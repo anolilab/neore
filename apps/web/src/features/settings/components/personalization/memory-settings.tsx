@@ -28,6 +28,7 @@ import { trackEvent } from "@/lib/analytics";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 import MemoryDigestCard from "./memory-digest-card";
+import MemoryExportButton from "./memory-export-button";
 import MemoryFileImport from "./memory-file-import";
 import MemoryImportDialog from "./memory-import-dialog";
 import MemoryItem from "./memory-item";
@@ -181,6 +182,8 @@ const MemorySettings: FC = () => {
                 <MemoryImportDialog memoryEnabled={memoryEnabled} onEnableMemory={handleEnableMemory} onImported={refresh} />
 
                 <MemoryFileImport memoryEnabled={memoryEnabled} onImported={refresh} />
+
+                <MemoryExportButton />
 
                 {memoryEnabled && (
                     <>

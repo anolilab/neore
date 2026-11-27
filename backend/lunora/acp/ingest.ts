@@ -48,6 +48,7 @@ import { rememberOpenedRunner } from "./lib/project-runner";
 import { reapExpiredHostStreams } from "./lib/reap";
 import { markReattachFailed, nativeIdFits, reattachFailureOf } from "./lib/reattach";
 import { sessionOfThread, touchSession } from "./lib/sessions";
+import { recordFirstSignedUse } from "../devices/lib/state";
 import { verifyDeviceRequest } from "./lib/verify-device";
 import type { vAgentUsage } from "./validators";
 import { vHostEvent } from "./validators";
@@ -536,6 +537,9 @@ export const applyHostEvents = internalMutation
         }
 
         const { now } = ctx;
+
+        // The post is signed (`verifyHostPost`), so its computer holds the secret: a device that never sent a heartbeat counts as signed in.
+        await recordFirstSignedUse(ctx, device, now);
 
         if (args.close === true) {
             return args.threadId === undefined && args.events.length === 0 ? await closeSession(ctx, device, args.sessionId, now) : REFUSED;

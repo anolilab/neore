@@ -33,7 +33,7 @@ msgstr "-- 挿入 --"
 msgid "-- NORMAL --"
 msgstr "-- ノーマル --"
 
-#: src/features/notifications/components/notification-list.tsx:115
+#: src/features/notifications/components/notification-list.tsx:117
 msgid ", unread"
 msgstr "、未読"
 
@@ -693,7 +693,7 @@ msgid "{0} lines"
 msgstr "{0} 行"
 
 #. placeholder {0}: stats.total
-#: src/features/settings/components/personalization/memory-settings.tsx:192
+#: src/features/settings/components/personalization/memory-settings.tsx:195
 msgid "{0} memories"
 msgstr "{0} 件のメモリ"
 
@@ -783,7 +783,7 @@ msgid "{0} on {1}, in {2}"
 msgstr "{2} の {1} 上の {0}"
 
 #. placeholder {0}: stats.pinned
-#: src/features/settings/components/personalization/memory-settings.tsx:193
+#: src/features/settings/components/personalization/memory-settings.tsx:196
 msgid "{0} pinned"
 msgstr "ピン留め {0} 件"
 
@@ -2153,6 +2153,10 @@ msgstr "ある時刻になったとき"
 msgid "A new chat opens with the selected messages quoted. Review it, then send."
 msgstr "選択したメッセージを引用した新しいチャットが開きます。確認してから送信してください。"
 
+#: src/features/notifications/lib/notification-labels.ts:56
+msgid "A new device signed in"
+msgstr "新しいデバイスがサインインしました"
+
 #: src/features/coding-agents/components/setup-fix-dialog.tsx:92
 msgid "A new run on the same repository and branch will fix the cause in the repository and run the step again. Read and edit its task before you start it."
 msgstr "同じリポジトリとブランチで新しい実行を始めると、リポジトリ内の原因を修正し、そのステップをもう一度実行します。開始する前にタスクを確認して編集できます。"
@@ -2201,7 +2205,7 @@ msgstr "1 つのプロジェクトに入れられるルールファイルは最�
 msgid "A public http or https address. The first check only records how the page looks. Only the first 1 MiB of a page is read."
 msgstr "公開されている http または https のアドレス。最初のチェックではページの見た目を記録するだけです。ページの先頭 1 MiB のみが読み取られます。"
 
-#: src/features/notifications/lib/notification-labels.ts:40
+#: src/features/notifications/lib/notification-labels.ts:41
 msgid "A question is waiting for you"
 msgstr "回答待ちの質問があります"
 
@@ -2275,7 +2279,7 @@ msgstr "あくまで提案です。同意する場合は、{hostLabel} で自分
 msgid "A tag, #id, .class, tag.class or tag#id. Leave it empty to watch the whole page."
 msgstr "タグ、#id、.class、tag.class、または tag#id。空のままにするとページ全体を監視します。"
 
-#: src/features/notifications/lib/notification-labels.ts:70
+#: src/features/notifications/lib/notification-labels.ts:74
 msgid "A task is stuck"
 msgstr "タスクが停止しています"
 
@@ -2291,7 +2295,7 @@ msgstr "スレッドに返信があったとき"
 msgid "a tool"
 msgstr "ツール"
 
-#: src/features/notifications/lib/notification-labels.ts:73
+#: src/features/notifications/lib/notification-labels.ts:77
 msgid "A tool call needs your approval"
 msgstr "ツールの呼び出しに承認が必要です"
 
@@ -2312,7 +2316,7 @@ msgstr "入力したツールが追加されていません。先に追加する
 msgid "A unique webhook URL and secret will be generated when you create this trigger. Use the URL as the target for external services (Zapier, n8n, your own code, etc.)."
 msgstr "このトリガーを作成すると、固有の Webhook URL とシークレットが生成されます。この URL を外部サービス（Zapier、n8n、独自のコードなど）の送信先として使用してください。"
 
-#: src/features/notifications/lib/notification-labels.ts:79
+#: src/features/notifications/lib/notification-labels.ts:83
 msgid "A usage alert was triggered"
 msgstr "使用量アラートが発生したとき"
 
@@ -2384,11 +2388,11 @@ msgstr "アクセントカラーを更新しました"
 
 #: src/features/auth/components/organization/accept-invitation-card.tsx:192
 #: src/features/auth/components/organization/user-invitations-card.tsx:116
-#: src/features/tasks/components/task-suggestions.tsx:248
+#: src/features/tasks/components/task-suggestions.tsx:297
 msgid "Accept"
 msgstr "承諾"
 
-#: src/features/tasks/components/task-suggestions.tsx:241
+#: src/features/tasks/components/task-suggestions.tsx:290
 msgid "Accept \"{title}\""
 msgstr "「{title}」を承諾"
 
@@ -2604,7 +2608,7 @@ msgstr "メモを追加..."
 msgid "Add a note…"
 msgstr "メモを追加…"
 
-#: src/features/devices/components/devices-settings.tsx:532
+#: src/features/devices/components/devices-settings.tsx:535
 msgid "Add a server over SSH"
 msgstr "SSH でサーバーを追加"
 
@@ -2773,12 +2777,12 @@ msgstr "選択したフレームを画像ノードとして追加"
 
 #: src/features/chat/thread-list/thread-list-header.tsx:126
 #: src/features/chat/thread-list/thread-list-header.tsx:136
-#: src/features/projects/components/add-project-dialog.tsx:691
+#: src/features/projects/components/add-project-dialog.tsx:695
 msgid "Add project"
 msgstr "プロジェクトを追加"
 
 #. placeholder {0}: rowName(machine)
-#: src/features/projects/components/add-project-dialog.tsx:514
+#: src/features/projects/components/add-project-dialog.tsx:518
 msgid "Add project on {0}"
 msgstr "{0} 上にプロジェクトを追加"
 
@@ -2967,11 +2971,11 @@ msgstr "追加："
 msgid "Adding documents… {0} of {1}"
 msgstr "ドキュメントを追加中… {0} / {1}"
 
-#: src/features/projects/components/add-project-dialog.tsx:525
+#: src/features/projects/components/add-project-dialog.tsx:529
 msgid "Adding the project…"
 msgstr "プロジェクトを追加しています…"
 
-#: src/features/devices/components/devices-settings.tsx:514
+#: src/features/devices/components/devices-settings.tsx:515
 msgid "Adding the server was cancelled on this computer."
 msgstr "このコンピュータでサーバーの追加がキャンセルされました。"
 
@@ -2980,11 +2984,11 @@ msgid "Adding your earlier replies…"
 msgstr "以前の返信を追加しています…"
 
 #: src/features/chat/aside/aside-panel.tsx:168
-#: src/features/projects/components/add-project-dialog.tsx:691
+#: src/features/projects/components/add-project-dialog.tsx:695
 msgid "Adding…"
 msgstr "追加中…"
 
-#: src/features/devices/components/devices-settings.tsx:545
+#: src/features/devices/components/devices-settings.tsx:548
 msgid "Address"
 msgstr "アドレス"
 
@@ -3520,7 +3524,7 @@ msgid "All"
 msgstr "すべて"
 
 #. placeholder {0}: memories.length
-#: src/features/settings/components/personalization/memory-settings.tsx:214
+#: src/features/settings/components/personalization/memory-settings.tsx:217
 msgid "All ({0})"
 msgstr "すべて（{0}）"
 
@@ -5070,7 +5074,7 @@ msgstr "Azure ポータル → OpenAI リソース → キーとエンドポイ�
 #: src/features/code/components/code-shell.tsx:162
 #: src/features/onboarding/components/onboarding-dialog.tsx:394
 #: src/features/pages/components/page-version-panel.tsx:89
-#: src/features/projects/components/add-project-dialog.tsx:688
+#: src/features/projects/components/add-project-dialog.tsx:692
 #: src/features/settings/components/personalization/memory-import-dialog.tsx:309
 msgid "Back"
 msgstr "戻る"
@@ -5732,8 +5736,8 @@ msgid "Browse, fork, and remix workflows shared by the community"
 msgstr "コミュニティが共有したワークフローを閲覧、フォーク、リミックス"
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:824
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1038
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1267
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1035
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1264
 msgid "Browser"
 msgstr "ブラウザー"
 
@@ -6152,7 +6156,7 @@ msgstr "カナダ"
 #: src/features/local-models/components/ollama-model-manager.tsx:300
 #: src/features/pages/components/page-agent-dialog.tsx:148
 #: src/features/pages/components/page-comments-panel.tsx:87
-#: src/features/projects/components/add-project-dialog.tsx:682
+#: src/features/projects/components/add-project-dialog.tsx:686
 #: src/features/projects/components/computer-rule-file-import.tsx:613
 #: src/features/projects/components/move-to-project-dialog.tsx:95
 #: src/features/projects/components/project-form-dialog.tsx:474
@@ -6172,7 +6176,7 @@ msgstr "カナダ"
 #: src/features/settings/components/chat/usage-settings.tsx:581
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:416
 #: src/features/settings/components/personalization/memory-item.tsx:351
-#: src/features/settings/components/personalization/memory-settings.tsx:263
+#: src/features/settings/components/personalization/memory-settings.tsx:266
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:381
 #: src/features/settings/connectors/messenger/messenger-setup-dialog.tsx:156
 #: src/features/skills/components/bundle-export-dialog.tsx:219
@@ -6235,7 +6239,7 @@ msgstr "選択をキャンセル"
 msgid "Cancelled"
 msgstr "キャンセル済み"
 
-#: src/features/projects/components/add-project-dialog.tsx:148
+#: src/features/projects/components/add-project-dialog.tsx:149
 msgid "Cancelled on this computer."
 msgstr "このコンピューターでキャンセルされました。"
 
@@ -6580,11 +6584,11 @@ msgstr "チャットの完了"
 msgid "Chat Import"
 msgstr "チャットのインポート"
 
-#: src/features/notifications/lib/notification-labels.ts:43
+#: src/features/notifications/lib/notification-labels.ts:44
 msgid "Chat import failed"
 msgstr "チャットのインポートに失敗しました"
 
-#: src/features/notifications/lib/notification-labels.ts:43
+#: src/features/notifications/lib/notification-labels.ts:44
 msgid "Chat import finished"
 msgstr "チャットのインポートが完了しました"
 
@@ -6908,7 +6912,7 @@ msgstr "検索モードを選択"
 msgid "Choose the camera system for your shot"
 msgstr "撮影に使うカメラシステムを選択します"
 
-#: src/features/projects/components/add-project-dialog.tsx:517
+#: src/features/projects/components/add-project-dialog.tsx:521
 msgid "Choose the project's folder, or type a path."
 msgstr "プロジェクトのフォルダーを選択するか、パスを入力してください。"
 
@@ -7085,11 +7089,11 @@ msgstr "すべてクリア"
 msgid "Clear All"
 msgstr "すべてクリア"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:253
+#: src/features/settings/components/personalization/memory-settings.tsx:256
 msgid "Clear All Memories"
 msgstr "すべてのメモリを消去"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:257
+#: src/features/settings/components/personalization/memory-settings.tsx:260
 msgid "Clear all memories?"
 msgstr "すべてのメモリを消去しますか？"
 
@@ -7140,7 +7144,7 @@ msgstr "タグフィルターをクリア"
 msgid "Clear the queue"
 msgstr "キューをクリア"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:139
+#: src/features/settings/components/personalization/memory-settings.tsx:140
 msgid "Cleared {count} memories"
 msgstr "{count} 件のメモリを消去しました"
 
@@ -7226,7 +7230,7 @@ msgstr "クリップボード"
 msgid "clock"
 msgstr "時計"
 
-#: src/features/projects/components/add-project-dialog.tsx:679
+#: src/features/projects/components/add-project-dialog.tsx:683
 msgid "Clone or create new…"
 msgstr "クローンまたは新規作成…"
 
@@ -7448,11 +7452,11 @@ msgstr "コーディングエージェントのログ"
 msgid "Coding Agent Pull Requests"
 msgstr "コーディングエージェントのプルリクエスト"
 
-#: src/features/notifications/lib/notification-labels.ts:46
+#: src/features/notifications/lib/notification-labels.ts:47
 msgid "Coding agent run failed"
 msgstr "コーディングエージェントの実行に失敗しました"
 
-#: src/features/notifications/lib/notification-labels.ts:46
+#: src/features/notifications/lib/notification-labels.ts:47
 msgid "Coding agent run finished"
 msgstr "コーディングエージェントの実行が完了しました"
 
@@ -8171,7 +8175,7 @@ msgstr "音声/ファイルノードを入力として接続してください"
 msgid "Connect an image node as input"
 msgstr "画像ノードを入力として接続してください"
 
-#: src/features/devices/components/devices-settings.tsx:563
+#: src/features/devices/components/devices-settings.tsx:566
 msgid "Connect and add"
 msgstr "接続して追加"
 
@@ -8244,7 +8248,7 @@ msgstr "最新の状態に保つには、ホストに接続してください。
 msgid "Connect third-party services to extend AI capabilities with your data and tools."
 msgstr "サードパーティのサービスを接続して、あなたのデータやツールで AI の機能を拡張します。"
 
-#: src/features/projects/components/add-project-dialog.tsx:164
+#: src/features/projects/components/add-project-dialog.tsx:165
 msgid "Connect this server first."
 msgstr "先にこのサーバーに接続してください。"
 
@@ -8280,7 +8284,7 @@ msgstr "メッセンジャープラットフォームを接続すると、Telegr
 msgid "Connect your own Telegram, WhatsApp, Slack or Discord bot to Neore and message your agent from the app you already use."
 msgstr "お持ちの Telegram、WhatsApp、Slack、Discord のボットを Neore に接続すると、普段使っているアプリからエージェントにメッセージを送れます。"
 
-#: src/features/projects/components/add-project-dialog.tsx:181
+#: src/features/projects/components/add-project-dialog.tsx:182
 #: src/features/settings/components/chat/mcp/status-indicator.tsx:24
 #: src/features/settings/connectors/connector-card.tsx:74
 #: src/features/settings/connectors/messenger/messenger-platform-card.tsx:172
@@ -8319,7 +8323,7 @@ msgstr "{0} に接続済み"
 msgid "Connected. You can close this window."
 msgstr "接続しました。このウィンドウは閉じてかまいません。"
 
-#: src/features/projects/components/add-project-dialog.tsx:522
+#: src/features/projects/components/add-project-dialog.tsx:526
 msgid "Connecting {pairingHost}…"
 msgstr "{pairingHost} に接続しています…"
 
@@ -8611,11 +8615,11 @@ msgstr "絞り設定で被写界深度を調整します"
 msgid "Control how your personal information is displayed in the UI."
 msgstr "UI での個人情報の表示方法を管理します。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:507
+#: src/features/chat/browser-live-view/browser-live-view.tsx:504
 msgid "Control of the browser is back with the agent: the server did not confirm in time that you still have it."
 msgstr "ブラウザーの操作はエージェントに戻りました。まだ操作権があることをサーバーが時間内に確認できませんでした。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:508
+#: src/features/chat/browser-live-view/browser-live-view.tsx:505
 msgid "Control of the browser is back with the agent."
 msgstr "ブラウザーの操作はエージェントに戻りました。"
 
@@ -8981,7 +8985,7 @@ msgstr "Gemini 2.5 の最下位ティアで信頼性の高い Google AI を必�
 msgid "Costa Rica"
 msgstr "コスタリカ"
 
-#: src/features/devices/components/devices-settings.tsx:524
+#: src/features/devices/components/devices-settings.tsx:527
 msgid "Could not add the server."
 msgstr "サーバーを追加できませんでした。"
 
@@ -9300,7 +9304,7 @@ msgstr "ページとして開けませんでした"
 msgid "Could not open the pull request."
 msgstr "プルリクエストを作成できませんでした。"
 
-#: src/features/devices/components/devices-settings.tsx:628
+#: src/features/devices/components/devices-settings.tsx:634
 msgid "Could not pair this computer. Try again."
 msgstr "このコンピューターをペアリングできませんでした。もう一度お試しください。"
 
@@ -9846,7 +9850,7 @@ msgid "Created"
 msgstr "作成日"
 
 #. placeholder {0}: created.value.path
-#: src/features/projects/components/add-project-dialog.tsx:246
+#: src/features/projects/components/add-project-dialog.tsx:247
 msgid "Created {0}"
 msgstr "{0} を作成しました"
 
@@ -10295,7 +10299,7 @@ msgstr "データアクセスの概要"
 msgid "Data Export"
 msgstr "データのエクスポート"
 
-#: src/features/notifications/lib/notification-labels.ts:52
+#: src/features/notifications/lib/notification-labels.ts:53
 msgid "Data export failed"
 msgstr "データのエクスポートに失敗しました"
 
@@ -10738,7 +10742,7 @@ msgstr "アカウントを削除"
 msgid "Delete alert \"{ruleName}\""
 msgstr "アラート「{ruleName}」を削除"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:264
+#: src/features/settings/components/personalization/memory-settings.tsx:267
 msgid "Delete All"
 msgstr "すべて削除"
 
@@ -11332,7 +11336,7 @@ msgstr "オープンソースモデルで強力なコーディング能力と汎
 msgid "Development"
 msgstr "開発"
 
-#: src/features/devices/components/devices-settings.tsx:707
+#: src/features/devices/components/devices-settings.tsx:713
 msgid "Device activity"
 msgstr "デバイスのアクティビティ"
 
@@ -11344,7 +11348,7 @@ msgstr "デバイス名"
 msgid "Device removed"
 msgstr "デバイスを削除しました"
 
-#: src/features/devices/components/devices-settings.tsx:640
+#: src/features/devices/components/devices-settings.tsx:646
 #: src/features/layout/lib/dashboard-page-names.ts:23
 msgid "Devices"
 msgstr "デバイス"
@@ -11502,12 +11506,12 @@ msgstr "Discord 公開鍵"
 #: src/features/chat/thread/composer-long-text-prompt.tsx:71
 #: src/features/develop/components/guide-view.tsx:141
 #: src/features/devices/components/devices-settings.tsx:389
-#: src/features/tasks/components/task-suggestions.tsx:237
+#: src/features/tasks/components/task-suggestions.tsx:286
 #: src/features/workflow/components/nodes/file-node.tsx:231
 msgid "Dismiss"
 msgstr "閉じる"
 
-#: src/features/tasks/components/task-suggestions.tsx:224
+#: src/features/tasks/components/task-suggestions.tsx:273
 msgid "Dismiss \"{title}\""
 msgstr "「{title}」を閉じる"
 
@@ -11808,6 +11812,10 @@ msgstr "JSON をダウンロード"
 #: src/features/chat/header/thread-download-button.tsx:118
 msgid "Download Markdown"
 msgstr "Markdown をダウンロード"
+
+#: src/features/settings/components/personalization/memory-export-button.tsx:93
+msgid "Download memories (Markdown)"
+msgstr "メモリをダウンロード（Markdown）"
 
 #: src/features/download/components/download-page.tsx:68
 msgid "Download Neore for desktop"
@@ -12698,7 +12706,7 @@ msgstr "フォローアップの提案を有効化"
 msgid "Enable for Next Chat"
 msgstr "次のチャットで有効化"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:173
+#: src/features/settings/components/personalization/memory-settings.tsx:174
 msgid "Enable memory"
 msgstr "メモリを有効化"
 
@@ -13284,11 +13292,11 @@ msgstr "エストニア語（エストニア）"
 msgid "European Union"
 msgstr "欧州連合"
 
-#: src/features/notifications/lib/notification-labels.ts:55
+#: src/features/notifications/lib/notification-labels.ts:59
 msgid "Eval run failed"
 msgstr "評価の実行に失敗しました"
 
-#: src/features/notifications/lib/notification-labels.ts:55
+#: src/features/notifications/lib/notification-labels.ts:59
 msgid "Eval run finished"
 msgstr "評価の実行が完了しました"
 
@@ -14010,7 +14018,7 @@ msgstr "タグの色を変更できませんでした"
 msgid "Failed to clear filter rules"
 msgstr "フィルタールールをクリアできませんでした"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:135
+#: src/features/settings/components/personalization/memory-settings.tsx:136
 msgid "Failed to clear memories"
 msgstr "メモリを消去できませんでした"
 
@@ -14071,7 +14079,7 @@ msgstr "プリセットを作成できませんでした"
 msgid "Failed to create tag"
 msgstr "タグを作成できませんでした"
 
-#: src/features/tasks/components/task-suggestions.tsx:244
+#: src/features/tasks/components/task-suggestions.tsx:293
 msgid "Failed to create the task"
 msgstr "タスクを作成できませんでした"
 
@@ -14107,7 +14115,7 @@ msgstr "ファイルを削除できませんでした。もう一度お試しく
 msgid "Failed to delete files"
 msgstr "ファイルを削除できませんでした"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:107
+#: src/features/settings/components/personalization/memory-settings.tsx:108
 msgid "Failed to delete memory"
 msgstr "メモリを削除できませんでした"
 
@@ -14195,7 +14203,7 @@ msgstr "コネクタを切断できませんでした"
 msgid "Failed to dismiss the digest"
 msgstr "ダイジェストを閉じられませんでした"
 
-#: src/features/tasks/components/task-suggestions.tsx:231
+#: src/features/tasks/components/task-suggestions.tsx:280
 msgid "Failed to dismiss the suggestion"
 msgstr "提案を閉じられませんでした"
 
@@ -14304,7 +14312,7 @@ msgstr "スキルを読み込めませんでした"
 msgid "Failed to load spreadsheet"
 msgstr "スプレッドシートを読み込めませんでした"
 
-#: src/features/tasks/components/task-suggestions.tsx:153
+#: src/features/tasks/components/task-suggestions.tsx:186
 msgid "Failed to load the suggested tasks"
 msgstr "提案されたタスクを読み込めませんでした"
 
@@ -14636,8 +14644,8 @@ msgstr "キーボードショートカットを更新できませんでした"
 msgid "Failed to update MCP server"
 msgstr "MCP サーバーを更新できませんでした"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:118
-#: src/features/settings/components/personalization/memory-settings.tsx:126
+#: src/features/settings/components/personalization/memory-settings.tsx:119
+#: src/features/settings/components/personalization/memory-settings.tsx:127
 msgid "Failed to update memory"
 msgstr "メモリを更新できませんでした"
 
@@ -14665,7 +14673,7 @@ msgstr "プルリクエストの設定を更新できませんでした"
 msgid "Failed to update reply tools"
 msgstr "返信ツールを更新できませんでした"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:150
+#: src/features/settings/components/personalization/memory-settings.tsx:151
 #: src/features/settings/components/personalization/schedule-ideas-switch.tsx:41
 msgid "Failed to update setting"
 msgstr "設定を更新できませんでした"
@@ -15364,7 +15372,7 @@ msgstr "種類で絞り込み"
 msgid "Filter condition"
 msgstr "フィルター条件"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:200
+#: src/features/settings/components/personalization/memory-settings.tsx:203
 msgid "Filter memories by type"
 msgstr "種類でメモリを絞り込み"
 
@@ -15601,11 +15609,11 @@ msgstr "チャットにフォーカス: {title}"
 msgid "Focus Search"
 msgstr "検索にフォーカス"
 
-#: src/features/projects/components/add-project-dialog.tsx:604
+#: src/features/projects/components/add-project-dialog.tsx:608
 msgid "Folder path"
 msgstr "フォルダーのパス"
 
-#: src/features/projects/components/add-project-dialog.tsx:623
+#: src/features/projects/components/add-project-dialog.tsx:627
 msgid "Folders"
 msgstr "フォルダー"
 
@@ -16525,7 +16533,7 @@ msgstr "このページへのアクセス権を付与するか、読み取り専
 msgid "Global analyst research, market analysis, and investment data"
 msgstr "グローバルなアナリストリサーチ、市場分析、投資データ"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1138
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1135
 msgid "Go"
 msgstr "移動"
 
@@ -16639,7 +16647,7 @@ msgstr "ボールトへ移動"
 msgid "Go to your pages"
 msgstr "ページ一覧へ移動"
 
-#: src/features/projects/components/add-project-dialog.tsx:627
+#: src/features/projects/components/add-project-dialog.tsx:631
 msgid "Go up to {parent}"
 msgstr "{parent} へ上る"
 
@@ -17109,7 +17117,7 @@ msgstr "H"
 msgid "Hand (pan)"
 msgstr "ハンド（パン）"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1061
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1058
 msgid "Hand back"
 msgstr "操作を返す"
 
@@ -17268,7 +17276,7 @@ msgstr "列を非表示"
 msgid "Hide follow-up suggestions"
 msgstr "フォローアップの提案を非表示"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1056
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1053
 msgid "Hide live view"
 msgstr "ライブビューを隠す"
 
@@ -17740,7 +17748,7 @@ msgstr "シンプルな分類や抽出に最適"
 msgid "Ideas"
 msgstr "アイデア"
 
-#: src/features/tasks/components/task-suggestions.tsx:139
+#: src/features/tasks/components/task-suggestions.tsx:172
 msgid "Ideas from your own recent messages. Nothing is created until you accept one."
 msgstr "あなた自身の最近のメッセージから得たアイデアです。承諾するまで何も作成されません。"
 
@@ -19081,7 +19089,7 @@ msgstr "自分のものとして保持"
 msgid "Keep chats with an open pull request"
 msgstr "オープンなプルリクエストがあるチャットを保持する"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1081
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1078
 msgid "Keep control"
 msgstr "操作を続ける"
 
@@ -19129,7 +19137,7 @@ msgstr "ケニア"
 msgid "Kept as yours"
 msgstr "自分のものとして保持しました"
 
-#: src/features/devices/components/devices-settings.tsx:557
+#: src/features/devices/components/devices-settings.tsx:560
 msgid "Key file (optional, absolute path)"
 msgstr "キーファイル（任意、絶対パス）"
 
@@ -19780,11 +19788,11 @@ msgstr "クイックチェックで低リスクの呼び出しを承認する"
 msgid "Let replies use tools"
 msgstr "返信でツールを使う"
 
-#: src/features/devices/components/devices-settings.tsx:638
+#: src/features/devices/components/devices-settings.tsx:644
 msgid "Let the agent use files, a terminal and local MCP servers on your own computer through the Neore desktop app. Every action asks you on that computer first, and nothing runs from shared chats or background tasks."
 msgstr "Neore デスクトップアプリを通じて、エージェントがあなたのコンピューター上のファイル、ターミナル、ローカル MCP サーバーを使えるようにします。すべての操作はまずそのコンピューターで確認を求め、共有チャットやバックグラウンドタスクからは何も実行されません。"
 
-#: src/features/devices/components/devices-settings.tsx:698
+#: src/features/devices/components/devices-settings.tsx:704
 msgid "Let the agent work on a server you reach over SSH, with your own SSH client and keys. Neore asks you to trust the server's key the first time, and every action asks you on this computer before it is sent. The server holds no secret of yours."
 msgstr "ご自身の SSH クライアントとキーで接続できるサーバー上で、エージェントに作業させます。Neore は初回にサーバーのキーを信頼するかどうかを確認し、すべての操作は送信前にこのコンピュータで確認されます。サーバーにはお客様のシークレットは保存されません。"
 
@@ -20057,11 +20065,11 @@ msgstr "ライブプレビュー — コンポーネントのストリーミン�
 msgid "Live preview — updating as the artifact streams"
 msgstr "ライブプレビュー — アーティファクトのストリーミングに合わせて更新中"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1172
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1169
 msgid "Live view of the agent's browser (read-only)"
 msgstr "エージェントのブラウザーのライブビュー（閲覧のみ）"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1172
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1169
 msgid "Live view of the agent's browser (you have control)"
 msgstr "エージェントのブラウザーのライブビュー（操作中）"
 
@@ -20210,7 +20218,7 @@ msgstr "ファイルを読み込み中"
 msgid "Loading files…"
 msgstr "ファイルを読み込み中…"
 
-#: src/features/projects/components/add-project-dialog.tsx:523
+#: src/features/projects/components/add-project-dialog.tsx:527
 msgid "Loading folders…"
 msgstr "フォルダーを読み込んでいます…"
 
@@ -20659,7 +20667,7 @@ msgstr "プルリクエスト {address} で変更をリクエストしたレビ�
 msgid "Looking for instruction files..."
 msgstr "指示ファイルを探しています..."
 
-#: src/features/projects/components/add-project-dialog.tsx:538
+#: src/features/projects/components/add-project-dialog.tsx:542
 msgid "Looking for machines…"
 msgstr "コンピューターを検索しています…"
 
@@ -20767,7 +20775,7 @@ msgstr "Mach-O バイナリ"
 msgid "Machine"
 msgstr "コンピューター"
 
-#: src/features/projects/components/add-project-dialog.tsx:542
+#: src/features/projects/components/add-project-dialog.tsx:546
 msgid "Machines"
 msgstr "コンピューター"
 
@@ -21304,7 +21312,7 @@ msgid "memories"
 msgstr "メモリ"
 
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:31
-#: src/features/settings/components/personalization/memory-settings.tsx:226
+#: src/features/settings/components/personalization/memory-settings.tsx:229
 msgid "Memories"
 msgstr "メモリ"
 
@@ -21322,7 +21330,7 @@ msgid "Memories used for this reply ({0})"
 msgstr "この返信で使用したメモリ（{0}）"
 
 #: src/features/marketing/use-cases/use-case-data.ts:114
-#: src/features/settings/components/personalization/memory-settings.tsx:166
+#: src/features/settings/components/personalization/memory-settings.tsx:167
 #: src/features/settings/lib/settings-keywords.ts:96
 msgid "Memory"
 msgstr "メモリ"
@@ -21331,15 +21339,15 @@ msgstr "メモリ"
 msgid "Memory — what the agent keeps across chats"
 msgstr "メモリ — エージェントがチャットをまたいで保持する内容"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:111
+#: src/features/settings/components/personalization/memory-settings.tsx:112
 msgid "Memory deleted"
 msgstr "メモリを削除しました"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:148
+#: src/features/settings/components/personalization/memory-settings.tsx:149
 msgid "Memory disabled"
 msgstr "メモリを無効にしました"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:148
+#: src/features/settings/components/personalization/memory-settings.tsx:149
 msgid "Memory enabled"
 msgstr "メモリを有効にしました"
 
@@ -22396,11 +22404,11 @@ msgstr "スレッドをミュート"
 msgid "my data"
 msgstr "自分のデータ"
 
-#: src/features/devices/components/devices-settings.tsx:602
+#: src/features/devices/components/devices-settings.tsx:606
 msgid "My Linux computer"
 msgstr "マイ Linux コンピューター"
 
-#: src/features/devices/components/devices-settings.tsx:602
+#: src/features/devices/components/devices-settings.tsx:606
 msgid "My Mac"
 msgstr "マイ Mac"
 
@@ -22412,7 +22420,7 @@ msgstr "マイ MCP サーバー"
 msgid "My skills"
 msgstr "マイスキル"
 
-#: src/features/devices/components/devices-settings.tsx:602
+#: src/features/devices/components/devices-settings.tsx:606
 msgid "My Windows PC"
 msgstr "マイ Windows PC"
 
@@ -22438,7 +22446,7 @@ msgstr "名前"
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:478
 #: src/features/auth/components/settings/account/update-name-card.tsx:23
 #: src/features/auth/components/settings/api-key/create-api-key-dialog.tsx:117
-#: src/features/devices/components/devices-settings.tsx:541
+#: src/features/devices/components/devices-settings.tsx:544
 #: src/features/evals/components/dataset-form-dialog.tsx:81
 #: src/features/knowledge/components/collection-dialog.tsx:57
 #: src/features/projects/components/project-rule-files.tsx:262
@@ -23327,7 +23335,7 @@ msgstr "説明なし"
 msgid "No description provided."
 msgstr "説明はありません。"
 
-#: src/features/devices/components/devices-settings.tsx:692
+#: src/features/devices/components/devices-settings.tsx:698
 msgid "No devices paired."
 msgstr "ペアリングされたデバイスはありません。"
 
@@ -23389,7 +23397,7 @@ msgstr "ナレッジベースにはまだファイルがありません。上か
 msgid "No focal length selected"
 msgstr "焦点距離が選択されていません"
 
-#: src/features/projects/components/add-project-dialog.tsx:659
+#: src/features/projects/components/add-project-dialog.tsx:663
 msgid "No folders in here."
 msgstr "ここにフォルダーはありません。"
 
@@ -23428,7 +23436,7 @@ msgstr "画像はまだありません"
 msgid "No indexed files available. Files are still being processed."
 msgstr "インデックス済みのファイルはありません。ファイルはまだ処理中です。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1078
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1075
 msgid "No input for a while: control goes back to the agent in under a minute."
 msgstr "しばらく入力がありません。1 分以内に操作がエージェントに戻ります。"
 
@@ -23480,11 +23488,11 @@ msgstr "MCP サーバーが設定されていません。サーバーを追加�
 msgid "No members in this team yet"
 msgstr "このチームにはまだメンバーがいません"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:242
+#: src/features/settings/components/personalization/memory-settings.tsx:245
 msgid "No memories of this type."
 msgstr "この種類のメモリはありません。"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:243
+#: src/features/settings/components/personalization/memory-settings.tsx:246
 msgid "No memories yet. The AI will start learning from your conversations automatically."
 msgstr "メモリはまだありません。AI は会話から自動的に学習を始めます。"
 
@@ -24127,7 +24135,7 @@ msgstr "対応待ちのものはありません。"
 msgid "Nothing to stop: that run had already ended."
 msgstr "停止するものはありません。その実行はすでに終了しています。"
 
-#: src/features/notifications/lib/notification-labels.ts:82
+#: src/features/notifications/lib/notification-labels.ts:86
 msgid "Notification"
 msgstr "通知"
 
@@ -24824,7 +24832,7 @@ msgstr "モデルピッカーを開く"
 msgid "Open Model Picker"
 msgstr "モデルピッカーを開く"
 
-#: src/features/devices/components/devices-settings.tsx:644
+#: src/features/devices/components/devices-settings.tsx:650
 msgid "Open Neore in the desktop app to pair this computer. Devices you paired before are listed below."
 msgstr "このコンピューターをペアリングするには、デスクトップアプリで Neore を開いてください。これまでにペアリングしたデバイスは下に表示されます。"
 
@@ -25279,11 +25287,11 @@ msgstr "プルリクエストを作成しています…"
 msgid "Opening the assistant without a conversation takes you to your most recent one instead of a blank chat."
 msgstr "会話なしでアシスタントを開くと、空のチャットではなく最新の会話に移動します。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1089
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1086
 msgid "Opening the live view…"
 msgstr "ライブビューを開いています…"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1144
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1141
 msgid "Opening the page. This can take up to a minute."
 msgstr "ページを開いています。最大 1 分ほどかかることがあります。"
 
@@ -25731,7 +25739,7 @@ msgstr "{currentPage} / {totalPages} ページ"
 msgid "Page added. It is being fetched and indexed."
 msgstr "ページを追加しました。取得とインデックス作成を行っています。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1123
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1120
 #: src/features/settings/components/chat/event-trigger-fields.tsx:217
 msgid "Page address"
 msgstr "ページのアドレス"
@@ -25802,7 +25810,7 @@ msgstr "設定でペアリングしてください"
 msgid "Pair the desktop app in Settings → Devices to import from a computer."
 msgstr "コンピューターからインポートするには、設定 → デバイスでデスクトップアプリをペアリングしてください。"
 
-#: src/features/projects/components/add-project-dialog.tsx:208
+#: src/features/projects/components/add-project-dialog.tsx:209
 msgid "Pair this computer with your account first (Settings → Devices)."
 msgstr "先にこのコンピューターをアカウントにペアリングしてください（設定 → デバイス）。"
 
@@ -25814,7 +25822,7 @@ msgstr "このコンピューターをペアリングしますか？"
 msgid "Paired"
 msgstr "ペアリング済み"
 
-#: src/features/devices/components/devices-settings.tsx:677
+#: src/features/devices/components/devices-settings.tsx:683
 msgid "Paired devices"
 msgstr "ペアリング済みのデバイス"
 
@@ -25822,7 +25830,7 @@ msgstr "ペアリング済みのデバイス"
 msgid "Pairing request"
 msgstr "ペアリングのリクエスト"
 
-#: src/features/devices/components/devices-settings.tsx:618
+#: src/features/devices/components/devices-settings.tsx:622
 msgid "Pairing was cancelled on this computer."
 msgstr "このコンピューターでペアリングがキャンセルされました。"
 
@@ -26364,7 +26372,7 @@ msgstr "受信トレイから 1 つ選ぶと、内容を読めます。"
 msgid "Pick skills, schedules, webhooks and group chats to share as one Markdown file. API keys, webhook secrets, connector tokens and other credentials are never included, and neither are your account or organization ids."
 msgstr "共有するスキル、スケジュール、Webhook、グループチャットを選んで、1 つの Markdown ファイルにまとめます。API キー、Webhook のシークレット、コネクタのトークンなどの認証情報は含まれません。アカウント ID や組織 ID も含まれません。"
 
-#: src/features/projects/components/add-project-dialog.tsx:517
+#: src/features/projects/components/add-project-dialog.tsx:521
 msgid "Pick the computer or server the project's folder is on."
 msgstr "プロジェクトのフォルダーがあるコンピューターまたはサーバーを選択してください。"
 
@@ -26649,7 +26657,7 @@ msgstr "洗練されたハリウッド調"
 msgid "Popular"
 msgstr "人気"
 
-#: src/features/devices/components/devices-settings.tsx:553
+#: src/features/devices/components/devices-settings.tsx:556
 msgid "Port"
 msgstr "ポート"
 
@@ -26861,6 +26869,11 @@ msgstr "リクエストを準備中…"
 msgid "Preparing the import…"
 msgstr "インポートを準備しています…"
 
+#: src/features/settings/components/personalization/memory-export-button.tsx:93
+#: src/features/settings/components/personalization/memory-export-button.tsx:96
+msgid "Preparing your memories…"
+msgstr "メモリを準備しています…"
+
 #: src/features/settings/components/privacy/data-export.tsx:158
 msgid "Preparing..."
 msgstr "準備しています..."
@@ -26934,7 +26947,7 @@ msgstr "Enter キーまたはスペースキーでノードを選択します。
 msgid "Press enter or space to select an edge. You can then press delete to remove it or escape to cancel."
 msgstr "Enter キーまたはスペースキーでエッジを選択します。その後、Delete キーで削除、Esc キーでキャンセルできます。"
 
-#: src/features/projects/components/add-project-dialog.tsx:620
+#: src/features/projects/components/add-project-dialog.tsx:624
 msgid "Press Enter to open the folder. A folder that does not exist is created."
 msgstr "Enter を押すとフォルダーを開きます。存在しないフォルダーは作成されます。"
 
@@ -29553,7 +29566,7 @@ msgstr "再試行"
 #: src/features/settings/components/chat/bot-tool-selection.tsx:495
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:493
 #: src/features/tasks/components/task-detail-dialog.tsx:108
-#: src/features/tasks/components/task-suggestions.tsx:161
+#: src/features/tasks/components/task-suggestions.tsx:194
 #: src/features/workflow/components/nodes/file-node.tsx:221
 #: src/lib/toast.ts:70
 #: src/lib/toast.ts:171
@@ -31351,7 +31364,7 @@ msgstr "セリフ"
 msgid "Served from cache"
 msgstr "キャッシュから提供"
 
-#: src/features/devices/components/devices-settings.tsx:521
+#: src/features/devices/components/devices-settings.tsx:524
 msgid "Server added. Choose which of its folders to share in the desktop app."
 msgstr "サーバーを追加しました。共有するフォルダはデスクトップアプリで選択してください。"
 
@@ -31395,7 +31408,7 @@ msgstr "ブランチ機能付きのサーバーレス Postgres データベー�
 msgid "servers"
 msgstr "サーバー"
 
-#: src/features/devices/components/devices-settings.tsx:700
+#: src/features/devices/components/devices-settings.tsx:706
 msgid "Servers over SSH"
 msgstr "SSH 経由のサーバー"
 
@@ -31574,7 +31587,7 @@ msgstr "共有"
 msgid "Shared conversation"
 msgstr "共有された会話"
 
-#: src/features/devices/components/devices-settings.tsx:672
+#: src/features/devices/components/devices-settings.tsx:678
 msgid "Shared folders and local servers…"
 msgstr "共有フォルダーとローカルサーバー…"
 
@@ -31686,7 +31699,7 @@ msgid "Show a message in the app when a chat waits for your answer or your appro
 msgstr "チャットがあなたの返答または承認を待っているときにアプリ内でメッセージを表示します。"
 
 #: src/features/skills/components/bundle-import-dialog.tsx:99
-#: src/features/tasks/components/task-suggestions.tsx:216
+#: src/features/tasks/components/task-suggestions.tsx:265
 msgid "Show all"
 msgstr "すべて表示"
 
@@ -31694,7 +31707,7 @@ msgstr "すべて表示"
 msgid "Show all {lines} lines"
 msgstr "{lines} 行すべてを表示"
 
-#: src/features/tasks/components/task-suggestions.tsx:206
+#: src/features/tasks/components/task-suggestions.tsx:255
 msgid "Show all instructions for \"{title}\""
 msgstr "「{title}」の指示をすべて表示"
 
@@ -31741,11 +31754,11 @@ msgstr "ラベルを表示"
 #: ../../packages/ui/src/components/chat-markdown.tsx:83
 #: src/features/chat/pins/pin-item.tsx:214
 #: src/features/skills/components/bundle-import-dialog.tsx:99
-#: src/features/tasks/components/task-suggestions.tsx:216
+#: src/features/tasks/components/task-suggestions.tsx:265
 msgid "Show less"
 msgstr "表示を減らす"
 
-#: src/features/tasks/components/task-suggestions.tsx:206
+#: src/features/tasks/components/task-suggestions.tsx:255
 msgid "Show less of the instructions for \"{title}\""
 msgstr "「{title}」の指示を折りたたむ"
 
@@ -31753,7 +31766,7 @@ msgstr "「{title}」の指示を折りたたむ"
 msgid "Show more"
 msgstr "さらに表示"
 
-#: src/features/projects/components/add-project-dialog.tsx:669
+#: src/features/projects/components/add-project-dialog.tsx:673
 msgid "Show more folders"
 msgstr "さらにフォルダーを表示"
 
@@ -32481,8 +32494,8 @@ msgid "Some steps had no pricing data; the total is a minimum."
 msgstr "一部のステップに料金データがありませんでした。合計は最小値です。"
 
 #: src/features/chat/browser-live-view/browser-human-check.tsx:435
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1042
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1101
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1039
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1098
 msgid "Someone else has control of this browser."
 msgstr "このブラウザーは別の人が操作しています。"
 
@@ -32832,16 +32845,16 @@ msgid "Sri Lanka"
 msgstr "スリランカ"
 
 #. placeholder {0}: row.name
-#: src/features/projects/components/add-project-dialog.tsx:185
+#: src/features/projects/components/add-project-dialog.tsx:186
 msgid "SSH · {0}"
 msgstr "SSH · {0}"
 
 #. placeholder {0}: row.name
-#: src/features/projects/components/add-project-dialog.tsx:188
+#: src/features/projects/components/add-project-dialog.tsx:189
 msgid "SSH · {0} · not connected yet"
 msgstr "SSH · {0} · まだ接続されていません"
 
-#: src/features/projects/components/add-project-dialog.tsx:581
+#: src/features/projects/components/add-project-dialog.tsx:585
 msgid "SSH hosts come from ~/.ssh/config. Picking one connects it."
 msgstr "SSH ホストは ~/.ssh/config から取得されます。選択すると接続されます。"
 
@@ -33761,11 +33774,11 @@ msgstr "サブエージェント"
 msgid "Sub-agent"
 msgstr "サブエージェント"
 
-#: src/features/notifications/lib/notification-labels.ts:64
+#: src/features/notifications/lib/notification-labels.ts:68
 msgid "Sub-agent failed"
 msgstr "サブエージェントが失敗しました"
 
-#: src/features/notifications/lib/notification-labels.ts:64
+#: src/features/notifications/lib/notification-labels.ts:68
 msgid "Sub-agent finished"
 msgstr "サブエージェントが完了しました"
 
@@ -33851,7 +33864,7 @@ msgstr "回答の候補"
 msgid "Suggested next prompt: {nextPromptSuggestion}. Press Tab to insert."
 msgstr "次のプロンプトの提案: {nextPromptSuggestion}。Tab キーで挿入します。"
 
-#: src/features/tasks/components/task-suggestions.tsx:137
+#: src/features/tasks/components/task-suggestions.tsx:170
 msgid "Suggested tasks"
 msgstr "提案されたタスク"
 
@@ -33859,11 +33872,11 @@ msgstr "提案されたタスク"
 msgid "Suggestion available, press Right Arrow to accept"
 msgstr "候補があります。右矢印キーで確定します"
 
-#: src/features/tasks/components/task-suggestions.tsx:230
+#: src/features/tasks/components/task-suggestions.tsx:279
 msgid "Suggestion dismissed: {title}"
 msgstr "提案を閉じました：{title}"
 
-#: src/features/tasks/components/task-suggestions.tsx:143
+#: src/features/tasks/components/task-suggestions.tsx:176
 msgid "Suggestion updates"
 msgstr "提案の更新"
 
@@ -34205,7 +34218,7 @@ msgid "Take an input image, remove the background, then apply style transfer"
 msgstr "入力画像の背景を削除し、スタイル転送を適用"
 
 #: src/features/chat/browser-live-view/browser-human-check.tsx:588
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1066
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1063
 msgid "Take control"
 msgstr "操作を代わる"
 
@@ -34221,7 +34234,7 @@ msgstr "操作を引き継いで確認を済ませたら、ブラウザーを返
 msgid "Take turns"
 msgstr "順番に回答"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:356
+#: src/features/chat/browser-live-view/browser-live-view.tsx:353
 msgid "Taking control is not available while impersonating."
 msgstr "なりすまし中はブラウザーを操作できません。"
 
@@ -34274,7 +34287,7 @@ msgstr "タスク"
 msgid "Task approved"
 msgstr "タスクを承認しました"
 
-#: src/features/tasks/components/task-suggestions.tsx:244
+#: src/features/tasks/components/task-suggestions.tsx:293
 msgid "Task created: {title}"
 msgstr "タスクを作成しました：{title}"
 
@@ -34294,11 +34307,11 @@ msgstr "タスクのメールをオフにしました"
 msgid "Task emails turned on"
 msgstr "タスクのメールをオンにしました"
 
-#: src/features/notifications/lib/notification-labels.ts:67
+#: src/features/notifications/lib/notification-labels.ts:71
 msgid "Task failed"
 msgstr "タスクが失敗しました"
 
-#: src/features/notifications/lib/notification-labels.ts:67
+#: src/features/notifications/lib/notification-labels.ts:71
 msgid "Task finished"
 msgstr "タスクが完了しました"
 
@@ -34810,7 +34823,7 @@ msgstr "うまくいきませんでした。もう一度お試しください。
 msgid "That did not work. Try again."
 msgstr "うまくいきませんでした。もう一度お試しください。"
 
-#: src/features/projects/components/add-project-dialog.tsx:152
+#: src/features/projects/components/add-project-dialog.tsx:153
 msgid "That folder is already shared with this server."
 msgstr "そのフォルダーは、このサーバーとすでに共有されています。"
 
@@ -34818,11 +34831,11 @@ msgstr "そのフォルダーは、このサーバーとすでに共有されて
 msgid "That folder is not offered for this repository on that computer."
 msgstr "そのフォルダは、そのコンピュータのこのリポジトリには提供されていません。"
 
-#: src/features/projects/components/add-project-dialog.tsx:156
+#: src/features/projects/components/add-project-dialog.tsx:157
 msgid "That folder is the server's home folder or a folder above it. Choose a folder inside it."
 msgstr "そのフォルダーは、サーバーのホームフォルダー、またはその上位のフォルダーです。その中のフォルダーを選択してください。"
 
-#: src/features/projects/components/add-project-dialog.tsx:136
+#: src/features/projects/components/add-project-dialog.tsx:137
 msgid "That folder was not found."
 msgstr "そのフォルダーは見つかりませんでした。"
 
@@ -34866,12 +34879,12 @@ msgid "That message was already sent."
 msgstr "そのメッセージはすでに送信されています。"
 
 #. placeholder {0}: result.error
-#: src/features/chat/browser-live-view/browser-live-view.tsx:942
+#: src/features/chat/browser-live-view/browser-live-view.tsx:939
 msgid "That page could not be opened: {0}"
 msgstr "そのページを開けませんでした: {0}"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:656
-#: src/features/chat/browser-live-view/browser-live-view.tsx:962
+#: src/features/chat/browser-live-view/browser-live-view.tsx:653
+#: src/features/chat/browser-live-view/browser-live-view.tsx:959
 msgid "That page could not be opened."
 msgstr "そのページを開けませんでした。"
 
@@ -34879,7 +34892,7 @@ msgstr "そのページを開けませんでした。"
 msgid "That passcode is not right."
 msgstr "パスコードが正しくありません。"
 
-#: src/features/projects/components/add-project-dialog.tsx:140
+#: src/features/projects/components/add-project-dialog.tsx:141
 msgid "That path is a file."
 msgstr "そのパスはファイルです。"
 
@@ -34980,7 +34993,7 @@ msgstr "エージェントはその選択肢を提示していません"
 msgid "The agent finished without giving a guide. Write it again."
 msgstr "エージェントがガイドを作成せずに終了しました。もう一度作成してください。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1100
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1097
 msgid "The agent is finishing a browser action, which can take over a minute. Try again shortly."
 msgstr "エージェントがブラウザー操作を終えるところです。1 分以上かかることがあります。少ししてからもう一度お試しください。"
 
@@ -34992,7 +35005,7 @@ msgstr "エージェントはまだセッションを開いています。しば
 msgid "The agent is still working on the last message."
 msgstr "エージェントはまだ最後のメッセージを処理中です。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1039
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1036
 msgid "The agent is using a browser"
 msgstr "エージェントがブラウザーを使用しています"
 
@@ -35016,7 +35029,7 @@ msgstr "エージェントはファイルを変更しませんでした。"
 msgid "The agent on your computer is reading the change…"
 msgstr "お使いのコンピュータ上のエージェントが変更を読み取っています…"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:936
+#: src/features/chat/browser-live-view/browser-live-view.tsx:933
 msgid "The agent's browser closed while the page loaded."
 msgstr "ページの読み込み中にエージェントのブラウザーが閉じられました。"
 
@@ -35028,7 +35041,7 @@ msgstr "エージェントのブラウザーが、人にしか通過できない
 msgid "The agent's browser reached a page only a person can clear. The agent waits and will not try to get around it."
 msgstr "エージェントのブラウザーが、人にしか通過できないページに到達しました。エージェントは待機し、回避を試みません。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:818
+#: src/features/chat/browser-live-view/browser-live-view.tsx:815
 msgid "The agent's browser was replaced, and control went back to the agent. You can take control again."
 msgstr "エージェントのブラウザーが置き換えられ、操作はエージェントに戻りました。もう一度操作を代わることができます。"
 
@@ -35045,7 +35058,7 @@ msgstr "エージェントのプラン"
 msgid "The agent's tool calls"
 msgstr "エージェントのツール呼び出し"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:165
+#: src/features/settings/components/personalization/memory-settings.tsx:166
 msgid "The AI learns from your conversations to personalize its responses, and reflects on what it learned each night. Everything it remembers is listed here — edit, retype, pin or delete any of it."
 msgstr "AI は会話から学習して応答をパーソナライズし、毎晩学んだことを振り返ります。記憶している内容はすべてここに表示され、編集、種類の変更、ピン留め、削除ができます。"
 
@@ -35074,7 +35087,7 @@ msgstr "アシスタントからいくつか質問があります"
 msgid "The assistant has a question"
 msgstr "アシスタントから質問があります"
 
-#: src/features/notifications/lib/notification-labels.ts:61
+#: src/features/notifications/lib/notification-labels.ts:65
 msgid "The assistant is asking for a secret"
 msgstr "アシスタントがシークレットを求めています"
 
@@ -35106,7 +35119,7 @@ msgstr "現在、このブラウザーを操作できません。ページがま
 msgid "The browser cannot read this video to capture a frame"
 msgstr "ブラウザーがこの動画を読み取れないため、フレームをキャプチャできません"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:911
+#: src/features/chat/browser-live-view/browser-live-view.tsx:908
 msgid "The browser could not be handed back. The agent gets it back on its own after two minutes without input."
 msgstr "ブラウザーを返せませんでした。2 分間入力がないと、エージェントに自動的に戻ります。"
 
@@ -35255,7 +35268,7 @@ msgstr "\"{name}\" の説明は 1 行で最大 {limit} 文字にしてくださ�
 msgid "The desktop app runs on macOS, Windows and Linux. Installers are attached to a desktop release on GitHub, and they appear there once that release is published."
 msgstr "デスクトップアプリは macOS、Windows、Linux で動作します。インストーラーは GitHub のデスクトップリリースに添付され、そのリリースが公開されるとそこに表示されます。"
 
-#: src/features/projects/components/add-project-dialog.tsx:167
+#: src/features/projects/components/add-project-dialog.tsx:168
 msgid "The desktop could not complete that. Try again."
 msgstr "デスクトップでその処理を完了できませんでした。もう一度お試しください。"
 
@@ -35274,6 +35287,10 @@ msgstr "差分が大きすぎて保持できません。ファイルとその行
 #: src/features/evals/components/case-fields.tsx:115
 msgid "The documents the answer should be retrieved from. Used for hit rate, MRR, precision and recall."
 msgstr "回答の取得元となるべきドキュメント。ヒット率、MRR、適合率、再現率の計算に使われます。"
+
+#: src/features/settings/components/personalization/memory-export-button.tsx:100
+msgid "The download could not be prepared. Please try again in a moment."
+msgstr "ダウンロードを準備できませんでした。しばらくしてからもう一度お試しください。"
 
 #: src/features/chat/host/diff-comment-form.tsx:73
 msgid "The draft is full. Send or remove some comments before adding more."
@@ -35523,11 +35540,11 @@ msgstr "リンクが間違っているか、所有者が会話を非公開にし
 msgid "The link may be wrong, or its owner has unpublished or deleted the page."
 msgstr "リンクが間違っているか、所有者がページの公開を停止したか削除した可能性があります。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1109
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1106
 msgid "The live view could not be opened."
 msgstr "ライブビューを開けませんでした。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1094
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1091
 msgid "The live view is not available right now."
 msgstr "現在ライブビューは利用できません。"
 
@@ -35682,7 +35699,7 @@ msgstr "ページには相手のバージョンが表示されています。残
 msgid "The page with the login form. Leave empty to start at the site's front page."
 msgstr "ログインフォームがあるページです。空欄にすると、サイトのトップページから始めます。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1149
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1146
 msgid "The page you opened is still loading."
 msgstr "開いたページはまだ読み込み中です。"
 
@@ -36266,8 +36283,8 @@ msgid "this computer"
 msgstr "このコンピュータ"
 
 #: src/features/devices/components/devices-settings.tsx:372
-#: src/features/projects/components/add-project-dialog.tsx:173
-#: src/features/projects/components/add-project-dialog.tsx:177
+#: src/features/projects/components/add-project-dialog.tsx:174
+#: src/features/projects/components/add-project-dialog.tsx:178
 #: src/features/settings/components/chat/custom-providers-settings.tsx:368
 msgid "This computer"
 msgstr "このコンピューター"
@@ -36284,20 +36301,20 @@ msgstr "このコンピューターはペアリングされなくなりました
 msgid "This computer is no longer paired. Pair it again in Settings → Devices."
 msgstr "このコンピューターはペアリングされていません。設定 → デバイスでもう一度ペアリングしてください。"
 
-#: src/features/devices/components/devices-settings.tsx:649
+#: src/features/devices/components/devices-settings.tsx:655
 msgid "This computer is not paired yet."
 msgstr "このコンピューターはまだペアリングされていません。"
 
 #. placeholder {0}: pairedHere.name
-#: src/features/devices/components/devices-settings.tsx:665
+#: src/features/devices/components/devices-settings.tsx:671
 msgid "This computer is paired as “{0}”."
 msgstr "このコンピューターは「{0}」としてペアリングされています。"
 
-#: src/features/devices/components/devices-settings.tsx:649
+#: src/features/devices/components/devices-settings.tsx:655
 msgid "This computer is paired with another account."
 msgstr "このコンピューターは別のアカウントとペアリングされています。"
 
-#: src/features/devices/components/devices-settings.tsx:625
+#: src/features/devices/components/devices-settings.tsx:631
 msgid "This computer is paired. Choose which folders to share in the desktop app."
 msgstr "このコンピューターはペアリングされました。共有するフォルダーはデスクトップアプリで選択してください。"
 
@@ -36309,7 +36326,7 @@ msgstr "このコンピューターは一部のプロジェクトでのみ使用
 msgid "This computer may only be used in some projects. Choose the project to start the agent in."
 msgstr "このコンピューターは一部のプロジェクトでのみ使用できます。エージェントを開始するプロジェクトを選択してください。"
 
-#: src/features/projects/components/add-project-dialog.tsx:348
+#: src/features/projects/components/add-project-dialog.tsx:349
 msgid "This computer must be paired first."
 msgstr "先にこのコンピューターをペアリングする必要があります。"
 
@@ -36409,7 +36426,7 @@ msgstr "このファイルは大きすぎる（{0} KB）ため、ブラウザー
 msgid "This file is too large (~{0} tokens) and exceeds the model's context window. The model may not be able to process this file effectively."
 msgstr "このファイルは大きすぎ（約 {0} トークン）、モデルのコンテキストウィンドウを超えています。モデルがこのファイルを適切に処理できない可能性があります。"
 
-#: src/features/projects/components/add-project-dialog.tsx:144
+#: src/features/projects/components/add-project-dialog.tsx:145
 msgid "This folder cannot be read."
 msgstr "このフォルダーは読み取れません。"
 
@@ -36425,15 +36442,15 @@ msgstr "このホストはまだ受信トレイを提供していません。"
 msgid "This host does not offer any view of a {requestNoun} yet."
 msgstr "このホストはまだ{requestNoun}のビューを提供していません。"
 
-#: src/features/projects/components/add-project-dialog.tsx:205
+#: src/features/projects/components/add-project-dialog.tsx:206
 msgid "This host has an invalid Port in ~/.ssh/config."
 msgstr "このホストの ~/.ssh/config に無効な Port が設定されています。"
 
-#: src/features/projects/components/add-project-dialog.tsx:201
+#: src/features/projects/components/add-project-dialog.tsx:202
 msgid "This host is used by a Match rule in ~/.ssh/config, which Neore does not evaluate."
 msgstr "このホストは ~/.ssh/config の Match ルールで使用されていますが、Neore はそのルールを評価しません。"
 
-#: src/features/projects/components/add-project-dialog.tsx:197
+#: src/features/projects/components/add-project-dialog.tsx:198
 msgid "This host uses {key} in ~/.ssh/config, which Neore does not support."
 msgstr "このホストは ~/.ssh/config で {key} を使用していますが、Neore はこれをサポートしていません。"
 
@@ -36516,7 +36533,7 @@ msgstr "このログインは別の場所で変更されたため、再読み込
 msgid "This login was changed elsewhere. Reload the page to see it before saving again."
 msgstr "このログインは別の場所で変更されました。再度保存する前に、ページを再読み込みして確認してください。"
 
-#: src/features/projects/components/add-project-dialog.tsx:436
+#: src/features/projects/components/add-project-dialog.tsx:440
 msgid "This machine is not ready yet."
 msgstr "このコンピューターはまだ準備ができていません。"
 
@@ -36690,7 +36707,7 @@ msgstr "この実行は利用できなくなりました。"
 msgid "This selection is too large to import at once. Import fewer files at a time."
 msgstr "この選択はサイズが大きすぎて一度にインポートできません。一度にインポートするファイルを減らしてください。"
 
-#: src/features/projects/components/add-project-dialog.tsx:160
+#: src/features/projects/components/add-project-dialog.tsx:161
 msgid "This server already has its maximum of shared folders. Share a parent folder or remove one in the desktop app."
 msgstr "このサーバーには共有フォルダーの上限数がすでに設定されています。親フォルダーを共有するか、デスクトップアプリでいずれかを削除してください。"
 
@@ -36810,7 +36827,7 @@ msgid "This will permanently delete {0} anonymous user accounts and all their da
 msgstr "{0} 件の匿名ユーザーアカウントとそのすべてのデータが完全に削除されます。この操作は元に戻せません。"
 
 #. placeholder {0}: memories.length
-#: src/features/settings/components/personalization/memory-settings.tsx:259
+#: src/features/settings/components/personalization/memory-settings.tsx:262
 msgid "This will permanently delete all {0} memories and their daily digests. The AI will start learning fresh from your next conversation."
 msgstr "{0} 件のメモリとその日次ダイジェストがすべて完全に削除されます。AI は次の会話から改めて学習を始めます。"
 
@@ -37240,7 +37257,7 @@ msgstr "試行回数が多すぎます。数秒待ってから、もう一度お
 msgid "too many files"
 msgstr "ファイルが多すぎます"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1108
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1105
 msgid "Too many live views were opened. Try again later."
 msgstr "ライブビューを開いた回数が多すぎます。後でもう一度お試しください。"
 
@@ -37579,11 +37596,11 @@ msgstr "トリガーを有効にしました"
 msgid "Trigger name is required"
 msgstr "トリガー名は必須です"
 
-#: src/features/notifications/lib/notification-labels.ts:76
+#: src/features/notifications/lib/notification-labels.ts:80
 msgid "Trigger run failed"
 msgstr "トリガーの実行に失敗しました"
 
-#: src/features/notifications/lib/notification-labels.ts:76
+#: src/features/notifications/lib/notification-labels.ts:80
 msgid "Trigger run finished"
 msgstr "トリガーの実行が完了しました"
 
@@ -37659,8 +37676,8 @@ msgstr "検索キーワードを変えてみてください。"
 #: src/features/auth/components/device-approval.tsx:95
 #: src/features/auth/components/device-approval.tsx:338
 #: src/features/chat/browser-live-view/browser-human-check.tsx:578
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1113
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1280
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1110
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1277
 #: src/features/chat/guest-links/guest-page.tsx:269
 #: src/features/connection/components/offline-screen.tsx:64
 #: src/features/develop/components/files-tab.tsx:400
@@ -38770,7 +38787,7 @@ msgstr "組織で許可されたモデルを使用"
 msgid "Use these keyboard shortcuts to navigate and interact with the data grid more efficiently."
 msgstr "これらのキーボードショートカットを使うと、データグリッドをより効率的に移動・操作できます。"
 
-#: src/features/devices/components/devices-settings.tsx:659
+#: src/features/devices/components/devices-settings.tsx:665
 msgid "Use this computer for agent tools"
 msgstr "このコンピューターをエージェントのツールに使う"
 
@@ -38810,7 +38827,7 @@ msgstr "ユーザー"
 #: src/features/auth/components/user-view.tsx:35
 #: src/features/auth/components/user-view.tsx:38
 #: src/features/auth/components/user-view.tsx:44
-#: src/features/devices/components/devices-settings.tsx:549
+#: src/features/devices/components/devices-settings.tsx:552
 #: src/features/layout/components/nav-user.tsx:373
 #: src/features/layout/components/nav-user.tsx:373
 #: src/features/layout/components/sidebar-shortcut.tsx:212
@@ -39781,7 +39798,7 @@ msgstr "ここから続けますか？"
 msgid "Watch"
 msgstr "監視"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1056
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1053
 msgid "Watch live"
 msgstr "ライブで見る"
 
@@ -40067,7 +40084,7 @@ msgstr "AI にどう呼んでほしいですか？"
 msgid "What should the guide pay attention to?"
 msgstr "ガイドで何に注目すべきですか？"
 
-#: src/features/devices/components/devices-settings.tsx:707
+#: src/features/devices/components/devices-settings.tsx:713
 msgid "What the agent asked your devices to do in the last 30 days."
 msgstr "過去 30 日間にエージェントがあなたのデバイスに依頼した内容です。"
 
@@ -40207,7 +40224,7 @@ msgstr "サブエージェントやサイドチャットを開く場所"
 msgid "Where each run goes"
 msgstr "各実行の保存先"
 
-#: src/features/projects/components/add-project-dialog.tsx:514
+#: src/features/projects/components/add-project-dialog.tsx:518
 msgid "Where is the project?"
 msgstr "プロジェクトはどこにありますか？"
 
@@ -40227,7 +40244,7 @@ msgstr "思考が<0/><1>行動に変わる場所。</1>"
 msgid "Where you stay in control"
 msgstr "コントロールを保てる場面"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1269
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1266
 msgid "Whether the agent is using a browser could not be checked."
 msgstr "エージェントがブラウザーを使用しているか確認できませんでした。"
 
@@ -40323,7 +40340,7 @@ msgstr "メールアドレス/パスワード"
 msgid "With this, it fires when the text starts to contain the phrase, not on every change."
 msgstr "これを使うと、変更のたびにではなく、テキストにそのフレーズが含まれ始めたときに実行されます。"
 
-#: src/features/devices/components/devices-settings.tsx:559
+#: src/features/devices/components/devices-settings.tsx:562
 msgid "Without one, your SSH agent and default keys are used. Passwords are not supported yet."
 msgstr "指定しない場合は、SSH エージェントとデフォルトのキーが使用されます。パスワードはまだサポートされていません。"
 
@@ -40731,8 +40748,8 @@ msgstr "この確認を拒否しました。この返信の間、エージェン
 msgid "You get a notification when a run finishes, needs your review or fails. A finished run links to its chat, and a run that needs review links to the tasks board."
 msgstr "実行が完了したとき、レビューが必要なとき、または失敗したときに通知を受け取ります。完了した実行はそのチャットにリンクされ、レビューが必要な実行はタスクボードにリンクされます。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:541
-#: src/features/chat/browser-live-view/browser-live-view.tsx:890
+#: src/features/chat/browser-live-view/browser-live-view.tsx:538
+#: src/features/chat/browser-live-view/browser-live-view.tsx:887
 msgid "You handed the browser back to the agent."
 msgstr "ブラウザーの操作をエージェントに返しました。"
 
@@ -40798,7 +40815,7 @@ msgstr "本日の翻訳の上限に達しました。後でもう一度お試し
 msgid "You marked this check done. The agent looks at the page again before it goes on."
 msgstr "この確認を完了にしました。エージェントは続ける前にもう一度ページを確認します。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:356
+#: src/features/chat/browser-live-view/browser-live-view.tsx:353
 msgid "You may not take control of this browser."
 msgstr "このブラウザーを操作する権限がありません。"
 
@@ -40806,10 +40823,10 @@ msgstr "このブラウザーを操作する権限がありません。"
 msgid "You need to sign in to access this page."
 msgstr "このページにアクセスするにはサインインが必要です。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:546
-#: src/features/chat/browser-live-view/browser-live-view.tsx:709
-#: src/features/chat/browser-live-view/browser-live-view.tsx:890
-#: src/features/chat/browser-live-view/browser-live-view.tsx:938
+#: src/features/chat/browser-live-view/browser-live-view.tsx:543
+#: src/features/chat/browser-live-view/browser-live-view.tsx:706
+#: src/features/chat/browser-live-view/browser-live-view.tsx:887
+#: src/features/chat/browser-live-view/browser-live-view.tsx:935
 msgid "You no longer have control of the browser."
 msgstr "このブラウザーの操作権はもうありません。"
 
@@ -40837,7 +40854,7 @@ msgstr "サインイン後、このページに戻ります。"
 msgid "You'll need an authenticator app like Google Authenticator or Authy to generate verification codes."
 msgstr "確認コードを生成するには、Google Authenticator や Authy などの認証アプリが必要です。"
 
-#: src/features/notifications/components/notification-list.tsx:84
+#: src/features/notifications/components/notification-list.tsx:86
 msgid "You're all caught up."
 msgstr "すべて確認済みです。"
 
@@ -40977,7 +40994,7 @@ msgstr "自分のチャットと {0}"
 msgid "Your chats and the bots you chose"
 msgstr "自分のチャットと選択したボット"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1158
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1155
 msgid "Your clicks, typing and scrolling in the view go to the browser. The agent waits until you hand it back."
 msgstr "ビュー内でのクリック、入力、スクロールはブラウザーに送られます。操作を返すまでエージェントは待機します。"
 
@@ -41017,7 +41034,7 @@ msgstr "会話は非公開のまま"
 msgid "Your current anonymous session will be converted to a permanent account."
 msgstr "現在の匿名セッションは永続的なアカウントに変換されます。"
 
-#: src/features/notifications/lib/notification-labels.ts:49
+#: src/features/notifications/lib/notification-labels.ts:50
 msgid "Your daily brief"
 msgstr "あなたの Daily Brief"
 
@@ -41026,7 +41043,7 @@ msgstr "あなたの Daily Brief"
 msgid "Your daily limit for AI requests is used up."
 msgstr "AI リクエストの 1 日の上限を使い切りました。"
 
-#: src/features/notifications/lib/notification-labels.ts:52
+#: src/features/notifications/lib/notification-labels.ts:53
 msgid "Your data export is ready"
 msgstr "データのエクスポートの準備ができました"
 
@@ -41229,7 +41246,7 @@ msgstr "レビューを送信中です。完了するまでお待ちください
 msgid "Your review is kept."
 msgstr "レビューは保持されています。"
 
-#: src/features/notifications/lib/notification-labels.ts:58
+#: src/features/notifications/lib/notification-labels.ts:62
 msgid "Your review was requested"
 msgstr "あなたのレビューがリクエストされました"
 

@@ -7,11 +7,12 @@ import { LunoraError } from "lunorash/server";
 import type { Doc } from "../../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../../_generated/server";
 import { encryptKey } from "../../lib/encryption";
+import { notify } from "../../notifications/notify";
 import { setShardRoute } from "../../lib/shard-routes";
 import { DEVICE_LIMIT_CODE, MAX_DEVICES_PER_USER } from "./constants";
 import { generateDeviceSecret } from "./signing";
 
-type NewDevice = Partial<Pick<Doc<"devices">, "pairedByCode" | "projectIds" | "transport" | "viaDeviceId">> &
+type NewDevice = Partial<Pick<Doc<"devices">, "alertPending" | "pairedByCode" | "projectIds" | "transport" | "viaDeviceId">> &
     Pick<Doc<"devices">, "name" | "platform" | "userId">;
 
 /** Refuses when the account already holds as many devices as it may. */
@@ -38,10 +39,39 @@ export const insertDevice = async (ctx: Pick<MutationCtx, "db" | "now">, device:
         ...(device.transport !== undefined && { transport: device.transport }),
         ...(device.projectIds !== undefined && { projectIds: device.projectIds }),
         ...(device.viaDeviceId !== undefined && { viaDeviceId: device.viaDeviceId }),
+        ...(device.alertPending === true && { alertPending: true }),
     });
 
     // The host ingest has no session: it finds this device's owner, hence its shard, from this row.
     await setShardRoute(ctx, "device", deviceId as string, device.userId);
 
     return { deviceId: deviceId as string, secret };
+};
+
+/**
+ * The owner's "a device was paired" alert. Throws when the write fails, so a caller that retries it (a scheduled alert job)
+ * sees the failure. Keyed per device, so a repeat is one notification.
+ */
+export const sendDevicePairedAlert = async (ctx: MutationCtx, device: { _id: string; name: string; userId: string }): Promise<void> => {
+    await notify(ctx, {
+        dedupeKey: `device-paired:${device._id}`,
+        link: "/dashboard/settings/chat/devices",
+        title: device.name,
+        type: "device_paired",
+        userId: device.userId,
+    });
+};
+
+/**
+ * Writes the owner's alert for a device that was just paired, once. `alertPending` is set when the row is created and cleared
+ * here, in the same transaction as the alert, so a repeat call or a queued alert job finds nothing left to do. A failed write
+ * throws and rolls the cleared flag back with it, so the alert is retried rather than lost.
+ */
+export const announceNewDevice = async (ctx: MutationCtx, device: Doc<"devices">): Promise<void> => {
+    if (device.alertPending !== true) {
+        return;
+    }
+
+    await ctx.db.patch("devices", device._id, { alertPending: false });
+    await sendDevicePairedAlert(ctx, { _id: device._id as string, name: device.name, userId: device.userId });
 };
