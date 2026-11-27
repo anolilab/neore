@@ -213,4 +213,37 @@ describe("a changed webhook trigger", () => {
 
         expect(page[0]).toMatchObject({ status: "installed", version: "1.0.0" });
     });
+
+    it("is refused when the stored webhook becomes a schedule under the same key", async () => {
+        const as = () => harness.withIdentity({ userId: OWNER } as never);
+        const body = buildBundleMarkdown({
+            description: "",
+            items: [
+                { key: "analyst", kind: "skill" as const, skill: skill("analyst") },
+                {
+                    key: "hook",
+                    kind: "trigger" as const,
+                    trigger: { cronExpression: "0 9 * * 1", model: DIGEST.model, name: "Hook", type: "schedule" as const },
+                },
+            ],
+            name: "Daily brief",
+        });
+        const contentHash = await bodyHash(body);
+        const markdown = withPluginHeader(body, { contentHash, slug: SLUG, version: "1.1.0" });
+        const preview = (await as().action(procedureAt("plugins_update", "previewUpdate"), { markdown } as never)) as PreviewResult;
+
+        await expect(
+            as().action(procedureAt("plugins_update", "updatePlugin"), {
+                confirmDowngrade: false,
+                contentHash,
+                expectedGeneration: preview.generation,
+                expectedInstallId: preview.installId,
+                markdown,
+            } as never),
+        ).rejects.toThrow("Uninstall the plugin and install the new version");
+
+        const { page } = await harness.run(async (context: any) => await context.db.pluginInstalls.findMany({ where: { userId: OWNER } }));
+
+        expect(page[0]).toMatchObject({ status: "installed", version: "1.0.0" });
+    });
 });

@@ -46,6 +46,8 @@ export const loadInstalledForUpdate = internalQuery
                         currentHash: v.string(),
                         entryKey: v.string(),
                         kind: vPluginItemKind,
+                        /** A trigger child's stored type; empty for any other kind or a missing row. */
+                        triggerType: v.string(),
                     }),
                 ),
                 generation: v.number(),
@@ -69,7 +71,7 @@ export const loadInstalledForUpdate = internalQuery
 
         const installId = install._id as string;
         const { page } = await ctx.db.pluginItems.findMany({ consistency: "primary", where: { installId } });
-        const children: { contentHash: string; currentHash: string; entryKey: string; kind: "group" | "skill" | "trigger" }[] = [];
+        const children: { contentHash: string; currentHash: string; entryKey: string; kind: "group" | "skill" | "trigger"; triggerType: string }[] = [];
         const ownSlugs: { entryKey: string; slug: string }[] = [];
 
         for (const link of page) {
@@ -88,7 +90,18 @@ export const loadInstalledForUpdate = internalQuery
                 }
             }
 
-            children.push({ contentHash: link.contentHash, currentHash, entryKey: link.entryKey, kind: link.kind });
+            let triggerType = "";
+
+            if (link.kind === "trigger") {
+                const trigger = await ctx.db
+                    .query("triggers")
+                    .withIndex("by_plugin_marker", (q) => q.eq("pluginMarker", markerFor(installId, link.entryKey)))
+                    .first();
+
+                triggerType = trigger?.type ?? "";
+            }
+
+            children.push({ contentHash: link.contentHash, currentHash, entryKey: link.entryKey, kind: link.kind, triggerType });
         }
 
         return { children, generation: install.generation, installId, ownSlugs, status: install.status, version: install.version };
@@ -227,7 +240,14 @@ export const updatePlugin = authAction
                 return entry !== undefined;
             }
 
-            return step.action === "update" && entry?.plan?.kind === "trigger" && entry.plan.create.type !== "schedule";
+            if (step.action !== "update" || entry?.plan?.kind !== "trigger") {
+                return false;
+            }
+
+            // Either side being a webhook or an event trigger cannot be rewritten in place.
+            const stored = installed.children.find((child) => child.entryKey === step.entryKey)?.triggerType;
+
+            return entry.plan.create.type !== "schedule" || (stored !== undefined && stored !== "" && stored !== "schedule");
         });
 
         if (unrewritable.length > 0) {
