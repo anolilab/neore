@@ -205,6 +205,18 @@ const planTrigger = (trigger: BundleTrigger, env: PlanEnv, problems: string[]): 
         problems.push(templateProblem);
     }
 
+    // `createTrigger` refuses a prompt that is only hidden characters, so the preview does too.
+    for (const [label, text] of [
+        ["The input", trigger.inputTemplate],
+        ["The system prompt", trigger.systemPrompt],
+    ] as const) {
+        const cleaned = text === undefined ? undefined : stripHiddenText(text);
+
+        if (cleaned !== undefined && cleaned.removed > 0 && cleaned.text.trim() === "") {
+            problems.push(`${label} is empty after removing hidden characters.`);
+        }
+    }
+
     if (problems.length > 0) {
         return { view };
     }
@@ -584,11 +596,22 @@ export const runBundleImport = async (
     const planFor = (key: string): PlannedCreate | undefined => entries.find((entry) => entry.key === key)?.plan;
 
     // `failed`: could not be removed and still needs deleting by hand. `kept`: stays on purpose, with the skills it uses.
-    const rollback = async (): Promise<{ failed: string[]; kept: string[] }> => {
+    const rollback = async (leftKeys: ReadonlyArray<string> = []): Promise<{ failed: string[]; kept: string[] }> => {
         const failed: string[] = [];
         const kept: string[] = [];
         // Skill keys that a group chat which is still there names: they stay, or it would point at nothing.
         const protectedBy = new Map<string, "failed" | "kept">();
+
+        // A group its own create step could not remove is not in `created`, but it is still there: its skills stay too.
+        for (const key of leftKeys) {
+            const left = planFor(key);
+
+            if (left?.kind === "group") {
+                for (const skillKey of [...left.create.participantKeys, ...(left.create.synthesizerKey === undefined ? [] : [left.create.synthesizerKey])]) {
+                    protectedBy.set(skillKey, "failed");
+                }
+            }
+        }
 
         for (const item of created.toReversed()) {
             if (item.kind === "skill" && protectedBy.has(item.key)) {
@@ -643,10 +666,11 @@ export const runBundleImport = async (
                 );
             }
 
-            const { failed, kept } = await rollback();
+            const leftKeys = error instanceof BundleImportError ? error.leftBehind : [];
+            const { failed, kept } = await rollback(leftKeys);
 
             // A child its own step could not remove again is already named by the error it threw.
-            failed.push(...(error instanceof BundleImportError ? error.leftBehind : []));
+            failed.push(...leftKeys.map((key) => entries.find((candidate) => candidate.key === key)?.title ?? key));
 
             const reason = messageOf(error);
             const failedNote = failed.length === 0 ? "" : ` These could not be removed again: ${failed.join(", ")}. Delete them by hand.`;

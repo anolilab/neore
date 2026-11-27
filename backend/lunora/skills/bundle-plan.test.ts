@@ -205,6 +205,32 @@ describe("the dry run", () => {
         expect(long?.problems.join(" ")).toContain("over the limit");
     });
 
+    it("blocks a trigger prompt that is only hidden characters, as the create step does", () => {
+        const [entry] = plan([{ kind: "trigger", trigger: { ...WEBHOOK, inputTemplate: "\u{200B}\u{200B}" } }]);
+
+        expect(entry?.problems.join(" ")).toContain("hidden characters");
+    });
+
+    it("keeps the skills of a group its own create step could not remove, when a later failure rolls back", async () => {
+        const items: BundleItem[] = [{ group: GROUP, kind: "group" }, skill("alpha"), skill("beta")];
+        const { ops } = fakeOps();
+        const leaving = new BundleImportError("could not link", ["group:0"]);
+        const failing = {
+            ...ops,
+            createGroupChat: vi.fn(async () => {
+                throw leaving;
+            }),
+        };
+
+        const entries = plan(items);
+        const error = (await runBundleImport(entries, new Set(entries.map((entry) => entry.key)), failing).catch(
+            (error_: unknown) => error_,
+        )) as BundleImportError;
+
+        expect(ops.deleteSkill).not.toHaveBeenCalled();
+        expect(error.leftBehind).toStrictEqual(expect.arrayContaining(["Panel", "alpha", "beta"]));
+    });
+
     it("keeps trigger creation args free of anything but the whitelist", () => {
         const [entry] = plan([{ kind: "trigger", trigger: WEBHOOK }]);
 

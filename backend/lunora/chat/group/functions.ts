@@ -365,6 +365,7 @@ export const createPluginGroupChat = internalMutation
     })
     .output(v.object({ threadId: v.string() }))
     .mutation(async ({ args: { plan, pluginInstallId, pluginMarker, userId, ...fields }, ctx }) => {
+        const { debateRounds, mode, organizationId, skillIds, synthesizerSkillId } = fields;
         const existing = await ctx.db
             .query("threads")
             .withIndex("by_plugin_marker", (q) => q.eq("pluginMarker", pluginMarker))
@@ -373,6 +374,28 @@ export const createPluginGroupChat = internalMutation
         if (existing) {
             if (existing.userId !== userId) {
                 throw new LunoraError("FORBIDDEN", "That plugin group belongs to another account");
+            }
+
+            // A repair recreates a deleted skill under a new id: the group found by its marker follows the skills it is given now,
+            // or it would keep naming the deleted one, which a turn silently drops.
+            const stored = existing.groupChat;
+
+            if (
+                stored &&
+                (stored.participants.length !== skillIds.length || stored.participants.some((participant) => !skillIds.includes(participant.skillId)))
+            ) {
+                const options = requireGroupOptions({ debateRounds, mode, skillIds, synthesizerSkillId });
+
+                await requireUsableSkills(ctx, skillIds, { organizationId, userId }, false);
+                await ctx.db.patch("threads", existing._id, {
+                    groupChat: {
+                        ...stored,
+                        ...options,
+                        participants: skillIds.map(
+                            (skillId) => stored.participants.find((participant) => participant.skillId === skillId) ?? { addedAt: ctx.now, skillId },
+                        ),
+                    },
+                });
             }
 
             return { threadId: existing._id as string };

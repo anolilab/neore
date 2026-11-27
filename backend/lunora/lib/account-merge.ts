@@ -2144,11 +2144,15 @@ const REASSIGN_BATCH = 200;
  */
 const REASSIGN_BATCH_BY_TABLE: Readonly<Record<string, number>> = { projectRuleFiles: 8 };
 
-/** Installs one `mergePluginInstallsPage` call moves: each costs a read and a write against the invocation's D1 queries. */
-const PLUGIN_MERGE_INSTALLS = 12;
+/** Installs one `mergePluginInstallsPage` call moves: each costs a read, and a patch that reads before it writes (3 D1 queries). */
+const PLUGIN_MERGE_INSTALLS = 6;
 
-/** Children, then links, one call detaches or deletes for a duplicate install; the call that does the rest deletes the install. */
-const PLUGIN_MERGE_CHILDREN = 12;
+/**
+ * Skills, then links, one call detaches or deletes for a duplicate install; the call that does the rest deletes the install. A
+ * patch or delete of a `.global()` row reads before it writes (two D1 queries): 4 + 4 of them, three reads and the install's
+ * delete are about 22, leaving room in the invocation for the grant steps ahead of this one.
+ */
+const PLUGIN_MERGE_CHILDREN = 4;
 
 /**
  * Moves the guest's plugin installs to the new account, one install per plugin: for a plugin the new account already has, the
@@ -2169,7 +2173,7 @@ export const mergePluginInstallsPage = async (ctx: MutationCtx, from: string, to
 
         if (!target) {
             await ctx.db.patch("pluginInstalls", install._id, { userId: to });
-            statements += 1;
+            statements += 2;
 
             continue;
         }
@@ -2185,7 +2189,7 @@ export const mergePluginInstallsPage = async (ctx: MutationCtx, from: string, to
 
         for (const skill of skills.page.slice(0, PLUGIN_MERGE_CHILDREN)) {
             await ctx.db.patch("skills", skill._id as Id<"skills">, { pluginInstallId: "", pluginMarker: "" });
-            statements += 1;
+            statements += 2;
         }
 
         const triggers = await ctx.db
@@ -2211,12 +2215,12 @@ export const mergePluginInstallsPage = async (ctx: MutationCtx, from: string, to
 
         const links = await ctx.db.pluginItems.findMany({ consistency: "primary", limit: PLUGIN_MERGE_CHILDREN + 1, where: { installId } });
 
+        statements += 1;
+
         for (const link of links.page.slice(0, PLUGIN_MERGE_CHILDREN)) {
             await ctx.db.delete("pluginItems", link._id);
-            statements += 1;
+            statements += 2;
         }
-
-        statements += 1;
 
         // The install goes last, once nothing names it; a call that left rows behind is followed by another.
         if (more || links.page.length > PLUGIN_MERGE_CHILDREN) {
@@ -2224,7 +2228,7 @@ export const mergePluginInstallsPage = async (ctx: MutationCtx, from: string, to
         }
 
         await ctx.db.delete("pluginInstalls", install._id);
-        statements += 1;
+        statements += 2;
 
         return { done: false, statements };
     }

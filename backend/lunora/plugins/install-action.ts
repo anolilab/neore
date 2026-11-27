@@ -92,6 +92,8 @@ export const previewPlugin = authAction
         const { entries } = await planFor(ctx, args.markdown, undefined);
 
         assertNoToolConfig(entries);
+        // The rules install applies: a preview that lists an entry install would refuse is refused here, naming the problem.
+        assertSelectionImportable(entries, new Set(entries.map((entry) => entry.key)));
 
         return {
             contentHash: hash,
@@ -110,7 +112,12 @@ export const installPlugin = authAction
         markdown: v.string().max(MAX_LENGTH.document),
     })
     .use(rateLimit("plugins/install"))
-    .output(v.object({ installId: v.string(), items: v.array(v.object({ id: v.string(), key: v.string(), kind: vKind, title: v.string() })) }))
+    .output(
+        v.object({
+            installId: v.string(),
+            items: v.array(v.object({ id: v.string(), key: v.string(), kind: vKind, title: v.string(), webhookSecret: v.optional(v.string()) })),
+        }),
+    )
     .action(async ({ args, ctx }) => {
         if (ctx.user.activeOrganization) {
             throw new LunoraError("UNPROCESSABLE", organizationRefusal);
@@ -124,14 +131,14 @@ export const installPlugin = authAction
 
         const { userId } = ctx.user;
         const claimKey = `${userId}:${header.slug}`;
-        const claimed = await ctx.runMutation(internal.lib.claim_once.claimKey, {
+        const claimedAt = await ctx.runMutation(internal.lib.claim_once.claimKeyFenced, {
             key: claimKey,
             scope: INSTALL_CLAIM_SCOPE,
             ttlMs: INSTALL_CLAIM_TTL_MS,
             userId,
         });
 
-        if (!claimed) {
+        if (claimedAt === null) {
             throw new LunoraError("CONFLICT", `The plugin "${header.slug}" is already being installed.`);
         }
 
@@ -200,6 +207,6 @@ export const installPlugin = authAction
 
             return { installId, items };
         } finally {
-            await ctx.runMutation(internal.lib.claim_once.releaseKey, { key: claimKey, scope: INSTALL_CLAIM_SCOPE }).catch(() => undefined);
+            await ctx.runMutation(internal.lib.claim_once.releaseKey, { claimedAt, key: claimKey, scope: INSTALL_CLAIM_SCOPE }).catch(() => undefined);
         }
     });

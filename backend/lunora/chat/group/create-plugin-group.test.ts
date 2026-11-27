@@ -83,4 +83,23 @@ describe("plugin group chats", () => {
         expect(rows).toHaveLength(1);
         expect(rows[0]).toMatchObject({ pluginInstallId: INSTALL, pluginMarker: GROUP_MARKER, userId: OWNER });
     });
+
+    it("points the group found by its marker at the skills it is given now, after a repair recreated one", async () => {
+        const { a, b, c } = await harness.run(async (context: any) => {
+            const first = await context.runMutation(createPluginSkill, skill("analyst"));
+            const second = await context.runMutation(createPluginSkill, skill("critic"));
+
+            await context.runMutation(createPluginGroupChat, groupInput([first, second]));
+            await context.db.delete("skills", second);
+
+            return { a: first, b: second, c: await context.runMutation(createPluginSkill, skill("critic-again")) };
+        });
+
+        await harness.run(async (context: any) => await context.runMutation(createPluginGroupChat, groupInput([a, c])));
+
+        const [group] = await groupsWithMarker();
+
+        expect(group.groupChat.participants.map((participant: any) => participant.skillId)).toEqual([a, c]);
+        expect(group.groupChat.participants.some((participant: any) => participant.skillId === b)).toBe(false);
+    });
 });

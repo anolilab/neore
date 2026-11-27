@@ -229,6 +229,7 @@ export const updatePlugin = authAction
 
         const applied: string[] = [];
         const skipped: { action: UpdateAction; entryKey: string }[] = [];
+        const removals: { action: UpdateAction; entryKey: string }[] = [];
 
         try {
             for (const step of plan) {
@@ -251,22 +252,11 @@ export const updatePlugin = authAction
                 if (step.action === "delete" || step.action === "detach") {
                     if (child?.kind === "group" || groupSwap.has(step.entryKey)) {
                         skipped.push(step);
-                        continue;
-                    }
-
-                    const ids = { entryKey: step.entryKey, generation, installId: installed.installId, userId };
-
-                    if (step.action === "delete") {
-                        // A skill that a group chat still names is kept, and reported.
-                        if (!(await ctx.runMutation(internal.plugins.update_apply.removeChild, ids))) {
-                            skipped.push(step);
-                            continue;
-                        }
                     } else {
-                        await ctx.runMutation(internal.plugins.update_apply.detachChild, ids);
+                        // Removal cannot be undone, so it waits until the new children are in: a failed create then loses nothing.
+                        removals.push(step);
                     }
 
-                    applied.push(step.entryKey);
                     continue;
                 }
 
@@ -352,6 +342,22 @@ export const updatePlugin = authAction
                 );
 
                 applied.push(...created.map((item) => item.key));
+            }
+
+            for (const step of removals) {
+                const ids = { entryKey: step.entryKey, generation, installId: installed.installId, userId };
+
+                // A skill that a group chat still names is kept, and reported.
+                if (step.action === "delete" && !(await ctx.runMutation(internal.plugins.update_apply.removeChild, ids))) {
+                    skipped.push(step);
+                    continue;
+                }
+
+                if (step.action === "detach") {
+                    await ctx.runMutation(internal.plugins.update_apply.detachChild, ids);
+                }
+
+                applied.push(step.entryKey);
             }
 
             await ctx.runMutation(internal.plugins.update_apply.finishUpdate, {

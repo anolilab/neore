@@ -488,7 +488,8 @@ export const exportBundle = authAction
         // item under the key its install gave it. The lookup runs first, because a plugin file's body carries the keys.
         const plugin = await ctx.runQuery(internal.plugins.export.pluginForSelection, {
             groupChatIds,
-            skillIds,
+            // The skills the file will hold, a group's participants included: a plugin group alone is still that plugin's content.
+            skillIds: [...skillSources.keys()],
             triggerIds,
             userId,
         });

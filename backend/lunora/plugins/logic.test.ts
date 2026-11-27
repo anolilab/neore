@@ -212,5 +212,6 @@ describe("bodyHash", () => {
     it("changes when the body changes, and treats CRLF and LF the same", async () => {
         expect(await bodyHash(file("h", "item one"))).not.toBe(await bodyHash(file("h", "item two")));
         expect(await bodyHash(file("h", "a\r\nb"))).toBe(await bodyHash(file("h", "a\nb")));
+        expect(await bodyHash("---\rh\r---\ra\rb")).toBe(await bodyHash(file("h", "a\nb")));
     });
 });

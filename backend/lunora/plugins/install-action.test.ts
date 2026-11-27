@@ -163,4 +163,46 @@ describe("plugin install action", () => {
         expect(rows).toEqual([expect.objectContaining({ status: "needs-repair" })]);
         expect(skills).toHaveLength(1);
     });
+
+    it("releases its install claim only under the claim's own claimedAt, so a stale action cannot free a newer one", async () => {
+        const original = registry.get("lib_claim_once:releaseKey");
+        const { internalMutation } = await import("../_generated/server");
+        const { v } = await import("lunorash/server");
+        const released: unknown[] = [];
+
+        registry.set(
+            "lib_claim_once:releaseKey",
+            internalMutation
+                .input({ claimedAt: v.optional(v.number()), key: v.string(), scope: v.string() })
+                .output(v.null())
+                .mutation(async ({ args }) => {
+                    released.push(args);
+
+                    return null;
+                }),
+        );
+
+        try {
+            await as().action(procedureAt("plugins_install_action", "installPlugin"), { contentHash: hash, markdown: pluginFile(hash) } as never);
+        } finally {
+            registry.set("lib_claim_once:releaseKey", original);
+        }
+
+        expect(released).toEqual([expect.objectContaining({ claimedAt: expect.any(Number), scope: "plugin-install" })]);
+    });
+
+    it("refuses a preview of a plugin that holds an entry install would refuse", async () => {
+        const blocked = buildBundleMarkdown({
+            description: "",
+            items: [{ key: "t", kind: "trigger", trigger: { model: "no-such-model", name: "On PR", type: "webhook" } }],
+            name: "Blocked",
+        });
+        const blockedHash = await bodyHash(blocked);
+
+        await expect(
+            as().action(procedureAt("plugins_install_action", "previewPlugin"), {
+                markdown: withPluginHeader(blocked, { contentHash: blockedHash, slug: "blocked", version: "1.0.0" }),
+            } as never),
+        ).rejects.toThrow("not available");
+    });
 });

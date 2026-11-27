@@ -5,6 +5,7 @@ import schema from "../schema";
 import { createPluginSkill } from "../skills/create-skill";
 import { skillRowHash } from "./entry-hash";
 import { createInstallRow, finishInstall, recordCreated, recordIntent } from "./install-steps";
+import { patchInstallIf } from "./held-install";
 import { diffUpdate, markerFor } from "./logic";
 import { loadInstalledForUpdate } from "./update";
 import { beginUpdate, failUpdate, finishUpdate, removeChild, updateSkillChild } from "./update-apply";
@@ -104,6 +105,38 @@ describe("applying an update", () => {
         expect(skill).toMatchObject({ instructions: REVISED.instructions });
         expect(link).toMatchObject({ contentHash: await skillRowHash(REVISED), pendingHash: "" });
         expect(install).toMatchObject({ status: "installed", version: "1.1.0" });
+    });
+
+    it("records a history revision and advances the version when a plugin update changes the instructions", async () => {
+        const { installId, skillId } = await installed();
+        const generation = await run(
+            async (context) => await context.runMutation(beginUpdate, { expectedGeneration: 1, installId, targetVersion: "1.1.0", userId: OWNER }),
+        );
+
+        await run(
+            async (context) =>
+                await context.runMutation(updateSkillChild, {
+                    contentHash: await skillRowHash(REVISED),
+                    description: REVISED.description,
+                    entryKey: "skill:analyst",
+                    generation,
+                    installId,
+                    instructions: REVISED.instructions,
+                    name: REVISED.name,
+                    slug: REVISED.slug,
+                    userId: OWNER,
+                }),
+        );
+
+        const history = await run(async (context) => {
+            const { page } = await context.db.skillHistory.findMany({ where: { skillId } });
+
+            return page;
+        });
+        const skill = await run(async (context) => await context.db.skills.findFirst({ where: { _id: skillId } }));
+
+        expect(history.map((row: { instructions: string }) => row.instructions)).toContain(REVISED.instructions);
+        expect(skill?.currentVersion).toBe(2);
     });
 
     it("refuses to rewrite a skill the person has edited, and leaves it as it is", async () => {
@@ -382,5 +415,21 @@ describe("applying an update", () => {
         await expect(
             run(async (context) => await context.runMutation(beginUpdate, { expectedGeneration: 0, installId, targetVersion: "1.1.0", userId: OWNER })),
         ).rejects.toThrow("Preview it again");
+    });
+
+    it("an install-row write is conditional on the generation held: a takeover between the read and the write makes it STALE_LEASE", async () => {
+        const { installId } = await installed();
+        const generation = await run(
+            async (context) => await context.runMutation(beginUpdate, { expectedGeneration: 1, installId, targetVersion: "1.1.0", userId: OWNER }),
+        );
+
+        // A repair takes over; the caller still holds the generation it read earlier.
+        await run(async (context) => await context.db.patch("pluginInstalls", installId, { generation: generation + 1, status: "needs-repair" }));
+        await expect(run(async (context) => await patchInstallIf(context, installId, generation, { status: "installed" }))).rejects.toThrow("STALE_LEASE");
+
+        expect(await run(async (context) => await context.db.pluginInstalls.findFirst({ where: { _id: installId } }))).toMatchObject({
+            generation: generation + 1,
+            status: "needs-repair",
+        });
     });
 });

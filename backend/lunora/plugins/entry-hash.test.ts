@@ -32,6 +32,12 @@ describe("a trigger's live hash", () => {
         expect(await triggerRowHash({ ...TRIGGER, cronExpression: "0 10 * * *" })).not.toBe(await entryHash(triggerEntry(TRIGGER)));
     });
 
+    it("hashes a webhook without a scheme as creation stores it, as timestamped", async () => {
+        const hook = { model: "claude-haiku-5-5", name: "Hook", type: "webhook" as const };
+
+        expect(await entryHash(triggerEntry(hook as never))).toBe(await triggerRowHash({ ...hook, webhookSignatureScheme: "timestamped" }));
+    });
+
     it("ignores the row's own fields, which are not content", async () => {
         expect(await triggerRowHash({ ...TRIGGER, enabled: true, triggerCount: 4, userId: "owner" } as typeof TRIGGER)).toBe(
             await entryHash(triggerEntry(TRIGGER)),

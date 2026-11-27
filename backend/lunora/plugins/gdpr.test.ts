@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { GLOBAL_USER_COLUMNS } from "../lib/account-merge";
-import { erasePluginsForUser } from "./gdpr";
+import { collectPluginsForExport, erasePluginsForUser } from "./gdpr";
 
 const USER = "user-a";
 const OTHER = "user-b";
@@ -18,7 +18,12 @@ const fakeCtx = (tables: { pluginInstalls: Row[]; pluginItems: Row[] }) => {
 
     const reader = (rows: Row[]) => {
         return {
-            findMany: async ({ limit, where }: { limit: number; where: { userId: string } }) => {
+            findMany: async ({ consistency, limit, where }: { consistency?: string; limit: number; where: { userId: string } }) => {
+                // A replica that lags shows nothing: only a primary read sees the rows.
+                if (consistency !== "primary") {
+                    return { page: [] };
+                }
+
                 await Promise.resolve();
                 statements += 1;
 
@@ -101,5 +106,38 @@ describe("account merge lists the plugin tables", () => {
         // The installs move in the merge's own step (`mergePluginInstallsPage`), so a plugin both accounts have is not installed twice.
         expect(GLOBAL_USER_COLUMNS.pluginInstalls).toEqual([]);
         expect(GLOBAL_USER_COLUMNS.pluginItems).toEqual(["userId"]);
+    });
+});
+
+describe("collectPluginsForExport", () => {
+    it("exports the person's installs and links across pages, without content hashes, and no other person's", async () => {
+        const mine = { _id: "i1", contentHash: "h", installedAt: 1, pluginSlug: "brief", status: "installed", updatedAt: 2, userId: USER, version: "1.0.0" };
+        const item = (id: string, userId: string) => {
+            return { _id: id, contentHash: "h", createdAt: 3, entryKey: `skill:${id}`, installId: "i1", kind: "skill", state: "created", userId };
+        };
+        const all = [...Array.from({ length: 3 }, (_, index) => item(`a${String(index)}`, USER)), item("b0", OTHER)];
+        const reader = (source: unknown[]) => {
+            return {
+                findMany: async ({ cursor, limit, where }: { cursor: string | null; limit: number; where: { userId: string } }) => {
+                    await Promise.resolve();
+
+                    const mineRows = source.filter((row) => (row as Row).userId === where.userId);
+                    const start = cursor === null ? 0 : Number(cursor);
+                    const page = mineRows.slice(start, start + 2);
+
+                    expect(limit).toBeGreaterThan(0);
+
+                    return { continueCursor: String(start + 2), isDone: start + 2 >= mineRows.length, page };
+                },
+            };
+        };
+        const ctx = { db: { pluginInstalls: reader([mine, { ...mine, _id: "i2", userId: OTHER }]), pluginItems: reader(all) } };
+        const result = await (
+            collectPluginsForExport as unknown as { handler: (c: unknown, a: unknown) => Promise<{ installs: object[]; items: object[] }> }
+        ).handler(ctx, { userId: USER });
+
+        expect(result.installs).toEqual([{ id: "i1", installedAt: 1, pluginSlug: "brief", status: "installed", updatedAt: 2, version: "1.0.0" }]);
+        expect(result.items).toHaveLength(3);
+        expect(result.items[0]).toEqual({ createdAt: 3, entryKey: "skill:a0", installId: "i1", kind: "skill", state: "created" });
     });
 });

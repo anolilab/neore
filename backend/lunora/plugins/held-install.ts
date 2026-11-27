@@ -42,3 +42,23 @@ export const heldInstallForShardWrite = async (ctx: Pick<MutationCtx, "db" | "no
 
     return install;
 };
+
+/**
+ * Writes the install row only while its stored generation is still the one the caller holds. The read in {@link heldInstall} and a
+ * later plain patch are separate statements on a `.global()` table, so a takeover can land between them; this write is conditional, and
+ * a miss is `STALE_LEASE`. Writes to `pluginItems` cannot be fenced against the install row this way, so a step that writes both
+ * writes the install row first.
+ */
+export const patchInstallIf = async (
+    ctx: Pick<MutationCtx, "db">,
+    installId: Id<"pluginInstalls">,
+    generation: number,
+    patch: Record<string, unknown>,
+    stale: string = STALE,
+): Promise<void> => {
+    const { applied } = await ctx.db.patchIf("pluginInstalls", installId, { patch: patch as never, where: { generation } });
+
+    if (!applied) {
+        throw new LunoraError("CONFLICT", stale);
+    }
+};

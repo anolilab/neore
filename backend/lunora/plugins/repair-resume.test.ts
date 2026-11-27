@@ -2,6 +2,7 @@ import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import schema from "../schema";
+import { removeImportedItem } from "../skills/bundle";
 import { createPluginSkill } from "../skills/create-skill";
 import { createInstallRow, markNeedsRepair, recordCreated, recordIntent } from "./install-steps";
 import { ROOT_SHARD_KEY, runInShard } from "../lib/shard-context";
@@ -251,5 +252,42 @@ describe("repair: taking over a stopped install", () => {
 
         expect(begun.missing).toMatchObject([{ entryKey: "skill:late" }]);
         expect(begun.unresolved).toEqual(["skill:analyst"]);
+    });
+
+    it("keeps a child when the install's generation moved on before the rollback's delete ran", async () => {
+        const first = await run(
+            async (context) => await context.runMutation(createInstallRow, { contentHash: HASH, pluginSlug: SLUG, userId: OWNER, version: "1.0.0" }),
+        );
+        const skillId = await run(
+            async (context) =>
+                await context.runMutation(createPluginSkill, {
+                    description: "Analyst",
+                    instructions: "Analyse.",
+                    isPremium: true,
+                    name: "Analyst",
+                    plan: "premium",
+                    pluginInstallId: first.installId,
+                    pluginMarker: markerFor(first.installId, "skill:analyst"),
+                    slug: "analyst",
+                    source: { type: "plugin" as const, version: "1.0.0" },
+                    userId: OWNER,
+                }),
+        );
+
+        // A repair takes the install over after the old action began its rollback.
+        await run(async (context) => await context.db.patch("pluginInstalls", first.installId, { generation: first.generation + 1 }));
+
+        const outcome = await run(
+            async (context) =>
+                await context.runMutation(removeImportedItem, {
+                    id: skillId,
+                    kind: "skill",
+                    lease: { generation: first.generation, installId: first.installId },
+                    userId: OWNER,
+                }),
+        );
+
+        expect(outcome).toEqual({ kept: true, leaseLost: true });
+        expect(await run(async (context) => await context.db.skills.findFirst({ where: { _id: skillId } }))).toBeTruthy();
     });
 });

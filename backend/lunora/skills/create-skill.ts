@@ -2,7 +2,7 @@ import { v } from "lunorash/server";
 import { LunoraError } from "lunorash/server";
 import type { Infer } from "lunorash/server";
 
-import type { Id } from "../_generated/dataModel";
+import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx as MutationContext } from "../_generated/server";
 import { internalMutation } from "../_generated/server";
 import { rateLimitGuard } from "../lib/rate-limiter";
@@ -163,6 +163,34 @@ export const insertSkill = async (ctx: MutationContext, owner: SkillOwner, args:
     return skillId;
 };
 
+/** Writes the bookkeeping rows (stats, the owner's enabled row, the first history entry) of a skill that lacks any of them. */
+const ensureSkillRows = async (ctx: MutationContext, skill: Doc<"skills">, enabled: boolean): Promise<void> => {
+    const skillId = skill._id as Id<"skills">;
+    const { userId } = skill;
+
+    if (!(await ctx.db.skillStats.findFirst({ where: { skillId } }))) {
+        await ctx.db.insert("skillStats", { skillId, usageCount: 0 });
+    }
+
+    if (!(await ctx.db.userSkills.findFirst({ where: { skillId, userId } }))) {
+        await ctx.db.insert("userSkills", { addedAt: ctx.now, autoRun: false, enabled, skillId, userId });
+    }
+
+    if (!(await ctx.db.skillHistory.findFirst({ where: { skillId } }))) {
+        await ctx.db.insert("skillHistory", {
+            changeType: "created",
+            config: skill.config,
+            createdAt: ctx.now,
+            instructions: skill.instructions,
+            note: "Initial version",
+            skillId,
+            userId,
+            variables: skill.variables,
+            version: 1,
+        });
+    }
+};
+
 /**
  * Creates a skill for a plugin install. Called from an action, which stamps the caller's identity. A skill with the same
  * marker is returned as it is, so a retried install never makes a second copy and spends no rate-limit budget on the re-find.
@@ -179,7 +207,7 @@ export const createPluginSkill = internalMutation
         userId: v.string().max(MAX_LENGTH.id),
     })
     .output(v.id("skills"))
-    .mutation(async ({ args: { activeOrganizationId, isPremium, plan, pluginInstallId, pluginMarker, source, userId, ...fields }, ctx }) => {
+    .mutation(async ({ args: { activeOrganizationId, enabled, isPremium, plan, pluginInstallId, pluginMarker, source, userId, ...fields }, ctx }) => {
         const existing = await ctx.db.skills.findFirst({ where: { pluginMarker } });
 
         if (existing) {
@@ -187,10 +215,18 @@ export const createPluginSkill = internalMutation
                 throw new LunoraError("FORBIDDEN", "That plugin skill belongs to another account");
             }
 
+            if (existing.pluginInstallId !== pluginInstallId) {
+                throw new LunoraError("CONFLICT", "That plugin skill belongs to another install");
+            }
+
+            // The skill row commits before its bookkeeping rows, so a retry after a crash completes whatever is missing.
+            await ensureSkillRows(ctx, existing, enabled ?? true);
+
             return existing._id as Id<"skills">;
         }
 
-        await rateLimitGuard({ ...ctx, rateLimitKey: "skills/create", user: { plan, userId } } as never);
+        // The caller already decided the tier (`isPremium`); an admin has no plan, and a free session's plan is null.
+        await rateLimitGuard({ ...ctx, rateLimitKey: "skills/create", user: { plan: isPremium ? (plan ?? "premium") : null, userId } } as never);
 
         return await insertSkill(ctx, { activeOrganizationId, isPremium, userId }, { ...fields, source }, { pluginInstallId, pluginMarker });
     });

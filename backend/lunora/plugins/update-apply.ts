@@ -18,9 +18,10 @@ import { internalMutation } from "../_generated/server";
 import { patchRow } from "../lib/patch";
 import { skillRowHash, triggerRowHash } from "./entry-hash";
 import { skillVisibility } from "../skills/access";
+import { invalidateSkillsCache } from "../skills/cache";
 import { deleteSkillRows } from "../skills/functions";
 import { ensureSlugUnique, validateSlug } from "../skills/validators";
-import { heldInstall, heldInstallForShardWrite } from "./held-install";
+import { heldInstall, heldInstallForShardWrite, patchInstallIf } from "./held-install";
 import { LEASE_MS, markerFor } from "./logic";
 
 /** The same bound uninstall uses when it looks for group chats that name a skill. */
@@ -47,13 +48,20 @@ export const beginUpdate = internalMutation
 
         const generation = install.generation + 1;
 
-        await ctx.db.patch("pluginInstalls", args.installId as Id<"pluginInstalls">, {
-            generation,
-            leaseUntil: ctx.now + LEASE_MS,
-            status: "updating",
-            targetVersion: args.targetVersion,
-            updatedAt: ctx.now,
-        });
+        // Conditional on the generation that was read: of two callers with the same plan, one takes the lease and the other is told to preview again.
+        await patchInstallIf(
+            ctx,
+            args.installId as Id<"pluginInstalls">,
+            install.generation,
+            {
+                generation,
+                leaseUntil: ctx.now + LEASE_MS,
+                status: "updating",
+                targetVersion: args.targetVersion,
+                updatedAt: ctx.now,
+            },
+            "The plugin changed while this update was being prepared. Preview it again.",
+        );
 
         return generation;
     });
@@ -109,11 +117,33 @@ export const updateSkillChild = internalMutation
         // Pending first: if the write below stops, repair sees a child that matches neither hash and knows an update was half done.
         await ctx.db.patch("pluginItems", link._id as Id<"pluginItems">, { pendingHash: args.contentHash });
 
+        // The content a revision records: a change to it is a new version in the skill's history, as an edit by the owner would be.
+        const contentChanged =
+            args.instructions !== skill.instructions ||
+            JSON.stringify(args.variables) !== JSON.stringify(skill.variables) ||
+            JSON.stringify(args.config) !== JSON.stringify(skill.config);
+        const currentVersion = (skill.currentVersion || 1) + (contentChanged ? 1 : 0);
+
+        if (contentChanged) {
+            await ctx.db.insert("skillHistory", {
+                changeType: "plugin-update",
+                config: args.config,
+                createdAt: ctx.now,
+                instructions: args.instructions,
+                note: "Plugin update",
+                skillId: skill._id,
+                userId: skill.userId,
+                variables: args.variables,
+                version: currentVersion,
+            });
+        }
+
         // The slug is part of the content hash, so the row must take the planned slug or it reads as edited on the next update.
         // A field the new version leaves out is removed, so the row matches the hash recorded below.
         await patchRow(ctx.db, "skills", skill, {
             category: args.category,
             config: args.config,
+            currentVersion,
             description: args.description,
             icon: args.icon,
             instructions: args.instructions,
@@ -124,6 +154,8 @@ export const updateSkillChild = internalMutation
             variables: args.variables,
             version: args.version,
         });
+
+        await invalidateSkillsCache(ctx, skill.userId);
 
         await ctx.db.patch("pluginItems", link._id as Id<"pluginItems">, { contentHash: args.contentHash, pendingHash: "" });
 
@@ -136,7 +168,7 @@ export const finishUpdate = internalMutation
     .mutation(async ({ args, ctx }) => {
         await heldInstall(ctx, args.installId as Id<"pluginInstalls">, args.generation);
 
-        await ctx.db.patch("pluginInstalls", args.installId as Id<"pluginInstalls">, {
+        await patchInstallIf(ctx, args.installId as Id<"pluginInstalls">, args.generation, {
             contentHash: args.contentHash,
             status: "installed",
             updatedAt: ctx.now,
@@ -183,7 +215,7 @@ export const failUpdate = internalMutation
         await heldInstall(ctx, args.installId as Id<"pluginInstalls">, args.generation);
 
         if (args.keepForRepair) {
-            await ctx.db.patch("pluginInstalls", args.installId as Id<"pluginInstalls">, {
+            await patchInstallIf(ctx, args.installId as Id<"pluginInstalls">, args.generation, {
                 contentHash: args.contentHash,
                 status: "needs-repair",
                 updatedAt: ctx.now,
@@ -191,6 +223,9 @@ export const failUpdate = internalMutation
 
             return null;
         }
+
+        // The install row first, conditionally: a stale caller then stops before it touches the links.
+        await patchInstallIf(ctx, args.installId as Id<"pluginInstalls">, args.generation, { status: "installed", updatedAt: ctx.now });
 
         const { page } = await ctx.db.pluginItems.findMany({ where: { installId: args.installId } });
 
@@ -202,8 +237,6 @@ export const failUpdate = internalMutation
                 await ctx.db.delete("pluginItems", row._id as Id<"pluginItems">);
             }
         }
-
-        await ctx.db.patch("pluginInstalls", args.installId as Id<"pluginInstalls">, { status: "installed", updatedAt: ctx.now });
 
         return null;
     });

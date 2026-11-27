@@ -1,5 +1,5 @@
 import { lunoraTest } from "@lunora/testing";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { deleteAllForThreadIdAsync } from "../agent/threads";
 import { createPluginGroupChat } from "../chat/group/functions";
@@ -121,6 +121,20 @@ describe("uninstall", () => {
         await expect(runInShard(ROOT_SHARD_KEY, async () => await run(async (context) => await uninstallRows(context, OWNER, SLUG)))).rejects.toThrow(
             "must run on the owner's shard",
         );
+    });
+
+    it("runs on the root shard where development collapses every user onto it", async () => {
+        await installed();
+        vi.stubEnv("ENVIRONMENT", "development");
+        vi.stubEnv("SHARD_ROUTING", "off");
+
+        try {
+            const begun = await runInShard(ROOT_SHARD_KEY, async () => await run(async (context) => await uninstallRows(context, OWNER, SLUG)));
+
+            expect(begun.removed).toBe(1);
+        } finally {
+            vi.unstubAllEnvs();
+        }
     });
 
     it("keeps a skill shared beyond its owner, because another person's group chat may use it", async () => {

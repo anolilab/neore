@@ -128,4 +128,36 @@ describe("plugin skills", () => {
         expect(rows).toHaveLength(1);
         expect(rows[0]).toMatchObject({ pluginInstallId: INSTALL, pluginMarker: MARKER, source: { type: "plugin", version: "1.0.0" }, userId: OWNER });
     });
+
+    it("refuses a retry of a marker under another install", async () => {
+        await harness.run(async (context: any) => await context.runMutation(createPluginSkill, pluginInput));
+
+        await expect(
+            harness.run(async (context: any) => await context.runMutation(createPluginSkill, { ...pluginInput, pluginInstallId: "install-2" })),
+        ).rejects.toThrow("another install");
+    });
+
+    it("completes the bookkeeping rows of a skill whose first create stopped after the skill row", async () => {
+        const id = await harness.run(async (context: any) => await context.runMutation(createPluginSkill, pluginInput));
+
+        await harness.run(async (context: any) => {
+            const stats = await context.db.skillStats.findFirst({ where: { skillId: id } });
+            const enabled = await context.db.userSkills.findFirst({ where: { skillId: id } });
+
+            await context.db.delete("skillStats", stats._id);
+            await context.db.delete("userSkills", enabled._id);
+        });
+
+        const again = await harness.run(async (context: any) => await context.runMutation(createPluginSkill, pluginInput));
+        const rows = await harness.run(async (context: any) => {
+            return {
+                enabled: await context.db.userSkills.findFirst({ where: { skillId: id } }),
+                stats: await context.db.skillStats.findFirst({ where: { skillId: id } }),
+            };
+        });
+
+        expect(again).toBe(id);
+        expect(rows.stats).toBeTruthy();
+        expect(rows.enabled).toBeTruthy();
+    });
 });

@@ -325,6 +325,10 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
                 "collect-bots",
                 async () => await context.run(internal.bots.gdpr.collectBotsForExport, { userId }, { dedupId: stepDedupId(scope, "collect-bots") }),
             );
+            const plugins = await context.step.do(
+                "collect-plugins",
+                async () => await context.run(internal.plugins.gdpr.collectPluginsForExport, { userId }, { dedupId: stepDedupId(scope, "collect-plugins") }),
+            );
             const codingAgentRuns = await context.step.do(
                 "collect-coding-agent-runs",
                 async () =>
@@ -472,6 +476,7 @@ export const dataExportWorkflowConfig: WorkflowConfig<ExportParams, void> = {
                             memories,
                             notifications,
                             pages,
+                            plugins,
                             profile,
                             prompts,
                             pullRequestGuides,

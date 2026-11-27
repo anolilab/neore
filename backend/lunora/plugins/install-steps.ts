@@ -9,7 +9,7 @@ import { v, LunoraError } from "lunorash/server";
 import type { Id } from "../_generated/dataModel";
 import { internalMutation } from "../_generated/server";
 import { patchRow } from "../lib/patch";
-import { heldInstall, heldInstallForShardWrite } from "./held-install";
+import { heldInstall, heldInstallForShardWrite, patchInstallIf } from "./held-install";
 import { requireOwnerShard } from "./owner-shard";
 import { LEASE_MS } from "./logic";
 import { vPluginItemKind } from "./validators";
@@ -97,12 +97,20 @@ export const finishInstall = internalMutation
         const install = await heldInstall(ctx, args.installId as Id<"pluginInstalls">, args.generation);
 
         // An update kept for repair holds its target version: finishing it makes that the installed version, to match the new file's hash.
-        await patchRow(ctx.db, "pluginInstalls", install, {
+        await patchInstallIf(ctx, args.installId as Id<"pluginInstalls">, args.generation, {
             status: "installed",
-            targetVersion: undefined,
             updatedAt: ctx.now,
             version: install.targetVersion ?? install.version,
         });
+
+        // Only the removal of the held target version follows; the conditional write above has already decided who holds the install.
+        if (install.targetVersion !== undefined) {
+            const written = await ctx.db.pluginInstalls.findFirst({ where: { _id: args.installId as Id<"pluginInstalls"> } });
+
+            if (written && written.generation === args.generation) {
+                await patchRow(ctx.db, "pluginInstalls", written, { targetVersion: undefined });
+            }
+        }
 
         return null;
     });
@@ -114,7 +122,7 @@ export const markNeedsRepair = internalMutation
     .mutation(async ({ args, ctx }) => {
         await heldInstall(ctx, args.installId as Id<"pluginInstalls">, args.generation);
 
-        await ctx.db.patch("pluginInstalls", args.installId as Id<"pluginInstalls">, { status: "needs-repair", updatedAt: ctx.now });
+        await patchInstallIf(ctx, args.installId as Id<"pluginInstalls">, args.generation, { status: "needs-repair", updatedAt: ctx.now });
 
         return null;
     });

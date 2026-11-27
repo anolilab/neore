@@ -242,7 +242,7 @@ export const getSkill = authQuery
             ctx,
         }): Promise<
             | (StoredRow<Doc<"skills">> & { enabled?: boolean; isOwner: true; stats?: StoredRow<Doc<"skillStats">> })
-            | (Omit<StoredRow<Doc<"skills">>, "organizationId" | "source" | "userId"> & {
+            | (Omit<StoredRow<Doc<"skills">>, "organizationId" | "pluginInstallId" | "pluginMarker" | "source" | "userId"> & {
                   enabled?: boolean;
                   isOwner: false;
                   stats?: StoredRow<Doc<"skillStats">>;
@@ -276,7 +276,12 @@ export const getSkill = authQuery
             // (a GitHub source can name a private repository) — the same line the
             // marketplace projection draws.
             if (!isSkillOwner(skill, { userId })) {
-                return { ...omit(skill, ["organizationId", "source", "userId"]), enabled: userSkill?.enabled, isOwner: false, stats: stats ?? undefined };
+                return {
+                    ...omit(skill, ["organizationId", "pluginInstallId", "pluginMarker", "source", "userId"]),
+                    enabled: userSkill?.enabled,
+                    isOwner: false,
+                    stats: stats ?? undefined,
+                };
             }
 
             return {
