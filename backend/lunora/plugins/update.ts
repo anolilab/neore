@@ -177,8 +177,9 @@ export const previewUpdate = authAction
  * rewrite keeps its messages. New children are created (skills, triggers, then new group chats, which name the plugin's skills by
  * entry key), and removed ones deleted or detached: a dropped group chat with no messages or pins is deleted, one that has either is
  * kept and detached from the plugin (and reported as skipped), and a skill such a group still names is kept the way it is for any
- * group chat. The order is: skill and trigger rewrites, creates, group rewrites, dropped group chats, dropped skills and triggers, so a
- * dropped skill is never judged against a group chat that is about to go. An update whose group chat names a skill that does not exist
+ * group chat. The order is: skill rewrites, creates, group rewrites, dropped group chats, dropped skills and triggers, then trigger
+ * rewrites (webhook targets last), so a dropped skill is never judged against a group chat that is about to go, and a step that can
+ * issue a webhook secret has as few steps after it as possible. An update whose group chat names a skill that does not exist
  * is refused before anything is written. A downgrade needs `confirmDowngrade`. If a step fails, the install goes back to `installed`
  * (or to `needs-repair` when new children were left behind) and the update can be run again; repair does not rewrite a group chat, it
  * marks the install partial, and running the update again finishes the group.
@@ -311,6 +312,12 @@ export const updatePlugin = authAction
         const removals: { action: UpdateAction; entryKey: string }[] = [];
         const groupRewrites: { action: UpdateAction; entryKey: string }[] = [];
         const groupRemovals: { action: UpdateAction; entryKey: string }[] = [];
+        const triggerRewrites: { action: UpdateAction; entryKey: string }[] = [];
+        const isWebhookEntry = (entryKey: string): boolean => {
+            const entry = entries.find((candidate) => candidate.key === entryKey);
+
+            return entry?.plan?.kind === "trigger" && entry.plan.create.type === "webhook";
+        };
 
         try {
             for (const step of plan) {
@@ -344,24 +351,8 @@ export const updatePlugin = authAction
                 }
 
                 if (step.action === "update" && entry?.plan?.kind === "trigger") {
-                    const { create } = entry.plan;
-
-                    const { webhookSecret } = await ctx.runMutation(internal.plugins.update_apply.updateTriggerChild, {
-                        ...create,
-                        contentHash: await entryHash(entry),
-                        entryKey: step.entryKey,
-                        generation,
-                        installId: installed.installId,
-                        userId,
-                    });
-
-                    applied.push(step.entryKey);
-
-                    // A secret is issued only when a type change made a new webhook; it is returned once and never logged.
-                    if (webhookSecret !== undefined) {
-                        webhookSecrets.push({ entryKey: step.entryKey, secret: webhookSecret });
-                    }
-
+                    // Last, after every other step: a replaced webhook's new secret is returned only when the update succeeds.
+                    triggerRewrites.push(step);
                     continue;
                 }
 
@@ -526,6 +517,33 @@ export const updatePlugin = authAction
                 }
 
                 applied.push(step.entryKey);
+            }
+
+            // Webhook targets after the others, so a step that can issue a secret has as few steps after it as possible.
+            const webhookLast = [...triggerRewrites].sort((a, b) => Number(isWebhookEntry(a.entryKey)) - Number(isWebhookEntry(b.entryKey)));
+
+            for (const step of webhookLast) {
+                const entry = entries.find((candidate) => candidate.key === step.entryKey);
+
+                if (entry?.plan?.kind !== "trigger") {
+                    continue;
+                }
+
+                const { webhookSecret } = await ctx.runMutation(internal.plugins.update_apply.updateTriggerChild, {
+                    ...entry.plan.create,
+                    contentHash: await entryHash(entry),
+                    entryKey: step.entryKey,
+                    generation,
+                    installId: installed.installId,
+                    userId,
+                });
+
+                applied.push(step.entryKey);
+
+                // A secret is issued only when a type or scheme change made a new webhook; it is returned once and never logged.
+                if (webhookSecret !== undefined) {
+                    webhookSecrets.push({ entryKey: step.entryKey, secret: webhookSecret });
+                }
             }
 
             await ctx.runMutation(internal.plugins.update_apply.finishUpdate, {

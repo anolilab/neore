@@ -396,7 +396,7 @@ describe("a changed trigger that cannot be planned", () => {
 describe("a webhook secret when a later step fails", () => {
     let harness: ReturnType<typeof lunoraTest>;
 
-    const file = async (hookScheme: "native" | "timestamped", version: string) => {
+    const file = async (hookScheme: "native" | "timestamped", version: string, digest: typeof DIGEST = DIGEST) => {
         const body = buildBundleMarkdown({
             description: "",
             items: [
@@ -406,7 +406,7 @@ describe("a webhook secret when a later step fails", () => {
                     kind: "trigger" as const,
                     trigger: { model: DIGEST.model, name: "Hook", type: "webhook" as const, webhookSignatureScheme: hookScheme },
                 },
-                { key: "digest", kind: "trigger" as const, trigger: DIGEST },
+                { key: "digest", kind: "trigger" as const, trigger: digest },
             ],
             name: "Daily brief",
         });
@@ -431,6 +431,47 @@ describe("a webhook secret when a later step fails", () => {
     });
 
     const as = () => harness.withIdentity({ userId: OWNER } as never);
+
+    it("replaces a webhook only after every other step, so an earlier failure issues no secret", async () => {
+        // The webhook's scheme changes (a replacement) and the schedule changes too; the schedule's rewrite fails.
+        const next = await file("native", "1.1.0", { ...DIGEST, cronExpression: "0 10 * * 1" });
+        const original = procedureAt("plugins_update_apply", "updateTriggerChild") as { handler: (context: unknown, args: { entryKey: string }) => unknown };
+        const before = await harness.run(async (context: any) => await context.db.query("triggers").collect());
+
+        registry.set(
+            "plugins_update_apply:updateTriggerChild",
+            Object.assign(Object.create(original as object), {
+                handler: async (context: unknown, args: { entryKey: string }) => {
+                    if (args.entryKey === "trigger:digest") {
+                        throw new LunoraError("CONFLICT", "injected failure");
+                    }
+
+                    return await original.handler(context, args);
+                },
+            }),
+        );
+        try {
+            const preview = (await as().action(procedureAt("plugins_update", "previewUpdate"), { markdown: next.markdown } as never)) as PreviewResult;
+
+            await expect(
+                as().action(procedureAt("plugins_update", "updatePlugin"), {
+                    confirmDowngrade: false,
+                    contentHash: next.contentHash,
+                    expectedGeneration: preview.generation,
+                    expectedInstallId: preview.installId,
+                    markdown: next.markdown,
+                } as never),
+            ).rejects.toThrow("injected failure");
+        } finally {
+            registry.set("plugins_update_apply:updateTriggerChild", original);
+        }
+
+        const after = await harness.run(async (context: any) => await context.db.query("triggers").collect());
+        const hookBefore = before.find((row: { name: string }) => row.name === "Hook");
+        const hookAfter = after.find((row: { name: string }) => row.name === "Hook");
+
+        expect(hookAfter).toMatchObject({ _id: hookBefore._id, webhookSignatureScheme: "timestamped" });
+    });
 
     it("is not put on the error when a later step fails; the replaced webhook stays switched off", async () => {
         // The scheme change replaces the webhook (new secret); the last step, recording the new version, then fails.
