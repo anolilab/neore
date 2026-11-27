@@ -11702,8 +11702,26 @@
     "memoryCleanups": {
       "commitOrdered": false,
       "fields": {
+        "attempts": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "dueAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
         "embeddingId": {
           "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "fromCreatedAt": {
+          "kind": "number",
           "nullable": false,
           "optional": true,
           "unique": false
@@ -11719,6 +11737,18 @@
             "optional": false,
             "unique": false,
             "ref": "memories"
+          }
+        },
+        "ids": {
+          "kind": "array",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "of": {
+            "kind": "string",
+            "nullable": false,
+            "optional": false,
+            "unique": false
           }
         },
         "kind": {
@@ -11739,6 +11769,13 @@
               "nullable": false,
               "optional": false,
               "unique": false,
+              "literal": "\"digests\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
               "literal": "\"vector\""
             }
           ]
@@ -11749,12 +11786,6 @@
           "optional": true,
           "unique": false
         },
-        "updatedAt": {
-          "kind": "number",
-          "nullable": false,
-          "optional": false,
-          "unique": false
-        },
         "userId": {
           "kind": "string",
           "nullable": false,
@@ -11763,15 +11794,15 @@
         }
       },
       "indexes": {
-        "by_embeddingId": {
+        "by_dueAt": {
           "fields": [
-            "embeddingId"
+            "dueAt"
           ],
           "unique": false
         },
-        "by_updatedAt": {
+        "by_embeddingId": {
           "fields": [
-            "updatedAt"
+            "embeddingId"
           ],
           "unique": false
         },
