@@ -577,6 +577,24 @@ describe("the session hold every isolate shares", () => {
         expect(started).toStrictEqual(["connect"]);
     });
 
+    it("refuses at once, without waiting for the other call, a sign-in whose budget leaves no time to wait", async () => {
+        const { env, started } = binding();
+        const other = await otherIsolate();
+
+        post(env, "/action", { action: "extract", sessionId: "busy" }, other).catch(() => undefined);
+        await vi.advanceTimersByTimeAsync(0);
+
+        let isAnswered = false;
+        const answer = post(env, "/login", { ...LOGIN, budgetMs: 20_000, sessionId: "busy" }).finally(() => {
+            isAnswered = true;
+        });
+
+        await vi.advanceTimersByTimeAsync(0);
+        expect(isAnswered).toBe(true);
+        await expect(answer).resolves.toHaveProperty("status", 409);
+        expect(started).toStrictEqual(["connect"]);
+    });
+
     it.each([
         ["/login", { ...LOGIN, sessionId: "away" }],
         ["/action", { action: "extract", sessionId: "away" }],

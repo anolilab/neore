@@ -46,8 +46,8 @@ const SIGNING_SECRET = "browser-control-test-secret";
 const VIEW_URL = "https://live.browser.run/ui/view?mode=tab&wss=live.browser.run/api/devtools/browser/s-1?jwt=signed";
 
 const { config, impersonation, registry, sessionFrom } = vi.hoisted(() => {
-    // Set while a test acts as an admin impersonating the signed-in user.
-    const state: { by?: string } = {};
+    // `by` is set while a test acts as an admin impersonating the signed-in user; `admin` while the user is an admin.
+    const state: { admin?: boolean; by?: string } = {};
 
     return {
         config: { accountId: "account-1", token: "token-1" },
@@ -55,7 +55,7 @@ const { config, impersonation, registry, sessionFrom } = vi.hoisted(() => {
         registry: new Map<string, unknown>(),
         sessionFrom: async (context: { auth: { userId?: string | null } }) =>
             context.auth.userId
-                ? { activeOrganization: null, id: context.auth.userId, impersonatedBy: state.by, isAdmin: false, userId: context.auth.userId }
+                ? { activeOrganization: null, id: context.auth.userId, impersonatedBy: state.by, isAdmin: state.admin === true, userId: context.auth.userId }
                 : null,
     };
 });
@@ -166,7 +166,10 @@ vi.mock("@neore/service-sdk/browser-renderer", async (importOriginal) => {
 // The release route crosses to the shard its token names as the system: here, straight into the harness, and the
 // shard it asked for is kept for the test to check.
 const { releaseLimit, releaseShards } = vi.hoisted(() => {
-    return { releaseLimit: { down: false, guarded: [] as string[], keys: [] as string[], limited: false }, releaseShards: [] as string[] };
+    return {
+        releaseLimit: { down: false, guarded: [] as string[], guardedFor: [] as unknown[], keys: [] as string[], limited: false },
+        releaseShards: [] as string[],
+    };
 });
 
 vi.mock("../lib/http-shard", async (importOriginal) => {
@@ -196,8 +199,9 @@ vi.mock("../lib/rate-limiter", async (importOriginal) => {
 
             return { ok: !releaseLimit.limited };
         },
-        rateLimitGuard: async (context: { rateLimitKey: string }) => {
+        rateLimitGuard: async (context: { rateLimitKey: string; user: unknown }) => {
             releaseLimit.guarded.push(context.rateLimitKey);
+            releaseLimit.guardedFor.push(context.user);
         },
     };
 });
@@ -287,10 +291,12 @@ afterEach(() => {
     releaseLimit.down = false;
     releaseLimit.keys.length = 0;
     releaseLimit.guarded.length = 0;
+    releaseLimit.guardedFor.length = 0;
     releaseLimit.limited = false;
     delete replica.grant;
     delete replica.afterPrimary;
     impersonation.by = undefined;
+    impersonation.admin = undefined;
     actionStart.hook = undefined;
     rendererStart.hook = undefined;
     vi.restoreAllMocks();
@@ -2010,6 +2016,16 @@ describe("a phone that takes control", () => {
         await expect(statusFor(OWNER)).resolves.toMatchObject({ control: { byYou: true, claimIds: [phone.claimId] } });
         // Charged to control's budget, never the live view budget the web card's views need.
         expect(releaseLimit.guarded).toStrictEqual(["browser/control"]);
+    });
+
+    it("charges an admin's take to the admin's tier, as the rate limit middleware does", async () => {
+        await addSession();
+        impersonation.admin = true;
+
+        await expect(as(OWNER).action(takeControl as never, { exclusive: true, leaseOnly: true, threadId, view: "phone-1" } as never)).resolves.toMatchObject({
+            status: "ok",
+        });
+        expect(releaseLimit.guardedFor).toStrictEqual([expect.objectContaining({ isAdmin: true, userId: OWNER })]);
     });
 
     it("takes back a lease whose answer it lost by naming its own view, but never another view's", async () => {
