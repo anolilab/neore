@@ -27,6 +27,7 @@ import {
     PAIRING_REVOKED_CODE,
 } from "./lib/constants";
 import { isDeviceInScope, resolveThreadProject } from "./lib/scope";
+import { recordFirstSignedUse } from "./lib/state";
 import { signDevicePayload, utf8Length } from "./lib/signing";
 import { announceNewDevice, assertRoomForDevice, insertDevice, sendDevicePairedAlert } from "./lib/register";
 import { mergeTaint } from "./lib/taint";
@@ -494,6 +495,23 @@ export const announceDeviceAlert = internalMutation
 
         if (device) {
             await announceNewDevice(ctx, device);
+        }
+
+        return null;
+    });
+
+/**
+ * Records the first signed request of a device whose owner has not seen one yet (`lib/state.ts`). Run by the upload route after it
+ * verified the request's signature on this shard. Does nothing once the device has signed in.
+ */
+export const recordDeviceSignedUse = internalMutation
+    .input({ deviceId: v.string().max(MAX_LENGTH.id), userId: v.string().max(MAX_LENGTH.short) })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        const device = await ctx.db.devices.findFirst({ where: { _id: ctx.db.asId("devices", args.deviceId), userId: args.userId } });
+
+        if (device) {
+            await recordFirstSignedUse(ctx, device, ctx.now);
         }
 
         return null;
