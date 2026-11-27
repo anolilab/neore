@@ -109,6 +109,17 @@ const rectAt = (top: number) => {
     };
 };
 
+/** Stubs the hit's rectangle: the hit whose text is "too" wide sits far below, every other hit at `top`. */
+const stubHitRects = (top: number): void => {
+    Object.defineProperty(Range.prototype, "getBoundingClientRect", {
+        configurable: true,
+        value: function rectOfHit(this: Range) {
+            // eslint-disable-next-line unicorn/no-this-outside-of-class -- the rect depends on which range is asked, which only the receiver says
+            return rectAt(this.startContainer.textContent?.includes("too") ? 900 : top);
+        },
+    });
+};
+
 const ask = (question: string) => {
     fireEvent.change(screen.getByLabelText("Your side question"), { target: { value: question } });
     fireEvent.click(screen.getByRole("button", { name: "Ask" }));
@@ -771,13 +782,7 @@ describe("AsidePanel", () => {
 
         Object.defineProperty(Element.prototype, "scrollIntoView", { configurable: true, value: scroll });
         // The new earlier hit sits well out of view. The selected hit does not move, so nothing scrolls.
-        Object.defineProperty(Range.prototype, "getBoundingClientRect", {
-            configurable: true,
-            value: function rectOfHit(this: Range) {
-                // eslint-disable-next-line unicorn/no-this-outside-of-class -- the rect depends on which range is asked, which only the receiver says
-                return rectAt(this.startContainer.textContent?.includes("too") ? 900 : hitTop);
-            },
-        });
+        stubHitRects(hitTop);
 
         try {
             act(() => {
@@ -814,13 +819,7 @@ describe("AsidePanel", () => {
         render(<AsidePanel threadId="thread-1" />);
 
         Object.defineProperty(Element.prototype, "scrollIntoView", { configurable: true, value: scroll });
-        Object.defineProperty(Range.prototype, "getBoundingClientRect", {
-            configurable: true,
-            value: function rectOfHit(this: Range) {
-                // eslint-disable-next-line unicorn/no-this-outside-of-class -- the rect depends on which range is asked, which only the receiver says
-                return rectAt(this.startContainer.textContent?.includes("too") ? 900 : hitTop);
-            },
-        });
+        stubHitRects(hitTop);
 
         try {
             act(() => {
@@ -856,13 +855,7 @@ describe("AsidePanel", () => {
         render(<AsidePanel threadId="thread-1" />);
 
         Object.defineProperty(Element.prototype, "scrollIntoView", { configurable: true, value: scroll });
-        Object.defineProperty(Range.prototype, "getBoundingClientRect", {
-            configurable: true,
-            value: function rectOfHit(this: Range) {
-                // eslint-disable-next-line unicorn/no-this-outside-of-class -- the rect depends on which range is asked, which only the receiver says
-                return rectAt(this.startContainer.textContent?.includes("too") ? 900 : hitTop);
-            },
-        });
+        stubHitRects(hitTop);
 
         try {
             act(() => {
@@ -896,13 +889,7 @@ describe("AsidePanel", () => {
         render(<AsidePanel threadId="thread-1" />);
 
         Object.defineProperty(Element.prototype, "scrollIntoView", { configurable: true, value: scroll });
-        Object.defineProperty(Range.prototype, "getBoundingClientRect", {
-            configurable: true,
-            value: function rectOfHit(this: Range) {
-                // eslint-disable-next-line unicorn/no-this-outside-of-class -- the rect depends on which range is asked, which only the receiver says
-                return rectAt(this.startContainer.textContent?.includes("too") ? 900 : hitTop);
-            },
-        });
+        stubHitRects(hitTop);
 
         try {
             act(() => {
