@@ -77,6 +77,7 @@ export const ALWAYS_AVAILABLE_TOOLS = [
     "createPresentation",
     "updateSlide",
     "searchMemory",
+    "searchPastChats",
     "knowledgeSearch",
     "taskList",
     "canvasAI",

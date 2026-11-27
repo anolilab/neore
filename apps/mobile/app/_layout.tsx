@@ -118,6 +118,7 @@ const SignInGate = () => {
             <Stack.Screen name="settings" options={{ title: "Settings" }} />
             <Stack.Screen name="sign-in" options={{ title: "Sign in" }} />
             <Stack.Screen name="chat/[threadId]" options={{ title: "Chat" }} />
+            <Stack.Screen name="browser/[threadId]" options={{ title: "Browser" }} />
             <Stack.Screen name="projects/index" options={{ title: "Projects" }} />
             <Stack.Screen name="projects/[projectId]" options={{ title: "Project" }} />
         </Stack>

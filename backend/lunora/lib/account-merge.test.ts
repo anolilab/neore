@@ -1301,6 +1301,37 @@ describe("reassignGlobalRows", () => {
         }
     });
 
+    it("re-points an owner's shared-pin routes to the new account when the owner moves, so a collaborator's route still finds the thread", async () => {
+        const harness = lunoraTest(schemaWithShardedTables([...Object.keys(GLOBAL_USER_COLUMNS), "shardActivity"]) as never);
+
+        try {
+            await harness.run(async (context: any) => {
+                await context.db.insert("sharedPinRoutes", { createdAt: 1, ownerId: "owner-a", threadId: "thread-1", userId: "collaborator" });
+            });
+
+            // The owner's merge runs the same global pass with the owner as the moving account.
+            const { generation } = (await harness.run(
+                async (context: any) => await context.runMutation(acquireMergeLease, { from: "owner-a", to: "owner-n" }),
+            )) as { generation: number };
+
+            for (let call = 1; call <= 20; call += 1) {
+                const { done } = (await harness.run(
+                    async (context: any) => await context.runMutation(reassignGlobalRows, { from: "owner-a", generation, to: "owner-n" }),
+                )) as { done: boolean };
+
+                if (done) {
+                    break;
+                }
+            }
+
+            const rows = await harness.run(async (context: any) => await context.db.sharedPinRoutes.findMany({ where: { userId: "collaborator" } }));
+
+            expect(rows.page.map((row: any) => [row.ownerId, row.threadId, row.userId])).toStrictEqual([["owner-n", "thread-1", "collaborator"]]);
+        } finally {
+            harness.close();
+        }
+    });
+
     it("moves a guest's grant revisions to the new account, keeping the higher count where both have one for a thread", async () => {
         const harness = lunoraTest(schemaWithShardedTables([...Object.keys(GLOBAL_USER_COLUMNS), "shardActivity"]) as never);
 
@@ -1713,6 +1744,60 @@ describe("deleteMergedGuest", () => {
 
             return await context.runMutation(deleteMergedGuest, { generation, userId });
         });
+
+    it("keeps the guest while an owed pin restore still names it, and deletes it once that restore has settled", async () => {
+        const harness = harnessWithUsers();
+        const guest = await insertUser(harness, true);
+        const owed = (await harness.run(
+            async (context: any) =>
+                await context.db.insert("pendingPinRestores", {
+                    dispatchedAt: 1,
+                    ownerId: "user",
+                    routeCreatedAt: 1,
+                    threadId: "thread-1",
+                    until: 1,
+                    userId: guest,
+                }),
+        )) as string;
+
+        expect(await deleteGuest(harness, guest)).toStrictEqual({ deleted: false, pinsRemain: true });
+
+        await harness.run(async (context: any) => await context.db.delete("pendingPinRestores", owed));
+
+        expect(await deleteGuest(harness, guest)).toStrictEqual({ deleted: true });
+    });
+
+    it("keeps the guest while its pin-write leases remain, and clears them a batch per call", async () => {
+        const harness = harnessWithUsers();
+
+        try {
+            const guest = await insertUser(harness, true);
+
+            // More than one batch of lease rows, as a guest with many pin writes leaves behind.
+            await harness.run(async (context: any) => {
+                for (let index = 0; index < 45; index += 1) {
+                    await context.db.insert("pinWriteLeases", { expiresAt: 0, userId: guest, writerId: `writer-${String(index)}` });
+                }
+            });
+
+            expect(await deleteGuest(harness, guest)).toStrictEqual({ deleted: false, leasesRemain: true });
+            await expect(userExists(harness, guest)).resolves.toBe(true);
+
+            let result: { deleted: boolean; leasesRemain?: boolean } = { deleted: false, leasesRemain: true };
+
+            for (let call = 0; call < 5 && result.leasesRemain === true; call += 1) {
+                result = await deleteGuest(harness, guest);
+            }
+
+            expect(result).toStrictEqual({ deleted: true });
+
+            const leases = await harness.run(async (context: any) => await context.db.pinWriteLeases.findMany({ where: { userId: guest } }));
+
+            expect(leases.page).toHaveLength(0);
+        } finally {
+            harness.close();
+        }
+    });
 
     it("takes the guest's pins-left signal with it", async () => {
         const harness = harnessWithUsers();
@@ -2415,6 +2500,17 @@ describe("mergeGuestInto across two real shards", () => {
             switch (name) {
                 // The guest's user row is `.global()`, which this harness does not hold: the deletion's own shard check only.
                 case "deleteMergedGuest": {
+                    // An owed restore keeps the guest, as the guard in `deleteMergedGuest` does.
+                    const owed = (await shards.guest.run(async (context: any) => {
+                        const { page } = await context.db.pendingPinRestores.findMany({ consistency: "primary", limit: 1, where: { userId: args.userId } });
+
+                        return page.length;
+                    })) as number;
+
+                    if (owed > 0) {
+                        return { deleted: false, pinsRemain: true } as never;
+                    }
+
                     const left = (await shards.guest.run(
                         async (context: any) => await firstTableWithGuestRows(context, args.userId as string, args.sharedStore === true),
                     )) as string | null;
@@ -3042,6 +3138,114 @@ describe("mergeGuestInto across two real shards", () => {
         }
     });
 
+    it("ends the guest's merging marker only after its deletion has returned, so a writer that sees no marker finds the guest's row gone", async () => {
+        const merge = twoShards();
+
+        // The guest's merging marker, read on the guest's shard. A writer refuses while it is live, and once it is gone the guest's row is too.
+        const mergingMarkerLive = async () =>
+            (await merge.shards.user.run(async (context: any) => {
+                const { page } = await context.db.accountMoves.findMany({ consistency: "primary", where: { userId: "guest" } });
+
+                return page.some((row: { kind: string }) => row.kind === "merging");
+            })) as boolean;
+
+        try {
+            // A thread on the guest's shard, so the merge has rows to move and reaches the guest's own deletion.
+            await merge.shards.guest.run(async (context: any) => await context.db.insert("threads", thread("the guest's")));
+
+            const markerAtDeletion: boolean[] = [];
+            const deletedBeforeMarkersDrop: boolean[] = [];
+            let deleted = false;
+
+            const call: ShardCall = async (reference, args, shardKey) => {
+                const name = reference.__lunoraRef.split(":", 2)[1]!;
+
+                if (name === "deleteMergedGuest") {
+                    markerAtDeletion.push(await mergingMarkerLive());
+
+                    const result = (await merge.call(reference, args, shardKey)) as { deleted: boolean };
+
+                    deleted ||= result.deleted;
+
+                    return result as never;
+                }
+
+                if (name === "dropImportMarkersPage") {
+                    deletedBeforeMarkersDrop.push(deleted);
+                }
+
+                return (await merge.call(reference, args, shardKey)) as never;
+            };
+
+            await mergeToEnd(call, "guest", "user");
+
+            expect(markerAtDeletion.length).toBeGreaterThan(0);
+            expect(markerAtDeletion.every(Boolean)).toBe(true);
+            expect(deletedBeforeMarkersDrop).toStrictEqual([true]);
+        } finally {
+            merge.close();
+        }
+    });
+
+    it("keeps the guest while an owed pin restore still names it, and deletes the guest once that restore has settled", async () => {
+        const merge = twoShards();
+
+        try {
+            const threadId = (await merge.shards.guest.run(async (context: any) => await context.db.insert("threads", thread("the guest's")))) as string;
+            const firstAnswers: unknown[] = [];
+            let deleteCalls = 0;
+            const call: ShardCall = async (reference, args, shardKey) => {
+                const name = reference.__lunoraRef.split(":", 2)[1]!;
+
+                if (name === "deleteMergedGuest") {
+                    deleteCalls += 1;
+
+                    // The first attempt finds a restore still owed to the guest, written after the global step re-pointed the rest.
+                    if (deleteCalls === 1) {
+                        await merge.shards.guest.run(
+                            async (context: any) =>
+                                await context.db.insert("pendingPinRestores", {
+                                    dispatchedAt: 1,
+                                    ownerId: "user",
+                                    routeCreatedAt: 1,
+                                    threadId,
+                                    until: 1,
+                                    userId: "guest",
+                                }),
+                        );
+                    } else if (deleteCalls === 2) {
+                        // The restore has settled by the next attempt: its row is gone.
+                        await merge.shards.guest.run(async (context: any) => {
+                            const { page } = await context.db.pendingPinRestores.findMany({ where: { userId: "guest" } });
+
+                            for (const row of page) {
+                                await context.db.delete("pendingPinRestores", row._id);
+                            }
+                        });
+                    }
+
+                    const result: unknown = await merge.call(reference, args, shardKey);
+
+                    if (deleteCalls === 1) {
+                        firstAnswers.push(result);
+                    }
+
+                    return result as never;
+                }
+
+                return (await merge.call(reference, args, shardKey)) as never;
+            };
+
+            await mergeToEnd(call, "guest", "user");
+
+            expect(firstAnswers).toStrictEqual([{ deleted: false, pinsRemain: true }]);
+            expect(deleteCalls).toBeGreaterThanOrEqual(2);
+            expect(merge.guestDeletions.at(-1)).toBeNull();
+        } finally {
+            merge.close();
+        }
+    });
+
     it("takes back the copy of a row the guest deletes right after the reconcile found it still on the guest's shard", async () => {
         const merge = twoShards();
 
@@ -3507,7 +3711,7 @@ describe("mergeGuestInto across two real shards", () => {
                 await merge.lapseLease();
                 await merge.shards.guest.run(async (context: any) => await context.db.patch("threads", id, { title: "edited during the merge", updatedAt: 2 }));
                 ({ next: newer } = await mergeGuestInto(merge.call, REFERENCES, "guest", "user", {
-                    budget: MERGE_LEASE_CALLS + MERGE_STOP_CALLS + 4,
+                    budget: MERGE_LEASE_CALLS + MERGE_STOP_CALLS + 5,
                     resume: { cursor: null, moved: 0, phase: "clear", run: 1, table: "threads" },
                 }));
             });

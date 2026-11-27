@@ -229,6 +229,12 @@ describe("Always allow on a tool that spends money or sends out as the person", 
         await expect(record("today", key)).rejects.toMatchObject({ code: "BAD_REQUEST" });
     });
 
+    it.each(["builtin:watchPullRequest", "builtin:unwatchPullRequest"])("refuses Always for %s and stores no auto", async (key) => {
+        await expect(record("always", key)).rejects.toMatchObject({ code: "BAD_REQUEST" });
+
+        expect(await stored()).toBeNull();
+    });
+
     it("offers only a single approval for a person-only tool, and offers a period for the rest", async () => {
         const personMessage = await record("always", "builtin:mergePullRequest")
             .then(() => "")

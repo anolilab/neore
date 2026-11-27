@@ -3,7 +3,7 @@
  *
  * The feature is OPT-IN (`userSettings.scheduleIdeasEnabled`, absent = off) and nothing here creates a task by
  * itself: accepting goes through `insertTask`, the path `createTask` uses, and only for a pending row the caller
- * owns while the switch is on. Turning the switch off erases the rows (`eraseUserTaskSuggestions`).
+ * owns while the switch is on. Turning the switch or memory off erases the rows (`eraseUserTaskSuggestions`).
  *
  * A row holds the proposed task in its own shape and the ids of the chats it came from — never message text.
  *
@@ -86,14 +86,14 @@ export const readScheduleIdeasEnabled = async (ctx: Pick<QueryCtx, "db">, userId
     return settings?.scheduleIdeasEnabled === true;
 };
 
-/** The caller's pending suggestions, newest first, at most {@link MAX_PENDING_SUGGESTIONS}. Empty while the switch is off. */
+/** The caller's pending suggestions, newest first, at most {@link MAX_PENDING_SUGGESTIONS}. Empty while the switch or memory is off. */
 export const listTaskSuggestions = authQuery
     .input({})
     .output(v.array(vSuggestionView))
     .query(async ({ ctx }) => {
         const { userId } = ctx.user;
 
-        if (!(await readScheduleIdeasEnabled(ctx, userId))) {
+        if (!(await readScheduleIdeasEnabled(ctx, userId)) || !(await readMemoryEnabled(ctx, userId))) {
             return [];
         }
 
@@ -117,7 +117,7 @@ export const listTaskSuggestions = authQuery
 
 /**
  * Turns a pending suggestion into a task. A row that is not the caller's answers NOT_FOUND (ids cannot be probed);
- * one already decided, or a switch that is off, is refused. The task and the status change are one transaction, so a
+ * one already decided, or a switch (or memory) that is off, is refused. The task and the status change are one transaction, so a
  * repeated or concurrent accept creates the task once.
  */
 export const acceptTaskSuggestion = authMutation
@@ -132,7 +132,7 @@ export const acceptTaskSuggestion = authMutation
             throw new LunoraError("NOT_FOUND", "Suggestion not found");
         }
 
-        if (!(await readScheduleIdeasEnabled(ctx, userId))) {
+        if (!(await readScheduleIdeasEnabled(ctx, userId)) || !(await readMemoryEnabled(ctx, userId))) {
             throw new LunoraError("FORBIDDEN", "Schedule ideas are turned off");
         }
 

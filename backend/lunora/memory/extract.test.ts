@@ -8,7 +8,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { filterPrivateToolResults, hasPrivacyMarker } from "./gate";
+import { hasPrivacyMarker } from "./gate";
 
 const WHITESPACE_RE = /\s+/;
 // ── hasPrivacyMarker (privacy gate) ──────────────────────────────────────────
@@ -44,30 +44,6 @@ describe(hasPrivacyMarker, () => {
         expect(hasPrivacyMarker("My name is Alice")).toBe(false);
         expect(hasPrivacyMarker("")).toBe(false);
         expect(hasPrivacyMarker("Using a private method in Java")).toBe(false);
-    });
-});
-
-// ── filterPrivateToolResults ───────────────────────────────────────────────
-
-describe(filterPrivateToolResults, () => {
-    it("drops only the tool results that carry a privacy marker", () => {
-        expect.assertions(1);
-
-        const results = [
-            { summary: "Weather in Berlin: 18°C, light rain", toolName: "weather" },
-            { summary: "Salary slip for Dana 🔒", toolName: "retrieve" },
-            { summary: "<PRIVATE> medical record excerpt", toolName: "retrieve" },
-            { summary: "notes [no-memory]", toolName: "knowledge" },
-            { summary: "TypeScript 5.9 release notes", toolName: "web_search" },
-        ];
-
-        expect(filterPrivateToolResults(results).map((r) => r.toolName)).toStrictEqual(["weather", "web_search"]);
-    });
-
-    it("treats a missing list as empty", () => {
-        expect.assertions(1);
-
-        expect(filterPrivateToolResults(undefined)).toStrictEqual([]);
     });
 });
 

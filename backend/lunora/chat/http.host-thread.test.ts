@@ -43,10 +43,18 @@ const httpContext = () => {
         },
         runMutation: async (ref: never, args: never) => await harness.run(async (ctx: any) => await ctx.runMutation(ref, args)),
         // The caller's sign-in is a valid session in the personal space; every other read goes to the harness.
-        runQuery: async (ref: never, args: never) =>
-            (ref as { __lunoraRef?: string }).__lunoraRef === "auth_session_organization:getSessionOrganizationForCap"
+        runQuery: async (ref: never, args: never) => {
+            const name = (ref as { __lunoraRef?: string }).__lunoraRef;
+
+            // No pull request watch is waking any chat here.
+            if (name === "source_control_pr_watch_wake_lease:wakeLeaseHeldFor") {
+                return false;
+            }
+
+            return name === "auth_session_organization:getSessionOrganizationForCap"
                 ? { organizationId: null }
-                : await harness.run(async (ctx: any) => await ctx.runQuery(ref, args)),
+                : await harness.run(async (ctx: any) => await ctx.runQuery(ref, args));
+        },
     };
 
     return {

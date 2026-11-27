@@ -602,8 +602,16 @@ const useThreadGroups = (
             const projectId = project._id;
             const projectThreads = threadsByProject.map.get(projectId) || [];
 
-            // Filter out archived threads from project groups
-            const activeProjectThreads = projectThreads.filter((candidate) => candidate.status !== "archived" && !derivedIds.has(candidate.threadId));
+            // Archived project chats go to the archived list, as the held copies above do; the derived sections took theirs already.
+            const activeProjectThreads: BranchNode[] = [];
+
+            for (const candidate of projectThreads) {
+                if (candidate.status === "archived") {
+                    archivedThreads.push(candidate);
+                } else if (!derivedIds.has(candidate.threadId)) {
+                    activeProjectThreads.push(candidate);
+                }
+            }
 
             // Check if this specific project group is collapsed
             const isCollapsed = collapsedProjects.has(projectId);

@@ -1,6 +1,8 @@
 import type { Infer } from "lunorash/server";
 import { LunoraError, v } from "lunorash/server";
 
+import { refuseWhileWaking } from "../source-control/pr-watch-wake-lease";
+
 import type { Id } from "../_generated/dataModel";
 import { internal } from "../_generated/internal";
 import { internalMutation, internalQuery, type MutationCtx, type QueryCtx as QueryContext } from "../_generated/server";
@@ -248,6 +250,8 @@ export const insertThreadAccess = async (
     },
 ): Promise<{ accessId: Id<"threadAccess">; revision: number }> => {
     await refuseGrantOnLockedThread(ctx, args.threadId);
+    // A pull request watch is writing to this chat: no new reader until it is done (`source-control/pr-watch-wake-lease.ts`).
+    await refuseWhileWaking(ctx, args.ownerId, args.threadId);
     await refuseGrantToMergedGuest(ctx, args.userId);
     await refuseGrantOnMergingOwner(ctx, args.ownerId);
 
