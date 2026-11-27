@@ -14,6 +14,7 @@ import { parseBundleMarkdown } from "../skills/bundle-format";
 import { planFor } from "../skills/bundle";
 import { assertSelectionImportable, BundleImportError, runBundleImport } from "../skills/bundle-plan";
 import { entryHash } from "./entry-hash";
+import { requirePluginFeature } from "./gate";
 import { childOps, importFailure } from "./install-ops";
 import { bodyHash } from "./logic";
 
@@ -88,6 +89,8 @@ export const previewPlugin = authAction
             throw new LunoraError("UNPROCESSABLE", organizationRefusal);
         }
 
+        requirePluginFeature(ctx.user.userId, "plugins");
+
         const { hash, header, name } = await checkPluginFile(args.markdown);
         const { entries } = await planFor(ctx, args.markdown, undefined);
 
@@ -122,6 +125,8 @@ export const installPlugin = authAction
         if (ctx.user.activeOrganization) {
             throw new LunoraError("UNPROCESSABLE", organizationRefusal);
         }
+
+        requirePluginFeature(ctx.user.userId, "plugins");
 
         const { hash, header } = await checkPluginFile(args.markdown);
 

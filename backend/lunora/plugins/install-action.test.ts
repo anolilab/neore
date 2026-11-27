@@ -3,6 +3,7 @@
  * procedures and the internal functions they call are registered by module, so a call reaches the code, not the sign-in.
  */
 import { lunoraTest } from "@lunora/testing";
+import { env } from "cloudflare:workers";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { registeredApi } from "../../test/registered-api";
@@ -103,6 +104,25 @@ describe("plugin install action", () => {
 
         expect(preview).toMatchObject({ contentHash: hash, pluginSlug: "daily-brief", pluginVersion: "1.0.0" });
         expect(preview).toMatchObject({ items: [expect.objectContaining({ kind: "skill", title: "analyst" })] });
+    });
+
+    it("refuses preview and install for an account that is not on the plugins allowlist, and writes nothing", async () => {
+        const variables = env as { PLUGINS_ALLOWED_USERS?: string };
+        const before = variables.PLUGINS_ALLOWED_USERS;
+
+        variables.PLUGINS_ALLOWED_USERS = "someone-else";
+
+        try {
+            await expect(as().action(procedureAt("plugins_install_action", "previewPlugin"), { markdown: pluginFile(hash) } as never)).rejects.toThrow(
+                "not available for this account",
+            );
+            await expect(
+                as().action(procedureAt("plugins_install_action", "installPlugin"), { contentHash: hash, markdown: pluginFile(hash) } as never),
+            ).rejects.toThrow("not available for this account");
+            expect(await installs()).toHaveLength(0);
+        } finally {
+            variables.PLUGINS_ALLOWED_USERS = before;
+        }
     });
 
     it("refuses an install whose hash is not the previewed one, and writes nothing", async () => {
