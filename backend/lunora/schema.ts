@@ -540,6 +540,17 @@ export const schema = defineSchema({
                 until: v.number(),
             }),
         ),
+        /**
+         * How many fresh control leases were taken on this row, by anyone (`browser/live-view.ts#claimControl`): a frame
+         * read that sees it change knows a person took control while its shot ran, even once the lease ended and was cleared.
+         */
+        controlClaims: v.optional(v.number()),
+        /**
+         * The client's own name for the view that holds the current lease (the phone's screen), written by every claim (a
+         * claim naming none clears it), so a take whose answer was lost is not refused as another view's when that view asks
+         * again. Not a credential: it only lifts `exclusive` (`browser/live-view.ts#claimControl`).
+         */
+        controlView: v.optional(v.string()),
         currentUrl: v.optional(v.string()),
         /** When the action that wrote `currentUrl` started, so an older action finishing later does not overwrite it. */
         currentUrlStartedAt: v.optional(v.number()),
@@ -1780,6 +1791,36 @@ export const schema = defineSchema({
         .index("by_userId_botId", ["userId", "botId", "type"])
         // The same scope, active rows only: superseded history never enters a read. `supersededBy` is null for an active row.
         .index("by_userId_botId_active", ["userId", "botId", "supersededBy", "type"]),
+
+    // Cleanup a memory write could not finish, written in the same commit as the work that left it so the reference
+    // survives a retry that cannot be scheduled or runs out (`memory/functions.ts`, `runMemoryCleanup`).
+    // `vector`: the embedding of a retired or deleted memory whose delete failed. `chain`: the ids still to walk of a
+    // delete's older versions, after the first write used its budget. `digests`: the deleted ids still to take out of the
+    // rest of the user's reflection digests (`ids`, from `cursor` on). A scheduler job on the owner's shard works each
+    // record at its `dueAt`; the housekeeping sweep arms any record that is due and has no live job.
+    memoryCleanups: defineTable({
+        // Steps that failed. At the cap the record keeps its row and its `dueAt` moves out of reach.
+        attempts: v.optional(v.number()),
+        // `digests`: where the walk over the user's digests goes on, the pagination cursor of the last page read. It names
+        // positions by value (`createdAt`, then the row's own id), so rows that share a `createdAt` are not read twice or skipped.
+        cursor: v.optional(v.string()),
+        // When the record is next worked: after a grace period at first, after a backoff once a step failed.
+        dueAt: v.number(),
+        embeddingId: v.optional(v.string()),
+        frontier: v.optional(v.array(v.id("memories"))),
+        // `digests`: the deleted memories' ids.
+        ids: v.optional(v.array(v.string())),
+        kind: v.union(v.literal("vector"), v.literal("chain"), v.literal("digests")),
+        memoryId: v.optional(v.string()),
+        // `chain` and `digests`: when the delete began, kept through every continuation. The walks over the user's digests read
+        // only digests written by then; a later one went through `saveMemoryDigest`'s own checks.
+        startedAt: v.optional(v.number()),
+        userId: v.string(),
+    })
+        .shardBy("userId")
+        .index("by_dueAt", ["dueAt"])
+        .index("by_embeddingId", ["embeddingId"])
+        .index("by_userId", ["userId"]),
 
     // One nightly-reflection digest ("what I learned today") per run. See `memory/reflection.ts`.
     memoryDigests: defineTable({

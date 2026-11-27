@@ -9,11 +9,13 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import type { Id } from "../_generated/dataModel";
 import { registeredApi, registerModule } from "../../test/registered-api";
 import { createThreadAccess, deleteThreadAccess, updateThreadAccess } from "../agent/sharing";
+import { patchRow } from "../lib/patch";
 import { applyLimit } from "../lib/rate-limiter-mutations";
 import { internalMutation, internalQuery } from "../lib/crpc";
 import schema from "../schema";
 import { getBrowserActions } from "../chat/functions";
 import { logAction } from "./functions";
+import { MAX_FRAME_BASE64, readBrowserFrame } from "./frame";
 import { controlHolder, getThreadBrowser, handBack, keepControl, navigateInControl, openLiveView, takeControl } from "./live-view";
 import { releaseControlHttpAction } from "./release-http";
 import { runInShard } from "../lib/shard-context";
@@ -44,8 +46,8 @@ const SIGNING_SECRET = "browser-control-test-secret";
 const VIEW_URL = "https://live.browser.run/ui/view?mode=tab&wss=live.browser.run/api/devtools/browser/s-1?jwt=signed";
 
 const { config, impersonation, registry, sessionFrom } = vi.hoisted(() => {
-    // Set while a test acts as an admin impersonating the signed-in user.
-    const state: { by?: string } = {};
+    // `by` is set while a test acts as an admin impersonating the signed-in user; `admin` while the user is an admin.
+    const state: { admin?: boolean; by?: string } = {};
 
     return {
         config: { accountId: "account-1", token: "token-1" },
@@ -53,7 +55,7 @@ const { config, impersonation, registry, sessionFrom } = vi.hoisted(() => {
         registry: new Map<string, unknown>(),
         sessionFrom: async (context: { auth: { userId?: string | null } }) =>
             context.auth.userId
-                ? { activeOrganization: null, id: context.auth.userId, impersonatedBy: state.by, isAdmin: false, userId: context.auth.userId }
+                ? { activeOrganization: null, id: context.auth.userId, impersonatedBy: state.by, isAdmin: state.admin === true, userId: context.auth.userId }
                 : null,
     };
 });
@@ -164,7 +166,10 @@ vi.mock("@neore/service-sdk/browser-renderer", async (importOriginal) => {
 // The release route crosses to the shard its token names as the system: here, straight into the harness, and the
 // shard it asked for is kept for the test to check.
 const { releaseLimit, releaseShards } = vi.hoisted(() => {
-    return { releaseLimit: { down: false, keys: [] as string[], limited: false }, releaseShards: [] as string[] };
+    return {
+        releaseLimit: { down: false, guarded: [] as string[], guardedFor: [] as unknown[], keys: [] as string[], limited: false },
+        releaseShards: [] as string[],
+    };
 });
 
 vi.mock("../lib/http-shard", async (importOriginal) => {
@@ -194,7 +199,10 @@ vi.mock("../lib/rate-limiter", async (importOriginal) => {
 
             return { ok: !releaseLimit.limited };
         },
-        rateLimitGuard: async () => undefined,
+        rateLimitGuard: async (context: { rateLimitKey: string; user: unknown }) => {
+            releaseLimit.guarded.push(context.rateLimitKey);
+            releaseLimit.guardedFor.push(context.user);
+        },
     };
 });
 
@@ -282,10 +290,13 @@ afterEach(() => {
     releaseShards.length = 0;
     releaseLimit.down = false;
     releaseLimit.keys.length = 0;
+    releaseLimit.guarded.length = 0;
+    releaseLimit.guardedFor.length = 0;
     releaseLimit.limited = false;
     delete replica.grant;
     delete replica.afterPrimary;
     impersonation.by = undefined;
+    impersonation.admin = undefined;
     actionStart.hook = undefined;
     rendererStart.hook = undefined;
     vi.restoreAllMocks();
@@ -1794,5 +1805,275 @@ describe("opening a page while in control", () => {
         const after = await session();
 
         expect(after.control).not.toHaveProperty("navigatingUntil");
+    });
+});
+
+describe("a still frame of the browser", () => {
+    const frame = async (userId: string): Promise<any> => await as(userId).action(readBrowserFrame as never, { threadId } as never);
+    const shot = (fields: Record<string, unknown> = {}) => {
+        return {
+            data: { screenshot: "aGVsbG8=", screenshotFormat: "jpeg", sessionId: "s-1", success: true, viewport: { height: 720, width: 1280 }, ...fields },
+            response: { ok: true, status: 200 },
+        };
+    };
+    const session = async (): Promise<any> => await harness.run(async (ctx: any) => await ctx.db.query("browserSessions").first());
+
+    it("gives a reader the viewport, reconnecting only to the row's browser, and writes nothing", async () => {
+        await addSession({ lastActivityAt: NOW - 1000 });
+        renderer.mockResolvedValueOnce(shot());
+
+        await expect(frame(READER)).resolves.toStrictEqual({ image: "aGVsbG8=", status: "ok", takenAt: NOW, viewport: { height: 720, width: 1280 } });
+        expect(renderer.mock.calls[0]?.[0]).toMatchObject({ body: { action: "screenshot", fullPage: false, reconnectOnly: true, sessionId: "s-1" } });
+        // A watching phone keeps no browser alive and holds no agent action off.
+        await expect(session()).resolves.toMatchObject({ lastActivityAt: NOW - 1000 });
+        await expect(session()).resolves.not.toHaveProperty("inUseHolds");
+    });
+
+    it("refuses a stranger and a locked chat without asking the renderer", async () => {
+        await addSession();
+
+        await expect(frame(STRANGER)).rejects.toMatchObject({ code: "NOT_FOUND" });
+        await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId, { lockedAt: 1 }));
+        await expect(frame(OWNER)).rejects.toMatchObject({ code: "NOT_FOUND" });
+        expect(renderer).not.toHaveBeenCalled();
+    });
+
+    it("says ended, not unavailable, when no browser runs or the provider reaped it, and launches none", async () => {
+        await expect(frame(OWNER)).resolves.toStrictEqual({ status: "ended" });
+        expect(renderer).not.toHaveBeenCalled();
+
+        await addSession();
+        renderer.mockResolvedValueOnce({ data: undefined, error: { code: "SESSION_GONE", success: false }, response: { ok: false, status: 404 } });
+
+        await expect(frame(OWNER)).resolves.toStrictEqual({ status: "ended" });
+    });
+
+    it("shows nobody else the page while another person drives it, before and after the shot", async () => {
+        await addSession();
+        fetchMock.mockImplementation(async () => answer(200, { devtoolsFrontendUrl: VIEW_URL, id: "v-1" }));
+        await as(WRITER).action(takeControl as never, { threadId } as never);
+
+        await expect(frame(OWNER)).resolves.toStrictEqual({ status: "controlled" });
+        expect(renderer).not.toHaveBeenCalled();
+        // The holder sees their own page.
+        renderer.mockResolvedValueOnce(shot());
+        await expect(frame(WRITER)).resolves.toMatchObject({ status: "ok" });
+    });
+
+    it("drops a frame when another person took control while it was taken", async () => {
+        await addSession();
+        fetchMock.mockImplementation(async () => answer(200, { devtoolsFrontendUrl: VIEW_URL, id: "v-1" }));
+        renderer.mockImplementationOnce(async () => {
+            await as(WRITER).action(takeControl as never, { threadId } as never);
+
+            return shot();
+        });
+
+        await expect(frame(OWNER)).resolves.toStrictEqual({ status: "controlled" });
+    });
+
+    it("drops a frame when another person took control and handed it back while it was taken", async () => {
+        await addSession();
+        fetchMock.mockImplementation(async () => answer(200, { devtoolsFrontendUrl: VIEW_URL, id: "v-1" }));
+        renderer.mockImplementationOnce(async () => {
+            const taken = await as(WRITER).action(takeControl as never, { threadId } as never);
+
+            await as(WRITER).mutation(handBack as never, { claim: (taken as { claim: string }).claim, reason: "handed_back", threadId } as never);
+
+            return shot();
+        });
+
+        await expect(frame(OWNER)).resolves.toStrictEqual({ status: "unavailable" });
+    });
+
+    it("drops a frame when another person's lease taken during the shot was replaced by the caller's own claim", async () => {
+        await addSession();
+        fetchMock.mockImplementation(async () => answer(200, { devtoolsFrontendUrl: VIEW_URL, id: "v-1" }));
+        renderer.mockImplementationOnce(async () => {
+            const taken = await as(WRITER).action(takeControl as never, { threadId } as never);
+
+            await as(WRITER).mutation(handBack as never, { claim: (taken as { claim: string }).claim, reason: "handed_back", threadId } as never);
+            await as(OWNER).action(takeControl as never, { threadId } as never);
+
+            return shot();
+        });
+
+        await expect(frame(OWNER)).resolves.toStrictEqual({ status: "unavailable" });
+    });
+
+    it("keeps a frame when the agent only cleared an ended lease while it was taken", async () => {
+        await addSession({ control: { by: "someone-else", claim: "old", ended: "handed_back", since: NOW - 60_000, until: NOW - 1000 } });
+        renderer.mockImplementationOnce(async () => {
+            await harness.run(async (ctx: any) => {
+                const row = await ctx.db.query("browserSessions").first();
+
+                await patchRow(ctx.db, "browserSessions", row, { control: undefined });
+            });
+
+            return shot();
+        });
+
+        await expect(frame(OWNER)).resolves.toMatchObject({ status: "ok" });
+    });
+
+    it("says ended for a frame of another browser than the one asked for, which the agent never drove", async () => {
+        await addSession();
+        renderer.mockResolvedValueOnce(shot({ sessionId: "s-launched" }));
+
+        await expect(frame(OWNER)).resolves.toStrictEqual({ status: "ended" });
+    });
+
+    it("drops a frame when the reader's grant changed while it was taken", async () => {
+        await addSession();
+        renderer.mockImplementationOnce(async () => {
+            await harness.run(async (ctx: any) => {
+                const grant = await ctx.db.threadAccess.findFirst({ where: { threadId, userId: READER } });
+
+                await ctx.runMutation(updateThreadAccess, { accessId: grant._id, expiresAt: NOW + 60_000 });
+            });
+
+            return shot();
+        });
+
+        await expect(frame(READER)).resolves.toStrictEqual({ status: "unavailable" });
+    });
+
+    it("answers the picture without a viewport the page made into something other than numbers", async () => {
+        await addSession();
+        renderer.mockResolvedValueOnce(shot({ viewport: { height: 720, width: "x" } }));
+
+        await expect(frame(OWNER)).resolves.toStrictEqual({ image: "aGVsbG8=", status: "ok", takenAt: NOW });
+    });
+
+    it("refuses a frame too large for the answer, and a renderer that failed", async () => {
+        await addSession();
+        renderer.mockResolvedValueOnce(shot({ screenshot: "a".repeat(MAX_FRAME_BASE64 + 1) }));
+
+        await expect(frame(OWNER)).resolves.toStrictEqual({ status: "unavailable" });
+
+        renderer.mockResolvedValueOnce({ data: undefined, error: { success: false }, response: { ok: false, status: 500 } });
+        await expect(frame(OWNER)).resolves.toStrictEqual({ status: "unavailable" });
+    });
+});
+
+describe("a phone that takes control", () => {
+    const take = async (userId: string, exclusive?: true): Promise<any> =>
+        await as(userId).action(takeControl as never, { threadId, ...(exclusive && { exclusive }) } as never);
+
+    beforeEach(() => {
+        fetchMock.mockImplementation(async () => answer(200, { devtoolsFrontendUrl: VIEW_URL, id: "v-1" }));
+    });
+
+    it("drives the browser, and the person's other views see its claim at once", async () => {
+        await addSession();
+        const phone = await take(OWNER, true);
+
+        expect(phone).toMatchObject({ status: "ok" });
+        // The web card of the same person: the lease is theirs, under the phone's claim, not the card's.
+        await expect(statusFor(OWNER)).resolves.toMatchObject({ control: { byYou: true, claimIds: [phone.claimId] } });
+        await expect(statusFor(WRITER)).resolves.toMatchObject({ control: { byYou: false } });
+
+        renderer.mockResolvedValueOnce({ data: { sessionId: "s-1", success: true, url: "https://example.com/next" }, response: { ok: true } });
+        await expect(
+            as(OWNER).action(navigateInControl as never, { claim: phone.claim, threadId, url: "https://example.com/next" } as never),
+        ).resolves.toMatchObject({ status: "ok" });
+    });
+
+    it("is refused, saying so, while the web holds the claim, and the web keeps it", async () => {
+        await addSession();
+        const web = await take(OWNER);
+
+        await expect(take(OWNER, true)).resolves.toStrictEqual({ status: "held" });
+        await expect(heldClaim()).resolves.toBe(web.claim);
+        await expect(keep(OWNER, web.claim)).resolves.toMatchObject({ until: expect.any(Number) });
+        // Another person's lease is refused as before.
+        await giveBack(OWNER, "handed_back", web.claim);
+        await take(WRITER);
+        await expect(take(OWNER, true)).resolves.toStrictEqual({ status: "taken" });
+    });
+
+    it("takes back its own lease, which it names, but never another view's", async () => {
+        await addSession();
+        const phone = await take(OWNER, true);
+        const again: any = await as(OWNER).action(takeControl as never, { exclusive: true, renews: phone.claim, threadId } as never);
+
+        expect(again).toMatchObject({ status: "ok" });
+        await expect(heldClaim()).resolves.toBe(again.claim);
+        // Naming a claim that is not the lease's does not get past another view's.
+        await expect(as(OWNER).action(takeControl as never, { exclusive: true, renews: phone.claim, threadId } as never)).resolves.toStrictEqual({
+            status: "held",
+        });
+    });
+
+    it("takes the lease alone when it asks for no view: nothing is minted at the provider and no URL is returned", async () => {
+        await addSession();
+        const phone: any = await as(OWNER).action(takeControl as never, { exclusive: true, leaseOnly: true, threadId, view: "phone-1" } as never);
+
+        expect(phone).toMatchObject({ claim: expect.any(String), claimId: expect.any(String), status: "ok" });
+        expect(phone).not.toHaveProperty("url");
+        expect(phone).not.toHaveProperty("connectBy");
+        expect(fetchMock).not.toHaveBeenCalled();
+        await expect(statusFor(OWNER)).resolves.toMatchObject({ control: { byYou: true, claimIds: [phone.claimId] } });
+        // Charged to control's budget, never the live view budget the web card's views need.
+        expect(releaseLimit.guarded).toStrictEqual(["browser/control"]);
+    });
+
+    it("charges an admin's take to the admin's tier, as the rate limit middleware does", async () => {
+        await addSession();
+        impersonation.admin = true;
+
+        await expect(as(OWNER).action(takeControl as never, { exclusive: true, leaseOnly: true, threadId, view: "phone-1" } as never)).resolves.toMatchObject({
+            status: "ok",
+        });
+        expect(releaseLimit.guardedFor).toStrictEqual([expect.objectContaining({ isAdmin: true, userId: OWNER })]);
+    });
+
+    it("takes back a lease whose answer it lost by naming its own view, but never another view's", async () => {
+        await addSession();
+        const viewTake = async (view: string): Promise<any> => await as(OWNER).action(takeControl as never, { exclusive: true, threadId, view } as never);
+
+        // The first answer never arrived: the phone holds no claim, only its view's name.
+        await expect(viewTake("phone-1")).resolves.toMatchObject({ status: "ok" });
+        await expect(viewTake("phone-1")).resolves.toMatchObject({ status: "ok" });
+        await expect(viewTake("phone-2")).resolves.toStrictEqual({ status: "held" });
+    });
+
+    it("gives the phone's view name back with its lease when a web takeover fails", async () => {
+        await addSession();
+        await as(OWNER).action(takeControl as never, { exclusive: true, threadId, view: "phone-1" } as never);
+        // The web card's takeover: the provider refuses its view, so the phone's lease goes on.
+        fetchMock.mockResolvedValueOnce(answer(500, {}));
+        await expect(take(OWNER)).resolves.toStrictEqual({ status: "unavailable" });
+
+        await expect(as(OWNER).action(takeControl as never, { exclusive: true, threadId, view: "phone-1" } as never)).resolves.toMatchObject({
+            status: "ok",
+        });
+    });
+
+    it("forgets the phone's view name when the web takes the lease over, so the phone cannot take it back", async () => {
+        await addSession();
+        await as(OWNER).action(takeControl as never, { exclusive: true, threadId, view: "phone-1" } as never);
+        // The web card takes over (a renewal of the same person's lease that names no view).
+        const web = await take(OWNER);
+
+        await expect(as(OWNER).action(takeControl as never, { exclusive: true, threadId, view: "phone-1" } as never)).resolves.toStrictEqual({
+            status: "held",
+        });
+        await expect(heldClaim()).resolves.toBe(web.claim);
+    });
+
+    it("gives the claim back when it leaves, or within one lease interval when it sends nothing", async () => {
+        await addSession();
+        const phone = await take(OWNER, true);
+
+        await expect(giveBack(OWNER, "left", phone.claim)).resolves.toBe(true);
+        await expect(statusFor(OWNER)).resolves.not.toHaveProperty("control");
+
+        // A phone that dies without a word: the lease lapses after one interval, and the agent may act again.
+        const silent = await take(OWNER, true);
+
+        vi.setSystemTime(NOW + CONTROL_IDLE_MS);
+        await expect(keep(OWNER, silent.claim)).resolves.toBeNull();
+        await expect(statusFor(OWNER)).resolves.not.toHaveProperty("control");
     });
 });

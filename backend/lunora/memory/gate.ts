@@ -488,16 +488,6 @@ export const hasPrivacyMarker = (text: string): boolean => {
     return lower.includes("[no-memory]") || lower.includes("<no-memory>") || lower.includes("[private]") || lower.includes("<private>");
 };
 
-/**
- * Tool results that may reach the extraction prompt: the same marker rule as the
- * user message, applied per entry. A result carrying a marker — say, a fetched
- * document the user tagged private, or a tool echoing the user's own 🔒 input —
- * is dropped whole rather than redacted, since the marker says nothing about
- * which part of the text is the private one.
- */
-export const filterPrivateToolResults = <T extends { summary: string; toolName: string }>(toolResults: ReadonlyArray<T> | undefined): T[] =>
-    (toolResults ?? []).filter((t) => !hasPrivacyMarker(t.summary) && !hasPrivacyMarker(t.toolName));
-
 // ============================================================================
 // Heuristic gate
 // ============================================================================

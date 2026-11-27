@@ -511,15 +511,20 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
             requestId: args.requestId,
         });
 
-        await drain(
-            "delete-user-memory-reflection",
-            async (round) =>
-                await context.run(
-                    internal.memory.gdpr.deleteUserMemoryReflectionData,
-                    { userId: args.userId },
-                    { dedupId: stepDedupId(scope, "delete-user-memory-reflection", round) },
-                ),
-        );
+        // The cleanup records are walked by a cursor carried from round to round: one whose vector could not be erased is kept.
+        let cleanupCursor: string | null | undefined;
+
+        await drain("delete-user-memory-reflection", async (round) => {
+            const result = (await context.run(
+                internal.memory.gdpr.deleteUserMemoryReflectionData,
+                { cleanupCursor, userId: args.userId },
+                { dedupId: stepDedupId(scope, "delete-user-memory-reflection", round) },
+            )) as { cleanupCursor: string | null; hasMore: boolean };
+
+            ({ cleanupCursor } = result);
+
+            return result;
+        });
         await drain(
             "delete-user-knowledge",
             async (round) =>

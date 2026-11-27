@@ -9,6 +9,7 @@
 import { useLingui } from "@lingui/react/macro";
 import { api } from "@neore/backend/api";
 import type { Id } from "@neore/backend/dataModel";
+import { isTakenOverByOwnView } from "@neore/client-runtime";
 import { Button } from "@neore/ui/components/button";
 import { Input } from "@neore/ui/components/input";
 import { hashKey, skipToken, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -120,8 +121,8 @@ type Asked = { attempt: number; browserId: string; connectBy: number; mode: Mode
 type NavigationAnswer = { error: string; status: "refused" } | { status: "closed" } | { status: "ok"; url?: string };
 
 type Answer =
-    | { status: "busy" | "controlled" | "ended" | "taken" | "unavailable" }
-    | { claim?: string; claimId?: string; connectBy: number; release?: string; status: "ok"; until?: number; url: string };
+    | { status: "busy" | "controlled" | "ended" | "held" | "taken" | "unavailable" }
+    | { claim?: string; claimId?: string; connectBy?: number; release?: string; status: "ok"; until?: number; url?: string };
 
 /**
  * The claim this tab holds, on the server's clock. Its lease was written before `writtenBy` (when `takeControl`
@@ -150,7 +151,8 @@ const sendReleaseBeacon = (release: string, reason: "handed_back" | "left"): boo
  * status read drops the card, or the provider may not see it at all, and either way the click must not do nothing.
  */
 const viewFrom = (asked: Asked, result: Answer, now: number): View => {
-    if (result.status === "ok") {
+    // A view is only ever asked for with its URL (`leaseOnly` is the phone's): an answer without one has nothing to show.
+    if (result.status === "ok" && result.url !== undefined) {
         return { ...asked, connected: false, kind: "open", stale: now >= asked.connectBy, url: result.url };
     }
 
@@ -158,7 +160,8 @@ const viewFrom = (asked: Asked, result: Answer, now: number): View => {
         return { kind: "refused", reason: "busy" };
     }
 
-    if (result.status === "taken" || result.status === "controlled") {
+    // `held` comes only to an `exclusive` claim, which this card never sends: read as taken, never as unavailable.
+    if (["controlled", "held", "taken"].includes(result.status)) {
         return { kind: "refused", reason: "taken" };
     }
 
@@ -344,13 +347,7 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
     const renewingControl = view.kind === "opening" && view.mode === "control" && claim !== undefined;
     // Another of the person's tabs took the lease over: the live status names its claim, not this tab's. Not while this
     // tab's own renewal mints: its new claim may be named before `takeControl` answers with it.
-    const takenByOtherTab =
-        seen &&
-        !renewingControl &&
-        lease.claimId !== undefined &&
-        control?.byYou === true &&
-        control.claimIds !== undefined &&
-        !control.claimIds.includes(lease.claimId);
+    const takenByOtherTab = seen && !renewingControl && isTakenOverByOwnView(control, lease.claimId);
     const warn = usePassed(youControl && leaseUntil !== undefined ? leaseUntil - CONTROL_WARNING_MS : undefined);
     const showStillLoading = !usePassed(stillLoading === 0 ? undefined : stillLoading) && stillLoading !== 0;
     const forbiddenText = impersonating ? t`Taking control is not available while impersonating.` : t`You may not take control of this browser.`;
@@ -426,7 +423,7 @@ const BrowserCard: FC<CardProps> = ({ browserId, canControl, control, currentUrl
     const tookControl = (attempt: number, result: Answer): void => {
         const current = mounted.current && attempts.current === attempt && wantedControl.current === attempt;
 
-        if (result.status === "ok" && result.claim !== undefined && result.until !== undefined) {
+        if (result.status === "ok" && result.claim !== undefined && result.until !== undefined && result.connectBy !== undefined) {
             if (current) {
                 setClaim({
                     claim: result.claim,

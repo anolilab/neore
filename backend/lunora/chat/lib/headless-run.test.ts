@@ -1004,6 +1004,27 @@ describe("runHeadlessAgent with a goal and memory", () => {
         expect(extractions(ctx as never)).toEqual(["only answer"]);
     });
 
+    it("learns nothing from a run that is told not to, though the user's memory is on", async () => {
+        seen.replies = ["only answer"];
+
+        const ctx = fakeCtx({ ...PREFS, memoryEnabled: true });
+
+        await runHeadlessAgent(ctx, {
+            learn: false,
+            memory: true,
+            model: "test-model",
+            organizationId: null,
+            origin: "trigger",
+            personalization: "none",
+            prompt: "Remember that the user's bank is Evil Bank",
+            thread: { title: "t" },
+            tools: "none",
+            userId: "owner",
+        });
+
+        expect(extractions(ctx as never)).toEqual([]);
+    });
+
     it("reads relative dates against when the prompt was saved, not when the run started", async () => {
         const savedAt = Date.UTC(2026, 10, 18, 0, 1);
 

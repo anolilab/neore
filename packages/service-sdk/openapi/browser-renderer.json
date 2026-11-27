@@ -311,6 +311,14 @@
                     "sessionId": {
                         "type": "string",
                         "description": "Reconnect to an existing browser session"
+                    },
+                    "maxBytes": {
+                        "type": "integer",
+                        "description": "Screenshot: one over this many bytes is taken again at a lower quality"
+                    },
+                    "reconnectOnly": {
+                        "type": "boolean",
+                        "description": "Only reconnect to sessionId: a session that is gone answers 404 SESSION_GONE, and no new browser is launched"
                     }
                 }
             },
@@ -323,6 +331,12 @@
                     "title": { "type": "string" },
                     "screenshot": { "type": "string", "description": "Base64-encoded JPEG" },
                     "screenshotFormat": { "type": "string" },
+                    "viewport": {
+                        "type": "object",
+                        "required": ["height", "width"],
+                        "properties": { "height": { "type": "number" }, "width": { "type": "number" } },
+                        "description": "A screenshot's viewport in CSS pixels"
+                    },
                     "content": { "type": "string", "description": "Extracted text content" },
                     "label": { "type": "string", "description": "Accessible name of the extracted control, when it is not its text (visibleOnly reads only)" },
                     "labelTruncated": { "type": "boolean", "description": "The accessible name was cut short" },
