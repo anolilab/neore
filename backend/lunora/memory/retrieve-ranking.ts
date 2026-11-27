@@ -269,9 +269,10 @@ export const keywordLookupOf = <
 export const KEYWORD_RESERVED_PER_TERM = 3;
 
 /**
- * The best `limit` keyword hits: first every hit of an identifier's lookup (matched whole, so a long row holding
- * `KX-2291` is not cut behind short rows sharing the query's other words), then the first `KEYWORD_RESERVED_PER_TERM`
- * of each other term's, then the rest best first by BM25 over whole tokens.
+ * The best `limit` keyword hits: first every hit of an identifier's lookup, the rarest identifier first (matched
+ * whole, so a long row holding `KX-2291` is not cut behind short rows sharing the query's other words, nor a rare
+ * code's row behind two common codes'), then the first `KEYWORD_RESERVED_PER_TERM` of each other term's, then the
+ * rest best first by BM25 over whole tokens.
  */
 export const topKeywordHits = <T extends { _id: string; memory: string }>(
     lookups: KeywordLookup<T>[],
@@ -288,7 +289,11 @@ export const topKeywordHits = <T extends { _id: string; memory: string }>(
     });
 
     const reserved = [
-        ...lookups.filter(({ code }) => code).flatMap(({ hits }) => hits),
+        // Rarest first, so two common codes cannot fill the slots before the one row of a rare code.
+        ...lookups
+            .filter(({ code }) => code)
+            .toSorted((a, b) => a.corpusRows - b.corpusRows)
+            .flatMap(({ hits }) => hits),
         ...lookups.filter(({ code }) => !code).flatMap(({ hits }) => hits.slice(0, KEYWORD_RESERVED_PER_TERM)),
     ];
     // BM25 over what the lookups counted: a term's df is its lookup's in-scope row count (the hits are cut at 20), and N

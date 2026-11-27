@@ -503,6 +503,17 @@ describe("keyword hits", () => {
         expect(kept.map((h) => h._id)).toEqual(expect.arrayContaining(["s0", "s1", "s2", "s20", "s21", "s22"]));
     });
 
+    it("keeps a rare code's row ahead of two common codes' rows", () => {
+        const common = (term: string) => Array.from({ length: 20 }, (_, i) => row(`${term}-${String(i)}`, `part ${term.toUpperCase()} ${String(i)}`));
+        const lookups = [
+            { code: true, complete: false, corpusRows: 20, hits: common("ab5508"), term: "ab5508" },
+            { code: true, complete: false, corpusRows: 20, hits: common("cd7701"), term: "cd7701" },
+            { code: true, complete: true, corpusRows: 1, hits: [row("rare", "the one note on QZ-5508")], term: "qz5508" },
+        ];
+
+        expect(topKeywordHits(lookups, 0).map((h) => h._id)).toContain("rare");
+    });
+
     it("ranks a word with more than 20 matches as common: its df is the lookup's count, not the 20 hits it keeps", () => {
         const common = Array.from({ length: 20 }, (_, i) => row(`d${String(i)}`, "dishwasher"));
         const rarer = Array.from({ length: 20 }, (_, i) => row(`k${String(i)}`, "kettle"));
