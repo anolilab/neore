@@ -149,7 +149,7 @@ const GATE_EVENT = "memory.extraction_gate";
 /** Structured event name — the facts the evidence gate dropped in one run, by reason (counts only, never text). */
 const EVIDENCE_GATE_EVENT = "memory.evidence_gate";
 
-type GateOutcome = (GateDecision | { reason: "opt_out"; verdict: "skip" }) & {
+type GateOutcome = GateDecision & {
     /** Identifies the marker this attempt wrote, so cleanup never deletes a concurrent attempt's refreshed one. */
     processedAttempt?: string;
     /** The cache entry that marks this exchange processed, when the gate wrote one: cleared if the extraction cannot run for a transient reason. */
@@ -201,10 +201,6 @@ const classifyExtractionWorthiness = async (
  * the pure heuristics run before any read, so a "thanks" costs nothing at all.
  */
 const runExtractionGate = async (ctx: ActionContext, args: GateArgs): Promise<GateOutcome> => {
-    if (hasPrivacyMarker(args.userMessage)) {
-        return { reason: "opt_out", verdict: "skip" };
-    }
-
     const heuristic = evaluateExtractionHeuristics(args.userMessage, args.assistantResponse);
 
     if (heuristic.verdict === "skip") {
@@ -312,6 +308,20 @@ export const extractMemories = internalAction
         if (args.quotablePrompt === undefined) {
             ctx.log.event(GATE_EVENT, {
                 reason: "no_quotable_text",
+                threadId: args.threadId,
+                userId: args.userId,
+                userMessageLength: args.userMessage.length,
+                verdict: "skip",
+            });
+
+            return;
+        }
+
+        // Privacy opt-out: a marker anywhere in the WHOLE turn (the prompt, even one that is not quotable, and every steer, typed
+        // or not) skips it. Checked before the text is cut to what extraction reads, so a marker in a cut part still counts.
+        if (hasPrivacyMarker(args.userMessage)) {
+            ctx.log.event(GATE_EVENT, {
+                reason: "opt_out",
                 threadId: args.threadId,
                 userId: args.userId,
                 userMessageLength: args.userMessage.length,

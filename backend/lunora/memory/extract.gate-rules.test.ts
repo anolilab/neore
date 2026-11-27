@@ -113,6 +113,69 @@ describe("extractMemories with an empty quotable prompt", () => {
     });
 });
 
+describe("extractMemories with a privacy marker in a part the extractor does not read", () => {
+    const TYPED = "Actually I am vegetarian, please remember that about me";
+
+    const run = async (extra: Record<string, unknown>) => {
+        loadModelFilterRules.mockResolvedValue({});
+        generateText.mockResolvedValue({ output: { facts: [{ memory: "User is vegetarian", type: "identity" }], remember: true } });
+
+        await harness.action(async (ctx: any) => await ctx.runAction(extractMemories, { assistantResponse: "Noted.", threadId, userId: USER, ...extra }));
+
+        const { page } = await harness.run(async (ctx: any) => await ctx.db.memories.findMany({}));
+
+        return page as unknown[];
+    };
+
+    it("skips the turn when a prompt that is not quotable holds the marker and a typed steer follows", async () => {
+        const prompt = "Forwarded draft [private] about my plans";
+
+        const stored = await run({
+            quotablePrompt: "",
+            steeredFrom: prompt.length + 2,
+            steers: [{ at: 100, from: prompt.length + 2 }],
+            userMessage: `${prompt}\n\n${TYPED}`,
+        });
+
+        expect(stored).toHaveLength(0);
+        expect(loadModelFilterRules).not.toHaveBeenCalled();
+        expect(generateText).not.toHaveBeenCalled();
+    });
+
+    it("skips the turn when a steer the owner did not type holds the marker", async () => {
+        const prompt = "Plan my week";
+
+        const stored = await run({
+            quotablePrompt: prompt,
+            steeredFrom: prompt.length + 2,
+            steers: [
+                { at: 100, from: prompt.length + 2, notTyped: true },
+                { at: 200, from: prompt.length + 2 + "🔒 do not keep this".length + 2 },
+            ],
+            userMessage: `${prompt}\n\n🔒 do not keep this\n\n${TYPED}`,
+        });
+
+        expect(stored).toHaveLength(0);
+        expect(loadModelFilterRules).not.toHaveBeenCalled();
+        expect(generateText).not.toHaveBeenCalled();
+    });
+
+    it("skips the turn when a typed steer holds the marker", async () => {
+        const prompt = "Plan my week";
+
+        const stored = await run({
+            quotablePrompt: prompt,
+            steeredFrom: prompt.length + 2,
+            steers: [{ at: 100, from: prompt.length + 2 }],
+            userMessage: `${prompt}\n\n${TYPED} [no-memory]`,
+        });
+
+        expect(stored).toHaveLength(0);
+        expect(loadModelFilterRules).not.toHaveBeenCalled();
+        expect(generateText).not.toHaveBeenCalled();
+    });
+});
+
 describe("extractMemories when the model filter rules cannot be read", () => {
     it("does not crash: the classifier fails open and the extraction skips quietly", async () => {
         loadModelFilterRules.mockRejectedValue(new NoAllowedUtilityModelError());
