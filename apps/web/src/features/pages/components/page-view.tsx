@@ -28,6 +28,7 @@ import PageEditor from "./page-editor";
 import PageKeptDraft from "./page-kept-draft";
 import PageShareDialog from "./page-share-dialog";
 import PageVersionPanel from "./page-version-panel";
+import { PagesSidebarToggle } from "./pages-layout";
 
 type Permission = "admin" | "comment" | "read" | "write";
 
@@ -187,17 +188,23 @@ const PageView: FC<{ pageId: string }> = ({ pageId }) => {
 
     if (error || !page) {
         return (
-            <Empty className="min-w-0" role="alert">
-                <EmptyHeader>
-                    <EmptyMedia variant="icon">
-                        <FileQuestion aria-hidden="true" />
-                    </EmptyMedia>
-                    <EmptyTitle>
-                        <h1>{t`Page not found`}</h1>
-                    </EmptyTitle>
-                    <EmptyDescription>{t`It may have been deleted, or you no longer have access.`}</EmptyDescription>
-                </EmptyHeader>
-            </Empty>
+            <div className="flex min-w-0 flex-1 flex-col">
+                {/* Below `lg` the tree is a drawer, and this is the only way to it from a page that is not there. */}
+                <div className="px-4 py-2 lg:hidden">
+                    <PagesSidebarToggle />
+                </div>
+                <Empty className="min-w-0" role="alert">
+                    <EmptyHeader>
+                        <EmptyMedia variant="icon">
+                            <FileQuestion aria-hidden="true" />
+                        </EmptyMedia>
+                        <EmptyTitle>
+                            <h1>{t`Page not found`}</h1>
+                        </EmptyTitle>
+                        <EmptyDescription>{t`It may have been deleted, or you no longer have access.`}</EmptyDescription>
+                    </EmptyHeader>
+                </Empty>
+            </div>
         );
     }
 
@@ -390,6 +397,7 @@ const PageView: FC<{ pageId: string }> = ({ pageId }) => {
         <div className="flex h-full min-w-0 flex-1">
             <div className="flex min-w-0 flex-1 flex-col">
                 <header className="border-border/50 flex flex-wrap items-center gap-2 border-b px-4 py-2">
+                    <PagesSidebarToggle />
                     <Breadcrumb className="min-w-0 flex-1">
                         <BreadcrumbList>
                             {page.breadcrumbs.map((crumb) => (

@@ -5,6 +5,7 @@ import { Button } from "@neore/ui/components/button";
 import ConfirmDialog from "@neore/ui/components/confirm-dialog";
 import { Input } from "@neore/ui/components/input";
 import { ScrollArea } from "@neore/ui/components/scroll-area";
+import cn from "@neore/ui/utils/cn";
 import { skipToken, useMutation, useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
 import { FileText, Plus, Search, Star, Users } from "lucide-react";
@@ -35,7 +36,7 @@ const ancestorsOf = (pages: ReadonlyArray<FlatPage>, pageId: string | undefined)
     return result;
 };
 
-const PagesSidebar: FC = () => {
+const PagesSidebar: FC<{ className?: string }> = ({ className }) => {
     const { t } = useLingui();
     const crpc = useCRPC();
     const navigate = useNavigate();
@@ -136,7 +137,7 @@ const PagesSidebar: FC = () => {
     };
 
     return (
-        <aside aria-label={t`Pages`} className="bg-background border-border/50 flex h-full w-64 shrink-0 flex-col border-r">
+        <aside aria-label={t`Pages`} className={cn("bg-background border-border/50 flex h-full w-64 shrink-0 flex-col border-r", className)}>
             <div className="flex items-center justify-between gap-2 px-3 pt-3 pb-2">
                 <h2 className="text-[15px] font-semibold">{t`Pages`}</h2>
                 <Button
