@@ -30,8 +30,14 @@ const isShown = (element: Element): boolean => {
  */
 const COLLAPSED_SIDEBAR = `[data-slot="sidebar"][data-state="collapsed"]`;
 
+/**
+ * The mobile sidebar's sheet while it animates closed. It stays in the DOM until the animation ends, so a panel still
+ * focused inside it is not shown, though `isShown` cannot tell.
+ */
+const CLOSING_MOBILE_SIDEBAR = `[data-slot="sidebar"][data-mobile="true"][data-closed]`;
+
 export const hasAsideFindTarget = (): boolean => {
     const host = document.activeElement?.closest(`[${CSS.escape(ASIDE_FIND_HOST_ATTRIBUTE)}]`);
 
-    return host != null && isShown(host) && host.closest(COLLAPSED_SIDEBAR) == null;
+    return host != null && isShown(host) && host.closest(COLLAPSED_SIDEBAR) == null && host.closest(CLOSING_MOBILE_SIDEBAR) == null;
 };

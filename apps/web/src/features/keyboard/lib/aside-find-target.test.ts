@@ -44,6 +44,22 @@ describe("hasAsideFindTarget", () => {
         expect(hasAsideFindTarget()).toBe(false);
     });
 
+    it("is false when the mobile sidebar is closing with focus still inside the panel", () => {
+        document.body.innerHTML = `<div data-slot="sidebar" data-mobile="true" data-closed=""><section data-aside-find-host="" tabindex="-1"><textarea id="inside"></textarea></section></div>`;
+
+        document.querySelector<HTMLElement>("#inside")?.focus();
+
+        expect(hasAsideFindTarget()).toBe(false);
+    });
+
+    it("is true while the mobile sidebar is open", () => {
+        document.body.innerHTML = `<div data-slot="sidebar" data-mobile="true" data-open=""><section data-aside-find-host="" tabindex="-1"><textarea id="inside"></textarea></section></div>`;
+
+        document.querySelector<HTMLElement>("#inside")?.focus();
+
+        expect(hasAsideFindTarget()).toBe(true);
+    });
+
     it("is true while the sidebar is expanded", () => {
         document.body.innerHTML = `<div data-slot="sidebar" data-state="expanded"><section data-aside-find-host="" tabindex="-1"><textarea id="inside"></textarea></section></div>`;
 
