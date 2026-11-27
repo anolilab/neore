@@ -15,6 +15,14 @@
 import { differentEventDays, type FactDates, factDatesOf, hasFactDates, isExpired, sameFactDates } from "./dates";
 import type { MemoryType } from "./taxonomy";
 
+/**
+ * What a digest's generated `summary` becomes once it may quote a memory that is gone. The summary is free text the
+ * model wrote from the day's memories, merges and promotions and carries no pointer to the rows it drew on, so it
+ * cannot be edited down to what is left: it is cleared (the card then shows its stock line, not the deleted wording),
+ * never regenerated in a mutation. The digest's other fields stay.
+ */
+export const DROPPED_DIGEST_SUMMARY = "";
+
 // ============================================================================
 // Limits
 // ============================================================================

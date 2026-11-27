@@ -9,8 +9,18 @@ import { deleteVectorRow } from "../agent/table-writes";
 import type { Id } from "../_generated/dataModel";
 import { memoryLogger } from "../lib/logger";
 import schema from "../schema";
-import { continueMemoryChainDelete, deleteMemory, linkMemoryEmbeddings, saveMemory, saveMemoryBatch } from "./functions";
-import { applyReflectionOps } from "./reflection";
+import { deleteUserMemoryReflectionData } from "./gdpr";
+import {
+    continueMemoryChainDelete,
+    deleteMemory,
+    linkMemoryEmbeddings,
+    retryMemoryVectorDelete,
+    saveMemory,
+    saveMemoryBatch,
+    supersedeMemory,
+    sweepMemoryCleanups,
+} from "./functions";
+import { applyReflectionOps, saveMemoryDigest } from "./reflection";
 
 const { sessionFrom } = vi.hoisted(() => {
     return {
@@ -313,5 +323,216 @@ describe("deleting a memory", () => {
 
         expect(await rowOf(first)).toBeNull();
         expect(await run(async (ctx) => await ctx.db.query("memories").collect())).toHaveLength(0);
+    });
+});
+
+const STATS = { contradictionsResolved: 0, decayed: 0, merged: 0, newMemories: 0, promoted: 0, retired: 0 };
+
+const insertDigest = async (learned: { memory: string; memoryId: string; type: string }[], summary: string, createdAt: number) =>
+    await run(async (ctx) => await ctx.db.insert("memoryDigests", { createdAt, learned, localDay: "2026-09-24", stats: STATS, summary, userId: OWNER }));
+
+const cleanups = async () => await run(async (ctx) => await ctx.db.query("memoryCleanups").collect());
+
+/** Makes every pending cleanup old enough for the housekeeping sweep to take. */
+const ageCleanups = async () =>
+    await run(async (ctx) => {
+        const rows = await ctx.db.query("memoryCleanups").collect();
+
+        for (const row of rows) {
+            await ctx.db.patch("memoryCleanups", row._id as Id<"memoryCleanups">, { updatedAt: 0 });
+        }
+    });
+
+const sweep = async () => await run(async (ctx) => await ctx.runMutation(sweepMemoryCleanups as never, {} as never));
+
+describe("a digest summary after a delete", () => {
+    it("drops the summary of every digest that may quote the deleted memory, and keeps one from before it existed", async () => {
+        const before = await insertDigest([], "Learned that you drink coffee.", 1);
+        const first = await seed("likes tea");
+        const second = await supersede(first.memoryId, "likes green tea");
+        const other = await seed("owns a bike");
+        const mixed = await insertDigest(
+            [
+                { memory: "likes green tea", memoryId: second, type: "preference" },
+                { memory: "owns a bike", memoryId: other.memoryId, type: "preference" },
+            ],
+            "You now like green tea and own a bike.",
+            Date.now() + 1000,
+        );
+        // Names no entry of the deleted memory, but was written after it existed: a merge or a promotion can put its wording in the summary.
+        const unlisted = await insertDigest(
+            [{ memory: "owns a bike", memoryId: other.memoryId, type: "preference" }],
+            "Merged your tea notes.",
+            Date.now() + 2000,
+        );
+
+        await asOwner().mutation(deleteMemory as never, { memoryId: second } as never);
+
+        const summaryOf = async (id: Id<"memoryDigests">) => {
+            const row = await run(async (ctx) => await ctx.db.get("memoryDigests", id));
+
+            return row?.summary;
+        };
+
+        expect(await summaryOf(mixed)).toBe("");
+        expect(await summaryOf(unlisted)).toBe("");
+        expect(await summaryOf(before)).toBe("Learned that you drink coffee.");
+        // The entry that stayed is still listed.
+        const left = await run(async (ctx) => await ctx.db.get("memoryDigests", mixed));
+
+        expect((left?.learned as { memoryId: string }[]).map((entry) => entry.memoryId)).toEqual([other.memoryId]);
+    });
+});
+
+describe("saving a digest while a memory is deleted", () => {
+    it("keeps only entries whose memory still exists and is active, and drops the summary when it lost one", async () => {
+        const kept = await seed("owns a bike");
+        const gone = await seed("likes tea");
+        const retired = await seed("likes coffee");
+        const next = await seed("likes espresso");
+
+        await run(async (ctx) => await supersedeMemory(ctx as never, retired.memoryId, next.memoryId, Date.now()));
+        await asOwner().mutation(deleteMemory as never, { memoryId: gone.memoryId } as never);
+
+        await run(
+            async (ctx) =>
+                await ctx.runMutation(
+                    saveMemoryDigest as never,
+                    {
+                        learned: [
+                            { memory: "owns a bike", memoryId: kept.memoryId, type: "preference" },
+                            { memory: "likes tea", memoryId: gone.memoryId, type: "preference" },
+                            { memory: "likes coffee", memoryId: retired.memoryId, type: "preference" },
+                        ],
+                        localDay: "2026-09-24",
+                        stats: STATS,
+                        summary: "You like tea and coffee and own a bike.",
+                        userId: OWNER,
+                    } as never,
+                ),
+        );
+
+        const [digest] = await run(async (ctx) => await ctx.db.query("memoryDigests").collect());
+
+        expect((digest?.learned as { memoryId: string }[]).map((entry) => entry.memoryId)).toEqual([kept.memoryId]);
+        expect(digest?.summary).toBe("");
+        expect(JSON.stringify(digest)).not.toContain("likes tea");
+    });
+
+    it("keeps the summary when every entry is still active", async () => {
+        const kept = await seed("owns a bike");
+
+        await run(
+            async (ctx) =>
+                await ctx.runMutation(
+                    saveMemoryDigest as never,
+                    {
+                        learned: [{ memory: "owns a bike", memoryId: kept.memoryId, type: "preference" }],
+                        localDay: "2026-09-24",
+                        stats: STATS,
+                        summary: "You own a bike.",
+                        userId: OWNER,
+                    } as never,
+                ),
+        );
+
+        const [digest] = await run(async (ctx) => await ctx.db.query("memoryDigests").collect());
+
+        expect(digest?.summary).toBe("You own a bike.");
+    });
+});
+
+describe("a vector delete that cannot be retried", () => {
+    it("keeps a durable record of the vector when the retry cannot be scheduled, and the sweep deletes it", async () => {
+        const old = await seed("likes tea");
+        const next = await seed("likes green tea");
+
+        vi.mocked(deleteVectorRow).mockRejectedValueOnce(new Error("vector index unavailable"));
+
+        await run(async (ctx) => {
+            const lost = Object.create(ctx, {
+                scheduler: {
+                    value: {
+                        runAfter: async () => {
+                            throw new Error("scheduler unavailable");
+                        },
+                    },
+                },
+            });
+
+            await supersedeMemory(lost, old.memoryId, next.memoryId, Date.now());
+        });
+
+        expect(await supersededByOf(old.memoryId)).toBe(next.memoryId);
+        expect(await vectorExists(old.embeddingId)).toBe(true);
+
+        const pending = await cleanups();
+
+        expect(pending).toHaveLength(1);
+        expect(pending[0]).toMatchObject({ embeddingId: old.embeddingId, kind: "vector", userId: OWNER });
+
+        await sweep();
+        // Too young for the sweep: a scheduled retry may still be on its way.
+        expect(await vectorExists(old.embeddingId)).toBe(true);
+
+        await ageCleanups();
+        await sweep();
+
+        expect(await vectorExists(old.embeddingId)).toBe(false);
+        expect(await cleanups()).toHaveLength(0);
+    });
+
+    it("keeps the record after the last scheduled attempt gives up", async () => {
+        const old = await seed("likes tea");
+
+        vi.mocked(deleteVectorRow).mockRejectedValueOnce(new Error("still down"));
+        await run(
+            async (ctx) => await ctx.runMutation(retryMemoryVectorDelete, { attempt: 5, embeddingId: old.embeddingId, memoryId: old.memoryId, userId: OWNER }),
+        );
+
+        expect(await vectorExists(old.embeddingId)).toBe(true);
+        expect(await cleanups()).toHaveLength(1);
+    });
+});
+
+describe("a long chain whose follow-up is lost", () => {
+    it("leaves a durable cursor that the sweep resumes", async () => {
+        const origin = await seed("version 0");
+        let newest = origin.memoryId;
+        const first = newest;
+
+        for (let index = 1; index <= 105; index += 1) {
+            newest = await supersede(newest, `version ${index}`);
+        }
+
+        await asOwner().mutation(deleteMemory as never, { memoryId: newest } as never);
+
+        // The scheduled follow-up never runs; the root is already deleted, so a second delete cannot restart the walk.
+        expect(await cleanups()).toHaveLength(1);
+        expect(await rowOf(first)).not.toBeNull();
+
+        await ageCleanups();
+        await sweep();
+
+        expect(await rowOf(first)).toBeNull();
+        expect(await run(async (ctx) => await ctx.db.query("memories").collect())).toHaveLength(0);
+        expect(await cleanups()).toHaveLength(0);
+    });
+});
+
+describe("erasing an account", () => {
+    it("removes the pending cleanups with the vector they still point at", async () => {
+        const old = await seed("likes tea");
+        const next = await seed("likes green tea");
+
+        vi.mocked(deleteVectorRow).mockRejectedValueOnce(new Error("vector index unavailable"));
+        await run(async (ctx) => await supersedeMemory(ctx as never, old.memoryId, next.memoryId, Date.now()));
+        expect(await cleanups()).toHaveLength(1);
+
+        const result: any = await run(async (ctx) => await ctx.runMutation(deleteUserMemoryReflectionData, { userId: OWNER }));
+
+        expect(result.hasMore).toBe(false);
+        expect(await cleanups()).toHaveLength(0);
+        expect(await vectorExists(old.embeddingId)).toBe(false);
     });
 });

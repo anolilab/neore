@@ -48,6 +48,7 @@ import {
     createReflectionBudget,
     decayToOps,
     digestDayOf,
+    DROPPED_DIGEST_SUMMARY,
     expiryToOps,
     estimateTokens,
     localDayOf,
@@ -591,7 +592,26 @@ export const saveMemoryDigest = internalMutation
     })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
-        await ctx.db.insert("memoryDigests", { ...args, createdAt: ctx.now });
+        // The run read its memories some time ago: a delete since then must not come back through this write. An entry
+        // stays only while its memory still exists, is the user's and is active, checked here in the write that inserts it.
+        // The summary is free text with no pointer to its sources, so a digest that lost an entry is saved without it.
+        const learned: typeof args.learned = [];
+
+        for (const entry of args.learned) {
+            const row = await ctx.db.get("memories", entry.memoryId as Id<"memories">).catch(() => null);
+
+            if (row && row.userId === args.userId && !row.supersededBy) {
+                learned.push(entry);
+            }
+        }
+
+        const lost = learned.length < args.learned.length;
+
+        if (lost && learned.length === 0 && Object.values(args.stats).every((count) => count === 0)) {
+            return null;
+        }
+
+        await ctx.db.insert("memoryDigests", { ...args, createdAt: ctx.now, learned, summary: lost ? DROPPED_DIGEST_SUMMARY : args.summary });
 
         const older = await ctx.db
             .query("memoryDigests")

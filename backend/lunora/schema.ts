@@ -1780,6 +1780,24 @@ export const schema = defineSchema({
         // The same scope, active rows only: superseded history never enters a read. `supersededBy` is null for an active row.
         .index("by_userId_botId_active", ["userId", "botId", "supersededBy", "type"]),
 
+    // Cleanup a memory write could not finish, written in the same commit as the work that left it so the reference
+    // survives a retry that cannot be scheduled or runs out; the housekeeping sweep resumes it (`memory/functions.ts`).
+    // `vector`: the embedding of a retired or deleted memory whose delete failed. `chain`: the ids still to walk of a
+    // delete's older versions, after the first write used its budget.
+    memoryCleanups: defineTable({
+        embeddingId: v.optional(v.string()),
+        frontier: v.optional(v.array(v.id("memories"))),
+        kind: v.union(v.literal("vector"), v.literal("chain")),
+        memoryId: v.optional(v.string()),
+        // Set when the row is written or a pass leaves it pending; the sweep takes rows idle past a grace period.
+        updatedAt: v.number(),
+        userId: v.string(),
+    })
+        .shardBy("userId")
+        .index("by_embeddingId", ["embeddingId"])
+        .index("by_updatedAt", ["updatedAt"])
+        .index("by_userId", ["userId"]),
+
     // One nightly-reflection digest ("what I learned today") per run. See `memory/reflection.ts`.
     memoryDigests: defineTable({
         createdAt: v.number(),

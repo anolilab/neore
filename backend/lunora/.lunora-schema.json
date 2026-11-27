@@ -11699,6 +11699,93 @@
       "relations": {},
       "shardMode": "shardBy:userId"
     },
+    "memoryCleanups": {
+      "commitOrdered": false,
+      "fields": {
+        "embeddingId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "frontier": {
+          "kind": "array",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "of": {
+            "kind": "id",
+            "nullable": false,
+            "optional": false,
+            "unique": false,
+            "ref": "memories"
+          }
+        },
+        "kind": {
+          "kind": "union",
+          "nullable": false,
+          "optional": false,
+          "unique": false,
+          "members": [
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"chain\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"vector\""
+            }
+          ]
+        },
+        "memoryId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "updatedAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "userId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        }
+      },
+      "indexes": {
+        "by_embeddingId": {
+          "fields": [
+            "embeddingId"
+          ],
+          "unique": false
+        },
+        "by_updatedAt": {
+          "fields": [
+            "updatedAt"
+          ],
+          "unique": false
+        },
+        "by_userId": {
+          "fields": [
+            "userId"
+          ],
+          "unique": false
+        }
+      },
+      "memory": false,
+      "relations": {},
+      "shardMode": "shardBy:userId"
+    },
     "memoryDigests": {
       "commitOrdered": false,
       "fields": {

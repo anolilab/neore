@@ -25,7 +25,7 @@ import {
 import { botOwnerRows } from "./bot-owner";
 import { type MemoryEvidence, newestEvidence, vMemoryEvidence } from "./evidence";
 import { logRedaction, redactMemoryText } from "./redact";
-import { localDayOf } from "./reflection-logic";
+import { DROPPED_DIGEST_SUMMARY, localDayOf } from "./reflection-logic";
 import { byNewest, isUsableOn, mergeScopeWindows, scopesOf } from "./retrieve-ranking";
 import { lastConfirmedOf, MEMORY_TYPES, type MemoryType, vMemoryType } from "./taxonomy";
 import { deleteVectorRow, patchMessage } from "../agent/table-writes";
@@ -320,6 +320,28 @@ const VECTOR_DELETE_RETRY_BASE_MS = 60_000;
 type OrphanedVector = { embeddingId: string; memoryId: string; userId: string };
 
 /**
+ * Notes a vector whose delete failed in `memoryCleanups`, in the writing transaction: the row that pointed at it is
+ * already cleared or gone, so this is the only reference left. The scheduled retries are a fast path; the record is
+ * what the housekeeping sweep ({@link sweepMemoryCleanups}) works from when they are lost or give up.
+ */
+const recordVectorDelete = async (ctx: Pick<MutationCtx, "db" | "now">, orphan: OrphanedVector): Promise<void> => {
+    const [known] = await ctx.db
+        .query("memoryCleanups")
+        .withIndex("by_embeddingId", (q) => q.eq("embeddingId", orphan.embeddingId))
+        .take(1);
+
+    if (!known) {
+        await ctx.db.insert("memoryCleanups", {
+            embeddingId: orphan.embeddingId,
+            kind: "vector",
+            memoryId: orphan.memoryId,
+            updatedAt: ctx.now,
+            userId: orphan.userId,
+        });
+    }
+};
+
+/**
  * Delete the embedding of a memory whose row is already gone. The vector's table is
  * resolved from its id (a memory's embedding is normally `embeddings_1024`) and the
  * embedding carries no memory text, only the vector plus model/table/thread/user ids.
@@ -327,12 +349,17 @@ type OrphanedVector = { embeddingId: string; memoryId: string; userId: string };
  * This covers the vector ROW in the database. The sync of that delete to the vector
  * index runs after the transaction commits, outside this function, so a failure
  * there is not seen here. When the row delete fails, the failure is never swallowed:
- * it is logged with the ids that find the orphan and retried by
- * {@link retryMemoryVectorDelete} with a growing delay. The retry is scheduled from
- * the mutation, so it exists only if the row delete committed. An id that names no
- * vector table is logged and skipped, so it can never block deleting the memory.
+ * it is logged with the ids that find the orphan, recorded in `memoryCleanups` (in
+ * this same transaction, so the reference is never lost) and retried by
+ * {@link retryMemoryVectorDelete} with a growing delay. That retry is scheduled from
+ * the mutation, so it exists only if the row delete committed; when it cannot be
+ * scheduled, or gives up, the record stays and the housekeeping sweep takes it. An id
+ * that names no vector table is logged and skipped, so it can never block deleting the memory.
+ *
+ * Resolves `true` when nothing is left to delete (done, already gone, or an id that can never resolve) and `false`
+ * while the vector is still there.
  */
-const deleteMemoryVector = async (context: MutationCtx, orphan: OrphanedVector, attempt = 1): Promise<void> => {
+const deleteMemoryVector = async (context: MutationCtx, orphan: OrphanedVector, attempt = 1): Promise<boolean> => {
     let vectorId: Id<VectorTableName>;
     let vectorTable: VectorTableName;
 
@@ -341,7 +368,7 @@ const deleteMemoryVector = async (context: MutationCtx, orphan: OrphanedVector, 
 
         // In no embeddings table: the vector is already gone (deleted with its thread, or a retried delete landed).
         if (info === null) {
-            return;
+            return true;
         }
 
         vectorTable = info.tableName;
@@ -349,33 +376,61 @@ const deleteMemoryVector = async (context: MutationCtx, orphan: OrphanedVector, 
     } catch (error) {
         memoryLogger.error(`Memory ${orphan.memoryId} of user ${orphan.userId} points at embedding ${orphan.embeddingId}, which is not a vector row id`, error);
 
-        return;
+        return true;
     }
 
     try {
         await deleteVectorRow(context.db, vectorId, vectorTable);
+
+        return true;
     } catch (error) {
         // Already gone (a retry of a delete that did land): nothing is orphaned.
         if ((await context.db.get(vectorTable, vectorId).catch(() => undefined)) === null) {
-            return;
+            return true;
         }
+
+        await recordVectorDelete(context, orphan);
 
         if (attempt >= VECTOR_DELETE_ATTEMPTS) {
             memoryLogger.error(
-                `Giving up deleting the vector of memory ${orphan.memoryId}: embedding ${orphan.embeddingId} of user ${orphan.userId} is orphaned`,
+                `Giving up the scheduled retries of the vector of memory ${orphan.memoryId}: embedding ${orphan.embeddingId} of user ${orphan.userId} stays recorded for the housekeeping sweep`,
                 error,
             );
 
-            return;
+            return false;
         }
 
         memoryLogger.warn(`Vector delete failed for memory ${orphan.memoryId} (embedding ${orphan.embeddingId}, user ${orphan.userId}); retrying`, error);
 
-        await context.scheduler.runAfter(VECTOR_DELETE_RETRY_BASE_MS * 2 ** (attempt - 1), internal.memory.functions.retryMemoryVectorDelete, {
-            ...orphan,
-            attempt: attempt + 1,
-        });
+        try {
+            await context.scheduler.runAfter(VECTOR_DELETE_RETRY_BASE_MS * 2 ** (attempt - 1), internal.memory.functions.retryMemoryVectorDelete, {
+                ...orphan,
+                attempt: attempt + 1,
+            });
+        } catch (scheduleError) {
+            memoryLogger.error(`Could not schedule the retry of embedding ${orphan.embeddingId}; the housekeeping sweep will retry it`, scheduleError);
+        }
+
+        return false;
     }
+};
+
+/** A retry or a sweep pass over a recorded vector delete: when nothing is left of the vector, its record goes. */
+const resumeVectorDelete = async (context: MutationCtx, orphan: OrphanedVector, attempt: number): Promise<boolean> => {
+    const done = await deleteMemoryVector(context, orphan, attempt);
+
+    if (done) {
+        const records = await context.db
+            .query("memoryCleanups")
+            .withIndex("by_embeddingId", (q) => q.eq("embeddingId", orphan.embeddingId))
+            .take(10);
+
+        for (const record of records) {
+            await context.db.delete("memoryCleanups", record._id);
+        }
+    }
+
+    return done;
 };
 
 /**
@@ -404,8 +459,9 @@ export const reembedRewordedMemory = async (ctx: MutationCtx, memoryId: Id<"memo
 /**
  * Ends a row's life as a current memory: `supersededBy` points at what replaced it (itself, for a decay, an expiry or a
  * compression), and its vector goes in the same write, so a retired row never takes a slot in a meaning search. The row
- * stays as history. The vector delete is a row delete the vector sync follows after commit; a failure of it is logged
- * and retried (`deleteMemoryVector`), and never undoes the retirement.
+ * stays as history. The vector delete is a row delete the vector sync follows after commit; a failure of it is logged,
+ * recorded in `memoryCleanups` in this write and retried (`deleteMemoryVector`), and never undoes the retirement. Nothing
+ * here swallows an error: a write that cannot even record the pending delete fails whole, so the row keeps its `embeddingId`.
  */
 export const supersedeMemory = async (ctx: MutationCtx, memoryId: Id<"memories">, supersededBy: Id<"memories">, now: number): Promise<void> => {
     // Read again here: the caller's copy may predate an earlier write of the same mutation, and the row is replaced when its vector link is cleared.
@@ -423,11 +479,7 @@ export const supersedeMemory = async (ctx: MutationCtx, memoryId: Id<"memories">
         return;
     }
 
-    try {
-        await deleteMemoryVector(ctx, { embeddingId, memoryId, userId: row.userId ?? "" });
-    } catch (error) {
-        memoryLogger.error(`Could not drop the vector of retired memory ${memoryId} (embedding ${embeddingId}); the row stays retired`, error);
-    }
+    await deleteMemoryVector(ctx, { embeddingId, memoryId, userId: row.userId ?? "" });
 };
 
 /** Retry of a memory vector delete that failed (`deleteMemoryVector`). */
@@ -440,7 +492,7 @@ export const retryMemoryVectorDelete = internalMutation
     })
     .output(v.null())
     .mutation(async ({ args: { attempt, ...orphan }, ctx: context }) => {
-        await deleteMemoryVector(context, orphan, attempt);
+        await resumeVectorDelete(context, orphan, attempt);
 
         return null;
     });
@@ -449,6 +501,8 @@ export const retryMemoryVectorDelete = internalMutation
 const CHAIN_DELETE_BATCH = 100;
 /** The reflection digests of one user kept at most (`DIGESTS_KEPT` in `reflection.ts`) plus room. */
 const DIGEST_SCAN = 100;
+/** Attempts the follow-up write of a long chain gets from the scheduler before only the sweep is left. */
+const CHAIN_RETRY = { backoff: "exponential", baseMs: 30_000, maxAttempts: 5 } as const;
 
 /** Removes a row and, after it, its vector (a vector with no row can be found by a retry; a row pointing at a gone vector cannot). */
 const removeMemoryRow = async (ctx: MutationCtx, row: Doc<"memories">, userId: string): Promise<void> => {
@@ -461,9 +515,15 @@ const removeMemoryRow = async (ctx: MutationCtx, row: Doc<"memories">, userId: s
 
 /**
  * Takes the deleted memories out of the user's reflection digests. An entry of a deleted id goes; a digest whose entries
- * all went is removed, one that still has others keeps them (and its other fields).
+ * all went is removed, one that still has others keeps them (and its other fields), without its summary.
+ *
+ * A digest's summary is model-written text with no pointer to the memories it drew on, so a deleted memory's wording can
+ * sit in it with or without an entry in `learned` (a merge or a promotion puts rows in it that the list never names).
+ * `since` is the oldest creation time among the deleted rows: a digest written at or after it could have quoted one of
+ * them, so its summary is cleared ({@link DROPPED_DIGEST_SUMMARY}); a digest written before every deleted row existed
+ * could not, and keeps it. This errs toward clearing, and nothing is regenerated here.
  */
-const removeFromDigests = async (ctx: Pick<MutationCtx, "db">, userId: string, ids: ReadonlySet<string>): Promise<void> => {
+const removeFromDigests = async (ctx: Pick<MutationCtx, "db">, userId: string, ids: ReadonlySet<string>, since: number): Promise<void> => {
     const digests = await ctx.db
         .query("memoryDigests")
         .withIndex("by_userId_createdAt", (q) => q.eq("userId", userId))
@@ -471,12 +531,19 @@ const removeFromDigests = async (ctx: Pick<MutationCtx, "db">, userId: string, i
 
     for (const digest of digests) {
         const learned = digest.learned.filter((entry) => !ids.has(entry.memoryId));
+        const listed = learned.length !== digest.learned.length;
 
-        if (learned.length === digest.learned.length) {
+        if (listed && learned.length === 0) {
+            await ctx.db.delete("memoryDigests", digest._id);
+
             continue;
         }
 
-        await (learned.length === 0 ? ctx.db.delete("memoryDigests", digest._id) : ctx.db.patch("memoryDigests", digest._id, { learned }));
+        const quoting = digest.createdAt >= since && digest.summary !== DROPPED_DIGEST_SUMMARY;
+
+        if (listed || quoting) {
+            await ctx.db.patch("memoryDigests", digest._id, { learned, ...(quoting && { summary: DROPPED_DIGEST_SUMMARY }) });
+        }
     }
 };
 
@@ -484,19 +551,24 @@ const removeFromDigests = async (ctx: Pick<MutationCtx, "db">, userId: string, i
  * Removes the older versions of the memories in `frontier` (ids already deleted, or about to be): every row that was
  * superseded by one of them, and so on back, with their vectors and digest entries. Rows are found by the pointer the
  * newer row left in `supersededBy`, so a merge or a promotion by reflection is followed as well as a belief revision.
- * At most {@link CHAIN_DELETE_BATCH} rows per call; what is left is queued on the owner's shard from the ids still to
- * walk, and a repeat finds the same rows (a deleted row is gone, the next read starts from the survivors).
+ * At most {@link CHAIN_DELETE_BATCH} rows per call; what is left is written to a `memoryCleanups` row in this same
+ * write (the ids still to walk, so a lost follow-up cannot strand them: the root is already gone and cannot be deleted
+ * again to restart the walk) and continued on the owner's shard with a retry policy. A failed follow-up leaves the row
+ * for {@link sweepMemoryCleanups}; a repeat finds the same rows (a deleted row is gone, the next read starts from the
+ * survivors). `cleanupId` is the row a follow-up or the sweep continues: it is moved on, or removed once nothing is left.
  */
 const eraseOlderVersions = async (
     ctx: MutationCtx,
     userId: string,
     frontier: ReadonlyArray<Id<"memories">>,
     deleted: ReadonlyArray<string>,
+    options: { cleanupId?: Id<"memoryCleanups">; since?: number } = {},
 ): Promise<number> => {
     const removed = new Set<string>(deleted);
     const pending: Id<"memories">[] = [];
     const queue = [...frontier];
     let budget = CHAIN_DELETE_BATCH;
+    let since = options.since ?? Infinity;
 
     while (queue.length > 0) {
         const id = queue.shift() as Id<"memories">;
@@ -516,6 +588,7 @@ const eraseOlderVersions = async (
         const taken = rows.slice(0, budget);
 
         for (const row of taken) {
+            since = Math.min(since, row._creationTime);
             await removeMemoryRow(ctx, row, userId);
             removed.add(row._id);
             queue.push(row._id);
@@ -528,21 +601,85 @@ const eraseOlderVersions = async (
         }
     }
 
-    await removeFromDigests(ctx, userId, removed);
+    await removeFromDigests(ctx, userId, removed, since);
 
-    if (pending.length > 0) {
-        await runAfterOnShard(ctx.scheduler, 0, internal.memory.functions.continueMemoryChainDelete, { frontier: pending, userId }, userId);
+    if (pending.length === 0) {
+        if (options.cleanupId) {
+            await ctx.db.delete("memoryCleanups", options.cleanupId);
+        }
+    } else {
+        let { cleanupId } = options;
+
+        if (cleanupId) {
+            await ctx.db.patch("memoryCleanups", cleanupId, { frontier: pending, updatedAt: ctx.now });
+        } else {
+            cleanupId = await ctx.db.insert("memoryCleanups", { frontier: pending, kind: "chain", updatedAt: ctx.now, userId });
+        }
+
+        try {
+            await runAfterOnShard(ctx.scheduler, 0, internal.memory.functions.continueMemoryChainDelete, { cleanupId }, userId, CHAIN_RETRY);
+        } catch (error) {
+            memoryLogger.error(`Could not schedule the rest of the older-version delete for user ${userId}; the housekeeping sweep will resume it`, error);
+        }
     }
 
     return removed.size - deleted.length;
 };
 
-/** The rest of a long chain's delete (`eraseOlderVersions`). */
+/** The rest of a long chain's delete (`eraseOlderVersions`), from its `memoryCleanups` row; a row already finished is a no-op. */
 export const continueMemoryChainDelete = internalMutation
-    .input({ frontier: v.array(v.id("memories")), userId: v.string() })
+    .input({ cleanupId: v.id("memoryCleanups") })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
-        await eraseOlderVersions(ctx, args.userId, args.frontier, []);
+        const row = await ctx.db.get("memoryCleanups", args.cleanupId);
+
+        if (row?.kind === "chain") {
+            await eraseOlderVersions(ctx, row.userId, row.frontier ?? [], [], { cleanupId: row._id });
+        }
+
+        return null;
+    });
+
+/** Cleanup rows one housekeeping pass takes; a backlog drains over the next passes. */
+const CLEANUP_SWEEP_BATCH = 20;
+/** A record younger than this may still have a scheduled retry on its way, so the sweep leaves it. */
+const CLEANUP_GRACE_MS = 20 * 60 * 1000;
+
+/**
+ * Housekeeping sweep (`shardSweeps()`): picks up what the scheduled retries did not finish. A recorded vector delete is
+ * tried again; a long chain's delete continues from its saved ids. A record that still cannot be finished is kept and
+ * moved to the back of the line, so one stuck row never holds up the rest.
+ */
+export const sweepMemoryCleanups = internalMutation
+    .input({})
+    .output(v.null())
+    .mutation(async ({ ctx }) => {
+        const rows = await ctx.db
+            .query("memoryCleanups")
+            .withIndex("by_updatedAt", (q) => q.lte("updatedAt", ctx.now - CLEANUP_GRACE_MS))
+            .take(CLEANUP_SWEEP_BATCH);
+
+        for (const row of rows) {
+            try {
+                if (row.kind === "chain") {
+                    await eraseOlderVersions(ctx, row.userId, row.frontier ?? [], [], { cleanupId: row._id });
+                } else if (row.embeddingId) {
+                    const done = await resumeVectorDelete(
+                        ctx,
+                        { embeddingId: row.embeddingId, memoryId: row.memoryId ?? "", userId: row.userId },
+                        VECTOR_DELETE_ATTEMPTS,
+                    );
+
+                    if (!done) {
+                        await ctx.db.patch("memoryCleanups", row._id, { updatedAt: ctx.now });
+                    }
+                } else {
+                    await ctx.db.delete("memoryCleanups", row._id);
+                }
+            } catch (error) {
+                memoryLogger.error(`A memory cleanup (${row.kind}) of user ${row.userId} failed; it stays recorded`, error);
+            }
+        }
 
         return null;
     });
@@ -563,7 +700,7 @@ export const deleteMemory = authMutation
 
         await removeMemoryRow(context, memory, userId);
 
-        const olderVersions = await eraseOlderVersions(context, userId, [memory._id], [memory._id]);
+        const olderVersions = await eraseOlderVersions(context, userId, [memory._id], [memory._id], { since: memory._creationTime });
 
         context.log.event("memory.delete_memory", { hadEmbedding: Boolean(memory.embeddingId), olderVersions });
 

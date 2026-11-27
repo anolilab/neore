@@ -1,6 +1,7 @@
 /**
- * Memories and reflection digests in the GDPR export; those, the reflection state and the background import jobs (with
- * their stored entries) in account deletion. The import's job and batch rows are erased, never exported: they are a
+ * Memories and reflection digests in the GDPR export; those, the reflection state, the pending cleanups (vectors whose
+ * delete failed, the rest of an older-version delete) and the background import jobs (with their stored entries) in
+ * account deletion. The import's job and batch rows are erased, never exported: they are a
  * short-lived copy of a file the user supplied, deleted when the job ends, and their entries become memories, which are
  * exported. (Chat import's job rows are handled the same way, `chat-import/gdpr.ts`.)
  *
@@ -77,7 +78,11 @@ export const deleteUserMemoryReflectionData = internalMutation
     .input({ userId: v.string() })
     .output(v.object({ hasMore: v.boolean() }))
     .mutation(async ({ args: { userId }, ctx }) => {
-        const [digests, states, importJobs, importBatches] = await Promise.all([
+        const [cleanups, digests, states, importJobs, importBatches] = await Promise.all([
+            ctx.db
+                .query("memoryCleanups")
+                .withIndex("by_userId", (q) => q.eq("userId", userId))
+                .take(BATCH),
             ctx.db
                 .query("memoryDigests")
                 .withIndex("by_userId_createdAt", (q) => q.eq("userId", userId))
@@ -105,12 +110,23 @@ export const deleteUserMemoryReflectionData = internalMutation
             }
         }
 
+        // A recorded vector delete is the only reference left to a vector no memory row points at: erase the vector itself.
+        for (const row of cleanups) {
+            if (row.kind === "vector" && row.embeddingId) {
+                await eraseEmbeddingRow(ctx, row.embeddingId, `embedding of retired memory ${row.memoryId ?? ""}`);
+            }
+        }
+
         await Promise.all([
+            ...cleanups.map((row) => ctx.db.delete("memoryCleanups", row._id)),
             ...digests.map((row) => ctx.db.delete("memoryDigests", row._id)),
             ...states.map((row) => ctx.db.delete("memoryReflectionState", row._id)),
             ...importJobs.map((row) => ctx.db.delete("memoryImportJobs", row._id)),
             ...importBatches.map((row) => ctx.db.delete("memoryImportBatches", row._id)),
         ]);
 
-        return { hasMore: digests.length >= BATCH || states.length >= BATCH || importJobs.length >= BATCH || importBatches.length >= BATCH };
+        return {
+            hasMore:
+                cleanups.length >= BATCH || digests.length >= BATCH || states.length >= BATCH || importJobs.length >= BATCH || importBatches.length >= BATCH,
+        };
     });
