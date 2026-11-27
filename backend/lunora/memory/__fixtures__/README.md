@@ -102,9 +102,9 @@ is no identifier, so "is parcel 52690 mine" is answered with the user's own parc
 nothing; that one query is the abstain rate's 0.967 → 0.933 (and 0.800 → 0.767 without vectors), and both floors record it. Single NDCG@8
 falls by 0.008 (two queries reorder) because a word the memory never had no longer dilutes the one it does: a row with
 no vector that shares one word of a question whose other words are in no memory scores in full. Its floor stays 0.830,
-within the 0.02 tolerance. Exact NDCG@8 is 0.982 because the keyword share is the IDF share of the terms a row holds,
-with no length factor: for "have I read Quillfeather" a recent row holding only `read` now ranks above the
-Quillfeather row (both injected). On the
+within the 0.02 tolerance. Exact NDCG@8 is 0.982 because each term's BM25 factor is capped at 1 in the keyword share,
+so a short row no longer scores above its share: for "have I read Quillfeather" a recent row holding only `read` now
+ranks above the shorter Quillfeather row (both injected). On the
 150-query fixture before the `exact` rows, the earlier changes (newest-rows window, relevance gate, weights) took
 overall Recall@8 0.600 → 0.950 and NDCG@8 0.431 → 0.771.
 

@@ -283,7 +283,11 @@ describe("candidates", () => {
         registry.set(
             "memory_functions:searchMemoriesByKeyword",
             internalQuery
-                .input({ activeOn: v.optional(v.number()), terms: v.array(v.object({ term: v.string(), tokens: v.array(v.string()) })), userId: v.string() })
+                .input({
+                    activeOn: v.optional(v.number()),
+                    terms: v.array(v.object({ code: v.boolean(), term: v.string(), tokens: v.array(v.string()) })),
+                    userId: v.string(),
+                })
                 .query(async () => {
                     throw new LunoraError("SEARCH_INDEX_BUILDING", "search index is still backfilling");
                 }),
@@ -308,7 +312,11 @@ describe("candidates", () => {
         registry.set(
             "memory_functions:searchMemoriesByKeyword",
             internalQuery
-                .input({ activeOn: v.optional(v.number()), terms: v.array(v.object({ term: v.string(), tokens: v.array(v.string()) })), userId: v.string() })
+                .input({
+                    activeOn: v.optional(v.number()),
+                    terms: v.array(v.object({ code: v.boolean(), term: v.string(), tokens: v.array(v.string()) })),
+                    userId: v.string(),
+                })
                 .query(async () => {
                     throw new Error("index unavailable");
                 }),

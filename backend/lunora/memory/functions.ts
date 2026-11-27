@@ -1916,13 +1916,14 @@ export const searchMemoriesByKeyword = internalQuery
         botId: v.optional(v.string()),
         includeUserWide: v.optional(v.boolean()),
         /** `keywordLookupTerms`: the index is asked for every token of a term, so an identifier is looked up whole. */
-        terms: v.array(v.object({ term: v.string(), tokens: v.array(v.string()) })),
+        terms: v.array(v.object({ code: v.boolean(), term: v.string(), tokens: v.array(v.string()) })),
         timeZone: v.optional(v.string()),
         userId: v.string(),
     })
     .output(
         v.array(
             v.object({
+                code: v.boolean(),
                 complete: v.boolean(),
                 corpusRows: v.number(),
                 // `retrievalRowOf`: what ranking reads of a stored memory.

@@ -4,9 +4,9 @@
  * runs in `retrieve.ts` and in the offline retrieval eval (`retrieval-eval.test.ts`).
  */
 
-import { bm25Idf, MAX_KEYWORD_TERMS, reciprocalRankFusion, scoreKeywordCandidates } from "../knowledge/hybrid";
+import { bm25Idf, bm25TermFactor, MAX_KEYWORD_TERMS, reciprocalRankFusion, scoreKeywordCandidates } from "../knowledge/hybrid";
 import { factDatesOf } from "./dates";
-import { holdsSequence, salientTermsOf, searchTokensOf } from "./search-terms";
+import { holdsSequence, salientTermsOf, searchTokensOf, sequenceCount } from "./search-terms";
 import type { SalientTerm } from "./search-terms";
 
 /**
@@ -190,18 +190,21 @@ export const KEYWORD_TOP_K = VECTOR_TOP_K;
 export const keywordLookupTerms = (searchText: string): LookupTerm[] =>
     salientTermsOf(searchText)
         .slice(0, MAX_KEYWORD_TERMS)
-        .map(({ term, tokens }) => {
-            return { term, tokens };
+        .map(({ code, term, tokens }) => {
+            return { code, term, tokens };
         });
 
 /** A term to look up: the index is asked for all of `tokens`, and a row is kept only when it holds them in order. */
 export interface LookupTerm {
+    /** Part of an identifier (`SalientTerm.code`). */
+    code: boolean;
     term: string;
     tokens: string[];
 }
 
 /** One term's lookup: the rows it keeps, and how many usable rows of the chat's scopes hold the term. */
 export interface KeywordLookup<T> {
+    code: boolean;
     /** The index had fewer rows than `KEYWORD_LOOKUP_LIMIT` for the term, so `corpusRows` is every row holding it. */
     complete: boolean;
     /** Usable rows of the chat's scopes holding the term whole; another bot's rows never count. */
@@ -217,7 +220,7 @@ export interface KeywordLookup<T> {
 export const keywordLookupOf = <
     T extends { botId?: string | null; memory: string; pinned?: boolean | null; supersededBy?: string | null; validUntil?: string | null },
 >(
-    { term, tokens }: LookupTerm,
+    { code, term, tokens }: LookupTerm,
     fetched: T[],
     scope: MemoryScope,
     today: string | undefined,
@@ -227,6 +230,7 @@ export const keywordLookupOf = <
     );
 
     return {
+        code,
         complete: fetched.length < KEYWORD_LOOKUP_LIMIT,
         corpusRows: held.length,
         hits: held.slice(0, KEYWORD_HITS_PER_TERM),
@@ -234,10 +238,13 @@ export const keywordLookupOf = <
     };
 };
 
+/** Hits of each salient term's lookup kept ahead of the cut, so one term's rows cannot crowd out another's. */
+export const KEYWORD_RESERVED_PER_TERM = 3;
+
 /**
- * The best `limit` keyword hits: first every hit of a rare term's lookup (at most `RARE_TERM_MAX_ROWS` rows hold it,
- * so a long row holding the query's identifier is not cut behind short rows sharing its other words), then the rest
- * best first by BM25 over whole tokens.
+ * The best `limit` keyword hits: first every hit of an identifier's lookup (matched whole, so a long row holding
+ * `KX-2291` is not cut behind short rows sharing the query's other words), then the first `KEYWORD_RESERVED_PER_TERM`
+ * of each other term's, then the rest best first by BM25 over whole tokens.
  */
 export const topKeywordHits = <T extends { _id: string; memory: string }>(
     lookups: KeywordLookup<T>[],
@@ -253,13 +260,16 @@ export const topKeywordHits = <T extends { _id: string; memory: string }>(
         };
     });
 
-    const rare = lookups.filter(({ complete, corpusRows }) => complete && corpusRows > 0 && corpusRows <= RARE_TERM_MAX_ROWS).flatMap(({ hits }) => hits);
+    const reserved = [
+        ...lookups.filter(({ code }) => code).flatMap(({ hits }) => hits),
+        ...lookups.filter(({ code }) => !code).flatMap(({ hits }) => hits.slice(0, KEYWORD_RESERVED_PER_TERM)),
+    ];
     const ranked = scoreKeywordCandidates(termHits, Math.max(corpusSize, CANDIDATE_WINDOW_SIZE), { tokenize: searchTokensOf, wholeTokens: true }).map(
         ({ candidate }) => candidate.row,
     );
     const kept = new Map<string, T>();
 
-    for (const row of [...rare, ...ranked]) {
+    for (const row of [...reserved, ...ranked]) {
         if (kept.size >= limit) {
             break;
         }
@@ -410,11 +420,16 @@ export const keywordSignalsFor = (
     const corpusSize = Math.max(candidates.length, CANDIDATE_WINDOW_SIZE);
     const idfs = termHits.map(({ hits, term }) => (inMemory(term, hits.length) ? bm25Idf(hits.length, corpusSize) : 0));
     const most = idfs.reduce((sum, idf) => sum + idf, 0);
+    const matching = new Set(termHits.flatMap(({ hits }) => hits));
+    const avgLength = Math.max(1, [...matching].reduce((sum, row) => sum + row.tokens.length, 0) / Math.max(1, matching.size));
 
-    // Numerator and denominator on one scale: the IDF of each held term the row holds, no term-frequency or length factor.
+    // Σ idf·min(1, factor) / Σ idf: BM25's term-frequency and length factor, capped at 1 so a short row cannot score
+    // above its share; a row holding a term once at average length keeps the term's whole IDF.
     for (const [index, { hits }] of termHits.entries()) {
         for (const hit of hits) {
-            keywordScores.set(hit.id, (keywordScores.get(hit.id) ?? 0) + idfs[index]! / most);
+            const factor = Math.min(1, bm25TermFactor(sequenceCount(hit.tokens, terms[index]!.tokens), Math.max(1, hit.tokens.length), avgLength));
+
+            keywordScores.set(hit.id, (keywordScores.get(hit.id) ?? 0) + (idfs[index]! * factor) / most);
         }
     }
 

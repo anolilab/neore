@@ -95,6 +95,19 @@ describe("rankMemories", () => {
         ).toBeCloseTo(1, 2);
     });
 
+    it("caps each term's share at its IDF: a short row holding one of three equally rare terms scores about a third", () => {
+        const rows = [
+            candidate("short", { memory: "kite" }),
+            candidate("zep", { memory: "rode a zeppelin over the bay at dusk last summer" }),
+            candidate("har", { memory: "walked along the old harbour wall at dawn each day" }),
+        ];
+        const { keywordScores } = keywordSignalsFor(rows, "kite zeppelin harbour");
+
+        // BM25's length factor would lift the one-word row above a third.
+        expect(keywordScores.get("short")).toBeCloseTo(1 / 3, 2);
+        expect(keywordScores.get("zep")).toBeLessThanOrEqual(1 / 3);
+    });
+
     it("scores every salient term of the search, past the lookups' six", () => {
         const searchText = "remember everything regarding wonderful holidays somewhere tropical kettle";
 
@@ -217,7 +230,12 @@ describe("rankMemories", () => {
         });
 
         it("never counts another bot's rows: a word only they hold is not rare and does not lower this chat's share", () => {
-            const kite = keywordLookupOf({ term: "kite", tokens: ["kite"] }, [{ _id: "other", botId: "bot-b", memory: "flew a kite" }], {}, undefined);
+            const kite = keywordLookupOf(
+                { code: false, term: "kite", tokens: ["kite"] },
+                [{ _id: "other", botId: "bot-b", memory: "flew a kite" }],
+                {},
+                undefined,
+            );
             const own = candidate("own", { ...old, memory: "likes Berlin cafes" });
             // `berlin` is held by two rows of this chat; counting the other bot's row, `kite` (one row) would be rarer.
             const lookups = [kite, lookup("berlin", 2)];
@@ -371,7 +389,7 @@ describe("keyword hits", () => {
             row("other", "time for tea", "bot-b"),
             row("own", "time for tea"),
         ];
-        const time = { term: "time", tokens: ["time"] };
+        const time = { code: false, term: "time", tokens: ["time"] };
         const result = keywordLookupOf(time, fetched, {}, "2026-11-27");
 
         expect(result.hits.map((h) => h._id)).toEqual(["own"]);
@@ -391,32 +409,34 @@ describe("keyword hits", () => {
         const [code] = keywordLookupTerms("did I order QZ-5508");
         const fetched = [row("ab", "Ordered part AB-5508"), row("apart", "QZ order and 5508 later"), row("qz", "Ordered part QZ-5508")];
 
-        expect(code).toEqual({ term: "5508", tokens: ["qz", "5508"] });
+        expect(code).toEqual({ code: true, term: "5508", tokens: ["qz", "5508"] });
         expect(keywordLookupOf(code!, fetched, {}, undefined)).toMatchObject({ corpusRows: 1, hits: [{ _id: "qz" }] });
     });
 
     it("keeps the best hits by BM25", () => {
         const lookups = [
-            { complete: true, corpusRows: 30, hits: [row("own", "ordered KX-2291 for the dishwasher"), row("plain", "KX notes")], term: "kx" },
-            { complete: true, corpusRows: 30, hits: [row("own", "ordered KX-2291 for the dishwasher")], term: "2291" },
+            { code: false, complete: true, corpusRows: 30, hits: [row("own", "ordered KX-2291 for the dishwasher"), row("plain", "KX notes")], term: "kx" },
+            { code: true, complete: true, corpusRows: 30, hits: [row("own", "ordered KX-2291 for the dishwasher")], term: "2291" },
         ];
 
         expect(topKeywordHits(lookups, 0).map((h) => h._id)).toEqual(["own", "plain"]);
         expect(topKeywordHits(lookups, 0, 1).map((h) => h._id)).toEqual(["own"]);
     });
 
-    it("keeps a rare term's hits ahead of the cut, so short rows sharing other words cannot push them out", () => {
+    it("keeps an identifier's rows and each term's first rows ahead of the cut, so short rows cannot push them out", () => {
         const short = Array.from({ length: 40 }, (_, i) => row(`s${String(i)}`, "replacement dishwasher part"));
-        const long = row("long", "after a long search the replacement dishwasher part QZ-5508 finally arrived by post");
+        const long = row("long", "after a long search the replacement dishwasher part KX-2291 finally arrived by post");
         const lookups = [
-            { complete: true, corpusRows: 1, hits: [long], term: "5508" },
-            { complete: true, corpusRows: 41, hits: [...short.slice(0, 20), long], term: "dishwasher" },
-            { complete: true, corpusRows: 41, hits: [...short.slice(20), long], term: "replacement" },
+            { code: true, complete: true, corpusRows: 1, hits: [long], term: "2291" },
+            { code: false, complete: true, corpusRows: 41, hits: short.slice(0, 20), term: "dishwasher" },
+            { code: false, complete: true, corpusRows: 41, hits: short.slice(20), term: "replacement" },
         ];
         const kept = topKeywordHits(lookups, 0);
 
         expect(kept).toHaveLength(KEYWORD_TOP_K);
-        expect(kept.map((h) => h._id)).toContain("long");
+        expect(kept[0]!._id).toBe("long");
+        // The first rows of each other term are kept too, whatever BM25 says of them.
+        expect(kept.map((h) => h._id)).toEqual(expect.arrayContaining(["s0", "s1", "s2", "s20", "s21", "s22"]));
     });
 
     it("fuses the vector and keyword hits by rank: a row both found leads, each row once", () => {

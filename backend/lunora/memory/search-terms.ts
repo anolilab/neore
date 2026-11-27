@@ -119,20 +119,22 @@ export interface SalientTerm {
     tokens: string[];
 }
 
-/** Whether `tokens` hold `sequence` in order and adjacent. */
-export const holdsSequence = (tokens: ReadonlyArray<string>, sequence: ReadonlyArray<string>): boolean => {
-    if (sequence.length === 1) {
-        return tokens.includes(sequence[0]!);
-    }
+/** How often `tokens` hold `sequence`, in order and adjacent. */
+export const sequenceCount = (tokens: ReadonlyArray<string>, sequence: ReadonlyArray<string>): number => {
+    let count = 0;
 
     for (let start = 0; start + sequence.length <= tokens.length; start += 1) {
         if (sequence.every((token, offset) => tokens[start + offset] === token)) {
-            return true;
+            count += 1;
         }
     }
 
-    return false;
+    return count;
 };
+
+/** Whether `tokens` hold `sequence` in order and adjacent. */
+export const holdsSequence = (tokens: ReadonlyArray<string>, sequence: ReadonlyArray<string>): boolean =>
+    sequence.length === 1 ? tokens.includes(sequence[0]!) : sequenceCount(tokens, sequence) > 0;
 
 /** Scoring reads at most this much of a search: a pasted document is not a question, and every term costs a pass. */
 export const MAX_SCORED_TEXT_LENGTH = 4000;

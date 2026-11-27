@@ -105,6 +105,10 @@ const termFrequency = (tokens: string[], term: string, wholeTokens: boolean): nu
     return Math.max(1, tf);
 };
 
+/** BM25's term-frequency factor of a term held `tf` times by a document `length` tokens long: 1 at tf 1 and average length. */
+export const bm25TermFactor = (tf: number, length: number, avgLength: number): number =>
+    (tf * (BM25_K1 + 1)) / (tf + BM25_K1 * (1 - BM25_B + (BM25_B * length) / avgLength));
+
 /** BM25's inverse document frequency of a term `df` of `n` documents hold; never negative. */
 export const bm25Idf = (df: number, n: number): number => Math.log(1 + (n - df + 0.5) / (df + 0.5));
 
@@ -183,7 +187,7 @@ export const scoreKeywordCandidates = <T extends KeywordCandidate>(
         for (const term of entry.matchedTerms) {
             const tf = termFrequency(entry.tokens, term, wholeTokens);
 
-            score += (idf.get(term) ?? 0) * ((tf * (BM25_K1 + 1)) / (tf + BM25_K1 * (1 - BM25_B + (BM25_B * length) / avgLength)));
+            score += (idf.get(term) ?? 0) * bm25TermFactor(tf, length, avgLength);
         }
 
         scored.push({ candidate: entry.candidate, score });
