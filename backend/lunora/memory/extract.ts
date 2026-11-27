@@ -504,9 +504,9 @@ export const extractMemories = internalAction
 
         logGate(gate.reason, "extract");
 
-        let extractedFacts: z.infer<typeof extractedFactSchema>[] = [];
+        let extractedFacts: z.infer<typeof extractedFactSchema>[];
         // Asked facts that were nothing but a secret: dropped by the redaction, and refused, as the evidence gate refuses.
-        let secretsAsked = 0;
+        let secretsAsked: number;
 
         try {
             const result = await generateText({
@@ -531,14 +531,19 @@ ${args.requested ? REQUESTED_RULE : "Extract NEW facts about the user not alread
                 system: EXTRACTION_SYSTEM_PROMPT,
             });
 
-            if (result.output?.facts) {
-                const redaction = redactMemoryFacts(result.output.facts);
-                const askedCount = (facts: ReadonlyArray<{ asked?: boolean }>) => facts.filter((fact) => fact.asked === true).length;
+            // A call that answered without structured facts is a failure, never "nothing found": the caller may try again.
+            if (!result.output?.facts) {
+                console.warn("[memory/extract] The extractor returned no facts list");
 
-                logRedaction(ctx.log, "extract", redaction);
-                extractedFacts = redaction.facts;
-                secretsAsked = askedCount(result.output.facts) - askedCount(redaction.facts);
+                return NOT_ASKED;
             }
+
+            const redaction = redactMemoryFacts(result.output.facts);
+            const askedCount = (facts: ReadonlyArray<{ asked?: boolean }>) => facts.filter((fact) => fact.asked === true).length;
+
+            logRedaction(ctx.log, "extract", redaction);
+            extractedFacts = redaction.facts;
+            secretsAsked = askedCount(result.output.facts) - askedCount(redaction.facts);
         } catch (error) {
             console.error("[memory/extract] LLM extraction failed:", error);
 

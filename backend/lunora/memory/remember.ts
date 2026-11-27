@@ -19,8 +19,12 @@ import { type ExtractionOutcome, vRunFact } from "./extract";
 import { checkRequestedSource, REMEMBER_SCOPE, type RequestedRefusal, vRequestedRefusal } from "./functions";
 import { hasPrivacyMarker } from "./gate";
 
-/** One request per prompt (`REMEMBER_SCOPE`): a second call for the same message, parallel or later, does not ask again. */
-const REMEMBER_CLAIM_TTL_MS = 24 * 60 * 60 * 1000;
+/**
+ * One request per prompt (`REMEMBER_SCOPE`): a second call for the same message, parallel or later, does not ask again.
+ * Held only a few minutes while it runs, so a request whose release never lands frees the prompt by itself; a handled
+ * one is held for a day (`markRememberDone`).
+ */
+const REMEMBER_PENDING_TTL_MS = 5 * 60 * 1000;
 
 export const vRememberStatus = v.union(
     v.literal("saved"),
@@ -112,6 +116,17 @@ export const readRememberSource = internalQuery
     .output(v.union(v.object({ reason: vRequestedRefusal }), v.object({ source: vSource })))
     .query(async ({ args, ctx }) => await readSource(ctx, args));
 
+/** Gives the prompt's claim back, trying once more if the first try fails; a claim never given back lapses on its own. */
+const release = async (ctx: ActionCtx, claim: { claimedAt: number; key: string; scope: string }): Promise<void> => {
+    try {
+        await ctx.runMutation(internal.lib.claim_once.releaseKey, claim);
+    } catch {
+        await ctx.runMutation(internal.lib.claim_once.releaseKey, claim).catch((error: unknown) => {
+            console.warn("[memory/remember] The prompt's claim could not be given back; it lapses on its own:", error);
+        });
+    }
+};
+
 /** Reads the source, takes the prompt's one request, and runs the extractor in its requested mode over the typed prompt. */
 export const rememberFactFor = async (ctx: ActionCtx, args: Omit<SourceArgs, "now">): Promise<RememberResult> => {
     const read = await ctx.runQuery(internal.memory.remember.readRememberSource, { ...args, now: Date.now() });
@@ -133,7 +148,7 @@ export const rememberFactFor = async (ctx: ActionCtx, args: Omit<SourceArgs, "no
 
     const claim = { key: args.promptMessageId, scope: REMEMBER_SCOPE };
 
-    const claimedAt = await ctx.runMutation(internal.lib.claim_once.claimKeyFenced, { ...claim, ttlMs: REMEMBER_CLAIM_TTL_MS, userId: args.userId });
+    const claimedAt = await ctx.runMutation(internal.lib.claim_once.claimKeyFenced, { ...claim, ttlMs: REMEMBER_PENDING_TTL_MS, userId: args.userId });
 
     if (claimedAt === null) {
         return { facts: [], status: "already_requested" };
@@ -156,7 +171,7 @@ export const rememberFactFor = async (ctx: ActionCtx, args: Omit<SourceArgs, "no
             userMessage: raw,
         });
     } catch (error) {
-        await ctx.runMutation(internal.lib.claim_once.releaseKey, { ...claim, claimedAt });
+        await release(ctx, { ...claim, claimedAt });
 
         throw error;
     }
@@ -166,7 +181,7 @@ export const rememberFactFor = async (ctx: ActionCtx, args: Omit<SourceArgs, "no
     // Handled, so the reply's own extraction leaves the prompt alone; or given back, so it reads the prompt as usual.
     await (keepClaim
         ? ctx.runMutation(internal.memory.functions.markRememberDone, { claimedAt, promptMessageId: args.promptMessageId })
-        : ctx.runMutation(internal.lib.claim_once.releaseKey, { ...claim, claimedAt }));
+        : release(ctx, { ...claim, claimedAt }));
 
     return result;
 };

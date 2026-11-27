@@ -470,6 +470,70 @@ describe(rememberFactFor, () => {
         expect(await memories()).toHaveLength(0);
     });
 
+    it("reads an approval's answer to the reply's own tool call as part of the reply", async () => {
+        answer([{ memory: "User is vegan", quote: "I'm vegan" }]);
+
+        // The reply's call, then the result an approval saved outside any run, under the same prompt.
+        const replies = [
+            { message: { content: [{ input: {}, toolCallId: "call-1", toolName: "dateTime", type: "tool-call" }], role: "assistant" }, replyId: REPLY },
+            {
+                message: {
+                    content: [
+                        { approvalId: "approval-1", approved: true, type: "tool-approval-response" },
+                        { output: { type: "text", value: "now" }, toolCallId: "call-1", toolName: "dateTime", type: "tool-result" },
+                    ],
+                    role: "tool",
+                },
+            },
+        ];
+
+        await expect(remember(await setUp({ replies }))).resolves.toMatchObject({ status: "saved" });
+
+        harness.close();
+        harness = lunoraTest(schema as never);
+
+        // An answer to a call this reply did not make is another run's.
+        const foreign = [
+            {
+                ...replies[1],
+                message: { content: [{ output: { type: "text", value: "x" }, toolCallId: "call-9", toolName: "dateTime", type: "tool-result" }], role: "tool" },
+            },
+        ];
+
+        await expect(remember(await setUp({ replies: foreign }))).resolves.toMatchObject({ status: "not_your_words" });
+    });
+
+    it("frees the prompt by itself when a request's claim was never given back, and holds a handled one for a day", async () => {
+        answer([{ memory: "User is vegan", quote: "I'm vegan" }]);
+
+        const ids = await setUp();
+        const claimOf = async () => await harness.run(async (ctx: any) => await ctx.db.query("idempotencyClaims").first());
+
+        // A request that died without its release: its claim lapsed after the few minutes a running one is held.
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("idempotencyClaims", { claimedAt: 1, expiresAt: 2, key: ids.promptMessageId, scope: "memory-remember" });
+        });
+
+        await expect(remember(ids)).resolves.toMatchObject({ status: "saved" });
+
+        const claim = await claimOf();
+
+        expect(claim).toMatchObject({ result: "done" });
+        expect(claim.expiresAt - claim.claimedAt).toBe(24 * 60 * 60 * 1000);
+    });
+
+    it("gives the prompt back when the model answers with no facts list", async () => {
+        generateText.mockResolvedValueOnce({ output: undefined });
+
+        const ids = await setUp();
+
+        await expect(remember(ids)).resolves.toStrictEqual({ facts: [], status: "unavailable" });
+
+        answer([{ memory: "User is vegan", quote: "I'm vegan" }]);
+
+        await expect(remember(ids)).resolves.toMatchObject({ status: "saved" });
+    });
+
     it("still extracts the turn when the remember call's model failed", async () => {
         generateText.mockRejectedValueOnce(new Error("model down"));
 
@@ -579,6 +643,18 @@ describe(rememberFactFor, () => {
                     .toSorted((a, b) => a.localeCompare(b)),
             ).toStrictEqual(["User flies to Paris", "User flies to Rome"]);
             expect(rows.find((row) => row._id === old)?.supersededBy).toBeDefined();
+        });
+
+        it("brings the request's quote to a row that has none", async () => {
+            const ids = await setUp();
+            const known = await insert({ memory: "User flies to Paris" });
+            const evidence = { at: 1, messageId: ids.promptMessageId, quote: "I fly to Paris", threadId: ids.threadId };
+
+            await expect(save(ids, { evidence })).resolves.toStrictEqual([{ known, text: "User flies to Paris" }]);
+
+            const [row] = await memories();
+
+            expect(row?.evidence).toStrictEqual(evidence);
         });
 
         it("is the first of two facts of one request that differ only in spacing and case: one row is saved", async () => {

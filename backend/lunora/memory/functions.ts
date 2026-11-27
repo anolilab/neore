@@ -43,7 +43,7 @@ import { messageCarriesGuestText, promptCannotBeQuoted } from "../chat/lib/attac
 import type { typedTextOf } from "../chat/lib/attached-text";
 import { GOAL_CONTINUATION_AGENT } from "../chat/goals/shared";
 import { isTypedChatKind } from "../chat/lib/typed-chat-kind";
-import { claimRow, recordClaimResult } from "../lib/claim-once";
+import { claimRow, holdClaim, recordClaimResult } from "../lib/claim-once";
 
 /**
  * Whether the user turned memory on. OPT-IN: absent means off. Memory extraction reads every
@@ -92,23 +92,71 @@ export const rememberClaimState = internalQuery
         return row.result === REMEMBER_DONE ? ("done" as const) : ("pending" as const);
     });
 
-/** Marks the claim `claimedAt` handled; `false` when that claim no longer holds the prompt. */
+/** How long a handled request keeps its prompt: a day, longer than any reply's later extraction job waits. */
+const REMEMBER_DONE_TTL_MS = 24 * 60 * 60 * 1000;
+
+/** Marks the claim `claimedAt` handled and holds it for a day; `false` when that claim no longer holds the prompt. */
 export const markRememberDone = internalMutation
     .input({ claimedAt: v.number(), promptMessageId: v.string() })
     .output(v.boolean())
-    .mutation(async ({ args, ctx }) => await recordClaimResult(ctx, REMEMBER_SCOPE, args.promptMessageId, args.claimedAt, REMEMBER_DONE));
+    .mutation(
+        async ({ args, ctx }) =>
+            (await recordClaimResult(ctx, REMEMBER_SCOPE, args.promptMessageId, args.claimedAt, REMEMBER_DONE)) &&
+            (await holdClaim(ctx, REMEMBER_SCOPE, args.promptMessageId, args.claimedAt, REMEMBER_DONE_TTL_MS)),
+    );
 
 /** Rows under a prompt the fresh-send check reads per page, and the pages it reads before it gives up on the prompt. */
 const PROMPT_REPLY_PAGE_ROWS = 100;
 const PROMPT_REPLY_PAGES = 10;
 
+type PromptReplyRow = { message?: unknown; replyId?: string; status: string };
+type ToolPart = { toolCallId?: string; type?: string };
+
+const toolPartsOf = (row: PromptReplyRow): ToolPart[] => {
+    const content = (row.message as { content?: unknown } | undefined)?.content;
+
+    return Array.isArray(content) ? (content as ToolPart[]) : [];
+};
+
 /**
- * Whether the rows under a prompt (its `order`, after it) are only this reply's: its saved rows (`replyId`, the reply's first
- * stream) or its pending row, not yet saved under its run. A row of another run means the prompt was answered before: a
- * regenerate, or a prompt a task or a sub-agent wrote, which is not the user's words. An unknown reply is no answer.
+ * Whether the rows under a prompt (its `order`, after it, in order) are only this reply's: its saved rows (`replyId`, the
+ * reply's first stream), its pending row, not yet saved under its run, and the answer to one of its own tool calls that an
+ * approval or a denial saved outside any run (a row of tool results and approval responses only, each result for a call
+ * a row of this reply made). A row of another run means the prompt was answered before: a regenerate, or a prompt a task
+ * or a sub-agent wrote, which is not the user's words. An unknown reply is no answer. `ownCalls` carries the reply's tool
+ * calls across pages.
  */
-const isFreshPrompt = (rows: ReadonlyArray<{ replyId?: string; status: string }>, replyKey: string | undefined): boolean =>
-    replyKey !== undefined && rows.every((row) => row.replyId === replyKey || (row.replyId === undefined && row.status === "pending"));
+const isFreshPrompt = (rows: ReadonlyArray<PromptReplyRow>, replyKey: string | undefined, ownCalls: Set<string>): boolean =>
+    replyKey !== undefined &&
+    rows.every((row) => {
+        if (row.replyId === replyKey) {
+            for (const part of toolPartsOf(row)) {
+                if (part.type === "tool-call" && part.toolCallId !== undefined) {
+                    ownCalls.add(part.toolCallId);
+                }
+            }
+
+            return true;
+        }
+
+        if (row.replyId !== undefined) {
+            return false;
+        }
+
+        if (row.status === "pending") {
+            return true;
+        }
+
+        const parts = toolPartsOf(row);
+
+        return (
+            parts.some((part) => part.type === "tool-result") &&
+            parts.every(
+                (part) =>
+                    part.type === "tool-approval-response" || (part.type === "tool-result" && part.toolCallId !== undefined && ownCalls.has(part.toolCallId)),
+            )
+        );
+    });
 
 /**
  * Whether a memory the user asked for may be written from this prompt now, with the thread and prompt when it may. Read
@@ -167,6 +215,7 @@ export const checkRequestedSource = async (
     // Page by page, stopping at the first row of another run: the reply's own rows never count against the prompt, however
     // many tool steps it ran before the call.
     let cursor: string | null = null;
+    const ownCalls = new Set<string>();
 
     for (let page = 0; page < PROMPT_REPLY_PAGES; page += 1) {
         const rows = await ctx.db
@@ -174,7 +223,7 @@ export const checkRequestedSource = async (
             .withIndex("by_threadId_order_stepOrder", (q) => q.eq("threadId", source.threadId).eq("order", prompt.order).gt("stepOrder", prompt.stepOrder))
             .paginate({ cursor, numItems: PROMPT_REPLY_PAGE_ROWS });
 
-        if (!isFreshPrompt(rows.page, source.replyKey)) {
+        if (!isFreshPrompt(rows.page, source.replyKey, ownCalls)) {
             return { refused: "not_your_words" };
         }
 
@@ -1429,7 +1478,12 @@ export const saveMemoryBatch = internalMutation
                     retire(supersedes);
                 }
 
-                await ctx.db.patch("memories", known._id, { lastConfirmedAt: now });
+                // A restatement brings its quote to a row that has none, as a confirmation does (`confirmMemories`).
+                await ctx.db.patch(
+                    "memories",
+                    known._id,
+                    withoutUndefined({ evidence: known.evidence === undefined ? mem.evidence : undefined, lastConfirmedAt: now }),
+                );
                 memoryIds.push({ known: known._id, text: known.memory });
                 continue;
             }
