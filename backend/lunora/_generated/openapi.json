@@ -41610,10 +41610,10 @@
         "x-lunora-function-kind": "action"
       }
     },
-    "/_lunora/rpc#plugins_uninstall:uninstallPlugin": {
+    "/_lunora/rpc#plugins_uninstall_action:uninstallPlugin": {
       "post": {
-        "description": "Invoke the `mutation` `plugins_uninstall:uninstallPlugin` over the Lunora RPC envelope (POST /_lunora/rpc).",
-        "operationId": "plugins_uninstall:uninstallPlugin",
+        "description": "Invoke the `action` `plugins_uninstall_action:uninstallPlugin` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "plugins_uninstall_action:uninstallPlugin",
         "requestBody": {
           "content": {
             "application/json": {
@@ -41632,7 +41632,7 @@
                     "type": "object"
                   },
                   "functionPath": {
-                    "const": "plugins_uninstall:uninstallPlugin",
+                    "const": "plugins_uninstall_action:uninstallPlugin",
                     "type": "string"
                   },
                   "shardKey": {
@@ -41679,11 +41679,11 @@
             "$ref": "#/components/responses/LunoraError"
           }
         },
-        "summary": "mutation: plugins_uninstall:uninstallPlugin",
+        "summary": "action: plugins_uninstall_action:uninstallPlugin",
         "tags": [
           "plugins"
         ],
-        "x-lunora-function-kind": "mutation"
+        "x-lunora-function-kind": "action"
       }
     },
     "/_lunora/rpc#plugins_update:previewUpdate": {
