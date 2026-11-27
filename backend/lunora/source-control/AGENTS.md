@@ -49,8 +49,10 @@
   the person, and it merges only the head the approved call names.
 
 - **PR watch wake** (`pr-watch-poll.ts` records, `pr-watch-wake.ts` delivers) — the poller only records owed reasons in
-  `watchPending`; `deliverWatchWake` claims a lease (`watchWakeLeaseUntil`), runs ONE headless turn in the linked thread
-  (nothing from the host in the prompt), and only `finishWatchWake` counts the wake (`wakes`, `lastWakeAt`) and clears the
-  delivered reasons. A failed turn leaves both as they were. The claim refuses a stale run or start, the cap of 5, the
-  10-minute cooldown, a locked or busy thread. The agent tools `watchPullRequest` (ask by default) and `unwatchPullRequest`
-  go through the same linked-pull-request gate as the other PR tools.
+  `watchPending`. `startWatchWake` (a short scheduled mutation) claims a lease (`watchWakeLeaseUntil`, longer than a queue job
+  may run), charges one round to the daily limits like a task run (a spent limit leaves everything pending, uncounted) and
+  enqueues `runWatchWake` on the jobs queue under a claim-once id. The job runs ONE headless turn in the linked thread (nothing
+  from the host in the prompt); only `finishWatchWake` counts the wake (`wakes`, `lastWakeAt`) and clears the delivered reasons,
+  and only those whose occurrence marker is unchanged since the claim. A failed turn releases the lease and changes nothing else.
+  The claim refuses a stale run or start, the cap of 5, the 10-minute cooldown, a locked or busy thread. The agent tools
+  `watchPullRequest` (ask by default) and `unwatchPullRequest` use the same linked-pull-request gate as the other PR tools.
