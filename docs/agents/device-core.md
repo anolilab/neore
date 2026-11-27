@@ -36,6 +36,14 @@ The rules are summarized in `packages/device-core/AGENTS.md`, which agents load 
   etc. stay unreachable: a writable one would let a server plant a package the user later runs outside
   the sandbox). The running process is keyed on its planned policy, so changed shared folders, tier or
   sandbox setting restart it. Allowed paths and the host list are in `packages/device-core/README.md`.
+  **An MCP server over HTTP** is reached through `neore-host mcp-bridge` (`mcp_bridge.rs`, feature `mcp-bridge`, never
+  in the addon): one more stdio server, under the same sandbox, that relays each JSON-RPC message to one URL
+  (Streamable HTTP, 2025-06-18). A server on the person's own network needs tier On (Linux cannot allow one private
+  address), and the filesystem sandbox stays. The URL and headers come in through `NEORE_MCP_BRIDGE_URL` and
+  `NEORE_MCP_BRIDGE_HEADERS`, never argv; only `http`/`https`, no user name or password in the URL; redirects are not
+  followed and no proxy is read from the environment, so the headers go to that one host. Its error texts and stderr
+  never name the address or a header value: they reach the chat, and the cloud learns only the server's name. TLS
+  trusts the bundled public roots only, never a skip-verify switch. Not wired into settings yet.
   Where there is no sandbox the call
   is REFUSED unless the user turned off "Require sandbox for shell commands and local MCP servers"
   (stored inverted, `allowUnsandboxedShell`, so absent = required). Allow

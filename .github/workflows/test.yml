@@ -725,6 +725,12 @@ jobs:
               shell: "bash"
               run: "cargo test --manifest-path packages/device-core/Cargo.toml --features headless --lib headless::"
 
+            # The `mcp-bridge` feature (`neore-host mcp-bridge`, an MCP server over HTTP) is off by default too.
+            - name: "Run the mcp-bridge feature's tests"
+              timeout-minutes: 20
+              shell: "bash"
+              run: "cargo test --manifest-path packages/device-core/Cargo.toml --no-default-features --features mcp-bridge --test mcp_bridge"
+
             # Records whether this runner's OpenSSH can multiplex (ControlMaster), for the plan's S5 note. The
             # step fails when it cannot reach a verdict (no sshd, no login), so a broken setup gets fixed.
             - name: "Measure ssh ControlMaster (Windows)"
