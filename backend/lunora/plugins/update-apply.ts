@@ -374,7 +374,8 @@ export const updateTriggerChild = internalMutation
                 pluginMarker: markerFor(installId, entryKey),
             });
 
-            await ctx.db.patch("pluginItems", linkId, { contentHash, pendingHash: "" });
+            // The link names the new row: export and the account data export find the child by this id.
+            await ctx.db.patch("pluginItems", linkId, { contentHash, itemId: created.triggerId, pendingHash: "" });
 
             return created.webhookSecret === undefined ? {} : { webhookSecret: created.webhookSecret };
         }

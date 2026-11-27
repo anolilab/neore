@@ -351,7 +351,7 @@ describe("rewriting a trigger of any type", () => {
         expect(executions.page).toHaveLength(0);
         expect(routes.deleted).toContain(triggerId);
         expect(routes.set).toContain(after[0]._id);
-        expect(link).toMatchObject({ contentHash: await triggerRowHash(HOOK), pendingHash: "" });
+        expect(link).toMatchObject({ contentHash: await triggerRowHash(HOOK), itemId: after[0]._id, pendingHash: "" });
         expect(await triggerRowHash(after[0])).toBe(await triggerRowHash(HOOK));
     });
 

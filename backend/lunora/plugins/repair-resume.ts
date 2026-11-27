@@ -392,7 +392,10 @@ export const repairPlugin = authAction
 
             return { created: created.map((item) => item.key), kept, status: "installed" };
         } catch (error) {
-            await ctx.runMutation(internal.plugins.install_steps.markNeedsRepair, { generation: begun.generation, installId: begun.installId });
+            // Guarded: a lease that expired meanwhile makes this throw too, and the import's own error (and its retry hint) is the one to show.
+            await ctx
+                .runMutation(internal.plugins.install_steps.markNeedsRepair, { generation: begun.generation, installId: begun.installId })
+                .catch(() => undefined);
 
             throw importFailure(error);
         }
