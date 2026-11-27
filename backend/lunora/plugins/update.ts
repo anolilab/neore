@@ -10,8 +10,9 @@ import { LunoraError, v } from "lunorash/server";
 import { internal } from "../_generated/internal";
 import { internalQuery } from "../_generated/server";
 import { authAction, rateLimit } from "../lib/crpc";
-import { childOps } from "./install-ops";
-import { runBundleImport } from "../skills/bundle-plan";
+import { requireOwnerShard } from "./owner-shard";
+import { childOps, importFailure } from "./install-ops";
+import { assertSelectionImportable, BundleImportError, runBundleImport } from "../skills/bundle-plan";
 import { MAX_LENGTH } from "../lib/validators";
 import { planFor } from "../skills/bundle";
 import { assertNoToolConfig, checkPluginFile } from "./install-action";
@@ -54,6 +55,10 @@ export const loadInstalledForUpdate = internalQuery
         ),
     )
     .query(async ({ args, ctx }) => {
+        // The children's live hashes are read from the owner's shard. On another shard every child would read as missing,
+        // so the preview would call it edited and an update would detach it.
+        requireOwnerShard(args.userId, "update");
+
         const install = await ctx.db.pluginInstalls.findFirst({ where: { pluginSlug: args.pluginSlug, userId: args.userId } });
 
         if (!install) {
@@ -62,8 +67,8 @@ export const loadInstalledForUpdate = internalQuery
 
         const installId = install._id as string;
         const { page } = await ctx.db.pluginItems.findMany({ where: { installId } });
-        const children: Array<{ contentHash: string; currentHash: string; entryKey: string; kind: "group" | "skill" | "trigger" }> = [];
-        const ownSlugs: Array<{ entryKey: string; slug: string }> = [];
+        const children: { contentHash: string; currentHash: string; entryKey: string; kind: "group" | "skill" | "trigger" }[] = [];
+        const ownSlugs: { entryKey: string; slug: string }[] = [];
 
         for (const link of page) {
             const currentHash = await liveHashOf(ctx, installId, link);
@@ -112,9 +117,14 @@ export const previewUpdate = authAction
         }
 
         const { entries } = await planFor(ctx, args.markdown, undefined, { ownSlugs: installed.ownSlugs });
+
         assertNoToolConfig(entries);
-        const incoming = await Promise.all(entries.map(async (entry) => ({ contentHash: await entryHash(entry), entryKey: entry.key, kind: entry.kind })));
-        const plan: Array<{ action: UpdateAction; entryKey: string }> = diffUpdate(installed.children, incoming);
+        const incoming = await Promise.all(
+            entries.map(async (entry) => {
+                return { contentHash: await entryHash(entry), entryKey: entry.key, kind: entry.kind };
+            }),
+        );
+        const plan: { action: UpdateAction; entryKey: string }[] = diffUpdate(installed.children, incoming);
 
         return {
             downgrade: isDowngrade(installed.version, header.version),
@@ -127,7 +137,7 @@ export const previewUpdate = authAction
 /**
  * Applies an update. Changed skills are rewritten in place; unchanged ones are left alone; an edited child, a child
  * that is not a skill, and any add or removal are reported as skipped (not applied yet). A downgrade needs
- * `confirmDowngrade`. If a step stops part-way the install stays `updating`, and repair handles it (not built yet).
+ * `confirmDowngrade`. If a step fails, the install goes back to `installed` (or to `needs-repair` when new children were left behind) and the update can be run again.
  */
 export const updatePlugin = authAction
     .input({
@@ -148,7 +158,7 @@ export const updatePlugin = authAction
             throw new LunoraError("UNPROCESSABLE", "Organization plugin installs are not available yet");
         }
 
-        const { header, hash } = await checkPluginFile(args.markdown);
+        const { hash, header } = await checkPluginFile(args.markdown);
 
         if (hash !== args.contentHash) {
             throw new LunoraError("BAD_REQUEST", "The file is not the one that was previewed. Preview it again before updating.");
@@ -169,9 +179,45 @@ export const updatePlugin = authAction
         }
 
         const { entries } = await planFor(ctx, args.markdown, undefined, { ownSlugs: installed.ownSlugs });
+
         assertNoToolConfig(entries);
-        const incoming = await Promise.all(entries.map(async (entry) => ({ contentHash: await entryHash(entry), entryKey: entry.key, kind: entry.kind })));
+        const incoming = await Promise.all(
+            entries.map(async (entry) => {
+                return { contentHash: await entryHash(entry), entryKey: entry.key, kind: entry.kind };
+            }),
+        );
         const plan = diffUpdate(installed.children, incoming);
+
+        // A child whose kind changed is a removal plus a creation under one key. Both halves are skipped when a group chat is on either side.
+        const groupSwap = new Set(
+            plan
+                .filter(
+                    (step) =>
+                        step.action === "create" &&
+                        plan.some((other) => other.entryKey === step.entryKey && (other.action === "delete" || other.action === "detach")),
+                )
+                .map((step) => step.entryKey)
+                .filter(
+                    (key) =>
+                        installed.children.find((row) => row.entryKey === key)?.kind === "group" ||
+                        entries.find((entry) => entry.key === key)?.plan?.kind === "group",
+                ),
+        );
+        const createKeys = new Set(
+            plan
+                .filter(
+                    (step) =>
+                        step.action === "create" &&
+                        !groupSwap.has(step.entryKey) &&
+                        entries.find((entry) => entry.key === step.entryKey)?.plan?.kind !== "group",
+                )
+                .map((step) => step.entryKey),
+        );
+
+        // Checked before anything is written: a new item the planner blocked must not be dropped while the new version is recorded.
+        if (createKeys.size > 0) {
+            assertSelectionImportable(entries, createKeys);
+        }
 
         const generation = await ctx.runMutation(internal.plugins.update_apply.beginUpdate, {
             installId: installed.installId,
@@ -180,129 +226,155 @@ export const updatePlugin = authAction
         });
 
         const applied: string[] = [];
-        const skipped: Array<{ action: UpdateAction; entryKey: string }> = [];
-        const createKeys = new Set<string>();
+        const skipped: { action: UpdateAction; entryKey: string }[] = [];
 
-        for (const step of plan) {
-            if (step.action === "same") {
-                continue;
-            }
-
-            const entry = entries.find((candidate) => candidate.key === step.entryKey);
-            const child = installed.children.find((row) => row.entryKey === step.entryKey);
-
-            if (step.action === "create") {
-                // A new group chat needs its participants in the same selection; it is reported until that is handled.
-                if (entry?.plan?.kind === "group") {
-                    skipped.push(step);
-                } else {
-                    createKeys.add(step.entryKey);
+        try {
+            for (const step of plan) {
+                if (step.action === "same") {
+                    continue;
                 }
-                continue;
-            }
 
-            if (step.action === "delete" || step.action === "detach") {
-                if (child?.kind === "group") {
+                const entry = entries.find((candidate) => candidate.key === step.entryKey);
+                const child = installed.children.find((row) => row.entryKey === step.entryKey);
+
+                if (step.action === "create") {
+                    // A new group chat needs its participants in the same selection; it is reported until that is handled.
+                    if (!createKeys.has(step.entryKey)) {
+                        skipped.push(step);
+                    }
+
+                    continue;
+                }
+
+                if (step.action === "delete" || step.action === "detach") {
+                    if (child?.kind === "group" || groupSwap.has(step.entryKey)) {
+                        skipped.push(step);
+                        continue;
+                    }
+
+                    const ids = { entryKey: step.entryKey, generation, installId: installed.installId, userId };
+
+                    if (step.action === "delete") {
+                        // A skill that a group chat still names is kept, and reported.
+                        if (!(await ctx.runMutation(internal.plugins.update_apply.removeChild, ids))) {
+                            skipped.push(step);
+                            continue;
+                        }
+                    } else {
+                        await ctx.runMutation(internal.plugins.update_apply.detachChild, ids);
+                    }
+
+                    applied.push(step.entryKey);
+                    continue;
+                }
+
+                if (step.action === "update" && entry?.plan?.kind === "trigger" && entry.plan.create.type === "schedule") {
+                    const { create } = entry.plan;
+
+                    const updatedTrigger = await ctx.runMutation(internal.plugins.update_apply.updateTriggerChild, {
+                        contentHash: await entryHash(entry),
+                        cronExpression: create.cronExpression,
+                        description: create.description,
+                        entryKey: step.entryKey,
+                        generation,
+                        inputTemplate: create.inputTemplate,
+                        installId: installed.installId,
+                        model: create.model,
+                        name: create.name,
+                        searchMode: create.searchMode,
+                        systemPrompt: create.systemPrompt,
+                        timezone: create.timezone,
+                        userId,
+                    });
+
+                    if (updatedTrigger) {
+                        applied.push(step.entryKey);
+                    } else {
+                        skipped.push(step);
+                    }
+
+                    continue;
+                }
+
+                if (step.action !== "update" || entry?.plan?.kind !== "skill") {
                     skipped.push(step);
                     continue;
                 }
 
-                const args = { entryKey: step.entryKey, generation, installId: installed.installId, userId };
+                const content = skillContent(entry.plan.create);
 
-                if (step.action === "delete") {
-                    await ctx.runMutation(internal.plugins.update_apply.removeChild, args);
-                } else {
-                    await ctx.runMutation(internal.plugins.update_apply.detachChild, args);
-                }
-
-                applied.push(step.entryKey);
-                continue;
-            }
-
-            if (step.action === "update" && entry?.plan?.kind === "trigger" && entry.plan.create.type === "schedule") {
-                const create = entry.plan.create;
-
-                await ctx.runMutation(internal.plugins.update_apply.updateTriggerChild, {
+                await ctx.runMutation(internal.plugins.update_apply.updateSkillChild, {
+                    category: content.category,
+                    config: content.config,
                     contentHash: await entryHash(entry),
-                    cronExpression: create.cronExpression,
-                    description: create.description,
+                    description: content.description,
                     entryKey: step.entryKey,
                     generation,
-                    inputTemplate: create.inputTemplate,
+                    icon: content.icon,
                     installId: installed.installId,
-                    model: create.model,
-                    name: create.name,
-                    searchMode: create.searchMode,
-                    systemPrompt: create.systemPrompt,
-                    timezone: create.timezone,
+                    instructions: content.instructions,
+                    name: content.name,
+                    slug: content.slug,
+                    tags: content.tags,
                     userId,
+                    variables: content.variables,
+                    version: content.version,
                 });
                 applied.push(step.entryKey);
-                continue;
             }
 
-            if (step.action !== "update" || entry?.plan?.kind !== "skill") {
-                skipped.push(step);
-                continue;
+            if (createKeys.size > 0) {
+                // New skills and triggers are created the way install creates them: intent first, then the create, then the link.
+                const hashByKey = new Map(await Promise.all(entries.map(async (entry) => [entry.key, await entryHash(entry)] as const)));
+                const created = await runBundleImport(
+                    entries,
+                    createKeys,
+                    childOps(ctx, {
+                        generation,
+                        installId: installed.installId,
+                        intentFor: async (key, kind) =>
+                            await ctx.runMutation(internal.plugins.install_steps.recordIntent, {
+                                contentHash: hashByKey.get(key) ?? "",
+                                entryKey: key,
+                                generation,
+                                installId: installed.installId,
+                                kind,
+                                userId,
+                            }),
+                        isPremium: ctx.user.plan === "premium" || ctx.user.isAdmin === true,
+                        plan: ctx.user.plan ?? undefined,
+                        userId,
+                        version: header.version,
+                    }),
+                    { keepOnRateLimit: true },
+                );
+
+                applied.push(...created.map((item) => item.key));
             }
 
-            const content = skillContent(entry.plan.create);
-
-            await ctx.runMutation(internal.plugins.update_apply.updateSkillChild, {
-                category: content.category,
-                config: content.config,
-                contentHash: await entryHash(entry),
-                description: content.description,
-                entryKey: step.entryKey,
+            await ctx.runMutation(internal.plugins.update_apply.finishUpdate, {
+                contentHash: hash,
                 generation,
-                icon: content.icon,
                 installId: installed.installId,
-                instructions: content.instructions,
-                name: content.name,
-                slug: content.slug,
-                tags: content.tags,
-                userId,
-                variables: content.variables,
-                version: content.version,
+                version: header.version,
             });
-            applied.push(step.entryKey);
-        }
+        } catch (error) {
+            // Each child step is one mutation, so what was done stays done and running the update again finishes the rest. A rate limit
+            // or a rollback that left rows behind keeps the install for repair, with the new file's hash so repair takes the new file.
+            const keepForRepair = error instanceof BundleImportError && (error.resumable || error.leftBehind.length > 0);
 
-        if (createKeys.size > 0) {
-            // New skills and triggers are created the way install creates them: intent first, then the create, then the link.
-            const hashByKey = new Map(await Promise.all(entries.map(async (entry) => [entry.key, await entryHash(entry)] as const)));
-            const created = await runBundleImport(
-                entries,
-                createKeys,
-                childOps(ctx, {
+            await ctx
+                .runMutation(internal.plugins.update_apply.failUpdate, {
+                    contentHash: hash,
+                    createKeys: [...createKeys],
                     generation,
                     installId: installed.installId,
-                    intentFor: async (key, kind) =>
-                        await ctx.runMutation(internal.plugins.install_steps.recordIntent, {
-                            contentHash: hashByKey.get(key) ?? "",
-                            entryKey: key,
-                            generation,
-                            installId: installed.installId,
-                            kind,
-                            userId,
-                        }),
-                    isPremium: ctx.user.plan === "premium" || ctx.user.isAdmin === true,
-                    plan: ctx.user.plan ?? undefined,
-                    userId,
-                    version: header.version,
-                }),
-                { keepOnRateLimit: true },
-            );
+                    keepForRepair,
+                })
+                .catch(() => undefined);
 
-            applied.push(...created.map((item) => item.key));
+            throw importFailure(error);
         }
-
-        await ctx.runMutation(internal.plugins.update_apply.finishUpdate, {
-            contentHash: hash,
-            generation,
-            installId: installed.installId,
-            version: header.version,
-        });
 
         return { applied, skipped, version: header.version };
     });

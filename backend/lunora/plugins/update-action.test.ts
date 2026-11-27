@@ -43,12 +43,12 @@ vi.mock("../lib/rate-limiter", async (importOriginal) => {
 
 const MODULES = {
     lib_claim_once: async () => await import("../lib/claim-once"),
-    skills_create_skill: async () => await import("../skills/create-skill"),
-    skills_bundle: async () => await import("../skills/bundle"),
     plugins_install_action: async () => await import("./install-action"),
     plugins_install_steps: async () => await import("./install-steps"),
     plugins_update: async () => await import("./update"),
     plugins_update_apply: async () => await import("./update-apply"),
+    skills_bundle: async () => await import("../skills/bundle"),
+    skills_create_skill: async () => await import("../skills/create-skill"),
 } as const;
 
 beforeAll(async () => {
@@ -71,19 +71,23 @@ const procedureAt = (module: keyof typeof MODULES, name: string): never => {
     return procedure as never;
 };
 
-type PreviewResult = { downgrade: boolean; installedVersion: string; plan: Array<{ action: string; entryKey: string }>; targetVersion: string };
-type UpdateResult = { applied: string[]; skipped: Array<{ action: string; entryKey: string }>; version: string };
+type PreviewResult = { downgrade: boolean; installedVersion: string; plan: { action: string; entryKey: string }[]; targetVersion: string };
+type UpdateResult = { applied: string[]; skipped: { action: string; entryKey: string }[]; version: string };
 
 const OWNER = "owner-a";
 const SLUG = "daily-brief";
 
-const skill = (slug: string) => ({ description: `${slug} skill`, instructions: `Be the ${slug}.`, name: slug, slug });
+const skill = (slug: string) => {
+    return { description: `${slug} skill`, instructions: `Be the ${slug}.`, name: slug, slug };
+};
 
 /** A plugin file with one skill per slug, at `version`. The header carries the hash of the body, as the install needs. */
 const fileOf = async (slugs: string[], version: string) => {
     const body = buildBundleMarkdown({
         description: "",
-        items: slugs.map((slug) => ({ key: slug, kind: "skill" as const, skill: skill(slug) })),
+        items: slugs.map((slug) => {
+            return { key: slug, kind: "skill" as const, skill: skill(slug) };
+        }),
         name: "Daily brief",
     });
     const contentHash = await bodyHash(body);
@@ -110,7 +114,7 @@ describe("plugin update action", () => {
     });
 
     const as = () => harness.withIdentity({ userId: OWNER } as never);
-    const run = async <T>(fn: (context: any) => Promise<T>): Promise<T> => await harness.run(async (context: any) => await fn(context));
+    const run = async <T>(function_: (context: any) => Promise<T>): Promise<T> => await harness.run(async (context: any) => await function_(context));
     const skillsNamed = async () => await run(async (context) => (await context.db.skills.findMany({ where: { userId: OWNER } })).page);
     const installRow = async () => await run(async (context) => (await context.db.pluginInstalls.findMany({ where: { userId: OWNER } })).page[0]);
     const updateTo = async (slugs: string[], version: string) => {
@@ -248,5 +252,23 @@ describe("plugin update action", () => {
         const again = (await as().action(procedureAt("plugins_update", "previewUpdate"), { markdown } as never)) as PreviewResult;
 
         expect(again.plan).toContainEqual({ action: "same", entryKey: "skill:critic" });
+    });
+
+    it("reports a removal as skipped when a group chat still names the skill", async () => {
+        const [critic] = await run(async (context) => (await context.db.skills.findMany({ where: { name: "critic" } })).page);
+
+        await run(async (context) => {
+            await context.db.insert("threads", {
+                groupChat: { mode: "round-robin", participants: [{ addedAt: Date.now(), skillId: critic._id }] },
+                status: "active",
+                title: "Panel",
+                userId: OWNER,
+            });
+        });
+
+        const result = await updateTo(["analyst"], "1.1.0");
+
+        expect(result.skipped).toContainEqual({ action: "delete", entryKey: "skill:critic" });
+        expect((await skillsNamed()).map((row: { name: string }) => row.name).toSorted()).toStrictEqual(["analyst", "critic"]);
     });
 });

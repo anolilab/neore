@@ -12,7 +12,9 @@ import { withPluginHeader } from "./export";
 import { bodyHash } from "./logic";
 
 const registry = vi.hoisted(() => new Map<string, unknown>());
-const limit = vi.hoisted(() => ({ allowed: 1, calls: 0 }));
+const limit = vi.hoisted(() => {
+    return { allowed: 1, calls: 0 };
+});
 
 vi.mock("../_generated/api", async (importOriginal) => registeredApi(await importOriginal(), registry));
 vi.mock("../_generated/internal", async (importOriginal) => registeredApi(await importOriginal(), registry));
@@ -86,12 +88,15 @@ const OWNER = "owner-a";
 const ANALYST = { description: "Analyst skill", instructions: "Be the analyst.", name: "analyst", slug: "analyst" };
 const REVIEWER = { description: "Reviewer skill", instructions: "Review it.", name: "reviewer", slug: "reviewer" };
 
+const AUDITOR = { description: "Auditor skill", instructions: "Audit it.", name: "auditor", slug: "auditor" };
+
 const body = () =>
     buildBundleMarkdown({
         description: "",
         items: [
             { key: "analyst", kind: "skill", skill: ANALYST },
             { key: "reviewer", kind: "skill", skill: REVIEWER },
+            { key: "auditor", kind: "skill", skill: AUDITOR },
         ],
         name: "Pair",
     });
@@ -113,14 +118,14 @@ describe("a rate limit part-way through an install", () => {
     });
 
     const as = () => harness.withIdentity({ userId: OWNER } as never);
-    const run = async <T>(fn: (context: any) => Promise<T>): Promise<T> => await harness.run(async (context: any) => await fn(context));
+    const run = async <T>(function_: (context: any) => Promise<T>): Promise<T> => await harness.run(async (context: any) => await function_(context));
     const skillNames = async () =>
         (await run(async (context) => (await context.db.skills.findMany({ where: { userId: OWNER } })).page)).map((skill: { name: string }) => skill.name);
 
-    it("keeps the child made before the limit, leaves the install for repair, and repair finishes the rest", async () => {
+    it("keeps the child made before the limit, leaves the install for repair, and repair creates the rest, including the entry never reached", async () => {
         await expect(
             as().action(procedureAt("plugins_install_action", "installPlugin"), { contentHash: hash, markdown: pluginFile(hash) } as never),
-        ).rejects.toThrow("rate limit");
+        ).rejects.toMatchObject({ code: "TOO_MANY_REQUESTS", message: expect.stringContaining("rate limit") });
 
         expect(await skillNames()).toEqual(["analyst"]);
 
@@ -139,6 +144,6 @@ describe("a rate limit part-way through an install", () => {
         } as never);
 
         expect(result).toMatchObject({ status: "installed" });
-        expect((await skillNames()).toSorted()).toEqual(["analyst", "reviewer"]);
+        expect((await skillNames()).toSorted()).toEqual(["analyst", "auditor", "reviewer"]);
     });
 });

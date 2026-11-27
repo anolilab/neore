@@ -18,6 +18,7 @@ export const beginUninstall = internalMutation
             groups: v.array(v.string()),
             installId: v.string(),
             kept: v.array(v.string()),
+            pendingSkills: v.array(v.string()),
             removed: v.number(),
         }),
     )
@@ -29,13 +30,17 @@ export const claimGroup = internalMutation
     .mutation(async ({ args, ctx }) => await claimGroupForDelete(ctx, args.installId, args.generation, args.threadId));
 
 export const finishUninstall = internalMutation
-    .input({ generation: v.number(), installId: v.string().max(128) })
-    .output(v.null())
-    .mutation(async ({ args, ctx }) => {
-        await finishUninstallRows(ctx, args.installId, args.generation);
-
-        return null;
-    });
+    .input({
+        generation: v.number(),
+        installId: v.string().max(128),
+        keptGroups: v.array(v.string().max(128)).max(300),
+        pendingSkills: v.array(v.string().max(128)).max(500),
+    })
+    .output(v.object({ kept: v.array(v.string()), removed: v.number() }))
+    .mutation(
+        async ({ args, ctx }) =>
+            await finishUninstallRows(ctx, args.installId, args.generation, { keptGroups: args.keptGroups, pendingSkills: args.pendingSkills }),
+    );
 
 export const uninstallPlugin = authAction
     .input({ pluginSlug: v.string().max(64) })
@@ -46,6 +51,7 @@ export const uninstallPlugin = authAction
             userId: ctx.user.userId,
         });
         const kept = [...begun.kept];
+        const keptGroups: string[] = [];
 
         for (const threadId of begun.groups) {
             const mayDelete = await ctx.runMutation(internal.plugins.uninstall_action.claimGroup, {
@@ -56,19 +62,37 @@ export const uninstallPlugin = authAction
 
             if (!mayDelete) {
                 kept.push(threadId);
+                keptGroups.push(threadId);
                 continue;
             }
 
             let isDone = false;
+            let isFirst = true;
 
             while (!isDone) {
-                const page = await ctx.runMutation(internal.agent.threads.deleteAllForThreadIdAsync, { threadId: threadId as Id<"threads"> });
+                // The first page rechecks, in its own transaction, that no message arrived since the claim; a group that gained one is kept.
+                const page = await ctx.runMutation(internal.agent.threads.deleteAllForThreadIdAsync, {
+                    threadId: threadId as Id<"threads">,
+                    ...(isFirst && { pluginInstallId: begun.installId }),
+                });
 
+                if (page.kept === true) {
+                    kept.push(threadId);
+                    keptGroups.push(threadId);
+                    break;
+                }
+
+                isFirst = false;
                 isDone = page.isDone;
             }
         }
 
-        await ctx.runMutation(internal.plugins.uninstall_action.finishUninstall, { generation: begun.generation, installId: begun.installId });
+        const finished = await ctx.runMutation(internal.plugins.uninstall_action.finishUninstall, {
+            generation: begun.generation,
+            installId: begun.installId,
+            keptGroups,
+            pendingSkills: begun.pendingSkills,
+        });
 
-        return { kept, removed: begun.removed };
+        return { kept: [...kept, ...finished.kept], removed: begun.removed + finished.removed };
     });

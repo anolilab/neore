@@ -208,12 +208,8 @@ export const deleteUserSkills = internalMutation
 /** The user's plugin installs and their child links (`plugins/gdpr.ts`). The children are erased by their own steps. */
 export const deleteUserPlugins = internalMutation
     .input({ userId: v.string() })
-    .output(v.null())
-    .mutation(async ({ args: { userId }, ctx: context }) => {
-        await erasePluginsForUser(context, userId);
-
-        return null;
-    });
+    .output(vBatchResult)
+    .mutation(async ({ args: { userId }, ctx: context }) => await erasePluginsForUser(context, userId));
 
 export const deleteUserConnectors = internalMutation
     .input({ userId: v.string() })

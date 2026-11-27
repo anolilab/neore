@@ -9,6 +9,7 @@ import { v, LunoraError } from "lunorash/server";
 import type { Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { internalMutation } from "../_generated/server";
+import { patchRow } from "../lib/patch";
 import { LEASE_MS } from "./logic";
 import { vPluginItemKind } from "./validators";
 
@@ -40,7 +41,7 @@ export const createInstallRow = internalMutation
             throw new LunoraError("CONFLICT", `The plugin "${args.pluginSlug}" is already installed. Uninstall it first.`);
         }
 
-        const now = ctx.now;
+        const { now } = ctx;
         const installId = await ctx.db.insert("pluginInstalls", {
             contentHash: args.contentHash,
             generation: 1,
@@ -102,9 +103,15 @@ export const finishInstall = internalMutation
     .input({ generation: v.number(), installId: v.string().max(128) })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
-        await heldInstall(ctx, args.installId as Id<"pluginInstalls">, args.generation);
+        const install = await heldInstall(ctx, args.installId as Id<"pluginInstalls">, args.generation);
 
-        await ctx.db.patch("pluginInstalls", args.installId as Id<"pluginInstalls">, { status: "installed", updatedAt: ctx.now });
+        // An update kept for repair holds its target version: finishing it makes that the installed version, to match the new file's hash.
+        await patchRow(ctx.db, "pluginInstalls", install, {
+            status: "installed",
+            targetVersion: undefined,
+            updatedAt: ctx.now,
+            version: install.targetVersion ?? install.version,
+        });
 
         return null;
     });
@@ -128,10 +135,17 @@ export const deleteInstall = internalMutation
     .mutation(async ({ args, ctx }) => {
         await heldInstall(ctx, args.installId as Id<"pluginInstalls">, args.generation);
 
-        const links = await ctx.db.pluginItems.findMany({ where: { installId: args.installId } });
+        // Every link, not one page of them: a link left behind would name an install that no longer exists.
+        for (;;) {
+            const { page: links } = await ctx.db.pluginItems.findMany({ where: { installId: args.installId } });
 
-        for (const link of links.page) {
-            await ctx.db.delete("pluginItems", link._id);
+            if (links.length === 0) {
+                break;
+            }
+
+            for (const link of links) {
+                await ctx.db.delete("pluginItems", link._id);
+            }
         }
 
         await ctx.db.delete("pluginInstalls", args.installId as Id<"pluginInstalls">);

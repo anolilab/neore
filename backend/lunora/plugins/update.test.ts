@@ -1,6 +1,7 @@
 import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import { ROOT_SHARD_KEY, runInShard } from "../lib/shard-context";
 import schema from "../schema";
 import { createPluginSkill } from "../skills/create-skill";
 import { skillRowHash } from "./entry-hash";
@@ -28,7 +29,7 @@ describe("update: the installed children and their live hashes", () => {
         harness.close();
     });
 
-    const run = async <T>(fn: (context: any) => Promise<T>): Promise<T> => await harness.run(async (context: any) => await fn(context));
+    const run = async <T>(function_: (context: any) => Promise<T>): Promise<T> => await harness.run(async (context: any) => await function_(context));
 
     /** An installed plugin with one skill child whose installed hash is the hash of its row as created. */
     const installWithSkill = async () => {
@@ -53,9 +54,9 @@ describe("update: the installed children and their live hashes", () => {
                 await context.runMutation(createPluginSkill, {
                     ...ANALYST,
                     isPremium: true,
+                    plan: "premium",
                     pluginInstallId: installId,
                     pluginMarker: markerFor(installId, "skill:analyst"),
-                    plan: "premium",
                     source: { type: "plugin" as const, version: "1.0.0" },
                     userId: OWNER,
                 }),
@@ -107,5 +108,23 @@ describe("update: the installed children and their live hashes", () => {
         const installed = await run(async (context) => await context.runQuery(loadInstalledForUpdate, { pluginSlug: "nothing", userId: OWNER }));
 
         expect(installed).toBeNull();
+    });
+
+    it("refuses to read the children from another person's shard", async () => {
+        await expect(
+            runInShard(
+                "someone-else",
+                async () => await run(async (context) => await context.runQuery(loadInstalledForUpdate, { pluginSlug: SLUG, userId: OWNER })),
+            ),
+        ).rejects.toThrow("owner's shard");
+    });
+
+    it("refuses to read the children on the root shard", async () => {
+        await expect(
+            runInShard(
+                ROOT_SHARD_KEY,
+                async () => await run(async (context) => await context.runQuery(loadInstalledForUpdate, { pluginSlug: SLUG, userId: OWNER })),
+            ),
+        ).rejects.toThrow("owner's shard");
     });
 });

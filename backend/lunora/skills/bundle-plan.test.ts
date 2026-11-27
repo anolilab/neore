@@ -302,6 +302,18 @@ describe("the import", () => {
         expect(created.map((item) => item.kind)).toStrictEqual(["skill", "skill", "group", "trigger"]);
     });
 
+    it("creates a missing group chat on skills that already exist, when their ids are known", async () => {
+        const { calls, ops } = fakeOps();
+        const known = new Map([
+            ["skill:2", "old-1"],
+            ["skill:3", "old-2"],
+        ]);
+
+        await runBundleImport(plan(items), new Set(["group:1"]), ops, { knownIds: known });
+
+        expect(calls).toStrictEqual(["createGroup:old-1+old-2"]);
+    });
+
     it("hands back a new webhook's secret once, on its item", async () => {
         const { ops } = fakeOps();
         const created = await runBundleImport(plan(items), ALL, ops);

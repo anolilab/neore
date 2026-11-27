@@ -1,11 +1,13 @@
 import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import { deleteAllForThreadIdAsync } from "../agent/threads";
 import { createPluginGroupChat } from "../chat/group/functions";
 import schema from "../schema";
 import { createPluginSkill } from "../skills/create-skill";
 import { skillRowHash } from "./entry-hash";
 import { createInstallRow, finishInstall, recordCreated, recordIntent } from "./install-steps";
+import { ROOT_SHARD_KEY, runInShard } from "../lib/shard-context";
 import { markerFor } from "./logic";
 import { claimGroupForDelete, finishUninstallRows, uninstallRows } from "./uninstall";
 
@@ -29,7 +31,7 @@ describe("uninstall", () => {
         harness.close();
     });
 
-    const run = async <T>(fn: (context: any) => Promise<T>): Promise<T> => await harness.run(async (context: any) => await fn(context));
+    const run = async <T>(function_: (context: any) => Promise<T>): Promise<T> => await harness.run(async (context: any) => await function_(context));
 
     /** An installed plugin with one skill child, created and linked as the install does it. */
     const installed = async () => {
@@ -53,9 +55,9 @@ describe("uninstall", () => {
                 await context.runMutation(createPluginSkill, {
                     ...ANALYST,
                     isPremium: true,
+                    plan: "premium",
                     pluginInstallId: installId,
                     pluginMarker: markerFor(installId, "skill:analyst"),
-                    plan: "premium",
                     source: { type: "plugin" as const, version: "1.0.0" },
                     userId: OWNER,
                 }),
@@ -82,7 +84,7 @@ describe("uninstall", () => {
         expect(result.removed).toBeGreaterThan(0);
 
         const skill = await run(async (context) => await context.db.skills.findFirst({ where: { _id: skillId } }));
-        const links = await run(async (context) => (await context.db.pluginItems.findMany({ where: { installId } })).page);
+        const { page: links } = await run(async (context) => await context.db.pluginItems.findMany({ where: { installId } }));
         const install = await run(async (context) => await context.db.pluginInstalls.findFirst({ where: { _id: installId } }));
 
         expect(skill).toBeNull();
@@ -108,7 +110,42 @@ describe("uninstall", () => {
         const skill = await run(async (context) => await context.db.skills.findFirst({ where: { _id: skillId } }));
 
         expect(skill).toMatchObject({ instructions: "Changed by the owner.", pluginInstallId: "", pluginMarker: "" });
-        expect(await run(async (context) => (await context.db.skills.findMany({ where: { pluginInstallId: installId } })).page)).toHaveLength(0);
+        const { page: attached } = await run(async (context) => await context.db.skills.findMany({ where: { pluginInstallId: installId } }));
+
+        expect(attached).toHaveLength(0);
+    });
+
+    it("refuses on the root shard, where the owner's group chats and skills cannot be seen", async () => {
+        await installed();
+
+        await expect(runInShard(ROOT_SHARD_KEY, async () => await run(async (context) => await uninstallRows(context, OWNER, SLUG)))).rejects.toThrow(
+            "must run on the owner's shard",
+        );
+    });
+
+    it("keeps a skill shared beyond its owner, because another person's group chat may use it", async () => {
+        const { installId, skillId } = await installed();
+
+        await run(async (context) => await context.db.patch("skills", skillId, { visibility: "public" }));
+
+        const begun = await run(async (context) => await uninstallRows(context, OWNER, SLUG));
+
+        expect(begun.kept).toEqual(["Analyst"]);
+        expect(begun.removed).toBe(0);
+        expect(await run(async (context) => await context.db.skills.findFirst({ where: { _id: skillId } }))).toMatchObject({
+            pluginInstallId: "",
+            pluginMarker: "",
+        });
+        expect(installId).toBe(begun.installId);
+    });
+
+    it("refuses to run on a shard that is not the owner's, before it changes anything", async () => {
+        const { installId } = await installed();
+
+        await expect(runInShard("someone-else", async () => await run(async (context) => await uninstallRows(context, OWNER, SLUG)))).rejects.toThrow(
+            "owner's shard",
+        );
+        expect(await run(async (context) => await context.db.pluginInstalls.findFirst({ where: { _id: installId } }))).toMatchObject({ status: "installed" });
     });
 
     it("refuses an uninstall of a plugin the person does not have", async () => {
@@ -119,6 +156,7 @@ describe("uninstall", () => {
             async (context) => await context.runMutation(createInstallRow, { contentHash: HASH, pluginSlug: SLUG, userId: OWNER, version: "1.0.0" }),
         );
         const { installId } = first;
+
         await run(async (context) => await context.runMutation(finishInstall, { generation: first.generation, installId }));
         const skillIds: string[] = [];
 
@@ -131,9 +169,9 @@ describe("uninstall", () => {
                             instructions: `Be ${slug}.`,
                             isPremium: true,
                             name: slug,
+                            plan: "premium",
                             pluginInstallId: installId,
                             pluginMarker: markerFor(installId, `skill:${slug}`),
-                            plan: "premium",
                             slug,
                             source: { type: "plugin" as const, version: "1.0.0" },
                             userId: OWNER,
@@ -147,9 +185,9 @@ describe("uninstall", () => {
                 await context.runMutation(createPluginGroupChat, {
                     mode: "round-robin",
                     model: "claude-haiku-5-5",
+                    plan: "premium",
                     pluginInstallId: installId,
                     pluginMarker: markerFor(installId, "group:panel"),
-                    plan: "premium",
                     skillIds,
                     title: "Panel",
                     userId: OWNER,
@@ -170,9 +208,9 @@ describe("uninstall", () => {
                     instructions: "Critique.",
                     isPremium: true,
                     name: "Critic",
+                    plan: "premium",
                     pluginInstallId: installId,
                     pluginMarker: markerFor(installId, "skill:critic"),
-                    plan: "premium",
                     slug: "critic",
                     source: { type: "plugin" as const, version: "1.0.0" },
                     userId: OWNER,
@@ -183,9 +221,9 @@ describe("uninstall", () => {
                 await context.runMutation(createPluginGroupChat, {
                     mode: "round-robin",
                     model: "claude-haiku-5-5",
+                    plan: "premium",
                     pluginInstallId: installId,
                     pluginMarker: markerFor(installId, "group:panel"),
-                    plan: "premium",
                     skillIds: [skillId, otherSkillId],
                     title: "Panel",
                     userId: OWNER,
@@ -240,9 +278,9 @@ describe("uninstall", () => {
                     instructions: "Critique.",
                     isPremium: true,
                     name: "Critic",
+                    plan: "premium",
                     pluginInstallId: installId,
                     pluginMarker: markerFor(installId, "skill:critic"),
-                    plan: "premium",
                     slug: "critic",
                     source: { type: "plugin" as const, version: "1.0.0" },
                     userId: OWNER,
@@ -253,9 +291,9 @@ describe("uninstall", () => {
                 await context.runMutation(createPluginGroupChat, {
                     mode: "round-robin",
                     model: "claude-haiku-5-5",
+                    plan: "premium",
                     pluginInstallId: installId,
                     pluginMarker: markerFor(installId, "group:late"),
-                    plan: "premium",
                     skillIds: [skillId, secondSkillId],
                     title: "Late panel",
                     userId: OWNER,
@@ -283,5 +321,123 @@ describe("uninstall", () => {
             pluginInstallId: "",
             pluginMarker: "",
         });
+    });
+
+    it("keeps a group that got a message after the claim, in the delete's own transaction", async () => {
+        const { installId, skillId } = await installed();
+        const secondSkillId = await run(
+            async (context) =>
+                await context.runMutation(createPluginSkill, {
+                    description: "Critic",
+                    instructions: "Critique.",
+                    isPremium: true,
+                    name: "Critic",
+                    plan: "premium",
+                    pluginInstallId: installId,
+                    pluginMarker: markerFor(installId, "skill:critic"),
+                    slug: "critic",
+                    source: { type: "plugin" as const, version: "1.0.0" },
+                    userId: OWNER,
+                }),
+        );
+        const { threadId } = await run(
+            async (context) =>
+                await context.runMutation(createPluginGroupChat, {
+                    mode: "round-robin",
+                    model: "claude-haiku-5-5",
+                    plan: "premium",
+                    pluginInstallId: installId,
+                    pluginMarker: markerFor(installId, "group:late"),
+                    skillIds: [skillId, secondSkillId],
+                    title: "Late panel",
+                    userId: OWNER,
+                }),
+        );
+        const begun = await run(async (context) => await uninstallRows(context, OWNER, SLUG));
+
+        expect(await run(async (context) => await claimGroupForDelete(context, begun.installId, begun.generation, threadId))).toBe(true);
+
+        await run(async (context) => {
+            await context.db.insert("messages", {
+                message: { content: "late", role: "user" },
+                order: 0,
+                status: "success",
+                stepOrder: 0,
+                text: "late",
+                threadId,
+                tool: false,
+                userId: OWNER,
+            });
+        });
+
+        const page = await run(async (context) => await context.runMutation(deleteAllForThreadIdAsync, { pluginInstallId: begun.installId, threadId }));
+
+        expect(page).toMatchObject({ isDone: true, kept: true });
+        expect(await run(async (context) => await context.db.threads.findFirst({ where: { _id: threadId } }))).toMatchObject({
+            pluginInstallId: "",
+            pluginMarker: "",
+        });
+        expect(await run(async (context) => await context.db.messages.findFirst({ where: { threadId } }))).not.toBeNull();
+
+        // The kept group still names its skills, so the finish step keeps them and detaches them rather than deleting them.
+        expect(begun.pendingSkills).toEqual([skillId]);
+        expect(await run(async (context) => await context.db.skills.findFirst({ where: { _id: skillId } }))).not.toBeNull();
+
+        const finished = await run(
+            async (context) =>
+                await finishUninstallRows(context, begun.installId, begun.generation, { keptGroups: [threadId], pendingSkills: begun.pendingSkills }),
+        );
+
+        expect(finished).toMatchObject({ kept: ["Analyst"], removed: 0 });
+        expect(await run(async (context) => await context.db.skills.findFirst({ where: { _id: skillId } }))).toMatchObject({
+            pluginInstallId: "",
+            pluginMarker: "",
+        });
+        expect(await run(async (context) => await context.db.skills.findFirst({ where: { _id: secondSkillId } }))).not.toBeNull();
+    });
+
+    it("deletes a skill that only a deleted group named, in the finish step", async () => {
+        const { installId, skillId } = await installed();
+        const secondSkillId = await run(
+            async (context) =>
+                await context.runMutation(createPluginSkill, {
+                    description: "Critic",
+                    instructions: "Critique.",
+                    isPremium: true,
+                    name: "Critic",
+                    plan: "premium",
+                    pluginInstallId: installId,
+                    pluginMarker: markerFor(installId, "skill:critic"),
+                    slug: "critic",
+                    source: { type: "plugin" as const, version: "1.0.0" },
+                    userId: OWNER,
+                }),
+        );
+
+        await run(
+            async (context) =>
+                await context.runMutation(createPluginGroupChat, {
+                    mode: "round-robin",
+                    model: "claude-haiku-5-5",
+                    plan: "premium",
+                    pluginInstallId: installId,
+                    pluginMarker: markerFor(installId, "group:panel"),
+                    skillIds: [skillId, secondSkillId],
+                    title: "Panel",
+                    userId: OWNER,
+                }),
+        );
+
+        const begun = await run(async (context) => await uninstallRows(context, OWNER, SLUG));
+
+        expect(begun.pendingSkills).toEqual([skillId]);
+        expect(await run(async (context) => await context.db.skills.findFirst({ where: { _id: skillId } }))).not.toBeNull();
+
+        const finished = await run(
+            async (context) => await finishUninstallRows(context, begun.installId, begun.generation, { pendingSkills: begun.pendingSkills }),
+        );
+
+        expect(finished.removed).toBe(1);
+        expect(await run(async (context) => await context.db.skills.findFirst({ where: { _id: skillId } }))).toBeNull();
     });
 });

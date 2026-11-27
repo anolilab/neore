@@ -5,11 +5,13 @@ import schema from "../schema";
 import { createPluginSkill } from "../skills/create-skill";
 import { skillRowHash } from "./entry-hash";
 import { createInstallRow, finishInstall, recordCreated, recordIntent } from "./install-steps";
-import { markerFor } from "./logic";
-import { beginUpdate, finishUpdate, updateSkillChild } from "./update-apply";
+import { diffUpdate, markerFor } from "./logic";
+import { loadInstalledForUpdate } from "./update";
+import { beginUpdate, failUpdate, finishUpdate, updateSkillChild } from "./update-apply";
 
 const OWNER = "owner-a";
 const SLUG = "daily-brief";
+const HASH = "e".repeat(64);
 const ANALYST = { description: "Analyst", instructions: "Analyse.", name: "Analyst", slug: "analyst" };
 const REVISED = { ...ANALYST, instructions: "Analyse in detail." };
 
@@ -28,7 +30,7 @@ describe("applying an update", () => {
         harness.close();
     });
 
-    const run = async <T>(fn: (context: any) => Promise<T>): Promise<T> => await harness.run(async (context: any) => await fn(context));
+    const run = async <T>(function_: (context: any) => Promise<T>): Promise<T> => await harness.run(async (context: any) => await function_(context));
 
     /** An installed plugin with one skill child, created and linked as the install does it. */
     const installed = async () => {
@@ -52,9 +54,9 @@ describe("applying an update", () => {
                 await context.runMutation(createPluginSkill, {
                     ...ANALYST,
                     isPremium: true,
+                    plan: "premium",
                     pluginInstallId: installId,
                     pluginMarker: markerFor(installId, "skill:analyst"),
-                    plan: "premium",
                     source: { type: "plugin" as const, version: "1.0.0" },
                     userId: OWNER,
                 }),
@@ -198,5 +200,134 @@ describe("applying an update", () => {
         const skill = await run(async (context) => await context.db.skills.findFirst({ where: { _id: skillId } }));
 
         expect(skill).toMatchObject({ slug: "analyst" });
+    });
+
+    it("removes a field the new version drops, so the row matches the hash the link records", async () => {
+        const { installId, skillId } = await installed();
+
+        await run(async (context) => await context.db.patch("skills", skillId, { tags: ["old"] }));
+
+        const tagged = await run(async (context) => await context.db.skills.findFirst({ where: { _id: skillId } }));
+
+        await run(async (context) => {
+            const { page } = await context.db.pluginItems.findMany({ where: { installId } });
+            const [link] = page;
+
+            await context.db.patch("pluginItems", link._id, { contentHash: await skillRowHash(tagged) });
+        });
+
+        const generation = await run(async (context) => await context.runMutation(beginUpdate, { installId, targetVersion: "1.1.0", userId: OWNER }));
+
+        await run(
+            async (context) =>
+                await context.runMutation(updateSkillChild, {
+                    contentHash: await skillRowHash(ANALYST),
+                    description: ANALYST.description,
+                    entryKey: "skill:analyst",
+                    generation,
+                    installId,
+                    instructions: ANALYST.instructions,
+                    name: ANALYST.name,
+                    slug: ANALYST.slug,
+                    userId: OWNER,
+                }),
+        );
+
+        const skill = await run(async (context) => await context.db.skills.findFirst({ where: { _id: skillId } }));
+        const link = await run(async (context) => (await context.db.pluginItems.findMany({ where: { installId } })).page[0]);
+
+        expect(skill?.tags).toBeUndefined();
+        expect(await skillRowHash(skill)).toBe(link.contentHash);
+    });
+
+    it("failUpdate returns the install to installed at its old version and drops intents left by a rolled-back create", async () => {
+        const { installId } = await installed();
+        const generation = await run(async (context) => await context.runMutation(beginUpdate, { installId, targetVersion: "1.1.0", userId: OWNER }));
+
+        await run(
+            async (context) =>
+                await context.db.insert("pluginItems", {
+                    contentHash: HASH,
+                    createdAt: Date.now(),
+                    entryKey: "skill:new",
+                    installId,
+                    kind: "skill",
+                    state: "intent",
+                    userId: OWNER,
+                }),
+        );
+        await run(async (context) => await context.runMutation(failUpdate, { contentHash: HASH, createKeys: [], generation, installId, keepForRepair: false }));
+
+        const install = await run(async (context) => await context.db.pluginInstalls.findFirst({ where: { _id: installId } }));
+        const links = await run(async (context) => (await context.db.pluginItems.findMany({ where: { installId } })).page);
+
+        expect(install).toMatchObject({ status: "installed", version: "1.0.0" });
+        expect(links.map((row: { entryKey: string }) => row.entryKey)).toStrictEqual(["skill:analyst"]);
+    });
+
+    it("failUpdate keeps the install for repair with the new file's hash when children were left behind", async () => {
+        const { installId } = await installed();
+        const generation = await run(async (context) => await context.runMutation(beginUpdate, { installId, targetVersion: "1.1.0", userId: OWNER }));
+
+        await run(async (context) => await context.runMutation(failUpdate, { contentHash: HASH, createKeys: [], generation, installId, keepForRepair: true }));
+
+        expect(await run(async (context) => await context.db.pluginInstalls.findFirst({ where: { _id: installId } }))).toMatchObject({
+            contentHash: HASH,
+            status: "needs-repair",
+            version: "1.0.0",
+        });
+    });
+
+    it("failUpdate drops the link of a new child the rollback removed, so the next update plans it as a create", async () => {
+        const { installId } = await installed();
+        const generation = await run(async (context) => await context.runMutation(beginUpdate, { installId, targetVersion: "1.1.0", userId: OWNER }));
+        const CRITIC = { description: "Critic", instructions: "Critique.", name: "Critic", slug: "critic" };
+
+        const intentId = await run(
+            async (context) =>
+                await context.runMutation(recordIntent, {
+                    contentHash: await skillRowHash(CRITIC),
+                    entryKey: "skill:critic",
+                    generation,
+                    installId,
+                    kind: "skill",
+                    userId: OWNER,
+                }),
+        );
+        const criticId = await run(
+            async (context) =>
+                await context.runMutation(createPluginSkill, {
+                    ...CRITIC,
+                    isPremium: true,
+                    plan: "premium",
+                    pluginInstallId: installId,
+                    pluginMarker: markerFor(installId, "skill:critic"),
+                    source: { type: "plugin" as const, version: "1.1.0" },
+                    userId: OWNER,
+                }),
+        );
+
+        await run(async (context) => await context.runMutation(recordCreated, { generation, installId, intentId, itemId: criticId }));
+        // The rollback of a later failed create removes the child but cannot touch its link.
+        await run(async (context) => await context.db.delete("skills", criticId));
+        await run(
+            async (context) =>
+                await context.runMutation(failUpdate, { contentHash: HASH, createKeys: ["skill:critic"], generation, installId, keepForRepair: false }),
+        );
+
+        const keys = await run(async (context) => {
+            const { page } = await context.db.pluginItems.findMany({ where: { installId } });
+
+            return page.map((row: { entryKey: string }) => row.entryKey);
+        });
+        const preview = await run(async (context) => await context.runQuery(loadInstalledForUpdate, { pluginSlug: SLUG, userId: OWNER }));
+
+        expect(keys).toStrictEqual(["skill:analyst"]);
+        expect(
+            diffUpdate(preview.children, [
+                { contentHash: await skillRowHash(ANALYST), entryKey: "skill:analyst", kind: "skill" },
+                { contentHash: await skillRowHash(CRITIC), entryKey: "skill:critic", kind: "skill" },
+            ]),
+        ).toContainEqual({ action: "create", entryKey: "skill:critic" });
     });
 });

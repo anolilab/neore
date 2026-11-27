@@ -14,6 +14,8 @@ import { LunoraError } from "lunorash/server";
 
 import type { Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
+import { skillVisibility } from "../skills/access";
+import { requireOwnerShard } from "./owner-shard";
 import { skillRowHash } from "./entry-hash";
 import { LEASE_MS, parseMarker } from "./logic";
 import { deleteSkillRows } from "../skills/functions";
@@ -21,28 +23,59 @@ import { deleteSkillRows } from "../skills/functions";
 /** How many of the owner's threads a scan reads. A scan that reaches it cannot prove a group is clear, so it refuses. */
 const GROUP_SCAN_LIMIT = 300;
 
+/** A page of rows, as `findMany` returns it. */
+interface RowPage<T> {
+    continueCursor?: string | null;
+    isDone: boolean;
+    page: T[];
+}
+
+/** Every row a `findMany` matches, page by page: one read stops at a page, and a missed row would be misjudged. */
+const readAllPages = async <T>(read: (cursor: string | null) => Promise<RowPage<T>>): Promise<T[]> => {
+    const rows: T[] = [];
+    let cursor: string | null = null;
+
+    for (;;) {
+        const result: RowPage<T> = await read(cursor);
+
+        rows.push(...result.page);
+
+        if (result.isDone || !result.continueCursor) {
+            return rows;
+        }
+
+        cursor = result.continueCursor;
+    }
+};
+
 export interface UninstallBegun {
     generation: number;
     groups: string[];
     installId: string;
     kept: string[];
+    /** Ids of unedited private skills that one of the plugin's own groups names. They go in the finish step, if no kept group needs them. */
+    pendingSkills: string[];
     removed: number;
 }
 
 export const uninstallRows = async (ctx: MutationCtx, userId: string, pluginSlug: string): Promise<UninstallBegun> => {
+    // The group chats, messages and skills scanned below live on the owner's shard. On another shard the scans would find
+    // nothing, and the sweep would remove the global rows without the checks.
+    requireOwnerShard(userId, "uninstall");
+
     const install = await ctx.db.pluginInstalls.findFirst({ where: { pluginSlug, userId } });
 
     if (!install) {
         throw new LunoraError("NOT_FOUND", `The plugin "${pluginSlug}" is not installed`);
     }
 
-    if (["installing", "updating", "uninstalling"].includes(install.status) && install.leaseUntil !== undefined && install.leaseUntil > ctx.now) {
+    if (["installing", "uninstalling", "updating"].includes(install.status) && install.leaseUntil !== undefined && install.leaseUntil > ctx.now) {
         throw new LunoraError("CONFLICT", `The plugin "${pluginSlug}" is busy. Try again in a few minutes.`);
     }
 
     const installId = install._id as string;
-    const { page: links } = await ctx.db.pluginItems.findMany({ where: { installId } });
-    const { page: skills } = await ctx.db.skills.findMany({ where: { pluginInstallId: installId } });
+    const links = await readAllPages(async (cursor) => await ctx.db.pluginItems.findMany({ cursor, where: { installId } }));
+    const skills = await readAllPages(async (cursor) => await ctx.db.skills.findMany({ cursor, where: { pluginInstallId: installId } }));
     const skillIds = new Set(skills.map((skill) => skill._id as string));
 
     // The plugin's own group chats: any with messages refuses the uninstall; the empty ones go with it.
@@ -104,15 +137,24 @@ export const uninstallRows = async (ctx: MutationCtx, userId: string, pluginSlug
 
     let removed = 0;
     const kept: string[] = [];
+    const pendingSkills: string[] = [];
+    const groupSkillIds = new Set(ownGroups.flatMap((group) => group.groupChat?.participants.map((participant) => participant.skillId) ?? []));
 
     for (const skill of skills) {
         const marker = parseMarker(skill.pluginMarker ?? "");
         const link = links.find((row) => row.entryKey === marker?.entryKey);
-        const edited = !link || (await skillRowHash(skill)) !== link.contentHash;
+        // A skill shared beyond its owner may sit in another person's group chat, on a shard this step cannot scan: keep it.
+        const edited = !link || skillVisibility(skill) !== "private" || (await skillRowHash(skill)) !== link.contentHash;
 
         if (edited) {
             await ctx.db.patch("skills", skill._id as Id<"skills">, { pluginInstallId: "", pluginMarker: "" });
             kept.push(skill.name);
+            continue;
+        }
+
+        // A group chat that is kept after all (it gained a message) still names its skills, so they wait for the finish step.
+        if (groupSkillIds.has(skill._id as string)) {
+            pendingSkills.push(skill._id as string);
             continue;
         }
 
@@ -131,7 +173,7 @@ export const uninstallRows = async (ctx: MutationCtx, userId: string, pluginSlug
         kept.push(trigger.name);
     }
 
-    return { generation, groups, installId, kept, removed };
+    return { generation, groups, installId, kept, pendingSkills, removed };
 };
 
 /**
@@ -168,19 +210,75 @@ export const claimGroupForDelete = async (ctx: MutationCtx, installId: string, g
     return true;
 };
 
-/** The last step: the links and the install go. Called once the group chats have been deleted. */
-export const finishUninstallRows = async (ctx: MutationCtx, installId: string, generation: number): Promise<void> => {
+export interface UninstallFinished {
+    kept: string[];
+    removed: number;
+}
+
+/**
+ * The last step: the held-back skills, the links and the install go. Called once the group chats have been deleted. A pending
+ * skill that a kept group chat still names is detached instead of deleted, the way an edited skill is.
+ */
+export const finishUninstallRows = async (
+    ctx: MutationCtx,
+    installId: string,
+    generation: number,
+    options: { keptGroups?: string[]; pendingSkills?: string[] } = {},
+): Promise<UninstallFinished> => {
     const install = await ctx.db.pluginInstalls.findFirst({ where: { _id: installId as Id<"pluginInstalls"> } });
 
     if (!install || install.generation !== generation) {
         throw new LunoraError("CONFLICT", "STALE_LEASE: this uninstall was taken over by another action");
     }
 
-    const { page: links } = await ctx.db.pluginItems.findMany({ where: { installId } });
+    requireOwnerShard(install.userId, "uninstall");
 
-    for (const link of links) {
-        await ctx.db.delete("pluginItems", link._id as Id<"pluginItems">);
+    const result: UninstallFinished = { kept: [], removed: 0 };
+    const usedByKept = new Set<string>();
+
+    const keptGroups = options.keptGroups ?? [];
+    const pendingSkills = options.pendingSkills ?? [];
+
+    for (const threadId of keptGroups) {
+        const group = await ctx.db.get("threads", threadId as Id<"threads">);
+        const participants = group?.groupChat?.participants ?? [];
+
+        for (const participant of participants) {
+            usedByKept.add(participant.skillId);
+        }
+    }
+
+    for (const skillId of pendingSkills) {
+        const skill = await ctx.db.skills.findFirst({ where: { _id: skillId as Id<"skills"> } });
+
+        if (!skill || skill.pluginInstallId !== installId) {
+            continue;
+        }
+
+        if (usedByKept.has(skillId)) {
+            await ctx.db.patch("skills", skill._id as Id<"skills">, { pluginInstallId: "", pluginMarker: "" });
+            result.kept.push(skill.name);
+            continue;
+        }
+
+        await deleteSkillRows(ctx, skill._id as Id<"skills">, install.userId);
+        result.removed += 1;
+    }
+
+    // Every link goes, not one page of them: a link left behind would name an install that no longer exists.
+    for (;;) {
+        const { page: links } = await ctx.db.pluginItems.findMany({ where: { installId } });
+
+        if (links.length === 0) {
+            break;
+        }
+
+        for (const link of links) {
+            await ctx.db.delete("pluginItems", link._id as Id<"pluginItems">);
+        }
     }
 
     await ctx.db.delete("pluginInstalls", install._id as Id<"pluginInstalls">);
+
+    return result;
 };

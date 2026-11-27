@@ -33,10 +33,10 @@ export interface PlanEnv {
     /** An enabled platform text model — never a user's own `custom:` endpoint. */
     isModelRunnable: (model: string) => boolean;
     now: number;
-    /** `undefined` for an account without a skill limit. */
-    skillLimit: number | undefined;
     /** An update's installed skills: the slug each holds, by entry key. That entry may keep the slug; no other entry may take it. */
     ownSlugByKey?: ReadonlyMap<string, string>;
+    /** `undefined` for an account without a skill limit. */
+    skillLimit: number | undefined;
 }
 
 export const skillLimitFor = (user: { isAdmin?: boolean; plan?: string | null }): number | undefined =>
@@ -485,11 +485,12 @@ export interface ImportedItem {
 export class BundleImportError extends Error {
     /** What could not be removed again after the failure. */
     leftBehind: string[];
+
     /** Set when the rows created so far are kept on purpose, so a repair can finish the rest (a rate limit). */
     resumable: boolean;
 
-    constructor(message: string, leftBehind: string[], resumable = false) {
-        super(message);
+    constructor(message: string, leftBehind: string[], resumable = false, cause?: unknown) {
+        super(message, cause === undefined ? undefined : { cause });
         this.name = "BundleImportError";
         this.leftBehind = leftBehind;
         this.resumable = resumable;
@@ -566,10 +567,14 @@ export const runBundleImport = async (
     entries: ReadonlyArray<PlanEntry>,
     selected: ReadonlySet<string>,
     ops: BundleOps,
-    options: { keepOnRateLimit?: boolean } = {},
+    options: {
+        keepOnRateLimit?: boolean;
+        /** Entry key → id of a skill that already exists (a repair's linked children), so a group made now can name it. */
+        knownIds?: ReadonlyMap<string, string>;
+    } = {},
 ): Promise<ImportedItem[]> => {
     const created: ImportedItem[] = [];
-    const idByKey = new Map<string, string>();
+    const idByKey = new Map<string, string>(options.knownIds);
     const order: Record<BundleItemKind, number> = { group: 1, skill: 0, trigger: 2 };
     const todo = entries
         .filter((entry) => entry.plan && selected.has(entry.key))
@@ -630,7 +635,12 @@ export const runBundleImport = async (
         } catch (error) {
             // A rate limit is not a failure of the import: what was created is kept, and a repair resumes the rest.
             if (options.keepOnRateLimit && error instanceof LunoraError && error.code === "TOO_MANY_REQUESTS") {
-                throw new BundleImportError(`"${entry.title}" hit the rate limit. What was created so far is kept, and repair finishes the rest.`, [], true);
+                throw new BundleImportError(
+                    `"${entry.title}" hit the rate limit. What was created so far is kept, and repair finishes the rest.`,
+                    [],
+                    true,
+                    error,
+                );
             }
 
             const { failed, kept } = await rollback();

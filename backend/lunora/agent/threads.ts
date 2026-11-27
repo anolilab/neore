@@ -454,9 +454,33 @@ export const _deletePageForThreadId = internalMutation
     .mutation(async ({ args, ctx }) => await deletePageForThreadIdHandler(ctx, args));
 
 export const deleteAllForThreadIdAsync = internalMutation
-    .input(deleteThreadArgs)
-    .output(v.object({ isDone: v.boolean() }))
+    .input({
+        ...deleteThreadArgs,
+        // Set only by a plugin uninstall, on the first call: the delete then rechecks, in this transaction, that the group is still
+        // the plugin's and still empty, and detaches and keeps it otherwise (`kept`). Ordinary deletes leave it unset.
+        pluginInstallId: v.optional(v.string()),
+    })
+    .output(v.object({ isDone: v.boolean(), kept: v.optional(v.boolean()) }))
     .mutation(async ({ args, ctx }) => {
+        if (args.pluginInstallId !== undefined && args.cursor === undefined && !args.messagesDone) {
+            const group = await ctx.db.get("threads", args.threadId);
+
+            if (!group || group.pluginInstallId !== args.pluginInstallId) {
+                return { isDone: true, kept: true };
+            }
+
+            const message = await ctx.db
+                .query("messages")
+                .withIndex("by_threadId_order_stepOrder", (q) => q.eq("threadId", args.threadId))
+                .first();
+
+            if (message) {
+                await ctx.db.patch("threads", args.threadId, { pluginInstallId: "", pluginMarker: "" });
+
+                return { isDone: true, kept: true };
+            }
+        }
+
         let messagesResult: { cursor: null | string | undefined; isDone: boolean } = {
             cursor: args.cursor,
             isDone: args.messagesDone ?? false,

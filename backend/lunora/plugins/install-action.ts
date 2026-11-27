@@ -14,7 +14,7 @@ import { parseBundleMarkdown } from "../skills/bundle-format";
 import { planFor } from "../skills/bundle";
 import { assertSelectionImportable, BundleImportError, runBundleImport } from "../skills/bundle-plan";
 import { entryHash } from "./entry-hash";
-import { childOps } from "./install-ops";
+import { childOps, importFailure } from "./install-ops";
 import { bodyHash } from "./logic";
 
 /** Ten minutes: the longest a claimed install may run before another attempt may start. */
@@ -39,7 +39,7 @@ export const refusesToolConfig = (config: unknown): boolean => {
 };
 
 /** Refuses a plugin whose skills set tools, naming the first one. */
-export const assertNoToolConfig = (entries: ReadonlyArray<{ plan?: { kind: string; create?: unknown }; title: string }>): void => {
+export const assertNoToolConfig = (entries: ReadonlyArray<{ plan?: { create?: unknown; kind: string }; title: string }>): void => {
     const offender = entries.find(
         (entry) => entry.plan?.kind === "skill" && refusesToolConfig((entry.plan.create as { config?: unknown } | undefined)?.config),
     );
@@ -69,7 +69,7 @@ export const checkPluginFile = async (markdown: string) => {
         throw new LunoraError("BAD_REQUEST", "The file does not match its own content hash. It was changed after it was made.");
     }
 
-    return { header: parsed.bundle.plugin, hash, name: parsed.bundle.name };
+    return { hash, header: parsed.bundle.plugin, name: parsed.bundle.name };
 };
 
 export const previewPlugin = authAction
@@ -88,13 +88,16 @@ export const previewPlugin = authAction
             throw new LunoraError("UNPROCESSABLE", organizationRefusal);
         }
 
-        const { header, hash, name } = await checkPluginFile(args.markdown);
+        const { hash, header, name } = await checkPluginFile(args.markdown);
         const { entries } = await planFor(ctx, args.markdown, undefined);
+
         assertNoToolConfig(entries);
 
         return {
             contentHash: hash,
-            items: entries.map((entry) => ({ key: entry.key, kind: entry.kind, title: entry.title, warnings: entry.warnings })),
+            items: entries.map((entry) => {
+                return { key: entry.key, kind: entry.kind, title: entry.title, warnings: entry.warnings };
+            }),
             name,
             pluginSlug: header.slug,
             pluginVersion: header.version,
@@ -113,7 +116,7 @@ export const installPlugin = authAction
             throw new LunoraError("UNPROCESSABLE", organizationRefusal);
         }
 
-        const { header, hash } = await checkPluginFile(args.markdown);
+        const { hash, header } = await checkPluginFile(args.markdown);
 
         if (hash !== args.contentHash) {
             throw new LunoraError("BAD_REQUEST", "The file is not the one that was previewed. Preview it again before installing.");
@@ -134,6 +137,7 @@ export const installPlugin = authAction
 
         try {
             const { entries } = await planFor(ctx, args.markdown, undefined);
+
             assertNoToolConfig(entries);
             const selected = new Set(entries.map((entry) => entry.key));
             const hashByKey = new Map(await Promise.all(entries.map(async (entry) => [entry.key, await entryHash(entry)] as const)));
@@ -183,7 +187,7 @@ export const installPlugin = authAction
                     await ctx.runMutation(internal.plugins.install_steps.deleteInstall, { generation, installId });
                 }
 
-                throw error instanceof BundleImportError ? new LunoraError("BAD_REQUEST", error.message) : error;
+                throw importFailure(error);
             }
         } finally {
             await ctx.runMutation(internal.lib.claim_once.releaseKey, { key: claimKey, scope: INSTALL_CLAIM_SCOPE }).catch(() => undefined);

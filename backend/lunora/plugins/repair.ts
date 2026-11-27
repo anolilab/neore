@@ -1,15 +1,20 @@
 /**
- * Repair: finishes an install whose last run stopped part-way. For each child that still has an intent row, the child is
- * looked up by its marker. A child that exists is linked (its row becomes `created`). When every child is linked the
- * install returns to `installed`; otherwise it stays `needs-repair`, and the missing entries are named.
+ * Repair: finishes an install whose last run stopped part-way. An install is repairable when it is `needs-repair`, or
+ * `installing` with an expired lease (its action died before it could say so). Each child that still has an intent row is
+ * looked up by its marker. A child that exists is linked (its row becomes `created`). A row marked `created` whose child is
+ * gone is put back to `intent`, so the resume path creates it again. A child with an unresolved pending hash (an update that
+ * stopped on it) keeps the install in `needs-repair`. When every child is linked and settled the install returns to
+ * `installed`; otherwise it stays `needs-repair`, and the missing entries are named.
  *
- * Creating a child that never existed is not done here: that needs the resume path, which is not built yet.
+ * Creating a child that never existed is not done here: that is the resume path (`repair-resume.ts`).
  */
 import { LunoraError } from "lunorash/server";
 
-import type { Id } from "../_generated/dataModel";
+import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
-import { skillRowHash } from "./entry-hash";
+import { liveHashOf } from "./live-hash";
+import { requireOwnerShard } from "./owner-shard";
+import { patchRow } from "../lib/patch";
 import { markerFor } from "./logic";
 import type { ChildKind } from "./logic";
 
@@ -36,58 +41,100 @@ export interface RepairResult {
     status: "installed" | "needs-repair";
 }
 
+type Link = {
+    _id: unknown;
+    contentHash: string;
+    entryKey: string;
+    itemId?: string;
+    kind: ChildKind;
+    pendingHash?: string;
+    state: "created" | "intent";
+};
+
 /**
- * An update that stopped part-way. Each child that had a pending hash is decided from its live content: a live hash equal
- * to the pending hash means its write finished (recorded); equal to the installed hash means it never wrote (cleared).
- * Anything else is unresolved and the install stays `needs-repair`. Repair never runs while the update's lease is live.
+ * Decides each link that has a pending hash from its child's live content: a live hash equal to the pending hash means the
+ * write finished (recorded); equal to the installed hash means it never wrote (cleared). Anything else is unresolved.
  */
-const repairStoppedUpdate = async (
-    ctx: MutationCtx,
-    install: { _id: Id<"pluginInstalls">; generation: number; leaseUntil?: number; status: string; targetVersion?: string; version: string },
-): Promise<RepairResult> => {
+const resolvePending = async (ctx: MutationCtx, installId: string, links: Link[]): Promise<{ resolved: number; unresolved: string[] }> => {
+    let resolved = 0;
+    const unresolved: string[] = [];
+
+    for (const link of links) {
+        if (!link.pendingHash || link.state !== "created") {
+            continue;
+        }
+
+        const live = await liveHashOf(ctx, installId, link);
+
+        if (live === link.pendingHash) {
+            await ctx.db.patch("pluginItems", link._id as Id<"pluginItems">, { contentHash: link.pendingHash, pendingHash: "" });
+            resolved += 1;
+        } else if (live === link.contentHash) {
+            await ctx.db.patch("pluginItems", link._id as Id<"pluginItems">, { pendingHash: "" });
+            resolved += 1;
+        } else {
+            unresolved.push(link.entryKey);
+        }
+    }
+
+    return { resolved, unresolved };
+};
+
+/**
+ * An update that stopped part-way. Its children are settled the same way as in an interrupted install: a pending hash is
+ * decided from the live content, a new child that exists is linked, and an intent whose child was never made is dropped
+ * (an update that runs again makes it). The install returns to `installed` at its OLD version and file hash: whether every
+ * step of the target file ran is not recorded, so the update is run again to finish, and it skips what is already done.
+ * Repair never runs while the update's lease is live.
+ */
+const repairStoppedUpdate = async (ctx: MutationCtx, install: Doc<"pluginInstalls">): Promise<RepairResult> => {
     if (install.leaseUntil === undefined || install.leaseUntil > ctx.now) {
         throw new LunoraError("CONFLICT", "An update of this plugin is still running");
     }
 
     const installId = install._id as string;
     const { page } = await ctx.db.pluginItems.findMany({ where: { installId } });
+    const { resolved, unresolved } = await resolvePending(ctx, installId, page as Link[]);
 
-    let linked = 0;
-    const missing: string[] = [];
+    let linked = resolved;
 
-    for (const link of page) {
-        if (!link.pendingHash) {
+    for (const row of page) {
+        if (row.state !== "intent") {
             continue;
         }
 
-        const skill = link.kind === "skill" ? await ctx.db.skills.findFirst({ where: { pluginMarker: markerFor(installId, link.entryKey) } }) : null;
-        const live = skill ? await skillRowHash(skill) : undefined;
+        const childId = await childIdByMarker(ctx, row.kind, markerFor(installId, row.entryKey), install.userId);
 
-        if (live === link.pendingHash) {
-            await ctx.db.patch("pluginItems", link._id as Id<"pluginItems">, { contentHash: link.pendingHash, pendingHash: "" });
-            linked += 1;
-        } else if (live === link.contentHash) {
-            await ctx.db.patch("pluginItems", link._id as Id<"pluginItems">, { pendingHash: "" });
-            linked += 1;
-        } else {
-            missing.push(link.entryKey);
+        if (childId === undefined) {
+            await ctx.db.delete("pluginItems", row._id as Id<"pluginItems">);
+            continue;
         }
+
+        await ctx.db.patch("pluginItems", row._id as Id<"pluginItems">, { itemId: childId, state: "created" });
+        linked += 1;
     }
 
-    const status = missing.length === 0 ? "installed" : "needs-repair";
+    const status = unresolved.length === 0 ? "installed" : "needs-repair";
 
-    await ctx.db.patch("pluginInstalls", install._id, {
+    await patchRow(ctx.db, "pluginInstalls", install, {
         generation: install.generation + 1,
         status,
+        targetVersion: unresolved.length === 0 ? undefined : install.targetVersion,
         updatedAt: ctx.now,
-        version: missing.length === 0 ? (install.targetVersion ?? install.version) : install.version,
     });
 
-    return { linked, missing, status };
+    return { linked, missing: unresolved, status };
 };
+
+/** Whether repair may start on this install now. An `installing` install is repairable only after its lease expired. */
+export const repairableNow = (install: { leaseUntil?: number; status: string }, now: number): boolean =>
+    install.status === "needs-repair" || (install.status === "installing" && (install.leaseUntil === undefined || install.leaseUntil <= now));
 
 /** Links every intent row whose child exists, and returns the install to `installed` once nothing is missing. */
 export const repairRows = async (ctx: MutationCtx, userId: string, pluginSlug: string): Promise<RepairResult> => {
+    // Triggers and group chats live on the owner's shard; anywhere else every child would read as gone and be created again.
+    requireOwnerShard(userId, "repair");
+
     const install = await ctx.db.pluginInstalls.findFirst({ where: { pluginSlug, userId } });
 
     if (!install) {
@@ -98,22 +145,49 @@ export const repairRows = async (ctx: MutationCtx, userId: string, pluginSlug: s
         return await repairStoppedUpdate(ctx, install);
     }
 
-    if (install.status !== "needs-repair") {
-        throw new LunoraError("CONFLICT", `The plugin "${pluginSlug}" does not need repair`);
+    if (!repairableNow(install, ctx.now)) {
+        throw new LunoraError(
+            "CONFLICT",
+            install.status === "installing" ? `The plugin "${pluginSlug}" is still being installed` : `The plugin "${pluginSlug}" does not need repair`,
+        );
     }
 
     const installId = install._id as string;
     const { page } = await ctx.db.pluginItems.findMany({ where: { installId } });
-    const intents = page.filter((row) => row.state === "intent");
 
     let linked = 0;
     const missing: string[] = [];
 
-    for (const row of intents) {
+    // A row marked `created` whose child is gone (a rollback removed it, or the person did) goes back to `intent`.
+    for (const row of page) {
+        if (row.state !== "created") {
+            continue;
+        }
+
+        if ((await childIdByMarker(ctx, row.kind, markerFor(installId, row.entryKey), userId)) !== undefined) {
+            continue;
+        }
+
+        await patchRow(ctx.db, "pluginItems", row, { itemId: undefined, pendingHash: undefined, state: "intent" });
+        missing.push(row.entryKey);
+    }
+
+    const { unresolved } = await resolvePending(ctx, installId, page.filter((row) => !missing.includes(row.entryKey)) as Link[]);
+
+    missing.push(...unresolved);
+
+    for (const row of page) {
+        if (row.state !== "intent") {
+            continue;
+        }
+
         const childId = await childIdByMarker(ctx, row.kind, markerFor(installId, row.entryKey), userId);
 
         if (childId === undefined) {
-            missing.push(row.entryKey);
+            if (!missing.includes(row.entryKey)) {
+                missing.push(row.entryKey);
+            }
+
             continue;
         }
 
@@ -122,9 +196,20 @@ export const repairRows = async (ctx: MutationCtx, userId: string, pluginSlug: s
     }
 
     if (missing.length === 0) {
-        await ctx.db.patch("pluginInstalls", install._id as Id<"pluginInstalls">, { status: "installed", updatedAt: ctx.now });
+        // An update kept for repair holds its target version; finishing the repair makes it the installed one.
+        await patchRow(ctx.db, "pluginInstalls", install, {
+            leaseUntil: undefined,
+            status: "installed",
+            targetVersion: undefined,
+            updatedAt: ctx.now,
+            version: install.targetVersion ?? install.version,
+        });
 
         return { linked, missing, status: "installed" };
+    }
+
+    if (install.status === "installing") {
+        await ctx.db.patch("pluginInstalls", install._id as Id<"pluginInstalls">, { status: "needs-repair", updatedAt: ctx.now });
     }
 
     return { linked, missing, status: "needs-repair" };

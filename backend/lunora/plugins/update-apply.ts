@@ -15,13 +15,17 @@ import { assertCronExpression, assertCustomModelRunnable, deleteTriggerRows } fr
 import type { Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { internalMutation } from "../_generated/server";
-import { withoutUndefined } from "../lib/patch";
+import { patchRow } from "../lib/patch";
 import { skillRowHash, triggerRowHash } from "./entry-hash";
+import { skillVisibility } from "../skills/access";
 import { deleteSkillRows } from "../skills/functions";
 import { ensureSlugUnique, validateSlug } from "../skills/validators";
 import { LEASE_MS, markerFor } from "./logic";
 
 const STALE = "STALE_LEASE: this install was taken over by another action";
+
+/** The same bound uninstall uses when it looks for group chats that name a skill. */
+const GROUP_SCAN_LIMIT = 300;
 
 /** The install row, after checking that the caller still holds the lease it started under. */
 const heldInstall = async (ctx: Pick<MutationCtx, "db">, installId: Id<"pluginInstalls">, generation: number) => {
@@ -71,13 +75,13 @@ export const updateSkillChild = internalMutation
         generation: v.number(),
         icon: v.optional(v.string().max(2048)),
         installId: v.string().max(128),
-        instructions: v.string().max(65536),
+        instructions: v.string().max(65_536),
         name: v.string().max(256),
         slug: v.string().max(256),
         tags: v.optional(v.array(v.string().max(256))),
+        userId: v.string().max(128),
         variables: v.optional(v.any()),
         version: v.optional(v.string().max(64)),
-        userId: v.string().max(128),
     })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
@@ -113,23 +117,20 @@ export const updateSkillChild = internalMutation
         await ctx.db.patch("pluginItems", link._id as Id<"pluginItems">, { pendingHash: args.contentHash });
 
         // The slug is part of the content hash, so the row must take the planned slug or it reads as edited on the next update.
-        await ctx.db.patch(
-            "skills",
-            skill._id as Id<"skills">,
-            withoutUndefined({
-                category: args.category,
-                config: args.config,
-                description: args.description,
-                icon: args.icon,
-                instructions: args.instructions,
-                name: args.name,
-                slug: args.slug,
-                tags: args.tags,
-                updatedAt: ctx.now,
-                variables: args.variables,
-                version: args.version,
-            }),
-        );
+        // A field the new version leaves out is removed, so the row matches the hash recorded below.
+        await patchRow(ctx.db, "skills", skill, {
+            category: args.category,
+            config: args.config,
+            description: args.description,
+            icon: args.icon,
+            instructions: args.instructions,
+            name: args.name,
+            slug: args.slug,
+            tags: args.tags,
+            updatedAt: ctx.now,
+            variables: args.variables,
+            version: args.version,
+        });
 
         await ctx.db.patch("pluginItems", link._id as Id<"pluginItems">, { contentHash: args.contentHash, pendingHash: "" });
 
@@ -152,12 +153,72 @@ export const finishUpdate = internalMutation
         return null;
     });
 
+/** Whether the child a link names is still there, looked up by its marker. */
+const childExists = async (ctx: Pick<MutationCtx, "db">, link: { entryKey: string; kind: string }, installId: string): Promise<boolean> => {
+    const marker = markerFor(installId, link.entryKey);
+
+    if (link.kind === "skill") {
+        return (await ctx.db.skills.findFirst({ where: { pluginMarker: marker } })) !== null;
+    }
+
+    const table = link.kind === "trigger" ? "triggers" : "threads";
+    const row = await ctx.db
+        .query(table)
+        .withIndex("by_plugin_marker", (q) => q.eq("pluginMarker", marker))
+        .first();
+
+    return row !== null;
+};
+
+/**
+ * An update that stopped on an error. Every child step is one mutation, so each child is either at the old content or the new
+ * one, and running the update again finishes what is left. Normally the install goes back to `installed` at its old version and
+ * the intent rows of creations that were rolled back are removed. When rows could not be removed or a rate limit kept them
+ * (`keepForRepair`), the install is `needs-repair` and holds the new file's hash, so repair accepts the new file to finish them.
+ */
+export const failUpdate = internalMutation
+    .input({
+        contentHash: v.string().max(128),
+        /** The entry keys this update tried to create. A link among them whose child the rollback removed is dropped, so the next update creates it again. */
+        createKeys: v.array(v.string().max(256)),
+        generation: v.number(),
+        installId: v.string().max(128),
+        keepForRepair: v.boolean(),
+    })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        await heldInstall(ctx, args.installId as Id<"pluginInstalls">, args.generation);
+
+        if (args.keepForRepair) {
+            await ctx.db.patch("pluginInstalls", args.installId as Id<"pluginInstalls">, {
+                contentHash: args.contentHash,
+                status: "needs-repair",
+                updatedAt: ctx.now,
+            });
+
+            return null;
+        }
+
+        const { page } = await ctx.db.pluginItems.findMany({ where: { installId: args.installId } });
+
+        for (const row of page) {
+            if (
+                row.state === "intent" ||
+                (row.state === "created" && args.createKeys.includes(row.entryKey) && !(await childExists(ctx, row, args.installId)))
+            ) {
+                await ctx.db.delete("pluginItems", row._id as Id<"pluginItems">);
+            }
+        }
+
+        await ctx.db.patch("pluginInstalls", args.installId as Id<"pluginInstalls">, { status: "installed", updatedAt: ctx.now });
+
+        return null;
+    });
+
 /**
  * Rewrites one unedited schedule trigger in place. The trigger is switched off: a changed trigger must be read and re-enabled by
  * the person, so new content never runs unseen. Only schedule triggers are updated here; a webhook or an event trigger is
- * reported as skipped.
- *
- * A field the new version leaves out keeps its old value, so the trigger then reads as edited (the safe side).
+ * left as it is and the result is `false`, so the action reports it as skipped instead of stopping the update.
  */
 export const updateTriggerChild = internalMutation
     .input({
@@ -166,16 +227,16 @@ export const updateTriggerChild = internalMutation
         description: v.optional(v.string().max(4096)),
         entryKey: v.string().max(256),
         generation: v.number(),
-        inputTemplate: v.optional(v.string().max(65536)),
+        inputTemplate: v.optional(v.string().max(65_536)),
         installId: v.string().max(128),
         model: v.string().max(256),
         name: v.string().max(256),
         searchMode: v.optional(v.string().max(256)),
-        systemPrompt: v.optional(v.string().max(65536)),
+        systemPrompt: v.optional(v.string().max(65_536)),
         timezone: v.optional(v.string().max(128)),
         userId: v.string().max(128),
     })
-    .output(v.null())
+    .output(v.boolean())
     .mutation(async ({ args, ctx }) => {
         await heldInstall(ctx, args.installId as Id<"pluginInstalls">, args.generation);
 
@@ -196,7 +257,7 @@ export const updateTriggerChild = internalMutation
         }
 
         if (trigger.type !== "schedule") {
-            throw new LunoraError("CONFLICT", `"${args.entryKey}" is not a schedule trigger, so it is not updated in place`);
+            return false;
         }
 
         if ((await triggerRowHash(trigger)) !== link.contentHash) {
@@ -212,26 +273,23 @@ export const updateTriggerChild = internalMutation
 
         await ctx.db.patch("pluginItems", link._id as Id<"pluginItems">, { pendingHash: args.contentHash });
 
-        await ctx.db.patch(
-            "triggers",
-            trigger._id as Id<"triggers">,
-            withoutUndefined({
-                cronExpression: args.cronExpression,
-                description: args.description,
-                enabled: false,
-                inputTemplate: args.inputTemplate,
-                model: args.model,
-                name: args.name,
-                searchMode: args.searchMode,
-                systemPrompt: args.systemPrompt,
-                timezone: args.timezone,
-                updatedAt: ctx.now,
-            }),
-        );
+        // A field the new version leaves out is removed, so the row matches the hash recorded below.
+        await patchRow(ctx.db, "triggers", trigger, {
+            cronExpression: args.cronExpression,
+            description: args.description,
+            enabled: false,
+            inputTemplate: args.inputTemplate,
+            model: args.model,
+            name: args.name,
+            searchMode: args.searchMode,
+            systemPrompt: args.systemPrompt,
+            timezone: args.timezone,
+            updatedAt: ctx.now,
+        });
 
         await ctx.db.patch("pluginItems", link._id as Id<"pluginItems">, { contentHash: args.contentHash, pendingHash: "" });
 
-        return null;
+        return true;
     });
 
 /** The child's link, by its entry key, after the generation check. */
@@ -241,20 +299,37 @@ const linkFor = async (ctx: Pick<MutationCtx, "db">, installId: string, entryKey
     return page.find((row) => row.entryKey === entryKey);
 };
 
+/** A group chat of the owner that names the skill as a participant or synthesizer, if any. Too many conversations to scan counts as a user. */
+const groupUsing = async (ctx: Pick<MutationCtx, "db">, skillId: string, userId: string): Promise<boolean> => {
+    const threads = await ctx.db
+        .query("threads")
+        .withIndex("by_user_and_updatedAt", (q) => q.eq("userId", userId))
+        .take(GROUP_SCAN_LIMIT);
+
+    return (
+        threads.length >= GROUP_SCAN_LIMIT ||
+        threads.some(
+            (thread) =>
+                thread.groupChat?.synthesizerSkillId === skillId || thread.groupChat?.participants.some((participant) => participant.skillId === skillId),
+        )
+    );
+};
+
 /**
  * Removes an unedited child that the new version no longer has: its row, then its link. A child whose content is not what was
- * installed is refused here too, so the check does not depend on the diff having been current.
+ * installed is refused here too, so the check does not depend on the diff having been current. A skill that a group chat still
+ * names, or one shared beyond its owner, is kept (the result is `false`), so the group keeps its participant; the link stays and a later update offers the removal again.
  */
 export const removeChild = internalMutation
     .input({ entryKey: v.string().max(256), generation: v.number(), installId: v.string().max(128), userId: v.string().max(128) })
-    .output(v.null())
+    .output(v.boolean())
     .mutation(async ({ args, ctx }) => {
         await heldInstall(ctx, args.installId as Id<"pluginInstalls">, args.generation);
 
         const link = await linkFor(ctx, args.installId, args.entryKey);
 
         if (!link) {
-            return null;
+            return true;
         }
 
         if (link.kind === "skill") {
@@ -263,6 +338,18 @@ export const removeChild = internalMutation
             if (skill && skill.userId === args.userId) {
                 if ((await skillRowHash(skill)) !== link.contentHash) {
                     throw new LunoraError("CONFLICT", `The skill for "${args.entryKey}" was edited, so it is kept`);
+                }
+
+                // A skill shared beyond its owner may sit in another person's group chat, on a shard this step cannot scan: keep it, detached.
+                if (skillVisibility(skill) !== "private") {
+                    await ctx.db.patch("skills", skill._id as Id<"skills">, { pluginInstallId: "", pluginMarker: "" });
+                    await ctx.db.patch("pluginItems", link._id as Id<"pluginItems">, { state: "detached" });
+
+                    return false;
+                }
+
+                if (await groupUsing(ctx, skill._id as string, args.userId)) {
+                    return false;
                 }
 
                 await deleteSkillRows(ctx, skill._id as Id<"skills">, args.userId);
@@ -286,7 +373,7 @@ export const removeChild = internalMutation
 
         await ctx.db.delete("pluginItems", link._id as Id<"pluginItems">);
 
-        return null;
+        return true;
     });
 
 /**

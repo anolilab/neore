@@ -27,7 +27,7 @@ describe("an update that removes a child", () => {
         harness.close();
     });
 
-    const run = async <T>(fn: (context: any) => Promise<T>): Promise<T> => await harness.run(async (context: any) => await fn(context));
+    const run = async <T>(function_: (context: any) => Promise<T>): Promise<T> => await harness.run(async (context: any) => await function_(context));
 
     /** An installed plugin with one skill child, created and linked as the install does it. */
     const installed = async () => {
@@ -51,9 +51,9 @@ describe("an update that removes a child", () => {
                 await context.runMutation(createPluginSkill, {
                     ...ANALYST,
                     isPremium: true,
+                    plan: "premium",
                     pluginInstallId: installId,
                     pluginMarker: markerFor(installId, "skill:analyst"),
-                    plan: "premium",
                     source: { type: "plugin" as const, version: "1.0.0" },
                     userId: OWNER,
                 }),
@@ -96,6 +96,44 @@ describe("an update that removes a child", () => {
 
         expect(await run(async (context) => await context.db.skills.findFirst({ where: { _id: skillId } }))).toMatchObject({
             instructions: "Changed by the owner.",
+            pluginInstallId: "",
+            pluginMarker: "",
+        });
+        expect(await run(async (context) => await context.db.pluginItems.findFirst({ where: { _id: intentId } }))).toMatchObject({ state: "detached" });
+    });
+
+    it("keeps a skill that a group chat still names, and keeps its link", async () => {
+        const { generation, installId, intentId, skillId } = await installed();
+
+        await run(async (context) => {
+            await context.db.insert("threads", {
+                groupChat: { mode: "round-robin", participants: [{ addedAt: Date.now(), skillId }] },
+                status: "active",
+                title: "Panel",
+                userId: OWNER,
+            });
+        });
+
+        const removed = await run(
+            async (context) => await context.runMutation(removeChild, { entryKey: "skill:analyst", generation, installId, userId: OWNER }),
+        );
+
+        expect(removed).toBe(false);
+        expect(await run(async (context) => await context.db.skills.findFirst({ where: { _id: skillId } }))).not.toBeNull();
+        expect(await run(async (context) => await context.db.pluginItems.findFirst({ where: { _id: intentId } }))).not.toBeNull();
+    });
+
+    it("keeps and detaches a skill shared beyond its owner, which another person's group chat may use", async () => {
+        const { generation, installId, intentId, skillId } = await installed();
+
+        await run(async (context) => await context.db.patch("skills", skillId, { visibility: "public" }));
+
+        const removed = await run(
+            async (context) => await context.runMutation(removeChild, { entryKey: "skill:analyst", generation, installId, userId: OWNER }),
+        );
+
+        expect(removed).toBe(false);
+        expect(await run(async (context) => await context.db.skills.findFirst({ where: { _id: skillId } }))).toMatchObject({
             pluginInstallId: "",
             pluginMarker: "",
         });
