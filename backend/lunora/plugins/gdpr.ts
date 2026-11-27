@@ -25,29 +25,25 @@ export const erasePluginsForUser = async (ctx: MutationCtx, userId: string): Pro
     return { hasMore: items.length >= PAGE || installs.length >= PAGE };
 };
 
-/** Links read per page for the export. */
+/** Rows read per page for the export, installs and links alike. */
 const EXPORT_PAGE = 100;
 
-/** Installs a person can hold: one per plugin, so the list is small and read whole with the first page. */
-const EXPORT_INSTALLS = 500;
-
 /**
- * One page of the person's plugin links for the account export, and, with the first page, their installs. The export action reads
- * the pages itself (no workflow step result carries them, which a persisted step caps at 1 MiB). No content hashes: they say
- * nothing about the person.
+ * One page of the person's plugin data for the account export: installs first, then links. A cursor names its table
+ * (`i:` installs, `t:` links) and carries that table's own cursor, so each is followed to its end across calls. `readBytes` is
+ * the page's size as read, for the export action's read budget. The action reads the pages itself (no workflow step result
+ * carries them, which a persisted step caps at 1 MiB). No content hashes: they say nothing about the person.
  */
 export const collectPluginsForExport = internalQuery
-    .input({ cursor: v.optional(v.string().max(512)), userId: v.string() })
-    .output(v.object({ continueCursor: v.optional(v.string()), installs: v.array(v.any()), items: v.array(v.any()) }))
+    .input({ cursor: v.optional(v.string().max(600)), userId: v.string() })
+    .output(v.object({ continueCursor: v.optional(v.string()), installs: v.array(v.any()), items: v.array(v.any()), readBytes: v.number() }))
     .query(async ({ args: { cursor, userId }, ctx }) => {
-        const installPage =
-            cursor === undefined ? await ctx.db.pluginInstalls.findMany({ consistency: "primary", limit: EXPORT_INSTALLS, where: { userId } }) : undefined;
-        const installs = installPage?.page ?? [];
-        const page = await ctx.db.pluginItems.findMany({ consistency: "primary", cursor: cursor ?? null, limit: EXPORT_PAGE, where: { userId } });
+        const size = (rows: unknown[]): number => new TextEncoder().encode(JSON.stringify(rows)).byteLength;
 
-        return {
-            continueCursor: page.isDone || !page.continueCursor ? undefined : page.continueCursor,
-            installs: installs.map((install) => {
+        if (cursor === undefined || cursor.startsWith("i:")) {
+            const own = cursor === undefined || cursor === "i:" ? null : cursor.slice(2);
+            const page = await ctx.db.pluginInstalls.findMany({ consistency: "primary", cursor: own, limit: EXPORT_PAGE, where: { userId } });
+            const installs = page.page.map((install) => {
                 return {
                     id: install._id,
                     installedAt: install.installedAt,
@@ -56,9 +52,25 @@ export const collectPluginsForExport = internalQuery
                     updatedAt: install.updatedAt,
                     version: install.version,
                 };
-            }),
+            });
+
+            return {
+                continueCursor: page.isDone || !page.continueCursor ? "t:" : `i:${page.continueCursor}`,
+                installs,
+                items: [],
+                readBytes: size(page.page),
+            };
+        }
+
+        const own = cursor === "t:" ? null : cursor.slice(2);
+        const page = await ctx.db.pluginItems.findMany({ consistency: "primary", cursor: own, limit: EXPORT_PAGE, where: { userId } });
+
+        return {
+            continueCursor: page.isDone || !page.continueCursor ? undefined : `t:${page.continueCursor}`,
+            installs: [],
             items: page.page.map((item) => {
                 return { createdAt: item.createdAt, entryKey: item.entryKey, installId: item.installId, kind: item.kind, state: item.state };
             }),
+            readBytes: size(page.page),
         };
     });

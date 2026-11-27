@@ -104,18 +104,16 @@ export const uninstallRows = async (ctx: MutationCtx, userId: string, pluginSlug
         groups.push(group._id as string);
     }
 
+    let scanFull = false;
+
     if (skillIds.size > 0) {
         const threads = await ctx.db
             .query("threads")
             .withIndex("by_user_and_updatedAt", (q) => q.eq("userId", userId))
             .take(GROUP_SCAN_LIMIT);
 
-        if (threads.length >= GROUP_SCAN_LIMIT) {
-            throw new LunoraError(
-                "CONFLICT",
-                "Too many conversations to check that no group chat uses this plugin. Remove the plugin later, or change the group chats first.",
-            );
-        }
+        // A scan that fills its page cannot prove no group chat uses a skill: the skills are kept and detached below, not deleted.
+        scanFull = threads.length >= GROUP_SCAN_LIMIT;
 
         // The plugin's own groups use its skills by design; only someone else's group blocks.
         const user = threads.find(
@@ -145,7 +143,7 @@ export const uninstallRows = async (ctx: MutationCtx, userId: string, pluginSlug
         const marker = parseMarker(skill.pluginMarker ?? "");
         const link = links.find((row) => row.entryKey === marker?.entryKey);
         // A skill shared beyond its owner may sit in another person's group chat, on a shard this step cannot scan: keep it.
-        const edited = !link || skillVisibility(skill) !== "private" || (await skillRowHash(skill)) !== link.contentHash;
+        const edited = scanFull || !link || skillVisibility(skill) !== "private" || (await skillRowHash(skill)) !== link.contentHash;
 
         if (edited) {
             await ctx.db.patch("skills", skill._id as Id<"skills">, { pluginInstallId: "", pluginMarker: "" });

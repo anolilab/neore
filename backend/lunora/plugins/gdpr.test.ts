@@ -111,44 +111,58 @@ describe("account merge lists the plugin tables", () => {
 });
 
 describe("collectPluginsForExport", () => {
-    it("returns the installs with the first page only, then pages of links, without content hashes and other people's rows", async () => {
-        const install = { _id: "i1", contentHash: "h", installedAt: 1, pluginSlug: "brief", status: "installed", updatedAt: 2, userId: USER, version: "1.0.0" };
+    it("follows installs and then links across pages, each to its end, with the size read, without hashes or other people's rows", async () => {
+        const install = (id: string, userId: string) => {
+            return { _id: id, contentHash: "h", installedAt: 1, pluginSlug: `p-${id}`, status: "installed", updatedAt: 2, userId, version: "1.0.0" };
+        };
         const item = (id: string, userId: string) => {
             return { _id: id, contentHash: "h", createdAt: 3, entryKey: `skill:${id}`, installId: "i1", kind: "skill", state: "created", userId };
         };
-        const links = [...Array.from({ length: 250 }, (_, index) => item(`a${String(index)}`, USER)), item("b0", OTHER)];
+        const reader = (all: { userId: string }[]) => {
+            return {
+                findMany: async ({ cursor, limit, where }: { cursor: string | null; limit: number; where: { userId: string } }) => {
+                    await Promise.resolve();
+
+                    const mine = all.filter((row) => row.userId === where.userId);
+                    const start = cursor === null ? 0 : Number(cursor);
+
+                    return { continueCursor: String(start + limit), isDone: start + limit >= mine.length, page: mine.slice(start, start + limit) };
+                },
+            };
+        };
         const ctx = {
             db: {
-                pluginInstalls: {
-                    findMany: async () => {
-                        await Promise.resolve();
-
-                        return { isDone: true, page: [install, { ...install, _id: "i2", userId: OTHER }].filter((row) => row.userId === USER) };
-                    },
-                },
-                pluginItems: {
-                    findMany: async ({ cursor, limit, where }: { cursor: string | null; limit: number; where: { userId: string } }) => {
-                        await Promise.resolve();
-
-                        const mine = links.filter((row) => row.userId === where.userId);
-                        const start = cursor === null ? 0 : Number(cursor);
-
-                        return { continueCursor: String(start + limit), isDone: start + limit >= mine.length, page: mine.slice(start, start + limit) };
-                    },
-                },
+                pluginInstalls: reader([...Array.from({ length: 150 }, (_, index) => install(`n${String(index)}`, USER)), install("x", OTHER)]),
+                pluginItems: reader([...Array.from({ length: 250 }, (_, index) => item(`a${String(index)}`, USER)), item("b0", OTHER)]),
             },
         };
         const { handler } = collectPluginsForExport as unknown as {
-            handler: (c: unknown, a: unknown) => Promise<{ continueCursor?: string; installs: object[]; items: object[] }>;
+            handler: (c: unknown, a: unknown) => Promise<{ continueCursor?: string; installs: object[]; items: object[]; readBytes: number }>;
         };
-        const first = await handler(ctx, { userId: USER });
-        const second = await handler(ctx, { cursor: first.continueCursor, userId: USER });
-        const third = await handler(ctx, { cursor: second.continueCursor, userId: USER });
+        const installs: object[] = [];
+        const items: object[] = [];
+        let calls = 0;
 
-        expect(first.installs).toEqual([{ id: "i1", installedAt: 1, pluginSlug: "brief", status: "installed", updatedAt: 2, version: "1.0.0" }]);
-        expect([first.items.length, second.items.length, third.items.length]).toEqual([100, 100, 50]);
-        expect(second.installs).toEqual([]);
-        expect(third.continueCursor).toBeUndefined();
-        expect(first.items[0]).toEqual({ createdAt: 3, entryKey: "skill:a0", installId: "i1", kind: "skill", state: "created" });
+        for (let cursor: string | undefined; ;) {
+            const page = await handler(ctx, { cursor, userId: USER });
+
+            installs.push(...page.installs);
+            items.push(...page.items);
+            calls += 1;
+
+            expect(page.readBytes).toBeGreaterThan(0);
+
+            if (page.continueCursor === undefined) {
+                break;
+            }
+
+            cursor = page.continueCursor;
+        }
+
+        expect(installs).toHaveLength(150);
+        expect(items).toHaveLength(250);
+        expect(calls).toBe(2 + 3);
+        expect(installs[0]).toEqual({ id: "n0", installedAt: 1, pluginSlug: "p-n0", status: "installed", updatedAt: 2, version: "1.0.0" });
+        expect(items[0]).toEqual({ createdAt: 3, entryKey: "skill:a0", installId: "i1", kind: "skill", state: "created" });
     });
 });

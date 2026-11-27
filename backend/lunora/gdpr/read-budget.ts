@@ -53,3 +53,9 @@ export const THREAD_FOLLOWS_READ_BYTES = 2 * 1024 * 1024;
 
 /** What the follow rows may read after the earlier sections read `used` bytes; 0 leaves them all out, marked as cut. */
 export const threadFollowsReadBudget = (used: number): number => Math.max(0, Math.min(THREAD_FOLLOWS_READ_BYTES, ACTION_READ_BYTES - used - READ_MARGIN_BYTES));
+
+/** The most reading the user's plugin installs and links may cost (`plugins/gdpr.ts`); a row is a few hundred bytes. */
+export const PLUGINS_READ_BYTES = 2 * 1024 * 1024;
+
+/** What the plugin rows may read after the earlier sections read `used` bytes; 0 leaves them all out, marked as cut. */
+export const pluginsReadBudget = (used: number): number => Math.max(0, Math.min(PLUGINS_READ_BYTES, ACTION_READ_BYTES - used - READ_MARGIN_BYTES));

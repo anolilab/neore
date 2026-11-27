@@ -93,6 +93,7 @@ export const previewUpdate = authAction
     .output(
         v.object({
             downgrade: v.boolean(),
+            generation: v.number(),
             installedVersion: v.string(),
             plan: v.array(v.object({ action: vAction, entryKey: v.string() })),
             targetVersion: v.string(),
@@ -129,6 +130,7 @@ export const previewUpdate = authAction
 
         return {
             downgrade: isDowngrade(installed.version, header.version),
+            generation: installed.generation,
             installedVersion: installed.version,
             plan,
             targetVersion: header.version,
@@ -144,6 +146,8 @@ export const updatePlugin = authAction
     .input({
         confirmDowngrade: v.boolean(),
         contentHash: v.string().max(128),
+        /** The generation `previewUpdate` returned: the update applies only to the install as that preview saw it. */
+        expectedGeneration: v.number(),
         markdown: v.string().max(MAX_LENGTH.document),
     })
     .use(rateLimit("plugins/install"))
@@ -170,6 +174,10 @@ export const updatePlugin = authAction
 
         if (!installed) {
             throw new LunoraError("NOT_FOUND", `The plugin "${header.slug}" is not installed`);
+        }
+
+        if (installed.generation !== args.expectedGeneration) {
+            throw new LunoraError("CONFLICT", "The plugin changed since it was previewed. Preview it again before updating.");
         }
 
         if (isDowngrade(installed.version, header.version) && !args.confirmDowngrade) {
@@ -232,7 +240,7 @@ export const updatePlugin = authAction
         }
 
         const generation = await ctx.runMutation(internal.plugins.update_apply.beginUpdate, {
-            expectedGeneration: installed.generation,
+            expectedGeneration: args.expectedGeneration,
             installId: installed.installId,
             targetVersion: header.version,
             userId,

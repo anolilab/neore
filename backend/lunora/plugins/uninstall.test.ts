@@ -610,4 +610,22 @@ describe("uninstall", () => {
             pluginMarker: "",
         });
     });
+
+    it("keeps and detaches the skills, instead of refusing, when the owner has too many conversations to scan for group chats", async () => {
+        const { skillId } = await installed();
+
+        await run(async (context) => {
+            for (let index = 0; index < 300; index += 1) {
+                await context.db.insert("threads", { status: "active", title: `Chat ${String(index)}`, userId: OWNER });
+            }
+        });
+
+        const begun = await run(async (context) => await uninstallRows(context, OWNER, SLUG));
+
+        expect(begun).toMatchObject({ kept: ["Analyst"], removed: 0 });
+        expect(await run(async (context) => await context.db.skills.findFirst({ where: { _id: skillId } }))).toMatchObject({
+            pluginInstallId: "",
+            pluginMarker: "",
+        });
+    });
 });

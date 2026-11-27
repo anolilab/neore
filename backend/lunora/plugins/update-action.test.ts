@@ -130,10 +130,14 @@ describe("plugin update action", () => {
         });
     const updateTo = async (slugs: string[], version: string) => {
         const next = await fileOf(slugs, version);
+        const preview = (await as().action(procedureAt("plugins_update", "previewUpdate"), { markdown: next.markdown } as never)) as PreviewResult & {
+            generation: number;
+        };
 
         return (await as().action(procedureAt("plugins_update", "updatePlugin"), {
             confirmDowngrade: false,
             contentHash: next.contentHash,
+            expectedGeneration: preview.generation,
             markdown: next.markdown,
         } as never)) as UpdateResult;
     };
@@ -230,6 +234,7 @@ describe("plugin update action", () => {
         const result = (await as().action(procedureAt("plugins_update", "updatePlugin"), {
             confirmDowngrade: false,
             contentHash,
+            expectedGeneration: 1,
             markdown,
         } as never)) as UpdateResult;
 
@@ -259,6 +264,7 @@ describe("plugin update action", () => {
         const result = (await as().action(procedureAt("plugins_update", "updatePlugin"), {
             confirmDowngrade: false,
             contentHash,
+            expectedGeneration: 1,
             markdown,
         } as never)) as UpdateResult;
 
@@ -341,9 +347,28 @@ describe("plugin update action", () => {
         const contentHash = await bodyHash(body);
         const markdown = withPluginHeader(body, { contentHash, slug: SLUG, version: "1.1.0" });
 
-        await expect(as().action(procedureAt("plugins_update", "updatePlugin"), { confirmDowngrade: false, contentHash, markdown } as never)).rejects.toThrow(
-            "Uninstall the plugin and install the new version",
-        );
+        await expect(
+            as().action(procedureAt("plugins_update", "updatePlugin"), { confirmDowngrade: false, contentHash, expectedGeneration: 1, markdown } as never),
+        ).rejects.toThrow("Uninstall the plugin and install the new version");
+        expect(await installRow()).toMatchObject({ status: "installed", version: "1.0.0" });
+    });
+
+    it("returns the generation from the preview and refuses an update whose preview is older", async () => {
+        const next = await fileOf(["analyst", "critic", "reviewer"], "1.1.0");
+        const preview = (await as().action(procedureAt("plugins_update", "previewUpdate"), { markdown: next.markdown } as never)) as PreviewResult & {
+            generation: number;
+        };
+
+        expect(preview.generation).toBe(1);
+
+        await expect(
+            as().action(procedureAt("plugins_update", "updatePlugin"), {
+                confirmDowngrade: false,
+                contentHash: next.contentHash,
+                expectedGeneration: preview.generation - 1,
+                markdown: next.markdown,
+            } as never),
+        ).rejects.toThrow("Preview it again");
         expect(await installRow()).toMatchObject({ status: "installed", version: "1.0.0" });
     });
 });

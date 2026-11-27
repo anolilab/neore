@@ -145,6 +145,7 @@ describe("a schedule below an inserted skill, through the action path", () => {
         const result = (await as().action(procedureAt("plugins_update", "updatePlugin"), {
             confirmDowngrade: false,
             contentHash: next.contentHash,
+            expectedGeneration: 1,
             markdown: next.markdown,
         } as never)) as UpdateResult;
 
