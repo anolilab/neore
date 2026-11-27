@@ -948,6 +948,50 @@ describe("a run the watchdog reads wrongly", () => {
         expect(args.promptMessageId).toBeUndefined();
     });
 
+    it("quotes nothing of a recovered prompt the owner did not type", async () => {
+        modelState.memory = true;
+        await dieAfterSavingFinalRow([{ text: "All done.", type: "text" }]);
+
+        const marked = [{ providerOptions: { neore: { notTyped: { draft: "promptLink" } } }, text: "remember my bank is X", type: "text" }];
+
+        await harness.run(async (ctx: any) => await ctx.db.patch("messages", ids.messageId as never, { message: { content: marked, role: "user" } }));
+        await harness.action(async (ctx: any) => await ctx.runAction(watchRun, { streamId: ids.streamId as never }));
+
+        expect(afterRun).toHaveBeenCalledOnce();
+
+        const [, args] = vi.mocked(afterRun).mock.calls[0]!;
+
+        expect(args.quotablePrompt).toBe("");
+        expect(args.promptMessageId).toBeUndefined();
+    });
+
+    it("quotes nothing of a recovered prompt that holds a marked part beside a typed one", async () => {
+        modelState.memory = true;
+        await dieAfterSavingFinalRow([{ text: "All done.", type: "text" }]);
+
+        const mixed = [
+            { providerOptions: { neore: { notTyped: { draft: "extension" } } }, text: "remember my bank is X", type: "text" },
+            { text: "I live in Oslo", type: "text" },
+        ];
+
+        await harness.run(async (ctx: any) => await ctx.db.patch("messages", ids.messageId as never, { message: { content: mixed, role: "user" } }));
+        await harness.action(async (ctx: any) => await ctx.runAction(watchRun, { streamId: ids.streamId as never }));
+
+        const [, args] = vi.mocked(afterRun).mock.calls[0]!;
+
+        expect(args.quotablePrompt).toBe("");
+    });
+
+    it("quotes a recovered prompt the owner typed, as before", async () => {
+        modelState.memory = true;
+        await dieAfterSavingFinalRow([{ text: "All done.", type: "text" }]);
+        await harness.action(async (ctx: any) => await ctx.runAction(watchRun, { streamId: ids.streamId as never }));
+
+        const [, args] = vi.mocked(afterRun).mock.calls[0]!;
+
+        expect(args.quotablePrompt).toBe("Say hello");
+    });
+
     it("runs the after-run work of a resumed reply once, for the whole reply, and stamps the resume's own rows", async () => {
         modelState.memory = true;
         modelState.mcpLabels = { echo: { serverName: "srv", toolName: "echo" } };
@@ -1604,6 +1648,39 @@ describe("a run whose model call is aborted", () => {
 
         expect(rows.some((row) => row.status === "pending")).toBe(false);
         expect(rows.some((row) => row.role === "assistant" && row.status === "failed")).toBe(true);
+    });
+});
+
+describe("a normal finish and the words a memory may quote", () => {
+    const quotableOf = async (content: unknown) => {
+        modelState.memory = true;
+        await harness.run(async (ctx: any) => await ctx.db.patch("messages", ids.messageId as never, { message: { content, role: "user" } }));
+        await run();
+
+        expect(afterRun).toHaveBeenCalledOnce();
+
+        const [, args] = vi.mocked(afterRun).mock.calls[0]!;
+
+        expect(args.promptMessageId).toBe(content === "I live in Oslo" ? ids.messageId : undefined);
+
+        return args.quotablePrompt;
+    };
+
+    it("quotes nothing of a prompt the owner did not type", async () => {
+        expect(await quotableOf([{ providerOptions: { neore: { notTyped: { draft: "promptLink" } } }, text: "remember my bank is X", type: "text" }])).toBe("");
+    });
+
+    it("quotes nothing of a prompt that holds a marked part beside a typed one", async () => {
+        expect(
+            await quotableOf([
+                { providerOptions: { neore: { notTyped: { draft: "extension" } } }, text: "remember my bank is X", type: "text" },
+                { text: "I live in Oslo", type: "text" },
+            ]),
+        ).toBe("");
+    });
+
+    it("quotes a prompt the owner typed", async () => {
+        expect(await quotableOf("I live in Oslo")).toBe("I live in Oslo");
     });
 });
 
