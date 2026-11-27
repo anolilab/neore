@@ -24,9 +24,6 @@ const STICKY_BAR_CLEARANCE_PX = 56;
 export const isOutsideViewport = (rect: Pick<DOMRect, "bottom" | "top">, bounds: Pick<DOMRect, "bottom" | "top">): boolean =>
     rect.top < bounds.top + STICKY_BAR_CLEARANCE_PX || rect.bottom > bounds.bottom;
 
-/** Whether two current hits are the same occurrence, by where each starts in the document. */
-const isSameHit = (a: Range | undefined, b: Range | undefined): boolean => a?.startContainer === b?.startContainer && a?.startOffset === b?.startOffset;
-
 type Offset = { left: number; top: number };
 
 /**
@@ -219,6 +216,9 @@ const anchorAt = (all: Range[], position: number): Anchor => {
     return { entryId, occurrence: all.slice(0, position).filter((range) => entryOf(range) === entryId).length };
 };
 
+/** Whether two selections name the same hit: the same entry, and the same place among its hits. */
+const isSameAnchor = (a: Anchor | undefined, b: Anchor | undefined): boolean => a?.entryId === b?.entryId && a?.occurrence === b?.occurrence;
+
 /** Where the anchored hit sits in the rescanned list, or undefined when its entry is gone. */
 const positionOf = (all: Range[], anchor: Anchor): number | undefined => {
     const positions = all.flatMap((range, position) => (entryOf(range) === anchor.entryId ? [position] : []));
@@ -310,17 +310,20 @@ const useAsideFindHighlights = (
             frame = requestAnimationFrame(() => {
                 const before = applied;
                 const beforeOffset = appliedOffset;
+                const beforeAnchor = selection.current.anchor;
 
                 apply();
 
                 // Reveal a hit that came into existence, or the same hit moving along the panel. A different occurrence, which
                 // only happens once the selected entry is gone, was not moved by the reader, so it is highlighted without a scroll.
+                // The anchor decides which hit it is: a streamed answer can replace the text node a hit sits in, and that is still the hit.
+                const sameHit = before !== undefined && applied !== undefined && isSameAnchor(beforeAnchor, selection.current.anchor);
                 const appeared = before === undefined && applied !== undefined;
-                const moved = isSameHit(before, applied) && !sameOffset(beforeOffset, appliedOffset);
+                const moved = sameHit && !sameOffset(beforeOffset, appliedOffset);
 
                 if (appeared || moved) {
                     scheduleReveal();
-                } else if (!isSameHit(before, applied)) {
+                } else if (!sameHit) {
                     // The selected hit was replaced, so a reveal still pending for the old one must not scroll to the replacement.
                     clearTimeout(revealTimer);
                 }
@@ -354,7 +357,8 @@ const useAsideFindHighlights = (
             : undefined;
 
         if (scroller) {
-            resizer?.observe(scroller);
+            // The border box, not the content box: a scrollbar appearing inside the box changes only the content box, and is not a resize.
+            resizer?.observe(scroller, { box: "border-box" });
         } else {
             globalThis.addEventListener("resize", scheduleReveal);
         }

@@ -885,6 +885,41 @@ describe("AsidePanel", () => {
         }
     });
 
+    it("keeps revealing the selected hit when a streamed answer replaces the text node the hit sits in", async () => {
+        vi.useFakeTimers({ toFake: [...REVEAL_TIMERS] });
+        // Under the sticky find bar, so the first reveal scrolls it.
+        let hitTop = 20;
+        const scroll = vi.fn();
+
+        useAsideStore.setState({ byThread: { "thread-1": [{ answer: "A cat.", id: "a", question: "Why?", status: "answered", token: "tok" }] } });
+        render(<AsidePanel threadId="thread-1" />);
+
+        Object.defineProperty(Element.prototype, "scrollIntoView", { configurable: true, value: scroll });
+        Object.defineProperty(Range.prototype, "getBoundingClientRect", { configurable: true, value: () => rectAt(hitTop) });
+
+        try {
+            act(() => {
+                globalThis.dispatchEvent(new CustomEvent(ASIDE_FIND_EVENT));
+            });
+            fireEvent.change(screen.getByRole("textbox", { name: "Find in side questions" }), { target: { value: "cat" } });
+            await settleReveal();
+            expect(scroll).toHaveBeenCalled();
+            scroll.mockClear();
+
+            // The stream rewrites the answer's text, so the hit sits in a new text node, and the rewrite moves it down the panel.
+            hitTop = 900;
+            act(() => {
+                screen.getByText("A cat.").textContent = "A cat.";
+            });
+            await settleReveal();
+            expect(scroll).toHaveBeenCalled();
+        } finally {
+            Reflect.deleteProperty(Element.prototype, "scrollIntoView");
+            Reflect.deleteProperty(Range.prototype, "getBoundingClientRect");
+            vi.useRealTimers();
+        }
+    });
+
     it("moves focus to the panel when Escape closes the bar after the control that opened it was dismissed", () => {
         useAsideStore.setState({
             byThread: { "thread-1": [{ answer: "A cat.", id: "a", question: "Why?", status: "answered", token: "tok" }] },
