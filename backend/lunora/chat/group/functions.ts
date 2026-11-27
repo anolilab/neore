@@ -37,7 +37,7 @@ import { vGroupChatMode } from "./validators";
 import { admitSkills } from "../../lib/rls/scope";
 import { MAX_LENGTH } from "../../lib/validators";
 
-const DEFAULT_GROUP_TITLE = "Group chat";
+export const DEFAULT_GROUP_TITLE = "Group chat";
 
 const vParticipantSummary = v.object({
     description: v.string(),

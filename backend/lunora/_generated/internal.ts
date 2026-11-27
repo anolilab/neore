@@ -1036,6 +1036,9 @@ export interface InternalApiTypes {
         };
     };
     plugins: {
+        export: {
+            pluginForSelection: FunctionReference<"query", { groupChatIds: Array<string>; skillIds: Array<string>; triggerIds: Array<string>; userId: string }, null | { keys: Array<{ id: string; key: string }>; slug: string; version: string }>;
+        };
         install_steps: {
             createInstallRow: FunctionReference<"mutation", { contentHash: string; pluginSlug: string; userId: string; version: string }, { generation: number; installId: string }>;
             deleteInstall: FunctionReference<"mutation", { generation: number; installId: string }, null>;
@@ -1044,8 +1047,24 @@ export interface InternalApiTypes {
             recordCreated: FunctionReference<"mutation", { generation: number; installId: string; intentId: string; itemId: string }, null>;
             recordIntent: FunctionReference<"mutation", { contentHash: string; entryKey: string; generation: number; installId: string; kind: "skill" | "trigger" | "group"; userId: string }, string>;
         };
+        repair_resume: {
+            beginRepair: FunctionReference<"mutation", { contentHash: string; pluginSlug: string; userId: string }, { generation: number; installId: string; linked: number; missing: Array<{ entryKey: string; intentId: string; kind: "skill" | "trigger" | "group" }>; status: "installed" | "needs-repair" }>;
+        };
+        uninstall_action: {
+            beginUninstall: FunctionReference<"mutation", { pluginSlug: string; userId: string }, { generation: number; groups: Array<string>; installId: string; kept: Array<string>; removed: number }>;
+            claimGroup: FunctionReference<"mutation", { generation: number; installId: string; threadId: string }, boolean>;
+            finishUninstall: FunctionReference<"mutation", { generation: number; installId: string }, null>;
+        };
         update: {
-            loadInstalledForUpdate: FunctionReference<"query", { pluginSlug: string; userId: string }, null | { children: Array<{ contentHash: string; currentHash: string; entryKey: string; kind: "skill" | "trigger" | "group" }>; installId: string; status: string; version: string }>;
+            loadInstalledForUpdate: FunctionReference<"query", { pluginSlug: string; userId: string }, null | { children: Array<{ contentHash: string; currentHash: string; entryKey: string; kind: "skill" | "trigger" | "group" }>; installId: string; ownSlugs: Array<{ entryKey: string; slug: string }>; status: string; version: string }>;
+        };
+        update_apply: {
+            beginUpdate: FunctionReference<"mutation", { installId: string; targetVersion: string; userId: string }, number>;
+            detachChild: FunctionReference<"mutation", { entryKey: string; generation: number; installId: string; userId: string }, null>;
+            finishUpdate: FunctionReference<"mutation", { contentHash: string; generation: number; installId: string; version: string }, null>;
+            removeChild: FunctionReference<"mutation", { entryKey: string; generation: number; installId: string; userId: string }, null>;
+            updateSkillChild: FunctionReference<"mutation", { category?: string; config?: unknown; contentHash: string; description: string; entryKey: string; generation: number; icon?: string; installId: string; instructions: string; name: string; slug: string; tags?: Array<string>; variables?: unknown; version?: string; userId: string }, null>;
+            updateTriggerChild: FunctionReference<"mutation", { contentHash: string; cronExpression?: string; description?: string; entryKey: string; generation: number; inputTemplate?: string; installId: string; model: string; name: string; searchMode?: string; systemPrompt?: string; timezone?: string; userId: string }, null>;
         };
     };
     projects: {
@@ -2374,6 +2393,9 @@ export const internal: InternalApiTypes = {
         },
     },
     plugins: {
+        export: {
+            pluginForSelection: { __lunoraRef: "plugins_export:pluginForSelection" },
+        },
         install_steps: {
             createInstallRow: { __lunoraRef: "plugins_install_steps:createInstallRow" },
             deleteInstall: { __lunoraRef: "plugins_install_steps:deleteInstall" },
@@ -2382,8 +2404,24 @@ export const internal: InternalApiTypes = {
             recordCreated: { __lunoraRef: "plugins_install_steps:recordCreated" },
             recordIntent: { __lunoraRef: "plugins_install_steps:recordIntent" },
         },
+        repair_resume: {
+            beginRepair: { __lunoraRef: "plugins_repair_resume:beginRepair" },
+        },
+        uninstall_action: {
+            beginUninstall: { __lunoraRef: "plugins_uninstall_action:beginUninstall" },
+            claimGroup: { __lunoraRef: "plugins_uninstall_action:claimGroup" },
+            finishUninstall: { __lunoraRef: "plugins_uninstall_action:finishUninstall" },
+        },
         update: {
             loadInstalledForUpdate: { __lunoraRef: "plugins_update:loadInstalledForUpdate" },
+        },
+        update_apply: {
+            beginUpdate: { __lunoraRef: "plugins_update_apply:beginUpdate" },
+            detachChild: { __lunoraRef: "plugins_update_apply:detachChild" },
+            finishUpdate: { __lunoraRef: "plugins_update_apply:finishUpdate" },
+            removeChild: { __lunoraRef: "plugins_update_apply:removeChild" },
+            updateSkillChild: { __lunoraRef: "plugins_update_apply:updateSkillChild" },
+            updateTriggerChild: { __lunoraRef: "plugins_update_apply:updateTriggerChild" },
         },
     },
     projects: {
