@@ -438,9 +438,10 @@ const memoryDay = (value: string | undefined): string | undefined => {
 /**
  * Note text that stays on its own line and inside the fence: line breaks become spaces, so a note cannot start a
  * line of its own, invisible characters go, and every `<` is escaped, so no note can open or close a tag. A memory
- * note is a short fact: a literal `<` reads the same as `&lt;`.
+ * note is a short fact: a literal `<` reads the same as `&lt;`. Also used for other text of the user's that reaches the
+ * model as data, such as an excerpt of an earlier chat.
  */
-const neutraliseMemoryText = (text: string): string =>
+export const neutraliseMemoryText = (text: string): string =>
     text.replaceAll(MEMORY_INVISIBLE_RE, "").replaceAll(MEMORY_LINE_BREAKS_RE, " ").replaceAll(MEMORY_LESS_THAN_RE, "&lt;").trim();
 
 /** A note's dates: when it was last confirmed or saved, the event it is about, and the last day it holds. */
@@ -573,6 +574,7 @@ TOOL USAGE PRINCIPLES:
 - Handle tool failures gracefully with alternative approaches
 - Chain tool calls efficiently when operations are independent
 - Save results from expensive operations to avoid redundant calls
+- When the user refers to something they said in an earlier conversation and your memory has nothing on it, search their past chats with searchPastChats if that tool is available
 
 ERROR HANDLING:
 - When tool execution fails, analyze the error message carefully
