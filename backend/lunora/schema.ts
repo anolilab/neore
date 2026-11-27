@@ -539,6 +539,17 @@ export const schema = defineSchema({
                 until: v.number(),
             }),
         ),
+        /**
+         * How many fresh control leases were taken on this row, by anyone (`browser/live-view.ts#claimControl`): a frame
+         * read that sees it change knows a person took control while its shot ran, even once the lease ended and was cleared.
+         */
+        controlClaims: v.optional(v.number()),
+        /**
+         * The client's own name for the view that holds the current lease (the phone's screen), written by every claim (a
+         * claim naming none clears it), so a take whose answer was lost is not refused as another view's when that view asks
+         * again. Not a credential: it only lifts `exclusive` (`browser/live-view.ts#claimControl`).
+         */
+        controlView: v.optional(v.string()),
         currentUrl: v.optional(v.string()),
         /** When the action that wrote `currentUrl` started, so an older action finishing later does not overwrite it. */
         currentUrlStartedAt: v.optional(v.number()),
@@ -974,6 +985,9 @@ export const schema = defineSchema({
         // The (agent, folder) pairs the user approved for coding agents, from the signed manifest
         // (`updateDeviceManifest`); unset until a shell that knows coding agents has sent one.
         acpOffers: v.optional(v.array(vAcpOffer)),
+        // Set by the registration that creates the row, cleared once its owner alert is written (`devices/lib/register.ts`).
+        // The housekeeping sweep announces any still set, so an alert never depends on the caller staying around to make it.
+        alertPending: v.optional(v.boolean()),
         // The desktop app's version, as the page relayed it beside the last manifest. Unsigned and display-only.
         appVersion: v.optional(v.string()),
         createdAt: v.number(),
@@ -997,7 +1011,8 @@ export const schema = defineSchema({
         viaDeviceId: v.optional(v.id("devices")),
     })
         .shardBy("userId")
-        .index("by_userId", ["userId"]),
+        .index("by_userId", ["userId"])
+        .index("by_alertPending", ["alertPending"]),
 
     // Ported 1:1 from the audit-history component schema. Read by
     // GDPR (`listUserActivity`, `getDocumentAtTime`) and the canvas version
@@ -1780,6 +1795,36 @@ export const schema = defineSchema({
         // The same scope, active rows only: superseded history never enters a read. `supersededBy` is null for an active row.
         .index("by_userId_botId_active", ["userId", "botId", "supersededBy", "type"]),
 
+    // Cleanup a memory write could not finish, written in the same commit as the work that left it so the reference
+    // survives a retry that cannot be scheduled or runs out (`memory/functions.ts`, `runMemoryCleanup`).
+    // `vector`: the embedding of a retired or deleted memory whose delete failed. `chain`: the ids still to walk of a
+    // delete's older versions, after the first write used its budget. `digests`: the deleted ids still to take out of the
+    // rest of the user's reflection digests (`ids`, from `cursor` on). A scheduler job on the owner's shard works each
+    // record at its `dueAt`; the housekeeping sweep arms any record that is due and has no live job.
+    memoryCleanups: defineTable({
+        // Steps that failed. At the cap the record keeps its row and its `dueAt` moves out of reach.
+        attempts: v.optional(v.number()),
+        // `digests`: where the walk over the user's digests goes on, the pagination cursor of the last page read. It names
+        // positions by value (`createdAt`, then the row's own id), so rows that share a `createdAt` are not read twice or skipped.
+        cursor: v.optional(v.string()),
+        // When the record is next worked: after a grace period at first, after a backoff once a step failed.
+        dueAt: v.number(),
+        embeddingId: v.optional(v.string()),
+        frontier: v.optional(v.array(v.id("memories"))),
+        // `digests`: the deleted memories' ids.
+        ids: v.optional(v.array(v.string())),
+        kind: v.union(v.literal("vector"), v.literal("chain"), v.literal("digests")),
+        memoryId: v.optional(v.string()),
+        // `chain` and `digests`: when the delete began, kept through every continuation. The walks over the user's digests read
+        // only digests written by then; a later one went through `saveMemoryDigest`'s own checks.
+        startedAt: v.optional(v.number()),
+        userId: v.string(),
+    })
+        .shardBy("userId")
+        .index("by_dueAt", ["dueAt"])
+        .index("by_embeddingId", ["embeddingId"])
+        .index("by_userId", ["userId"]),
+
     // One nightly-reflection digest ("what I learned today") per run. See `memory/reflection.ts`.
     memoryDigests: defineTable({
         createdAt: v.number(),
@@ -2233,6 +2278,33 @@ export const schema = defineSchema({
         .index("credentialID", ["credentialID"])
         .triggers((t) => auditTriggersFor(t, "passkey", AUDIT_TABLES["passkey"]!)),
 
+    /**
+     * A route restore a refused pin write still owes (`chat/pins/functions.ts#restoreRoutes`). It is written before the write's route cleanup
+     * returns. A refused write's rollback does not undo a global row, so the row survives the refusal. The restore settles it at its terminal
+     * outcome. The cron (`restorePendingPinRoutes`) dispatches it when the queue send does not run the restore, and the erasure turns it into
+     * a route before its second sweep (`chat/gdpr.ts#materializePendingPinRoutesBatch`). `ownerId` names the owner when it was written, and a
+     * guest merge re-points it like `sharedPinRoutes`.
+     *
+     * Not in the account export, by decision: a transient recovery record, settled within minutes, that holds route ids and timestamps and
+     * no content. The pin it protects is exported through its route (`gdpr/steps.ts#collectSharedPins`).
+     */
+    pendingPinRestores: defineTable({
+        // When the cron pass last dispatched this row (its write time until then). The pass takes the least recently dispatched rows, so a
+        // row that cannot settle yet does not hold back the others.
+        dispatchedAt: v.number(),
+        ownerId: v.string(),
+        routeCreatedAt: v.number(),
+        threadId: v.id("threads"),
+        until: v.number(),
+        userId: v.string(),
+    })
+        .global()
+        .index("by_owner", ["ownerId"])
+        .index("by_thread", ["threadId"])
+        .index("by_user", ["userId"])
+        .index("by_user_and_thread", ["userId", "threadId"])
+        .index("by_dispatched", ["dispatchedAt"]),
+
     persistentChunks: defineTable({
         // A host stream's event that carries no text (a tool call, a permission request, the end of the
         // turn). It still takes its `seq`, so the host's `(turnId, seq)` claim covers every event.
@@ -2421,11 +2493,15 @@ export const schema = defineSchema({
             };
         }),
 
-    // One row per account that writes pins: the latest time a pin write of the account may still be in flight. A move waits for it
-    // to pass before it sweeps the account's pins (`lib/account-moves.ts`).
+    // One row per admitted pin write: the time that write may still be in flight. A move waits for the latest of them to pass before it
+    // sweeps the account's pins, and a refused write's route cleanup waits for the others (`lib/account-moves.ts`).
+    // Upgrade: none by hand. The global-table provisioner adds `writerId` to a store's existing table after its sweep (`COLUMNS_ADDED_SINCE`
+    // in `auth/lib/ensure-global-tables.ts`), so a store from an earlier build needs nothing and is never reset for it.
     pinWriteLeases: defineTable({
         expiresAt: v.number(),
         userId: v.string(),
+        // Absent on rows an earlier build wrote; such a row counts as another writer's.
+        writerId: v.optional(v.string()),
     })
         .global()
         .index("by_user", ["userId"]),
@@ -2803,11 +2879,58 @@ export const schema = defineSchema({
         ),
         // Names one start of the watch: fresh at every start and never the clock, so a poll leased before a stop and restart cannot match the restarted watch (`source-control/pr-watch-poll.ts`).
         watchRun: v.optional(v.string()),
+        // The record of one wake turn's occurrence (`source-control/pr-watch-wake.ts`), written before the model is asked: the claim, the run and
+        // start it belongs to, the reasons with the occurrence markers they came from, and where it stands. `running`: the turn was started and
+        // its end is not recorded; `completed`: it ran to its end. `done` is set once it is settled. A claim that finds one that is not done never
+        // generates again for it: a completed one is settled (counted, cleared), a running one is settled as a failed attempt, so one occurrence
+        // costs at most one model call. A record of another run is discarded, and starting a watch discards any.
+        watchWakeCompleted: v.optional(
+            v.object({
+                claim: v.number(),
+                done: v.boolean(),
+                markers: v.object({ checks: v.optional(v.string()), conflict: v.optional(v.string()), review: v.optional(v.string()) }),
+                // The order of the chat's newest message when the turn started: a turn that fails or is fenced is rolled back to it, so its prompt
+                // and any partial reply leave no trace and a retry does not repeat them in the chat.
+                markOrder: v.optional(v.number()),
+                // Set when the charge is kept, right before the model is asked, and kept through any settlement: the model may have generated
+                // for this occurrence, so no new paid turn is admitted for the same markers.
+                modelReached: v.optional(v.boolean()),
+                reasons: v.array(v.union(v.literal("checks"), v.literal("conflict"), v.literal("review"))),
+                run: v.optional(v.string()),
+                startedAt: v.number(),
+                state: v.union(v.literal("completed"), v.literal("running")),
+            }),
+        ),
+        // How the wake turns of this watch are failing (`source-control/pr-watch-wake.ts`): when the last one failed, how many failed in a row
+        // (0 after a delivery), when the next try may start, and what kind of failure it was: "retryable", "terminal" (cannot be cured by trying
+        // again), "shared" (the chat is no longer the owner's alone) or "unavailable" (the chat's model is no longer available): the watch waits and no failure is counted. The watch is stopped at the
+        // third failure in a row or at a terminal one; the last failure stays as history.
+        watchWakeFailure: v.optional(
+            v.object({
+                at: v.number(),
+                attempts: v.number(),
+                kind: v.union(v.literal("retryable"), v.literal("shared"), v.literal("terminal"), v.literal("unavailable")),
+                retryAt: v.number(),
+            }),
+        ),
+        // The lease a wake turn holds while it is delivered (`source-control/pr-watch-wake.ts`): until when no second delivery may start.
+        // Released when the delivery ends; a delivery that never ends frees itself when it lapses.
+        watchWakeLeaseUntil: v.optional(v.number()),
+        // The limits a wake turn's round was charged to, written in the same transaction as the charge: it is owed back until the model is
+        // reached (`applied` is then set without a refund) or the refund is paid. `windowEnds` is when each limit's window ends: a refund after
+        // that is not paid, since the window the charge came from is gone. A job that dies before the model leaves it unpaid, and the claim's
+        // lapse handler or the next charge pays it once.
+        watchWakeRefund: v.optional(
+            v.object({ applied: v.boolean(), claim: v.number(), keys: v.array(v.string()), windowEnds: v.optional(v.array(v.number())) }),
+        ),
     })
         .shardBy("userId")
         .index("by_user_and_repository_number", ["userId", "repository", "number"])
         .index("by_user_and_repository_number_threadId", ["userId", "repository", "number", "threadId"])
         .index("by_user_and_threadId", ["userId", "threadId"])
+        // The links of a thread that hold a wake lease (`source-control/pr-watch-wake-lease.ts`): read by lease time, so the check is bounded by
+        // the live leases and not by how many links the thread has.
+        .index("by_user_thread_and_wakeLease", ["userId", "threadId", "watchWakeLeaseUntil"])
         .index("by_user_and_watchActive", ["userId", "watchActive"]),
 
     // A phone's Expo push token (`notifications/native-push.ts`): one row per token, owned by the account signed in on

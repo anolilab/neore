@@ -8,6 +8,8 @@ import { decryptKey } from "../../lib/encryption";
 /** What a verified request proved: whose device it is, and the payload's fields. */
 export interface VerifiedDeviceRequest {
     post: Record<string, unknown>;
+    /** Whether the device has signed in before (`lastSeenAt` is set). A route that finds it unset records the first use. */
+    seen: boolean;
     userId: string;
 }
 
@@ -34,5 +36,7 @@ export const verifyDeviceRequest = async (
 
     const post = parseSignedPayload(args.payload, args.domain, device._id as string);
 
-    return post && isFreshTimestamp(post.issuedAt, args.now, DEVICE_SIGNATURE_WINDOW_MS) ? { post, userId: device.userId } : null;
+    return post && isFreshTimestamp(post.issuedAt, args.now, DEVICE_SIGNATURE_WINDOW_MS)
+        ? { post, seen: device.lastSeenAt !== undefined, userId: device.userId }
+        : null;
 };

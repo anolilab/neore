@@ -165,7 +165,8 @@ describe("auth hook shard placement", { timeout: 30_000 }, () => {
         );
 
         expect(response.status).toBe(200);
-        // The check before the code is spent and the registration after it, both on the account's shard.
+        // The check before the code is spent and the registration after it, both on the account's shard. The owner's alert is
+        // queued by that registration, not a call of its own.
         expect(names).toStrictEqual(["user-a", "user-a"]);
     });
 

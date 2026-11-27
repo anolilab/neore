@@ -77,6 +77,25 @@ export const settingsTabForPath = (pathname: string): SettingsTab | undefined =>
 };
 
 /** The search keys that open the settings modal at a tab, on top of whatever the page already has. */
+
+/**
+ * The element id a URL fragment names, for a settings anchor: without its "#" and percent-decoded, since a link may
+ * encode it (`#voice-mode%2Dvoice`). A malformed escape is kept as written rather than failing the navigation.
+ */
+export const anchorFromHash = (hash: string): string | undefined => {
+    const raw = hash.startsWith("#") ? hash.slice(1) : hash;
+
+    if (!raw) {
+        return undefined;
+    }
+
+    try {
+        return decodeURIComponent(raw);
+    } catch {
+        return raw;
+    }
+};
+
 export interface SettingsSearch {
     settings: true;
     settingsAnchor?: string;

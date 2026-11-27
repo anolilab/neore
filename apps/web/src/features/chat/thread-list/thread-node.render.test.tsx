@@ -649,6 +649,17 @@ describe("ThreadNode", () => {
         expect(strip?.className).toContain("opacity-0");
         expect(strip?.className).not.toMatch(TOUCH_CLASSES);
     });
+
+    it("keeps a streaming row's stop button in reach on a touch screen, outside the hover-only strip", () => {
+        render(<ThreadNode {...baseProps} node={{ ...baseProps.node, status: "running" }} />);
+
+        const [touch, strip] = screen.getAllByRole("button", { name: "Stop generating: Quarterly plan" });
+
+        expect(strip?.closest("span[role=presentation]")?.className).toContain("[@media(hover:none)]:hidden");
+        expect(strip?.closest(".opacity-0")).not.toBeNull();
+        expect(touch?.closest("span[role=presentation]")?.className).toContain("[@media(hover:none)]:contents");
+        expect(touch?.closest(".opacity-0")).toBeNull();
+    });
     /* eslint-enable testing-library/no-node-access */
 
     it.each([

@@ -263,6 +263,14 @@ export const collectPullRequestThreadsForExport = internalQuery
                             ),
                         }),
                     ),
+                    watchWakeFailure: v.optional(
+                        v.object({
+                            at: v.number(),
+                            attempts: v.number(),
+                            kind: v.union(v.literal("retryable"), v.literal("shared"), v.literal("terminal"), v.literal("unavailable")),
+                            retryAt: v.number(),
+                        }),
+                    ),
                 }),
             ),
         }),
@@ -294,6 +302,7 @@ export const collectPullRequestThreadsForExport = internalQuery
                     ...(link.watch !== undefined && { watch: link.watch }),
                     ...(link.watchPending !== undefined && { watchPending: link.watchPending }),
                     ...(link.watchReadFailure !== undefined && { watchReadFailure: link.watchReadFailure }),
+                    ...(link.watchWakeFailure !== undefined && { watchWakeFailure: link.watchWakeFailure }),
                     threadId: link.threadId,
                     title: link.title,
                     url: link.url,

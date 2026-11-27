@@ -21,6 +21,7 @@ const SETTINGS_LINK_SOURCE = fileURLToPath(new URL("../src/features/settings/lib
 
 /** Every old settings page, as its path below `/dashboard/settings/`, with the modal tab it opens and that tab's English title. */
 const SETTINGS_PAGES = {
+    "api-keys": { tab: "chat-api-keys", title: "API Keys" },
     "app/customization": { tab: "app-customization", title: "Customization" },
     "app/keyboard-shortcuts": { tab: "app-keyboard", title: "Keyboard Shortcuts" },
     "app/personalization": { tab: "chat-personalization", title: "Personalization" },
@@ -31,21 +32,33 @@ const SETTINGS_PAGES = {
     "auth/organizations": { tab: "auth-organizations", title: "Organizations" },
     "auth/security": { tab: "auth-security", title: "Security" },
     "auth/teams": { tab: "auth-teams", title: "Teams" },
+    "billing/limits": { tab: "auth-billing", title: "Billing" },
     "chat/agent": { tab: "chat-agent", title: "Agent" },
     "chat/bots": { tab: "chat-bots", title: "Bots" },
     "chat/devices": { tab: "chat-devices", title: "Devices" },
     "chat/knowledge": { tab: "chat-knowledge", title: "Knowledge Base" },
     "chat/mcp": { tab: "chat-mcp", title: "MCP Servers" },
+    "chat/model": { tab: "chat-models", title: "Models" },
     "chat/model-filters": { tab: "chat-model-filters", title: "Model Restrictions" },
     "chat/models": { tab: "chat-models", title: "Models" },
     "chat/triggers": { tab: "chat-triggers", title: "Triggers" },
     "chat/usage": { tab: "chat-usage", title: "Usage" },
+    "compliance/model-filters": { tab: "chat-model-filters", title: "Model Restrictions" },
     connectors: { tab: "connectors", title: "Connectors" },
     "connectors/messenger": { tab: "connectors-messenger", title: "Messenger" },
     privacy: { tab: "privacy", title: "Privacy & Data" },
 } as const;
 
 type SettingsPath = keyof typeof SETTINGS_PAGES;
+
+/**
+ * One old path per tab: a second path to a tab already loaded renders the same tab again, and its redirect is the
+ * table's (`settings-link.test.ts`), so it adds a full page load and nothing else. The sweep's loads are what the
+ * shared dev backend has to carry, and it runs out of room toward the end of a longer one.
+ */
+const SWEPT_PATHS = (Object.keys(SETTINGS_PAGES) as SettingsPath[]).filter(
+    (path, index, paths) => paths.findIndex((other) => SETTINGS_PAGES[other].tab === SETTINGS_PAGES[path].tab) === index,
+);
 
 // `"app/customization": "app-customization",` or `connectors: "connectors",`
 const PAIR_RE = /^ +(?:"([^"]+)"|([a-z]+)): "([^"]+)",$/gmu;
@@ -130,39 +143,70 @@ const expectTabTitle = async (page: Page, path: SettingsPath, locale: string): P
 };
 
 /**
- * Load an old settings page URL; it redirects to the chat with the modal open.
+ * Cold-load an old settings page URL: the server renders the redirect to the chat with the modal open.
  *
- * The sweep is two full page loads a second, from one IP. It used to reload any
- * page that got a 429 from `/api/auth/*` and wait out better-auth's per-IP
- * window first, because a rate-limited `get-session` rendered the dashboard
- * without its session. That is the app's job now, and this spec relies on it:
- * `get-session` is exempt from the limiter (`AUTH_RATE_LIMIT_CUSTOM_RULES`,
- * `backend/lunora/auth.ts`), and any session read that still fails is retried
- * and treated as "unknown", never as signed out (`src/lib/auth/session-read.ts`,
- * `src/lib/auth/route-guard.ts`). A page that does not render here is the
- * page's — or that recovery's — fault.
+ * A session read that fails is retried and treated as "unknown", never as signed out
+ * (`src/lib/auth/session-read.ts`, `src/lib/auth/route-guard.ts`), and `get-session` is exempt from the
+ * rate limiter (`AUTH_RATE_LIMIT_CUSTOM_RULES`, `backend/lunora/auth.ts`); this spec relies on both. A page
+ * that does not render here is the page's — or that recovery's — fault.
  */
-const loadSettingsPage = async (page: Page, path: SettingsPath, clearErrors: () => void): Promise<void> => {
-    await settle(page);
-    // Only this load's errors count.
-    clearErrors();
+const loadSettingsPage = async (page: Page, path: SettingsPath): Promise<void> => {
     // Bounded, so a page that never finishes loading fails as itself, not as the whole sweep's timeout.
     await page.goto(`/dashboard/settings/${path}`, { timeout: 90_000 });
+};
+
+/** The router TanStack Router publishes on `window` in the browser (`router-core`'s `__TSR_ROUTER__`). */
+interface WindowWithRouter {
+    __TSR_ROUTER__?: { navigate: (options: { to: string }) => Promise<void> };
+}
+
+/** Go to an old settings page URL through the router, so it takes the `/dashboard` redirect without reloading the app. */
+const openSettingsPageInApp = async (page: Page, path: SettingsPath): Promise<void> => {
+    await page.evaluate(async (to) => {
+        const { __TSR_ROUTER__: router } = globalThis as unknown as WindowWithRouter;
+
+        if (!router) {
+            throw new Error("the router is not on window: the app has not hydrated");
+        }
+
+        await router.navigate({ to });
+    }, `/dashboard/settings/${path}`);
 };
 
 /**
  * Open every old settings page URL in turn and return the errors each one logged. Render
  * failures are soft assertions, so one broken page does not hide the next.
+ *
+ * Only the first URL is a cold load, which keeps the server-side redirect covered; the rest navigate in the
+ * running app, because each full load boots the whole chat shell and the late loads of a sweep stalled the CI runner.
  */
 const sweepSettingsPages = async (page: Page, locale: string): Promise<Record<string, string[]>> => {
     const errors = collectErrors(page);
     const errorsByPage: Record<string, string[]> = {};
+    let previous: SettingsPath | undefined;
 
-    for (const path of Object.keys(SETTINGS_PAGES) as SettingsPath[]) {
+    for (const path of SWEPT_PATHS) {
+        const before = previous;
+
         await test.step(path, async () => {
-            await loadSettingsPage(page, path, () => {
-                errors.length = 0;
-            });
+            await settle(page);
+            // Only this step's errors count.
+            errors.length = 0;
+
+            if (before) {
+                const previousTitle = (await currentTabItem(page).textContent())?.trim() ?? "";
+
+                await openSettingsPageInApp(page, path);
+
+                // The old tab's item is still current until the redirect lands; wait for the item to name the new tab.
+                if (SETTINGS_PAGES[before].title !== SETTINGS_PAGES[path].title) {
+                    const switched = `${path} switches the current tab away from ${before}`;
+
+                    await expect.soft(currentTabItem(page), switched).not.toHaveText(previousTitle, { timeout: 60_000 });
+                }
+            } else {
+                await loadSettingsPage(page, path);
+            }
 
             await expect(page, `${path} redirects to the chat with its tab open`).toHaveURL(settingsUrlFor(SETTINGS_PAGES[path].tab), { timeout: 60_000 });
             await expect(settingsDialog(page), `${path} opens the settings modal`).toBeVisible({ timeout: 60_000 });
@@ -176,6 +220,8 @@ const sweepSettingsPages = async (page: Page, locale: string): Promise<Record<st
                 errorsByPage[path] = [...errors];
             }
         });
+
+        previous = path;
     }
 
     return errorsByPage;

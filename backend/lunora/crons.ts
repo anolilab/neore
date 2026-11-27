@@ -228,6 +228,8 @@ const EVERY_MINUTE_JOBS: ReadonlyArray<CronJob> = [
     { name: "cleanupStaleWorkflowPresence", ref: internal.workflow.presence.cleanupStalePresence },
     // Queue jobs whose delivery died mid-run: fail their pending state (`lib/claim-once.ts`).
     { name: "reapLapsedClaims", ref: internal.lib.claim_once.reapLapsedClaims },
+    // Owed route restores a refused pin write queued that its queue send did not run (`chat/pins/functions.ts`).
+    { name: "restorePendingPinRoutes", ref: internal.chat.pins.functions.restorePendingPinRoutes },
     // Every job above sweeps `__root__` only. The same sweeps on each USER shard,
     // where those rows now live, are fanned out through the `.global()` census
     // (`lib/shard-housekeeping.ts`).

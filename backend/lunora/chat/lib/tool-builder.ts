@@ -37,6 +37,8 @@ import {
     readPullRequestTool,
     replyToReviewCommentTool,
     rerunFailedChecksTool,
+    unwatchPullRequestTool,
+    watchPullRequestTool,
     imageEditingTool,
     imageGenerationTool,
     imageSearchTool,
@@ -55,6 +57,7 @@ import {
     retrieveTool,
     saveSecretAsProviderKeyTool,
     searchMemoryTool,
+    searchPastChatsTool,
     setMcpServerSecretTool,
     signInWithSavedLoginTool,
     shellExecutionTool,
@@ -132,7 +135,7 @@ export const SEARCH_MODES: SearchModeInfo[] = [
 // Document tools are available in all search modes
 const DOCUMENT_TOOLS = [ToolName.CreateDocument, ToolName.UpdateDocument, ToolName.RenderUI];
 // Memory search is available in all modes for progressive disclosure
-const MEMORY_TOOLS = [ToolName.SearchMemory];
+const MEMORY_TOOLS = [ToolName.SearchMemory, ToolName.SearchPastChats];
 // Knowledge base search is available in all modes
 const KNOWLEDGE_TOOLS = [ToolName.KnowledgeSearch];
 
@@ -153,6 +156,8 @@ export const PULL_REQUEST_TOOLS: ReadonlyArray<string> = [
     ToolName.ReplyToReviewComment,
     ToolName.RerunFailedChecks,
     ToolName.MergePullRequest,
+    ToolName.WatchPullRequest,
+    ToolName.UnwatchPullRequest,
 ];
 // Delegating a self-contained piece of work to a headless sub-agent (`sub-agents/`)
 const SUB_AGENT_TOOLS = [ToolName.DelegateToSubAgent, ToolName.MessageWorker];
@@ -422,6 +427,7 @@ const ALL_TOOLS: Record<ToolName, unknown> = {
 
     // Memory Tools
     [ToolName.SearchMemory]: searchMemoryTool,
+    [ToolName.SearchPastChats]: searchPastChatsTool,
     [ToolName.SetMcpServerSecret]: setMcpServerSecretTool,
     // Sandbox Tools
     [ToolName.ShellExecution]: shellExecutionTool,
@@ -438,6 +444,7 @@ const ALL_TOOLS: Record<ToolName, unknown> = {
     [ToolName.TrendingMovies]: trendingMoviesTool,
     [ToolName.TrendingTv]: trendingTvTool,
 
+    [ToolName.UnwatchPullRequest]: unwatchPullRequestTool,
     [ToolName.UpdateDesign]: updateDesignTool,
 
     [ToolName.UpdateDocument]: updateDocumentTool,
@@ -449,6 +456,8 @@ const ALL_TOOLS: Record<ToolName, unknown> = {
 
     // Vision / Analysis Tools
     [ToolName.VisionAnalysis]: visionAnalysisTool,
+
+    [ToolName.WatchPullRequest]: watchPullRequestTool,
     // Information Tools
     [ToolName.Weather]: weatherTool,
 
@@ -498,8 +507,16 @@ const TOOLS_BY_CATEGORY = {
     interaction: [ToolName.AskUser, ToolName.RequestSecret, ToolName.SaveSecretAsProviderKey, ToolName.SetMcpServerSecret],
     knowledge: [ToolName.KnowledgeSearch],
     location: [ToolName.FindPlace, ToolName.NearbyPlacesSearch, ToolName.Weather],
-    memory: [ToolName.SearchMemory],
-    pullRequest: [ToolName.ReadPullRequest, ToolName.ReadFailingChecks, ToolName.ReplyToReviewComment, ToolName.RerunFailedChecks, ToolName.MergePullRequest],
+    memory: [ToolName.SearchMemory, ToolName.SearchPastChats],
+    pullRequest: [
+        ToolName.ReadPullRequest,
+        ToolName.ReadFailingChecks,
+        ToolName.ReplyToReviewComment,
+        ToolName.RerunFailedChecks,
+        ToolName.MergePullRequest,
+        ToolName.WatchPullRequest,
+        ToolName.UnwatchPullRequest,
+    ],
     research: [ToolName.DeepResearch],
     sandbox: [ToolName.ShellExecution, ToolName.FileOperations],
     search: [
