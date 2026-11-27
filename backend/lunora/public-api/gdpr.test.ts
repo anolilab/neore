@@ -2,9 +2,45 @@ import { lunoraTest } from "@lunora/testing";
 import { describe, expect, it } from "vitest";
 
 import { schemaWithShardedTables } from "../lib/test-schema";
-import { collectMcpEventsForExport, deleteUserMcpEvents, EXPORT_EVENT_BYTES, MAX_EXPORT_EVENTS } from "./gdpr";
+import { collectEventWebhooksForExport, collectMcpEventsForExport, deleteUserMcpEvents, EXPORT_EVENT_BYTES, MAX_EXPORT_EVENTS } from "./gdpr";
 
 const BATCH = 200;
+
+describe("collectEventWebhooksForExport", () => {
+    it("exports the owner's hosts and each subscription's fields, and never the secret, the key hash or the key", async () => {
+        const harness = lunoraTest(schemaWithShardedTables([]) as never);
+
+        try {
+            await harness.run(async (context: any) => {
+                await context.db.insert("eventWebhookHosts", { createdAt: 1, host: "hooks.example.com", userId: "user" });
+                await context.db.insert("eventWebhookSubscriptions", {
+                    argumentsKey: "{}",
+                    createdAt: 2,
+                    expiresAt: 3,
+                    id: "sub_1",
+                    keyHash: "hash-1",
+                    minTimestamp: 0,
+                    name: "run.completed",
+                    principal: "key-1",
+                    scanSeq: 0,
+                    secretCiphertext: "ciphertext",
+                    updatedAt: 2,
+                    url: "https://hooks.example.com/neore",
+                    userId: "user",
+                });
+            });
+
+            const exported = await harness.run(async (context: any) => await context.runQuery(collectEventWebhooksForExport, { userId: "user" }));
+
+            expect(exported).toStrictEqual({
+                hosts: [{ createdAt: 1, host: "hooks.example.com" }],
+                subscriptions: [{ argumentsKey: "{}", createdAt: 2, expiresAt: 3, name: "run.completed", url: "https://hooks.example.com/neore" }],
+            });
+        } finally {
+            harness.close();
+        }
+    });
+});
 
 describe("collectMcpEventsForExport", () => {
     it("stops the scan at the read budget, so rows past it are never read", async () => {

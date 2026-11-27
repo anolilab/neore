@@ -8,6 +8,10 @@ import { v } from "lunorash/server";
 
 import type { Doc } from "../_generated/dataModel";
 import { internalMutation, internalQuery } from "../_generated/server";
+import { MAX_SUBSCRIPTIONS } from "./events-webhook";
+
+/** Approved hosts exported per account: the list the owner can see, the same ceiling the list uses (`auth/event-webhook-hosts.ts`). */
+const MAX_LISTED_EXPORT_HOSTS = 500;
 
 const BATCH = 200;
 
@@ -157,4 +161,34 @@ export const deleteUserMcpEvents = internalMutation
         }
 
         return { hasMore: false };
+    });
+
+/**
+ * The owner's Events webhook hosts and subscriptions, for the account export. Only what the owner can read back: the host names, and each
+ * subscription's name, callback URL, arguments and times. The signing secret (ciphertext), the key hash and the API key id are left out.
+ */
+export const collectEventWebhooksForExport = internalQuery
+    .input({ userId: v.string() })
+    .output(
+        v.object({
+            hosts: v.array(v.object({ createdAt: v.number(), host: v.string() })),
+            subscriptions: v.array(v.object({ argumentsKey: v.string(), createdAt: v.number(), expiresAt: v.number(), name: v.string(), url: v.string() })),
+        }),
+    )
+    .query(async ({ args: { userId }, ctx }) => {
+        const { page: hosts } = await ctx.db.eventWebhookHosts.findMany({ consistency: "primary", limit: MAX_LISTED_EXPORT_HOSTS, where: { userId } });
+        const { page: subscriptions } = await ctx.db.eventWebhookSubscriptions.findMany({
+            consistency: "primary",
+            limit: MAX_SUBSCRIPTIONS,
+            where: { userId },
+        });
+
+        return {
+            hosts: hosts.map((row) => {
+                return { createdAt: row.createdAt, host: row.host };
+            }),
+            subscriptions: subscriptions.map((row) => {
+                return { argumentsKey: row.argumentsKey, createdAt: row.createdAt, expiresAt: row.expiresAt, name: row.name, url: row.url };
+            }),
+        };
     });
