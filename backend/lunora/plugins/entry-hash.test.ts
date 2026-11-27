@@ -38,6 +38,14 @@ describe("a trigger's live hash", () => {
         expect(await entryHash(triggerEntry(hook as never))).toBe(await triggerRowHash({ ...hook, webhookSignatureScheme: "timestamped" }));
     });
 
+    it("hashes a padded or empty time zone as creation stores it, trimmed and none when empty", async () => {
+        const padded = { ...TRIGGER, timezone: "  Europe/Berlin " };
+        const empty = { ...TRIGGER, timezone: " ".repeat(3) };
+
+        expect(await entryHash(triggerEntry(padded))).toBe(await triggerRowHash({ ...TRIGGER, timezone: "Europe/Berlin" }));
+        expect(await entryHash(triggerEntry(empty))).toBe(await triggerRowHash({ ...TRIGGER, timezone: undefined }));
+    });
+
     it("ignores the row's own fields, which are not content", async () => {
         expect(await triggerRowHash({ ...TRIGGER, enabled: true, triggerCount: 4, userId: "owner" } as typeof TRIGGER)).toBe(
             await entryHash(triggerEntry(TRIGGER)),

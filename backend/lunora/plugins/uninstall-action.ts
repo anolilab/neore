@@ -8,7 +8,7 @@ import type { Id } from "../_generated/dataModel";
 import { internal } from "../_generated/internal";
 import { internalMutation } from "../_generated/server";
 import { authAction } from "../lib/crpc";
-import { claimGroupForDelete, finishUninstallRows, uninstallRows } from "./uninstall";
+import { claimGroupForDelete, finishUninstallRows, SKILLS_PER_CALL, uninstallRows } from "./uninstall";
 
 export const beginUninstall = internalMutation
     .input({ pluginSlug: v.string().max(64), userId: v.string().max(128) })
@@ -35,11 +35,17 @@ export const finishUninstall = internalMutation
         installId: v.string().max(128),
         keptGroups: v.array(v.string().max(128)).max(300),
         pendingSkills: v.array(v.string().max(128)).max(500),
+        // Set on the calls after the first: the kept groups were reported by that one.
+        settled: v.optional(v.boolean()),
     })
     .output(v.object({ hasMore: v.boolean(), kept: v.array(v.string()), removed: v.number() }))
     .mutation(
         async ({ args, ctx }) =>
-            await finishUninstallRows(ctx, args.installId, args.generation, { keptGroups: args.keptGroups, pendingSkills: args.pendingSkills }),
+            await finishUninstallRows(ctx, args.installId, args.generation, {
+                keptGroups: args.keptGroups,
+                pendingSkills: args.pendingSkills,
+                settled: args.settled,
+            }),
     );
 
 export const uninstallPlugin = authAction
@@ -109,14 +115,18 @@ export const uninstallPlugin = authAction
         let finishedKept = finished.kept;
         let finishedRemoved = finished.removed;
 
-        // A few links a call: go on, with nothing left to settle, until the links and the install are gone.
+        // A few skills, then a few links, a call: go on until the skills, the links and the install are gone.
+        let remaining = begun.pendingSkills.slice(SKILLS_PER_CALL);
+
         while (finished.hasMore) {
             finished = await ctx.runMutation(internal.plugins.uninstall_action.finishUninstall, {
                 generation: begun.generation,
                 installId: begun.installId,
-                keptGroups: [],
-                pendingSkills: [],
+                keptGroups,
+                pendingSkills: remaining,
+                settled: true,
             });
+            remaining = remaining.slice(SKILLS_PER_CALL);
             finishedKept = [...finishedKept, ...finished.kept];
             finishedRemoved += finished.removed;
         }

@@ -97,6 +97,8 @@ export const entryHash = async (entry: PlanEntry): Promise<string> => {
                 ...create,
                 inputTemplate: create.inputTemplate === undefined ? undefined : stripHiddenText(create.inputTemplate).text,
                 systemPrompt: create.systemPrompt === undefined ? undefined : stripHiddenText(create.systemPrompt).text,
+                // Creation stores the time zone trimmed, and none when it is empty.
+                timezone: create.timezone?.trim() || undefined,
                 // A webhook without a scheme is stored as "timestamped" (`webhookSetup`); other types store none.
                 webhookSignatureScheme: create.type === "webhook" ? (create.webhookSignatureScheme ?? "timestamped") : create.webhookSignatureScheme,
             }),

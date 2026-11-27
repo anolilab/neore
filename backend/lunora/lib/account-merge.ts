@@ -2185,7 +2185,7 @@ export const mergePluginInstallsPage = async (ctx: MutationCtx, from: string, to
             return { done: false, statements };
         }
 
-        const skills = await ctx.db.skills.findMany({ limit: PLUGIN_MERGE_CHILDREN + 1, where: { pluginInstallId: installId } });
+        const skills = await ctx.db.skills.findMany({ consistency: "primary", limit: PLUGIN_MERGE_CHILDREN + 1, where: { pluginInstallId: installId } });
 
         statements += 1;
 

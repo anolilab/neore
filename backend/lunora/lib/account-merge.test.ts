@@ -1482,6 +1482,58 @@ describe("reassignGlobalRows", () => {
         }
     });
 
+    it("reads a duplicate install's skills from the primary, so a lagging replica cannot leave one attached to a deleted install", async () => {
+        const harness = lunoraTest(schemaWithShardedTables([...Object.keys(GLOBAL_USER_COLUMNS), "shardActivity"]) as never);
+
+        try {
+            const base = { contentHash: "a".repeat(64), createdAt: 0, generation: 1, status: "installed" as const, updatedAt: 0, version: "1.0.0" };
+            const guestInstall = await harness.run(async (context: any) => {
+                await context.db.insert("pluginInstalls", { ...base, pluginSlug: "shared", userId: "user" });
+
+                const id = await context.db.insert("pluginInstalls", { ...base, pluginSlug: "shared", userId: "guest" });
+
+                await context.db.insert("skills", {
+                    description: "d",
+                    instructions: "i",
+                    name: "S",
+                    pluginInstallId: id,
+                    pluginMarker: "m",
+                    slug: "s",
+                    userId: "user",
+                });
+
+                return id;
+            });
+
+            // A replica that has not seen the skill shows none to a read at default consistency.
+            const lagging = (context: any) => {
+                const skills = {
+                    ...context.db.skills,
+                    findMany: async (options: any) =>
+                        options.consistency === "primary" ? await context.db.skills.findMany(options) : { isDone: true, page: [] },
+                };
+
+                return { ...context, db: new Proxy(context.db, { get: (target, key) => (key === "skills" ? skills : Reflect.get(target, key)) }) };
+            };
+
+            for (let call = 0; call < 10; call += 1) {
+                const { done } = await harness.run(async (context: any) => await mergePluginInstallsPage(lagging(context), "guest", "user"));
+
+                if (done) {
+                    break;
+                }
+            }
+
+            const skill = await harness.run(async (context: any) => await context.db.skills.findFirst({ where: { slug: "s" } }));
+            const install = await harness.run(async (context: any) => await context.db.pluginInstalls.findFirst({ where: { _id: guestInstall } }));
+
+            expect(install).toBeNull();
+            expect(skill).toMatchObject({ pluginInstallId: "", pluginMarker: "" });
+        } finally {
+            harness.close();
+        }
+    });
+
     it("moves a guest's rule-file rows a few per call, each read charged whole, until all are the new account's", async () => {
         const harness = lunoraTest(schemaWithShardedTables([...Object.keys(GLOBAL_USER_COLUMNS), "shardActivity"]) as never);
 

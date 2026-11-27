@@ -141,10 +141,8 @@ export const uninstallRows = async (ctx: MutationCtx, userId: string, pluginSlug
         install.status,
     );
 
-    let removed = 0;
     const kept: string[] = [];
     const pendingSkills: string[] = [];
-    const groupSkillIds = new Set(ownGroups.flatMap((group) => group.groupChat?.participants.map((participant) => participant.skillId) ?? []));
 
     for (const skill of skills) {
         const marker = parseMarker(skill.pluginMarker ?? "");
@@ -158,14 +156,9 @@ export const uninstallRows = async (ctx: MutationCtx, userId: string, pluginSlug
             continue;
         }
 
-        // A group chat that is kept after all (it gained a message) still names its skills, so they wait for the finish step.
-        if (groupSkillIds.has(skill._id as string)) {
-            pendingSkills.push(skill._id as string);
-            continue;
-        }
-
-        await deleteSkillRows(ctx, skill._id as Id<"skills">, userId);
-        removed += 1;
+        // Deleting a skill is several D1 statements (stats, ratings, files, the row), so none is deleted here, after the claim: the
+        // finish step deletes pending skills a few a call.
+        pendingSkills.push(skill._id as string);
     }
 
     const triggers = await ctx.db
@@ -179,7 +172,7 @@ export const uninstallRows = async (ctx: MutationCtx, userId: string, pluginSlug
         kept.push(trigger.name);
     }
 
-    return { generation, groups, installId, kept, pendingSkills, removed };
+    return { generation, groups, installId, kept, pendingSkills, removed: 0 };
 };
 
 /**
@@ -252,6 +245,12 @@ export interface UninstallFinished {
     removed: number;
 }
 
+/**
+ * Skills one finish call deletes. A delete reads the skill's stats, ratings and files and deletes them and the row (about eight D1
+ * statements), plus the call's own reads for each skill: three stay well under an invocation's 50.
+ */
+export const SKILLS_PER_CALL = 3;
+
 /** Links one finish call deletes: each is a read and a delete against the invocation's D1 queries. */
 const LINKS_PER_CALL = 10;
 
@@ -263,7 +262,7 @@ export const finishUninstallRows = async (
     ctx: MutationCtx,
     installId: string,
     generation: number,
-    options: { keptGroups?: string[]; pendingSkills?: string[] } = {},
+    options: { keptGroups?: string[]; pendingSkills?: string[]; settled?: boolean } = {},
 ): Promise<UninstallFinished> => {
     const install = await ctx.db.pluginInstalls.findFirst({ consistency: "primary", where: { _id: installId as Id<"pluginInstalls"> } });
 
@@ -277,13 +276,14 @@ export const finishUninstallRows = async (
     const usedByKept = new Set<string>();
 
     const keptGroups = options.keptGroups ?? [];
-    const pendingSkills = options.pendingSkills ?? [];
+    const allPending = options.pendingSkills ?? [];
+    const pendingSkills = allPending.slice(0, SKILLS_PER_CALL);
 
     for (const threadId of keptGroups) {
         const group = await ctx.db.get("threads", threadId as Id<"threads">);
 
-        // A kept group chat is reported by its title, never by its id.
-        if (group) {
+        // A kept group chat is reported by its title, never by its id, and once: the calls that follow the first are `settled`.
+        if (group && options.settled !== true) {
             result.kept.push(group.title?.trim() || DEFAULT_GROUP_TITLE);
         }
 
@@ -346,6 +346,11 @@ export const finishUninstallRows = async (
 
         await deleteSkillRows(ctx, skill._id as Id<"skills">, install.userId);
         result.removed += 1;
+    }
+
+    // Skills first, a few a call; the links and the install wait for the call that settles the last of them.
+    if (allPending.length > SKILLS_PER_CALL) {
+        return { ...result, hasMore: true };
     }
 
     const { page: links } = await ctx.db.pluginItems.findMany({ consistency: "primary", limit: LINKS_PER_CALL + 1, where: { installId } });

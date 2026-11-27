@@ -9,7 +9,7 @@ import { skillRowHash } from "./entry-hash";
 import { createInstallRow, finishInstall, recordCreated, recordIntent } from "./install-steps";
 import { ROOT_SHARD_KEY, runInShard } from "../lib/shard-context";
 import { markerFor } from "./logic";
-import { claimGroupForDelete, finishUninstallRows, uninstallRows } from "./uninstall";
+import { claimGroupForDelete, finishUninstallRows, SKILLS_PER_CALL, uninstallRows } from "./uninstall";
 
 const OWNER = "owner-a";
 const SLUG = "daily-brief";
@@ -75,9 +75,9 @@ describe("uninstall", () => {
         const result = await run(async (context) => {
             const begun = await uninstallRows(context, OWNER, SLUG);
 
-            await finishUninstallRows(context, begun.installId, begun.generation);
+            const finished = await finishUninstallRows(context, begun.installId, begun.generation, { pendingSkills: begun.pendingSkills });
 
-            return { kept: begun.kept, removed: begun.removed };
+            return { kept: begun.kept, removed: finished.removed };
         });
 
         expect(result.kept).toEqual([]);
@@ -131,7 +131,7 @@ describe("uninstall", () => {
         try {
             const begun = await runInShard(ROOT_SHARD_KEY, async () => await run(async (context) => await uninstallRows(context, OWNER, SLUG)));
 
-            expect(begun.removed).toBe(1);
+            expect(begun.pendingSkills).toHaveLength(1);
         } finally {
             vi.unstubAllEnvs();
         }
@@ -711,5 +711,89 @@ describe("uninstall", () => {
 
         expect(finished).toMatchObject({ kept: ["Analyst"], removed: 0 });
         expect(await run(async (context) => await context.db.skills.findFirst({ where: { _id: skillId } }))).toMatchObject({ pluginInstallId: "" });
+    });
+
+    it("deletes nothing at begin, then a plugin of nine skills over several finish calls, with the install last", async () => {
+        const first = await run(
+            async (context) => await context.runMutation(createInstallRow, { contentHash: HASH, pluginSlug: SLUG, userId: OWNER, version: "1.0.0" }),
+        );
+        const { installId } = first;
+        const skillIds: string[] = [];
+
+        for (let index = 0; index < 9; index += 1) {
+            const skill = { description: `s${String(index)}`, instructions: `Do ${String(index)}.`, name: `S${String(index)}`, slug: `s${String(index)}` };
+            const key = `skill:s${String(index)}`;
+
+            await run(
+                async (context) =>
+                    await context.runMutation(recordIntent, {
+                        contentHash: await skillRowHash(skill),
+                        entryKey: key,
+                        generation: first.generation,
+                        installId,
+                        kind: "skill",
+                        userId: OWNER,
+                    }),
+            );
+
+            const link = await run(async (context) => await context.db.pluginItems.findFirst({ where: { entryKey: key, installId } }));
+            const itemId = link._id;
+            const skillId = await run(
+                async (context) =>
+                    await context.runMutation(createPluginSkill, {
+                        ...skill,
+                        isPremium: true,
+                        plan: "premium",
+                        pluginInstallId: installId,
+                        pluginMarker: markerFor(installId, key),
+                        source: { type: "plugin" as const, version: "1.0.0" },
+                        userId: OWNER,
+                    }),
+            );
+
+            await run(
+                async (context) => await context.runMutation(recordCreated, { generation: first.generation, installId, intentId: itemId, itemId: skillId }),
+            );
+            skillIds.push(skillId);
+        }
+
+        await run(async (context) => await context.runMutation(finishInstall, { generation: first.generation, installId }));
+
+        const begun = await run(async (context) => await uninstallRows(context, OWNER, SLUG));
+
+        expect(begun.pendingSkills).toHaveLength(9);
+
+        for (const skillId of skillIds) {
+            expect(await run(async (context) => await context.db.skills.findFirst({ where: { _id: skillId } }))).not.toBeNull();
+        }
+
+        const answers: boolean[] = [];
+        let remaining = begun.pendingSkills;
+        let removed = 0;
+
+        for (let call = 0; call < 10; call += 1) {
+            const finished = await run(
+                async (context) => await finishUninstallRows(context, begun.installId, begun.generation, { pendingSkills: remaining, settled: call > 0 }),
+            );
+
+            answers.push(finished.hasMore);
+            removed += finished.removed;
+            remaining = remaining.slice(SKILLS_PER_CALL);
+
+            if (!finished.hasMore) {
+                break;
+            }
+
+            expect(await run(async (context) => await context.db.pluginInstalls.findFirst({ where: { _id: installId } }))).not.toBeNull();
+        }
+
+        expect(answers).toEqual([true, true, false]);
+        expect(removed).toBe(9);
+
+        for (const skillId of skillIds) {
+            expect(await run(async (context) => await context.db.skills.findFirst({ where: { _id: skillId } }))).toBeNull();
+        }
+
+        expect(await run(async (context) => await context.db.pluginInstalls.findFirst({ where: { _id: installId } }))).toBeNull();
     });
 });

@@ -316,6 +316,9 @@ export const updateTriggerChild = internalMutation
 
         await ctx.db.patch("pluginItems", link._id as Id<"pluginItems">, { pendingHash: args.contentHash });
 
+        // Stored trimmed, and none when empty, as creation stores it (the entry hash is over that value).
+        const timezone = args.timezone?.trim() || undefined;
+
         // A field the new version leaves out is removed, so the row matches the hash recorded below.
         await patchRow(ctx.db, "triggers", trigger, {
             cronExpression: args.cronExpression,
@@ -327,10 +330,10 @@ export const updateTriggerChild = internalMutation
             name: args.name,
             searchMode: args.searchMode,
             systemPrompt: cleanPromptField(args.systemPrompt, "The system prompt"),
-            timezone: args.timezone,
+            timezone,
             updatedAt: ctx.now,
             // A changed schedule must not keep the due time of the old one: undefined removes it, and enabling recomputes it. An unchanged schedule keeps it.
-            ...((args.cronExpression !== trigger.cronExpression || args.timezone !== trigger.timezone) && { nextTriggerAt: undefined }),
+            ...((args.cronExpression !== trigger.cronExpression || timezone !== trigger.timezone) && { nextTriggerAt: undefined }),
         });
 
         await ctx.db.patch("pluginItems", link._id as Id<"pluginItems">, { contentHash: args.contentHash, pendingHash: "" });
