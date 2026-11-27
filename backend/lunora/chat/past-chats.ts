@@ -11,6 +11,7 @@ import { readMemoryEnabled } from "../memory/functions";
 import { isSearchIndexBuilding, listsSentPrompts, sentPromptOf } from "./functions";
 import { PAST_CHAT_RESULTS_DEFAULT, PAST_CHAT_RESULTS_MAX, pastChatSnippet, pastChatTitle } from "./lib/past-chat-snippet";
 import { capSearchTerms, matchesQueryTerms, queryTerms } from "./lib/search-terms";
+import { TRIGGER_THREAD_TAG } from "../triggers/quiet";
 
 /**
  * Index hits read before the filters, then once more with the wider window when too few survived: the current chat's
@@ -24,12 +25,27 @@ const PAST_CHAT_LOOKUP_BATCH = 16;
 
 const vPastChatHit = v.object({ sentAt: v.number(), snippet: v.string(), title: v.string() });
 
+/** Chats a sub-agent or a worker runs in (`sub-agents/`): what they post goes to the chat that started them, not here. */
+const CHILD_RUN_TAGS: ReadonlySet<string> = new Set(["sub-agent", "worker"]);
 /**
- * Why a search did not run: memory is off for the user (the same kind of recall, so it follows that setting), or the
- * chat it would answer in is not the caller's alone (a shared, group, public or messenger chat, where others would read
- * the result).
+ * Chats whose prompts no person typed here: a sub-agent's or worker's brief, a task's instructions, a trigger's template,
+ * an eval case. Their rows carry `typedText` like any prompt, so the chat is what tells them apart.
  */
-const vPastChatUnavailable = v.union(v.literal("memory_off"), v.literal("not_private"));
+const UNTYPED_PROMPT_TAGS: ReadonlySet<string> = new Set([...CHILD_RUN_TAGS, "eval", "task", TRIGGER_THREAD_TAG]);
+
+/**
+ * Whether a chat's prompts are the caller's own typed words: none of {@link UNTYPED_PROMPT_TAGS}, and no messenger chat,
+ * whose user rows hold what the connection's senders wrote.
+ */
+const holdsTypedPrompts = (thread: ThreadDoc): boolean =>
+    thread.externalThreadId === undefined && thread.messengerConnectionId === undefined && (thread.tags ?? []).every((tag) => !UNTYPED_PROMPT_TAGS.has(tag));
+
+/**
+ * Why a search did not run: memory is off for the user (the same kind of recall, so it follows that setting), the chat it
+ * would answer in is not the caller's alone (a shared, group, public or messenger chat, where others would read the
+ * result), or it is a sub-agent's or worker's chat, whose result is posted to the chat that started it.
+ */
+const vPastChatUnavailable = v.union(v.literal("background_run"), v.literal("memory_off"), v.literal("not_private"));
 
 /**
  * The caller's own words from earlier chats that match `query`, best match first, at most {@link PAST_CHAT_RESULTS_MAX}:
@@ -38,11 +54,12 @@ const vPastChatUnavailable = v.union(v.literal("memory_off"), v.literal("not_pri
  * through `typedTextSearch`, which drops every locked chat (no proof is passed), and keeps only prompts the composer's
  * search would list (`listsSentPrompts`: the caller's own chat, not trashed, deleted, locked or temporary;
  * `sentPromptOf`: a typed user row, no goal round), with no not-typed mark (a prompt link, an extension's relay, an admin
- * acting as the owner), and never the chat it answers in. A bot chat reads that bot's chats and the user's chats with no
+ * acting as the owner), and never the chat it answers in. Messenger, sub-agent, worker, task, trigger and eval chats
+ * are never read: their prompts are not the caller's typed words. A bot chat reads that bot's chats and the user's chats with no
  * bot, as memory reads the bot's notes and the user's own; a chat with no bot (or one whose bot is gone) reads only chats
  * with no bot. A hit holds every word of the query (the last one also as the start of a longer word), as the index matches. Branch copies (the same words
- * sent at the same time) list once. `preparing` says the index is still being built after a deploy, so nothing was
- * searched yet.
+ * sent at the same time) list once. `truncated` says the last index window was full, so an older match may not have been
+ * searched. `preparing` says the index is still being built after a deploy, so nothing was searched yet.
  */
 export const searchPastChats = internalQuery
     .input({
@@ -51,7 +68,14 @@ export const searchPastChats = internalQuery
         threadId: v.id("threads"),
         userId: v.string().max(MAX_LENGTH.short),
     })
-    .output(v.object({ hits: v.array(vPastChatHit), preparing: v.optional(v.literal(true)), unavailable: v.optional(vPastChatUnavailable) }))
+    .output(
+        v.object({
+            hits: v.array(vPastChatHit),
+            preparing: v.optional(v.literal(true)),
+            truncated: v.optional(v.literal(true)),
+            unavailable: v.optional(vPastChatUnavailable),
+        }),
+    )
     .query(async ({ args: { limit, query, threadId, userId }, ctx: context }) => {
         if (!(await readMemoryEnabled(context, userId))) {
             context.log.event("chat.search_past_chats", { listed: 0, unavailable: "memory_off" });
@@ -65,6 +89,14 @@ export const searchPastChats = internalQuery
             context.log.event("chat.search_past_chats", { listed: 0, unavailable: "not_private" });
 
             return { hits: [], unavailable: "not_private" as const };
+        }
+
+        // A sub-agent's or worker's chat passes the check above (the owner's alone), but its result is posted to the chat
+        // that started it, which others may read.
+        if ((current.tags ?? []).some((tag) => CHILD_RUN_TAGS.has(tag))) {
+            context.log.event("chat.search_past_chats", { listed: 0, unavailable: "background_run" });
+
+            return { hits: [], unavailable: "background_run" as const };
         }
 
         const text = capSearchTerms(query.trim().slice(0, MAX_LENGTH.short).trim());
@@ -118,7 +150,7 @@ export const searchPastChats = internalQuery
             for (const { message, typed: words } of elsewhere) {
                 const thread = threads.get(message.threadId) ?? null;
 
-                if (!listsSentPrompts(thread, userId) || !inScope(thread)) {
+                if (!listsSentPrompts(thread, userId) || !inScope(thread) || !holdsTypedPrompts(thread)) {
                     continue;
                 }
 
@@ -153,7 +185,7 @@ export const searchPastChats = internalQuery
 
             context.log.event("chat.search_past_chats", { listed: hits.length, truncated: filled, widened });
 
-            return { hits };
+            return filled ? { hits, truncated: true as const } : { hits };
         } catch (error) {
             // After a deploy that adds `typed_text_search`, Lunora refuses the index until its backfill covers the existing
             // messages: "not ready yet", not a failure and not "no match".

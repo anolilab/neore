@@ -37,7 +37,7 @@ const OTHER = "user-other";
 const SENT_AT = Date.UTC(2026, 2, 4, 23, 30);
 
 type Hit = { sentAt: number; snippet: string; title: string };
-type Result = { hits: Hit[]; preparing?: true; unavailable?: string };
+type Result = { hits: Hit[]; preparing?: true; truncated?: true; unavailable?: string };
 
 const insertPrompt = (context: any, fields: { createdAt?: number; order?: number; role?: string; text: string; threadId: string; userId?: string }) => {
     const role = fields.role ?? "user";
@@ -57,8 +57,10 @@ const insertPrompt = (context: any, fields: { createdAt?: number; order?: number
     });
 };
 
-const insertThread = (context: any, fields: { botId?: string; isPublic?: boolean; lockedAt?: number; title: string; userId?: string }) =>
-    context.db.insert("threads", { model: "gpt-4o", status: "active", userId: OWNER, ...fields });
+const insertThread = (
+    context: any,
+    fields: { botId?: string; externalThreadId?: string; isPublic?: boolean; lockedAt?: number; tags?: string[]; title: string; userId?: string },
+) => context.db.insert("threads", { model: "gpt-4o", status: "active", userId: OWNER, ...fields });
 
 const withMemory = (context: any, memoryEnabled = true) => context.db.insert("userSettings", { memoryEnabled, userId: OWNER });
 
@@ -142,6 +144,70 @@ describe("searchPastChats", () => {
             const { hits } = await searchIn(harness, { query: "Lisbon", threadId: current });
 
             expect(hits.map((hit) => hit.title).toSorted((a, b) => a.localeCompare(b))).toStrictEqual(["Bot", "Plain"]);
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("never reads what the user did not type: messenger, sub-agent, worker, task, trigger or eval chats", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            const current = await harness.run(async (context: any) => {
+                await withMemory(context);
+
+                const here = await insertThread(context, { title: "Today" });
+                const sources: { externalThreadId?: string; tags?: string[]; title: string }[] = [
+                    { externalThreadId: "slack:C1:1799999000.000001", title: "Messenger" },
+                    { tags: ["sub-agent"], title: "Sub-agent" },
+                    { tags: ["sub-agent", "worker"], title: "Worker" },
+                    { tags: ["task"], title: "Task" },
+                    { tags: ["trigger"], title: "Trigger" },
+                    { tags: ["eval"], title: "Eval" },
+                ];
+
+                for (const [index, source] of sources.entries()) {
+                    await insertPrompt(context, {
+                        createdAt: SENT_AT + index,
+                        text: `Lisbon from ${source.title}`,
+                        threadId: await insertThread(context, source),
+                    });
+                }
+
+                await insertPrompt(context, {
+                    createdAt: SENT_AT + 10,
+                    text: "Lisbon typed by the user",
+                    threadId: await insertThread(context, { tags: ["chat"], title: "Plain" }),
+                });
+
+                return here;
+            });
+
+            const { hits } = await searchIn(harness, { query: "Lisbon", threadId: current });
+
+            expect(hits.map((hit) => hit.title)).toStrictEqual(["Plain"]);
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("searches nothing from a sub-agent's or worker's chat, whose result is posted where others may read it", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            const children = await harness.run(async (context: any) => {
+                await withMemory(context);
+                await insertPrompt(context, { text: "Lisbon apartment", threadId: await insertThread(context, { title: "Other" }) });
+
+                return [
+                    await insertThread(context, { tags: ["sub-agent"], title: "Sub-agent" }),
+                    await insertThread(context, { tags: ["sub-agent", "worker"], title: "Worker" }),
+                ];
+            });
+
+            for (const threadId of children) {
+                expect(await searchIn(harness, { query: "Lisbon", threadId })).toStrictEqual({ hits: [], unavailable: "background_run" });
+            }
         } finally {
             harness.close();
         }
@@ -255,5 +321,30 @@ describe("searchPastChats while the typed-words index is still being built", () 
 
     it("still fails on any other index error", async () => {
         await expect(searchFailingWith(new LunoraError("INTERNAL", "boom"))).rejects.toThrow("boom");
+    });
+
+    it("says the search was cut short when the widest index window was full", async () => {
+        const harness = lunoraTest(schema as never);
+        const textSearch = registry.get(key);
+
+        registry.set(
+            key,
+            internalQuery.input({ limit: v.number(), text: v.string(), userId: v.string() }).query(async () => {
+                return { filled: true, messages: [] };
+            }),
+        );
+
+        try {
+            const current = await harness.run(async (context: any) => {
+                await withMemory(context);
+
+                return insertThread(context, { title: "Today" });
+            });
+
+            expect(await searchIn(harness, { query: "Lisbon", threadId: current })).toStrictEqual({ hits: [], truncated: true });
+        } finally {
+            registry.set(key, textSearch);
+            harness.close();
+        }
     });
 });

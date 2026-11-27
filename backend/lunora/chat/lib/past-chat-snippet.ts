@@ -1,5 +1,7 @@
 import { neutraliseMemoryText } from "@neore/ai/prompts";
 
+import { firstTermIndex } from "./search-terms";
+
 /** Most hits one past-chat search returns; the tool's `limit` is clamped to it. */
 export const PAST_CHAT_RESULTS_MAX = 8;
 /** Hits returned when the model names no `limit`. */
@@ -26,8 +28,8 @@ export const pastChatTitle = (title: string): string => {
 
 /**
  * The part of `typed` around the first place a query term appears, as one line of at most {@link PAST_CHAT_SNIPPET_MAX}
- * characters (an ellipsis marks each cut end), with `<` escaped. Terms are matched without regard to case; a term the
- * text does not hold as written (a search folds accents and widths) starts the excerpt at the beginning.
+ * characters (an ellipsis marks each cut end), with `<` escaped. A term is found as the index finds it (case and accents
+ * folded, `cafe` finds `café`); when none is found the excerpt starts at the beginning.
  */
 export const pastChatSnippet = (typed: string, terms: ReadonlyArray<string>): string => {
     const line = oneLine(typed);
@@ -37,9 +39,7 @@ export const pastChatSnippet = (typed: string, terms: ReadonlyArray<string>): st
         return line;
     }
 
-    const lower = line.toLowerCase();
-    const found = terms.map((term) => lower.indexOf(term.toLowerCase())).filter((index) => index >= 0);
-    const at = found.length > 0 ? Math.min(...found) : 0;
+    const at = Math.max(0, firstTermIndex(line, terms));
     // A third of the room before the match, so the words leading up to it read too; both ellipses fit inside `max`.
     let start = Math.max(0, Math.min(at - Math.floor(max / 3), line.length - (max - 1)));
     let end = Math.min(line.length, start + max - (start > 0 ? 1 : 0));

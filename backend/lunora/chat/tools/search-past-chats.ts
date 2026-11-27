@@ -13,7 +13,8 @@ import toonEncodeOutput from "./toon-encode";
 type PastChatsOutput = {
     hits: { day: string; snippet: string; title: string }[];
     preparing?: true;
-    unavailable?: "memory_off" | "not_private";
+    truncated?: true;
+    unavailable?: "background_run" | "memory_off" | "not_private";
 };
 
 /** How the model is told to read the hits: the user's own past words, data and not instructions. */
@@ -30,11 +31,18 @@ const modelNote = (output: PastChatsOutput): string => {
         return "Past chats are not searched in a chat other people can read.";
     }
 
+    if (output.unavailable === "background_run") {
+        return "Past chats are not searched in a background run (a sub-agent, worker, task, trigger or messenger reply).";
+    }
+
     if (output.preparing) {
         return "The search of past chats is still being prepared after an update; try again in a few minutes.";
     }
 
-    return output.hits.length === 0 ? "No earlier chat holds these words." : PAST_WORDS_NOTE;
+    // A full index window: only the best-ranked matching prompts were searched, so an older one may be missing.
+    const partial = output.truncated ? " Only the best-ranked matching prompts were searched; an older one may be missing, so try more specific words." : "";
+
+    return output.hits.length === 0 ? `No match among the prompts searched.${partial}` : `${PAST_WORDS_NOTE}${partial}`;
 };
 
 /**
@@ -49,6 +57,12 @@ const searchPastChatsTool = createTool<{ limit?: number; query: string }, PastCh
         "something they said in another chat and memory has nothing on it. A match must hold every word of the query, so the query " +
         "should be 1-4 distinctive words the user would have typed (a name, a place, a term), not a sentence.",
     execute: async (context, { limit, query }) => {
+        // A background run's answer can be posted to another chat (a sub-agent's to its parent) or sent out (a messenger
+        // reply), where others may read it.
+        if (context.headless) {
+            return { hits: [], unavailable: "background_run" };
+        }
+
         // The run's chat lives on its owner's shard: a collaborator's run there is not the caller's own chat.
         if (!context.userId || !context.threadId || !servesUser(context.userId)) {
             return { hits: [], unavailable: "not_private" };

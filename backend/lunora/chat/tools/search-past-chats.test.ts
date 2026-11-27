@@ -76,6 +76,17 @@ describe("searchPastChats tool", () => {
         await expect(run(context, { query: "Lisbon" })).resolves.toMatchObject({ hits: [{ day: "2026-03-04" }] });
     });
 
+    it("searches nothing in a background run (a sub-agent, worker, task, trigger or messenger reply)", async () => {
+        const { context, runQuery } = contextWith(async () => null, { headless: true });
+
+        await expect(run(context, { query: "Lisbon" })).resolves.toStrictEqual({ hits: [], unavailable: "background_run" });
+        expect(runQuery).not.toHaveBeenCalled();
+    });
+
+    it("tells the model a full window may have left an older match unsearched", () => {
+        expect(modelText({ hits: [], truncated: true })).toContain("an older one may be missing");
+    });
+
     it("searches nothing outside a chat, or for a caller whose shard this run is not on", async () => {
         const noThread = contextWith(async () => null, { threadId: undefined });
 

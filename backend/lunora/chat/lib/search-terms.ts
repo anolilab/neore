@@ -83,6 +83,24 @@ export const capSearchTerms = (text: string): string => {
     return terms.length <= MAX_SEARCH_TERMS ? text : terms.slice(0, MAX_SEARCH_TERMS).join(" ");
 };
 
+/**
+ * Where in `text` the first word holding a term of the query starts, matched as {@link matchesQueryTerms} matches it
+ * (case and accents folded, the last term also as the start of a word), or -1 when none does.
+ */
+export const firstTermIndex = (text: string, query: ReadonlyArray<string>): number => {
+    const last = query.length - 1;
+
+    for (const match of text.matchAll(WORD)) {
+        const candidates = splitCjk(normalize(match[0]));
+
+        if (candidates.some((candidate) => query.some((term, index) => (index === last ? candidate.startsWith(term) : candidate === term)))) {
+            return match.index;
+        }
+    }
+
+    return -1;
+};
+
 /** Whether `text` holds every term of the query: each one whole, the last one as the start of a term, as the index matches. */
 export const matchesQueryTerms = (text: string, query: ReadonlyArray<string>): boolean => {
     if (query.length === 0) {
