@@ -4831,6 +4831,18 @@
             }
           }
         },
+        "controlClaims": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "controlView": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "currentUrl": {
           "kind": "string",
           "nullable": false,
@@ -6985,6 +6997,12 @@
             }
           }
         },
+        "alertPending": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "appVersion": {
           "kind": "string",
           "nullable": false,
@@ -7185,6 +7203,12 @@
         }
       },
       "indexes": {
+        "by_alertPending": {
+          "fields": [
+            "alertPending"
+          ],
+          "unique": false
+        },
         "by_userId": {
           "fields": [
             "userId"
@@ -11699,6 +11723,130 @@
       "relations": {},
       "shardMode": "shardBy:userId"
     },
+    "memoryCleanups": {
+      "commitOrdered": false,
+      "fields": {
+        "attempts": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "cursor": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "dueAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "embeddingId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "frontier": {
+          "kind": "array",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "of": {
+            "kind": "id",
+            "nullable": false,
+            "optional": false,
+            "unique": false,
+            "ref": "memories"
+          }
+        },
+        "ids": {
+          "kind": "array",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "of": {
+            "kind": "string",
+            "nullable": false,
+            "optional": false,
+            "unique": false
+          }
+        },
+        "kind": {
+          "kind": "union",
+          "nullable": false,
+          "optional": false,
+          "unique": false,
+          "members": [
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"chain\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"digests\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"vector\""
+            }
+          ]
+        },
+        "memoryId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "startedAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "userId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        }
+      },
+      "indexes": {
+        "by_dueAt": {
+          "fields": [
+            "dueAt"
+          ],
+          "unique": false
+        },
+        "by_embeddingId": {
+          "fields": [
+            "embeddingId"
+          ],
+          "unique": false
+        },
+        "by_userId": {
+          "fields": [
+            "userId"
+          ],
+          "unique": false
+        }
+      },
+      "memory": false,
+      "relations": {},
+      "shardMode": "shardBy:userId"
+    },
     "memoryDigests": {
       "commitOrdered": false,
       "fields": {
@@ -12893,6 +13041,13 @@
               "optional": false,
               "unique": false,
               "literal": "\"data_export\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"device_paired\""
             },
             {
               "kind": "literal",
@@ -14804,6 +14959,84 @@
       "relations": {},
       "shardMode": "root",
       "refinementsRecorded": true
+    },
+    "pendingPinRestores": {
+      "commitOrdered": false,
+      "fields": {
+        "dispatchedAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "ownerId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "routeCreatedAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "threadId": {
+          "kind": "id",
+          "nullable": false,
+          "optional": false,
+          "unique": false,
+          "ref": "threads"
+        },
+        "until": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "userId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        }
+      },
+      "indexes": {
+        "by_dispatched": {
+          "fields": [
+            "dispatchedAt"
+          ],
+          "unique": false
+        },
+        "by_owner": {
+          "fields": [
+            "ownerId"
+          ],
+          "unique": false
+        },
+        "by_thread": {
+          "fields": [
+            "threadId"
+          ],
+          "unique": false
+        },
+        "by_user": {
+          "fields": [
+            "userId"
+          ],
+          "unique": false
+        },
+        "by_user_and_thread": {
+          "fields": [
+            "userId",
+            "threadId"
+          ],
+          "unique": false
+        }
+      },
+      "memory": false,
+      "relations": {},
+      "shardMode": "global:d1"
     },
     "persistentChunks": {
       "commitOrdered": false,
@@ -22632,6 +22865,12 @@
           "nullable": false,
           "optional": false,
           "unique": false
+        },
+        "writerId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
         }
       },
       "indexes": {
@@ -25252,6 +25491,245 @@
           "nullable": false,
           "optional": true,
           "unique": false
+        },
+        "watchWakeCompleted": {
+          "kind": "object",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "fields": {
+            "claim": {
+              "kind": "number",
+              "nullable": false,
+              "optional": false,
+              "unique": false
+            },
+            "done": {
+              "kind": "boolean",
+              "nullable": false,
+              "optional": false,
+              "unique": false
+            },
+            "markOrder": {
+              "kind": "number",
+              "nullable": false,
+              "optional": true,
+              "unique": false
+            },
+            "markers": {
+              "kind": "object",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "fields": {
+                "checks": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false
+                },
+                "conflict": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false
+                },
+                "review": {
+                  "kind": "string",
+                  "nullable": false,
+                  "optional": true,
+                  "unique": false
+                }
+              }
+            },
+            "modelReached": {
+              "kind": "boolean",
+              "nullable": false,
+              "optional": true,
+              "unique": false
+            },
+            "reasons": {
+              "kind": "array",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "of": {
+                "kind": "union",
+                "nullable": false,
+                "optional": false,
+                "unique": false,
+                "members": [
+                  {
+                    "kind": "literal",
+                    "nullable": false,
+                    "optional": false,
+                    "unique": false,
+                    "literal": "\"checks\""
+                  },
+                  {
+                    "kind": "literal",
+                    "nullable": false,
+                    "optional": false,
+                    "unique": false,
+                    "literal": "\"conflict\""
+                  },
+                  {
+                    "kind": "literal",
+                    "nullable": false,
+                    "optional": false,
+                    "unique": false,
+                    "literal": "\"review\""
+                  }
+                ]
+              }
+            },
+            "run": {
+              "kind": "string",
+              "nullable": false,
+              "optional": true,
+              "unique": false
+            },
+            "startedAt": {
+              "kind": "number",
+              "nullable": false,
+              "optional": false,
+              "unique": false
+            },
+            "state": {
+              "kind": "union",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "members": [
+                {
+                  "kind": "literal",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "literal": "\"completed\""
+                },
+                {
+                  "kind": "literal",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "literal": "\"running\""
+                }
+              ]
+            }
+          }
+        },
+        "watchWakeFailure": {
+          "kind": "object",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "fields": {
+            "at": {
+              "kind": "number",
+              "nullable": false,
+              "optional": false,
+              "unique": false
+            },
+            "attempts": {
+              "kind": "number",
+              "nullable": false,
+              "optional": false,
+              "unique": false
+            },
+            "kind": {
+              "kind": "union",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "members": [
+                {
+                  "kind": "literal",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "literal": "\"retryable\""
+                },
+                {
+                  "kind": "literal",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "literal": "\"shared\""
+                },
+                {
+                  "kind": "literal",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "literal": "\"terminal\""
+                },
+                {
+                  "kind": "literal",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "literal": "\"unavailable\""
+                }
+              ]
+            },
+            "retryAt": {
+              "kind": "number",
+              "nullable": false,
+              "optional": false,
+              "unique": false
+            }
+          }
+        },
+        "watchWakeLeaseUntil": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "watchWakeRefund": {
+          "kind": "object",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "fields": {
+            "applied": {
+              "kind": "boolean",
+              "nullable": false,
+              "optional": false,
+              "unique": false
+            },
+            "claim": {
+              "kind": "number",
+              "nullable": false,
+              "optional": false,
+              "unique": false
+            },
+            "keys": {
+              "kind": "array",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "of": {
+                "kind": "string",
+                "nullable": false,
+                "optional": false,
+                "unique": false
+              }
+            },
+            "windowEnds": {
+              "kind": "array",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "of": {
+                "kind": "number",
+                "nullable": false,
+                "optional": false,
+                "unique": false
+              }
+            }
+          }
         }
       },
       "indexes": {
@@ -25283,6 +25761,14 @@
           "fields": [
             "userId",
             "watchActive"
+          ],
+          "unique": false
+        },
+        "by_user_thread_and_wakeLease": {
+          "fields": [
+            "userId",
+            "threadId",
+            "watchWakeLeaseUntil"
           ],
           "unique": false
         }

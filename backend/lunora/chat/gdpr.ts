@@ -10,25 +10,95 @@ import { dropGuestLinkRoutes } from "./lib/guest-link-store";
 import { BATCH, type BatchResult, deleteParentsWithChildren } from "../gdpr/batch";
 
 /**
+ * Rows one erasure call deletes from the pin routes and owed restores together. Each delete counts as two global statements (a read and a
+ * write), and each read as one, so a call makes at most 4 reads and 2 * ERASE_DRAIN_ROWS writes: {@link ERASE_DRAIN_WORST}, under the
+ * Worker's 50-statement budget (`backend/AGENTS.md`). The drain repeats the call until it reports no more rows.
+ */
+export const ERASE_DRAIN_ROWS = 20;
+export const ERASE_DRAIN_WORST = 4 + 2 * ERASE_DRAIN_ROWS;
+
+/**
+ * Owed restores one materialize call takes. Per row: one route read, one insert and one delete, each counted as two statements where a
+ * write is involved, plus the page read, so {@link MATERIALIZE_WORST} stays under the 50-statement budget.
+ */
+export const MATERIALIZE_ROWS = 8;
+export const MATERIALIZE_WORST = 1 + MATERIALIZE_ROWS * 5;
+
+/**
  * The pin routes that name the user, as the collaborator who pinned or as the owner of the thread: a route names no one else, so
- * it goes with the account.
+ * it goes with the account. The routes and the owed restores share one budget of {@link ERASE_DRAIN_ROWS} rows per call.
  */
 export const eraseSharedPinRoutesBatch = async (ctx: MutationCtx, userId: string): Promise<{ hasMore: boolean }> => {
+    let budget = ERASE_DRAIN_ROWS;
     let hasMore = false;
 
     for (const where of [{ userId }, { ownerId: userId }]) {
-        const { page } = await ctx.db.sharedPinRoutes.findMany({ consistency: "primary", limit: BATCH, where });
+        const limit = budget;
+
+        // Spent: the rest waits for the next call, and this one reports that rows may remain.
+        if (limit === 0) {
+            hasMore = true;
+            break;
+        }
+
+        const { page } = await ctx.db.sharedPinRoutes.findMany({ consistency: "primary", limit, where });
 
         for (const route of page) {
             await ctx.db.delete("sharedPinRoutes", route._id);
         }
 
-        if (page.length === BATCH) {
+        budget -= page.length;
+        hasMore ||= page.length === limit;
+    }
+
+    // Owed restores name the user the same way. This drain runs after the owner-shard sweeps, so each write that could need one has passed:
+    // a row still here needs no route any more. It is never dropped before the sweeps, which turn it into a route (`materializePendingPinRoutesBatch`).
+    for (const where of [{ userId }, { ownerId: userId }]) {
+        const limit = budget;
+
+        if (limit === 0) {
             hasMore = true;
+            break;
         }
+
+        const { page } = await ctx.db.pendingPinRestores.findMany({ consistency: "primary", limit, where });
+
+        for (const row of page) {
+            await ctx.db.delete("pendingPinRestores", row._id);
+        }
+
+        budget -= page.length;
+        hasMore ||= page.length === limit;
     }
 
     return { hasMore };
+};
+
+/**
+ * One batch of the owed restores (`pendingPinRestores`) that name the user as the collaborator, each made into its route where the route is not
+ * already there. The owner-shard sweep that follows then finds the pins they lead to. The restore may not have run yet: the cron pass is a minute
+ * behind the queue. The route it would write exists now, so its row is settled here. The route is looked up for its owner, so a route on a later
+ * page of the collaborator's routes is found too.
+ */
+export const materializePendingPinRoutesBatch = async (ctx: MutationCtx, userId: string): Promise<{ hasMore: boolean }> => {
+    const { page } = await ctx.db.pendingPinRestores.findMany({ consistency: "primary", limit: MATERIALIZE_ROWS, where: { userId } });
+
+    for (const row of page) {
+        if (row.ownerId !== userId) {
+            const route = await ctx.db.sharedPinRoutes.findFirst({
+                consistency: "primary",
+                where: { ownerId: row.ownerId, threadId: row.threadId, userId },
+            });
+
+            if (route === null) {
+                await ctx.db.insert("sharedPinRoutes", { createdAt: row.routeCreatedAt, ownerId: row.ownerId, threadId: row.threadId, userId });
+            }
+        }
+
+        await ctx.db.delete("pendingPinRestores", row._id);
+    }
+
+    return { hasMore: page.length === MATERIALIZE_ROWS };
 };
 
 /**
@@ -206,11 +276,28 @@ export const eraseThreadPinsAndRoutesBatch = async (ctx: MutationCtx, threadId: 
         await ctx.db.delete("threadPins", pin._id);
     }
 
-    const { page } = await ctx.db.sharedPinRoutes.findMany({ consistency: "primary", limit: BATCH, where: { threadId } });
+    // The routes and the owed restores are global statements, so they share the erasure drain's budget (`ERASE_DRAIN_ROWS`, one call's
+    // reads and writes stay under the Worker's 50-statement limit). The owed restores take what the routes leave.
+    const { page } = await ctx.db.sharedPinRoutes.findMany({ consistency: "primary", limit: ERASE_DRAIN_ROWS, where: { threadId } });
 
     for (const route of page) {
         await ctx.db.delete("sharedPinRoutes", route._id);
     }
 
-    return { hasMore: pins.length >= BATCH || page.length >= BATCH };
+    // An owed restore names the thread, and so it goes with the thread: there is no route left for it to write.
+    const left = ERASE_DRAIN_ROWS - page.length;
+    let owedFull = false;
+
+    if (left > 0) {
+        const { page: owed } = await ctx.db.pendingPinRestores.findMany({ consistency: "primary", limit: left, where: { threadId } });
+
+        for (const row of owed) {
+            await ctx.db.delete("pendingPinRestores", row._id);
+        }
+
+        owedFull = owed.length === left;
+    }
+
+    // A full routes page means the budget went to routes and more may remain; the owed restores are read only if the budget was not spent.
+    return { hasMore: pins.length >= BATCH || page.length === ERASE_DRAIN_ROWS || owedFull };
 };

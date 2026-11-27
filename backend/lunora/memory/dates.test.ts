@@ -117,6 +117,28 @@ describe("retrieval drops expired facts", () => {
         expect(rows.map((row: { memory: string }) => row.memory)).toEqual(["User likes tea"]);
     });
 
+    it("finds an older live fact behind more expired rows than one type's share of the read budget", async () => {
+        const insertActivity = async (memory: string, dates: Record<string, string>): Promise<void> => {
+            await harness.run(
+                async (ctx: any) =>
+                    await ctx.db.insert("memories", { lastConfirmedAt: 0, memory, source: "auto", type: "activity", updatedAt: 0, userId: "user-1", ...dates }),
+            );
+        };
+
+        await insertActivity("User keeps bees", {});
+
+        for (let i = 0; i < 301; i += 1) {
+            await insertActivity(`User was in Lisbon, trip ${String(i)}`, { validUntil: "2026-11-01" });
+        }
+
+        const rows = await harness.run(
+            async (ctx: any) =>
+                await ctx.runQuery(getActiveMemoriesForUser, { activeOn: Date.UTC(2026, 10, 17, 12, 0), limit: 100, newestFirst: true, userId: "user-1" }),
+        );
+
+        expect(rows.map((row: { memory: string }) => row.memory)).toEqual(["User keeps bees"]);
+    });
+
     it("drops the old event end when an update moves the event to a single day", async () => {
         const id = await harness.run(
             async (ctx: any) =>

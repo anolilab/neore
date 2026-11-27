@@ -89,7 +89,8 @@ export const toolPermissionKey = (source: ToolSource, toolName: string, owner?: 
  * musicGeneration) ask too: a default `auto` would run a paid call with no approval for anyone who has not set an override. `delegateToCodingAgent` spends the user's
  * own provider key on a long sandbox run and can push to their GitHub;
  * `delegateToSubAgent` and `messageWorker` start a background run charged to their task quota —
- * so the user sees the task before anything starts. `replyToReviewComment` and `rerunFailedChecks` act on a pull request
+ * so the user sees the task before anything starts. `watchPullRequest` starts runs that wake the thread later, each one charged as a task
+ * run (against `chat/dailyText` and `tasks/dailyRuns`), and `unwatchPullRequest` stops them (text from a pull request must not be able to silence the person's own watch). `replyToReviewComment` and `rerunFailedChecks` act on a pull request
  * as the user (`mergePullRequest` asks every time: it needs a person; so does `signInWithSavedLogin`, which types a saved
  * password for them). Headless callers lose them
  * (`ask` degrades to `off`), which is intended — except a sub-agent's own
@@ -110,7 +111,9 @@ export const BUILTIN_TOOLS_ASK_BY_DEFAULT: ReadonlySet<string> = new Set([
     "requestSecret",
     "rerunFailedChecks",
     "signInWithSavedLogin",
+    "unwatchPullRequest",
     "videoGeneration",
+    "watchPullRequest",
 ]);
 
 const SUB_AGENT_BUILTINS: ReadonlySet<string> = new Set(["delegateToSubAgent", "messageWorker"]);
@@ -144,7 +147,9 @@ export const ALWAYS_ALLOW_REFUSED_BUILTINS: ReadonlySet<string> = new Set([
     "replyToReviewComment",
     "rerunFailedChecks",
     "signInWithSavedLogin",
+    "unwatchPullRequest",
     "videoGeneration",
+    "watchPullRequest",
 ]);
 
 /** Whether an `always` answer for this permission key is refused: a built-in listed in {@link ALWAYS_ALLOW_REFUSED_BUILTINS}. */

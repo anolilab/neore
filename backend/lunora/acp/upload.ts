@@ -16,14 +16,17 @@ import { MAX_LENGTH } from "../lib/validators";
 import { HOST_MEDIA_MIME_TYPES } from "./lib/constants";
 import { verifyDeviceRequest } from "./lib/verify-device";
 
-/** Who owns the device whose signed `upload` request this is, or null. The action never sees the secret. */
+/**
+ * Who owns the device whose signed `upload` request this is, or null, and whether it has signed in before. The action never sees
+ * the secret. A query, so it writes nothing: a route that finds `seen` false records the first use (`recordDeviceSignedUse`).
+ */
 export const verifyHostUpload = internalQuery
     .input({ deviceId: v.string().max(MAX_LENGTH.id), now: v.number(), payload: v.string().max(MAX_LENGTH.document), signature: v.string().max(128) })
-    .output(v.union(v.null(), v.object({ userId: v.string() })))
+    .output(v.union(v.null(), v.object({ seen: v.boolean(), userId: v.string() })))
     .query(async ({ args, ctx }) => {
         const verified = await verifyDeviceRequest(ctx, { ...args, domain: "upload" });
 
-        return verified ? { userId: verified.userId } : null;
+        return verified ? { seen: verified.seen, userId: verified.userId } : null;
     });
 
 /** The `seq` the stream of host turn `turnId` expects next, or null when `userId` has no such stream (a turn's first post). */

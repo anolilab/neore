@@ -168,6 +168,16 @@ const fakeContext = (): any => {
                 case "chat_functions:gateThreadAction": {
                     return await run(async (ctx) => await gateThreadActionHandler(ctx, args));
                 }
+                case "source_control_pr_watch_wake_lease:wakeLeaseHeldFor": {
+                    const { wakeLeaseHeld } = await import("../source-control/pr-watch-wake-lease");
+
+                    // As the query does: keyed on the thread, under the thread's owner.
+                    return await run(async (ctx) => {
+                        const thread = await ctx.db.get("threads", args.threadId);
+
+                        return await wakeLeaseHeld(ctx, thread.userId, args.threadId, Date.now());
+                    });
+                }
                 default: {
                     return null;
                 }
@@ -203,6 +213,104 @@ beforeEach(async () => {
 
 afterEach(() => {
     harness.close();
+});
+
+describe("/chat/start while a pull request watch is waking the chat", () => {
+    const linkWithLease = async (lease: number) =>
+        await run(
+            async (ctx) =>
+                await ctx.db.insert("pullRequestThreads", {
+                    createdAt: 0,
+                    kind: "linked",
+                    number: 7,
+                    repository: "octo/hello",
+                    threadId,
+                    title: "pull",
+                    url: "https://github.com/octo/hello/pull/7",
+                    userId: OWNER,
+                    watchWakeLeaseUntil: lease,
+                }),
+        );
+
+    const shareChat = async (permission: "read" | "write") => {
+        await run(async (ctx) => {
+            await ctx.db.patch("threads", threadId, { userId: "chat-owner" });
+            await ctx.db.insert("threadAccess", {
+                grantedAt: 0,
+                grantedBy: "chat-owner",
+                ownerId: "chat-owner",
+                permission,
+                revision: 1,
+                threadId,
+                userId: OWNER,
+            });
+        });
+    };
+
+    it("refuses a collaborator's reply too: the lease sits on the thread owner's link, not the replier's", async () => {
+        // The chat belongs to someone else; the signed-in replier is a collaborator with write access, and no link of their own.
+        await shareChat("write");
+        await run(async (ctx) => {
+            await ctx.db.insert("pullRequestThreads", {
+                createdAt: 0,
+                kind: "linked",
+                number: 7,
+                repository: "octo/hello",
+                threadId,
+                title: "pull",
+                url: "https://github.com/octo/hello/pull/7",
+                userId: "chat-owner",
+                watchWakeLeaseUntil: Date.now() + 60_000,
+            });
+        });
+
+        const response = await start({});
+
+        expect([response.status, savedPrompts.length, mutationCalls.length]).toEqual([409, 0, 0]);
+    });
+
+    it("answers a caller without write access as for any other chat, and tells it nothing of the wake", async () => {
+        // Another user's chat, shared with the caller for reading only: the access refusal comes first, so a wake cannot be probed.
+        await shareChat("read");
+        await run(async (ctx) => {
+            await ctx.db.insert("pullRequestThreads", {
+                createdAt: 0,
+                kind: "linked",
+                number: 7,
+                repository: "octo/hello",
+                threadId,
+                title: "pull",
+                url: "https://github.com/octo/hello/pull/7",
+                userId: "chat-owner",
+                watchWakeLeaseUntil: Date.now() + 60_000,
+            });
+        });
+
+        const response = await start({});
+
+        expect(response.status).toBe(404);
+        expect([savedPrompts.length, mutationCalls.length]).toEqual([0, 0]);
+    });
+
+    it("refuses the reply with a conflict before anything is written, and lets it through once the lease is released", async () => {
+        const linkId = await linkWithLease(Date.now() + 60_000);
+        const refused = await start({});
+
+        expect(refused.status).toBe(409);
+        await expect(refused.json()).resolves.toMatchObject({ error: "A pull request watch is replying to this chat. Try again in a moment." });
+        expect(savedPrompts).toStrictEqual([]);
+        expect(mutationCalls).toStrictEqual([]);
+        expect(streamingConfigs).toStrictEqual([]);
+
+        await run(async (ctx) => {
+            await ctx.db.patch("pullRequestThreads", linkId, { watchWakeLeaseUntil: 0 });
+        });
+
+        const allowed = await start({});
+
+        expect(allowed.status).toBe(200);
+        expect(streamingConfigs).toHaveLength(1);
+    });
 });
 
 describe("/chat/start after a switch", () => {
