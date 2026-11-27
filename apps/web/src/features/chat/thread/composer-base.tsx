@@ -43,6 +43,8 @@ export interface ComposerBaseProps {
     onDragLeave?: (e: React.DragEvent) => void;
     onDragOver?: (e: React.DragEvent) => void;
     onDrop?: (e: React.DragEvent) => void;
+    /** Chips at the top of the panel for what the composer is doing; it renders nothing when none apply */
+    status?: ReactNode;
     /** View transition name for morph animations */
     viewTransitionName?: string;
 }
@@ -73,6 +75,7 @@ const ComposerBase = ({
     onDragOver,
     onDrop,
     ref,
+    status,
     viewTransitionName,
 }: ComposerBaseProps & { ref?: React.RefObject<ComposerBaseRef | null> }) => {
     const containerRef = useRef<HTMLDivElement>(null);
@@ -130,6 +133,9 @@ const ComposerBase = ({
                 <div aria-hidden="true" className={clsx("pointer-events-none absolute inset-0 bg-gradient-to-br to-transparent", MODE_TINT[mode])} />
                 {/* Content wrapper, above the tint */}
                 <div className="relative z-10">
+                    {/* Status line: chips for what is going on; the wrapper hides itself while the line renders nothing */}
+                    {status && <div className="px-3 pt-2.5 empty:hidden">{status}</div>}
+
                     {/* Mode settings row (image/video/audio options) */}
                     <AnimatePresence mode="popLayout">
                         {modeSettings && (

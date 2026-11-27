@@ -94,7 +94,7 @@ const PinnedGoal: FC<PinnedGoalProps> = ({ disabled, threadId }) => {
                         pinned ? (
                             <Button
                                 aria-label={t`Change the pinned goal: ${pinned.text}`}
-                                className="bg-primary/10 text-primary-text border-primary/30 hover:bg-primary/20 h-7 max-w-48 gap-1 px-2"
+                                className="bg-surface-row-active text-foreground h-7 max-w-48 gap-1 px-2"
                                 disabled={disabled}
                                 variant="outline"
                             >

@@ -74,6 +74,7 @@ import ComposerReferencesButton from "./composer-references-button";
 import ComposerResearchDepth from "./composer-research-depth";
 import ComposerSearchMode from "./composer-search-mode";
 import ComposerSearchSuggestions from "./composer-search-suggestions";
+import ComposerStatusLine from "./composer-status-line";
 import ThreadWelcomeSuggestions from "./thread-welcome-suggestions";
 
 // Shared animation config
@@ -766,6 +767,7 @@ const Composer: FC<ComposerProps> = ({
                             <ComposerModeSwitcher disabled={isSSEStreaming} mode={composerMode} onModeChange={handleModeChange} />
                         ) : undefined
                     }
+                    status={<ComposerStatusLine researchDepth={researchDepth} searchMode={searchMode} textMode={composerMode === "text"} />}
                 >
                     <ComposerInputWrapper
                         compact={compact}

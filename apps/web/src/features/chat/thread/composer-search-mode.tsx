@@ -18,7 +18,7 @@ import type { SearchMode } from "@/features/chat/core/stores/model-store";
  */
 type SearchModeIcon = ComponentType<{ className?: string; size?: number | string }>;
 
-interface SearchModeInfo {
+export interface SearchModeInfo {
     description: string;
     enabled: boolean;
     icon: SearchModeIcon;
@@ -32,7 +32,8 @@ interface ComposerSearchModeProps {
     onModeChange: (mode: SearchMode) => void;
 }
 
-const ComposerSearchMode: FC<ComposerSearchModeProps> = ({ disabled, mode, onModeChange }) => {
+/** The search modes with their labels, shared by the picker and the composer's status line. */
+export const useSearchModes = (): SearchModeInfo[] => {
     const { t } = useLingui();
     /*
      * This used to gate every mode but "chat" behind
@@ -58,6 +59,19 @@ const ComposerSearchMode: FC<ComposerSearchModeProps> = ({ disabled, mode, onMod
         { description: t`Search songs, artists, and albums`, enabled: true, icon: Music, id: "spotify", label: t`Spotify` },
     ];
 
+    return modes;
+};
+
+/** The info of one search mode (the first, "chat", for an unknown id). */
+export const useSearchModeInfo = (mode: SearchMode): SearchModeInfo => {
+    const modes = useSearchModes();
+
+    return modes.find((m) => m.id === mode) ?? (modes[0] as SearchModeInfo);
+};
+
+const ComposerSearchMode: FC<ComposerSearchModeProps> = ({ disabled, mode, onModeChange }) => {
+    const { t } = useLingui();
+    const modes = useSearchModes();
     const enabledModes = modes.filter((m) => m.enabled);
     // modes is a non-empty array, so modes[0] is always defined
     const currentMode = (modes.find((m) => m.id === mode) ?? modes[0]) as SearchModeInfo;
@@ -74,13 +88,12 @@ const ComposerSearchMode: FC<ComposerSearchModeProps> = ({ disabled, mode, onMod
                                 <Button
                                     className={clsx(
                                         "bg-transparent hover:bg-surface-row-hover dark:hover:bg-surface-row-hover rounded-lg text-muted-foreground hover:text-foreground h-7 gap-1 px-2",
-                                        mode !== "chat" &&
-                                            "bg-primary/10 text-primary-text border-primary/30 dark:text-primary-text hover:bg-primary/20 hover:border-primary/40",
+                                        mode !== "chat" && "bg-surface-row-active text-foreground",
                                     )}
                                     variant="ghost"
                                 >
                                     <CurrentIcon className="size-3 shrink-0" />
-                                    <span className="@max-[32rem]/strip:sr-only">{currentMode.label}</span>
+                                    <span className="@max-[40rem]/strip:sr-only">{currentMode.label}</span>
                                 </Button>
                             }
                         />

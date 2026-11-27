@@ -1239,7 +1239,7 @@ msgstr "{itemCount, plural, one {# item} other {# items}}"
 msgid "{label} added to starred"
 msgstr "{label} added to starred"
 
-#: src/features/develop/components/failure-notice.tsx:17
+#: src/features/develop/components/failure-notice.tsx:18
 #: src/features/develop/lib/use-review-messages.ts:20
 msgid "{label} could not be reached or answered unexpectedly. Try again in a moment."
 msgstr "{label} could not be reached or answered unexpectedly. Try again in a moment."
@@ -1257,12 +1257,12 @@ msgstr "{label} did not accept this."
 msgid "{label} did not answer, so it may have taken this. Check on {label} before trying again."
 msgstr "{label} did not answer, so it may have taken this. Check on {label} before trying again."
 
-#: src/features/develop/components/failure-notice.tsx:21
+#: src/features/develop/components/failure-notice.tsx:22
 #: src/features/develop/lib/use-review-messages.ts:24
 msgid "{label} is limiting requests for this account. Try again in a few minutes."
 msgstr "{label} is limiting requests for this account. Try again in a few minutes."
 
-#: src/features/develop/components/failure-notice.tsx:19
+#: src/features/develop/components/failure-notice.tsx:20
 msgid "{label} is not connected"
 msgstr "{label} is not connected"
 
@@ -1275,7 +1275,7 @@ msgstr "{label} is not connected."
 msgid "{label} moved to position {position} of {0} in starred"
 msgstr "{label} moved to position {position} of {0} in starred"
 
-#: src/features/develop/components/failure-notice.tsx:14
+#: src/features/develop/components/failure-notice.tsx:15
 msgid "{label} refused this request. Your account may lack access, or an organization may require you to authorize the app."
 msgstr "{label} refused this request. Your account may lack access, or an organization may require you to authorize the app."
 
@@ -1295,7 +1295,7 @@ msgstr "{label}, {count}"
 msgid "{maxReviewers, plural, one {Request at most # reviewer at a time.} other {Request at most # reviewers at a time.}}"
 msgstr "{maxReviewers, plural, one {Request at most # reviewer at a time.} other {Request at most # reviewers at a time.}}"
 
-#: src/features/chat/goal/composer-goal.tsx:98
+#: src/features/chat/goal/composer-goal.tsx:97
 msgid "{maxRounds} rounds"
 msgstr "{maxRounds} rounds"
 
@@ -1385,15 +1385,15 @@ msgstr "{name} — AI Video Generation Model | Neore"
 msgid "{name} added to starred"
 msgstr "{name} added to starred"
 
-#: src/routes/dashboard/settings/connectors/callback.tsx:64
+#: src/routes/dashboard/settings/connectors/callback.tsx:65
 msgid "{name} connected"
 msgstr "{name} connected"
 
-#: src/routes/dashboard/settings/connectors/callback.tsx:64
+#: src/routes/dashboard/settings/connectors/callback.tsx:65
 msgid "{name} connected to {accountLabel}"
 msgstr "{name} connected to {accountLabel}"
 
-#: src/routes/dashboard/settings/connectors/callback.tsx:63
+#: src/routes/dashboard/settings/connectors/callback.tsx:64
 msgid "{name} connected."
 msgstr "{name} connected."
 
@@ -2368,14 +2368,14 @@ msgstr "About {0}"
 msgid "about {0} (opens in a new tab)"
 msgstr "about {0} (opens in a new tab)"
 
-#: src/features/settings/lib/settings-keywords.ts:89
+#: src/features/settings/lib/settings-keywords.ts:92
 msgid "about me"
 msgstr "about me"
 
 #: src/features/settings/components/personalization/personalization-settings.tsx:225
-#: src/features/settings/lib/settings-keywords.ts:87
-#: src/features/settings/lib/settings-keywords.ts:88
-#: src/features/settings/lib/settings-keywords.ts:89
+#: src/features/settings/lib/settings-keywords.ts:90
+#: src/features/settings/lib/settings-keywords.ts:91
+#: src/features/settings/lib/settings-keywords.ts:92
 msgid "About You"
 msgstr "About You"
 
@@ -2383,7 +2383,7 @@ msgstr "About You"
 msgid "Above {FREE_PLAN_MAX_HEIGHT}p needs a Pro plan. Otherwise the video renders at {FREE_PLAN_MAX_HEIGHT}p."
 msgstr "Above {FREE_PLAN_MAX_HEIGHT}p needs a Pro plan. Otherwise the video renders at {FREE_PLAN_MAX_HEIGHT}p."
 
-#: src/features/chat/thread/composer-search-mode.tsx:50
+#: src/features/chat/thread/composer-search-mode.tsx:51
 msgid "Academic"
 msgstr "Academic"
 
@@ -2441,7 +2441,7 @@ msgstr "Access on Neore"
 msgid "Access to real-time information from X/Twitter data"
 msgstr "Access to real-time information from X/Twitter data"
 
-#: src/routes/dashboard/settings/connectors/callback.tsx:37
+#: src/routes/dashboard/settings/connectors/callback.tsx:38
 msgid "Access was not granted."
 msgstr "Access was not granted."
 
@@ -2462,8 +2462,8 @@ msgid "Accessing Veo 3.1 quality with audio at faster speeds and a more accessib
 msgstr "Accessing Veo 3.1 quality with audio at faster speeds and a more accessible price point"
 
 #: src/features/layout/lib/dashboard-page-names.ts:11
-#: src/features/settings/lib/settings-navigation.ts:104
-#: src/features/settings/lib/settings-navigation.ts:113
+#: src/features/settings/lib/settings-navigation.ts:132
+#: src/features/settings/lib/settings-navigation.ts:142
 msgid "Account"
 msgstr "Account"
 
@@ -3028,9 +3028,9 @@ msgstr "Adjust"
 #: src/features/chat/sharing/thread-share-button.tsx:323
 #: src/features/layout/components/sidebar-shortcut.tsx:266
 #: src/features/layout/lib/dashboard-page-names.ts:12
-#: src/routes/admin/route.tsx:56
-#: src/routes/admin/route.tsx:76
-#: src/routes/admin/route.tsx:87
+#: src/routes/admin/route.tsx:57
+#: src/routes/admin/route.tsx:77
+#: src/routes/admin/route.tsx:88
 msgid "Admin"
 msgstr "Admin"
 
@@ -3248,7 +3248,7 @@ msgstr "After outside content"
 #: src/features/chat/host/host-composer.tsx:756
 #: src/features/evals/components/dataset-panel.tsx:102
 #: src/features/layout/lib/dashboard-page-names.ts:14
-#: src/features/settings/lib/settings-navigation.ts:94
+#: src/features/settings/lib/settings-navigation.ts:111
 #: src/features/tasks/components/task-form-dialog.tsx:354
 msgid "Agent"
 msgstr "Agent"
@@ -3313,7 +3313,7 @@ msgstr "Aggregate scores of both runs"
 msgid "AI"
 msgstr "AI"
 
-#: src/routes/admin/route.tsx:73
+#: src/routes/admin/route.tsx:74
 msgid "AI Chat"
 msgstr "AI Chat"
 
@@ -3949,7 +3949,7 @@ msgstr "analytical"
 msgid "Analytical (deep structure)"
 msgstr "Analytical (deep structure)"
 
-#: src/features/settings/lib/settings-keywords.ts:109
+#: src/features/settings/lib/settings-keywords.ts:116
 msgid "analytics"
 msgstr "analytics"
 
@@ -4171,9 +4171,9 @@ msgstr "API Key Created"
 #: src/features/auth/components/settings/api-key/api-keys-card.tsx:80
 #: src/features/layout/lib/dashboard-page-names.ts:15
 #: src/features/settings/components/chat/api-keys-settings.tsx:554
-#: src/features/settings/lib/settings-navigation.ts:98
-#: src/features/settings/lib/settings-navigation.ts:106
-#: src/routes/admin/route.tsx:61
+#: src/features/settings/lib/settings-navigation.ts:117
+#: src/features/settings/lib/settings-navigation.ts:134
+#: src/routes/admin/route.tsx:62
 msgid "API Keys"
 msgstr "API Keys"
 
@@ -4191,7 +4191,7 @@ msgid "API version"
 msgstr "API version"
 
 #: src/features/layout/lib/dashboard-page-names.ts:16
-#: src/features/settings/lib/settings-navigation.ts:85
+#: src/features/settings/lib/settings-navigation.ts:101
 msgid "App"
 msgstr "App"
 
@@ -4277,8 +4277,8 @@ msgstr "Apply Style"
 msgid "Applying..."
 msgstr "Applying..."
 
-#: src/features/settings/lib/settings-keywords.ts:102
-#: src/features/settings/lib/settings-keywords.ts:103
+#: src/features/settings/lib/settings-keywords.ts:105
+#: src/features/settings/lib/settings-keywords.ts:106
 msgid "approval"
 msgstr "approval"
 
@@ -4598,7 +4598,7 @@ msgstr "Artists who want Krea's aesthetic quality in an open-source, accessible 
 msgid "Asc"
 msgstr "Asc"
 
-#: src/features/settings/lib/settings-keywords.ts:102
+#: src/features/settings/lib/settings-keywords.ts:105
 msgid "ask"
 msgstr "ask"
 
@@ -4636,7 +4636,7 @@ msgstr "Ask anything to start a new chat…"
 msgid "Ask GPT-4, Claude, and Gemini the same question. Run the same prompt across FLUX, Imagen, and Stable Diffusion. Pick the winner — not the default."
 msgstr "Ask GPT-4, Claude, and Gemini the same question. Run the same prompt across FLUX, Imagen, and Stable Diffusion. Pick the winner — not the default."
 
-#: src/features/chat/thread/composer.tsx:191
+#: src/features/chat/thread/composer.tsx:192
 msgid "Ask me anything..."
 msgstr "Ask me anything..."
 
@@ -4786,7 +4786,7 @@ msgstr "Auckland"
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:781
 #: src/components/model-picker/model-picker.tsx:1291
 #: src/features/chat/sidebar/usage-card.tsx:131
-#: src/features/chat/thread/composer.tsx:132
+#: src/features/chat/thread/composer.tsx:133
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:85
 #: src/features/workflow/components/gallery/gallery-card.tsx:25
 #: src/features/workflow/components/gallery/publish-dialog.tsx:31
@@ -4814,8 +4814,8 @@ msgstr "audio-video"
 
 #: src/features/admin/components/audit-log-card.tsx:130
 #: src/features/layout/lib/dashboard-page-names.ts:18
-#: src/routes/admin/route.tsx:34
-#: src/routes/admin/route.tsx:57
+#: src/routes/admin/route.tsx:35
+#: src/routes/admin/route.tsx:58
 msgid "Audit Log"
 msgstr "Audit Log"
 
@@ -4840,14 +4840,14 @@ msgstr "Authentication"
 msgid "Authentication Required"
 msgstr "Authentication Required"
 
-#: src/features/settings/lib/settings-keywords.ts:102
+#: src/features/settings/lib/settings-keywords.ts:105
 msgid "auto"
 msgstr "auto"
 
 #: src/features/chat/thread/composer-image-settings.tsx:28
 #: src/features/chat/thread/composer-image-settings.tsx:52
 #: src/features/chat/thread/composer-image-settings.tsx:192
-#: src/features/chat/thread/composer-model-selector.tsx:123
+#: src/features/chat/thread/composer-model-selector.tsx:133
 #: src/features/chat/thread/composer-permission-mode.tsx:42
 #: src/features/chat/thread/composer-video-settings.tsx:24
 #: src/features/chat/thread/media-gallery-view.tsx:65
@@ -5098,7 +5098,7 @@ msgstr "Back to editor"
 msgid "Back to Gallery"
 msgstr "Back to Gallery"
 
-#: src/components/settings/settings-modal.tsx:595
+#: src/components/settings/settings-modal.tsx:667
 msgid "Back to settings sections"
 msgstr "Back to settings sections"
 
@@ -5106,7 +5106,7 @@ msgstr "Back to settings sections"
 msgid "Back to workflows"
 msgstr "Back to workflows"
 
-#: src/features/settings/lib/settings-keywords.ts:89
+#: src/features/settings/lib/settings-keywords.ts:92
 msgid "background"
 msgstr "background"
 
@@ -5118,7 +5118,7 @@ msgstr "Background Color (optional)"
 msgid "Background Removal"
 msgstr "Background Removal"
 
-#: src/features/settings/lib/settings-keywords.ts:106
+#: src/features/settings/lib/settings-keywords.ts:113
 msgid "backup"
 msgstr "backup"
 
@@ -5161,7 +5161,7 @@ msgstr "Backup models"
 msgid "balanced"
 msgstr "balanced"
 
-#: src/features/chat/thread/composer-research-depth.tsx:24
+#: src/features/chat/thread/composer-research-depth.tsx:25
 msgid "Balanced"
 msgstr "Balanced"
 
@@ -5441,7 +5441,7 @@ msgstr "Bigger pieces go to this model; quick questions stay in the chat."
 msgid "Billed to your own API key, not your credits."
 msgstr "Billed to your own API key, not your credits."
 
-#: src/features/settings/lib/settings-navigation.ts:109
+#: src/features/settings/lib/settings-navigation.ts:137
 msgid "Billing"
 msgstr "Billing"
 
@@ -5468,7 +5468,7 @@ msgstr "Billing settings updated successfully"
 msgid "Binary"
 msgstr "Binary"
 
-#: src/features/settings/lib/settings-keywords.ts:89
+#: src/features/settings/lib/settings-keywords.ts:92
 msgid "bio"
 msgstr "bio"
 
@@ -5605,6 +5605,7 @@ msgid "Bot token from the Discord Developer Portal"
 msgstr "Bot token from the Discord Developer Portal"
 
 #: src/features/layout/lib/dashboard-page-names.ts:17
+#: src/features/settings/lib/settings-navigation.ts:112
 msgid "Bots"
 msgstr "Bots"
 
@@ -5728,7 +5729,7 @@ msgstr "Bring Your Own Keys (BYOK)"
 msgid "Broad style range from photorealism to illustration"
 msgstr "Broad style range from photorealism to illustration"
 
-#: src/features/settings/lib/settings-keywords.ts:84
+#: src/features/settings/lib/settings-keywords.ts:86
 msgid "browse"
 msgstr "browse"
 
@@ -5869,7 +5870,7 @@ msgstr "Built-in reasoning before generating"
 
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:374
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:375
-#: src/features/settings/lib/settings-keywords.ts:102
+#: src/features/settings/lib/settings-keywords.ts:105
 msgid "Built-in tools"
 msgstr "Built-in tools"
 
@@ -6042,7 +6043,7 @@ msgstr "Cache Hit Rate"
 msgid "Cached input"
 msgstr "Cached input"
 
-#: src/features/settings/lib/settings-keywords.ts:87
+#: src/features/settings/lib/settings-keywords.ts:90
 msgid "call me"
 msgstr "call me"
 
@@ -6359,7 +6360,7 @@ msgstr "Catalan"
 msgid "Catalan (Spain)"
 msgstr "Catalan (Spain)"
 
-#: src/features/settings/lib/settings-keywords.ts:84
+#: src/features/settings/lib/settings-keywords.ts:86
 msgid "catalog"
 msgstr "catalog"
 
@@ -6540,7 +6541,7 @@ msgstr "chat"
 
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:29
 #: src/features/chat/split/chat-split-view.tsx:116
-#: src/features/chat/thread/composer-search-mode.tsx:48
+#: src/features/chat/thread/composer-search-mode.tsx:49
 #: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:66
 #: src/features/layout/components/sidebar-shortcut.tsx:79
 #: src/features/layout/components/workspace-switch.tsx:47
@@ -6548,7 +6549,7 @@ msgstr "chat"
 #: src/features/settings/components/account/account-settings.tsx:347
 #: src/features/settings/components/chat/bots-settings.tsx:515
 #: src/features/settings/lib/settings-keywords.ts:33
-#: src/features/settings/lib/settings-navigation.ts:100
+#: src/features/settings/lib/settings-navigation.ts:121
 msgid "Chat"
 msgstr "Chat"
 
@@ -6630,7 +6631,7 @@ msgstr "Chat Text Size"
 msgid "Chat text size updated"
 msgstr "Chat text size updated"
 
-#: src/features/settings/lib/settings-keywords.ts:95
+#: src/features/settings/lib/settings-keywords.ts:98
 msgid "chat titles"
 msgstr "chat titles"
 
@@ -6646,7 +6647,7 @@ msgstr "Chat with the AI from a Feishu or Lark custom app bot, in direct message
 msgid "Chat, create, <0>and build.</0>"
 msgstr "Chat, create, <0>and build.</0>"
 
-#: src/features/settings/lib/settings-keywords.ts:107
+#: src/features/settings/lib/settings-keywords.ts:114
 msgid "chatgpt"
 msgstr "chatgpt"
 
@@ -6897,7 +6898,7 @@ msgstr "Choose one on the left to start."
 msgid "Choose prompt improvement style"
 msgstr "Choose prompt improvement style"
 
-#: src/features/chat/thread/composer-search-mode.tsx:94
+#: src/features/chat/thread/composer-search-mode.tsx:108
 msgid "Choose Search Mode"
 msgstr "Choose Search Mode"
 
@@ -7015,7 +7016,7 @@ msgstr "Circulating Supply"
 msgid "city"
 msgstr "city"
 
-#: src/features/settings/lib/settings-keywords.ts:107
+#: src/features/settings/lib/settings-keywords.ts:114
 msgid "claude"
 msgstr "claude"
 
@@ -7043,8 +7044,8 @@ msgstr "Clean data"
 msgid "Clean title slide"
 msgstr "Clean title slide"
 
-#: src/routes/admin/route.tsx:49
-#: src/routes/admin/route.tsx:58
+#: src/routes/admin/route.tsx:50
+#: src/routes/admin/route.tsx:59
 msgid "Cleanup"
 msgstr "Cleanup"
 
@@ -7340,7 +7341,7 @@ msgstr "Cloudflare Workers AI models run wherever Cloudflare has capacity, so an
 #: src/features/auth/components/device-code-parts.tsx:80
 #: src/features/auth/components/device-code-parts.tsx:134
 #: src/features/canvas/canvas-panel.tsx:770
-#: src/features/chat/thread/composer-search-mode.tsx:56
+#: src/features/chat/thread/composer-search-mode.tsx:57
 #: src/features/code/components/code-workspace.tsx:219
 #: src/features/layout/components/workspace-switch.tsx:48
 #: src/features/workflow/components/nodes/code-node.tsx:60
@@ -7392,7 +7393,7 @@ msgstr "Code navigation"
 msgid "Code output"
 msgstr "Code output"
 
-#: src/features/settings/lib/settings-keywords.ts:99
+#: src/features/settings/lib/settings-keywords.ts:102
 msgid "code review"
 msgstr "code review"
 
@@ -7881,7 +7882,7 @@ msgstr "completed"
 msgid "Completed"
 msgstr "Completed"
 
-#: src/routes/dashboard/settings/connectors/callback.tsx:20
+#: src/routes/dashboard/settings/connectors/callback.tsx:21
 msgid "Completing the connection..."
 msgstr "Completing the connection..."
 
@@ -7975,6 +7976,10 @@ msgstr "Complex visual reasoning requiring transparent thinking over visual inpu
 msgid "Composer"
 msgstr "Composer"
 
+#: src/features/chat/thread/composer-status-line.tsx:57
+msgid "Composer status"
+msgstr "Composer status"
+
 #: src/features/marketing/data/models-data.ts:132
 msgid "composition"
 msgstr "composition"
@@ -8062,7 +8067,7 @@ msgstr "Configure variable values for this thread. These values will replace {VA
 msgid "Configure Variables"
 msgstr "Configure Variables"
 
-#: src/components/settings/settings-modal.tsx:510
+#: src/components/settings/settings-modal.tsx:582
 msgid "Configure your application settings"
 msgstr "Configure your application settings"
 
@@ -8124,7 +8129,7 @@ msgstr "Conflicts with {base}"
 
 #: src/features/devices/components/devices-settings.tsx:297
 #: src/features/settings/connectors/messenger/messenger-platform-card.tsx:250
-#: src/features/skills/components/skill-builder-setup.tsx:136
+#: src/features/skills/components/skill-builder-setup.tsx:132
 #: src/routes/auth/extension.tsx:156
 msgid "Connect"
 msgstr "Connect"
@@ -8134,12 +8139,12 @@ msgstr "Connect"
 msgid "Connect {0}"
 msgstr "Connect {0}"
 
-#: src/features/develop/components/connect-host-card.tsx:20
-#: src/features/develop/components/connect-host-card.tsx:24
+#: src/features/develop/components/connect-host-card.tsx:21
+#: src/features/develop/components/connect-host-card.tsx:25
 msgid "Connect {label}"
 msgstr "Connect {label}"
 
-#: src/features/develop/components/failure-notice.tsx:19
+#: src/features/develop/components/failure-notice.tsx:20
 msgid "Connect {label} to see what needs your review here."
 msgstr "Connect {label} to see what needs your review here."
 
@@ -8255,7 +8260,7 @@ msgstr "Connect WeChat Official Account"
 msgid "Connect WhatsApp"
 msgstr "Connect WhatsApp"
 
-#: src/features/develop/components/connect-host-card.tsx:21
+#: src/features/develop/components/connect-host-card.tsx:22
 msgid "Connect your {label} account to see what needs your review, what is yours, and what is ready to merge."
 msgstr "Connect your {label} account to see what needs your review, what is yours, and what is ready to merge."
 
@@ -8322,7 +8327,7 @@ msgstr "Connecting {pairingHost}…"
 msgid "Connecting to your MCP servers..."
 msgstr "Connecting to your MCP servers..."
 
-#: src/routes/dashboard/settings/connectors/callback.tsx:86
+#: src/routes/dashboard/settings/connectors/callback.tsx:87
 msgid "Connecting..."
 msgstr "Connecting..."
 
@@ -8378,16 +8383,18 @@ msgstr "Connector disconnected. Revoke access in the provider's settings if it i
 #. placeholder {0}: CONNECTOR_LABELS[connector.id] ?? connector.id
 #. placeholder {0}: connectorLabels[connector.id] ?? connector.id
 #: src/features/skills/components/skill-builder-review.tsx:276
-#: src/features/skills/components/skill-builder-setup.tsx:122
+#: src/features/skills/components/skill-builder-setup.tsx:118
 msgid "Connector: {0}"
 msgstr "Connector: {0}"
 
-#: src/features/settings/lib/settings-keywords.ts:84
+#: src/features/settings/lib/settings-keywords.ts:86
 msgid "connectors"
 msgstr "connectors"
 
 #: src/features/layout/lib/dashboard-page-names.ts:21
 #: src/features/settings/connectors/connectors-page.tsx:39
+#: src/features/settings/lib/settings-navigation.ts:125
+#: src/features/settings/lib/settings-navigation.ts:128
 msgid "Connectors"
 msgstr "Connectors"
 
@@ -8396,7 +8403,7 @@ msgid "Connectors talk to each provider's own MCP server over OAuth 2.0. Your to
 msgstr "Connectors talk to each provider's own MCP server over OAuth 2.0. Your tokens are stored encrypted, the AI asks before using a tool that can change data, and disconnecting revokes access."
 
 #: src/features/settings/components/privacy/consent-preferences.tsx:17
-#: src/features/settings/lib/settings-keywords.ts:109
+#: src/features/settings/lib/settings-keywords.ts:116
 msgid "Consent Preferences"
 msgstr "Consent Preferences"
 
@@ -8723,7 +8730,7 @@ msgstr "Convert to TypeScript"
 msgid "Converting..."
 msgstr "Converting..."
 
-#: src/features/settings/lib/settings-keywords.ts:109
+#: src/features/settings/lib/settings-keywords.ts:116
 msgid "cookies"
 msgstr "cookies"
 
@@ -9022,7 +9029,7 @@ msgstr "Could not cancel the message. It is still queued."
 msgid "Could not cancel the run."
 msgstr "Could not cancel the run."
 
-#: src/features/chat/thread/composer-model-selector.tsx:130
+#: src/features/chat/thread/composer-model-selector.tsx:140
 msgid "Could not change Auto. Please try again."
 msgstr "Could not change Auto. Please try again."
 
@@ -9039,7 +9046,7 @@ msgstr "Could not change the bot's permission mode."
 msgid "Could not change the model. Please try again."
 msgstr "Could not change the model. Please try again."
 
-#: src/features/chat/thread/composer-permission-mode.tsx:205
+#: src/features/chat/thread/composer-permission-mode.tsx:231
 msgid "Could not change the permission mode. Please try again."
 msgstr "Could not change the permission mode. Please try again."
 
@@ -9221,7 +9228,7 @@ msgstr "Could not load the sub-agent's requests."
 msgid "Could not load the threads for this {requestNoun}."
 msgstr "Could not load the threads for this {requestNoun}."
 
-#: src/features/develop/components/failure-notice.tsx:17
+#: src/features/develop/components/failure-notice.tsx:18
 msgid "Could not load this"
 msgstr "Could not load this"
 
@@ -9650,7 +9657,7 @@ msgstr "Create a tag…"
 msgid "Create a task, give it success criteria, and run it. You can chain tasks with dependencies and repeat them on a schedule."
 msgstr "Create a task, give it success criteria, and run it. You can chain tasks with dependencies and repeat them on a schedule."
 
-#: src/components/settings/settings-modal.tsx:162
+#: src/components/settings/settings-modal.tsx:159
 msgid "Create an account"
 msgstr "Create an account"
 
@@ -9967,11 +9974,11 @@ msgstr "Cron presets"
 msgid "Crop"
 msgstr "Crop"
 
-#: src/features/chat/thread/composer-search-mode.tsx:55
+#: src/features/chat/thread/composer-search-mode.tsx:56
 msgid "Crypto"
 msgstr "Crypto"
 
-#: src/features/chat/thread/composer-search-mode.tsx:55
+#: src/features/chat/thread/composer-search-mode.tsx:56
 msgid "Cryptocurrency research"
 msgstr "Cryptocurrency research"
 
@@ -10068,7 +10075,7 @@ msgstr "Custom endpoints"
 msgid "Custom Endpoints"
 msgstr "Custom Endpoints"
 
-#: src/features/settings/lib/settings-keywords.ts:91
+#: src/features/settings/lib/settings-keywords.ts:94
 msgid "custom instructions"
 msgstr "custom instructions"
 
@@ -10078,7 +10085,7 @@ msgstr "Custom instructions"
 
 #: src/features/settings/components/personalization/personalization-settings.tsx:310
 #: src/features/settings/components/personalization/personalization-settings.tsx:325
-#: src/features/settings/lib/settings-keywords.ts:93
+#: src/features/settings/lib/settings-keywords.ts:96
 msgid "Custom Instructions"
 msgstr "Custom Instructions"
 
@@ -10119,11 +10126,11 @@ msgid "Customer messaging and support platform"
 msgstr "Customer messaging and support platform"
 
 #: src/features/layout/lib/dashboard-page-names.ts:22
-#: src/features/settings/lib/settings-navigation.ts:82
+#: src/features/settings/lib/settings-navigation.ts:98
 msgid "Customization"
 msgstr "Customization"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:145
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:141
 msgid "Customize"
 msgstr "Customize"
 
@@ -10251,7 +10258,7 @@ msgid "Darken"
 msgstr "Darken"
 
 #: src/features/layout/lib/dashboard-page-names.ts:13
-#: src/routes/admin/route.tsx:24
+#: src/routes/admin/route.tsx:25
 msgid "Dashboard"
 msgstr "Dashboard"
 
@@ -10264,12 +10271,12 @@ msgid "Data & Analysis"
 msgstr "Data & Analysis"
 
 #: src/features/settings/components/privacy/data-access.tsx:21
-#: src/features/settings/lib/settings-keywords.ts:108
+#: src/features/settings/lib/settings-keywords.ts:115
 msgid "Data Access Summary"
 msgstr "Data Access Summary"
 
 #: src/features/settings/components/privacy/data-export.tsx:99
-#: src/features/settings/lib/settings-keywords.ts:106
+#: src/features/settings/lib/settings-keywords.ts:113
 msgid "Data Export"
 msgstr "Data Export"
 
@@ -10345,7 +10352,7 @@ msgstr "Debate rounds"
 msgid "Debates for {0} rounds."
 msgstr "Debates for {0} rounds."
 
-#: src/features/chat/thread/composer.tsx:197
+#: src/features/chat/thread/composer.tsx:198
 msgid "Debug an error or review my code..."
 msgstr "Debug an error or review my code..."
 
@@ -10406,7 +10413,7 @@ msgstr "Deep reasoning tasks with Kimi K2.5's transparent thinking capability"
 msgid "Deep Research"
 msgstr "Deep Research"
 
-#: src/features/chat/thread/composer-research-depth.tsx:32
+#: src/features/chat/thread/composer-research-depth.tsx:39
 msgid "Deep research, many queries"
 msgstr "Deep research, many queries"
 
@@ -10568,7 +10575,7 @@ msgstr "Default model for video understanding and transcription"
 msgid "Default model updated"
 msgstr "Default model updated"
 
-#: src/features/settings/lib/settings-navigation.ts:92
+#: src/features/settings/lib/settings-navigation.ts:108
 msgid "Default Models"
 msgstr "Default Models"
 
@@ -10604,7 +10611,7 @@ msgstr "Degrees"
 msgid "Delayed"
 msgstr "Delayed"
 
-#: src/features/settings/lib/settings-keywords.ts:99
+#: src/features/settings/lib/settings-keywords.ts:102
 msgid "delegate"
 msgstr "delegate"
 
@@ -11316,6 +11323,7 @@ msgstr "Device removed"
 
 #: src/features/devices/components/devices-settings.tsx:640
 #: src/features/layout/lib/dashboard-page-names.ts:23
+#: src/features/settings/lib/settings-navigation.ts:118
 msgid "Devices"
 msgstr "Devices"
 
@@ -11496,7 +11504,7 @@ msgstr "Dismiss note"
 msgid "Dismiss note: {snippet}"
 msgstr "Dismiss note: {snippet}"
 
-#: src/features/skills/components/skill-builder-setup.tsx:94
+#: src/features/skills/components/skill-builder-setup.tsx:90
 msgid "Dismiss setup suggestions"
 msgstr "Dismiss setup suggestions"
 
@@ -11670,7 +11678,7 @@ msgstr "Double-click to rename"
 msgid "down"
 msgstr "down"
 
-#: src/features/settings/lib/settings-keywords.ts:106
+#: src/features/settings/lib/settings-keywords.ts:113
 msgid "download"
 msgstr "download"
 
@@ -11829,7 +11837,7 @@ msgstr "Draft"
 msgid "Draft a cover letter for a software engineering position"
 msgstr "Draft a cover letter for a software engineering position"
 
-#: src/features/chat/thread/composer.tsx:195
+#: src/features/chat/thread/composer.tsx:196
 msgid "Draft an email, report, or essay..."
 msgstr "Draft an email, report, or essay..."
 
@@ -13674,7 +13682,7 @@ msgstr "Expires: {expiresAt}"
 msgid "Expiring soon"
 msgstr "Expiring soon"
 
-#: src/features/chat/thread/composer.tsx:198
+#: src/features/chat/thread/composer.tsx:199
 msgid "Explain a concept in simple terms..."
 msgstr "Explain a concept in simple terms..."
 
@@ -13965,7 +13973,7 @@ msgstr "Failed to clear filter rules"
 msgid "Failed to clear memories"
 msgstr "Failed to clear memories"
 
-#: src/routes/dashboard/settings/connectors/callback.tsx:74
+#: src/routes/dashboard/settings/connectors/callback.tsx:75
 msgid "Failed to connect"
 msgstr "Failed to connect"
 
@@ -15014,7 +15022,7 @@ msgid "Favicon"
 msgstr "Favicon"
 
 #: src/features/settings/components/chat/favorite-models-settings.tsx:118
-#: src/features/settings/lib/settings-keywords.ts:85
+#: src/features/settings/lib/settings-keywords.ts:88
 msgid "Favorite models"
 msgstr "Favorite models"
 
@@ -15059,8 +15067,8 @@ msgstr "Feed image"
 
 #: src/features/admin/components/feedback-admin-page.tsx:139
 #: src/features/admin/components/feedback-admin-page.tsx:154
-#: src/routes/admin/route.tsx:39
-#: src/routes/admin/route.tsx:59
+#: src/routes/admin/route.tsx:40
+#: src/routes/admin/route.tsx:60
 msgid "Feedback"
 msgstr "Feedback"
 
@@ -15321,8 +15329,8 @@ msgstr "Filter results"
 msgid "Filter rules updated"
 msgstr "Filter rules updated"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:151
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:157
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:147
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:153
 msgid "Filter shortcuts"
 msgstr "Filter shortcuts"
 
@@ -15393,7 +15401,7 @@ msgid "Fine-tune CFG scale, sampler, scheduler, and seed"
 msgstr "Fine-tune CFG scale, sampler, scheduler, and seed"
 
 #. placeholder {0}: pending.name
-#: src/features/skills/components/skill-builder-setup.tsx:90
+#: src/features/skills/components/skill-builder-setup.tsx:86
 msgid "Finish setting up \"{0}\""
 msgstr "Finish setting up \"{0}\""
 
@@ -15646,7 +15654,7 @@ msgstr "For this model"
 msgid "Forest"
 msgstr "Forest"
 
-#: src/features/settings/lib/settings-keywords.ts:96
+#: src/features/settings/lib/settings-keywords.ts:99
 msgid "forget"
 msgstr "forget"
 
@@ -16077,7 +16085,7 @@ msgid "Gamma"
 msgstr "Gamma"
 
 #: src/features/marketing/components/gateway-navbar.tsx:43
-#: src/routes/admin/route.tsx:60
+#: src/routes/admin/route.tsx:61
 msgid "Gateway"
 msgstr "Gateway"
 
@@ -16089,8 +16097,8 @@ msgstr "Gateway sections"
 msgid "Gaussian Blur"
 msgstr "Gaussian Blur"
 
-#: src/features/settings/lib/settings-keywords.ts:106
-#: src/features/settings/lib/settings-keywords.ts:108
+#: src/features/settings/lib/settings-keywords.ts:113
+#: src/features/settings/lib/settings-keywords.ts:115
 msgid "gdpr"
 msgstr "gdpr"
 
@@ -16098,7 +16106,7 @@ msgstr "gdpr"
 msgid "GDPR Requests:"
 msgstr "GDPR Requests:"
 
-#: src/features/settings/lib/settings-keywords.ts:107
+#: src/features/settings/lib/settings-keywords.ts:114
 msgid "gemini"
 msgstr "gemini"
 
@@ -16189,7 +16197,7 @@ msgstr "Generate an image from a text prompt and upscale it to 4x"
 msgid "Generate an image of a cozy reading nook with warm lighting and plants."
 msgstr "Generate an image of a cozy reading nook with warm lighting and plants."
 
-#: src/features/chat/thread/composer.tsx:200
+#: src/features/chat/thread/composer.tsx:201
 msgid "Generate an image or video..."
 msgstr "Generate an image or video..."
 
@@ -16426,7 +16434,7 @@ msgid "GIF image"
 msgstr "GIF image"
 
 #: src/features/appearance/components/appearance-controls.tsx:173
-#: src/features/chat/thread/composer-search-mode.tsx:57
+#: src/features/chat/thread/composer-search-mode.tsx:58
 #: src/features/settings/components/chat/webhook-trigger-fields.tsx:78
 #: src/features/skills/components/skill-item.tsx:82
 msgid "GitHub"
@@ -16607,6 +16615,7 @@ msgid "Goal: {goalTitle}"
 msgstr "Goal: {goalTitle}"
 
 #: src/features/chat/goal/composer-goal.tsx:66
+#: src/features/chat/thread/composer-status-line.tsx:73
 msgid "Goal: run until done"
 msgstr "Goal: run until done"
 
@@ -17556,7 +17565,7 @@ msgid "How often the agent retries with the verifier's feedback before asking yo
 msgstr "How often the agent retries with the verifier's feedback before asking you to review."
 
 #: src/features/settings/components/personalization/personalization-settings.tsx:346
-#: src/features/settings/lib/settings-keywords.ts:95
+#: src/features/settings/lib/settings-keywords.ts:98
 msgid "How should titles be written?"
 msgstr "How should titles be written?"
 
@@ -17573,7 +17582,7 @@ msgid "How Triggers Work"
 msgstr "How Triggers Work"
 
 #: src/features/settings/components/personalization/personalization-settings.tsx:314
-#: src/features/settings/lib/settings-keywords.ts:92
+#: src/features/settings/lib/settings-keywords.ts:95
 msgid "How would you like the AI to respond?"
 msgstr "How would you like the AI to respond?"
 
@@ -17730,7 +17739,7 @@ msgstr "illustration"
 #: src/components/model-picker/model-picker.tsx:1265
 #: src/features/chat/image-gallery/thread-image-gallery.tsx:80
 #: src/features/chat/sidebar/usage-card.tsx:129
-#: src/features/chat/thread/composer.tsx:130
+#: src/features/chat/thread/composer.tsx:131
 #: src/features/marketing/components/landing-footer.tsx:165
 #: src/features/settings/components/chat/default-models-settings.tsx:600
 #: src/features/settings/components/chat/models-settings.tsx:41
@@ -18002,7 +18011,7 @@ msgid "Import complete!"
 msgstr "Import complete!"
 
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:333
-#: src/features/settings/lib/settings-keywords.ts:107
+#: src/features/settings/lib/settings-keywords.ts:114
 msgid "Import Conversations"
 msgstr "Import Conversations"
 
@@ -18440,7 +18449,7 @@ msgstr "Instagram Post"
 msgid "Instagram Story"
 msgstr "Instagram Story"
 
-#: src/features/settings/lib/settings-keywords.ts:84
+#: src/features/settings/lib/settings-keywords.ts:86
 msgid "install"
 msgstr "install"
 
@@ -18479,7 +18488,7 @@ msgstr "instruct"
 msgid "Instruction files"
 msgstr "Instruction files"
 
-#: src/features/settings/lib/settings-keywords.ts:100
+#: src/features/settings/lib/settings-keywords.ts:103
 msgid "instructions"
 msgstr "instructions"
 
@@ -18517,7 +18526,7 @@ msgstr "Instructions for the AI..."
 msgid "Instructions must be {INSTRUCTIONS_MAX} characters or less"
 msgstr "Instructions must be {INSTRUCTIONS_MAX} characters or less"
 
-#: src/features/settings/lib/settings-keywords.ts:84
+#: src/features/settings/lib/settings-keywords.ts:86
 msgid "integrations"
 msgstr "integrations"
 
@@ -18572,7 +18581,7 @@ msgstr "Interrupted replies will stop"
 msgid "Intimate, street photography"
 msgstr "Intimate, street photography"
 
-#: src/features/settings/lib/settings-keywords.ts:97
+#: src/features/settings/lib/settings-keywords.ts:100
 msgid "intro"
 msgstr "intro"
 
@@ -18592,7 +18601,7 @@ msgstr "Invalid image output"
 msgid "Invalid JSON"
 msgstr "Invalid JSON"
 
-#: src/routes/dashboard/settings/connectors/callback.tsx:48
+#: src/routes/dashboard/settings/connectors/callback.tsx:49
 msgid "Invalid OAuth callback"
 msgstr "Invalid OAuth callback"
 
@@ -18694,11 +18703,11 @@ msgid "Invite link copied to clipboard!"
 msgstr "Invite link copied to clipboard!"
 
 #: src/features/auth/components/organization/invite-member-dialog.tsx:89
-#: src/features/auth/components/organization/organization-members-card.tsx:103
+#: src/features/auth/components/organization/organization-members-card.tsx:106
 msgid "Invite Member"
 msgstr "Invite Member"
 
-#: src/features/auth/components/organization/organization-members-card.tsx:107
+#: src/features/auth/components/organization/organization-members-card.tsx:110
 msgid "Invite new members and update existing member roles"
 msgstr "Invite new members and update existing member roles"
 
@@ -18797,7 +18806,7 @@ msgstr "Issue tracking and project management"
 msgid "It does not exist, or your {hostLabel} account cannot see it."
 msgstr "It does not exist, or your {hostLabel} account cannot see it."
 
-#: src/features/develop/components/failure-notice.tsx:20
+#: src/features/develop/components/failure-notice.tsx:21
 #: src/features/develop/lib/use-review-messages.ts:23
 msgid "It does not exist, or your {label} account cannot see it."
 msgstr "It does not exist, or your {label} account cannot see it."
@@ -18890,7 +18899,7 @@ msgstr "Javanese"
 msgid "Javanese (Indonesia)"
 msgstr "Javanese (Indonesia)"
 
-#: src/features/settings/lib/settings-keywords.ts:88
+#: src/features/settings/lib/settings-keywords.ts:91
 msgid "job"
 msgstr "job"
 
@@ -19059,7 +19068,7 @@ msgstr "Keyboard shortcuts"
 #: src/features/settings/lib/settings-keywords.ts:43
 #: src/features/settings/lib/settings-keywords.ts:44
 #: src/features/settings/lib/settings-keywords.ts:45
-#: src/features/settings/lib/settings-navigation.ts:83
+#: src/features/settings/lib/settings-navigation.ts:99
 #: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:76
 msgid "Keyboard Shortcuts"
 msgstr "Keyboard Shortcuts"
@@ -19102,7 +19111,7 @@ msgstr "Knowledge base"
 #: src/features/chat/header/kb-attachment-button.tsx:186
 #: src/features/layout/lib/dashboard-page-names.ts:26
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:279
-#: src/features/settings/lib/settings-navigation.ts:91
+#: src/features/settings/lib/settings-navigation.ts:107
 msgid "Knowledge Base"
 msgstr "Knowledge Base"
 
@@ -19659,7 +19668,7 @@ msgstr "Left to Right (LTR)"
 msgid "Left: this version. Right: the page now."
 msgstr "Left: this version. Right: the page now."
 
-#: src/features/settings/lib/settings-keywords.ts:110
+#: src/features/settings/lib/settings-keywords.ts:117
 msgid "legal"
 msgstr "legal"
 
@@ -20798,7 +20807,7 @@ msgid "Manage Organization"
 msgstr "Manage Organization"
 
 #: src/features/auth/components/organization/organization-members-card.tsx:55
-#: src/features/auth/components/organization/organization-members-card.tsx:106
+#: src/features/auth/components/organization/organization-members-card.tsx:109
 msgid "Manage organization members and their roles"
 msgstr "Manage organization members and their roles"
 
@@ -20856,8 +20865,8 @@ msgid "Manage your organizations and memberships"
 msgstr "Manage your organizations and memberships"
 
 #: src/routes/dashboard/settings/privacy.tsx:18
-msgid "Manage your privacy settings and data rights"
-msgstr "Manage your privacy settings and data rights"
+#~ msgid "Manage your privacy settings and data rights"
+#~ msgstr "Manage your privacy settings and data rights"
 
 #: src/features/prompts/components/prompt-header.tsx:11
 msgid "Manage your system prompts for threads. Use them via slash commands or set as default for new threads."
@@ -21031,7 +21040,7 @@ msgid "MCP"
 msgstr "MCP"
 
 #: src/features/settings/components/chat/mcp/server-catalog.tsx:160
-#: src/features/settings/lib/settings-keywords.ts:84
+#: src/features/settings/lib/settings-keywords.ts:86
 msgid "MCP Registry"
 msgstr "MCP Registry"
 
@@ -21061,14 +21070,14 @@ msgstr "MCP server updated"
 
 #. placeholder {0}: server.title
 #: src/features/skills/components/skill-builder-review.tsx:265
-#: src/features/skills/components/skill-builder-setup.tsx:102
+#: src/features/skills/components/skill-builder-setup.tsx:98
 msgid "MCP server: {0}"
 msgstr "MCP server: {0}"
 
 #: src/features/chat/thread/composer-mcp-selector.tsx:142
 #: src/features/layout/lib/dashboard-page-names.ts:27
 #: src/features/settings/components/chat/mcp-settings.tsx:407
-#: src/features/settings/lib/settings-navigation.ts:95
+#: src/features/settings/lib/settings-navigation.ts:114
 msgid "MCP Servers"
 msgstr "MCP Servers"
 
@@ -21078,7 +21087,7 @@ msgstr "MCP servers provide additional tools that the AI can use during conversa
 
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:391
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:392
-#: src/features/settings/lib/settings-keywords.ts:103
+#: src/features/settings/lib/settings-keywords.ts:106
 msgid "MCP tools"
 msgstr "MCP tools"
 
@@ -21188,9 +21197,9 @@ msgid "Member role updated successfully"
 msgstr "Member role updated successfully"
 
 #: src/features/auth/components/organization/organization-members-card.tsx:58
-#: src/features/auth/components/organization/organization-members-card.tsx:109
+#: src/features/auth/components/organization/organization-members-card.tsx:112
 #: src/features/layout/lib/dashboard-page-names.ts:28
-#: src/features/settings/lib/settings-navigation.ts:111
+#: src/features/settings/lib/settings-navigation.ts:139
 msgid "Members"
 msgstr "Members"
 
@@ -21202,7 +21211,7 @@ msgstr "Members of {organizationName} can attach this collection and the AI can 
 msgid "Members of your active organization can use it."
 msgstr "Members of your active organization can use it."
 
-#: src/features/settings/lib/settings-keywords.ts:96
+#: src/features/settings/lib/settings-keywords.ts:99
 msgid "memories"
 msgstr "memories"
 
@@ -21226,7 +21235,7 @@ msgstr "Memories used for this reply ({0})"
 
 #: src/features/marketing/use-cases/use-case-data.ts:114
 #: src/features/settings/components/personalization/memory-settings.tsx:164
-#: src/features/settings/lib/settings-keywords.ts:96
+#: src/features/settings/lib/settings-keywords.ts:99
 msgid "Memory"
 msgstr "Memory"
 
@@ -21436,6 +21445,7 @@ msgid "messenger"
 msgstr "messenger"
 
 #: src/features/layout/lib/dashboard-page-names.ts:29
+#: src/features/settings/lib/settings-navigation.ts:126
 msgid "Messenger"
 msgstr "Messenger"
 
@@ -21504,7 +21514,7 @@ msgstr "Microphone access denied. Please allow microphone access in your browser
 msgid "Microsoft App ID of your Azure Bot"
 msgstr "Microsoft App ID of your Azure Bot"
 
-#: src/features/settings/lib/settings-keywords.ts:107
+#: src/features/settings/lib/settings-keywords.ts:114
 msgid "migrate"
 msgstr "migrate"
 
@@ -21782,7 +21792,7 @@ msgstr "Model filter"
 msgid "Model info"
 msgstr "Model info"
 
-#: src/features/settings/lib/settings-keywords.ts:99
+#: src/features/settings/lib/settings-keywords.ts:102
 msgid "Model per kind of work"
 msgstr "Model per kind of work"
 
@@ -21792,6 +21802,7 @@ msgstr "Model pricing from models.dev, KV-cached for 24 hours. Automatic cost ca
 
 #: src/features/layout/lib/dashboard-page-names.ts:30
 #: src/features/settings/components/chat/model-filter-settings.tsx:135
+#: src/features/settings/lib/settings-navigation.ts:110
 msgid "Model Restrictions"
 msgstr "Model Restrictions"
 
@@ -21832,7 +21843,7 @@ msgstr "Model: OpenAI Whisper"
 #: src/features/settings/components/chat/custom-providers-settings.tsx:564
 #: src/features/settings/components/chat/models-settings.tsx:367
 #: src/features/settings/components/chat/native-providers-settings.tsx:637
-#: src/features/settings/lib/settings-navigation.ts:93
+#: src/features/settings/lib/settings-navigation.ts:109
 msgid "Models"
 msgstr "Models"
 
@@ -21977,7 +21988,7 @@ msgstr "More"
 
 #: src/features/settings/components/personalization/personalization-settings.tsx:291
 #: src/features/settings/components/personalization/personalization-settings.tsx:295
-#: src/features/settings/lib/settings-keywords.ts:89
+#: src/features/settings/lib/settings-keywords.ts:92
 msgid "More About You"
 msgstr "More About You"
 
@@ -22285,7 +22296,7 @@ msgstr "Mute"
 msgid "Mute thread"
 msgstr "Mute thread"
 
-#: src/features/settings/lib/settings-keywords.ts:106
+#: src/features/settings/lib/settings-keywords.ts:113
 msgid "my data"
 msgstr "my data"
 
@@ -22324,7 +22335,7 @@ msgid "n/a"
 msgstr "n/a"
 
 #: src/features/settings/lib/settings-keywords.ts:26
-#: src/features/settings/lib/settings-keywords.ts:87
+#: src/features/settings/lib/settings-keywords.ts:90
 msgid "name"
 msgstr "name"
 
@@ -22392,7 +22403,7 @@ msgstr "Name of tag {0}"
 msgid "Name:"
 msgstr "Name:"
 
-#: src/features/settings/lib/settings-keywords.ts:95
+#: src/features/settings/lib/settings-keywords.ts:98
 msgid "naming"
 msgstr "naming"
 
@@ -22571,7 +22582,7 @@ msgstr "Neore {0}"
 msgid "Neore agent"
 msgstr "Neore agent"
 
-#: src/features/chat/thread/composer.tsx:614
+#: src/features/chat/thread/composer.tsx:615
 msgid "Neore can make mistakes. Check important information."
 msgstr "Neore can make mistakes. Check important information."
 
@@ -22583,7 +22594,7 @@ msgstr "Neore cannot reach the server. It will keep trying to reconnect."
 msgid "Neore Chat"
 msgstr "Neore Chat"
 
-#: src/routes/__root.tsx:607
+#: src/routes/__root.tsx:611
 msgid "Neore Chat is a modern AI chat application. Chat with the latest AI models, organise your conversations, and stay productive."
 msgstr "Neore Chat is a modern AI chat application. Chat with the latest AI models, organise your conversations, and stay productive."
 
@@ -23046,7 +23057,7 @@ msgstr "Nicaragua"
 
 #: src/features/settings/components/chat/favorite-models-settings.tsx:53
 #: src/features/settings/components/personalization/personalization-settings.tsx:253
-#: src/features/settings/lib/settings-keywords.ts:87
+#: src/features/settings/lib/settings-keywords.ts:90
 msgid "Nickname"
 msgstr "Nickname"
 
@@ -23059,7 +23070,7 @@ msgstr "Nickname for {label}"
 msgid "No"
 msgstr "No"
 
-#: src/features/develop/components/failure-notice.tsx:15
+#: src/features/develop/components/failure-notice.tsx:16
 msgid "No access"
 msgstr "No access"
 
@@ -23573,7 +23584,7 @@ msgid "No response yet"
 msgstr "No response yet"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-search.tsx:221
-#: src/components/settings/settings-search.tsx:180
+#: src/components/settings/settings-search.tsx:189
 #: src/features/vault/components/empty-states.tsx:13
 msgid "No results"
 msgstr "No results"
@@ -23615,7 +23626,7 @@ msgstr "No sheets found in spreadsheet"
 msgid "No shortcuts found"
 msgstr "No shortcuts found"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:184
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:180
 msgid "No shortcuts match \"{query}\"."
 msgstr "No shortcuts match \"{query}\"."
 
@@ -23906,7 +23917,7 @@ msgstr "Not covered by the guide"
 msgid "Not delivered to the lead"
 msgstr "Not delivered to the lead"
 
-#: src/features/develop/components/failure-notice.tsx:20
+#: src/features/develop/components/failure-notice.tsx:21
 msgid "Not found"
 msgstr "Not found"
 
@@ -24081,8 +24092,8 @@ msgstr "now"
 msgid "NSFW Content Review"
 msgstr "NSFW Content Review"
 
-#: src/routes/admin/route.tsx:44
-#: src/routes/admin/route.tsx:62
+#: src/routes/admin/route.tsx:45
+#: src/routes/admin/route.tsx:63
 msgid "NSFW Review"
 msgstr "NSFW Review"
 
@@ -24124,11 +24135,11 @@ msgstr "Object Editor"
 msgid "Object Prompt"
 msgstr "Object Prompt"
 
-#: src/features/settings/lib/settings-keywords.ts:88
+#: src/features/settings/lib/settings-keywords.ts:91
 msgid "occupation"
 msgstr "occupation"
 
-#: src/features/settings/lib/settings-keywords.ts:102
+#: src/features/settings/lib/settings-keywords.ts:105
 msgid "off"
 msgstr "off"
 
@@ -24282,7 +24293,7 @@ msgid "On-premise option"
 msgstr "On-premise option"
 
 #: src/features/settings/components/personalization/personalization-settings.tsx:377
-#: src/features/settings/lib/settings-keywords.ts:97
+#: src/features/settings/lib/settings-keywords.ts:100
 msgid "Onboarding"
 msgstr "Onboarding"
 
@@ -24627,7 +24638,7 @@ msgstr "Open chat"
 msgid "Open command palette"
 msgstr "Open command palette"
 
-#: src/features/develop/components/failure-notice.tsx:35
+#: src/features/develop/components/failure-notice.tsx:36
 msgid "Open connectors"
 msgstr "Open connectors"
 
@@ -25138,11 +25149,11 @@ msgstr "OpenAI's smallest LLM"
 msgid "OpenAI's smallest model for maximum speed"
 msgstr "OpenAI's smallest model for maximum speed"
 
-#: src/components/settings/settings-modal.tsx:342
+#: src/components/settings/settings-modal.tsx:398
 msgid "Opened {tabLabel}"
 msgstr "Opened {tabLabel}"
 
-#: src/components/settings/settings-modal.tsx:342
+#: src/components/settings/settings-modal.tsx:398
 msgid "Opened {tabLabel}: {label}"
 msgstr "Opened {tabLabel}: {label}"
 
@@ -25360,7 +25371,7 @@ msgstr "Ordinary clicks are checked, then made for real. A page can change an or
 #: src/features/auth/components/organization/organization-view.tsx:64
 #: src/features/layout/lib/dashboard-page-names.ts:32
 #: src/features/settings/components/chat/usage-project-breakdown.tsx:186
-#: src/features/settings/lib/settings-navigation.ts:110
+#: src/features/settings/lib/settings-navigation.ts:138
 #: src/features/skills/components/skill-form-dialog.tsx:476
 #: src/features/skills/components/skill-item.tsx:130
 msgid "Organization"
@@ -25420,7 +25431,7 @@ msgstr "Organization slug updated successfully"
 
 #: src/features/auth/components/organization/organizations-card.tsx:42
 #: src/features/layout/lib/dashboard-page-names.ts:33
-#: src/features/settings/lib/settings-navigation.ts:107
+#: src/features/settings/lib/settings-navigation.ts:135
 msgid "Organizations"
 msgstr "Organizations"
 
@@ -25547,7 +25558,7 @@ msgstr "Output Format"
 msgid "Output is not loaded in this view."
 msgstr "Output is not loaded in this view."
 
-#: src/features/chat/thread/composer.tsx:155
+#: src/features/chat/thread/composer.tsx:156
 msgid "Output mode"
 msgstr "Output mode"
 
@@ -26145,8 +26156,8 @@ msgstr "Permission mode: {0}"
 msgid "Permission requests from the agent"
 msgstr "Permission requests from the agent"
 
-#: src/features/settings/lib/settings-keywords.ts:102
-#: src/features/settings/lib/settings-keywords.ts:103
+#: src/features/settings/lib/settings-keywords.ts:105
+#: src/features/settings/lib/settings-keywords.ts:106
 msgid "permissions"
 msgstr "permissions"
 
@@ -26162,7 +26173,7 @@ msgstr "Persian"
 msgid "Persian (Iran)"
 msgstr "Persian (Iran)"
 
-#: src/features/settings/lib/settings-keywords.ts:100
+#: src/features/settings/lib/settings-keywords.ts:103
 msgid "persona"
 msgstr "persona"
 
@@ -26184,7 +26195,7 @@ msgid "Personal information is now visible"
 msgstr "Personal information is now visible"
 
 #: src/features/layout/lib/dashboard-page-names.ts:34
-#: src/features/settings/lib/settings-navigation.ts:89
+#: src/features/settings/lib/settings-navigation.ts:105
 msgid "Personalization"
 msgstr "Personalization"
 
@@ -26279,7 +26290,7 @@ msgstr "Picked at (s)"
 msgid "Picked frame wire (remove it)"
 msgstr "Picked frame wire (remove it)"
 
-#: src/features/settings/lib/settings-keywords.ts:85
+#: src/features/settings/lib/settings-keywords.ts:88
 msgid "picker"
 msgstr "picker"
 
@@ -26353,7 +26364,7 @@ msgstr "Pin to right"
 msgid "Pink"
 msgstr "Pink"
 
-#: src/features/settings/lib/settings-keywords.ts:85
+#: src/features/settings/lib/settings-keywords.ts:88
 msgid "pinned"
 msgstr "pinned"
 
@@ -26405,7 +26416,7 @@ msgstr "plan"
 msgid "Plan"
 msgstr "Plan"
 
-#: src/features/chat/thread/composer.tsx:194
+#: src/features/chat/thread/composer.tsx:195
 msgid "Plan a project or brainstorm ideas..."
 msgstr "Plan a project or brainstorm ideas..."
 
@@ -27037,18 +27048,17 @@ msgstr "privacy"
 #: src/features/settings/components/account/account-settings.tsx:165
 #: src/features/settings/components/chat/model-filter-settings.tsx:363
 #: src/features/settings/lib/settings-keywords.ts:26
-#: src/features/settings/lib/settings-navigation.ts:117
+#: src/features/settings/lib/settings-navigation.ts:146
 msgid "Privacy"
 msgstr "Privacy"
 
 #: src/features/layout/lib/dashboard-page-names.ts:36
-#: src/features/settings/lib/settings-navigation.ts:116
-#: src/routes/dashboard/settings/privacy.tsx:16
+#: src/features/settings/lib/settings-navigation.ts:145
 msgid "Privacy & Data"
 msgstr "Privacy & Data"
 
 #: src/features/settings/components/privacy/privacy-policy.tsx:16
-#: src/features/settings/lib/settings-keywords.ts:110
+#: src/features/settings/lib/settings-keywords.ts:117
 msgid "Privacy Policy"
 msgstr "Privacy Policy"
 
@@ -27170,7 +27180,7 @@ msgid "Productivity"
 msgstr "Productivity"
 
 #: src/features/settings/components/personalization/personalization-settings.tsx:272
-#: src/features/settings/lib/settings-keywords.ts:88
+#: src/features/settings/lib/settings-keywords.ts:91
 msgid "Profession"
 msgstr "Profession"
 
@@ -27247,7 +27257,7 @@ msgstr "Professional-grade editing precision"
 msgid "Professionals who need versatile, high-quality image creation from descriptive text prompts"
 msgstr "Professionals who need versatile, high-quality image creation from descriptive text prompts"
 
-#: src/features/settings/lib/settings-keywords.ts:108
+#: src/features/settings/lib/settings-keywords.ts:115
 msgid "profile"
 msgstr "profile"
 
@@ -27331,7 +27341,7 @@ msgstr "Projects this device is offered in"
 msgid "Promote to Admin"
 msgstr "Promote to Admin"
 
-#: src/features/settings/lib/settings-keywords.ts:100
+#: src/features/settings/lib/settings-keywords.ts:103
 msgid "prompt"
 msgstr "prompt"
 
@@ -27749,7 +27759,7 @@ msgstr "Quick inference for production use"
 msgid "Quick iteration cycles at high quality"
 msgstr "Quick iteration cycles at high quality"
 
-#: src/features/chat/thread/composer-research-depth.tsx:31
+#: src/features/chat/thread/composer-research-depth.tsx:38
 msgid "Quick lookup, fewer queries"
 msgstr "Quick lookup, fewer queries"
 
@@ -27880,7 +27890,7 @@ msgid "Rate limit reached. You can improve {minutes, plural, one {# more prompt}
 msgstr "Rate limit reached. You can improve {minutes, plural, one {# more prompt} other {# more prompts}} in {minutes, plural, one {# minute} other {# minutes}}."
 
 #: src/features/chat/thread/rate-limit-pause-notice.tsx:108
-#: src/features/develop/components/failure-notice.tsx:21
+#: src/features/develop/components/failure-notice.tsx:22
 msgid "Rate limited"
 msgstr "Rate limited"
 
@@ -28261,7 +28271,7 @@ msgstr "Recently Used"
 msgid "Recommended settings"
 msgstr "Recommended settings"
 
-#: src/features/skills/components/skill-builder-setup.tsx:136
+#: src/features/skills/components/skill-builder-setup.tsx:132
 msgid "Reconnect"
 msgstr "Reconnect"
 
@@ -28328,7 +28338,7 @@ msgstr "Red"
 msgid "Red Channel"
 msgstr "Red Channel"
 
-#: src/features/chat/thread/composer-search-mode.tsx:52
+#: src/features/chat/thread/composer-search-mode.tsx:53
 msgid "Reddit"
 msgstr "Reddit"
 
@@ -28647,7 +28657,7 @@ msgstr "Reload preview"
 msgid "Reload their version"
 msgstr "Reload their version"
 
-#: src/features/settings/lib/settings-keywords.ts:96
+#: src/features/settings/lib/settings-keywords.ts:99
 msgid "remember"
 msgstr "remember"
 
@@ -29061,6 +29071,10 @@ msgstr "Reply ready"
 msgid "Reply tools are off by default. You switch them on per connection and choose which groups they may use."
 msgstr "Reply tools are off by default. You switch them on per connection and choose which groups they may use."
 
+#: src/features/chat/thread/composer-status-line.tsx:61
+msgid "Replying"
+msgstr "Replying"
+
 #: src/features/settings/components/chat/mcp/popular-servers.ts:35
 msgid "Repos, issues, PRs, and code search"
 msgstr "Repos, issues, PRs, and code search"
@@ -29154,11 +29168,11 @@ msgstr "Required variables missing"
 msgid "Required."
 msgstr "Required."
 
-#: src/components/settings/settings-modal.tsx:153
+#: src/components/settings/settings-modal.tsx:150
 msgid "requires an account"
 msgstr "requires an account"
 
-#: src/components/settings/settings-search.tsx:216
+#: src/components/settings/settings-search.tsx:225
 msgid "Requires an account"
 msgstr "Requires an account"
 
@@ -29177,7 +29191,7 @@ msgstr "Research"
 msgid "Research a topic"
 msgstr "Research a topic"
 
-#: src/features/chat/thread/composer.tsx:196
+#: src/features/chat/thread/composer.tsx:197
 msgid "Research a topic in depth..."
 msgstr "Research a topic in depth..."
 
@@ -29520,7 +29534,7 @@ msgstr "Reverting…"
 msgid "Review"
 msgstr "Review"
 
-#: src/features/skills/components/skill-builder-setup.tsx:115
+#: src/features/skills/components/skill-builder-setup.tsx:111
 msgid "Review and add"
 msgstr "Review and add"
 
@@ -29550,8 +29564,8 @@ msgid "Review requests in {0}"
 msgstr "Review requests in {0}"
 
 #: src/features/chat/goal/composer-goal.tsx:92
-msgid "Review rounds: {maxRounds}. Change"
-msgstr "Review rounds: {maxRounds}. Change"
+#~ msgid "Review rounds: {maxRounds}. Change"
+#~ msgstr "Review rounds: {maxRounds}. Change"
 
 #: src/features/develop/components/review-panel.tsx:292
 msgid "Review submitted"
@@ -29683,7 +29697,7 @@ msgstr "Role Updated"
 msgid "Role Updates"
 msgstr "Role Updates"
 
-#: src/features/settings/lib/settings-keywords.ts:99
+#: src/features/settings/lib/settings-keywords.ts:102
 msgid "roles"
 msgstr "roles"
 
@@ -30393,11 +30407,11 @@ msgstr "search"
 msgid "Search"
 msgstr "Search"
 
-#: src/features/chat/thread/composer-search-mode.tsx:50
+#: src/features/chat/thread/composer-search-mode.tsx:51
 msgid "Search academic papers and PDFs"
 msgstr "Search academic papers and PDFs"
 
-#: src/features/chat/thread/composer-search-mode.tsx:49
+#: src/features/chat/thread/composer-search-mode.tsx:50
 msgid "Search across the entire internet"
 msgstr "Search across the entire internet"
 
@@ -30431,8 +30445,8 @@ msgid "Search data..."
 msgstr "Search data..."
 
 #. placeholder {0}: labels[depth]
-#: src/features/chat/thread/composer-research-depth.tsx:47
-#: src/features/chat/thread/composer-research-depth.tsx:63
+#: src/features/chat/thread/composer-research-depth.tsx:54
+#: src/features/chat/thread/composer-research-depth.tsx:70
 msgid "Search depth: {0}"
 msgstr "Search depth: {0}"
 
@@ -30462,7 +30476,7 @@ msgstr "Search for an icon..."
 msgid "Search for the latest news about space exploration"
 msgstr "Search for the latest news about space exploration"
 
-#: src/features/chat/thread/composer-search-mode.tsx:57
+#: src/features/chat/thread/composer-search-mode.tsx:58
 msgid "Search GitHub repositories and code"
 msgstr "Search GitHub repositories and code"
 
@@ -30504,7 +30518,7 @@ msgstr "Search mode"
 
 #. placeholder {0}: currentMode.label
 #. placeholder {0}: draft.searchMode.id
-#: src/features/chat/thread/composer-search-mode.tsx:90
+#: src/features/chat/thread/composer-search-mode.tsx:104
 #: src/features/skills/components/skill-builder-review.tsx:201
 msgid "Search mode: {0}"
 msgstr "Search mode: {0}"
@@ -30553,7 +30567,7 @@ msgstr "Search prompts..."
 msgid "Search public skills…"
 msgstr "Search public skills…"
 
-#: src/features/chat/thread/composer-search-mode.tsx:52
+#: src/features/chat/thread/composer-search-mode.tsx:53
 msgid "Search Reddit posts"
 msgstr "Search Reddit posts"
 
@@ -30596,11 +30610,11 @@ msgstr "Search shortcuts..."
 msgid "Search skills..."
 msgstr "Search skills..."
 
-#: src/features/chat/thread/composer-search-mode.tsx:58
+#: src/features/chat/thread/composer-search-mode.tsx:59
 msgid "Search songs, artists, and albums"
 msgstr "Search songs, artists, and albums"
 
-#: src/features/chat/thread/composer-search-mode.tsx:56
+#: src/features/chat/thread/composer-search-mode.tsx:57
 msgid "Search Stack Overflow for programming help"
 msgstr "Search Stack Overflow for programming help"
 
@@ -30648,7 +30662,7 @@ msgstr "Search variables..."
 msgid "Search workflows..."
 msgstr "Search workflows..."
 
-#: src/features/chat/thread/composer-search-mode.tsx:51
+#: src/features/chat/thread/composer-search-mode.tsx:52
 msgid "Search X posts"
 msgstr "Search X posts"
 
@@ -30660,7 +30674,7 @@ msgstr "Search your knowledge files and score retrieval (hit rate, MRR, precisio
 msgid "Search your skills"
 msgstr "Search your skills"
 
-#: src/features/chat/thread/composer-search-mode.tsx:53
+#: src/features/chat/thread/composer-search-mode.tsx:54
 msgid "Search YouTube videos and channels"
 msgstr "Search YouTube videos and channels"
 
@@ -30722,7 +30736,7 @@ msgstr "Sections"
 
 #: src/features/layout/lib/dashboard-page-names.ts:37
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:57
-#: src/features/settings/lib/settings-navigation.ts:105
+#: src/features/settings/lib/settings-navigation.ts:133
 msgid "Security"
 msgstr "Security"
 
@@ -31293,7 +31307,7 @@ msgstr "Server-Sent Events (SSE)"
 msgid "Serverless Postgres database with branching"
 msgstr "Serverless Postgres database with branching"
 
-#: src/features/settings/lib/settings-keywords.ts:103
+#: src/features/settings/lib/settings-keywords.ts:106
 msgid "servers"
 msgstr "servers"
 
@@ -31367,8 +31381,9 @@ msgid "Set up triggers to automate tasks on a schedule, via webhooks, or in resp
 msgstr "Set up triggers to automate tasks on a schedule, via webhooks, or in response to events."
 
 #: ../../packages/chat-ui/src/org-switcher/org-switcher.tsx:260
-#: src/components/settings/settings-modal.tsx:407
-#: src/components/settings/settings-modal.tsx:508
+#: src/components/settings/settings-modal.tsx:458
+#: src/components/settings/settings-modal.tsx:580
+#: src/components/settings/settings-modal.tsx:680
 #: src/features/layout/components/mobile-section-nav.tsx:59
 #: src/features/layout/lib/dashboard-page-names.ts:38
 msgid "Settings"
@@ -31380,7 +31395,7 @@ msgstr "Settings"
 msgid "Settings saved"
 msgstr "Settings saved"
 
-#: src/components/settings/settings-search.tsx:186
+#: src/components/settings/settings-search.tsx:195
 msgid "Settings search results"
 msgstr "Settings search results"
 
@@ -31769,7 +31784,7 @@ msgstr "Sidebar Right"
 
 #: ../../packages/chat-ui/src/auth/login-form.tsx:43
 #: src/components/not-found.tsx:12
-#: src/components/settings/settings-modal.tsx:166
+#: src/components/settings/settings-modal.tsx:163
 #: src/features/auth/components/auth/auth-card.tsx:493
 #: src/features/auth/components/auth/forms/sign-in-form.tsx:415
 #: src/features/auth/components/device-approval.tsx:363
@@ -31807,7 +31822,7 @@ msgstr "Sign in on another site?"
 msgid "Sign in the command line?"
 msgstr "Sign in the command line?"
 
-#: src/features/develop/components/failure-notice.tsx:18
+#: src/features/develop/components/failure-notice.tsx:19
 msgid "Sign in to {label} again"
 msgstr "Sign in to {label} again"
 
@@ -31843,7 +31858,7 @@ msgstr "Sign in to unlock all models."
 msgid "Sign in to your account"
 msgstr "Sign in to your account"
 
-#: src/components/settings/settings-modal.tsx:156
+#: src/components/settings/settings-modal.tsx:153
 msgid "Sign in to your account to use it."
 msgstr "Sign in to your account to use it."
 
@@ -31893,7 +31908,7 @@ msgstr "Sign up"
 msgid "Sign Up"
 msgstr "Sign Up"
 
-#: src/components/settings/settings-modal.tsx:156
+#: src/components/settings/settings-modal.tsx:153
 msgid "Sign up and subscribe for $8/mo to unlock all features."
 msgstr "Sign up and subscribe for $8/mo to unlock all features."
 
@@ -32112,7 +32127,7 @@ msgstr "Skip CLIP layers (0 = none, 1-2 = more stylized)"
 msgid "Skip questions"
 msgstr "Skip questions"
 
-#: src/routes/__root.tsx:505
+#: src/routes/__root.tsx:508
 msgid "Skip to content"
 msgstr "Skip to content"
 
@@ -32380,7 +32395,7 @@ msgid "Someone else has control of this browser."
 msgstr "Someone else has control of this browser."
 
 #: src/components/error-boundary.tsx:200
-#: src/components/settings/settings-modal.tsx:130
+#: src/components/settings/settings-modal.tsx:127
 #: src/features/pages/components/page-share-dialog.tsx:50
 msgid "Something went wrong"
 msgstr "Something went wrong"
@@ -32639,7 +32654,7 @@ msgid "speech-to-text"
 msgstr "speech-to-text"
 
 #: src/features/chat/thread/composer-audio-settings.tsx:102
-#: src/features/chat/thread/composer-research-depth.tsx:25
+#: src/features/chat/thread/composer-research-depth.tsx:26
 msgid "Speed"
 msgstr "Speed"
 
@@ -32686,7 +32701,7 @@ msgstr "Split view enabled"
 msgid "Split view is full. Close a chat first."
 msgstr "Split view is full. Close a chat first."
 
-#: src/features/chat/thread/composer-search-mode.tsx:58
+#: src/features/chat/thread/composer-search-mode.tsx:59
 msgid "Spotify"
 msgstr "Spotify"
 
@@ -32800,7 +32815,7 @@ msgstr "Standard pin"
 msgid "Standard postcard"
 msgstr "Standard postcard"
 
-#: src/features/chat/thread/composer-research-depth.tsx:30
+#: src/features/chat/thread/composer-research-depth.tsx:37
 msgid "Standard search depth"
 msgstr "Standard search depth"
 
@@ -32812,7 +32827,7 @@ msgstr "Star"
 msgid "Star a model in the model picker and it shows up here."
 msgstr "Star a model in the model picker and it shows up here."
 
-#: src/features/settings/lib/settings-keywords.ts:85
+#: src/features/settings/lib/settings-keywords.ts:88
 msgid "starred"
 msgstr "starred"
 
@@ -33137,7 +33152,7 @@ msgstr "Steps"
 msgid "Still connecting to the server..."
 msgstr "Still connecting to the server..."
 
-#: src/features/chat/thread/composer-search-mode.tsx:54
+#: src/features/chat/thread/composer-search-mode.tsx:55
 msgid "Stock and currency information"
 msgstr "Stock and currency information"
 
@@ -33145,7 +33160,7 @@ msgstr "Stock and currency information"
 msgid "Stockholm"
 msgstr "Stockholm"
 
-#: src/features/chat/thread/composer-search-mode.tsx:54
+#: src/features/chat/thread/composer-search-mode.tsx:55
 msgid "Stocks"
 msgstr "Stocks"
 
@@ -33585,7 +33600,7 @@ msgstr "Strong visual reasoning and understanding"
 msgid "Strongest reasoning in the GLM family"
 msgstr "Strongest reasoning in the GLM family"
 
-#: src/features/settings/lib/settings-keywords.ts:91
+#: src/features/settings/lib/settings-keywords.ts:94
 #: src/features/workflow/templates/index.ts:217
 msgid "style"
 msgstr "style"
@@ -33646,7 +33661,7 @@ msgstr "Styled Result"
 msgid "stylized animation"
 msgstr "stylized animation"
 
-#: src/features/settings/lib/settings-keywords.ts:99
+#: src/features/settings/lib/settings-keywords.ts:102
 msgid "sub-agent"
 msgstr "sub-agent"
 
@@ -33663,7 +33678,7 @@ msgid "Sub-agent finished"
 msgstr "Sub-agent finished"
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:428
-#: src/features/settings/lib/settings-navigation.ts:97
+#: src/features/settings/lib/settings-navigation.ts:116
 msgid "Sub-agent roles"
 msgstr "Sub-agent roles"
 
@@ -33773,7 +33788,7 @@ msgstr "Summarise my notes from today"
 msgid "Summarise my notes in three bullets."
 msgstr "Summarise my notes in three bullets."
 
-#: src/features/chat/thread/composer.tsx:193
+#: src/features/chat/thread/composer.tsx:194
 msgid "Summarize a document or URL..."
 msgstr "Summarize a document or URL..."
 
@@ -33995,7 +34010,7 @@ msgstr "System default"
 msgid "System message:"
 msgstr "System message:"
 
-#: src/features/settings/lib/settings-keywords.ts:91
+#: src/features/settings/lib/settings-keywords.ts:94
 msgid "system prompt"
 msgstr "system prompt"
 
@@ -34015,11 +34030,11 @@ msgid "System prompt applied"
 msgstr "System prompt applied"
 
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:258
-#: src/features/settings/lib/settings-keywords.ts:100
+#: src/features/settings/lib/settings-keywords.ts:103
 msgid "System Prompt Presets"
 msgstr "System Prompt Presets"
 
-#: src/features/settings/lib/settings-navigation.ts:90
+#: src/features/settings/lib/settings-navigation.ts:106
 msgid "System Prompts"
 msgstr "System Prompts"
 
@@ -34121,7 +34136,7 @@ msgstr "Talk to sales"
 msgid "Talk to the AI from Microsoft Teams through an Azure Bot. Each Teams conversation maps to a thread."
 msgstr "Talk to the AI from Microsoft Teams through an Azure Bot. Each Teams conversation maps to a thread."
 
-#: src/features/chat/thread/composer-search-mode.tsx:48
+#: src/features/chat/thread/composer-search-mode.tsx:49
 msgid "Talk to the model directly"
 msgstr "Talk to the model directly"
 
@@ -34285,6 +34300,7 @@ msgstr "Team settings updated successfully"
 #: src/features/auth/components/team/teams-card.tsx:42
 #: src/features/auth/components/team/teams-card.tsx:60
 #: src/features/layout/lib/dashboard-page-names.ts:39
+#: src/features/settings/lib/settings-navigation.ts:140
 msgid "Teams"
 msgstr "Teams"
 
@@ -34432,7 +34448,7 @@ msgstr "Temporary mode enabled"
 msgid "Temporary mode enabled ({0})"
 msgstr "Temporary mode enabled ({0})"
 
-#: src/features/settings/lib/settings-keywords.ts:110
+#: src/features/settings/lib/settings-keywords.ts:117
 msgid "terms"
 msgstr "terms"
 
@@ -34489,7 +34505,7 @@ msgstr "text"
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:351
 #: src/components/model-picker/model-picker.tsx:1252
 #: src/features/chat/sidebar/usage-card.tsx:128
-#: src/features/chat/thread/composer.tsx:129
+#: src/features/chat/thread/composer.tsx:130
 #: src/features/marketing/components/landing-footer.tsx:164
 #: src/features/settings/components/chat/default-models-settings.tsx:556
 #: src/features/settings/components/chat/models-settings.tsx:45
@@ -34969,7 +34985,7 @@ msgstr "The bot and its computer are removed. Its chats stay, as plain chats."
 msgid "The bot gets only the tools you allow. With none allowed, it gets no tools."
 msgstr "The bot gets only the tools you allow. With none allowed, it gets no tools."
 
-#: src/features/chat/thread/composer-model-selector.tsx:138
+#: src/features/chat/thread/composer-status-line.tsx:85
 msgid "The bot sets the model for this chat."
 msgstr "The bot sets the model for this chat."
 
@@ -35090,7 +35106,7 @@ msgstr "The computer's answer could not be read. Try again, or update the deskto
 msgid "The condition is checked without asking a model; the agent runs only when it comes true. You can keep {MAX_ACTIVE_EVENT_WATCHERS} event triggers switched on at a time."
 msgstr "The condition is checked without asking a model; the agent runs only when it comes true. You can keep {MAX_ACTIVE_EVENT_WATCHERS} event triggers switched on at a time."
 
-#: src/routes/dashboard/settings/connectors/callback.tsx:73
+#: src/routes/dashboard/settings/connectors/callback.tsx:74
 msgid "The connection could not be completed."
 msgstr "The connection could not be completed."
 
@@ -35098,11 +35114,11 @@ msgstr "The connection could not be completed."
 msgid "The connection was lost."
 msgstr "The connection was lost."
 
-#: src/routes/dashboard/settings/connectors/callback.tsx:40
+#: src/routes/dashboard/settings/connectors/callback.tsx:41
 msgid "The connection was not completed: {reason}"
 msgstr "The connection was not completed: {reason}"
 
-#: src/routes/dashboard/settings/connectors/callback.tsx:39
+#: src/routes/dashboard/settings/connectors/callback.tsx:40
 msgid "The connection was not completed."
 msgstr "The connection was not completed."
 
@@ -35508,7 +35524,7 @@ msgstr "The most demanding software engineering tasks requiring OpenAI's maximum
 msgid "The most demanding tasks requiring Anthropic's latest frontier reasoning and capabilities"
 msgstr "The most demanding tasks requiring Anthropic's latest frontier reasoning and capabilities"
 
-#: src/features/chat/goal/composer-goal.tsx:103
+#: src/features/chat/goal/composer-goal.tsx:102
 msgid "The most review rounds before it stops"
 msgstr "The most review rounds before it stops"
 
@@ -36128,7 +36144,7 @@ msgstr "This collection is shared with you by a member of your organization. You
 msgid "This command name is reserved"
 msgstr "This command name is reserved"
 
-#: src/features/chat/thread/composer-permission-mode.tsx:201
+#: src/features/chat/thread/composer-permission-mode.tsx:227
 msgid "This comparison's mode applies to every column. Change it on the comparison."
 msgstr "This comparison's mode applies to every column. Change it on the comparison."
 
@@ -36363,7 +36379,7 @@ msgstr "This link has ended."
 msgid "This link is already in use in another browser."
 msgstr "This link is already in use in another browser."
 
-#: src/routes/dashboard/settings/connectors/callback.tsx:47
+#: src/routes/dashboard/settings/connectors/callback.tsx:48
 msgid "This link is incomplete."
 msgstr "This link is incomplete."
 
@@ -36718,7 +36734,7 @@ msgstr "This workflow file uses a version this app cannot read."
 msgid "This workflow may have been unpublished or deleted."
 msgstr "This workflow may have been unpublished or deleted."
 
-#: src/features/chat/thread/composer-research-depth.tsx:26
+#: src/features/chat/thread/composer-research-depth.tsx:27
 msgid "Thorough"
 msgstr "Thorough"
 
@@ -36811,12 +36827,12 @@ msgstr "Thread statistics"
 msgid "Thread summary"
 msgstr "Thread summary"
 
-#: src/features/settings/lib/settings-keywords.ts:95
+#: src/features/settings/lib/settings-keywords.ts:98
 msgid "thread titles"
 msgstr "thread titles"
 
 #: src/features/settings/components/personalization/personalization-settings.tsx:342
-#: src/features/settings/lib/settings-keywords.ts:95
+#: src/features/settings/lib/settings-keywords.ts:98
 msgid "Thread Titles"
 msgstr "Thread Titles"
 
@@ -37085,7 +37101,7 @@ msgstr "Tokens used on your own endpoint are not charged as credits. Daily messa
 msgid "Tokyo"
 msgstr "Tokyo"
 
-#: src/features/settings/lib/settings-keywords.ts:91
+#: src/features/settings/lib/settings-keywords.ts:94
 msgid "tone"
 msgstr "tone"
 
@@ -37170,7 +37186,7 @@ msgid "Tool output's share of the stored size"
 msgstr "Tool output's share of the stored size"
 
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:356
-#: src/features/settings/lib/settings-navigation.ts:96
+#: src/features/settings/lib/settings-navigation.ts:115
 msgid "Tool Permissions"
 msgstr "Tool Permissions"
 
@@ -37204,6 +37220,10 @@ msgstr "Tools for {0}"
 #: src/features/settings/components/chat/new-chat-permission-mode-setting.tsx:47
 msgid "Tools run on their own settings; a quick check can clear low-risk calls"
 msgstr "Tools run on their own settings; a quick check can clear low-risk calls"
+
+#: src/features/chat/thread/composer-status-line.tsx:79
+msgid "Tools run without asking"
+msgstr "Tools run without asking"
 
 #: src/features/marketing/use-cases/use-case-data.ts:69
 msgid "Tools that need your approval are not offered in messaging apps, because nobody can approve a card there."
@@ -37302,7 +37322,7 @@ msgstr "Track every token and dollar."
 msgid "Track your LLM token usage, cost, and set budget alerts"
 msgstr "Track your LLM token usage, cost, and set budget alerts"
 
-#: src/features/settings/lib/settings-keywords.ts:109
+#: src/features/settings/lib/settings-keywords.ts:116
 msgid "tracking"
 msgstr "tracking"
 
@@ -37365,7 +37385,7 @@ msgstr "Transformed Image"
 msgid "Translate"
 msgstr "Translate"
 
-#: src/features/chat/thread/composer.tsx:199
+#: src/features/chat/thread/composer.tsx:200
 msgid "Translate text to another language..."
 msgstr "Translate text to another language..."
 
@@ -37477,6 +37497,7 @@ msgstr "Trigger updated"
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:36
 #: src/features/layout/lib/dashboard-page-names.ts:40
 #: src/features/settings/components/chat/trigger-settings.tsx:733
+#: src/features/settings/lib/settings-navigation.ts:113
 msgid "Triggers"
 msgstr "Triggers"
 
@@ -37555,7 +37576,7 @@ msgstr "Try again"
 
 #: src/components/error-boundaries/global-error-boundary-provider.tsx:211
 #: src/components/error-boundaries/route-error-boundary.tsx:80
-#: src/components/settings/settings-modal.tsx:135
+#: src/components/settings/settings-modal.tsx:132
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:442
 msgid "Try Again"
 msgstr "Try Again"
@@ -37650,7 +37671,7 @@ msgstr "Turn on memory"
 msgid "Turns these tools off:"
 msgstr "Turns these tools off:"
 
-#: src/features/settings/lib/settings-keywords.ts:97
+#: src/features/settings/lib/settings-keywords.ts:100
 msgid "tutorial"
 msgstr "tutorial"
 
@@ -38329,7 +38350,7 @@ msgstr "Upgrade to Pro"
 msgid "Upgrade to Pro, monthly"
 msgstr "Upgrade to Pro, monthly"
 
-#: src/features/settings/lib/settings-keywords.ts:107
+#: src/features/settings/lib/settings-keywords.ts:114
 msgid "upload"
 msgstr "upload"
 
@@ -38504,6 +38525,7 @@ msgstr "US"
 #: src/features/chat/sidebar/usage-card.tsx:117
 #: src/features/layout/lib/dashboard-page-names.ts:41
 #: src/features/projects/components/project-usage-summary.tsx:50
+#: src/features/settings/lib/settings-navigation.ts:119
 msgid "Usage"
 msgstr "Usage"
 
@@ -38771,8 +38793,8 @@ msgid "Username: @{platformUsername}"
 msgstr "Username: @{platformUsername}"
 
 #: src/features/layout/lib/dashboard-page-names.ts:42
-#: src/routes/admin/route.tsx:29
-#: src/routes/admin/route.tsx:63
+#: src/routes/admin/route.tsx:30
+#: src/routes/admin/route.tsx:64
 msgid "Users"
 msgstr "Users"
 
@@ -39104,7 +39126,7 @@ msgstr "video"
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:767
 #: src/components/model-picker/model-picker.tsx:1278
 #: src/features/chat/sidebar/usage-card.tsx:130
-#: src/features/chat/thread/composer.tsx:131
+#: src/features/chat/thread/composer.tsx:132
 #: src/features/marketing/components/landing-footer.tsx:166
 #: src/features/settings/components/chat/default-models-settings.tsx:642
 #: src/features/settings/components/chat/models-settings.tsx:46
@@ -39685,7 +39707,7 @@ msgid "We're sorry, but the website has encountered an unexpected issue"
 msgstr "We're sorry, but the website has encountered an unexpected issue"
 
 #: src/features/canvas/components/design-preset-selector.tsx:66
-#: src/features/chat/thread/composer-search-mode.tsx:49
+#: src/features/chat/thread/composer-search-mode.tsx:50
 msgid "Web"
 msgstr "Web"
 
@@ -39827,7 +39849,7 @@ msgstr "Welcome back"
 msgid "Welcome to Neore"
 msgstr "Welcome to Neore"
 
-#: src/features/settings/lib/settings-keywords.ts:97
+#: src/features/settings/lib/settings-keywords.ts:100
 msgid "welcome tour"
 msgstr "welcome tour"
 
@@ -39970,7 +39992,7 @@ msgstr "What to watch"
 msgid "What users sent from the app, newest first"
 msgstr "What users sent from the app, newest first"
 
-#: src/features/settings/lib/settings-keywords.ts:108
+#: src/features/settings/lib/settings-keywords.ts:115
 msgid "what we store"
 msgstr "what we store"
 
@@ -40196,7 +40218,7 @@ msgstr "Without one, your SSH agent and default keys are used. Passwords are not
 msgid "Wix developer docs, Velo code assistance, and site management"
 msgstr "Wix developer docs, Velo code assistance, and site management"
 
-#: src/features/settings/lib/settings-keywords.ts:88
+#: src/features/settings/lib/settings-keywords.ts:91
 msgid "work"
 msgstr "work"
 
@@ -40317,7 +40339,7 @@ msgstr "Write long-form content alongside chat"
 msgid "Write long-form content in a side-by-side canvas editor. Go from chat to finished document without switching tools."
 msgstr "Write long-form content in a side-by-side canvas editor. Go from chat to finished document without switching tools."
 
-#: src/features/chat/thread/composer.tsx:192
+#: src/features/chat/thread/composer.tsx:193
 msgid "Write some code for me..."
 msgstr "Write some code for me..."
 
@@ -40354,7 +40376,7 @@ msgstr "Writing tests and checking that a change works."
 msgid "Writing the guide…"
 msgstr "Writing the guide…"
 
-#: src/features/chat/thread/composer-search-mode.tsx:51
+#: src/features/chat/thread/composer-search-mode.tsx:52
 msgid "X"
 msgstr "X"
 
@@ -40584,7 +40606,7 @@ msgstr "You cannot see that pull request on the host."
 msgid "You choose the schedule, the run destination and the project. The project must be one you can write to."
 msgstr "You choose the schedule, the run destination and the project. The project must be one you can write to."
 
-#: src/features/skills/components/skill-builder-setup.tsx:92
+#: src/features/skills/components/skill-builder-setup.tsx:88
 msgid "You chose these integrations in the agent builder. Each one opens for you to review before anything connects."
 msgstr "You chose these integrations in the agent builder. Each one opens for you to review before anything connects."
 
@@ -40751,7 +40773,7 @@ msgstr "You've successfully joined the thread. Redirecting..."
 msgid "Your {hostLabel} sign-in has expired. Connect it again."
 msgstr "Your {hostLabel} sign-in has expired. Connect it again."
 
-#: src/features/develop/components/failure-notice.tsx:18
+#: src/features/develop/components/failure-notice.tsx:19
 msgid "Your {label} sign-in has expired. Connect it again to keep reading."
 msgstr "Your {label} sign-in has expired. Connect it again to keep reading."
 
@@ -41163,7 +41185,7 @@ msgstr "Your unsaved version"
 msgid "Your watched repositories could not be loaded."
 msgstr "Your watched repositories could not be loaded."
 
-#: src/features/chat/thread/composer-search-mode.tsx:53
+#: src/features/chat/thread/composer-search-mode.tsx:54
 msgid "YouTube"
 msgstr "YouTube"
 

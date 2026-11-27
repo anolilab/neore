@@ -1240,7 +1240,7 @@ msgstr "{itemCount, plural, other {# 個の項目}}"
 msgid "{label} added to starred"
 msgstr "{label} をスター付きに追加しました"
 
-#: src/features/develop/components/failure-notice.tsx:17
+#: src/features/develop/components/failure-notice.tsx:18
 #: src/features/develop/lib/use-review-messages.ts:20
 msgid "{label} could not be reached or answered unexpectedly. Try again in a moment."
 msgstr "{label} に接続できないか、予期しない応答がありました。しばらくしてからもう一度お試しください。"
@@ -1258,12 +1258,12 @@ msgstr "{label} がこれを受け付けませんでした。"
 msgid "{label} did not answer, so it may have taken this. Check on {label} before trying again."
 msgstr "{label} から応答がなかったため、処理された可能性があります。再試行する前に {label} を確認してください。"
 
-#: src/features/develop/components/failure-notice.tsx:21
+#: src/features/develop/components/failure-notice.tsx:22
 #: src/features/develop/lib/use-review-messages.ts:24
 msgid "{label} is limiting requests for this account. Try again in a few minutes."
 msgstr "{label} がこのアカウントのリクエストを制限しています。数分後にもう一度お試しください。"
 
-#: src/features/develop/components/failure-notice.tsx:19
+#: src/features/develop/components/failure-notice.tsx:20
 msgid "{label} is not connected"
 msgstr "{label} に接続されていません"
 
@@ -1276,7 +1276,7 @@ msgstr "{label} に接続されていません。"
 msgid "{label} moved to position {position} of {0} in starred"
 msgstr "{label} をスター内の {position}/{0} 番目に移動しました"
 
-#: src/features/develop/components/failure-notice.tsx:14
+#: src/features/develop/components/failure-notice.tsx:15
 msgid "{label} refused this request. Your account may lack access, or an organization may require you to authorize the app."
 msgstr "{label} がこのリクエストを拒否しました。アカウントにアクセス権がないか、組織でアプリの承認が必要な可能性があります。"
 
@@ -1296,7 +1296,7 @@ msgstr "{label}、{count}"
 msgid "{maxReviewers, plural, one {Request at most # reviewer at a time.} other {Request at most # reviewers at a time.}}"
 msgstr "{maxReviewers, plural, other {一度にリクエストできるレビュアーは最大 # 人です。}}"
 
-#: src/features/chat/goal/composer-goal.tsx:98
+#: src/features/chat/goal/composer-goal.tsx:97
 msgid "{maxRounds} rounds"
 msgstr "{maxRounds} ラウンド"
 
@@ -1386,15 +1386,15 @@ msgstr "{name} — AI 動画生成モデル | Neore"
 msgid "{name} added to starred"
 msgstr "{name} をスター付きに追加しました"
 
-#: src/routes/dashboard/settings/connectors/callback.tsx:64
+#: src/routes/dashboard/settings/connectors/callback.tsx:65
 msgid "{name} connected"
 msgstr "{name} を接続しました"
 
-#: src/routes/dashboard/settings/connectors/callback.tsx:64
+#: src/routes/dashboard/settings/connectors/callback.tsx:65
 msgid "{name} connected to {accountLabel}"
 msgstr "{name} を {accountLabel} に接続しました"
 
-#: src/routes/dashboard/settings/connectors/callback.tsx:63
+#: src/routes/dashboard/settings/connectors/callback.tsx:64
 msgid "{name} connected."
 msgstr "{name} を接続しました。"
 
@@ -2369,14 +2369,14 @@ msgstr "{0} について"
 msgid "about {0} (opens in a new tab)"
 msgstr "{0} について（新しいタブで開きます）"
 
-#: src/features/settings/lib/settings-keywords.ts:89
+#: src/features/settings/lib/settings-keywords.ts:92
 msgid "about me"
 msgstr "自己紹介"
 
 #: src/features/settings/components/personalization/personalization-settings.tsx:225
-#: src/features/settings/lib/settings-keywords.ts:87
-#: src/features/settings/lib/settings-keywords.ts:88
-#: src/features/settings/lib/settings-keywords.ts:89
+#: src/features/settings/lib/settings-keywords.ts:90
+#: src/features/settings/lib/settings-keywords.ts:91
+#: src/features/settings/lib/settings-keywords.ts:92
 msgid "About You"
 msgstr "あなたについて"
 
@@ -2384,7 +2384,7 @@ msgstr "あなたについて"
 msgid "Above {FREE_PLAN_MAX_HEIGHT}p needs a Pro plan. Otherwise the video renders at {FREE_PLAN_MAX_HEIGHT}p."
 msgstr "{FREE_PLAN_MAX_HEIGHT}p を超えるには Pro プランが必要です。それ以外は {FREE_PLAN_MAX_HEIGHT}p で動画が生成されます。"
 
-#: src/features/chat/thread/composer-search-mode.tsx:50
+#: src/features/chat/thread/composer-search-mode.tsx:51
 msgid "Academic"
 msgstr "学術"
 
@@ -2442,7 +2442,7 @@ msgstr "Neore で利用する"
 msgid "Access to real-time information from X/Twitter data"
 msgstr "X/Twitter のデータによるリアルタイム情報へのアクセス"
 
-#: src/routes/dashboard/settings/connectors/callback.tsx:37
+#: src/routes/dashboard/settings/connectors/callback.tsx:38
 msgid "Access was not granted."
 msgstr "アクセスが許可されませんでした。"
 
@@ -2463,8 +2463,8 @@ msgid "Accessing Veo 3.1 quality with audio at faster speeds and a more accessib
 msgstr "Veo 3.1 の品質と音声を、より高速かつ手頃な価格で"
 
 #: src/features/layout/lib/dashboard-page-names.ts:11
-#: src/features/settings/lib/settings-navigation.ts:104
-#: src/features/settings/lib/settings-navigation.ts:113
+#: src/features/settings/lib/settings-navigation.ts:132
+#: src/features/settings/lib/settings-navigation.ts:142
 msgid "Account"
 msgstr "アカウント"
 
@@ -3029,9 +3029,9 @@ msgstr "調整"
 #: src/features/chat/sharing/thread-share-button.tsx:323
 #: src/features/layout/components/sidebar-shortcut.tsx:266
 #: src/features/layout/lib/dashboard-page-names.ts:12
-#: src/routes/admin/route.tsx:56
-#: src/routes/admin/route.tsx:76
-#: src/routes/admin/route.tsx:87
+#: src/routes/admin/route.tsx:57
+#: src/routes/admin/route.tsx:77
+#: src/routes/admin/route.tsx:88
 msgid "Admin"
 msgstr "管理者"
 
@@ -3249,7 +3249,7 @@ msgstr "外部コンテンツ参照後"
 #: src/features/chat/host/host-composer.tsx:756
 #: src/features/evals/components/dataset-panel.tsx:102
 #: src/features/layout/lib/dashboard-page-names.ts:14
-#: src/features/settings/lib/settings-navigation.ts:94
+#: src/features/settings/lib/settings-navigation.ts:111
 #: src/features/tasks/components/task-form-dialog.tsx:354
 msgid "Agent"
 msgstr "エージェント"
@@ -3314,7 +3314,7 @@ msgstr "両方の実行の集計スコア"
 msgid "AI"
 msgstr "AI"
 
-#: src/routes/admin/route.tsx:73
+#: src/routes/admin/route.tsx:74
 msgid "AI Chat"
 msgstr "AI チャット"
 
@@ -3950,7 +3950,7 @@ msgstr "分析的"
 msgid "Analytical (deep structure)"
 msgstr "分析的（深い構造）"
 
-#: src/features/settings/lib/settings-keywords.ts:109
+#: src/features/settings/lib/settings-keywords.ts:116
 msgid "analytics"
 msgstr "アナリティクス"
 
@@ -4172,9 +4172,9 @@ msgstr "API キーを作成しました"
 #: src/features/auth/components/settings/api-key/api-keys-card.tsx:80
 #: src/features/layout/lib/dashboard-page-names.ts:15
 #: src/features/settings/components/chat/api-keys-settings.tsx:554
-#: src/features/settings/lib/settings-navigation.ts:98
-#: src/features/settings/lib/settings-navigation.ts:106
-#: src/routes/admin/route.tsx:61
+#: src/features/settings/lib/settings-navigation.ts:117
+#: src/features/settings/lib/settings-navigation.ts:134
+#: src/routes/admin/route.tsx:62
 msgid "API Keys"
 msgstr "API キー"
 
@@ -4192,7 +4192,7 @@ msgid "API version"
 msgstr "API バージョン"
 
 #: src/features/layout/lib/dashboard-page-names.ts:16
-#: src/features/settings/lib/settings-navigation.ts:85
+#: src/features/settings/lib/settings-navigation.ts:101
 msgid "App"
 msgstr "アプリ"
 
@@ -4278,8 +4278,8 @@ msgstr "スタイルを適用"
 msgid "Applying..."
 msgstr "適用しています..."
 
-#: src/features/settings/lib/settings-keywords.ts:102
-#: src/features/settings/lib/settings-keywords.ts:103
+#: src/features/settings/lib/settings-keywords.ts:105
+#: src/features/settings/lib/settings-keywords.ts:106
 msgid "approval"
 msgstr "承認"
 
@@ -4599,7 +4599,7 @@ msgstr "Krea の美的クオリティを、オープンソースで手軽に使�
 msgid "Asc"
 msgstr "昇順"
 
-#: src/features/settings/lib/settings-keywords.ts:102
+#: src/features/settings/lib/settings-keywords.ts:105
 msgid "ask"
 msgstr "質問"
 
@@ -4637,7 +4637,7 @@ msgstr "何でも質問して新しいチャットを始めましょう…"
 msgid "Ask GPT-4, Claude, and Gemini the same question. Run the same prompt across FLUX, Imagen, and Stable Diffusion. Pick the winner — not the default."
 msgstr "GPT-4、Claude、Gemini に同じ質問をしましょう。同じプロンプトを FLUX、Imagen、Stable Diffusion で実行できます。既定ではなく、勝者を選びましょう。"
 
-#: src/features/chat/thread/composer.tsx:191
+#: src/features/chat/thread/composer.tsx:192
 msgid "Ask me anything..."
 msgstr "何でも聞いてください..."
 
@@ -4787,7 +4787,7 @@ msgstr "オークランド"
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:781
 #: src/components/model-picker/model-picker.tsx:1291
 #: src/features/chat/sidebar/usage-card.tsx:131
-#: src/features/chat/thread/composer.tsx:132
+#: src/features/chat/thread/composer.tsx:133
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:85
 #: src/features/workflow/components/gallery/gallery-card.tsx:25
 #: src/features/workflow/components/gallery/publish-dialog.tsx:31
@@ -4815,8 +4815,8 @@ msgstr "音声・動画"
 
 #: src/features/admin/components/audit-log-card.tsx:130
 #: src/features/layout/lib/dashboard-page-names.ts:18
-#: src/routes/admin/route.tsx:34
-#: src/routes/admin/route.tsx:57
+#: src/routes/admin/route.tsx:35
+#: src/routes/admin/route.tsx:58
 msgid "Audit Log"
 msgstr "監査ログ"
 
@@ -4841,14 +4841,14 @@ msgstr "認証"
 msgid "Authentication Required"
 msgstr "認証が必要です"
 
-#: src/features/settings/lib/settings-keywords.ts:102
+#: src/features/settings/lib/settings-keywords.ts:105
 msgid "auto"
 msgstr "自動"
 
 #: src/features/chat/thread/composer-image-settings.tsx:28
 #: src/features/chat/thread/composer-image-settings.tsx:52
 #: src/features/chat/thread/composer-image-settings.tsx:192
-#: src/features/chat/thread/composer-model-selector.tsx:123
+#: src/features/chat/thread/composer-model-selector.tsx:133
 #: src/features/chat/thread/composer-permission-mode.tsx:42
 #: src/features/chat/thread/composer-video-settings.tsx:24
 #: src/features/chat/thread/media-gallery-view.tsx:65
@@ -5099,7 +5099,7 @@ msgstr "エディターに戻る"
 msgid "Back to Gallery"
 msgstr "ギャラリーに戻る"
 
-#: src/components/settings/settings-modal.tsx:595
+#: src/components/settings/settings-modal.tsx:667
 msgid "Back to settings sections"
 msgstr "設定セクションに戻る"
 
@@ -5107,7 +5107,7 @@ msgstr "設定セクションに戻る"
 msgid "Back to workflows"
 msgstr "ワークフローに戻る"
 
-#: src/features/settings/lib/settings-keywords.ts:89
+#: src/features/settings/lib/settings-keywords.ts:92
 msgid "background"
 msgstr "バックグラウンド"
 
@@ -5119,7 +5119,7 @@ msgstr "背景色（任意）"
 msgid "Background Removal"
 msgstr "背景除去"
 
-#: src/features/settings/lib/settings-keywords.ts:106
+#: src/features/settings/lib/settings-keywords.ts:113
 msgid "backup"
 msgstr "バックアップ"
 
@@ -5162,7 +5162,7 @@ msgstr "バックアップモデル"
 msgid "balanced"
 msgstr "バランス型"
 
-#: src/features/chat/thread/composer-research-depth.tsx:24
+#: src/features/chat/thread/composer-research-depth.tsx:25
 msgid "Balanced"
 msgstr "バランス"
 
@@ -5442,7 +5442,7 @@ msgstr "大きな作業はこのモデルに任され、簡単な質問はチャ
 msgid "Billed to your own API key, not your credits."
 msgstr "クレジットではなく、ご自身の API キーに課金されます。"
 
-#: src/features/settings/lib/settings-navigation.ts:109
+#: src/features/settings/lib/settings-navigation.ts:137
 msgid "Billing"
 msgstr "請求"
 
@@ -5469,7 +5469,7 @@ msgstr "請求設定を更新しました"
 msgid "Binary"
 msgstr "バイナリ"
 
-#: src/features/settings/lib/settings-keywords.ts:89
+#: src/features/settings/lib/settings-keywords.ts:92
 msgid "bio"
 msgstr "プロフィール"
 
@@ -5606,6 +5606,7 @@ msgid "Bot token from the Discord Developer Portal"
 msgstr "Discord Developer Portal で取得したボットトークン"
 
 #: src/features/layout/lib/dashboard-page-names.ts:17
+#: src/features/settings/lib/settings-navigation.ts:112
 msgid "Bots"
 msgstr "ボット"
 
@@ -5729,7 +5730,7 @@ msgstr "独自キーの持ち込み（BYOK）"
 msgid "Broad style range from photorealism to illustration"
 msgstr "フォトリアリズムからイラストまで幅広いスタイル"
 
-#: src/features/settings/lib/settings-keywords.ts:84
+#: src/features/settings/lib/settings-keywords.ts:86
 msgid "browse"
 msgstr "閲覧"
 
@@ -5870,7 +5871,7 @@ msgstr "生成前の組み込み推論"
 
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:374
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:375
-#: src/features/settings/lib/settings-keywords.ts:102
+#: src/features/settings/lib/settings-keywords.ts:105
 msgid "Built-in tools"
 msgstr "組み込みツール"
 
@@ -6043,7 +6044,7 @@ msgstr "キャッシュヒット率"
 msgid "Cached input"
 msgstr "キャッシュ入力"
 
-#: src/features/settings/lib/settings-keywords.ts:87
+#: src/features/settings/lib/settings-keywords.ts:90
 msgid "call me"
 msgstr "呼び名"
 
@@ -6360,7 +6361,7 @@ msgstr "カタルーニャ語"
 msgid "Catalan (Spain)"
 msgstr "カタルーニャ語（スペイン）"
 
-#: src/features/settings/lib/settings-keywords.ts:84
+#: src/features/settings/lib/settings-keywords.ts:86
 msgid "catalog"
 msgstr "カタログ"
 
@@ -6541,7 +6542,7 @@ msgstr "チャット"
 
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:29
 #: src/features/chat/split/chat-split-view.tsx:116
-#: src/features/chat/thread/composer-search-mode.tsx:48
+#: src/features/chat/thread/composer-search-mode.tsx:49
 #: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:66
 #: src/features/layout/components/sidebar-shortcut.tsx:79
 #: src/features/layout/components/workspace-switch.tsx:47
@@ -6549,7 +6550,7 @@ msgstr "チャット"
 #: src/features/settings/components/account/account-settings.tsx:347
 #: src/features/settings/components/chat/bots-settings.tsx:515
 #: src/features/settings/lib/settings-keywords.ts:33
-#: src/features/settings/lib/settings-navigation.ts:100
+#: src/features/settings/lib/settings-navigation.ts:121
 msgid "Chat"
 msgstr "チャット"
 
@@ -6631,7 +6632,7 @@ msgstr "チャットの文字サイズ"
 msgid "Chat text size updated"
 msgstr "チャットの文字サイズを更新しました"
 
-#: src/features/settings/lib/settings-keywords.ts:95
+#: src/features/settings/lib/settings-keywords.ts:98
 msgid "chat titles"
 msgstr "チャットのタイトル"
 
@@ -6647,7 +6648,7 @@ msgstr "Feishu または Lark のカスタムアプリボットから、ダイ�
 msgid "Chat, create, <0>and build.</0>"
 msgstr "チャットして、創作して、<0>構築しよう。</0>"
 
-#: src/features/settings/lib/settings-keywords.ts:107
+#: src/features/settings/lib/settings-keywords.ts:114
 msgid "chatgpt"
 msgstr "chatgpt"
 
@@ -6898,7 +6899,7 @@ msgstr "開始するには、左側から 1 つ選んでください。"
 msgid "Choose prompt improvement style"
 msgstr "プロンプト改善のスタイルを選択"
 
-#: src/features/chat/thread/composer-search-mode.tsx:94
+#: src/features/chat/thread/composer-search-mode.tsx:108
 msgid "Choose Search Mode"
 msgstr "検索モードを選択"
 
@@ -7016,7 +7017,7 @@ msgstr "循環供給量"
 msgid "city"
 msgstr "都市"
 
-#: src/features/settings/lib/settings-keywords.ts:107
+#: src/features/settings/lib/settings-keywords.ts:114
 msgid "claude"
 msgstr "claude"
 
@@ -7044,8 +7045,8 @@ msgstr "データのクリーンアップ"
 msgid "Clean title slide"
 msgstr "すっきりしたタイトルスライド"
 
-#: src/routes/admin/route.tsx:49
-#: src/routes/admin/route.tsx:58
+#: src/routes/admin/route.tsx:50
+#: src/routes/admin/route.tsx:59
 msgid "Cleanup"
 msgstr "クリーンアップ"
 
@@ -7341,7 +7342,7 @@ msgstr "Cloudflare Workers AI のモデルは Cloudflare に空きのある場�
 #: src/features/auth/components/device-code-parts.tsx:80
 #: src/features/auth/components/device-code-parts.tsx:134
 #: src/features/canvas/canvas-panel.tsx:770
-#: src/features/chat/thread/composer-search-mode.tsx:56
+#: src/features/chat/thread/composer-search-mode.tsx:57
 #: src/features/code/components/code-workspace.tsx:219
 #: src/features/layout/components/workspace-switch.tsx:48
 #: src/features/workflow/components/nodes/code-node.tsx:60
@@ -7393,7 +7394,7 @@ msgstr "コードナビゲーション"
 msgid "Code output"
 msgstr "コードの出力"
 
-#: src/features/settings/lib/settings-keywords.ts:99
+#: src/features/settings/lib/settings-keywords.ts:102
 msgid "code review"
 msgstr "コードレビュー"
 
@@ -7882,7 +7883,7 @@ msgstr "完了"
 msgid "Completed"
 msgstr "完了"
 
-#: src/routes/dashboard/settings/connectors/callback.tsx:20
+#: src/routes/dashboard/settings/connectors/callback.tsx:21
 msgid "Completing the connection..."
 msgstr "接続を完了しています..."
 
@@ -7976,6 +7977,10 @@ msgstr "視覚入力に対する透明な思考を必要とする複雑な視覚
 msgid "Composer"
 msgstr "コンポーザー"
 
+#: src/features/chat/thread/composer-status-line.tsx:57
+msgid "Composer status"
+msgstr "入力欄の状態"
+
 #: src/features/marketing/data/models-data.ts:132
 msgid "composition"
 msgstr "構図"
@@ -8063,7 +8068,7 @@ msgstr "このスレッドの変数の値を設定します。プロンプトを
 msgid "Configure Variables"
 msgstr "変数を設定"
 
-#: src/components/settings/settings-modal.tsx:510
+#: src/components/settings/settings-modal.tsx:582
 msgid "Configure your application settings"
 msgstr "アプリケーションの設定を構成します"
 
@@ -8125,7 +8130,7 @@ msgstr "{base} とのコンフリクト"
 
 #: src/features/devices/components/devices-settings.tsx:297
 #: src/features/settings/connectors/messenger/messenger-platform-card.tsx:250
-#: src/features/skills/components/skill-builder-setup.tsx:136
+#: src/features/skills/components/skill-builder-setup.tsx:132
 #: src/routes/auth/extension.tsx:156
 msgid "Connect"
 msgstr "接続"
@@ -8135,12 +8140,12 @@ msgstr "接続"
 msgid "Connect {0}"
 msgstr "{0} を接続"
 
-#: src/features/develop/components/connect-host-card.tsx:20
-#: src/features/develop/components/connect-host-card.tsx:24
+#: src/features/develop/components/connect-host-card.tsx:21
+#: src/features/develop/components/connect-host-card.tsx:25
 msgid "Connect {label}"
 msgstr "{label} に接続"
 
-#: src/features/develop/components/failure-notice.tsx:19
+#: src/features/develop/components/failure-notice.tsx:20
 msgid "Connect {label} to see what needs your review here."
 msgstr "{label} に接続すると、ここでレビューが必要なものを確認できます。"
 
@@ -8256,7 +8261,7 @@ msgstr "WeChat 公式アカウントを接続"
 msgid "Connect WhatsApp"
 msgstr "WhatsApp を接続"
 
-#: src/features/develop/components/connect-host-card.tsx:21
+#: src/features/develop/components/connect-host-card.tsx:22
 msgid "Connect your {label} account to see what needs your review, what is yours, and what is ready to merge."
 msgstr "{label} アカウントに接続すると、レビューが必要なもの、自分のもの、マージ可能なものを確認できます。"
 
@@ -8323,7 +8328,7 @@ msgstr "{pairingHost} に接続しています…"
 msgid "Connecting to your MCP servers..."
 msgstr "MCP サーバーに接続しています..."
 
-#: src/routes/dashboard/settings/connectors/callback.tsx:86
+#: src/routes/dashboard/settings/connectors/callback.tsx:87
 msgid "Connecting..."
 msgstr "接続しています..."
 
@@ -8379,16 +8384,18 @@ msgstr "コネクタを切断しました。プロバイダーの設定にまだ
 #. placeholder {0}: CONNECTOR_LABELS[connector.id] ?? connector.id
 #. placeholder {0}: connectorLabels[connector.id] ?? connector.id
 #: src/features/skills/components/skill-builder-review.tsx:276
-#: src/features/skills/components/skill-builder-setup.tsx:122
+#: src/features/skills/components/skill-builder-setup.tsx:118
 msgid "Connector: {0}"
 msgstr "コネクタ：{0}"
 
-#: src/features/settings/lib/settings-keywords.ts:84
+#: src/features/settings/lib/settings-keywords.ts:86
 msgid "connectors"
 msgstr "コネクタ"
 
 #: src/features/layout/lib/dashboard-page-names.ts:21
 #: src/features/settings/connectors/connectors-page.tsx:39
+#: src/features/settings/lib/settings-navigation.ts:125
+#: src/features/settings/lib/settings-navigation.ts:128
 msgid "Connectors"
 msgstr "コネクタ"
 
@@ -8397,7 +8404,7 @@ msgid "Connectors talk to each provider's own MCP server over OAuth 2.0. Your to
 msgstr "コネクタは、各プロバイダー独自の MCP サーバーと OAuth 2.0 で通信します。トークンは暗号化して保存され、データを変更できるツールを使う前には AI が確認し、切断するとアクセス権が取り消されます。"
 
 #: src/features/settings/components/privacy/consent-preferences.tsx:17
-#: src/features/settings/lib/settings-keywords.ts:109
+#: src/features/settings/lib/settings-keywords.ts:116
 msgid "Consent Preferences"
 msgstr "同意設定"
 
@@ -8724,7 +8731,7 @@ msgstr "TypeScript に変換"
 msgid "Converting..."
 msgstr "変換しています..."
 
-#: src/features/settings/lib/settings-keywords.ts:109
+#: src/features/settings/lib/settings-keywords.ts:116
 msgid "cookies"
 msgstr "クッキー"
 
@@ -9023,7 +9030,7 @@ msgstr "メッセージをキャンセルできませんでした。まだキュ
 msgid "Could not cancel the run."
 msgstr "実行をキャンセルできませんでした。"
 
-#: src/features/chat/thread/composer-model-selector.tsx:130
+#: src/features/chat/thread/composer-model-selector.tsx:140
 msgid "Could not change Auto. Please try again."
 msgstr "Autoを変更できませんでした。もう一度お試しください。"
 
@@ -9040,7 +9047,7 @@ msgstr "ボットの権限モードを変更できませんでした。"
 msgid "Could not change the model. Please try again."
 msgstr "モデルを変更できませんでした。もう一度お試しください。"
 
-#: src/features/chat/thread/composer-permission-mode.tsx:205
+#: src/features/chat/thread/composer-permission-mode.tsx:231
 msgid "Could not change the permission mode. Please try again."
 msgstr "権限モードを変更できませんでした。もう一度お試しください。"
 
@@ -9222,7 +9229,7 @@ msgstr "サブエージェントのリクエストを読み込めませんでし
 msgid "Could not load the threads for this {requestNoun}."
 msgstr "この{requestNoun}のスレッドを読み込めませんでした。"
 
-#: src/features/develop/components/failure-notice.tsx:17
+#: src/features/develop/components/failure-notice.tsx:18
 msgid "Could not load this"
 msgstr "読み込めませんでした"
 
@@ -9651,7 +9658,7 @@ msgstr "タグを作成…"
 msgid "Create a task, give it success criteria, and run it. You can chain tasks with dependencies and repeat them on a schedule."
 msgstr "タスクを作成し、成功基準を設定して実行します。依存関係でタスクをつなげたり、スケジュールで繰り返したりできます。"
 
-#: src/components/settings/settings-modal.tsx:162
+#: src/components/settings/settings-modal.tsx:159
 msgid "Create an account"
 msgstr "アカウントを作成"
 
@@ -9968,11 +9975,11 @@ msgstr "cron のプリセット"
 msgid "Crop"
 msgstr "切り抜き"
 
-#: src/features/chat/thread/composer-search-mode.tsx:55
+#: src/features/chat/thread/composer-search-mode.tsx:56
 msgid "Crypto"
 msgstr "暗号資産"
 
-#: src/features/chat/thread/composer-search-mode.tsx:55
+#: src/features/chat/thread/composer-search-mode.tsx:56
 msgid "Cryptocurrency research"
 msgstr "暗号資産のリサーチ"
 
@@ -10069,7 +10076,7 @@ msgstr "カスタムエンドポイント"
 msgid "Custom Endpoints"
 msgstr "カスタムエンドポイント"
 
-#: src/features/settings/lib/settings-keywords.ts:91
+#: src/features/settings/lib/settings-keywords.ts:94
 msgid "custom instructions"
 msgstr "カスタム指示"
 
@@ -10079,7 +10086,7 @@ msgstr "カスタム指示"
 
 #: src/features/settings/components/personalization/personalization-settings.tsx:310
 #: src/features/settings/components/personalization/personalization-settings.tsx:325
-#: src/features/settings/lib/settings-keywords.ts:93
+#: src/features/settings/lib/settings-keywords.ts:96
 msgid "Custom Instructions"
 msgstr "カスタム指示"
 
@@ -10120,11 +10127,11 @@ msgid "Customer messaging and support platform"
 msgstr "カスタマーメッセージングとサポートのプラットフォーム"
 
 #: src/features/layout/lib/dashboard-page-names.ts:22
-#: src/features/settings/lib/settings-navigation.ts:82
+#: src/features/settings/lib/settings-navigation.ts:98
 msgid "Customization"
 msgstr "カスタマイズ"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:145
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:141
 msgid "Customize"
 msgstr "カスタマイズ"
 
@@ -10252,7 +10259,7 @@ msgid "Darken"
 msgstr "暗くする"
 
 #: src/features/layout/lib/dashboard-page-names.ts:13
-#: src/routes/admin/route.tsx:24
+#: src/routes/admin/route.tsx:25
 msgid "Dashboard"
 msgstr "ダッシュボード"
 
@@ -10265,12 +10272,12 @@ msgid "Data & Analysis"
 msgstr "データと分析"
 
 #: src/features/settings/components/privacy/data-access.tsx:21
-#: src/features/settings/lib/settings-keywords.ts:108
+#: src/features/settings/lib/settings-keywords.ts:115
 msgid "Data Access Summary"
 msgstr "データアクセスの概要"
 
 #: src/features/settings/components/privacy/data-export.tsx:99
-#: src/features/settings/lib/settings-keywords.ts:106
+#: src/features/settings/lib/settings-keywords.ts:113
 msgid "Data Export"
 msgstr "データのエクスポート"
 
@@ -10346,7 +10353,7 @@ msgstr "ディベートのラウンド数"
 msgid "Debates for {0} rounds."
 msgstr "{0} ラウンドにわたって討論します。"
 
-#: src/features/chat/thread/composer.tsx:197
+#: src/features/chat/thread/composer.tsx:198
 msgid "Debug an error or review my code..."
 msgstr "エラーのデバッグやコードレビューなど..."
 
@@ -10407,7 +10414,7 @@ msgstr "Kimi K2.5 の透明な思考機能による深い推論タスク"
 msgid "Deep Research"
 msgstr "ディープリサーチ"
 
-#: src/features/chat/thread/composer-research-depth.tsx:32
+#: src/features/chat/thread/composer-research-depth.tsx:39
 msgid "Deep research, many queries"
 msgstr "詳細なリサーチ、多数のクエリ"
 
@@ -10569,7 +10576,7 @@ msgstr "動画の理解と文字起こしの既定のモデル"
 msgid "Default model updated"
 msgstr "既定のモデルを更新しました"
 
-#: src/features/settings/lib/settings-navigation.ts:92
+#: src/features/settings/lib/settings-navigation.ts:108
 msgid "Default Models"
 msgstr "既定のモデル"
 
@@ -10605,7 +10612,7 @@ msgstr "角度"
 msgid "Delayed"
 msgstr "遅延"
 
-#: src/features/settings/lib/settings-keywords.ts:99
+#: src/features/settings/lib/settings-keywords.ts:102
 msgid "delegate"
 msgstr "委任"
 
@@ -11317,6 +11324,7 @@ msgstr "デバイスを削除しました"
 
 #: src/features/devices/components/devices-settings.tsx:640
 #: src/features/layout/lib/dashboard-page-names.ts:23
+#: src/features/settings/lib/settings-navigation.ts:118
 msgid "Devices"
 msgstr "デバイス"
 
@@ -11497,7 +11505,7 @@ msgstr "メッセージを破棄"
 msgid "Dismiss note: {snippet}"
 msgstr "メッセージを破棄: {snippet}"
 
-#: src/features/skills/components/skill-builder-setup.tsx:94
+#: src/features/skills/components/skill-builder-setup.tsx:90
 msgid "Dismiss setup suggestions"
 msgstr "セットアップの提案を閉じる"
 
@@ -11671,7 +11679,7 @@ msgstr "ダブルクリックして名前を変更"
 msgid "down"
 msgstr "下"
 
-#: src/features/settings/lib/settings-keywords.ts:106
+#: src/features/settings/lib/settings-keywords.ts:113
 msgid "download"
 msgstr "ダウンロード"
 
@@ -11830,7 +11838,7 @@ msgstr "下書き"
 msgid "Draft a cover letter for a software engineering position"
 msgstr "ソフトウェアエンジニア職のカバーレターを作成する"
 
-#: src/features/chat/thread/composer.tsx:195
+#: src/features/chat/thread/composer.tsx:196
 msgid "Draft an email, report, or essay..."
 msgstr "メール、レポート、エッセイなどの下書き..."
 
@@ -13675,7 +13683,7 @@ msgstr "有効期限：{expiresAt}"
 msgid "Expiring soon"
 msgstr "まもなく期限切れ"
 
-#: src/features/chat/thread/composer.tsx:198
+#: src/features/chat/thread/composer.tsx:199
 msgid "Explain a concept in simple terms..."
 msgstr "概念をわかりやすく説明して..."
 
@@ -13966,7 +13974,7 @@ msgstr "フィルタールールをクリアできませんでした"
 msgid "Failed to clear memories"
 msgstr "メモリを消去できませんでした"
 
-#: src/routes/dashboard/settings/connectors/callback.tsx:74
+#: src/routes/dashboard/settings/connectors/callback.tsx:75
 msgid "Failed to connect"
 msgstr "接続できませんでした"
 
@@ -15015,7 +15023,7 @@ msgid "Favicon"
 msgstr "ファビコン"
 
 #: src/features/settings/components/chat/favorite-models-settings.tsx:118
-#: src/features/settings/lib/settings-keywords.ts:85
+#: src/features/settings/lib/settings-keywords.ts:88
 msgid "Favorite models"
 msgstr "お気に入りのモデル"
 
@@ -15060,8 +15068,8 @@ msgstr "フィード画像"
 
 #: src/features/admin/components/feedback-admin-page.tsx:139
 #: src/features/admin/components/feedback-admin-page.tsx:154
-#: src/routes/admin/route.tsx:39
-#: src/routes/admin/route.tsx:59
+#: src/routes/admin/route.tsx:40
+#: src/routes/admin/route.tsx:60
 msgid "Feedback"
 msgstr "フィードバック"
 
@@ -15322,8 +15330,8 @@ msgstr "結果を絞り込む"
 msgid "Filter rules updated"
 msgstr "フィルタールールを更新しました"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:151
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:157
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:147
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:153
 msgid "Filter shortcuts"
 msgstr "ショートカットを絞り込む"
 
@@ -15394,7 +15402,7 @@ msgid "Fine-tune CFG scale, sampler, scheduler, and seed"
 msgstr "CFG スケール、サンプラー、スケジューラー、シードを微調整"
 
 #. placeholder {0}: pending.name
-#: src/features/skills/components/skill-builder-setup.tsx:90
+#: src/features/skills/components/skill-builder-setup.tsx:86
 msgid "Finish setting up \"{0}\""
 msgstr "「{0}」のセットアップを完了"
 
@@ -15647,7 +15655,7 @@ msgstr "このモデル用"
 msgid "Forest"
 msgstr "フォレスト"
 
-#: src/features/settings/lib/settings-keywords.ts:96
+#: src/features/settings/lib/settings-keywords.ts:99
 msgid "forget"
 msgstr "忘れる"
 
@@ -16078,7 +16086,7 @@ msgid "Gamma"
 msgstr "ガンマ"
 
 #: src/features/marketing/components/gateway-navbar.tsx:43
-#: src/routes/admin/route.tsx:60
+#: src/routes/admin/route.tsx:61
 msgid "Gateway"
 msgstr "ゲートウェイ"
 
@@ -16090,8 +16098,8 @@ msgstr "ゲートウェイのセクション"
 msgid "Gaussian Blur"
 msgstr "ガウスぼかし"
 
-#: src/features/settings/lib/settings-keywords.ts:106
-#: src/features/settings/lib/settings-keywords.ts:108
+#: src/features/settings/lib/settings-keywords.ts:113
+#: src/features/settings/lib/settings-keywords.ts:115
 msgid "gdpr"
 msgstr "gdpr"
 
@@ -16099,7 +16107,7 @@ msgstr "gdpr"
 msgid "GDPR Requests:"
 msgstr "GDPR リクエスト："
 
-#: src/features/settings/lib/settings-keywords.ts:107
+#: src/features/settings/lib/settings-keywords.ts:114
 msgid "gemini"
 msgstr "gemini"
 
@@ -16190,7 +16198,7 @@ msgstr "テキストプロンプトから画像を生成し、4 倍にアップ�
 msgid "Generate an image of a cozy reading nook with warm lighting and plants."
 msgstr "暖かい照明と植物に囲まれた居心地のよい読書スペースの画像を生成して。"
 
-#: src/features/chat/thread/composer.tsx:200
+#: src/features/chat/thread/composer.tsx:201
 msgid "Generate an image or video..."
 msgstr "画像または動画を生成..."
 
@@ -16427,7 +16435,7 @@ msgid "GIF image"
 msgstr "GIF 画像"
 
 #: src/features/appearance/components/appearance-controls.tsx:173
-#: src/features/chat/thread/composer-search-mode.tsx:57
+#: src/features/chat/thread/composer-search-mode.tsx:58
 #: src/features/settings/components/chat/webhook-trigger-fields.tsx:78
 #: src/features/skills/components/skill-item.tsx:82
 msgid "GitHub"
@@ -16608,6 +16616,7 @@ msgid "Goal: {goalTitle}"
 msgstr "目標：{goalTitle}"
 
 #: src/features/chat/goal/composer-goal.tsx:66
+#: src/features/chat/thread/composer-status-line.tsx:73
 msgid "Goal: run until done"
 msgstr "目標: 完了するまで実行"
 
@@ -17557,7 +17566,7 @@ msgid "How often the agent retries with the verifier's feedback before asking yo
 msgstr "レビューを依頼する前に、エージェントが検証役のフィードバックをもとに再試行する回数です。"
 
 #: src/features/settings/components/personalization/personalization-settings.tsx:346
-#: src/features/settings/lib/settings-keywords.ts:95
+#: src/features/settings/lib/settings-keywords.ts:98
 msgid "How should titles be written?"
 msgstr "タイトルはどのように書きますか？"
 
@@ -17574,7 +17583,7 @@ msgid "How Triggers Work"
 msgstr "トリガーの仕組み"
 
 #: src/features/settings/components/personalization/personalization-settings.tsx:314
-#: src/features/settings/lib/settings-keywords.ts:92
+#: src/features/settings/lib/settings-keywords.ts:95
 msgid "How would you like the AI to respond?"
 msgstr "AI にどのように応答してほしいですか？"
 
@@ -17731,7 +17740,7 @@ msgstr "イラスト"
 #: src/components/model-picker/model-picker.tsx:1265
 #: src/features/chat/image-gallery/thread-image-gallery.tsx:80
 #: src/features/chat/sidebar/usage-card.tsx:129
-#: src/features/chat/thread/composer.tsx:130
+#: src/features/chat/thread/composer.tsx:131
 #: src/features/marketing/components/landing-footer.tsx:165
 #: src/features/settings/components/chat/default-models-settings.tsx:600
 #: src/features/settings/components/chat/models-settings.tsx:41
@@ -18003,7 +18012,7 @@ msgid "Import complete!"
 msgstr "インポートが完了しました！"
 
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:333
-#: src/features/settings/lib/settings-keywords.ts:107
+#: src/features/settings/lib/settings-keywords.ts:114
 msgid "Import Conversations"
 msgstr "会話をインポート"
 
@@ -18441,7 +18450,7 @@ msgstr "Instagram 投稿"
 msgid "Instagram Story"
 msgstr "Instagram ストーリー"
 
-#: src/features/settings/lib/settings-keywords.ts:84
+#: src/features/settings/lib/settings-keywords.ts:86
 msgid "install"
 msgstr "インストール"
 
@@ -18480,7 +18489,7 @@ msgstr "指示追従型"
 msgid "Instruction files"
 msgstr "指示ファイル"
 
-#: src/features/settings/lib/settings-keywords.ts:100
+#: src/features/settings/lib/settings-keywords.ts:103
 msgid "instructions"
 msgstr "指示"
 
@@ -18518,7 +18527,7 @@ msgstr "AI への指示..."
 msgid "Instructions must be {INSTRUCTIONS_MAX} characters or less"
 msgstr "指示は {INSTRUCTIONS_MAX} 文字以内で入力してください"
 
-#: src/features/settings/lib/settings-keywords.ts:84
+#: src/features/settings/lib/settings-keywords.ts:86
 msgid "integrations"
 msgstr "連携"
 
@@ -18573,7 +18582,7 @@ msgstr "中断された返信は停止されます"
 msgid "Intimate, street photography"
 msgstr "親密さ、ストリートフォト"
 
-#: src/features/settings/lib/settings-keywords.ts:97
+#: src/features/settings/lib/settings-keywords.ts:100
 msgid "intro"
 msgstr "はじめに"
 
@@ -18593,7 +18602,7 @@ msgstr "無効な画像出力"
 msgid "Invalid JSON"
 msgstr "無効な JSON"
 
-#: src/routes/dashboard/settings/connectors/callback.tsx:48
+#: src/routes/dashboard/settings/connectors/callback.tsx:49
 msgid "Invalid OAuth callback"
 msgstr "無効な OAuth コールバックです"
 
@@ -18695,11 +18704,11 @@ msgid "Invite link copied to clipboard!"
 msgstr "招待リンクをクリップボードにコピーしました！"
 
 #: src/features/auth/components/organization/invite-member-dialog.tsx:89
-#: src/features/auth/components/organization/organization-members-card.tsx:103
+#: src/features/auth/components/organization/organization-members-card.tsx:106
 msgid "Invite Member"
 msgstr "メンバーを招待"
 
-#: src/features/auth/components/organization/organization-members-card.tsx:107
+#: src/features/auth/components/organization/organization-members-card.tsx:110
 msgid "Invite new members and update existing member roles"
 msgstr "新しいメンバーを招待し、既存メンバーのロールを更新します"
 
@@ -18798,7 +18807,7 @@ msgstr "課題管理とプロジェクト管理"
 msgid "It does not exist, or your {hostLabel} account cannot see it."
 msgstr "存在しないか、お使いの {hostLabel} アカウントでは表示できません。"
 
-#: src/features/develop/components/failure-notice.tsx:20
+#: src/features/develop/components/failure-notice.tsx:21
 #: src/features/develop/lib/use-review-messages.ts:23
 msgid "It does not exist, or your {label} account cannot see it."
 msgstr "存在しないか、お使いの {label} アカウントでは表示できません。"
@@ -18891,7 +18900,7 @@ msgstr "ジャワ語"
 msgid "Javanese (Indonesia)"
 msgstr "ジャワ語（インドネシア）"
 
-#: src/features/settings/lib/settings-keywords.ts:88
+#: src/features/settings/lib/settings-keywords.ts:91
 msgid "job"
 msgstr "ジョブ"
 
@@ -19060,7 +19069,7 @@ msgstr "キーボードショートカット"
 #: src/features/settings/lib/settings-keywords.ts:43
 #: src/features/settings/lib/settings-keywords.ts:44
 #: src/features/settings/lib/settings-keywords.ts:45
-#: src/features/settings/lib/settings-navigation.ts:83
+#: src/features/settings/lib/settings-navigation.ts:99
 #: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:76
 msgid "Keyboard Shortcuts"
 msgstr "キーボードショートカット"
@@ -19103,7 +19112,7 @@ msgstr "ナレッジベース"
 #: src/features/chat/header/kb-attachment-button.tsx:186
 #: src/features/layout/lib/dashboard-page-names.ts:26
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:279
-#: src/features/settings/lib/settings-navigation.ts:91
+#: src/features/settings/lib/settings-navigation.ts:107
 msgid "Knowledge Base"
 msgstr "ナレッジベース"
 
@@ -19660,7 +19669,7 @@ msgstr "左から右（LTR）"
 msgid "Left: this version. Right: the page now."
 msgstr "左：このバージョン。右：現在のページ。"
 
-#: src/features/settings/lib/settings-keywords.ts:110
+#: src/features/settings/lib/settings-keywords.ts:117
 msgid "legal"
 msgstr "法務"
 
@@ -20799,7 +20808,7 @@ msgid "Manage Organization"
 msgstr "組織を管理"
 
 #: src/features/auth/components/organization/organization-members-card.tsx:55
-#: src/features/auth/components/organization/organization-members-card.tsx:106
+#: src/features/auth/components/organization/organization-members-card.tsx:109
 msgid "Manage organization members and their roles"
 msgstr "組織のメンバーとそのロールを管理します"
 
@@ -20857,8 +20866,8 @@ msgid "Manage your organizations and memberships"
 msgstr "組織とメンバーシップを管理します"
 
 #: src/routes/dashboard/settings/privacy.tsx:18
-msgid "Manage your privacy settings and data rights"
-msgstr "プライバシー設定とデータに関する権利を管理します"
+#~ msgid "Manage your privacy settings and data rights"
+#~ msgstr "プライバシー設定とデータに関する権利を管理します"
 
 #: src/features/prompts/components/prompt-header.tsx:11
 msgid "Manage your system prompts for threads. Use them via slash commands or set as default for new threads."
@@ -21032,7 +21041,7 @@ msgid "MCP"
 msgstr "MCP"
 
 #: src/features/settings/components/chat/mcp/server-catalog.tsx:160
-#: src/features/settings/lib/settings-keywords.ts:84
+#: src/features/settings/lib/settings-keywords.ts:86
 msgid "MCP Registry"
 msgstr "MCP レジストリ"
 
@@ -21062,14 +21071,14 @@ msgstr "MCP サーバーを更新しました"
 
 #. placeholder {0}: server.title
 #: src/features/skills/components/skill-builder-review.tsx:265
-#: src/features/skills/components/skill-builder-setup.tsx:102
+#: src/features/skills/components/skill-builder-setup.tsx:98
 msgid "MCP server: {0}"
 msgstr "MCP サーバー：{0}"
 
 #: src/features/chat/thread/composer-mcp-selector.tsx:142
 #: src/features/layout/lib/dashboard-page-names.ts:27
 #: src/features/settings/components/chat/mcp-settings.tsx:407
-#: src/features/settings/lib/settings-navigation.ts:95
+#: src/features/settings/lib/settings-navigation.ts:114
 msgid "MCP Servers"
 msgstr "MCP サーバー"
 
@@ -21079,7 +21088,7 @@ msgstr "MCP サーバーは、AI が会話中に使える追加のツールを�
 
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:391
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:392
-#: src/features/settings/lib/settings-keywords.ts:103
+#: src/features/settings/lib/settings-keywords.ts:106
 msgid "MCP tools"
 msgstr "MCP ツール"
 
@@ -21189,9 +21198,9 @@ msgid "Member role updated successfully"
 msgstr "メンバーのロールを更新しました"
 
 #: src/features/auth/components/organization/organization-members-card.tsx:58
-#: src/features/auth/components/organization/organization-members-card.tsx:109
+#: src/features/auth/components/organization/organization-members-card.tsx:112
 #: src/features/layout/lib/dashboard-page-names.ts:28
-#: src/features/settings/lib/settings-navigation.ts:111
+#: src/features/settings/lib/settings-navigation.ts:139
 msgid "Members"
 msgstr "メンバー"
 
@@ -21203,7 +21212,7 @@ msgstr "{organizationName} のメンバーはこのコレクションを添付�
 msgid "Members of your active organization can use it."
 msgstr "アクティブな組織のメンバーが使用できます。"
 
-#: src/features/settings/lib/settings-keywords.ts:96
+#: src/features/settings/lib/settings-keywords.ts:99
 msgid "memories"
 msgstr "メモリ"
 
@@ -21227,7 +21236,7 @@ msgstr "この返信で使用したメモリ（{0}）"
 
 #: src/features/marketing/use-cases/use-case-data.ts:114
 #: src/features/settings/components/personalization/memory-settings.tsx:164
-#: src/features/settings/lib/settings-keywords.ts:96
+#: src/features/settings/lib/settings-keywords.ts:99
 msgid "Memory"
 msgstr "メモリ"
 
@@ -21437,6 +21446,7 @@ msgid "messenger"
 msgstr "メッセンジャー"
 
 #: src/features/layout/lib/dashboard-page-names.ts:29
+#: src/features/settings/lib/settings-navigation.ts:126
 msgid "Messenger"
 msgstr "メッセンジャー"
 
@@ -21505,7 +21515,7 @@ msgstr "マイクへのアクセスが拒否されました。ブラウザーの
 msgid "Microsoft App ID of your Azure Bot"
 msgstr "Azure Bot の Microsoft App ID"
 
-#: src/features/settings/lib/settings-keywords.ts:107
+#: src/features/settings/lib/settings-keywords.ts:114
 msgid "migrate"
 msgstr "移行"
 
@@ -21783,7 +21793,7 @@ msgstr "モデルフィルター"
 msgid "Model info"
 msgstr "モデル情報"
 
-#: src/features/settings/lib/settings-keywords.ts:99
+#: src/features/settings/lib/settings-keywords.ts:102
 msgid "Model per kind of work"
 msgstr "作業の種類ごとのモデル"
 
@@ -21793,6 +21803,7 @@ msgstr "モデル料金は models.dev から取得し、KV に 24 時間キャ�
 
 #: src/features/layout/lib/dashboard-page-names.ts:30
 #: src/features/settings/components/chat/model-filter-settings.tsx:135
+#: src/features/settings/lib/settings-navigation.ts:110
 msgid "Model Restrictions"
 msgstr "モデルの制限"
 
@@ -21833,7 +21844,7 @@ msgstr "モデル: OpenAI Whisper"
 #: src/features/settings/components/chat/custom-providers-settings.tsx:564
 #: src/features/settings/components/chat/models-settings.tsx:367
 #: src/features/settings/components/chat/native-providers-settings.tsx:637
-#: src/features/settings/lib/settings-navigation.ts:93
+#: src/features/settings/lib/settings-navigation.ts:109
 msgid "Models"
 msgstr "モデル"
 
@@ -21978,7 +21989,7 @@ msgstr "多い"
 
 #: src/features/settings/components/personalization/personalization-settings.tsx:291
 #: src/features/settings/components/personalization/personalization-settings.tsx:295
-#: src/features/settings/lib/settings-keywords.ts:89
+#: src/features/settings/lib/settings-keywords.ts:92
 msgid "More About You"
 msgstr "あなたについての詳細"
 
@@ -22286,7 +22297,7 @@ msgstr "ミュート"
 msgid "Mute thread"
 msgstr "スレッドをミュート"
 
-#: src/features/settings/lib/settings-keywords.ts:106
+#: src/features/settings/lib/settings-keywords.ts:113
 msgid "my data"
 msgstr "自分のデータ"
 
@@ -22325,7 +22336,7 @@ msgid "n/a"
 msgstr "該当なし"
 
 #: src/features/settings/lib/settings-keywords.ts:26
-#: src/features/settings/lib/settings-keywords.ts:87
+#: src/features/settings/lib/settings-keywords.ts:90
 msgid "name"
 msgstr "名前"
 
@@ -22393,7 +22404,7 @@ msgstr "タグ {0} の名前"
 msgid "Name:"
 msgstr "名前："
 
-#: src/features/settings/lib/settings-keywords.ts:95
+#: src/features/settings/lib/settings-keywords.ts:98
 msgid "naming"
 msgstr "命名"
 
@@ -22572,7 +22583,7 @@ msgstr "Neore {0}"
 msgid "Neore agent"
 msgstr "Neore エージェント"
 
-#: src/features/chat/thread/composer.tsx:614
+#: src/features/chat/thread/composer.tsx:615
 msgid "Neore can make mistakes. Check important information."
 msgstr "Neore は間違えることがあります。重要な情報は確認してください。"
 
@@ -22584,7 +22595,7 @@ msgstr "Neore はサーバーに接続できません。再接続を試み続け
 msgid "Neore Chat"
 msgstr "Neore Chat"
 
-#: src/routes/__root.tsx:607
+#: src/routes/__root.tsx:611
 msgid "Neore Chat is a modern AI chat application. Chat with the latest AI models, organise your conversations, and stay productive."
 msgstr "Neore Chat はモダンな AI チャットアプリケーションです。最新の AI モデルとチャットし、会話を整理して、生産性を高めましょう。"
 
@@ -23047,7 +23058,7 @@ msgstr "ニカラグア"
 
 #: src/features/settings/components/chat/favorite-models-settings.tsx:53
 #: src/features/settings/components/personalization/personalization-settings.tsx:253
-#: src/features/settings/lib/settings-keywords.ts:87
+#: src/features/settings/lib/settings-keywords.ts:90
 msgid "Nickname"
 msgstr "ニックネーム"
 
@@ -23060,7 +23071,7 @@ msgstr "{label} のニックネーム"
 msgid "No"
 msgstr "いいえ"
 
-#: src/features/develop/components/failure-notice.tsx:15
+#: src/features/develop/components/failure-notice.tsx:16
 msgid "No access"
 msgstr "アクセス権なし"
 
@@ -23574,7 +23585,7 @@ msgid "No response yet"
 msgstr "まだ応答がありません"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-search.tsx:221
-#: src/components/settings/settings-search.tsx:180
+#: src/components/settings/settings-search.tsx:189
 #: src/features/vault/components/empty-states.tsx:13
 msgid "No results"
 msgstr "結果なし"
@@ -23616,7 +23627,7 @@ msgstr "スプレッドシートにシートが見つかりません"
 msgid "No shortcuts found"
 msgstr "ショートカットが見つかりません"
 
-#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:184
+#: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:180
 msgid "No shortcuts match \"{query}\"."
 msgstr "「{query}」に一致するショートカットはありません。"
 
@@ -23907,7 +23918,7 @@ msgstr "ガイドの対象外"
 msgid "Not delivered to the lead"
 msgstr "リードに配信されませんでした"
 
-#: src/features/develop/components/failure-notice.tsx:20
+#: src/features/develop/components/failure-notice.tsx:21
 msgid "Not found"
 msgstr "見つかりません"
 
@@ -24082,8 +24093,8 @@ msgstr "今"
 msgid "NSFW Content Review"
 msgstr "NSFW コンテンツのレビュー"
 
-#: src/routes/admin/route.tsx:44
-#: src/routes/admin/route.tsx:62
+#: src/routes/admin/route.tsx:45
+#: src/routes/admin/route.tsx:63
 msgid "NSFW Review"
 msgstr "NSFW レビュー"
 
@@ -24125,11 +24136,11 @@ msgstr "オブジェクトエディター"
 msgid "Object Prompt"
 msgstr "オブジェクトプロンプト"
 
-#: src/features/settings/lib/settings-keywords.ts:88
+#: src/features/settings/lib/settings-keywords.ts:91
 msgid "occupation"
 msgstr "職業"
 
-#: src/features/settings/lib/settings-keywords.ts:102
+#: src/features/settings/lib/settings-keywords.ts:105
 msgid "off"
 msgstr "オフ"
 
@@ -24283,7 +24294,7 @@ msgid "On-premise option"
 msgstr "オンプレミス対応"
 
 #: src/features/settings/components/personalization/personalization-settings.tsx:377
-#: src/features/settings/lib/settings-keywords.ts:97
+#: src/features/settings/lib/settings-keywords.ts:100
 msgid "Onboarding"
 msgstr "オンボーディング"
 
@@ -24628,7 +24639,7 @@ msgstr "チャットを開く"
 msgid "Open command palette"
 msgstr "コマンドパレットを開く"
 
-#: src/features/develop/components/failure-notice.tsx:35
+#: src/features/develop/components/failure-notice.tsx:36
 msgid "Open connectors"
 msgstr "コネクタを開く"
 
@@ -25139,11 +25150,11 @@ msgstr "OpenAI の最小の LLM"
 msgid "OpenAI's smallest model for maximum speed"
 msgstr "最高速を実現する OpenAI の最小モデル"
 
-#: src/components/settings/settings-modal.tsx:342
+#: src/components/settings/settings-modal.tsx:398
 msgid "Opened {tabLabel}"
 msgstr "{tabLabel} を開きました"
 
-#: src/components/settings/settings-modal.tsx:342
+#: src/components/settings/settings-modal.tsx:398
 msgid "Opened {tabLabel}: {label}"
 msgstr "{tabLabel} を開きました: {label}"
 
@@ -25361,7 +25372,7 @@ msgstr "通常のクリックは確認されたあとに実際に実行されま
 #: src/features/auth/components/organization/organization-view.tsx:64
 #: src/features/layout/lib/dashboard-page-names.ts:32
 #: src/features/settings/components/chat/usage-project-breakdown.tsx:186
-#: src/features/settings/lib/settings-navigation.ts:110
+#: src/features/settings/lib/settings-navigation.ts:138
 #: src/features/skills/components/skill-form-dialog.tsx:476
 #: src/features/skills/components/skill-item.tsx:130
 msgid "Organization"
@@ -25421,7 +25432,7 @@ msgstr "組織のスラッグを更新しました"
 
 #: src/features/auth/components/organization/organizations-card.tsx:42
 #: src/features/layout/lib/dashboard-page-names.ts:33
-#: src/features/settings/lib/settings-navigation.ts:107
+#: src/features/settings/lib/settings-navigation.ts:135
 msgid "Organizations"
 msgstr "組織"
 
@@ -25548,7 +25559,7 @@ msgstr "出力形式"
 msgid "Output is not loaded in this view."
 msgstr "この表示では出力を読み込んでいません。"
 
-#: src/features/chat/thread/composer.tsx:155
+#: src/features/chat/thread/composer.tsx:156
 msgid "Output mode"
 msgstr "出力モード"
 
@@ -26146,8 +26157,8 @@ msgstr "権限モード: {0}"
 msgid "Permission requests from the agent"
 msgstr "エージェントからの権限リクエスト"
 
-#: src/features/settings/lib/settings-keywords.ts:102
-#: src/features/settings/lib/settings-keywords.ts:103
+#: src/features/settings/lib/settings-keywords.ts:105
+#: src/features/settings/lib/settings-keywords.ts:106
 msgid "permissions"
 msgstr "権限"
 
@@ -26163,7 +26174,7 @@ msgstr "ペルシア語"
 msgid "Persian (Iran)"
 msgstr "ペルシア語（イラン）"
 
-#: src/features/settings/lib/settings-keywords.ts:100
+#: src/features/settings/lib/settings-keywords.ts:103
 msgid "persona"
 msgstr "ペルソナ"
 
@@ -26185,7 +26196,7 @@ msgid "Personal information is now visible"
 msgstr "個人情報を表示しました"
 
 #: src/features/layout/lib/dashboard-page-names.ts:34
-#: src/features/settings/lib/settings-navigation.ts:89
+#: src/features/settings/lib/settings-navigation.ts:105
 msgid "Personalization"
 msgstr "パーソナライズ"
 
@@ -26280,7 +26291,7 @@ msgstr "選択位置 (秒)"
 msgid "Picked frame wire (remove it)"
 msgstr "選択フレームの接続（削除）"
 
-#: src/features/settings/lib/settings-keywords.ts:85
+#: src/features/settings/lib/settings-keywords.ts:88
 msgid "picker"
 msgstr "ピッカー"
 
@@ -26354,7 +26365,7 @@ msgstr "右に固定"
 msgid "Pink"
 msgstr "ピンク"
 
-#: src/features/settings/lib/settings-keywords.ts:85
+#: src/features/settings/lib/settings-keywords.ts:88
 msgid "pinned"
 msgstr "固定"
 
@@ -26406,7 +26417,7 @@ msgstr "プラン"
 msgid "Plan"
 msgstr "プラン"
 
-#: src/features/chat/thread/composer.tsx:194
+#: src/features/chat/thread/composer.tsx:195
 msgid "Plan a project or brainstorm ideas..."
 msgstr "プロジェクトの計画やアイデア出しなど..."
 
@@ -27038,18 +27049,17 @@ msgstr "プライバシー"
 #: src/features/settings/components/account/account-settings.tsx:165
 #: src/features/settings/components/chat/model-filter-settings.tsx:363
 #: src/features/settings/lib/settings-keywords.ts:26
-#: src/features/settings/lib/settings-navigation.ts:117
+#: src/features/settings/lib/settings-navigation.ts:146
 msgid "Privacy"
 msgstr "プライバシー"
 
 #: src/features/layout/lib/dashboard-page-names.ts:36
-#: src/features/settings/lib/settings-navigation.ts:116
-#: src/routes/dashboard/settings/privacy.tsx:16
+#: src/features/settings/lib/settings-navigation.ts:145
 msgid "Privacy & Data"
 msgstr "プライバシーとデータ"
 
 #: src/features/settings/components/privacy/privacy-policy.tsx:16
-#: src/features/settings/lib/settings-keywords.ts:110
+#: src/features/settings/lib/settings-keywords.ts:117
 msgid "Privacy Policy"
 msgstr "プライバシーポリシー"
 
@@ -27171,7 +27181,7 @@ msgid "Productivity"
 msgstr "生産性"
 
 #: src/features/settings/components/personalization/personalization-settings.tsx:272
-#: src/features/settings/lib/settings-keywords.ts:88
+#: src/features/settings/lib/settings-keywords.ts:91
 msgid "Profession"
 msgstr "職業"
 
@@ -27248,7 +27258,7 @@ msgstr "プロ品質の編集精度"
 msgid "Professionals who need versatile, high-quality image creation from descriptive text prompts"
 msgstr "説明的なテキストプロンプトから多用途で高品質な画像を作成したいプロフェッショナル"
 
-#: src/features/settings/lib/settings-keywords.ts:108
+#: src/features/settings/lib/settings-keywords.ts:115
 msgid "profile"
 msgstr "プロフィール"
 
@@ -27332,7 +27342,7 @@ msgstr "このデバイスが提供されるプロジェクト"
 msgid "Promote to Admin"
 msgstr "管理者に昇格"
 
-#: src/features/settings/lib/settings-keywords.ts:100
+#: src/features/settings/lib/settings-keywords.ts:103
 msgid "prompt"
 msgstr "プロンプト"
 
@@ -27750,7 +27760,7 @@ msgstr "本番利用向けの高速推論"
 msgid "Quick iteration cycles at high quality"
 msgstr "高品質での素早い反復サイクル"
 
-#: src/features/chat/thread/composer-research-depth.tsx:31
+#: src/features/chat/thread/composer-research-depth.tsx:38
 msgid "Quick lookup, fewer queries"
 msgstr "簡単な調べもの、少数のクエリ"
 
@@ -27881,7 +27891,7 @@ msgid "Rate limit reached. You can improve {minutes, plural, one {# more prompt}
 msgstr "レート制限に達しました。{minutes, plural, other {# 分}}後に、あと {minutes, plural, other {# 件}}のプロンプトを改善できます。"
 
 #: src/features/chat/thread/rate-limit-pause-notice.tsx:108
-#: src/features/develop/components/failure-notice.tsx:21
+#: src/features/develop/components/failure-notice.tsx:22
 msgid "Rate limited"
 msgstr "レート制限中"
 
@@ -28262,7 +28272,7 @@ msgstr "最近使用"
 msgid "Recommended settings"
 msgstr "推奨設定"
 
-#: src/features/skills/components/skill-builder-setup.tsx:136
+#: src/features/skills/components/skill-builder-setup.tsx:132
 msgid "Reconnect"
 msgstr "再接続"
 
@@ -28329,7 +28339,7 @@ msgstr "レッド"
 msgid "Red Channel"
 msgstr "赤チャンネル"
 
-#: src/features/chat/thread/composer-search-mode.tsx:52
+#: src/features/chat/thread/composer-search-mode.tsx:53
 msgid "Reddit"
 msgstr "Reddit"
 
@@ -28648,7 +28658,7 @@ msgstr "プレビューを再読み込み"
 msgid "Reload their version"
 msgstr "相手のバージョンを再読み込み"
 
-#: src/features/settings/lib/settings-keywords.ts:96
+#: src/features/settings/lib/settings-keywords.ts:99
 msgid "remember"
 msgstr "記憶"
 
@@ -29062,6 +29072,10 @@ msgstr "返信の準備ができました"
 msgid "Reply tools are off by default. You switch them on per connection and choose which groups they may use."
 msgstr "返信ツールは既定でオフです。接続ごとにオンにし、使用してよいグループを選択します。"
 
+#: src/features/chat/thread/composer-status-line.tsx:61
+msgid "Replying"
+msgstr "返信中"
+
 #: src/features/settings/components/chat/mcp/popular-servers.ts:35
 msgid "Repos, issues, PRs, and code search"
 msgstr "リポジトリ、Issue、PR、コード検索"
@@ -29155,11 +29169,11 @@ msgstr "必須の変数が入力されていません"
 msgid "Required."
 msgstr "必須。"
 
-#: src/components/settings/settings-modal.tsx:153
+#: src/components/settings/settings-modal.tsx:150
 msgid "requires an account"
 msgstr "にはアカウントが必要です"
 
-#: src/components/settings/settings-search.tsx:216
+#: src/components/settings/settings-search.tsx:225
 msgid "Requires an account"
 msgstr "アカウントが必要です"
 
@@ -29178,7 +29192,7 @@ msgstr "リサーチ"
 msgid "Research a topic"
 msgstr "トピックをリサーチ"
 
-#: src/features/chat/thread/composer.tsx:196
+#: src/features/chat/thread/composer.tsx:197
 msgid "Research a topic in depth..."
 msgstr "トピックを深くリサーチ..."
 
@@ -29521,7 +29535,7 @@ msgstr "リバート中…"
 msgid "Review"
 msgstr "レビュー"
 
-#: src/features/skills/components/skill-builder-setup.tsx:115
+#: src/features/skills/components/skill-builder-setup.tsx:111
 msgid "Review and add"
 msgstr "確認して追加"
 
@@ -29551,8 +29565,8 @@ msgid "Review requests in {0}"
 msgstr "{0} のレビューリクエスト"
 
 #: src/features/chat/goal/composer-goal.tsx:92
-msgid "Review rounds: {maxRounds}. Change"
-msgstr "レビューのラウンド数: {maxRounds}。変更"
+#~ msgid "Review rounds: {maxRounds}. Change"
+#~ msgstr "レビューのラウンド数: {maxRounds}。変更"
 
 #: src/features/develop/components/review-panel.tsx:292
 msgid "Review submitted"
@@ -29684,7 +29698,7 @@ msgstr "ロールを更新しました"
 msgid "Role Updates"
 msgstr "ロールの更新"
 
-#: src/features/settings/lib/settings-keywords.ts:99
+#: src/features/settings/lib/settings-keywords.ts:102
 msgid "roles"
 msgstr "ロール"
 
@@ -30394,11 +30408,11 @@ msgstr "検索"
 msgid "Search"
 msgstr "検索"
 
-#: src/features/chat/thread/composer-search-mode.tsx:50
+#: src/features/chat/thread/composer-search-mode.tsx:51
 msgid "Search academic papers and PDFs"
 msgstr "学術論文や PDF を検索"
 
-#: src/features/chat/thread/composer-search-mode.tsx:49
+#: src/features/chat/thread/composer-search-mode.tsx:50
 msgid "Search across the entire internet"
 msgstr "インターネット全体を検索"
 
@@ -30432,8 +30446,8 @@ msgid "Search data..."
 msgstr "データを検索..."
 
 #. placeholder {0}: labels[depth]
-#: src/features/chat/thread/composer-research-depth.tsx:47
-#: src/features/chat/thread/composer-research-depth.tsx:63
+#: src/features/chat/thread/composer-research-depth.tsx:54
+#: src/features/chat/thread/composer-research-depth.tsx:70
 msgid "Search depth: {0}"
 msgstr "検索の深さ：{0}"
 
@@ -30463,7 +30477,7 @@ msgstr "アイコンを検索..."
 msgid "Search for the latest news about space exploration"
 msgstr "宇宙探査に関する最新ニュースを検索する"
 
-#: src/features/chat/thread/composer-search-mode.tsx:57
+#: src/features/chat/thread/composer-search-mode.tsx:58
 msgid "Search GitHub repositories and code"
 msgstr "GitHub のリポジトリとコードを検索"
 
@@ -30505,7 +30519,7 @@ msgstr "検索モード"
 
 #. placeholder {0}: currentMode.label
 #. placeholder {0}: draft.searchMode.id
-#: src/features/chat/thread/composer-search-mode.tsx:90
+#: src/features/chat/thread/composer-search-mode.tsx:104
 #: src/features/skills/components/skill-builder-review.tsx:201
 msgid "Search mode: {0}"
 msgstr "検索モード：{0}"
@@ -30554,7 +30568,7 @@ msgstr "プロンプトを検索..."
 msgid "Search public skills…"
 msgstr "公開スキルを検索…"
 
-#: src/features/chat/thread/composer-search-mode.tsx:52
+#: src/features/chat/thread/composer-search-mode.tsx:53
 msgid "Search Reddit posts"
 msgstr "Reddit の投稿を検索"
 
@@ -30597,11 +30611,11 @@ msgstr "ショートカットを検索..."
 msgid "Search skills..."
 msgstr "スキルを検索..."
 
-#: src/features/chat/thread/composer-search-mode.tsx:58
+#: src/features/chat/thread/composer-search-mode.tsx:59
 msgid "Search songs, artists, and albums"
 msgstr "曲、アーティスト、アルバムを検索"
 
-#: src/features/chat/thread/composer-search-mode.tsx:56
+#: src/features/chat/thread/composer-search-mode.tsx:57
 msgid "Search Stack Overflow for programming help"
 msgstr "Stack Overflow でプログラミングのヘルプを検索"
 
@@ -30649,7 +30663,7 @@ msgstr "変数を検索..."
 msgid "Search workflows..."
 msgstr "ワークフローを検索..."
 
-#: src/features/chat/thread/composer-search-mode.tsx:51
+#: src/features/chat/thread/composer-search-mode.tsx:52
 msgid "Search X posts"
 msgstr "X の投稿を検索"
 
@@ -30661,7 +30675,7 @@ msgstr "ナレッジファイルを検索し、検索精度（ヒット率、MRR
 msgid "Search your skills"
 msgstr "スキルを検索"
 
-#: src/features/chat/thread/composer-search-mode.tsx:53
+#: src/features/chat/thread/composer-search-mode.tsx:54
 msgid "Search YouTube videos and channels"
 msgstr "YouTube の動画とチャンネルを検索"
 
@@ -30723,7 +30737,7 @@ msgstr "セクション"
 
 #: src/features/layout/lib/dashboard-page-names.ts:37
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:57
-#: src/features/settings/lib/settings-navigation.ts:105
+#: src/features/settings/lib/settings-navigation.ts:133
 msgid "Security"
 msgstr "セキュリティ"
 
@@ -31294,7 +31308,7 @@ msgstr "Server-Sent Events（SSE）"
 msgid "Serverless Postgres database with branching"
 msgstr "ブランチ機能付きのサーバーレス Postgres データベース"
 
-#: src/features/settings/lib/settings-keywords.ts:103
+#: src/features/settings/lib/settings-keywords.ts:106
 msgid "servers"
 msgstr "サーバー"
 
@@ -31368,8 +31382,9 @@ msgid "Set up triggers to automate tasks on a schedule, via webhooks, or in resp
 msgstr "トリガーを設定して、スケジュール、Webhook、またはイベントに応じてタスクを自動化しましょう。"
 
 #: ../../packages/chat-ui/src/org-switcher/org-switcher.tsx:260
-#: src/components/settings/settings-modal.tsx:407
-#: src/components/settings/settings-modal.tsx:508
+#: src/components/settings/settings-modal.tsx:458
+#: src/components/settings/settings-modal.tsx:580
+#: src/components/settings/settings-modal.tsx:680
 #: src/features/layout/components/mobile-section-nav.tsx:59
 #: src/features/layout/lib/dashboard-page-names.ts:38
 msgid "Settings"
@@ -31381,7 +31396,7 @@ msgstr "設定"
 msgid "Settings saved"
 msgstr "設定を保存しました"
 
-#: src/components/settings/settings-search.tsx:186
+#: src/components/settings/settings-search.tsx:195
 msgid "Settings search results"
 msgstr "設定の検索結果"
 
@@ -31770,7 +31785,7 @@ msgstr "サイドバーを右に"
 
 #: ../../packages/chat-ui/src/auth/login-form.tsx:43
 #: src/components/not-found.tsx:12
-#: src/components/settings/settings-modal.tsx:166
+#: src/components/settings/settings-modal.tsx:163
 #: src/features/auth/components/auth/auth-card.tsx:493
 #: src/features/auth/components/auth/forms/sign-in-form.tsx:415
 #: src/features/auth/components/device-approval.tsx:363
@@ -31808,7 +31823,7 @@ msgstr "別のサイトでサインインしますか？"
 msgid "Sign in the command line?"
 msgstr "コマンドラインにサインインしますか？"
 
-#: src/features/develop/components/failure-notice.tsx:18
+#: src/features/develop/components/failure-notice.tsx:19
 msgid "Sign in to {label} again"
 msgstr "{label} に再度サインイン"
 
@@ -31844,7 +31859,7 @@ msgstr "サインインしてすべてのモデルを利用できます。"
 msgid "Sign in to your account"
 msgstr "アカウントにサインイン"
 
-#: src/components/settings/settings-modal.tsx:156
+#: src/components/settings/settings-modal.tsx:153
 msgid "Sign in to your account to use it."
 msgstr "利用するにはアカウントにサインインしてください。"
 
@@ -31894,7 +31909,7 @@ msgstr "サインアップ"
 msgid "Sign Up"
 msgstr "サインアップ"
 
-#: src/components/settings/settings-modal.tsx:156
+#: src/components/settings/settings-modal.tsx:153
 msgid "Sign up and subscribe for $8/mo to unlock all features."
 msgstr "サインアップして月額 $8 で登録すると、すべての機能を利用できます。"
 
@@ -32113,7 +32128,7 @@ msgstr "CLIP レイヤーをスキップ (0 = なし、1〜2 = よりスタイ�
 msgid "Skip questions"
 msgstr "質問をスキップ"
 
-#: src/routes/__root.tsx:505
+#: src/routes/__root.tsx:508
 msgid "Skip to content"
 msgstr "コンテンツへスキップ"
 
@@ -32381,7 +32396,7 @@ msgid "Someone else has control of this browser."
 msgstr "このブラウザーは別の人が操作しています。"
 
 #: src/components/error-boundary.tsx:200
-#: src/components/settings/settings-modal.tsx:130
+#: src/components/settings/settings-modal.tsx:127
 #: src/features/pages/components/page-share-dialog.tsx:50
 msgid "Something went wrong"
 msgstr "問題が発生しました"
@@ -32640,7 +32655,7 @@ msgid "speech-to-text"
 msgstr "音声からテキスト"
 
 #: src/features/chat/thread/composer-audio-settings.tsx:102
-#: src/features/chat/thread/composer-research-depth.tsx:25
+#: src/features/chat/thread/composer-research-depth.tsx:26
 msgid "Speed"
 msgstr "速度"
 
@@ -32687,7 +32702,7 @@ msgstr "分割ビューを有効にしました"
 msgid "Split view is full. Close a chat first."
 msgstr "分割ビューがいっぱいです。先にチャットを 1 つ閉じてください。"
 
-#: src/features/chat/thread/composer-search-mode.tsx:58
+#: src/features/chat/thread/composer-search-mode.tsx:59
 msgid "Spotify"
 msgstr "Spotify"
 
@@ -32801,7 +32816,7 @@ msgstr "標準ピン"
 msgid "Standard postcard"
 msgstr "標準ポストカード"
 
-#: src/features/chat/thread/composer-research-depth.tsx:30
+#: src/features/chat/thread/composer-research-depth.tsx:37
 msgid "Standard search depth"
 msgstr "標準の検索の深さ"
 
@@ -32813,7 +32828,7 @@ msgstr "星"
 msgid "Star a model in the model picker and it shows up here."
 msgstr "モデルピッカーでモデルにスターを付けると、ここに表示されます。"
 
-#: src/features/settings/lib/settings-keywords.ts:85
+#: src/features/settings/lib/settings-keywords.ts:88
 msgid "starred"
 msgstr "スター付き"
 
@@ -33138,7 +33153,7 @@ msgstr "ステップ数"
 msgid "Still connecting to the server..."
 msgstr "まだサーバーに接続中です..."
 
-#: src/features/chat/thread/composer-search-mode.tsx:54
+#: src/features/chat/thread/composer-search-mode.tsx:55
 msgid "Stock and currency information"
 msgstr "株価と為替の情報"
 
@@ -33146,7 +33161,7 @@ msgstr "株価と為替の情報"
 msgid "Stockholm"
 msgstr "ストックホルム"
 
-#: src/features/chat/thread/composer-search-mode.tsx:54
+#: src/features/chat/thread/composer-search-mode.tsx:55
 msgid "Stocks"
 msgstr "株式"
 
@@ -33586,7 +33601,7 @@ msgstr "優れた視覚的推論と理解"
 msgid "Strongest reasoning in the GLM family"
 msgstr "GLM ファミリーで最強の推論"
 
-#: src/features/settings/lib/settings-keywords.ts:91
+#: src/features/settings/lib/settings-keywords.ts:94
 #: src/features/workflow/templates/index.ts:217
 msgid "style"
 msgstr "スタイル"
@@ -33647,7 +33662,7 @@ msgstr "スタイル適用結果"
 msgid "stylized animation"
 msgstr "スタイライズされたアニメーション"
 
-#: src/features/settings/lib/settings-keywords.ts:99
+#: src/features/settings/lib/settings-keywords.ts:102
 msgid "sub-agent"
 msgstr "サブエージェント"
 
@@ -33664,7 +33679,7 @@ msgid "Sub-agent finished"
 msgstr "サブエージェントが完了しました"
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:428
-#: src/features/settings/lib/settings-navigation.ts:97
+#: src/features/settings/lib/settings-navigation.ts:116
 msgid "Sub-agent roles"
 msgstr "サブエージェントのロール"
 
@@ -33774,7 +33789,7 @@ msgstr "今日のメモを要約"
 msgid "Summarise my notes in three bullets."
 msgstr "私のメモを 3 つの箇条書きで要約してください。"
 
-#: src/features/chat/thread/composer.tsx:193
+#: src/features/chat/thread/composer.tsx:194
 msgid "Summarize a document or URL..."
 msgstr "ドキュメントや URL を要約..."
 
@@ -33996,7 +34011,7 @@ msgstr "システムの既定"
 msgid "System message:"
 msgstr "システムメッセージ:"
 
-#: src/features/settings/lib/settings-keywords.ts:91
+#: src/features/settings/lib/settings-keywords.ts:94
 msgid "system prompt"
 msgstr "システムプロンプト"
 
@@ -34016,11 +34031,11 @@ msgid "System prompt applied"
 msgstr "システムプロンプトを適用しました"
 
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:258
-#: src/features/settings/lib/settings-keywords.ts:100
+#: src/features/settings/lib/settings-keywords.ts:103
 msgid "System Prompt Presets"
 msgstr "システムプロンプトのプリセット"
 
-#: src/features/settings/lib/settings-navigation.ts:90
+#: src/features/settings/lib/settings-navigation.ts:106
 msgid "System Prompts"
 msgstr "システムプロンプト"
 
@@ -34122,7 +34137,7 @@ msgstr "営業に相談"
 msgid "Talk to the AI from Microsoft Teams through an Azure Bot. Each Teams conversation maps to a thread."
 msgstr "Azure Bot を通じて Microsoft Teams から AI と会話できます。Teams の各会話がスレッドに対応します。"
 
-#: src/features/chat/thread/composer-search-mode.tsx:48
+#: src/features/chat/thread/composer-search-mode.tsx:49
 msgid "Talk to the model directly"
 msgstr "モデルと直接会話"
 
@@ -34286,6 +34301,7 @@ msgstr "チーム設定を更新しました"
 #: src/features/auth/components/team/teams-card.tsx:42
 #: src/features/auth/components/team/teams-card.tsx:60
 #: src/features/layout/lib/dashboard-page-names.ts:39
+#: src/features/settings/lib/settings-navigation.ts:140
 msgid "Teams"
 msgstr "チーム"
 
@@ -34433,7 +34449,7 @@ msgstr "一時モードを有効にしました"
 msgid "Temporary mode enabled ({0})"
 msgstr "一時モードを有効にしました（{0}）"
 
-#: src/features/settings/lib/settings-keywords.ts:110
+#: src/features/settings/lib/settings-keywords.ts:117
 msgid "terms"
 msgstr "利用規約"
 
@@ -34490,7 +34506,7 @@ msgstr "テキスト"
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:351
 #: src/components/model-picker/model-picker.tsx:1252
 #: src/features/chat/sidebar/usage-card.tsx:128
-#: src/features/chat/thread/composer.tsx:129
+#: src/features/chat/thread/composer.tsx:130
 #: src/features/marketing/components/landing-footer.tsx:164
 #: src/features/settings/components/chat/default-models-settings.tsx:556
 #: src/features/settings/components/chat/models-settings.tsx:45
@@ -34970,7 +34986,7 @@ msgstr "ボットとそのコンピュータは削除されます。チャット
 msgid "The bot gets only the tools you allow. With none allowed, it gets no tools."
 msgstr "ボットは許可したツールのみを使います。何も許可しなければ、ツールは使えません。"
 
-#: src/features/chat/thread/composer-model-selector.tsx:138
+#: src/features/chat/thread/composer-status-line.tsx:85
 msgid "The bot sets the model for this chat."
 msgstr "このチャットのモデルはボットが設定します。"
 
@@ -35091,7 +35107,7 @@ msgstr "コンピューターからの応答を読み取れませんでした。
 msgid "The condition is checked without asking a model; the agent runs only when it comes true. You can keep {MAX_ACTIVE_EVENT_WATCHERS} event triggers switched on at a time."
 msgstr "条件はモデルに問い合わせずに確認され、条件が満たされたときにのみエージェントが実行されます。同時にオンにできるイベントトリガーは {MAX_ACTIVE_EVENT_WATCHERS} 件までです。"
 
-#: src/routes/dashboard/settings/connectors/callback.tsx:73
+#: src/routes/dashboard/settings/connectors/callback.tsx:74
 msgid "The connection could not be completed."
 msgstr "接続を完了できませんでした。"
 
@@ -35099,11 +35115,11 @@ msgstr "接続を完了できませんでした。"
 msgid "The connection was lost."
 msgstr "接続が切断されました。"
 
-#: src/routes/dashboard/settings/connectors/callback.tsx:40
+#: src/routes/dashboard/settings/connectors/callback.tsx:41
 msgid "The connection was not completed: {reason}"
 msgstr "接続は完了しませんでした：{reason}"
 
-#: src/routes/dashboard/settings/connectors/callback.tsx:39
+#: src/routes/dashboard/settings/connectors/callback.tsx:40
 msgid "The connection was not completed."
 msgstr "接続は完了しませんでした。"
 
@@ -35509,7 +35525,7 @@ msgstr "OpenAI の最高のコーディング能力を必要とする、最も�
 msgid "The most demanding tasks requiring Anthropic's latest frontier reasoning and capabilities"
 msgstr "Anthropic の最新フロンティアの推論と能力を必要とする、最も要求の厳しいタスク"
 
-#: src/features/chat/goal/composer-goal.tsx:103
+#: src/features/chat/goal/composer-goal.tsx:102
 msgid "The most review rounds before it stops"
 msgstr "停止するまでの最大レビューラウンド数"
 
@@ -36129,7 +36145,7 @@ msgstr "このコレクションは組織のメンバーから共有されてい
 msgid "This command name is reserved"
 msgstr "このコマンド名は予約されています"
 
-#: src/features/chat/thread/composer-permission-mode.tsx:201
+#: src/features/chat/thread/composer-permission-mode.tsx:227
 msgid "This comparison's mode applies to every column. Change it on the comparison."
 msgstr "この比較のモードはすべての列に適用されます。比較画面で変更してください。"
 
@@ -36364,7 +36380,7 @@ msgstr "このリンクは終了しました。"
 msgid "This link is already in use in another browser."
 msgstr "このリンクはすでに別のブラウザーで使用されています。"
 
-#: src/routes/dashboard/settings/connectors/callback.tsx:47
+#: src/routes/dashboard/settings/connectors/callback.tsx:48
 msgid "This link is incomplete."
 msgstr "このリンクは不完全です。"
 
@@ -36719,7 +36735,7 @@ msgstr "このワークフローファイルは、このアプリで読み取れ
 msgid "This workflow may have been unpublished or deleted."
 msgstr "このワークフローは非公開にされたか、削除された可能性があります。"
 
-#: src/features/chat/thread/composer-research-depth.tsx:26
+#: src/features/chat/thread/composer-research-depth.tsx:27
 msgid "Thorough"
 msgstr "徹底的"
 
@@ -36812,12 +36828,12 @@ msgstr "スレッドの統計"
 msgid "Thread summary"
 msgstr "スレッドの要約"
 
-#: src/features/settings/lib/settings-keywords.ts:95
+#: src/features/settings/lib/settings-keywords.ts:98
 msgid "thread titles"
 msgstr "スレッドのタイトル"
 
 #: src/features/settings/components/personalization/personalization-settings.tsx:342
-#: src/features/settings/lib/settings-keywords.ts:95
+#: src/features/settings/lib/settings-keywords.ts:98
 msgid "Thread Titles"
 msgstr "スレッドのタイトル"
 
@@ -37086,7 +37102,7 @@ msgstr "独自のエンドポイントで使用したトークンはクレジッ
 msgid "Tokyo"
 msgstr "東京"
 
-#: src/features/settings/lib/settings-keywords.ts:91
+#: src/features/settings/lib/settings-keywords.ts:94
 msgid "tone"
 msgstr "トーン"
 
@@ -37171,7 +37187,7 @@ msgid "Tool output's share of the stored size"
 msgstr "保存サイズに占めるツール出力の割合"
 
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:356
-#: src/features/settings/lib/settings-navigation.ts:96
+#: src/features/settings/lib/settings-navigation.ts:115
 msgid "Tool Permissions"
 msgstr "ツールの権限"
 
@@ -37205,6 +37221,10 @@ msgstr "{0} のツール"
 #: src/features/settings/components/chat/new-chat-permission-mode-setting.tsx:47
 msgid "Tools run on their own settings; a quick check can clear low-risk calls"
 msgstr "ツールはそれぞれの設定で実行され、簡易チェックで低リスクの呼び出しを許可できます"
+
+#: src/features/chat/thread/composer-status-line.tsx:79
+msgid "Tools run without asking"
+msgstr "ツールは確認なしで実行されます"
 
 #: src/features/marketing/use-cases/use-case-data.ts:69
 msgid "Tools that need your approval are not offered in messaging apps, because nobody can approve a card there."
@@ -37303,7 +37323,7 @@ msgstr "すべてのトークンと費用を追跡。"
 msgid "Track your LLM token usage, cost, and set budget alerts"
 msgstr "LLM のトークン使用量とコストを追跡し、予算アラートを設定します"
 
-#: src/features/settings/lib/settings-keywords.ts:109
+#: src/features/settings/lib/settings-keywords.ts:116
 msgid "tracking"
 msgstr "トラッキング"
 
@@ -37366,7 +37386,7 @@ msgstr "変換後の画像"
 msgid "Translate"
 msgstr "翻訳"
 
-#: src/features/chat/thread/composer.tsx:199
+#: src/features/chat/thread/composer.tsx:200
 msgid "Translate text to another language..."
 msgstr "テキストを別の言語に翻訳..."
 
@@ -37478,6 +37498,7 @@ msgstr "トリガーを更新しました"
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:36
 #: src/features/layout/lib/dashboard-page-names.ts:40
 #: src/features/settings/components/chat/trigger-settings.tsx:733
+#: src/features/settings/lib/settings-navigation.ts:113
 msgid "Triggers"
 msgstr "トリガー"
 
@@ -37556,7 +37577,7 @@ msgstr "再試行"
 
 #: src/components/error-boundaries/global-error-boundary-provider.tsx:211
 #: src/components/error-boundaries/route-error-boundary.tsx:80
-#: src/components/settings/settings-modal.tsx:135
+#: src/components/settings/settings-modal.tsx:132
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:442
 msgid "Try Again"
 msgstr "もう一度試す"
@@ -37651,7 +37672,7 @@ msgstr "メモリをオンにする"
 msgid "Turns these tools off:"
 msgstr "次のツールをオフにします:"
 
-#: src/features/settings/lib/settings-keywords.ts:97
+#: src/features/settings/lib/settings-keywords.ts:100
 msgid "tutorial"
 msgstr "チュートリアル"
 
@@ -38330,7 +38351,7 @@ msgstr "Pro にアップグレード"
 msgid "Upgrade to Pro, monthly"
 msgstr "Pro にアップグレード（月額）"
 
-#: src/features/settings/lib/settings-keywords.ts:107
+#: src/features/settings/lib/settings-keywords.ts:114
 msgid "upload"
 msgstr "アップロード"
 
@@ -38505,6 +38526,7 @@ msgstr "米国"
 #: src/features/chat/sidebar/usage-card.tsx:117
 #: src/features/layout/lib/dashboard-page-names.ts:41
 #: src/features/projects/components/project-usage-summary.tsx:50
+#: src/features/settings/lib/settings-navigation.ts:119
 msgid "Usage"
 msgstr "使用量"
 
@@ -38772,8 +38794,8 @@ msgid "Username: @{platformUsername}"
 msgstr "ユーザー名: @{platformUsername}"
 
 #: src/features/layout/lib/dashboard-page-names.ts:42
-#: src/routes/admin/route.tsx:29
-#: src/routes/admin/route.tsx:63
+#: src/routes/admin/route.tsx:30
+#: src/routes/admin/route.tsx:64
 msgid "Users"
 msgstr "ユーザー"
 
@@ -39105,7 +39127,7 @@ msgstr "動画"
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:767
 #: src/components/model-picker/model-picker.tsx:1278
 #: src/features/chat/sidebar/usage-card.tsx:130
-#: src/features/chat/thread/composer.tsx:131
+#: src/features/chat/thread/composer.tsx:132
 #: src/features/marketing/components/landing-footer.tsx:166
 #: src/features/settings/components/chat/default-models-settings.tsx:642
 #: src/features/settings/components/chat/models-settings.tsx:46
@@ -39686,7 +39708,7 @@ msgid "We're sorry, but the website has encountered an unexpected issue"
 msgstr "申し訳ありません。Web サイトで予期しない問題が発生しました"
 
 #: src/features/canvas/components/design-preset-selector.tsx:66
-#: src/features/chat/thread/composer-search-mode.tsx:49
+#: src/features/chat/thread/composer-search-mode.tsx:50
 msgid "Web"
 msgstr "Web"
 
@@ -39828,7 +39850,7 @@ msgstr "おかえりなさい"
 msgid "Welcome to Neore"
 msgstr "Neore へようこそ"
 
-#: src/features/settings/lib/settings-keywords.ts:97
+#: src/features/settings/lib/settings-keywords.ts:100
 msgid "welcome tour"
 msgstr "ウェルカムツアー"
 
@@ -39971,7 +39993,7 @@ msgstr "監視する対象"
 msgid "What users sent from the app, newest first"
 msgstr "ユーザーがアプリから送信した内容（新しい順）"
 
-#: src/features/settings/lib/settings-keywords.ts:108
+#: src/features/settings/lib/settings-keywords.ts:115
 msgid "what we store"
 msgstr "保存する内容"
 
@@ -40197,7 +40219,7 @@ msgstr "指定しない場合は、SSH エージェントとデフォルトの�
 msgid "Wix developer docs, Velo code assistance, and site management"
 msgstr "Wix 開発者ドキュメント、Velo コードのサポート、サイト管理"
 
-#: src/features/settings/lib/settings-keywords.ts:88
+#: src/features/settings/lib/settings-keywords.ts:91
 msgid "work"
 msgstr "仕事"
 
@@ -40318,7 +40340,7 @@ msgstr "チャットと並行して長文コンテンツを作成"
 msgid "Write long-form content in a side-by-side canvas editor. Go from chat to finished document without switching tools."
 msgstr "横並びのキャンバスエディターで長文コンテンツを作成できます。ツールを切り替えずに、チャットから完成したドキュメントまで。"
 
-#: src/features/chat/thread/composer.tsx:192
+#: src/features/chat/thread/composer.tsx:193
 msgid "Write some code for me..."
 msgstr "コードを書いて..."
 
@@ -40355,7 +40377,7 @@ msgstr "テストを書き、変更が動作することを確認します。"
 msgid "Writing the guide…"
 msgstr "ガイドを作成中…"
 
-#: src/features/chat/thread/composer-search-mode.tsx:51
+#: src/features/chat/thread/composer-search-mode.tsx:52
 msgid "X"
 msgstr "X"
 
@@ -40585,7 +40607,7 @@ msgstr "そのプルリクエストはホスト上で表示できません。"
 msgid "You choose the schedule, the run destination and the project. The project must be one you can write to."
 msgstr "スケジュール、実行先、プロジェクトを選択します。プロジェクトは書き込み可能なものである必要があります。"
 
-#: src/features/skills/components/skill-builder-setup.tsx:92
+#: src/features/skills/components/skill-builder-setup.tsx:88
 msgid "You chose these integrations in the agent builder. Each one opens for you to review before anything connects."
 msgstr "これらはエージェントビルダーで選択した連携です。接続される前に、それぞれ確認画面が開きます。"
 
@@ -40752,7 +40774,7 @@ msgstr "スレッドに参加しました。リダイレクトしています...
 msgid "Your {hostLabel} sign-in has expired. Connect it again."
 msgstr "{hostLabel} のサインインの有効期限が切れました。もう一度接続してください。"
 
-#: src/features/develop/components/failure-notice.tsx:18
+#: src/features/develop/components/failure-notice.tsx:19
 msgid "Your {label} sign-in has expired. Connect it again to keep reading."
 msgstr "{label} のサインインの有効期限が切れました。読み取りを続けるには、もう一度接続してください。"
 
@@ -41164,7 +41186,7 @@ msgstr "未保存のバージョン"
 msgid "Your watched repositories could not be loaded."
 msgstr "監視中のリポジトリを読み込めませんでした。"
 
-#: src/features/chat/thread/composer-search-mode.tsx:53
+#: src/features/chat/thread/composer-search-mode.tsx:54
 msgid "YouTube"
 msgstr "YouTube"
 

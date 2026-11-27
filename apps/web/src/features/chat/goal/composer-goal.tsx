@@ -67,8 +67,7 @@ const ComposerGoal: FC<ComposerGoalProps> = ({ disabled, threadId }) => {
                             aria-pressed={enabled}
                             className={clsx(
                                 "bg-transparent hover:bg-surface-row-hover dark:hover:bg-surface-row-hover rounded-lg text-muted-foreground hover:text-foreground h-7 gap-1 px-2",
-                                enabled &&
-                                    "bg-primary/10 text-primary-text border-primary/30 dark:text-primary-text hover:bg-primary/20 hover:border-primary/40",
+                                enabled && "bg-surface-row-active text-foreground",
                             )}
                             disabled={disabled}
                             onClick={() => setEnabled(!enabled)}
@@ -88,13 +87,7 @@ const ComposerGoal: FC<ComposerGoalProps> = ({ disabled, threadId }) => {
                 <Tooltip>
                     <TooltipTrigger
                         render={
-                            <Button
-                                aria-label={t`Review rounds: ${maxRounds}. Change`}
-                                className="bg-primary/10 text-primary-text border-primary/30 h-7 px-2"
-                                disabled={disabled}
-                                onClick={cycleRounds}
-                                variant="ghost"
-                            >
+                            <Button className="bg-surface-row-active text-foreground h-7 px-2" disabled={disabled} onClick={cycleRounds} variant="ghost">
                                 {t`${maxRounds} rounds`}
                             </Button>
                         }

@@ -22,6 +22,25 @@ interface ComposerModelSelectorProps {
     className?: string;
 }
 
+/**
+ * Whether the open thread is a bot's: it always runs on the bot's model (the server enforces it), so the picker is locked.
+ * Lock while the bot exists: a deleted bot leaves its chats behind, as plain chats. The bot list is read
+ * only for a bot thread, and a bot thread stays locked until that list has loaded.
+ */
+export const useBotThread = () => {
+    const { thread } = useChatThread();
+    const botId = thread?.botId ?? null;
+    const crpc = useCRPC();
+    const { data: bots = [], isSuccess: botsLoaded } = useQuery({
+        ...crpc.bots.functions.listBots.queryOptions({}, { live: false }),
+        enabled: typeof botId === "string" && botId.length > 0,
+    });
+    const liveBot = bots.find((bot) => bot._id === botId);
+    const isBotThread = typeof botId === "string" && (!botsLoaded || liveBot !== undefined);
+
+    return { botId, isBotThread, liveBot };
+};
+
 const ComposerModelSelector: FC<ComposerModelSelectorProps> = ({ className }) => {
     const { t } = useLingui();
     const { model, thread, threadId } = useChatThread();
@@ -40,17 +59,8 @@ const ComposerModelSelector: FC<ComposerModelSelectorProps> = ({ className }) =>
     // A switch is refused while a reply streams, so the picker waits for it (`chat.agent_switch`).
     const isRunning = useChatIsRunning();
 
-    // A bot's thread always runs on the bot's model (the server enforces it), so the picker is locked.
-    const botId = thread?.botId ?? null;
-    // Lock while the bot exists: a deleted bot leaves its chats behind, as plain chats. The bot list is read
-    // only for a bot thread, and a bot thread stays locked until that list has loaded.
+    const { botId, isBotThread, liveBot } = useBotThread();
     const crpc = useCRPC();
-    const { data: bots = [], isSuccess: botsLoaded } = useQuery({
-        ...crpc.bots.functions.listBots.queryOptions({}, { live: false }),
-        enabled: typeof botId === "string" && botId.length > 0,
-    });
-    const liveBot = bots.find((bot) => bot._id === botId);
-    const isBotThread = typeof botId === "string" && (!botsLoaded || liveBot !== undefined);
 
     // Get current composer mode to show mode-appropriate model for anonymous users
     const storeNewThreadMode = useModelStore((state) => state.newThreadMode);
@@ -135,7 +145,6 @@ const ComposerModelSelector: FC<ComposerModelSelectorProps> = ({ className }) =>
                 </div>
             )}
             <AgentSwitchConfirmDialog onCancel={cancelSwitch} onConfirm={confirmSwitch} pending={pendingSwitch} />
-            {isBotThread && <span className="text-muted-foreground text-xs">{t`The bot sets the model for this chat.`}</span>}
         </>
     );
 };

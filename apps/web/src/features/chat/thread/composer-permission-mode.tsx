@@ -67,7 +67,7 @@ export const ComposerPermissionMode: FC<ComposerPermissionModeProps> = ({ disabl
                 variant="ghost"
             >
                 <ShieldCheck aria-hidden="true" className="size-3 shrink-0" />
-                <span className="@max-[32rem]/strip:sr-only">{labels[mode]}</span>
+                <span className="@max-[40rem]/strip:sr-only">{labels[mode]}</span>
                 <span className="sr-only" id={noteId}>
                     {note}
                 </span>
@@ -81,7 +81,7 @@ export const ComposerPermissionMode: FC<ComposerPermissionModeProps> = ({ disabl
                 render={
                     <Button aria-label={t`Permission mode: ${labels[mode]}`} className={buttonClass} disabled={disabled} variant="ghost">
                         <ShieldCheck aria-hidden="true" className="size-3 shrink-0" />
-                        <span className="@max-[32rem]/strip:sr-only">{labels[mode]}</span>
+                        <span className="@max-[40rem]/strip:sr-only">{labels[mode]}</span>
                     </Button>
                 }
             />
@@ -114,15 +114,21 @@ export const permissionModeSaveKey = (threadId: string) => ["thread-permission-m
 export const usePermissionModeSaving = (threadId: string | undefined): boolean =>
     useIsMutating({ exact: true, mutationKey: permissionModeSaveKey(threadId ?? "") }) > 0;
 
+interface ShownPermissionModeState {
+    isColumn: boolean;
+    /** The mode being saved, when a selection has not landed yet. */
+    pending: ThreadPermissionMode | undefined;
+    /** What the control shows: the pending selection, else the mode the owner's runs use. */
+    shown: ThreadPermissionMode;
+}
+
 /**
- * The control for the open cloud thread: shows the stored mode and writes it. Nothing for a thread that does not exist yet,
- * one the viewer does not own, or a host thread (its approvals keep their own rules).
+ * The mode the control shows for the open thread, and why: `null` while it is unknown or not shown (no thread yet, one the viewer
+ * does not own, a host thread, a locked stub, an admin acting as the owner).
  */
-const ComposerThreadPermissionMode: FC = () => {
-    const { t } = useLingui();
+const useShownPermissionModeState = (): ShownPermissionModeState | null => {
     const { thread, threadId } = useChatThread();
     const crpc = useCRPC();
-    const isRunning = useChatIsRunning();
     // A passcode-locked chat answers its owner only with the unlock proof, as the model selector sends it.
     const unlockProof = useUnlockProof(threadId);
     const { data: access } = useQuery(crpc.chat.sharing.getThreadAccess.queryOptions(threadId ? { threadId: threadId as never, unlockProof } : skipToken));
@@ -137,32 +143,6 @@ const ComposerThreadPermissionMode: FC = () => {
         // Owner-only: asked for once the ownership answer says so, so a shared viewer sends no request the server would refuse.
         crpc.chat.thread_state.getEffectivePermissionMode.queryOptions(threadId && access?.isOwner === true ? { threadId: threadId as never } : skipToken),
     );
-    const queryClient = useQueryClient();
-    const { mutateAsync } = useMutation({
-        ...crpc.chat.thread_state.setThreadPermissionMode.mutationOptions(),
-        mutationKey: permissionModeSaveKey(threadId ?? ""),
-        // The menu reads the mode from the cached thread: the saved mode must show before the save reads as settled, so the selection
-        // does not fall back to the old stored mode for a moment. TanStack awaits this before it reports the save as done.
-        // Both handlers use the thread the save was for (its variables), not the chat shown when it settles: the user may have moved on.
-        onSuccess: async (_data, variables) => {
-            const saved = variables.threadId as never;
-
-            await queryClient.invalidateQueries({ queryKey: crpc.chat.functions.getThread.queryKey({ threadId: saved }) });
-            await queryClient.invalidateQueries({ queryKey: crpc.chat.thread_state.getEffectivePermissionMode.queryKey({ threadId: saved }) });
-        },
-        // Runs before the save stops reading as in flight, so the queue sees the failure before it may release a held prompt: a prompt
-        // held for a save that did not land would otherwise go out under the stored mode. A refused save on a comparison column changed
-        // nothing, so it holds nothing: only a save that failed after it was sent does.
-        onError: (error, variables) => {
-            const saved = variables.threadId as string;
-
-            if (!isComparisonRefusal(error) && (usePromptQueueStore.getState().queues[saved]?.items.length ?? 0) > 0) {
-                usePromptQueueStore.getState().setPaused(saved, true);
-                // The pause is the failed save's: an explicit held send does not clear it (see the queue's release checks).
-                useQueueEditStore.getState().markFailedSave(saved, true);
-            }
-        },
-    });
     // The selection still saving for this chat, read from the query cache: it outlives this control, so a change of chat and back keeps it,
     // and it leaves the cache once the save settles or fails.
     const pendingModes = useMutationState({
@@ -192,13 +172,59 @@ const ComposerThreadPermissionMode: FC = () => {
     // thread's own stored mode otherwise.
     const fallback: ThreadPermissionMode = !isColumn && isMode(thread.permissionMode) ? thread.permissionMode : "auto";
     const stored: ThreadPermissionMode = isMode(effective) ? effective : fallback;
-    const shown = pending ?? stored;
+
+    return { isColumn, pending, shown: pending ?? stored };
+};
+
+/** The permission mode the control shows for the open thread, or `undefined` while unknown or not shown. */
+export const useShownPermissionMode = (): ThreadPermissionMode | undefined => useShownPermissionModeState()?.shown;
+
+/**
+ * The control for the open cloud thread: shows the stored mode and writes it. Nothing for a thread that does not exist yet,
+ * one the viewer does not own, or a host thread (its approvals keep their own rules).
+ */
+const ComposerThreadPermissionMode: FC = () => {
+    const { t } = useLingui();
+    const { threadId } = useChatThread();
+    const crpc = useCRPC();
+    const isRunning = useChatIsRunning();
+    const state = useShownPermissionModeState();
+    const queryClient = useQueryClient();
+    const { mutateAsync } = useMutation({
+        ...crpc.chat.thread_state.setThreadPermissionMode.mutationOptions(),
+        mutationKey: permissionModeSaveKey(threadId ?? ""),
+        // The menu reads the mode from the cached thread: the saved mode must show before the save reads as settled, so the selection
+        // does not fall back to the old stored mode for a moment. TanStack awaits this before it reports the save as done.
+        // Both handlers use the thread the save was for (its variables), not the chat shown when it settles: the user may have moved on.
+        onSuccess: async (_data, variables) => {
+            const saved = variables.threadId as never;
+
+            await queryClient.invalidateQueries({ queryKey: crpc.chat.functions.getThread.queryKey({ threadId: saved }) });
+            await queryClient.invalidateQueries({ queryKey: crpc.chat.thread_state.getEffectivePermissionMode.queryKey({ threadId: saved }) });
+        },
+        // Runs before the save stops reading as in flight, so the queue sees the failure before it may release a held prompt: a prompt
+        // held for a save that did not land would otherwise go out under the stored mode. A refused save on a comparison column changed
+        // nothing, so it holds nothing: only a save that failed after it was sent does.
+        onError: (error, variables) => {
+            const saved = variables.threadId as string;
+
+            if (!isComparisonRefusal(error) && (usePromptQueueStore.getState().queues[saved]?.items.length ?? 0) > 0) {
+                usePromptQueueStore.getState().setPaused(saved, true);
+                // The pause is the failed save's: an explicit held send does not clear it (see the queue's release checks).
+                useQueueEditStore.getState().markFailedSave(saved, true);
+            }
+        },
+    });
+
+    if (!threadId || !state) {
+        return null;
+    }
 
     return (
         <ComposerPermissionMode
-            disabled={isRunning || pending !== undefined}
-            mode={shown}
-            note={isColumn ? t`This comparison's mode applies to every column. Change it on the comparison.` : undefined}
+            disabled={isRunning || state.pending !== undefined}
+            mode={state.shown}
+            note={state.isColumn ? t`This comparison's mode applies to every column. Change it on the comparison.` : undefined}
             onModeChange={(mode) => {
                 mutateAsync({ mode, threadId: threadId as never })
                     .catch((error: unknown) => {

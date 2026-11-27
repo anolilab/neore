@@ -17,14 +17,21 @@ interface ComposerResearchDepthProps {
 
 const DEPTH_ORDER: ResearchDepth[] = ["speed", "balanced", "thorough"];
 
-const ComposerResearchDepth: FC<ComposerResearchDepthProps> = ({ depth, disabled, onDepthChange }) => {
+/** The depth labels, shared by the control and the composer's status line. */
+export const useResearchDepthLabels = (): Record<ResearchDepth, string> => {
     const { t } = useLingui();
 
-    const labels: Record<ResearchDepth, string> = {
+    return {
         balanced: t`Balanced`,
         speed: t`Speed`,
         thorough: t`Thorough`,
     };
+};
+
+const ComposerResearchDepth: FC<ComposerResearchDepthProps> = ({ depth, disabled, onDepthChange }) => {
+    const { t } = useLingui();
+
+    const labels = useResearchDepthLabels();
 
     const descriptions: Record<ResearchDepth, string> = {
         balanced: t`Standard search depth`,
@@ -47,15 +54,14 @@ const ComposerResearchDepth: FC<ComposerResearchDepthProps> = ({ depth, disabled
                         aria-label={t`Search depth: ${labels[depth]}`}
                         className={clsx(
                             "bg-transparent hover:bg-surface-row-hover dark:hover:bg-surface-row-hover rounded-lg text-muted-foreground hover:text-foreground h-7 gap-1 px-2",
-                            depth !== "balanced" &&
-                                "bg-primary/10 text-primary-text border-primary/30 dark:text-primary-text hover:bg-primary/20 hover:border-primary/40",
+                            depth !== "balanced" && "bg-surface-row-active text-foreground",
                         )}
                         disabled={disabled}
                         onClick={cycleDepth}
                         variant="ghost"
                     >
                         <Gauge aria-hidden="true" className="size-3 shrink-0" />
-                        <span className="@max-[32rem]/strip:sr-only">{labels[depth]}</span>
+                        <span className="@max-[40rem]/strip:sr-only">{labels[depth]}</span>
                     </Button>
                 }
             />

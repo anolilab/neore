@@ -91,7 +91,7 @@ const ComposerSearchSuggestions: FC = () => {
                         type="button"
                     >
                         {suggestion.type === "operator" && (
-                            <span aria-hidden="true" className="font-mono text-[10px] opacity-60">
+                            <span aria-hidden="true" className="font-mono text-[10px]">
                                 op
                             </span>
                         )}
