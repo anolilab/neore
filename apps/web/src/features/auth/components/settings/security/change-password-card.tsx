@@ -254,7 +254,7 @@ const ChangePasswordCardContent = ({
                     isPending={isPending}
                     title={t`Change Password`}
                 >
-                    <CardContent className={cn("grid gap-6", classNames?.content)}>
+                    <CardContent className={cn("grid gap-4", classNames?.content)}>
                         {isPending || !accounts ? (
                             <>
                                 <div className="flex flex-col gap-1.5">

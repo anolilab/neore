@@ -45,7 +45,7 @@ const MemoryDigestCard: FC = () => {
     const fallbackSummary = t`${stats.newMemories} new, ${stats.merged} merged, ${stats.promoted} promoted, ${stats.contradictionsResolved} contradictions resolved, ${stats.decayed + stats.retired} faded.`;
 
     return (
-        <section aria-labelledby="memory-digest-title" className="bg-muted/40 relative space-y-2 rounded-md border p-3">
+        <section aria-labelledby="memory-digest-title" className="border-border/50 space-y-2 border-t py-3">
             <div className="flex items-start justify-between gap-2">
                 <Heading className="flex items-center gap-1.5 text-sm font-medium" fallbackLevel={3} id="memory-digest-title">
                     <SparklesIcon aria-hidden="true" className="text-muted-foreground size-4" />

@@ -261,7 +261,8 @@ export const SettingsModal: FC = () => {
         const onKeyDown = (event: KeyboardEvent) => {
             const field = searchInputRef.current;
 
-            if (event.key !== "/" || event.metaKey || event.ctrlKey || event.altKey || !field || field.offsetParent === null) {
+            // Shift stays allowed: on some layouts "/" is Shift+7. A key that is part of an IME composition is not a slash yet.
+            if (event.key !== "/" || event.isComposing || event.metaKey || event.ctrlKey || event.altKey || !field || field.offsetParent === null) {
                 return;
             }
 

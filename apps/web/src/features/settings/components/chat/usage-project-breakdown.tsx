@@ -1,14 +1,13 @@
 import { useLingui } from "@lingui/react/macro";
 import { api } from "@neore/backend/api";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@neore/ui/components/card";
 import { Skeleton } from "@neore/ui/components/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@neore/ui/components/table";
 import { ToggleGroup, ToggleGroupItem } from "@neore/ui/components/toggle-group";
 import { skipToken, useQuery } from "@tanstack/react-query";
-import { FolderKanban } from "lucide-react";
 import type { FC } from "react";
 import { useState } from "react";
 
+import SettingsCard from "@/components/settings/settings-card";
 import { useActiveOrganization, useHasPermission } from "@/features/auth/hooks/organization-management";
 import { useAuthSession } from "@/features/auth/hooks/use-auth-session";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
@@ -150,45 +149,39 @@ const UsageProjectBreakdown: FC<UsageProjectBreakdownProps> = ({ backfilling, da
     const truncated = active.data?.truncated === true;
 
     return (
-        <Card>
-            <CardHeader>
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                        <CardTitle className="flex items-center gap-2 text-base">
-                            <FolderKanban aria-hidden="true" className="size-4" />
-                            {t`Usage by project`}
-                        </CardTitle>
-                        <CardDescription>
-                            {showing === "mine"
-                                ? t`Replies, tokens and spend per project for the selected period`
-                                : t`Your organization's projects, summed over every member, for the selected period`}
-                        </CardDescription>
-                        {showing === "organization" && (
-                            <p className="text-muted-foreground mt-1 text-xs">{t`Counted in whole weeks (Monday to Sunday, UTC) once each week has ended, so this week's usage shows next week.`}</p>
-                        )}
-                    </div>
-                    {isOrganizationAdmin && (
-                        <ToggleGroup
-                            aria-label={t`Whose usage`}
-                            className="gap-1"
-                            onValueChange={(value) => {
-                                const next = value?.[0];
+        <SettingsCard
+            description={
+                showing === "mine"
+                    ? t`Replies, tokens and spend per project for the selected period`
+                    : t`Your organization's projects, summed over every member, for the selected period`
+            }
+            title={t`Usage by project`}
+        >
+            {isOrganizationAdmin && (
+                <div className="flex justify-end pt-3">
+                    <ToggleGroup
+                        aria-label={t`Whose usage`}
+                        className="gap-1"
+                        onValueChange={(value) => {
+                            const next = value?.[0];
 
-                                if (next === "mine" || next === "organization") {
-                                    setScope(next);
-                                }
-                            }}
-                            size="sm"
-                            value={[showing]}
-                            variant="outline"
-                        >
-                            <ToggleGroupItem value="mine">{t`Mine`}</ToggleGroupItem>
-                            <ToggleGroupItem value="organization">{t`Organization`}</ToggleGroupItem>
-                        </ToggleGroup>
-                    )}
+                            if (next === "mine" || next === "organization") {
+                                setScope(next);
+                            }
+                        }}
+                        size="sm"
+                        value={[showing]}
+                        variant="outline"
+                    >
+                        <ToggleGroupItem value="mine">{t`Mine`}</ToggleGroupItem>
+                        <ToggleGroupItem value="organization">{t`Organization`}</ToggleGroupItem>
+                    </ToggleGroup>
                 </div>
-            </CardHeader>
-            <CardContent aria-busy={isPending}>
+            )}
+            {showing === "organization" && (
+                <p className="text-muted-foreground pt-3 text-xs">{t`Counted in whole weeks (Monday to Sunday, UTC) once each week has ended, so this week's usage shows next week.`}</p>
+            )}
+            <div aria-busy={isPending} className="py-3">
                 {isPending && (
                     <div className="space-y-2" role="status">
                         <span className="sr-only">{t`Loading usage…`}</span>
@@ -260,8 +253,8 @@ const UsageProjectBreakdown: FC<UsageProjectBreakdownProps> = ({ backfilling, da
                         {t`Only part of this period is included.`}
                     </p>
                 )}
-            </CardContent>
-        </Card>
+            </div>
+        </SettingsCard>
     );
 };
 

@@ -245,7 +245,12 @@ const MemoryItem: FC<MemoryItemProps> = ({ busy, memory, onDelete, onSave, onTog
     };
 
     return (
-        <li className={cn("bg-muted/50 group rounded-md p-2", memory.pinned && "ring-primary/40 ring-1")}>
+        <li
+            className={cn(
+                "not-first:border-border/50 group rounded-md py-3 not-first:border-t",
+                memory.pinned && "ring-primary/40 -mx-2 px-2 ring-1 ring-inset",
+            )}
+        >
             <div className="flex flex-wrap items-center gap-1.5">
                 <Select
                     disabled={busy}

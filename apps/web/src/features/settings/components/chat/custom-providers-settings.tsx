@@ -3,24 +3,22 @@
 import { Plural, useLingui } from "@lingui/react/macro";
 import { LM_STUDIO_DEFAULT_BASE_URL, OLLAMA_DEFAULT_BASE_URL, validateLocalEndpointUrl } from "@neore/ai/models";
 import { api } from "@neore/backend/api";
-import { Alert, AlertDescription, AlertTitle } from "@neore/ui/components/alert";
 import { Badge } from "@neore/ui/components/badge";
 import { Button } from "@neore/ui/components/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@neore/ui/components/card";
 import ConfirmDialog from "@neore/ui/components/confirm-dialog";
 import { Heading } from "@neore/ui/components/heading";
 import { Input } from "@neore/ui/components/input";
 import { Label } from "@neore/ui/components/label";
 import { RadioGroup, RadioGroupItem } from "@neore/ui/components/radio-group";
-import { Separator } from "@neore/ui/components/separator";
 import { Switch } from "@neore/ui/components/switch";
 import { Textarea } from "@neore/ui/components/textarea";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { AlertTriangle, CheckCircle2, Globe, HardDrive, Loader2, Pencil, PlugZap, Plus, RefreshCw, Server, SlidersHorizontal, Trash2, X } from "lucide-react";
+import { AlertTriangle, CheckCircle2, HardDrive, Loader2, Pencil, PlugZap, Plus, RefreshCw, Server, SlidersHorizontal, Trash2, X } from "lucide-react";
 import type { FC } from "react";
 import { useCallback, useId, useMemo, useState } from "react";
 import { toast } from "sonner";
 
+import SettingsCard from "@/components/settings/settings-card";
 import LocalSetupGuide from "@/features/local-models/components/local-setup-guide";
 import OllamaModelManager from "@/features/local-models/components/ollama-model-manager";
 import { listLocalModels } from "@/features/local-models/lib/local-client";
@@ -314,41 +312,35 @@ const CustomProvidersSettings: FC = () => {
     const isLocalForm = form?.type === "local-browser";
 
     return (
-        <Card>
-            <CardHeader>
-                <div className="flex items-start justify-between gap-4">
-                    <div>
-                        <CardTitle className="text-base">{t`Custom Endpoints`}</CardTitle>
-                        <CardDescription>
-                            {t`Connect any OpenAI- or Anthropic-compatible server — Ollama, LM Studio, vLLM or a hosted proxy. Its models appear in the chat model picker.`}
-                        </CardDescription>
-                    </div>
-                    {!form && (
-                        <Button onClick={() => setForm(EMPTY_FORM)} size="sm" variant="outline">
+        <>
+            <SettingsCard
+                action={form ? undefined : () => setForm(EMPTY_FORM)}
+                actionLabel={
+                    form ? undefined : (
+                        <>
                             <Plus aria-hidden="true" className="mr-1 size-4" />
                             {t`Add Endpoint`}
-                        </Button>
-                    )}
-                </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-                <Alert>
-                    <Globe aria-hidden="true" />
-                    <AlertTitle>{t`Two ways to connect`}</AlertTitle>
-                    <AlertDescription>
+                        </>
+                    )
+                }
+                description={t`Connect any OpenAI- or Anthropic-compatible server — Ollama, LM Studio, vLLM or a hosted proxy. Its models appear in the chat model picker.`}
+                title={t`Custom Endpoints`}
+            >
+                <div className="space-y-1 py-3">
+                    <p className="text-sm font-medium">{t`Two ways to connect`}</p>
+                    <p className="text-muted-foreground max-w-2xl text-xs">
                         {t`OpenAI- and Anthropic-compatible endpoints are called from our servers, so they must be public HTTPS URLs. For Ollama or LM Studio on this computer, choose "On this computer": your browser then talks to it directly — text only, not billed, and only in this browser.`}
-                    </AlertDescription>
-                </Alert>
+                    </p>
+                </div>
 
-                {isLoading && <p className="text-muted-foreground text-sm">{t`Loading...`}</p>}
+                {isLoading && <p className="text-muted-foreground py-3 text-sm">{t`Loading...`}</p>}
 
-                {!isLoading && providers.length === 0 && !form && <p className="text-muted-foreground text-sm">{t`No custom endpoints yet.`}</p>}
+                {!isLoading && providers.length === 0 && !form && <p className="text-muted-foreground py-3 text-sm">{t`No custom endpoints yet.`}</p>}
 
                 {providers.length > 0 && (
-                    <ul aria-label={t`Custom endpoints`} className="space-y-3">
-                        {providers.map((provider, index) => (
-                            <li key={provider.id}>
-                                {index > 0 && <Separator className="mb-3" />}
+                    <ul aria-label={t`Custom endpoints`}>
+                        {providers.map((provider) => (
+                            <li className="border-border/50 py-3 not-first:border-t" key={provider.id}>
                                 <div className="flex items-start justify-between gap-4">
                                     <div className="min-w-0 flex-1">
                                         <div className="flex flex-wrap items-center gap-2">
@@ -427,7 +419,7 @@ const CustomProvidersSettings: FC = () => {
                 {form && (
                     <form
                         aria-labelledby={fieldId("title")}
-                        className="space-y-4 rounded-lg border p-4"
+                        className="border-border/50 space-y-4 py-3 not-first:border-t"
                         noValidate
                         onSubmit={(event) => {
                             event.preventDefault();
@@ -644,10 +636,10 @@ const CustomProvidersSettings: FC = () => {
                     </form>
                 )}
 
-                <p className="text-muted-foreground text-xs">
+                <p className="text-muted-foreground border-border/50 py-3 text-xs not-first:border-t">
                     {t`Tokens used on your own endpoint are not charged as credits. Daily message limits still apply.`}
                 </p>
-            </CardContent>
+            </SettingsCard>
 
             <ConfirmDialog
                 confirmLabel={t`Remove`}
@@ -658,7 +650,7 @@ const CustomProvidersSettings: FC = () => {
                 open={deleting !== null}
                 title={deleting ? t`Remove "${deleting.name}"?` : t`Remove endpoint?`}
             />
-        </Card>
+        </>
     );
 };
 

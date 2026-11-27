@@ -1,7 +1,5 @@
 "use client";
 
-import { useLingui } from "@lingui/react/macro";
-import { Heading, HeadingSection } from "@neore/ui/components/heading";
 import cn from "@neore/ui/utils/cn";
 
 import { useSession } from "@/features/auth/hooks/session-user-management";
@@ -18,7 +16,6 @@ import ChangeEmailCard from "./security/change-email-card";
 
 const AccountSettingsCards = ({ className, classNames }: AuthCardProps) => {
     const { additionalFields, authClient, avatar, changeEmail, credentials, multiSession, settings } = useAuth();
-    const { t } = useLingui();
 
     const { data: sessionData } = useSession(authClient);
 
@@ -71,10 +68,7 @@ const AccountSettingsCards = ({ className, classNames }: AuthCardProps) => {
 
             {multiSession && <AccountsCard classNames={classNames} />}
 
-            <Heading className="text-lg font-semibold">{t`Danger Zone`}</Heading>
-            <HeadingSection>
-                <DeleteAccountCard classNames={classNames} />
-            </HeadingSection>
+            <DeleteAccountCard classNames={classNames} />
         </div>
     );
 };

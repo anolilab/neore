@@ -3,17 +3,15 @@
 import { Trans, useLingui } from "@lingui/react/macro";
 import { Alert, AlertDescription } from "@neore/ui/components/alert";
 import { Button } from "@neore/ui/components/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@neore/ui/components/card";
-import { Heading, HeadingSection } from "@neore/ui/components/heading";
-import { Label } from "@neore/ui/components/label";
 import { RadioGroup, RadioGroupItem } from "@neore/ui/components/radio-group";
-import { Separator } from "@neore/ui/components/separator";
 import { Switch } from "@neore/ui/components/switch";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Info } from "lucide-react";
 import type { FC } from "react";
 import { toast } from "sonner";
 
+import SettingsCard from "@/components/settings/settings-card";
+import SettingsRow from "@/components/settings/settings-row";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 type BrowserClickMode = "page" | "pointer" | "all";
@@ -105,215 +103,158 @@ const AgentSettings: FC = () => {
     };
 
     return (
-        <div className="space-y-6">
-            <div>
-                <Heading className="text-2xl font-bold tracking-tight">{t`Agent Capabilities`}</Heading>
-                <p className="text-muted-foreground">{t`Configure advanced AI agent modules for enhanced task execution`}</p>
-            </div>
+        <div className="space-y-8">
+            <Alert>
+                <Info aria-hidden="true" className="h-4 w-4" />
+                <AlertDescription>
+                    <Trans>
+                        The agent loop is always enabled for systematic task execution. These settings control additional specialized modules that enhance the
+                        AI&apos;s capabilities for specific task types.
+                    </Trans>
+                </AlertDescription>
+            </Alert>
 
-            <HeadingSection>
-                <Alert>
-                    <Info aria-hidden="true" className="h-4 w-4" />
-                    <AlertDescription>
+            <SettingsCard description={t`Enable specialized modules to enhance AI capabilities`} title={t`Agent Modules`}>
+                <SettingsRow
+                    control={
+                        <Switch
+                            checked={aiPreferences?.enablePlanner ?? false}
+                            disabled={updateAIUserPreferencesMutation.isPending}
+                            id="enablePlanner"
+                            onCheckedChange={(checked: boolean) => handleToggle("enablePlanner", checked)}
+                        />
+                    }
+                    description={t`Break down complex tasks into numbered steps with progress tracking. Ideal for multi-step projects and development tasks.`}
+                    htmlFor="enablePlanner"
+                    title={t`Task Planning Module`}
+                />
+                <SettingsRow
+                    control={
+                        <Switch
+                            checked={aiPreferences?.enableKnowledge ?? false}
+                            disabled={updateAIUserPreferencesMutation.isPending}
+                            id="enableKnowledge"
+                            onCheckedChange={(checked: boolean) => handleToggle("enableKnowledge", checked)}
+                        />
+                    }
+                    description={t`Apply best practices, patterns, and domain-specific guidelines. Enhances responses with expert knowledge and proven approaches.`}
+                    htmlFor="enableKnowledge"
+                    title={t`Knowledge Module`}
+                />
+                <SettingsRow
+                    control={
+                        <Switch
+                            checked={aiPreferences?.enableDatasource ?? false}
+                            disabled={updateAIUserPreferencesMutation.isPending}
+                            id="enableDatasource"
+                            onCheckedChange={(checked: boolean) => handleToggle("enableDatasource", checked)}
+                        />
+                    }
+                    description={t`Validate data quality and prioritize authoritative sources. Essential for research tasks and fact-checking.`}
+                    htmlFor="enableDatasource"
+                    title={t`Data Source Module`}
+                />
+                <SettingsRow
+                    control={
+                        <Switch
+                            checked={aiPreferences?.autoMediaEnrichment ?? false}
+                            disabled={updateAIUserPreferencesMutation.isPending}
+                            id="autoMediaEnrichment"
+                            onCheckedChange={(checked: boolean) => handleToggle("autoMediaEnrichment", checked)}
+                        />
+                    }
+                    description={t`Automatically include relevant images and videos alongside text responses when using search modes.`}
+                    htmlFor="autoMediaEnrichment"
+                    title={t`Auto Media Enrichment`}
+                />
+            </SettingsCard>
+
+            <SettingsCard description={t`Automatically enable modules based on task complexity`} title={t`Automation`}>
+                <SettingsRow
+                    control={
+                        <Switch
+                            checked={aiPreferences?.autoDetectComplexity ?? false}
+                            disabled={updateAIUserPreferencesMutation.isPending}
+                            id="autoDetectComplexity"
+                            onCheckedChange={(checked: boolean) => handleToggle("autoDetectComplexity", checked)}
+                        />
+                    }
+                    description={
                         <Trans>
-                            The agent loop is always enabled for systematic task execution. These settings control additional specialized modules that enhance
-                            the AI&apos;s capabilities for specific task types.
+                            Automatically enable appropriate modules based on detected task type. Simplifies usage by intelligently activating features when
+                            needed.
                         </Trans>
-                    </AlertDescription>
-                </Alert>
+                    }
+                    htmlFor="autoDetectComplexity"
+                    title={t`Auto-Detect Task Complexity`}
+                />
+            </SettingsCard>
 
-                <Card>
-                    <CardHeader>
-                        <CardTitle>{t`Agent Modules`}</CardTitle>
-                        <CardDescription>{t`Enable specialized modules to enhance AI capabilities`}</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-6">
-                        {/* Task Planning Module */}
-                        <div className="flex items-start justify-between gap-4">
-                            <div className="flex-1 space-y-1">
-                                <Label className="text-base font-medium" htmlFor="enablePlanner">
-                                    {t`Task Planning Module`}
-                                </Label>
-                                <p className="text-muted-foreground text-sm">
-                                    {t`Break down complex tasks into numbered steps with progress tracking. Ideal for multi-step projects and development tasks.`}
-                                </p>
-                            </div>
-                            <Switch
-                                checked={aiPreferences?.enablePlanner ?? false}
-                                disabled={updateAIUserPreferencesMutation.isPending}
-                                id="enablePlanner"
-                                onCheckedChange={(checked: boolean) => handleToggle("enablePlanner", checked)}
-                            />
-                        </div>
+            <SettingsCard description={t`Who a pull request's commits are made as`} title={t`Coding Agent Pull Requests`}>
+                <SettingsRow
+                    control={
+                        <Switch
+                            aria-describedby="commitAsMeDescription"
+                            checked={aiPreferences?.codingAgentCommitIdentity === "user"}
+                            disabled={setCommitIdentityMutation.isPending || isAIPreferencesError}
+                            id="commitAsMe"
+                            onCheckedChange={(checked: boolean) => setCommitIdentityMutation.mutate({ identity: checked ? "user" : "agent" })}
+                        />
+                    }
+                    description={t`Commits are made under your name and email, with Neore Agent listed as co-author. Off keeps the agent as the author, and so does an account without a name or a verified email.`}
+                    descriptionId="commitAsMeDescription"
+                    htmlFor="commitAsMe"
+                    title={t`Commit as me`}
+                >
+                    <p className="text-destructive text-sm empty:-mt-3 empty:h-0" id="commitAsMeError" role="status">
+                        {isAIPreferencesError ? t`Something went wrong. Try again.` : null}
+                    </p>
+                    {isAIPreferencesError ? (
+                        <Button aria-describedby="commitAsMeError" className="mt-2" onClick={() => refetchAIPreferences()} size="sm" variant="outline">
+                            {t`Retry`}
+                        </Button>
+                    ) : null}
+                </SettingsRow>
+            </SettingsCard>
 
-                        <Separator />
+            <SettingsCard
+                description={t`How the agent's browser presses buttons and links`}
+                title={<span id="browserClickModeTitle">{t`Browser Clicks`}</span>}
+            >
+                <div className="py-3">
+                    <RadioGroup
+                        aria-labelledby="browserClickModeTitle"
+                        className="gap-4"
+                        disabled={setBrowserClickModeMutation.isPending || isAIPreferencesError}
+                        onValueChange={(value: unknown) => setBrowserClickModeMutation.mutate({ mode: toBrowserClickMode(value) })}
+                        value={toBrowserClickMode(aiPreferences?.browserClickMode)}
+                    >
+                        {browserClickModeOptions.map((option) => (
+                            <label className="flex cursor-pointer items-start gap-3" htmlFor={`browser-click-mode-${option.mode}`} key={option.mode}>
+                                <RadioGroupItem className="mt-0.5" id={`browser-click-mode-${option.mode}`} value={option.mode} />
+                                <span className="min-w-0 flex-1 space-y-1">
+                                    <span className="block text-sm font-medium">{option.label}</span>
+                                    <span className="text-muted-foreground block text-xs">{option.description}</span>
+                                </span>
+                            </label>
+                        ))}
+                    </RadioGroup>
+                </div>
+            </SettingsCard>
 
-                        {/* Knowledge Module */}
-                        <div className="flex items-start justify-between gap-4">
-                            <div className="flex-1 space-y-1">
-                                <Label className="text-base font-medium" htmlFor="enableKnowledge">
-                                    {t`Knowledge Module`}
-                                </Label>
-                                <p className="text-muted-foreground text-sm">
-                                    {t`Apply best practices, patterns, and domain-specific guidelines. Enhances responses with expert knowledge and proven approaches.`}
-                                </p>
-                            </div>
-                            <Switch
-                                checked={aiPreferences?.enableKnowledge ?? false}
-                                disabled={updateAIUserPreferencesMutation.isPending}
-                                id="enableKnowledge"
-                                onCheckedChange={(checked: boolean) => handleToggle("enableKnowledge", checked)}
-                            />
-                        </div>
-
-                        <Separator />
-
-                        {/* Data Source Module */}
-                        <div className="flex items-start justify-between gap-4">
-                            <div className="flex-1 space-y-1">
-                                <Label className="text-base font-medium" htmlFor="enableDatasource">
-                                    {t`Data Source Module`}
-                                </Label>
-                                <p className="text-muted-foreground text-sm">
-                                    {t`Validate data quality and prioritize authoritative sources. Essential for research tasks and fact-checking.`}
-                                </p>
-                            </div>
-                            <Switch
-                                checked={aiPreferences?.enableDatasource ?? false}
-                                disabled={updateAIUserPreferencesMutation.isPending}
-                                id="enableDatasource"
-                                onCheckedChange={(checked: boolean) => handleToggle("enableDatasource", checked)}
-                            />
-                        </div>
-
-                        <Separator />
-
-                        {/* Auto Media Enrichment */}
-                        <div className="flex items-start justify-between gap-4">
-                            <div className="flex-1 space-y-1">
-                                <Label className="text-base font-medium" htmlFor="autoMediaEnrichment">
-                                    {t`Auto Media Enrichment`}
-                                </Label>
-                                <p className="text-muted-foreground text-sm">
-                                    {t`Automatically include relevant images and videos alongside text responses when using search modes.`}
-                                </p>
-                            </div>
-                            <Switch
-                                checked={aiPreferences?.autoMediaEnrichment ?? false}
-                                disabled={updateAIUserPreferencesMutation.isPending}
-                                id="autoMediaEnrichment"
-                                onCheckedChange={(checked: boolean) => handleToggle("autoMediaEnrichment", checked)}
-                            />
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardHeader>
-                        <CardTitle>{t`Automation`}</CardTitle>
-                        <CardDescription>{t`Automatically enable modules based on task complexity`}</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="flex items-start justify-between gap-4">
-                            <div className="flex-1 space-y-1">
-                                <Label className="text-base font-medium" htmlFor="autoDetectComplexity">
-                                    {t`Auto-Detect Task Complexity`}
-                                </Label>
-                                <p className="text-muted-foreground text-sm">
-                                    <Trans>
-                                        Automatically enable appropriate modules based on detected task type. Simplifies usage by intelligently activating
-                                        features when needed.
-                                    </Trans>
-                                </p>
-                            </div>
-                            <Switch
-                                checked={aiPreferences?.autoDetectComplexity ?? false}
-                                disabled={updateAIUserPreferencesMutation.isPending}
-                                id="autoDetectComplexity"
-                                onCheckedChange={(checked: boolean) => handleToggle("autoDetectComplexity", checked)}
-                            />
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardHeader>
-                        <CardTitle>{t`Coding Agent Pull Requests`}</CardTitle>
-                        <CardDescription>{t`Who a pull request's commits are made as`}</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="flex items-start justify-between gap-4">
-                            <div className="flex-1 space-y-1">
-                                <Label className="text-base font-medium" htmlFor="commitAsMe">
-                                    {t`Commit as me`}
-                                </Label>
-                                <p className="text-muted-foreground text-sm" id="commitAsMeDescription">
-                                    {t`Commits are made under your name and email, with Neore Agent listed as co-author. Off keeps the agent as the author, and so does an account without a name or a verified email.`}
-                                </p>
-                            </div>
-                            <Switch
-                                aria-describedby="commitAsMeDescription"
-                                checked={aiPreferences?.codingAgentCommitIdentity === "user"}
-                                disabled={setCommitIdentityMutation.isPending || isAIPreferencesError}
-                                id="commitAsMe"
-                                onCheckedChange={(checked: boolean) => setCommitIdentityMutation.mutate({ identity: checked ? "user" : "agent" })}
-                            />
-                        </div>
-                        <p className={isAIPreferencesError ? "text-destructive mt-4 text-sm" : "text-destructive text-sm"} id="commitAsMeError" role="status">
-                            {isAIPreferencesError ? t`Something went wrong. Try again.` : null}
-                        </p>
-                        {isAIPreferencesError ? (
-                            <Button aria-describedby="commitAsMeError" className="mt-2" onClick={() => refetchAIPreferences()} size="sm" variant="outline">
-                                {t`Retry`}
-                            </Button>
-                        ) : null}
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardHeader>
-                        <CardTitle id="browserClickModeTitle">{t`Browser Clicks`}</CardTitle>
-                        <CardDescription>{t`How the agent's browser presses buttons and links`}</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <RadioGroup
-                            aria-labelledby="browserClickModeTitle"
-                            className="gap-4"
-                            disabled={setBrowserClickModeMutation.isPending || isAIPreferencesError}
-                            onValueChange={(value: unknown) => setBrowserClickModeMutation.mutate({ mode: toBrowserClickMode(value) })}
-                            value={toBrowserClickMode(aiPreferences?.browserClickMode)}
-                        >
-                            {browserClickModeOptions.map((option) => (
-                                <label className="flex cursor-pointer items-start gap-3" htmlFor={`browser-click-mode-${option.mode}`} key={option.mode}>
-                                    <RadioGroupItem className="mt-0.5" id={`browser-click-mode-${option.mode}`} value={option.mode} />
-                                    <span className="min-w-0 flex-1 space-y-1">
-                                        <span className="block font-medium">{option.label}</span>
-                                        <span className="text-muted-foreground block text-sm">{option.description}</span>
-                                    </span>
-                                </label>
-                            ))}
-                        </RadioGroup>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardHeader>
-                        <CardTitle>{t`Token Cost Impact`}</CardTitle>
-                        <CardDescription>{t`Estimated token cost per conversation`}</CardDescription>
-                    </CardHeader>
-                    <CardContent className="text-muted-foreground text-sm">
-                        <ul className="list-disc space-y-2 pl-5">
-                            <li>{t`Base (agent loop only): ~2,300 tokens`}</li>
-                            <li>{t`+ Task Planning: ~2,500 tokens (+200)`}</li>
-                            <li>{t`+ Knowledge: ~2,600 tokens (+100)`}</li>
-                            <li>{t`+ Data Source: ~2,700 tokens (+100)`}</li>
-                        </ul>
-                        <p className="mt-4 text-xs">
-                            {t`Note: Modules are applied per conversation, not per message. Enable only the modules you need to optimize token usage.`}
-                        </p>
-                    </CardContent>
-                </Card>
-            </HeadingSection>
+            <SettingsCard description={t`Estimated token cost per conversation`} title={t`Token Cost Impact`}>
+                <div className="text-muted-foreground py-3 text-sm">
+                    <ul className="list-disc space-y-2 pl-5">
+                        <li>{t`Base (agent loop only): ~2,300 tokens`}</li>
+                        <li>{t`+ Task Planning: ~2,500 tokens (+200)`}</li>
+                        <li>{t`+ Knowledge: ~2,600 tokens (+100)`}</li>
+                        <li>{t`+ Data Source: ~2,700 tokens (+100)`}</li>
+                    </ul>
+                    <p className="mt-4 text-xs">
+                        {t`Note: Modules are applied per conversation, not per message. Enable only the modules you need to optimize token usage.`}
+                    </p>
+                </div>
+            </SettingsCard>
         </div>
     );
 };

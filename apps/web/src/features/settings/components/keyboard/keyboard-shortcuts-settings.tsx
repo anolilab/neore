@@ -4,11 +4,8 @@ import { Field } from "@base-ui/react/field";
 import { useLingui } from "@lingui/react/macro";
 import { isValidShortcut } from "@neore/backend/auth/shortcut";
 import { Button } from "@neore/ui/components/button";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@neore/ui/components/card";
 import { useAppForm } from "@neore/ui/components/form";
 import { Input } from "@neore/ui/components/input";
-import { Label } from "@neore/ui/components/label";
-import { Separator } from "@neore/ui/components/separator";
 import { eventToShortcut, formatShortcutForDisplay } from "@neore/ui/utils/keyboard-shortcuts";
 import { useMutation } from "@tanstack/react-query";
 import type { FC } from "react";
@@ -16,6 +13,8 @@ import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import * as z from "zod";
 
+import SettingsCard from "@/components/settings/settings-card";
+import SettingsRow from "@/components/settings/settings-row";
 import { findEffortConflicts } from "@/features/keyboard/lib/recorded-shortcut-converter";
 import { SHORTCUT_ENTRIES } from "@/features/keyboard/lib/shortcut-sheet";
 import { useKeyboardShortcuts } from "@/features/layout/hooks/use-ui-state";
@@ -310,119 +309,111 @@ const KeyboardShortcutsSettings: FC = () => {
     }, [isResetting, resetKeyboardShortcuts, form, saveShortcuts, t]);
 
     return (
-        <div className="space-y-6">
-            <Card>
-                <CardHeader className="pb-2">
-                    <CardTitle className="text-[15px] font-semibold">{t`Keyboard Shortcuts`}</CardTitle>
-                    <p className="text-muted-foreground mt-1 text-xs">
-                        {t`Customize keyboard shortcuts for common actions. Click "Record" and press your desired key combination.`}
-                    </p>
-                </CardHeader>
-                <form.AppForm>
-                    <form
-                        onSubmit={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            form.handleSubmit();
-                        }}
-                    >
-                        <CardContent className="space-y-6">
-                            <div className="space-y-4">
-                                {EDITABLE_SHORTCUT_KEYS.map((key) => (
-                                    <Field.Root className="space-y-2" key={key}>
-                                        <div className="flex items-center justify-between">
-                                            <div>
-                                                <Label className="text-sm font-medium" htmlFor={key}>
-                                                    {shortcutLabels[key]}
-                                                </Label>
-                                                <p className="text-muted-foreground text-xs">{shortcutDescriptions[key]}</p>
-                                                <form.Subscribe selector={(state) => isDuplicate(state.fieldMeta[key]?.errors)}>
-                                                    {(duplicate) =>
-                                                        duplicate && (
-                                                            <p className="text-destructive text-xs" id={`${key}-error`} role="alert">
-                                                                {t`Another action already uses this key combination. Change or clear one of them to save.`}
-                                                            </p>
-                                                        )
+        <SettingsCard
+            description={t`Customize keyboard shortcuts for common actions. Click "Record" and press your desired key combination.`}
+            title={t`Keyboard Shortcuts`}
+        >
+            <form.AppForm>
+                <form
+                    onSubmit={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        form.handleSubmit();
+                    }}
+                >
+                    {EDITABLE_SHORTCUT_KEYS.map((key) => (
+                        // The hairline sits on the field root, which is the row's parent, so the row itself is always a first child.
+                        <Field.Root className="not-first:border-border/50 not-first:border-t" key={key}>
+                            <SettingsRow
+                                control={
+                                    <form.AppField name={key}>
+                                        {(field) => (
+                                            <div className="flex items-center gap-2">
+                                                <Input
+                                                    // The field names its own error, so a person who comes back to it hears why it was refused.
+                                                    aria-describedby={isDuplicate(field.state.meta.errors) ? `${key}-error` : undefined}
+                                                    aria-invalid={isDuplicate(field.state.meta.errors) || undefined}
+                                                    className="w-32"
+                                                    id={key}
+                                                    placeholder={t`Not set`}
+                                                    readOnly
+                                                    value={
+                                                        isRecording === key
+                                                            ? formatShortcutForDisplay(pressedKeys.join("+")) || t`Press keys...`
+                                                            : formatShortcutForDisplay(field.state.value || "") || t`Not set`
                                                     }
-                                                </form.Subscribe>
+                                                />
+                                                <Button
+                                                    aria-label={`${isRecording === key ? t`Stop` : t`Record`} ${shortcutLabels[key]}`}
+                                                    disabled={isResetting}
+                                                    onClick={() => {
+                                                        if (isRecording === key) {
+                                                            stopRecording();
+                                                        } else {
+                                                            startRecording(key);
+                                                        }
+                                                    }}
+                                                    size="sm"
+                                                    type="button"
+                                                    variant={isRecording === key ? "destructive" : "outline"}
+                                                >
+                                                    {isRecording === key ? t`Stop` : t`Record`}
+                                                </Button>
+                                                <Button
+                                                    aria-label={`${t`Clear`} ${shortcutLabels[key]}`}
+                                                    disabled={!field.state.value}
+                                                    onClick={() => {
+                                                        form.setFieldValue(key, "");
+                                                    }}
+                                                    size="sm"
+                                                    type="button"
+                                                    variant="ghost"
+                                                >
+                                                    {t`Clear`}
+                                                </Button>
                                             </div>
-                                            <form.AppField name={key}>
-                                                {(field) => (
-                                                    <div className="flex items-center gap-2">
-                                                        <Input
-                                                            // The field names its own error, so a person who comes back to it hears why it was refused.
-                                                            aria-describedby={isDuplicate(field.state.meta.errors) ? `${key}-error` : undefined}
-                                                            aria-invalid={isDuplicate(field.state.meta.errors) || undefined}
-                                                            className="w-32"
-                                                            id={key}
-                                                            placeholder={t`Not set`}
-                                                            readOnly
-                                                            value={
-                                                                isRecording === key
-                                                                    ? formatShortcutForDisplay(pressedKeys.join("+")) || t`Press keys...`
-                                                                    : formatShortcutForDisplay(field.state.value || "") || t`Not set`
-                                                            }
-                                                        />
-                                                        <Button
-                                                            aria-label={`${isRecording === key ? t`Stop` : t`Record`} ${shortcutLabels[key]}`}
-                                                            disabled={isResetting}
-                                                            onClick={() => {
-                                                                if (isRecording === key) {
-                                                                    stopRecording();
-                                                                } else {
-                                                                    startRecording(key);
-                                                                }
-                                                            }}
-                                                            size="sm"
-                                                            type="button"
-                                                            variant={isRecording === key ? "destructive" : "outline"}
-                                                        >
-                                                            {isRecording === key ? t`Stop` : t`Record`}
-                                                        </Button>
-                                                        <Button
-                                                            aria-label={`${t`Clear`} ${shortcutLabels[key]}`}
-                                                            disabled={!field.state.value}
-                                                            onClick={() => {
-                                                                form.setFieldValue(key, "");
-                                                            }}
-                                                            size="sm"
-                                                            type="button"
-                                                            variant="ghost"
-                                                        >
-                                                            {t`Clear`}
-                                                        </Button>
-                                                    </div>
-                                                )}
-                                            </form.AppField>
-                                        </div>
-                                        {key !== EDITABLE_SHORTCUT_KEYS.at(-1) && <Separator />}
-                                    </Field.Root>
-                                ))}
-                            </div>
-                        </CardContent>
+                                        )}
+                                    </form.AppField>
+                                }
+                                description={
+                                    <>
+                                        {shortcutDescriptions[key]}
+                                        <form.Subscribe selector={(state) => isDuplicate(state.fieldMeta[key]?.errors)}>
+                                            {(duplicate) =>
+                                                duplicate && (
+                                                    <span className="text-destructive mt-1 block" id={`${key}-error`} role="alert">
+                                                        {t`Another action already uses this key combination. Change or clear one of them to save.`}
+                                                    </span>
+                                                )
+                                            }
+                                        </form.Subscribe>
+                                    </>
+                                }
+                                htmlFor={key}
+                                title={shortcutLabels[key]}
+                            />
+                        </Field.Root>
+                    ))}
 
-                        <CardFooter>
-                            <div className="flex gap-2">
-                                <form.Subscribe selector={(state) => state.isSubmitting}>
-                                    {(isSubmitting) => (
-                                        <Button disabled={isSubmitting || isResetting} onClick={handleReset} type="button" variant="outline">
-                                            {t`Reset to Defaults`}
-                                        </Button>
-                                    )}
-                                </form.Subscribe>
-                                <form.Subscribe selector={saveStatus}>
-                                    {(status) => (
-                                        <Button disabled={status !== "ready" || isResetting} type="submit">
-                                            {status === "saving" ? t`Saving...` : t`Save Shortcuts`}
-                                        </Button>
-                                    )}
-                                </form.Subscribe>
-                            </div>
-                        </CardFooter>
-                    </form>
-                </form.AppForm>
-            </Card>
-        </div>
+                    <div className="border-border/50 flex flex-wrap justify-end gap-2 border-t py-3">
+                        <form.Subscribe selector={(state) => state.isSubmitting}>
+                            {(isSubmitting) => (
+                                <Button disabled={isSubmitting || isResetting} onClick={handleReset} type="button" variant="outline">
+                                    {t`Reset to Defaults`}
+                                </Button>
+                            )}
+                        </form.Subscribe>
+                        <form.Subscribe selector={saveStatus}>
+                            {(status) => (
+                                <Button disabled={status !== "ready" || isResetting} type="submit">
+                                    {status === "saving" ? t`Saving...` : t`Save Shortcuts`}
+                                </Button>
+                            )}
+                        </form.Subscribe>
+                    </div>
+                </form>
+            </form.AppForm>
+        </SettingsCard>
     );
 };
 

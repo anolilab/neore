@@ -15,13 +15,11 @@ import {
 import { api } from "@neore/backend/api";
 import { Badge } from "@neore/ui/components/badge";
 import { Button } from "@neore/ui/components/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@neore/ui/components/card";
 import ConfirmDialog from "@neore/ui/components/confirm-dialog";
 import { Heading } from "@neore/ui/components/heading";
 import { Input } from "@neore/ui/components/input";
 import { Label } from "@neore/ui/components/label";
 import { RadioGroup, RadioGroupItem } from "@neore/ui/components/radio-group";
-import { Separator } from "@neore/ui/components/separator";
 import { Switch } from "@neore/ui/components/switch";
 import { Textarea } from "@neore/ui/components/textarea";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -30,6 +28,7 @@ import type { FC } from "react";
 import { useCallback, useId, useMemo, useState } from "react";
 import { toast } from "sonner";
 
+import SettingsCard from "@/components/settings/settings-card";
 import type { CustomProviderView } from "@/features/settings/lib/custom-models";
 import { isNativeProviderView, parseModelListInput } from "@/features/settings/lib/custom-models";
 import { useAction, useCRPC } from "@/lib/lunora/crpc";
@@ -375,33 +374,30 @@ const NativeProvidersSettings: FC = () => {
     };
 
     return (
-        <Card>
-            <CardHeader>
-                <div className="flex items-start justify-between gap-4">
-                    <div>
-                        <CardTitle className="text-base">{t`Cloud Provider Accounts`}</CardTitle>
-                        <CardDescription>
-                            {t`Use your own Google Gemini, Azure OpenAI, Amazon Bedrock or Mistral account. Requests go to that provider on your key, and its models appear in the chat model picker.`}
-                        </CardDescription>
-                    </div>
-                    {!form && (
-                        <Button onClick={() => setForm(emptyForm("google", labels.google))} size="sm" variant="outline">
+        <>
+            <SettingsCard
+                action={form ? undefined : () => setForm(emptyForm("google", labels.google))}
+                actionLabel={
+                    form ? undefined : (
+                        <>
                             <Plus aria-hidden="true" className="mr-1 size-4" />
                             {t`Add Provider`}
-                        </Button>
-                    )}
-                </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-                {isLoading && <p className="text-muted-foreground text-sm">{t`Loading...`}</p>}
+                        </>
+                    )
+                }
+                description={t`Use your own Google Gemini, Azure OpenAI, Amazon Bedrock or Mistral account. Requests go to that provider on your key, and its models appear in the chat model picker.`}
+                title={t`Cloud Provider Accounts`}
+            >
+                {isLoading && <p className="text-muted-foreground py-3 text-sm">{t`Loading...`}</p>}
 
-                {!isLoading && providers.length === 0 && !form && <p className="text-muted-foreground text-sm">{t`No provider accounts connected yet.`}</p>}
+                {!isLoading && providers.length === 0 && !form && (
+                    <p className="text-muted-foreground py-3 text-sm">{t`No provider accounts connected yet.`}</p>
+                )}
 
                 {providers.length > 0 && (
-                    <ul aria-label={t`Provider accounts`} className="space-y-3">
-                        {providers.map((provider, index) => (
-                            <li key={provider.id}>
-                                {index > 0 && <Separator className="mb-3" />}
+                    <ul aria-label={t`Provider accounts`}>
+                        {providers.map((provider) => (
+                            <li className="border-border/50 py-3 not-first:border-t" key={provider.id}>
                                 <div className="flex items-start justify-between gap-4">
                                     <div className="min-w-0 flex-1">
                                         <div className="flex flex-wrap items-center gap-2">
@@ -449,7 +445,7 @@ const NativeProvidersSettings: FC = () => {
                 {form && (
                     <form
                         aria-labelledby={fieldId("title")}
-                        className="space-y-4 rounded-lg border p-4"
+                        className="border-border/50 space-y-4 py-3 not-first:border-t"
                         noValidate
                         onSubmit={(event) => {
                             event.preventDefault();
@@ -715,10 +711,10 @@ const NativeProvidersSettings: FC = () => {
                     </form>
                 )}
 
-                <p className="text-muted-foreground text-xs">
+                <p className="text-muted-foreground border-border/50 py-3 text-xs not-first:border-t">
                     {t`The provider bills you directly for these requests. Where we know the model's price, the usual platform fee for your own keys is charged in credits.`}
                 </p>
-            </CardContent>
+            </SettingsCard>
 
             <ConfirmDialog
                 confirmLabel={t`Remove`}
@@ -729,7 +725,7 @@ const NativeProvidersSettings: FC = () => {
                 open={deleting !== null}
                 title={deleting ? t`Remove "${deleting.name}"?` : t`Remove provider?`}
             />
-        </Card>
+        </>
     );
 };
 

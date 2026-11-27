@@ -103,7 +103,7 @@ const ProviderCell = ({ account, className, classNames, linkDisabled = false, ot
                 </span>
             )}
 
-            <span className="text-sm">{provider.name}</span>
+            <span className="text-sm font-medium">{provider.name}</span>
 
             <Button
                 className={cn("relative ms-auto", classNames?.button)}

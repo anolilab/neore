@@ -3,17 +3,16 @@
 import { useLingui } from "@lingui/react/macro";
 import { MAX_THREAD_TITLE_INSTRUCTIONS_LENGTH } from "@neore/ai/constants";
 import { Button } from "@neore/ui/components/button";
-import { CardContent } from "@neore/ui/components/card";
-import { Field, FieldDescription, FieldLabel } from "@neore/ui/components/field";
 import { Input } from "@neore/ui/components/input";
 import { Textarea } from "@neore/ui/components/textarea";
 import { useMutation } from "@tanstack/react-query";
-import { RotateCcw, Sparkles } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import type { FC } from "react";
 import { useCallback, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import SettingsCard from "@/components/settings/settings-card";
+import SettingsRow from "@/components/settings/settings-row";
 import ChangedByAdminMark from "@/features/admin/components/changed-by-admin-mark";
 import { useSession } from "@/features/auth/hooks/session-user-management";
 import { useUpdateUserSettings, useUserSettings } from "@/features/auth/hooks/use-user-settings";
@@ -224,10 +223,10 @@ const PersonalizationSettings: FC = () => {
                 description={t`Help the AI understand you better by sharing some information about yourself. This information is used to personalize responses across all tasks.`}
                 title={t`About You`}
             >
-                <CardContent className="space-y-6">
-                    {userSettings?.personalizationByImpersonator && (
-                        // One mark for every field the system prompt carries (`auth/lib/personalization.ts`): language and location
-                        // are set elsewhere, so they are shown here. The keep sends the stored text, refused if it changed since.
+                {userSettings?.personalizationByImpersonator && (
+                    // One mark for every field the system prompt carries (`auth/lib/personalization.ts`): language and location
+                    // are set elsewhere, so they are shown here. The keep sends the stored text, refused if it changed since.
+                    <div className="py-3">
                         <ChangedByAdminMark
                             disabled={updateSettingsMutation.isPending}
                             fieldLabel={t`Your personalization`}
@@ -248,11 +247,12 @@ const PersonalizationSettings: FC = () => {
                             {userSettings.language && <p className="text-muted-foreground w-full text-xs">{t`Language: ${userSettings.language}`}</p>}
                             {userSettings.location && <p className="text-muted-foreground w-full text-xs">{t`Location: ${userSettings.location}`}</p>}
                         </ChangedByAdminMark>
-                    )}
-                    <Field>
-                        <FieldLabel htmlFor="nickname">{t`Nickname`}</FieldLabel>
-                        <FieldDescription>{t`What should the AI call you?`}</FieldDescription>
+                    </div>
+                )}
+                <SettingsRow
+                    control={
                         <Input
+                            className="w-full @lg/settings-row:w-64"
                             id="nickname"
                             maxLength={MAX_NICKNAME_LENGTH}
                             onBlur={handleNicknameBlur}
@@ -266,12 +266,15 @@ const PersonalizationSettings: FC = () => {
                             type="text"
                             value={nickname}
                         />
-                    </Field>
-
-                    <Field>
-                        <FieldLabel htmlFor="profession">{t`Profession`}</FieldLabel>
-                        <FieldDescription>{t`e.g., Product Designer, Software Developer`}</FieldDescription>
+                    }
+                    description={t`What should the AI call you?`}
+                    htmlFor="nickname"
+                    title={t`Nickname`}
+                />
+                <SettingsRow
+                    control={
                         <Input
+                            className="w-full @lg/settings-row:w-64"
                             id="profession"
                             maxLength={MAX_PROFESSION_LENGTH}
                             onBlur={handleProfessionBlur}
@@ -285,82 +288,84 @@ const PersonalizationSettings: FC = () => {
                             type="text"
                             value={profession}
                         />
-                    </Field>
-
-                    <Field>
-                        <FieldLabel htmlFor="about-me">{t`More About You`}</FieldLabel>
-                        <FieldDescription>{t`Your background, preferences, or location to help the AI understand you better`}</FieldDescription>
-                        <Textarea
-                            expandable
-                            expandableDialogTitle={t`More About You`}
-                            id="about-me"
-                            maxLength={MAX_ABOUT_ME_LENGTH}
-                            onBlur={handleAboutMeBlur}
-                            onChange={(e) => setAboutMe(e.target.value)}
-                            placeholder={t`Tell us about yourself...`}
-                            value={aboutMe}
-                        />
-                        <div className="text-muted-foreground mt-1 text-right text-xs">
-                            {aboutMe.length} /{MAX_ABOUT_ME_LENGTH}
-                        </div>
-                    </Field>
-                </CardContent>
+                    }
+                    description={t`e.g., Product Designer, Software Developer`}
+                    htmlFor="profession"
+                    title={t`Profession`}
+                />
+                <SettingsRow
+                    description={t`Your background, preferences, or location to help the AI understand you better`}
+                    htmlFor="about-me"
+                    title={t`More About You`}
+                >
+                    <Textarea
+                        expandable
+                        expandableDialogTitle={t`More About You`}
+                        id="about-me"
+                        maxLength={MAX_ABOUT_ME_LENGTH}
+                        onBlur={handleAboutMeBlur}
+                        onChange={(e) => setAboutMe(e.target.value)}
+                        placeholder={t`Tell us about yourself...`}
+                        value={aboutMe}
+                    />
+                    <div className="text-muted-foreground mt-1 text-right text-xs">
+                        {aboutMe.length} /{MAX_ABOUT_ME_LENGTH}
+                    </div>
+                </SettingsRow>
             </SettingsCard>
 
             <SettingsCard description={t`Define how you want the AI to respond. These instructions apply to all conversations.`} title={t`Custom Instructions`}>
-                <CardContent className="space-y-4">
-                    <Field>
-                        <div className="flex items-center justify-between">
-                            <FieldLabel htmlFor="custom-instructions">{t`How would you like the AI to respond?`}</FieldLabel>
-                            <Button onClick={() => setIsOptimizerOpen(true)} size="sm" type="button" variant="outline">
-                                <Sparkles aria-hidden="true" className="mr-1.5 size-3.5" />
-                                {t`Optimize`}
-                            </Button>
-                        </div>
-                        <FieldDescription>
-                            {t`For example: "Focus on Python best practices", "Maintain a professional tone", or "Always cite sources for key conclusions".`}
-                        </FieldDescription>
-                        <Textarea
-                            expandable
-                            expandableDialogTitle={t`Custom Instructions`}
-                            id="custom-instructions"
-                            maxLength={MAX_CUSTOM_INSTRUCTIONS_LENGTH}
-                            onBlur={handleCustomInstructionsBlur}
-                            onChange={(e) => setCustomInstructions(e.target.value)}
-                            placeholder={t`Enter your custom instructions...`}
-                            value={customInstructions}
-                        />
-                        <div className="text-muted-foreground mt-1 text-right text-xs">
-                            {customInstructions.length} /{MAX_CUSTOM_INSTRUCTIONS_LENGTH}
-                        </div>
-                    </Field>
-                </CardContent>
+                <SettingsRow
+                    control={
+                        <Button onClick={() => setIsOptimizerOpen(true)} size="sm" type="button" variant="outline">
+                            <Sparkles aria-hidden="true" className="mr-1.5 size-3.5" />
+                            {t`Optimize`}
+                        </Button>
+                    }
+                    description={t`For example: "Focus on Python best practices", "Maintain a professional tone", or "Always cite sources for key conclusions".`}
+                    htmlFor="custom-instructions"
+                    title={t`How would you like the AI to respond?`}
+                >
+                    <Textarea
+                        expandable
+                        expandableDialogTitle={t`Custom Instructions`}
+                        id="custom-instructions"
+                        maxLength={MAX_CUSTOM_INSTRUCTIONS_LENGTH}
+                        onBlur={handleCustomInstructionsBlur}
+                        onChange={(e) => setCustomInstructions(e.target.value)}
+                        placeholder={t`Enter your custom instructions...`}
+                        value={customInstructions}
+                    />
+                    <div className="text-muted-foreground mt-1 text-right text-xs">
+                        {customInstructions.length} /{MAX_CUSTOM_INSTRUCTIONS_LENGTH}
+                    </div>
+                </SettingsRow>
             </SettingsCard>
 
             <SettingsCard
                 description={t`Tell the AI how to word the titles it gives new conversations. This adds to the default title style.`}
                 title={t`Thread Titles`}
             >
-                <CardContent className="space-y-4">
-                    <Field>
-                        <FieldLabel htmlFor="thread-title-instructions">{t`How should titles be written?`}</FieldLabel>
-                        <FieldDescription>{t`For example: "Keep titles under four words", "Write titles in German", or "Start with a verb".`}</FieldDescription>
-                        <Input
-                            // The draft belongs to an account; until the session names it, typed text would be dropped when it does.
-                            // `undefined` settings mean the load failed (an account with no row reads `null`): a save would overwrite unseen text.
-                            disabled={ownerId === null || userSettings === undefined}
-                            id="thread-title-instructions"
-                            maxLength={MAX_THREAD_TITLE_INSTRUCTIONS_LENGTH}
-                            onBlur={handleThreadTitleInstructionsBlur}
-                            onChange={(e) => setDraftState({ ownerId, text: e.target.value })}
-                            placeholder={t`Enter your title instructions...`}
-                            value={threadTitleInstructions}
-                        />
-                        <div className="text-muted-foreground mt-1 text-right text-xs">
-                            {threadTitleInstructions.length} /{MAX_THREAD_TITLE_INSTRUCTIONS_LENGTH}
-                        </div>
-                    </Field>
-                </CardContent>
+                <SettingsRow
+                    description={t`For example: "Keep titles under four words", "Write titles in German", or "Start with a verb".`}
+                    htmlFor="thread-title-instructions"
+                    title={t`How should titles be written?`}
+                >
+                    <Input
+                        // The draft belongs to an account; until the session names it, typed text would be dropped when it does.
+                        // `undefined` settings mean the load failed (an account with no row reads `null`): a save would overwrite unseen text.
+                        disabled={ownerId === null || userSettings === undefined}
+                        id="thread-title-instructions"
+                        maxLength={MAX_THREAD_TITLE_INSTRUCTIONS_LENGTH}
+                        onBlur={handleThreadTitleInstructionsBlur}
+                        onChange={(e) => setDraftState({ ownerId, text: e.target.value })}
+                        placeholder={t`Enter your title instructions...`}
+                        value={threadTitleInstructions}
+                    />
+                    <div className="text-muted-foreground mt-1 text-right text-xs">
+                        {threadTitleInstructions.length} /{MAX_THREAD_TITLE_INSTRUCTIONS_LENGTH}
+                    </div>
+                </SettingsRow>
             </SettingsCard>
 
             <SystemPromptOptimizerDialog
@@ -374,21 +379,15 @@ const PersonalizationSettings: FC = () => {
             <MemorySettings />
 
             {onboardingCompleted && (
-                <SettingsCard description={t`Replay the welcome tour to review the core features of Neore.`} title={t`Onboarding`}>
-                    <CardContent>
-                        <Button
-                            onClick={() => {
-                                setOnboardingCompleted(false);
-                                toast.success(t`Onboarding will restart on your next visit to chat.`);
-                            }}
-                            size="sm"
-                            variant="outline"
-                        >
-                            <RotateCcw aria-hidden="true" className="mr-2 size-4" />
-                            {t`Replay Onboarding`}
-                        </Button>
-                    </CardContent>
-                </SettingsCard>
+                <SettingsCard
+                    action={() => {
+                        setOnboardingCompleted(false);
+                        toast.success(t`Onboarding will restart on your next visit to chat.`);
+                    }}
+                    actionLabel={t`Replay Onboarding`}
+                    description={t`Replay the welcome tour to review the core features of Neore.`}
+                    title={t`Onboarding`}
+                />
             )}
         </div>
     );

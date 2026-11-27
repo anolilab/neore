@@ -8,11 +8,11 @@
 import { useLingui } from "@lingui/react/macro";
 import type { ThreadPermissionMode } from "@neore/backend/chat/permission-mode";
 import { isThreadPermissionMode, THREAD_PERMISSION_MODES } from "@neore/backend/chat/permission-mode";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@neore/ui/components/card";
 import { ToggleGroup, ToggleGroupItem } from "@neore/ui/components/toggle-group";
 import type { FC } from "react";
 import { useId } from "react";
 
+import SettingsCard from "@/components/settings/settings-card";
 import { useIsImpersonating } from "@/features/admin/hooks/use-admin";
 import { useUpdateUserSettings, useUserSettings } from "@/features/auth/hooks/use-user-settings";
 import { showError } from "@/lib/toast";
@@ -50,14 +50,15 @@ const NewChatPermissionModeSetting: FC = () => {
     };
 
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle id={titleId}>{t`Default for new chats`}</CardTitle>
-                <CardDescription id={descriptionId}>
+        <SettingsCard
+            description={
+                <span id={descriptionId}>
                     {t`New chats start in this permission mode. A chat that already exists keeps its own mode, and you can still change a chat's mode in its composer.`}
-                </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
+                </span>
+            }
+            title={<span id={titleId}>{t`Default for new chats`}</span>}
+        >
+            <div className="space-y-3 py-3">
                 <ToggleGroup
                     aria-describedby={`${descriptionId} ${modeGuidanceId}`}
                     aria-labelledby={titleId}
@@ -90,8 +91,8 @@ const NewChatPermissionModeSetting: FC = () => {
                     {descriptions[current]}
                 </p>
                 {impersonating && <p className="text-muted-foreground text-sm">{t`An admin acting as you cannot change this default.`}</p>}
-            </CardContent>
-        </Card>
+            </div>
+        </SettingsCard>
     );
 };
 

@@ -79,12 +79,12 @@ const PasskeyCell = ({ className, classNames, passkey }: PasskeyCellProperties) 
                 open={showFreshnessDialog}
             />
 
-            <Card className={cn("surface-row-card rounded-none flex-row items-center px-0 py-3", className, classNames?.cell)}>
+            <Card className={cn("surface-row-card rounded-none flex-row items-center gap-3 px-0 py-3", className, classNames?.cell)}>
                 <div className="flex items-center gap-3">
                     <span aria-hidden="true" className="surface-well grid size-[30px] shrink-0 place-items-center rounded-lg">
                         <FingerprintIcon className={cn("text-muted-foreground size-4", classNames?.icon)} />
                     </span>
-                    <span className="text-sm" suppressHydrationWarning>
+                    <span className="text-sm font-medium" suppressHydrationWarning>
                         {formatDateTime(passkey.createdAt, i18n.locale)}
                     </span>
                 </div>

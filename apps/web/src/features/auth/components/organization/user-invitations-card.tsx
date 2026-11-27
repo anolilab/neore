@@ -101,9 +101,9 @@ const UserInvitationCell = ({ className, invitation, refetchInvitations }: UserI
 
     return (
         <Card className={cn("surface-row-card rounded-none flex-row items-center gap-4 px-0 py-3", className)}>
-            <div className="flex flex-1 flex-col gap-1">
-                <span className="font-medium">{invitation.organizationName}</span>
-                <span className="text-muted-foreground text-sm">
+            <div className="flex flex-1 flex-col gap-0.5">
+                <span className="text-sm font-medium">{invitation.organizationName}</span>
+                <span className="text-muted-foreground text-xs">
                     {invitation.inviterName ? t`Invited by ${invitation.inviterName}` : t`Invited to join`}
                     {invitation.role !== "member" && ` as ${invitation.role}`}
                 </span>
@@ -151,7 +151,7 @@ const UserInvitationsCard = ({ className, classNames, ...properties }: SettingsC
             {...properties}
         >
             {!isPending && pendingInvitations.length > 0 && (
-                <CardContent className={cn("grid gap-1.5", classNames?.content)}>
+                <CardContent className={cn("grid gap-0", classNames?.content)}>
                     {pendingInvitations.map((invitation) => (
                         <UserInvitationCell
                             invitation={invitation}
@@ -166,7 +166,7 @@ const UserInvitationsCard = ({ className, classNames, ...properties }: SettingsC
 
             {!isPending && pendingInvitations.length === 0 && (
                 <CardContent className={classNames?.content}>
-                    <p className="text-muted-foreground text-center text-sm">{t`No pending invitations`}</p>
+                    <p className="text-muted-foreground py-2 text-center text-sm">{t`No pending invitations`}</p>
                 </CardContent>
             )}
         </SettingsCard>

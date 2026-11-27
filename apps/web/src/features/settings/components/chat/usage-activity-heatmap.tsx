@@ -1,14 +1,13 @@
 import { plural } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@neore/ui/components/card";
 import { Skeleton } from "@neore/ui/components/skeleton";
 import { ToggleGroup, ToggleGroupItem } from "@neore/ui/components/toggle-group";
 import cn from "@neore/ui/utils/cn";
 import { skipToken, useQuery } from "@tanstack/react-query";
-import { CalendarDays } from "lucide-react";
 import type { FC, KeyboardEvent } from "react";
 import { useId, useState } from "react";
 
+import SettingsCard from "@/components/settings/settings-card";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 import { BACKFILL_REFETCH_MS, useRefetchAfterBackfill } from "../../hooks/use-usage-backfill";
@@ -123,36 +122,27 @@ const UsageActivityHeatmap: FC<UsageActivityHeatmapProps> = ({ backfilling }) =>
     };
 
     return (
-        <Card>
-            <CardHeader>
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                        <CardTitle className="flex items-center gap-2 text-base" id={titleId}>
-                            <CalendarDays aria-hidden="true" className="size-4" />
-                            {t`Activity`}
-                        </CardTitle>
-                        <CardDescription>{t`Replies and spend per day over the last 53 weeks`}</CardDescription>
-                    </div>
-                    <ToggleGroup
-                        aria-label={t`Colour days by`}
-                        className="gap-1"
-                        onValueChange={(value) => {
-                            const next = value?.[0];
+        <SettingsCard description={t`Replies and spend per day over the last 53 weeks`} title={<span id={titleId}>{t`Activity`}</span>}>
+            <div className="flex justify-end pt-3">
+                <ToggleGroup
+                    aria-label={t`Colour days by`}
+                    className="gap-1"
+                    onValueChange={(value) => {
+                        const next = value?.[0];
 
-                            if (next === "cost" || next === "replies") {
-                                setMetric(next);
-                            }
-                        }}
-                        size="sm"
-                        value={[metric]}
-                        variant="outline"
-                    >
-                        <ToggleGroupItem value="replies">{t`Replies`}</ToggleGroupItem>
-                        <ToggleGroupItem value="cost">{t`Spend`}</ToggleGroupItem>
-                    </ToggleGroup>
-                </div>
-            </CardHeader>
-            <CardContent className="space-y-3">
+                        if (next === "cost" || next === "replies") {
+                            setMetric(next);
+                        }
+                    }}
+                    size="sm"
+                    value={[metric]}
+                    variant="outline"
+                >
+                    <ToggleGroupItem value="replies">{t`Replies`}</ToggleGroupItem>
+                    <ToggleGroupItem value="cost">{t`Spend`}</ToggleGroupItem>
+                </ToggleGroup>
+            </div>
+            <div className="space-y-3 py-3">
                 {isPending && <Skeleton className="h-28 w-full" />}
                 {isError && <p className="text-destructive text-sm">{t`Could not load your activity.`}</p>}
                 {!isPending && !isError && (
@@ -266,8 +256,8 @@ const UsageActivityHeatmap: FC<UsageActivityHeatmapProps> = ({ backfilling }) =>
                         </table>
                     </>
                 )}
-            </CardContent>
-        </Card>
+            </div>
+        </SettingsCard>
     );
 };
 

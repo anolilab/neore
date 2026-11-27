@@ -13,16 +13,16 @@ import {
     AlertDialogTrigger,
 } from "@neore/ui/components/alert-dialog";
 import { Button } from "@neore/ui/components/button";
-import { CardContent } from "@neore/ui/components/card";
 import { Switch } from "@neore/ui/components/switch";
 import { ToggleGroup, ToggleGroupItem } from "@neore/ui/components/toggle-group";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { BrainIcon, Trash2Icon } from "lucide-react";
+import { Trash2Icon } from "lucide-react";
 import type { FC } from "react";
 import { useCallback, useId, useState } from "react";
 import { toast } from "sonner";
 
 import SettingsCard from "@/components/settings/settings-card";
+import SettingsRow from "@/components/settings/settings-row";
 import { useUpdateUserSettings, useUserSettings } from "@/features/auth/hooks/use-user-settings";
 import { trackEvent } from "@/lib/analytics";
 import { useCRPC } from "@/lib/lunora/crpc";
@@ -163,23 +163,43 @@ const MemorySettings: FC = () => {
             description={t`The AI learns from your conversations to personalize its responses, and reflects on what it learned each night. Everything it remembers is listed here — edit, retype, pin or delete any of it.`}
             title={t`Memory`}
         >
-            <CardContent className="space-y-4">
-                {/* Toggle */}
-                <div className="flex items-center justify-between">
-                    <label className="flex items-center gap-2 text-sm font-medium" htmlFor="memory-enabled-switch">
-                        <BrainIcon aria-hidden="true" className="text-muted-foreground h-4 w-4" />
-                        {t`Enable memory`}
-                    </label>
-                    <Switch checked={memoryEnabled} id="memory-enabled-switch" onCheckedChange={handleToggleMemory} />
-                </div>
+            <SettingsRow
+                control={<Switch checked={memoryEnabled} id="memory-enabled-switch" onCheckedChange={handleToggleMemory} />}
+                htmlFor="memory-enabled-switch"
+                title={t`Enable memory`}
+            />
 
-                {/* Outside the enabled block: with memory off it offers to turn it on first. */}
+            {/* Outside the enabled block: with memory off it offers to turn it on first. */}
+            <div className="border-border/50 flex flex-wrap items-center gap-2 border-t py-3">
                 <MemoryImportDialog memoryEnabled={memoryEnabled} onEnableMemory={handleEnableMemory} onImported={refresh} />
+                {memoryEnabled && memories && memories.length > 0 && (
+                    <AlertDialog>
+                        {/* Base UI composes via `render`, not Radix's `asChild`. */}
+                        <AlertDialogTrigger render={<Button disabled={isClearingAll} size="sm" variant="destructive" />}>
+                            <Trash2Icon aria-hidden="true" className="mr-2 h-4 w-4" />
+                            {t`Clear All Memories`}
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>{t`Clear all memories?`}</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    {t`This will permanently delete all ${memories.length} memories and their daily digests. The AI will start learning fresh from your next conversation.`}
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel>{t`Cancel`}</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => clearAll({})}>{t`Delete All`}</AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
+                )}
+            </div>
 
-                {memoryEnabled && (
-                    <>
-                        <MemoryDigestCard />
+            {memoryEnabled && (
+                <>
+                    <MemoryDigestCard />
 
+                    <div className="border-border/50 space-y-3 border-t py-3">
                         {/* Stats */}
                         {stats && stats.total > 0 && (
                             <div className="text-muted-foreground text-xs">
@@ -217,7 +237,7 @@ const MemorySettings: FC = () => {
 
                         {/* Memory list */}
                         {visible.length > 0 ? (
-                            <ul aria-label={t`Memories`} className="max-h-96 space-y-2 overflow-y-auto">
+                            <ul aria-label={t`Memories`} className="-mx-2 max-h-96 overflow-y-auto px-2">
                                 {visible.map((memory) => (
                                     <MemoryItem
                                         busy={busy}
@@ -231,38 +251,15 @@ const MemorySettings: FC = () => {
                                 ))}
                             </ul>
                         ) : (
-                            <div className="text-muted-foreground py-4 text-center text-sm">
+                            <div className="text-muted-foreground py-2 text-sm">
                                 {memories && memories.length > 0
                                     ? t`No memories of this type.`
                                     : t`No memories yet. The AI will start learning from your conversations automatically.`}
                             </div>
                         )}
-
-                        {/* Clear all */}
-                        {memories && memories.length > 0 && (
-                            <AlertDialog>
-                                {/* Base UI composes via `render`, not Radix's `asChild`. */}
-                                <AlertDialogTrigger render={<Button className="w-full" disabled={isClearingAll} variant="destructive" />}>
-                                    <Trash2Icon aria-hidden="true" className="mr-2 h-4 w-4" />
-                                    {t`Clear All Memories`}
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                        <AlertDialogTitle>{t`Clear all memories?`}</AlertDialogTitle>
-                                        <AlertDialogDescription>
-                                            {t`This will permanently delete all ${memories.length} memories and their daily digests. The AI will start learning fresh from your next conversation.`}
-                                        </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                        <AlertDialogCancel>{t`Cancel`}</AlertDialogCancel>
-                                        <AlertDialogAction onClick={() => clearAll({})}>{t`Delete All`}</AlertDialogAction>
-                                    </AlertDialogFooter>
-                                </AlertDialogContent>
-                            </AlertDialog>
-                        )}
-                    </>
-                )}
-            </CardContent>
+                    </div>
+                </>
+            )}
         </SettingsCard>
     );
 };

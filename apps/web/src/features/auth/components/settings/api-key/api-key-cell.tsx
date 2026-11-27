@@ -70,9 +70,9 @@ const APIKeyCell = ({ apiKey, className, classNames, refetch }: APIKeyCellProper
 
                 <div className="flex flex-col truncate">
                     <div className="flex items-center gap-2">
-                        <span className="truncate text-sm font-semibold">{apiKey.name}</span>
+                        <span className="truncate text-sm font-medium">{apiKey.name}</span>
 
-                        <span className="text-muted-foreground flex-1 truncate text-sm">
+                        <span className="text-muted-foreground flex-1 truncate text-xs">
                             {apiKey.start}
                             ******
                         </span>

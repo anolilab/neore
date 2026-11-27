@@ -44,10 +44,10 @@ const TeamCell = ({ className, classNames, refetchTeams, team }: TeamCellPropert
 
     return (
         <>
-            <Card className={cn("surface-row-card rounded-none flex-row items-center px-0 py-3", className, classNames?.cell)}>
-                <div className="flex flex-col gap-1">
-                    <span className="font-medium">{team.name}</span>
-                    <span className="text-muted-foreground text-sm">
+            <Card className={cn("surface-row-card rounded-none flex-row items-center gap-3 px-0 py-3", className, classNames?.cell)}>
+                <div className="flex flex-col gap-0.5">
+                    <span className="text-sm font-medium">{team.name}</span>
+                    <span className="text-muted-foreground text-xs">
                         <Plural one="# member" other="# members" value={team.memberCount} />
                     </span>
                 </div>

@@ -159,7 +159,7 @@ export const MCPServerForm: FC<MCPServerFormProps> = ({ formData, isEditing, isT
     );
 
     return (
-        <div className="space-y-4 rounded-lg border p-4">
+        <div className="border-border/50 space-y-4 py-3 not-first:border-t">
             <div className="flex items-center justify-between">
                 <Heading className="text-sm font-medium" fallbackLevel={4}>
                     {isEditing ? t`Edit MCP Server` : t`Add MCP Server`}

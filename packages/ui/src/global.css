@@ -327,8 +327,15 @@
     box-shadow: none !important;
 
     &:not(:first-child) {
-        border-top: 1px solid var(--border);
+        /* As light as a settings row's hairline. */
+        border-top: 1px solid color-mix(in srgb, var(--border) 50%, transparent);
     }
+}
+
+/* An icon laid over an Input (a search field's magnifier) sits before it in the markup; the Input's wrapper is positioned
+   and painted, so it would cover the icon. */
+svg:has(~ [data-slot="input-control"]) {
+    z-index: 1;
 }
 
 @layer base {

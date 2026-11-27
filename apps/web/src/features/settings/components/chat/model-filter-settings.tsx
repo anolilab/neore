@@ -4,17 +4,16 @@ import { msg } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
 import { Badge } from "@neore/ui/components/badge";
 import { Button } from "@neore/ui/components/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@neore/ui/components/card";
 import { Input } from "@neore/ui/components/input";
-import { Label } from "@neore/ui/components/label";
-import { Separator } from "@neore/ui/components/separator";
 import { Switch } from "@neore/ui/components/switch";
-import { Globe, RotateCcw, Shield, X } from "lucide-react";
+import { X } from "lucide-react";
 import type { FC } from "react";
 import { useState } from "react";
 import { toast } from "sonner";
 
 import { getCreatorDisplayName } from "@/components/model-picker/utilities";
+import SettingsCard from "@/components/settings/settings-card";
+import SettingsRow from "@/components/settings/settings-row";
 import type { ModelFilterRules } from "@/hooks/use-model-filter-rules";
 import { useBlockedCreators, useUpdateModelFilterRules, withoutCreator } from "@/hooks/use-model-filter-rules";
 
@@ -127,43 +126,26 @@ const ModelFilterSettings: FC = () => {
 
     return (
         <div className="space-y-6">
-            {/* Header */}
-            <Card>
-                <CardHeader className="pb-2">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <CardTitle className="text-[15px] font-semibold">{t`Model Restrictions`}</CardTitle>
-                            <CardDescription className="text-muted-foreground mt-1 text-xs">
-                                {t`Control which AI models and providers can be used based on geographic region, compliance requirements, and privacy preferences.`}
-                            </CardDescription>
-                        </div>
-                        {hasAnyRules && (
-                            <Button onClick={resetAll} size="sm" variant="outline">
-                                <RotateCcw aria-hidden="true" className="mr-2 size-4" />
-                                {t`Clear All`}
-                            </Button>
-                        )}
-                    </div>
-                </CardHeader>
-            </Card>
+            <SettingsCard
+                action={hasAnyRules ? resetAll : undefined}
+                actionLabel={hasAnyRules ? t`Clear All` : undefined}
+                description={t`Control which AI models and providers can be used based on geographic region, compliance requirements, and privacy preferences.`}
+                title={t`Model Restrictions`}
+            />
 
             {/* Region Filtering */}
-            <Card>
-                <CardHeader className="pb-2">
-                    <CardTitle className="flex items-center gap-2 text-sm font-semibold">
-                        <Globe aria-hidden="true" className="size-4" />
-                        {t`Region Restrictions`}
-                    </CardTitle>
-                    <CardDescription className="text-xs">
+            <SettingsCard
+                description={
+                    <>
                         {t`Restrict which regions models can be hosted in. Useful for GDPR, data residency, and compliance requirements.`}{" "}
                         {t`Cloudflare Workers AI models run wherever Cloudflare has capacity, so any region rule hides them.`}
-                    </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <div>
-                        <Label className="text-muted-foreground text-xs font-medium">{t`Allowed Regions`}</Label>
-                        <p className="text-muted-foreground mb-2 text-[11px]">{t`When set, only models hosted in these regions will be available.`}</p>
-                        <div className="flex flex-wrap gap-2">
+                    </>
+                }
+                title={t`Region Restrictions`}
+            >
+                <SettingsRow
+                    control={
+                        <>
                             {REGIONS.map((region) => {
                                 const isSelected = rules.allowedRegions?.includes(region.code) ?? false;
 
@@ -177,19 +159,18 @@ const ModelFilterSettings: FC = () => {
                                         variant={isSelected ? "default" : "outline"}
                                     >
                                         {i18n._(region.label)}
-                                        {isSelected && <Badge className="ml-1.5 h-4 bg-white/20 px-1 text-[10px] text-inherit">{t`Active`}</Badge>}
+                                        {isSelected && <Badge className="bg-background text-foreground ml-1.5 h-4 px-1 text-[10px]">{t`Active`}</Badge>}
                                     </Button>
                                 );
                             })}
-                        </div>
-                    </div>
-
-                    <Separator />
-
-                    <div>
-                        <Label className="text-muted-foreground text-xs font-medium">{t`Blocked Regions`}</Label>
-                        <p className="text-muted-foreground mb-2 text-[11px]">{t`Models hosted exclusively in these regions will be unavailable.`}</p>
-                        <div className="flex flex-wrap gap-2">
+                        </>
+                    }
+                    description={t`When set, only models hosted in these regions will be available.`}
+                    title={t`Allowed Regions`}
+                />
+                <SettingsRow
+                    control={
+                        <>
                             {REGIONS.map((region) => {
                                 const isSelected = rules.blockedRegions?.includes(region.code) ?? false;
 
@@ -203,84 +184,69 @@ const ModelFilterSettings: FC = () => {
                                         variant={isSelected ? "destructive" : "outline"}
                                     >
                                         {i18n._(region.label)}
-                                        {isSelected && <Badge className="ml-1.5 h-4 bg-white/20 px-1 text-[10px] text-inherit">{t`Blocked`}</Badge>}
+                                        {isSelected && <Badge className="bg-background text-foreground ml-1.5 h-4 px-1 text-[10px]">{t`Blocked`}</Badge>}
                                     </Button>
                                 );
                             })}
-                        </div>
-                    </div>
-                </CardContent>
-            </Card>
+                        </>
+                    }
+                    description={t`Models hosted exclusively in these regions will be unavailable.`}
+                    title={t`Blocked Regions`}
+                />
+            </SettingsCard>
 
             {/* Provider Filtering */}
-            <Card>
-                <CardHeader className="pb-2">
-                    <CardTitle className="flex items-center gap-2 text-sm font-semibold">
-                        <Shield aria-hidden="true" className="size-4" />
-                        {t`Provider Restrictions`}
-                    </CardTitle>
-                    <CardDescription className="text-xs">{t`Control which AI providers can serve your requests.`}</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <div>
-                        <Label className="text-muted-foreground text-xs font-medium">{t`Allowed Providers`}</Label>
-                        <p className="text-muted-foreground mb-2 text-[11px]">{t`When set, only these providers will be used. Leave empty to allow all.`}</p>
-                        <div className="flex flex-wrap gap-2">
-                            {PROVIDERS.map((provider) => {
-                                const isSelected = rules.allowedProviders?.includes(provider.id) ?? false;
+            <SettingsCard description={t`Control which AI providers can serve your requests.`} title={t`Provider Restrictions`}>
+                <SettingsRow description={t`When set, only these providers will be used. Leave empty to allow all.`} title={t`Allowed Providers`}>
+                    <div className="flex flex-wrap gap-2">
+                        {PROVIDERS.map((provider) => {
+                            const isSelected = rules.allowedProviders?.includes(provider.id) ?? false;
 
-                                return (
-                                    <Button
-                                        className="h-8 text-xs"
-                                        key={provider.id}
-                                        onClick={() => toggleProvider(provider.id, "allowedProviders")}
-                                        size="sm"
-                                        variant={isSelected ? "default" : "outline"}
-                                    >
-                                        {provider.label}
-                                        {isSelected && <Badge className="ml-1.5 h-4 bg-white/20 px-1 text-[10px] text-inherit">{t`Active`}</Badge>}
-                                    </Button>
-                                );
-                            })}
-                        </div>
+                            return (
+                                <Button
+                                    className="h-8 text-xs"
+                                    key={provider.id}
+                                    onClick={() => toggleProvider(provider.id, "allowedProviders")}
+                                    size="sm"
+                                    variant={isSelected ? "default" : "outline"}
+                                >
+                                    {provider.label}
+                                    {isSelected && <Badge className="bg-background text-foreground ml-1.5 h-4 px-1 text-[10px]">{t`Active`}</Badge>}
+                                </Button>
+                            );
+                        })}
                     </div>
+                </SettingsRow>
+                <SettingsRow description={t`These providers will never be used for your requests.`} title={t`Blocked Providers`}>
+                    <div className="flex flex-wrap gap-2">
+                        {PROVIDERS.map((provider) => {
+                            const isSelected = rules.blockedProviders?.includes(provider.id) ?? false;
 
-                    <Separator />
-
-                    <div>
-                        <Label className="text-muted-foreground text-xs font-medium">{t`Blocked Providers`}</Label>
-                        <p className="text-muted-foreground mb-2 text-[11px]">{t`These providers will never be used for your requests.`}</p>
-                        <div className="flex flex-wrap gap-2">
-                            {PROVIDERS.map((provider) => {
-                                const isSelected = rules.blockedProviders?.includes(provider.id) ?? false;
-
-                                return (
-                                    <Button
-                                        className="h-8 text-xs"
-                                        key={provider.id}
-                                        onClick={() => toggleProvider(provider.id, "blockedProviders")}
-                                        size="sm"
-                                        variant={isSelected ? "destructive" : "outline"}
-                                    >
-                                        {provider.label}
-                                        {isSelected && <Badge className="ml-1.5 h-4 bg-white/20 px-1 text-[10px] text-inherit">{t`Blocked`}</Badge>}
-                                    </Button>
-                                );
-                            })}
-                        </div>
+                            return (
+                                <Button
+                                    className="h-8 text-xs"
+                                    key={provider.id}
+                                    onClick={() => toggleProvider(provider.id, "blockedProviders")}
+                                    size="sm"
+                                    variant={isSelected ? "destructive" : "outline"}
+                                >
+                                    {provider.label}
+                                    {isSelected && <Badge className="bg-background text-foreground ml-1.5 h-4 px-1 text-[10px]">{t`Blocked`}</Badge>}
+                                </Button>
+                            );
+                        })}
                     </div>
-                </CardContent>
-            </Card>
+                </SettingsRow>
+            </SettingsCard>
 
             {/* Hidden labs: written by the model picker's "Hide" action, restored here */}
-            <Card>
-                <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-semibold">{t`Hidden in Model Picker`}</CardTitle>
-                    <CardDescription className="text-xs">{t`Labs hidden from the model picker only. Models already selected or set as defaults keep working.`}</CardDescription>
-                </CardHeader>
-                <CardContent>
+            <SettingsCard
+                description={t`Labs hidden from the model picker only. Models already selected or set as defaults keep working.`}
+                title={t`Hidden in Model Picker`}
+            >
+                <div className="py-3">
                     {blockedCreators.length === 0 ? (
-                        <p className="text-muted-foreground text-xs">{t`No labs are hidden.`}</p>
+                        <p className="text-muted-foreground text-sm">{t`No labs are hidden.`}</p>
                     ) : (
                         <div className="flex flex-wrap gap-1.5">
                             {blockedCreators.map((slug) => {
@@ -303,16 +269,12 @@ const ModelFilterSettings: FC = () => {
                             })}
                         </div>
                     )}
-                </CardContent>
-            </Card>
+                </div>
+            </SettingsCard>
 
             {/* Model Block List */}
-            <Card>
-                <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-semibold">{t`Blocked Models`}</CardTitle>
-                    <CardDescription className="text-xs">{t`Block specific models by their ID. These models will never be used.`}</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
+            <SettingsCard description={t`Block specific models by their ID. These models will never be used.`} title={t`Blocked Models`}>
+                <div className="space-y-3 py-3">
                     <div className="flex gap-2">
                         <Input
                             className="flex-1"
@@ -352,59 +314,54 @@ const ModelFilterSettings: FC = () => {
                             ))}
                         </div>
                     )}
-                </CardContent>
-            </Card>
+                </div>
+            </SettingsCard>
 
             {/* Privacy Settings */}
-            <Card>
-                <CardHeader className="pb-2">
-                    <CardTitle className="flex items-center gap-2 text-sm font-semibold">
-                        <Shield aria-hidden="true" className="size-4" />
-                        {t`Privacy`}
-                    </CardTitle>
-                    <CardDescription className="text-xs">
+            <SettingsCard
+                description={
+                    <>
                         {t`Control data handling and retention policies for AI providers. Privacy settings are currently enforced for models routed through OpenRouter.`}{" "}
                         {t`Either setting also hides the Cloudflare Workers AI models, which cannot guarantee it.`}
-                    </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <Label className="text-sm font-medium">{t`Zero Data Retention (ZDR)`}</Label>
-                            <p className="text-muted-foreground text-xs">
-                                {t`Only use providers that guarantee zero data retention — your prompts are never stored.`}
-                            </p>
-                        </div>
+                    </>
+                }
+                title={t`Privacy`}
+            >
+                <SettingsRow
+                    control={
                         <Switch
                             aria-label={t`Zero Data Retention (ZDR)`}
                             checked={rules.requireZDR ?? false}
+                            id="filter-require-zdr"
                             onCheckedChange={(checked) =>
                                 updateRules((current) => {
                                     return { ...current, requireZDR: checked || undefined };
                                 })
                             }
                         />
-                    </div>
-
-                    <Separator />
-
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <Label className="text-sm font-medium">{t`Deny Data Collection`}</Label>
-                            <p className="text-muted-foreground text-xs">{t`Block providers that may use your data for training or collect usage data.`}</p>
-                        </div>
+                    }
+                    description={t`Only use providers that guarantee zero data retention — your prompts are never stored.`}
+                    htmlFor="filter-require-zdr"
+                    title={t`Zero Data Retention (ZDR)`}
+                />
+                <SettingsRow
+                    control={
                         <Switch
                             aria-label={t`Deny Data Collection`}
                             checked={rules.denyDataCollection ?? false}
+                            id="filter-deny-data-collection"
                             onCheckedChange={(checked) =>
                                 updateRules((current) => {
                                     return { ...current, denyDataCollection: checked || undefined };
                                 })
                             }
                         />
-                    </div>
-                </CardContent>
-            </Card>
+                    }
+                    description={t`Block providers that may use your data for training or collect usage data.`}
+                    htmlFor="filter-deny-data-collection"
+                    title={t`Deny Data Collection`}
+                />
+            </SettingsCard>
         </div>
     );
 };

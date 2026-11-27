@@ -18,16 +18,16 @@ import type { GatewayModel } from "@neore/ai/models";
 import { MAX_BACKUP_MODELS, storedBackupModels } from "@neore/backend/chat/backup-models";
 import { ProviderIcon } from "@neore/ui/components/ai-elements/provider-icon";
 import { Button } from "@neore/ui/components/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@neore/ui/components/card";
 import { Label } from "@neore/ui/components/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@neore/ui/components/select";
-import { Separator } from "@neore/ui/components/separator";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { ArrowDown, ArrowUp, X } from "lucide-react";
 import type { FC } from "react";
 import { useEffect, useId, useRef, useState } from "react";
 import { toast } from "sonner";
 
+import SettingsCard from "@/components/settings/settings-card";
+import SettingsRow from "@/components/settings/settings-row";
 import { useUpdateUserSettings, useUserSettings } from "@/features/auth/hooks/use-user-settings";
 import { moveBackupModel, offerableBackupModels } from "@/features/settings/lib/backup-model-options";
 import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
@@ -63,6 +63,8 @@ interface ModelSelectProps<Field extends string> {
     loading?: boolean;
     models: GatewayModel[];
     onChange: (field: Field, modelId: string | null) => void;
+    /** Draws the setting as a row of a settings box (`SettingsRow`) instead of a free-standing label and select. */
+    row?: boolean;
     /** The system fallback model ID shown in the "System default" option */
     systemDefaultId?: string;
     value: string | undefined;
@@ -77,6 +79,7 @@ export const ModelSelect = <Field extends string>({
     loading,
     models,
     onChange,
+    row,
     systemDefaultId,
     value,
 }: ModelSelectProps<Field>) => {
@@ -91,6 +94,58 @@ export const ModelSelect = <Field extends string>({
     const empty = loading === true || models.length === 0;
     const emptyListLabel = loading === true ? t`Loading models…` : t`No models available`;
 
+    const picker = (
+        <Select<string> disabled={disabled || empty} onValueChange={(v) => onChange(field, v)} value={value ?? null}>
+            <SelectTrigger aria-labelledby={labelId} className="w-48 shrink-0">
+                <SelectValue placeholder={empty ? emptyListLabel : systemDefaultLabel}>
+                    {selectedModel && (
+                        <span className="flex items-center gap-1.5 truncate">
+                            <ProviderIcon
+                                className="size-3 shrink-0"
+                                provider={selectedModel.provider ?? selectedModel.displayProvider ?? ""}
+                                providerIcon={selectedModel.id.split("/", 1)[0] ?? selectedModel.displayProvider ?? ""}
+                            />
+                            <span className="truncate">{selectedModel.name}</span>
+                        </span>
+                    )}
+                </SelectValue>
+            </SelectTrigger>
+            <SelectContent align="end" className="max-h-64">
+                <SelectItem value={null as unknown as string}>
+                    {systemDefaultModel ? (
+                        <span className="flex items-center gap-1.5">
+                            <ProviderIcon
+                                className="size-3 shrink-0"
+                                provider={systemDefaultModel.provider ?? systemDefaultModel.displayProvider ?? ""}
+                                providerIcon={systemDefaultModel.id.split("/", 1)[0] ?? systemDefaultModel.displayProvider ?? ""}
+                            />
+                            <span className="text-muted-foreground truncate">{systemDefaultModel.name}</span>
+                            <span className="text-muted-foreground/60 text-xs">{t`(default)`}</span>
+                        </span>
+                    ) : (
+                        <span className="text-muted-foreground">{emptyLabel ?? t`System default`}</span>
+                    )}
+                </SelectItem>
+                {models.map((m) => (
+                    <SelectItem key={m.id} value={m.id}>
+                        <span className="flex items-center gap-1.5">
+                            <ProviderIcon
+                                className="size-3 shrink-0"
+                                provider={m.provider ?? m.displayProvider ?? ""}
+                                providerIcon={m.id.split("/", 1)[0] ?? m.displayProvider ?? ""}
+                            />
+                            <span className="truncate">{m.name}</span>
+                        </span>
+                    </SelectItem>
+                ))}
+            </SelectContent>
+        </Select>
+    );
+
+    if (row) {
+        return <SettingsRow control={picker} description={description} title={label} titleId={labelId} />;
+    }
+
     return (
         <div className="flex items-start justify-between gap-4">
             <div className="min-w-0 flex-1 space-y-0.5">
@@ -99,51 +154,7 @@ export const ModelSelect = <Field extends string>({
                 </Label>
                 <p className="text-muted-foreground text-xs">{description}</p>
             </div>
-            <Select<string> disabled={disabled || empty} onValueChange={(v) => onChange(field, v)} value={value ?? null}>
-                <SelectTrigger aria-labelledby={labelId} className="w-48 shrink-0">
-                    <SelectValue placeholder={empty ? emptyListLabel : systemDefaultLabel}>
-                        {selectedModel && (
-                            <span className="flex items-center gap-1.5 truncate">
-                                <ProviderIcon
-                                    className="size-3 shrink-0"
-                                    provider={selectedModel.provider ?? selectedModel.displayProvider ?? ""}
-                                    providerIcon={selectedModel.id.split("/", 1)[0] ?? selectedModel.displayProvider ?? ""}
-                                />
-                                <span className="truncate">{selectedModel.name}</span>
-                            </span>
-                        )}
-                    </SelectValue>
-                </SelectTrigger>
-                <SelectContent align="end" className="max-h-64">
-                    <SelectItem value={null as unknown as string}>
-                        {systemDefaultModel ? (
-                            <span className="flex items-center gap-1.5">
-                                <ProviderIcon
-                                    className="size-3 shrink-0"
-                                    provider={systemDefaultModel.provider ?? systemDefaultModel.displayProvider ?? ""}
-                                    providerIcon={systemDefaultModel.id.split("/", 1)[0] ?? systemDefaultModel.displayProvider ?? ""}
-                                />
-                                <span className="text-muted-foreground truncate">{systemDefaultModel.name}</span>
-                                <span className="text-muted-foreground/60 text-xs">{t`(default)`}</span>
-                            </span>
-                        ) : (
-                            <span className="text-muted-foreground">{emptyLabel ?? t`System default`}</span>
-                        )}
-                    </SelectItem>
-                    {models.map((m) => (
-                        <SelectItem key={m.id} value={m.id}>
-                            <span className="flex items-center gap-1.5">
-                                <ProviderIcon
-                                    className="size-3 shrink-0"
-                                    provider={m.provider ?? m.displayProvider ?? ""}
-                                    providerIcon={m.id.split("/", 1)[0] ?? m.displayProvider ?? ""}
-                                />
-                                <span className="truncate">{m.name}</span>
-                            </span>
-                        </SelectItem>
-                    ))}
-                </SelectContent>
-            </Select>
+            {picker}
         </div>
     );
 };
@@ -317,176 +328,178 @@ export const BackupModelsSetting: FC<{ disabled?: boolean; models: GatewayModel[
     });
 
     return (
-        <div
-            aria-busy={saving}
-            aria-labelledby={labelId}
-            // Takes focus from script when nothing can be added; `focus:`, not `focus-visible:`, so the ring shows then too.
-            // The padding and negative margin leave room for the ring without moving the layout.
-            className="focus:border-ring focus:ring-ring/30 -m-1 space-y-3 rounded-md border border-transparent p-[3px] outline-none focus:ring-[2px]"
-            onBlur={(event) => {
-                const next = event.relatedTarget;
-
-                // A move to another control inside the section keeps it. With no target, a removed element is not a move.
-                if (next instanceof Node ? !event.currentTarget.contains(next) : event.target instanceof Node && event.target.isConnected) {
-                    holdsFocus.current = false;
-                }
-
-                // The user chose somewhere else: a control still waiting for focus must not take it back later.
-                if (next instanceof Node && !event.currentTarget.contains(next)) {
-                    focusAfter.current = null;
-                }
-            }}
-            onFocus={() => {
-                holdsFocus.current = true;
-            }}
-            ref={section}
-            role="group"
-            tabIndex={-1}
+        <SettingsRow
+            description={t`If your chosen model is unavailable, the reply is retried on these models in order`}
+            title={t`Backup models`}
+            titleId={labelId}
         >
-            <div className="space-y-0.5">
-                <Label className="text-sm font-medium" id={labelId}>
-                    {t`Backup models`}
-                </Label>
-                <p className="text-muted-foreground text-xs">{t`If your chosen model is unavailable, the reply is retried on these models in order`}</p>
-            </div>
-            {chosen.length > 0 && (
-                <ol aria-labelledby={labelId} className="space-y-1">
-                    {chosen.map((id, index) => {
-                        const model = catalog.find((m) => m.id === id);
-                        const name = model?.name ?? id;
+            <div
+                aria-busy={saving}
+                aria-labelledby={labelId}
+                // Takes focus from script when nothing can be added; `focus:`, not `focus-visible:`, so the ring shows then too.
+                // The padding and negative margin leave room for the ring without moving the layout.
+                className="focus:border-ring focus:ring-ring/30 -m-1 space-y-3 rounded-md border border-transparent p-[3px] outline-none focus:ring-[2px]"
+                onBlur={(event) => {
+                    const next = event.relatedTarget;
 
-                        return (
-                            <li className="flex items-center gap-2" key={id}>
-                                <span className="text-muted-foreground w-4 shrink-0 text-xs tabular-nums">{index + 1}.</span>
-                                <span className="flex min-w-0 flex-1 items-center gap-1.5 text-sm">
-                                    {model && (
-                                        <ProviderIcon
-                                            className="size-3 shrink-0"
-                                            provider={model.provider ?? model.displayProvider ?? ""}
-                                            providerIcon={model.id.split("/", 1)[0] ?? model.displayProvider ?? ""}
-                                        />
-                                    )}
-                                    <span className="truncate">{name}</span>
-                                    {availabilityKnown && !usable.has(id) && <span className="text-muted-foreground shrink-0 text-xs">{t`Unavailable`}</span>}
-                                </span>
-                                <Button
-                                    aria-label={t`Move ${name} up`}
-                                    disabled={locked || index === 0}
-                                    onClick={() =>
-                                        // At the top, "up" is disabled: focus moves to "down". A refused move puts the entry back, and "up" with it.
-                                        save((list) => moveBackupModel(list, id, -1), controlKey(id, index === 1 ? "down" : "up"), controlKey(id, "up"))
-                                    }
-                                    ref={register(controlKey(id, "up"))}
-                                    size="icon-sm"
-                                    variant="ghost"
-                                >
-                                    <ArrowUp aria-hidden />
-                                </Button>
-                                <Button
-                                    aria-label={t`Move ${name} down`}
-                                    disabled={locked || index === chosen.length - 1}
-                                    onClick={() =>
-                                        save(
-                                            (list) => moveBackupModel(list, id, 1),
-                                            controlKey(id, index === chosen.length - 2 ? "up" : "down"),
-                                            controlKey(id, "down"),
-                                        )
-                                    }
-                                    ref={register(controlKey(id, "down"))}
-                                    size="icon-sm"
-                                    variant="ghost"
-                                >
-                                    <ArrowDown aria-hidden />
-                                </Button>
-                                <Button
-                                    aria-label={t`Remove ${name}`}
-                                    disabled={locked}
-                                    onClick={() => {
-                                        const next = chosen[index + 1] ?? chosen[index - 1];
+                    // A move to another control inside the section keeps it. With no target, a removed element is not a move.
+                    if (next instanceof Node ? !event.currentTarget.contains(next) : event.target instanceof Node && event.target.isConnected) {
+                        holdsFocus.current = false;
+                    }
 
-                                        save(
-                                            (list) => list.filter((entry) => entry !== id),
-                                            next === undefined ? "" : controlKey(next, "remove"),
-                                            controlKey(id, "remove"),
-                                        );
-                                    }}
-                                    ref={register(controlKey(id, "remove"))}
-                                    size="icon-sm"
-                                    variant="ghost"
-                                >
-                                    <X aria-hidden />
-                                </Button>
-                            </li>
-                        );
-                    })}
-                </ol>
-            )}
-            {saveError !== null && (
-                <p className="text-muted-foreground text-xs" role="status">
-                    {saveError === "conflict"
-                        ? t`Your backup models were changed in another tab. The saved list is shown again.`
-                        : t`Failed to update backup models`}
-                </p>
-            )}
-            {readFailed && (
-                <div className="flex flex-wrap items-center gap-2" ref={addRow} role="alert">
-                    {/* A full list offers no add, but its entries still need the catalog for their names and availability. */}
-                    <p className="text-destructive text-xs">
-                        {chosen.length < limit ? t`Couldn't load the models you can add.` : t`Couldn't load the model list.`}
+                    // The user chose somewhere else: a control still waiting for focus must not take it back later.
+                    if (next instanceof Node && !event.currentTarget.contains(next)) {
+                        focusAfter.current = null;
+                    }
+                }}
+                onFocus={() => {
+                    holdsFocus.current = true;
+                }}
+                ref={section}
+                role="group"
+                tabIndex={-1}
+            >
+                {chosen.length > 0 && (
+                    <ol aria-labelledby={labelId} className="space-y-1">
+                        {chosen.map((id, index) => {
+                            const model = catalog.find((m) => m.id === id);
+                            const name = model?.name ?? id;
+
+                            return (
+                                <li className="flex items-center gap-2" key={id}>
+                                    <span className="text-muted-foreground w-4 shrink-0 text-xs tabular-nums">{index + 1}.</span>
+                                    <span className="flex min-w-0 flex-1 items-center gap-1.5 text-sm">
+                                        {model && (
+                                            <ProviderIcon
+                                                className="size-3 shrink-0"
+                                                provider={model.provider ?? model.displayProvider ?? ""}
+                                                providerIcon={model.id.split("/", 1)[0] ?? model.displayProvider ?? ""}
+                                            />
+                                        )}
+                                        <span className="truncate">{name}</span>
+                                        {availabilityKnown && !usable.has(id) && (
+                                            <span className="text-muted-foreground shrink-0 text-xs">{t`Unavailable`}</span>
+                                        )}
+                                    </span>
+                                    <Button
+                                        aria-label={t`Move ${name} up`}
+                                        disabled={locked || index === 0}
+                                        onClick={() =>
+                                            // At the top, "up" is disabled: focus moves to "down". A refused move puts the entry back, and "up" with it.
+                                            save((list) => moveBackupModel(list, id, -1), controlKey(id, index === 1 ? "down" : "up"), controlKey(id, "up"))
+                                        }
+                                        ref={register(controlKey(id, "up"))}
+                                        size="icon-sm"
+                                        variant="ghost"
+                                    >
+                                        <ArrowUp aria-hidden />
+                                    </Button>
+                                    <Button
+                                        aria-label={t`Move ${name} down`}
+                                        disabled={locked || index === chosen.length - 1}
+                                        onClick={() =>
+                                            save(
+                                                (list) => moveBackupModel(list, id, 1),
+                                                controlKey(id, index === chosen.length - 2 ? "up" : "down"),
+                                                controlKey(id, "down"),
+                                            )
+                                        }
+                                        ref={register(controlKey(id, "down"))}
+                                        size="icon-sm"
+                                        variant="ghost"
+                                    >
+                                        <ArrowDown aria-hidden />
+                                    </Button>
+                                    <Button
+                                        aria-label={t`Remove ${name}`}
+                                        disabled={locked}
+                                        onClick={() => {
+                                            const next = chosen[index + 1] ?? chosen[index - 1];
+
+                                            save(
+                                                (list) => list.filter((entry) => entry !== id),
+                                                next === undefined ? "" : controlKey(next, "remove"),
+                                                controlKey(id, "remove"),
+                                            );
+                                        }}
+                                        ref={register(controlKey(id, "remove"))}
+                                        size="icon-sm"
+                                        variant="ghost"
+                                    >
+                                        <X aria-hidden />
+                                    </Button>
+                                </li>
+                            );
+                        })}
+                    </ol>
+                )}
+                {saveError !== null && (
+                    <p className="text-muted-foreground text-xs" role="status">
+                        {saveError === "conflict"
+                            ? t`Your backup models were changed in another tab. The saved list is shown again.`
+                            : t`Failed to update backup models`}
                     </p>
-                    <Button
-                        onClick={() => {
-                            if (filtersFailed && !filtersRead) {
-                                void refetchFilters();
-                            }
+                )}
+                {readFailed && (
+                    <div className="flex flex-wrap items-center gap-2" ref={addRow} role="alert">
+                        {/* A full list offers no add, but its entries still need the catalog for their names and availability. */}
+                        <p className="text-destructive text-xs">
+                            {chosen.length < limit ? t`Couldn't load the models you can add.` : t`Couldn't load the model list.`}
+                        </p>
+                        <Button
+                            onClick={() => {
+                                if (filtersFailed && !filtersRead) {
+                                    void refetchFilters();
+                                }
 
-                            if (accessFailed && !accessRead) {
-                                void refetchAccess();
-                            }
+                                if (accessFailed && !accessRead) {
+                                    void refetchAccess();
+                                }
 
-                            if (catalogFailed) {
-                                refetchCatalog();
-                            }
-                        }}
-                        size="sm"
-                        type="button"
-                        variant="outline"
-                    >
-                        {t`Try again`}
-                    </Button>
-                </div>
-            )}
-            {chosen.length < limit && !readFailed && (
-                <div ref={addRow}>
-                    <ModelSelect
-                        description={t`Up to ${limit}, tried in the order listed`}
-                        // Not disabled while a save runs, so it keeps focus; a pick made then waits for the save (see `queuedPick`).
-                        disabled={!editable}
-                        emptyLabel={t`Choose a model`}
-                        field="backupModels"
-                        label={chosen.length === 0 ? t`Add a backup model` : t`Add another backup model`}
-                        // No failed read here, so an empty list is one still being read until all reads are in.
-                        loading={!filtersRead || !accessRead || !catalogLoaded}
-                        // Unread filters look like none, and an unread plan answer hides paid models, so nothing is offered until both are read.
-                        models={filtersRead && accessRead ? allModels.filter((m) => usable.has(m.id) && !chosen.includes(m.id)) : []}
-                        onChange={(_field, modelId) => {
-                            if (!modelId || !editable) {
-                                return;
-                            }
+                                if (catalogFailed) {
+                                    refetchCatalog();
+                                }
+                            }}
+                            size="sm"
+                            type="button"
+                            variant="outline"
+                        >
+                            {t`Try again`}
+                        </Button>
+                    </div>
+                )}
+                {chosen.length < limit && !readFailed && (
+                    <div ref={addRow}>
+                        <ModelSelect
+                            description={t`Up to ${limit}, tried in the order listed`}
+                            // Not disabled while a save runs, so it keeps focus; a pick made then waits for the save (see `queuedPick`).
+                            disabled={!editable}
+                            emptyLabel={t`Choose a model`}
+                            field="backupModels"
+                            label={chosen.length === 0 ? t`Add a backup model` : t`Add another backup model`}
+                            // No failed read here, so an empty list is one still being read until all reads are in.
+                            loading={!filtersRead || !accessRead || !catalogLoaded}
+                            // Unread filters look like none, and an unread plan answer hides paid models, so nothing is offered until both are read.
+                            models={filtersRead && accessRead ? allModels.filter((m) => usable.has(m.id) && !chosen.includes(m.id)) : []}
+                            onChange={(_field, modelId) => {
+                                if (!modelId || !editable) {
+                                    return;
+                                }
 
-                            if (saving) {
-                                queuedPick.current = modelId;
+                                if (saving) {
+                                    queuedPick.current = modelId;
 
-                                return;
-                            }
+                                    return;
+                                }
 
-                            addBackup(modelId);
-                        }}
-                        value={undefined}
-                    />
-                </div>
-            )}
-        </div>
+                                addBackup(modelId);
+                            }}
+                            value={undefined}
+                        />
+                    </div>
+                )}
+            </div>
+        </SettingsRow>
     );
 };
 
@@ -551,154 +564,138 @@ const DefaultModelsSettings: FC = () => {
     return (
         <div className="space-y-6 pb-6">
             {/* Text */}
-            <Card>
-                <CardHeader>
-                    <CardTitle>{t`Text`}</CardTitle>
-                    <CardDescription>{t`Choose default text models`}</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <ModelSelect
-                        description={t`Default model for chat and text generation`}
-                        disabled={isPending}
-                        field="textToText"
-                        label={t`Text to text`}
-                        models={textModels}
-                        onChange={handleChange}
-                        systemDefaultId={DEFAULT_TEXT_TO_TEXT_MODEL}
-                        value={defaults.textToText}
-                    />
-                    <Separator />
-                    <ModelSelect
-                        description={t`Default model for image understanding and analysis`}
-                        disabled={isPending}
-                        field="imageToText"
-                        label={t`Image to text`}
-                        models={visionModels}
-                        onChange={handleChange}
-                        systemDefaultId={DEFAULT_IMAGE_TO_TEXT_MODEL}
-                        value={defaults.imageToText}
-                    />
-                    <Separator />
-                    <ModelSelect
-                        description={t`Default model for video understanding and transcription`}
-                        disabled={isPending}
-                        field="videoToText"
-                        label={t`Video to text`}
-                        models={textModels}
-                        onChange={handleChange}
-                        systemDefaultId={DEFAULT_VIDEO_TO_TEXT_MODEL}
-                        value={defaults.videoToText}
-                    />
-                    <Separator />
-                    <BackupModelsSetting disabled={isPending} models={textModels} providersWithKey={providersWithKey} />
-                </CardContent>
-            </Card>
+            <SettingsCard description={t`Choose default text models`} title={t`Text`}>
+                <ModelSelect
+                    description={t`Default model for chat and text generation`}
+                    disabled={isPending}
+                    field="textToText"
+                    label={t`Text to text`}
+                    models={textModels}
+                    onChange={handleChange}
+                    row
+                    systemDefaultId={DEFAULT_TEXT_TO_TEXT_MODEL}
+                    value={defaults.textToText}
+                />
+                <ModelSelect
+                    description={t`Default model for image understanding and analysis`}
+                    disabled={isPending}
+                    field="imageToText"
+                    label={t`Image to text`}
+                    models={visionModels}
+                    onChange={handleChange}
+                    row
+                    systemDefaultId={DEFAULT_IMAGE_TO_TEXT_MODEL}
+                    value={defaults.imageToText}
+                />
+                <ModelSelect
+                    description={t`Default model for video understanding and transcription`}
+                    disabled={isPending}
+                    field="videoToText"
+                    label={t`Video to text`}
+                    models={textModels}
+                    onChange={handleChange}
+                    row
+                    systemDefaultId={DEFAULT_VIDEO_TO_TEXT_MODEL}
+                    value={defaults.videoToText}
+                />
+                <BackupModelsSetting disabled={isPending} models={textModels} providersWithKey={providersWithKey} />
+            </SettingsCard>
 
             {/* Image */}
-            <Card>
-                <CardHeader>
-                    <CardTitle>{t`Image`}</CardTitle>
-                    <CardDescription>{t`Choose default image models`}</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <ModelSelect
-                        description={t`Default model for generating images from text prompts`}
-                        disabled={isPending}
-                        field="textToImage"
-                        label={t`Text to image`}
-                        models={imageGenModels}
-                        onChange={handleChange}
-                        systemDefaultId={DEFAULT_TEXT_TO_IMAGE_MODEL}
-                        value={defaults.textToImage}
-                    />
-                    <Separator />
-                    <ModelSelect
-                        description={t`Default model for transforming existing images`}
-                        disabled={isPending}
-                        field="imageToImage"
-                        label={t`Image to image`}
-                        models={img2imgModels}
-                        onChange={handleChange}
-                        systemDefaultId={DEFAULT_IMAGE_TO_IMAGE_MODEL}
-                        value={defaults.imageToImage}
-                    />
-                    <Separator />
-                    <ModelSelect
-                        description={t`Default model for combining multiple reference images`}
-                        disabled={isPending}
-                        field="imagesToImage"
-                        label={t`Images to image`}
-                        models={charRefModels}
-                        onChange={handleChange}
-                        systemDefaultId={DEFAULT_IMAGES_TO_IMAGE_MODEL}
-                        value={defaults.imagesToImage}
-                    />
-                </CardContent>
-            </Card>
+            <SettingsCard description={t`Choose default image models`} title={t`Image`}>
+                <ModelSelect
+                    description={t`Default model for generating images from text prompts`}
+                    disabled={isPending}
+                    field="textToImage"
+                    label={t`Text to image`}
+                    models={imageGenModels}
+                    onChange={handleChange}
+                    row
+                    systemDefaultId={DEFAULT_TEXT_TO_IMAGE_MODEL}
+                    value={defaults.textToImage}
+                />
+                <ModelSelect
+                    description={t`Default model for transforming existing images`}
+                    disabled={isPending}
+                    field="imageToImage"
+                    label={t`Image to image`}
+                    models={img2imgModels}
+                    onChange={handleChange}
+                    row
+                    systemDefaultId={DEFAULT_IMAGE_TO_IMAGE_MODEL}
+                    value={defaults.imageToImage}
+                />
+                <ModelSelect
+                    description={t`Default model for combining multiple reference images`}
+                    disabled={isPending}
+                    field="imagesToImage"
+                    label={t`Images to image`}
+                    models={charRefModels}
+                    onChange={handleChange}
+                    row
+                    systemDefaultId={DEFAULT_IMAGES_TO_IMAGE_MODEL}
+                    value={defaults.imagesToImage}
+                />
+            </SettingsCard>
 
             {/* Video */}
-            <Card>
-                <CardHeader>
-                    <CardTitle>{t`Video`}</CardTitle>
-                    <CardDescription>{t`Choose default video models`}</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <ModelSelect
-                        description={t`Default model for generating video from text prompts`}
-                        disabled={isPending}
-                        field="textToVideo"
-                        label={t`Text to video`}
-                        models={textToVideoModels}
-                        onChange={handleChange}
-                        systemDefaultId={DEFAULT_TEXT_TO_VIDEO_MODEL}
-                        value={defaults.textToVideo}
-                    />
-                    <Separator />
-                    <ModelSelect
-                        description={t`Default model for animating a single image`}
-                        disabled={isPending}
-                        field="imageToVideo"
-                        label={t`Image to video`}
-                        models={imageToVideoModels}
-                        onChange={handleChange}
-                        systemDefaultId={DEFAULT_IMAGE_TO_VIDEO_MODEL}
-                        value={defaults.imageToVideo}
-                    />
-                    <Separator />
-                    <ModelSelect
-                        description={t`Default model for generating video from multiple images`}
-                        disabled={isPending}
-                        field="imagesToVideo"
-                        label={t`Images to video`}
-                        models={videoModels}
-                        onChange={handleChange}
-                        systemDefaultId={DEFAULT_IMAGES_TO_VIDEO_MODEL}
-                        value={defaults.imagesToVideo}
-                    />
-                    <Separator />
-                    <ModelSelect
-                        description={t`Default model for editing or transforming existing video`}
-                        disabled={isPending}
-                        field="videoToVideo"
-                        label={t`Video to video`}
-                        models={videoModels}
-                        onChange={handleChange}
-                        systemDefaultId={DEFAULT_VIDEO_TO_VIDEO_MODEL}
-                        value={defaults.videoToVideo}
-                    />
-                    <Separator />
-                    <ModelSelect
-                        description={t`Default model for video generation from mixed inputs`}
-                        disabled={isPending}
-                        field="mixedToVideo"
-                        label={t`Mixed to video`}
-                        models={videoModels}
-                        onChange={handleChange}
-                        systemDefaultId={DEFAULT_MIXED_TO_VIDEO_MODEL}
-                        value={defaults.mixedToVideo}
-                    />
-                </CardContent>
-            </Card>
+            <SettingsCard description={t`Choose default video models`} title={t`Video`}>
+                <ModelSelect
+                    description={t`Default model for generating video from text prompts`}
+                    disabled={isPending}
+                    field="textToVideo"
+                    label={t`Text to video`}
+                    models={textToVideoModels}
+                    onChange={handleChange}
+                    row
+                    systemDefaultId={DEFAULT_TEXT_TO_VIDEO_MODEL}
+                    value={defaults.textToVideo}
+                />
+                <ModelSelect
+                    description={t`Default model for animating a single image`}
+                    disabled={isPending}
+                    field="imageToVideo"
+                    label={t`Image to video`}
+                    models={imageToVideoModels}
+                    onChange={handleChange}
+                    row
+                    systemDefaultId={DEFAULT_IMAGE_TO_VIDEO_MODEL}
+                    value={defaults.imageToVideo}
+                />
+                <ModelSelect
+                    description={t`Default model for generating video from multiple images`}
+                    disabled={isPending}
+                    field="imagesToVideo"
+                    label={t`Images to video`}
+                    models={videoModels}
+                    onChange={handleChange}
+                    row
+                    systemDefaultId={DEFAULT_IMAGES_TO_VIDEO_MODEL}
+                    value={defaults.imagesToVideo}
+                />
+                <ModelSelect
+                    description={t`Default model for editing or transforming existing video`}
+                    disabled={isPending}
+                    field="videoToVideo"
+                    label={t`Video to video`}
+                    models={videoModels}
+                    onChange={handleChange}
+                    row
+                    systemDefaultId={DEFAULT_VIDEO_TO_VIDEO_MODEL}
+                    value={defaults.videoToVideo}
+                />
+                <ModelSelect
+                    description={t`Default model for video generation from mixed inputs`}
+                    disabled={isPending}
+                    field="mixedToVideo"
+                    label={t`Mixed to video`}
+                    models={videoModels}
+                    onChange={handleChange}
+                    row
+                    systemDefaultId={DEFAULT_MIXED_TO_VIDEO_MODEL}
+                    value={defaults.mixedToVideo}
+                />
+            </SettingsCard>
         </div>
     );
 };

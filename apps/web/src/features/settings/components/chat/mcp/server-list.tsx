@@ -47,11 +47,13 @@ export const MCPServerList: FC<MCPServerListProps> = ({
     const { t } = useLingui();
 
     if (servers.length === 0) {
-        return <div className="text-muted-foreground py-8 text-center text-sm">{t`No MCP servers configured. Add a server to extend AI capabilities.`}</div>;
+        return (
+            <div className="text-muted-foreground border-border/50 py-3 text-sm not-first:border-t">{t`No MCP servers configured. Add a server to extend AI capabilities.`}</div>
+        );
     }
 
     return (
-        <div className="space-y-2">
+        <>
             {servers.map((server, index) => {
                 const key = serverKey(server);
                 const statusInfo = statuses[key];
@@ -65,9 +67,8 @@ export const MCPServerList: FC<MCPServerListProps> = ({
                 return (
                     <div
                         className={cn(
-                            "rounded-lg border p-3 transition-colors",
-                            !server.enabled && "opacity-60",
-                            editingIndex === index && "ring-primary ring-2",
+                            "border-border/50 py-3 transition-colors not-first:border-t",
+                            editingIndex === index && "bg-muted/40 -mx-3 rounded-lg px-3",
                         )}
                         key={key}
                     >
@@ -186,6 +187,6 @@ export const MCPServerList: FC<MCPServerListProps> = ({
                     </div>
                 );
             })}
-        </div>
+        </>
     );
 };

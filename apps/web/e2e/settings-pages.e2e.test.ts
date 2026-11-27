@@ -106,7 +106,8 @@ const collectErrors = (page: Page): string[] => {
 };
 
 /** The settings modal. */
-const settingsDialog = (page: Page) => page.getByRole("dialog", { name: "Settings" });
+/** The settings modal, found by its section list rather than its name, which follows the locale ("Einstellungen" in German). */
+const settingsDialog = (page: Page) => page.getByRole("dialog").filter({ has: page.getByRole("navigation") });
 
 /** The navigation's current item: the tab the modal shows. */
 const currentTabItem = (page: Page) => settingsDialog(page).getByRole("navigation").locator('[aria-current="true"]');
