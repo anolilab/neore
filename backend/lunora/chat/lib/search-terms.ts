@@ -82,24 +82,25 @@ const foldedOrigins = (run: string, folded: string): ((index: number) => number)
 };
 
 /**
- * Every term of `text` as the index reads it, in order, repeats included, each with the offset in `text` where it starts:
- * its word's first character, or its own pair inside a run of Chinese, Japanese or Korean. Each run of letters, marks and
- * digits is normalised whole (no term crosses one), so the terms are the index's; a term past {@link MAX_TERM_LENGTH} is
- * dropped, as the index drops it.
+ * Every term of `text` as the index reads it, in order, repeats included. Each run of letters, marks and digits is
+ * normalised whole (no term crosses one), so the terms are the index's; a term past {@link MAX_TERM_LENGTH} is dropped, as
+ * the index drops it. With `offsets`, each term also carries the offset in `text` where it starts: its word's first
+ * character, or its own pair inside a run of Chinese, Japanese or Korean. Without, `at` is 0 and no character is
+ * normalised alone, which a search over many prompts cannot afford.
  */
-export const documentTermsAt = (text: string): { at: number; term: string }[] => {
+const readTerms = (text: string, offsets: boolean): { at: number; term: string }[] => {
     const out: { at: number; term: string }[] = [];
 
     for (const run of text.matchAll(WORD_RUN)) {
         const folded = normalize(run[0]);
-        const origin = foldedOrigins(run[0], folded);
+        const origin = offsets ? foldedOrigins(run[0], folded) : undefined;
 
         for (const word of folded.matchAll(WORD)) {
             const terms = splitCjk(word[0]);
 
             for (const { at, term } of terms) {
                 if (term.length <= MAX_TERM_LENGTH) {
-                    out.push({ at: run.index + origin(word.index + at), term });
+                    out.push({ at: origin ? run.index + origin(word.index + at) : 0, term });
                 }
             }
         }
@@ -108,8 +109,11 @@ export const documentTermsAt = (text: string): { at: number; term: string }[] =>
     return out;
 };
 
+/** Every term of `text` with the offset in `text` where it starts ({@link readTerms}): for placing an excerpt, not for a search. */
+export const documentTermsAt = (text: string): { at: number; term: string }[] => readTerms(text, true);
+
 /** Every term of `text`, in order, repeats included: what the index stores for a document. */
-export const documentTerms = (text: string): string[] => documentTermsAt(text).map(({ term }) => term);
+export const documentTerms = (text: string): string[] => readTerms(text, false).map(({ term }) => term);
 
 /** The terms a search for `text` looks for: each once, at its last place. */
 export const queryTerms = (text: string): string[] => {

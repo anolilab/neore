@@ -150,54 +150,65 @@ export const searchPastChats = internalQuery
             return threads.get(id) ?? null;
         };
 
-        // Whether a chat's prompts are the caller's typed words: a tagged chat by its kind; an untagged one (a branch, side
-        // chat or comparison) as the chat it was copied from, so a copied opening message of another kind stays out. A
-        // chain too deep or past the read budget, a link of another kind and any other untagged chat (an import) are no source.
-        const isTypedSource = async (thread: ThreadDoc, depth = 0): Promise<boolean> => {
+        // Whether a chat's prompts are the caller's typed words: a tagged chat by its kind; an untagged one (a branch or side
+        // chat) as the chat it was copied from, and only while every chat on the way there is one the search may list
+        // (`listsSentPrompts`): a branch made before its parent was locked, trashed or deleted holds that chat's prompts.
+        // An import and a link of another kind are no source. A walk cut short by the depth or the read budget is no
+        // source for this search, but is not remembered as one: another candidate may reach the same chat by a shorter way.
+        const walkSource = async (thread: ThreadDoc, depth: number): Promise<"no" | "unknown" | "yes"> => {
             if ((thread.tags ?? []).length > 0 || thread.externalThreadId !== undefined || thread.messengerConnectionId !== undefined) {
-                return isTypedChatKind(thread);
+                return isTypedChatKind(thread) ? "yes" : "no";
             }
 
             // An imported conversation (`chat-import/`) holds words typed elsewhere, whatever it is linked to.
             if (thread.createdBy?.startsWith("import:") === true) {
-                return false;
+                return "no";
             }
 
             const known = sources.get(thread._id);
 
             if (known !== undefined) {
-                return known;
+                return known ? "yes" : "no";
             }
 
-            let source = false;
+            if (depth >= PAST_CHAT_LINEAGE_DEPTH || lineageReads >= PAST_CHAT_LINEAGE_READS) {
+                return "unknown";
+            }
 
-            if (depth < PAST_CHAT_LINEAGE_DEPTH && lineageReads < PAST_CHAT_LINEAGE_READS) {
-                lineageReads += 1;
+            lineageReads += 1;
 
-                const links = await context.db
-                    .query("threadRelationships")
-                    .withIndex("by_thread", (q) => q.eq("threadId", thread._id as Id<"threads">))
-                    .take(PAST_CHAT_LINKS_READ);
+            const links = await context.db
+                .query("threadRelationships")
+                .withIndex("by_thread", (q) => q.eq("threadId", thread._id as Id<"threads">))
+                .take(PAST_CHAT_LINKS_READ);
+            let verdict: "no" | "unknown" | "yes" = "no";
 
-                // Any copy link to a source makes the chat one: a comparison link beside a branch's does not hide it.
-                for (const link of links) {
-                    if (!COPY_LINKS.has(link.branchType) || (link.userId ?? userId) !== userId) {
-                        continue;
-                    }
+            // Any copy link to a source makes the chat one: a comparison link beside a branch's does not hide it.
+            for (const link of links) {
+                if (!COPY_LINKS.has(link.branchType) || (link.userId ?? userId) !== userId) {
+                    continue;
+                }
 
-                    const parent = await threadOf(link.parentThreadId);
+                const parent = await threadOf(link.parentThreadId);
+                const parentVerdict = listsSentPrompts(parent, userId) ? await walkSource(parent, depth + 1) : "no";
 
-                    if (parent !== null && parent.userId === userId && (await isTypedSource(parent, depth + 1))) {
-                        source = true;
-                        break;
-                    }
+                if (parentVerdict === "yes") {
+                    verdict = "yes";
+                    break;
+                }
+
+                if (parentVerdict === "unknown") {
+                    verdict = "unknown";
                 }
             }
 
-            sources.set(thread._id, source);
+            if (verdict !== "unknown") {
+                sources.set(thread._id, verdict === "yes");
+            }
 
-            return source;
+            return verdict;
         };
+        const isTypedSource = async (thread: ThreadDoc): Promise<boolean> => (await walkSource(thread, 0)) === "yes";
 
         const collect = async (window: number) => {
             const { filled, messages } = await context.runQuery(internal.agent.messages.typedTextSearch, { limit: window, text, userId });

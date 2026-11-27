@@ -287,6 +287,56 @@ describe("searchPastChats", () => {
         }
     });
 
+    it("reads no copy of a chat that was locked, trashed or deleted after the copy was made", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            const current = await harness.run(async (context: any) => {
+                await withMemory(context);
+
+                const here = await insertThread(context, { title: "Today" });
+                const open = await insertThread(context, { title: "Open" });
+                const locked = await insertThread(context, { title: "Locked later" });
+                const trashed = await insertThread(context, { title: "Trashed later" });
+                // A branch of a branch: the lock two links up still keeps it out.
+                const middle = await insertUntaggedThread(context, "Middle", locked);
+
+                await insertPrompt(context, {
+                    createdAt: SENT_AT,
+                    text: "Lisbon in a branch of an open chat",
+                    threadId: await insertUntaggedThread(context, "Branch of open", open),
+                });
+                await insertPrompt(context, {
+                    createdAt: SENT_AT + 1,
+                    text: "Lisbon copied from the locked chat",
+                    threadId: await insertUntaggedThread(context, "Branch of locked", locked),
+                });
+                await insertPrompt(context, {
+                    createdAt: SENT_AT + 2,
+                    text: "Lisbon two links from the lock",
+                    threadId: await insertUntaggedThread(context, "Branch of middle", middle),
+                });
+                await insertPrompt(context, {
+                    createdAt: SENT_AT + 3,
+                    text: "Lisbon copied from the trashed chat",
+                    threadId: await insertUntaggedThread(context, "Branch of trashed", trashed),
+                });
+
+                // Locked and trashed after their branches were made.
+                await context.db.patch("threads", locked, { lockedAt: 1 });
+                await context.db.patch("threads", trashed, { deleted: true });
+
+                return here;
+            });
+
+            const { hits } = await searchIn(harness, { query: "Lisbon", threadId: current });
+
+            expect(hits.map((hit) => hit.title)).toStrictEqual(["Branch of open"]);
+        } finally {
+            harness.close();
+        }
+    });
+
     it("trusts only the server's copy links: a link the owner can write and an import are no source, a branch behind another link is", async () => {
         const harness = lunoraTest(schema as never);
 
