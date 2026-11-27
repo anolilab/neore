@@ -351,6 +351,9 @@ export const RATE_LIMIT_CONFIGS = {
     // outbound registry call, so free text cannot be an unbounded fan-out.
     "mcp/registry:free": Ratelimit.tokenBucket(30, MINUTE, 40),
     "mcp/registry:premium": Ratelimit.tokenBucket(60, MINUTE, 90),
+    // Downloading one's own memories as Markdown: up to four paged reads per call.
+    "memory/export:free": Ratelimit.fixedWindow(10, HOUR),
+    "memory/export:premium": Ratelimit.fixedWindow(30, HOUR),
     // Bringing in another assistant's memory: a preview labels the paste with a model,
     // a save may run belief revision per fact. Shared by both steps.
     "memory/import:free": Ratelimit.fixedWindow(10, HOUR),
