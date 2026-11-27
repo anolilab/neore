@@ -86,6 +86,7 @@ describe("applying an update", () => {
                     installId,
                     instructions: REVISED.instructions,
                     name: REVISED.name,
+                    pluginVersion: "1.1.0",
                     slug: REVISED.slug,
                     userId: OWNER,
                 }),
@@ -103,7 +104,7 @@ describe("applying an update", () => {
         });
         const install = await run(async (context) => await context.db.pluginInstalls.findFirst({ where: { _id: installId } }));
 
-        expect(skill).toMatchObject({ instructions: REVISED.instructions });
+        expect(skill).toMatchObject({ instructions: REVISED.instructions, source: { type: "plugin", version: "1.1.0" } });
         expect(link).toMatchObject({ contentHash: await skillRowHash(REVISED), pendingHash: "" });
         expect(install).toMatchObject({ status: "installed", version: "1.1.0" });
     });
@@ -127,6 +128,7 @@ describe("applying an update", () => {
                         installId,
                         instructions: REVISED.instructions,
                         name: REVISED.name,
+                        pluginVersion: "1.1.0",
                         slug: REVISED.slug,
                         userId: OWNER,
                     }),
@@ -154,6 +156,7 @@ describe("applying an update", () => {
                     installId,
                     instructions: REVISED.instructions,
                     name: REVISED.name,
+                    pluginVersion: "1.1.0",
                     slug: REVISED.slug,
                     userId: OWNER,
                 }),
@@ -190,6 +193,7 @@ describe("applying an update", () => {
                         installId,
                         instructions: REVISED.instructions,
                         name: REVISED.name,
+                        pluginVersion: "1.1.0",
                         slug: REVISED.slug,
                         userId: OWNER,
                     }),
@@ -218,6 +222,7 @@ describe("applying an update", () => {
                         installId,
                         instructions: REVISED.instructions,
                         name: REVISED.name,
+                        pluginVersion: "1.1.0",
                         slug: "clear",
                         userId: OWNER,
                     }),
@@ -267,6 +272,7 @@ describe("applying an update", () => {
                         installId,
                         instructions: REVISED.instructions,
                         name: REVISED.name,
+                        pluginVersion: "1.1.0",
                         slug: "taken",
                         userId: OWNER,
                     }),
@@ -306,6 +312,7 @@ describe("applying an update", () => {
                     installId,
                     instructions: ANALYST.instructions,
                     name: ANALYST.name,
+                    pluginVersion: "1.1.0",
                     slug: ANALYST.slug,
                     userId: OWNER,
                 }),
@@ -573,6 +580,7 @@ describe("applying an update", () => {
                     installId,
                     instructions: REVISED.instructions,
                     name: REVISED.name,
+                    pluginVersion: "1.1.0",
                     slug: REVISED.slug,
                     userId: OWNER,
                 }),

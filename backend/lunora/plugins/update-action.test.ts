@@ -5,7 +5,7 @@
  * Each skill declares its key in the file, so a change elsewhere in the file leaves every other skill's entry key as it was.
  */
 import { lunoraTest } from "@lunora/testing";
-import { isSelectableTextModel, MODEL_REGISTRY } from "@neore/ai/models";
+import { env } from "cloudflare:workers";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { registeredApi } from "../../test/registered-api";
@@ -341,37 +341,31 @@ describe("plugin update action", () => {
         expect(owned.map((row: { name: string }) => row.name).toSorted((a: string, b: string) => a.localeCompare(b))).toStrictEqual(["analyst", "critic"]);
     });
 
-    it("refuses an update that adds a group chat before it writes anything", async () => {
-        const body = buildBundleMarkdown({
-            description: "",
-            items: [
-                { key: "analyst", kind: "skill", skill: skill("analyst") },
-                { key: "critic", kind: "skill", skill: skill("critic") },
-                {
-                    group: {
-                        mode: "round-robin",
-                        model: MODEL_REGISTRY.find((definition) => isSelectableTextModel(definition))!.id,
-                        participants: ["analyst", "critic"],
-                        title: "Panel",
-                    },
-                    key: "panel",
-                    kind: "group",
-                },
-            ],
-            name: "Daily brief",
-        });
-        const contentHash = await bodyHash(body);
-        const markdown = withPluginHeader(body, { contentHash, slug: SLUG, version: "1.1.0" });
+    it("refuses the preview and the update for an account that is not on the plugins allowlist", async () => {
+        const next = await fileOf(["analyst", "critic", "reviewer"], "1.1.0");
+        const preview = (await as().action(procedureAt("plugins_update", "previewUpdate"), { markdown: next.markdown } as never)) as PreviewResult;
+        const variables = env as Record<string, string | undefined>;
+        const saved = variables.PLUGINS_ALLOWED_USERS;
 
-        await expect(
-            as().action(procedureAt("plugins_update", "updatePlugin"), {
-                confirmDowngrade: false,
-                contentHash,
-                expectedGeneration: 1,
-                expectedInstallId: await currentInstallId(),
-                markdown,
-            } as never),
-        ).rejects.toThrow("Uninstall the plugin and install the new version");
+        variables.PLUGINS_ALLOWED_USERS = "someone-else";
+
+        try {
+            await expect(as().action(procedureAt("plugins_update", "previewUpdate"), { markdown: next.markdown } as never)).rejects.toThrow(
+                "Plugins are not available for this account yet",
+            );
+            await expect(
+                as().action(procedureAt("plugins_update", "updatePlugin"), {
+                    confirmDowngrade: false,
+                    contentHash: next.contentHash,
+                    expectedGeneration: preview.generation,
+                    expectedInstallId: preview.installId,
+                    markdown: next.markdown,
+                } as never),
+            ).rejects.toThrow("Plugins are not available for this account yet");
+        } finally {
+            variables.PLUGINS_ALLOWED_USERS = saved;
+        }
+
         expect(await installRow()).toMatchObject({ status: "installed", version: "1.0.0" });
     });
 

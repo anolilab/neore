@@ -102,12 +102,30 @@ describe("diffUpdate", () => {
         expect(diffUpdate([child("a")], [incoming("a", "h1")])).toEqual([{ action: "same", entryKey: "a" }]);
     });
 
-    it("reports a group whose definition changed, and does not change it", () => {
-        expect(diffUpdate([child("g", { kind: "group" })], [incoming("g", "h2", "group")])).toEqual([{ action: "report-group", entryKey: "g" }]);
+    it("rewrites an unedited group whose definition changed", () => {
+        expect(diffUpdate([child("g", { kind: "group" })], [incoming("g", "h2", "group")])).toEqual([{ action: "update", entryKey: "g" }]);
     });
 
-    it("reports a removed group rather than deleting it, since it may have messages", () => {
-        expect(diffUpdate([child("g", { kind: "group" })], [])).toEqual([{ action: "report-group", entryKey: "g" }]);
+    it("keeps an edited group, even when the new version changed it", () => {
+        expect(diffUpdate([child("g", { currentHash: "edited", kind: "group" })], [incoming("g", "h2", "group")])).toEqual([
+            { action: "keep-edited", entryKey: "g" },
+        ]);
+    });
+
+    it("leaves an unchanged group alone", () => {
+        expect(diffUpdate([child("g", { kind: "group" })], [incoming("g", "h1", "group")])).toEqual([{ action: "same", entryKey: "g" }]);
+    });
+
+    it("deletes an unedited group the file drops, and detaches an edited one", () => {
+        expect(diffUpdate([child("g", { kind: "group" })], [])).toEqual([{ action: "delete", entryKey: "g" }]);
+        expect(diffUpdate([child("g", { currentHash: "edited", kind: "group" })], [])).toEqual([{ action: "detach", entryKey: "g" }]);
+    });
+
+    it("replaces a group whose kind changed", () => {
+        expect(diffUpdate([child("g", { kind: "group" })], [incoming("g", "h2", "skill")])).toEqual([
+            { action: "delete", entryKey: "g" },
+            { action: "create", entryKey: "g" },
+        ]);
     });
 
     it("creates a new entry, deletes an unedited removed one, and detaches an edited removed one", () => {

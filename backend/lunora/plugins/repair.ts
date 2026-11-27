@@ -43,6 +43,11 @@ export interface RepairResult {
     missing: string[];
     /** More dropped children remain than one call handles: call again before anything is created or the install finished. */
     moreDropped: boolean;
+    /**
+     * A linked child holds other content than the file's entry for it (an update stopped before it rewrote the child). Repair does not
+     * rewrite it: the install is marked partial, and running the update again finishes it. Only known when the file's hashes are given.
+     */
+    outdated: boolean;
     status: "installed" | "needs-repair";
 }
 
@@ -140,7 +145,7 @@ const repairStoppedUpdate = async (ctx: MutationCtx, install: Doc<"pluginInstall
         install.status,
     );
 
-    return { kept: [], linked, missing: unresolved, moreDropped: false, status };
+    return { kept: [], linked, missing: unresolved, moreDropped: false, outdated: true, status };
 };
 
 /** Whether repair may start on this install now. An `installing` install is repairable only after its lease expired. */
@@ -217,8 +222,40 @@ const detachDropped = async (
     return { kept, more: handled > 0 };
 };
 
-/** Links every intent row whose child exists, and returns the install to `installed` once nothing is missing. */
-export const repairRows = async (ctx: MutationCtx, userId: string, pluginSlug: string, fileKeys?: ReadonlySet<string>): Promise<RepairResult> => {
+/**
+ * Whether a linked child's recorded hash differs from the hash of its entry in the file repair finishes at. Links are read again: the
+ * steps above may have settled a pending hash. A child that is still missing is excluded (it is made from the file, so it will match).
+ */
+const anyOutdated = async (
+    ctx: MutationCtx,
+    installId: string,
+    entryHashes: ReadonlyMap<string, string> | undefined,
+    skip: ReadonlyArray<string>,
+): Promise<boolean> => {
+    if (entryHashes === undefined) {
+        return false;
+    }
+
+    const { page } = await ctx.db.pluginItems.findMany({ consistency: "primary", where: { installId } });
+
+    return page.some(
+        (row) => row.state === "created" && !skip.includes(row.entryKey) && entryHashes.has(row.entryKey) && entryHashes.get(row.entryKey) !== row.contentHash,
+    );
+};
+
+/**
+ * Links every intent row whose child exists, and returns the install to `installed` once nothing is missing. With the hash of every
+ * entry of the file (`entryHashes`), a linked child that still holds other content than the file's makes the finished install
+ * `partial` (it is not a complete copy of the file): repair does not rewrite a child, the update does, so a preview of the same file
+ * then plans `update` for it.
+ */
+export const repairRows = async (
+    ctx: MutationCtx,
+    userId: string,
+    pluginSlug: string,
+    fileKeys?: ReadonlySet<string>,
+    entryHashes?: ReadonlyMap<string, string>,
+): Promise<RepairResult> => {
     // Triggers and group chats live on the owner's shard; anywhere else every child would read as gone and be created again.
     requireOwnerShard(userId, "repair");
 
@@ -249,7 +286,7 @@ export const repairRows = async (ctx: MutationCtx, userId: string, pluginSlug: s
 
     // More dropped children than one call handles: stop here, within the call's statement budget; the caller calls again.
     if (dropped.more) {
-        return { kept, linked: 0, missing: [], moreDropped: true, status: "needs-repair" };
+        return { kept, linked: 0, missing: [], moreDropped: true, outdated: false, status: "needs-repair" };
     }
 
     const page = fileKeys === undefined ? allRows : allRows.filter((row) => fileKeys.has(row.entryKey));
@@ -294,6 +331,8 @@ export const repairRows = async (ctx: MutationCtx, userId: string, pluginSlug: s
         linked += 1;
     }
 
+    const outdated = await anyOutdated(ctx, installId, entryHashes, missing);
+
     if (missing.length === 0) {
         // An update kept for repair holds its target version; finishing the repair makes it the installed one. The next generation
         // fences out the action that stopped: an installed row carries no lease, so its generation is all that refuses it.
@@ -308,8 +347,9 @@ export const repairRows = async (ctx: MutationCtx, userId: string, pluginSlug: s
             install.generation,
             {
                 generation: install.generation + 1,
-                // Every child now matches the file it finishes at (the missing ones made, the dropped ones detached).
-                partial: false,
+                // The missing ones are made and the dropped ones detached; a child still holding other content than the file's keeps the
+                // install partial, until the update that rewrites it runs.
+                partial: outdated,
                 status: "installed",
                 ...(install.targetVersion !== undefined && { targetVersion: version }),
                 updatedAt: ctx.now,
@@ -319,7 +359,7 @@ export const repairRows = async (ctx: MutationCtx, userId: string, pluginSlug: s
             install.status,
         );
 
-        return { kept, linked, missing, moreDropped: false, status: "installed" };
+        return { kept, linked, missing, moreDropped: false, outdated, status: "installed" };
     }
 
     if (install.status === "installing") {
@@ -333,5 +373,5 @@ export const repairRows = async (ctx: MutationCtx, userId: string, pluginSlug: s
         );
     }
 
-    return { kept, linked, missing, moreDropped: false, status: "needs-repair" };
+    return { kept, linked, missing, moreDropped: false, outdated, status: "needs-repair" };
 };

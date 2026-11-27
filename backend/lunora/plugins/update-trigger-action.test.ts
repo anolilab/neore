@@ -159,6 +159,64 @@ describe("a schedule below an inserted skill, through the action path", () => {
         expect(after.map((row: { _id: string }) => row._id)).toStrictEqual(before.map((row: { _id: string }) => row._id));
         expect(after[0]).toMatchObject({ cronExpression: DIGEST.cronExpression, enabled: before[0].enabled, name: DIGEST.name });
     });
+
+    it("rewrites a changed schedule in place, and a schedule that becomes a webhook is replaced and returns its secret once", async () => {
+        const before = await schedules();
+        const changed = buildBundleMarkdown({
+            description: "",
+            items: [
+                { key: "analyst", kind: "skill" as const, skill: skill("analyst") },
+                { key: "digest", kind: "trigger" as const, trigger: { ...DIGEST, cronExpression: "0 10 * * 1" } },
+            ],
+            name: "Daily brief",
+        });
+        const changedHash = await bodyHash(changed);
+        const asWebhook = buildBundleMarkdown({
+            description: "",
+            items: [
+                { key: "analyst", kind: "skill" as const, skill: skill("analyst") },
+                { key: "digest", kind: "trigger" as const, trigger: { model: DIGEST.model, name: "Digest hook", type: "webhook" as const } },
+            ],
+            name: "Daily brief",
+        });
+        const hookHash = await bodyHash(asWebhook);
+        const steps = [
+            { contentHash: changedHash, markdown: withPluginHeader(changed, { contentHash: changedHash, slug: SLUG, version: "1.1.0" }) },
+            { contentHash: hookHash, markdown: withPluginHeader(asWebhook, { contentHash: hookHash, slug: SLUG, version: "1.2.0" }) },
+        ];
+        const apply = async (next: { contentHash: string; markdown: string }) => {
+            const preview = (await as().action(procedureAt("plugins_update", "previewUpdate"), { markdown: next.markdown } as never)) as PreviewResult;
+            const result = (await as().action(procedureAt("plugins_update", "updatePlugin"), {
+                confirmDowngrade: false,
+                contentHash: next.contentHash,
+                expectedGeneration: preview.generation,
+                expectedInstallId: preview.installId,
+                markdown: next.markdown,
+            } as never)) as UpdateResult & { webhookSecrets: { entryKey: string; secret: string }[] };
+            const again = (await as().action(procedureAt("plugins_update", "previewUpdate"), { markdown: next.markdown } as never)) as PreviewResult;
+
+            return { again, result };
+        };
+
+        const first = await apply(steps[0]);
+        const rewritten = await schedules();
+
+        expect(first.result.webhookSecrets).toStrictEqual([]);
+        expect(rewritten).toHaveLength(1);
+        expect(rewritten[0]).toMatchObject({ _id: before[0]._id, cronExpression: "0 10 * * 1", enabled: false });
+        expect(first.again.plan).toContainEqual({ action: "same", entryKey: "trigger:digest" });
+
+        const second = await apply(steps[1]);
+        const replaced = await schedules();
+
+        expect(second.result.webhookSecrets).toHaveLength(1);
+        expect(second.result.webhookSecrets[0]).toMatchObject({ entryKey: "trigger:digest" });
+        expect(typeof second.result.webhookSecrets[0].secret).toBe("string");
+        expect(replaced).toHaveLength(1);
+        expect(replaced[0]).toMatchObject({ enabled: false, name: "Digest hook", type: "webhook" });
+        expect(replaced[0]._id).not.toBe(before[0]._id);
+        expect(second.again.plan).toContainEqual({ action: "same", entryKey: "trigger:digest" });
+    });
 });
 
 describe("a changed webhook trigger", () => {
@@ -194,28 +252,70 @@ describe("a changed webhook trigger", () => {
         harness.close();
     });
 
-    it("is refused before anything is written, so the install does not claim a version it does not hold", async () => {
-        const as = () => harness.withIdentity({ userId: OWNER } as never);
-        const next = await hookFile("Renamed hook", "1.1.0");
+    const as = () => harness.withIdentity({ userId: OWNER } as never);
+    const run = async <T>(callback: (context: any) => Promise<T>): Promise<T> => await harness.run(async (context: any) => await callback(context));
+    const hooks = async () => {
+        const { page } = await run(async (context) => await context.db.triggers.findMany({ where: { userId: OWNER } }));
+
+        return page as any[];
+    };
+    const apply = async (next: {
+        contentHash: string;
+        markdown: string;
+    }): Promise<UpdateResult & { webhookSecrets: { entryKey: string; secret: string }[] }> => {
         const preview = (await as().action(procedureAt("plugins_update", "previewUpdate"), { markdown: next.markdown } as never)) as PreviewResult;
 
-        await expect(
-            as().action(procedureAt("plugins_update", "updatePlugin"), {
-                confirmDowngrade: false,
-                contentHash: next.contentHash,
-                expectedGeneration: preview.generation,
-                expectedInstallId: preview.installId,
-                markdown: next.markdown,
-            } as never),
-        ).rejects.toThrow("Uninstall the plugin and install the new version");
+        return (await as().action(procedureAt("plugins_update", "updatePlugin"), {
+            confirmDowngrade: false,
+            contentHash: next.contentHash,
+            expectedGeneration: preview.generation,
+            expectedInstallId: preview.installId,
+            markdown: next.markdown,
+        } as never)) as never;
+    };
+    const previewOf = async (next: { markdown: string }) =>
+        (await as().action(procedureAt("plugins_update", "previewUpdate"), { markdown: next.markdown } as never)) as PreviewResult;
 
-        const { page } = await harness.run(async (context: any) => await context.db.pluginInstalls.findMany({ where: { userId: OWNER } }));
+    it("is rewritten in place: same row, secret kept, switched off, and the next preview plans it unchanged", async () => {
+        const [before] = await hooks();
+        const next = await hookFile("Renamed hook", "1.1.0");
+        const result = await apply(next);
+        const after = await hooks();
 
-        expect(page[0]).toMatchObject({ status: "installed", version: "1.0.0" });
+        expect(result.applied).toContain("trigger:hook");
+        expect(result.skipped).toStrictEqual([]);
+        expect(result.webhookSecrets).toStrictEqual([]);
+        expect(after).toHaveLength(1);
+        expect(after[0]).toMatchObject({ _id: before._id, enabled: false, name: "Renamed hook", webhookSecret: before.webhookSecret });
+        const { plan } = await previewOf(next);
+
+        expect(plan).toContainEqual({ action: "same", entryKey: "trigger:hook" });
+
+        const { page } = await run(async (context) => await context.db.pluginInstalls.findMany({ where: { userId: OWNER } }));
+
+        expect(page[0]).toMatchObject({ status: "installed", version: "1.1.0" });
     });
 
-    it("is refused when the stored webhook becomes a schedule under the same key", async () => {
-        const as = () => harness.withIdentity({ userId: OWNER } as never);
+    it("is kept as edited when the person changed it", async () => {
+        const [before] = await hooks();
+
+        await run(async (context) => await context.db.patch("triggers", before._id, { description: "Mine." }));
+
+        const next = await hookFile("Renamed hook", "1.1.0");
+
+        const { plan } = await previewOf(next);
+
+        expect(plan).toContainEqual({ action: "keep-edited", entryKey: "trigger:hook" });
+
+        const result = await apply(next);
+        const [after] = await hooks();
+
+        expect(result.skipped).toContainEqual({ action: "keep-edited", entryKey: "trigger:hook" });
+        expect(after).toMatchObject({ _id: before._id, description: "Mine.", name: "Hook" });
+    });
+
+    it("becomes a new row when the stored webhook becomes a schedule under the same key, and the next preview plans it unchanged", async () => {
+        const [before] = await hooks();
         const body = buildBundleMarkdown({
             description: "",
             items: [
@@ -229,22 +329,18 @@ describe("a changed webhook trigger", () => {
             name: "Daily brief",
         });
         const contentHash = await bodyHash(body);
-        const markdown = withPluginHeader(body, { contentHash, slug: SLUG, version: "1.1.0" });
-        const preview = (await as().action(procedureAt("plugins_update", "previewUpdate"), { markdown } as never)) as PreviewResult;
+        const next = { contentHash, markdown: withPluginHeader(body, { contentHash, slug: SLUG, version: "1.1.0" }) };
+        const result = await apply(next);
+        const after = await hooks();
 
-        await expect(
-            as().action(procedureAt("plugins_update", "updatePlugin"), {
-                confirmDowngrade: false,
-                contentHash,
-                expectedGeneration: preview.generation,
-                expectedInstallId: preview.installId,
-                markdown,
-            } as never),
-        ).rejects.toThrow("Uninstall the plugin and install the new version");
+        expect(result.applied).toContain("trigger:hook");
+        expect(result.webhookSecrets).toStrictEqual([]);
+        expect(after).toHaveLength(1);
+        expect(after[0]).toMatchObject({ cronExpression: "0 9 * * 1", enabled: false, type: "schedule" });
+        expect(after[0]._id).not.toBe(before._id);
+        const { plan } = await previewOf(next);
 
-        const { page } = await harness.run(async (context: any) => await context.db.pluginInstalls.findMany({ where: { userId: OWNER } }));
-
-        expect(page[0]).toMatchObject({ status: "installed", version: "1.0.0" });
+        expect(plan).toContainEqual({ action: "same", entryKey: "trigger:hook" });
     });
 });
 

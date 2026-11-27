@@ -2,14 +2,16 @@
  * Update, step one: the preview. It reads the installed children and the new file, and says what an update would do to each
  * child (`diffUpdate`). It writes nothing. Applying the update is the next step.
  *
- * A child's live hash is known only for skills; triggers and groups are reported as `unknown`, which the diff treats as
- * edited, so an update never overwrites them until they can be compared.
+ * Every child's live hash is read from its row (`liveHashOf`), so the diff tells an edited skill, trigger or group chat from an
+ * unedited one.
  */
 import { LunoraError, v } from "lunorash/server";
 
+import type { Id } from "../_generated/dataModel";
 import { internal } from "../_generated/internal";
 import { internalQuery } from "../_generated/server";
 import { authAction, rateLimit } from "../lib/crpc";
+import { requirePluginFeature } from "./gate";
 import { requireOwnerShard } from "./owner-shard";
 import { childOps, importFailure } from "./install-ops";
 import { assertSelectionImportable, BundleImportError, runBundleImport } from "../skills/bundle-plan";
@@ -24,15 +26,9 @@ import { diffUpdate, isDowngrade, markerFor } from "./logic";
 import type { UpdateAction } from "./logic";
 import { vPluginItemKind } from "./validators";
 
-const vAction = v.union(
-    v.literal("create"),
-    v.literal("delete"),
-    v.literal("detach"),
-    v.literal("keep-edited"),
-    v.literal("report-group"),
-    v.literal("same"),
-    v.literal("update"),
-);
+type GroupDeleteCursor = { cursor?: string; deltaCursor?: string; messagesDone: boolean; pinsDone: boolean; streamOrder?: number; streamsDone: boolean };
+
+const vAction = v.union(v.literal("create"), v.literal("delete"), v.literal("detach"), v.literal("keep-edited"), v.literal("same"), v.literal("update"));
 
 /** The installed plugin and, for each child, the hash it was installed with and its live hash now. */
 export const loadInstalledForUpdate = internalQuery
@@ -54,6 +50,8 @@ export const loadInstalledForUpdate = internalQuery
                 generation: v.number(),
                 installId: v.string(),
                 ownSlugs: v.array(v.object({ entryKey: v.string(), slug: v.string() })),
+                /** The skills that exist now, by entry key: a group chat's participants must be among them or among the new skills. */
+                skillIds: v.array(v.object({ entryKey: v.string(), skillId: v.string() })),
                 status: v.string(),
                 version: v.string(),
             }),
@@ -74,6 +72,7 @@ export const loadInstalledForUpdate = internalQuery
         const { page } = await ctx.db.pluginItems.findMany({ consistency: "primary", where: { installId } });
         const children: { contentHash: string; currentHash: string; entryKey: string; kind: "group" | "skill" | "trigger"; triggerType: string }[] = [];
         const ownSlugs: { entryKey: string; slug: string }[] = [];
+        const skillIds: { entryKey: string; skillId: string }[] = [];
 
         const skillKeys: SkillKeyCache = new Map();
 
@@ -89,6 +88,7 @@ export const loadInstalledForUpdate = internalQuery
                 if (skill) {
                     skillKeys.set(skill._id as string, link.entryKey);
                     ownSlugs.push({ entryKey: link.entryKey, slug: skill.slug });
+                    skillIds.push({ entryKey: link.entryKey, skillId: skill._id as string });
 
                     // Visibility is not in the content hash: a skill shared beyond its owner reads as edited, so the diff keeps it.
                     if (skillVisibility(skill) !== "private") {
@@ -113,7 +113,7 @@ export const loadInstalledForUpdate = internalQuery
             children.push({ contentHash: link.contentHash, currentHash, entryKey: link.entryKey, kind: link.kind, triggerType });
         }
 
-        return { children, generation: install.generation, installId, ownSlugs, status: install.status, version: install.version };
+        return { children, generation: install.generation, installId, ownSlugs, skillIds, status: install.status, version: install.version };
     });
 
 export const previewUpdate = authAction
@@ -132,6 +132,8 @@ export const previewUpdate = authAction
         if (ctx.user.activeOrganization) {
             throw new LunoraError("UNPROCESSABLE", "Organization plugin installs are not available yet");
         }
+
+        requirePluginFeature(ctx.user.userId, "plugins");
 
         const { header } = await checkPluginFile(args.markdown);
         const installed = await ctx.runQuery(internal.plugins.update.loadInstalledForUpdate, {
@@ -168,9 +170,17 @@ export const previewUpdate = authAction
     });
 
 /**
- * Applies an update. Changed skills are rewritten in place; unchanged ones are left alone; an edited child, a child
- * that is not a skill, and any add or removal are reported as skipped (not applied yet). A downgrade needs
- * `confirmDowngrade`. If a step fails, the install goes back to `installed` (or to `needs-repair` when new children were left behind) and the update can be run again.
+ * Applies an update. Changed skills, triggers (schedule or webhook, a type change included) and group chats are rewritten in place, and
+ * a skill records the new plugin version as its source; unchanged ones are left alone; an edited child is reported as skipped. A trigger
+ * rewrite switches the trigger off; a webhook that a type change created returns its secret once in `webhookSecrets`. A group chat
+ * rewrite keeps its messages. New children are created (skills, triggers, then new group chats, which name the plugin's skills by
+ * entry key), and removed ones deleted or detached: a dropped group chat with no messages or pins is deleted, one that has either is
+ * kept and detached from the plugin (and reported as skipped), and a skill such a group still names is kept the way it is for any
+ * group chat. The order is: skill and trigger rewrites, creates, group rewrites, dropped group chats, dropped skills and triggers, so a
+ * dropped skill is never judged against a group chat that is about to go. An update whose group chat names a skill that does not exist
+ * is refused before anything is written. A downgrade needs `confirmDowngrade`. If a step fails, the install goes back to `installed`
+ * (or to `needs-repair` when new children were left behind) and the update can be run again; repair does not rewrite a group chat, it
+ * marks the install partial, and running the update again finishes the group.
  */
 export const updatePlugin = authAction
     .input({
@@ -188,12 +198,16 @@ export const updatePlugin = authAction
             applied: v.array(v.string()),
             skipped: v.array(v.object({ action: vAction, entryKey: v.string() })),
             version: v.string(),
+            /** The secret of a webhook an update created (its trigger changed type), shown once. */
+            webhookSecrets: v.array(v.object({ entryKey: v.string(), secret: v.string() })),
         }),
     )
     .action(async ({ args, ctx }) => {
         if (ctx.user.activeOrganization) {
             throw new LunoraError("UNPROCESSABLE", "Organization plugin installs are not available yet");
         }
+
+        requirePluginFeature(ctx.user.userId, "plugins");
 
         const { hash, header } = await checkPluginFile(args.markdown);
 
@@ -229,17 +243,6 @@ export const updatePlugin = authAction
         );
         const plan = diffUpdate(installed.children, incoming);
 
-        // An update cannot create a group chat yet. Finishing it anyway would record the new version and file hash without the group, and
-        // repair could not make it later, so it is refused before anything is written.
-        const addedGroups = plan.filter((step) => step.action === "create" && entries.find((entry) => entry.key === step.entryKey)?.plan?.kind === "group");
-
-        if (addedGroups.length > 0) {
-            throw new LunoraError(
-                "UNPROCESSABLE",
-                `This version adds a group chat (${addedGroups.map((step) => step.entryKey).join(", ")}), which an update cannot create yet. Uninstall the plugin and install the new version instead.`,
-            );
-        }
-
         // An entry that cannot be planned (a trigger whose model is gone, for instance) has no content: any step but "same" for it would be
         // skipped while the new version is recorded.
         const unplanned = plan.filter((step) => {
@@ -261,45 +264,32 @@ export const updatePlugin = authAction
             );
         }
 
-        // The same for a changed child that cannot be rewritten in place (a webhook or event trigger, a group chat): it would be skipped while
-        // the new version and file hash are recorded, and every later preview would offer the same update again.
-        const unrewritable = plan.filter((step) => {
-            const entry = entries.find((candidate) => candidate.key === step.entryKey);
+        const createKeys = new Set(plan.filter((step) => step.action === "create").map((step) => step.entryKey));
 
-            if (step.action === "report-group") {
-                return entry !== undefined;
+        // A group chat that is created or rewritten names its participants by entry key. One that is not a live skill of the plugin (the
+        // person deleted it) or a skill this update creates would leave a broken group, so the update is refused before it writes.
+        const liveSkillKeys = new Set(installed.skillIds.map((row) => row.entryKey));
+        const brokenGroups = plan.flatMap((step) => {
+            const group = entries.find((candidate) => candidate.key === step.entryKey)?.plan;
+
+            if ((step.action !== "create" && step.action !== "update") || group?.kind !== "group") {
+                return [];
             }
 
-            if (step.action !== "update" || entry?.plan?.kind !== "trigger") {
-                return false;
-            }
+            const names = [...group.create.participantKeys, ...(group.create.synthesizerKey === undefined ? [] : [group.create.synthesizerKey])];
+            const missing = names.filter(
+                (key) => !(createKeys.has(key) && entries.find((candidate) => candidate.key === key)?.plan?.kind === "skill") && !liveSkillKeys.has(key),
+            );
 
-            // Either side being a webhook or an event trigger cannot be rewritten in place.
-            const stored = installed.children.find((child) => child.entryKey === step.entryKey)?.triggerType;
-
-            return entry.plan.create.type !== "schedule" || (stored !== undefined && stored !== "" && stored !== "schedule");
+            return missing.length === 0 ? [] : [`${step.entryKey} names ${[...new Set(missing)].join(", ")}`];
         });
 
-        if (unrewritable.length > 0) {
+        if (brokenGroups.length > 0) {
             throw new LunoraError(
                 "UNPROCESSABLE",
-                `This version changes ${unrewritable.map((step) => step.entryKey).join(", ")}, which an update cannot rewrite in place yet. Uninstall the plugin and install the new version instead.`,
+                `A group chat names a skill that is not in the plugin any more (${brokenGroups.join("; ")}). Restore or reinstall that skill, or change the group chat.`,
             );
         }
-
-        // A child whose kind changed is a removal plus a creation under one key. Both halves are skipped when the old child is a group chat
-        // (a group is never removed in place). A group on the new side was refused above.
-        const groupSwap = new Set(
-            plan
-                .filter(
-                    (step) =>
-                        step.action === "create" &&
-                        plan.some((other) => other.entryKey === step.entryKey && (other.action === "delete" || other.action === "detach")),
-                )
-                .map((step) => step.entryKey)
-                .filter((key) => installed.children.find((row) => row.entryKey === key)?.kind === "group"),
-        );
-        const createKeys = new Set(plan.filter((step) => step.action === "create" && !groupSwap.has(step.entryKey)).map((step) => step.entryKey));
 
         // Checked before anything is written: a new item the planner blocked must not be dropped while the new version is recorded.
         if (createKeys.size > 0) {
@@ -314,9 +304,12 @@ export const updatePlugin = authAction
         });
 
         const applied: string[] = [];
+        const webhookSecrets: { entryKey: string; secret: string }[] = [];
         let importDone = false;
         const skipped: { action: UpdateAction; entryKey: string }[] = [];
         const removals: { action: UpdateAction; entryKey: string }[] = [];
+        const groupRewrites: { action: UpdateAction; entryKey: string }[] = [];
+        const groupRemovals: { action: UpdateAction; entryKey: string }[] = [];
 
         try {
             for (const step of plan) {
@@ -328,48 +321,44 @@ export const updatePlugin = authAction
                 const child = installed.children.find((row) => row.entryKey === step.entryKey);
 
                 if (step.action === "create") {
-                    // The creation half of a kind change whose old child is a group chat: reported, not applied.
-                    if (!createKeys.has(step.entryKey)) {
-                        skipped.push(step);
-                    }
-
                     continue;
                 }
 
                 if (step.action === "delete" || step.action === "detach") {
-                    if (child?.kind === "group" || groupSwap.has(step.entryKey)) {
-                        skipped.push(step);
+                    // Removal cannot be undone, so it waits until the new children are in: a failed create then loses nothing. A group chat
+                    // goes first, so a skill it names is not judged against a group that is about to go.
+                    if (child?.kind === "group") {
+                        groupRemovals.push(step);
                     } else {
-                        // Removal cannot be undone, so it waits until the new children are in: a failed create then loses nothing.
                         removals.push(step);
                     }
 
                     continue;
                 }
 
-                if (step.action === "update" && entry?.plan?.kind === "trigger" && entry.plan.create.type === "schedule") {
+                if (step.action === "update" && entry?.plan?.kind === "group") {
+                    // After the new skills exist: the group may name one of them.
+                    groupRewrites.push(step);
+                    continue;
+                }
+
+                if (step.action === "update" && entry?.plan?.kind === "trigger") {
                     const { create } = entry.plan;
 
-                    const updatedTrigger = await ctx.runMutation(internal.plugins.update_apply.updateTriggerChild, {
+                    const { webhookSecret } = await ctx.runMutation(internal.plugins.update_apply.updateTriggerChild, {
+                        ...create,
                         contentHash: await entryHash(entry),
-                        cronExpression: create.cronExpression,
-                        description: create.description,
                         entryKey: step.entryKey,
                         generation,
-                        inputTemplate: create.inputTemplate,
                         installId: installed.installId,
-                        model: create.model,
-                        name: create.name,
-                        searchMode: create.searchMode,
-                        systemPrompt: create.systemPrompt,
-                        timezone: create.timezone,
                         userId,
                     });
 
-                    if (updatedTrigger) {
-                        applied.push(step.entryKey);
-                    } else {
-                        skipped.push(step);
+                    applied.push(step.entryKey);
+
+                    // A secret is issued only when a type change made a new webhook; it is returned once and never logged.
+                    if (webhookSecret !== undefined) {
+                        webhookSecrets.push({ entryKey: step.entryKey, secret: webhookSecret });
                     }
 
                     continue;
@@ -393,6 +382,7 @@ export const updatePlugin = authAction
                     installId: installed.installId,
                     instructions: content.instructions,
                     name: content.name,
+                    pluginVersion: header.version,
                     slug: content.slug,
                     tags: content.tags,
                     userId,
@@ -430,11 +420,94 @@ export const updatePlugin = authAction
                         userId,
                         version: header.version,
                     }),
-                    { keepOnRateLimit: true },
+                    {
+                        keepOnRateLimit: true,
+                        // A new group chat may name a skill that already exists: its id is looked up by entry key.
+                        knownIds: new Map(installed.skillIds.map((row) => [row.entryKey, row.skillId] as const)),
+                    },
                 );
 
                 importDone = true;
                 applied.push(...created.map((item) => item.key));
+            }
+
+            for (const step of groupRewrites) {
+                const group = entries.find((candidate) => candidate.key === step.entryKey);
+
+                if (group?.plan?.kind !== "group") {
+                    continue;
+                }
+
+                const { debateRounds, mode, model, participantKeys, synthesizerKey, title } = group.plan.create;
+
+                await ctx.runMutation(internal.plugins.update_apply.updateGroupChild, {
+                    contentHash: await entryHash(group),
+                    debateRounds,
+                    entryKey: step.entryKey,
+                    generation,
+                    installId: installed.installId,
+                    mode,
+                    model,
+                    participantKeys,
+                    synthesizerKey,
+                    title,
+                    userId,
+                });
+
+                applied.push(step.entryKey);
+            }
+
+            for (const step of groupRemovals) {
+                const { outcome, threadId } = await ctx.runMutation(internal.plugins.update_apply.retireGroupChild, {
+                    detach: step.action === "detach",
+                    entryKey: step.entryKey,
+                    generation,
+                    installId: installed.installId,
+                    userId,
+                });
+
+                if (outcome === "kept") {
+                    // It has messages or pins: kept, detached from the plugin, and reported.
+                    skipped.push(step);
+                } else if (outcome === "delete" && threadId !== undefined) {
+                    // The action owns the pagination, as at uninstall: each incomplete page hands back where it stopped.
+                    let next: GroupDeleteCursor | undefined;
+                    let kept = false;
+
+                    for (;;) {
+                        const page = await ctx.runMutation(internal.agent.threads.deleteAllForThreadIdAsync, {
+                            ...next,
+                            pluginInstallId: installed.installId,
+                            threadId: threadId as Id<"threads">,
+                        });
+
+                        if (page.kept === true) {
+                            kept = true;
+                            break;
+                        }
+
+                        if (page.isDone) {
+                            break;
+                        }
+
+                        if (!page.next) {
+                            throw new Error("The group chat deletion stopped without saying where");
+                        }
+
+                        next = page.next;
+                    }
+
+                    // A message that landed after the check keeps the group (the delete detaches it, as at uninstall): reported, not applied.
+                    await ctx.runMutation(internal.plugins.update_apply.dropGroupLink, { entryKey: step.entryKey, generation, installId: installed.installId });
+
+                    if (kept) {
+                        skipped.push(step);
+                    } else {
+                        applied.push(step.entryKey);
+                    }
+                } else {
+                    applied.push(step.entryKey);
+                }
             }
 
             for (const step of removals) {
@@ -481,5 +554,5 @@ export const updatePlugin = authAction
             throw importFailure(error);
         }
 
-        return { applied, skipped, version: header.version };
+        return { applied, skipped, version: header.version, webhookSecrets };
     });

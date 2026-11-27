@@ -61,7 +61,7 @@ describe("repair", () => {
 
         const result = await run(async (context) => await repairRows(context, OWNER, SLUG));
 
-        expect(result).toEqual({ kept: [], linked: 1, missing: [], moreDropped: false, status: "installed" });
+        expect(result).toEqual({ kept: [], linked: 1, missing: [], moreDropped: false, outdated: false, status: "installed" });
 
         const link = await run(async (context) => await context.db.pluginItems.findFirst({ where: { _id: intentId } }));
         const install = await run(async (context) => await context.db.pluginInstalls.findFirst({ where: { _id: installId } }));
@@ -99,7 +99,7 @@ describe("repair", () => {
 
         const result = await run(async (context) => await repairRows(context, OWNER, SLUG));
 
-        expect(result).toEqual({ kept: [], linked: 0, missing: ["skill:ghost"], moreDropped: false, status: "needs-repair" });
+        expect(result).toEqual({ kept: [], linked: 0, missing: ["skill:ghost"], moreDropped: false, outdated: false, status: "needs-repair" });
     });
 
     it("refuses to repair an install that does not need it", async () => {
@@ -196,7 +196,7 @@ describe("repair", () => {
 
         const result = await run(async (context) => await repairRows(context, OWNER, SLUG));
 
-        expect(result).toEqual({ kept: [], linked: 0, missing: ["skill:ghost"], moreDropped: false, status: "needs-repair" });
+        expect(result).toEqual({ kept: [], linked: 0, missing: ["skill:ghost"], moreDropped: false, outdated: false, status: "needs-repair" });
         expect(await run(async (context) => await context.db.pluginInstalls.findFirst({ where: { _id: installId } }))).toMatchObject({
             status: "needs-repair",
         });
@@ -217,7 +217,7 @@ describe("repair", () => {
 
         const result = await run(async (context) => await repairRows(context, OWNER, SLUG));
 
-        expect(result).toEqual({ kept: [], linked: 0, missing: ["skill:gone"], moreDropped: false, status: "needs-repair" });
+        expect(result).toEqual({ kept: [], linked: 0, missing: ["skill:gone"], moreDropped: false, outdated: false, status: "needs-repair" });
 
         const link = await run(async (context) => await context.db.pluginItems.findFirst({ where: { _id: intentId } }));
 
@@ -283,7 +283,7 @@ describe("repair", () => {
 
             const result = await run(async (context) => await repairRows(context, OWNER, SLUG));
 
-            expect(result).toEqual({ kept: [], linked: 1, missing: [], moreDropped: false, status: "installed" });
+            expect(result).toEqual({ kept: [], linked: 1, missing: [], moreDropped: false, outdated: true, status: "installed" });
 
             const link = await run(async (context) => await context.db.pluginItems.findFirst({ where: { _id: intentId } }));
             const install = await run(async (context) => await context.db.pluginInstalls.findFirst({ where: { _id: installId } }));
@@ -375,7 +375,7 @@ describe("repair", () => {
 
             const result = await run(async (context) => await repairRows(context, OWNER, SLUG));
 
-            expect(result).toEqual({ kept: [], linked: 1, missing: [], moreDropped: false, status: "installed" });
+            expect(result).toEqual({ kept: [], linked: 1, missing: [], moreDropped: false, outdated: true, status: "installed" });
 
             const link = await run(async (context) => await context.db.pluginItems.findFirst({ where: { _id: intentId } }));
 

@@ -1,8 +1,11 @@
 /**
- * Applying an update, in three internal mutations the update action calls in order:
+ * Applying an update, in internal mutations the update action calls in order:
  *   1. `beginUpdate` takes the install's lease (status `updating`, a new generation);
- *   2. `updateSkillChild` rewrites one unedited skill in place, after setting the child's pending hash;
- *   3. `finishUpdate` returns the install to `installed` at the new version.
+ *   2. `updateSkillChild`, `updateTriggerChild` and `updateGroupChild` rewrite one unedited child in place, after setting the
+ *      child's pending hash;
+ *   3. `retireGroupChild` and `dropGroupLink` remove a group chat the new version drops, `removeChild` and `detachChild` the
+ *      other dropped children;
+ *   4. `finishUpdate` returns the install to `installed` at the new version.
  *
  * Every step checks the generation, so a stale action writes nothing. A child whose live content is not the
  * installed content is refused inside the same mutation that would write it. The pending hash is cleared to "",
@@ -10,20 +13,37 @@
  */
 import { LunoraError, v } from "lunorash/server";
 
-import { assertCronExpression, assertCustomModelRunnable, cleanPromptField, deleteTriggerRows } from "../triggers/functions";
+import { internal } from "../_generated/internal";
+import { normalizeGroupOptions, validateParticipantIds } from "../chat/group/logic";
+import { vGroupChatMode } from "../chat/group/validators";
+import { watchesSomethingElse } from "../triggers/event-sources";
+import {
+    assertBotRoutineOptions,
+    assertCronExpression,
+    assertCustomModelRunnable,
+    assertTimeZone,
+    assertWebhookTemplateFits,
+    checkedEventSource,
+    cleanPromptField,
+    deleteTriggerRows,
+    insertTrigger,
+    triggerCreateFields,
+    triggerTypeSchema,
+    webhookSetup,
+} from "../triggers/functions";
 
-import type { Id } from "../_generated/dataModel";
+import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { internalMutation } from "../_generated/server";
 import { patchRow } from "../lib/patch";
-import { skillRowHash, triggerRowHash } from "./entry-hash";
+import { groupRowHash, normalizeGroupTitle, skillRowHash, triggerRowHash } from "./entry-hash";
 import { skillVisibility } from "../skills/access";
 import { invalidateSkillsCache } from "../skills/cache";
 import { deleteSkillRows } from "../skills/functions";
 import { ensureSlugUnique, validateSlug } from "../skills/validators";
 import { heldInstall, heldInstallForShardWrite, patchInstallIf } from "./held-install";
 import { liveHashOf } from "./live-hash";
-import { LEASE_MS, markerFor } from "./logic";
+import { LEASE_MS, markerFor, parseMarker } from "./logic";
 import { refuseWhileErasing } from "./owner-shard";
 
 /** The same bound uninstall uses when it looks for group chats that name a skill. */
@@ -86,6 +106,8 @@ export const updateSkillChild = internalMutation
         installId: v.string().max(128),
         instructions: v.string().max(65_536),
         name: v.string().max(256),
+        /** The plugin version this update brings: the skill's `source` records it. */
+        pluginVersion: v.string().max(32),
         slug: v.string().max(256),
         tags: v.optional(v.array(v.string().max(256))),
         userId: v.string().max(128),
@@ -165,6 +187,8 @@ export const updateSkillChild = internalMutation
             instructions: args.instructions,
             name: args.name,
             slug: args.slug,
+            // Not part of the content hash: it says which plugin version the skill came from.
+            source: { type: "plugin" as const, version: args.pluginVersion },
             tags: args.tags,
             updatedAt: ctx.now,
             variables: args.variables,
@@ -289,29 +313,26 @@ export const failUpdate = internalMutation
     });
 
 /**
- * Rewrites one unedited schedule trigger in place. The trigger is switched off: a changed trigger must be read and re-enabled by
- * the person, so new content never runs unseen. Only schedule triggers are updated here; a webhook or an event trigger is
- * left as it is and the result is `false`, so the action reports it as skipped instead of stopping the update.
+ * Rewrites one unedited trigger of any type to the new version's content. Every field the entry hash covers is stored the way
+ * trigger creation stores it, and the same checks run. The trigger is switched off: a changed trigger must be read and re-enabled
+ * by the person, so new content never runs unseen. When the type stays the same the row is patched, so a webhook keeps its id,
+ * URL and secret. When the type changes the old row and its runs are deleted and a new one is created under the same marker in the
+ * same mutation; a new webhook's secret is returned once. An edited trigger is refused (`CONFLICT`) and left as it is.
  */
 export const updateTriggerChild = internalMutation
     .input({
+        ...triggerCreateFields,
         contentHash: v.string().max(128),
-        cronExpression: v.optional(v.string().max(256)),
-        description: v.optional(v.string().max(4096)),
         entryKey: v.string().max(256),
         generation: v.number(),
-        inputTemplate: v.optional(v.string().max(65_536)),
         installId: v.string().max(128),
-        model: v.string().max(256),
-        name: v.string().max(256),
-        searchMode: v.optional(v.string().max(256)),
-        systemPrompt: v.optional(v.string().max(65_536)),
-        timezone: v.optional(v.string().max(128)),
         userId: v.string().max(128),
     })
-    .output(v.boolean())
+    .output(v.object({ webhookSecret: v.optional(v.string()) }))
     .mutation(async ({ args, ctx }) => {
         await heldInstallForShardWrite(ctx, args.installId as Id<"pluginInstalls">, args.generation);
+        // A type change creates a row and a route; an erasure that began after `beginUpdate` must not find them behind its sweep.
+        await refuseWhileErasing(ctx, args.userId);
 
         const { page } = await ctx.db.pluginItems.findMany({ consistency: "primary", where: { installId: args.installId } });
         const link = page.find((row) => row.entryKey === args.entryKey && row.kind === "trigger");
@@ -329,49 +350,98 @@ export const updateTriggerChild = internalMutation
             throw new LunoraError("CONFLICT", `The trigger for "${args.entryKey}" is missing`);
         }
 
-        if (trigger.type !== "schedule") {
-            return false;
-        }
-
         if ((await triggerRowHash(trigger)) !== link.contentHash) {
             throw new LunoraError("CONFLICT", `The trigger for "${args.entryKey}" was edited, so it is kept as it is`);
         }
 
-        if (args.cronExpression !== undefined) {
-            assertCronExpression(args.cronExpression);
+        const { contentHash, entryKey, installId, userId, ...fields } = args; // `fields` also holds `generation`, which no write below reads
+        const type = triggerTypeSchema.parse(fields.type);
+        const linkId = link._id as Id<"pluginItems">;
+
+        if (trigger.type !== type) {
+            // Pending first, as for any rewrite. The delete and the create are one transaction: a failed create leaves the old row.
+            await ctx.db.patch("pluginItems", linkId, { pendingHash: contentHash });
+            await deleteTriggerRows(ctx, trigger._id as Id<"triggers">);
+
+            const created = await insertTrigger(ctx, { organizationId: trigger.organizationId, userId }, fields, {
+                pluginInstallId: installId,
+                pluginMarker: markerFor(installId, entryKey),
+            });
+
+            await ctx.db.patch("pluginItems", linkId, { contentHash, pendingHash: "" });
+
+            return created.webhookSecret === undefined ? {} : { webhookSecret: created.webhookSecret };
         }
 
-        // The same model check the create path makes: a custom model must be one the owner may run.
-        await assertCustomModelRunnable(ctx, args.model, args.userId);
+        // The checks creation makes, on the state the row ends up in.
+        await assertCustomModelRunnable(ctx, fields.model, userId);
 
-        await ctx.db.patch("pluginItems", link._id as Id<"pluginItems">, { pendingHash: args.contentHash });
+        const timezone = fields.timezone?.trim() || undefined;
 
-        // Stored trimmed, and none when empty, as creation stores it (the entry hash is over that value).
-        const timezone = args.timezone?.trim() || undefined;
+        if (timezone !== undefined) {
+            assertTimeZone(timezone);
+        }
+
+        if (fields.cronExpression !== undefined || type === "schedule") {
+            assertCronExpression(fields.cronExpression ?? "");
+        }
+
+        const bot = fields.botId ? await ctx.runQuery(internal.bots.functions.getBotForRun, { botId: fields.botId, userId }) : null;
+
+        if (fields.botId && !bot) {
+            throw new LunoraError("NOT_FOUND", "Bot not found");
+        }
+
+        if (bot) {
+            await assertCustomModelRunnable(ctx, bot.model, userId);
+        }
+
+        assertBotRoutineOptions({ botComputer: fields.botComputer === true, botId: fields.botId, quietWhenEmpty: fields.quietWhenEmpty === true, type });
+
+        const { filters, webhookSignatureScheme } = webhookSetup(fields, type);
+        const eventSource = await checkedEventSource(ctx, fields.eventSource, type, userId, ctx.now);
+        // Stored cleaned, the way trigger creation stores it, which is also what the entry hash is computed over.
+        const inputTemplate = cleanPromptField(fields.inputTemplate, "The input");
+
+        assertWebhookTemplateFits(type, inputTemplate);
+
+        const systemPrompt = cleanPromptField(fields.systemPrompt, "The system prompt");
+
+        await ctx.db.patch("pluginItems", linkId, { pendingHash: contentHash });
+
+        // Watching something else forgets the old baseline. The trigger is switched off, so enabling arms it again.
+        const sourceChanged = type === "event" && eventSource !== undefined && watchesSomethingElse(trigger.eventSource, eventSource);
+        const scheduleChanged = type === "schedule" && (fields.cronExpression !== trigger.cronExpression || timezone !== trigger.timezone);
 
         // A field the new version leaves out is removed, so the row matches the hash recorded below.
         await patchRow(ctx.db, "triggers", trigger, {
-            cronExpression: args.cronExpression,
-            description: args.description,
+            botComputer: fields.botComputer === true ? true : undefined,
+            botId: fields.botId as Id<"bots"> | undefined,
+            cronExpression: fields.cronExpression,
+            description: fields.description,
             enabled: false,
-            // Stored cleaned, the way trigger creation stores them, which is also what the entry hash is computed over.
-            inputTemplate: cleanPromptField(args.inputTemplate, "The input"),
-            model: args.model,
-            name: args.name,
-            searchMode: args.searchMode,
-            systemPrompt: cleanPromptField(args.systemPrompt, "The system prompt"),
+            eventSource,
+            filters,
+            inputTemplate,
+            model: fields.model,
+            name: fields.name,
+            quietWhenEmpty: fields.quietWhenEmpty === true ? true : undefined,
+            searchMode: fields.searchMode,
+            systemPrompt,
             timezone,
             updatedAt: ctx.now,
+            webhookSignatureScheme,
             // A changed schedule must not keep the due time of the old one: undefined removes it, and enabling recomputes it. An unchanged schedule keeps it.
-            ...((args.cronExpression !== trigger.cronExpression || timezone !== trigger.timezone) && { nextTriggerAt: undefined }),
+            ...((scheduleChanged || sourceChanged) && { nextTriggerAt: undefined }),
+            ...(sourceChanged && { eventState: {} }),
         });
 
-        await ctx.db.patch("pluginItems", link._id as Id<"pluginItems">, { contentHash: args.contentHash, pendingHash: "" });
+        await ctx.db.patch("pluginItems", linkId, { contentHash, pendingHash: "" });
 
-        return true;
+        return {};
     });
 
-/** The child's link, by its entry key, after the generation check. */
+/** The child's link, by its entry key, after the generation check. An entry key carries its kind (`skill:analyst`), so it names one link. */
 const linkFor = async (ctx: Pick<MutationCtx, "db">, installId: string, entryKey: string) => {
     const { page } = await ctx.db.pluginItems.findMany({ consistency: "primary", where: { installId } });
 
@@ -400,7 +470,12 @@ const groupUsing = async (ctx: Pick<MutationCtx, "db">, skillId: string, userId:
  * names, or one shared beyond its owner, is kept (the result is `false`), so the group keeps its participant; it is detached (marker cleared, link deleted), so the plugin no longer holds a child its file lacks.
  */
 export const removeChild = internalMutation
-    .input({ entryKey: v.string().max(256), generation: v.number(), installId: v.string().max(128), userId: v.string().max(128) })
+    .input({
+        entryKey: v.string().max(256),
+        generation: v.number(),
+        installId: v.string().max(128),
+        userId: v.string().max(128),
+    })
     .output(v.boolean())
     .mutation(async ({ args, ctx }) => {
         await heldInstallForShardWrite(ctx, args.installId as Id<"pluginInstalls">, args.generation);
@@ -444,7 +519,7 @@ export const removeChild = internalMutation
                 await deleteTriggerRows(ctx, trigger._id as Id<"triggers">);
             }
         } else {
-            throw new LunoraError("CONFLICT", `"${args.entryKey}" is a group chat, which is not removed in place`);
+            throw new LunoraError("CONFLICT", `"${args.entryKey}" is a group chat, which is removed through retireGroupChild`);
         }
 
         await ctx.db.delete("pluginItems", link._id as Id<"pluginItems">);
@@ -457,7 +532,12 @@ export const removeChild = internalMutation
  * trigger is switched off. The link is deleted, so the child is no longer counted as part of the plugin.
  */
 export const detachChild = internalMutation
-    .input({ entryKey: v.string().max(256), generation: v.number(), installId: v.string().max(128), userId: v.string().max(128) })
+    .input({
+        entryKey: v.string().max(256),
+        generation: v.number(),
+        installId: v.string().max(128),
+        userId: v.string().max(128),
+    })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
         await heldInstallForShardWrite(ctx, args.installId as Id<"pluginInstalls">, args.generation);
@@ -486,11 +566,279 @@ export const detachChild = internalMutation
                 await ctx.db.patch("triggers", trigger._id as Id<"triggers">, { enabled: false, pluginInstallId: "", pluginMarker: "" });
             }
         } else {
-            throw new LunoraError("CONFLICT", `"${args.entryKey}" is a group chat, which is not detached in place`);
+            throw new LunoraError("CONFLICT", `"${args.entryKey}" is a group chat, which is detached through retireGroupChild`);
         }
 
         // The link goes with the marker: a detached child is no longer part of the plugin, so a later version that brings the key back creates it afresh.
         await ctx.db.delete("pluginItems", link._id as Id<"pluginItems">);
+
+        return null;
+    });
+
+/**
+ * The plugin's skills by entry key and by id, read from the primary in pages (one statement a page, 25 skills each). A group's
+ * participants are mapped through these: the same mapping the live hash uses (`liveHashOf`), so a group rewritten here reads
+ * as unedited afterwards.
+ */
+const pluginSkillMaps = async (ctx: Pick<MutationCtx, "db">, installId: string, userId: string) => {
+    const idByKey = new Map<string, string>();
+    const keyById = new Map<string, string>();
+    let cursor: string | null = null;
+
+    for (;;) {
+        const result: { continueCursor?: string | null; isDone: boolean; page: { _id: unknown; pluginMarker?: string; userId: string }[] } =
+            await ctx.db.skills.findMany({ consistency: "primary", cursor, where: { pluginInstallId: installId } });
+
+        for (const skill of result.page) {
+            const parsed = parseMarker(skill.pluginMarker ?? "");
+
+            if (skill.userId === userId && parsed?.installId === installId) {
+                idByKey.set(parsed.entryKey, skill._id as string);
+                keyById.set(skill._id as string, parsed.entryKey);
+            }
+        }
+
+        if (result.isDone || !result.continueCursor) {
+            return { idByKey, keyById };
+        }
+
+        cursor = result.continueCursor;
+    }
+};
+
+/** A group thread's live hash: its stored fields, with each participant named by its plugin entry key. */
+const groupThreadHash = async (thread: Doc<"threads">, keyById: ReadonlyMap<string, string>): Promise<string> =>
+    await groupRowHash(
+        {
+            debateRounds: thread.groupChat?.debateRounds,
+            mode: thread.groupChat?.mode ?? "",
+            model: thread.model ?? "",
+            participants: thread.groupChat?.participants ?? [],
+            synthesizerSkillId: thread.groupChat?.synthesizerSkillId,
+            title: thread.title,
+        },
+        (skillId) => keyById.get(skillId),
+    );
+
+/** The group thread a marker names, if it is the owner's. */
+const groupThreadFor = async (ctx: Pick<MutationCtx, "db">, installId: string, entryKey: string, userId: string) => {
+    const thread = await ctx.db
+        .query("threads")
+        .withIndex("by_plugin_marker", (q) => q.eq("pluginMarker", markerFor(installId, entryKey)))
+        .first();
+
+    return thread && thread.userId === userId ? thread : null;
+};
+
+/**
+ * Rewrites one unedited group chat to the new version's definition, in place: title, mode, model, participants, synthesizer and
+ * debate rounds. The messages stay. Participants are named by entry key and mapped to the plugin's skills here, and are stored the
+ * way a new group stores them (`{ addedAt, skillId }`, the options its mode uses), so the entry hash matches the live hash afterwards.
+ * A participant that is not a live skill of this plugin, or a group that was edited since the preview, is refused (`CONFLICT`) before
+ * anything is written. The link's pending hash brackets the write, as for a skill.
+ *
+ * D1 statements: the install row, one link read, one read of the plugin's skills per 25 skills, and two link patches.
+ */
+export const updateGroupChild = internalMutation
+    .input({
+        contentHash: v.string().max(128),
+        debateRounds: v.optional(v.number()),
+        entryKey: v.string().max(256),
+        generation: v.number(),
+        installId: v.string().max(128),
+        mode: vGroupChatMode,
+        model: v.string().max(256),
+        /** Entry keys of the participant skills, in order. */
+        participantKeys: v.array(v.string().max(256)),
+        synthesizerKey: v.optional(v.string().max(256)),
+        title: v.string().max(512),
+        userId: v.string().max(128),
+    })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        await heldInstallForShardWrite(ctx, args.installId as Id<"pluginInstalls">, args.generation);
+        await refuseWhileErasing(ctx, args.userId);
+
+        const { page: links } = await ctx.db.pluginItems.findMany({ consistency: "primary", where: { installId: args.installId } });
+        const link = links.find((row) => row.entryKey === args.entryKey && row.kind === "group");
+
+        if (!link || link.state !== "created") {
+            throw new LunoraError("CONFLICT", `The child "${args.entryKey}" is not a linked group chat of this plugin`);
+        }
+
+        const thread = await groupThreadFor(ctx, args.installId, args.entryKey, args.userId);
+
+        if (!thread?.groupChat) {
+            throw new LunoraError("CONFLICT", `The group chat for "${args.entryKey}" is missing`);
+        }
+
+        const { idByKey, keyById } = await pluginSkillMaps(ctx, args.installId, args.userId);
+
+        if ((await groupThreadHash(thread, keyById)) !== link.contentHash) {
+            throw new LunoraError("CONFLICT", `The group chat for "${args.entryKey}" was edited, so it is kept as it is`);
+        }
+
+        const unresolved = [...args.participantKeys, ...(args.synthesizerKey === undefined ? [] : [args.synthesizerKey])].filter((key) => !idByKey.has(key));
+
+        if (unresolved.length > 0) {
+            throw new LunoraError(
+                "CONFLICT",
+                `The group chat "${args.title}" names ${[...new Set(unresolved)].join(", ")}, which is not a skill of this plugin`,
+            );
+        }
+
+        if (args.participantKeys.length < 2) {
+            throw new LunoraError("BAD_REQUEST", "A group chat needs at least two participants");
+        }
+
+        const skillIds = args.participantKeys.flatMap((key) => idByKey.get(key) ?? []);
+        const synthesizerSkillId = args.synthesizerKey === undefined ? undefined : idByKey.get(args.synthesizerKey);
+
+        const participantError = validateParticipantIds(skillIds, () => true);
+
+        if (participantError) {
+            throw new LunoraError("BAD_REQUEST", participantError);
+        }
+
+        const options = normalizeGroupOptions({ debateRounds: args.debateRounds, mode: args.mode, skillIds, synthesizerSkillId });
+
+        if ("error" in options) {
+            throw new LunoraError("BAD_REQUEST", options.error);
+        }
+
+        const linkId = link._id as Id<"pluginItems">;
+        const stored = thread.groupChat;
+        const addedAt = new Map(stored.participants.map((participant) => [participant.skillId, participant.addedAt]));
+
+        // Pending first: if the write below stops, repair sees a child that matches neither hash and knows an update was half done.
+        await ctx.db.patch("pluginItems", linkId, { pendingHash: args.contentHash });
+
+        // A field the new version leaves out is removed (the whole group object is replaced), so the row matches the hash recorded below.
+        await patchRow(ctx.db, "threads", thread, {
+            groupChat: {
+                ...options.options,
+                mode: args.mode,
+                participants: skillIds.map((skillId) => {
+                    return { addedAt: addedAt.get(skillId) ?? ctx.now, skillId };
+                }),
+                ...(stored.stopRequestedAt !== undefined && { stopRequestedAt: stored.stopRequestedAt }),
+            },
+            model: args.model,
+            title: normalizeGroupTitle(args.title),
+        });
+
+        await ctx.db.patch("pluginItems", linkId, { contentHash: args.contentHash, pendingHash: "" });
+
+        return null;
+    });
+
+/**
+ * Detaches a group chat from the plugin: marker and install id cleared, so no later sweep finds it. It does not touch the plugin's
+ * skills the group names (unlike uninstall's `detachKeptGroup`): in an update those skills usually stay in the plugin.
+ */
+const detachGroupOnly = async (ctx: Pick<MutationCtx, "db">, thread: Doc<"threads"> | null, link: { _id: unknown }): Promise<void> => {
+    if (thread) {
+        await ctx.db.patch("threads", thread._id as Id<"threads">, { pluginInstallId: "", pluginMarker: "" });
+    }
+
+    await ctx.db.delete("pluginItems", link._id as Id<"pluginItems">);
+};
+
+/**
+ * The first half of removing a group chat the new version drops. It says what the action does next:
+ *   - `delete`: the group is unedited, empty and has no pins. It stays linked and attached until the action has deleted it in pages
+ *     (`deleteAllForThreadIdAsync`, callable only from an action) and calls `dropGroupLink`;
+ *   - `kept`: it has messages or pins (or was edited since the preview), so it is detached, with its link, and reported;
+ *   - `detached`: the plan said it was edited, so it is detached, with its link;
+ *   - `gone`: the thread no longer exists; its link is deleted.
+ * A message or pin keeps a group, as at uninstall, and the plugin's skills it names are not detached. The skill removal that follows
+ * keeps a skill a kept group still names (`removeChild`).
+ *
+ * D1 statements: the install row, one link read, one read of the plugin's skills per 25 skills, and the link delete.
+ */
+export const retireGroupChild = internalMutation
+    .input({
+        /** The plan detaches the group: it was edited. */
+        detach: v.boolean(),
+        entryKey: v.string().max(256),
+        generation: v.number(),
+        installId: v.string().max(128),
+        userId: v.string().max(128),
+    })
+    .output(
+        v.object({
+            outcome: v.union(v.literal("delete"), v.literal("detached"), v.literal("gone"), v.literal("kept")),
+            /** The thread to delete, for `delete`. */
+            threadId: v.optional(v.string()),
+        }),
+    )
+    .mutation(async ({ args, ctx }) => {
+        await heldInstallForShardWrite(ctx, args.installId as Id<"pluginInstalls">, args.generation);
+
+        const link = await linkFor(ctx, args.installId, args.entryKey);
+
+        if (!link) {
+            return { outcome: "gone" };
+        }
+
+        const thread = await groupThreadFor(ctx, args.installId, args.entryKey, args.userId);
+
+        if (!thread) {
+            await ctx.db.delete("pluginItems", link._id as Id<"pluginItems">);
+
+            return { outcome: "gone" };
+        }
+
+        if (args.detach) {
+            await detachGroupOnly(ctx, thread, link);
+
+            return { outcome: "detached" };
+        }
+
+        const threadId = thread._id as Id<"threads">;
+        const message = await ctx.db
+            .query("messages")
+            .withIndex("by_threadId_order_stepOrder", (q) => q.eq("threadId", threadId))
+            .first();
+
+        // A pin keeps a group as a message does: its deletion needs a second page, and a stopped action could not find it again.
+        const pin = message
+            ? undefined
+            : await ctx.db
+                  .query("threadPins")
+                  .withIndex("by_thread", (q) => q.eq("threadId", threadId))
+                  .first();
+
+        // The group may have been edited since the preview: it is kept, not deleted.
+        let edited = false;
+
+        if (!message && !pin) {
+            const { keyById } = await pluginSkillMaps(ctx, args.installId, args.userId);
+
+            edited = (await groupThreadHash(thread, keyById)) !== link.contentHash;
+        }
+
+        if (message || pin || edited) {
+            await detachGroupOnly(ctx, thread, link);
+
+            return { outcome: "kept" };
+        }
+
+        return { outcome: "delete", threadId };
+    });
+
+/** The second half of removing a group chat: its thread is deleted, so its link goes. */
+export const dropGroupLink = internalMutation
+    .input({ entryKey: v.string().max(256), generation: v.number(), installId: v.string().max(128) })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        await heldInstall(ctx, args.installId as Id<"pluginInstalls">, args.generation);
+
+        const link = await linkFor(ctx, args.installId, args.entryKey);
+
+        if (link) {
+            await ctx.db.delete("pluginItems", link._id as Id<"pluginItems">);
+        }
 
         return null;
     });

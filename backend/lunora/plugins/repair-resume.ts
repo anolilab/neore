@@ -12,7 +12,7 @@ import { LunoraError, v } from "lunorash/server";
 import type { Id } from "../_generated/dataModel";
 import { internal } from "../_generated/internal";
 import type { MutationCtx } from "../_generated/server";
-import { internalMutation } from "../_generated/server";
+import { internalMutation, internalQuery } from "../_generated/server";
 import { authAction } from "../lib/crpc";
 import { MAX_LENGTH } from "../lib/validators";
 import { assertSelectionImportable, runBundleImport } from "../skills/bundle-plan";
@@ -21,7 +21,7 @@ import { assertNoToolConfig, checkPluginFile } from "./install-action";
 import { childOps, importFailure } from "./install-ops";
 import { entryHash } from "./entry-hash";
 import { heldInstall, patchInstallIf, STALE } from "./held-install";
-import { LEASE_MS } from "./logic";
+import { LEASE_MS, markerFor } from "./logic";
 import { refuseWhileErasing, requireOwnerShard } from "./owner-shard";
 import { childIdByMarker, repairableNow, repairRows } from "./repair";
 import { vPluginItemKind } from "./validators";
@@ -45,6 +45,7 @@ export const beginRepair = internalMutation
             linked: v.number(),
             missing: v.array(v.object({ entryKey: v.string(), intentId: v.string(), kind: vPluginItemKind })),
             moreDropped: v.boolean(),
+            outdated: v.boolean(),
             status: v.union(v.literal("installed"), v.literal("needs-repair")),
             unresolved: v.array(v.string()),
         }),
@@ -80,6 +81,8 @@ export const beginRepairRows = async (
     missing: { entryKey: string; intentId: string; kind: "group" | "skill" | "trigger" }[];
     /** More dropped children remain: call again before creating anything or finishing. */
     moreDropped: boolean;
+    /** A linked child holds other content than the file's entry: the finished install is partial until an update rewrites it. */
+    outdated: boolean;
     status: "installed" | "needs-repair";
     /** Children whose pending hash is not settled yet: the install may not finish while any remains. */
     unresolved: string[];
@@ -124,7 +127,13 @@ export const beginRepairRows = async (
         }
     }
 
-    const result = await repairRows(ctx, userId, pluginSlug, fileKeys);
+    const result = await repairRows(
+        ctx,
+        userId,
+        pluginSlug,
+        fileKeys,
+        fileKeys === undefined ? undefined : new Map(entries.map((entry) => [entry.entryKey, entry.contentHash] as const)),
+    );
     const { page } = await ctx.db.pluginItems.findMany({ consistency: "primary", where: { installId } });
     const existing = page.flatMap((row) =>
         row.state === "created" && row.kind === "skill" && row.itemId ? [{ entryKey: row.entryKey, itemId: row.itemId }] : [],
@@ -153,6 +162,7 @@ export const beginRepairRows = async (
             linked: result.linked,
             missing: [],
             moreDropped: result.moreDropped,
+            outdated: result.outdated,
             status: result.status,
             unresolved,
         };
@@ -171,8 +181,76 @@ export const beginRepairRows = async (
         current.status,
     );
 
-    return { existing, generation, installId, kept: result.kept, linked: result.linked, missing, moreDropped: false, status: "needs-repair", unresolved };
+    return {
+        existing,
+        generation,
+        installId,
+        kept: result.kept,
+        linked: result.linked,
+        missing,
+        moreDropped: false,
+        outdated: result.outdated,
+        status: "needs-repair",
+        unresolved,
+    };
 };
+
+/**
+ * Ends a repair that created children: like `finishInstall`, but the install is `partial` when a linked child still holds other
+ * content than the file's entry for it (`beginRepair` says so). Repair does not rewrite a child; an update of the same file does.
+ */
+export const finishRepair = internalMutation
+    .input({ generation: v.number(), installId: v.string().max(128), partial: v.boolean() })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        const install = await heldInstall(ctx, args.installId as Id<"pluginInstalls">, args.generation);
+        const version = install.targetVersion ?? install.version;
+
+        await patchInstallIf(ctx, args.installId as Id<"pluginInstalls">, args.generation, {
+            partial: args.partial,
+            status: "installed",
+            ...(install.targetVersion !== undefined && { targetVersion: version }),
+            updatedAt: ctx.now,
+            version,
+        });
+
+        return null;
+    });
+
+/**
+ * The slugs the installed skills hold now, by entry key. The file is planned with them, so a skill that already holds its slug
+ * hashes as the file's entry does, instead of reading as a changed one because the slug looks taken.
+ */
+export const loadOwnSlugs = internalQuery
+    .input({ pluginSlug: v.string().max(64), userId: v.string().max(128) })
+    .output(v.array(v.object({ entryKey: v.string(), slug: v.string() })))
+    .query(async ({ args, ctx }) => {
+        requireOwnerShard(args.userId, "repair");
+
+        const install = await ctx.db.pluginInstalls.findFirst({ consistency: "primary", where: { pluginSlug: args.pluginSlug, userId: args.userId } });
+
+        if (!install) {
+            return [];
+        }
+
+        const installId = install._id as string;
+        const { page } = await ctx.db.pluginItems.findMany({ consistency: "primary", where: { installId } });
+        const slugs: { entryKey: string; slug: string }[] = [];
+
+        for (const link of page) {
+            if (link.kind !== "skill" || link.state !== "created") {
+                continue;
+            }
+
+            const skill = await ctx.db.skills.findFirst({ consistency: "primary", where: { pluginMarker: markerFor(installId, link.entryKey) } });
+
+            if (skill && skill.userId === args.userId) {
+                slugs.push({ entryKey: link.entryKey, slug: skill.slug });
+            }
+        }
+
+        return slugs;
+    });
 
 /** The id of the child that carries a marker, if it exists and belongs to the owner: what a create that threw may have left behind. */
 export const childIdForMarker = internalMutation
@@ -217,7 +295,8 @@ export const repairPlugin = authAction
         }
 
         const { userId } = ctx.user;
-        const { entries } = await planFor(ctx, args.markdown, undefined);
+        const ownSlugs = await ctx.runQuery(internal.plugins.repair_resume.loadOwnSlugs, { pluginSlug: args.pluginSlug, userId });
+        const { entries } = await planFor(ctx, args.markdown, undefined, { ownSlugs });
 
         assertNoToolConfig(entries);
 
@@ -302,7 +381,11 @@ export const repairPlugin = authAction
                 return { created: created.map((item) => item.key), kept, status: "needs-repair" };
             }
 
-            await ctx.runMutation(internal.plugins.install_steps.finishInstall, { generation: begun.generation, installId: begun.installId });
+            await ctx.runMutation(internal.plugins.repair_resume.finishRepair, {
+                generation: begun.generation,
+                installId: begun.installId,
+                partial: begun.outdated,
+            });
 
             return { created: created.map((item) => item.key), kept, status: "installed" };
         } catch (error) {

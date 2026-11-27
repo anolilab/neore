@@ -59,7 +59,7 @@ import type { EventSourceConfig, WebhookSignatureScheme } from "./validators";
 import { vEventSource, vWebhookSignatureScheme } from "./validators";
 
 // "event" stays in the union because existing rows carry it; removing a member is a breaking schema change.
-const triggerTypeSchema = v.union(v.literal("schedule"), v.literal("webhook"), v.literal("event"));
+export const triggerTypeSchema = v.union(v.literal("schedule"), v.literal("webhook"), v.literal("event"));
 
 /**
  * A provider and one of its events: one object per provider, so a mismatched pair cannot be sent.
@@ -128,7 +128,7 @@ export const assertCustomModelRunnable = async (context: Pick<MutationCtx, "runQ
  * The event condition a trigger is saved with. Only an event trigger has one, and it must: the shape is checked
  * and normalised (`normalizeEventSource`), and a thread must be one the caller may read.
  */
-const checkedEventSource = async (
+export const checkedEventSource = async (
     context: Pick<MutationCtx, "db">,
     source: EventSourceConfig | undefined,
     type: Doc<"triggers">["type"],
@@ -174,7 +174,7 @@ export const assertCronExpression = (cronExpression: string): void => {
  * A zone the scheduler would read as UTC (`resolveTimeZone`) is a typo here, not UTC:
  * the row would show the typed name beside a cron that runs in UTC.
  */
-const assertTimeZone = (timeZone: string): void => {
+export const assertTimeZone = (timeZone: string): void => {
     if (resolveTimeZone(timeZone) !== timeZone) {
         throw new LunoraError("BAD_REQUEST", "Unknown time zone");
     }
@@ -217,7 +217,7 @@ const checkedFilters = (filters: PayloadFilter[] | undefined, type: Doc<"trigger
  * mismatch would verify the sender with the wrong credential. A webhook without a
  * preset is "timestamped" unless it names a scheme; other types store neither.
  */
-const webhookSetup = (
+export const webhookSetup = (
     args: { filters?: PayloadFilter[]; webhookPreset?: WebhookPreset; webhookSignatureScheme?: WebhookSignatureScheme },
     type: Doc<"triggers">["type"],
 ): { filters: PayloadFilter[] | undefined; webhookSignatureScheme: WebhookSignatureScheme | undefined } => {
@@ -393,7 +393,7 @@ export const cleanPromptField = <T extends string | undefined>(value: T, label: 
  * A webhook's Input Template is its prompt. A template that could render past the prompt limit with long values would
  * refuse those deliveries, so it is refused when it is saved (`longestWebhookPrompt` in `webhook-template.ts`).
  */
-const assertWebhookTemplateFits = (type: string, template: string | undefined): void => {
+export const assertWebhookTemplateFits = (type: string, template: string | undefined): void => {
     const problem = type === "webhook" && template !== undefined ? webhookTemplateProblem(template) : undefined;
 
     if (problem !== undefined) {

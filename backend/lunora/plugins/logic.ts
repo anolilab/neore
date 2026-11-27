@@ -98,11 +98,12 @@ export interface IncomingEntry {
     kind: ChildKind;
 }
 
-export type UpdateAction = "create" | "delete" | "detach" | "keep-edited" | "report-group" | "same" | "update";
+export type UpdateAction = "create" | "delete" | "detach" | "keep-edited" | "same" | "update";
 
 /**
- * What an update does with each child, matched by entry key. An edited child is never overwritten. A
- * group whose definition changed is reported, not changed. A child whose kind changed is replaced.
+ * What an update does with each child, matched by entry key. An edited child is never overwritten, a group chat included: an
+ * unedited group whose definition changed is rewritten in place (`update`), an edited one is kept, a group the file drops is
+ * deleted (`delete`) or, when edited, kept and detached (`detach`). A child whose kind changed is replaced.
  * A child caught mid-update (its live hash is its pending hash) is not an edit: the update finishes it.
  */
 export const diffUpdate = (installed: ReadonlyArray<InstalledChild>, incoming: ReadonlyArray<IncomingEntry>): { action: UpdateAction; entryKey: string }[] => {
@@ -122,8 +123,6 @@ export const diffUpdate = (installed: ReadonlyArray<InstalledChild>, incoming: R
 
         if (entry.kind !== child.kind) {
             plan.push({ action: edited ? "detach" : "delete", entryKey: entry.entryKey }, { action: "create", entryKey: entry.entryKey });
-        } else if (child.kind === "group" && entry.contentHash !== child.contentHash) {
-            plan.push({ action: "report-group", entryKey: entry.entryKey });
         } else if (edited) {
             plan.push({ action: "keep-edited", entryKey: entry.entryKey });
         } else if (entry.contentHash === child.contentHash) {
@@ -135,11 +134,6 @@ export const diffUpdate = (installed: ReadonlyArray<InstalledChild>, incoming: R
 
     for (const child of installed) {
         if (incomingKeys.has(child.entryKey)) {
-            continue;
-        }
-
-        if (child.kind === "group") {
-            plan.push({ action: "report-group", entryKey: child.entryKey });
             continue;
         }
 
