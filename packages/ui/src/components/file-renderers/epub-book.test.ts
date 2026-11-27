@@ -1,6 +1,7 @@
 /**
- * Reading an EPUB for the preview: a small book built here is parsed by the real parser, its chapters come in reading order (the spine's,
- * not the manifest's or the file names'), and a chapter becomes a document for a frame that can load nothing.
+ * Reading an EPUB for the preview: a small book built here is parsed by the real parser and read from its archive. Its chapters come in
+ * reading order (the spine's, not the manifest's or the file names'), a chapter's pictures and styles become `data:` URLs and inert text with
+ * no object URL made, and the document a chapter becomes carries the policy first and leaves nothing that can reach beyond it.
  */
 // @vitest-environment jsdom
 
@@ -9,100 +10,274 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import JSZip from "jszip";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
-import { chapterDocument, FRAME_POLICY, inlineBlobUrls, MAX_INLINED_CHARS, openEpub, safeStylesheet } from "./epub-book";
+import { chapterDocument, FRAME_POLICY, MAX_ASSETS_PER_CHAPTER, openEpub, safeStylesheet } from "./epub-book";
 
-const REFRESH = /refresh/iu;
+const PNG_DATA = /^data:image\/png;base64,iVBORw0KGgo=$/u;
+const TRACKER = /tracker\.example/u;
 const SCRIPTY = /expression\s*\(|behaviou?r\s*:|-moz-binding\s*:/iu;
 const NS = 'xmlns="http://www.idpf.org/2007/opf"';
+const CONTAINER =
+    '<?xml version="1.0"?><container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles></container>';
+const PNG = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
 
-/** Three chapters whose reading order (two, one, three) differs from their manifest and file-name order. */
-const sampleBook = async (): Promise<Uint8Array> => {
+interface SampleChapter {
+    body: string;
+    file: string;
+    id: string;
+    label?: string;
+}
+
+interface SampleOptions {
+    chapters: SampleChapter[];
+    files?: Record<string, Uint8Array | string>;
+    language?: string;
+}
+
+/** A book with `chapters` in the given reading order (the manifest lists them in the order given too, the spine as `chapters` says). */
+const book = async ({ chapters, files = {}, language = "en" }: SampleOptions): Promise<Uint8Array> => {
     const zip = new JSZip();
 
     zip.file("mimetype", "application/epub+zip", { compression: "STORE" });
-    zip.file(
-        "META-INF/container.xml",
-        '<?xml version="1.0"?><container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles></container>',
-    );
+    zip.file("META-INF/container.xml", CONTAINER);
     zip.file(
         "OEBPS/content.opf",
-        `<?xml version="1.0"?><package ${NS} version="2.0" unique-identifier="id"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:identifier id="id">sample</dc:identifier><dc:title>Sample</dc:title><dc:language>en</dc:language></metadata>` +
-            '<manifest><item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/><item id="c1" href="one.xhtml" media-type="application/xhtml+xml"/><item id="c2" href="two.xhtml" media-type="application/xhtml+xml"/><item id="c3" href="three.xhtml" media-type="application/xhtml+xml"/><item id="cover" href="cover.png" media-type="image/png"/></manifest>' +
-            '<spine toc="ncx"><itemref idref="c2"/><itemref idref="c1"/><itemref idref="c3"/></spine></package>',
+        `<?xml version="1.0"?><package ${NS} version="2.0" unique-identifier="id"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:identifier id="id">sample</dc:identifier><dc:title>Sample</dc:title><dc:language>${language}</dc:language></metadata>` +
+            `<manifest><item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>${chapters.map((chapter) => `<item id="${chapter.id}" href="${chapter.file}" media-type="application/xhtml+xml"/>`).join("")}</manifest>` +
+            `<spine toc="ncx">${chapters.map((chapter) => `<itemref idref="${chapter.id}"/>`).join("")}</spine></package>`,
     );
     zip.file(
         "OEBPS/toc.ncx",
         '<?xml version="1.0"?><ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1"><head><meta name="dtb:uid" content="sample"/></head><docTitle><text>Sample</text></docTitle><navMap>' +
-            '<navPoint id="n2" playOrder="1"><navLabel><text>Beginning</text></navLabel><content src="two.xhtml"/></navPoint><navPoint id="n1" playOrder="2"><navLabel><text>Middle</text></navLabel><content src="one.xhtml#top"/></navPoint></navMap></ncx>',
+            `${chapters
+                // The parser needs at least one entry in the table of contents: the first chapter gets one when the sample names none.
+                .map((chapter, order) => (order === 0 && chapters.every((other) => other.label === undefined) ? { ...chapter, label: "Start" } : chapter))
+                .filter((chapter) => chapter.label !== undefined)
+                .map(
+                    (chapter, order) =>
+                        `<navPoint id="n${String(order)}" playOrder="${String(order + 1)}"><navLabel><text>${chapter.label}</text></navLabel><content src="${chapter.file}"/></navPoint>`,
+                )
+                .join("")}</navMap></ncx>`,
     );
 
-    for (const [name, heading] of [
-        ["one", "Middle chapter"],
-        ["two", "First chapter"],
-        ["three", "Last chapter"],
-    ] as const) {
+    for (const chapter of chapters) {
         zip.file(
-            `OEBPS/${name}.xhtml`,
-            `<?xml version="1.0"?><html xmlns="http://www.w3.org/1999/xhtml"><head><title>${heading}</title></head><body><h1>${heading}</h1>${name === "three" ? "<script>window.ran = true</script>" : ""}</body></html>`,
+            `OEBPS/${chapter.file}`,
+            `<?xml version="1.0"?><html xmlns="http://www.w3.org/1999/xhtml"><head><title>t</title></head><body>${chapter.body}</body></html>`,
         );
     }
 
-    zip.file("OEBPS/cover.png", new Uint8Array([137, 80, 78, 71]));
+    for (const [path, content] of Object.entries(files)) {
+        zip.file(`OEBPS/${path}`, content);
+    }
 
     return await zip.generateAsync({ type: "uint8array" });
 };
 
+const parse = (markup: string): Document => new DOMParser().parseFromString(markup, "text/html");
+
+const folder = { path: "" };
+
+beforeAll(async () => {
+    folder.path = await mkdtemp(join(tmpdir(), "neore-epub-"));
+});
+
+afterAll(async () => {
+    await rm(folder.path, { force: true, recursive: true });
+});
+
+afterEach(() => {
+    vi.restoreAllMocks();
+});
+
 describe("openEpub", () => {
-    let directory = "";
-
-    beforeAll(async () => {
-        directory = await mkdtemp(join(tmpdir(), "neore-epub-"));
-    });
-
-    afterAll(async () => {
-        await rm(directory, { force: true, recursive: true });
-    });
-
     it("lists the chapters in the book's reading order, named from its table of contents where it names them", async () => {
-        const book = await openEpub(await sampleBook(), directory);
+        const opened = await openEpub(
+            await book({
+                chapters: [
+                    { body: "<p>two</p>", file: "two.xhtml", id: "c2", label: "Beginning" },
+                    { body: "<p>one</p>", file: "one.xhtml", id: "c1", label: "Middle" },
+                    { body: "<p>three</p>", file: "three.xhtml", id: "c3" },
+                ],
+            }),
+            folder.path,
+        );
 
-        expect(book.chapters).toEqual([{ id: "c2", title: "Beginning" }, { id: "c1", title: "Middle" }, { id: "c3" }]);
-        book.destroy();
+        expect(opened.chapters).toEqual([{ id: "c2", title: "Beginning" }, { id: "c1", title: "Middle" }, { id: "c3" }]);
+        opened.destroy();
     });
 
-    it("leaves a chapter's markup as it is, scripts included: the frame it is shown in is the boundary", async () => {
-        const book = await openEpub(await sampleBook(), directory);
-        const last = await book.read("c3");
+    it("names two chapters that share a file name in different folders by their own entries, and none by a guess", async () => {
+        const opened = await openEpub(
+            await book({
+                chapters: [
+                    { body: "<p>a</p>", file: "Text/chap.xhtml", id: "a", label: "Main" },
+                    { body: "<p>b</p>", file: "Appendix/chap.xhtml", id: "b", label: "Extra" },
+                    { body: "<p>u</p>", file: "x/same.xhtml", id: "u" },
+                    { body: "<p>v</p>", file: "y/same.xhtml", id: "v" },
+                ],
+                language: "fr",
+            }),
+            folder.path,
+        );
 
-        expect(last).toContain("<h1>Last chapter</h1>");
-        expect(last).toContain("<script>window.ran = true</script>");
-        book.destroy();
+        expect(opened.chapters).toEqual([{ id: "a", title: "Main" }, { id: "b", title: "Extra" }, { id: "u" }, { id: "v" }]);
+        expect(await opened.read("a")).toContain('lang="fr"');
+        opened.destroy();
+        // Destroying again is harmless, and says so.
+        opened.destroy();
+        expect(opened.destroyed).toBe(true);
+    });
+
+    it("matches a long table of contents to a long spine without a scan of the spine for each entry", async () => {
+        const chapters = Array.from({ length: 1500 }, (_item, index) => {
+            return {
+                body: "<p>x</p>",
+                file: `Text/c${String(index)}.xhtml`,
+                id: `c${String(index)}`,
+                label: `Chapter ${String(index)}`,
+            };
+        });
+        const opened = await openEpub(await book({ chapters }), folder.path);
+        const started = performance.now();
+
+        expect(opened.chapters).toHaveLength(1500);
+        expect(opened.chapters[1499]).toEqual({ id: "c1499", title: "Chapter 1499" });
+        expect(performance.now() - started).toBeLessThan(2000);
+        opened.destroy();
     });
 });
 
-const parse = (parsed: string): Document => new DOMParser().parseFromString(parsed, "text/html");
+describe("reading a chapter", () => {
+    it("puts a picture and a style sheet of the book into the chapter, as a data: address and as text, and makes no object URL", async () => {
+        const createObjectUrl = vi.spyOn(URL, "createObjectURL");
+        const opened = await openEpub(
+            await book({
+                chapters: [
+                    {
+                        body: '<link rel="stylesheet" href="../css/s.css"/><h1 class="t">Title</h1><img src="../images/p.png" alt="p"/>',
+                        file: "text/one.xhtml",
+                        id: "c1",
+                    },
+                ],
+                files: { "css/s.css": ".t { color: #036; background: url(../images/p.png) } p { margin: 0 }", "images/p.png": PNG },
+            }),
+            folder.path,
+        );
+        const frame = parse(await opened.read("c1"));
+        const style = [...frame.head.querySelectorAll("style")].map((element) => element.textContent).join("\n");
+
+        expect(frame.querySelector("img")?.getAttribute("src")).toMatch(PNG_DATA);
+        expect(style).toContain(".t { color: #036;");
+        expect(style).toContain('url("data:image/png;base64,iVBORw0KGgo=")');
+        expect(createObjectUrl).not.toHaveBeenCalled();
+        opened.destroy();
+    });
+
+    it("does not give one book's pictures to another that names the same file", async () => {
+        const first = await openEpub(
+            await book({ chapters: [{ body: '<img src="images/cover.png"/>', file: "one.xhtml", id: "c1" }], files: { "images/cover.png": PNG } }),
+            folder.path,
+        );
+        const second = await openEpub(
+            await book({
+                chapters: [{ body: '<img src="images/cover.png"/>', file: "one.xhtml", id: "c1" }],
+                files: { "images/cover.png": new Uint8Array([1, 2, 3, 4]) },
+            }),
+            folder.path,
+        );
+        const firstSource = parse(await first.read("c1"))
+            .querySelector("img")
+            ?.getAttribute("src");
+        const secondSource = parse(await second.read("c1"))
+            .querySelector("img")
+            ?.getAttribute("src");
+
+        // Each chapter shows its own book's bytes, whichever was opened or closed first.
+        first.destroy();
+        expect(secondSource).toBe("data:image/png;base64,AQIDBA==");
+        expect(firstSource).toBe("data:image/png;base64,iVBORw0KGgo=");
+        expect(
+            parse(await second.read("c1"))
+                .querySelector("img")
+                ?.getAttribute("src"),
+        ).toBe(secondSource);
+        second.destroy();
+    });
+
+    it("leaves the chapter's text, scripts included, for the frame to refuse", async () => {
+        const opened = await openEpub(
+            await book({ chapters: [{ body: "<p>kept</p><script>window.ran = 1</script>", file: "one.xhtml", id: "c1" }] }),
+            folder.path,
+        );
+        const frame = parse(await opened.read("c1"));
+
+        expect(frame.body.querySelector("p")?.textContent).toBe("kept");
+        expect(frame.body.querySelector("script")?.textContent).toBe("window.ran = 1");
+        opened.destroy();
+    });
+
+    it("leaves out what is past the count of files one chapter may inline, and keeps the first", async () => {
+        const pictures = Object.fromEntries(
+            Array.from({ length: MAX_ASSETS_PER_CHAPTER + 5 }, (_item, index) => [`images/${String(index)}.png`, PNG] as const),
+        );
+        const body = Object.keys(pictures)
+            .map((path) => `<img src="${path}"/>`)
+            .join("");
+        const opened = await openEpub(await book({ chapters: [{ body, file: "one.xhtml", id: "c1" }], files: pictures }), folder.path);
+        const sources = [...parse(await opened.read("c1")).querySelectorAll("img")].map((image) => image.getAttribute("src"));
+
+        expect(sources.filter((source) => source?.startsWith("data:image/png"))).toHaveLength(MAX_ASSETS_PER_CHAPTER);
+        // What is left out is left without an address: the frame is not asked for it.
+        expect(sources.filter((source) => source === null)).toHaveLength(5);
+        opened.destroy();
+    });
+
+    it("leaves out a picture that will not fit what is left of the chapter's budget, without encoding it", async () => {
+        const big = new Uint8Array(12 * 1024 * 1024).fill(7);
+        const opened = await openEpub(
+            await book({
+                chapters: [{ body: '<img src="a.png"/><img src="b.png"/><p>text</p>', file: "one.xhtml", id: "c1" }],
+                files: { "a.png": big, "b.png": big },
+            }),
+            folder.path,
+        );
+        const frame = parse(await opened.read("c1"));
+        const sources = [...frame.querySelectorAll("img")].map((image) => image.getAttribute("src"));
+
+        // The first (about 16 million characters as data) fits; the second would pass 24 million.
+        expect(sources[0]?.startsWith("data:image/png;base64,")).toBe(true);
+        expect(sources[1]).toBeNull();
+        expect(frame.querySelector("p")?.textContent).toBe("text");
+        opened.destroy();
+    });
+});
 
 describe("chapterDocument", () => {
-    it("carries the policy first in the head, ahead of anything the chapter or its styles add, and opens no link in the frame", () => {
-        const parsed = parse(chapterDocument("<p>text</p>", ["p{color:red}"]));
-        const policy = parsed.querySelectorAll('meta[http-equiv="Content-Security-Policy"]');
+    it("carries the policy as the first element of the head, before any of the chapter is written, and opens no link in the frame", () => {
+        const frame = parse(chapterDocument("<p>text</p>", ["p{color:red}"]));
+        const policy = frame.querySelectorAll('meta[http-equiv="Content-Security-Policy"]');
 
-        expect(FRAME_POLICY).toBe("default-src 'none'; img-src data:; style-src 'unsafe-inline'; font-src data:");
+        expect(FRAME_POLICY).toBe("default-src 'none'; img-src data:; style-src 'unsafe-inline'; font-src data:; form-action 'none'");
         expect(policy).toHaveLength(1);
         expect(policy[0]?.getAttribute("content")).toBe(FRAME_POLICY);
-        expect([...parsed.head.children].map((element) => element.tagName)).toEqual(["META", "META", "BASE", "STYLE", "STYLE"]);
-        // The policy precedes every style of the head.
-        expect((policy[0] as Element).compareDocumentPosition(parsed.head.querySelector("style") as Node) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-        expect(parsed.querySelector("base")?.getAttribute("target")).toBe("_blank");
-        expect(parsed.head.querySelectorAll("style")[1]?.textContent).toBe("p{color:red}");
-        expect(parsed.body.outerHTML).toBe("<body><p>text</p></body>");
+        expect(frame.head.firstElementChild).toBe(policy[0]);
+        expect([...frame.head.children].map((element) => element.tagName)).toEqual(["META", "META", "BASE", "STYLE", "STYLE"]);
+        expect(frame.querySelector("base")?.getAttribute("target")).toBe("_blank");
+        expect(frame.head.querySelectorAll("style")[1]?.textContent).toBe("p{color:red}");
+        expect(frame.body.outerHTML).toBe("<body><p>text</p></body>");
+    });
+
+    it("writes the policy before the chapter: it comes earlier in the serialized document than any of the chapter's markup", () => {
+        const text = chapterDocument('<p id="mark">text</p>', []);
+
+        expect(text.indexOf("Content-Security-Policy")).toBeGreaterThan(-1);
+        expect(text.indexOf("Content-Security-Policy")).toBeLessThan(text.indexOf('id="mark"'));
     });
 
     it("carries the book's language on the document, and only a well-formed one", () => {
         expect(parse(chapterDocument("<p>x</p>", [], "de-CH")).documentElement.getAttribute("lang")).toBe("de-CH");
-        expect(parse(chapterDocument("<p>x</p>", [], "en")).documentElement.getAttribute("lang")).toBe("en");
         expect(parse(chapterDocument("<p>x</p>", [], 'en"><script>')).documentElement.hasAttribute("lang")).toBe(false);
         expect(parse(chapterDocument("<p>x</p>", [])).documentElement.hasAttribute("lang")).toBe(false);
     });
@@ -115,30 +290,64 @@ describe("chapterDocument", () => {
         ["a character reference", '<meta http-equiv="&#114;efresh" content="0;url=https://tracker.example/x">'],
         ["a refresh in the middle of the text", '<p>a</p><meta http-equiv=refresh content="0;url=https://tracker.example/x"><p>b</p>'],
     ])("leaves no refresh directive from %s", (_name, markup) => {
-        const parsed = parse(chapterDocument(markup, []));
+        const frame = parse(chapterDocument(markup, []));
 
-        expect([...parsed.querySelectorAll("meta")].map((meta) => meta.getAttribute("http-equiv") ?? meta.getAttribute("charset"))).toEqual([
+        expect([...frame.querySelectorAll("meta")].map((meta) => meta.getAttribute("http-equiv") ?? meta.getAttribute("charset"))).toEqual([
+            "Content-Security-Policy",
             // eslint-disable-next-line unicorn/text-encoding-identifier-case -- the HTML label
             "utf-8",
-            "Content-Security-Policy",
         ]);
-        expect(parsed.documentElement.outerHTML).not.toContain("tracker.example");
+        expect(frame.documentElement.outerHTML).not.toMatch(TRACKER);
     });
 
-    it("leaves the rest of the chapter's markup, links and scripts included", () => {
-        const body = '<p>kept</p><a href="https://example.org" target="_self">link</a><script>window.ran = 1</script>';
-        const parsed = parse(chapterDocument(body, []));
+    it("removes a remote picture, style or frame from the markup: nothing the chapter names is left to load", () => {
+        const frame = parse(
+            chapterDocument(
+                [
+                    '<img src="https://evil.example/a.png" srcset="https://evil.example/b.png 2x" alt="x">',
+                    '<img src="//evil.example/c.png">',
+                    '<img src="data:image/png;base64,AAAA">',
+                    '<video poster="https://evil.example/p.png" src="https://evil.example/v.mp4"></video>',
+                    '<svg><image href="https://evil.example/i.png"/><use xlink:href="https://evil.example/u.svg#a"/><use href="#local"/></svg>',
+                    '<iframe src="https://evil.example/"></iframe><object data="https://evil.example/o"></object><embed src="https://evil.example/e">',
+                    '<link rel="stylesheet" href="https://evil.example/s.css">',
+                    '<div style="background:url(https://evil.example/bg.png)">x</div>',
+                    "<style>@import url(https://evil.example/i.css); p{background:url(https://evil.example/b.png)}</style>",
+                    '<form action="https://evil.example/post"><input type="image" src="https://evil.example/f.png"></form>',
+                ].join(""),
+                [],
+            ),
+        );
+        const html = frame.body.outerHTML;
 
-        expect(parsed.body.querySelector("p")?.textContent).toBe("kept");
-        expect(parsed.body.querySelector("a")?.getAttribute("href")).toBe("https://example.org");
-        expect(parsed.body.querySelector("script")?.textContent).toBe("window.ran = 1");
+        expect(html).not.toContain("evil.example");
+        expect(frame.querySelectorAll("iframe, object, embed, link")).toHaveLength(0);
+        expect(frame.querySelector('img[src^="data:image/png"]')).not.toBeNull();
+        expect(frame.querySelector('use[href="#local"]')).not.toBeNull();
+    });
+
+    it("makes every anchor's target _blank, whatever the chapter wrote, so a link cannot navigate the frame", () => {
+        const frame = parse(
+            chapterDocument(
+                '<a href="https://example.org" target="_top">top</a><a href="x" target="_self">self</a><a href="y" target="named">named</a><a href="z">none</a><map><area href="w" target="_parent"></map>',
+                [],
+            ),
+        );
+
+        for (const link of frame.querySelectorAll("a, area")) {
+            expect(link.getAttribute("target")).toBe("_blank");
+            expect(link.getAttribute("rel")).toBe("noopener noreferrer");
+        }
+
+        // The addresses stay: a link is not a load.
+        expect(frame.querySelector("a")?.getAttribute("href")).toBe("https://example.org");
     });
 
     it("drops a base a chapter brings, so its links keep the frame's own", () => {
-        const parsed = parse(chapterDocument('<base href="https://evil.example/"><p>x</p>', []));
+        const frame = parse(chapterDocument('<base href="https://evil.example/"><p>x</p>', []));
 
-        expect(parsed.querySelectorAll("base")).toHaveLength(1);
-        expect(parsed.querySelector("base")?.getAttribute("href")).toBeNull();
+        expect(frame.querySelectorAll("base")).toHaveLength(1);
+        expect(frame.querySelector("base")?.getAttribute("href")).toBeNull();
     });
 });
 
@@ -152,8 +361,6 @@ describe("a style sheet in the document", () => {
         expect([...withHostile.head.children].map((element) => element.tagName)).toEqual([...without.head.children].map((element) => element.tagName));
         expect(withHostile.body.outerHTML).toBe(without.body.outerHTML);
         expect(withHostile.querySelectorAll('meta[http-equiv="refresh"]')).toHaveLength(0);
-        expect(withHostile.documentElement.outerHTML).not.toContain("tracker.example</");
-        // What was written is text of the one style element, with its `<` escaped.
         expect(withHostile.head.querySelectorAll("style")[1]?.textContent).toContain(String.raw`\3c /style>`);
     });
 
@@ -178,157 +385,6 @@ describe("a style sheet in the document", () => {
     });
 
     it("takes out the script-like constructs of old engines", () => {
-        const safe = safeStylesheet("a { width: expression(alert(1)); behavior: url(x.htc); -moz-binding: url(x.xml#b) }");
-
-        expect(safe).not.toMatch(SCRIPTY);
-    });
-});
-
-describe("inlineBlobUrls", () => {
-    it("replaces a blob address of this page by the bytes it names, and leaves one that cannot be read", async () => {
-        const fetched: string[] = [];
-
-        vi.stubGlobal("fetch", async (url: string) => {
-            fetched.push(url);
-
-            if (url === "blob:https://app/gone") {
-                throw new Error("revoked");
-            }
-
-            return new Response("abc", { headers: { "content-type": "image/png" } });
-        });
-
-        try {
-            const text =
-                '<img src="blob:https://app/one"><img src="blob:https://app/one"><img src="blob:https://app/gone"><img src="https://other.example/x.png">';
-            const result = await inlineBlobUrls(text);
-
-            expect(result).toContain('<img src="data:image/png;base64,YWJj">');
-            expect(result.match(/data:image\/png;base64,YWJj/gu)).toHaveLength(2);
-            expect(result).toContain('src="blob:https://app/gone"');
-            expect(result).toContain('src="https://other.example/x.png"');
-            // Each address is read once, however often it appears.
-            expect(fetched.filter((url) => url === "blob:https://app/one")).toHaveLength(1);
-        } finally {
-            vi.unstubAllGlobals();
-        }
-    });
-});
-
-describe("chapterDocument language and refresh", () => {
-    it("carries the book's language on the document, and only a well-formed one", () => {
-        expect(chapterDocument("<p>x</p>", [], "de-CH")).toContain('<html lang="de-CH">');
-        expect(chapterDocument("<p>x</p>", [], "en")).toContain('<html lang="en">');
-        expect(chapterDocument("<p>x</p>", [], 'en"><script>')).toContain("<html><head>");
-        expect(chapterDocument("<p>x</p>", [])).toContain("<html><head>");
-    });
-
-    it("takes out a refresh that would move the frame by itself, and leaves the rest of the markup", () => {
-        const body =
-            '<meta http-equiv="refresh" content="0;url=https://tracker.example/x"><META HTTP-EQUIV=Refresh CONTENT="1"><p>kept</p><a href="https://example.org">link</a>';
-        const document = chapterDocument(body, []);
-
-        expect(document).not.toMatch(REFRESH);
-        expect(document).toContain("<p>kept</p>");
-        expect(document).toContain('<a href="https://example.org">link</a>');
-    });
-});
-
-describe("inlineBlobUrls budget", () => {
-    const answerWith = (sizes: Record<string, number>, fetched: string[]) =>
-        vi.stubGlobal("fetch", async (url: string) => {
-            fetched.push(url);
-
-            return new Response("x".repeat(sizes[url] ?? 0), { headers: { "content-type": "image/png" } });
-        });
-
-    it("counts an address as often as it appears, and does not convert one that will not fit", async () => {
-        const fetched: string[] = [];
-
-        answerWith({ "blob:https://app/big": 300, "blob:https://app/small": 30 }, fetched);
-
-        try {
-            // A data address of 30 bytes is about 70 characters; of 300, about 430.
-            const text = '<img src="blob:https://app/small"><img src="blob:https://app/big"><img src="blob:https://app/big">';
-            const budget = { left: 700 };
-            const result = await inlineBlobUrls(text, undefined, budget);
-
-            expect(result.match(/data:image\/png/gu)).toHaveLength(1);
-            expect(result).toContain("blob:https://app/big");
-            expect(budget.left).toBeGreaterThan(0);
-            expect(budget.left).toBeLessThan(700);
-            expect(MAX_INLINED_CHARS).toBeGreaterThan(1_000_000);
-        } finally {
-            vi.unstubAllGlobals();
-        }
-    });
-
-    it("reads the addresses one at a time, not all at once", async () => {
-        let inFlight = 0;
-        let peak = 0;
-
-        vi.stubGlobal("fetch", async () => {
-            inFlight += 1;
-            peak = Math.max(peak, inFlight);
-            await Promise.resolve();
-            inFlight -= 1;
-
-            return new Response("x", { headers: { "content-type": "image/png" } });
-        });
-
-        try {
-            const text = Array.from({ length: 20 }, (_item, index) => `<img src="blob:https://app/${String(index)}">`).join("");
-
-            await inlineBlobUrls(text);
-            expect(peak).toBe(1);
-        } finally {
-            vi.unstubAllGlobals();
-        }
-    });
-});
-
-describe("chapter titles", () => {
-    it("names two chapters that share a file name in different folders by their own table-of-contents entries, and none by a guess", async () => {
-        const zip = new JSZip();
-
-        zip.file("mimetype", "application/epub+zip", { compression: "STORE" });
-        zip.file(
-            "META-INF/container.xml",
-            '<?xml version="1.0"?><container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles></container>',
-        );
-        zip.file(
-            "OEBPS/content.opf",
-            `<?xml version="1.0"?><package ${NS} version="2.0" unique-identifier="id"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:identifier id="id">s</dc:identifier><dc:title>S</dc:title><dc:language>fr</dc:language></metadata>` +
-                '<manifest><item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/><item id="a" href="Text/chap.xhtml" media-type="application/xhtml+xml"/><item id="b" href="Appendix/chap.xhtml" media-type="application/xhtml+xml"/><item id="u" href="x/same.xhtml" media-type="application/xhtml+xml"/><item id="v" href="y/same.xhtml" media-type="application/xhtml+xml"/></manifest>' +
-                '<spine toc="ncx"><itemref idref="a"/><itemref idref="b"/><itemref idref="u"/><itemref idref="v"/></spine></package>',
-        );
-        zip.file(
-            "OEBPS/toc.ncx",
-            '<?xml version="1.0"?><ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1"><head><meta name="dtb:uid" content="s"/></head><docTitle><text>S</text></docTitle><navMap>' +
-                '<navPoint id="n1" playOrder="1"><navLabel><text>Main</text></navLabel><content src="Text/chap.xhtml"/></navPoint>' +
-                '<navPoint id="n2" playOrder="2"><navLabel><text>Extra</text></navLabel><content src="Appendix/chap.xhtml"/></navPoint>' +
-                '<navPoint id="n3" playOrder="3"><navLabel><text>Which</text></navLabel><content src="same.xhtml"/></navPoint></navMap></ncx>',
-        );
-
-        for (const path of ["Text/chap", "Appendix/chap", "x/same", "y/same"]) {
-            zip.file(
-                `OEBPS/${path}.xhtml`,
-                '<?xml version="1.0"?><html xmlns="http://www.w3.org/1999/xhtml"><head><title>t</title></head><body><p>text</p></body></html>',
-            );
-        }
-
-        const directory = await mkdtemp(join(tmpdir(), "neore-epub-titles-"));
-
-        try {
-            const book = await openEpub(await zip.generateAsync({ type: "uint8array" }), directory);
-
-            expect(book.chapters).toEqual([{ id: "a", title: "Main" }, { id: "b", title: "Extra" }, { id: "u" }, { id: "v" }]);
-            expect(await book.read("a")).toContain('<html lang="fr">');
-            book.destroy();
-            // Destroying again is harmless.
-            book.destroy();
-        } finally {
-            await rm(directory, { force: true, recursive: true });
-        }
+        expect(safeStylesheet("a { width: expression(alert(1)); behavior: url(x.htc); -moz-binding: url(x.xml#b) }")).not.toMatch(SCRIPTY);
     });
 });

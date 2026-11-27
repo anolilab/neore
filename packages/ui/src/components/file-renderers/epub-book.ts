@@ -1,19 +1,19 @@
 /**
  * Reads an EPUB for the preview: its chapters in reading order, and one chapter as a document for a sandboxed frame.
  *
- * The frame is the boundary (`epub-preview.tsx`): no scripts, no same origin, and a content security policy that allows only inline
- * styles and `data:` pictures and fonts, so a chapter can run nothing and reach nothing. Its pictures and style sheets, which the parser
- * hands out as `blob:` addresses of this page, are read here and put in the document itself, so the frame never needs to ask for anything.
+ * The parser (`@lingo-reader/epub-parser`) gives the book's structure only: spine, table of contents, language. A chapter is read from
+ * the archive here, not through the parser's `loadChapter`: that one turns a book's pictures and styles into `blob:` addresses kept in a
+ * cache shared by every open book (a second book's `cover.png` can be the first's) and released only by a global revoke. Reading them here
+ * creates no object URL at all, so nothing is shared between books and nothing is left to revoke when one closes.
  *
- * Two things are not left alone, because a policy limits what a document loads, not where its frame goes or what ends an element:
- * - The chapter is parsed by the browser's own parser before it goes into the document, and every `<meta>` and `<base>` in it is dropped.
- *   A refresh directive moves a frame with no script and outside the policy, and there is no list of its spellings to match: it is closed
- *   by taking out every `<meta>` of the chapter, whatever the markup around it does to the tokenizer.
- * - A book's style sheet is written into a `<style>` element as text that cannot end it, with no `@import` and no address but a `data:`
- *   one (`safeStylesheet`); it never becomes markup.
+ * The frame is the boundary (`epub-preview.tsx`): no scripts, no same origin, and a content security policy that allows only inline
+ * styles and `data:` pictures and fonts. A chapter's pictures and styles are read one at a time, within a budget, and written into its
+ * document as `data:` URLs and text, so the frame never needs to ask for anything. Because a policy limits what a document loads, not where
+ * its frame goes or what ends an element, the chapter is also not trusted as markup: see `chapterDocument`.
  */
 
 import type { EpubToc, SpineItem } from "@lingo-reader/epub-parser";
+import JSZip from "jszip";
 
 /** The chapter kinds a reader shows; the rest of a spine (a cover image, a style sheet) is not a page of text. */
 const READABLE_TYPES: ReadonlySet<string> = new Set(["application/xhtml+xml", "text/html"]);
@@ -30,7 +30,7 @@ export interface OpenedEpub {
     destroy: () => void;
     /** Whether `destroy` has been called: a destroyed book is no longer one to read from. */
     readonly destroyed: boolean;
-    /** The chapter as a whole document, ready for a frame's `srcdoc`. `signal` stops the reads of its pictures and styles. */
+    /** The chapter as a whole document, ready for a frame's `srcdoc`. `signal` stops the reads that are still to come. */
     read: (id: string, signal?: AbortSignal) => Promise<string>;
 }
 
@@ -41,25 +41,42 @@ const DOT_SLASH = /^\.\//u;
 const pathOf = (href: string): string => (href.replace(EPUB_PREFIX, "").split("#", 1)[0] ?? "").replace(DOT_SLASH, "");
 
 /**
- * The table of contents' labels by spine item. The spine spells a path from the book's root and the table of contents from its own
- * folder, so a label belongs to the spine item whose path ends with the label's whole path (not only its file name: two chapters in
- * different folders can share one). A label that fits more than one item names none of them rather than the wrong one.
+ * The table of contents' labels by spine item. The spine spells a path from the book's root and the table of contents from its own folder,
+ * so a label belongs to the spine item whose path ends with the label's whole path (not only its file name: two chapters in different
+ * folders can share one). The spine is indexed ONCE by every tail of every item's path, so each entry is a lookup, not a scan of the spine.
+ * A label that fits more than one item names none of them rather than the wrong one.
  */
 const titlesBySpineItem = (toc: EpubToc, spine: ReadonlyArray<SpineItem>): Map<string, string> => {
+    const byTail = new Map<string, Set<string>>();
+
+    for (const item of spine) {
+        const parts = pathOf(item.href).split("/");
+
+        for (let from = 0; from < parts.length; from += 1) {
+            const tail = parts.slice(from).join("/");
+            const ids = byTail.get(tail) ?? new Set<string>();
+
+            ids.add(item.id);
+            byTail.set(tail, ids);
+        }
+    }
+
     const titles = new Map<string, string>();
     const ambiguous = new Set<string>();
 
     const visit = (points: EpubToc): void => {
         for (const point of points) {
-            const target = pathOf(point.href);
-            const fits =
-                target === "" || point.label === "" ? [] : spine.filter((item) => pathOf(item.href) === target || pathOf(item.href).endsWith(`/${target}`));
+            const fits = point.label === "" ? undefined : byTail.get(pathOf(point.href));
 
-            if (fits.length === 1 && fits[0] !== undefined && !titles.has(fits[0].id)) {
-                titles.set(fits[0].id, point.label);
-            } else if (fits.length > 1) {
-                for (const item of fits) {
-                    ambiguous.add(item.id);
+            if (fits?.size === 1) {
+                const [id] = fits;
+
+                if (id !== undefined && !titles.has(id)) {
+                    titles.set(id, point.label);
+                }
+            } else if (fits !== undefined) {
+                for (const id of fits) {
+                    ambiguous.add(id);
                 }
             }
 
@@ -78,71 +95,133 @@ const titlesBySpineItem = (toc: EpubToc, spine: ReadonlyArray<SpineItem>): Map<s
     return titles;
 };
 
-const BLOB_URL = /blob:[^\s"')<>]+/gu;
+/** The most a chapter's inlined pictures, fonts and style sheets may add to its document, in characters. Past it the rest are left out. */
+export const MAX_INLINED_CHARS = 24 * 1024 * 1024;
+
+/** The most distinct files one chapter may inline. A chapter that names more has the rest left out, so a book cannot make a reader read without end. */
+export const MAX_ASSETS_PER_CHAPTER = 200;
+
+const MEDIA_TYPES: Readonly<Record<string, string>> = {
+    avif: "image/avif",
+    bmp: "image/bmp",
+    gif: "image/gif",
+    jpeg: "image/jpeg",
+    jpg: "image/jpeg",
+    otf: "font/otf",
+    png: "image/png",
+    svg: "image/svg+xml",
+    ttf: "font/ttf",
+    webp: "image/webp",
+    woff: "font/woff",
+    woff2: "font/woff2",
+};
 
 const CHUNK = 0x80_00;
 
-/** The most a chapter's inlined pictures and fonts may add to its document, in characters. Past it the rest stay `blob:`, which the policy refuses. */
-export const MAX_INLINED_CHARS = 24 * 1024 * 1024;
-
-const mediaTypeOf = (blob: Blob): string => blob.type || "application/octet-stream";
-
-/** The length of the `data:` URL of `blob`, worked out from its size, so a blob that will not fit is never encoded. */
-const dataUrlLength = (blob: Blob): number => `data:${mediaTypeOf(blob)};base64,`.length + Math.ceil(blob.size / 3) * 4;
-
-const readAsDataUrl = async (blob: Blob): Promise<string> => {
-    const bytes = new Uint8Array(await blob.arrayBuffer());
+const toBase64 = (bytes: Uint8Array): string => {
     let binary = "";
 
     for (let at = 0; at < bytes.length; at += CHUNK) {
         binary += String.fromCodePoint(...bytes.subarray(at, at + CHUNK));
     }
 
-    return `data:${mediaTypeOf(blob)};base64,${btoa(binary)}`;
+    return btoa(binary);
 };
 
-/**
- * Every `blob:` address in `text` replaced by the bytes it names. One that cannot be read stays: the frame's policy then blocks it.
- * What the replacements add is bounded (`shared`: one budget for a chapter's styles and markup). The cost of an address is its data URL
- * times how often it appears, taken from the blob's size BEFORE it is converted, so one that will not fit is never encoded; and the
- * addresses are read one at a time, so a chapter with many of them never holds them all at once.
- */
-export const inlineBlobUrls = async (text: string, signal?: AbortSignal, shared?: { left: number }): Promise<string> => {
-    const budget = shared ?? { left: MAX_INLINED_CHARS };
-    const counts = new Map<string, number>();
+const SCHEME = /^[a-z][a-z\d+.-]*:/iu;
+const QUERY_OR_FRAGMENT = /[#?]/u;
 
-    const found = text.match(BLOB_URL) ?? [];
+/** `reference` (a path in a chapter or a style sheet) as a path from the archive's root, or `undefined` for an address that is not a path in it. */
+const resolveInArchive = (reference: string, fromDirectory: string): string | undefined => {
+    const bare = reference.split(QUERY_OR_FRAGMENT, 1)[0]?.trim() ?? "";
 
-    for (const url of found) {
-        counts.set(url, (counts.get(url) ?? 0) + 1);
+    if (bare === "" || SCHEME.test(bare) || bare.startsWith("//")) {
+        return undefined;
     }
 
-    const inlined = new Map<string, string>();
+    let decoded = bare;
 
-    for (const [url, times] of counts) {
-        try {
-            const response = await fetch(url, { signal });
-            const blob = await response.blob();
-            const cost = dataUrlLength(blob) * times;
+    try {
+        decoded = decodeURIComponent(bare);
+    } catch {
+        // Kept as written.
+    }
 
-            if (cost <= budget.left) {
-                inlined.set(url, await readAsDataUrl(blob));
-                budget.left -= cost;
-            }
-        } catch {
-            // Left as it is.
+    const parts: string[] = bare.startsWith("/") ? [] : fromDirectory.split("/").filter(Boolean);
+
+    for (const part of decoded.split("/")) {
+        if (part === "..") {
+            parts.pop();
+        } else if (part !== "." && part !== "") {
+            parts.push(part);
         }
     }
 
-    return text.replaceAll(BLOB_URL, (url) => inlined.get(url) ?? url);
+    return parts.join("/");
 };
 
-/**
- * What the frame may load: nothing by itself, only styles written in the document and pictures or fonts carried in it. Scripts, frames,
- * forms, connections and every other address are refused. The frame's `sandbox` is the first wall and this the second, for a request
- * a chapter's markup could still make without a script (a picture or style sheet from another site).
- */
-export const FRAME_POLICY = "default-src 'none'; img-src data:; style-src 'unsafe-inline'; font-src data:";
+const directoryOf = (path: string): string => path.split("/").slice(0, -1).join("/");
+
+const extensionOf = (path: string): string => path.split(".").pop()?.toLowerCase() ?? "";
+
+/** What a chapter's reads draw on: one budget for its styles and its markup, a count of distinct files, and a reader of the archive. */
+interface AssetReader {
+    budget: { files: number; left: number };
+    /** A file as a `data:` URL, or `undefined` when it is not in the archive, does not fit the budget or the count, or is not a kind that is inlined. */
+    dataUrl: (path: string) => Promise<string | undefined>;
+    /** A text file of the archive. */
+    text: (path: string) => Promise<string | undefined>;
+}
+
+const assetReader = (zip: JSZip, signal?: AbortSignal): AssetReader => {
+    const budget = { files: MAX_ASSETS_PER_CHAPTER, left: MAX_INLINED_CHARS };
+    const seen = new Map<string, string | undefined>();
+
+    return {
+        budget,
+        dataUrl: async (path) => {
+            signal?.throwIfAborted();
+
+            if (seen.has(path)) {
+                return seen.get(path);
+            }
+
+            const type = MEDIA_TYPES[extensionOf(path)];
+            const entry = type === undefined ? null : zip.file(path);
+
+            if (entry === null || type === undefined || budget.files <= 0 || budget.left <= 0) {
+                seen.set(path, undefined);
+
+                return undefined;
+            }
+
+            budget.files -= 1;
+
+            const bytes = await entry.async("uint8array");
+            // From the size, before the encoding: one that will not fit is never encoded.
+            const length = `data:${type};base64,`.length + Math.ceil(bytes.length / 3) * 4;
+
+            if (length > budget.left) {
+                seen.set(path, undefined);
+
+                return undefined;
+            }
+
+            budget.left -= length;
+
+            const url = `data:${type};base64,${toBase64(bytes)}`;
+
+            seen.set(path, url);
+
+            return url;
+        },
+        text: async (path) => {
+            signal?.throwIfAborted();
+
+            return (await zip.file(path)?.async("string")) ?? undefined;
+        },
+    };
+};
 
 const CSS_IMPORT = /@import\b[^;{]*;?/giu;
 const CSS_URL = /url\(([^)]*)\)/giu;
@@ -150,17 +229,15 @@ const CSS_QUOTE = /^["']|["']$/gu;
 const CSS_SCRIPTY = /expression\s*\(|-moz-binding\s*:|behaviou?r\s*:/giu;
 const LESS_THAN = /</gu;
 
+const isDataUrl = (address: string): boolean => address.trim().replaceAll(CSS_QUOTE, "").trim().toLowerCase().startsWith("data:");
+
+const dataOnly = (match: string, argument: string): string => (isDataUrl(argument) ? match : 'url("")');
+
 /**
  * A book's style sheet as text for a `<style>` element: no `@import`, no `url()` that is not a `data:` one (it is made empty), no
  * `expression(`, `behavior:` or `-moz-binding:` (old engines ran script from them), and every `<` as the CSS escape `\3c `, so nothing in it
  * can end the element or begin markup. An ordinary sheet is otherwise as it was.
  */
-const dataOnly = (match: string, argument: string): string => {
-    const address = argument.trim().replaceAll(CSS_QUOTE, "").trim().toLowerCase();
-
-    return address.startsWith("data:") ? match : 'url("")';
-};
-
 export const safeStylesheet = (css: string): string => {
     const withoutImports = css.replaceAll(CSS_IMPORT, "");
     const dataUrlsOnly = withoutImports.replaceAll(CSS_URL, (match, argument: string) => dataOnly(match, argument));
@@ -168,23 +245,103 @@ export const safeStylesheet = (css: string): string => {
     return dataUrlsOnly.replaceAll(CSS_SCRIPTY, "blocked:").replaceAll(LESS_THAN, String.raw`\3c `);
 };
 
+/** A style sheet's relative `url()`s replaced by the files they name, within the chapter's budget; the rest are left for `safeStylesheet` to empty. */
+const inlineStylesheetUrls = async (css: string, directory: string, reader: AssetReader): Promise<string> => {
+    const found = [...css.matchAll(CSS_URL)].map((match) => match[1] ?? "");
+    const replaced = new Map<string, string>();
+
+    for (const argument of found) {
+        const reference = argument.trim().replaceAll(CSS_QUOTE, "").trim();
+        const path = resolveInArchive(reference, directory);
+
+        if (path !== undefined && !replaced.has(argument)) {
+            const url = await reader.dataUrl(path);
+
+            if (url !== undefined) {
+                replaced.set(argument, url);
+            }
+        }
+    }
+
+    return css.replaceAll(CSS_URL, (match, argument: string) => {
+        const url = replaced.get(argument);
+
+        return url === undefined ? match : `url("${url}")`;
+    });
+};
+
+/**
+ * What the frame may load: nothing by itself, only styles written in the document and pictures or fonts carried in it. Scripts, frames,
+ * forms, connections and every other address are refused. The frame's `sandbox` is the first wall and this the second, for a request
+ * a chapter's markup could still make without a script (a picture or style sheet from another site).
+ */
+export const FRAME_POLICY = "default-src 'none'; img-src data:; style-src 'unsafe-inline'; font-src data:; form-action 'none'";
+
 const LANGUAGE = /^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8}){0,3}$/u;
 
 const BASE_STYLE = "body{font-family:system-ui,sans-serif;line-height:1.6;margin:1rem;overflow-wrap:anywhere}img,svg,video{max-width:100%;height:auto}";
 
+/** Attributes that make a browser request something by themselves, and so may hold nothing but a `data:` address (or, for an SVG reference, a `#` one). */
+const LOADING_ATTRIBUTES: ReadonlyArray<string> = ["action", "background", "data", "formaction", "ping", "poster", "src", "srcset"];
+const REFERENCE_ATTRIBUTES: ReadonlyArray<string> = ["href", "xlink:href"];
+/** Elements that load or frame another document: none is wanted in a chapter, and the policy refuses what they would load. */
+const EMBEDDING_ELEMENTS = "iframe, frame, frameset, object, embed, link";
+const SELF_CONTAINED = /^\s*(?:data:|#)/iu;
+
 /**
- * A chapter's markup as a whole document. The markup is parsed first by the browser's parser, in a document of its own that loads and runs
- * nothing, and its `<meta>` and `<base>` elements are dropped (a refresh directive, or a base that would move its links). The policy
- * comes first in the head, ahead of anything the chapter or its styles add. A link in it opens nowhere (`target` with no popups allowed).
+ * Takes out of parsed chapter markup what could reach beyond it: every `<meta>` and `<base>` (a refresh directive moves a frame with no script
+ * and there is no list of its spellings to match, so none is kept); the elements that embed another document; every attribute that loads
+ * something unless it holds a `data:` address; and the cleaning of `style` attributes and `<style>` elements. An anchor keeps its `href`, which
+ * goes nowhere, and every explicit `target` of an anchor or area becomes `_blank`, which a frame with no popups allowed opens nowhere.
  */
-export const chapterDocument = (body: string, styles: ReadonlyArray<string>, language?: string): string => {
-    const frame = new DOMParser().parseFromString("<!doctype html><html><head></head><body></body></html>", "text/html");
-
-    frame.body.innerHTML = body;
-
-    for (const element of frame.querySelectorAll("meta, base")) {
+const neutralize = (root: Element): void => {
+    for (const element of root.querySelectorAll("meta, base")) {
         element.remove();
     }
+
+    for (const element of root.querySelectorAll(EMBEDDING_ELEMENTS)) {
+        element.remove();
+    }
+
+    for (const element of root.querySelectorAll("*")) {
+        for (const name of LOADING_ATTRIBUTES) {
+            if (element.hasAttribute(name) && !SELF_CONTAINED.test(element.getAttribute(name) ?? "")) {
+                element.removeAttribute(name);
+            }
+        }
+
+        if (element.localName !== "a" && element.localName !== "area") {
+            for (const name of REFERENCE_ATTRIBUTES) {
+                if (element.hasAttribute(name) && !SELF_CONTAINED.test(element.getAttribute(name) ?? "")) {
+                    element.removeAttribute(name);
+                }
+            }
+        }
+
+        if (element.localName === "a" || element.localName === "area") {
+            element.setAttribute("target", "_blank");
+            element.setAttribute("rel", "noopener noreferrer");
+        }
+
+        const style = element.getAttribute("style");
+
+        if (style !== null) {
+            element.setAttribute("style", safeStylesheet(style));
+        }
+
+        if (element.localName === "style") {
+            element.textContent = safeStylesheet(element.textContent ?? "");
+        }
+    }
+};
+
+/**
+ * A chapter's markup as a whole document. The policy is the first element of the head, written before any of the chapter is; the markup is
+ * then parsed by the browser's own parser in a document of its own that loads and runs nothing, neutralized (`neutralize`), and only then moved
+ * into the document. The book's styles follow the policy as inert text (`safeStylesheet`).
+ */
+export const chapterDocument = (markup: string, styles: ReadonlyArray<string>, language?: string): string => {
+    const frame = new DOMParser().parseFromString("<!doctype html><html><head></head><body></body></html>", "text/html");
 
     const make = (tag: string, attributes: Record<string, string> = {}, text?: string): HTMLElement => {
         const element = frame.createElement(tag);
@@ -200,10 +357,11 @@ export const chapterDocument = (body: string, styles: ReadonlyArray<string>, lan
         return element;
     };
 
+    // The head first, the policy first in it: before any markup of the chapter is written into the document.
     const head: Node[] = [
+        make("meta", { content: FRAME_POLICY, "http-equiv": "Content-Security-Policy" }),
         // eslint-disable-next-line unicorn/text-encoding-identifier-case -- the HTML label; `utf8` is not the one a document names
         make("meta", { charset: "utf-8" }),
-        make("meta", { content: FRAME_POLICY, "http-equiv": "Content-Security-Policy" }),
         make("base", { target: "_blank" }),
         make("style", {}, BASE_STYLE),
         ...styles.map((style) => make("style", {}, safeStylesheet(style))),
@@ -219,14 +377,68 @@ export const chapterDocument = (body: string, styles: ReadonlyArray<string>, lan
         frame.documentElement.setAttribute("lang", language);
     }
 
+    const chapter = new DOMParser().parseFromString(`<!doctype html><html><body>${markup}</body></html>`, "text/html");
+
+    neutralize(chapter.body);
+
+    for (const node of chapter.body.childNodes) {
+        frame.body.appendChild(frame.importNode(node, true));
+    }
+
     return `<!doctype html>${frame.documentElement.outerHTML}`;
 };
 
+/** A chapter read from the archive: its markup with its pictures inlined, and its styles, in the order the chapter names them. */
+const readChapter = async (chapterPath: string, reader: AssetReader): Promise<{ markup: string; styles: string[] }> => {
+    const source = await reader.text(chapterPath);
+
+    if (source === undefined) {
+        throw new Error("chapter not found");
+    }
+
+    const directory = directoryOf(chapterPath);
+    const parsed = new DOMParser().parseFromString(source, "text/html");
+    const styles: string[] = [];
+
+    for (const link of parsed.querySelectorAll('link[rel~="stylesheet" i][href]')) {
+        const path = resolveInArchive(link.getAttribute("href") ?? "", directory);
+        const text = path === undefined ? undefined : await reader.text(path);
+
+        if (path !== undefined && text !== undefined) {
+            styles.push(await inlineStylesheetUrls(text, directoryOf(path), reader));
+        }
+    }
+
+    for (const style of parsed.querySelectorAll("style")) {
+        style.textContent = await inlineStylesheetUrls(style.textContent ?? "", directory, reader);
+    }
+
+    for (const element of parsed.body.querySelectorAll("img[src], source[src], video[poster], image, input[src], audio[src]")) {
+        for (const name of ["src", "poster", "href", "xlink:href"]) {
+            const value = element.getAttribute(name);
+            const path = value === null ? undefined : resolveInArchive(value, directory);
+            const url = path === undefined ? undefined : await reader.dataUrl(path);
+
+            if (url !== undefined) {
+                element.setAttribute(name, url);
+            }
+        }
+    }
+
+    // eslint-disable-next-line unicorn/prefer-dom-node-html-methods -- `getHTML` is not in every engine this runs in (nor in jsdom)
+    return { markup: parsed.body.innerHTML, styles };
+};
+
+/** Books opened so far: each gets a folder of its own for the parser, so two books never write over each other. */
+const opened = { count: 0 };
+
 export const openEpub = async (bytes: Uint8Array, resourceSaveDirectory?: string): Promise<OpenedEpub> => {
-    const { initEpubFile } = await import("@lingo-reader/epub-parser");
-    const book = await initEpubFile(bytes, resourceSaveDirectory);
+    const [{ initEpubFile }, zip] = await Promise.all([import("@lingo-reader/epub-parser"), JSZip.loadAsync(bytes)]);
+    // The parser reads the structure only; it is given a folder of its own (its default is shared by every book on the page).
+    const book = await initEpubFile(bytes, resourceSaveDirectory ?? `./epub-${String(++opened.count)}`);
     const spine = book.getSpine().filter((item) => READABLE_TYPES.has(item.mediaType));
     const titles = titlesBySpineItem(book.getToc(), spine);
+    const pathById = new Map(spine.map((item) => [item.id, pathOf(item.href)]));
     const { language } = book.getMetadata();
     let isDestroyed = false;
 
@@ -249,23 +461,16 @@ export const openEpub = async (bytes: Uint8Array, resourceSaveDirectory?: string
             return isDestroyed;
         },
         read: async (id, signal) => {
-            const { css, html } = await book.loadChapter(id);
-            // One budget for the chapter: its styles and its markup together.
-            const budget = { left: MAX_INLINED_CHARS };
-            const styles: string[] = [];
+            const chapterPath = pathById.get(id);
 
-            for (const part of css) {
-                try {
-                    const response = await fetch(part.href, { signal });
-                    const text = await response.text();
-
-                    styles.push(await inlineBlobUrls(text, signal, budget));
-                } catch {
-                    styles.push("");
-                }
+            if (chapterPath === undefined) {
+                throw new Error("unknown chapter");
             }
 
-            return chapterDocument(await inlineBlobUrls(html, signal, budget), styles, language);
+            const reader = assetReader(zip, signal);
+            const { markup, styles } = await readChapter(chapterPath, reader);
+
+            return chapterDocument(markup, styles, language);
         },
     };
 };

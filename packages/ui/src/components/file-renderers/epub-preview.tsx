@@ -97,6 +97,9 @@ const fetchBook = async (url: string, maxBytes: number, signal: AbortSignal): Pr
     const declared = Number(response.headers.get("content-length"));
 
     if (declared > maxBytes) {
+        // Not read, and not left open either: the connection is let go.
+        await response.body?.cancel().catch(() => undefined);
+
         throw TooLarge;
     }
 
@@ -127,7 +130,7 @@ const EpubPreview: FC<EpubPreviewProps> = memo(({ className, filename, maxBytes 
     // one, and a book whose load was torn down (the effect's cleanup destroys it) is not one to show again if the same file comes back.
     const key = `${url}\n${String(maxBytes)}`;
     const [loaded, setLoaded] = useState<{ key: string; load: Load }>({ key, load: { status: "loading" } });
-    const [shown, setShown] = useState<{ doc: string; id: string; key: string } | undefined>();
+    const [shown, setShown] = useState<{ book: OpenedEpub; doc: string; id: string; key: string } | undefined>();
     const [position, setPosition] = useState({ index: 0, key });
     const isLive = loaded.key === key && !(loaded.load.status === "ready" && loaded.load.book.destroyed);
     const load: Load = isLive ? loaded.load : { status: "loading" };
@@ -220,7 +223,7 @@ const EpubPreview: FC<EpubPreviewProps> = memo(({ className, filename, maxBytes 
                 const doc = await Promise.race([book.read(chapterId, controller.signal), timeout]);
 
                 if (!cancelled) {
-                    setShown({ doc, id: chapterId, key });
+                    setShown({ book, doc, id: chapterId, key });
                 }
             } catch {
                 if (!cancelled) {
@@ -296,7 +299,7 @@ const EpubPreview: FC<EpubPreviewProps> = memo(({ className, filename, maxBytes 
                         className="bg-background h-[500px] w-full border-0"
                         referrerPolicy="no-referrer"
                         sandbox=""
-                        srcDoc={shown !== undefined && shown.id === chapterId && shown.key === key ? shown.doc : undefined}
+                        srcDoc={shown !== undefined && shown.book === book && shown.id === chapterId && shown.key === key ? shown.doc : undefined}
                         title={chapter?.title ?? label}
                     />
                     <div className="bg-muted/50 flex items-center justify-between gap-2 border-t px-3 py-1.5">

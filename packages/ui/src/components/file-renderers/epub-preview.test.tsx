@@ -18,6 +18,7 @@ const book = vi.hoisted(() => {
         guardArgs: [] as unknown[],
         opened: 0,
         openGate: undefined as Promise<void> | undefined,
+        readGate: undefined as Promise<void> | undefined,
         reads: [] as string[],
         stall: false,
         throwOnOpen: false,
@@ -49,6 +50,7 @@ vi.mock("./epub-book", () => {
             }
 
             let destroyed = false;
+            const number = book.opened;
 
             return {
                 chapters: [{ id: "c1", title: "Beginning" }, { id: "c2" }, { id: "c3", title: "End" }].slice(0, book.chapters),
@@ -70,7 +72,11 @@ vi.mock("./epub-book", () => {
                         await new Promise(() => {});
                     }
 
-                    return `<body>chapter ${id}${id === "c2" ? "<script>window.ran = true</script>" : ""}</body>`;
+                    if (book.readGate !== undefined) {
+                        await book.readGate;
+                    }
+
+                    return `<body>book ${String(number)} chapter ${id}${id === "c2" ? "<script>window.ran = true</script>" : ""}</body>`;
                 },
             };
         },
@@ -137,6 +143,7 @@ beforeEach(() => {
     book.guard = undefined;
     book.guardArgs = [];
     book.openGate = undefined;
+    book.readGate = undefined;
     book.opened = 0;
     book.reads = [];
     book.stall = false;
@@ -431,5 +438,75 @@ describe("EpubPreview load generations", () => {
         } finally {
             vi.useRealTimers();
         }
+    });
+});
+
+describe("EpubPreview other books and bodies", () => {
+    const render = async (url: string) => {
+        await act(async () => {
+            view.root.render(
+                <FetchableOriginsProvider origins={[ORIGIN]}>
+                    <EpubPreview filename="book.epub" url={url} />
+                </FetchableOriginsProvider>,
+            );
+        });
+        await act(async () => {
+            await Promise.resolve();
+        });
+    };
+
+    it("does not show the chapter of an earlier book once another book is the one shown", async () => {
+        answer(new Uint8Array([1]));
+        await render(`${ORIGIN}/a.epub`);
+        expect(frame().getAttribute("srcdoc")).toContain("book 1 chapter c1");
+
+        // The next book is ready, but its first chapter is still being read: the earlier book's chapter is not shown in its place.
+        let release: () => void = () => undefined;
+
+        // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- the configured Node range (22.0) predates `Promise.withResolvers`
+        book.readGate = new Promise<void>((resolve) => {
+            release = resolve;
+        });
+        await render(`${ORIGIN}/b.epub`);
+        expect(view.container.querySelector("iframe")).not.toBeNull();
+        expect(frame().getAttribute("srcdoc") ?? "").not.toContain("book 1");
+        expect(frame().hasAttribute("srcdoc")).toBe(false);
+
+        release();
+        await act(async () => {
+            await Promise.resolve();
+        });
+        await act(async () => {
+            await Promise.resolve();
+        });
+        expect(frame().getAttribute("srcdoc")).toContain("book 2 chapter c1");
+    });
+
+    it("lets go of the body of a response that declares more than the cap, without reading it", async () => {
+        let cancelled = false;
+        const stream = new ReadableStream<Uint8Array>({
+            cancel() {
+                cancelled = true;
+            },
+            pull(controller) {
+                controller.enqueue(new Uint8Array(10));
+            },
+        });
+
+        vi.stubGlobal("fetch", async () => new Response(stream, { headers: { "content-length": "5000" }, status: 200 }));
+        await act(async () => {
+            view.root.render(
+                <FetchableOriginsProvider origins={[ORIGIN]}>
+                    <EpubPreview filename="book.epub" maxBytes={1000} url={`${ORIGIN}/big.epub`} />
+                </FetchableOriginsProvider>,
+            );
+        });
+        await act(async () => {
+            await Promise.resolve();
+        });
+
+        expect(view.container.textContent).toContain("Too large to preview");
+        expect(cancelled).toBe(true);
+        expect(book.opened).toBe(0);
     });
 });
