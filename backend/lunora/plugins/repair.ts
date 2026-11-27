@@ -197,8 +197,10 @@ export const repairRows = async (ctx: MutationCtx, userId: string, pluginSlug: s
     }
 
     if (missing.length === 0) {
-        // An update kept for repair holds its target version; finishing the repair makes it the installed one.
+        // An update kept for repair holds its target version; finishing the repair makes it the installed one. The next generation
+        // fences out the action that stopped: an installed row carries no lease, so its generation is all that refuses it.
         await patchRow(ctx.db, "pluginInstalls", install, {
+            generation: install.generation + 1,
             leaseUntil: undefined,
             status: "installed",
             targetVersion: undefined,
@@ -210,7 +212,11 @@ export const repairRows = async (ctx: MutationCtx, userId: string, pluginSlug: s
     }
 
     if (install.status === "installing") {
-        await ctx.db.patch("pluginInstalls", install._id as Id<"pluginInstalls">, { status: "needs-repair", updatedAt: ctx.now });
+        await ctx.db.patch("pluginInstalls", install._id as Id<"pluginInstalls">, {
+            generation: install.generation + 1,
+            status: "needs-repair",
+            updatedAt: ctx.now,
+        });
     }
 
     return { linked, missing, status: "needs-repair" };

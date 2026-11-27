@@ -70,6 +70,22 @@ describe("repair", () => {
         expect(install).toMatchObject({ status: "installed" });
     });
 
+    it("moves the generation on when it finishes a repair, so the action that stopped can write nothing more", async () => {
+        const { generation, installId } = await run(
+            async (context) => await context.runMutation(createInstallRow, { contentHash: HASH, pluginSlug: SLUG, userId: OWNER, version: "1.0.0" }),
+        );
+
+        await run(async (context) => await context.runMutation(markNeedsRepair, { generation, installId }));
+        await run(async (context) => await repairRows(context, OWNER, SLUG));
+
+        // The stopped action wakes up and tries to finish: its generation is no longer the install's.
+        await expect(run(async (context) => await context.runMutation(markNeedsRepair, { generation, installId }))).rejects.toThrow("STALE_LEASE");
+
+        const install = await run(async (context) => await context.db.pluginInstalls.findFirst({ where: { _id: installId } }));
+
+        expect(install).toMatchObject({ generation: generation + 1, status: "installed" });
+    });
+
     it("stays in needs-repair and names the entry when its child was never created", async () => {
         const { generation, installId } = await run(
             async (context) => await context.runMutation(createInstallRow, { contentHash: HASH, pluginSlug: SLUG, userId: OWNER, version: "1.0.0" }),
