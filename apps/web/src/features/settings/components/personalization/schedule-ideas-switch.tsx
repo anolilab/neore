@@ -6,7 +6,6 @@ import type { FC } from "react";
 import { toast } from "sonner";
 
 import SettingsRow from "@/components/settings/settings-row";
-
 import { useUpdateUserSettings, useUserSettings } from "@/features/auth/hooks/use-user-settings";
 
 interface ScheduleIdeasSwitchProps {
