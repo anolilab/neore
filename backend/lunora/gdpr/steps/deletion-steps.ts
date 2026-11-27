@@ -2,8 +2,7 @@ import { v } from "lunorash/server";
 
 import { internalMutation } from "../../_generated/server";
 import { endHostThread } from "../../acp/lib/thread-removed";
-import { deleteEventWebhookHostsOf } from "../../auth/event-webhook-hosts";
-import { deleteAccountsOf, deleteSessionsOf, deleteUserSettingRows } from "../../auth/gdpr";
+import { deleteAccountsOf, deleteEventWebhookHostsOf, deleteSessionsOf, deleteUserSettingRows } from "../../auth/gdpr";
 import { deleteShardRoutesOf } from "../../lib/shard-routes";
 import { eraseConnectorsForUser } from "../../connectors/gdpr";
 import {

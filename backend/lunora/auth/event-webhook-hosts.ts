@@ -8,9 +8,10 @@
  */
 import { LunoraError, v } from "lunorash/server";
 
-import type { MutationCtx, QueryCtx } from "../_generated/server";
+import type { QueryCtx } from "../_generated/server";
 import { internalQuery } from "../_generated/server";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
+import { onOwnShard } from "../lib/own-shard";
 import { MAX_APPROVED_HOSTS, normalizeApprovedHost } from "../public-api/events-webhook";
 
 /**
@@ -61,6 +62,10 @@ export const addEventWebhookHost = authMutation
             throw new LunoraError("FORBIDDEN", "Callback hosts cannot be approved while impersonating");
         }
 
+        if (!onOwnShard(context.user.userId)) {
+            throw new LunoraError("FORBIDDEN", "Callback hosts are saved on your own account only.");
+        }
+
         const host = normalizeApprovedHost(args.host);
 
         if (host === null) {
@@ -98,6 +103,10 @@ export const removeEventWebhookHost = authMutation
             throw new LunoraError("FORBIDDEN", "Callback hosts cannot be removed while impersonating");
         }
 
+        if (!onOwnShard(context.user.userId)) {
+            throw new LunoraError("FORBIDDEN", "Callback hosts are saved on your own account only.");
+        }
+
         const host = normalizeApprovedHost(args.host);
 
         if (host === null) {
@@ -115,12 +124,3 @@ export const removeEventWebhookHost = authMutation
 
         return { removed: page.length > 0 };
     });
-
-/** Erases the account's approved hosts (account deletion, `gdpr/steps/deletion-steps.ts`). */
-export const deleteEventWebhookHostsOf = async (ctx: Pick<MutationCtx, "db">, userId: string): Promise<void> => {
-    const { page } = await ctx.db.eventWebhookHosts.findMany({ where: { userId } });
-
-    for (const row of page) {
-        await ctx.db.delete("eventWebhookHosts", row._id);
-    }
-};

@@ -6,6 +6,7 @@
 import { lunoraTest } from "@lunora/testing";
 import { describe, expect, it } from "vitest";
 
+import { cascadeDeleteUser } from "./hooks";
 import schema from "../schema";
 import { addEventWebhookHost, listEventWebhookHosts, removeEventWebhookHost } from "./event-webhook-hosts";
 
@@ -31,6 +32,24 @@ const signedIn = async (harness: ReturnType<typeof lunoraTest>) =>
     })) as { sessionId: string; userId: string };
 
 describe("the owner's approved callback hosts", () => {
+    it("erases the owner's approved hosts with the account's cascade delete, as the admin cleanup runs it", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            const identity = await signedIn(harness);
+            const as = harness.withIdentity(identity as never);
+
+            await as.mutation(addEventWebhookHost as never, { host: "hooks.example.com" } as never);
+            await harness.run(async (context: any) => await context.runMutation(cascadeDeleteUser, { userId: identity.userId }));
+
+            const left = await harness.run(async (context: any) => await context.db.eventWebhookHosts.findMany({ where: { userId: identity.userId } }));
+
+            expect(left.page).toStrictEqual([]);
+        } finally {
+            harness.close();
+        }
+    });
+
     it("lists every host a merge left the owner with, past the add cap", async () => {
         const harness = lunoraTest(schema as never);
 

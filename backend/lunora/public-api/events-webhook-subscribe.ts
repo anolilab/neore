@@ -11,6 +11,7 @@ import { internal } from "../_generated/internal";
 import { BETTER_AUTH_SECRET } from "../env";
 import { encryptKey } from "../lib/encryption";
 import { inShard } from "../lib/http-shard";
+import { fromProcedureError } from "./errors";
 import { decodeEventCursor, encodeEventCursor } from "./events-cursor";
 import {
     CALLBACK_ENDPOINT_ERROR,
@@ -35,7 +36,9 @@ export const subscribeWebhook = async (lunora: HttpActionCtx, identity: ApiKeyId
         lunora,
         userId,
         async (ctx) => await ctx.runQuery(internal.auth.event_webhook_hosts.hostApproved, { host: request.host, userId }),
-    );
+    ).catch((error: unknown) => {
+        throw fromProcedureError(error);
+    });
 
     if (!approved) {
         throw new EventsWebhookError(FORBIDDEN, "The callback host is not on this account's approved list.", {
@@ -81,7 +84,9 @@ export const subscribeWebhook = async (lunora: HttpActionCtx, identity: ApiKeyId
                 url: request.url,
                 userId,
             }),
-    );
+    ).catch((error: unknown) => {
+        throw fromProcedureError(error);
+    });
 
     if (outcome.refusal === "host_not_approved") {
         throw new EventsWebhookError(FORBIDDEN, "The callback host is not on this account's approved list.", {
@@ -114,7 +119,13 @@ export const subscribeWebhook = async (lunora: HttpActionCtx, identity: ApiKeyId
 export const unsubscribeWebhook = async (lunora: HttpActionCtx, identity: ApiKeyIdentity, request: UnsubscribeRequest): Promise<void> => {
     const { userId } = identity;
     const keyHash = await subscriptionKeyHash(identity.apiKeyId, request.url, request.name, request.argumentsKey);
-    const { found } = await inShard(lunora, userId, async (ctx) => await ctx.runMutation(internal.public_api.event_webhooks.unsubscribe, { keyHash, userId }));
+    const { found } = await inShard(
+        lunora,
+        userId,
+        async (ctx) => await ctx.runMutation(internal.public_api.event_webhooks.unsubscribe, { keyHash, userId }),
+    ).catch((error: unknown) => {
+        throw fromProcedureError(error);
+    });
 
     if (!found) {
         throw new EventsWebhookError(NOT_FOUND, "No subscription matches this key.", { kind: "subscription" });

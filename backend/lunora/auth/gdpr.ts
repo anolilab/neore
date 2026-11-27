@@ -137,3 +137,12 @@ export const deleteUserRecord = async (ctx: MutationCtx, userId: Id<"user">): Pr
         await ctx.db.delete("user", userId);
     }
 };
+
+/** Erases the account's approved hosts (account deletion, `gdpr/steps/deletion-steps.ts`). */
+export const deleteEventWebhookHostsOf = async (ctx: Pick<MutationCtx, "db">, userId: string): Promise<void> => {
+    const { page } = await ctx.db.eventWebhookHosts.findMany({ where: { userId } });
+
+    for (const row of page) {
+        await ctx.db.delete("eventWebhookHosts", row._id);
+    }
+};
