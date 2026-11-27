@@ -5,11 +5,10 @@
  *
  * Creating a child that never existed is not done here: that needs the resume path, which is not built yet.
  */
-import { LunoraError, v } from "lunorash/server";
+import { LunoraError } from "lunorash/server";
 
 import type { Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
-import { authMutation } from "../lib/crpc";
 import { skillRowHash } from "./entry-hash";
 import { markerFor } from "./logic";
 import type { ChildKind } from "./logic";
@@ -130,8 +129,3 @@ export const repairRows = async (ctx: MutationCtx, userId: string, pluginSlug: s
 
     return { linked, missing, status: "needs-repair" };
 };
-
-export const repairPlugin = authMutation
-    .input({ pluginSlug: v.string().max(64) })
-    .output(v.object({ linked: v.number(), missing: v.array(v.string()), status: v.union(v.literal("installed"), v.literal("needs-repair")) }))
-    .mutation(async ({ args, ctx }) => await repairRows(ctx, ctx.user.userId, args.pluginSlug));

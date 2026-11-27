@@ -81,10 +81,13 @@ describe("applying an update", () => {
                     installId,
                     instructions: REVISED.instructions,
                     name: REVISED.name,
+                    slug: REVISED.slug,
                     userId: OWNER,
                 }),
         );
-        await run(async (context) => await context.runMutation(finishUpdate, { generation, installId, version: "1.1.0" }));
+        await run(
+            async (context) => await context.runMutation(finishUpdate, { contentHash: await skillRowHash(REVISED), generation, installId, version: "1.1.0" }),
+        );
 
         const skill = await run(async (context) => await context.db.skills.findFirst({ where: { _id: skillId } }));
         const link = await run(async (context) => (await context.db.pluginItems.findMany({ where: { installId } })).page[0]);
@@ -113,6 +116,7 @@ describe("applying an update", () => {
                         installId,
                         instructions: REVISED.instructions,
                         name: REVISED.name,
+                        slug: REVISED.slug,
                         userId: OWNER,
                     }),
             ),
@@ -121,5 +125,78 @@ describe("applying an update", () => {
         const skill = await run(async (context) => await context.db.skills.findFirst({ where: { _id: skillId } }));
 
         expect(skill).toMatchObject({ instructions: "Changed by the owner." });
+    });
+
+    it("refuses a planned slug that is reserved, and writes nothing to the skill or its link", async () => {
+        const { installId, skillId } = await installed();
+        const generation = await run(async (context) => await context.runMutation(beginUpdate, { installId, targetVersion: "1.1.0", userId: OWNER }));
+
+        await expect(
+            run(
+                async (context) =>
+                    await context.runMutation(updateSkillChild, {
+                        contentHash: await skillRowHash({ ...REVISED, slug: "clear" }),
+                        description: REVISED.description,
+                        entryKey: "skill:analyst",
+                        generation,
+                        installId,
+                        instructions: REVISED.instructions,
+                        name: REVISED.name,
+                        slug: "clear",
+                        userId: OWNER,
+                    }),
+            ),
+        ).rejects.toThrow("reserved");
+
+        const skill = await run(async (context) => await context.db.skills.findFirst({ where: { _id: skillId } }));
+        const { page: links } = await run(async (context) => await context.db.pluginItems.findMany({ where: { installId } }));
+        const link = links[0];
+
+        expect(skill).toMatchObject({ slug: "analyst" });
+        // An unset pending hash and an empty one both mean "no update in progress".
+        expect(link?.pendingHash ?? "").toBe("");
+    });
+
+    it("refuses a planned slug that another skill of the person holds by the time the update writes", async () => {
+        const { installId, skillId } = await installed();
+
+        // A skill another request created after the preview read the person's slugs.
+        await run(
+            async (context) =>
+                await context.runMutation(createPluginSkill, {
+                    ...ANALYST,
+                    isPremium: true,
+                    name: "Taken",
+                    plan: "premium",
+                    pluginInstallId: installId,
+                    pluginMarker: markerFor(installId, "skill:other"),
+                    slug: "taken",
+                    source: { type: "plugin" as const, version: "1.0.0" },
+                    userId: OWNER,
+                }),
+        );
+
+        const generation = await run(async (context) => await context.runMutation(beginUpdate, { installId, targetVersion: "1.1.0", userId: OWNER }));
+
+        await expect(
+            run(
+                async (context) =>
+                    await context.runMutation(updateSkillChild, {
+                        contentHash: await skillRowHash({ ...REVISED, slug: "taken" }),
+                        description: REVISED.description,
+                        entryKey: "skill:analyst",
+                        generation,
+                        installId,
+                        instructions: REVISED.instructions,
+                        name: REVISED.name,
+                        slug: "taken",
+                        userId: OWNER,
+                    }),
+            ),
+        ).rejects.toThrow("already exists");
+
+        const skill = await run(async (context) => await context.db.skills.findFirst({ where: { _id: skillId } }));
+
+        expect(skill).toMatchObject({ slug: "analyst" });
     });
 });
