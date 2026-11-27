@@ -84,17 +84,56 @@ export const capSearchTerms = (text: string): string => {
 };
 
 /**
- * Where in `text` the first word holding a term of the query starts, matched as {@link matchesQueryTerms} matches it
- * (case and accents folded, the last term also as the start of a word), or -1 when none does.
+ * The terms of one word as {@link splitCjk} splits it, each with its offset in the word as written: the other text
+ * normalised whole, each Chinese, Japanese or Korean pair at its own first character.
+ */
+const termsAt = (word: string): { at: number; term: string }[] => {
+    if (!CJK.test(word)) {
+        return [{ at: 0, term: normalize(word) }];
+    }
+
+    const out: { at: number; term: string }[] = [];
+    let last = 0;
+
+    for (const match of word.matchAll(CJK_RUN)) {
+        const characters = [...match[0]];
+
+        if (match.index > last) {
+            out.push({ at: last, term: normalize(word.slice(last, match.index)) });
+        }
+
+        last = match.index + match[0].length;
+
+        let at = match.index;
+
+        for (let index = 0; index < Math.max(1, characters.length - 1); index += 1) {
+            out.push({ at, term: characters.length === 1 ? match[0] : `${characters[index]}${characters[index + 1]}` });
+            at += characters[index]!.length;
+        }
+    }
+
+    if (last < word.length) {
+        out.push({ at: last, term: normalize(word.slice(last)) });
+    }
+
+    return out;
+};
+
+/**
+ * Where in `text` the first term of the query appears, matched as {@link matchesQueryTerms} matches it (case and
+ * accents folded, the last term also as the start of a term): the start of its word, or of its own pair inside a run of
+ * Chinese, Japanese or Korean. -1 when none does.
  */
 export const firstTermIndex = (text: string, query: ReadonlyArray<string>): number => {
     const last = query.length - 1;
 
     for (const match of text.matchAll(WORD)) {
-        const candidates = splitCjk(normalize(match[0]));
+        const candidates = termsAt(match[0]);
 
-        if (candidates.some((candidate) => query.some((term, index) => (index === last ? candidate.startsWith(term) : candidate === term)))) {
-            return match.index;
+        for (const { at, term: candidate } of candidates) {
+            if (query.some((term, index) => (index === last ? candidate.startsWith(term) : candidate === term))) {
+                return match.index + at;
+            }
         }
     }
 

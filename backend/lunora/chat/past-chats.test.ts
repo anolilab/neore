@@ -35,6 +35,7 @@ vi.mock("../lib/audit-triggers", async (importOriginal) => {
 const OWNER = "user-owner";
 const OTHER = "user-other";
 const SENT_AT = Date.UTC(2026, 2, 4, 23, 30);
+const NOW = Date.UTC(2026, 3, 1);
 
 type Hit = { sentAt: number; snippet: string; title: string };
 type Result = { hits: Hit[]; preparing?: true; truncated?: true; unavailable?: string };
@@ -60,12 +61,23 @@ const insertPrompt = (context: any, fields: { createdAt?: number; order?: number
 const insertThread = (
     context: any,
     fields: { botId?: string; externalThreadId?: string; isPublic?: boolean; lockedAt?: number; tags?: string[]; title: string; userId?: string },
-) => context.db.insert("threads", { model: "gpt-4o", status: "active", userId: OWNER, ...fields });
+) => context.db.insert("threads", { model: "gpt-4o", status: "active", tags: ["chat"], userId: OWNER, ...fields });
+
+/** An untagged chat (as a branch, side chat or import is created), linked to `parentThreadId` when one is given. */
+const insertUntaggedThread = async (context: any, title: string, parentThreadId?: string) => {
+    const threadId = await context.db.insert("threads", { model: "gpt-4o", status: "active", title, userId: OWNER });
+
+    if (parentThreadId !== undefined) {
+        await context.db.insert("threadRelationships", { branchType: "branch", createdAt: 0, parentThreadId, threadId, userId: OWNER });
+    }
+
+    return threadId;
+};
 
 const withMemory = (context: any, memoryEnabled = true) => context.db.insert("userSettings", { memoryEnabled, userId: OWNER });
 
 const searchIn = (harness: ReturnType<typeof lunoraTest>, args: { limit?: number; query: string; threadId: string }) =>
-    harness.run(async (context: any) => (await context.runQuery(searchPastChats, { userId: OWNER, ...args })) as Result);
+    harness.run(async (context: any) => (await context.runQuery(searchPastChats, { now: NOW, userId: OWNER, ...args })) as Result);
 
 describe("searchPastChats", () => {
     it("returns the caller's own typed words from their other private chats, with title, send time and excerpt", async () => {
@@ -149,7 +161,7 @@ describe("searchPastChats", () => {
         }
     });
 
-    it("never reads what the user did not type: messenger, sub-agent, worker, task, trigger or eval chats", async () => {
+    it("reads only chats a person types into, and their branches: no messenger, sub-agent, worker, task, trigger, eval, pull request or import chat", async () => {
         const harness = lunoraTest(schema as never);
 
         try {
@@ -164,6 +176,9 @@ describe("searchPastChats", () => {
                     { tags: ["task"], title: "Task" },
                     { tags: ["trigger"], title: "Trigger" },
                     { tags: ["eval"], title: "Eval" },
+                    // A pull request chat opens with a message the server writes.
+                    { tags: ["chat", "develop"], title: "Pull request" },
+                    { tags: ["chat", "kind-added-later"], title: "Unknown kind" },
                 ];
 
                 for (const [index, source] of sources.entries()) {
@@ -174,18 +189,28 @@ describe("searchPastChats", () => {
                     });
                 }
 
+                const plain = await insertThread(context, { title: "Plain" });
+                const task = await insertThread(context, { tags: ["task"], title: "Task parent" });
+
+                await insertPrompt(context, { createdAt: SENT_AT + 10, text: "Lisbon typed by the user", threadId: plain });
                 await insertPrompt(context, {
-                    createdAt: SENT_AT + 10,
-                    text: "Lisbon typed by the user",
-                    threadId: await insertThread(context, { tags: ["chat"], title: "Plain" }),
+                    createdAt: SENT_AT + 11,
+                    text: "Lisbon typed in a branch",
+                    threadId: await insertUntaggedThread(context, "Branch", plain),
                 });
+                await insertPrompt(context, {
+                    createdAt: SENT_AT + 12,
+                    text: "Lisbon copied from a task",
+                    threadId: await insertUntaggedThread(context, "Branch of a task", task),
+                });
+                await insertPrompt(context, { createdAt: SENT_AT + 13, text: "Lisbon imported", threadId: await insertUntaggedThread(context, "Import") });
 
                 return here;
             });
 
             const { hits } = await searchIn(harness, { query: "Lisbon", threadId: current });
 
-            expect(hits.map((hit) => hit.title)).toStrictEqual(["Plain"]);
+            expect(hits.map((hit) => hit.title).toSorted((a, b) => a.localeCompare(b))).toStrictEqual(["Branch", "Plain"]);
         } finally {
             harness.close();
         }
@@ -208,6 +233,64 @@ describe("searchPastChats", () => {
             for (const threadId of children) {
                 expect(await searchIn(harness, { query: "Lisbon", threadId })).toStrictEqual({ hits: [], unavailable: "background_run" });
             }
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("answers in no chat shared with someone a moment ago", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            const current = await harness.run(async (context: any) => {
+                await withMemory(context);
+
+                const here = await insertThread(context, { title: "Today" });
+
+                await insertPrompt(context, { text: "Lisbon apartment", threadId: await insertThread(context, { title: "Other" }) });
+                await context.db.insert("threadAccess", {
+                    grantedAt: NOW - 1,
+                    grantedBy: OWNER,
+                    ownerId: OWNER,
+                    permission: "read",
+                    threadId: here,
+                    userId: OTHER,
+                });
+
+                return here;
+            });
+
+            expect(await searchIn(harness, { query: "Lisbon", threadId: current })).toStrictEqual({ hits: [], unavailable: "not_private" });
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("does not call a full window cut short when it gave every hit asked for", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            const current = await harness.run(async (context: any) => {
+                await withMemory(context);
+
+                const here = await insertThread(context, { title: "Today" });
+
+                // A common word: more matching prompts than the first index window reads.
+                for (let index = 0; index < 120; index += 1) {
+                    await insertPrompt(context, {
+                        createdAt: SENT_AT + index,
+                        text: `common word ${String(index)}`,
+                        threadId: await insertThread(context, { title: `Chat ${String(index)}` }),
+                    });
+                }
+
+                return here;
+            });
+
+            const result = await searchIn(harness, { query: "common", threadId: current });
+
+            expect(result.hits).toHaveLength(5);
+            expect(result).not.toHaveProperty("truncated");
         } finally {
             harness.close();
         }

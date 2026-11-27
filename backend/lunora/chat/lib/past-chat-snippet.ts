@@ -16,6 +16,19 @@ const SPACES_RE = /\s+/gu;
 // Characters the cut may end on without halving a word, read from the window's edge inwards.
 const WORD_EDGE = 24;
 
+/**
+ * `index` moved off the middle of a surrogate pair: back before the pair for a cut's end, past it for a cut's start, so an
+ * emoji is kept whole or dropped whole. `length` and `slice` count UTF-16 units, so a plain cut can halve one.
+ */
+const codePointBoundary = (text: string, index: number, side: "end" | "start"): number => {
+    // A code point past U+FFFF starting just before `index` is a pair whose second half `index` would cut off.
+    if (index <= 0 || index >= text.length || (text.codePointAt(index - 1) ?? 0) <= 0xff_ff) {
+        return index;
+    }
+
+    return side === "end" ? index - 1 : index + 1;
+};
+
 /** The text on one line, made safe as data by the memory block's sanitiser (`neutraliseMemoryText`), runs of spaces collapsed. */
 const oneLine = (text: string): string => neutraliseMemoryText(text).replaceAll(SPACES_RE, " ");
 
@@ -23,7 +36,7 @@ const oneLine = (text: string): string => neutraliseMemoryText(text).replaceAll(
 export const pastChatTitle = (title: string): string => {
     const line = oneLine(title);
 
-    return line.length > PAST_CHAT_TITLE_MAX ? `${line.slice(0, PAST_CHAT_TITLE_MAX - 1)}…` : line;
+    return line.length > PAST_CHAT_TITLE_MAX ? `${line.slice(0, codePointBoundary(line, PAST_CHAT_TITLE_MAX - 1, "end"))}…` : line;
 };
 
 /**
@@ -64,6 +77,9 @@ export const pastChatSnippet = (typed: string, terms: ReadonlyArray<string>): st
             end = space;
         }
     }
+
+    start = codePointBoundary(line, start, "start");
+    end = codePointBoundary(line, end, "end");
 
     return `${start > 0 ? "…" : ""}${line.slice(start, end).trim()}${end < line.length ? "…" : ""}`;
 };

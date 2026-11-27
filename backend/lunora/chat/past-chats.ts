@@ -5,13 +5,13 @@ import type { Id } from "../_generated/dataModel";
 import { internal } from "../_generated/internal";
 import { internalQuery } from "../_generated/server";
 import type { ThreadDoc, TypedPromptRow } from "../agent/validators";
-import { loadEligibleThread } from "../devices/internal";
+import { threadSharedWithOthers } from "../agent/live-grant";
+import { isDeviceEligibleThread } from "../devices/internal";
 import { MAX_LENGTH } from "../lib/validators";
 import { readMemoryEnabled } from "../memory/functions";
 import { isSearchIndexBuilding, listsSentPrompts, sentPromptOf } from "./functions";
 import { PAST_CHAT_RESULTS_DEFAULT, PAST_CHAT_RESULTS_MAX, pastChatSnippet, pastChatTitle } from "./lib/past-chat-snippet";
 import { capSearchTerms, matchesQueryTerms, queryTerms } from "./lib/search-terms";
-import { TRIGGER_THREAD_TAG } from "../triggers/quiet";
 
 /**
  * Index hits read before the filters, then once more with the wider window when too few survived: the current chat's
@@ -22,23 +22,37 @@ const PAST_CHAT_WINDOW = 100;
 const PAST_CHAT_WINDOW_MAX = 400;
 /** Thread lookups that run at once inside one search. */
 const PAST_CHAT_LOOKUP_BATCH = 16;
+/** Parent links followed from an untagged chat to the chat it was copied from; a deeper chain is no source. */
+const PAST_CHAT_LINEAGE_DEPTH = 8;
+/** `threadRelationships` reads one search may make; past it an untagged chat is no source. */
+const PAST_CHAT_LINEAGE_READS = 64;
 
 const vPastChatHit = v.object({ sentAt: v.number(), snippet: v.string(), title: v.string() });
 
 /** Chats a sub-agent or a worker runs in (`sub-agents/`): what they post goes to the chat that started them, not here. */
 const CHILD_RUN_TAGS: ReadonlySet<string> = new Set(["sub-agent", "worker"]);
 /**
- * Chats whose prompts no person typed here: a sub-agent's or worker's brief, a task's instructions, a trigger's template,
- * an eval case. Their rows carry `typedText` like any prompt, so the chat is what tells them apart.
+ * The tags of the chats a person types into: the composer's (`chat`), a local model's (`local`) and a coding agent's on
+ * a paired computer (`host`). A chat whose tags are all of these, `chat` among them, is a source. Every other kind is
+ * not, whatever its tags: a sub-agent's or worker's brief, a task's instructions, a trigger's template, an eval case and
+ * a pull request chat's opening message (`develop`) carry `typedText` like any prompt, so the kind is what tells them
+ * apart, and a kind added later stays out until it is listed here.
  */
-const UNTYPED_PROMPT_TAGS: ReadonlySet<string> = new Set([...CHILD_RUN_TAGS, "eval", "task", TRIGGER_THREAD_TAG]);
+const TYPED_CHAT_TAGS: ReadonlySet<string> = new Set(["chat", "host", "local"]);
+/** Links whose chat starts as a copy of its parent's rows: a branch (no type on older links), a side chat, a comparison. */
+const COPY_LINKS: ReadonlySet<string | undefined> = new Set(["branch", "comparison", "side", undefined]);
 
-/**
- * Whether a chat's prompts are the caller's own typed words: none of {@link UNTYPED_PROMPT_TAGS}, and no messenger chat,
- * whose user rows hold what the connection's senders wrote.
- */
-const holdsTypedPrompts = (thread: ThreadDoc): boolean =>
-    thread.externalThreadId === undefined && thread.messengerConnectionId === undefined && (thread.tags ?? []).every((tag) => !UNTYPED_PROMPT_TAGS.has(tag));
+/** Whether a tagged chat is one a person types into ({@link TYPED_CHAT_TAGS}); a messenger chat never is. */
+const isTypedChatKind = (thread: ThreadDoc): boolean => {
+    const tags = thread.tags ?? [];
+
+    return (
+        thread.externalThreadId === undefined &&
+        thread.messengerConnectionId === undefined &&
+        tags.includes("chat") &&
+        tags.every((tag) => TYPED_CHAT_TAGS.has(tag))
+    );
+};
 
 /**
  * Why a search did not run: memory is off for the user (the same kind of recall, so it follows that setting), the chat it
@@ -54,16 +68,18 @@ const vPastChatUnavailable = v.union(v.literal("background_run"), v.literal("mem
  * through `typedTextSearch`, which drops every locked chat (no proof is passed), and keeps only prompts the composer's
  * search would list (`listsSentPrompts`: the caller's own chat, not trashed, deleted, locked or temporary;
  * `sentPromptOf`: a typed user row, no goal round), with no not-typed mark (a prompt link, an extension's relay, an admin
- * acting as the owner), and never the chat it answers in. Messenger, sub-agent, worker, task, trigger and eval chats
- * are never read: their prompts are not the caller's typed words. A bot chat reads that bot's chats and the user's chats with no
+ * acting as the owner), and never the chat it answers in. Only chats a person types into are read ({@link TYPED_CHAT_TAGS},
+ * and their branches and side chats): a messenger, sub-agent, worker, task, trigger, eval or pull request chat is not. A bot chat reads that bot's chats and the user's chats with no
  * bot, as memory reads the bot's notes and the user's own; a chat with no bot (or one whose bot is gone) reads only chats
  * with no bot. A hit holds every word of the query (the last one also as the start of a longer word), as the index matches. Branch copies (the same words
- * sent at the same time) list once. `truncated` says the last index window was full, so an older match may not have been
- * searched. `preparing` says the index is still being built after a deploy, so nothing was searched yet.
+ * sent at the same time) list once. `truncated` says the last index window was full and fewer hits than asked for were
+ * found, so an older match may not have been searched. `preparing` says the index is still being built after a deploy, so nothing was searched yet.
  */
 export const searchPastChats = internalQuery
     .input({
         limit: v.optional(v.number()),
+        /** The caller's clock, so the query stays deterministic: a grant past its `expiresAt` shares nothing. */
+        now: v.number(),
         query: v.string().max(MAX_LENGTH.long),
         threadId: v.id("threads"),
         userId: v.string().max(MAX_LENGTH.short),
@@ -76,14 +92,16 @@ export const searchPastChats = internalQuery
             unavailable: v.optional(vPastChatUnavailable),
         }),
     )
-    .query(async ({ args: { limit, query, threadId, userId }, ctx: context }) => {
+    .query(async ({ args: { limit, now, query, threadId, userId }, ctx: context }) => {
         if (!(await readMemoryEnabled(context, userId))) {
             context.log.event("chat.search_past_chats", { listed: 0, unavailable: "memory_off" });
 
             return { hits: [], unavailable: "memory_off" as const };
         }
 
-        const current = await loadEligibleThread(context, threadId, userId);
+        // The grants are read on the primary (`threadSharedWithOthers`): a replica may not yet hold one made a moment ago.
+        const here = await context.db.get("threads", threadId);
+        const current = isDeviceEligibleThread(here, userId, await threadSharedWithOthers(context, threadId, userId, now)) ? here : null;
 
         if (!current) {
             context.log.event("chat.search_past_chats", { listed: 0, unavailable: "not_private" });
@@ -115,6 +133,49 @@ export const searchPastChats = internalQuery
         const scopeBot = bot ? current.botId : undefined;
         const inScope = (thread: ThreadDoc): boolean => (thread.botId ?? null) === null || thread.botId === scopeBot;
         const threads = new Map<string, ThreadDoc | null>();
+        const sources = new Map<string, boolean>();
+        let lineageReads = 0;
+
+        const threadOf = async (id: string): Promise<ThreadDoc | null> => {
+            if (!threads.has(id)) {
+                threads.set(id, await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: id as Id<"threads"> }));
+            }
+
+            return threads.get(id) ?? null;
+        };
+
+        // Whether a chat's prompts are the caller's typed words: a tagged chat by its kind; an untagged one (a branch, side
+        // chat or comparison) as the chat it was copied from, so a copied opening message of another kind stays out. A
+        // chain too deep or past the read budget, a link of another kind and any other untagged chat (an import) are no source.
+        const isTypedSource = async (thread: ThreadDoc, depth = 0): Promise<boolean> => {
+            if ((thread.tags ?? []).length > 0 || thread.externalThreadId !== undefined || thread.messengerConnectionId !== undefined) {
+                return isTypedChatKind(thread);
+            }
+
+            const known = sources.get(thread._id);
+
+            if (known !== undefined) {
+                return known;
+            }
+
+            let source = false;
+
+            if (depth < PAST_CHAT_LINEAGE_DEPTH && lineageReads < PAST_CHAT_LINEAGE_READS) {
+                lineageReads += 1;
+
+                const [link] = await context.db
+                    .query("threadRelationships")
+                    .withIndex("by_thread", (q) => q.eq("threadId", thread._id as Id<"threads">))
+                    .take(1);
+                const parent = link && COPY_LINKS.has(link.branchType) && (link.userId ?? userId) === userId ? await threadOf(link.parentThreadId) : null;
+
+                source = parent !== null && parent.userId === userId && (await isTypedSource(parent, depth + 1));
+            }
+
+            sources.set(thread._id, source);
+
+            return source;
+        };
 
         const collect = async (window: number) => {
             const { filled, messages } = await context.runQuery(internal.agent.messages.typedTextSearch, { limit: window, text, userId });
@@ -150,7 +211,7 @@ export const searchPastChats = internalQuery
             for (const { message, typed: words } of elsewhere) {
                 const thread = threads.get(message.threadId) ?? null;
 
-                if (!listsSentPrompts(thread, userId) || !inScope(thread) || !holdsTypedPrompts(thread)) {
+                if (!listsSentPrompts(thread, userId) || !inScope(thread) || !(await isTypedSource(thread))) {
                     continue;
                 }
 
@@ -183,9 +244,12 @@ export const searchPastChats = internalQuery
                 ({ filled, hits } = await collect(PAST_CHAT_WINDOW_MAX));
             }
 
-            context.log.event("chat.search_past_chats", { listed: hits.length, truncated: filled, widened });
+            // A full window with every asked-for hit found is a complete answer; only one that came up short may be missing some.
+            const truncated = filled && hits.length < wanted;
 
-            return filled ? { hits, truncated: true as const } : { hits };
+            context.log.event("chat.search_past_chats", { listed: hits.length, truncated, widened });
+
+            return truncated ? { hits, truncated: true as const } : { hits };
         } catch (error) {
             // After a deploy that adds `typed_text_search`, Lunora refuses the index until its backfill covers the existing
             // messages: "not ready yet", not a failure and not "no match".

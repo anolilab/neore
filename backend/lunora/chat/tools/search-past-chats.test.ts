@@ -20,6 +20,7 @@ vi.mock("../../lib/shard-context", async (importOriginal) => {
 
 // 2026-03-04T23:30:00Z: still the 4th in UTC, already the 5th in Berlin.
 const SENT_AT = Date.UTC(2026, 2, 4, 23, 30);
+const FOUND_FOR_MODEL = { hits: [{ day: "2026-03-05", snippet: "we booked the Lisbon apartment", title: "Trip planning" }] };
 const FOUND = { hits: [{ sentAt: SENT_AT, snippet: "we booked the Lisbon apartment", title: "Trip planning" }] };
 
 const contextWith = (timeZone: () => Promise<string | null>, extra: Record<string, unknown> = {}) => {
@@ -54,6 +55,7 @@ describe("searchPastChats tool", () => {
         expect(output).toStrictEqual({ hits: [{ day: "2026-03-05", snippet: "we booked the Lisbon apartment", title: "Trip planning" }] });
         expect(runQuery).toHaveBeenCalledWith(internal.chat.past_chats.searchPastChats, {
             limit: undefined,
+            now: expect.any(Number),
             query: "Lisbon",
             threadId: "thread-1",
             userId: "owner-1",
@@ -85,6 +87,7 @@ describe("searchPastChats tool", () => {
 
     it("tells the model a full window may have left an older match unsearched", () => {
         expect(modelText({ hits: [], truncated: true })).toContain("an older one may be missing");
+        expect(modelText(FOUND_FOR_MODEL)).not.toContain("an older one may be missing");
     });
 
     it("searches nothing outside a chat, or for a caller whose shard this run is not on", async () => {

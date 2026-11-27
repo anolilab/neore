@@ -69,6 +69,7 @@ const searchPastChatsTool = createTool<{ limit?: number; query: string }, PastCh
 
         const search = context.runQuery(internal.chat.past_chats.searchPastChats, {
             limit,
+            now: Date.now(),
             query,
             threadId: context.threadId as Id<"threads">,
             userId: context.userId,
