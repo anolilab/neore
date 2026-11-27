@@ -9,7 +9,7 @@ import { v, LunoraError } from "lunorash/server";
 import type { Id } from "../_generated/dataModel";
 import { internalMutation } from "../_generated/server";
 import { heldInstall, heldInstallForShardWrite, patchInstallIf } from "./held-install";
-import { requireOwnerShard } from "./owner-shard";
+import { refuseWhileErasing, requireOwnerShard } from "./owner-shard";
 import { LEASE_MS } from "./logic";
 import { vPluginItemKind } from "./validators";
 
@@ -23,8 +23,9 @@ export const createInstallRow = internalMutation
     .output(v.object({ generation: v.number(), installId: v.string() }))
     .mutation(async ({ args, ctx }) => {
         requireOwnerShard(args.userId, "install");
+        await refuseWhileErasing(ctx, args.userId);
 
-        const existing = await ctx.db.pluginInstalls.findFirst({ where: { pluginSlug: args.pluginSlug, userId: args.userId } });
+        const existing = await ctx.db.pluginInstalls.findFirst({ consistency: "primary", where: { pluginSlug: args.pluginSlug, userId: args.userId } });
 
         if (existing) {
             throw new LunoraError("CONFLICT", `The plugin "${args.pluginSlug}" is already installed. Uninstall it first.`);
@@ -57,6 +58,8 @@ export const recordIntent = internalMutation
     })
     .output(v.string())
     .mutation(async ({ args, ctx }) => {
+        await refuseWhileErasing(ctx, args.userId);
+
         // Each create that follows writes a sharded table (skills, triggers, group chats) and needs time left on the lease.
         await heldInstallForShardWrite(ctx, args.installId as Id<"pluginInstalls">, args.generation);
 
@@ -131,7 +134,7 @@ export const deleteInstall = internalMutation
 
         // Every link, not one page of them: a link left behind would name an install that no longer exists.
         for (;;) {
-            const { page: links } = await ctx.db.pluginItems.findMany({ where: { installId: args.installId } });
+            const { page: links } = await ctx.db.pluginItems.findMany({ consistency: "primary", where: { installId: args.installId } });
 
             if (links.length === 0) {
                 break;

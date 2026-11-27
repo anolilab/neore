@@ -487,4 +487,13 @@ describe("applying an update", () => {
             version: "1.1.0",
         });
     });
+
+    it("a conditional install write names the status too: a row that went to needs-repair is not written", async () => {
+        const { installId } = await installed();
+
+        await run(async (context) => await context.db.patch("pluginInstalls", installId, { status: "needs-repair" }));
+        await expect(run(async (context) => await patchInstallIf(context, installId, 1, { status: "updating" }, undefined, "installed"))).rejects.toThrow(
+            "STALE_LEASE",
+        );
+    });
 });

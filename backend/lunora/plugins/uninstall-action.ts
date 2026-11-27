@@ -2,7 +2,7 @@
  * The uninstall procedure: begin (refuse, lease, sweep), delete the plugin's empty group chats in pages, then finish (links and
  * install). The group chats are deleted from here because their deletion is paged and only runs from an action.
  */
-import { v } from "lunorash/server";
+import { LunoraError, v } from "lunorash/server";
 
 import type { Id } from "../_generated/dataModel";
 import { internal } from "../_generated/internal";
@@ -46,6 +46,11 @@ export const uninstallPlugin = authAction
     .input({ pluginSlug: v.string().max(64) })
     .output(v.object({ kept: v.array(v.string()), removed: v.number() }))
     .action(async ({ args, ctx }) => {
+        // As the other plugin actions: an organization session would act on the personal install.
+        if (ctx.user.activeOrganization) {
+            throw new LunoraError("UNPROCESSABLE", "Organization plugin installs are not available yet");
+        }
+
         const begun = await ctx.runMutation(internal.plugins.uninstall_action.beginUninstall, {
             pluginSlug: args.pluginSlug,
             userId: ctx.user.userId,

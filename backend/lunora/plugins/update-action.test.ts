@@ -5,6 +5,7 @@
  * Each skill declares its key in the file, so a change elsewhere in the file leaves every other skill's entry key as it was.
  */
 import { lunoraTest } from "@lunora/testing";
+import { isSelectableTextModel, MODEL_REGISTRY } from "@neore/ai/models";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { registeredApi } from "../../test/registered-api";
@@ -316,5 +317,33 @@ describe("plugin update action", () => {
         const owned = named.filter((row: { pluginMarker?: string }) => row.pluginMarker);
 
         expect(owned.map((row: { name: string }) => row.name).toSorted((a: string, b: string) => a.localeCompare(b))).toStrictEqual(["analyst", "critic"]);
+    });
+
+    it("refuses an update that adds a group chat before it writes anything", async () => {
+        const body = buildBundleMarkdown({
+            description: "",
+            items: [
+                { key: "analyst", kind: "skill", skill: skill("analyst") },
+                { key: "critic", kind: "skill", skill: skill("critic") },
+                {
+                    group: {
+                        mode: "round-robin",
+                        model: MODEL_REGISTRY.find((definition) => isSelectableTextModel(definition))!.id,
+                        participants: ["analyst", "critic"],
+                        title: "Panel",
+                    },
+                    key: "panel",
+                    kind: "group",
+                },
+            ],
+            name: "Daily brief",
+        });
+        const contentHash = await bodyHash(body);
+        const markdown = withPluginHeader(body, { contentHash, slug: SLUG, version: "1.1.0" });
+
+        await expect(as().action(procedureAt("plugins_update", "updatePlugin"), { confirmDowngrade: false, contentHash, markdown } as never)).rejects.toThrow(
+            "Uninstall the plugin and install the new version",
+        );
+        expect(await installRow()).toMatchObject({ status: "installed", version: "1.0.0" });
     });
 });

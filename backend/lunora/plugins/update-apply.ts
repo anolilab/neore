@@ -23,6 +23,7 @@ import { deleteSkillRows } from "../skills/functions";
 import { ensureSlugUnique, validateSlug } from "../skills/validators";
 import { heldInstall, heldInstallForShardWrite, patchInstallIf } from "./held-install";
 import { LEASE_MS, markerFor } from "./logic";
+import { refuseWhileErasing } from "./owner-shard";
 
 /** The same bound uninstall uses when it looks for group chats that name a skill. */
 const GROUP_SCAN_LIMIT = 300;
@@ -31,7 +32,12 @@ export const beginUpdate = internalMutation
     .input({ expectedGeneration: v.number(), installId: v.string().max(128), targetVersion: v.string().max(32), userId: v.string().max(128) })
     .output(v.number())
     .mutation(async ({ args, ctx }) => {
-        const install = await ctx.db.pluginInstalls.findFirst({ where: { _id: args.installId as Id<"pluginInstalls">, userId: args.userId } });
+        await refuseWhileErasing(ctx, args.userId);
+
+        const install = await ctx.db.pluginInstalls.findFirst({
+            consistency: "primary",
+            where: { _id: args.installId as Id<"pluginInstalls">, userId: args.userId },
+        });
 
         if (!install) {
             throw new LunoraError("NOT_FOUND", "The plugin is not installed");
@@ -61,6 +67,7 @@ export const beginUpdate = internalMutation
                 updatedAt: ctx.now,
             },
             "The plugin changed while this update was being prepared. Preview it again.",
+            "installed",
         );
 
         return generation;
@@ -88,7 +95,7 @@ export const updateSkillChild = internalMutation
     .mutation(async ({ args, ctx }) => {
         await heldInstall(ctx, args.installId as Id<"pluginInstalls">, args.generation);
 
-        const { page } = await ctx.db.pluginItems.findMany({ where: { installId: args.installId } });
+        const { page } = await ctx.db.pluginItems.findMany({ consistency: "primary", where: { installId: args.installId } });
         const link = page.find((row) => row.entryKey === args.entryKey && row.kind === "skill");
 
         if (!link || link.state !== "created") {
@@ -224,7 +231,7 @@ export const failUpdate = internalMutation
             return null;
         }
 
-        const { page } = await ctx.db.pluginItems.findMany({ where: { installId: args.installId } });
+        const { page } = await ctx.db.pluginItems.findMany({ consistency: "primary", where: { installId: args.installId } });
 
         // Only the links of this attempt: its intents (an intent has no child yet) and the links of the children it created whose
         // rollback removed the child. The install is released afterwards, so no new update can record links while this runs.
@@ -268,7 +275,7 @@ export const updateTriggerChild = internalMutation
     .mutation(async ({ args, ctx }) => {
         await heldInstallForShardWrite(ctx, args.installId as Id<"pluginInstalls">, args.generation);
 
-        const { page } = await ctx.db.pluginItems.findMany({ where: { installId: args.installId } });
+        const { page } = await ctx.db.pluginItems.findMany({ consistency: "primary", where: { installId: args.installId } });
         const link = page.find((row) => row.entryKey === args.entryKey && row.kind === "trigger");
 
         if (!link || link.state !== "created") {
@@ -325,7 +332,7 @@ export const updateTriggerChild = internalMutation
 
 /** The child's link, by its entry key, after the generation check. */
 const linkFor = async (ctx: Pick<MutationCtx, "db">, installId: string, entryKey: string) => {
-    const { page } = await ctx.db.pluginItems.findMany({ where: { installId } });
+    const { page } = await ctx.db.pluginItems.findMany({ consistency: "primary", where: { installId } });
 
     return page.find((row) => row.entryKey === entryKey);
 };

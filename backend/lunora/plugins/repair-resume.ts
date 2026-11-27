@@ -22,7 +22,7 @@ import { childOps, importFailure } from "./install-ops";
 import { entryHash } from "./entry-hash";
 import { heldInstall } from "./held-install";
 import { LEASE_MS } from "./logic";
-import { requireOwnerShard } from "./owner-shard";
+import { refuseWhileErasing, requireOwnerShard } from "./owner-shard";
 import { repairableNow, repairRows } from "./repair";
 import { vPluginItemKind } from "./validators";
 
@@ -61,8 +61,9 @@ export const beginRepairRows = async (
     unresolved: string[];
 }> => {
     requireOwnerShard(userId, "repair");
+    await refuseWhileErasing(ctx, userId);
 
-    const install = await ctx.db.pluginInstalls.findFirst({ where: { pluginSlug, userId } });
+    const install = await ctx.db.pluginInstalls.findFirst({ consistency: "primary", where: { pluginSlug, userId } });
 
     if (!install) {
         throw new LunoraError("NOT_FOUND", `The plugin "${pluginSlug}" is not installed`);
@@ -79,7 +80,7 @@ export const beginRepairRows = async (
     // An install stopped by a rate limit has rows only for the entries it reached; the rest get theirs now, so none is skipped.
     // Not for a stopped update: its file was not checked above, so it may not add children.
     if (install.status !== "updating" && repairableNow(install, ctx.now)) {
-        const { page: existingRows } = await ctx.db.pluginItems.findMany({ where: { installId } });
+        const { page: existingRows } = await ctx.db.pluginItems.findMany({ consistency: "primary", where: { installId } });
         const known = new Set(existingRows.map((row) => row.entryKey));
 
         for (const entry of entries) {
@@ -100,7 +101,7 @@ export const beginRepairRows = async (
     }
 
     const result = await repairRows(ctx, userId, pluginSlug);
-    const { page } = await ctx.db.pluginItems.findMany({ where: { installId } });
+    const { page } = await ctx.db.pluginItems.findMany({ consistency: "primary", where: { installId } });
     const existing = page.flatMap((row) =>
         row.state === "created" && row.kind === "skill" && row.itemId ? [{ entryKey: row.entryKey, itemId: row.itemId }] : [],
     );

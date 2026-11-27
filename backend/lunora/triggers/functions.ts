@@ -18,6 +18,7 @@ import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { rateLimitGuard } from "../lib/rate-limiter";
+import { heldInstallForShardWrite } from "../plugins/held-install";
 import { isThreadLocked } from "../lib/thread-lock";
 import { authAction, authMutation, authQuery, rateLimit } from "../lib/crpc";
 import {
@@ -571,13 +572,15 @@ export const createTrigger = authMutation
 export const createPluginTrigger = internalMutation
     .input({
         ...triggerCreateFields,
+        // The install generation the caller started under: a create under an older one is refused.
+        generation: v.optional(v.number()),
         plan: v.optional(v.string().max(MAX_LENGTH.short)),
         pluginInstallId: v.string().max(MAX_LENGTH.id),
         pluginMarker: v.string().max(MAX_LENGTH.short),
         userId: v.string().max(MAX_LENGTH.id),
     })
     .output(v.object({ triggerId: v.string(), webhookSecret: v.optional(v.string()) }))
-    .mutation(async ({ args: { plan, pluginInstallId, pluginMarker, userId, ...fields }, ctx }) => {
+    .mutation(async ({ args: { generation, plan, pluginInstallId, pluginMarker, userId, ...fields }, ctx }) => {
         const existing = await ctx.db
             .query("triggers")
             .withIndex("by_plugin_marker", (q) => q.eq("pluginMarker", pluginMarker))
@@ -589,6 +592,11 @@ export const createPluginTrigger = internalMutation
             }
 
             return { triggerId: existing._id as string };
+        }
+
+        // A stale action (its lease taken over) must not start a new child: the one it made would be lost to the new holder.
+        if (generation !== undefined) {
+            await heldInstallForShardWrite(ctx, pluginInstallId as Id<"pluginInstalls">, generation);
         }
 
         await rateLimitGuard({ ...ctx, rateLimitKey: "triggers/create", user: { plan, userId } } as never);

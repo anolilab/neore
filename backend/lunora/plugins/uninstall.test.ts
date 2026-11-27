@@ -546,8 +546,10 @@ describe("uninstall", () => {
             }
         });
 
+        // A group with pins is kept at its first page, so the continuation is driven from the state a first page of an empty group
+        // leaves: messages and streams done, pins still to go.
         const pages: { isDone: boolean; next?: object }[] = [];
-        let next: object | undefined;
+        let next: object | undefined = { messagesDone: true, pinsDone: false, streamsDone: true };
 
         for (;;) {
             const page = await run(async (context) => await context.runMutation(deleteAllForThreadIdAsync, { ...next, pluginInstallId: installId, threadId }));
@@ -563,9 +565,49 @@ describe("uninstall", () => {
 
         expect(pages.length).toBeGreaterThan(1);
         expect(pages[0]).toMatchObject({ isDone: false, next: expect.any(Object) });
-        expect(await run(async (context) => await context.db.threads.findFirst({ where: { _id: threadId } }))).toBeNull();
         const { page: pins } = await run(async (context) => await context.db.threadPins.findMany({ where: { threadId } }));
 
         expect(pins).toHaveLength(0);
+    });
+
+    it("keeps a group that has pins but no messages, detached, because its deletion would need a second page", async () => {
+        const { installId, skillId } = await installed();
+        const secondSkillId = await run(
+            async (context) =>
+                await context.runMutation(createPluginSkill, {
+                    description: "Critic",
+                    instructions: "Critique.",
+                    isPremium: true,
+                    name: "Critic",
+                    plan: "premium",
+                    pluginInstallId: installId,
+                    pluginMarker: markerFor(installId, "skill:critic"),
+                    slug: "critic",
+                    source: { type: "plugin" as const, version: "1.0.0" },
+                    userId: OWNER,
+                }),
+        );
+        const { threadId } = await run(
+            async (context) =>
+                await context.runMutation(createPluginGroupChat, {
+                    mode: "round-robin",
+                    model: "claude-haiku-5-5",
+                    plan: "premium",
+                    pluginInstallId: installId,
+                    pluginMarker: markerFor(installId, "group:pinned"),
+                    skillIds: [skillId, secondSkillId],
+                    title: "Pinned panel",
+                    userId: OWNER,
+                }),
+        );
+        const begun = await run(async (context) => await uninstallRows(context, OWNER, SLUG));
+
+        await run(async (context) => await context.db.insert("threadPins", { createdAt: 1, messageRole: "user", threadId, updatedAt: 1, userId: OWNER }));
+
+        expect(await run(async (context) => await claimGroupForDelete(context, begun.installId, begun.generation, threadId))).toBe(false);
+        expect(await run(async (context) => await context.db.threads.findFirst({ where: { _id: threadId } }))).toMatchObject({
+            pluginInstallId: "",
+            pluginMarker: "",
+        });
     });
 });

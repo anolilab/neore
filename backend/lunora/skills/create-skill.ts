@@ -6,6 +6,7 @@ import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx as MutationContext } from "../_generated/server";
 import { internalMutation } from "../_generated/server";
 import { rateLimitGuard } from "../lib/rate-limiter";
+import { heldInstallForShardWrite } from "../plugins/held-install";
 import { systemDb } from "../lib/rls/scope";
 import { MAX_LENGTH } from "../lib/validators";
 import { invalidateSkillsCache } from "./cache";
@@ -199,6 +200,8 @@ export const createPluginSkill = internalMutation
     .input({
         ...skillCreateFields,
         activeOrganizationId: v.optional(v.string().max(MAX_LENGTH.id)),
+        // The install generation the caller started under: a create under an older one is refused.
+        generation: v.optional(v.number()),
         isPremium: v.boolean(),
         plan: v.optional(v.string().max(MAX_LENGTH.short)),
         pluginInstallId: v.string().max(MAX_LENGTH.id),
@@ -207,26 +210,33 @@ export const createPluginSkill = internalMutation
         userId: v.string().max(MAX_LENGTH.id),
     })
     .output(v.id("skills"))
-    .mutation(async ({ args: { activeOrganizationId, enabled, isPremium, plan, pluginInstallId, pluginMarker, source, userId, ...fields }, ctx }) => {
-        const existing = await ctx.db.skills.findFirst({ where: { pluginMarker } });
+    .mutation(
+        async ({ args: { activeOrganizationId, enabled, generation, isPremium, plan, pluginInstallId, pluginMarker, source, userId, ...fields }, ctx }) => {
+            const existing = await ctx.db.skills.findFirst({ where: { pluginMarker } });
 
-        if (existing) {
-            if (existing.userId !== userId) {
-                throw new LunoraError("FORBIDDEN", "That plugin skill belongs to another account");
+            if (existing) {
+                if (existing.userId !== userId) {
+                    throw new LunoraError("FORBIDDEN", "That plugin skill belongs to another account");
+                }
+
+                if (existing.pluginInstallId !== pluginInstallId) {
+                    throw new LunoraError("CONFLICT", "That plugin skill belongs to another install");
+                }
+
+                // The skill row commits before its bookkeeping rows, so a retry after a crash completes whatever is missing.
+                await ensureSkillRows(ctx, existing, enabled ?? true);
+
+                return existing._id as Id<"skills">;
             }
 
-            if (existing.pluginInstallId !== pluginInstallId) {
-                throw new LunoraError("CONFLICT", "That plugin skill belongs to another install");
+            // A stale action (its lease taken over) must not start a new child: the one it made would be lost to the new holder.
+            if (generation !== undefined) {
+                await heldInstallForShardWrite(ctx, pluginInstallId as Id<"pluginInstalls">, generation);
             }
 
-            // The skill row commits before its bookkeeping rows, so a retry after a crash completes whatever is missing.
-            await ensureSkillRows(ctx, existing, enabled ?? true);
+            // The caller already decided the tier (`isPremium`); an admin has no plan, and a free session's plan is null.
+            await rateLimitGuard({ ...ctx, rateLimitKey: "skills/create", user: { plan: isPremium ? (plan ?? "premium") : null, userId } } as never);
 
-            return existing._id as Id<"skills">;
-        }
-
-        // The caller already decided the tier (`isPremium`); an admin has no plan, and a free session's plan is null.
-        await rateLimitGuard({ ...ctx, rateLimitKey: "skills/create", user: { plan: isPremium ? (plan ?? "premium") : null, userId } } as never);
-
-        return await insertSkill(ctx, { activeOrganizationId, isPremium, userId }, { ...fields, source }, { pluginInstallId, pluginMarker });
-    });
+            return await insertSkill(ctx, { activeOrganizationId, isPremium, userId }, { ...fields, source }, { pluginInstallId, pluginMarker });
+        },
+    );

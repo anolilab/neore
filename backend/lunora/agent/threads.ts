@@ -491,7 +491,15 @@ export const deleteAllForThreadIdAsync = internalMutation
                 .withIndex("by_threadId_order_stepOrder", (q) => q.eq("threadId", args.threadId))
                 .first();
 
-            if (message) {
+            // A pin keeps the group as a message does: its deletion would need a second page after the thread row has gone.
+            const pin = message
+                ? undefined
+                : await ctx.db
+                      .query("threadPins")
+                      .withIndex("by_thread", (q) => q.eq("threadId", args.threadId))
+                      .first();
+
+            if (message || pin) {
                 // Loaded lazily, as the sub-agent module above: the group and the plugin skills it names are detached together.
                 const { detachKeptGroup } = await import("../plugins/uninstall");
 

@@ -18,6 +18,7 @@ import type { Doc, Id } from "../../_generated/dataModel";
 import { refuseHostThread } from "../../acp/lib/host-thread";
 import { internalMutation, internalQuery } from "../../_generated/server";
 import { rateLimitGuard } from "../../lib/rate-limiter";
+import { heldInstallForShardWrite } from "../../plugins/held-install";
 import type { MutationCtx, QueryCtx as QueryContext } from "../../_generated/server";
 import { loadActivePathTail } from "../../agent/branch-rows";
 import { insertThread, patchMessage, patchThread } from "../../agent/table-writes";
@@ -352,6 +353,8 @@ export const createImportedGroupChat = internalMutation
 export const createPluginGroupChat = internalMutation
     .input({
         debateRounds: v.optional(v.number()),
+        // The install generation the caller started under: a create under an older one is refused.
+        generation: v.optional(v.number()),
         mode: vGroupChatMode,
         model: v.string().max(MAX_LENGTH.short),
         organizationId: v.optional(v.string().max(MAX_LENGTH.id)),
@@ -364,7 +367,7 @@ export const createPluginGroupChat = internalMutation
         userId: v.string().max(MAX_LENGTH.id),
     })
     .output(v.object({ threadId: v.string() }))
-    .mutation(async ({ args: { plan, pluginInstallId, pluginMarker, userId, ...fields }, ctx }) => {
+    .mutation(async ({ args: { generation, plan, pluginInstallId, pluginMarker, userId, ...fields }, ctx }) => {
         const { organizationId, skillIds } = fields;
         const existing = await ctx.db
             .query("threads")
@@ -414,6 +417,11 @@ export const createPluginGroupChat = internalMutation
             }
 
             return { threadId: existing._id as string };
+        }
+
+        // A stale action (its lease taken over) must not start a new child: the one it made would be lost to the new holder.
+        if (generation !== undefined) {
+            await heldInstallForShardWrite(ctx, pluginInstallId as Id<"pluginInstalls">, generation);
         }
 
         await rateLimitGuard({ ...ctx, rateLimitKey: "chat/create", user: { plan, userId } } as never);

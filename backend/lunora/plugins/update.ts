@@ -60,14 +60,14 @@ export const loadInstalledForUpdate = internalQuery
         // so the preview would call it edited and an update would detach it.
         requireOwnerShard(args.userId, "update");
 
-        const install = await ctx.db.pluginInstalls.findFirst({ where: { pluginSlug: args.pluginSlug, userId: args.userId } });
+        const install = await ctx.db.pluginInstalls.findFirst({ consistency: "primary", where: { pluginSlug: args.pluginSlug, userId: args.userId } });
 
         if (!install) {
             return null;
         }
 
         const installId = install._id as string;
-        const { page } = await ctx.db.pluginItems.findMany({ where: { installId } });
+        const { page } = await ctx.db.pluginItems.findMany({ consistency: "primary", where: { installId } });
         const children: { contentHash: string; currentHash: string; entryKey: string; kind: "group" | "skill" | "trigger" }[] = [];
         const ownSlugs: { entryKey: string; slug: string }[] = [];
 
@@ -188,6 +188,17 @@ export const updatePlugin = authAction
             }),
         );
         const plan = diffUpdate(installed.children, incoming);
+
+        // An update cannot create a group chat yet. Finishing it anyway would record the new version and file hash without the group, and
+        // repair could not make it later, so it is refused before anything is written.
+        const addedGroups = plan.filter((step) => step.action === "create" && entries.find((entry) => entry.key === step.entryKey)?.plan?.kind === "group");
+
+        if (addedGroups.length > 0) {
+            throw new LunoraError(
+                "UNPROCESSABLE",
+                `This version adds a group chat (${addedGroups.map((step) => step.entryKey).join(", ")}), which an update cannot create yet. Uninstall the plugin and install the new version instead.`,
+            );
+        }
 
         // A child whose kind changed is a removal plus a creation under one key. Both halves are skipped when a group chat is on either side.
         const groupSwap = new Set(

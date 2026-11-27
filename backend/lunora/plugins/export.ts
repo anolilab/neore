@@ -88,13 +88,13 @@ export const pluginForSelection = internalQuery
             return null;
         }
 
-        const install = await ctx.db.pluginInstalls.findFirst({ where: { _id: installId as Id<"pluginInstalls"> } });
+        const install = await ctx.db.pluginInstalls.findFirst({ consistency: "primary", where: { _id: installId as Id<"pluginInstalls"> } });
 
         if (!install || install.userId !== args.userId) {
             return null;
         }
 
-        const { page: links } = await ctx.db.pluginItems.findMany({ where: { installId } });
+        const { page: links } = await ctx.db.pluginItems.findMany({ consistency: "primary", where: { installId } });
         const children = [];
 
         for (const link of links) {

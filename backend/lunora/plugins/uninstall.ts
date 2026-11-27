@@ -64,7 +64,7 @@ export const uninstallRows = async (ctx: MutationCtx, userId: string, pluginSlug
     // nothing, and the sweep would remove the global rows without the checks.
     requireOwnerShard(userId, "uninstall");
 
-    const install = await ctx.db.pluginInstalls.findFirst({ where: { pluginSlug, userId } });
+    const install = await ctx.db.pluginInstalls.findFirst({ consistency: "primary", where: { pluginSlug, userId } });
 
     if (!install) {
         throw new LunoraError("NOT_FOUND", `The plugin "${pluginSlug}" is not installed`);
@@ -75,7 +75,7 @@ export const uninstallRows = async (ctx: MutationCtx, userId: string, pluginSlug
     }
 
     const installId = install._id as string;
-    const links = await readAllPages(async (cursor) => await ctx.db.pluginItems.findMany({ cursor, where: { installId } }));
+    const links = await readAllPages(async (cursor) => await ctx.db.pluginItems.findMany({ consistency: "primary", cursor, where: { installId } }));
     const skills = await readAllPages(async (cursor) => await ctx.db.skills.findMany({ cursor, where: { pluginInstallId: installId } }));
     const skillIds = new Set(skills.map((skill) => skill._id as string));
 
@@ -206,7 +206,7 @@ export const detachKeptGroup = async (ctx: MutationCtx, threadId: string, instal
  * Returns `true` when the group may be deleted, `false` when it was kept.
  */
 export const claimGroupForDelete = async (ctx: MutationCtx, installId: string, generation: number, threadId: string): Promise<boolean> => {
-    const install = await ctx.db.pluginInstalls.findFirst({ where: { _id: installId as Id<"pluginInstalls"> } });
+    const install = await ctx.db.pluginInstalls.findFirst({ consistency: "primary", where: { _id: installId as Id<"pluginInstalls"> } });
 
     if (!install || install.generation !== generation) {
         throw new LunoraError("CONFLICT", "STALE_LEASE: this uninstall was taken over by another action");
@@ -223,7 +223,15 @@ export const claimGroupForDelete = async (ctx: MutationCtx, installId: string, g
         .withIndex("by_threadId_order_stepOrder", (q) => q.eq("threadId", threadId as Id<"threads">))
         .first();
 
-    if (message) {
+    // A pin keeps a group as a message does: its deletion needs a second page, and a stopped action could not find it again.
+    const pin = message
+        ? undefined
+        : await ctx.db
+              .query("threadPins")
+              .withIndex("by_thread", (q) => q.eq("threadId", threadId as Id<"threads">))
+              .first();
+
+    if (message || pin) {
         await detachKeptGroup(ctx, threadId, installId);
 
         return false;
@@ -247,7 +255,7 @@ export const finishUninstallRows = async (
     generation: number,
     options: { keptGroups?: string[]; pendingSkills?: string[] } = {},
 ): Promise<UninstallFinished> => {
-    const install = await ctx.db.pluginInstalls.findFirst({ where: { _id: installId as Id<"pluginInstalls"> } });
+    const install = await ctx.db.pluginInstalls.findFirst({ consistency: "primary", where: { _id: installId as Id<"pluginInstalls"> } });
 
     if (!install || install.generation !== generation) {
         throw new LunoraError("CONFLICT", "STALE_LEASE: this uninstall was taken over by another action");
@@ -276,7 +284,10 @@ export const finishUninstallRows = async (
         }
     }
 
-    const planned = pendingSkills.length > 0 ? await readAllPages(async (cursor) => await ctx.db.pluginItems.findMany({ cursor, where: { installId } })) : [];
+    const planned =
+        pendingSkills.length > 0
+            ? await readAllPages(async (cursor) => await ctx.db.pluginItems.findMany({ consistency: "primary", cursor, where: { installId } }))
+            : [];
 
     for (const skillId of pendingSkills) {
         const skill = await ctx.db.skills.findFirst({ where: { _id: skillId as Id<"skills"> } });
@@ -310,7 +321,7 @@ export const finishUninstallRows = async (
 
     // Every link goes, not one page of them: a link left behind would name an install that no longer exists.
     for (;;) {
-        const { page: links } = await ctx.db.pluginItems.findMany({ where: { installId } });
+        const { page: links } = await ctx.db.pluginItems.findMany({ consistency: "primary", where: { installId } });
 
         if (links.length === 0) {
             break;

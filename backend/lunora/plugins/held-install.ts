@@ -15,7 +15,7 @@ const LEASED = new Set(["installing", "updating"]);
 
 /** The install row, after checking that the caller still holds the lease it started under. */
 export const heldInstall = async (ctx: Pick<MutationCtx, "db" | "now">, installId: Id<"pluginInstalls">, generation: number) => {
-    const install = await ctx.db.pluginInstalls.findFirst({ where: { _id: installId } });
+    const install = await ctx.db.pluginInstalls.findFirst({ consistency: "primary", where: { _id: installId } });
 
     if (!install || install.generation !== generation) {
         throw new LunoraError("CONFLICT", STALE);
@@ -55,8 +55,13 @@ export const patchInstallIf = async (
     generation: number,
     patch: Record<string, unknown>,
     stale: string = STALE,
+    status?: string,
 ): Promise<void> => {
-    const { applied } = await ctx.db.patchIf("pluginInstalls", installId, { patch: patch as never, where: { generation } });
+    // `status`, when given, is part of the condition too: a row that moved to another status since the read is not written.
+    const { applied } = await ctx.db.patchIf("pluginInstalls", installId, {
+        patch: patch as never,
+        where: { generation, ...(status !== undefined && { status }) } as never,
+    });
 
     if (!applied) {
         throw new LunoraError("CONFLICT", stale);

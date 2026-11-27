@@ -3,6 +3,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 
 import { registeredApi } from "../../test/registered-api";
 import schema from "../schema";
+import { createInstallRow } from "../plugins/install-steps";
 import { createPluginSkill } from "./create-skill";
 
 const registry = vi.hoisted(() => new Map<string, unknown>());
@@ -159,5 +160,30 @@ describe("plugin skills", () => {
         expect(again).toBe(id);
         expect(rows.stats).toBeTruthy();
         expect(rows.enabled).toBeTruthy();
+    });
+
+    it("refuses to start a child under a generation the install has moved past, and writes nothing", async () => {
+        const install = await harness.run(
+            async (context: any) =>
+                await context.runMutation(createInstallRow, { contentHash: "a".repeat(64), pluginSlug: "daily-brief", userId: OWNER, version: "1.0.0" }),
+        );
+
+        await harness.run(async (context: any) => await context.db.patch("pluginInstalls", install.installId, { generation: install.generation + 1 }));
+
+        await expect(
+            harness.run(
+                async (context: any) =>
+                    await context.runMutation(createPluginSkill, {
+                        ...pluginInput,
+                        generation: install.generation,
+                        pluginInstallId: install.installId,
+                        pluginMarker: `${install.installId}:skill:summary`,
+                    }),
+            ),
+        ).rejects.toThrow("STALE_LEASE");
+
+        const { page } = await harness.run(async (context: any) => await context.db.skills.findMany({ where: { userId: OWNER } }));
+
+        expect(page).toHaveLength(0);
     });
 });

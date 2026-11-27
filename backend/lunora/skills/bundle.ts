@@ -616,6 +616,12 @@ export const removeImportedItem = internalMutation
                     return { kept: true };
                 }
 
+                // A pinned group is kept as one with messages is: its delete would continue on unfenced scheduled pages, and a
+                // rollback may only delete what finishes in this one.
+                if (await ctx.db.threadPins.findFirst({ where: { threadId: thread._id } })) {
+                    return { kept: true };
+                }
+
                 await ctx.runMutation(internal.agent.threads.deleteAllForThreadIdAsync, { threadId: thread._id });
             }
         }

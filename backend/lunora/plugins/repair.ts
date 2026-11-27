@@ -93,7 +93,7 @@ const repairStoppedUpdate = async (ctx: MutationCtx, install: Doc<"pluginInstall
     }
 
     const installId = install._id as string;
-    const { page } = await ctx.db.pluginItems.findMany({ where: { installId } });
+    const { page } = await ctx.db.pluginItems.findMany({ consistency: "primary", where: { installId } });
     const { resolved, unresolved } = await resolvePending(ctx, installId, page as Link[]);
 
     let linked = resolved;
@@ -136,7 +136,7 @@ export const repairRows = async (ctx: MutationCtx, userId: string, pluginSlug: s
     // Triggers and group chats live on the owner's shard; anywhere else every child would read as gone and be created again.
     requireOwnerShard(userId, "repair");
 
-    const install = await ctx.db.pluginInstalls.findFirst({ where: { pluginSlug, userId } });
+    const install = await ctx.db.pluginInstalls.findFirst({ consistency: "primary", where: { pluginSlug, userId } });
 
     if (!install) {
         throw new LunoraError("NOT_FOUND", `The plugin "${pluginSlug}" is not installed`);
@@ -154,7 +154,7 @@ export const repairRows = async (ctx: MutationCtx, userId: string, pluginSlug: s
     }
 
     const installId = install._id as string;
-    const { page } = await ctx.db.pluginItems.findMany({ where: { installId } });
+    const { page } = await ctx.db.pluginItems.findMany({ consistency: "primary", where: { installId } });
 
     let linked = 0;
     const missing: string[] = [];

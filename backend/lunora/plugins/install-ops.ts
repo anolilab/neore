@@ -41,7 +41,8 @@ export const importFailure = (error: unknown): unknown => {
 
 export const childOps = (ctx: ActionCtx, options: ChildOptions): BundleOps => {
     const { generation, installId, intentFor, isPremium, plan, userId, version } = options;
-    const link = { pluginInstallId: installId };
+    // `generation` rides with every create, so a stale action cannot start a child after a takeover.
+    const link = { generation, pluginInstallId: installId };
     // Once another action has taken the install over, this one must not delete anything: the children it made now belong to that
     // action's repair (found by marker), and a rollback here would remove ones the new holder has already linked.
     let lostLease = false;

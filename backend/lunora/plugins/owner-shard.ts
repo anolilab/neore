@@ -1,5 +1,7 @@
 import { LunoraError } from "lunorash/server";
 
+import type { QueryCtx } from "../_generated/server";
+import { isErasing } from "../lib/account-moves";
 import { currentShard, ROOT_SHARD_KEY } from "../lib/shard-context";
 import { isShardRoutingEnabled } from "../lib/shard-namespace";
 
@@ -18,5 +20,15 @@ export const requireOwnerShard = (userId: string, step: string): void => {
 
     if (shard !== undefined && shard !== userId) {
         throw new LunoraError("CONFLICT", `The ${step} must run on the owner's shard`);
+    }
+};
+
+/**
+ * Refuses a step that creates plugin rows while the account is being erased. An install action already running when the erasure
+ * began would otherwise write rows after the sweep has passed them, and nothing would remove them.
+ */
+export const refuseWhileErasing = async (ctx: Pick<QueryCtx, "db">, userId: string): Promise<void> => {
+    if (await isErasing(ctx, userId)) {
+        throw new LunoraError("CONFLICT", "This account is being deleted, so plugins can no longer be changed");
     }
 };
