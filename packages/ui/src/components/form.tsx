@@ -123,11 +123,14 @@ const useAdoptPrehydrationValue = (field: { handleChange: (value: never) => void
     );
 };
 
-const FormControl = ({ required, ...properties }: FormControlProperties) => {
+const FormControl = ({ children, render, required, ...properties }: FormControlProperties) => {
     const { errors, formDescriptionId, formItemId, formMessageId, required: contextRequired } = useFieldContext();
     const field = useFormFieldContext();
     const isRequired = required ?? contextRequired;
     const adoptRef = useAdoptPrehydrationValue(field);
+    // A single control takes the id and ARIA state itself, so the label names it and `aria-required` sits on an element that
+    // allows it. Without this the props land on a wrapping `div`, which a label cannot point at.
+    const control = render ?? (React.isValidElement(children) ? children : undefined);
 
     return (
         <Slot
@@ -139,7 +142,10 @@ const FormControl = ({ required, ...properties }: FormControlProperties) => {
             id={formItemId}
             {...properties}
             ref={adoptRef}
-        />
+            render={control}
+        >
+            {control ? undefined : children}
+        </Slot>
     );
 };
 
