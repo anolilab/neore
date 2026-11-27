@@ -386,6 +386,7 @@ const useAsideFindHighlights = (
             : undefined;
 
         if (scroller) {
+            // The content box, the default: a scrollbar that appears inside the box changes only the content box, and that is a resize too.
             resizer?.observe(scroller);
         } else {
             globalThis.addEventListener("resize", scheduleReveal);
