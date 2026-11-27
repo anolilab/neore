@@ -89,6 +89,14 @@ describe("events/subscribe store", () => {
         expect(await rows()).toHaveLength(0);
     });
 
+    it("refuses a subscription while the account is merging into another, and stores nothing", async () => {
+        await approve();
+        await harness.run(async (ctx: any) => await beginAccountMove(ctx, OWNER, "merging", NOW));
+
+        expect(await subscribe(writeOf())).toStrictEqual({ kind: "account_merging" });
+        expect(await rows()).toHaveLength(0);
+    });
+
     it("wakes the owner's shard at the subscription's expiry, so a dormant shard's expired rows are reaped", async () => {
         await approve();
 

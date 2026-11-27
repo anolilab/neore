@@ -10,7 +10,7 @@ import { LunoraError, v } from "lunorash/server";
 import type { MutationCtx } from "../_generated/server";
 import { internalMutation } from "../_generated/server";
 import { isHostApproved } from "../auth/event-webhook-hosts";
-import { isErasing } from "../lib/account-moves";
+import { hasAccountMove, isErasing } from "../lib/account-moves";
 import { noteShardDue } from "../lib/shard-housekeeping";
 import { MAX_SUBSCRIPTIONS } from "./events-webhook";
 
@@ -39,6 +39,7 @@ export interface SubscribeWrite {
 export type SubscribeOutcome =
     | { cursorSeq: number; expiresAt: number; kind: "granted"; truncated: boolean }
     | { kind: "account_erasing" }
+    | { kind: "account_merging" }
     | { kind: "host_not_approved" }
     | { kind: "limit" };
 
@@ -49,7 +50,7 @@ export type SubscribeOutcome =
 const vSubscribeWire = v.object({
     cursorSeq: v.number(),
     expiresAt: v.number(),
-    refusal: v.union(v.null(), v.literal("account_erasing"), v.literal("host_not_approved"), v.literal("limit")),
+    refusal: v.union(v.null(), v.literal("account_erasing"), v.literal("account_merging"), v.literal("host_not_approved"), v.literal("limit")),
     truncated: v.boolean(),
 });
 
@@ -80,6 +81,11 @@ export const subscribeOn = async (ctx: Pick<MutationCtx, "db">, input: Subscribe
     // The erasure's final drain of subscriptions runs after its marker is set, so a row written once the marker is there would survive it.
     if (await isErasing(ctx, input.userId)) {
         return { kind: "account_erasing" };
+    }
+
+    // A merge into another account ends this account's subscriptions when it clears them, so a subscription written meanwhile would not last.
+    if (await hasAccountMove(ctx, input.userId, "merging")) {
+        return { kind: "account_merging" };
     }
 
     if (!(await isHostApproved(ctx, input.userId, input.host))) {

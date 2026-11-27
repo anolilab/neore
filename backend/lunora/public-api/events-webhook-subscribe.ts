@@ -95,6 +95,12 @@ export const subscribeWebhook = async (lunora: HttpActionCtx, identity: ApiKeyId
         });
     }
 
+    if (outcome.refusal === "account_merging") {
+        throw new EventsWebhookError(FORBIDDEN, "This account is being merged into another, so it takes no new webhook subscriptions.", {
+            reason: "account_merging",
+        });
+    }
+
     if (outcome.refusal === "account_erasing") {
         throw new EventsWebhookError(FORBIDDEN, "This account is being deleted, so it takes no new webhook subscriptions.", {
             reason: "account_erasing",
