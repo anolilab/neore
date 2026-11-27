@@ -12,7 +12,7 @@ import { join } from "node:path";
 import JSZip from "jszip";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
-import { chapterDocument, FRAME_POLICY, MAX_ASSETS_PER_CHAPTER, openEpub, safeStylesheet } from "./epub-book";
+import { chapterDocument, FRAME_POLICY, MAX_ASSETS_PER_CHAPTER, MAX_CHAPTER_CHARS, openEpub, safeStylesheet } from "./epub-book";
 
 const PNG_DATA = /^data:image\/png;base64,iVBORw0KGgo=$/u;
 const TRACKER = /tracker\.example/u;
@@ -250,6 +250,66 @@ describe("reading a chapter", () => {
         expect(sources[0]?.startsWith("data:image/png;base64,")).toBe(true);
         expect(sources[1]).toBeNull();
         expect(frame.querySelector("p")?.textContent).toBe("text");
+        opened.destroy();
+    });
+});
+
+describe("a chapter's style sheets", () => {
+    const sheetsOf = (frame: Document): string[] => [...frame.head.querySelectorAll("style")].slice(1).map((element) => element.textContent ?? "");
+    const links = (names: string[]) => names.map((name) => `<link rel="stylesheet" href="${name}"/>`).join("");
+
+    it("keeps every sheet of a chapter within the budget, each as it is", async () => {
+        const opened = await openEpub(
+            await book({
+                chapters: [{ body: `${links(["a.css", "b.css", "c.css"])}<p>x</p>`, file: "one.xhtml", id: "c1" }],
+                files: { "a.css": "p{color:red}", "b.css": "p{margin:0}", "c.css": "p{padding:0}" },
+            }),
+            folder.path,
+        );
+
+        expect(sheetsOf(parse(await opened.read("c1")))).toEqual(["p{color:red}", "p{margin:0}", "p{padding:0}"]);
+        opened.destroy();
+    });
+
+    it("stops at the count of files a chapter may read: the sheets past it are not read or included", async () => {
+        const files = Object.fromEntries(
+            Array.from({ length: MAX_ASSETS_PER_CHAPTER + 5 }, (_item, index) => [`s${String(index)}.css`, `p{order:${String(index)}}`] as const),
+        );
+        const opened = await openEpub(
+            await book({ chapters: [{ body: `${links(Object.keys(files))}<p>x</p>`, file: "one.xhtml", id: "c1" }], files }),
+            folder.path,
+        );
+        const sheets = sheetsOf(parse(await opened.read("c1")));
+
+        expect(sheets).toHaveLength(MAX_ASSETS_PER_CHAPTER);
+        expect(sheets[0]).toBe("p{order:0}");
+        expect(sheets.at(-1)).toBe(`p{order:${String(MAX_ASSETS_PER_CHAPTER - 1)}}`);
+        opened.destroy();
+    });
+
+    it("leaves out whole a sheet that does not fit what is left of the budget, and keeps the ones that did", async () => {
+        const big = "a{}".repeat(5_000_000);
+        const opened = await openEpub(
+            await book({
+                chapters: [{ body: `${links(["small.css", "big1.css", "big2.css", "after.css"])}<p>x</p>`, file: "one.xhtml", id: "c1" }],
+                files: { "after.css": "p{after:1}", "big1.css": big, "big2.css": big, "small.css": "p{small:1}" },
+            }),
+            folder.path,
+        );
+        const sheets = sheetsOf(parse(await opened.read("c1")));
+
+        // 15 million characters fit; a second 15 million would pass the 24 million the chapter may take, so it is left out entire, not cut.
+        expect(sheets.map((sheet) => sheet.length)).toEqual(["p{small:1}".length, big.length, "p{after:1}".length]);
+        opened.destroy();
+    });
+
+    it("refuses a chapter whose own markup is larger than a chapter may be", async () => {
+        const opened = await openEpub(
+            await book({ chapters: [{ body: `<p>${"x".repeat(MAX_CHAPTER_CHARS)}</p>`, file: "one.xhtml", id: "c1" }] }),
+            folder.path,
+        );
+
+        await expect(opened.read("c1")).rejects.toThrow("chapter too large");
         opened.destroy();
     });
 });

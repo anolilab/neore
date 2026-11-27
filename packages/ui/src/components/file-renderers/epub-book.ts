@@ -98,6 +98,9 @@ const titlesBySpineItem = (toc: EpubToc, spine: ReadonlyArray<SpineItem>): Map<s
 /** The most a chapter's inlined pictures, fonts and style sheets may add to its document, in characters. Past it the rest are left out. */
 export const MAX_INLINED_CHARS = 24 * 1024 * 1024;
 
+/** The most a chapter's own markup may be, in characters: a file past it is not parsed. */
+export const MAX_CHAPTER_CHARS = 8 * 1024 * 1024;
+
 /** The most distinct files one chapter may inline. A chapter that names more has the rest left out, so a book cannot make a reader read without end. */
 export const MAX_ASSETS_PER_CHAPTER = 200;
 
@@ -169,6 +172,10 @@ interface AssetReader {
     budget: { files: number; left: number };
     /** A file as a `data:` URL, or `undefined` when it is not in the archive, does not fit the budget or the count, or is not a kind that is inlined. */
     dataUrl: (path: string) => Promise<string | undefined>;
+    /** Whether the chapter may still take another file at all (some budget and some count left): asked before a file is read. */
+    mayRead: () => boolean;
+    /** Charges a text that is to go into the document (a style sheet, after its addresses are rewritten) to the budget and the count; `false` when it does not fit. */
+    spend: (length: number) => boolean;
     /** A text file of the archive. */
     text: (path: string) => Promise<string | undefined>;
 }
@@ -214,6 +221,17 @@ const assetReader = (zip: JSZip, signal?: AbortSignal): AssetReader => {
             seen.set(path, url);
 
             return url;
+        },
+        mayRead: () => budget.files > 0 && budget.left > 0,
+        spend: (length) => {
+            if (budget.files <= 0 || length > budget.left) {
+                return false;
+            }
+
+            budget.files -= 1;
+            budget.left -= length;
+
+            return true;
         },
         text: async (path) => {
             signal?.throwIfAborted();
@@ -397,21 +415,38 @@ const readChapter = async (chapterPath: string, reader: AssetReader): Promise<{ 
         throw new Error("chapter not found");
     }
 
+    if (source.length > MAX_CHAPTER_CHARS) {
+        throw new Error("chapter too large");
+    }
+
     const directory = directoryOf(chapterPath);
     const parsed = new DOMParser().parseFromString(source, "text/html");
     const styles: string[] = [];
 
     for (const link of parsed.querySelectorAll('link[rel~="stylesheet" i][href]')) {
+        // Asked before the file is read: with the budget or the count spent, no further sheet is even opened.
+        if (!reader.mayRead()) {
+            break;
+        }
+
         const path = resolveInArchive(link.getAttribute("href") ?? "", directory);
         const text = path === undefined ? undefined : await reader.text(path);
 
         if (path !== undefined && text !== undefined) {
-            styles.push(await inlineStylesheetUrls(text, directoryOf(path), reader));
+            const sheet = await inlineStylesheetUrls(text, directoryOf(path), reader);
+
+            // A sheet that does not fit is left out whole, not cut: half a sheet would style a chapter wrongly.
+            if (reader.spend(sheet.length)) {
+                styles.push(sheet);
+            }
         }
     }
 
     for (const style of parsed.querySelectorAll("style")) {
-        style.textContent = await inlineStylesheetUrls(style.textContent ?? "", directory, reader);
+        const sheet = await inlineStylesheetUrls(style.textContent ?? "", directory, reader);
+
+        // The chapter's own style element is charged the same way; one that does not fit is emptied.
+        style.textContent = reader.spend(sheet.length) ? sheet : "";
     }
 
     for (const element of parsed.body.querySelectorAll("img[src], source[src], video[poster], image, input[src], audio[src]")) {
