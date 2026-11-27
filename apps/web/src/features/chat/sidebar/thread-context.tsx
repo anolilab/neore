@@ -17,6 +17,8 @@ import { useCRPC } from "@/lib/lunora/crpc";
 
 /** What the box reads off the thread record the Thread tab already holds. */
 export interface ThreadContextRecord {
+    /** After an agent switch, the agent's model is the one the thread runs on. */
+    activeAgent?: { model?: string };
     autoModel?: boolean;
     model?: string;
     projectId?: string;
@@ -48,7 +50,10 @@ const ThreadContext: FC<{ thread: ThreadContextRecord; threadId: string }> = ({ 
     const usage = useThreadUsage(threadId);
     const permissionMode = useShownPermissionMode();
     const project = useProject(thread.projectId as never);
-    const modelName = useCachedModelName(thread.model);
+    // The model the composer and the next turn use: the active agent's, and Auto only without one (`use-model-combobox.ts`).
+    const model = thread.activeAgent?.model ?? thread.model;
+    const isAuto = thread.autoModel === true && !thread.activeAgent;
+    const modelName = useCachedModelName(model);
 
     const permissionLabels: Record<ThreadPermissionMode, string> = {
         auto: t`Auto`,
@@ -62,8 +67,9 @@ const ThreadContext: FC<{ thread: ThreadContextRecord; threadId: string }> = ({ 
         <section aria-label={t`Context`} className="surface-raised overflow-hidden rounded-xl" data-slot="thread-context">
             {hostSession && (
                 <Row icon={Monitor} label={t`Computer`}>
-                    <span className="font-medium">{deviceName ?? hostSession.folderLabel}</span>
-                    {deviceName && <span className="text-muted-foreground ms-1.5 font-mono text-xs">{hostSession.folderLabel}</span>}
+                    {/* A device revoked since keeps its session readable: say so rather than show the folder as the computer. */}
+                    <span className="font-medium">{deviceName ?? t`Device removed`}</span>
+                    <span className="text-muted-foreground ms-1.5 font-mono text-xs">{hostSession.folderLabel}</span>
                     <span className="text-muted-foreground block text-xs">
                         {hostSession.agentLabel}
                         {hostSession.liveStreamId && (
@@ -77,11 +83,9 @@ const ThreadContext: FC<{ thread: ThreadContextRecord; threadId: string }> = ({ 
             )}
 
             {/* Linked pull requests and the Link button, as in the header; keyed so a thread switch starts fresh. */}
-            {!isHostRun || hostSession ? (
-                <Row icon={GitPullRequest} label={t`Pull requests`}>
-                    <ThreadPullRequests key={threadId} threadId={threadId} />
-                </Row>
-            ) : null}
+            <Row icon={GitPullRequest} label={t`Pull requests`}>
+                <ThreadPullRequests key={threadId} threadId={threadId} />
+            </Row>
 
             {goal && (
                 <Row icon={Target} label={t`Goal`}>
@@ -93,9 +97,9 @@ const ThreadContext: FC<{ thread: ThreadContextRecord; threadId: string }> = ({ 
             )}
 
             {/* A thread on your computer runs the coding agent's own model; the agent row above says which. */}
-            {!isHostRun && (thread.model || thread.autoModel) && (
-                <Row icon={thread.autoModel ? Sparkles : Brain} label={t`Model`}>
-                    {thread.autoModel ? t`Auto` : (modelName ?? thread.model)}
+            {!isHostRun && (model || isAuto) && (
+                <Row icon={isAuto ? Sparkles : Brain} label={t`Model`}>
+                    {isAuto ? t`Auto` : (modelName ?? model)}
                 </Row>
             )}
 

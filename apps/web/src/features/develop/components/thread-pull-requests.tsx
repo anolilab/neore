@@ -110,10 +110,13 @@ const LinkedPullRequest = ({ link, onFocusLost, readStatus, threadId }: LinkedPu
  * somewhere else is left where it is.
  */
 export const LinkedPullRequestList = ({
+    compact = false,
     fallbackFocus,
     links,
     threadId,
 }: {
+    /** One row that never wraps: links past the width are clipped, not stacked under the header. */
+    compact?: boolean;
     fallbackFocus: RefObject<HTMLElement | null>;
     links: ReadonlyArray<PullRequestAddress & { statusReadAt?: number }>;
     threadId: string;
@@ -156,7 +159,7 @@ export const LinkedPullRequestList = ({
     }
 
     return (
-        <ul className="flex flex-wrap items-center gap-2" ref={listRef}>
+        <ul className={cn("flex items-center gap-2", compact ? "max-w-80 min-w-0 flex-nowrap overflow-hidden" : "flex-wrap")} ref={listRef}>
             {links.map((link) => {
                 const key = linkKey(link);
 
@@ -332,7 +335,7 @@ const ThreadPullRequests = ({ compact = false, threadId }: { compact?: boolean; 
                     </Button>
                 </p>
             )}
-            <LinkedPullRequestList fallbackFocus={linkButtonRef} links={links.data ?? []} threadId={threadId} />
+            <LinkedPullRequestList compact={compact} fallbackFocus={linkButtonRef} links={links.data ?? []} threadId={threadId} />
             <Button
                 className={cn(compact && "size-7 shrink-0 p-0")}
                 onClick={() => setOpen(true)}
