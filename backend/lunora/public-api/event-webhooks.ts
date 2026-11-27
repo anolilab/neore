@@ -63,7 +63,8 @@ const toWire = (outcome: SubscribeOutcome) =>
  * (`mcpEventWatermarks`), never a row's: retention may delete the newest rows.
  */
 const oldestSeqOf = async (ctx: Pick<MutationCtx, "db">, userId: string): Promise<number | undefined> => {
-    const row = await ctx.db.mcpEvents.findFirst({ orderBy: [{ seq: "asc" }], where: { userId } });
+    // From the primary: a replica that has not seen the newest event would report an older log, and a replay would pass the event.
+    const row = await ctx.db.mcpEvents.findFirst({ consistency: "primary", orderBy: [{ seq: "asc" }], where: { userId } });
 
     return row?.seq;
 };
@@ -186,7 +187,7 @@ export const reapExpiredOn = async (ctx: Pick<MutationCtx, "db">, now: number): 
 
     // The census keeps only the earliest wake, so the next expiry still to come is returned for the tick to arm (at expiresAt + 1, as
     // `subscribeOn` arms it). A shard holds at most one account's rows, so the page is the whole of them.
-    const { page: remaining } = await ctx.db.eventWebhookSubscriptions.findMany({ limit: MAX_SUBSCRIPTIONS });
+    const { page: remaining } = await ctx.db.eventWebhookSubscriptions.findMany({ consistency: "primary", limit: MAX_SUBSCRIPTIONS });
     let earliest: number | undefined;
 
     for (const row of remaining) {

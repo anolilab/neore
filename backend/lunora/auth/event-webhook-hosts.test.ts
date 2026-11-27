@@ -91,6 +91,25 @@ describe("the owner's approved callback hosts", () => {
         }
     });
 
+    it("counts distinct host names against the add cap, so duplicate rows from a merge do not refuse an eligible host", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            const identity = await signedIn(harness);
+            const as = harness.withIdentity(identity as never);
+
+            await harness.run(async (context: any) => {
+                for (let index = 0; index < 50; index += 1) {
+                    await context.db.insert("eventWebhookHosts", { createdAt: 0, host: `host-${index % 25}.example.com`, userId: identity.userId });
+                }
+            });
+
+            expect(await as.mutation(addEventWebhookHost as never, { host: "fresh.example.com" } as never)).toStrictEqual({ host: "fresh.example.com" });
+        } finally {
+            harness.close();
+        }
+    });
+
     it("lists every host a merge left the owner with, past the add cap", async () => {
         const harness = lunoraTest(schema as never);
 

@@ -8,7 +8,7 @@ import { v } from "lunorash/server";
 
 import type { Doc } from "../_generated/dataModel";
 import { internalMutation, internalQuery } from "../_generated/server";
-import { MAX_LISTED_APPROVED_HOSTS, MAX_SUBSCRIPTIONS } from "./events-webhook";
+import { MAX_SUBSCRIPTIONS } from "./events-webhook";
 
 const BATCH = 200;
 
@@ -173,7 +173,8 @@ export const collectEventWebhooksForExport = internalQuery
         }),
     )
     .query(async ({ args: { userId }, ctx }) => {
-        const { page: hosts } = await ctx.db.eventWebhookHosts.findMany({ consistency: "primary", limit: MAX_LISTED_APPROVED_HOSTS, where: { userId } });
+        // Every row: a merge can grow the list past the list ceiling, and an unbounded read returns all of them (`docs/agents/backend-lunora.md`).
+        const { page: hosts } = await ctx.db.eventWebhookHosts.findMany({ consistency: "primary", where: { userId } });
         const { page: subscriptions } = await ctx.db.eventWebhookSubscriptions.findMany({
             consistency: "primary",
             limit: MAX_SUBSCRIPTIONS,

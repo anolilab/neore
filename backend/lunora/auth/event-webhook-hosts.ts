@@ -78,9 +78,10 @@ export const addEventWebhookHost = authMutation
             return { host };
         }
 
-        const { page } = await context.db.eventWebhookHosts.findMany({ limit: MAX_APPROVED_HOSTS, where: { userId } });
+        // A merge can leave one host in two rows, so the cap counts the distinct host names the owner approves.
+        const { page } = await context.db.eventWebhookHosts.findMany({ limit: MAX_LISTED_APPROVED_HOSTS, where: { userId } });
 
-        if (page.length >= MAX_APPROVED_HOSTS) {
+        if (new Set(page.map((row) => row.host)).size >= MAX_APPROVED_HOSTS) {
             throw new LunoraError("INVALID_INPUT", `An account can approve up to ${String(MAX_APPROVED_HOSTS)} hosts.`);
         }
 
