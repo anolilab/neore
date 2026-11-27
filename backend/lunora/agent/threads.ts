@@ -40,7 +40,7 @@ import { clearAwaitingInput, patchThread } from "./table-writes";
 import { deleteMcpEventsOfThread, hasMcpEventsOfThread } from "../public-api/events-log";
 import { runAfterOnShard } from "../lib/shard-scheduler";
 import { deletePullRequestLinksOfThread, setLinksThreadDeleted } from "../source-control/pr-thread-links";
-import { heldWakeLeases } from "../source-control/pr-watch-wake-lease";
+import { wakeLeaseHeld } from "../source-control/pr-watch-wake-lease";
 import { deleteThreadSummaries } from "./thread-summaries";
 import { SEARCH_INTERNAL_FIELDS } from "./thread-search-plan";
 
@@ -543,9 +543,7 @@ async function deletePageForThreadIdHandler(context: MutationContext, args: Dele
         const host = await context.db.get("threads", args.threadId);
 
         // A pull request watch is waking this chat: the delete waits, as it does for a suggestion (`source-control/pr-watch-wake-lease.ts`).
-        const waking = host?.userId === undefined ? [] : await heldWakeLeases(context, host.userId, args.threadId, context.now);
-
-        if (waking.length > 0) {
+        if (host?.userId !== undefined && (await wakeLeaseHeld(context, host.userId, args.threadId, context.now))) {
             throw new LunoraError("CONFLICT", "A pull request watch is waking this chat. Try again in a moment.");
         }
 
@@ -846,9 +844,7 @@ export const softDeleteThread = internalMutation
         assert(oldThread, `Thread ${args.threadId} not found`);
 
         // A pull request watch is waking this chat: the trash waits, as it does for a suggestion (`source-control/pr-watch-wake-lease.ts`).
-        const waking = oldThread.userId === undefined ? [] : await heldWakeLeases(ctx, oldThread.userId, args.threadId, ctx.now);
-
-        if (waking.length > 0) {
+        if (oldThread.userId !== undefined && (await wakeLeaseHeld(ctx, oldThread.userId, args.threadId, ctx.now))) {
             throw new LunoraError("CONFLICT", "A pull request watch is waking this chat. Try again in a moment.");
         }
 

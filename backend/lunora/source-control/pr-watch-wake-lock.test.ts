@@ -10,7 +10,7 @@ import { _deletePageForThreadId, softDeleteThread } from "../agent/threads";
 import { enableThreadLock } from "../agent/thread-lock";
 import { insertThread } from "../agent/table-writes";
 import schema from "../schema";
-import { heldWakeLeases } from "./pr-watch-wake-lease";
+import { wakeLeaseHeld } from "./pr-watch-wake-lease";
 
 const { sessionFrom } = vi.hoisted(() => {
     return {
@@ -121,33 +121,58 @@ describe("deleting a chat while a wake turn holds it", () => {
     });
 });
 
-describe("heldWakeLeases", () => {
-    it("lists the other links of a thread that hold a lease, and none that do not", async () => {
+const addLinks = async (threadId: string, count: number, from: number, leaseOn?: number): Promise<void> => {
+    await harness.run(async (ctx: any) => {
+        for (let index = 0; index < count; index += 1) {
+            await ctx.db.insert("pullRequestThreads", {
+                createdAt: 0,
+                kind: "linked",
+                number: from + index,
+                repository: "octo/hello",
+                threadId,
+                title: `pull ${String(from + index)}`,
+                url: `https://github.com/octo/hello/pull/${String(from + index)}`,
+                userId: OWNER,
+                ...(leaseOn === from + index && { watchWakeLeaseUntil: Date.now() + 60_000 }),
+            });
+        }
+    });
+};
+
+describe("wakeLeaseHeld", () => {
+    const held = async (threadId: string, except?: string) =>
+        await harness.run(async (ctx: any) => await wakeLeaseHeld(ctx, OWNER, threadId as never, Date.now(), except as never));
+
+    it("sees a lease on another link of the thread, and none that is not held or is the excepted one", async () => {
         const { linkId, threadId } = await seed(Date.now() + 60_000);
 
-        const other = await harness.run(async (ctx: any) =>
-            String(
-                await ctx.db.insert("pullRequestThreads", {
-                    createdAt: 0,
-                    kind: "linked",
-                    number: 8,
-                    repository: "octo/hello",
-                    threadId,
-                    title: "pull 8",
-                    url: "https://github.com/octo/hello/pull/8",
-                    userId: OWNER,
-                }),
-            ),
-        );
-        const held = async (except?: string) =>
-            await harness.run(async (ctx: any) => {
-                const ids = await heldWakeLeases(ctx, OWNER, threadId as never, Date.now(), except as never);
+        await addLinks(threadId, 1, 8);
 
-                return ids.map(String);
-            });
+        expect(await held(threadId)).toBe(true);
+        expect(await held(threadId, linkId)).toBe(false);
+    });
 
-        expect(await held()).toEqual([linkId]);
-        expect(await held(linkId)).toEqual([]);
-        expect(await held(other)).toEqual([linkId]);
+    it("finds a held lease on a link beyond the first hundred, so the lock and the delete still refuse", async () => {
+        const { threadId } = await seed(undefined);
+
+        // 150 further links: the held lease is on the 130th, past the first page.
+        await addLinks(threadId, 150, 100, 230);
+
+        expect(await held(threadId)).toBe(true);
+        await expect(lock(threadId)).rejects.toMatchObject({ message: expect.stringContaining("pull request watch") });
+        await expect(harness.run(async (ctx: any) => await ctx.runMutation(softDeleteThread, { threadId }))).rejects.toMatchObject({
+            message: expect.stringContaining("pull request watch"),
+        });
+        await expect(harness.run(async (ctx: any) => await ctx.runMutation(_deletePageForThreadId, { threadId }))).rejects.toMatchObject({
+            message: expect.stringContaining("pull request watch"),
+        });
+    });
+
+    it("does not refuse a thread with many links and no held lease", async () => {
+        const { threadId } = await seed(undefined);
+
+        await addLinks(threadId, 150, 100);
+
+        expect(await held(threadId)).toBe(false);
     });
 });

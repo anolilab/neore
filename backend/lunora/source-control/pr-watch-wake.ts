@@ -40,7 +40,7 @@ import { threadHasLiveGrant } from "../agent/live-grant";
 import { isDeviceEligibleThread } from "../devices/internal";
 import { isThreadLocked } from "../lib/thread-lock";
 import { chargeRound, loadTaskAccount, refundRoundKeys, roundQuotaKeys, taskAccessProblem } from "../tasks/account";
-import { heldWakeLeases } from "./pr-watch-wake-lease";
+import { wakeLeaseHeld } from "./pr-watch-wake-lease";
 import { PR_WATCH_MAX_WAKES, PR_WATCH_WAKE_COOLDOWN_MS, type WatchWakeReason } from "./pr-watch-logic";
 
 /**
@@ -253,9 +253,7 @@ export const claimWatchWake = internalMutation
         }
 
         // Another watch's turn is running in this thread (a thread can link several pull requests): no replacement claim beside it.
-        const running = await heldWakeLeases(ctx, link.userId, link.threadId, ctx.now, link._id);
-
-        if (running.length > 0) {
+        if (await wakeLeaseHeld(ctx, link.userId, link.threadId, ctx.now, link._id)) {
             return null;
         }
 
