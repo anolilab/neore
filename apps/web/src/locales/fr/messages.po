@@ -26554,6 +26554,10 @@ msgstr "Veuillez vérifier votre nouvelle adresse e-mail"
 msgid "Plug in your own tools"
 msgstr "Branchez vos propres outils"
 
+#: src/features/skills/components/skill-item.tsx:84
+msgid "Plugin"
+msgstr "Plugin"
+
 #: src/features/workflow/components/nodes/background-removal-node.tsx:23
 msgid "PNG (Transparent)"
 msgstr "PNG (transparent)"

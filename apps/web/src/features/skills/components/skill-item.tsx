@@ -81,6 +81,7 @@ const SkillItem = ({ canDelete, isBusy = false, onDelete, onEdit, onExport, onFo
                 editor: t`Created`,
                 github: t`GitHub`,
                 official: t`Official`,
+                plugin: t`Plugin`,
                 upload: t`Uploaded`,
             } as Record<string, string>
         )[sourceType] || sourceType;

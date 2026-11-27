@@ -26554,6 +26554,10 @@ msgstr "新しいメールアドレスを認証してください"
 msgid "Plug in your own tools"
 msgstr "独自のツールを接続"
 
+#: src/features/skills/components/skill-item.tsx:84
+msgid "Plugin"
+msgstr "プラグイン"
+
 #: src/features/workflow/components/nodes/background-removal-node.tsx:23
 msgid "PNG (Transparent)"
 msgstr "PNG (透過)"

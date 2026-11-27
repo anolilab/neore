@@ -26554,6 +26554,10 @@ msgstr "请验证你的新邮箱地址"
 msgid "Plug in your own tools"
 msgstr "接入你自己的工具"
 
+#: src/features/skills/components/skill-item.tsx:84
+msgid "Plugin"
+msgstr "插件"
+
 #: src/features/workflow/components/nodes/background-removal-node.tsx:23
 msgid "PNG (Transparent)"
 msgstr "PNG（透明）"
