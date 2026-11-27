@@ -147,9 +147,9 @@ describe("memory vector deletion", () => {
         expect(jobs()).toHaveLength(0);
     });
 
-    it("deletes the memory and logs when its embedding id names no vector table", async () => {
+    it("deletes the memory and records the vector when its table cannot be found, never reading that as gone", async () => {
         vi.mocked(getVectorIdInfo).mockImplementationOnce(() => {
-            throw new Error("Unknown vector table id");
+            throw new Error("read failed");
         });
 
         await asOwner().mutation(deleteMemory as never, { memoryId } as never);
@@ -158,6 +158,11 @@ describe("memory vector deletion", () => {
         expect(memoryLogger.error).toHaveBeenCalledWith(expect.stringContaining(embeddingId), expect.any(Error));
         expect(deleteVectorRow).not.toHaveBeenCalled();
         expect(jobs()).toHaveLength(0);
+        // The record is what finds the vector again: a failed read is not proof that it is gone.
+        const records = await run(async (ctx) => await ctx.db.query("memoryCleanups").collect());
+
+        expect(records).toHaveLength(1);
+        expect(records[0]).toMatchObject({ embeddingId, kind: "vector" });
     });
 
     it("returns quietly, without an error log, when the vector is already gone", async () => {

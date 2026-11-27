@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/auth/auth-state";
 import { fetchAccessToken } from "@/auth/grant";
 import { secureGrantStore } from "@/auth/secure-store";
+import { BrowserLink } from "@/browser/browser-link";
 import type { StartedChat } from "@/chat/chat-api";
 import { ChatError, startChat } from "@/chat/chat-api";
 import { ChatComposer } from "@/chat/chat-composer";
@@ -868,6 +869,8 @@ const Chat = () => {
     return (
         <View onLayout={measureTopOffset} ref={rootRef} style={{ flex: 1 }}>
             <OfflineBanner syncedAt={syncedAt} />
+            {/* Keyed by the account too: another account's sign-in starts the link afresh, with none of the last one's answers. */}
+            {threadId === undefined ? null : <BrowserLink key={`${accountId ?? "none"}:${threadId}`} threadId={threadId} />}
             <KeyboardAvoidingView behavior="padding" keyboardVerticalOffset={topOffset} style={{ flex: 1 }}>
                 <View
                     onLayout={(event) => {

@@ -1,7 +1,8 @@
 /**
  * Schedule ideas are opt-in, and switching the setting off erases the suggestions waiting to be accepted: saving
  * `scheduleIdeasEnabled` as anything but `true` queues the erasure on the user's shard; switching it on or saving
- * another setting queues nothing, and the setting is absent until it is saved.
+ * another setting queues nothing, and the setting is absent until it is saved. Turning memory off (the ideas need it)
+ * queues the same erasure in that save.
  */
 import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -98,5 +99,16 @@ describe("the schedule ideas setting", () => {
         expect(erasures()).toHaveLength(1);
         expect(JSON.stringify(erasures()[0])).toContain(USER);
         expect(JSON.stringify(erasures()[0])).toContain("before");
+    });
+
+    it("queues the erasure when memory is turned off, and not when memory is turned on", async () => {
+        await save({ memoryEnabled: true });
+
+        expect(erasures()).toHaveLength(0);
+
+        await save({ memoryEnabled: false });
+
+        expect(erasures()).toHaveLength(1);
+        expect(JSON.stringify(erasures()[0])).toContain(USER);
     });
 });

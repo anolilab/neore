@@ -8,6 +8,7 @@
  * by its structural marker. A person typing a label by hand is refused too, which only ever asks them.
  */
 import { guestNoteIdOf, isGuestTextPart } from "../../lib/guest-text";
+import { hasNotTypedMarks, notTypedMarksOfMessage } from "../../lib/not-typed-text";
 import { PAGE_CONTEXT_LABEL } from "./page-context";
 
 const ATTACHED_DOCUMENT_LABEL = "[Attached Document]";
@@ -234,6 +235,17 @@ export const typedTextOf = (message: MessageLike | undefined, options: TypedText
         })
         .join("\n\n");
 };
+
+/**
+ * Whether a prompt row cannot back a memory at all: an outside agent wrote part of it, or it carries a not-typed mark
+ * (`lib/not-typed-text.ts`: a prompt link, the desktop shell, an extension's relay, an admin acting as the owner). Those words
+ * reach the row as the owner's own without being typed by them. Read over the whole row, not per part: the extractor reads the
+ * whole prompt, so a marked part beside a typed one could still supply a claim that the typed part's words then back. Both
+ * ends of a run (`execute.ts`, `recover-finished-reply.ts`) send an empty quotable prompt for such a row, so only steers the
+ * owner typed into the run count.
+ */
+export const promptCannotBeQuoted = (message: MessageLike | undefined): boolean =>
+    messageCarriesOutsideAgentText(message) || hasNotTypedMarks(notTypedMarksOfMessage(message));
 
 /**
  * Whether one stored part of a user message may hold the person's typing: a text part that is no captured page, no

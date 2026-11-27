@@ -39,6 +39,10 @@ const usePinOverrides = create<Record<string, PinnedGoal | null | undefined>>()(
 /** The override for a chat: its pin as this tab last left it, or `undefined` when none is pending. */
 export const pinOverrideFor = (threadId: string): PinnedGoal | null | undefined => usePinOverrides.getState()[threadId];
 
+/** The override for a chat as a hook, for a view that shows the pin the next send will use. */
+export const usePinOverride = (threadId: string | undefined): PinnedGoal | null | undefined =>
+    usePinOverrides((state) => (threadId ? state[threadId] : undefined));
+
 /** Records (or with `undefined`, drops) the pending override for a chat. */
 export const setPinOverride = (threadId: string, pinned: PinnedGoal | null | undefined): void => {
     usePinOverrides.setState({ [threadId]: pinned });

@@ -37,7 +37,7 @@ import type { NavItem } from "@/features/layout/components/nav-items";
 import NavItems from "@/features/layout/components/nav-items";
 import SiteHeader from "@/features/layout/components/site-header";
 import { breadcrumbLabel, DASHBOARD_PAGE_NAMES } from "@/features/layout/lib/dashboard-page-names";
-import { adminPathFor, settingsLocation, settingsTabForPath } from "@/features/settings/lib/settings-link";
+import { adminPathFor, anchorFromHash, settingsLocation, settingsTabForPath } from "@/features/settings/lib/settings-link";
 import { requireSession } from "@/lib/auth/route-guard";
 
 /** The page names, as descriptors: this runs outside a component, so the caller translates them (`i18n._`). */
@@ -198,12 +198,12 @@ const RouteComponent = () => {
     const sidebarContent = (
         <>
             {isAdmin && navigationItems.admin.length > 0 && (
-                <NavItems classes={{ group: "pl-2" }} colorMode="light" items={navigationItems.admin} label={i18n._(DASHBOARD_PAGE_NAMES.admin)} />
+                <NavItems classes={{ group: "px-2" }} colorMode="light" items={navigationItems.admin} label={i18n._(DASHBOARD_PAGE_NAMES.admin)} />
             )}
-            <NavItems classes={{ group: "pl-2" }} colorMode="light" items={navigationItems.app} label={i18n._(DASHBOARD_PAGE_NAMES.app)} />
-            <NavItems classes={{ group: "pl-2" }} colorMode="light" items={navigationItems.chat} label={i18n._(DASHBOARD_PAGE_NAMES.chat)} />
-            <NavItems classes={{ group: "pl-2" }} colorMode="light" items={navigationItems.auth} label={i18n._(DASHBOARD_PAGE_NAMES.auth)} />
-            <NavItems classes={{ group: "pl-2" }} colorMode="light" items={navigationItems.privacy} label={i18n._(DASHBOARD_PAGE_NAMES.privacy)} />
+            <NavItems classes={{ group: "px-2" }} colorMode="light" items={navigationItems.app} label={i18n._(DASHBOARD_PAGE_NAMES.app)} />
+            <NavItems classes={{ group: "px-2" }} colorMode="light" items={navigationItems.chat} label={i18n._(DASHBOARD_PAGE_NAMES.chat)} />
+            <NavItems classes={{ group: "px-2" }} colorMode="light" items={navigationItems.auth} label={i18n._(DASHBOARD_PAGE_NAMES.auth)} />
+            <NavItems classes={{ group: "px-2" }} colorMode="light" items={navigationItems.privacy} label={i18n._(DASHBOARD_PAGE_NAMES.privacy)} />
         </>
     );
 
@@ -261,10 +261,8 @@ export const Route = createFileRoute("/dashboard")({
         const settingsTab = settingsTabForPath(location.pathname);
 
         if (settingsTab) {
-            // The router's hash may carry its "#"; the modal looks the anchor up as an element id.
-            const anchor = location.hash.startsWith("#") ? location.hash.slice(1) : location.hash;
-
-            throw redirect(settingsLocation(settingsTab, anchor || undefined));
+            // The router's hash may carry its "#" and be percent-encoded; the modal looks the anchor up as an element id.
+            throw redirect(settingsLocation(settingsTab, anchorFromHash(location.hash)));
         }
 
         // Admin moved to its own pages.

@@ -15,7 +15,7 @@
  * two share lives in `lib/agent-run.ts`.
  */
 import { DEFAULT_CHAT_MODEL } from "@neore/ai/constants";
-import { messageCarriesOutsideAgentText, typedTextOf } from "./lib/attached-text";
+import { promptCannotBeQuoted, typedTextOf } from "./lib/attached-text";
 import { estimateTokensFromCharacters, hasActiveFilters, MODEL_LOOKUP, parseCustomModelId } from "@neore/ai/models";
 import { v } from "lunorash/server";
 
@@ -1081,14 +1081,15 @@ export const runStreamingAgent = internalAction
                     firstTokenTime,
                     prompt,
                     // Only the user's own words are quoted: not a prompt an outside agent wrote (its origin, or the mark it was saved with, since a
-                    // regenerate runs with no origin), nor a collaborator's prompt the user regenerated.
-                    ...(origin !== "outside_agent" &&
-                        !messageCarriesOutsideAgentText(message?.message) &&
-                        (message?.userId === undefined || message.userId === userId) && {
-                            ...(message && { promptAt: message._creationTime }),
-                            promptMessageId: messageId,
-                            quotablePrompt: typedTextOf(message?.message),
-                        }),
+                    // regenerate runs with no origin), nor a collaborator's prompt the user regenerated. Such a prompt still carries an EMPTY
+                    // quotable text, never none: memory extraction keeps a fact only when it quotes the user's words, and an unset text would skip that check.
+                    ...(origin !== "outside_agent" && !promptCannotBeQuoted(message?.message) && (message?.userId === undefined || message.userId === userId)
+                        ? {
+                              ...(message && { promptAt: message._creationTime }),
+                              promptMessageId: messageId,
+                              quotablePrompt: typedTextOf(message?.message),
+                          }
+                        : { quotablePrompt: "" }),
                 });
 
                 // A run that belongs to a goal is reviewed before the chat settles: the goal keeps the thread running

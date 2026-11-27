@@ -24,7 +24,15 @@ import deepfakeDetectionTool from "./deepfake-detection";
 import fileOperationsTool from "./file-operations";
 import flightTrackerTool from "./flight-tracker";
 import githubSearchTool from "./github-search";
-import { mergePullRequestTool, readFailingChecksTool, readPullRequestTool, replyToReviewCommentTool, rerunFailedChecksTool } from "./pull-request";
+import {
+    mergePullRequestTool,
+    readFailingChecksTool,
+    readPullRequestTool,
+    replyToReviewCommentTool,
+    rerunFailedChecksTool,
+    unwatchPullRequestTool,
+    watchPullRequestTool,
+} from "./pull-request";
 import imageEditingTool from "./image-editing";
 import imageGenerationTool from "./image-generation";
 import imageSearchTool from "./image-search";
@@ -40,6 +48,7 @@ import requestSecretTool from "./request-secret";
 import retrieveTool from "./retrieve";
 import { saveSecretAsProviderKeyTool, setMcpServerSecretTool } from "./use-secret";
 import searchMemoryTool from "./search-memory";
+import searchPastChatsTool from "./search-past-chats";
 import signInWithSavedLoginTool from "./site-login";
 import shellExecutionTool from "./shell-execution";
 import spotifySearchTool from "./spotify-search";
@@ -105,7 +114,15 @@ export type { MediaDetails, MediaResult } from "./movie-tv-search";
 export { default as movieTvSearchTool } from "./movie-tv-search";
 export { default as musicGenerationTool } from "./music-generation";
 export { default as peopleSearchTool } from "./people-search";
-export { mergePullRequestTool, readFailingChecksTool, readPullRequestTool, replyToReviewCommentTool, rerunFailedChecksTool } from "./pull-request";
+export {
+    mergePullRequestTool,
+    readFailingChecksTool,
+    readPullRequestTool,
+    replyToReviewCommentTool,
+    rerunFailedChecksTool,
+    unwatchPullRequestTool,
+    watchPullRequestTool,
+} from "./pull-request";
 export type { RedditPost } from "./reddit-search";
 export { default as redditSearchTool } from "./reddit-search";
 export type { RenderUIOutput } from "./render-ui";
@@ -115,6 +132,7 @@ export { default as requestSecretTool } from "./request-secret";
 export type { RetrievedContent } from "./retrieve";
 export { default as retrieveTool } from "./retrieve";
 export { default as searchMemoryTool } from "./search-memory";
+export { default as searchPastChatsTool } from "./search-past-chats";
 export { default as shellExecutionTool } from "./shell-execution";
 export { default as signInWithSavedLoginTool } from "./site-login";
 export type { SpotifyAlbum, SpotifyArtist, SpotifyPlaylist, SpotifyShow, SpotifyTrack } from "./spotify-search";
@@ -248,6 +266,7 @@ export enum ToolName {
     SaveSecretAsProviderKey = "saveSecretAsProviderKey",
     // Memory Tools
     SearchMemory = "searchMemory",
+    SearchPastChats = "searchPastChats",
     SetMcpServerSecret = "setMcpServerSecret",
 
     // Sandbox Tools
@@ -267,6 +286,7 @@ export enum ToolName {
     TrendingMovies = "trendingMovies",
     TrendingTv = "trendingTv",
 
+    UnwatchPullRequest = "unwatchPullRequest",
     UpdateDesign = "updateDesign",
 
     UpdateDocument = "updateDocument",
@@ -279,6 +299,7 @@ export enum ToolName {
     VisionAnalysis = "visionAnalysis",
 
     // Information Tools
+    WatchPullRequest = "watchPullRequest",
     Weather = "weather",
 
     // Search Tools
@@ -365,6 +386,7 @@ export const getAllTools = () => {
         [ToolName.Retrieve]: retrieveTool,
         [ToolName.SaveSecretAsProviderKey]: saveSecretAsProviderKeyTool,
         [ToolName.SearchMemory]: searchMemoryTool,
+        [ToolName.SearchPastChats]: searchPastChatsTool,
         [ToolName.SetMcpServerSecret]: setMcpServerSecretTool,
         [ToolName.ShellExecution]: shellExecutionTool,
         [ToolName.SignInWithSavedLogin]: signInWithSavedLoginTool,
@@ -374,12 +396,14 @@ export const getAllTools = () => {
         [ToolName.TextTranslate]: textTranslateTool,
         [ToolName.TrendingMovies]: trendingMoviesTool,
         [ToolName.TrendingTv]: trendingTvTool,
+        [ToolName.UnwatchPullRequest]: unwatchPullRequestTool,
         [ToolName.UpdateDesign]: updateDesignTool,
         [ToolName.UpdateDocument]: updateDocumentTool,
         [ToolName.UpdateSlide]: updateSlideTool,
         [ToolName.VideoGeneration]: videoGenerationTool,
         [ToolName.VideoSearch]: videoSearchTool,
         [ToolName.VisionAnalysis]: visionAnalysisTool,
+        [ToolName.WatchPullRequest]: watchPullRequestTool,
         [ToolName.Weather]: weatherTool,
         [ToolName.WebSearch]: webSearchTool,
         [ToolName.WolframAlpha]: wolframAlphaTool,
