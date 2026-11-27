@@ -98,6 +98,10 @@ const { getHostSession } = await import("./functions");
 const { internalAction } = await import("../_generated/server");
 const { v } = await import("lunorash/server");
 const agentMessages = await import("../agent/messages");
+const { pendingHandoffOf } = await import("./lib/pending-handoff");
+const { FORK_HANDOFF_MAX_BYTES } = await import("./lib/fork-fallback");
+const { jsonBytes } = await import("../agent/handoff");
+const { agentSwitchOf } = await import("../agent/agent-switch-logic");
 const streaming = await import("../chat/streaming/index");
 const { reapExpiredHostStreams } = await import("./lib/reap");
 
@@ -570,8 +574,9 @@ describe("forkHostThread", () => {
     };
 
     const say = async (threadId: string, rowsToAdd: [string, string, number][]) => {
-        await run(async (ctx) => {
-            for (const [content, status, order] of rowsToAdd) {
+        // One transaction each: a long chat in one would meet the harness's limit on trigger recursion.
+        for (const [content, status, order] of rowsToAdd) {
+            await run(async (ctx) => {
                 await ctx.db.insert("messages", {
                     message: { content, role: order % 2 === 0 ? "user" : "assistant" },
                     order,
@@ -581,8 +586,8 @@ describe("forkHostThread", () => {
                     tool: false,
                     userId: ownerId,
                 });
-            }
-        });
+            });
+        }
     };
 
     it("copies the source chat's settled messages into the new chat, in order", async () => {
@@ -989,6 +994,103 @@ describe("forkHostThread", () => {
                 ),
             ).rejects.toThrow("Chat not found");
             expect(await rows("deviceCalls", { toolName: "acp_start" })).toHaveLength(1);
+        });
+    });
+
+    describe("a fork the agent could not make", () => {
+        const open = async (device: { deviceId: string }, threadId: string, fork: Row) => {
+            const [opening] = await rows("acpSessions", { threadId });
+
+            await run(
+                async (ctx) =>
+                    await ctx.runMutation(applyHostEvents, {
+                        deviceId: device.deviceId,
+                        events: [{ ...SESSION_OPEN, fork }],
+                        sessionId: opening?.hostSessionId as string,
+                    }),
+            );
+        };
+        const dividersOf = async (threadId: string) =>
+            (await rows("messages", { threadId })).filter((message) => agentSwitchOf(message as never) !== undefined);
+        const handoffOf = async (threadId: string) => await run(async (ctx) => await pendingHandoffOf(ctx, (await ctx.db.get("threads", threadId)) as never));
+
+        it("marks the copied history with a divider and carries a summary of it into the first turn", async () => {
+            const { device, threadId } = await started();
+
+            await say(threadId, [
+                ["first question", "success", 0],
+                ["first answer", "success", 1],
+                ["half an answer", "pending", 2],
+            ]);
+
+            const result = (await fork(threadId)) as { threadId: string };
+
+            await open(device, result.threadId, { forked: false, reason: "fork_unsupported" });
+
+            const dividers = await dividersOf(result.threadId);
+            const handoff = await handoffOf(result.threadId);
+
+            expect(dividers).toHaveLength(1);
+            expect(agentSwitchOf(dividers[0] as never)).toMatchObject({ mode: "portable" });
+            // The divider is the newest row, after the copied history, and the first turn carries what came before.
+            expect(handoff).toContain("first question");
+            expect(handoff).toContain("first answer");
+            expect(handoff).not.toContain("half an answer");
+            expect(await fieldOf(result.threadId, "hasHandoff")).toBe(true);
+        });
+
+        it("marks it once when the report arrives twice", async () => {
+            const { device, threadId } = await started();
+
+            await say(threadId, [["asked", "success", 0]]);
+
+            const result = (await fork(threadId)) as { threadId: string };
+
+            await open(device, result.threadId, { forked: false, reason: "fork_failed" });
+            await open(device, result.threadId, { forked: false, reason: "fork_failed" });
+            expect(await dividersOf(result.threadId)).toHaveLength(1);
+        });
+
+        it("adds no divider and no summary when the agent forked its own session", async () => {
+            const { device, threadId } = await started();
+
+            await say(threadId, [["asked", "success", 0]]);
+
+            const result = (await fork(threadId)) as { threadId: string };
+
+            await open(device, result.threadId, { forked: true });
+            expect(await dividersOf(result.threadId)).toHaveLength(0);
+            expect(await handoffOf(result.threadId)).toBeUndefined();
+        });
+
+        it("adds nothing to a fork that copied no history", async () => {
+            const { device, threadId } = await started();
+            const result = (await fork(threadId)) as { threadId: string };
+
+            await open(device, result.threadId, { forked: false, reason: "fork_unsupported" });
+            expect(await dividersOf(result.threadId)).toHaveLength(0);
+        });
+
+        it("caps the summary at the newest whole turns that fit, and says how many earlier ones are left out", async () => {
+            const { device, threadId } = await started();
+            const long = "word ".repeat(120);
+
+            await say(
+                threadId,
+                Array.from({ length: 24 }, (_item, index): [string, string, number] => [`turn ${String(index)} ${long}`, "success", index]),
+            );
+
+            const result = (await fork(threadId)) as { threadId: string };
+
+            await open(device, result.threadId, { forked: false, reason: "fork_unsupported" });
+
+            const handoff = (await handoffOf(result.threadId)) as string;
+
+            expect(jsonBytes(handoff)).toBeLessThanOrEqual(FORK_HANDOFF_MAX_BYTES);
+            expect(handoff).toContain("turn 23");
+            expect(handoff).not.toContain("turn 0 ");
+            // All 24 were copied; the summary is the newest of them only.
+            expect(await textOf(result.threadId)).toHaveLength(25);
         });
     });
 

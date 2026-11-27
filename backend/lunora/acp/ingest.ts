@@ -46,6 +46,7 @@ import { isHostRunThread } from "./lib/host-thread";
 import { applyImportTurns, isImportEvent, openImport } from "./lib/import";
 import { rememberOpenedRunner } from "./lib/project-runner";
 import { reapExpiredHostStreams } from "./lib/reap";
+import { markForkFellBack } from "./lib/fork-fallback";
 import { markReattachFailed, nativeIdFits, reattachFailureOf } from "./lib/reattach";
 import { sessionOfThread, touchSession } from "./lib/sessions";
 import { recordFirstSignedUse } from "../devices/lib/state";
@@ -110,6 +111,9 @@ const openSession = async (ctx: MutationCtx, device: Doc<"devices">, hostSession
                     await ctx.db.delete("threadRelationships", link._id);
                 }
             }
+
+            // The agent did not fork, so it starts fresh: the copied history is marked as handed over, and a summary of it goes in the first turn.
+            await markForkFellBack(ctx, existing);
         }
 
         // A thread deleted in the app ends its session: the desktop learns it is over instead of posting into it.
