@@ -1353,6 +1353,11 @@ export const saveMemoryBatch = internalMutation
             }
         }
 
+        // A row this batch retires is no match for a later fact of it.
+        const retire = (retired: Id<"memories"> | undefined) => {
+            activeRows = retired === undefined ? activeRows : activeRows?.filter((row) => row._id !== retired);
+        };
+
         for (const { evidenceFrom, supersedesBase, supersedesDates, ...mem } of args.memories) {
             // A supersession applies only while its target still reads as the text, and holds the dates, the decision was
             // made on, in the same scope, unpinned and active. Otherwise the new memory is saved beside it.
@@ -1379,6 +1384,7 @@ export const saveMemoryBatch = internalMutation
             if (known) {
                 if (supersedes !== undefined && supersedes !== known._id) {
                     await supersedeMemory(ctx, supersedes, known._id, now);
+                    retire(supersedes);
                 }
 
                 await ctx.db.patch("memories", known._id, { lastConfirmedAt: now });
@@ -1410,6 +1416,10 @@ export const saveMemoryBatch = internalMutation
             const inserted = await insertMemory(ctx, { ...mem, evidence, supersedes }, now);
 
             memoryIds.push(inserted);
+
+            if (inserted !== null) {
+                retire(supersedes);
+            }
 
             // A later fact of the same request with this text and dates is this row (`known` above), not a twin of it.
             const insertedRow = activeRows !== undefined && inserted !== null ? await ctx.db.get("memories", inserted) : null;

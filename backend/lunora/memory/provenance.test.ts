@@ -74,6 +74,7 @@ beforeAll(async () => {
     registerModule(registry, "memory_functions", await import("./functions"));
     registerModule(registry, "memory_compress", await import("./compress"));
     registerModule(registry, "lib_action_cache", await import("../lib/action-cache"));
+    registerModule(registry, "lib_claim_once", await import("../lib/claim-once"));
 });
 
 beforeEach(async () => {

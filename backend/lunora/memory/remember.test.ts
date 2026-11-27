@@ -362,7 +362,7 @@ describe(rememberFactFor, () => {
         await expect(remember(ids)).resolves.toMatchObject({ status: "saved" });
     });
 
-    it("is the turn's one extraction: other facts are saved as usual, and the reply's own extraction then reads nothing again", async () => {
+    it("is the turn's one extraction: other facts are saved as usual, and the reply's own jobs then read nothing again", async () => {
         answer([
             { memory: "User is vegan", quote: "I'm vegan" },
             { asked: false, memory: "User works as a nurse", quote: "I work as a nurse" },
@@ -372,10 +372,15 @@ describe(rememberFactFor, () => {
 
         await expect(remember(ids)).resolves.toMatchObject({ status: "saved" });
 
-        // The job the reply schedules once it ends (`afterRun`), marked because the reply called `remember`.
-        await harness.action(async (ctx: any) => {
-            await ctx.runAction(extractMemories, { ...extraction(ids), afterRemember: true });
-        });
+        // The jobs the reply schedules for its prompt (`afterRun`): at an approval pause and at its end, or after a resume, each
+        // knowing only its own segment's rows.
+        const runJob = async () =>
+            await harness.action(async (ctx: any) => {
+                await ctx.runAction(extractMemories, extraction(ids));
+            });
+
+        await runJob();
+        await runJob();
 
         const rows = await memories();
 
@@ -386,20 +391,29 @@ describe(rememberFactFor, () => {
         ]);
     });
 
-    it("leaves a reply that did not call remember to its usual extraction, whatever claim the prompt holds", async () => {
+    it("extracts a prompt no remember call holds as usual", async () => {
         answer([{ asked: false, memory: "User works as a nurse", quote: "I work as a nurse" }]);
 
         const ids = await setUp({ prompt: "I work as a nurse." });
 
-        await harness.run(async (ctx: any) => {
-            await ctx.db.insert("idempotencyClaims", { claimedAt: 1, expiresAt: Number.MAX_SAFE_INTEGER, key: ids.promptMessageId, scope: "memory-remember" });
-        });
         await harness.action(async (ctx: any) => {
             await ctx.runAction(extractMemories, extraction(ids));
         });
 
         expect(generateText).toHaveBeenCalledTimes(1);
         expect(await memories()).toHaveLength(1);
+    });
+
+    it("saves a fact the extractor returned twice, asked only the second time, as asked", async () => {
+        answer([
+            { asked: false, memory: "User is vegan", quote: "I'm vegan" },
+            { memory: "user is vegan", quote: "I'm vegan" },
+        ]);
+
+        await expect(remember(await setUp())).resolves.toStrictEqual({ facts: [{ asked: true, memory: "User is vegan", status: "saved" }], status: "saved" });
+        const rows = await memories();
+
+        expect(rows.map((row) => row.source)).toStrictEqual(["requested"]);
     });
 
     it("refuses a fact whose own wording names a health condition, whatever its quote says", async () => {
@@ -454,6 +468,33 @@ describe(rememberFactFor, () => {
 
             expect(rows.find((row) => row._id === old)?.supersededBy).toBe(known);
             expect(rows).toHaveLength(2);
+        });
+
+        it("is never a row an earlier fact of the same batch retired", async () => {
+            const ids = await setUp();
+            const old = await insert({ memory: "User flies to Rome" });
+            const saved = await harness.action(
+                async (ctx: any) =>
+                    await ctx.runMutation(saveMemoryBatch, {
+                        memories: [
+                            { memory: "User flies to Paris", supersedes: old, supersedesBase: "User flies to Rome" },
+                            { memory: "User flies to Rome" },
+                        ].map((fact) => {
+                            return { confidence: 90, importance: 70, source: "requested", threadId: ids.threadId, type: "activity", userId: USER, ...fact };
+                        }),
+                        requested: { promptMessageId: ids.promptMessageId, replyKey: REPLY, threadId: ids.threadId, userId: USER },
+                    }),
+            );
+            const rows = await memories();
+
+            expect(saved.every((entry: unknown) => typeof entry === "string")).toBe(true);
+            expect(
+                rows
+                    .filter((row) => row.supersededBy === undefined)
+                    .map((row) => row.memory)
+                    .toSorted((a, b) => a.localeCompare(b)),
+            ).toStrictEqual(["User flies to Paris", "User flies to Rome"]);
+            expect(rows.find((row) => row._id === old)?.supersededBy).toBeDefined();
         });
 
         it("is the first of two facts of one request that differ only in spacing and case: one row is saved", async () => {

@@ -296,8 +296,6 @@ const runExtractionGate = async (ctx: ActionContext, args: GateArgs): Promise<Ga
 
 export const extractMemories = internalAction
     .input({
-        /** The reply called `remember`, which may have extracted the prompt already (`REMEMBER_SCOPE`). */
-        afterRemember: v.optional(v.boolean()),
         assistantResponse: v.string(),
         // The bot whose chat produced the turn. Its memories are written and deduped in
         // that scope only (`getActiveMemoriesForUser`), never against the user's own.
@@ -337,11 +335,10 @@ export const extractMemories = internalAction
     })
     .output(v.object({ asked: v.boolean(), blocked: v.optional(vRequestedRefusal), facts: v.array(vRunFact), refused: v.number() }))
     .action(async ({ args: input, ctx }): Promise<ExtractionOutcome> => {
-        // A reply that called `remember` extracted its prompt in that call, when the call still holds the prompt's claim (it
-        // releases it when it wrote nothing): the prompt is then cut as one that is not quotable, and only steers are read.
-        // Read only for such a reply, so no other turn pays for it.
+        // A `remember` call extracted this prompt already when it still holds the prompt's claim (it releases it when it wrote
+        // nothing): the prompt is then cut as one that is not quotable, and only steers are read. One keyed read, made for every
+        // job with a typed prompt, so no path of the reply (a pause, a resume, a recovery) can miss that the call ran.
         const promptHandled =
-            input.afterRemember === true &&
             !input.requested &&
             input.promptMessageId !== undefined &&
             (input.quotablePrompt ?? "").trim() !== "" &&
@@ -553,6 +550,11 @@ ${args.requested ? REQUESTED_RULE : "Extract NEW facts about the user not alread
         if (extractedFacts.length === 0) {
             return { asked: true, facts: [], refused };
         }
+
+        // The extractor can return one statement twice, asked once: the copy kept below carries the request either way.
+        const askedKeys = new Set(extractedFacts.flatMap((fact) => (fact.asked === true ? [statementKey(fact)] : [])));
+
+        extractedFacts = extractedFacts.map((fact) => (askedKeys.has(statementKey(fact)) ? { ...fact, asked: true } : fact));
 
         const now = Date.now();
 
@@ -973,6 +975,9 @@ ${args.requested ? REQUESTED_RULE : "Extract NEW facts about the user not alread
 
         return { asked: true, ...(blocked !== undefined && { blocked }), facts: outcomes, refused };
     });
+
+/** A fact's statement as the run's own twice-returned check reads it: its trimmed text in lower case, and its dates. */
+const statementKey = (fact: z.infer<typeof extractedFactSchema>): string => JSON.stringify([fact.memory.trim().toLowerCase(), normalizeFactDates(fact)]);
 
 type SteerOffset = { at: number; from: number; messageId?: string; notTyped?: boolean };
 
