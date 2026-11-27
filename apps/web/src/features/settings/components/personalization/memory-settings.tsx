@@ -28,6 +28,7 @@ import { trackEvent } from "@/lib/analytics";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 import MemoryDigestCard from "./memory-digest-card";
+import MemoryFileImport from "./memory-file-import";
 import MemoryImportDialog from "./memory-import-dialog";
 import MemoryItem from "./memory-item";
 import type { MemoryType } from "./memory-types";
@@ -175,6 +176,8 @@ const MemorySettings: FC = () => {
 
                 {/* Outside the enabled block: with memory off it offers to turn it on first. */}
                 <MemoryImportDialog memoryEnabled={memoryEnabled} onEnableMemory={handleEnableMemory} onImported={refresh} />
+
+                <MemoryFileImport memoryEnabled={memoryEnabled} onImported={refresh} />
 
                 {memoryEnabled && (
                     <>

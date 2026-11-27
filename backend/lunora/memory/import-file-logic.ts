@@ -21,18 +21,11 @@ import {
     redactImportText,
     unwrapImportLine,
 } from "./import-logic";
+import { MEMORY_FILE_MAX_BYTES, MEMORY_FILE_MAX_ENTRIES } from "./import-file-limits";
 import { isMemoryType, type MemoryType } from "./taxonomy";
 
-/**
- * Largest file accepted, in UTF-8 bytes. The file travels as a JSON string in a request body the runtime reads with a
- * 1,048,576-byte cap (a 413 before the action runs). JSON escaping grows a quote, a backslash or a line break to two
- * bytes, so a file near the runtime's own size can be refused by the transport; half of it leaves room for those. A
- * file made mostly of control characters (six bytes each once escaped) can still exceed the cap and be refused there.
- */
-export const MEMORY_FILE_MAX_BYTES = 500_000;
-
-/** Most entries (non-empty lines, or array items) one file may hold; a file with more is refused, not cut. */
-export const MEMORY_FILE_MAX_ENTRIES = 5000;
+// Defined in `./import-file-limits.ts`, which the web app imports; kept exported here for the callers of this module.
+export { MEMORY_FILE_MAX_BYTES, MEMORY_FILE_MAX_ENTRIES } from "./import-file-limits";
 
 /** Longest single entry, as the longest stored fact. A longer one is skipped and counted, never cut. */
 export const MEMORY_FILE_ENTRY_MAX_CHARS = IMPORT_MAX_FACT_CHARS;
