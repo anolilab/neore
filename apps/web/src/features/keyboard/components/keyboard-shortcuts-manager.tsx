@@ -5,6 +5,7 @@ import { useKeyboardShortcuts as useUIKeyboardShortcuts } from "@/features/layou
 import type { KeyboardShortcuts } from "@/features/layout/stores/ui-state-store";
 
 import { useFocusAreaHotkeys } from "../hooks/use-focus-area-hotkeys";
+import { hasAsideFindTarget } from "../lib/aside-find-target";
 import { hasFindInThreadTarget } from "../lib/find-in-thread-target";
 import { convertRecordedShortcutToHotkeysHook, effortCommandsToRegister } from "../lib/recorded-shortcut-converter";
 import convertShortcutToHotkeysHook from "../lib/shortcut-converter";
@@ -212,7 +213,7 @@ const KeyboardShortcutsHandler: React.FC<{
     const handleFindInThread = useCallback(
         (event: KeyboardEvent) => {
             // Off a thread page the chord keeps its older meaning: the thread list's search, else the browser's find.
-            if (!(hasFindInThreadTarget() || hasThreadSearchTarget()) || isTextEntryKeystroke(event)) {
+            if (!(hasFindInThreadTarget() || hasThreadSearchTarget() || hasAsideFindTarget()) || isTextEntryKeystroke(event)) {
                 return;
             }
 
@@ -435,7 +436,8 @@ const KeyboardShortcutsHandler: React.FC<{
             // A modifier chord must work from the composer and from the find field itself; a bare key stays with the field.
             enableOnContentEditable: true,
             enableOnFormTags: true,
-            preventDefault: (event: KeyboardEvent) => !isTextEntryKeystroke(event) && (hasFindInThreadTarget() || hasThreadSearchTarget()),
+            preventDefault: (event: KeyboardEvent) =>
+                !isTextEntryKeystroke(event) && (hasFindInThreadTarget() || hasThreadSearchTarget() || hasAsideFindTarget()),
         },
         [convertedShortcuts.findInThread, handleFindInThread],
     );
