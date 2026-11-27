@@ -370,6 +370,24 @@ describe("applying an update", () => {
         expect(links.map((row: { entryKey: string }) => row.entryKey)).toStrictEqual(["skill:analyst"]);
     });
 
+    it("failUpdate never clears a partial mark an earlier update left", async () => {
+        const { installId } = await installed();
+        const generation = await run(
+            async (context) => await context.runMutation(beginUpdate, { expectedGeneration: 1, installId, targetVersion: "1.1.0", userId: OWNER }),
+        );
+
+        await run(async (context) => await context.db.patch("pluginInstalls", installId, { partial: true }));
+        await run(
+            async (context) =>
+                await context.runMutation(failUpdate, { contentHash: HASH, createKeys: [], generation, installId, keepForRepair: false, partial: false }),
+        );
+
+        expect(await run(async (context) => await context.db.pluginInstalls.findFirst({ where: { _id: installId } }))).toMatchObject({
+            partial: true,
+            status: "installed",
+        });
+    });
+
     it("failUpdate keeps the install for repair with the new file's hash when children were left behind", async () => {
         const { installId } = await installed();
         const generation = await run(

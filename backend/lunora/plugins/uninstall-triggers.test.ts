@@ -129,7 +129,7 @@ describe("uninstall of triggers", () => {
         const { triggerIds } = await installed(1);
         const [triggerId] = triggerIds;
 
-        await addRuns(triggerId, 3);
+        await addRuns(triggerId!, 3);
 
         const begun = await run(async (context) => await uninstallRows(context, OWNER, SLUG));
 
@@ -153,7 +153,7 @@ describe("uninstall of triggers", () => {
         const [edited, untouched] = triggerIds;
 
         await run(async (context) => await context.db.patch("triggers", edited, { description: "Changed by the owner." }));
-        await addRuns(edited, 2);
+        await addRuns(edited!, 2);
 
         const begun = await run(async (context) => await uninstallRows(context, OWNER, SLUG));
         const result = await finishAll(begun.installId, begun.generation);
@@ -198,7 +198,7 @@ describe("uninstall of triggers", () => {
         const { triggerIds } = await installed(1);
         const [triggerId] = triggerIds;
 
-        await addRuns(triggerId, 205);
+        await addRuns(triggerId!, 205);
 
         const begun = await run(async (context) => await uninstallRows(context, OWNER, SLUG));
         const first = await run(async (context) => await finishUninstallRows(context, begun.installId, begun.generation, { pendingSkills: [] }));

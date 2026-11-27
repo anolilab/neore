@@ -457,6 +457,9 @@ export const _deletePageForThreadId = internalMutation
 export const deleteAllForThreadIdAsync = internalMutation
     .input({
         ...deleteThreadArgs,
+        // False from a plugin update: a kept group is detached alone, as the plugin's skills it names usually stay in the plugin.
+        // Unset or true (uninstall) detaches those skills with it.
+        detachSkills: v.optional(v.boolean()),
         // Set only by a plugin uninstall, which drives every page itself: the first call rechecks, in its transaction, that the group
         // is still the plugin's and still empty, and detaches and keeps it otherwise (`kept`). An incomplete page returns its
         // continuation (`next`) for the caller to pass back instead of scheduling the next page, so one party owns the pagination.
@@ -502,9 +505,13 @@ export const deleteAllForThreadIdAsync = internalMutation
 
             if (message || pin) {
                 // Loaded lazily, as the sub-agent module above: the group and the plugin skills it names are detached together.
-                const { detachKeptGroup } = await import("../plugins/uninstall");
+                if (args.detachSkills === false) {
+                    await ctx.db.patch("threads", args.threadId, { pluginInstallId: "", pluginMarker: "" });
+                } else {
+                    const { detachKeptGroup } = await import("../plugins/uninstall");
 
-                await detachKeptGroup(ctx, args.threadId, args.pluginInstallId);
+                    await detachKeptGroup(ctx, args.threadId, args.pluginInstallId);
+                }
 
                 return { isDone: true, kept: true };
             }

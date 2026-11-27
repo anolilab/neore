@@ -172,7 +172,8 @@ export const previewUpdate = authAction
 /**
  * Applies an update. Changed skills, triggers (schedule or webhook, a type change included) and group chats are rewritten in place, and
  * a skill records the new plugin version as its source; unchanged ones are left alone; an edited child is reported as skipped. A trigger
- * rewrite switches the trigger off; a webhook that a type change created returns its secret once in `webhookSecrets`. A group chat
+ * rewrite switches the trigger off; a webhook that a type change (or a signature scheme change) created returns its secret once in
+ * `webhookSecrets`, and when a later step fails the error carries them in `data.webhookSecrets`. A group chat
  * rewrite keeps its messages. New children are created (skills, triggers, then new group chats, which name the plugin's skills by
  * entry key), and removed ones deleted or detached: a dropped group chat with no messages or pins is deleted, one that has either is
  * kept and detached from the plugin (and reported as skipped), and a skill such a group still names is kept the way it is for any
@@ -477,6 +478,7 @@ export const updatePlugin = authAction
                     for (;;) {
                         const page = await ctx.runMutation(internal.agent.threads.deleteAllForThreadIdAsync, {
                             ...next,
+                            detachSkills: false,
                             pluginInstallId: installed.installId,
                             threadId: threadId as Id<"threads">,
                         });
@@ -547,11 +549,23 @@ export const updatePlugin = authAction
                     generation,
                     installId: installed.installId,
                     keepForRepair,
-                    partial: applied.length > 0 || importDone,
+                    partial: applied.length > 0 || skipped.length > 0 || importDone,
                 })
                 .catch(() => undefined);
 
-            throw importFailure(error);
+            const failure = importFailure(error);
+
+            if (webhookSecrets.length === 0) {
+                throw failure;
+            }
+
+            // A secret a finished step issued is shown once and a retry plans that trigger `same`, so it rides on the error. The existing
+            // `triggers.rotateWebhookSecret` makes a new one if the client still loses it.
+            const cause = failure instanceof LunoraError ? failure : undefined;
+
+            throw new LunoraError(cause?.code ?? "INTERNAL", cause?.message ?? (failure instanceof Error ? failure.message : "The update failed"), {
+                data: { ...(cause?.data as Record<string, unknown> | undefined), webhookSecrets },
+            });
         }
 
         return { applied, skipped, version: header.version, webhookSecrets };

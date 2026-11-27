@@ -238,9 +238,8 @@ const anyOutdated = async (
 
     const { page } = await ctx.db.pluginItems.findMany({ consistency: "primary", where: { installId } });
 
-    return page.some(
-        (row) => row.state === "created" && !skip.includes(row.entryKey) && entryHashes.has(row.entryKey) && entryHashes.get(row.entryKey) !== row.contentHash,
-    );
+    // A linked child the file no longer has (a dropped group chat whose thread still exists) is outdated too.
+    return page.some((row) => row.state === "created" && !skip.includes(row.entryKey) && entryHashes.get(row.entryKey) !== row.contentHash);
 };
 
 /**

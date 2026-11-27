@@ -254,7 +254,7 @@ describe("rewriting a trigger of any type", () => {
         return page as any[];
     };
 
-    it("rewrites a webhook in place: same id, secret and route, filters and scheme stored as creation stores them", async () => {
+    it("rewrites a webhook in place: same id, secret and route, filters stored as creation stores them", async () => {
         const { installId, triggerId } = await installedWith(HOOK);
         const [before] = await triggers();
         const revised = {
@@ -262,7 +262,6 @@ describe("rewriting a trigger of any type", () => {
             filters: [{ op: "exists" as const, path: "pull_request" }],
             inputTemplate: "Review {{payload}}",
             name: "Renamed hook",
-            webhookSignatureScheme: "native" as const,
         };
 
         const result = await rewrite(installId, revised);
@@ -276,10 +275,26 @@ describe("rewriting a trigger of any type", () => {
             filters: revised.filters,
             inputTemplate: "Review {{payload}}",
             name: "Renamed hook",
-            webhookSignatureScheme: "native",
+            webhookSignatureScheme: "timestamped",
         });
         expect(after[0].webhookSecret).toBe(before.webhookSecret);
         expect(routes.deleted).toStrictEqual([]);
+        expect(await triggerRowHash(after[0])).toBe(await triggerRowHash(revised));
+    });
+
+    it("replaces a webhook whose signature scheme changes, with a new secret returned once, since the scheme is fixed with the secret", async () => {
+        const { installId, triggerId } = await installedWith(HOOK);
+        const [before] = await triggers();
+        const revised = { ...HOOK, name: "Native hook", webhookSignatureScheme: "native" as const };
+
+        const result = await rewrite(installId, revised);
+        const after = await triggers();
+
+        expect(typeof result.webhookSecret).toBe("string");
+        expect(after).toHaveLength(1);
+        expect(after[0]._id).not.toBe(triggerId);
+        expect(after[0]).toMatchObject({ pluginMarker: markerFor(installId, INSTALL_KEY), webhookSignatureScheme: "native" });
+        expect(after[0].webhookSecret).not.toBe(before.webhookSecret);
         expect(await triggerRowHash(after[0])).toBe(await triggerRowHash(revised));
     });
 

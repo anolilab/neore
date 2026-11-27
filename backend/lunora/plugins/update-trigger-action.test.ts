@@ -4,6 +4,7 @@
  * not a deleted and recreated one.
  */
 import { lunoraTest } from "@lunora/testing";
+import { LunoraError } from "lunorash/server";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { registeredApi } from "../../test/registered-api";
@@ -198,7 +199,7 @@ describe("a schedule below an inserted skill, through the action path", () => {
             return { again, result };
         };
 
-        const first = await apply(steps[0]);
+        const first = await apply(steps[0]!);
         const rewritten = await schedules();
 
         expect(first.result.webhookSecrets).toStrictEqual([]);
@@ -206,12 +207,12 @@ describe("a schedule below an inserted skill, through the action path", () => {
         expect(rewritten[0]).toMatchObject({ _id: before[0]._id, cronExpression: "0 10 * * 1", enabled: false });
         expect(first.again.plan).toContainEqual({ action: "same", entryKey: "trigger:digest" });
 
-        const second = await apply(steps[1]);
+        const second = await apply(steps[1]!);
         const replaced = await schedules();
 
         expect(second.result.webhookSecrets).toHaveLength(1);
         expect(second.result.webhookSecrets[0]).toMatchObject({ entryKey: "trigger:digest" });
-        expect(typeof second.result.webhookSecrets[0].secret).toBe("string");
+        expect(typeof second.result.webhookSecrets[0]?.secret).toBe("string");
         expect(replaced).toHaveLength(1);
         expect(replaced[0]).toMatchObject({ enabled: false, name: "Digest hook", type: "webhook" });
         expect(replaced[0]._id).not.toBe(before[0]._id);
@@ -389,5 +390,81 @@ describe("a changed trigger that cannot be planned", () => {
         const { page } = await harness.run(async (context: any) => await context.db.pluginInstalls.findMany({ where: { userId: OWNER } }));
 
         expect(page[0]).toMatchObject({ status: "installed", version: "1.0.0" });
+    });
+});
+
+describe("a webhook secret when a later step fails", () => {
+    let harness: ReturnType<typeof lunoraTest>;
+
+    const file = async (hookScheme: "native" | "timestamped", version: string) => {
+        const body = buildBundleMarkdown({
+            description: "",
+            items: [
+                { key: "analyst", kind: "skill" as const, skill: skill("analyst") },
+                {
+                    key: "hook",
+                    kind: "trigger" as const,
+                    trigger: { model: DIGEST.model, name: "Hook", type: "webhook" as const, webhookSignatureScheme: hookScheme },
+                },
+                { key: "digest", kind: "trigger" as const, trigger: DIGEST },
+            ],
+            name: "Daily brief",
+        });
+        const contentHash = await bodyHash(body);
+
+        return { contentHash, markdown: withPluginHeader(body, { contentHash, slug: SLUG, version }) };
+    };
+
+    beforeEach(async () => {
+        harness = lunoraTest(schemaWithShardedTables(["skills", "skillStats", "userSkills", "skillHistory"]) as never);
+
+        const first = await file("timestamped", "1.0.0");
+
+        await harness.withIdentity({ userId: OWNER } as never).action(procedureAt("plugins_install_action", "installPlugin"), {
+            contentHash: first.contentHash,
+            markdown: first.markdown,
+        } as never);
+    });
+
+    afterEach(() => {
+        harness.close();
+    });
+
+    const as = () => harness.withIdentity({ userId: OWNER } as never);
+
+    it("rides on the error, since a retry plans the replaced webhook unchanged", async () => {
+        // The scheme change replaces the webhook (new secret); the last step, recording the new version, then fails.
+        const next = await file("native", "1.1.0");
+        const original = procedureAt("plugins_update_apply", "finishUpdate");
+
+        registry.set(
+            "plugins_update_apply:finishUpdate",
+            Object.assign(Object.create(original as object), {
+                handler: async () => {
+                    throw new LunoraError("CONFLICT", "injected failure");
+                },
+            }),
+        );
+        const preview = (await as().action(procedureAt("plugins_update", "previewUpdate"), { markdown: next.markdown } as never)) as PreviewResult;
+        const failure: any = await as()
+            .action(procedureAt("plugins_update", "updatePlugin"), {
+                confirmDowngrade: false,
+                contentHash: next.contentHash,
+                expectedGeneration: preview.generation,
+                expectedInstallId: preview.installId,
+                markdown: next.markdown,
+            } as never)
+            .catch((error: unknown) => error);
+
+        registry.set("plugins_update_apply:finishUpdate", original);
+
+        expect(failure).toBeInstanceOf(Error);
+        expect(failure.data?.webhookSecrets).toHaveLength(1);
+        expect(failure.data.webhookSecrets[0]).toMatchObject({ entryKey: "trigger:hook" });
+        expect(typeof failure.data.webhookSecrets[0].secret).toBe("string");
+
+        const retry = (await as().action(procedureAt("plugins_update", "previewUpdate"), { markdown: next.markdown } as never)) as PreviewResult;
+
+        expect(retry.plan).toContainEqual({ action: "same", entryKey: "trigger:hook" });
     });
 });

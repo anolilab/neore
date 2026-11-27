@@ -257,12 +257,12 @@ export const failUpdate = internalMutation
         generation: v.number(),
         installId: v.string().max(128),
         keepForRepair: v.boolean(),
-        /** Some child was rewritten, removed or created before the failure, so the old version no longer describes every child. */
+        /** Some child was rewritten, removed, kept, detached or created before the failure, so the old version no longer describes every child. */
         partial: v.boolean(),
     })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
-        await heldInstall(ctx, args.installId as Id<"pluginInstalls">, args.generation);
+        const install = await heldInstall(ctx, args.installId as Id<"pluginInstalls">, args.generation);
 
         if (args.keepForRepair) {
             await patchInstallIf(ctx, args.installId as Id<"pluginInstalls">, args.generation, {
@@ -276,7 +276,8 @@ export const failUpdate = internalMutation
         }
 
         const { page } = await ctx.db.pluginItems.findMany({ consistency: "primary", where: { installId: args.installId } });
-        let { partial } = args;
+        // A failure never clears a partial mark an earlier update or repair left.
+        let partial = args.partial || install.partial === true;
 
         // A step that stopped between its row write and its link write left a pending hash: a child at the pending content is adopted, one
         // still at the installed content is cleared, as repair does. A child that was adopted holds new content, so the install is partial.
@@ -358,7 +359,12 @@ export const updateTriggerChild = internalMutation
         const type = triggerTypeSchema.parse(fields.type);
         const linkId = link._id as Id<"pluginItems">;
 
-        if (trigger.type !== type) {
+        const { filters, webhookSignatureScheme } = webhookSetup(fields, type);
+
+        // The signature scheme is fixed when the secret is made, so a webhook whose scheme changes is replaced, with a new secret, as a type change is.
+        const schemeChanged = type === "webhook" && (trigger.webhookSignatureScheme ?? "timestamped") !== webhookSignatureScheme;
+
+        if (trigger.type !== type || schemeChanged) {
             // Pending first, as for any rewrite. The delete and the create are one transaction: a failed create leaves the old row.
             await ctx.db.patch("pluginItems", linkId, { pendingHash: contentHash });
             await deleteTriggerRows(ctx, trigger._id as Id<"triggers">);
@@ -398,7 +404,6 @@ export const updateTriggerChild = internalMutation
 
         assertBotRoutineOptions({ botComputer: fields.botComputer === true, botId: fields.botId, quietWhenEmpty: fields.quietWhenEmpty === true, type });
 
-        const { filters, webhookSignatureScheme } = webhookSetup(fields, type);
         const eventSource = await checkedEventSource(ctx, fields.eventSource, type, userId, ctx.now);
         // Stored cleaned, the way trigger creation stores it, which is also what the entry hash is computed over.
         const inputTemplate = cleanPromptField(fields.inputTemplate, "The input");

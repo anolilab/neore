@@ -9,6 +9,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { registeredApi } from "../../test/registered-api";
 import { schemaWithShardedTables } from "../lib/test-schema";
 import { buildBundleMarkdown } from "../skills/bundle-format";
+import { deleteAllForThreadIdAsync } from "../agent/threads";
 import { withPluginHeader } from "./export";
 import { bodyHash } from "./logic";
 
@@ -343,6 +344,25 @@ describe("plugin update with group chats", () => {
         expect(await markerOf("analyst")).toBeTruthy();
         expect(await markerOf("critic")).toBeTruthy();
         expect(await installRow()).toMatchObject({ partial: true, status: "installed" });
+    });
+
+    it("a message that lands before the delete keeps the group detached, and the plugin's skills keep their links and markers", async () => {
+        await install(["analyst", "critic"], { participants: ["analyst", "critic"], title: "Panel" });
+
+        const [group] = await groups();
+        const { _id: installId } = await installRow();
+
+        await addMessage(group._id);
+
+        const page = await run(
+            async (context) => await context.runMutation(deleteAllForThreadIdAsync, { detachSkills: false, pluginInstallId: installId, threadId: group._id }),
+        );
+
+        expect(page).toMatchObject({ isDone: true, kept: true });
+        expect(await firstGroup()).toMatchObject({ _id: group._id, pluginInstallId: "", pluginMarker: "" });
+        expect(await markerOf("analyst")).toBeTruthy();
+        expect(await markerOf("critic")).toBeTruthy();
+        expect(await linkKeys()).toStrictEqual(["group:panel", "skill:analyst", "skill:critic"]);
     });
 
     it("deletes a dropped skill that only a dropped group used", async () => {

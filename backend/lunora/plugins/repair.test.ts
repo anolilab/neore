@@ -2,6 +2,7 @@ import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import schema from "../schema";
+import { createPluginGroupChat } from "../chat/group/functions";
 import { createPluginSkill } from "../skills/create-skill";
 import { createInstallRow, finishInstall, markNeedsRepair, recordCreated, recordIntent } from "./install-steps";
 import { skillRowHash } from "./entry-hash";
@@ -481,6 +482,54 @@ describe("repair", () => {
 
             expect(result).toMatchObject({ missing: [], status: "installed" });
             expect(await linkKeys(first.installId)).toEqual([]);
+        });
+
+        it("is partial while a dropped group chat's thread still exists, since the install still holds a group the file lacks", async () => {
+            const first = await install();
+            const keepId = await linkedSkill(first, "skill:keep");
+            const otherId = await linkedSkill(first, "skill:other");
+            const { threadId } = await run(
+                async (context) =>
+                    await context.runMutation(createPluginGroupChat, {
+                        mode: "round-robin",
+                        model: "claude-haiku-5-5",
+                        plan: "premium",
+                        pluginInstallId: first.installId,
+                        pluginMarker: markerFor(first.installId, "group:old"),
+                        skillIds: [keepId, otherId],
+                        title: "Old panel",
+                        userId: OWNER,
+                    }),
+            );
+            const intentId = await run(
+                async (context) =>
+                    await context.runMutation(recordIntent, {
+                        contentHash: HASH,
+                        entryKey: "group:old",
+                        generation: first.generation,
+                        installId: first.installId,
+                        kind: "group",
+                        userId: OWNER,
+                    }),
+            );
+
+            await run(
+                async (context) =>
+                    await context.runMutation(recordCreated, { generation: first.generation, installId: first.installId, intentId, itemId: threadId }),
+            );
+            await run(async (context) => await context.runMutation(markNeedsRepair, { generation: first.generation, installId: first.installId }));
+
+            const file = new Map([
+                ["skill:keep", HASH],
+                ["skill:other", HASH],
+            ]);
+            const result = await run(async (context) => await repairRows(context, OWNER, SLUG, new Set(file.keys()), file));
+
+            expect(result).toMatchObject({ status: "installed" });
+            expect(await linkKeys(first.installId)).toContain("group:old");
+            expect(await run(async (context) => await context.db.pluginInstalls.findFirst({ where: { _id: first.installId } }))).toMatchObject({
+                partial: true,
+            });
         });
 
         it("handles a bounded number of dropped children per call and says when more remain", async () => {
