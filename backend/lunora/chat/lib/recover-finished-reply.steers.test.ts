@@ -104,6 +104,51 @@ describe("recoverFinishedReply steers", () => {
         expect(vi.mocked(afterRun).mock.calls[0]?.[1]).toMatchObject({ steered: [{ messageId: "steer-row", sentAt: 3, text: "use the train" }] });
     });
 
+    it("flags the steer the owner did not type, and only it, when it shares a row with a typed one", async () => {
+        expect.assertions(1);
+
+        const row = { ...STEER_ROW, _creationTime: 900 };
+
+        await recoverFinishedReply(contextWith([row]) as never, {
+            ...reply,
+            steerRowIds: ["steer-row"],
+            steers: [
+                { messageId: "steer-row", notTyped: true, sentAt: 100, textLength: 13 },
+                { messageId: "steer-row", sentAt: 500, textLength: 17 },
+            ],
+        });
+
+        expect(vi.mocked(afterRun).mock.calls[0]?.[1]).toMatchObject({
+            steered: [
+                { messageId: "steer-row", notTyped: true, sentAt: 100, text: "use the train" },
+                { messageId: "steer-row", sentAt: 500, text: "and keep it short" },
+            ],
+        });
+    });
+
+    it("flags a whole row it cannot split when any steer in it is marked, or the row itself is", async () => {
+        expect.assertions(2);
+
+        await recoverFinishedReply(contextWith([STEER_ROW]) as never, {
+            ...reply,
+            steerRowIds: ["steer-row"],
+            steers: [
+                { messageId: "steer-row", sentAt: 100 },
+                { messageId: "steer-row", notTyped: true, sentAt: 500 },
+            ],
+        });
+        expect(vi.mocked(afterRun).mock.calls[0]?.[1]).toMatchObject({ steered: [{ messageId: "steer-row", notTyped: true }] });
+
+        // A row saved marked, with no per-steer flags kept for it: all of it is read as not typed.
+        const marked = {
+            ...STEER_ROW,
+            message: { content: [{ providerOptions: { neore: { notTyped: { draft: "promptLink" } } }, text: "use the train", type: "text" }], role: "user" },
+        };
+
+        await recoverFinishedReply(contextWith([marked]) as never, { ...reply, steerRowIds: ["steer-row"] });
+        expect(vi.mocked(afterRun).mock.calls[1]?.[1]).toMatchObject({ steered: [{ messageId: "steer-row", notTyped: true }] });
+    });
+
     it("gives the after-run work no steers when the run took none", async () => {
         expect.assertions(1);
 

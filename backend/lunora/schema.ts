@@ -1813,6 +1813,47 @@ export const schema = defineSchema({
         .shardBy("userId")
         .index("by_userId_createdAt", ["userId", "createdAt"]),
 
+    // The parsed, redacted entries of one job's batch. Never the raw file; deleted when the job ends.
+    memoryImportBatches: defineTable({
+        entries: v.array(
+            v.object({
+                memory: v.string(),
+                type: v.union(v.literal("identity"), v.literal("preference"), v.literal("context"), v.literal("activity"), v.literal("experience")),
+            }),
+        ),
+        index: v.number(),
+        jobId: v.id("memoryImportJobs"),
+        userId: v.string(),
+    })
+        .shardBy("userId")
+        .index("by_jobId_index", ["jobId", "index"])
+        .index("by_userId", ["userId"]),
+
+    // One background import of a large memory file. The job reads its parsed entries from `memoryImportBatches`, one
+    // batch per queue message, and drops them when it ends. See `memory/import-job.ts`.
+    memoryImportJobs: defineTable({
+        batchCount: v.number(),
+        // The batch a delivery claimed, so a redelivery of the same batch finds the claim taken.
+        claimedBatch: v.optional(v.number()),
+        createdAt: v.number(),
+        done: v.number(),
+        duplicates: v.number(),
+        error: v.optional(v.string()),
+        imported: v.number(),
+        invalid: v.number(),
+        // The batch that runs next; only that batch may be claimed.
+        nextBatch: v.number(),
+        status: v.union(v.literal("preparing"), v.literal("queued"), v.literal("running"), v.literal("done"), v.literal("failed")),
+        tooLong: v.number(),
+        // Entries read from the file: kept, duplicate, too long and invalid.
+        total: v.number(),
+        updated: v.number(),
+        updatedAt: v.number(),
+        userId: v.string(),
+    })
+        .shardBy("userId")
+        .index("by_userId_createdAt", ["userId", "createdAt"]),
+
     // Per-user scheduling state for nightly reflection. See `memory/reflection.ts`.
     memoryReflectionState: defineTable({
         lastActiveAt: v.number(),
@@ -2203,6 +2244,33 @@ export const schema = defineSchema({
         .index("credentialID", ["credentialID"])
         .triggers((t) => auditTriggersFor(t, "passkey", AUDIT_TABLES["passkey"]!)),
 
+    /**
+     * A route restore a refused pin write still owes (`chat/pins/functions.ts#restoreRoutes`). It is written before the write's route cleanup
+     * returns. A refused write's rollback does not undo a global row, so the row survives the refusal. The restore settles it at its terminal
+     * outcome. The cron (`restorePendingPinRoutes`) dispatches it when the queue send does not run the restore, and the erasure turns it into
+     * a route before its second sweep (`chat/gdpr.ts#materializePendingPinRoutesBatch`). `ownerId` names the owner when it was written, and a
+     * guest merge re-points it like `sharedPinRoutes`.
+     *
+     * Not in the account export, by decision: a transient recovery record, settled within minutes, that holds route ids and timestamps and
+     * no content. The pin it protects is exported through its route (`gdpr/steps.ts#collectSharedPins`).
+     */
+    pendingPinRestores: defineTable({
+        // When the cron pass last dispatched this row (its write time until then). The pass takes the least recently dispatched rows, so a
+        // row that cannot settle yet does not hold back the others.
+        dispatchedAt: v.number(),
+        ownerId: v.string(),
+        routeCreatedAt: v.number(),
+        threadId: v.id("threads"),
+        until: v.number(),
+        userId: v.string(),
+    })
+        .global()
+        .index("by_owner", ["ownerId"])
+        .index("by_thread", ["threadId"])
+        .index("by_user", ["userId"])
+        .index("by_user_and_thread", ["userId", "threadId"])
+        .index("by_dispatched", ["dispatchedAt"]),
+
     persistentChunks: defineTable({
         // A host stream's event that carries no text (a tool call, a permission request, the end of the
         // turn). It still takes its `seq`, so the host's `(turnId, seq)` claim covers every event.
@@ -2391,11 +2459,15 @@ export const schema = defineSchema({
             };
         }),
 
-    // One row per account that writes pins: the latest time a pin write of the account may still be in flight. A move waits for it
-    // to pass before it sweeps the account's pins (`lib/account-moves.ts`).
+    // One row per admitted pin write: the time that write may still be in flight. A move waits for the latest of them to pass before it
+    // sweeps the account's pins, and a refused write's route cleanup waits for the others (`lib/account-moves.ts`).
+    // Upgrade: none by hand. The global-table provisioner adds `writerId` to a store's existing table after its sweep (`COLUMNS_ADDED_SINCE`
+    // in `auth/lib/ensure-global-tables.ts`), so a store from an earlier build needs nothing and is never reset for it.
     pinWriteLeases: defineTable({
         expiresAt: v.number(),
         userId: v.string(),
+        // Absent on rows an earlier build wrote; such a row counts as another writer's.
+        writerId: v.optional(v.string()),
     })
         .global()
         .index("by_user", ["userId"]),

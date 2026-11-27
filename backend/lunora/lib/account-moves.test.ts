@@ -8,9 +8,10 @@ import { describe, expect, it } from "vitest";
 
 import schema from "../schema";
 import {
+    ADMISSION_RECLAIM_BATCH,
     PIN_WRITE_LEASE_MS,
     admitPinWrite,
-    admitPinWriteUnlessMoving,
+    admitPinWriteAs,
     beginAccountMove,
     endAccountMove,
     eraseWaitUntil,
@@ -20,6 +21,8 @@ import {
     MERGE_MARKER_MAX_AGE_MS,
     isAccountMoving,
     pinWritesInFlightUntil,
+    reclaimPinWriteLeases,
+    refusesPinWrite,
 } from "./account-moves";
 
 describe("the account move marker", () => {
@@ -95,17 +98,78 @@ describe("the pin-write lease", () => {
         }
     });
 
-    it("keeps one row per account, renewed by each later write", async () => {
+    it("reclaims at most one batch of expired rows per admission, so a busy account's writes stay within budget", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            await harness.run(async (context: any) => {
+                for (let index = 0; index < 50; index += 1) {
+                    await context.db.insert("pinWriteLeases", { expiresAt: 1, userId: "user-busy", writerId: `old-${String(index)}` });
+                }
+            });
+
+            await harness.run(async (context: any) => await admitPinWrite(context, "user-busy", 1000));
+
+            const rows = await harness.run(async (context: any) => await context.db.pinWriteLeases.findMany({ where: { userId: "user-busy" } }));
+
+            // One admission's batch of the fifty expired rows goes, and the admitted write's own row is added.
+            expect(rows.page).toHaveLength(50 - ADMISSION_RECLAIM_BATCH + 1);
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("the erasure's reclaim deletes one batch per call until no row of the account is left", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            await harness.run(async (context: any) => {
+                for (let index = 0; index < 45; index += 1) {
+                    await context.db.insert("pinWriteLeases", { expiresAt: 1, userId: "user-erased", writerId: `old-${String(index)}` });
+                }
+            });
+
+            const rowsOf = async () => {
+                const { page } = await harness.run(async (context: any) => await context.db.pinWriteLeases.findMany({ where: { userId: "user-erased" } }));
+
+                return page;
+            };
+
+            const first = await harness.run(async (context: any) => await reclaimPinWriteLeases(context, "user-erased"));
+
+            expect(first).toBe(true);
+            expect(await rowsOf()).toHaveLength(25);
+
+            // Repeated until the reclaim reports nothing left: each call goes at most one batch.
+            let more = first;
+
+            while (more) {
+                more = await harness.run(async (context: any) => await reclaimPinWriteLeases(context, "user-erased"));
+            }
+
+            expect(await rowsOf()).toHaveLength(0);
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("adds one row per admitted write, and removes a row once it has expired", async () => {
         const harness = lunoraTest(schema as never);
 
         try {
             await harness.run(async (context: any) => await admitPinWrite(context, "user-writer", 1000));
-            await harness.run(async (context: any) => await admitPinWrite(context, "user-writer", 50_000));
+
+            const afterFirst = await harness.run(async (context: any) => await context.db.pinWriteLeases.findMany({ where: { userId: "user-writer" } }));
+
+            expect(afterFirst.page).toHaveLength(1);
+
+            // The first write's lease has run out by 70 000, so the next admission removes it and adds its own.
+            await harness.run(async (context: any) => await admitPinWrite(context, "user-writer", 70_000));
 
             const rows = await harness.run(async (context: any) => await context.db.pinWriteLeases.findMany({ where: { userId: "user-writer" } }));
 
             expect(rows.page).toHaveLength(1);
-            expect(rows.page[0].expiresAt).toBe(50_000 + PIN_WRITE_LEASE_MS);
+            expect(rows.page[0].expiresAt).toBe(70_000 + PIN_WRITE_LEASE_MS);
         } finally {
             harness.close();
         }
@@ -144,14 +208,42 @@ describe("the pin-write lease", () => {
 
             // Repeated refused attempts: each is refused, and none renews a lease.
             for (let attempt = 0; attempt < 3; attempt += 1) {
-                const refused = await harness.run(async (context: any) => await admitPinWriteUnlessMoving(context, "user-guest", 1000 + attempt));
+                const refused = await harness.run(async (context: any) => await admitPinWriteAs(context, "user-guest", 1000 + attempt));
 
-                expect(refused).toBe(true);
+                expect(refused).toBeNull();
             }
 
             const rows = await harness.run(async (context: any) => await context.db.pinWriteLeases.findMany({ where: { userId: "user-guest" } }));
 
             expect(rows.page).toHaveLength(0);
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("judges a writer's own lease by the wall clock, so a write that stalled past its lease is refused whatever time it started at", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            // Each writer has an account row, so the only reason a refusal can come from is its lease.
+            const [stalled, live] = (await harness.run(async (context: any) => {
+                const ids: string[] = [];
+
+                for (const name of ["stalled", "live"]) {
+                    ids.push(await context.db.insert("user", { createdAt: 0, email: `${name}@example.com`, emailVerified: true, name, updatedAt: 0 }));
+                }
+
+                await context.db.insert("pinWriteLeases", { expiresAt: Date.now() - 1000, userId: ids[0], writerId: "w-stalled" });
+                await context.db.insert("pinWriteLeases", { expiresAt: Date.now() + 60_000, userId: ids[1], writerId: "w-live" });
+
+                return ids;
+            })) as [string, string];
+
+            // The write started before its lease ran out, so its own start time still sees the lease as live. The check must not use it.
+            const started = Date.now() - 120_000;
+
+            expect(await harness.run(async (context: any) => await refusesPinWrite(context, stalled, started, "w-stalled"))).toBe(true);
+            expect(await harness.run(async (context: any) => await refusesPinWrite(context, live, started, "w-live"))).toBe(false);
         } finally {
             harness.close();
         }
@@ -239,11 +331,29 @@ describe("the owner-shard fence", () => {
         try {
             await harness.run(async (context: any) => await fencePinsOnShard(context, "user-fenced", 1));
 
-            expect(await harness.run(async (context: any) => await admitPinWriteUnlessMoving(context, "user-fenced", 1))).toBe(true);
+            expect(await harness.run(async (context: any) => await admitPinWriteAs(context, "user-fenced", 1))).toBeNull();
 
             await harness.run(async (context: any) => await unfencePinsOnShard(context, "user-fenced"));
 
-            expect(await harness.run(async (context: any) => await admitPinWriteUnlessMoving(context, "user-fenced", 2))).toBe(false);
+            expect(await harness.run(async (context: any) => await admitPinWriteAs(context, "user-fenced", 2))).not.toBeNull();
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("refuses a write admitted before the sweep at its last check, once the fence is on the shard", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            // The write is admitted while the shard is open, so its lease is in flight when the sweep fences the shard.
+            const writerId = await harness.run(async (context: any) => await admitPinWriteAs(context, "user-window", 1));
+
+            expect(writerId).not.toBeNull();
+
+            await harness.run(async (context: any) => await fencePinsOnShard(context, "user-window", 2));
+
+            // The write's insert follows this check in the same transaction, so the pin it would commit after the sweep is refused.
+            expect(await harness.run(async (context: any) => await refusesPinWrite(context, "user-window", 3))).toBe(true);
         } finally {
             harness.close();
         }

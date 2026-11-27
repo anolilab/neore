@@ -27,6 +27,7 @@ import { internalMutation } from "../_generated/server";
 import { guestHoldsGrantRows } from "../agent/grant-revision";
 import { guestHasFollowRows } from "../chat/follows/follow-writes";
 import { guestHasPinRoutes } from "../chat/pins/pin-route-writes";
+import { reclaimPinWriteLeases } from "../lib/account-moves";
 import { ADMIN } from "../env";
 import { dropMergeGeneration, dropPinsLeft, firstTableWithGuestRows, mergeGenerationCurrent, onGuestShard } from "../lib/account-merge";
 import { patchBetterAuthRow } from "../lib/better-auth-dates";
@@ -187,6 +188,7 @@ export const deleteMergedGuest = internalMutation
             fenced: v.optional(v.boolean()),
             followsRemain: v.optional(v.boolean()),
             grantsRemain: v.optional(v.boolean()),
+            leasesRemain: v.optional(v.boolean()),
             pinsRemain: v.optional(v.boolean()),
             rowsRemain: v.optional(v.string()),
             sharedShard: v.optional(v.boolean()),
@@ -227,6 +229,14 @@ export const deleteMergedGuest = internalMutation
             return { deleted: false, pinsRemain: true };
         }
 
+        // A route restore still owed to the guest's pins names the guest until it settles (`chat/pins/functions.ts`). The guest waits for it,
+        // so the restore cannot land on the new account after the guest is gone with its pin.
+        const { page: owed } = await ctx.db.pendingPinRestores.findMany({ consistency: "primary", limit: 1, where: { userId: args.userId } });
+
+        if (owed.length > 0) {
+            return { deleted: false, pinsRemain: true };
+        }
+
         // A grant or a count still under the guest: the merge's `global` step moves it first.
         if (await guestHoldsGrantRows(ctx, guestId)) {
             return { deleted: false, grantsRemain: true };
@@ -236,6 +246,12 @@ export const deleteMergedGuest = internalMutation
 
         if (rowsRemain !== null) {
             return { deleted: false, rowsRemain };
+        }
+
+        // Pin-write lease rows still name the guest: a batch goes now, and the merge calls again while any remains. The merge has waited
+        // for every live lease and admits none now, since the guest is marked, so each row left is expired.
+        if (await reclaimPinWriteLeases(ctx, args.userId)) {
+            return { deleted: false, leasesRemain: true };
         }
 
         await cascadeDelete(ctx, guestId);

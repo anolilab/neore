@@ -74,7 +74,7 @@ beforeEach(async () => {
     embedMany.mockImplementation(async (_ctx: unknown, { values }: { values: string[] }) => {
         return { embeddings: values.map(() => VECTOR) };
     });
-    generateText.mockResolvedValue({ output: { facts: [{ confidence: 90, importance: 80, memory: FACT, type: "activity" }] } });
+    generateText.mockResolvedValue({ output: { facts: [{ confidence: 90, importance: 80, memory: FACT, quote: "blue vase in Lisbon", type: "activity" }] } });
 
     threadId = await harness.run(async (ctx: any) => {
         await ctx.db.insert("userSettings", { memoryEnabled: true, timezone: "UTC", userId: USER });
@@ -129,6 +129,7 @@ describe("extraction vector dedup", () => {
             async (ctx: any) =>
                 await ctx.runAction(extractMemories, {
                     assistantResponse: "A lovely vase.",
+                    quotablePrompt: "I bought a blue vase in Lisbon, please remember that about me",
                     threadId,
                     userId: USER,
                     userMessage: "I bought a blue vase in Lisbon, please remember that about me",
@@ -160,13 +161,14 @@ describe("extraction vector dedup", () => {
         });
 
         generateText
-            .mockResolvedValueOnce({ output: { facts: [{ confidence: 90, importance: 80, memory: FACT, type: "activity" }] } })
+            .mockResolvedValueOnce({ output: { facts: [{ confidence: 90, importance: 80, memory: FACT, quote: "blue vase in Lisbon", type: "activity" }] } })
             .mockResolvedValueOnce({ output: { action: "UPDATE", mergedMemory: `${FACT} and keeps it on a shelf` } });
 
         await harness.action(
             async (ctx: any) =>
                 await ctx.runAction(extractMemories, {
                     assistantResponse: "A lovely vase.",
+                    quotablePrompt: "I bought a blue vase in Lisbon, please remember that about me",
                     threadId,
                     userId: USER,
                     userMessage: "I bought a blue vase in Lisbon, please remember that about me",
@@ -191,13 +193,14 @@ describe("extraction vector dedup", () => {
         });
 
         generateText
-            .mockResolvedValueOnce({ output: { facts: [{ confidence: 90, importance: 80, memory: FACT, type: "activity" }] } })
+            .mockResolvedValueOnce({ output: { facts: [{ confidence: 90, importance: 80, memory: FACT, quote: "blue vase in Lisbon", type: "activity" }] } })
             .mockResolvedValueOnce({ output: { action: "UPDATE" } });
 
         await harness.action(
             async (ctx: any) =>
                 await ctx.runAction(extractMemories, {
                     assistantResponse: "A lovely vase.",
+                    quotablePrompt: "I bought a blue vase in Lisbon, please remember that about me",
                     threadId,
                     userId: USER,
                     userMessage: "I bought a blue vase in Lisbon, please remember that about me",
@@ -229,7 +232,7 @@ describe("extraction vector dedup", () => {
         });
 
         generateText
-            .mockResolvedValueOnce({ output: { facts: [{ confidence: 90, importance: 80, memory: FACT, type: "activity" }] } })
+            .mockResolvedValueOnce({ output: { facts: [{ confidence: 90, importance: 80, memory: FACT, quote: "blue vase in Lisbon", type: "activity" }] } })
             .mockResolvedValueOnce({ output: { action: "UPDATE", mergedMemory: `${FACT} and keeps it on a shelf` } });
 
         const getMemoryById = registry.get("memory_functions:getMemoryById");
@@ -246,6 +249,7 @@ describe("extraction vector dedup", () => {
                 async (ctx: any) =>
                     await ctx.runAction(extractMemories, {
                         assistantResponse: "A lovely vase.",
+                        quotablePrompt: "I bought a blue vase in Lisbon, please remember that about me",
                         threadId,
                         userId: USER,
                         userMessage: "I bought a blue vase in Lisbon, please remember that about me",
@@ -273,13 +277,14 @@ describe("extraction vector dedup", () => {
         });
 
         generateText
-            .mockResolvedValueOnce({ output: { facts: [{ confidence: 90, importance: 80, memory: FACT, type: "activity" }] } })
+            .mockResolvedValueOnce({ output: { facts: [{ confidence: 90, importance: 80, memory: FACT, quote: "blue vase in Lisbon", type: "activity" }] } })
             .mockResolvedValueOnce({ output: { action: "UPDATE", mergedMemory: `${FACT} and keeps it on a shelf` } });
 
         await harness.action(
             async (ctx: any) =>
                 await ctx.runAction(extractMemories, {
                     assistantResponse: "A lovely vase.",
+                    quotablePrompt: "I bought a blue vase in Lisbon, please remember that about me",
                     threadId,
                     userId: USER,
                     userMessage: "I bought a blue vase in Lisbon, please remember that about me",
@@ -304,8 +309,14 @@ describe("extraction vector dedup", () => {
             .mockResolvedValueOnce({
                 output: {
                     facts: [
-                        { confidence: 90, importance: 80, memory: "The user owns a blue vase from Lisbon", type: "activity" },
-                        { confidence: 90, importance: 80, memory: "The user owns a blue vase from Lisbon today", type: "activity" },
+                        { confidence: 90, importance: 80, memory: "The user owns a blue vase from Lisbon", quote: "blue vase in Lisbon", type: "activity" },
+                        {
+                            confidence: 90,
+                            importance: 80,
+                            memory: "The user owns a blue vase from Lisbon today",
+                            quote: "blue vase in Lisbon",
+                            type: "activity",
+                        },
                     ],
                 },
             })
@@ -316,6 +327,7 @@ describe("extraction vector dedup", () => {
             async (ctx: any) =>
                 await ctx.runAction(extractMemories, {
                     assistantResponse: "A lovely vase.",
+                    quotablePrompt: "I bought a blue vase in Lisbon, please remember that about me",
                     threadId,
                     userId: USER,
                     userMessage: "I bought a blue vase in Lisbon, please remember that about me",
@@ -349,8 +361,14 @@ describe("extraction vector dedup", () => {
             .mockResolvedValueOnce({
                 output: {
                     facts: [
-                        { confidence: 90, importance: 80, memory: "The user owns a blue vase from Lisbon", type: "activity" },
-                        { confidence: 40, importance: 80, memory: "The user owns a blue vase from Lisbon today", type: "activity" },
+                        { confidence: 90, importance: 80, memory: "The user owns a blue vase from Lisbon", quote: "blue vase in Lisbon", type: "activity" },
+                        {
+                            confidence: 40,
+                            importance: 80,
+                            memory: "The user owns a blue vase from Lisbon today",
+                            quote: "blue vase in Lisbon",
+                            type: "activity",
+                        },
                     ],
                 },
             })
@@ -361,6 +379,7 @@ describe("extraction vector dedup", () => {
             async (ctx: any) =>
                 await ctx.runAction(extractMemories, {
                     assistantResponse: "A lovely vase.",
+                    quotablePrompt: "I bought a blue vase in Lisbon, please remember that about me",
                     threadId,
                     userId: USER,
                     userMessage: "I bought a blue vase in Lisbon, please remember that about me",
@@ -387,8 +406,14 @@ describe("extraction vector dedup", () => {
             .mockResolvedValueOnce({
                 output: {
                     facts: [
-                        { confidence: 90, importance: 80, memory: "The user sold the blue vase in Lisbon", type: "activity" },
-                        { confidence: 90, importance: 80, memory: "The user owns a blue vase from Lisbon today", type: "activity" },
+                        { confidence: 90, importance: 80, memory: "The user sold the blue vase in Lisbon", quote: "blue vase in Lisbon", type: "activity" },
+                        {
+                            confidence: 90,
+                            importance: 80,
+                            memory: "The user owns a blue vase from Lisbon today",
+                            quote: "blue vase in Lisbon",
+                            type: "activity",
+                        },
                     ],
                 },
             })
@@ -398,6 +423,7 @@ describe("extraction vector dedup", () => {
             async (ctx: any) =>
                 await ctx.runAction(extractMemories, {
                     assistantResponse: "A lovely vase.",
+                    quotablePrompt: "I sold my blue vase in Lisbon, please remember that about me",
                     threadId,
                     userId: USER,
                     userMessage: "I sold my blue vase in Lisbon, please remember that about me",
@@ -461,8 +487,14 @@ describe("extraction vector dedup", () => {
             .mockResolvedValueOnce({
                 output: {
                     facts: [
-                        { confidence: 90, importance: 80, memory: "The user owns a blue vase from Lisbon", type: "activity" },
-                        { confidence: 90, importance: 80, memory: "The user owns a blue vase from Lisbon today", type: "activity" },
+                        { confidence: 90, importance: 80, memory: "The user owns a blue vase from Lisbon", quote: "blue vase in Lisbon", type: "activity" },
+                        {
+                            confidence: 90,
+                            importance: 80,
+                            memory: "The user owns a blue vase from Lisbon today",
+                            quote: "blue vase in Lisbon",
+                            type: "activity",
+                        },
                     ],
                 },
             })
@@ -473,6 +505,7 @@ describe("extraction vector dedup", () => {
             async (ctx: any) =>
                 await ctx.runAction(extractMemories, {
                     assistantResponse: "A lovely vase.",
+                    quotablePrompt: "I bought a blue vase in Lisbon, please remember that about me",
                     threadId,
                     userId: USER,
                     userMessage: "I bought a blue vase in Lisbon, please remember that about me",
@@ -506,7 +539,7 @@ describe("extraction vector dedup", () => {
                 validUntil: "2026-11-20",
             });
         });
-        const fact = { confidence: 90, importance: 80, memory: STAY, type: "context", validUntil: "2026-12-05" };
+        const fact = { confidence: 90, importance: 80, memory: STAY, quote: "staying in Lisbon until December 5th", type: "context", validUntil: "2026-12-05" };
 
         generateText.mockResolvedValue({ output: { facts: [fact, fact] } });
 
@@ -515,6 +548,7 @@ describe("extraction vector dedup", () => {
                 await ctx.runAction(extractMemories, {
                     assistantResponse: "Enjoy Lisbon.",
                     messageAt: Date.UTC(2026, 10, 18, 12),
+                    quotablePrompt: "I'm staying in Lisbon until December 5th now, remember that",
                     threadId,
                     userId: USER,
                     userMessage: "I'm staying in Lisbon until December 5th now, remember that",
@@ -547,7 +581,20 @@ describe("extraction vector dedup", () => {
         });
 
         generateText
-            .mockResolvedValueOnce({ output: { facts: [{ confidence: 90, eventStart: "2026-12-18", importance: 80, memory: SECOND, type: "activity" }] } })
+            .mockResolvedValueOnce({
+                output: {
+                    facts: [
+                        {
+                            confidence: 90,
+                            eventStart: "2026-12-18",
+                            importance: 80,
+                            memory: SECOND,
+                            quote: "fly to Paris again on December 18th",
+                            type: "activity",
+                        },
+                    ],
+                },
+            })
             .mockResolvedValue({ output: { action: "SUPERSEDE" } });
 
         await harness.action(
@@ -555,6 +602,7 @@ describe("extraction vector dedup", () => {
                 await ctx.runAction(extractMemories, {
                     assistantResponse: "Bon voyage again.",
                     messageAt: Date.UTC(2026, 10, 18, 12),
+                    quotablePrompt: "I fly to Paris again on December 18th, remember that",
                     threadId,
                     userId: USER,
                     userMessage: "I fly to Paris again on December 18th, remember that",
@@ -589,7 +637,9 @@ describe("extraction vector dedup", () => {
         });
 
         generateText
-            .mockResolvedValueOnce({ output: { facts: [{ confidence: 90, importance: 80, memory: NEWER, type: "context" }] } })
+            .mockResolvedValueOnce({
+                output: { facts: [{ confidence: 90, importance: 80, memory: NEWER, quote: "working from a cafe in Lisbon", type: "context" }] },
+            })
             .mockResolvedValue({ output: { action: "UPDATE", mergedMemory: "The user is in Lisbon, working from a cafe" } });
 
         await harness.action(
@@ -597,6 +647,7 @@ describe("extraction vector dedup", () => {
                 await ctx.runAction(extractMemories, {
                     assistantResponse: "Sounds lovely.",
                     messageAt: Date.UTC(2026, 10, 18, 12),
+                    quotablePrompt: "I'm working from a cafe in Lisbon, remember that",
                     threadId,
                     userId: USER,
                     userMessage: "I'm working from a cafe in Lisbon, remember that",
