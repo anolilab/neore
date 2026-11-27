@@ -40,6 +40,7 @@ import requestSecretTool from "./request-secret";
 import retrieveTool from "./retrieve";
 import { saveSecretAsProviderKeyTool, setMcpServerSecretTool } from "./use-secret";
 import searchMemoryTool from "./search-memory";
+import searchPastChatsTool from "./search-past-chats";
 import signInWithSavedLoginTool from "./site-login";
 import shellExecutionTool from "./shell-execution";
 import spotifySearchTool from "./spotify-search";
@@ -115,6 +116,7 @@ export { default as requestSecretTool } from "./request-secret";
 export type { RetrievedContent } from "./retrieve";
 export { default as retrieveTool } from "./retrieve";
 export { default as searchMemoryTool } from "./search-memory";
+export { default as searchPastChatsTool } from "./search-past-chats";
 export { default as shellExecutionTool } from "./shell-execution";
 export { default as signInWithSavedLoginTool } from "./site-login";
 export type { SpotifyAlbum, SpotifyArtist, SpotifyPlaylist, SpotifyShow, SpotifyTrack } from "./spotify-search";
@@ -248,6 +250,7 @@ export enum ToolName {
     SaveSecretAsProviderKey = "saveSecretAsProviderKey",
     // Memory Tools
     SearchMemory = "searchMemory",
+    SearchPastChats = "searchPastChats",
     SetMcpServerSecret = "setMcpServerSecret",
 
     // Sandbox Tools
@@ -365,6 +368,7 @@ export const getAllTools = () => {
         [ToolName.Retrieve]: retrieveTool,
         [ToolName.SaveSecretAsProviderKey]: saveSecretAsProviderKeyTool,
         [ToolName.SearchMemory]: searchMemoryTool,
+        [ToolName.SearchPastChats]: searchPastChatsTool,
         [ToolName.SetMcpServerSecret]: setMcpServerSecretTool,
         [ToolName.ShellExecution]: shellExecutionTool,
         [ToolName.SignInWithSavedLogin]: signInWithSavedLoginTool,
