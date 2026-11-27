@@ -1,5 +1,6 @@
 import { useLingui } from "@lingui/react/macro";
 import type { ThreadPermissionMode } from "@neore/backend/chat/permission-mode";
+import { useUnlockProof } from "@neore/client-runtime";
 import cn from "@neore/ui/utils/cn";
 import { skipToken, useQuery } from "@tanstack/react-query";
 import type { LucideIcon } from "lucide-react";
@@ -45,7 +46,10 @@ const ThreadContext: FC<{ thread: ThreadContextRecord; threadId: string }> = ({ 
     const crpc = useCRPC();
     const isHostRun = thread.runner === "host";
     const { data: hostSession } = useQuery(crpc.acp.functions.getHostSession.queryOptions(isHostRun ? { threadId } : skipToken));
-    const { data: devices } = useQuery(crpc.devices.functions.listDevices.queryOptions(hostSession ? {} : skipToken));
+    const devices = useQuery(crpc.devices.functions.listDevices.queryOptions(hostSession ? {} : skipToken));
+    // The header's pull request control asks the same, so this shares its answer: only the owner has a row there.
+    const unlockProof = useUnlockProof(threadId);
+    const { data: access } = useQuery(crpc.chat.sharing.getThreadAccess.queryOptions({ threadId: threadId as never, unlockProof }));
     const goal = useThreadGoal(threadId);
     const usage = useThreadUsage(threadId);
     const permissionMode = useShownPermissionMode();
@@ -60,7 +64,8 @@ const ThreadContext: FC<{ thread: ThreadContextRecord; threadId: string }> = ({ 
         full: t`Full access`,
         supervised: t`Supervised`,
     };
-    const deviceName = hostSession ? devices?.find((device) => device._id === hostSession.deviceId)?.name : undefined;
+    // "Device removed" only once the list has answered without it; while it loads, or if it failed, the folder stands alone.
+    const deviceName = devices.isSuccess ? (devices.data.find((device) => device._id === hostSession?.deviceId)?.name ?? t`Device removed`) : undefined;
     const totalTokens = usage?.totalTokens ?? 0;
 
     return (
@@ -68,24 +73,27 @@ const ThreadContext: FC<{ thread: ThreadContextRecord; threadId: string }> = ({ 
             {hostSession && (
                 <Row icon={Monitor} label={t`Computer`}>
                     {/* A device revoked since keeps its session readable: say so rather than show the folder as the computer. */}
-                    <span className="font-medium">{deviceName ?? t`Device removed`}</span>
-                    <span className="text-muted-foreground ms-1.5 font-mono text-xs">{hostSession.folderLabel}</span>
+                    {deviceName !== undefined && <span className="me-1.5 font-medium">{deviceName}</span>}
+                    <span className="text-muted-foreground font-mono text-xs">{hostSession.folderLabel}</span>
                     <span className="text-muted-foreground block text-xs">
                         {hostSession.agentLabel}
                         {hostSession.liveStreamId && (
                             <>
                                 {" · "}
-                                <span className="text-primary-text">{t`Running`}</span>
+                                {/* A turn is live from the moment it is sent, before the computer picks it up: "In progress" covers both. */}
+                                <span className="text-primary-text">{t`In progress`}</span>
                             </>
                         )}
                     </span>
                 </Row>
             )}
 
-            {/* Linked pull requests and the Link button, as in the header; keyed so a thread switch starts fresh. */}
-            <Row icon={GitPullRequest} label={t`Pull requests`}>
-                <ThreadPullRequests key={threadId} threadId={threadId} />
-            </Row>
+            {/* Linked pull requests and the Link button, as in the header; keyed so a thread switch starts fresh. Owner only, as there. */}
+            {access?.isOwner === true && (
+                <Row icon={GitPullRequest} label={t`Pull requests`}>
+                    <ThreadPullRequests key={threadId} threadId={threadId} />
+                </Row>
+            )}
 
             {goal && (
                 <Row icon={Target} label={t`Goal`}>

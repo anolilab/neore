@@ -158,8 +158,12 @@ export const LinkedPullRequestList = ({
         return null;
     }
 
+    // Compact: one row that scrolls sideways, with no bar, so a link that Tab reaches past the edge scrolls into view.
     return (
-        <ul className={cn("flex items-center gap-2", compact ? "max-w-80 min-w-0 flex-nowrap overflow-hidden" : "flex-wrap")} ref={listRef}>
+        <ul
+            className={cn("flex items-center gap-2", compact ? "max-w-80 min-w-0 flex-nowrap overflow-x-auto [scrollbar-width:none]" : "flex-wrap")}
+            ref={listRef}
+        >
             {links.map((link) => {
                 const key = linkKey(link);
 
