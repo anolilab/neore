@@ -24,6 +24,7 @@ import { jumpToSettingsRow } from "@/features/settings/lib/settings-jump";
 import { scrollToAnchorWhenRendered } from "@/features/settings/lib/settings-link";
 import type { SettingsTab } from "@/features/settings/lib/settings-navigation";
 import { isSettingsTab, resolveSettingsNavigation, SETTINGS_NAVIGATION } from "@/features/settings/lib/settings-navigation";
+import { useSettingsRequest } from "@/features/settings/lib/settings-request";
 import type { SettingsSearchEntry } from "@/features/settings/lib/settings-search";
 import { ErrorUtilities } from "@/lib/errors";
 import { useCRPC } from "@/lib/lunora/crpc";
@@ -230,6 +231,21 @@ export const SettingsModal: FC = () => {
             closeFromUrl();
         }
     }, [search.settings, search.settingsTab, search.settingsAnchor]);
+
+    // A link to the tab the URL already names leaves the search as it was, so the effect above does not run: the link's
+    // own request switches the tab then (`settings-request.ts`).
+    const requestId = useSettingsRequest((state) => state.request?.id);
+    // A request made before this modal mounted (a link clicked, the modal closed, the page left) is not one for it.
+    const handledRequestId = useRef(requestId);
+
+    useEffect(() => {
+        const { request } = useSettingsRequest.getState();
+
+        if (request && request.id !== handledRequestId.current) {
+            handledRequestId.current = request.id;
+            openFromUrl(request.tab, request.anchor);
+        }
+    }, [requestId]);
 
     // Latch the first open during render: React documents adjusting state directly
     // in the render pass instead of in an effect, which avoids the extra pass.
