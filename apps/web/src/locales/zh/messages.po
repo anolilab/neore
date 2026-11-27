@@ -898,7 +898,7 @@ msgstr "{activeCount, plural, other {你已连接 # 个即时通讯平台}}"
 msgid "{activeCount} of {0} MCP servers active"
 msgstr "{activeCount}/{0} 个 MCP 服务器已启用"
 
-#: src/features/develop/components/thread-pull-requests.tsx:289
+#: src/features/develop/components/thread-pull-requests.tsx:295
 msgid "{address}: {reason}"
 msgstr "{address}：{reason}"
 
@@ -1620,7 +1620,7 @@ msgstr "{star, plural, other {# 星}}"
 msgid "{stateLabel} Stop hands-free voice mode"
 msgstr "{stateLabel} 停止免提语音模式"
 
-#: src/features/develop/components/thread-pull-requests.tsx:373
+#: src/features/develop/components/thread-pull-requests.tsx:387
 msgid "{success, plural, one {# pull request linked.} other {# pull requests linked.}}"
 msgstr "{success, plural, other {已关联 # 个拉取请求。}}"
 
@@ -2810,7 +2810,7 @@ msgstr "添加提示词"
 msgid "Add Provider"
 msgstr "添加提供商"
 
-#: src/features/develop/components/thread-pull-requests.tsx:351
+#: src/features/develop/components/thread-pull-requests.tsx:365
 msgid "Add pull requests that already exist to this thread. Each one is read from the host with your own connection first."
 msgstr "将已有的拉取请求添加到此对话。每个请求会先通过你自己的连接从托管方读取。"
 
@@ -3797,7 +3797,7 @@ msgstr "按字母顺序"
 msgid "Already have an account?"
 msgstr "已有账号？"
 
-#: src/features/develop/components/thread-pull-requests.tsx:223
+#: src/features/develop/components/thread-pull-requests.tsx:229
 msgid "Already linked to this thread."
 msgstr "已关联到此对话。"
 
@@ -4610,7 +4610,7 @@ msgid "ask"
 msgstr "询问"
 
 #: src/features/chat/aside/aside-panel.tsx:306
-#: src/features/chat/sidebar/thread-sidebar.tsx:345
+#: src/features/chat/sidebar/thread-sidebar.tsx:350
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:64
 msgid "Ask"
 msgstr "询问"
@@ -4851,6 +4851,8 @@ msgstr "需要身份验证"
 msgid "auto"
 msgstr "自动"
 
+#: src/features/chat/sidebar/thread-context.tsx:54
+#: src/features/chat/sidebar/thread-context.tsx:98
 #: src/features/chat/thread/composer-image-settings.tsx:28
 #: src/features/chat/thread/composer-image-settings.tsx:52
 #: src/features/chat/thread/composer-image-settings.tsx:192
@@ -7266,7 +7268,7 @@ msgstr "克隆或新建…"
 #: src/features/canvas/canvas-panel.tsx:835
 #: src/features/canvas/pdf-preview-panel.tsx:105
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:868
-#: src/features/develop/components/thread-pull-requests.tsx:396
+#: src/features/develop/components/thread-pull-requests.tsx:410
 #: src/features/evals/components/save-eval-case-action.tsx:95
 #: src/features/prompts/components/prompt-history-dialog.tsx:195
 #: src/features/settings/components/chat/custom-providers-settings.tsx:433
@@ -8024,6 +8026,7 @@ msgid "Compressing context..."
 msgstr "正在压缩上下文..."
 
 #: src/features/auth/components/device-code-parts.tsx:76
+#: src/features/chat/sidebar/thread-context.tsx:64
 #: src/features/projects/components/computer-rule-file-import.tsx:502
 #: src/features/settings/components/chat/bots-settings.tsx:453
 msgid "Computer"
@@ -8292,7 +8295,7 @@ msgstr "连接 WhatsApp"
 msgid "Connect your {label} account to see what needs your review, what is yours, and what is ready to merge."
 msgstr "连接你的 {label} 账号，即可查看需要你审查的内容、属于你的内容以及可合并的内容。"
 
-#: src/features/develop/components/thread-pull-requests.tsx:228
+#: src/features/develop/components/thread-pull-requests.tsx:234
 msgid "Connect your Git host in settings to link a pull request."
 msgstr "请在设置中连接 Git 托管服务，以关联拉取请求。"
 
@@ -8526,6 +8529,7 @@ msgstr "内容安全"
 msgid "Content Slide"
 msgstr "内容页"
 
+#: src/features/chat/sidebar/thread-context.tsx:62
 #: src/features/settings/components/personalization/memory-types.ts:26
 msgid "Context"
 msgstr "上下文"
@@ -9215,7 +9219,7 @@ msgstr "无法导入工作流"
 msgid "Could not keep this as yours. Try again."
 msgstr "无法保留为你的内容。请重试。"
 
-#: src/features/develop/components/thread-pull-requests.tsx:305
+#: src/features/develop/components/thread-pull-requests.tsx:311
 msgid "Could not link. Try again."
 msgstr "无法关联。请重试。"
 
@@ -9236,7 +9240,7 @@ msgstr "无法加载更多项目。"
 msgid "Could not load statistics for this thread."
 msgstr "无法加载此对话的统计数据。"
 
-#: src/features/develop/components/thread-pull-requests.tsx:323
+#: src/features/develop/components/thread-pull-requests.tsx:329
 msgid "Could not load the linked pull requests."
 msgstr "无法加载已关联的拉取请求。"
 
@@ -10152,8 +10156,8 @@ msgstr "自定义设置（默认：{0}）"
 msgid "custom styles"
 msgstr "自定义风格"
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:174
-#: src/features/chat/sidebar/thread-sidebar.tsx:187
+#: src/features/chat/sidebar/thread-sidebar.tsx:179
+#: src/features/chat/sidebar/thread-sidebar.tsx:192
 msgid "Custom System Prompt"
 msgstr "自定义系统提示词"
 
@@ -12985,7 +12989,7 @@ msgstr "输入组织名称"
 msgid "Enter organization slug"
 msgstr "输入组织 slug"
 
-#: src/features/develop/components/thread-pull-requests.tsx:247
+#: src/features/develop/components/thread-pull-requests.tsx:253
 msgid "Enter pull requests as owner/name#123."
 msgstr "请按 owner/name#123 的格式输入拉取请求。"
 
@@ -13055,7 +13059,7 @@ msgstr "输入当前密码并设置新密码"
 msgid "Enter your custom instructions..."
 msgstr "输入你的自定义指令..."
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:200
+#: src/features/chat/sidebar/thread-sidebar.tsx:205
 msgid "Enter your custom system prompt here. This will be used for every message."
 msgstr "在此输入你的自定义系统提示词。它将用于每一条消息。"
 
@@ -16070,6 +16074,7 @@ msgid "Full 1080p high-definition video output"
 msgstr "完整 1080p 高清视频输出"
 
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:77
+#: src/features/chat/sidebar/thread-context.tsx:55
 #: src/features/chat/thread/composer-permission-mode.tsx:43
 #: src/features/settings/components/chat/bots-settings.tsx:134
 #: src/features/settings/components/chat/new-chat-permission-mode-setting.tsx:42
@@ -16207,7 +16212,7 @@ msgid "General-purpose video generation using Alibaba's latest-generation Wan mo
 msgstr "使用阿里巴巴最新一代 Wan 模型的通用视频生成"
 
 #: ../../packages/ui/src/components/media-preview-dialog.tsx:260
-#: src/features/chat/sidebar/thread-sidebar.tsx:145
+#: src/features/chat/sidebar/thread-sidebar.tsx:150
 #: src/features/chat/thread/generation-model-menu.tsx:167
 #: src/features/skills/components/skill-generate-panel.tsx:111
 #: src/features/workflow/components/nodes/image-node.tsx:56
@@ -16358,7 +16363,7 @@ msgid "Generating video..."
 msgstr "正在生成视频..."
 
 #: ../../packages/ui/src/components/media-preview-dialog.tsx:260
-#: src/features/chat/sidebar/thread-sidebar.tsx:145
+#: src/features/chat/sidebar/thread-sidebar.tsx:150
 #: src/features/slides/components/presentation-viewer.tsx:369
 #: src/features/workflow/components/prompt-to-workflow-dialog.tsx:148
 msgid "Generating..."
@@ -16639,6 +16644,7 @@ msgstr "返回上一级：{parent}"
 #: src/features/chat/goal/composer-goal.tsx:77
 #: src/features/chat/goal/goal-notes.tsx:70
 #: src/features/chat/goal/goal-notes.tsx:77
+#: src/features/chat/sidebar/thread-context.tsx:87
 #: src/features/tasks/components/task-form-dialog.tsx:380
 msgid "Goal"
 msgstr "目标"
@@ -19923,7 +19929,7 @@ msgstr "不是有效 JSON 的行"
 
 #: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:340
 #: src/features/auth/components/settings/providers/provider-cell.tsx:117
-#: src/features/develop/components/thread-pull-requests.tsx:398
+#: src/features/develop/components/thread-pull-requests.tsx:412
 msgid "Link"
 msgstr "关联"
 
@@ -19931,7 +19937,7 @@ msgstr "关联"
 msgid "Link active until {expiresAt}"
 msgstr "链接有效期至 {expiresAt}"
 
-#: src/features/develop/components/thread-pull-requests.tsx:259
+#: src/features/develop/components/thread-pull-requests.tsx:265
 msgid "Link at most {MAX_PULL_REQUESTS_PER_ATTACH} pull requests at a time."
 msgstr "一次最多关联 {MAX_PULL_REQUESTS_PER_ATTACH} 个拉取请求。"
 
@@ -19949,11 +19955,12 @@ msgstr "链接预览"
 msgid "Link previews"
 msgstr "链接预览"
 
-#: src/features/develop/components/thread-pull-requests.tsx:331
+#: src/features/develop/components/thread-pull-requests.tsx:341
+#: src/features/develop/components/thread-pull-requests.tsx:345
 msgid "Link pull request"
 msgstr "关联拉取请求"
 
-#: src/features/develop/components/thread-pull-requests.tsx:350
+#: src/features/develop/components/thread-pull-requests.tsx:364
 msgid "Link pull requests"
 msgstr "关联拉取请求"
 
@@ -19965,7 +19972,7 @@ msgstr "手动关联"
 msgid "Linked pull requests: {linkedPullRequests}"
 msgstr "已关联的拉取请求：{linkedPullRequests}"
 
-#: src/features/develop/components/thread-pull-requests.tsx:224
+#: src/features/develop/components/thread-pull-requests.tsx:230
 msgid "Linked to this thread."
 msgstr "已关联到此对话。"
 
@@ -19973,8 +19980,8 @@ msgstr "已关联到此对话。"
 msgid "LinkedIn Post"
 msgstr "LinkedIn 帖子"
 
-#: src/features/develop/components/thread-pull-requests.tsx:379
-#: src/features/develop/components/thread-pull-requests.tsx:398
+#: src/features/develop/components/thread-pull-requests.tsx:393
+#: src/features/develop/components/thread-pull-requests.tsx:412
 msgid "Linking…"
 msgstr "正在关联…"
 
@@ -20333,7 +20340,7 @@ msgstr "正在加载访客链接…"
 msgid "Loading the guide"
 msgstr "正在加载指南"
 
-#: src/features/develop/components/thread-pull-requests.tsx:318
+#: src/features/develop/components/thread-pull-requests.tsx:324
 msgid "Loading the linked pull requests…"
 msgstr "正在加载已关联的拉取请求…"
 
@@ -21815,6 +21822,7 @@ msgstr "模式："
 
 #: src/features/admin/components/admin-provider-cache-row.tsx:179
 #: src/features/chat/host/host-options.tsx:146
+#: src/features/chat/sidebar/thread-context.tsx:97
 #: src/features/evals/components/model-comparison.tsx:110
 #: src/features/evals/components/run-dialog.tsx:212
 #: src/features/prompts/components/prompt-form-dialog.tsx:387
@@ -23753,7 +23761,7 @@ msgstr "未检测到语音。免提模式已停止。"
 msgid "No starred models"
 msgstr "没有星标模型"
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:151
+#: src/features/chat/sidebar/thread-sidebar.tsx:156
 msgid "No summary available. Click \"Generate\" to create one."
 msgstr "暂无摘要。点击“生成”来创建一个。"
 
@@ -24007,7 +24015,7 @@ msgstr "未送达主导者"
 msgid "Not found"
 msgstr "未找到"
 
-#: src/features/develop/components/thread-pull-requests.tsx:384
+#: src/features/develop/components/thread-pull-requests.tsx:398
 msgid "Not linked"
 msgstr "未关联"
 
@@ -24940,7 +24948,7 @@ msgstr "在输入框中打开模型选择器（{0}）"
 
 #. placeholder {0}: link.repository
 #. placeholder {1}: link.number
-#: src/features/develop/components/thread-pull-requests.tsx:78
+#: src/features/develop/components/thread-pull-requests.tsx:79
 msgid "Open the pull request {0}#{1}"
 msgstr "打开拉取请求 {0}#{1}"
 
@@ -25310,7 +25318,7 @@ msgstr "优化风格"
 
 #: src/features/canvas/components/canvas-toolbar.tsx:42
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:442
-#: src/features/chat/sidebar/thread-sidebar.tsx:180
+#: src/features/chat/sidebar/thread-sidebar.tsx:185
 #: src/features/prompts/components/prompt-optimize-dialog.tsx:227
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:221
 #: src/features/settings/components/personalization/personalization-settings.tsx:322
@@ -25333,7 +25341,7 @@ msgstr "优化提示词"
 msgid "Optimize system prompt"
 msgstr "优化系统提示词"
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:217
+#: src/features/chat/sidebar/thread-sidebar.tsx:222
 msgid "Optimize thread system prompt"
 msgstr "优化对话系统提示词"
 
@@ -26225,6 +26233,7 @@ msgstr "永久删除你的账号及所有相关数据"
 msgid "Permission Level"
 msgstr "权限级别"
 
+#: src/features/chat/sidebar/thread-context.tsx:103
 #: src/features/chat/thread/composer-permission-mode.tsx:90
 #: src/features/settings/components/chat/bots-settings.tsx:430
 msgid "Permission mode"
@@ -26473,7 +26482,7 @@ msgstr "已置顶的项目"
 msgid "Pinned threads"
 msgstr "已置顶的对话"
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:350
+#: src/features/chat/sidebar/thread-sidebar.tsx:355
 msgid "Pins"
 msgstr "置顶"
 
@@ -27204,7 +27213,7 @@ msgstr "{name} 上的问题：{count}"
 msgid "Process a text file with AI to extract key points, then generate an image based on the summary"
 msgstr "用 AI 处理文本文件提取要点，再根据摘要生成图像"
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:165
+#: src/features/chat/sidebar/thread-sidebar.tsx:170
 msgid "Process each message independently with only the system prompt and current input. No chat history context."
 msgstr "仅使用系统提示词和当前输入独立处理每条消息，不带聊天历史上下文。"
 
@@ -27362,6 +27371,7 @@ msgstr "进度"
 msgid "Progress of {toolName}"
 msgstr "{toolName} 的进度"
 
+#: src/features/chat/sidebar/thread-context.tsx:109
 #: src/features/devices/components/devices-settings.tsx:121
 #: src/features/projects/components/project-repo-picker.tsx:145
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:439
@@ -27553,7 +27563,7 @@ msgstr "已用优化后的内容更新提示词"
 msgid "Prompt Variables"
 msgstr "提示词变量"
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:336
+#: src/features/chat/sidebar/thread-sidebar.tsx:341
 #: src/features/layout/components/sidebar-shortcut.tsx:87
 #: src/features/prompts/components/prompt-header.tsx:10
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:521
@@ -27715,8 +27725,9 @@ msgstr "拉取请求已打开"
 msgid "Pull request settings updated"
 msgstr "拉取请求设置已更新"
 
+#: src/features/chat/sidebar/thread-context.tsx:81
 #: src/features/code/components/code-shell.tsx:95
-#: src/features/develop/components/thread-pull-requests.tsx:354
+#: src/features/develop/components/thread-pull-requests.tsx:368
 msgid "Pull requests"
 msgstr "拉取请求"
 
@@ -28369,7 +28380,7 @@ msgstr "重新连接"
 msgid "Reconnect {0}"
 msgstr "重新连接 {0}"
 
-#: src/features/develop/components/thread-pull-requests.tsx:227
+#: src/features/develop/components/thread-pull-requests.tsx:233
 msgid "Reconnect your Git host in settings to link a pull request."
 msgstr "请在设置中重新连接 Git 托管服务，以关联拉取请求。"
 
@@ -30005,6 +30016,7 @@ msgstr "运行工作流"
 msgid "Run your workflow to see execution history here."
 msgstr "运行你的工作流后，可在此查看执行历史。"
 
+#: src/features/chat/sidebar/thread-context.tsx:72
 #: src/features/chat/thread/host-activity.tsx:142
 #: src/features/evals/components/run-detail.tsx:28
 #: src/features/evals/components/run-status.tsx:16
@@ -32950,7 +32962,7 @@ msgstr "用最新的 AI 模型开始你自己的对话。"
 msgid "Start a conversation to ask a side question."
 msgstr "开始一段对话后才能提出旁支问题。"
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:372
+#: src/features/chat/sidebar/thread-sidebar.tsx:377
 msgid "Start a conversation to configure variables."
 msgstr "开始对话以配置变量。"
 
@@ -33186,8 +33198,8 @@ msgstr "状态："
 msgid "Stateless"
 msgstr "无状态"
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:163
 #: src/features/chat/sidebar/thread-sidebar.tsx:168
+#: src/features/chat/sidebar/thread-sidebar.tsx:173
 msgid "Stateless Mode"
 msgstr "无状态模式"
 
@@ -33903,7 +33915,7 @@ msgstr "总结互联网的发展史"
 msgid "Summary"
 msgstr "摘要"
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:153
+#: src/features/chat/sidebar/thread-sidebar.tsx:158
 msgid "Summary is only available for text models."
 msgstr "摘要仅适用于文本模型。"
 
@@ -33936,6 +33948,7 @@ msgstr "出众的多文件代码生成与重构"
 msgid "Superior understanding of complex visual concepts"
 msgstr "对复杂视觉概念的理解出众"
 
+#: src/features/chat/sidebar/thread-context.tsx:56
 #: src/features/chat/thread/composer-permission-mode.tsx:44
 #: src/features/settings/components/chat/bots-settings.tsx:135
 #: src/features/settings/components/chat/new-chat-permission-mode-setting.tsx:43
@@ -35398,7 +35411,7 @@ msgstr "托管方"
 msgid "the host did not answer"
 msgstr "主机未作答"
 
-#: src/features/develop/components/thread-pull-requests.tsx:226
+#: src/features/develop/components/thread-pull-requests.tsx:232
 msgid "The host did not answer. Try again."
 msgstr "托管方没有响应。请重试。"
 
@@ -35410,11 +35423,11 @@ msgstr "托管方没有响应。稍后将重试。"
 msgid "the host did not change the option"
 msgstr "主机未更改该选项"
 
-#: src/features/develop/components/thread-pull-requests.tsx:229
+#: src/features/develop/components/thread-pull-requests.tsx:235
 msgid "The host has no pull request at that address."
 msgstr "托管方在该地址没有拉取请求。"
 
-#: src/features/develop/components/thread-pull-requests.tsx:231
+#: src/features/develop/components/thread-pull-requests.tsx:237
 msgid "The host is limiting requests. Try again shortly."
 msgstr "托管方正在限制请求。请稍后重试。"
 
@@ -36179,7 +36192,7 @@ msgstr "此聊天已闲置，模型缓存已过期。精简较早的消息可使
 msgid "This chat is locked"
 msgstr "此聊天已锁定"
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:295
+#: src/features/chat/sidebar/thread-sidebar.tsx:300
 msgid "This chat is locked. Unlock it to see its details."
 msgstr "此聊天已锁定。解锁后可查看详情。"
 
@@ -36621,11 +36634,11 @@ msgstr "无法加载此预览。"
 msgid "This project's chats. Anything it does not set uses your default."
 msgstr "此项目的聊天。项目未设置的内容使用你的默认设置。"
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:206
+#: src/features/chat/sidebar/thread-sidebar.tsx:211
 msgid "This prompt will be used for every message alongside the conversation history."
 msgstr "此提示词将与对话历史一起用于每条消息。"
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:205
+#: src/features/chat/sidebar/thread-sidebar.tsx:210
 msgid "This prompt will be used for every message. Each message is processed independently without chat history."
 msgstr "此提示词将用于每条消息。每条消息都独立处理，不带聊天历史。"
 
@@ -36633,7 +36646,7 @@ msgstr "此提示词将用于每条消息。每条消息都独立处理，不带
 msgid "This prompt will configure:"
 msgstr "此提示词将配置："
 
-#: src/features/develop/components/thread-pull-requests.tsx:230
+#: src/features/develop/components/thread-pull-requests.tsx:236
 msgid "This pull request already has as many threads linked as it can keep."
 msgstr "此拉取请求已关联了所能保留的最多对话数。"
 
@@ -36746,7 +36759,7 @@ msgstr "此文本仅包含隐藏字符，因此没有可保存的内容。"
 msgid "This thread"
 msgstr "此对话"
 
-#: src/features/develop/components/thread-pull-requests.tsx:232
+#: src/features/develop/components/thread-pull-requests.tsx:238
 msgid "This thread already has as many pull requests linked as it can keep."
 msgstr "此对话已关联了所能保留的最多拉取请求数。"
 
@@ -36846,7 +36859,7 @@ msgstr "思考了几秒钟"
 msgid "thread"
 msgstr "对话"
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:332
+#: src/features/chat/sidebar/thread-sidebar.tsx:337
 #: src/features/settings/components/chat/event-trigger-fields.tsx:270
 #: src/features/settings/components/chat/trigger-settings.tsx:1013
 msgid "Thread"
@@ -36923,7 +36936,7 @@ msgstr "对话分区（按住 Shift 点击可显示多个）"
 msgid "Thread statistics"
 msgstr "对话统计"
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:141
+#: src/features/chat/sidebar/thread-sidebar.tsx:146
 msgid "Thread summary"
 msgstr "对话摘要"
 
@@ -37186,6 +37199,7 @@ msgstr "Token 数"
 msgid "Token usage and cost breakdown per model for the selected period"
 msgstr "所选期间内每个模型的 token 用量和成本明细"
 
+#: src/features/chat/sidebar/thread-context.tsx:115
 #: src/features/projects/components/project-usage-summary.tsx:40
 #: src/features/settings/components/chat/usage-project-breakdown.tsx:207
 #: src/features/settings/components/chat/usage-settings.tsx:326
@@ -37659,7 +37673,7 @@ msgstr "尝试调整搜索词。"
 #: src/features/chat/guest-links/guest-page.tsx:269
 #: src/features/connection/components/offline-screen.tsx:64
 #: src/features/develop/components/files-tab.tsx:400
-#: src/features/develop/components/thread-pull-requests.tsx:325
+#: src/features/develop/components/thread-pull-requests.tsx:331
 #: src/features/home/components/home-page.tsx:154
 #: src/features/projects/components/computer-rule-file-import.tsx:495
 #: src/features/projects/components/project-repo-picker.tsx:190
@@ -38984,7 +38998,7 @@ msgstr "可变焦距"
 msgid "Variable name..."
 msgstr "变量名..."
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:340
+#: src/features/chat/sidebar/thread-sidebar.tsx:345
 #: src/features/prompts/components/prompt-list-view.tsx:180
 #: src/features/prompts/components/variable-definitions.tsx:69
 #: src/features/skills/components/marketplace-skill-detail-dialog.tsx:141
@@ -40702,7 +40716,7 @@ msgstr "你可以查看此页面，但不能编辑。"
 msgid "You cannot ask a side question in this chat."
 msgstr "你不能在此聊天中提出旁支问题。"
 
-#: src/features/develop/components/thread-pull-requests.tsx:225
+#: src/features/develop/components/thread-pull-requests.tsx:231
 msgid "You cannot see that pull request on the host."
 msgstr "你在托管方上看不到该拉取请求。"
 

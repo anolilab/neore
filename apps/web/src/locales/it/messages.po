@@ -898,7 +898,7 @@ msgstr "{activeCount, plural, one {Hai # app di messaggistica collegata} other {
 msgid "{activeCount} of {0} MCP servers active"
 msgstr "{activeCount} di {0} server MCP attivi"
 
-#: src/features/develop/components/thread-pull-requests.tsx:289
+#: src/features/develop/components/thread-pull-requests.tsx:295
 msgid "{address}: {reason}"
 msgstr "{address}: {reason}"
 
@@ -1620,7 +1620,7 @@ msgstr "{star, plural, one {# stella} other {# stelle}}"
 msgid "{stateLabel} Stop hands-free voice mode"
 msgstr "{stateLabel} Interrompi la modalità vocale a mani libere"
 
-#: src/features/develop/components/thread-pull-requests.tsx:373
+#: src/features/develop/components/thread-pull-requests.tsx:387
 msgid "{success, plural, one {# pull request linked.} other {# pull requests linked.}}"
 msgstr "{success, plural, one {# pull request collegata.} other {# pull request collegate.}}"
 
@@ -2810,7 +2810,7 @@ msgstr "Aggiungi prompt"
 msgid "Add Provider"
 msgstr "Aggiungi provider"
 
-#: src/features/develop/components/thread-pull-requests.tsx:351
+#: src/features/develop/components/thread-pull-requests.tsx:365
 msgid "Add pull requests that already exist to this thread. Each one is read from the host with your own connection first."
 msgstr "Aggiungi a questo thread le pull request già esistenti. Ognuna viene prima letta dall’host con la tua connessione."
 
@@ -3797,7 +3797,7 @@ msgstr "Alfabetico"
 msgid "Already have an account?"
 msgstr "Hai già un account?"
 
-#: src/features/develop/components/thread-pull-requests.tsx:223
+#: src/features/develop/components/thread-pull-requests.tsx:229
 msgid "Already linked to this thread."
 msgstr "Già collegata a questo thread."
 
@@ -4610,7 +4610,7 @@ msgid "ask"
 msgstr "chiedi"
 
 #: src/features/chat/aside/aside-panel.tsx:306
-#: src/features/chat/sidebar/thread-sidebar.tsx:345
+#: src/features/chat/sidebar/thread-sidebar.tsx:350
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:64
 msgid "Ask"
 msgstr "Chiedi"
@@ -4851,6 +4851,8 @@ msgstr "Autenticazione richiesta"
 msgid "auto"
 msgstr "auto"
 
+#: src/features/chat/sidebar/thread-context.tsx:54
+#: src/features/chat/sidebar/thread-context.tsx:98
 #: src/features/chat/thread/composer-image-settings.tsx:28
 #: src/features/chat/thread/composer-image-settings.tsx:52
 #: src/features/chat/thread/composer-image-settings.tsx:192
@@ -7266,7 +7268,7 @@ msgstr "Clona o crea nuovo…"
 #: src/features/canvas/canvas-panel.tsx:835
 #: src/features/canvas/pdf-preview-panel.tsx:105
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:868
-#: src/features/develop/components/thread-pull-requests.tsx:396
+#: src/features/develop/components/thread-pull-requests.tsx:410
 #: src/features/evals/components/save-eval-case-action.tsx:95
 #: src/features/prompts/components/prompt-history-dialog.tsx:195
 #: src/features/settings/components/chat/custom-providers-settings.tsx:433
@@ -8024,6 +8026,7 @@ msgid "Compressing context..."
 msgstr "Compressione del contesto..."
 
 #: src/features/auth/components/device-code-parts.tsx:76
+#: src/features/chat/sidebar/thread-context.tsx:64
 #: src/features/projects/components/computer-rule-file-import.tsx:502
 #: src/features/settings/components/chat/bots-settings.tsx:453
 msgid "Computer"
@@ -8292,7 +8295,7 @@ msgstr "Connetti WhatsApp"
 msgid "Connect your {label} account to see what needs your review, what is yours, and what is ready to merge."
 msgstr "Connetti il tuo account {label} per vedere cosa richiede la tua revisione, cosa è tuo e cosa è pronto per essere unito."
 
-#: src/features/develop/components/thread-pull-requests.tsx:228
+#: src/features/develop/components/thread-pull-requests.tsx:234
 msgid "Connect your Git host in settings to link a pull request."
 msgstr "Connetti il tuo host Git nelle impostazioni per collegare una pull request."
 
@@ -8526,6 +8529,7 @@ msgstr "Sicurezza dei contenuti"
 msgid "Content Slide"
 msgstr "Slide di contenuto"
 
+#: src/features/chat/sidebar/thread-context.tsx:62
 #: src/features/settings/components/personalization/memory-types.ts:26
 msgid "Context"
 msgstr "Contesto"
@@ -9215,7 +9219,7 @@ msgstr "Impossibile importare il workflow"
 msgid "Could not keep this as yours. Try again."
 msgstr "Impossibile mantenerlo come tuo. Riprova."
 
-#: src/features/develop/components/thread-pull-requests.tsx:305
+#: src/features/develop/components/thread-pull-requests.tsx:311
 msgid "Could not link. Try again."
 msgstr "Impossibile collegare. Riprova."
 
@@ -9236,7 +9240,7 @@ msgstr "Impossibile caricare altri progetti."
 msgid "Could not load statistics for this thread."
 msgstr "Impossibile caricare le statistiche di questo thread."
 
-#: src/features/develop/components/thread-pull-requests.tsx:323
+#: src/features/develop/components/thread-pull-requests.tsx:329
 msgid "Could not load the linked pull requests."
 msgstr "Impossibile caricare le pull request collegate."
 
@@ -10152,8 +10156,8 @@ msgstr "Impostazione personalizzata (predefinita: {0})"
 msgid "custom styles"
 msgstr "stili personalizzati"
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:174
-#: src/features/chat/sidebar/thread-sidebar.tsx:187
+#: src/features/chat/sidebar/thread-sidebar.tsx:179
+#: src/features/chat/sidebar/thread-sidebar.tsx:192
 msgid "Custom System Prompt"
 msgstr "Prompt di sistema personalizzato"
 
@@ -12985,7 +12989,7 @@ msgstr "Inserisci il nome dell'organizzazione"
 msgid "Enter organization slug"
 msgstr "Inserisci lo slug dell'organizzazione"
 
-#: src/features/develop/components/thread-pull-requests.tsx:247
+#: src/features/develop/components/thread-pull-requests.tsx:253
 msgid "Enter pull requests as owner/name#123."
 msgstr "Inserisci le pull request come owner/name#123."
 
@@ -13055,7 +13059,7 @@ msgstr "Inserisci la password attuale e scegline una nuova"
 msgid "Enter your custom instructions..."
 msgstr "Inserisci le tue istruzioni personalizzate..."
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:200
+#: src/features/chat/sidebar/thread-sidebar.tsx:205
 msgid "Enter your custom system prompt here. This will be used for every message."
 msgstr "Inserisci qui il tuo prompt di sistema personalizzato. Verrà usato per ogni messaggio."
 
@@ -16070,6 +16074,7 @@ msgid "Full 1080p high-definition video output"
 msgstr "Output video in alta definizione Full 1080p"
 
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:77
+#: src/features/chat/sidebar/thread-context.tsx:55
 #: src/features/chat/thread/composer-permission-mode.tsx:43
 #: src/features/settings/components/chat/bots-settings.tsx:134
 #: src/features/settings/components/chat/new-chat-permission-mode-setting.tsx:42
@@ -16207,7 +16212,7 @@ msgid "General-purpose video generation using Alibaba's latest-generation Wan mo
 msgstr "Generazione video generica con il modello Wan di ultima generazione di Alibaba"
 
 #: ../../packages/ui/src/components/media-preview-dialog.tsx:260
-#: src/features/chat/sidebar/thread-sidebar.tsx:145
+#: src/features/chat/sidebar/thread-sidebar.tsx:150
 #: src/features/chat/thread/generation-model-menu.tsx:167
 #: src/features/skills/components/skill-generate-panel.tsx:111
 #: src/features/workflow/components/nodes/image-node.tsx:56
@@ -16358,7 +16363,7 @@ msgid "Generating video..."
 msgstr "Generazione del video..."
 
 #: ../../packages/ui/src/components/media-preview-dialog.tsx:260
-#: src/features/chat/sidebar/thread-sidebar.tsx:145
+#: src/features/chat/sidebar/thread-sidebar.tsx:150
 #: src/features/slides/components/presentation-viewer.tsx:369
 #: src/features/workflow/components/prompt-to-workflow-dialog.tsx:148
 msgid "Generating..."
@@ -16639,6 +16644,7 @@ msgstr "Torna a {parent}"
 #: src/features/chat/goal/composer-goal.tsx:77
 #: src/features/chat/goal/goal-notes.tsx:70
 #: src/features/chat/goal/goal-notes.tsx:77
+#: src/features/chat/sidebar/thread-context.tsx:87
 #: src/features/tasks/components/task-form-dialog.tsx:380
 msgid "Goal"
 msgstr "Obiettivo"
@@ -19923,7 +19929,7 @@ msgstr "Righe con JSON non valido"
 
 #: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:340
 #: src/features/auth/components/settings/providers/provider-cell.tsx:117
-#: src/features/develop/components/thread-pull-requests.tsx:398
+#: src/features/develop/components/thread-pull-requests.tsx:412
 msgid "Link"
 msgstr "Collega"
 
@@ -19931,7 +19937,7 @@ msgstr "Collega"
 msgid "Link active until {expiresAt}"
 msgstr "Link attivo fino al {expiresAt}"
 
-#: src/features/develop/components/thread-pull-requests.tsx:259
+#: src/features/develop/components/thread-pull-requests.tsx:265
 msgid "Link at most {MAX_PULL_REQUESTS_PER_ATTACH} pull requests at a time."
 msgstr "Collega al massimo {MAX_PULL_REQUESTS_PER_ATTACH} pull request alla volta."
 
@@ -19949,11 +19955,12 @@ msgstr "Anteprima link"
 msgid "Link previews"
 msgstr "Anteprime dei link"
 
-#: src/features/develop/components/thread-pull-requests.tsx:331
+#: src/features/develop/components/thread-pull-requests.tsx:341
+#: src/features/develop/components/thread-pull-requests.tsx:345
 msgid "Link pull request"
 msgstr "Collega pull request"
 
-#: src/features/develop/components/thread-pull-requests.tsx:350
+#: src/features/develop/components/thread-pull-requests.tsx:364
 msgid "Link pull requests"
 msgstr "Collega pull request"
 
@@ -19965,7 +19972,7 @@ msgstr "Collegata manualmente"
 msgid "Linked pull requests: {linkedPullRequests}"
 msgstr "Pull request collegate: {linkedPullRequests}"
 
-#: src/features/develop/components/thread-pull-requests.tsx:224
+#: src/features/develop/components/thread-pull-requests.tsx:230
 msgid "Linked to this thread."
 msgstr "Collegata a questo thread."
 
@@ -19973,8 +19980,8 @@ msgstr "Collegata a questo thread."
 msgid "LinkedIn Post"
 msgstr "Post LinkedIn"
 
-#: src/features/develop/components/thread-pull-requests.tsx:379
-#: src/features/develop/components/thread-pull-requests.tsx:398
+#: src/features/develop/components/thread-pull-requests.tsx:393
+#: src/features/develop/components/thread-pull-requests.tsx:412
 msgid "Linking…"
 msgstr "Collegamento in corso…"
 
@@ -20333,7 +20340,7 @@ msgstr "Caricamento del link ospite…"
 msgid "Loading the guide"
 msgstr "Caricamento della guida"
 
-#: src/features/develop/components/thread-pull-requests.tsx:318
+#: src/features/develop/components/thread-pull-requests.tsx:324
 msgid "Loading the linked pull requests…"
 msgstr "Caricamento delle pull request collegate…"
 
@@ -21815,6 +21822,7 @@ msgstr "Modalità:"
 
 #: src/features/admin/components/admin-provider-cache-row.tsx:179
 #: src/features/chat/host/host-options.tsx:146
+#: src/features/chat/sidebar/thread-context.tsx:97
 #: src/features/evals/components/model-comparison.tsx:110
 #: src/features/evals/components/run-dialog.tsx:212
 #: src/features/prompts/components/prompt-form-dialog.tsx:387
@@ -23753,7 +23761,7 @@ msgstr "Nessuna voce rilevata. Modalità a mani libere interrotta."
 msgid "No starred models"
 msgstr "Nessun modello contrassegnato"
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:151
+#: src/features/chat/sidebar/thread-sidebar.tsx:156
 msgid "No summary available. Click \"Generate\" to create one."
 msgstr "Nessun riepilogo disponibile. Clicca \"Genera\" per crearne uno."
 
@@ -24007,7 +24015,7 @@ msgstr "Non consegnato al principale"
 msgid "Not found"
 msgstr "Non trovato"
 
-#: src/features/develop/components/thread-pull-requests.tsx:384
+#: src/features/develop/components/thread-pull-requests.tsx:398
 msgid "Not linked"
 msgstr "Non collegata"
 
@@ -24940,7 +24948,7 @@ msgstr "Apri il selettore dei modelli nel composer ({0})"
 
 #. placeholder {0}: link.repository
 #. placeholder {1}: link.number
-#: src/features/develop/components/thread-pull-requests.tsx:78
+#: src/features/develop/components/thread-pull-requests.tsx:79
 msgid "Open the pull request {0}#{1}"
 msgstr "Apri la pull request {0}#{1}"
 
@@ -25310,7 +25318,7 @@ msgstr "Stile di ottimizzazione"
 
 #: src/features/canvas/components/canvas-toolbar.tsx:42
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:442
-#: src/features/chat/sidebar/thread-sidebar.tsx:180
+#: src/features/chat/sidebar/thread-sidebar.tsx:185
 #: src/features/prompts/components/prompt-optimize-dialog.tsx:227
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:221
 #: src/features/settings/components/personalization/personalization-settings.tsx:322
@@ -25333,7 +25341,7 @@ msgstr "Ottimizza prompt"
 msgid "Optimize system prompt"
 msgstr "Ottimizza il prompt di sistema"
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:217
+#: src/features/chat/sidebar/thread-sidebar.tsx:222
 msgid "Optimize thread system prompt"
 msgstr "Ottimizza il prompt di sistema della conversazione"
 
@@ -26225,6 +26233,7 @@ msgstr "Elimina definitivamente il tuo account e tutti i dati associati"
 msgid "Permission Level"
 msgstr "Livello di permesso"
 
+#: src/features/chat/sidebar/thread-context.tsx:103
 #: src/features/chat/thread/composer-permission-mode.tsx:90
 #: src/features/settings/components/chat/bots-settings.tsx:430
 msgid "Permission mode"
@@ -26473,7 +26482,7 @@ msgstr "Progetto fissato"
 msgid "Pinned threads"
 msgstr "Conversazioni fissate"
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:350
+#: src/features/chat/sidebar/thread-sidebar.tsx:355
 msgid "Pins"
 msgstr "Elementi fissati"
 
@@ -27204,7 +27213,7 @@ msgstr "Problemi su {name}: {count}"
 msgid "Process a text file with AI to extract key points, then generate an image based on the summary"
 msgstr "Elabora un file di testo con l’IA per estrarne i punti chiave, poi genera un’immagine basata sul riepilogo"
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:165
+#: src/features/chat/sidebar/thread-sidebar.tsx:170
 msgid "Process each message independently with only the system prompt and current input. No chat history context."
 msgstr "Elabora ogni messaggio in modo indipendente, solo con il prompt di sistema e l'input attuale. Nessun contesto della cronologia della chat."
 
@@ -27362,6 +27371,7 @@ msgstr "Avanzamento"
 msgid "Progress of {toolName}"
 msgstr "Avanzamento di {toolName}"
 
+#: src/features/chat/sidebar/thread-context.tsx:109
 #: src/features/devices/components/devices-settings.tsx:121
 #: src/features/projects/components/project-repo-picker.tsx:145
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:439
@@ -27553,7 +27563,7 @@ msgstr "Prompt aggiornato con il contenuto ottimizzato"
 msgid "Prompt Variables"
 msgstr "Variabili del prompt"
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:336
+#: src/features/chat/sidebar/thread-sidebar.tsx:341
 #: src/features/layout/components/sidebar-shortcut.tsx:87
 #: src/features/prompts/components/prompt-header.tsx:10
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:521
@@ -27715,8 +27725,9 @@ msgstr "Pull request aperta"
 msgid "Pull request settings updated"
 msgstr "Impostazioni delle pull request aggiornate"
 
+#: src/features/chat/sidebar/thread-context.tsx:81
 #: src/features/code/components/code-shell.tsx:95
-#: src/features/develop/components/thread-pull-requests.tsx:354
+#: src/features/develop/components/thread-pull-requests.tsx:368
 msgid "Pull requests"
 msgstr "Pull request"
 
@@ -28369,7 +28380,7 @@ msgstr "Ricollega"
 msgid "Reconnect {0}"
 msgstr "Ricollega {0}"
 
-#: src/features/develop/components/thread-pull-requests.tsx:227
+#: src/features/develop/components/thread-pull-requests.tsx:233
 msgid "Reconnect your Git host in settings to link a pull request."
 msgstr "Riconnetti il tuo host Git nelle impostazioni per collegare una pull request."
 
@@ -30005,6 +30016,7 @@ msgstr "Esegui workflow"
 msgid "Run your workflow to see execution history here."
 msgstr "Esegui il workflow per vedere qui la cronologia delle esecuzioni."
 
+#: src/features/chat/sidebar/thread-context.tsx:72
 #: src/features/chat/thread/host-activity.tsx:142
 #: src/features/evals/components/run-detail.tsx:28
 #: src/features/evals/components/run-status.tsx:16
@@ -32950,7 +32962,7 @@ msgstr "Inizia una conversazione tutta tua con i modelli di IA più recenti."
 msgid "Start a conversation to ask a side question."
 msgstr "Avvia una conversazione per fare una domanda a parte."
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:372
+#: src/features/chat/sidebar/thread-sidebar.tsx:377
 msgid "Start a conversation to configure variables."
 msgstr "Inizia una conversazione per configurare le variabili."
 
@@ -33186,8 +33198,8 @@ msgstr "Stato:"
 msgid "Stateless"
 msgstr "Senza stato"
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:163
 #: src/features/chat/sidebar/thread-sidebar.tsx:168
+#: src/features/chat/sidebar/thread-sidebar.tsx:173
 msgid "Stateless Mode"
 msgstr "Modalità senza stato"
 
@@ -33903,7 +33915,7 @@ msgstr "Riassumi la storia di internet"
 msgid "Summary"
 msgstr "Riepilogo"
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:153
+#: src/features/chat/sidebar/thread-sidebar.tsx:158
 msgid "Summary is only available for text models."
 msgstr "Il riepilogo è disponibile solo per i modelli di testo."
 
@@ -33936,6 +33948,7 @@ msgstr "Generazione e refactoring di codice su più file di livello superiore"
 msgid "Superior understanding of complex visual concepts"
 msgstr "Comprensione superiore di concetti visivi complessi"
 
+#: src/features/chat/sidebar/thread-context.tsx:56
 #: src/features/chat/thread/composer-permission-mode.tsx:44
 #: src/features/settings/components/chat/bots-settings.tsx:135
 #: src/features/settings/components/chat/new-chat-permission-mode-setting.tsx:43
@@ -35398,7 +35411,7 @@ msgstr "L’host"
 msgid "the host did not answer"
 msgstr "l’host non ha risposto"
 
-#: src/features/develop/components/thread-pull-requests.tsx:226
+#: src/features/develop/components/thread-pull-requests.tsx:232
 msgid "The host did not answer. Try again."
 msgstr "L’host non ha risposto. Riprova."
 
@@ -35410,11 +35423,11 @@ msgstr "L’host non ha risposto. Si riprova più tardi."
 msgid "the host did not change the option"
 msgstr "l’host non ha modificato l’opzione"
 
-#: src/features/develop/components/thread-pull-requests.tsx:229
+#: src/features/develop/components/thread-pull-requests.tsx:235
 msgid "The host has no pull request at that address."
 msgstr "L’host non ha alcuna pull request a quell’indirizzo."
 
-#: src/features/develop/components/thread-pull-requests.tsx:231
+#: src/features/develop/components/thread-pull-requests.tsx:237
 msgid "The host is limiting requests. Try again shortly."
 msgstr "L’host sta limitando le richieste. Riprova a breve."
 
@@ -36179,7 +36192,7 @@ msgstr "Questa chat è inattiva, quindi la cache del modello è scaduta. Riassum
 msgid "This chat is locked"
 msgstr "Questa chat è bloccata"
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:295
+#: src/features/chat/sidebar/thread-sidebar.tsx:300
 msgid "This chat is locked. Unlock it to see its details."
 msgstr "Questa chat è bloccata. Sbloccala per vederne i dettagli."
 
@@ -36621,11 +36634,11 @@ msgstr "Impossibile caricare questa anteprima."
 msgid "This project's chats. Anything it does not set uses your default."
 msgstr "Le chat di questo progetto. Ciò che non imposta usa il tuo valore predefinito."
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:206
+#: src/features/chat/sidebar/thread-sidebar.tsx:211
 msgid "This prompt will be used for every message alongside the conversation history."
 msgstr "Questo prompt verrà usato per ogni messaggio insieme alla cronologia della conversazione."
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:205
+#: src/features/chat/sidebar/thread-sidebar.tsx:210
 msgid "This prompt will be used for every message. Each message is processed independently without chat history."
 msgstr "Questo prompt verrà usato per ogni messaggio. Ogni messaggio viene elaborato in modo indipendente, senza cronologia della chat."
 
@@ -36633,7 +36646,7 @@ msgstr "Questo prompt verrà usato per ogni messaggio. Ogni messaggio viene elab
 msgid "This prompt will configure:"
 msgstr "Questo prompt configurerà:"
 
-#: src/features/develop/components/thread-pull-requests.tsx:230
+#: src/features/develop/components/thread-pull-requests.tsx:236
 msgid "This pull request already has as many threads linked as it can keep."
 msgstr "Questa pull request ha già collegato il massimo di thread che può conservare."
 
@@ -36746,7 +36759,7 @@ msgstr "Questo testo contiene solo caratteri nascosti, quindi non c'è nulla da 
 msgid "This thread"
 msgstr "Questa conversazione"
 
-#: src/features/develop/components/thread-pull-requests.tsx:232
+#: src/features/develop/components/thread-pull-requests.tsx:238
 msgid "This thread already has as many pull requests linked as it can keep."
 msgstr "Questo thread ha già collegato il massimo di pull request che può conservare."
 
@@ -36846,7 +36859,7 @@ msgstr "Ha ragionato per qualche secondo"
 msgid "thread"
 msgstr "thread"
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:332
+#: src/features/chat/sidebar/thread-sidebar.tsx:337
 #: src/features/settings/components/chat/event-trigger-fields.tsx:270
 #: src/features/settings/components/chat/trigger-settings.tsx:1013
 msgid "Thread"
@@ -36923,7 +36936,7 @@ msgstr "Sezioni delle conversazioni (Maiusc-clic per mostrarne più di una)"
 msgid "Thread statistics"
 msgstr "Statistiche del thread"
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:141
+#: src/features/chat/sidebar/thread-sidebar.tsx:146
 msgid "Thread summary"
 msgstr "Riepilogo della conversazione"
 
@@ -37186,6 +37199,7 @@ msgstr "Numero di token"
 msgid "Token usage and cost breakdown per model for the selected period"
 msgstr "Utilizzo dei token e ripartizione dei costi per modello nel periodo selezionato"
 
+#: src/features/chat/sidebar/thread-context.tsx:115
 #: src/features/projects/components/project-usage-summary.tsx:40
 #: src/features/settings/components/chat/usage-project-breakdown.tsx:207
 #: src/features/settings/components/chat/usage-settings.tsx:326
@@ -37659,7 +37673,7 @@ msgstr "Prova a modificare i termini di ricerca."
 #: src/features/chat/guest-links/guest-page.tsx:269
 #: src/features/connection/components/offline-screen.tsx:64
 #: src/features/develop/components/files-tab.tsx:400
-#: src/features/develop/components/thread-pull-requests.tsx:325
+#: src/features/develop/components/thread-pull-requests.tsx:331
 #: src/features/home/components/home-page.tsx:154
 #: src/features/projects/components/computer-rule-file-import.tsx:495
 #: src/features/projects/components/project-repo-picker.tsx:190
@@ -38984,7 +38998,7 @@ msgstr "Lunghezza focale variabile"
 msgid "Variable name..."
 msgstr "Nome della variabile..."
 
-#: src/features/chat/sidebar/thread-sidebar.tsx:340
+#: src/features/chat/sidebar/thread-sidebar.tsx:345
 #: src/features/prompts/components/prompt-list-view.tsx:180
 #: src/features/prompts/components/variable-definitions.tsx:69
 #: src/features/skills/components/marketplace-skill-detail-dialog.tsx:141
@@ -40702,7 +40716,7 @@ msgstr "Puoi visualizzare questa pagina ma non modificarla."
 msgid "You cannot ask a side question in this chat."
 msgstr "Non puoi fare una domanda a parte in questa chat."
 
-#: src/features/develop/components/thread-pull-requests.tsx:225
+#: src/features/develop/components/thread-pull-requests.tsx:231
 msgid "You cannot see that pull request on the host."
 msgstr "Non puoi vedere quella pull request sull’host."
 

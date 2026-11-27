@@ -320,3 +320,114 @@ export const DetailsPanel: Story = {
         await expect(root.getByText("Thread summary")).toBeVisible();
     },
 };
+
+/** What the context box reads for a thread: a linked pull request, a goal two rounds in, its project and the tokens it used. */
+const contextFixtures = (options: { host?: boolean } = {}) => {
+    const current = { ...THREADS.main, projectId: "project_q1", ...(options.host && { runner: "host" }) };
+
+    return [
+        ...userFixtures(),
+        ...shellFixtures(),
+        ...chatFixtures({ relationships: SIDEBAR_RELATIONSHIPS, thread: current as typeof THREADS.main, threads: SIDEBAR_THREADS }),
+        lunora(api.source_control.pr_thread_attach.listForThread, [
+            {
+                baseBranch: "main",
+                createdAt: ago(3 * HOUR),
+                headBranch: "feat/launch-checklist",
+                kind: "opened",
+                number: 412,
+                repository: "acme/launch",
+                threadId: THREAD_IDS.main,
+                title: "Add the launch checklist and owners",
+                url: "https://github.com/acme/launch/pull/412",
+            },
+        ]),
+        lunora(api.chat.composite.getThreadPaneState, {
+            childThreads: [],
+            goal: {
+                costMicrodollars: 180_000,
+                createdAt: ago(2 * HOUR),
+                goalId: "goal_launch",
+                maxCostMicrodollars: 2_000_000,
+                maxRounds: 5,
+                round: 2,
+                startMessageId: "message_goal",
+                status: "active",
+                text: "Every track has an owner and a due date in the checklist",
+                verdicts: [],
+            },
+            relationship: null,
+            title: current.title,
+        } as never),
+        lunora(api.projects.functions.getProject, {
+            _creationTime: ago(20 * DAY),
+            _id: "project_q1",
+            createdAt: ago(20 * DAY),
+            title: "Q1 Launch",
+            updatedAt: ago(DAY),
+            userId: "user-pro",
+        } as never),
+        lunora(api.acp.functions.getHostSession, {
+            _id: "acp_session_1",
+            agentKey: "claude-code",
+            agentLabel: "Claude Code",
+            createdAt: ago(HOUR),
+            deviceId: "device_nova",
+            folderLabel: "~/Projects/launch",
+            liveStreamId: "stream_live",
+            status: "busy",
+            threadId: THREAD_IDS.main,
+        } as never),
+        lunora(api.devices.functions.listDevices, [
+            {
+                _id: "device_nova",
+                appVersion: "1.14.2",
+                createdAt: ago(60 * DAY),
+                lastSeenAt: ago(MINUTE),
+                name: "nova",
+                platform: "linux",
+                toolNames: ["read_file", "write_file", "run_command"],
+                updateRequired: false,
+            },
+        ] as never),
+    ];
+};
+
+/** Opens the details panel and waits for the context box. */
+const openContext = async (canvasElement: HTMLElement) => {
+    const root = await sidebar(canvasElement);
+    const toggles = await root.findAllByRole("button", { name: "Toggle Sidebar" }, PAGE_WAIT);
+
+    await userEvent.click(toggles.at(-1) as HTMLElement);
+
+    return await root.findByRole("region", { name: "Context" }, PAGE_WAIT);
+};
+
+/** A chat thread's context: its linked pull request, the goal two rounds in, the model, the permission mode, its project and tokens. */
+export const ContextBox: Story = {
+    parameters: {
+        msw: { handlers: { lunora: lunoraHandlers(...contextFixtures()) } },
+    },
+    play: async ({ canvasElement }) => {
+        const box = within(await openContext(canvasElement));
+
+        await expect(await box.findByText("Every track has an owner and a due date in the checklist", undefined, PAGE_WAIT)).toBeVisible();
+        await expect(await box.findByText("Q1 Launch", undefined, PAGE_WAIT)).toBeVisible();
+    },
+};
+
+/** A thread that runs on a paired computer: the computer, its folder and the coding agent, which is working. */
+export const ContextBoxOnComputer: Story = {
+    parameters: {
+        // Axe checks the box. The computer thread's composer gives its textarea role="combobox", which axe rejects; that is the
+        // composer's, it predates the box, and this is the first story with a computer thread.
+        a11y: { context: { include: ['[data-slot="thread-context"]'] } },
+        msw: { handlers: { lunora: lunoraHandlers(...contextFixtures({ host: true })) } },
+    },
+    play: async ({ canvasElement }) => {
+        const box = within(await openContext(canvasElement));
+
+        await expect(await box.findByText("nova", undefined, PAGE_WAIT)).toBeVisible();
+        await expect(box.getByText("~/Projects/launch")).toBeVisible();
+    },
+};
