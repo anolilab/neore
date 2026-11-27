@@ -36,7 +36,7 @@ export const BrowserLink = ({ threadId }: { threadId: string }) => {
         }
 
         // A newer status clears this timer and sets its own.
-        const timer = setTimeout(() => setShown(undefined), Math.max(0, shown.until - Date.now()));
+        const timer = setTimeout(setShown, Math.max(0, shown.until - Date.now()), undefined);
 
         return () => clearTimeout(timer);
     }, [shown]);
