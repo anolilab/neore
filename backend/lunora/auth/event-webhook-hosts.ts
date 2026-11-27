@@ -17,7 +17,8 @@ import { MAX_APPROVED_HOSTS, MAX_LISTED_APPROVED_HOSTS, normalizeApprovedHost } 
 
 /** Whether `host` is on `userId`'s approved list. The only read the Events code makes of this table. */
 export const isHostApproved = async (ctx: Pick<QueryCtx, "db">, userId: string, host: string): Promise<boolean> => {
-    const row = await ctx.db.eventWebhookHosts.findFirst({ where: { host, userId } });
+    // From the primary: a host removed a moment ago must not still pass on a replica that has not seen the removal.
+    const row = await ctx.db.eventWebhookHosts.findFirst({ consistency: "primary", where: { host, userId } });
 
     return row !== null && row !== undefined;
 };
