@@ -25,7 +25,7 @@ import {
     vImportApp,
 } from "./import-logic";
 import { botOwnerRows } from "./bot-owner";
-import { type MemoryEvidence, mentionsHealth, newestEvidence, vMemoryEvidence } from "./evidence";
+import { type MemoryEvidence, newestEvidence, statesHealthCondition, vMemoryEvidence } from "./evidence";
 import { logRedaction, redactMemoryText } from "./redact";
 import { DROPPED_DIGEST_SUMMARY, localDayOf } from "./reflection-logic";
 import { byNewest, isUsableOn, KEYWORD_LOOKUP_LIMIT, keywordLookupOf, lookupSearchesOf, mergeScopeWindows, scopesOf } from "./retrieve-ranking";
@@ -1788,7 +1788,7 @@ export const reviseExtractedMemory = internalMutation
         // wording names a health condition, does not apply, so the caller saves the fact as new, as for any that cannot apply.
         const memory = redactMemoryText(args.memory);
 
-        if (row.memory !== args.base || memory === null || mentionsHealth(memory)) {
+        if (row.memory !== args.base || memory === null || statesHealthCondition(memory)) {
             return false;
         }
 

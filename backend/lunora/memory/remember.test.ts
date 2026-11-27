@@ -207,6 +207,20 @@ describe(rememberFactFor, () => {
         expect(await memories()).toHaveLength(0);
     });
 
+    it("saves a request typed after a long attachment: its quote is read where the model read it", async () => {
+        answer([{ memory: "User is vegan", quote: "I'm vegan" }]);
+
+        const ids = await setUp({
+            prompt: [
+                { text: "Here are my notes.", type: "text" },
+                documentTextPart("notes.txt", "Lorem ipsum dolor sit amet. ".repeat(200)),
+                { text: "Remember that I'm vegan.", type: "text" },
+            ],
+        });
+
+        await expect(remember(ids)).resolves.toMatchObject({ status: "saved" });
+    });
+
     it("gives the model only the typed words, and refuses a fact worded from an attachment", async () => {
         answer([{ memory: "User is allergic to nuts", quote: "allergic to nuts" }]);
 

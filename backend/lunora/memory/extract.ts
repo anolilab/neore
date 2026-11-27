@@ -58,7 +58,7 @@ import {
     saveMemoryVectors,
     type SimilarMemoryResult,
 } from "./dedup";
-import { evidenceMatchEnd, type MemoryEvidence, mentionsHealth, typedEvidenceQuote } from "./evidence";
+import { evidenceMatchEnd, type MemoryEvidence, statesHealthCondition, typedEvidenceQuote } from "./evidence";
 import { REMEMBER_SCOPE, type RequestedRefusal, vRequestedRefusal } from "./functions";
 import { logRedaction, redactMemoryFacts, redactMemoryText, type RedactionCounts } from "./redact";
 import {
@@ -446,6 +446,9 @@ export const extractMemories = internalAction
             ? truncateUserMessage(args.quotablePrompt)
             : truncateUserMessage(readArgs.userMessage, readArgs.steeredFrom);
         const truncatedAssistantResponse = args.assistantResponse.slice(0, 4000);
+        // A quote must sit in what the model read: for a requested run that is the typed prompt alone, not the message as sent,
+        // where an attachment would push later typed words past the cut.
+        const evidenceTurn = args.requested ? { ...args, readPrompt: truncatedUserMessage } : args;
 
         let model: Awaited<ReturnType<typeof getUtilityModel>>;
         let rules: ModelFilterRules;
@@ -522,13 +525,13 @@ ${args.requested ? REQUESTED_RULE : "Extract NEW facts about the user not alread
         const dropped = { health: 0, noQuote: 0, quoteRefused: 0 };
 
         extractedFacts = extractedFacts.filter((fact) => {
-            if (mentionsHealth(fact.memory)) {
+            if (statesHealthCondition(fact.memory)) {
                 dropped.health += 1;
 
                 return false;
             }
 
-            if (factEvidence(fact.quote, args.promptAt ?? Date.now(), args) !== undefined) {
+            if (factEvidence(fact.quote, args.promptAt ?? Date.now(), evidenceTurn) !== undefined) {
                 return true;
             }
 
@@ -690,7 +693,7 @@ ${args.requested ? REQUESTED_RULE : "Extract NEW facts about the user not alread
         for (const [i, extractedFact] of extractedFacts.entries()) {
             const fact = extractedFact!;
             const dates = normalizeFactDates(fact);
-            const evidence = factEvidence(fact.quote, args.promptAt ?? now, args);
+            const evidence = factEvidence(fact.quote, args.promptAt ?? now, evidenceTurn);
 
             // Skip very short or empty facts
             if (fact.memory.trim().length < 10) {
@@ -1090,6 +1093,8 @@ export const factEvidence = (
         promptAt?: number;
         promptMessageId?: string;
         quotablePrompt?: string;
+        /** The prompt text the model read, when it was not the message as sent (a requested run reads the typed prompt only). */
+        readPrompt?: string;
         steeredFrom?: number;
         steers?: ReadonlyArray<SteerOffset>;
         threadId?: string;
@@ -1115,7 +1120,7 @@ export const factEvidence = (
     // (`truncateUserMessage`), and words past the cut that a steer repeats came from that steer. The cut is measured on
     // the text the model was given (`typedTurnText`: no marked steer), so a long marked steer takes none of the room.
     const typedRead = typedTurnText(labelledTurn);
-    const promptRead = rawPrompt.slice(0, promptCharsRead(typedRead.userMessage, typedRead.steeredFrom));
+    const promptRead = labelledTurn.readPrompt ?? rawPrompt.slice(0, promptCharsRead(typedRead.userMessage, typedRead.steeredFrom));
     const fromPrompt = evidenceMatchEnd(claimed, promptRead) === undefined ? undefined : typedEvidenceQuote(claimed, quotablePrompt, rawPrompt);
     const link = (extra: Partial<MemoryEvidence>, quote: string, at: number): MemoryEvidence => {
         return {

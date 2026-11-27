@@ -1,13 +1,29 @@
 import { describe, expect, it } from "vitest";
 
 import { compressedEvidenceSources, type ThreadMemory } from "./compress";
-import { EVIDENCE_QUOTE_MAX_CHARS, evidenceQuote, newestEvidence, typedEvidenceQuote } from "./evidence";
+import { EVIDENCE_QUOTE_MAX_CHARS, evidenceQuote, newestEvidence, statesHealthCondition, typedEvidenceQuote } from "./evidence";
 import { factEvidence } from "./extract";
 
 /** An opaque all-letter token, built at run time so the commit secret scan does not take the fixture for a real one. */
 const LETTER_TOKEN = "qwertyuiopasdfghjklzxcvbnm".repeat(2);
 
 const USER_MESSAGE = "Hi!  I moved to\nLisbon last spring and I work as a nurse.";
+
+describe(statesHealthCondition, () => {
+    it.each(["The user is doing a doctorate", "The user studies psychology", "The user works as a physical therapist", "The user works at a hospital"])(
+        "keeps %j: a degree, a field, a job or a place names no condition",
+        (fact) => {
+            expect(statesHealthCondition(fact)).toBe(false);
+        },
+    );
+
+    it.each(["The user has diabetes", "The user takes insulin", "The user was diagnosed with depression", "The user has dia\u{200B}betes"])(
+        "drops %j",
+        (fact) => {
+            expect(statesHealthCondition(fact)).toBe(true);
+        },
+    );
+});
 
 describe(evidenceQuote, () => {
     it("keeps the user's own span of their words, matched whitespace and case aside", () => {
