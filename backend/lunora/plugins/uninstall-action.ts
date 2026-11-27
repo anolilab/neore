@@ -131,5 +131,9 @@ export const uninstallPlugin = authAction
             finishedRemoved += finished.removed;
         }
 
-        return { kept: [...kept, ...finishedKept], removed: begun.removed + finishedRemoved };
+        const outcome = { kept: [...kept, ...finishedKept], removed: begun.removed + finishedRemoved };
+
+        ctx.log.event("plugins.uninstall", { kept: outcome.kept.length, removed: outcome.removed });
+
+        return outcome;
     });

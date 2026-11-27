@@ -94,6 +94,9 @@ describe("the live hash of group chats that share skills", () => {
             return { cached, plain, withCache };
         });
 
+        // A group whose participants were never read would hash as "missing" both ways and still match.
+        expect(reads.cached.every((hash) => hash !== "missing")).toBe(true);
+        expect(reads.withCache).toBeGreaterThan(0);
         expect(reads.withCache).toBeLessThanOrEqual(8);
         expect(reads.cached).toStrictEqual(reads.plain);
     });

@@ -249,6 +249,6 @@ export const createPluginSkill = internalMutation
             // The caller already decided the tier (`isPremium`); an admin has no plan, and a free session's plan is null.
             await rateLimitGuard({ ...ctx, rateLimitKey: "skills/create", user: { plan: isPremium ? (plan ?? "premium") : null, userId } } as never);
 
-            return await insertSkill(ctx, { activeOrganizationId, isPremium, userId }, { ...fields, source }, { pluginInstallId, pluginMarker });
+            return await insertSkill(ctx, { activeOrganizationId, isPremium, userId }, { ...fields, enabled, source }, { pluginInstallId, pluginMarker });
         },
     );

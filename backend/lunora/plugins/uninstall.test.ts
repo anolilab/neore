@@ -475,6 +475,15 @@ describe("uninstall", () => {
         expect(begun.pendingSkills).toEqual([skillId]);
         expect(await run(async (context) => await context.db.skills.findFirst({ where: { _id: skillId } }))).not.toBeNull();
 
+        // The action deletes the plugin's empty groups between begin and finish.
+        await run(async (context) => {
+            for (const groupId of begun.groups) {
+                await context.db.delete("threads", groupId as never);
+            }
+        });
+        expect(begun.groups).toHaveLength(1);
+        expect(await run(async (context) => await context.db.get("threads", begun.groups[0] as never))).toBeNull();
+
         const finished = await run(
             async (context) => await finishUninstallRows(context, begun.installId, begun.generation, { pendingSkills: begun.pendingSkills }),
         );

@@ -104,7 +104,9 @@ describe("plugin skills", () => {
                 .mutation(procedureAt("skills_functions", "createSkill"), { ...skillInput, source: { type: "plugin", version: "1.0.0" } } as never),
         ).rejects.toThrow();
 
-        expect(await rowsWithMarker()).toHaveLength(0);
+        const { page } = await harness.run(async (context: any) => await context.db.skills.findMany({ where: { slug: skillInput.slug, userId: OWNER } }));
+
+        expect(page).toHaveLength(0);
     });
 
     it("never stores a marker from the public create procedure, even when a caller sends one", async () => {
@@ -128,6 +130,16 @@ describe("plugin skills", () => {
 
         expect(rows).toHaveLength(1);
         expect(rows[0]).toMatchObject({ pluginInstallId: INSTALL, pluginMarker: MARKER, source: { type: "plugin", version: "1.0.0" }, userId: OWNER });
+    });
+
+    it("creates the skill switched off when asked, and a retry leaves it off", async () => {
+        const id = await harness.run(async (context: any) => await context.runMutation(createPluginSkill, { ...pluginInput, enabled: false }));
+
+        await harness.run(async (context: any) => await context.runMutation(createPluginSkill, { ...pluginInput, enabled: false }));
+
+        const row = await harness.run(async (context: any) => await context.db.userSkills.findFirst({ where: { skillId: id } }));
+
+        expect(row.enabled).toBe(false);
     });
 
     it("refuses a retry of a marker under another install", async () => {
