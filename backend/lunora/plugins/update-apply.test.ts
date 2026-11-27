@@ -527,7 +527,7 @@ describe("applying an update", () => {
         );
     });
 
-    it("does not rewrite a skill that was made public after install, and detaches it", async () => {
+    it("does not rewrite a skill that was made public after install, and keeps it linked so a later update does not create it again", async () => {
         const { installId, skillId } = await installed();
 
         await run(async (context) => await context.db.patch("skills", skillId, { visibility: "public" }));
@@ -553,8 +553,7 @@ describe("applying an update", () => {
         expect(rewritten).toBe(false);
         expect(await run(async (context) => await context.db.skills.findFirst({ where: { _id: skillId } }))).toMatchObject({
             instructions: ANALYST.instructions,
-            pluginInstallId: "",
-            pluginMarker: "",
+            pluginInstallId: installId,
         });
         const links = await run(async (context) => {
             const { page } = await context.db.pluginItems.findMany({ where: { installId } });
@@ -562,6 +561,6 @@ describe("applying an update", () => {
             return page;
         });
 
-        expect(links).toHaveLength(0);
+        expect(links).toMatchObject([{ entryKey: "skill:analyst", state: "created" }]);
     });
 });

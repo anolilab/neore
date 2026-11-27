@@ -114,12 +114,9 @@ export const updateSkillChild = internalMutation
             throw new LunoraError("CONFLICT", `The skill for "${args.entryKey}" was edited, so it is kept as it is`);
         }
 
-        // Visibility is not part of the content hash. A skill shared beyond its owner is used by others, so it is not rewritten: it is
-        // detached, as removal does, and kept as it is.
+        // Visibility is not part of the content hash. A skill shared beyond its owner is used by others, so it is not rewritten. It
+        // stays linked, as an edited skill does: the file still holds its key, so an unlinked skill would be created again next time.
         if (skillVisibility(skill) !== "private") {
-            await ctx.db.patch("skills", skill._id as Id<"skills">, { pluginInstallId: "", pluginMarker: "" });
-            await ctx.db.delete("pluginItems", link._id as Id<"pluginItems">);
-
             return false;
         }
 
