@@ -10,6 +10,11 @@ export interface InboundMessage {
     attachments?: InboundAttachment[];
     /** Chat to reply into (DM partner, group, channel or conversation id). */
     chatId: string;
+    /**
+     * The platform says this is a one-to-one chat with the sender (no group, channel or room). Only then may a reply
+     * show what is remembered about the owner (`/memory`); absent or false is treated as a group.
+     */
+    direct?: boolean;
     /** Platform-unique id of this message or event — the dedupe key. */
     eventId: string;
     /**

@@ -7,7 +7,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { mappedReferences } from "../../test/registered-api";
 
+import { memoryLogger } from "../lib/logger";
 import { MEMORY_OFF_DIGEST } from "../memory/export-format";
+import { MEMORY_DIGEST_FAILED_NOTICE } from "./lib/memory-command";
 import { AI_DISCLOSURE } from "./lib/pairing";
 import { MESSENGER_MEDIA_MODEL, MESSENGER_TOOL_REPLY_MAX_STEPS, MESSENGER_TOOL_SYSTEM } from "./lib/reply-tools";
 
@@ -23,7 +25,11 @@ const state = vi.hoisted(() => {
         disclosed: false,
         /** Discord and Slack: `true` delivered, `false` refused. */
         discord: true,
+        /** The connection row the digest re-reads; `null` when it is gone. */
+        memoryConnection: null as Record<string, unknown> | null,
         memoryEnabled: true,
+        /** Set: the memory page read throws it. */
+        memoryReadError: undefined as Error | undefined,
         /** The rows the memory page answers with, and the users it was asked for. */
         memoryReads: [] as string[],
         memoryRows: [] as Record<string, unknown>[],
@@ -134,7 +140,7 @@ vi.mock("../lib/storage-read", () => {
     };
 });
 
-const { memoryDigestText, respondToInbound } = await import("./respond");
+const { answerMemoryCommand, memoryDigestText, respondToInbound } = await import("./respond");
 
 const NOW = 1_800_000_000_000;
 const HOUR = 3_600_000;
@@ -189,6 +195,10 @@ const ctx = () =>
                 case "memory_markdown_export:readMemoryExportPage": {
                     state.memoryReads.push((args as { userId: string }).userId);
 
+                    if (state.memoryReadError) {
+                        throw state.memoryReadError;
+                    }
+
                     return { cursor: null, isDone: true, rows: state.memoryRows };
                 }
                 case "memory_markdown_export:resolveMemoryBotLabels": {
@@ -198,6 +208,9 @@ const ctx = () =>
                 }
                 case "messenger_functions:aiDisclosureSent": {
                     return state.disclosed;
+                }
+                case "messenger_functions:getConnectionById": {
+                    return state.memoryConnection;
                 }
                 case "messenger_functions:getReplyToolSetting": {
                     state.settingArgs.push(args);
@@ -234,7 +247,9 @@ beforeEach(() => {
     state.afterRun = undefined;
     state.charge = "charged";
     state.disclosed = true;
+    state.memoryConnection = { platform: "telegram", platformChatId: "chat-1", platformUserId: "contact-1", status: "active", userId: "owner" };
     state.memoryEnabled = true;
+    state.memoryReadError = undefined;
     state.memoryReads = [];
     state.memoryRows = [{ lastConfirmedAt: NOW, memory: "Likes tea", pinned: false, type: "preference" }];
     state.mutations = [];
@@ -449,5 +464,49 @@ describe("/memory digest", () => {
         expect(wechat.length).toBeLessThanOrEqual(600);
         expect(wechat.endsWith("Download memories.")).toBe(true);
         expect(telegram.length).toBeGreaterThan(600);
+    });
+});
+
+describe("/memory answer", () => {
+    const answer = async () =>
+        await answerMemoryCommand(ctx(), {
+            connectionId: "connection-1" as never,
+            inboundAt: NOW - 1000,
+            platform: "telegram",
+            platformChatId: "chat-1",
+            platformUserId: "contact-1",
+            userId: "owner",
+        });
+
+    it("sends the owner's digest while the pairing is the one it was queued with", async () => {
+        await answer();
+
+        expect(state.sentText).toStrictEqual([{ chatId: "chat-1", platform: "telegram", text: expect.stringContaining("• Likes tea") }]);
+    });
+
+    it.each([
+        ["unpaired", { platformUserId: undefined }],
+        ["paired to another contact", { platformUserId: "contact-2" }],
+        ["paired in another chat", { platformChatId: "chat-2" }],
+        ["paused", { status: "paused" }],
+    ])("reads and sends nothing once the connection is %s", async (_case, change) => {
+        state.memoryConnection = { ...state.memoryConnection, ...change };
+
+        await answer();
+
+        expect(state.memoryReads).toStrictEqual([]);
+        expect(state.sentText).toStrictEqual([]);
+    });
+
+    it("tells the owner to try again when the read fails, and logs its cause without its text", async () => {
+        const logged = vi.spyOn(memoryLogger, "error").mockImplementation(() => {});
+
+        state.memoryReadError = Object.assign(new Error("Likes tea is in this message"), { code: "TRANSACTION_LIMIT_EXCEEDED" });
+
+        await answer();
+
+        expect(state.sentText).toStrictEqual([{ chatId: "chat-1", platform: "telegram", text: MEMORY_DIGEST_FAILED_NOTICE }]);
+        expect(logged).toHaveBeenCalledWith(expect.stringContaining("memory_digest"), { code: "TRANSACTION_LIMIT_EXCEEDED", name: "Error" });
+        logged.mockRestore();
     });
 });

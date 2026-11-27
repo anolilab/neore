@@ -163,6 +163,8 @@ export const parseDiscordEvent = (body: unknown, signedAtMs: number): { message:
             message: {
                 ...(attachments.length > 0 && { attachments }),
                 chatId: data.channel_id,
+                // A message outside any server is a direct message.
+                direct: data.guild_id === undefined,
                 eventId: data.id,
                 kind: inboundKind(data.content, attachments),
                 senderId: data.author.id,
@@ -192,6 +194,7 @@ export const parseDiscordEvent = (body: unknown, signedAtMs: number): { message:
             message: {
                 ...(attachments.length > 0 && { attachments }),
                 chatId: payload.channel_id || "",
+                direct: payload.guild_id === undefined,
                 eventId: payload.id,
                 kind: attachments.length > 0 ? "media" : "text",
                 senderId: user.id,

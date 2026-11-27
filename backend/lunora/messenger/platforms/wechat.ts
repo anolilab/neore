@@ -184,6 +184,8 @@ export const parseWeChatMessage = (xml: string): InboundMessage | null => {
     return {
         ...(attachments.length > 0 && { attachments }),
         chatId: from,
+        // An official account's messages are one person writing to it; the reply goes back to that person alone.
+        direct: true,
         eventId: messageId,
         kind: inboundKind(text, attachments),
         senderId: from,

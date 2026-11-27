@@ -29,9 +29,11 @@ import { internalAction } from "../_generated/server";
 import { loadModelFilterRules } from "../chat/lib/model-filter-rules";
 import { formatMemoryDigest, MEMORY_OFF_DIGEST } from "../memory/export-format";
 import { readBotLabels, readExportMemories } from "../memory/markdown-export";
+import { memoryLogger } from "../lib/logger";
 import { runHeadlessAgent } from "../chat/lib/headless-run";
 import type { Delivery } from "./lib/platform-media";
 import { requireKey } from "./lib/platform-media";
+import { MEMORY_DIGEST_FAILED_NOTICE } from "./lib/memory-command";
 import { AI_DISCLOSURE } from "./lib/pairing";
 import type { ReplyToolPlan } from "./lib/reply-tools";
 import { chooseReplyModel, MESSENGER_TEXT_REPLY_MAX_STEPS, MESSENGER_TOOL_REPLY_MAX_STEPS, MESSENGER_TOOL_SYSTEM, planReplyTools } from "./lib/reply-tools";
@@ -370,19 +372,18 @@ export const sendNotice = internalAction
     })
     .output(v.null())
     .action(async ({ args: { text, userId, ...delivery }, ctx }) => {
-        await sendFixedText(ctx, delivery, userId, async () => text);
+        await sendFixedText(ctx, delivery, userId, text);
 
         return null;
     });
 
-/** Send a text built only once the reply window is known to be open; a failure is logged and swallowed, as for a notice. */
-const sendFixedText = async (ctx: ActionCtx, delivery: Delivery, userId: string, build: () => Promise<string>): Promise<void> => {
+/** Send a fixed text while the reply window is open; a failed send is logged and swallowed, as for a notice. */
+const sendFixedText = async (ctx: Pick<ActionCtx, "runQuery">, delivery: Delivery, userId: string, text: string): Promise<void> => {
     if (!isReplyWindowOpen(delivery)) {
         return;
     }
 
     try {
-        const text = await build();
         const messengerKeys = await ctx.runQuery(internal.auth.functions.getDecryptedMessengerKeysQuery, { userId });
 
         await sendPlatformMessage(delivery, text, messengerKeys);
@@ -411,24 +412,73 @@ export const memoryDigestText = async (ctx: Pick<ActionCtx, "runQuery">, userId:
     return formatMemoryDigest(rows, { bots, maxChars: DIGEST_MAX_CHARS[platform], now: Date.now(), timeZone, truncated });
 };
 
+interface MemoryDigestArgs extends Delivery {
+    connectionId: Id<"messengerConnections">;
+    /** The contact who sent `/memory`, as the webhook saw it. */
+    platformUserId: string;
+    userId: string;
+}
+
 /**
- * The `/memory` reply (`lib/memory-command.ts`): the owner's memory digest, or that memory is off. No thread and no
- * model run; the webhook schedules it only for the paired contact in the paired chat.
+ * Whether the connection is still paired to the same owner, contact and chat as when `/memory` was queued: a pairing
+ * reset or re-paired in between (a new code, another contact) answers nothing.
  */
+const stillPairedAs = async (ctx: Pick<ActionCtx, "runQuery">, args: MemoryDigestArgs): Promise<boolean> => {
+    const connection = await ctx.runQuery(internal.messenger.functions.getConnectionById, { connectionId: args.connectionId });
+
+    return (
+        connection !== null &&
+        connection.status === "active" &&
+        connection.userId === args.userId &&
+        connection.platform === args.platform &&
+        connection.platformUserId === args.platformUserId &&
+        connection.platformChatId === args.platformChatId
+    );
+};
+
+/** What a failed read is logged with: its name and code, never its message (which could quote what was read). */
+const failureCause = (error: unknown): { code?: string; name: string } => {
+    const code = (error as { code?: unknown } | null)?.code;
+
+    return { ...(typeof code === "string" && { code }), name: error instanceof Error ? error.name : typeof error };
+};
+
+/**
+ * The `/memory` reply (`lib/memory-command.ts`): the owner's memory digest, that memory is off, or, when the read
+ * fails, that it could not be read. Nothing is read or sent once the reply window closed or the pairing changed.
+ */
+export const answerMemoryCommand = async (ctx: Pick<ActionCtx, "runQuery">, args: MemoryDigestArgs): Promise<void> => {
+    // `args` is the delivery too: the extra ids it carries are not read by the send.
+    if (!isReplyWindowOpen(args) || !(await stillPairedAs(ctx, args))) {
+        return;
+    }
+
+    const text = await memoryDigestText(ctx, args.userId, args.platform).catch((error: unknown) => {
+        memoryLogger.error("memory_digest: the owner's memories could not be read for /memory", failureCause(error));
+
+        return MEMORY_DIGEST_FAILED_NOTICE;
+    });
+
+    await sendFixedText(ctx, args, args.userId, text);
+};
+
+/** Scheduled by the webhook only for the paired contact in the paired, one-to-one chat (`answerMemoryCommand`). */
 export const sendMemoryDigest = internalAction
     .input({
+        connectionId: v.id("messengerConnections"),
         inboundAt: v.optional(v.number()),
         platform: v.string(),
         platformChatId: v.string(),
         platformThreadTs: v.optional(v.string()),
+        platformUserId: v.string(),
         replyToId: v.optional(v.string()),
         replyToken: v.optional(v.string()),
         serviceUrl: v.optional(v.string()),
         userId: v.string(),
     })
     .output(v.null())
-    .action(async ({ args: { userId, ...delivery }, ctx }) => {
-        await sendFixedText(ctx, delivery, userId, async () => await memoryDigestText(ctx, userId, delivery.platform));
+    .action(async ({ args, ctx }) => {
+        await answerMemoryCommand(ctx, args);
 
         return null;
     });

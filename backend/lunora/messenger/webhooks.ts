@@ -116,7 +116,10 @@ export const resolveConnectionAndKeys = async <Key extends string>(
     return { connection, isPaused: connection.status === "paused", keys: keys as Record<Key, string> };
 };
 
-/** `/memory` from the paired contact: the digest in the paired chat; in any other (a group they share), a notice only. */
+/**
+ * `/memory` from the paired contact: the digest only in the paired chat, and only when the platform says that chat is
+ * one-to-one (`direct`), so it never reaches a group; anywhere else a notice only. The action re-checks the pairing.
+ */
 const answerMemoryCommand = async (
     context: HttpActionCtx,
     connection: Doc<"messengerConnections">,
@@ -125,8 +128,13 @@ const answerMemoryCommand = async (
 ): Promise<void> => {
     const scheduler = httpScheduler(context);
 
-    await (message.chatId === connection.platformChatId
-        ? scheduler.runAfter(0, internal.messenger.respond.sendMemoryDigest, { ...notice, userId: connection.userId })
+    await (message.direct === true && message.chatId === connection.platformChatId
+        ? scheduler.runAfter(0, internal.messenger.respond.sendMemoryDigest, {
+              ...notice,
+              connectionId: connection._id,
+              platformUserId: message.senderId,
+              userId: connection.userId,
+          })
         : scheduler.runAfter(0, internal.messenger.respond.sendNotice, { ...notice, text: MEMORY_COMMAND_OTHER_CHAT_NOTICE, userId: connection.userId }));
 };
 

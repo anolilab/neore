@@ -240,6 +240,24 @@ describe("Telegram through acceptInbound", () => {
         expect(await savedTexts()).toStrictEqual([]);
     });
 
+    it("gives a group that is the paired chat only the notice, never the digest", async () => {
+        const connectionId = await connection("telegram", { platformChatId: "-100", platformUserId: SENDER });
+        const { context, scheduledPaths } = httpContext(KEYS);
+        const inGroup = JSON.stringify({
+            message: {
+                chat: { id: -100, type: "group" },
+                date: NOW_SECONDS,
+                from: { first_name: "Ada", id: Number(SENDER), is_bot: false },
+                message_id: 3,
+                text: "/memory",
+            },
+            update_id: 3,
+        });
+
+        expect(await statusOf(send(context, connectionId, inGroup))).toBe(200);
+        expect(scheduledPaths()).toStrictEqual(["messenger_respond:sendNotice"]);
+    });
+
     it("answers no /memory once the sender is over the rate limit", async () => {
         const connectionId = await connection("telegram", { platformChatId: "77", platformUserId: SENDER });
         const { context, scheduledPaths } = httpContext(KEYS);

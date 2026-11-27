@@ -125,7 +125,8 @@ const normalizeServiceUrl = (value: unknown): string => (typeof value === "strin
 export interface TeamsActivity {
     attachments?: { content?: { downloadUrl?: string; fileType?: string }; contentType?: string; contentUrl?: string; name?: string }[];
     channelId?: string;
-    conversation?: { id?: string; tenantId?: string };
+    /** `conversationType`: `personal` for a one-to-one chat with the bot, `groupChat` or `channel` otherwise. */
+    conversation?: { conversationType?: string; id?: string; tenantId?: string };
     from?: { aadObjectId?: string; id?: string; name?: string };
     id?: string;
     serviceUrl?: string;
@@ -232,6 +233,7 @@ export const parseTeamsActivity = (activity: TeamsActivity): TeamsInboundMessage
         ...(attachments.length > 0 && { attachments }),
         activityId: activity.id,
         chatId: activity.conversation.id,
+        direct: activity.conversation.conversationType === "personal",
         eventId: activity.id,
         kind: inboundKind(text, attachments),
         senderId: activity.from.aadObjectId ?? activity.from.id,
