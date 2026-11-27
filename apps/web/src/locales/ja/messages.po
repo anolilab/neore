@@ -6508,6 +6508,11 @@ msgstr "「Basic settings」タブにある Channel secret（X-Line-Signature �
 msgid "Channels"
 msgstr "チャンネル"
 
+#. placeholder {0}: index + 1
+#: ../../packages/ui/src/components/file-renderers/epub-preview.tsx:161
+msgid "Chapter {0} of {total}"
+msgstr "第{0}章 / 全{total}章"
+
 #: src/features/workflow/templates/index.ts:311
 msgid "character"
 msgstr "キャラクター"
@@ -23065,6 +23070,10 @@ msgstr "次へ"
 msgid "Next branch"
 msgstr "次のブランチ"
 
+#: ../../packages/ui/src/components/file-renderers/epub-preview.tsx:217
+msgid "Next chapter"
+msgstr "次の章"
+
 #: src/features/marketing/data/models-data.ts:270
 msgid "next gen"
 msgstr "次世代"
@@ -27059,6 +27068,10 @@ msgstr "前へ"
 #: ../../packages/ui/src/components/ai-elements/message.tsx:208
 msgid "Previous branch"
 msgstr "前のブランチ"
+
+#: ../../packages/ui/src/components/file-renderers/epub-preview.tsx:205
+msgid "Previous chapter"
+msgstr "前の章"
 
 #: src/features/settings/components/privacy/data-export.tsx:138
 msgid "Previous export was cancelled"
@@ -37247,6 +37260,10 @@ msgstr "大きすぎます"
 #: src/features/chat/thread/use-ask-user-attachments.ts:180
 msgid "Too large to attach: {0}. Reduce the file and attach it again."
 msgstr "大きすぎて添付できません: {0}。ファイルを小さくしてから、もう一度添付してください。"
+
+#: ../../packages/ui/src/components/file-renderers/epub-preview.tsx:152
+msgid "Too large to preview · Click to download"
+msgstr "大きすぎてプレビューできません · クリックしてダウンロード"
 
 #: src/features/settings/components/chat/bot-tool-selection.tsx:366
 msgid "Too long to add: the server's address or the tool's name is too long."

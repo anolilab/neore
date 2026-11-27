@@ -6508,6 +6508,11 @@ msgstr "Channel secret z karty Basic settings, używany do weryfikacji X-Line-Si
 msgid "Channels"
 msgstr "Kanały"
 
+#. placeholder {0}: index + 1
+#: ../../packages/ui/src/components/file-renderers/epub-preview.tsx:161
+msgid "Chapter {0} of {total}"
+msgstr "Rozdział {0} z {total}"
+
 #: src/features/workflow/templates/index.ts:311
 msgid "character"
 msgstr "postać"
@@ -23065,6 +23070,10 @@ msgstr "Dalej"
 msgid "Next branch"
 msgstr "Następna gałąź"
 
+#: ../../packages/ui/src/components/file-renderers/epub-preview.tsx:217
+msgid "Next chapter"
+msgstr "Następny rozdział"
+
 #: src/features/marketing/data/models-data.ts:270
 msgid "next gen"
 msgstr "nowa generacja"
@@ -27059,6 +27068,10 @@ msgstr "Poprzedni"
 #: ../../packages/ui/src/components/ai-elements/message.tsx:208
 msgid "Previous branch"
 msgstr "Poprzednia gałąź"
+
+#: ../../packages/ui/src/components/file-renderers/epub-preview.tsx:205
+msgid "Previous chapter"
+msgstr "Poprzedni rozdział"
 
 #: src/features/settings/components/privacy/data-export.tsx:138
 msgid "Previous export was cancelled"
@@ -37247,6 +37260,10 @@ msgstr "za duży"
 #: src/features/chat/thread/use-ask-user-attachments.ts:180
 msgid "Too large to attach: {0}. Reduce the file and attach it again."
 msgstr "Za duży, aby go dołączyć: {0}. Zmniejsz plik i dołącz go ponownie."
+
+#: ../../packages/ui/src/components/file-renderers/epub-preview.tsx:152
+msgid "Too large to preview · Click to download"
+msgstr "Za duży na podgląd · Kliknij, aby pobrać"
 
 #: src/features/settings/components/chat/bot-tool-selection.tsx:366
 msgid "Too long to add: the server's address or the tool's name is too long."

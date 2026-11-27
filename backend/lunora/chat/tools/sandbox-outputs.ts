@@ -43,6 +43,7 @@ const MAX_FILENAME_LENGTH = 120;
 export const SANDBOX_OUTPUT_TYPES: Readonly<Record<string, string>> = {
     csv: "text/csv",
     docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    epub: "application/epub+zip",
     gif: "image/gif",
     jpeg: "image/jpeg",
     jpg: "image/jpeg",

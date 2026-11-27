@@ -523,6 +523,9 @@ catalogs:
       specifier: 0.147.6
       version: 0.147.6
   file-renderers:
+    '@lingo-reader/epub-parser':
+      specifier: 0.4.7
+      version: 0.4.7
     hls.js:
       specifier: 1.7.4
       version: 1.7.4
@@ -3034,6 +3037,9 @@ importers:
       '@dnd-kit/utilities':
         specifier: catalog:dnd
         version: 3.2.2(react@19.3.1)
+      '@lingo-reader/epub-parser':
+        specifier: catalog:file-renderers
+        version: 0.4.7
       '@lingui/core':
         specifier: catalog:i18n
         version: 6.12.0(@babel/core@7.29.7(supports-color@10.2.2))(babel-plugin-macros@3.1.0)
@@ -7378,6 +7384,12 @@ packages:
 
   '@lifeomic/attempt@3.1.0':
     resolution: {integrity: sha512-QZqem4QuAnAyzfz+Gj5/+SLxqwCAw2qmt7732ZXodr6VDWGeYLG6w1i/vYLa55JQM9wRuBKLmXmiZ2P0LtE5rw==}
+
+  '@lingo-reader/epub-parser@0.4.7':
+    resolution: {integrity: sha512-1u8oWJ0eQzWqSeUfg3Njor0SU8iXEMxGC2c7CD5sLEEa9s9nGznpKFXxBIqewkeJTCdpafLDpQJZf//HFscV3A==}
+
+  '@lingo-reader/shared@0.4.7':
+    resolution: {integrity: sha512-h4ZsNN8ykEmhsyNYiLubc971iUYrj0bwK/wPC8+0e0mUamslIIV9fBHIMClchjePpENpmNAYdjnyWA5dhTPT1A==}
 
   '@lingui/babel-plugin-extract-messages@6.12.0':
     resolution: {integrity: sha512-myPdUHwEFY1OUhn3PKSqkmyl55a+Htzae7F1ksiS9dCjsxQQYvjC3LoCeLQadKrhu+PbG0zOUPQ/vF+ZWt1wJw==}
@@ -31437,6 +31449,18 @@ snapshots:
     optional: true
 
   '@lifeomic/attempt@3.1.0': {}
+
+  '@lingo-reader/epub-parser@0.4.7':
+    dependencies:
+      '@lingo-reader/shared': 0.4.7
+      fflate: 0.8.3
+      jszip: 3.10.2
+
+  '@lingo-reader/shared@0.4.7':
+    dependencies:
+      events: 3.3.0
+      path-browserify: 1.0.1
+      sax: 1.6.1
 
   '@lingui/babel-plugin-extract-messages@6.12.0':
     dependencies:

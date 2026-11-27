@@ -6508,6 +6508,11 @@ msgstr "« Channel secret » de l’onglet « Basic settings », utilisé pour v
 msgid "Channels"
 msgstr "Canaux"
 
+#. placeholder {0}: index + 1
+#: ../../packages/ui/src/components/file-renderers/epub-preview.tsx:161
+msgid "Chapter {0} of {total}"
+msgstr "Chapitre {0} sur {total}"
+
 #: src/features/workflow/templates/index.ts:311
 msgid "character"
 msgstr "personnage"
@@ -23065,6 +23070,10 @@ msgstr "Suivant"
 msgid "Next branch"
 msgstr "Branche suivante"
 
+#: ../../packages/ui/src/components/file-renderers/epub-preview.tsx:217
+msgid "Next chapter"
+msgstr "Chapitre suivant"
+
 #: src/features/marketing/data/models-data.ts:270
 msgid "next gen"
 msgstr "nouvelle génération"
@@ -27059,6 +27068,10 @@ msgstr "Précédent"
 #: ../../packages/ui/src/components/ai-elements/message.tsx:208
 msgid "Previous branch"
 msgstr "Branche précédente"
+
+#: ../../packages/ui/src/components/file-renderers/epub-preview.tsx:205
+msgid "Previous chapter"
+msgstr "Chapitre précédent"
 
 #: src/features/settings/components/privacy/data-export.tsx:138
 msgid "Previous export was cancelled"
@@ -37247,6 +37260,10 @@ msgstr "trop volumineux"
 #: src/features/chat/thread/use-ask-user-attachments.ts:180
 msgid "Too large to attach: {0}. Reduce the file and attach it again."
 msgstr "Trop volumineux pour être joint : {0}. Réduisez le fichier et joignez-le à nouveau."
+
+#: ../../packages/ui/src/components/file-renderers/epub-preview.tsx:152
+msgid "Too large to preview · Click to download"
+msgstr "Trop volumineux pour l’aperçu · Cliquez pour télécharger"
 
 #: src/features/settings/components/chat/bot-tool-selection.tsx:366
 msgid "Too long to add: the server's address or the tool's name is too long."
