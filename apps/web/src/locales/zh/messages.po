@@ -33,7 +33,7 @@ msgstr "-- 插入 --"
 msgid "-- NORMAL --"
 msgstr "-- 普通 --"
 
-#: src/features/notifications/components/notification-list.tsx:115
+#: src/features/notifications/components/notification-list.tsx:117
 msgid ", unread"
 msgstr "，未读"
 
@@ -259,7 +259,7 @@ msgid "{0, plural, one {# active day} other {# active days}}"
 msgstr "{0, plural, other {# 个活跃日}}"
 
 #. placeholder {0}: node.children.length
-#: src/features/chat/thread-list/thread-node.tsx:870
+#: src/features/chat/thread-list/thread-node.tsx:908
 msgid "{0, plural, one {# branch} other {# branches}}"
 msgstr "{0, plural, other {# 个分支}}"
 
@@ -329,7 +329,7 @@ msgid "{0, plural, one {# line} other {# lines}}"
 msgstr "{0, plural, other {# 行}}"
 
 #. placeholder {0}: node.relevantMessages?.length ?? 0
-#: src/features/chat/thread-list/thread-node.tsx:914
+#: src/features/chat/thread-list/thread-node.tsx:952
 msgid "{0, plural, one {# match} other {# matches}}"
 msgstr "{0, plural, other {# 个匹配}}"
 
@@ -698,7 +698,7 @@ msgid "{0} lines"
 msgstr "{0} 行"
 
 #. placeholder {0}: stats.total
-#: src/features/settings/components/personalization/memory-settings.tsx:214
+#: src/features/settings/components/personalization/memory-settings.tsx:219
 msgid "{0} memories"
 msgstr "{0} 条记忆"
 
@@ -788,7 +788,7 @@ msgid "{0} on {1}, in {2}"
 msgstr "{0}，位于 {1}，目录 {2}"
 
 #. placeholder {0}: stats.pinned
-#: src/features/settings/components/personalization/memory-settings.tsx:215
+#: src/features/settings/components/personalization/memory-settings.tsx:220
 msgid "{0} pinned"
 msgstr "{0} 条已置顶"
 
@@ -2171,6 +2171,10 @@ msgstr "某个时刻到来"
 msgid "A new chat opens with the selected messages quoted. Review it, then send."
 msgstr "将打开一个引用所选消息的新聊天。检查后再发送。"
 
+#: src/features/notifications/lib/notification-labels.ts:56
+msgid "A new device signed in"
+msgstr "新设备已登录"
+
 #: src/features/coding-agents/components/setup-fix-dialog.tsx:92
 msgid "A new run on the same repository and branch will fix the cause in the repository and run the step again. Read and edit its task before you start it."
 msgstr "在同一代码仓库和分支上的新运行会修复仓库中的原因，并重新运行该步骤。开始之前，请先阅读并编辑其任务。"
@@ -2219,7 +2223,7 @@ msgstr "一个项目最多包含 {limit} 个规则文件。请先删除一个。
 msgid "A public http or https address. The first check only records how the page looks. Only the first 1 MiB of a page is read."
 msgstr "公开的 http 或 https 地址。首次检查只记录页面的外观。仅读取页面的前 1 MiB。"
 
-#: src/features/notifications/lib/notification-labels.ts:40
+#: src/features/notifications/lib/notification-labels.ts:41
 msgid "A question is waiting for you"
 msgstr "有一个问题在等你回答"
 
@@ -2293,7 +2297,7 @@ msgstr "仅为建议。如果你同意，请自行在 {hostLabel} 上添加该�
 msgid "A tag, #id, .class, tag.class or tag#id. Leave it empty to watch the whole page."
 msgstr "标签、#id、.class、tag.class 或 tag#id。留空则监视整个页面。"
 
-#: src/features/notifications/lib/notification-labels.ts:70
+#: src/features/notifications/lib/notification-labels.ts:74
 msgid "A task is stuck"
 msgstr "任务卡住了"
 
@@ -2309,7 +2313,7 @@ msgstr "对话收到回复"
 msgid "a tool"
 msgstr "某个工具"
 
-#: src/features/notifications/lib/notification-labels.ts:73
+#: src/features/notifications/lib/notification-labels.ts:77
 msgid "A tool call needs your approval"
 msgstr "有工具调用需要你批准"
 
@@ -2330,7 +2334,7 @@ msgstr "你输入的工具尚未添加。请先添加它或清空输入框。"
 msgid "A unique webhook URL and secret will be generated when you create this trigger. Use the URL as the target for external services (Zapier, n8n, your own code, etc.)."
 msgstr "创建此触发器时将生成唯一的 webhook URL 和密钥。将该 URL 用作外部服务（Zapier、n8n、你自己的代码等）的目标地址。"
 
-#: src/features/notifications/lib/notification-labels.ts:79
+#: src/features/notifications/lib/notification-labels.ts:83
 msgid "A usage alert was triggered"
 msgstr "触发了用量提醒"
 
@@ -2623,7 +2627,7 @@ msgstr "添加备注..."
 msgid "Add a note…"
 msgstr "添加备注…"
 
-#: src/features/devices/components/devices-settings.tsx:535
+#: src/features/devices/components/devices-settings.tsx:538
 msgid "Add a server over SSH"
 msgstr "通过 SSH 添加服务器"
 
@@ -2797,12 +2801,12 @@ msgstr "将选取的帧添加为图片节点"
 #: src/features/chat/signed-out/signed-out-chat.tsx:147
 #: src/features/chat/thread-list/thread-list-dock.tsx:120
 #: src/features/chat/thread-list/thread-list-dock.tsx:130
-#: src/features/projects/components/add-project-dialog.tsx:691
+#: src/features/projects/components/add-project-dialog.tsx:695
 msgid "Add project"
 msgstr "添加项目"
 
 #. placeholder {0}: rowName(machine)
-#: src/features/projects/components/add-project-dialog.tsx:514
+#: src/features/projects/components/add-project-dialog.tsx:518
 msgid "Add project on {0}"
 msgstr "在 {0} 上添加项目"
 
@@ -2991,11 +2995,11 @@ msgstr "新增："
 msgid "Adding documents… {0} of {1}"
 msgstr "正在添加文档… {0} / {1}"
 
-#: src/features/projects/components/add-project-dialog.tsx:525
+#: src/features/projects/components/add-project-dialog.tsx:529
 msgid "Adding the project…"
 msgstr "正在添加项目…"
 
-#: src/features/devices/components/devices-settings.tsx:517
+#: src/features/devices/components/devices-settings.tsx:518
 msgid "Adding the server was cancelled on this computer."
 msgstr "在这台电脑上，添加服务器已被取消。"
 
@@ -3004,11 +3008,11 @@ msgid "Adding your earlier replies…"
 msgstr "正在添加你之前的回复…"
 
 #: src/features/chat/aside/aside-panel.tsx:168
-#: src/features/projects/components/add-project-dialog.tsx:691
+#: src/features/projects/components/add-project-dialog.tsx:695
 msgid "Adding…"
 msgstr "正在添加…"
 
-#: src/features/devices/components/devices-settings.tsx:548
+#: src/features/devices/components/devices-settings.tsx:551
 msgid "Address"
 msgstr "地址"
 
@@ -3544,7 +3548,7 @@ msgid "All"
 msgstr "全部"
 
 #. placeholder {0}: memories.length
-#: src/features/settings/components/personalization/memory-settings.tsx:236
+#: src/features/settings/components/personalization/memory-settings.tsx:241
 msgid "All ({0})"
 msgstr "全部（{0}）"
 
@@ -4296,7 +4300,7 @@ msgstr "正在应用..."
 msgid "approval"
 msgstr "审批"
 
-#: src/features/chat/thread-list/thread-node.tsx:838
+#: src/features/chat/thread-list/thread-node.tsx:874
 msgid "Approval"
 msgstr "审批"
 
@@ -4456,7 +4460,7 @@ msgid "Archive thread"
 msgstr "归档对话"
 
 #: src/components/command-palette.tsx:961
-#: src/features/chat/thread-list/hooks/use-thread-groups.ts:635
+#: src/features/chat/thread-list/hooks/use-thread-groups.ts:643
 #: src/features/chat/thread-list/section-bar.tsx:45
 #: src/features/sub-agents/components/worker-list.tsx:107
 #: src/features/tasks/components/goal-form-dialog.tsx:47
@@ -4507,7 +4511,7 @@ msgid "Are you sure you want to delete this item? This action cannot be undone."
 msgstr "确定要删除此项吗？此操作无法撤销。"
 
 #: src/components/command-palette.tsx:899
-#: src/features/chat/thread-list/thread-node.tsx:1105
+#: src/features/chat/thread-list/thread-node.tsx:1114
 #: src/features/chat/thread/thread-shortcuts-listener.tsx:82
 msgid "Are you sure you want to delete this thread? This action cannot be undone and will permanently remove all messages in this conversation."
 msgstr "确定要删除此对话吗？此操作无法撤销，并将永久删除此对话中的所有消息。"
@@ -5094,7 +5098,7 @@ msgstr "Azure 门户 → 你的 OpenAI 资源 → 密钥和终结点。加密存
 #: src/features/code/components/code-shell.tsx:162
 #: src/features/onboarding/components/onboarding-dialog.tsx:394
 #: src/features/pages/components/page-version-panel.tsx:89
-#: src/features/projects/components/add-project-dialog.tsx:688
+#: src/features/projects/components/add-project-dialog.tsx:692
 #: src/features/settings/components/personalization/memory-import-dialog.tsx:309
 msgid "Back"
 msgstr "返回"
@@ -6183,7 +6187,7 @@ msgstr "加拿大"
 #: src/features/local-models/components/ollama-model-manager.tsx:300
 #: src/features/pages/components/page-agent-dialog.tsx:148
 #: src/features/pages/components/page-comments-panel.tsx:87
-#: src/features/projects/components/add-project-dialog.tsx:682
+#: src/features/projects/components/add-project-dialog.tsx:686
 #: src/features/projects/components/computer-rule-file-import.tsx:613
 #: src/features/projects/components/move-to-project-dialog.tsx:95
 #: src/features/projects/components/project-form-dialog.tsx:474
@@ -6203,7 +6207,7 @@ msgstr "加拿大"
 #: src/features/settings/components/chat/usage-settings.tsx:568
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:421
 #: src/features/settings/components/personalization/memory-item.tsx:356
-#: src/features/settings/components/personalization/memory-settings.tsx:194
+#: src/features/settings/components/personalization/memory-settings.tsx:195
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:381
 #: src/features/settings/connectors/messenger/messenger-setup-dialog.tsx:156
 #: src/features/skills/components/bundle-export-dialog.tsx:219
@@ -6266,7 +6270,7 @@ msgstr "取消选择"
 msgid "Cancelled"
 msgstr "已取消"
 
-#: src/features/projects/components/add-project-dialog.tsx:148
+#: src/features/projects/components/add-project-dialog.tsx:149
 msgid "Cancelled on this computer."
 msgstr "已在此电脑上取消。"
 
@@ -6612,11 +6616,11 @@ msgstr "聊天已完成"
 msgid "Chat Import"
 msgstr "聊天导入"
 
-#: src/features/notifications/lib/notification-labels.ts:43
+#: src/features/notifications/lib/notification-labels.ts:44
 msgid "Chat import failed"
 msgstr "对话导入失败"
 
-#: src/features/notifications/lib/notification-labels.ts:43
+#: src/features/notifications/lib/notification-labels.ts:44
 msgid "Chat import finished"
 msgstr "对话导入完成"
 
@@ -6940,7 +6944,7 @@ msgstr "选择搜索模式"
 msgid "Choose the camera system for your shot"
 msgstr "为你的镜头选择相机系统"
 
-#: src/features/projects/components/add-project-dialog.tsx:517
+#: src/features/projects/components/add-project-dialog.tsx:521
 msgid "Choose the project's folder, or type a path."
 msgstr "选择项目文件夹，或输入路径。"
 
@@ -7121,11 +7125,11 @@ msgstr "全部清除"
 msgid "Clear All"
 msgstr "全部清除"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:184
+#: src/features/settings/components/personalization/memory-settings.tsx:185
 msgid "Clear All Memories"
 msgstr "清除所有记忆"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:188
+#: src/features/settings/components/personalization/memory-settings.tsx:189
 msgid "Clear all memories?"
 msgstr "清除所有记忆？"
 
@@ -7176,7 +7180,7 @@ msgstr "清除标签筛选"
 msgid "Clear the queue"
 msgstr "清空队列"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:139
+#: src/features/settings/components/personalization/memory-settings.tsx:140
 msgid "Cleared {count} memories"
 msgstr "已清除 {count} 条记忆"
 
@@ -7261,7 +7265,7 @@ msgstr "剪贴板"
 msgid "clock"
 msgstr "时钟"
 
-#: src/features/projects/components/add-project-dialog.tsx:679
+#: src/features/projects/components/add-project-dialog.tsx:683
 msgid "Clone or create new…"
 msgstr "克隆或新建…"
 
@@ -7481,11 +7485,11 @@ msgstr "编程智能体日志"
 msgid "Coding Agent Pull Requests"
 msgstr "编码智能体的拉取请求"
 
-#: src/features/notifications/lib/notification-labels.ts:46
+#: src/features/notifications/lib/notification-labels.ts:47
 msgid "Coding agent run failed"
 msgstr "编程智能体运行失败"
 
-#: src/features/notifications/lib/notification-labels.ts:46
+#: src/features/notifications/lib/notification-labels.ts:47
 msgid "Coding agent run finished"
 msgstr "编程智能体运行完成"
 
@@ -7562,7 +7566,7 @@ msgstr "收起{groupLabel}操作"
 msgid "Collapse {title}"
 msgstr "折叠 {title}"
 
-#: src/features/chat/thread-list/thread-node.tsx:872
+#: src/features/chat/thread-list/thread-node.tsx:910
 msgid "Collapse branches"
 msgstr "收起分支"
 
@@ -8013,7 +8017,7 @@ msgstr "需要对视觉输入进行透明思考的复杂视觉推理"
 msgid "Composer"
 msgstr "输入框"
 
-#: src/features/chat/thread/composer-status-line.tsx:57
+#: src/features/chat/thread/composer-status-line.tsx:87
 msgid "Composer status"
 msgstr "输入框状态"
 
@@ -8209,7 +8213,7 @@ msgstr "连接一个音频/文件节点作为输入"
 msgid "Connect an image node as input"
 msgstr "连接一个图像节点作为输入"
 
-#: src/features/devices/components/devices-settings.tsx:566
+#: src/features/devices/components/devices-settings.tsx:569
 msgid "Connect and add"
 msgstr "连接并添加"
 
@@ -8282,7 +8286,7 @@ msgstr "连接托管服务以保持内容最新。"
 #~ msgid "Connect third-party services to extend AI capabilities with your data and tools."
 #~ msgstr "连接第三方服务，用你的数据和工具扩展 AI 能力。"
 
-#: src/features/projects/components/add-project-dialog.tsx:164
+#: src/features/projects/components/add-project-dialog.tsx:165
 msgid "Connect this server first."
 msgstr "请先连接此服务器。"
 
@@ -8318,7 +8322,7 @@ msgstr "连接你的消息平台，直接在 Telegram、Slack、Discord、WhatsA
 msgid "Connect your own Telegram, WhatsApp, Slack or Discord bot to Neore and message your agent from the app you already use."
 msgstr "将你自己的 Telegram、WhatsApp、Slack 或 Discord 机器人连接到 Neore，即可在你常用的应用中给智能体发消息。"
 
-#: src/features/projects/components/add-project-dialog.tsx:181
+#: src/features/projects/components/add-project-dialog.tsx:182
 #: src/features/settings/components/chat/mcp/status-indicator.tsx:24
 #: src/features/settings/connectors/connector-card.tsx:76
 #: src/features/settings/connectors/messenger/messenger-platform-card.tsx:199
@@ -8357,7 +8361,7 @@ msgstr "已连接到 {0}"
 msgid "Connected. You can close this window."
 msgstr "已连接。你可以关闭此窗口。"
 
-#: src/features/projects/components/add-project-dialog.tsx:522
+#: src/features/projects/components/add-project-dialog.tsx:526
 msgid "Connecting {pairingHost}…"
 msgstr "正在连接 {pairingHost}…"
 
@@ -9022,7 +9026,7 @@ msgstr "需要以 Gemini 2.5 最低档获得可靠 Google AI 的成本敏感型�
 msgid "Costa Rica"
 msgstr "哥斯达黎加"
 
-#: src/features/devices/components/devices-settings.tsx:527
+#: src/features/devices/components/devices-settings.tsx:530
 msgid "Could not add the server."
 msgstr "无法添加服务器。"
 
@@ -9341,7 +9345,7 @@ msgstr "无法作为页面打开"
 msgid "Could not open the pull request."
 msgstr "无法打开拉取请求。"
 
-#: src/features/devices/components/devices-settings.tsx:631
+#: src/features/devices/components/devices-settings.tsx:637
 msgid "Could not pair this computer. Try again."
 msgstr "无法配对此计算机。请重试。"
 
@@ -9551,7 +9555,7 @@ msgstr "无法开始试运行。"
 msgid "Could not stop the conversation"
 msgstr "无法停止对话"
 
-#: src/features/chat/thread-list/thread-node.tsx:960
+#: src/features/chat/thread-list/thread-node.tsx:690
 #: src/features/chat/thread/rate-limit-pause-notice.tsx:196
 msgid "Could not stop the reply. Please try again."
 msgstr "无法停止回复。请重试。"
@@ -9886,7 +9890,7 @@ msgid "Created"
 msgstr "已创建"
 
 #. placeholder {0}: created.value.path
-#: src/features/projects/components/add-project-dialog.tsx:246
+#: src/features/projects/components/add-project-dialog.tsx:247
 msgid "Created {0}"
 msgstr "已创建 {0}"
 
@@ -10336,7 +10340,7 @@ msgstr "数据访问摘要"
 msgid "Data Export"
 msgstr "数据导出"
 
-#: src/features/notifications/lib/notification-labels.ts:52
+#: src/features/notifications/lib/notification-labels.ts:53
 msgid "Data export failed"
 msgstr "数据导出失败"
 
@@ -10779,7 +10783,7 @@ msgstr "删除账号"
 msgid "Delete alert \"{ruleName}\""
 msgstr "删除提醒“{ruleName}”"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:195
+#: src/features/settings/components/personalization/memory-settings.tsx:196
 msgid "Delete All"
 msgstr "全部删除"
 
@@ -10881,7 +10885,7 @@ msgstr "删除预设"
 msgid "Delete preset?"
 msgstr "删除预设？"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1213
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1235
 msgid "Delete Project"
 msgstr "删除项目"
 
@@ -10979,7 +10983,7 @@ msgstr "删除此登录信息？"
 msgid "Delete thread"
 msgstr "删除对话"
 
-#: src/features/chat/thread-list/thread-node.tsx:1119
+#: src/features/chat/thread-list/thread-node.tsx:1128
 msgid "Delete Thread"
 msgstr "删除对话"
 
@@ -11377,7 +11381,7 @@ msgstr "需要开源模型具备强大编程和通用能力的开发者"
 msgid "Development"
 msgstr "开发"
 
-#: src/features/devices/components/devices-settings.tsx:712
+#: src/features/devices/components/devices-settings.tsx:718
 #: src/features/settings/lib/settings-keywords.ts:89
 msgid "Device activity"
 msgstr "设备活动"
@@ -11390,7 +11394,7 @@ msgstr "设备名称"
 msgid "Device removed"
 msgstr "设备已移除"
 
-#: src/features/devices/components/devices-settings.tsx:643
+#: src/features/devices/components/devices-settings.tsx:649
 #: src/features/layout/lib/dashboard-page-names.ts:23
 #: src/features/settings/lib/settings-navigation.ts:118
 msgid "Devices"
@@ -11856,6 +11860,10 @@ msgstr "下载 JSON"
 msgid "Download Markdown"
 msgstr "下载 Markdown"
 
+#: src/features/settings/components/personalization/memory-export-button.tsx:93
+msgid "Download memories (Markdown)"
+msgstr "下载记忆（Markdown）"
+
 #: src/features/download/components/download-page.tsx:68
 msgid "Download Neore for desktop"
 msgstr "下载 Neore 桌面版"
@@ -11900,7 +11908,7 @@ msgid "Downloads open the GitHub releases page. If no installers are listed ther
 msgstr "下载会打开 GitHub 发布页面。如果页面上还没有安装包，说明桌面版尚未发布。"
 
 #: src/features/chat/link-preview/link-preview-card.tsx:117
-#: src/features/chat/thread-list/thread-node.tsx:894
+#: src/features/chat/thread-list/thread-node.tsx:932
 #: src/features/develop/components/inbox-list.tsx:118
 #: src/features/develop/components/pull-request-view.tsx:83
 #: src/features/skills/components/skill-builder-review.tsx:133
@@ -12746,7 +12754,7 @@ msgstr "启用后续建议"
 msgid "Enable for Next Chat"
 msgstr "为下一个聊天启用"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:171
+#: src/features/settings/components/personalization/memory-settings.tsx:172
 msgid "Enable memory"
 msgstr "启用记忆"
 
@@ -13332,11 +13340,11 @@ msgstr "爱沙尼亚语（爱沙尼亚）"
 msgid "European Union"
 msgstr "欧盟"
 
-#: src/features/notifications/lib/notification-labels.ts:55
+#: src/features/notifications/lib/notification-labels.ts:59
 msgid "Eval run failed"
 msgstr "评测运行失败"
 
-#: src/features/notifications/lib/notification-labels.ts:55
+#: src/features/notifications/lib/notification-labels.ts:59
 msgid "Eval run finished"
 msgstr "评测运行完成"
 
@@ -13625,7 +13633,7 @@ msgstr "展开 {groupLabel} 操作"
 msgid "Expand {title}"
 msgstr "展开 {title}"
 
-#: src/features/chat/thread-list/thread-node.tsx:872
+#: src/features/chat/thread-list/thread-node.tsx:910
 msgid "Expand branches"
 msgstr "展开分支"
 
@@ -13750,7 +13758,7 @@ msgstr "过期时间"
 msgid "Expires {date}"
 msgstr "{date} 过期"
 
-#: src/features/chat/thread-list/thread-node.tsx:906
+#: src/features/chat/thread-list/thread-node.tsx:944
 msgid "Expires in {remainingTime}"
 msgstr "{remainingTime} 后过期"
 
@@ -14058,7 +14066,7 @@ msgstr "更改标签颜色失败"
 msgid "Failed to clear filter rules"
 msgstr "清除筛选规则失败"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:135
+#: src/features/settings/components/personalization/memory-settings.tsx:136
 msgid "Failed to clear memories"
 msgstr "清除记忆失败"
 
@@ -14155,7 +14163,7 @@ msgstr "删除文件失败，请重试。"
 msgid "Failed to delete files"
 msgstr "删除文件失败"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:107
+#: src/features/settings/components/personalization/memory-settings.tsx:108
 msgid "Failed to delete memory"
 msgstr "删除记忆失败"
 
@@ -14167,7 +14175,7 @@ msgstr "删除通行密钥失败"
 msgid "Failed to delete preset"
 msgstr "删除预设失败"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:572
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:594
 msgid "Failed to delete project"
 msgstr "删除项目失败"
 
@@ -14373,7 +14381,7 @@ msgstr "将对话设为永久失败"
 msgid "Failed to move file"
 msgstr "移动文件失败"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:857
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:879
 #: src/features/projects/components/move-to-project-dialog.tsx:38
 msgid "Failed to move thread"
 msgstr "移动对话失败"
@@ -14684,8 +14692,8 @@ msgstr "更新键盘快捷键失败"
 msgid "Failed to update MCP server"
 msgstr "更新 MCP 服务器失败"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:118
-#: src/features/settings/components/personalization/memory-settings.tsx:126
+#: src/features/settings/components/personalization/memory-settings.tsx:119
+#: src/features/settings/components/personalization/memory-settings.tsx:127
 msgid "Failed to update memory"
 msgstr "更新记忆失败"
 
@@ -14713,8 +14721,8 @@ msgstr "无法更新拉取请求设置"
 msgid "Failed to update reply tools"
 msgstr "无法更新回复工具"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:150
-#: src/features/settings/components/personalization/schedule-ideas-switch.tsx:42
+#: src/features/settings/components/personalization/memory-settings.tsx:151
+#: src/features/settings/components/personalization/schedule-ideas-switch.tsx:41
 msgid "Failed to update setting"
 msgstr "更新设置失败"
 
@@ -15412,7 +15420,7 @@ msgstr "按类型筛选"
 msgid "Filter condition"
 msgstr "筛选条件"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:222
+#: src/features/settings/components/personalization/memory-settings.tsx:227
 msgid "Filter memories by type"
 msgstr "按类型筛选记忆"
 
@@ -15649,11 +15657,11 @@ msgstr "聚焦聊天：{title}"
 msgid "Focus Search"
 msgstr "聚焦搜索"
 
-#: src/features/projects/components/add-project-dialog.tsx:604
+#: src/features/projects/components/add-project-dialog.tsx:608
 msgid "Folder path"
 msgstr "文件夹路径"
 
-#: src/features/projects/components/add-project-dialog.tsx:623
+#: src/features/projects/components/add-project-dialog.tsx:627
 msgid "Folders"
 msgstr "文件夹"
 
@@ -16686,7 +16694,7 @@ msgstr "前往文件库"
 msgid "Go to your pages"
 msgstr "前往你的页面"
 
-#: src/features/projects/components/add-project-dialog.tsx:627
+#: src/features/projects/components/add-project-dialog.tsx:631
 msgid "Go up to {parent}"
 msgstr "返回上一级：{parent}"
 
@@ -16715,7 +16723,7 @@ msgid "Goal: {goalTitle}"
 msgstr "目标：{goalTitle}"
 
 #: src/features/chat/goal/composer-goal.tsx:66
-#: src/features/chat/thread/composer-status-line.tsx:73
+#: src/features/chat/thread/composer-status-line.tsx:103
 msgid "Goal: run until done"
 msgstr "目标：运行直至完成"
 
@@ -17799,7 +17807,7 @@ msgid "Identity"
 msgstr "身份"
 
 #: ../../packages/chat-ui/src/chat/auto-continue-status.tsx:53
-#: src/features/chat/thread-list/thread-node.tsx:895
+#: src/features/chat/thread-list/thread-node.tsx:933
 #: src/features/sub-agents/components/worker-list.tsx:104
 msgid "Idle"
 msgstr "空闲"
@@ -19179,7 +19187,7 @@ msgstr "肯尼亚"
 msgid "Kept as yours"
 msgstr "已保留为你的"
 
-#: src/features/devices/components/devices-settings.tsx:560
+#: src/features/devices/components/devices-settings.tsx:563
 msgid "Key file (optional, absolute path)"
 msgstr "密钥文件（可选，绝对路径）"
 
@@ -19442,7 +19450,7 @@ msgstr "最近 24 小时"
 msgid "Last 30 days"
 msgstr "最近 30 天"
 
-#: src/features/chat/thread-list/hooks/use-thread-groups.ts:632
+#: src/features/chat/thread-list/hooks/use-thread-groups.ts:640
 #: src/features/settings/components/chat/usage-settings.tsx:256
 #: src/features/settings/components/chat/usage-settings.tsx:264
 #: src/routes/admin/gateway/index.tsx:234
@@ -19498,7 +19506,7 @@ msgstr "客户的最后一条消息"
 msgid "Last message: {lastMessageAt}"
 msgstr "最后一条消息：{lastMessageAt}"
 
-#: src/features/chat/thread-list/hooks/use-thread-groups.ts:633
+#: src/features/chat/thread-list/hooks/use-thread-groups.ts:641
 msgid "Last month"
 msgstr "上个月"
 
@@ -19830,11 +19838,11 @@ msgstr "让快速检查批准低风险调用"
 msgid "Let replies use tools"
 msgstr "允许回复使用工具"
 
-#: src/features/devices/components/devices-settings.tsx:641
+#: src/features/devices/components/devices-settings.tsx:647
 msgid "Let the agent use files, a terminal and local MCP servers on your own computer through the Neore desktop app. Every action asks you on that computer first, and nothing runs from shared chats or background tasks."
 msgstr "通过 Neore 桌面应用，让智能体使用你自己电脑上的文件、终端和本地 MCP 服务器。每个操作都会先在那台电脑上征求你的同意，共享聊天或后台任务不会运行任何操作。"
 
-#: src/features/devices/components/devices-settings.tsx:703
+#: src/features/devices/components/devices-settings.tsx:709
 msgid "Let the agent work on a server you reach over SSH, with your own SSH client and keys. Neore asks you to trust the server's key the first time, and every action asks you on this computer before it is sent. The server holds no secret of yours."
 msgstr "让智能体在你通过 SSH 访问的服务器上工作，使用你自己的 SSH 客户端和密钥。Neore 会在首次连接时请你信任服务器的密钥，且每个操作在发送前都会在这台电脑上询问你。服务器不保存你的任何机密。"
 
@@ -20021,7 +20029,7 @@ msgstr "关联拉取请求"
 msgid "Linked by hand"
 msgstr "手动关联"
 
-#: src/features/chat/thread-list/thread-node.tsx:889
+#: src/features/chat/thread-list/thread-node.tsx:927
 msgid "Linked pull requests: {linkedPullRequests}"
 msgstr "已关联的拉取请求：{linkedPullRequests}"
 
@@ -20260,7 +20268,7 @@ msgstr "正在加载文件"
 msgid "Loading files…"
 msgstr "正在加载文件…"
 
-#: src/features/projects/components/add-project-dialog.tsx:523
+#: src/features/projects/components/add-project-dialog.tsx:527
 msgid "Loading folders…"
 msgstr "正在加载文件夹…"
 
@@ -20409,7 +20417,7 @@ msgstr "正在加载此验证…"
 msgid "Loading threads"
 msgstr "正在加载对话"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:963
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:985
 msgid "Loading threads..."
 msgstr "正在加载对话..."
 
@@ -20709,7 +20717,7 @@ msgstr "查看拉取请求 {address} 中请求更改的审查。将每项请求�
 msgid "Looking for instruction files..."
 msgstr "正在查找指令文件..."
 
-#: src/features/projects/components/add-project-dialog.tsx:538
+#: src/features/projects/components/add-project-dialog.tsx:542
 msgid "Looking for machines…"
 msgstr "正在查找设备…"
 
@@ -20817,7 +20825,7 @@ msgstr "Mach-O 二进制文件"
 msgid "Machine"
 msgstr "设备"
 
-#: src/features/projects/components/add-project-dialog.tsx:542
+#: src/features/projects/components/add-project-dialog.tsx:546
 msgid "Machines"
 msgstr "设备"
 
@@ -21353,7 +21361,7 @@ msgid "memories"
 msgstr "记忆"
 
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:31
-#: src/features/settings/components/personalization/memory-settings.tsx:248
+#: src/features/settings/components/personalization/memory-settings.tsx:253
 msgid "Memories"
 msgstr "记忆"
 
@@ -21371,7 +21379,7 @@ msgid "Memories used for this reply ({0})"
 msgstr "此回复使用的记忆（{0}）"
 
 #: src/features/marketing/use-cases/use-case-data.ts:114
-#: src/features/settings/components/personalization/memory-settings.tsx:166
+#: src/features/settings/components/personalization/memory-settings.tsx:167
 #: src/features/settings/lib/settings-keywords.ts:116
 msgid "Memory"
 msgstr "记忆"
@@ -21380,15 +21388,15 @@ msgstr "记忆"
 msgid "Memory — what the agent keeps across chats"
 msgstr "记忆——智能体跨聊天保留的内容"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:111
+#: src/features/settings/components/personalization/memory-settings.tsx:112
 msgid "Memory deleted"
 msgstr "记忆已删除"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:148
+#: src/features/settings/components/personalization/memory-settings.tsx:149
 msgid "Memory disabled"
 msgstr "记忆已关闭"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:148
+#: src/features/settings/components/personalization/memory-settings.tsx:149
 msgid "Memory enabled"
 msgstr "记忆已开启"
 
@@ -21556,8 +21564,8 @@ msgstr "消息"
 msgid "Messages API (/v1/messages) — Anthropic and services that mirror it."
 msgstr "Messages API（/v1/messages）——Anthropic 及与其兼容的服务。"
 
-#: src/features/chat/thread-list/thread-node.tsx:923
-#: src/features/chat/thread-list/thread-node.tsx:935
+#: src/features/chat/thread-list/thread-node.tsx:961
+#: src/features/chat/thread-list/thread-node.tsx:973
 msgid "Messages from {sourceName}"
 msgstr "来自 {sourceName} 的消息"
 
@@ -21908,7 +21916,7 @@ msgstr "模型已被屏蔽"
 msgid "Model Breakdown"
 msgstr "模型明细"
 
-#: src/features/chat/thread-list/thread-node.tsx:794
+#: src/features/chat/thread-list/thread-node.tsx:830
 msgid "Model comparison"
 msgstr "模型对比"
 
@@ -22447,11 +22455,11 @@ msgstr "将对话静音"
 msgid "my data"
 msgstr "我的数据"
 
-#: src/features/devices/components/devices-settings.tsx:605
+#: src/features/devices/components/devices-settings.tsx:609
 msgid "My Linux computer"
 msgstr "我的 Linux 电脑"
 
-#: src/features/devices/components/devices-settings.tsx:605
+#: src/features/devices/components/devices-settings.tsx:609
 msgid "My Mac"
 msgstr "我的 Mac"
 
@@ -22463,7 +22471,7 @@ msgstr "我的 MCP 服务器"
 msgid "My skills"
 msgstr "我的技能"
 
-#: src/features/devices/components/devices-settings.tsx:605
+#: src/features/devices/components/devices-settings.tsx:609
 msgid "My Windows PC"
 msgstr "我的 Windows 电脑"
 
@@ -22489,7 +22497,7 @@ msgstr "名称"
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:478
 #: src/features/auth/components/settings/account/update-name-card.tsx:23
 #: src/features/auth/components/settings/api-key/create-api-key-dialog.tsx:117
-#: src/features/devices/components/devices-settings.tsx:544
+#: src/features/devices/components/devices-settings.tsx:547
 #: src/features/evals/components/dataset-form-dialog.tsx:81
 #: src/features/knowledge/components/collection-dialog.tsx:57
 #: src/features/projects/components/project-rule-files.tsx:262
@@ -23382,7 +23390,7 @@ msgstr "无描述"
 msgid "No description provided."
 msgstr "未提供描述。"
 
-#: src/features/devices/components/devices-settings.tsx:698
+#: src/features/devices/components/devices-settings.tsx:704
 msgid "No devices paired."
 msgstr "没有已配对的设备。"
 
@@ -23444,7 +23452,7 @@ msgstr "你的知识库中还没有文件。在上方上传文档即可开始。
 msgid "No focal length selected"
 msgstr "未选择焦距"
 
-#: src/features/projects/components/add-project-dialog.tsx:659
+#: src/features/projects/components/add-project-dialog.tsx:663
 msgid "No folders in here."
 msgstr "此处没有文件夹。"
 
@@ -23470,7 +23478,7 @@ msgstr "还没有历史记录"
 msgid "No icon found"
 msgstr "未找到图标"
 
-#: src/features/settings/components/personalization/schedule-ideas-switch.tsx:54
+#: src/features/settings/components/personalization/schedule-ideas-switch.tsx:53
 msgid "No ideas are made while memory is off."
 msgstr "记忆关闭时不会生成想法。"
 
@@ -23535,11 +23543,11 @@ msgstr "未配置 MCP 服务器。添加服务器以扩展 AI 能力。"
 msgid "No members in this team yet"
 msgstr "此团队还没有成员"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:264
+#: src/features/settings/components/personalization/memory-settings.tsx:269
 msgid "No memories of this type."
 msgstr "没有此类型的记忆。"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:265
+#: src/features/settings/components/personalization/memory-settings.tsx:270
 msgid "No memories yet. The AI will start learning from your conversations automatically."
 msgstr "还没有记忆。AI 会自动从你的对话中开始学习。"
 
@@ -23547,7 +23555,7 @@ msgstr "还没有记忆。AI 会自动从你的对话中开始学习。"
 msgid "No message of yours is loaded in this conversation"
 msgstr "此对话中未加载你的任何消息"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1011
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1033
 msgid "No messages found for"
 msgstr "未找到消息："
 
@@ -23857,7 +23865,7 @@ msgstr "无可显示的文本。"
 msgid "No thread has worked on this {requestNoun} yet."
 msgstr "还没有对话处理过此{requestNoun}。"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1011
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1033
 msgid "No threads found for"
 msgstr "未找到对话："
 
@@ -23865,16 +23873,16 @@ msgstr "未找到对话："
 msgid "No threads in this group"
 msgstr "此分组中没有对话"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:977
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:999
 msgid "No threads in this section"
 msgstr "此分区中没有对话"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:626
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:648
 msgid "No threads were active in that date range."
 msgstr "该日期范围内没有活跃的对话。"
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:263
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:988
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1010
 msgid "No threads yet"
 msgstr "还没有对话"
 
@@ -24186,7 +24194,7 @@ msgstr "没有等待你处理的事项。"
 msgid "Nothing to stop: that run had already ended."
 msgstr "无需停止：该运行已结束。"
 
-#: src/features/notifications/lib/notification-labels.ts:82
+#: src/features/notifications/lib/notification-labels.ts:86
 msgid "Notification"
 msgstr "通知"
 
@@ -24389,7 +24397,7 @@ msgstr "旧版第 {text} 行"
 
 #: ../../packages/chat-ui/src/threads/thread-list.tsx:45
 #: src/features/admin/components/feedback-admin-page.tsx:196
-#: src/features/chat/thread-list/hooks/use-thread-groups.ts:634
+#: src/features/chat/thread-list/hooks/use-thread-groups.ts:642
 msgid "Older"
 msgstr "更早"
 
@@ -24474,7 +24482,7 @@ msgstr "下次访问聊天时将重新开始新手引导。"
 msgid "Onboarding wizard"
 msgstr "新手引导向导"
 
-#: src/features/settings/components/personalization/schedule-ideas-switch.tsx:53
+#: src/features/settings/components/personalization/schedule-ideas-switch.tsx:52
 msgid "Once a day, suggest recurring tasks based only on your own recent messages. Nothing is created until you accept a suggestion. Turning this off deletes the suggestions waiting for you."
 msgstr "每天根据你自己最近的消息建议一次重复任务。在你接受建议之前不会创建任何内容。关闭此项会删除等待处理的建议。"
 
@@ -24849,7 +24857,7 @@ msgstr "全屏打开"
 msgid "Open in new window"
 msgstr "在新窗口中打开"
 
-#: src/features/chat/thread-list/thread-node.tsx:811
+#: src/features/chat/thread-list/thread-node.tsx:847
 #: src/features/chat/thread-list/thread-options-menu.tsx:160
 msgid "Open in split view"
 msgstr "在分屏视图中打开"
@@ -24887,7 +24895,7 @@ msgstr "打开模型选择器"
 msgid "Open Model Picker"
 msgstr "打开模型选择器"
 
-#: src/features/devices/components/devices-settings.tsx:646
+#: src/features/devices/components/devices-settings.tsx:652
 msgid "Open Neore in the desktop app to pair this computer. Devices you paired before are listed below."
 msgstr "请在桌面应用中打开 Neore 以配对此计算机。之前配对的设备列在下方。"
 
@@ -25871,7 +25879,7 @@ msgstr "在设置中配对一台"
 msgid "Pair the desktop app in Settings → Devices to import from a computer."
 msgstr "请在 设置 → 设备 中配对桌面应用，以便从电脑导入。"
 
-#: src/features/projects/components/add-project-dialog.tsx:208
+#: src/features/projects/components/add-project-dialog.tsx:209
 msgid "Pair this computer with your account first (Settings → Devices)."
 msgstr "请先将此电脑与你的账户配对（设置 → 设备）。"
 
@@ -25883,7 +25891,7 @@ msgstr "配对此设备？"
 msgid "Paired"
 msgstr "已配对"
 
-#: src/features/devices/components/devices-settings.tsx:683
+#: src/features/devices/components/devices-settings.tsx:689
 msgid "Paired devices"
 msgstr "已配对的设备"
 
@@ -25891,7 +25899,7 @@ msgstr "已配对的设备"
 msgid "Pairing request"
 msgstr "配对请求"
 
-#: src/features/devices/components/devices-settings.tsx:621
+#: src/features/devices/components/devices-settings.tsx:625
 msgid "Pairing was cancelled on this computer."
 msgstr "已在此计算机上取消配对。"
 
@@ -26434,7 +26442,7 @@ msgstr "从收件箱中选择一项进行阅读。"
 msgid "Pick skills, schedules, webhooks and group chats to share as one Markdown file. API keys, webhook secrets, connector tokens and other credentials are never included, and neither are your account or organization ids."
 msgstr "选择要作为一个 Markdown 文件分享的技能、计划任务、webhook 和群聊。API 密钥、webhook 密钥、连接器令牌和其他凭据绝不会包含在内，你的账号或组织 ID 也不会。"
 
-#: src/features/projects/components/add-project-dialog.tsx:517
+#: src/features/projects/components/add-project-dialog.tsx:521
 msgid "Pick the computer or server the project's folder is on."
 msgstr "选择项目文件夹所在的电脑或服务器。"
 
@@ -26528,7 +26536,7 @@ msgstr "粉色"
 msgid "pinned"
 msgstr "已固定"
 
-#: src/features/chat/thread-list/hooks/use-thread-groups.ts:629
+#: src/features/chat/thread-list/hooks/use-thread-groups.ts:637
 msgid "Pinned"
 msgstr "已置顶"
 
@@ -26715,7 +26723,7 @@ msgstr "精致的好莱坞风格"
 msgid "Popular"
 msgstr "热门"
 
-#: src/features/devices/components/devices-settings.tsx:556
+#: src/features/devices/components/devices-settings.tsx:559
 msgid "Port"
 msgstr "端口"
 
@@ -26927,6 +26935,11 @@ msgstr "正在准备请求…"
 msgid "Preparing the import…"
 msgstr "正在准备导入…"
 
+#: src/features/settings/components/personalization/memory-export-button.tsx:93
+#: src/features/settings/components/personalization/memory-export-button.tsx:96
+msgid "Preparing your memories…"
+msgstr "正在准备你的记忆…"
+
 #: src/features/settings/components/privacy/data-export.tsx:158
 msgid "Preparing..."
 msgstr "正在准备..."
@@ -26978,9 +26991,9 @@ msgstr "预设已更新"
 msgid "Presets"
 msgstr "预设"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:990
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1003
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1029
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1012
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1025
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1051
 msgid "Press ? for keyboard shortcuts"
 msgstr "按 ? 查看键盘快捷键"
 
@@ -27000,7 +27013,7 @@ msgstr "按回车键或空格键选择节点。然后可使用方向键移动节
 msgid "Press enter or space to select an edge. You can then press delete to remove it or escape to cancel."
 msgstr "按回车键或空格键选择连线。然后可按 Delete 键删除，或按 Esc 键取消。"
 
-#: src/features/projects/components/add-project-dialog.tsx:620
+#: src/features/projects/components/add-project-dialog.tsx:624
 msgid "Press Enter to open the folder. A folder that does not exist is created."
 msgstr "按回车键打开文件夹。不存在的文件夹将被创建。"
 
@@ -27869,7 +27882,7 @@ msgstr "路由引擎分配的查询复杂度等级"
 msgid "Query usage analytics and costs"
 msgstr "查询用量分析和成本"
 
-#: src/features/chat/thread-list/thread-node.tsx:838
+#: src/features/chat/thread-list/thread-node.tsx:874
 msgid "Question"
 msgstr "问题"
 
@@ -29127,7 +29140,7 @@ msgstr "重命名、锁文件、快照和生成的文件。最后阅读，且只
 msgid "Reopen"
 msgstr "重新打开"
 
-#: src/features/chat/thread-list/thread-node.tsx:754
+#: src/features/chat/thread-list/thread-node.tsx:790
 msgid "Reorder"
 msgstr "重新排序"
 
@@ -29243,7 +29256,7 @@ msgstr "回复已就绪"
 msgid "Reply tools are off by default. You switch them on per connection and choose which groups they may use."
 msgstr "回复工具默认关闭。你可以按连接开启，并选择允许使用的工具组。"
 
-#: src/features/chat/thread/composer-status-line.tsx:61
+#: src/features/chat/thread/composer-status-line.tsx:91
 msgid "Replying"
 msgstr "正在回复"
 
@@ -29493,7 +29506,7 @@ msgstr "资源"
 msgid "Response"
 msgstr "响应"
 
-#: src/features/chat/thread-list/thread-node.tsx:823
+#: src/features/chat/thread-list/thread-node.tsx:859
 msgid "Response failed - try again"
 msgstr "回复失败——请重试"
 
@@ -30148,7 +30161,7 @@ msgstr "运行在 Cloudflare Workers 上——冷启动低于 50ms，全球 300+
 msgid "Runs on the schedule {0}{1}, on {2}."
 msgstr "按计划 {0}{1} 运行，使用 {2}。"
 
-#: src/features/chat/thread-list/thread-node.tsx:879
+#: src/features/chat/thread-list/thread-node.tsx:917
 msgid "Runs on your computer"
 msgstr "在你的电脑上运行"
 
@@ -30494,11 +30507,11 @@ msgstr "计划"
 msgid "Schedule {0}"
 msgstr "计划 {0}"
 
-#: src/features/settings/components/personalization/schedule-ideas-switch.tsx:37
+#: src/features/settings/components/personalization/schedule-ideas-switch.tsx:36
 msgid "Schedule ideas disabled"
 msgstr "已关闭计划任务建议"
 
-#: src/features/settings/components/personalization/schedule-ideas-switch.tsx:37
+#: src/features/settings/components/personalization/schedule-ideas-switch.tsx:36
 msgid "Schedule ideas enabled"
 msgstr "已开启计划任务建议"
 
@@ -30631,7 +30644,7 @@ msgstr "搜索数据..."
 msgid "Search depth: {0}"
 msgstr "搜索深度：{0}"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1002
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1024
 msgid "Search failed for \"{searchQuery}\". Try again."
 msgstr "搜索“{searchQuery}”失败。请重试。"
 
@@ -30876,7 +30889,7 @@ msgstr "仅搜索了最新消息"
 msgid "Searching"
 msgstr "正在搜索"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1019
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1041
 msgid "Searching..."
 msgstr "正在搜索..."
 
@@ -30953,7 +30966,7 @@ msgstr "种子"
 #: ../../packages/ui/src/components/canvas-editor/fabric-canvas-editor.tsx:585
 #: ../../packages/ui/src/components/data-grid/data-grid-column-header.tsx:30
 #: src/features/chat/forward/select-messages-action.tsx:29
-#: src/features/chat/thread-list/thread-node.tsx:769
+#: src/features/chat/thread-list/thread-node.tsx:805
 #: src/features/prompts/components/prompt-list.tsx:583
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:220
 msgid "Select"
@@ -31449,7 +31462,7 @@ msgstr "衬线"
 msgid "Served from cache"
 msgstr "来自缓存"
 
-#: src/features/devices/components/devices-settings.tsx:524
+#: src/features/devices/components/devices-settings.tsx:527
 msgid "Server added. Choose which of its folders to share in the desktop app."
 msgstr "服务器已添加。请在桌面应用中选择要共享其中哪些文件夹。"
 
@@ -31493,7 +31506,7 @@ msgstr "支持分支的 Serverless Postgres 数据库"
 msgid "servers"
 msgstr "服务器"
 
-#: src/features/devices/components/devices-settings.tsx:705
+#: src/features/devices/components/devices-settings.tsx:711
 #: src/features/settings/lib/settings-keywords.ts:88
 msgid "Servers over SSH"
 msgstr "SSH 服务器"
@@ -31675,7 +31688,7 @@ msgstr "已共享"
 msgid "Shared conversation"
 msgstr "共享的对话"
 
-#: src/features/devices/components/devices-settings.tsx:676
+#: src/features/devices/components/devices-settings.tsx:682
 msgid "Shared folders and local servers…"
 msgstr "共享文件夹和本地服务器…"
 
@@ -31854,7 +31867,7 @@ msgstr "收起“{title}”的说明"
 msgid "Show more"
 msgstr "展开"
 
-#: src/features/projects/components/add-project-dialog.tsx:669
+#: src/features/projects/components/add-project-dialog.tsx:673
 msgid "Show more folders"
 msgstr "显示更多文件夹"
 
@@ -32491,7 +32504,7 @@ msgstr "平滑过渡"
 msgid "Snooze"
 msgstr "暂时搁置"
 
-#: src/features/chat/thread-list/thread-node.tsx:1047
+#: src/features/chat/thread-list/thread-node.tsx:1056
 msgid "Snooze 1 hour"
 msgstr "暂时搁置 1 小时"
 
@@ -32499,8 +32512,8 @@ msgstr "暂时搁置 1 小时"
 msgid "Snooze chats until the limit resets"
 msgstr "在上限重置前暂时搁置对话"
 
-#: src/features/chat/thread-list/thread-node.tsx:1026
-#: src/features/chat/thread-list/thread-node.tsx:1040
+#: src/features/chat/thread-list/thread-node.tsx:1035
+#: src/features/chat/thread-list/thread-node.tsx:1049
 msgid "Snooze thread"
 msgstr "暂时搁置对话"
 
@@ -32508,19 +32521,19 @@ msgstr "暂时搁置对话"
 msgid "Snooze until"
 msgstr "暂时搁置至"
 
-#: src/features/chat/thread-list/thread-node.tsx:1053
+#: src/features/chat/thread-list/thread-node.tsx:1062
 msgid "Snooze until next week"
 msgstr "暂时搁置至下周"
 
-#: src/features/chat/thread-list/thread-node.tsx:1049
+#: src/features/chat/thread-list/thread-node.tsx:1058
 msgid "Snooze until tomorrow 09:00"
 msgstr "暂时搁置至明天 09:00"
 
-#: src/features/chat/thread-list/thread-node.tsx:1054
+#: src/features/chat/thread-list/thread-node.tsx:1063
 msgid "Snooze until…"
 msgstr "暂时搁置至…"
 
-#: src/features/chat/thread-list/hooks/use-thread-groups.ts:641
+#: src/features/chat/thread-list/hooks/use-thread-groups.ts:649
 #: src/features/chat/thread-list/section-bar.tsx:47
 msgid "Snoozed"
 msgstr "已暂时搁置"
@@ -32934,16 +32947,16 @@ msgid "Sri Lanka"
 msgstr "斯里兰卡"
 
 #. placeholder {0}: row.name
-#: src/features/projects/components/add-project-dialog.tsx:185
+#: src/features/projects/components/add-project-dialog.tsx:186
 msgid "SSH · {0}"
 msgstr "SSH · {0}"
 
 #. placeholder {0}: row.name
-#: src/features/projects/components/add-project-dialog.tsx:188
+#: src/features/projects/components/add-project-dialog.tsx:189
 msgid "SSH · {0} · not connected yet"
 msgstr "SSH · {0} · 尚未连接"
 
-#: src/features/projects/components/add-project-dialog.tsx:581
+#: src/features/projects/components/add-project-dialog.tsx:585
 msgid "SSH hosts come from ~/.ssh/config. Picking one connects it."
 msgstr "SSH 主机来自 ~/.ssh/config。选择一个即可连接。"
 
@@ -33082,7 +33095,7 @@ msgstr "新建聊天即可开始"
 msgid "Start a new context: earlier messages are no longer sent to the model"
 msgstr "开始新的上下文：之前的消息不再发送给模型"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:989
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1011
 msgid "Start a new conversation to create your first thread"
 msgstr "开始聊天，创建你的第一个对话"
 
@@ -33285,7 +33298,7 @@ msgid "State:"
 msgstr "状态："
 
 #: src/features/chat/header/chat-header.tsx:174
-#: src/features/chat/thread-list/hooks/use-thread-groups.ts:630
+#: src/features/chat/thread-list/hooks/use-thread-groups.ts:638
 msgid "Stateless"
 msgstr "无状态"
 
@@ -33388,8 +33401,8 @@ msgstr "停止并清空队列"
 msgid "Stop browser session"
 msgstr "停止浏览器会话"
 
-#: src/features/chat/thread-list/thread-node.tsx:949
-#: src/features/chat/thread-list/thread-node.tsx:971
+#: src/features/chat/thread-list/thread-node.tsx:679
+#: src/features/chat/thread-list/thread-node.tsx:701
 #: src/features/chat/thread/composer-input-area.tsx:420
 #: src/features/chat/thread/composer-input-area.tsx:433
 msgid "Stop generating"
@@ -33500,7 +33513,7 @@ msgstr "Streamable HTTP（推荐）"
 msgid "Streaming"
 msgstr "流式输出中"
 
-#: src/features/chat/thread-list/thread-node.tsx:822
+#: src/features/chat/thread-list/thread-node.tsx:858
 msgid "Streaming..."
 msgstr "流式输出中..."
 
@@ -33863,11 +33876,11 @@ msgstr "子代理"
 msgid "Sub-agent"
 msgstr "子代理"
 
-#: src/features/notifications/lib/notification-labels.ts:64
+#: src/features/notifications/lib/notification-labels.ts:68
 msgid "Sub-agent failed"
 msgstr "子代理运行失败"
 
-#: src/features/notifications/lib/notification-labels.ts:64
+#: src/features/notifications/lib/notification-labels.ts:68
 msgid "Sub-agent finished"
 msgstr "子代理运行完成"
 
@@ -33932,7 +33945,7 @@ msgstr "已成功从 {0} 导入 {imported} 个对话"
 msgid "Suggest innovative solutions to reduce plastic waste"
 msgstr "提出减少塑料垃圾的创新方案"
 
-#: src/features/settings/components/personalization/schedule-ideas-switch.tsx:59
+#: src/features/settings/components/personalization/schedule-ideas-switch.tsx:58
 msgid "Suggest scheduled tasks"
 msgstr "建议计划任务"
 
@@ -34402,11 +34415,11 @@ msgstr "已关闭任务邮件"
 msgid "Task emails turned on"
 msgstr "已开启任务邮件"
 
-#: src/features/notifications/lib/notification-labels.ts:67
+#: src/features/notifications/lib/notification-labels.ts:71
 msgid "Task failed"
 msgstr "任务失败"
 
-#: src/features/notifications/lib/notification-labels.ts:67
+#: src/features/notifications/lib/notification-labels.ts:71
 msgid "Task finished"
 msgstr "任务完成"
 
@@ -34619,11 +34632,11 @@ msgstr "模板"
 msgid "Templates"
 msgstr "模板"
 
-#: src/features/chat/thread-list/hooks/use-thread-groups.ts:628
+#: src/features/chat/thread-list/hooks/use-thread-groups.ts:636
 msgid "Temporary"
 msgstr "临时"
 
-#: src/features/chat/thread-list/thread-node.tsx:906
+#: src/features/chat/thread-list/thread-node.tsx:944
 msgid "Temporary chat"
 msgstr "临时聊天"
 
@@ -34920,7 +34933,7 @@ msgstr "操作未成功。请重试。"
 msgid "That did not work. Try again."
 msgstr "未成功。请重试。"
 
-#: src/features/projects/components/add-project-dialog.tsx:152
+#: src/features/projects/components/add-project-dialog.tsx:153
 msgid "That folder is already shared with this server."
 msgstr "该文件夹已与此服务器共享。"
 
@@ -34928,11 +34941,11 @@ msgstr "该文件夹已与此服务器共享。"
 msgid "That folder is not offered for this repository on that computer."
 msgstr "那台电脑上未提供该文件夹用于此仓库。"
 
-#: src/features/projects/components/add-project-dialog.tsx:156
+#: src/features/projects/components/add-project-dialog.tsx:157
 msgid "That folder is the server's home folder or a folder above it. Choose a folder inside it."
 msgstr "该文件夹是服务器的主目录或其上级目录。请选择其中的一个文件夹。"
 
-#: src/features/projects/components/add-project-dialog.tsx:136
+#: src/features/projects/components/add-project-dialog.tsx:137
 msgid "That folder was not found."
 msgstr "未找到该文件夹。"
 
@@ -34989,7 +35002,7 @@ msgstr "无法打开该页面。"
 msgid "That passcode is not right."
 msgstr "口令不正确。"
 
-#: src/features/projects/components/add-project-dialog.tsx:140
+#: src/features/projects/components/add-project-dialog.tsx:141
 msgid "That path is a file."
 msgstr "该路径是文件。"
 
@@ -35155,7 +35168,7 @@ msgstr "智能体的计划"
 msgid "The agent's tool calls"
 msgstr "智能体的工具调用"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:165
+#: src/features/settings/components/personalization/memory-settings.tsx:166
 msgid "The AI learns from your conversations to personalize its responses, and reflects on what it learned each night. Everything it remembers is listed here — edit, retype, pin or delete any of it."
 msgstr "AI 会从你的对话中学习以个性化回复，并在每晚反思所学内容。它记住的一切都列在这里——你可以编辑、修改类型、置顶或删除其中任何一条。"
 
@@ -35184,7 +35197,7 @@ msgstr "助手有几个问题"
 msgid "The assistant has a question"
 msgstr "助手有一个问题"
 
-#: src/features/notifications/lib/notification-labels.ts:61
+#: src/features/notifications/lib/notification-labels.ts:65
 msgid "The assistant is asking for a secret"
 msgstr "助手正在请求一个密钥"
 
@@ -35200,7 +35213,7 @@ msgstr "机器人及其电脑将被移除。它的聊天会保留，成为普通
 msgid "The bot gets only the tools you allow. With none allowed, it gets no tools."
 msgstr "机器人只获得你允许的工具。未允许任何工具时，它不会获得任何工具。"
 
-#: src/features/chat/thread/composer-status-line.tsx:85
+#: src/features/chat/thread/composer-status-line.tsx:115
 msgid "The bot sets the model for this chat."
 msgstr "机器人为此聊天设置模型。"
 
@@ -35365,7 +35378,7 @@ msgstr "\"{name}\" 的描述必须为一行，最多 {limit} 个字符。"
 msgid "The desktop app runs on macOS, Windows and Linux. Installers are attached to a desktop release on GitHub, and they appear there once that release is published."
 msgstr "桌面应用支持 macOS、Windows 和 Linux。安装包附在 GitHub 上的桌面版发布中，发布后会在那里显示。"
 
-#: src/features/projects/components/add-project-dialog.tsx:167
+#: src/features/projects/components/add-project-dialog.tsx:168
 msgid "The desktop could not complete that. Try again."
 msgstr "桌面应用无法完成该操作，请重试。"
 
@@ -35384,6 +35397,10 @@ msgstr "差异过大，无法保留。这里显示文件及其行数。"
 #: src/features/evals/components/case-fields.tsx:115
 msgid "The documents the answer should be retrieved from. Used for hit rate, MRR, precision and recall."
 msgstr "答案应检索自的文档。用于计算命中率、MRR、精确率和召回率。"
+
+#: src/features/settings/components/personalization/memory-export-button.tsx:100
+msgid "The download could not be prepared. Please try again in a moment."
+msgstr "无法准备下载。请稍后再试。"
 
 #: src/features/chat/host/diff-comment-form.tsx:73
 msgid "The draft is full. Send or remove some comments before adding more."
@@ -36376,8 +36393,8 @@ msgid "this computer"
 msgstr "这台电脑"
 
 #: src/features/devices/components/devices-settings.tsx:374
-#: src/features/projects/components/add-project-dialog.tsx:173
-#: src/features/projects/components/add-project-dialog.tsx:177
+#: src/features/projects/components/add-project-dialog.tsx:174
+#: src/features/projects/components/add-project-dialog.tsx:178
 #: src/features/settings/components/chat/custom-providers-settings.tsx:360
 msgid "This computer"
 msgstr "此电脑"
@@ -36394,20 +36411,20 @@ msgstr "此电脑已不再配对。"
 msgid "This computer is no longer paired. Pair it again in Settings → Devices."
 msgstr "这台电脑已不再配对。请在 设置 → 设备 中重新配对。"
 
-#: src/features/devices/components/devices-settings.tsx:663
+#: src/features/devices/components/devices-settings.tsx:669
 msgid "This computer is not paired yet."
 msgstr "此计算机尚未配对。"
 
 #. placeholder {0}: pairedHere.name
-#: src/features/devices/components/devices-settings.tsx:679
+#: src/features/devices/components/devices-settings.tsx:685
 msgid "This computer is paired as “{0}”."
 msgstr "此计算机已配对为“{0}”。"
 
-#: src/features/devices/components/devices-settings.tsx:663
+#: src/features/devices/components/devices-settings.tsx:669
 msgid "This computer is paired with another account."
 msgstr "此计算机已与另一个账户配对。"
 
-#: src/features/devices/components/devices-settings.tsx:628
+#: src/features/devices/components/devices-settings.tsx:634
 msgid "This computer is paired. Choose which folders to share in the desktop app."
 msgstr "此计算机已配对。请在桌面应用中选择要共享的文件夹。"
 
@@ -36419,7 +36436,7 @@ msgstr "此计算机只能在部分项目中使用，而这些项目你都无法
 msgid "This computer may only be used in some projects. Choose the project to start the agent in."
 msgstr "此计算机只能在部分项目中使用。请选择要启动代理的项目。"
 
-#: src/features/projects/components/add-project-dialog.tsx:348
+#: src/features/projects/components/add-project-dialog.tsx:349
 msgid "This computer must be paired first."
 msgstr "此电脑须先完成配对。"
 
@@ -36519,7 +36536,7 @@ msgstr "此文件过大（{0} KB），无法在浏览器中预览或编辑。为
 msgid "This file is too large (~{0} tokens) and exceeds the model's context window. The model may not be able to process this file effectively."
 msgstr "此文件过大（约 {0} 个 token），超出了模型的上下文窗口。模型可能无法有效处理此文件。"
 
-#: src/features/projects/components/add-project-dialog.tsx:144
+#: src/features/projects/components/add-project-dialog.tsx:145
 msgid "This folder cannot be read."
 msgstr "无法读取此文件夹。"
 
@@ -36535,15 +36552,15 @@ msgstr "此托管方暂不提供收件箱。"
 msgid "This host does not offer any view of a {requestNoun} yet."
 msgstr "此托管方暂不提供{requestNoun}的任何视图。"
 
-#: src/features/projects/components/add-project-dialog.tsx:205
+#: src/features/projects/components/add-project-dialog.tsx:206
 msgid "This host has an invalid Port in ~/.ssh/config."
 msgstr "此主机在 ~/.ssh/config 中的 Port 无效。"
 
-#: src/features/projects/components/add-project-dialog.tsx:201
+#: src/features/projects/components/add-project-dialog.tsx:202
 msgid "This host is used by a Match rule in ~/.ssh/config, which Neore does not evaluate."
 msgstr "此主机被 ~/.ssh/config 中的 Match 规则使用，Neore 不会对其求值。"
 
-#: src/features/projects/components/add-project-dialog.tsx:197
+#: src/features/projects/components/add-project-dialog.tsx:198
 msgid "This host uses {key} in ~/.ssh/config, which Neore does not support."
 msgstr "此主机在 ~/.ssh/config 中使用了 {key}，Neore 不支持该设置。"
 
@@ -36626,7 +36643,7 @@ msgstr "此登录信息已在别处更改，并已重新加载。你对用户名
 msgid "This login was changed elsewhere. Reload the page to see it before saving again."
 msgstr "此登录信息已在别处更改。请先刷新页面查看，再重新保存。"
 
-#: src/features/projects/components/add-project-dialog.tsx:436
+#: src/features/projects/components/add-project-dialog.tsx:440
 msgid "This machine is not ready yet."
 msgstr "此设备尚未就绪。"
 
@@ -36800,7 +36817,7 @@ msgstr "此运行已不可用。"
 msgid "This selection is too large to import at once. Import fewer files at a time."
 msgstr "所选内容过多，无法一次导入。请减少每次导入的文件数量。"
 
-#: src/features/projects/components/add-project-dialog.tsx:160
+#: src/features/projects/components/add-project-dialog.tsx:161
 msgid "This server already has its maximum of shared folders. Share a parent folder or remove one in the desktop app."
 msgstr "此服务器已达共享文件夹数量上限。请共享父文件夹，或在桌面应用中移除一个。"
 
@@ -36920,11 +36937,11 @@ msgid "This will permanently delete {0} anonymous user accounts and all their da
 msgstr "这将永久删除 {0} 个匿名用户账号及其所有数据。此操作无法撤销。"
 
 #. placeholder {0}: memories.length
-#: src/features/settings/components/personalization/memory-settings.tsx:190
+#: src/features/settings/components/personalization/memory-settings.tsx:191
 msgid "This will permanently delete all {0} memories and their daily digests. The AI will start learning fresh from your next conversation."
 msgstr "这将永久删除全部 {0} 条记忆及其每日摘要。AI 将从你的下一次对话开始重新学习。"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1203
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1225
 msgid "This will permanently delete the project and all associated threads. This action cannot be undone."
 msgstr "这将永久删除该项目及所有相关对话。此操作无法撤销。"
 
@@ -37199,7 +37216,7 @@ msgid "To do"
 msgstr "待办"
 
 #: ../../packages/chat-ui/src/threads/thread-list.tsx:47
-#: src/features/chat/thread-list/hooks/use-thread-groups.ts:631
+#: src/features/chat/thread-list/hooks/use-thread-groups.ts:639
 #: src/features/pages/components/page-version-panel.tsx:56
 msgid "Today"
 msgstr "今天"
@@ -37443,7 +37460,7 @@ msgstr "{0} 的工具"
 msgid "Tools run on their own settings; a quick check can clear low-risk calls"
 msgstr "工具按各自的设置运行；快速检查可放行低风险调用"
 
-#: src/features/chat/thread/composer-status-line.tsx:79
+#: src/features/chat/thread/composer-status-line.tsx:109
 msgid "Tools run without asking"
 msgstr "工具无需询问即可运行"
 
@@ -37696,11 +37713,11 @@ msgstr "触发器已启用"
 msgid "Trigger name is required"
 msgstr "触发器名称为必填项"
 
-#: src/features/notifications/lib/notification-labels.ts:76
+#: src/features/notifications/lib/notification-labels.ts:80
 msgid "Trigger run failed"
 msgstr "触发器运行失败"
 
-#: src/features/notifications/lib/notification-labels.ts:76
+#: src/features/notifications/lib/notification-labels.ts:80
 msgid "Trigger run finished"
 msgstr "触发器运行完成"
 
@@ -37834,11 +37851,11 @@ msgstr "试用 Neore"
 msgid "Try searching for a different term."
 msgstr "尝试搜索其他词。"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1025
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1047
 msgid "Try searching in message content"
 msgstr "尝试搜索消息内容"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1025
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1047
 msgid "Try searching in thread titles or summaries"
 msgstr "尝试搜索对话标题或摘要"
 
@@ -38332,7 +38349,7 @@ msgstr "取消置顶对话"
 msgid "Unpublish"
 msgstr "取消发布"
 
-#: src/features/chat/thread-list/thread-node.tsx:846
+#: src/features/chat/thread-list/thread-node.tsx:882
 msgid "Unread"
 msgstr "未读"
 
@@ -38344,7 +38361,7 @@ msgstr "未保存的更改"
 msgid "Unsent draft"
 msgstr "未发送的草稿"
 
-#: src/features/chat/thread-list/thread-node.tsx:1056
+#: src/features/chat/thread-list/thread-node.tsx:1065
 msgid "Unsnooze"
 msgstr "取消暂时搁置"
 
@@ -38889,7 +38906,7 @@ msgstr "使用组织允许的模型"
 msgid "Use these keyboard shortcuts to navigate and interact with the data grid more efficiently."
 msgstr "使用这些键盘快捷键更高效地浏览和操作数据表格。"
 
-#: src/features/devices/components/devices-settings.tsx:660
+#: src/features/devices/components/devices-settings.tsx:666
 msgid "Use this computer for agent tools"
 msgstr "将此计算机用于智能体工具"
 
@@ -38929,7 +38946,7 @@ msgstr "用户"
 #: src/features/auth/components/user-view.tsx:35
 #: src/features/auth/components/user-view.tsx:38
 #: src/features/auth/components/user-view.tsx:44
-#: src/features/devices/components/devices-settings.tsx:552
+#: src/features/devices/components/devices-settings.tsx:555
 #: src/features/layout/components/nav-user.tsx:373
 #: src/features/layout/components/nav-user.tsx:373
 #: src/features/layout/components/sidebar-shortcut.tsx:217
@@ -39863,8 +39880,8 @@ msgstr "正在等待上传完成…"
 msgid "Waiting for you"
 msgstr "正在等待你"
 
-#: src/features/chat/thread-list/thread-node.tsx:825
-#: src/features/chat/thread-list/thread-node.tsx:832
+#: src/features/chat/thread-list/thread-node.tsx:861
+#: src/features/chat/thread-list/thread-node.tsx:868
 #: src/features/chat/thread/ask-user-prompt.tsx:184
 msgid "Waiting for your answer"
 msgstr "正在等待你的回答"
@@ -39874,8 +39891,8 @@ msgstr "正在等待你的回答"
 msgid "Waiting for your answer in {0}"
 msgstr "正在“{0}”中等待你的回答"
 
-#: src/features/chat/thread-list/thread-node.tsx:824
-#: src/features/chat/thread-list/thread-node.tsx:831
+#: src/features/chat/thread-list/thread-node.tsx:860
+#: src/features/chat/thread-list/thread-node.tsx:867
 #: src/features/chat/thread/tool-approval.tsx:78
 #: src/features/home/components/home-page.tsx:116
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:20
@@ -40186,7 +40203,7 @@ msgstr "AI 应该怎么称呼你？"
 msgid "What should the guide pay attention to?"
 msgstr "指南应该关注什么？"
 
-#: src/features/devices/components/devices-settings.tsx:712
+#: src/features/devices/components/devices-settings.tsx:718
 msgid "What the agent asked your devices to do in the last 30 days."
 msgstr "过去 30 天内智能体请求你的设备执行的操作。"
 
@@ -40326,7 +40343,7 @@ msgstr "子代理或侧边聊天的打开位置"
 msgid "Where each run goes"
 msgstr "每次运行的去向"
 
-#: src/features/projects/components/add-project-dialog.tsx:514
+#: src/features/projects/components/add-project-dialog.tsx:518
 msgid "Where is the project?"
 msgstr "项目在哪里？"
 
@@ -40442,7 +40459,7 @@ msgstr "使用邮箱/密码"
 msgid "With this, it fires when the text starts to contain the phrase, not on every change."
 msgstr "启用后，它会在文本开始包含该短语时触发，而不是每次更改都触发。"
 
-#: src/features/devices/components/devices-settings.tsx:562
+#: src/features/devices/components/devices-settings.tsx:565
 msgid "Without one, your SSH agent and default keys are used. Passwords are not supported yet."
 msgstr "如果不提供，则使用你的 SSH 代理和默认密钥。暂不支持密码。"
 
@@ -40956,7 +40973,7 @@ msgstr "登录后你将被重定向回此处。"
 msgid "You'll need an authenticator app like Google Authenticator or Authy to generate verification codes."
 msgstr "你需要一个身份验证器应用（如 Google Authenticator 或 Authy）来生成验证码。"
 
-#: src/features/notifications/components/notification-list.tsx:84
+#: src/features/notifications/components/notification-list.tsx:86
 msgid "You're all caught up."
 msgstr "你已处理完所有通知。"
 
@@ -41137,7 +41154,7 @@ msgstr "你的对话保持私密"
 msgid "Your current anonymous session will be converted to a permanent account."
 msgstr "你当前的匿名会话将转换为永久账号。"
 
-#: src/features/notifications/lib/notification-labels.ts:49
+#: src/features/notifications/lib/notification-labels.ts:50
 msgid "Your daily brief"
 msgstr "你的每日简报"
 
@@ -41146,7 +41163,7 @@ msgstr "你的每日简报"
 msgid "Your daily limit for AI requests is used up."
 msgstr "你的 AI 请求每日额度已用完。"
 
-#: src/features/notifications/lib/notification-labels.ts:52
+#: src/features/notifications/lib/notification-labels.ts:53
 msgid "Your data export is ready"
 msgstr "你的数据导出已就绪"
 
@@ -41349,7 +41366,7 @@ msgstr "你的审查正在提交。请等待其完成。"
 msgid "Your review is kept."
 msgstr "你的审查已保留。"
 
-#: src/features/notifications/lib/notification-labels.ts:58
+#: src/features/notifications/lib/notification-labels.ts:62
 msgid "Your review was requested"
 msgstr "有人请求了你的审查"
 

@@ -28,6 +28,7 @@ import { trackEvent } from "@/lib/analytics";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 import MemoryDigestCard from "./memory-digest-card";
+import MemoryExportButton from "./memory-export-button";
 import MemoryFileImport from "./memory-file-import";
 import MemoryImportDialog from "./memory-import-dialog";
 import MemoryItem from "./memory-item";
@@ -201,6 +202,10 @@ const MemorySettings: FC = () => {
 
             <div className="border-border/50 border-t py-3">
                 <MemoryFileImport memoryEnabled={memoryEnabled} onImported={refresh} />
+            </div>
+
+            <div className="border-border/50 border-t py-3">
+                <MemoryExportButton />
             </div>
 
             {memoryEnabled && (
