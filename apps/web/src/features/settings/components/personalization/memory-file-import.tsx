@@ -136,19 +136,44 @@ const MemoryFileImport: FC<MemoryFileImportProps> = ({ memoryEnabled, onImported
 
     const {
         data: progress,
+        dataUpdatedAt,
         error: progressError,
         isError: isProgressError,
+        isFetching: isProgressFetching,
         refetch: refetchProgress,
     } = useQuery({
         ...crpc.memory.import_job.getMemoryImportProgress.queryOptions({}),
         enabled: memoryEnabled,
     });
 
-    // `null` is an answer ("no job yet"); only `undefined` means the query has not answered. An import starts only from an
-    // answered query: the job it finds then is the one "before" this start.
-    const baselineReady = progress !== undefined;
+    // The answer the query held when memory was last switched on: a cached answer from before that may be out of date (another
+    // tab can have started an import while memory was off), so it is not a baseline.
+    const [enabledMark, setEnabledMark] = useState<{ updatedAt: number } | undefined>(undefined);
 
-    const { isPending: isImporting, mutate: runImport } = useMutation({ ...useLunoraActionOptions(api.memory.import.importMemoryFile) });
+    if (memoryEnabled && enabledMark === undefined) {
+        setEnabledMark({ updatedAt: dataUpdatedAt });
+    } else if (!memoryEnabled && enabledMark !== undefined) {
+        setEnabledMark(undefined);
+    }
+
+    useEffect(() => {
+        if (memoryEnabled) {
+            // A cached answer can count as fresh and then never refetch on its own; this joins a fetch already running.
+            void refetchProgress({ cancelRefetch: false });
+        }
+    }, [memoryEnabled, refetchProgress]);
+
+    // `null` is an answer ("no job yet"); only `undefined` means the query has not answered. An import starts only from an
+    // answer that arrived after memory was switched on and has settled: the job it finds then is the one "before" this start.
+    const baselineReady =
+        memoryEnabled && enabledMark !== undefined && progress !== undefined && !isProgressFetching && dataUpdatedAt !== enabledMark.updatedAt;
+
+    // Lunora actions are not queued: offline, the import fails at once instead of running when the connection returns.
+    const { isPending: isImporting, mutate: runImport } = useMutation({
+        ...useLunoraActionOptions(api.memory.import.importMemoryFile),
+        networkMode: "always",
+        retry: 0,
+    });
     const { isPending: isCancelling, mutate: runCancel } = useMutation({ ...crpc.memory.import_job.cancelMemoryImport.mutationOptions() });
 
     // With memory off the query is disabled: its cached answer is out of date, so it is not read until memory is on again.
@@ -183,9 +208,7 @@ const MemoryFileImport: FC<MemoryFileImportProps> = ({ memoryEnabled, onImported
     const disabled = !memoryEnabled || running;
     // The query failed and gave this page nothing to show: no answer at all, or none for the job this page is waiting on.
     const progressFailed =
-        memoryEnabled &&
-        job === undefined &&
-        ((isProgressError && (watched !== undefined || progress === undefined)) || (startUnconfirmed && watched !== undefined));
+        memoryEnabled && job === undefined && ((isProgressError && (watched !== undefined || !baselineReady)) || (startUnconfirmed && watched !== undefined));
 
     useEffect(() => {
         if (refreshKey) {
@@ -253,6 +276,11 @@ const MemoryFileImport: FC<MemoryFileImportProps> = ({ memoryEnabled, onImported
 
         setResult(undefined);
         setImportError(undefined);
+
+        // A finished job's outcome belongs to the last file; one still running stays, so it can be seen and cancelled.
+        if (jobEnded) {
+            setWatched(undefined);
+        }
 
         if (!picked) {
             setFile(null);

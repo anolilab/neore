@@ -5,7 +5,7 @@
  * final counts, a refusal shows the server's words, an oversized file never reaches the server, and a job found
  * running can be cancelled. A finished job from an earlier visit is not shown.
  */
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { onlineManager, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -156,6 +156,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+    onlineManager.setOnline(true);
     vi.restoreAllMocks();
     harness.cancel.mockReset();
     harness.importFile.mockReset();
@@ -481,6 +482,111 @@ describe("memory file import", () => {
         open();
 
         await waitFor(() => expect(screen.getByRole("button", { name: "Import file" }).hasAttribute("disabled")).toBe(false));
+    });
+
+    it("fails an import at once while offline instead of running it when the connection returns", async () => {
+        expect.hasAssertions();
+
+        harness.importFile.mockRejectedValue(new Error("You are offline."));
+        renderImport();
+
+        pick(makeFile("memories.txt", "The user likes tea"));
+        await waitFor(() => expect(screen.getByRole("button", { name: "Import file" }).hasAttribute("disabled")).toBe(false));
+
+        onlineManager.setOnline(false);
+        fireEvent.click(screen.getByRole("button", { name: "Import file" }));
+
+        const alert = await screen.findByRole("alert");
+
+        expect(alert.textContent).toBe("You are offline.");
+        expect(harness.importFile).toHaveBeenCalledOnce();
+    });
+
+    it("clears a finished background import's outcome when a new file is picked", async () => {
+        expect.hasAssertions();
+
+        harness.progress = job({ done: 25, status: "running" });
+        renderImport();
+        await screen.findByRole("button", { name: "Cancel import" });
+
+        publish(job({ done: 100, duplicates: 20, imported: 60, invalid: 14, status: "done", tooLong: 1, updated: 5 }));
+        await screen.findByText("Import finished.");
+
+        pick(makeFile("next.txt", "The user likes coffee"));
+
+        expect(screen.queryByText("Import finished.")).toBeNull();
+        expect(screen.getByRole("status").textContent).not.toMatch(FINAL_RE);
+    });
+
+    it("keeps a running background import on screen when a new file is picked", async () => {
+        expect.hasAssertions();
+
+        harness.progress = job({ done: 25, status: "running" });
+        renderImport();
+        await screen.findByRole("button", { name: "Cancel import" });
+
+        pick(makeFile("next.txt", "The user likes coffee"));
+
+        expect(screen.getByRole("button", { name: "Cancel import" })).toBeTruthy();
+        expect(screen.getByText("25 of 100 entries processed")).toBeTruthy();
+    });
+
+    it("does not offer an import on a cached answer until a fetch after memory came back has settled", async () => {
+        expect.hasAssertions();
+
+        harness.importFile.mockResolvedValue({ duplicates: 0, imported: 1, invalid: 0, tooLong: 0, updated: 0 });
+
+        const view = renderImport();
+
+        pick(makeFile("export.json", "[]"));
+        await waitFor(() => expect(screen.getByRole("button", { name: "Import file" }).hasAttribute("disabled")).toBe(false));
+
+        view.rerender(importUi(false));
+
+        // Another tab starts an import while memory is off; the next answer is held back.
+        let open: () => void = () => undefined;
+
+        harness.progress = job({ done: 40, jobId: "job-2", status: "running" });
+        // eslint-disable-next-line unicorn/prefer-promise-with-resolvers
+        harness.gate = new Promise<void>((resolve) => {
+            open = resolve;
+        });
+        view.rerender(importUi(true));
+
+        expect(harness.client?.getQueryData(harness.progressKey)).toBeNull();
+        expect(screen.getByRole("button", { name: "Import file" }).hasAttribute("disabled")).toBe(true);
+
+        open();
+
+        expect(await screen.findByRole("button", { name: "Cancel import" })).toBeTruthy();
+        expect(screen.getByRole("button", { name: "Import file" }).hasAttribute("disabled")).toBe(true);
+        expect(harness.importFile).not.toHaveBeenCalled();
+    });
+
+    it("shows the failure and a retry when the refresh after memory came back fails, then offers an import once it answers", async () => {
+        expect.hasAssertions();
+
+        const view = renderImport();
+
+        pick(makeFile("export.json", "[]"));
+        await waitFor(() => expect(screen.getByRole("button", { name: "Import file" }).hasAttribute("disabled")).toBe(false));
+
+        view.rerender(importUi(false));
+
+        harness.progressError = new Error("Network down");
+        view.rerender(importUi(true));
+
+        const failure = await screen.findByRole("alert");
+
+        expect(failure.textContent).toBe("Network down");
+        expect(screen.getByRole("button", { name: "Import file" }).hasAttribute("disabled")).toBe(true);
+
+        harness.progressError = undefined;
+        fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+
+        await waitFor(() => expect(screen.getByRole("button", { name: "Import file" }).hasAttribute("disabled")).toBe(false));
+
+        expect(screen.queryByRole("alert")).toBeNull();
     });
 
     it("follows a job another tab created while its own start was being answered", async () => {
