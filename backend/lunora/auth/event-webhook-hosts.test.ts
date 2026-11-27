@@ -70,6 +70,27 @@ describe("the owner's approved callback hosts", () => {
         }
     });
 
+    it("erases every host of the owner, past one page of rows, in the account's cascade delete", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            const identity = await signedIn(harness);
+
+            await harness.run(async (context: any) => {
+                for (let index = 0; index < 60; index += 1) {
+                    await context.db.insert("eventWebhookHosts", { createdAt: 0, host: `host-${index}.example.com`, userId: identity.userId });
+                }
+            });
+            await harness.run(async (context: any) => await context.runMutation(cascadeDeleteUser, { userId: identity.userId }));
+
+            const left = await harness.run(async (context: any) => await context.db.eventWebhookHosts.findMany({ where: { userId: identity.userId } }));
+
+            expect(left.page).toStrictEqual([]);
+        } finally {
+            harness.close();
+        }
+    });
+
     it("lists every host a merge left the owner with, past the add cap", async () => {
         const harness = lunoraTest(schema as never);
 
