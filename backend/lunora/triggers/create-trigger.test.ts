@@ -44,7 +44,8 @@ describe("plugin triggers", () => {
                     .collect(),
         );
 
-    it("keeps a public trigger from carrying a plugin marker", async () => {
+    // PENDING: this public-call check cannot run in this harness yet. The call fails at sign-in before its validators run, so a pass proves nothing. Redo it with the authz suite's registry setup (authz-regressions.test.ts).
+    it.todo("keeps a public trigger from carrying a plugin marker", async () => {
         await harness
             .withIdentity({ userId: OWNER } as never)
             .mutation(api.triggers.functions.createTrigger as never, { ...pluginInput, pluginMarker: MARKER } as never)
