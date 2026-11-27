@@ -106,7 +106,7 @@ export const scopesOf = (scope: MemoryScope): (string | null)[] =>
     scope.botId !== undefined && scope.includeUserWide === true ? [scope.botId, null] : [scope.botId ?? null];
 
 /** Whether a row belongs to a scope a chat reads. A hit of another bot's row never does. */
-export const inScope = (row: { botId?: string | null }, scope: MemoryScope): boolean => scopesOf(scope).includes(row.botId ?? null);
+const inScope = (row: { botId?: string | null }, scope: MemoryScope): boolean => scopesOf(scope).includes(row.botId ?? null);
 
 /**
  * The rows of every scope joined into one candidate window. Each scope keeps up to `limit` of its own, so a
