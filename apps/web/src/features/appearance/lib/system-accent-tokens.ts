@@ -12,7 +12,7 @@ const OBSIDIAN = "#191919";
 const BLACK = "#000000";
 
 /** The surfaces each shade is checked against (as text, too): `--background` and `--card` of global.css, and of high contrast. */
-const LIGHT_SURFACES = ["#f2f2f2", "#ffffff"] as const;
+const LIGHT_SURFACES = ["#f0efeb", "#fffefc"] as const;
 const DARK_SURFACES = ["#0e0f11", "#16181b"] as const;
 const CONTRAST_LIGHT_SURFACES = ["#ffffff"] as const;
 const CONTRAST_DARK_SURFACES = ["#000000"] as const;

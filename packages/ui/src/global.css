@@ -64,21 +64,21 @@
 
     /* ── Design tokens ─────────────────────────────────────── */
     --radius: 0.625rem;
-    --background: var(--brand-frost);
+    --background: #f0efeb;
     --foreground: var(--brand-obsidian);
-    --card: var(--brand-white);
+    --card: #fffefc;
     --card-foreground: var(--brand-obsidian);
-    --popover: var(--brand-white);
+    --popover: #fffefc;
     --popover-foreground: var(--brand-obsidian);
     --primary: var(--brand-lime);
     --primary-foreground: var(--brand-obsidian);
     /* The accent as TEXT or an icon on the page. The lime is a fill: as text on white it is ~1.2:1. */
     --primary-text: #3f6212;
-    --secondary: var(--brand-frost);
+    --secondary: #ebe9e4;
     --secondary-foreground: var(--brand-obsidian);
-    --muted: var(--brand-frost);
+    --muted: #ebe9e4;
     --muted-foreground: var(--brand-graphite);
-    --accent: var(--brand-frost);
+    --accent: #ebe9e4;
     --accent-foreground: var(--brand-obsidian);
     /* Red. At L 0.5 the text is 4.8:1 even on its own 10% tint (AA is 4.5:1); the earlier 0.55 was 4.1:1 there. */
     --destructive: oklch(0.5 0.22 25);
@@ -91,11 +91,11 @@
     --chart-3: oklch(0.627 0.194 149.214);
     --chart-4: oklch(0.527 0.154 150.069);
     --chart-5: oklch(0.448 0.119 151.328);
-    --sidebar: var(--brand-white);
+    --sidebar: #f0efeb;
     --sidebar-foreground: var(--brand-graphite);
     --sidebar-primary: var(--brand-obsidian);
     --sidebar-primary-foreground: var(--brand-white);
-    --sidebar-accent: var(--brand-frost);
+    --sidebar-accent: #ebe9e4;
     --sidebar-accent-foreground: var(--brand-obsidian);
     --sidebar-border: var(--brand-silver);
     --sidebar-ring: var(--brand-graphite);
@@ -115,17 +115,17 @@
      * (segmented controls, search fields, code blocks). `surface-raised`, `surface-well` and `surface-edge` below
      * apply them; the tokens are here so a component can pick one part.
      */
-    --surface-main: var(--brand-white); /* the inset panel the page content sits in */
-    --surface-panel: var(--brand-white);
-    --surface-row: #f8f8f8; /* thread cards: a hair off the canvas */
-    --surface-row-hover: var(--brand-white);
-    --surface-row-active: var(--brand-white);
-    --surface-rail: #ececec;
-    --surface-well: #e9e9e9;
+    --surface-main: #fffefc; /* the inset panel the page content sits in */
+    --surface-panel: #fffefc;
+    --surface-row: #f8f7f4; /* thread cards: a hair off the canvas */
+    --surface-row-hover: #fffefc;
+    --surface-row-active: #fffefc;
+    --surface-rail: #e8e7e2;
+    --surface-well: #e7e5df;
     /* Code sits on white in light mode: the highlighter's light theme is tuned for white (its red is 4.5:1 there, not on grey). */
-    --surface-code: var(--brand-white);
+    --surface-code: #fffefc;
     --surface-well-shadow: inset 0 1px 2px rgb(0 0 0 / 0.06), inset 0 0 0 1px rgb(0 0 0 / 0.05);
-    --surface-edge: rgb(0 0 0 / 0.08);
+    --surface-edge: rgb(40 32 16 / 0.09);
     --surface-edge-top: rgb(255 255 255 / 0.9);
     --surface-drop: 0 1px 1px rgb(0 0 0 / 0.04), 0 6px 16px -10px rgb(0 0 0 / 0.14);
     /* The open thread's card: the accent fading from its top-left corner. */

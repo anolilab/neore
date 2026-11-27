@@ -7,7 +7,7 @@ import { readFileSync, renameSync, writeFileSync } from "node:fs";
  * `--background` of `packages/ui/src/global.css` (`--brand-frost`, `--brand-ink`). The window is filled with it
  * until the page's first paint, so a dark desktop never sees a white frame.
  */
-export const LIGHT_BACKGROUND = "#f2f2f2";
+export const LIGHT_BACKGROUND = "#f0efeb";
 export const DARK_BACKGROUND = "#0e0f11";
 
 /** Vibrancy shows only through pixels nobody painted, so the window itself must be fully transparent. */
