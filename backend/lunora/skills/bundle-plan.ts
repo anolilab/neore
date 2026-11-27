@@ -644,6 +644,10 @@ export const runBundleImport = async (
             }
 
             const { failed, kept } = await rollback();
+
+            // A child its own step could not remove again is already named by the error it threw.
+            failed.push(...(error instanceof BundleImportError ? error.leftBehind : []));
+
             const reason = messageOf(error);
             const failedNote = failed.length === 0 ? "" : ` These could not be removed again: ${failed.join(", ")}. Delete them by hand.`;
             const keptNote =

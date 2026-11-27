@@ -373,7 +373,7 @@ export const getTriggers = authQuery.output(v.from(vGetTriggersOutput)).query(as
 
 /** Create a new trigger */
 /** A prompt field without hidden characters; one that was only those is refused rather than stored empty. */
-const cleanPromptField = <T extends string | undefined>(value: T, label: string): T => {
+export const cleanPromptField = <T extends string | undefined>(value: T, label: string): T => {
     if (value === undefined) {
         return value;
     }

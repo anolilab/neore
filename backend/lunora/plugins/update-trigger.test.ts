@@ -122,4 +122,39 @@ describe("updating a trigger in place", () => {
 
         expect(trigger).toMatchObject({ cronExpression: "0 9 * * *", description: "Changed by the owner.", enabled: true });
     });
+
+    it("drops the due time of the old schedule when the cron changes, so re-enabling cannot fire once on it", async () => {
+        const { installId, triggerId } = await installed();
+
+        await run(async (context) => await context.db.patch("triggers", triggerId, { nextTriggerAt: Date.now() + 3_600_000 }));
+        await update(installId, 1, await triggerRowHash(REVISED));
+
+        const trigger = await run(async (context) => await context.db.triggers.findFirst({ where: { _id: triggerId } }));
+
+        expect(trigger?.nextTriggerAt).toBeUndefined();
+    });
+
+    it("keeps the due time when the update leaves the schedule as it was", async () => {
+        const { installId, triggerId } = await installed();
+        const due = Date.now() + 3_600_000;
+
+        await run(async (context) => await context.db.patch("triggers", triggerId, { nextTriggerAt: due }));
+        await run(
+            async (context) =>
+                await context.runMutation(updateTriggerChild, {
+                    contentHash: await triggerRowHash({ ...DAILY, name: "Renamed" }),
+                    cronExpression: DAILY.cronExpression,
+                    entryKey: INSTALL_KEY,
+                    generation: 1,
+                    installId,
+                    model: DAILY.model,
+                    name: "Renamed",
+                    userId: OWNER,
+                }),
+        );
+
+        const kept = await run(async (context) => await context.db.triggers.findFirst({ where: { _id: triggerId } }));
+
+        expect(kept?.nextTriggerAt).toBe(due);
+    });
 });

@@ -172,12 +172,10 @@ export const installPlugin = authAction
                 version: header.version,
             });
 
+            let items: Awaited<ReturnType<typeof runBundleImport>>;
+
             try {
-                const items = await runBundleImport(entries, selected, ops, { keepOnRateLimit: true });
-
-                await ctx.runMutation(internal.plugins.install_steps.finishInstall, { generation, installId });
-
-                return { installId, items };
+                items = await runBundleImport(entries, selected, ops, { keepOnRateLimit: true });
             } catch (error) {
                 // A rate limit keeps the rows created so far, and repair finishes the rest. Rows the rollback could not remove keep the
                 // install as `needs-repair` too; a clean rollback removes it.
@@ -189,6 +187,18 @@ export const installPlugin = authAction
 
                 throw importFailure(error);
             }
+
+            // The children exist now: a failure to finish keeps the install and its links (deleting them would orphan the children),
+            // and repair finishes it.
+            try {
+                await ctx.runMutation(internal.plugins.install_steps.finishInstall, { generation, installId });
+            } catch (error) {
+                await ctx.runMutation(internal.plugins.install_steps.markNeedsRepair, { generation, installId }).catch(() => undefined);
+
+                throw error;
+            }
+
+            return { installId, items };
         } finally {
             await ctx.runMutation(internal.lib.claim_once.releaseKey, { key: claimKey, scope: INSTALL_CLAIM_SCOPE }).catch(() => undefined);
         }

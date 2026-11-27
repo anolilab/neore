@@ -207,4 +207,49 @@ describe("repair: taking over a stopped install", () => {
             );
         }
     });
+
+    it("reports a child whose pending hash is unresolved, so the action does not finish the install", async () => {
+        const first = await run(
+            async (context) => await context.runMutation(createInstallRow, { contentHash: HASH, pluginSlug: SLUG, userId: OWNER, version: "1.0.0" }),
+        );
+        const intentId = await run(
+            async (context) =>
+                await context.runMutation(recordIntent, {
+                    contentHash: HASH,
+                    entryKey: "skill:analyst",
+                    generation: first.generation,
+                    installId: first.installId,
+                    kind: "skill",
+                    userId: OWNER,
+                }),
+        );
+        const skillId = await run(
+            async (context) =>
+                await context.runMutation(createPluginSkill, {
+                    description: "Analyst",
+                    instructions: "Edited by hand.",
+                    isPremium: true,
+                    name: "Analyst",
+                    plan: "premium",
+                    pluginInstallId: first.installId,
+                    pluginMarker: markerFor(first.installId, "skill:analyst"),
+                    slug: "analyst",
+                    source: { type: "plugin" as const, version: "1.0.0" },
+                    userId: OWNER,
+                }),
+        );
+
+        await run(
+            async (context) =>
+                await context.runMutation(recordCreated, { generation: first.generation, installId: first.installId, intentId, itemId: skillId }),
+        );
+        await run(async (context) => await context.db.patch("pluginItems", intentId, { pendingHash: "f".repeat(64) }));
+        await run(async (context) => await context.runMutation(markNeedsRepair, { generation: first.generation, installId: first.installId }));
+
+        const entries = [{ contentHash: HASH, entryKey: "skill:late", kind: "skill" as const }];
+        const begun = await run(async (context) => await beginRepairRows(context, OWNER, SLUG, HASH, entries));
+
+        expect(begun.missing).toMatchObject([{ entryKey: "skill:late" }]);
+        expect(begun.unresolved).toEqual(["skill:analyst"]);
+    });
 });

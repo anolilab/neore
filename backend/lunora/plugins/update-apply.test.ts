@@ -7,7 +7,7 @@ import { skillRowHash } from "./entry-hash";
 import { createInstallRow, finishInstall, recordCreated, recordIntent } from "./install-steps";
 import { diffUpdate, markerFor } from "./logic";
 import { loadInstalledForUpdate } from "./update";
-import { beginUpdate, failUpdate, finishUpdate, updateSkillChild } from "./update-apply";
+import { beginUpdate, failUpdate, finishUpdate, removeChild, updateSkillChild } from "./update-apply";
 
 const OWNER = "owner-a";
 const SLUG = "daily-brief";
@@ -71,7 +71,9 @@ describe("applying an update", () => {
     it("rewrites an unedited skill in place, links the new hash, and returns the install to installed at the new version", async () => {
         const { installId, skillId } = await installed();
 
-        const generation = await run(async (context) => await context.runMutation(beginUpdate, { installId, targetVersion: "1.1.0", userId: OWNER }));
+        const generation = await run(
+            async (context) => await context.runMutation(beginUpdate, { expectedGeneration: 1, installId, targetVersion: "1.1.0", userId: OWNER }),
+        );
 
         await run(
             async (context) =>
@@ -109,7 +111,9 @@ describe("applying an update", () => {
 
         await run(async (context) => await context.db.patch("skills", skillId, { instructions: "Changed by the owner." }));
 
-        const generation = await run(async (context) => await context.runMutation(beginUpdate, { installId, targetVersion: "1.1.0", userId: OWNER }));
+        const generation = await run(
+            async (context) => await context.runMutation(beginUpdate, { expectedGeneration: 1, installId, targetVersion: "1.1.0", userId: OWNER }),
+        );
 
         await expect(
             run(
@@ -135,7 +139,9 @@ describe("applying an update", () => {
 
     it("refuses a planned slug that is reserved, and writes nothing to the skill or its link", async () => {
         const { installId, skillId } = await installed();
-        const generation = await run(async (context) => await context.runMutation(beginUpdate, { installId, targetVersion: "1.1.0", userId: OWNER }));
+        const generation = await run(
+            async (context) => await context.runMutation(beginUpdate, { expectedGeneration: 1, installId, targetVersion: "1.1.0", userId: OWNER }),
+        );
 
         await expect(
             run(
@@ -182,7 +188,9 @@ describe("applying an update", () => {
                 }),
         );
 
-        const generation = await run(async (context) => await context.runMutation(beginUpdate, { installId, targetVersion: "1.1.0", userId: OWNER }));
+        const generation = await run(
+            async (context) => await context.runMutation(beginUpdate, { expectedGeneration: 1, installId, targetVersion: "1.1.0", userId: OWNER }),
+        );
 
         await expect(
             run(
@@ -220,7 +228,9 @@ describe("applying an update", () => {
             await context.db.patch("pluginItems", link._id, { contentHash: await skillRowHash(tagged) });
         });
 
-        const generation = await run(async (context) => await context.runMutation(beginUpdate, { installId, targetVersion: "1.1.0", userId: OWNER }));
+        const generation = await run(
+            async (context) => await context.runMutation(beginUpdate, { expectedGeneration: 1, installId, targetVersion: "1.1.0", userId: OWNER }),
+        );
 
         await run(
             async (context) =>
@@ -250,7 +260,9 @@ describe("applying an update", () => {
 
     it("failUpdate returns the install to installed at its old version and drops intents left by a rolled-back create", async () => {
         const { installId } = await installed();
-        const generation = await run(async (context) => await context.runMutation(beginUpdate, { installId, targetVersion: "1.1.0", userId: OWNER }));
+        const generation = await run(
+            async (context) => await context.runMutation(beginUpdate, { expectedGeneration: 1, installId, targetVersion: "1.1.0", userId: OWNER }),
+        );
 
         await run(
             async (context) =>
@@ -279,7 +291,9 @@ describe("applying an update", () => {
 
     it("failUpdate keeps the install for repair with the new file's hash when children were left behind", async () => {
         const { installId } = await installed();
-        const generation = await run(async (context) => await context.runMutation(beginUpdate, { installId, targetVersion: "1.1.0", userId: OWNER }));
+        const generation = await run(
+            async (context) => await context.runMutation(beginUpdate, { expectedGeneration: 1, installId, targetVersion: "1.1.0", userId: OWNER }),
+        );
 
         await run(async (context) => await context.runMutation(failUpdate, { contentHash: HASH, createKeys: [], generation, installId, keepForRepair: true }));
 
@@ -292,7 +306,9 @@ describe("applying an update", () => {
 
     it("failUpdate drops the link of a new child the rollback removed, so the next update plans it as a create", async () => {
         const { installId } = await installed();
-        const generation = await run(async (context) => await context.runMutation(beginUpdate, { installId, targetVersion: "1.1.0", userId: OWNER }));
+        const generation = await run(
+            async (context) => await context.runMutation(beginUpdate, { expectedGeneration: 1, installId, targetVersion: "1.1.0", userId: OWNER }),
+        );
         const CRITIC = { description: "Critic", instructions: "Critique.", name: "Critic", slug: "critic" };
 
         const intentId = await run(
@@ -341,5 +357,30 @@ describe("applying an update", () => {
                 { contentHash: await skillRowHash(CRITIC), entryKey: "skill:critic", kind: "skill" },
             ]),
         ).toContainEqual({ action: "create", entryKey: "skill:critic" });
+    });
+
+    it("refuses every step once the lease has expired, and a sharded write once less than a minute is left", async () => {
+        const { installId } = await installed();
+        const generation = await run(
+            async (context) => await context.runMutation(beginUpdate, { expectedGeneration: 1, installId, targetVersion: "1.1.0", userId: OWNER }),
+        );
+        const remove = async () =>
+            await run(async (context) => await context.runMutation(removeChild, { entryKey: "skill:analyst", generation, installId, userId: OWNER }));
+
+        await run(async (context) => await context.db.patch("pluginInstalls", installId, { leaseUntil: Date.now() + 30_000 }));
+        await expect(remove()).rejects.toThrow("STALE_LEASE");
+
+        await run(async (context) => await context.db.patch("pluginInstalls", installId, { leaseUntil: Date.now() - 1 }));
+        await expect(
+            run(async (context) => await context.runMutation(finishUpdate, { contentHash: HASH, generation, installId, version: "1.1.0" })),
+        ).rejects.toThrow("STALE_LEASE");
+    });
+
+    it("refuses to begin an update planned from an older read of the install", async () => {
+        const { installId } = await installed();
+
+        await expect(
+            run(async (context) => await context.runMutation(beginUpdate, { expectedGeneration: 0, installId, targetVersion: "1.1.0", userId: OWNER })),
+        ).rejects.toThrow("Preview it again");
     });
 });

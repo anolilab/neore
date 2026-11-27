@@ -14,6 +14,7 @@ import { LunoraError } from "lunorash/server";
 
 import type { Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
+import { DEFAULT_GROUP_TITLE } from "../chat/group/functions";
 import { skillVisibility } from "../skills/access";
 import { requireOwnerShard } from "./owner-shard";
 import { skillRowHash } from "./entry-hash";
@@ -177,6 +178,27 @@ export const uninstallRows = async (ctx: MutationCtx, userId: string, pluginSlug
 };
 
 /**
+ * Keeps a group chat of the plugin: detaches it, and detaches the plugin's skills it names in the same transaction. Written in one
+ * step so that an action that stops right after still leaves a state a retry can finish: a detached group that named skills still
+ * owned by the plugin would otherwise read as someone else's group using them, and the retry would refuse for good.
+ */
+export const detachKeptGroup = async (ctx: MutationCtx, threadId: string, installId: string): Promise<void> => {
+    const group = await ctx.db.get("threads", threadId as Id<"threads">);
+
+    const participants = group?.groupChat?.participants ?? [];
+
+    for (const participant of participants) {
+        const skill = await ctx.db.skills.findFirst({ where: { _id: participant.skillId as Id<"skills"> } });
+
+        if (skill?.pluginInstallId === installId) {
+            await ctx.db.patch("skills", skill._id as Id<"skills">, { pluginInstallId: "", pluginMarker: "" });
+        }
+    }
+
+    await ctx.db.patch("threads", threadId as Id<"threads">, { pluginInstallId: "", pluginMarker: "" });
+};
+
+/**
  * Run right before a group chat is deleted. The begin step checked it was empty, but that check and the delete are separate
  * transactions, so a message may have landed in between. Throwing here would strand a half-uninstalled plugin (skills swept,
  * lease held, begin refuses retries), so a group that now has messages is detached and kept instead.
@@ -202,7 +224,7 @@ export const claimGroupForDelete = async (ctx: MutationCtx, installId: string, g
         .first();
 
     if (message) {
-        await ctx.db.patch("threads", threadId as Id<"threads">, { pluginInstallId: "", pluginMarker: "" });
+        await detachKeptGroup(ctx, threadId, installId);
 
         return false;
     }
@@ -241,12 +263,20 @@ export const finishUninstallRows = async (
 
     for (const threadId of keptGroups) {
         const group = await ctx.db.get("threads", threadId as Id<"threads">);
+
+        // A kept group chat is reported by its title, never by its id.
+        if (group) {
+            result.kept.push(group.title?.trim() || DEFAULT_GROUP_TITLE);
+        }
+
         const participants = group?.groupChat?.participants ?? [];
 
         for (const participant of participants) {
             usedByKept.add(participant.skillId);
         }
     }
+
+    const planned = pendingSkills.length > 0 ? await readAllPages(async (cursor) => await ctx.db.pluginItems.findMany({ cursor, where: { installId } })) : [];
 
     for (const skillId of pendingSkills) {
         const skill = await ctx.db.skills.findFirst({ where: { _id: skillId as Id<"skills"> } });
@@ -255,7 +285,11 @@ export const finishUninstallRows = async (
             continue;
         }
 
-        if (usedByKept.has(skillId)) {
+        // Judged again as at begin: the owner may have edited or shared the skill while the groups were being deleted.
+        const link = planned.find((row) => row.entryKey === parseMarker(skill.pluginMarker ?? "")?.entryKey);
+        const changed = !link || skillVisibility(skill) !== "private" || (await skillRowHash(skill)) !== link.contentHash;
+
+        if (usedByKept.has(skillId) || changed) {
             await ctx.db.patch("skills", skill._id as Id<"skills">, { pluginInstallId: "", pluginMarker: "" });
             result.kept.push(skill.name);
             continue;

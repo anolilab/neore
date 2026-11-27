@@ -58,16 +58,46 @@ export const childOps = (ctx: ActionCtx, options: ChildOptions): BundleOps => {
         }
     };
 
-    const remove = async <T>(run: () => Promise<T>): Promise<T | undefined> => (lostLease ? undefined : await run());
+    // A create that failed for another reason can follow a takeover, so each delete first asks whether this action still holds the install.
+    const remove = async <T>(run: () => Promise<T>): Promise<T | undefined> => {
+        if (lostLease) {
+            return undefined;
+        }
+
+        if (!(await ctx.runMutation(internal.plugins.repair_resume.holdsLease, { generation, installId }))) {
+            lostLease = true;
+
+            return undefined;
+        }
+
+        return await run();
+    };
 
     /** One child: its intent first, then the create, then its link to the child. */
     const linked = async <T extends { id: string }>(kind: ChildKind, key: string, create: () => Promise<T>): Promise<T> => {
         const intentId = await keepLease(async () => await intentFor(key, kind));
         const created = await create();
 
-        await keepLease(
-            async () => await ctx.runMutation(internal.plugins.install_steps.recordCreated, { generation, installId, intentId, itemId: created.id }),
-        );
+        try {
+            await keepLease(
+                async () => await ctx.runMutation(internal.plugins.install_steps.recordCreated, { generation, installId, intentId, itemId: created.id }),
+            );
+        } catch (error) {
+            // The child is not in the import's rollback list yet, so it is removed here. A lost lease keeps it: its marker lets the
+            // new holder's repair link it. A child that cannot be removed is named, so the install is kept for repair.
+            if (!lostLease) {
+                const removed = await ctx
+                    .runMutation(internal.skills.bundle.removeImportedItem, { id: created.id, kind, userId })
+                    .then((outcome) => (outcome as { kept?: boolean } | undefined)?.kept !== true)
+                    .catch(() => false);
+
+                if (!removed) {
+                    throw new BundleImportError(error instanceof Error ? error.message : "The child could not be linked", [key]);
+                }
+            }
+
+            throw error;
+        }
 
         return created;
     };

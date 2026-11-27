@@ -1277,6 +1277,79 @@ describe("reassignGlobalRows", () => {
         }
     });
 
+    it("keeps one install per plugin: a plugin the new account has is dropped with its links and its children detached, the rest move", async () => {
+        const harness = lunoraTest(schemaWithShardedTables([...Object.keys(GLOBAL_USER_COLUMNS), "shardActivity"]) as never);
+        const install = (userId: string, pluginSlug: string) => {
+            return {
+                contentHash: "a".repeat(64),
+                createdAt: 0,
+                generation: 1,
+                pluginSlug,
+                status: "installed" as const,
+                updatedAt: 0,
+                userId,
+                version: "1.0.0",
+            };
+        };
+
+        try {
+            const { guestOnly, guestShared, userShared } = await harness.run(async (context: any) => {
+                const userSharedId = await context.db.insert("pluginInstalls", install("user", "shared"));
+                const guestSharedId = await context.db.insert("pluginInstalls", install("guest", "shared"));
+                const guestOnlyId = await context.db.insert("pluginInstalls", install("guest", "only"));
+
+                for (const [installId, key] of [
+                    [guestSharedId, "skill:a"],
+                    [guestOnlyId, "skill:b"],
+                ] as const) {
+                    await context.db.insert("pluginItems", {
+                        contentHash: "b".repeat(64),
+                        createdAt: 0,
+                        entryKey: key,
+                        installId,
+                        kind: "skill",
+                        state: "created",
+                        userId: "guest",
+                    });
+                }
+
+                await context.db.insert("skills", {
+                    description: "d",
+                    instructions: "i",
+                    name: "Dup",
+                    pluginInstallId: guestSharedId,
+                    pluginMarker: "marker",
+                    slug: "dup",
+                    userId: "user",
+                });
+
+                return { guestOnly: guestOnlyId, guestShared: guestSharedId, userShared: userSharedId };
+            });
+
+            for (let call = 0; call < 10; call += 1) {
+                const { done } = await harness.run(async (context: any) => await asLeaseHolder(context, reassignGlobalRows));
+
+                if (done) {
+                    break;
+                }
+            }
+
+            const { page: installs } = await harness.run(async (context: any) => await context.db.pluginInstalls.findMany({}));
+            const { page: links } = await harness.run(async (context: any) => await context.db.pluginItems.findMany({}));
+            const skill = await harness.run(async (context: any) => await context.db.skills.findFirst({ where: { slug: "dup" } }));
+
+            expect(installs.map((row: any) => row._id).toSorted((a: string, b: string) => a.localeCompare(b))).toStrictEqual(
+                [userShared, guestOnly].toSorted((a: string, b: string) => a.localeCompare(b)),
+            );
+            expect(installs.every((row: any) => row.userId === "user")).toBe(true);
+            expect(installs.some((row: any) => row._id === guestShared)).toBe(false);
+            expect(links.map((row: any) => [row.installId, row.userId])).toStrictEqual([[guestOnly, "user"]]);
+            expect(skill).toMatchObject({ pluginInstallId: "", pluginMarker: "" });
+        } finally {
+            harness.close();
+        }
+    });
+
     it("moves a guest's rule-file rows a few per call, each read charged whole, until all are the new account's", async () => {
         const harness = lunoraTest(schemaWithShardedTables([...Object.keys(GLOBAL_USER_COLUMNS), "shardActivity"]) as never);
 

@@ -10,7 +10,7 @@
  */
 import { LunoraError, v } from "lunorash/server";
 
-import { assertCronExpression, assertCustomModelRunnable, deleteTriggerRows } from "../triggers/functions";
+import { assertCronExpression, assertCustomModelRunnable, cleanPromptField, deleteTriggerRows } from "../triggers/functions";
 
 import type { Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
@@ -20,26 +20,14 @@ import { skillRowHash, triggerRowHash } from "./entry-hash";
 import { skillVisibility } from "../skills/access";
 import { deleteSkillRows } from "../skills/functions";
 import { ensureSlugUnique, validateSlug } from "../skills/validators";
+import { heldInstall, heldInstallForShardWrite } from "./held-install";
 import { LEASE_MS, markerFor } from "./logic";
-
-const STALE = "STALE_LEASE: this install was taken over by another action";
 
 /** The same bound uninstall uses when it looks for group chats that name a skill. */
 const GROUP_SCAN_LIMIT = 300;
 
-/** The install row, after checking that the caller still holds the lease it started under. */
-const heldInstall = async (ctx: Pick<MutationCtx, "db">, installId: Id<"pluginInstalls">, generation: number) => {
-    const install = await ctx.db.pluginInstalls.findFirst({ where: { _id: installId } });
-
-    if (!install || install.generation !== generation) {
-        throw new LunoraError("CONFLICT", STALE);
-    }
-
-    return install;
-};
-
 export const beginUpdate = internalMutation
-    .input({ installId: v.string().max(128), targetVersion: v.string().max(32), userId: v.string().max(128) })
+    .input({ expectedGeneration: v.number(), installId: v.string().max(128), targetVersion: v.string().max(32), userId: v.string().max(128) })
     .output(v.number())
     .mutation(async ({ args, ctx }) => {
         const install = await ctx.db.pluginInstalls.findFirst({ where: { _id: args.installId as Id<"pluginInstalls">, userId: args.userId } });
@@ -50,6 +38,11 @@ export const beginUpdate = internalMutation
 
         if (install.status !== "installed") {
             throw new LunoraError("CONFLICT", `The plugin is ${install.status}, not installed`);
+        }
+
+        // The plan was made from the install as it was read: if another update finished since, the plan is stale and the caller must preview again.
+        if (install.generation !== args.expectedGeneration) {
+            throw new LunoraError("CONFLICT", "The plugin changed while this update was being prepared. Preview it again.");
         }
 
         const generation = install.generation + 1;
@@ -238,7 +231,7 @@ export const updateTriggerChild = internalMutation
     })
     .output(v.boolean())
     .mutation(async ({ args, ctx }) => {
-        await heldInstall(ctx, args.installId as Id<"pluginInstalls">, args.generation);
+        await heldInstallForShardWrite(ctx, args.installId as Id<"pluginInstalls">, args.generation);
 
         const { page } = await ctx.db.pluginItems.findMany({ where: { installId: args.installId } });
         const link = page.find((row) => row.entryKey === args.entryKey && row.kind === "trigger");
@@ -278,13 +271,16 @@ export const updateTriggerChild = internalMutation
             cronExpression: args.cronExpression,
             description: args.description,
             enabled: false,
-            inputTemplate: args.inputTemplate,
+            // Stored cleaned, the way trigger creation stores them, which is also what the entry hash is computed over.
+            inputTemplate: cleanPromptField(args.inputTemplate, "The input"),
             model: args.model,
             name: args.name,
             searchMode: args.searchMode,
-            systemPrompt: args.systemPrompt,
+            systemPrompt: cleanPromptField(args.systemPrompt, "The system prompt"),
             timezone: args.timezone,
             updatedAt: ctx.now,
+            // A changed schedule must not keep the due time of the old one: undefined removes it, and enabling recomputes it. An unchanged schedule keeps it.
+            ...((args.cronExpression !== trigger.cronExpression || args.timezone !== trigger.timezone) && { nextTriggerAt: undefined }),
         });
 
         await ctx.db.patch("pluginItems", link._id as Id<"pluginItems">, { contentHash: args.contentHash, pendingHash: "" });
@@ -324,7 +320,7 @@ export const removeChild = internalMutation
     .input({ entryKey: v.string().max(256), generation: v.number(), installId: v.string().max(128), userId: v.string().max(128) })
     .output(v.boolean())
     .mutation(async ({ args, ctx }) => {
-        await heldInstall(ctx, args.installId as Id<"pluginInstalls">, args.generation);
+        await heldInstallForShardWrite(ctx, args.installId as Id<"pluginInstalls">, args.generation);
 
         const link = await linkFor(ctx, args.installId, args.entryKey);
 
@@ -343,7 +339,7 @@ export const removeChild = internalMutation
                 // A skill shared beyond its owner may sit in another person's group chat, on a shard this step cannot scan: keep it, detached.
                 if (skillVisibility(skill) !== "private") {
                     await ctx.db.patch("skills", skill._id as Id<"skills">, { pluginInstallId: "", pluginMarker: "" });
-                    await ctx.db.patch("pluginItems", link._id as Id<"pluginItems">, { state: "detached" });
+                    await ctx.db.delete("pluginItems", link._id as Id<"pluginItems">);
 
                     return false;
                 }
@@ -378,13 +374,13 @@ export const removeChild = internalMutation
 
 /**
  * Keeps an edited child that the new version no longer has: its marker fields are cleared, so no later sweep finds it, and a
- * trigger is switched off. The link is marked detached.
+ * trigger is switched off. The link is deleted, so the child is no longer counted as part of the plugin.
  */
 export const detachChild = internalMutation
     .input({ entryKey: v.string().max(256), generation: v.number(), installId: v.string().max(128), userId: v.string().max(128) })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
-        await heldInstall(ctx, args.installId as Id<"pluginInstalls">, args.generation);
+        await heldInstallForShardWrite(ctx, args.installId as Id<"pluginInstalls">, args.generation);
 
         const link = await linkFor(ctx, args.installId, args.entryKey);
 
@@ -413,7 +409,8 @@ export const detachChild = internalMutation
             throw new LunoraError("CONFLICT", `"${args.entryKey}" is a group chat, which is not detached in place`);
         }
 
-        await ctx.db.patch("pluginItems", link._id as Id<"pluginItems">, { state: "detached" });
+        // The link goes with the marker: a detached child is no longer part of the plugin, so a later version that brings the key back creates it afresh.
+        await ctx.db.delete("pluginItems", link._id as Id<"pluginItems">);
 
         return null;
     });

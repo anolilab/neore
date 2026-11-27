@@ -119,7 +119,8 @@ const repairStoppedUpdate = async (ctx: MutationCtx, install: Doc<"pluginInstall
     await patchRow(ctx.db, "pluginInstalls", install, {
         generation: install.generation + 1,
         status,
-        targetVersion: unresolved.length === 0 ? undefined : install.targetVersion,
+        // The file hash stays the old file's, so the version stays the old one: a later repair must not promote it to the target.
+        targetVersion: undefined,
         updatedAt: ctx.now,
     });
 

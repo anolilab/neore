@@ -188,6 +188,8 @@ describe("repair", () => {
         const ANALYST = { description: "Analyst", instructions: "Analyse.", name: "Analyst", slug: "analyst" };
         const REVISED = { ...ANALYST, instructions: "Analyse in detail." };
 
+        const repairOnce = async () => await run(async (context) => await repairRows(context, OWNER, SLUG));
+
         /** An installed plugin with one skill, then a stopped update: pending hash set, lease expired. */
         const stoppedUpdate = async (skillWritten: boolean) => {
             const first = await run(
@@ -276,6 +278,36 @@ describe("repair", () => {
             });
 
             expect(rows.map((row: { entryKey: string }) => row.entryKey)).toEqual(["skill:analyst"]);
+        });
+
+        it("finishes at the old version when the person restores the child after a stopped update", async () => {
+            const { installId } = await stoppedUpdate(false);
+
+            await run(async (context) => {
+                const skill = await context.db.skills.findFirst({ where: { pluginMarker: markerFor(installId, "skill:analyst") } });
+
+                await context.db.patch("skills", skill._id, { instructions: "Edited by hand." });
+            });
+            await repairOnce();
+
+            const stopped = await run(async (context) => await context.db.pluginInstalls.findFirst({ where: { _id: installId } }));
+
+            expect(stopped).toMatchObject({ status: "needs-repair", version: "1.0.0" });
+            expect(stopped?.targetVersion).toBeUndefined();
+
+            // The person puts the skill back to the installed content; the next repair finishes with the file hash's own version.
+            await run(async (context) => {
+                const skill = await context.db.skills.findFirst({ where: { pluginMarker: markerFor(installId, "skill:analyst") } });
+
+                await context.db.patch("skills", skill._id, { instructions: ANALYST.instructions });
+            });
+            await repairOnce();
+
+            expect(await run(async (context) => await context.db.pluginInstalls.findFirst({ where: { _id: installId } }))).toMatchObject({
+                contentHash: HASH,
+                status: "installed",
+                version: "1.0.0",
+            });
         });
 
         it("keeps an unresolved pending hash across a second repair", async () => {

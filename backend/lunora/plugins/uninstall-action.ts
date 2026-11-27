@@ -61,29 +61,37 @@ export const uninstallPlugin = authAction
             });
 
             if (!mayDelete) {
-                kept.push(threadId);
                 keptGroups.push(threadId);
                 continue;
             }
 
-            let isDone = false;
-            let isFirst = true;
+            // The action owns the pagination: each incomplete page hands back where it stopped, and that goes into the next call.
+            // The first call rechecks that the group is still empty; later ones carry the continuation.
+            let next:
+                | { cursor?: string; deltaCursor?: string; messagesDone: boolean; pinsDone: boolean; streamOrder?: number; streamsDone: boolean }
+                | undefined;
 
-            while (!isDone) {
-                // The first page rechecks, in its own transaction, that no message arrived since the claim; a group that gained one is kept.
+            for (;;) {
                 const page = await ctx.runMutation(internal.agent.threads.deleteAllForThreadIdAsync, {
+                    ...next,
+                    pluginInstallId: begun.installId,
                     threadId: threadId as Id<"threads">,
-                    ...(isFirst && { pluginInstallId: begun.installId }),
                 });
 
                 if (page.kept === true) {
-                    kept.push(threadId);
                     keptGroups.push(threadId);
                     break;
                 }
 
-                isFirst = false;
-                isDone = page.isDone;
+                if (page.isDone) {
+                    break;
+                }
+
+                if (!page.next) {
+                    throw new Error("The group chat deletion stopped without saying where");
+                }
+
+                next = page.next;
             }
         }
 

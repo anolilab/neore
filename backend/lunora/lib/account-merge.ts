@@ -239,7 +239,9 @@ export const GLOBAL_USER_COLUMNS: Readonly<Record<string, ReadonlyArray<string>>
     pageAccess: ["userId", "ownerId", "grantedBy"],
     pageInvites: ["userId", "ownerId", "acceptedBy"],
     passkey: ["userId"],
-    pluginInstalls: ["userId"],
+    // A plugin install is moved by its own step (`mergePluginInstallsPage`) ahead of this loop: a person has one install per plugin, so
+    // an install of a plugin the new account already has is dropped with its links, and its children detached, rather than moved.
+    pluginInstalls: [],
     pluginItems: ["userId"],
     projectRepositories: ["userId"],
     projectRuleFiles: ["userId"],
@@ -2142,6 +2144,84 @@ const REASSIGN_BATCH = 200;
  */
 const REASSIGN_BATCH_BY_TABLE: Readonly<Record<string, number>> = { projectRuleFiles: 8 };
 
+/** Installs one `mergePluginInstallsPage` call moves: each costs a read and a write against the invocation's D1 queries. */
+const PLUGIN_MERGE_INSTALLS = 12;
+
+/** Children, then links, one call detaches or deletes for a duplicate install; the call that does the rest deletes the install. */
+const PLUGIN_MERGE_CHILDREN = 12;
+
+/**
+ * Moves the guest's plugin installs to the new account, one install per plugin: for a plugin the new account already has, the
+ * guest's install is not moved. Its children (skills, triggers, group chats) are detached, as an uninstall keeps an edited one,
+ * and its links and the install row are deleted. A duplicate takes as many calls as it has rows (`done: false`); the rest of the
+ * installs are patched as before. The guest's links of an install that is kept follow in the generic loop.
+ * `statements` is the D1 work the call did.
+ */
+export const mergePluginInstallsPage = async (ctx: MutationCtx, from: string, to: string): Promise<{ done: boolean; statements: number }> => {
+    const { page } = await ctx.db.pluginInstalls.findMany({ consistency: "primary", limit: PLUGIN_MERGE_INSTALLS + 1, where: { userId: from } });
+    let statements = 1;
+
+    for (const install of page.slice(0, PLUGIN_MERGE_INSTALLS)) {
+        const installId = install._id as string;
+        const target = await ctx.db.pluginInstalls.findFirst({ consistency: "primary", where: { pluginSlug: install.pluginSlug, userId: to } });
+
+        statements += 1;
+
+        if (!target) {
+            await ctx.db.patch("pluginInstalls", install._id, { userId: to });
+            statements += 1;
+
+            continue;
+        }
+
+        const skills = await ctx.db.skills.findMany({ limit: PLUGIN_MERGE_CHILDREN + 1, where: { pluginInstallId: installId } });
+
+        for (const skill of skills.page.slice(0, PLUGIN_MERGE_CHILDREN)) {
+            await ctx.db.patch("skills", skill._id as Id<"skills">, { pluginInstallId: "", pluginMarker: "" });
+        }
+
+        const triggers = await ctx.db
+            .query("triggers")
+            .withIndex("by_plugin_install", (q) => q.eq("pluginInstallId", installId))
+            .take(PLUGIN_MERGE_CHILDREN + 1);
+
+        for (const trigger of triggers.slice(0, PLUGIN_MERGE_CHILDREN)) {
+            // Off as well: the new account's own install of the plugin has its own copy of this trigger.
+            await ctx.db.patch("triggers", trigger._id as Id<"triggers">, { enabled: false, pluginInstallId: "", pluginMarker: "" });
+        }
+
+        const groups = await ctx.db
+            .query("threads")
+            .withIndex("by_plugin_install", (q) => q.eq("pluginInstallId", installId))
+            .take(PLUGIN_MERGE_CHILDREN + 1);
+
+        for (const group of groups.slice(0, PLUGIN_MERGE_CHILDREN)) {
+            await ctx.db.patch("threads", group._id as Id<"threads">, { pluginInstallId: "", pluginMarker: "" });
+        }
+
+        const more = skills.page.length > PLUGIN_MERGE_CHILDREN || triggers.length > PLUGIN_MERGE_CHILDREN || groups.length > PLUGIN_MERGE_CHILDREN;
+
+        const links = await ctx.db.pluginItems.findMany({ consistency: "primary", limit: PLUGIN_MERGE_CHILDREN + 1, where: { installId } });
+
+        for (const link of links.page.slice(0, PLUGIN_MERGE_CHILDREN)) {
+            await ctx.db.delete("pluginItems", link._id);
+            statements += 1;
+        }
+
+        statements += 1;
+
+        // The install goes last, once nothing names it; a call that left rows behind is followed by another.
+        if (more || links.page.length > PLUGIN_MERGE_CHILDREN) {
+            return { done: false, statements };
+        }
+
+        await ctx.db.delete("pluginInstalls", install._id);
+        statements += 1;
+    }
+
+    return { done: page.length <= PLUGIN_MERGE_INSTALLS, statements };
+};
+
 export const reassignGlobalRows = internalMutation
     // `guestDrained: false` when rows are still on the guest's shard: the organization contributor entries are left as the hand-over
     // marked them (their cohorts withheld), so the guest's leftover ledger rows are never booked into a cohort of their own. The merge's
@@ -2199,7 +2279,14 @@ export const reassignGlobalRows = internalMutation
             return { done: false, reassigned: owned.moved };
         }
 
-        let reassigned = 0;
+        // The guest's plugin installs: one per plugin for the new account, so a duplicate is dropped, not moved.
+        const plugins = await mergePluginInstallsPage(ctx, args.from, args.to);
+
+        if (!plugins.done) {
+            return { done: false, reassigned: plugins.statements };
+        }
+
+        let reassigned = plugins.statements - 1;
 
         const settleContributors = args.guestDrained !== false;
 

@@ -381,14 +381,18 @@ describe("uninstall", () => {
 
         // The kept group still names its skills, so the finish step keeps them and detaches them rather than deleting them.
         expect(begun.pendingSkills).toEqual([skillId]);
-        expect(await run(async (context) => await context.db.skills.findFirst({ where: { _id: skillId } }))).not.toBeNull();
+        // The keep itself detached the skill the group names, so an action that stops here leaves a state a retry can finish.
+        expect(await run(async (context) => await context.db.skills.findFirst({ where: { _id: skillId } }))).toMatchObject({
+            pluginInstallId: "",
+            pluginMarker: "",
+        });
 
         const finished = await run(
             async (context) =>
                 await finishUninstallRows(context, begun.installId, begun.generation, { keptGroups: [threadId], pendingSkills: begun.pendingSkills }),
         );
 
-        expect(finished).toMatchObject({ kept: ["Analyst"], removed: 0 });
+        expect(finished).toMatchObject({ kept: ["Late panel"], removed: 0 });
         expect(await run(async (context) => await context.db.skills.findFirst({ where: { _id: skillId } }))).toMatchObject({
             pluginInstallId: "",
             pluginMarker: "",
@@ -439,5 +443,115 @@ describe("uninstall", () => {
 
         expect(finished.removed).toBe(1);
         expect(await run(async (context) => await context.db.skills.findFirst({ where: { _id: skillId } }))).toBeNull();
+    });
+
+    it("keeps a deferred skill the owner edited or shared while the groups were being deleted", async () => {
+        const { installId, skillId } = await installed();
+        const secondSkillId = await run(
+            async (context) =>
+                await context.runMutation(createPluginSkill, {
+                    description: "Critic",
+                    instructions: "Critique.",
+                    isPremium: true,
+                    name: "Critic",
+                    plan: "premium",
+                    pluginInstallId: installId,
+                    pluginMarker: markerFor(installId, "skill:critic"),
+                    slug: "critic",
+                    source: { type: "plugin" as const, version: "1.0.0" },
+                    userId: OWNER,
+                }),
+        );
+
+        await run(
+            async (context) =>
+                await context.runMutation(createPluginGroupChat, {
+                    mode: "round-robin",
+                    model: "claude-haiku-5-5",
+                    plan: "premium",
+                    pluginInstallId: installId,
+                    pluginMarker: markerFor(installId, "group:panel"),
+                    skillIds: [skillId, secondSkillId],
+                    title: "Panel",
+                    userId: OWNER,
+                }),
+        );
+
+        const begun = await run(async (context) => await uninstallRows(context, OWNER, SLUG));
+
+        expect(begun.pendingSkills).toEqual([skillId]);
+
+        await run(async (context) => await context.db.patch("skills", skillId, { instructions: "Edited after begin." }));
+
+        const finished = await run(
+            async (context) => await finishUninstallRows(context, begun.installId, begun.generation, { pendingSkills: begun.pendingSkills }),
+        );
+
+        expect(finished).toMatchObject({ kept: ["Analyst"], removed: 0 });
+        expect(await run(async (context) => await context.db.skills.findFirst({ where: { _id: skillId } }))).toMatchObject({
+            instructions: "Edited after begin.",
+            pluginInstallId: "",
+        });
+    });
+
+    it("drives a group's multi-page deletion itself, handing the continuation back instead of scheduling a second chain", async () => {
+        const { installId, skillId } = await installed();
+        const secondSkillId = await run(
+            async (context) =>
+                await context.runMutation(createPluginSkill, {
+                    description: "Critic",
+                    instructions: "Critique.",
+                    isPremium: true,
+                    name: "Critic",
+                    plan: "premium",
+                    pluginInstallId: installId,
+                    pluginMarker: markerFor(installId, "skill:critic"),
+                    slug: "critic",
+                    source: { type: "plugin" as const, version: "1.0.0" },
+                    userId: OWNER,
+                }),
+        );
+        const { threadId } = await run(
+            async (context) =>
+                await context.runMutation(createPluginGroupChat, {
+                    mode: "round-robin",
+                    model: "claude-haiku-5-5",
+                    plan: "premium",
+                    pluginInstallId: installId,
+                    pluginMarker: markerFor(installId, "group:big"),
+                    skillIds: [skillId, secondSkillId],
+                    title: "Big panel",
+                    userId: OWNER,
+                }),
+        );
+
+        // More pins than one batch removes: the delete needs a second page.
+        await run(async (context) => {
+            for (let index = 0; index < 120; index += 1) {
+                await context.db.insert("threadPins", { createdAt: 1, messageRole: "user", threadId, updatedAt: 1, userId: OWNER });
+            }
+        });
+
+        const pages: { isDone: boolean; next?: object }[] = [];
+        let next: object | undefined;
+
+        for (;;) {
+            const page = await run(async (context) => await context.runMutation(deleteAllForThreadIdAsync, { ...next, pluginInstallId: installId, threadId }));
+
+            pages.push(page);
+
+            if (page.isDone) {
+                break;
+            }
+
+            next = page.next;
+        }
+
+        expect(pages.length).toBeGreaterThan(1);
+        expect(pages[0]).toMatchObject({ isDone: false, next: expect.any(Object) });
+        expect(await run(async (context) => await context.db.threads.findFirst({ where: { _id: threadId } }))).toBeNull();
+        const { page: pins } = await run(async (context) => await context.db.threadPins.findMany({ where: { threadId } }));
+
+        expect(pins).toHaveLength(0);
     });
 });

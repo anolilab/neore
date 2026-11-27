@@ -18,6 +18,12 @@ const triggerEntry = (create: typeof TRIGGER): PlanEntry =>
     }) as unknown as PlanEntry;
 
 describe("a trigger's live hash", () => {
+    it("hashes a planned trigger's prompts as creation stores them, without hidden characters", async () => {
+        const planned = { ...TRIGGER, systemPrompt: "Be\u{200B} brief." };
+
+        expect(await entryHash(triggerEntry(planned))).toBe(await triggerRowHash({ ...TRIGGER, systemPrompt: "Be brief." }));
+    });
+
     it("matches the hash of its file entry when the row stores the same content", async () => {
         expect(await triggerRowHash(TRIGGER)).toBe(await entryHash(triggerEntry(TRIGGER)));
     });
@@ -45,7 +51,7 @@ describe("a group's live hash", () => {
     const GROUP = { mode: "round-robin", model: "claude-haiku-5-5", participantKeys: ["skill:0", "skill:1"], title: "Panel" };
     const groupEntry = (create: typeof GROUP): PlanEntry =>
         ({ key: "group:0", kind: "group", plan: { create, kind: "group" }, problems: [], requires: [], title: "Panel", warnings: [] }) as unknown as PlanEntry;
-    const keyOf = (skillId: string) => ({ A: "skill:0", B: "skill:1" })[skillId];
+    const keyOf = (skillId: string) => ({ A: "skill:0", B: "skill:1" } as Record<string, string | undefined>)[skillId];
     const row = (participants: string[], title = "Panel") => {
         return {
             mode: "round-robin",

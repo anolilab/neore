@@ -43,6 +43,7 @@ const MODULES = {
     lib_claim_once: async () => await import("../lib/claim-once"),
     plugins_install_action: async () => await import("./install-action"),
     plugins_install_steps: async () => await import("./install-steps"),
+    plugins_repair_resume: async () => await import("./repair-resume"),
     skills_bundle: async () => await import("../skills/bundle"),
     skills_create_skill: async () => await import("../skills/create-skill"),
 } as const;
@@ -131,5 +132,35 @@ describe("plugin install action", () => {
         expect(skills).toEqual([expect.objectContaining({ name: "analyst", pluginInstallId: rows[0]._id, source: { type: "plugin", version: "1.0.0" } })]);
 
         await expect(as().action(procedureAt("plugins_install_action", "installPlugin"), args as never)).rejects.toThrow("already installed");
+    });
+
+    it("keeps the install and its children, for repair, when finishing the install fails", async () => {
+        const original = registry.get("plugins_install_steps:finishInstall");
+        const { internalMutation } = await import("../_generated/server");
+        const { v } = await import("lunorash/server");
+
+        registry.set(
+            "plugins_install_steps:finishInstall",
+            internalMutation
+                .input({ generation: v.number(), installId: v.string() })
+                .output(v.null())
+                .mutation(async () => {
+                    throw new Error("finish failed");
+                }),
+        );
+
+        try {
+            await expect(
+                as().action(procedureAt("plugins_install_action", "installPlugin"), { contentHash: hash, markdown: pluginFile(hash) } as never),
+            ).rejects.toThrow("finish failed");
+        } finally {
+            registry.set("plugins_install_steps:finishInstall", original);
+        }
+
+        const rows = await installs();
+        const { page: skills } = await harness.run(async (context: any) => await context.db.skills.findMany({ where: { userId: OWNER } }));
+
+        expect(rows).toEqual([expect.objectContaining({ status: "needs-repair" })]);
+        expect(skills).toHaveLength(1);
     });
 });

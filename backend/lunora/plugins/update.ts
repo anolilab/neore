@@ -47,6 +47,7 @@ export const loadInstalledForUpdate = internalQuery
                         kind: vPluginItemKind,
                     }),
                 ),
+                generation: v.number(),
                 installId: v.string(),
                 ownSlugs: v.array(v.object({ entryKey: v.string(), slug: v.string() })),
                 status: v.string(),
@@ -84,7 +85,7 @@ export const loadInstalledForUpdate = internalQuery
             }
         }
 
-        return { children, installId, ownSlugs, status: install.status, version: install.version };
+        return { children, generation: install.generation, installId, ownSlugs, status: install.status, version: install.version };
     });
 
 export const previewUpdate = authAction
@@ -220,6 +221,7 @@ export const updatePlugin = authAction
         }
 
         const generation = await ctx.runMutation(internal.plugins.update_apply.beginUpdate, {
+            expectedGeneration: installed.generation,
             installId: installed.installId,
             targetVersion: header.version,
             userId,

@@ -99,7 +99,7 @@ describe("an update that removes a child", () => {
             pluginInstallId: "",
             pluginMarker: "",
         });
-        expect(await run(async (context) => await context.db.pluginItems.findFirst({ where: { _id: intentId } }))).toMatchObject({ state: "detached" });
+        expect(await run(async (context) => await context.db.pluginItems.findFirst({ where: { _id: intentId } }))).toBeNull();
     });
 
     it("keeps a skill that a group chat still names, and keeps its link", async () => {
@@ -137,6 +137,6 @@ describe("an update that removes a child", () => {
             pluginInstallId: "",
             pluginMarker: "",
         });
-        expect(await run(async (context) => await context.db.pluginItems.findFirst({ where: { _id: intentId } }))).toMatchObject({ state: "detached" });
+        expect(await run(async (context) => await context.db.pluginItems.findFirst({ where: { _id: intentId } }))).toBeNull();
     });
 });

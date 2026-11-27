@@ -297,4 +297,24 @@ describe("plugin update action", () => {
 
         expect(rows.map((row: { name: string }) => row.name).toSorted((a: string, b: string) => a.localeCompare(b))).toStrictEqual(["analyst", "critic"]);
     });
+
+    it("creates a key again when a later version brings back a skill that an earlier one removed while it was edited", async () => {
+        const [critic] = await run(async (context) => {
+            const { page } = await context.db.skills.findMany({ where: { name: "critic" } });
+
+            return page;
+        });
+
+        await run(async (context) => await context.db.patch("skills", critic._id, { instructions: "Changed by the owner." }));
+        await updateTo(["analyst"], "1.1.0");
+
+        const result = await updateTo(["analyst", "critic"], "1.2.0");
+
+        expect(result.applied).toContain("skill:critic");
+
+        const named = await skillsNamed();
+        const owned = named.filter((row: { pluginMarker?: string }) => row.pluginMarker);
+
+        expect(owned.map((row: { name: string }) => row.name).toSorted((a: string, b: string) => a.localeCompare(b))).toStrictEqual(["analyst", "critic"]);
+    });
 });

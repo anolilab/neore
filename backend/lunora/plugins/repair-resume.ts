@@ -20,6 +20,7 @@ import { planFor } from "../skills/bundle";
 import { assertNoToolConfig, checkPluginFile } from "./install-action";
 import { childOps, importFailure } from "./install-ops";
 import { entryHash } from "./entry-hash";
+import { heldInstall } from "./held-install";
 import { LEASE_MS } from "./logic";
 import { requireOwnerShard } from "./owner-shard";
 import { repairableNow, repairRows } from "./repair";
@@ -37,6 +38,7 @@ export const beginRepair = internalMutation
             linked: v.number(),
             missing: v.array(v.object({ entryKey: v.string(), intentId: v.string(), kind: vPluginItemKind })),
             status: v.union(v.literal("installed"), v.literal("needs-repair")),
+            unresolved: v.array(v.string()),
         }),
     )
     .mutation(async ({ args, ctx }) => await beginRepairRows(ctx, args.userId, args.pluginSlug, args.contentHash, args.entries));
@@ -55,6 +57,8 @@ export const beginRepairRows = async (
     linked: number;
     missing: { entryKey: string; intentId: string; kind: "group" | "skill" | "trigger" }[];
     status: "installed" | "needs-repair";
+    /** Children whose pending hash is not settled yet: the install may not finish while any remains. */
+    unresolved: string[];
 }> => {
     requireOwnerShard(userId, "repair");
 
@@ -106,8 +110,10 @@ export const beginRepairRows = async (
             return { entryKey: row.entryKey, intentId: row._id as string, kind: row.kind };
         });
 
+    const unresolved = result.missing.filter((key) => missing.every((row) => row.entryKey !== key));
+
     if (result.status === "installed" || missing.length === 0) {
-        return { existing, generation: install.generation, installId, linked: result.linked, missing: [], status: result.status };
+        return { existing, generation: install.generation, installId, linked: result.linked, missing: [], status: result.status, unresolved };
     }
 
     // Takeover: the next generation and a fresh lease, so an action started before this one writes nothing more and no other
@@ -121,8 +127,33 @@ export const beginRepairRows = async (
         updatedAt: ctx.now,
     });
 
-    return { existing, generation, installId, linked: result.linked, missing, status: "needs-repair" };
+    return { existing, generation, installId, linked: result.linked, missing, status: "needs-repair", unresolved };
 };
+
+/** Whether the caller still holds the install: its generation is current and its lease has not run out. Rollback asks before it deletes. */
+export const holdsLease = internalMutation
+    .input({ generation: v.number(), installId: v.string().max(128) })
+    .output(v.boolean())
+    .mutation(async ({ args, ctx }) => {
+        try {
+            await heldInstall(ctx, args.installId as Id<"pluginInstalls">, args.generation);
+
+            return true;
+        } catch {
+            return false;
+        }
+    });
+
+/** A child repair is about to create is baselined on the plan that creates it, which may differ from the install's (a slug taken since). */
+export const setIntentHash = internalMutation
+    .input({ contentHash: v.string().max(128), generation: v.number(), installId: v.string().max(128), intentId: v.string().max(128) })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        await heldInstall(ctx, args.installId as Id<"pluginInstalls">, args.generation);
+        await ctx.db.patch("pluginItems", args.intentId as Id<"pluginItems">, { contentHash: args.contentHash });
+
+        return null;
+    });
 
 export const repairPlugin = authAction
     .input({
@@ -172,6 +203,7 @@ export const repairPlugin = authAction
 
         const missingKeys = new Set(begun.missing.map((entry) => entry.entryKey));
         const intentByKey = new Map(begun.missing.map((entry) => [entry.entryKey, entry.intentId] as const));
+        const hashByKey = new Map(planned.map((entry) => [entry.entryKey, entry.contentHash] as const));
 
         assertSelectionImportable(entries, missingKeys);
 
@@ -187,6 +219,13 @@ export const repairPlugin = authAction
                     throw new LunoraError("CONFLICT", `No intent row for "${key}"`);
                 }
 
+                await ctx.runMutation(internal.plugins.repair_resume.setIntentHash, {
+                    contentHash: hashByKey.get(key) ?? "",
+                    generation: begun.generation,
+                    installId: begun.installId,
+                    intentId,
+                });
+
                 return intentId;
             },
             isPremium,
@@ -200,6 +239,13 @@ export const repairPlugin = authAction
                 keepOnRateLimit: true,
                 knownIds: new Map(begun.existing.map((row) => [row.entryKey, row.itemId] as const)),
             });
+
+            // A child whose pending hash is still unresolved keeps the install in needs-repair, with its target version unchanged.
+            if (begun.unresolved.length > 0) {
+                await ctx.runMutation(internal.plugins.install_steps.markNeedsRepair, { generation: begun.generation, installId: begun.installId });
+
+                return { created: created.map((item) => item.key), status: "needs-repair" };
+            }
 
             await ctx.runMutation(internal.plugins.install_steps.finishInstall, { generation: begun.generation, installId: begun.installId });
 

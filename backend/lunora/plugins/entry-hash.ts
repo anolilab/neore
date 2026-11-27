@@ -3,6 +3,8 @@
  * live hash, so the two must be computed from the same fields. A skill's content is its content fields only (the owner,
  * flags and ids on its row are not content), so the file's entry and the row are read through the same field list.
  */
+import { stripHiddenText } from "@neore/ai/utils";
+
 import { DEFAULT_GROUP_TITLE } from "../chat/group/functions";
 import type { PlanEntry } from "../skills/bundle-plan";
 import { contentHash } from "./logic";
@@ -87,7 +89,16 @@ export const entryHash = async (entry: PlanEntry): Promise<string> => {
     }
 
     if (entry.plan?.kind === "trigger") {
-        return await contentHash(triggerContent(entry.plan.create as TriggerContent));
+        const create = entry.plan.create as TriggerContent;
+
+        // Trigger creation stores the prompt fields without hidden characters; the hash is over what the row will hold.
+        return await contentHash(
+            triggerContent({
+                ...create,
+                inputTemplate: create.inputTemplate === undefined ? undefined : stripHiddenText(create.inputTemplate).text,
+                systemPrompt: create.systemPrompt === undefined ? undefined : stripHiddenText(create.systemPrompt).text,
+            }),
+        );
     }
 
     if (entry.plan?.kind === "group") {

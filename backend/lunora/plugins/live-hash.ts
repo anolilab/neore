@@ -46,7 +46,8 @@ export const liveHashOf = async (ctx: QueryCtx, installId: string, link: { entry
         const skill = await ctx.db.skills.findFirst({ where: { _id: skillId as Id<"skills"> } });
         const parsed = skill?.pluginMarker ? parseMarker(skill.pluginMarker) : null;
 
-        if (parsed) {
+        // Only this install's own skills map to an entry key: another plugin's skill under the same key is a replacement, and must change the hash.
+        if (parsed && parsed.installId === installId) {
             keys.set(skillId, parsed.entryKey);
         }
     }

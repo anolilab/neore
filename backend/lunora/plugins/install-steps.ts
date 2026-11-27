@@ -7,25 +7,12 @@
 import { v, LunoraError } from "lunorash/server";
 
 import type { Id } from "../_generated/dataModel";
-import type { MutationCtx } from "../_generated/server";
 import { internalMutation } from "../_generated/server";
 import { patchRow } from "../lib/patch";
+import { heldInstall, heldInstallForShardWrite } from "./held-install";
 import { requireOwnerShard } from "./owner-shard";
 import { LEASE_MS } from "./logic";
 import { vPluginItemKind } from "./validators";
-
-const STALE = "STALE_LEASE: this install was taken over by another action";
-
-/** The install row, if it still exists, after checking that the caller still holds the lease it started under. */
-const heldInstall = async (ctx: Pick<MutationCtx, "db">, installId: Id<"pluginInstalls">, generation: number) => {
-    const install = await ctx.db.pluginInstalls.findFirst({ where: { _id: installId } });
-
-    if (!install || install.generation !== generation) {
-        throw new LunoraError("CONFLICT", STALE);
-    }
-
-    return install;
-};
 
 export const createInstallRow = internalMutation
     .input({
@@ -71,7 +58,8 @@ export const recordIntent = internalMutation
     })
     .output(v.string())
     .mutation(async ({ args, ctx }) => {
-        await heldInstall(ctx, args.installId as Id<"pluginInstalls">, args.generation);
+        // Each create that follows writes a sharded table (skills, triggers, group chats) and needs time left on the lease.
+        await heldInstallForShardWrite(ctx, args.installId as Id<"pluginInstalls">, args.generation);
 
         const itemId = await ctx.db.insert("pluginItems", {
             contentHash: args.contentHash,
