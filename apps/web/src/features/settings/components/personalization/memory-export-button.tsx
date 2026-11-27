@@ -21,7 +21,10 @@ const saveMarkdown = (markdown: string, filename: string): void => {
     document.body.appendChild(link);
     link.click();
     link.remove();
-    URL.revokeObjectURL(url);
+    // Some browsers start the download after `click()` returns: the URL is revoked once it has begun.
+    setTimeout(() => {
+        URL.revokeObjectURL(url);
+    }, 0);
 };
 
 /**
@@ -33,6 +36,8 @@ const MemoryExportButton: FC = () => {
     const errorId = useId();
     const { error, isPending, mutate } = useMutation({
         ...useLunoraActionOptions(api.memory.markdown_export.exportMemoriesMarkdown),
+        // Lunora actions are not queued: offline, the click fails at once and says so instead of waiting for a connection.
+        networkMode: "always",
         onSuccess: ({ markdown }: { count: number; markdown: string; truncated: boolean }) => {
             saveMarkdown(markdown, `memories-${new Date().toISOString().slice(0, 10)}.md`);
         },

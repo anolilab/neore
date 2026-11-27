@@ -4,7 +4,7 @@
  * `<MemoryExportButton>`: a click downloads the server's Markdown as a `.md` file, the button is busy (and keeps focus)
  * meanwhile, and a failure is said next to it.
  */
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { onlineManager, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -42,11 +42,16 @@ const renderButton = () =>
 describe("MemoryExportButton", () => {
     let blobs: Blob[];
     let click: ReturnType<typeof vi.spyOn>;
+    let revoke: ReturnType<typeof vi.fn>;
+    /** How many URLs were revoked when each link was clicked. */
+    let revokedAtClick: number[];
     /** The links clicked: the spy records each call's `this`. */
     const clicks = (): HTMLAnchorElement[] => click.mock.contexts as HTMLAnchorElement[];
 
     beforeEach(() => {
         blobs = [];
+        revoke = vi.fn();
+        revokedAtClick = [];
         vi.stubGlobal("URL", {
             ...URL,
             createObjectURL: (blob: Blob) => {
@@ -54,12 +59,15 @@ describe("MemoryExportButton", () => {
 
                 return "blob:memories";
             },
-            revokeObjectURL: vi.fn(),
+            revokeObjectURL: revoke,
         });
-        click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+        click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {
+            revokedAtClick.push(revoke.mock.calls.length);
+        });
     });
 
     afterEach(() => {
+        onlineManager.setOnline(true);
         vi.unstubAllGlobals();
         vi.restoreAllMocks();
         harness.exportMemories.mockReset();
@@ -78,6 +86,23 @@ describe("MemoryExportButton", () => {
         expect(clicks()[0]?.getAttribute("href")).toBe("blob:memories");
         expect(await blobs[0]?.text()).toBe("# Your memories\n");
         expect(blobs[0]?.type).toBe("text/markdown;charset=utf-8");
+        // Revoked only after the click, once the download has begun.
+        expect(revokedAtClick).toStrictEqual([0]);
+        await waitFor(() => {
+            expect(revoke).toHaveBeenCalledWith("blob:memories");
+        });
+    });
+
+    it("fails at once while offline instead of waiting for a connection", async () => {
+        onlineManager.setOnline(false);
+        harness.exportMemories.mockRejectedValue(new Error("Failed to fetch"));
+        renderButton();
+
+        fireEvent.click(screen.getByRole("button", { name: "Download memories (Markdown)" }));
+
+        const alert = await screen.findByRole("alert");
+
+        expect(alert.textContent).toContain("The download could not be prepared.");
     });
 
     it("is busy while the file is prepared, and says when it failed", async () => {

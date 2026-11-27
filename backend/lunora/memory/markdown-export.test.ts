@@ -3,12 +3,12 @@
  * grouped and dated in the user's timezone (UTC when unset or unknown), bot memories labelled by scope.
  */
 import { lunoraTest } from "@lunora/testing";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import schema from "../schema";
 import type { BotLabel, ExportMemoryRow } from "./export-format";
-import { formatMemoryMarkdown } from "./export-format";
-import { MEMORY_EXPORT_MAX_ROWS, MEMORY_EXPORT_PAGE_ROWS, readExportMemories, readMemoryExportPage, resolveMemoryBotLabels } from "./markdown-export";
+import { formatMemoryMarkdown, MEMORY_EXPORT_MAX_ROWS } from "./export-format";
+import { MEMORY_EXPORT_PAGE_ROWS, readExportMemories, readMemoryExportPage, readPinnedMemories, resolveMemoryBotLabels } from "./markdown-export";
 
 type Harness = ReturnType<typeof lunoraTest>;
 
@@ -102,7 +102,29 @@ describe("formatMemoryMarkdown", () => {
         expect(markdown).toContain("gone — last confirmed 2026-03-01 · learned in chat · a deleted bot");
         expect(markdown).toContain("theirs — last confirmed 2026-03-01 · learned in chat · a shared chat's bot");
         expect(markdown).toContain("old — last confirmed 2026-03-01 · learned in chat · a bot");
-        expect(markdown).toContain("This file holds the first 3 memories only.");
+        expect(markdown).toContain(`This file is cut: it holds your pinned memories and the ${String(MEMORY_EXPORT_MAX_ROWS)} most recently saved others.`);
+        expect(markdown).toContain("holds up to 5,000 memories");
+    });
+
+    it("labels each source", () => {
+        const sources = ["auto", undefined, "compressed", "reflection", "manual", "imported"];
+        const markdown = formatMemoryMarkdown(
+            sources.map((source, index) => row({ lastConfirmedAt: LATE_EVENING - index, memory: `s${String(index)}`, ...(source && { source }) })),
+            { bots: NO_BOTS, now: NOW, timeZone: "UTC", truncated: false },
+        );
+        const labels = markdown
+            .split("\n")
+            .filter((line) => line.startsWith("- s"))
+            .map((line) => line.split(" · ").at(-2));
+
+        expect(labels).toStrictEqual([
+            "learned in chat",
+            "learned in chat",
+            "summarised from earlier memories",
+            "combined from earlier memories overnight",
+            "added by you",
+            "imported from another assistant",
+        ]);
     });
 });
 
@@ -128,10 +150,11 @@ const runner = () => {
     return {
         calls,
         ctx: {
-            runQuery: async (_reference: unknown, args: unknown) => {
+            runQuery: async (reference: { __lunoraRef: string }, args: unknown) => {
                 calls.push(1);
+                const query = reference.__lunoraRef.endsWith(":readPinnedMemories") ? readPinnedMemories : readMemoryExportPage;
 
-                return await harness.run(async (ctx: any) => await ctx.runQuery(readMemoryExportPage, args));
+                return await harness.run(async (ctx: any) => await ctx.runQuery(query, args));
             },
         } as never,
     };
@@ -164,7 +187,40 @@ describe("readExportMemories", () => {
 
         expect(rows).toHaveLength(MEMORY_EXPORT_MAX_ROWS);
         expect(truncated).toBe(true);
-        expect(calls).toHaveLength(MEMORY_EXPORT_MAX_ROWS / MEMORY_EXPORT_PAGE_ROWS + 1);
+        // The pinned scan, then the pages up to the cap and the one that finds it passed.
+        expect(calls).toHaveLength(1 + MEMORY_EXPORT_MAX_ROWS / MEMORY_EXPORT_PAGE_ROWS + 1);
+    });
+
+    it("keeps a pinned row and the newest rows past the cap, and leaves out the oldest unpinned ones", async () => {
+        // Each row its own creation time, so "newest" has one answer.
+        vi.useFakeTimers({ now: NOW, toFake: ["Date"] });
+
+        try {
+            await harness.run(async (ctx: any) => {
+                for (let index = 0; index < MEMORY_EXPORT_MAX_ROWS + 30; index += 1) {
+                    vi.setSystemTime(NOW + index);
+                    await ctx.db.insert("memories", {
+                        lastConfirmedAt: index,
+                        memory: `m${String(index)}`,
+                        pinned: index === 0,
+                        type: "context",
+                        userId: "user-1",
+                    });
+                }
+            });
+        } finally {
+            vi.useRealTimers();
+        }
+
+        const { ctx } = runner();
+        const { rows, truncated } = await readExportMemories(ctx, "user-1");
+        const texts = new Set(rows.map((r) => r.memory));
+
+        expect(rows).toHaveLength(MEMORY_EXPORT_MAX_ROWS + 1);
+        expect(truncated).toBe(true);
+        expect(rows[0]).toMatchObject({ memory: "m0", pinned: true });
+        expect(texts.has(`m${String(MEMORY_EXPORT_MAX_ROWS + 29)}`)).toBe(true);
+        expect(texts.has("m1")).toBe(false);
     });
 
     it("does not call exactly the cap cut", async () => {

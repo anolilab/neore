@@ -35,6 +35,9 @@ const TYPE_TITLES: Record<MemoryType, string> = {
     preference: "Preferences",
 };
 
+/** Unpinned rows one export holds: the settings list's own cap, so the file holds what the list can show. */
+export const MEMORY_EXPORT_MAX_ROWS = 2000;
+
 const IMPORT_APPS: Record<ImportApp, string> = { chatgpt: "ChatGPT", claude: "Claude", gemini: "Gemini", other: "another assistant" };
 
 const LINE_BREAKS = /[\r\n\u{2028}\u{2029}]+/gu;
@@ -66,15 +69,24 @@ const scopeOf = (row: ExportMemoryRow, bots: ReadonlyMap<string, BotLabel>): str
 };
 
 const sourceOf = (row: ExportMemoryRow): string => {
-    if (row.source === "manual") {
-        return "added by you";
+    switch (row.source) {
+        case "compressed": {
+            return "summarised from earlier memories";
+        }
+        case "imported": {
+            return `imported from ${IMPORT_APPS[row.importedFrom ?? "other"]}`;
+        }
+        case "manual": {
+            return "added by you";
+        }
+        case "reflection": {
+            return "combined from earlier memories overnight";
+        }
+        default: {
+            // `auto`, or a row from before the column.
+            return "learned in chat";
+        }
     }
-
-    if (row.source === "imported") {
-        return `imported from ${IMPORT_APPS[row.importedFrom ?? "other"]}`;
-    }
-
-    return "learned in chat";
 };
 
 const datesOf = (row: ExportMemoryRow, timeZone: string, today: string): string[] => {
@@ -129,7 +141,10 @@ export const formatMemoryMarkdown = (rows: ReadonlyArray<ExportMemoryRow>, optio
     ];
 
     if (options.truncated) {
-        lines.push("", `This file holds the first ${String(rows.length)} memories only. The account data export in Privacy settings holds all of them.`);
+        lines.push(
+            "",
+            `This file is cut: it holds your pinned memories and the ${String(MEMORY_EXPORT_MAX_ROWS)} most recently saved others. The account data export in Privacy settings holds up to 5,000 memories, earlier versions included.`,
+        );
     }
 
     if (rows.length === 0) {
