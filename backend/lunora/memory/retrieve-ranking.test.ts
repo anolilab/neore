@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
     fuseSearchHits,
+    INJECT_MIN_KEYWORD_RELEVANCE,
     KEYWORD_LOOKUP_LIMIT,
     keywordLookupOf,
     keywordLookupTerms,
@@ -289,6 +290,17 @@ describe("rankMemories", () => {
             const spacedLonger = candidate("spaced", { ...old, memory: "Ordered part QZ 5508 9000" });
 
             expect(ids([spacedLonger], "did I order QZ-5508", [lookup("qz5508", 0)])).toEqual([]);
+        });
+
+        it("keeps a rare code relevant however many common words a long message carries beside it", () => {
+            const words = ["please", "remember", "exactly", "happened", "yesterday", "evening", "during", "kitchen", "cleanup", "routine"];
+            const row = candidate("kx", { ...old, memory: "Router serial KX-2291" });
+            const searchText = `${words.join(" ")} KX-2291`;
+            const lookups = [lookup("kx2291", 1), ...words.map((word) => lookup(word, 5))];
+
+            // Ten words five rows each hold dilute the code's share under the floor; the code still decides.
+            expect(keywordSignalsFor([row], searchText, lookups).keywordScores.get("kx")).toBeLessThan(INJECT_MIN_KEYWORD_RELEVANCE);
+            expect(ids([row], searchText, lookups)).toEqual(["kx"]);
         });
 
         it("finds every rare identifier the query names past a decisive vector search", () => {

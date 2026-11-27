@@ -524,6 +524,19 @@ export const keywordSignalsFor = (
 };
 
 /**
+ * A candidate's keyword relevance, or none. A rare-term match is relevant by definition: it passes the floor however
+ * many common words the search carries beside its code, then competes on its weighted score like any other row.
+ * Another row counts by keyword only where the vector search leaves it to (`counts`), and only from the floor up.
+ */
+const keywordRelevanceOf = (keyword: number, floor: number, { counts, rare }: { counts: boolean; rare: boolean }): number | undefined => {
+    if (rare) {
+        return Math.max(keyword, floor);
+    }
+
+    return counts && keyword >= floor ? keyword : undefined;
+};
+
+/**
  * Scores each candidate and keeps the ones to inject. Relevance is a vector hit's cosine similarity; a candidate
  * without a hit falls back to its keyword score (`keywordSignalsFor`) and the keyword floor, unless the vector search
  * is decisive (`vectorSearched`: it ran, its hits resolved, and they fill the cut, `vectorCutIsFull`) and the memory has a
@@ -573,7 +586,10 @@ export const rankMemories = (input: {
                 const missed = hit === undefined && vectorSearched && Boolean(m.embeddingId) && now - m.lastConfirmedAt > VECTOR_SYNC_WINDOW_MS;
                 const byVector = hit !== undefined && hit >= minRelevance ? hit : undefined;
                 const keyword = keywordScores.get(m._id) ?? 0;
-                const byKeyword = ((hit === undefined && !missed) || rareTermMatches.has(m._id)) && keyword >= minKeywordRelevance ? keyword : undefined;
+                const byKeyword = keywordRelevanceOf(keyword, minKeywordRelevance, {
+                    counts: hit === undefined && !missed,
+                    rare: rareTermMatches.has(m._id),
+                });
                 const semanticScore = Math.max(byVector ?? 0, byKeyword ?? 0);
 
                 return {
