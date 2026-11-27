@@ -116,3 +116,10 @@ export const chargeRound = async (ctx: MutationCtx, userId: string, account: Tas
 
     return true;
 };
+
+/** Gives back what {@link chargeRound} took, for a round that was refused before it ran (a limiter refund never goes below what was spent). */
+export const refundRound = async (ctx: MutationCtx, userId: string, account: TaskAccount, kind: "chat" | "task" = "task"): Promise<void> => {
+    for (const key of roundQuotaKeys(account, kind)) {
+        await createRatelimit(key, ctx.db as never).refund(userId);
+    }
+};

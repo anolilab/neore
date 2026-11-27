@@ -2761,6 +2761,17 @@ export const schema = defineSchema({
         ),
         // Names one start of the watch: fresh at every start and never the clock, so a poll leased before a stop and restart cannot match the restarted watch (`source-control/pr-watch-poll.ts`).
         watchRun: v.optional(v.string()),
+        // How the wake turns of this watch are failing (`source-control/pr-watch-wake.ts`): when the last one failed, how many failed in a
+        // row (0 after a delivery), when the next try may start, and whether the failure can be cured by trying again. The watch is
+        // stopped at the third failure in a row or at a terminal one; the last failure stays as history.
+        watchWakeFailure: v.optional(
+            v.object({
+                at: v.number(),
+                attempts: v.number(),
+                kind: v.union(v.literal("retryable"), v.literal("terminal")),
+                retryAt: v.number(),
+            }),
+        ),
         // The lease a wake turn holds while it is delivered (`source-control/pr-watch-wake.ts`): until when no second delivery may start.
         // Released when the delivery ends; a delivery that never ends frees itself when it lapses.
         watchWakeLeaseUntil: v.optional(v.number()),

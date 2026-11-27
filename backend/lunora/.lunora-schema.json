@@ -25004,6 +25004,54 @@
           "optional": true,
           "unique": false
         },
+        "watchWakeFailure": {
+          "kind": "object",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "fields": {
+            "at": {
+              "kind": "number",
+              "nullable": false,
+              "optional": false,
+              "unique": false
+            },
+            "attempts": {
+              "kind": "number",
+              "nullable": false,
+              "optional": false,
+              "unique": false
+            },
+            "kind": {
+              "kind": "union",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "members": [
+                {
+                  "kind": "literal",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "literal": "\"retryable\""
+                },
+                {
+                  "kind": "literal",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "literal": "\"terminal\""
+                }
+              ]
+            },
+            "retryAt": {
+              "kind": "number",
+              "nullable": false,
+              "optional": false,
+              "unique": false
+            }
+          }
+        },
         "watchWakeLeaseUntil": {
           "kind": "number",
           "nullable": false,

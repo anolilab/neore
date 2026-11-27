@@ -1,6 +1,6 @@
 /**
- * The wake turn (`pr-watch-wake.ts`): the scheduled step only claims, charges and enqueues; the job runs the turn, and only then
- * the wake is counted and the delivered occurrences cleared. A failed or over-limit turn leaves the reasons pending. The agent run,
+ * The wake turn (`pr-watch-wake.ts`): the scheduled step claims, commits, and only then enqueues; the job charges a round right before
+ * the turn, runs it, and only then the wake is counted and the delivered occurrences cleared. A failed or over-limit turn leaves the reasons pending. The agent run,
  * the jobs queue and the daily charge are faked; claim, finish and the poller's record are the real procedures.
  */
 import { lunoraTest } from "@lunora/testing";
@@ -14,7 +14,18 @@ import { PR_WATCH_MAX_WAKES, PR_WATCH_WAKE_COOLDOWN_MS } from "./pr-watch-logic"
 const { enqueued, probe, registry, runs } = vi.hoisted(() => {
     return {
         enqueued: [] as { args: Record<string, any>; options: Record<string, any> }[],
-        probe: { allowRound: true, anonymous: false, charges: 0, fail: false },
+        probe: {
+            allowRound: true,
+            anonymous: false,
+            charges: 0,
+            enqueueFails: false,
+            fail: false,
+            failBeforeModel: false,
+            failWith: undefined as unknown,
+            leaseSeenAtEnqueue: undefined as number | undefined,
+            readLease: undefined as ((linkId: string) => Promise<number | undefined>) | undefined,
+            refunds: 0,
+        },
         registry: new Map<string, unknown>(),
         runs: [] as Record<string, any>[],
     };
@@ -25,6 +36,12 @@ vi.mock("../_generated/internal", async (importOriginal) => registeredApi(await 
 vi.mock("../lib/job-queue", () => {
     return {
         enqueueJob: async (_ref: unknown, args: Record<string, any>, options: Record<string, any>) => {
+            if (probe.enqueueFails) {
+                throw new Error("queue unavailable");
+            }
+
+            // What a consumer that starts the moment the message is sent would read: the claim must already be committed.
+            probe.leaseSeenAtEnqueue = await probe.readLease?.(args.linkId);
             enqueued.push({ args, options });
         },
     };
@@ -41,6 +58,9 @@ vi.mock("../tasks/account", async (importOriginal) => {
         loadTaskAccount: async () => {
             return { isAdmin: false, isAnonymous: probe.anonymous, tier: "free" as const };
         },
+        refundRound: async () => {
+            probe.refunds += 1;
+        },
     };
 });
 
@@ -49,8 +69,14 @@ vi.mock("../chat/lib/headless-run", () => {
         runHeadlessAgent: async (_ctx: unknown, options: Record<string, any>) => {
             runs.push(options);
 
+            if (probe.failBeforeModel) {
+                throw probe.failWith ?? new Error("failed before the model");
+            }
+
+            await options.onGenerationStart?.();
+
             if (probe.fail) {
-                throw new Error("run failed");
+                throw probe.failWith ?? new Error("run failed");
             }
 
             return { text: "ok", threadId: options.thread.threadId };
@@ -58,10 +84,25 @@ vi.mock("../chat/lib/headless-run", () => {
     };
 });
 
-const { finishWatchWake, isWatchWakeCurrent, PR_WATCH_WAKE_LEASE_MS, releaseWatchWake, runWatchWake, startWatchWake, wakePrompt } =
-    await import("./pr-watch-wake");
+const {
+    beginWatchWake,
+    finishWatchWake,
+    isTerminalWakeError,
+    PR_WATCH_MAX_WAKE_FAILURES,
+    PR_WATCH_WAKE_LEASE_MS,
+    releaseWatchWake,
+    runWatchWake,
+    startWatchWake,
+    wakePrompt,
+} = await import("./pr-watch-wake");
+
 const { recordWatchObservation } = await import("./pr-watch-poll");
 const { JOB_LEASE_MS } = await import("../lib/job-once");
+
+/** Stands in for the run's own `AgentRunError` (matched by name, so the suite need not load the agent run). */
+class AgentRunErrorStandIn extends Error {
+    public override name = "AgentRunError";
+}
 
 const OWNER = "user-a";
 const STARTED_AT = 1000;
@@ -79,7 +120,13 @@ beforeEach(() => {
     probe.allowRound = true;
     probe.anonymous = false;
     probe.charges = 0;
+    probe.enqueueFails = false;
+    probe.failBeforeModel = false;
+    probe.leaseSeenAtEnqueue = undefined;
+    probe.readLease = undefined;
+    probe.refunds = 0;
     probe.fail = false;
+    probe.failWith = undefined;
     harness = lunoraTest(schema as never);
 });
 
@@ -124,15 +171,26 @@ const rowOf = async (linkId: string): Promise<any> => await harness.run(async (c
 const key = (linkId: string) => {
     return { linkId, run: "run-1", startedAt: STARTED_AT };
 };
-const start = async (linkId: string, args: Record<string, unknown> = {}): Promise<boolean> =>
-    await harness.run(async (ctx: any) => await ctx.runMutation(startWatchWake, { ...key(linkId), ...args }));
-/** The job as the queue would run it: the args the scheduled step enqueued. */
-const runJob = async (job: { args: Record<string, any> }): Promise<void> => {
-    await harness.action(async (ctx: any) => await ctx.runAction(runWatchWake, job.args));
+const start = async (linkId: string, args: Record<string, unknown> = {}): Promise<boolean> => {
+    probe.readLease = async (id) => {
+        const row = await rowOf(String(id));
+
+        return row?.watchWakeLeaseUntil;
+    };
+
+    return await harness.action(async (ctx: any) => await ctx.runAction(startWatchWake, { ...key(linkId), ...args }));
+};
+/**
+ * The job as the claim-once wrapper (`lib/job-once.ts:runJobOnce`) invokes it: the enqueued args plus the claim key as `jobId`
+ * (`ctx.runAction(reference, { ...args, jobId })`). The harness cannot dispatch the wrapper's by-name reference, so the call is made
+ * here with that exact argument shape: an action that does not declare `jobId` rejects it, as it did in production.
+ */
+const runJob = async (job: { args: Record<string, any>; options: Record<string, any> }): Promise<void> => {
+    await harness.action(async (ctx: any) => await ctx.runAction(runWatchWake, { ...job.args, jobId: job.options.once.jobId }));
 };
 
 describe("the scheduled step", () => {
-    it("only claims, charges one round and enqueues the turn on the jobs queue: it runs no model", async () => {
+    it("claims, commits the lease, then enqueues the turn on the jobs queue: it runs no model and charges nothing yet", async () => {
         const { linkId, threadId } = await seed();
 
         expect(await start(linkId)).toBe(true);
@@ -140,8 +198,10 @@ describe("the scheduled step", () => {
         const row = await rowOf(linkId);
 
         expect(runs).toHaveLength(0);
-        expect(probe.charges).toBe(1);
+        expect(probe.charges).toBe(0);
         expect(enqueued).toHaveLength(1);
+        // A consumer starting the moment the message is sent already finds the committed lease.
+        expect(probe.leaseSeenAtEnqueue).toBe(enqueued[0]?.args.claim);
         expect(enqueued[0]?.args).toMatchObject({ linkId, model: "gpt-4o", reasons: ["checks"], threadId, userId: OWNER });
         expect(enqueued[0]?.options).toMatchObject({ once: { userId: OWNER }, shardKey: OWNER });
         expect(row.watchWakeLeaseUntil).toBe(enqueued[0]?.args.claim);
@@ -150,23 +210,22 @@ describe("the scheduled step", () => {
         expect(row.watch.wakes).toBeUndefined();
     });
 
-    it("does not run, charge or count when a daily limit is spent, and leaves the reasons pending for the next poll", async () => {
+    it("releases the claim at once, counting nothing, when the queue send fails", async () => {
         const { linkId } = await seed();
 
-        probe.allowRound = false;
+        probe.enqueueFails = true;
 
         expect(await start(linkId)).toBe(false);
 
         const row = await rowOf(linkId);
 
-        expect(enqueued).toHaveLength(0);
-        expect(runs).toHaveLength(0);
-        expect(row.watchWakeLeaseUntil).toBeUndefined();
+        expect(row.watchWakeLeaseUntil).toBe(0);
         expect(row.watchPending).toEqual(["checks"]);
         expect(row.watch.wakes).toBeUndefined();
+        expect(row.watchWakeFailure).toBeUndefined();
 
-        // Within the limit again, the next poll's delivery goes ahead.
-        probe.allowRound = true;
+        // The next poll claims again.
+        probe.enqueueFails = false;
         expect(await start(linkId)).toBe(true);
     });
 
@@ -176,7 +235,7 @@ describe("the scheduled step", () => {
         probe.anonymous = true;
 
         expect(await start(linkId)).toBe(false);
-        expect(probe.charges).toBe(0);
+        expect(enqueued).toHaveLength(0);
     });
 
     it("refuses at the cap of wakes, inside the cooldown, with nothing pending, and for another run or start", async () => {
@@ -226,6 +285,25 @@ describe("the scheduled step", () => {
         }
 
         expect(enqueued).toHaveLength(1);
+    });
+});
+
+describe("the job's argument shape", () => {
+    it("declares the jobId the claim-once wrapper adds, and every argument the scheduled step enqueues", async () => {
+        const { linkId } = await seed();
+
+        await start(linkId);
+
+        // The wrapper calls the target with `{ ...args, jobId }` and the host refuses an argument the action does not declare.
+        const declared = Object.keys((runWatchWake as unknown as { args: Record<string, unknown> }).args);
+
+        expect(declared).toContain("jobId");
+
+        const enqueuedNames = Object.keys(enqueued[0]!.args);
+
+        for (const name of enqueuedNames) {
+            expect(declared).toContain(name);
+        }
     });
 });
 
@@ -315,6 +393,289 @@ describe("the job", () => {
     });
 });
 
+describe("a failing wake turn", () => {
+    const failOnce = async (linkId: string): Promise<void> => {
+        await start(linkId);
+        probe.fail = true;
+        await runJob(enqueued.at(-1)!);
+        probe.fail = false;
+    };
+
+    it("records the failure, keeps the reasons and waits the retry time before another delivery", async () => {
+        const { linkId } = await seed();
+
+        await failOnce(linkId);
+
+        const row = await rowOf(linkId);
+
+        expect(row.watchWakeFailure).toMatchObject({ attempts: 1, kind: "retryable" });
+        expect(row.watchWakeFailure.retryAt).toBeGreaterThan(Date.now());
+        expect(row.watchPending).toEqual(["checks"]);
+        expect(row.watch.wakes).toBeUndefined();
+        expect(row.watchActive).toBe(true);
+
+        // The next poll finds the reasons pending but the retry time not reached: nothing is claimed or charged.
+        const { charges } = probe;
+
+        expect(await start(linkId)).toBe(false);
+        expect(probe.charges).toBe(charges);
+
+        // Past the retry time it goes ahead.
+        vi.useFakeTimers({ now: row.watchWakeFailure.retryAt + 1000, toFake: ["Date"] });
+
+        try {
+            expect(await start(linkId)).toBe(true);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it("stops the watch at the third failure in a row, keeping the last failure", async () => {
+        const { linkId } = await seed({ watchWakeFailure: { at: 1, attempts: PR_WATCH_MAX_WAKE_FAILURES - 1, kind: "retryable", retryAt: 0 } });
+
+        await failOnce(linkId);
+
+        const row = await rowOf(linkId);
+
+        expect(row.watchActive).toBe(false);
+        expect(row.watch.stoppedAt).toBeGreaterThan(0);
+        expect(row.watchWakeFailure).toMatchObject({ attempts: PR_WATCH_MAX_WAKE_FAILURES, kind: "retryable" });
+        expect(row.watchPending).toEqual(["checks"]);
+    });
+
+    it("stops the watch at once for an error that trying again cannot cure", async () => {
+        const { linkId } = await seed();
+
+        probe.failWith = new AgentRunErrorStandIn("left");
+        await failOnce(linkId);
+
+        const row = await rowOf(linkId);
+
+        expect(row.watchActive).toBe(false);
+        expect(row.watchWakeFailure).toMatchObject({ attempts: 1, kind: "terminal" });
+    });
+
+    it("classifies terminal and retryable errors", async () => {
+        const { LunoraError } = await import("lunorash/server");
+
+        expect(isTerminalWakeError(new AgentRunErrorStandIn("x"))).toBe(true);
+        expect(isTerminalWakeError(new LunoraError("FORBIDDEN", "no"))).toBe(true);
+        expect(isTerminalWakeError(new LunoraError("NOT_FOUND", "gone"))).toBe(true);
+        expect(isTerminalWakeError(new Error("503 from the provider"))).toBe(false);
+        expect(isTerminalWakeError(new LunoraError("INTERNAL_SERVER_ERROR", "boom"))).toBe(false);
+    });
+
+    it("resets the count on a delivery, keeping the last failure as history", async () => {
+        const { linkId } = await seed({ watchWakeFailure: { at: 5, attempts: 2, kind: "retryable", retryAt: 0 } });
+
+        await start(linkId);
+        await runJob(enqueued.at(-1)!);
+
+        const row = await rowOf(linkId);
+
+        expect(row.watchWakeFailure).toMatchObject({ at: 5, attempts: 0, retryAt: 0 });
+        expect(row.watch.wakes).toBe(1);
+    });
+});
+
+describe("the check right before the turn", () => {
+    const claimed = async (extra: Record<string, unknown> = {}, thread: Record<string, unknown> = {}) => {
+        const made = await seed(extra, thread);
+
+        await start(made.linkId);
+
+        return { ...made, job: enqueued.at(-1)! };
+    };
+
+    it("runs no turn for a reply that started since the claim, frees the lease and counts no failure", async () => {
+        const { job, linkId, threadId } = await claimed();
+
+        await harness.run(async (ctx: any) => {
+            await ctx.db.persistentStreams.insert({ status: "streaming", threadId });
+        });
+        await runJob(job);
+
+        const row = await rowOf(linkId);
+
+        expect(runs).toHaveLength(0);
+        expect(row.watchWakeLeaseUntil).toBe(0);
+        expect(row.watchPending).toEqual(["checks"]);
+        expect(row.watch.wakes).toBeUndefined();
+        expect(row.watchWakeFailure).toMatchObject({ attempts: 0, kind: "retryable" });
+        expect(row.watchWakeFailure.retryAt).toBeGreaterThan(Date.now());
+        expect(row.watchActive).toBe(true);
+    });
+
+    it.each([
+        ["locked", { lockedAt: Date.now() }],
+        ["deleted", { deleted: true }],
+        ["being deleted", { deletingAt: Date.now() }],
+    ])("runs no turn for a thread that is %s since the claim, and counts nothing", async (_name, patch) => {
+        const { job, linkId, threadId } = await claimed();
+
+        await harness.run(async (ctx: any) => {
+            await ctx.db.patch("threads", threadId, patch);
+        });
+        await runJob(job);
+
+        const row = await rowOf(linkId);
+
+        expect(runs).toHaveLength(0);
+        expect(row.watchWakeLeaseUntil).toBe(0);
+        expect(row.watchPending).toEqual(["checks"]);
+        expect(row.watch.wakes).toBeUndefined();
+        expect(row.watchWakeFailure.attempts).toBe(0);
+    });
+
+    it("runs no turn when its lease is no longer the current one, and leaves the newer claim alone", async () => {
+        const { job, linkId } = await claimed();
+
+        // A newer claim replaced this one while the job waited in the queue.
+        await harness.run(async (ctx: any) => {
+            await ctx.db.patch("pullRequestThreads", linkId, { watchWakeLeaseUntil: job.args.claim + 12_345 });
+        });
+        await runJob(job);
+
+        const row = await rowOf(linkId);
+
+        expect(runs).toHaveLength(0);
+        expect(row.watchWakeLeaseUntil).toBe(job.args.claim + 12_345);
+        expect(row.watchPending).toEqual(["checks"]);
+        expect(row.watch.wakes).toBeUndefined();
+    });
+
+    it("charges one round only when the turn starts", async () => {
+        const { job } = await claimed();
+
+        expect(probe.charges).toBe(0);
+
+        await runJob(job);
+
+        expect(probe.charges).toBe(1);
+        expect(runs).toHaveLength(1);
+    });
+
+    it("charges nothing for a job whose watch was stopped since the claim", async () => {
+        const { job, linkId } = await claimed();
+
+        await harness.run(async (ctx: any) => {
+            await ctx.db.patch("pullRequestThreads", linkId, { watch: { baselined: true, startedAt: STARTED_AT, stoppedAt: 2000 }, watchActive: false });
+        });
+        await runJob(job);
+
+        expect(probe.charges).toBe(0);
+        expect(runs).toHaveLength(0);
+    });
+
+    it("runs no turn, counts nothing and waits the retry spacing when a daily limit is spent", async () => {
+        const { job, linkId } = await claimed();
+
+        probe.allowRound = false;
+        await runJob(job);
+
+        const row = await rowOf(linkId);
+
+        expect(runs).toHaveLength(0);
+        expect(row.watchWakeLeaseUntil).toBe(0);
+        expect(row.watchPending).toEqual(["checks"]);
+        expect(row.watch.wakes).toBeUndefined();
+        expect(row.watchWakeFailure).toMatchObject({ attempts: 0, kind: "retryable" });
+        expect(row.watchWakeFailure.retryAt).toBeGreaterThan(Date.now());
+
+        // The next claim waits; once the retry time has passed and the limit has room, it goes ahead.
+        expect(await start(linkId)).toBe(false);
+        probe.allowRound = true;
+        vi.useFakeTimers({ now: row.watchWakeFailure.retryAt + 1000, toFake: ["Date"] });
+
+        try {
+            expect(await start(linkId)).toBe(true);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it("gives the round back for a turn that fails before it reaches the model, and not for one that did", async () => {
+        const first = await claimed();
+
+        probe.failBeforeModel = true;
+        await runJob(first.job);
+        expect(probe.charges).toBe(1);
+        expect(probe.refunds).toBe(1);
+
+        probe.failBeforeModel = false;
+        enqueued.length = 0;
+
+        const second = await claimed();
+
+        probe.fail = true;
+        await runJob(second.job);
+        // The model was reached (and may have been billed): the round stays charged.
+        expect(probe.charges).toBe(2);
+        expect(probe.refunds).toBe(1);
+    });
+
+    it("runs no turn for a job delivered after its lease ended, and frees the lease", async () => {
+        const { job, linkId } = await claimed();
+
+        vi.useFakeTimers({ now: job.args.claim + 1000, toFake: ["Date"] });
+
+        try {
+            await runJob(job);
+        } finally {
+            vi.useRealTimers();
+        }
+
+        const row = await rowOf(linkId);
+
+        expect(runs).toHaveLength(0);
+        expect(probe.charges).toBe(0);
+        expect(row.watchWakeLeaseUntil).toBe(0);
+        expect(row.watchPending).toEqual(["checks"]);
+        expect(row.watch.wakes).toBeUndefined();
+    });
+
+    it("answers `run` only while the delivery holds the lease on the same watch", async () => {
+        const { job, linkId } = await claimed();
+        const begin = async (claim: number) => await harness.run(async (ctx: any) => await ctx.runMutation(beginWatchWake, { ...key(linkId), claim }));
+
+        expect(await begin(job.args.claim)).toBe("run");
+        expect(await begin(1)).toBe("stale");
+    });
+});
+
+describe("a settlement that fails after the turn ran", () => {
+    it("is tried again without asking the model a second time, and counts the wake once", async () => {
+        const { linkId } = await seed();
+
+        await start(linkId);
+
+        // The first settlement fails, as a write that is lost would: only it is repeated, never the turn.
+        let failures = 1;
+
+        await harness.action(async (ctx: any) => {
+            const real = ctx.runMutation.bind(ctx);
+
+            ctx.runMutation = async (reference: unknown, args: unknown) => {
+                if (reference === finishWatchWake && failures > 0) {
+                    failures -= 1;
+
+                    throw new Error("write failed");
+                }
+
+                return await real(reference, args);
+            };
+
+            await ctx.runAction(runWatchWake, { ...enqueued[0]!.args, jobId: enqueued[0]!.options.once.jobId });
+        });
+
+        const row = await rowOf(linkId);
+
+        expect(runs).toHaveLength(1);
+        expect(row.watch.wakes).toBe(1);
+        expect(row.watchPending).toEqual([]);
+    });
+});
+
 describe("finishing and releasing", () => {
     const finish = async (linkId: string, claim: number, args: Record<string, unknown> = {}) =>
         await harness.run(
@@ -357,14 +718,6 @@ describe("finishing and releasing", () => {
         expect(row.watchWakeLeaseUntil).toBe(0);
         expect(row.watchPending).toEqual(["checks"]);
         expect(row.watch.wakes).toBeUndefined();
-    });
-
-    it("reports whether a delivery still holds the lease", async () => {
-        const { linkId } = await seed({ watchWakeLeaseUntil: 9000 });
-        const current = async (claim: number) => await harness.run(async (ctx: any) => await ctx.runQuery(isWatchWakeCurrent, { ...key(linkId), claim }));
-
-        expect(await current(9000)).toBe(true);
-        expect(await current(1)).toBe(false);
     });
 });
 
