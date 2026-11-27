@@ -328,7 +328,7 @@ describe("memory retrieval eval", () => {
         const { abstainRate, recallAt8 } = summary(totals);
 
         // Before relevance gated injection: Recall@8 0.165 and an abstain rate of 0. The keyword floor holds the first and moves the second.
-        expect(recallAt8!).toBeGreaterThanOrEqual(0.177 - TOLERANCE);
+        expect(recallAt8!).toBeGreaterThanOrEqual(0.185 - TOLERANCE);
         expect(abstainRate!).toBeGreaterThanOrEqual(0.55 - TOLERANCE);
     });
 });

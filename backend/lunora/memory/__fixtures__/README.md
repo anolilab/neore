@@ -94,7 +94,7 @@ What moved them:
   at cosine 0.40 is therefore under the floor, whatever its age. The score threshold is 0.3, since relevance is the floor now.
 - **Keywords count only where there is no vector.** A memory that has a vector the search did not return is not relevant by its
   words (a question's common words overlap with any memory); one with no vector, or any memory when no vector search ran, is found
-  by keyword overlap from 0.2 of the search's words. The last test of the eval runs that path: Recall@8 0.177 (0.165 before),
+  by keyword overlap from 0.2 of the search's words. The last test of the eval runs that path: Recall@8 0.185 (0.165 before),
   abstain rate 0.55 (0 before); 0.35 would fall to 0.015 Recall@8, 0.1 would rise to 0.212 with an abstain rate of 0.40.
 - **Relevance leads the weights.** Recall@8 / NDCG@8 by semantic weight (the rest shared by confidence, importance and recency):
   0.45 (the old 0.18 / 0.12 / 0.25) 0.919 / 0.600; 0.55 0.938 / 0.660; 0.65 (0.12 / 0.08 / 0.15) 0.950 / 0.771; 0.75 0.954 / 0.879;

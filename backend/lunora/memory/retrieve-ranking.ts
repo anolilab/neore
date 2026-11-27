@@ -28,7 +28,7 @@ export const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
  * Tuned on the retrieval eval (`__fixtures__/README.md`): relevant rows start at cosine 0.86 and unrelated ones end
  * at 0.40, so 0.45 leaves a margin over the noise. The keyword floor applies to a memory with no vector, to one whose
  * vector is new or the search did not fill its cut, and to every memory when no vector search ran; the eval's
- * keyword-only run holds Recall@8 there (0.177 at 0.2, 0.165 before, 0.015 at 0.35).
+ * keyword-only run holds Recall@8 there (0.185 at 0.2, 0.165 before, 0.015 at 0.35).
  */
 export const INJECT_MIN_RELEVANCE = 0.45;
 export const INJECT_MIN_KEYWORD_RELEVANCE = 0.2;
