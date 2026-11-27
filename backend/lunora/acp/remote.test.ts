@@ -992,6 +992,90 @@ describe("forkHostThread", () => {
         });
     });
 
+    describe("a fork cut short or raced", () => {
+        const begin = async (threadId: string, clientId: string) =>
+            (await run(async (ctx) => await ctx.runMutation(remote.beginHostFork, { clientId, threadId, userId: ownerId } as never))) as {
+                open: Record<string, unknown>;
+                started: boolean;
+                threadId: string;
+            };
+
+        it("refuses a fork whose source chat switched agent while the history was copied, and queues nothing", async () => {
+            const { threadId } = await started();
+            const [source] = await rows("acpSessions", { threadId });
+            const probe = {
+                during: async () => {
+                    // The source's agent session is no longer the one the fork was made from.
+                    await run(async (ctx) => {
+                        await ctx.db.patch("acpSessions", source!._id, { nativeSessionId: "native-after-switch" });
+                    });
+                },
+                fail: false,
+                queued: [] as number[],
+                sessions: [] as number[],
+            };
+
+            await say(threadId, [["asked", "success", 0]]);
+            probeCopy(probe);
+
+            try {
+                await expect(fork(threadId, "switch")).rejects.toThrow("agent changed while it was being forked");
+                expect(await rows("deviceCalls", { toolName: "acp_start" })).toHaveLength(1);
+                expect(await rows("acpSessions")).toHaveLength(1);
+            } finally {
+                registerModule(registry, "agent_messages", agentMessages);
+            }
+        });
+
+        it("does not queue a session for a new chat that is being deleted", async () => {
+            const { threadId } = await started();
+            const begun = await begin(threadId, "deleting");
+
+            await run(async (ctx) => {
+                await ctx.db.patch("threads", begun.threadId, { deletingAt: Date.now() });
+            });
+            await expect(
+                run(
+                    async (ctx) =>
+                        await ctx.runMutation(remote.openHostFork, {
+                            ...begun.open,
+                            clientId: "deleting",
+                            forkOfThreadId: threadId,
+                            threadId: begun.threadId,
+                            userId: ownerId,
+                        } as never),
+                ),
+            ).rejects.toThrow();
+            expect(await rows("deviceCalls", { toolName: "acp_start" })).toHaveLength(1);
+        });
+
+        it("answers a retry of a fork still being made with no chat, so the client does not mistake it for a finished one", async () => {
+            const { threadId } = await started();
+            const begun = await begin(threadId, "inflight");
+
+            expect(begun.started).toBe(true);
+            // The first run is between its two halves: the chat exists, its session is not queued yet.
+            expect(await fork(threadId, "inflight")).toEqual({ started: false });
+        });
+
+        it("frees the key of a fork the action never finished once its short claim lapses, so a retry forks", async () => {
+            const { device, threadId } = await started();
+
+            await begin(threadId, "cut-off");
+            expect(await fork(threadId, "cut-off")).toEqual({ started: false });
+
+            // Ten minutes on (the computer has been heard from since).
+            vi.setSystemTime(Date.now() + 11 * 60_000);
+            await run(async (ctx) => {
+                await ctx.db.patch("devices", device.deviceId, { lastSeenAt: Date.now() });
+            });
+
+            const retry = (await fork(threadId, "cut-off")) as { started: boolean; threadId: string };
+
+            expect(retry.started).toBe(true);
+        });
+    });
+
     it("refuses a chat that has messages but none settled to copy up to, instead of forking it empty", async () => {
         const { threadId } = await started();
 

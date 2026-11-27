@@ -46,12 +46,16 @@ const HostFork: FC<{ capabilities: CapabilityReportInput | undefined; disabled?:
             toast.error(getLocalizedError({ error, t }));
         },
         onSuccess: (result) => {
-            clientId.current = undefined;
-            setOpen(false);
-
+            // No chat in the answer: this fork is still being made (a retry of one in flight). Nothing opens and nothing is cleared, so the
+            // same click, tried again in a moment, gets the chat.
             if (result.threadId === undefined) {
+                toast.info(t`This fork is still being made. Try again in a moment.`);
+
                 return;
             }
+
+            clientId.current = undefined;
+            setOpen(false);
 
             const { threadId: forkedThreadId } = result;
 

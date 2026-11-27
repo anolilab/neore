@@ -41,6 +41,8 @@ import { fitsIdBytes, vPendingPermission } from "./validators";
 
 /** A double tap, or a retry after a lost answer, within this is the same start. */
 const START_CLAIM_TTL_MS = 24 * 60 * 60 * 1000;
+/** A fork's claim: the copy takes seconds, so a fork the action never finished (it was cut off between its two halves) frees its key soon, not after a day. */
+const FORK_CLAIM_TTL_MS = 10 * 60 * 1000;
 
 type Pending = Infer<typeof vPendingPermission>;
 
@@ -210,7 +212,7 @@ export const startHostSessionFor = async (ctx: MutationCtx, userId: string, args
     }
 
     // No live claim was read above, and none can be taken in between: this transaction is the only writer of it.
-    const claimedAt = await claimFence(ctx, claimScope, startKey, { ttlMs: START_CLAIM_TTL_MS, userId });
+    const claimedAt = await claimFence(ctx, claimScope, startKey, { ttlMs: args.deferOpen === true ? FORK_CLAIM_TTL_MS : START_CLAIM_TTL_MS, userId });
 
     if (claimedAt === null) {
         throw new LunoraError("CONFLICT", "That start is already being made.");
@@ -313,6 +315,8 @@ const vBegunFork = v.object({
             deviceId: v.id("devices"),
             folderId: v.string(),
             forkSessionId: v.string(),
+            /** The source chat's session the fork was made from: the one it must still be when the fork's session is queued. */
+            sourceSessionId: v.id("acpSessions"),
             taintedBy: v.optional(v.array(vDeviceTaintSource)),
         }),
     ),
@@ -409,6 +413,7 @@ export const beginHostFork = internalMutation
                     deviceId: session.deviceId,
                     folderId: session.folderId,
                     forkSessionId: nativeId,
+                    sourceSessionId: session._id,
                     ...(session.taintedBy !== undefined && session.taintedBy.length > 0 && { taintedBy: session.taintedBy }),
                 },
             }),
@@ -427,6 +432,7 @@ export const openHostFork = internalMutation
         folderId: v.string(),
         forkOfThreadId: v.id("threads"),
         forkSessionId: v.string(),
+        sourceSessionId: v.id("acpSessions"),
         taintedBy: v.optional(v.array(vDeviceTaintSource)),
         threadId: v.id("threads"),
         userId: v.string(),
@@ -438,7 +444,8 @@ export const openHostFork = internalMutation
         const device = await ctx.db.devices.findFirst({ consistency: "primary", where: { _id: args.deviceId, userId } });
         const offer = offerOf(device, args.agentKey, args.folderId);
 
-        if (!thread || thread.deleted === true || !isHostRunThread(thread) || !device?.encryptedSecret || !offer) {
+        // A chat being deleted had its session ended by the deletion: it is not given a new one.
+        if (!thread || thread.deleted === true || thread.deletingAt !== undefined || !isHostRunThread(thread) || !device?.encryptedSecret || !offer) {
             throw new LunoraError("BAD_REQUEST", "That agent is not approved for that folder on this computer. Approve it in the desktop app first.");
         }
 
@@ -453,6 +460,14 @@ export const openHostFork = internalMutation
 
         if (isThreadLocked(source)) {
             throw new LunoraError("FORBIDDEN", "Unlock this chat to fork it.");
+        }
+
+        // The agent session this fork continues must still be the source chat's own: a switch of agent (or a new session) while the history was
+        // copied would leave the new chat holding messages the session it continues has never seen.
+        const current = await sessionOfThread(ctx, source._id);
+
+        if (current?._id !== args.sourceSessionId || current.nativeSessionId !== args.forkSessionId) {
+            throw new LunoraError("CONFLICT", "This chat's agent changed while it was being forked. Fork it again.");
         }
 
         const refused = await hostOrganizationRefusal(ctx, thread.organizationId || thread.capOrganizationId, userId);

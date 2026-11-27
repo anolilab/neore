@@ -12,6 +12,8 @@ const harness = vi.hoisted(() => {
     return {
         calls: [] as unknown[],
         error: undefined as Error | undefined,
+        infos: [] as string[],
+        result: undefined as { started: boolean; threadId?: string } | undefined,
         hold: undefined as Promise<void> | undefined,
         release: undefined as (() => void) | undefined,
         navigated: [] as unknown[],
@@ -40,6 +42,9 @@ vi.mock("sonner", () => {
             error: (message: string) => {
                 harness.toasts.push(message);
             },
+            info: (message: string) => {
+                harness.infos.push(message);
+            },
             success: (message: string, options?: { action?: { label: string; onClick: () => void } }) => {
                 harness.successes.push({ action: options?.action, message });
             },
@@ -67,7 +72,7 @@ vi.mock("@/lib/lunora/crpc", () => {
                         throw harness.error;
                     }
 
-                    return { started: true, threadId: "thread-fork" };
+                    return harness.result ?? { started: true, threadId: "thread-fork" };
                 },
             };
         },
@@ -90,6 +95,8 @@ const mount = (capabilities: unknown, disabled = false) =>
 beforeEach(() => {
     harness.calls = [];
     harness.error = undefined;
+    harness.infos = [];
+    harness.result = undefined;
     harness.hold = undefined;
     harness.release = undefined;
     harness.navigated = [];
@@ -191,6 +198,28 @@ describe("HostFork", () => {
         const [first, second] = harness.calls as { clientId: string }[];
 
         expect(second?.clientId).toBe(first?.clientId);
+    });
+
+    it("says a fork is still being made, and opens nothing and keeps the id, when the answer names no chat", async () => {
+        const user = userEvent.setup();
+
+        harness.result = { started: false };
+        mount(FORKS);
+        await user.click(screen.getByRole("button", { name: "Fork here" }));
+        await screen.findByText(WARNING);
+        await user.click(screen.getAllByRole("button", { name: "Fork here" }).at(-1)!);
+        await waitFor(() => expect(harness.infos).toEqual(["This fork is still being made. Try again in a moment."]));
+        expect(harness.navigated).toEqual([]);
+
+        // The same click, again in a moment: the same id, and now the chat.
+        harness.result = undefined;
+        await user.click(screen.getAllByRole("button", { name: "Fork here" }).at(-1)!);
+        await waitFor(() => expect(harness.calls).toHaveLength(2));
+
+        const [first, second] = harness.calls as { clientId: string }[];
+
+        expect(second?.clientId).toBe(first?.clientId);
+        await waitFor(() => expect(harness.navigated).toHaveLength(1));
     });
 
     it("is off while the agent is still starting", () => {
