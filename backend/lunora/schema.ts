@@ -2875,11 +2875,58 @@ export const schema = defineSchema({
         ),
         // Names one start of the watch: fresh at every start and never the clock, so a poll leased before a stop and restart cannot match the restarted watch (`source-control/pr-watch-poll.ts`).
         watchRun: v.optional(v.string()),
+        // The record of one wake turn's occurrence (`source-control/pr-watch-wake.ts`), written before the model is asked: the claim, the run and
+        // start it belongs to, the reasons with the occurrence markers they came from, and where it stands. `running`: the turn was started and
+        // its end is not recorded; `completed`: it ran to its end. `done` is set once it is settled. A claim that finds one that is not done never
+        // generates again for it: a completed one is settled (counted, cleared), a running one is settled as a failed attempt, so one occurrence
+        // costs at most one model call. A record of another run is discarded, and starting a watch discards any.
+        watchWakeCompleted: v.optional(
+            v.object({
+                claim: v.number(),
+                done: v.boolean(),
+                markers: v.object({ checks: v.optional(v.string()), conflict: v.optional(v.string()), review: v.optional(v.string()) }),
+                // The order of the chat's newest message when the turn started: a turn that fails or is fenced is rolled back to it, so its prompt
+                // and any partial reply leave no trace and a retry does not repeat them in the chat.
+                markOrder: v.optional(v.number()),
+                // Set when the charge is kept, right before the model is asked, and kept through any settlement: the model may have generated
+                // for this occurrence, so no new paid turn is admitted for the same markers.
+                modelReached: v.optional(v.boolean()),
+                reasons: v.array(v.union(v.literal("checks"), v.literal("conflict"), v.literal("review"))),
+                run: v.optional(v.string()),
+                startedAt: v.number(),
+                state: v.union(v.literal("completed"), v.literal("running")),
+            }),
+        ),
+        // How the wake turns of this watch are failing (`source-control/pr-watch-wake.ts`): when the last one failed, how many failed in a row
+        // (0 after a delivery), when the next try may start, and what kind of failure it was: "retryable", "terminal" (cannot be cured by trying
+        // again), "shared" (the chat is no longer the owner's alone) or "unavailable" (the chat's model is no longer available): the watch waits and no failure is counted. The watch is stopped at the
+        // third failure in a row or at a terminal one; the last failure stays as history.
+        watchWakeFailure: v.optional(
+            v.object({
+                at: v.number(),
+                attempts: v.number(),
+                kind: v.union(v.literal("retryable"), v.literal("shared"), v.literal("terminal"), v.literal("unavailable")),
+                retryAt: v.number(),
+            }),
+        ),
+        // The lease a wake turn holds while it is delivered (`source-control/pr-watch-wake.ts`): until when no second delivery may start.
+        // Released when the delivery ends; a delivery that never ends frees itself when it lapses.
+        watchWakeLeaseUntil: v.optional(v.number()),
+        // The limits a wake turn's round was charged to, written in the same transaction as the charge: it is owed back until the model is
+        // reached (`applied` is then set without a refund) or the refund is paid. `windowEnds` is when each limit's window ends: a refund after
+        // that is not paid, since the window the charge came from is gone. A job that dies before the model leaves it unpaid, and the claim's
+        // lapse handler or the next charge pays it once.
+        watchWakeRefund: v.optional(
+            v.object({ applied: v.boolean(), claim: v.number(), keys: v.array(v.string()), windowEnds: v.optional(v.array(v.number())) }),
+        ),
     })
         .shardBy("userId")
         .index("by_user_and_repository_number", ["userId", "repository", "number"])
         .index("by_user_and_repository_number_threadId", ["userId", "repository", "number", "threadId"])
         .index("by_user_and_threadId", ["userId", "threadId"])
+        // The links of a thread that hold a wake lease (`source-control/pr-watch-wake-lease.ts`): read by lease time, so the check is bounded by
+        // the live leases and not by how many links the thread has.
+        .index("by_user_thread_and_wakeLease", ["userId", "threadId", "watchWakeLeaseUntil"])
         .index("by_user_and_watchActive", ["userId", "watchActive"]),
 
     // A phone's Expo push token (`notifications/native-push.ts`): one row per token, owned by the account signed in on
