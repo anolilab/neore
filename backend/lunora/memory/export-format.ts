@@ -37,6 +37,13 @@ const TYPE_TITLES: Record<MemoryType, string> = {
 
 /** Unpinned rows one export holds: the settings list's own cap, so the file holds what the list can show. */
 export const MEMORY_EXPORT_MAX_ROWS = 2000;
+/** Active rows one export reads at most: the account export's own memory cap. */
+export const MEMORY_EXPORT_SCAN_ROWS = 5000;
+
+/** The local day an export is dated (its header and its file name), in the user's timezone or UTC. */
+const SCAN_LABEL = `${MEMORY_EXPORT_SCAN_ROWS.toLocaleString("en-US")} memories`;
+
+export const exportDayOf = (now: number, timeZone: string | null | undefined): string => localDayOf(now, resolveTimeZone(timeZone));
 
 const IMPORT_APPS: Record<ImportApp, string> = { chatgpt: "ChatGPT", claude: "Claude", gemini: "Gemini", other: "another assistant" };
 
@@ -122,7 +129,7 @@ export interface MemoryMarkdownOptions {
  */
 export const formatMemoryMarkdown = (rows: ReadonlyArray<ExportMemoryRow>, options: MemoryMarkdownOptions): string => {
     const timeZone = resolveTimeZone(options.timeZone);
-    const today = localDayOf(options.now, timeZone);
+    const today = exportDayOf(options.now, timeZone);
     const line = (row: ExportMemoryRow, withType: boolean): string => {
         const details = [
             ...(withType ? [TYPE_TITLES[row.type].toLowerCase()] : []),
@@ -143,7 +150,7 @@ export const formatMemoryMarkdown = (rows: ReadonlyArray<ExportMemoryRow>, optio
     if (options.truncated) {
         lines.push(
             "",
-            `This file is cut: it holds your pinned memories and the ${String(MEMORY_EXPORT_MAX_ROWS)} most recently saved others. The account data export in Privacy settings holds up to 5,000 memories, earlier versions included.`,
+            `This file is cut: it holds the pinned memories and the ${String(MEMORY_EXPORT_MAX_ROWS)} most recently saved others among your newest ${SCAN_LABEL} (by when each was saved, not last confirmed). Older ones are left out; the account data export in Privacy settings holds up to ${SCAN_LABEL}, earlier versions included.`,
         );
     }
 

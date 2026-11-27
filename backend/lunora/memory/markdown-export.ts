@@ -3,9 +3,9 @@
  * active rows: superseded history is in the account data export (`./gdpr.ts`). It works with memory off, so the user
  * can still see what is stored.
  *
- * Pinned rows are read first, by one bounded scan; the others are paged newest first by a cursor, a page per
- * `runQuery`, up to {@link MEMORY_EXPORT_MAX_ROWS}. So a cut drops the oldest unpinned rows, never a pinned or a
- * recent one, and the file says it is cut.
+ * One read of the newest {@link MEMORY_EXPORT_SCAN_ROWS} active rows (there is no pinned index), split in memory: every
+ * pinned row among them, and the {@link MEMORY_EXPORT_MAX_ROWS} newest others. "Newest" is when a row was saved, not when
+ * it was last confirmed: a deliberate bound, so a cut drops the oldest saved rows and the file says it is cut.
  */
 import { v } from "lunorash/server";
 
@@ -15,14 +15,9 @@ import type { ActionCtx } from "../_generated/server";
 import { internalQuery } from "../_generated/server";
 import { authAction, rateLimit } from "../lib/crpc";
 import { botOwnerRows } from "./bot-owner";
-import { type BotLabel, type ExportMemoryRow, formatMemoryMarkdown, MEMORY_EXPORT_MAX_ROWS } from "./export-format";
+import { type BotLabel, exportDayOf, type ExportMemoryRow, formatMemoryMarkdown, MEMORY_EXPORT_MAX_ROWS, MEMORY_EXPORT_SCAN_ROWS } from "./export-format";
 import { vImportApp } from "./import-logic";
 import { lastConfirmedOf, vMemoryType } from "./taxonomy";
-
-/** Rows one `readMemoryExportPage` call returns. */
-export const MEMORY_EXPORT_PAGE_ROWS = 500;
-/** Active rows the pinned scan reads at most (there is no pinned index): the account export's own memory cap. */
-export const MEMORY_EXPORT_PINNED_SCAN_ROWS = 5000;
 
 const vExportRow = v.object({
     botId: v.optional(v.string()),
@@ -52,32 +47,26 @@ const toExportRow = (m: Doc<"memories">): ExportMemoryRow => {
     };
 };
 
-/** One page of the user's active memories, newest first; only its unpinned rows are returned (`readPinnedMemories` has the rest). */
-export const readMemoryExportPage = internalQuery
-    .input({ cursor: v.union(v.string(), v.null()), userId: v.string() })
-    .output(v.object({ cursor: v.union(v.string(), v.null()), isDone: v.boolean(), rows: v.array(vExportRow) }))
-    .query(async ({ args, ctx }) => {
-        const page = await ctx.db
-            .query("memories")
-            .withIndex("by_userId_supersededBy", (q) => q.eq("userId", args.userId).eq("supersededBy", null))
-            .order("desc")
-            .paginate({ cursor: args.cursor, numItems: MEMORY_EXPORT_PAGE_ROWS });
-
-        return { cursor: page.continueCursor, isDone: page.isDone, rows: page.page.filter((m) => m.pinned !== true).map((m) => toExportRow(m)) };
-    });
-
-/** The user's pinned active memories among the newest {@link MEMORY_EXPORT_PINNED_SCAN_ROWS}, and whether that was all of them. */
-export const readPinnedMemories = internalQuery
+/**
+ * The user's pinned memories and newest unpinned ones among their newest {@link MEMORY_EXPORT_SCAN_ROWS} active rows,
+ * and whether any active row was left out. One row past the scan is read, so exactly the scan is not reported as cut.
+ */
+export const readMemoryExportRows = internalQuery
     .input({ userId: v.string() })
-    .output(v.object({ complete: v.boolean(), rows: v.array(vExportRow) }))
+    .output(v.object({ rows: v.array(vExportRow), truncated: v.boolean() }))
     .query(async ({ args, ctx }) => {
         const scanned = await ctx.db
             .query("memories")
             .withIndex("by_userId_supersededBy", (q) => q.eq("userId", args.userId).eq("supersededBy", null))
             .order("desc")
-            .take(MEMORY_EXPORT_PINNED_SCAN_ROWS);
+            .take(MEMORY_EXPORT_SCAN_ROWS + 1);
+        const read = scanned.slice(0, MEMORY_EXPORT_SCAN_ROWS);
+        const unpinned = read.filter((m) => m.pinned !== true);
 
-        return { complete: scanned.length < MEMORY_EXPORT_PINNED_SCAN_ROWS, rows: scanned.filter((m) => m.pinned === true).map((m) => toExportRow(m)) };
+        return {
+            rows: [...read.filter((m) => m.pinned === true), ...unpinned.slice(0, MEMORY_EXPORT_MAX_ROWS)].map((m) => toExportRow(m)),
+            truncated: scanned.length > MEMORY_EXPORT_SCAN_ROWS || unpinned.length > MEMORY_EXPORT_MAX_ROWS,
+        };
     });
 
 /**
@@ -123,36 +112,9 @@ export const resolveMemoryBotLabels = internalQuery
 /** Bot ids one label lookup takes, so a user with many bots never builds one oversized read. */
 const BOT_LABEL_BATCH = 100;
 
-/**
- * The user's pinned memories, then their newest unpinned ones up to {@link MEMORY_EXPORT_MAX_ROWS}, with whether any
- * active row was left out.
- */
-export const readExportMemories = async (ctx: Pick<ActionCtx, "runQuery">, userId: string): Promise<{ rows: ExportMemoryRow[]; truncated: boolean }> => {
-    const pinned = await ctx.runQuery(internal.memory.markdown_export.readPinnedMemories, { userId });
-    const unpinned: ExportMemoryRow[] = [];
-    let cursor: string | null = null;
-
-    // At the cap itself one more page is read, so exactly the cap is not reported as cut.
-    while (unpinned.length <= MEMORY_EXPORT_MAX_ROWS) {
-        const page: { cursor: string | null; isDone: boolean; rows: ExportMemoryRow[] } = await ctx.runQuery(
-            internal.memory.markdown_export.readMemoryExportPage,
-            { cursor, userId },
-        );
-
-        unpinned.push(...page.rows);
-
-        if (page.isDone) {
-            break;
-        }
-
-        cursor = page.cursor;
-    }
-
-    return {
-        rows: [...pinned.rows, ...unpinned.slice(0, MEMORY_EXPORT_MAX_ROWS)],
-        truncated: !pinned.complete || unpinned.length > MEMORY_EXPORT_MAX_ROWS,
-    };
-};
+/** The rows an export holds, pinned first (`readMemoryExportRows`). */
+export const readExportMemories = async (ctx: Pick<ActionCtx, "runQuery">, userId: string): Promise<{ rows: ExportMemoryRow[]; truncated: boolean }> =>
+    await ctx.runQuery(internal.memory.markdown_export.readMemoryExportRows, { userId });
 
 const readBotLabels = async (ctx: Pick<ActionCtx, "runQuery">, userId: string, rows: ReadonlyArray<ExportMemoryRow>): Promise<Map<string, BotLabel>> => {
     const botIds = [...new Set(rows.map((row) => row.botId).filter((id): id is string => id !== undefined))];
@@ -178,7 +140,8 @@ const readBotLabels = async (ctx: Pick<ActionCtx, "runQuery">, userId: string, r
  */
 export const exportMemoriesMarkdown = authAction
     .use(rateLimit("memory/export"))
-    .output(v.object({ count: v.number(), markdown: v.string(), truncated: v.boolean() }))
+    // `day`: the local day the file is dated, so its name matches its header.
+    .output(v.object({ count: v.number(), day: v.string(), markdown: v.string(), truncated: v.boolean() }))
     .action(async ({ ctx }) => {
         const { userId } = ctx.user;
         const [{ rows, truncated }, timeZone] = await Promise.all([
@@ -186,8 +149,14 @@ export const exportMemoriesMarkdown = authAction
             ctx.runQuery(internal.memory.functions.getUserTimeZone, { userId }),
         ]);
         const bots = await readBotLabels(ctx, userId, rows);
+        const now = Date.now();
 
         ctx.log.event("memory.export_markdown", { count: rows.length, truncated, userId });
 
-        return { count: rows.length, markdown: formatMemoryMarkdown(rows, { bots, now: Date.now(), timeZone, truncated }), truncated };
+        return {
+            count: rows.length,
+            day: exportDayOf(now, timeZone),
+            markdown: formatMemoryMarkdown(rows, { bots, now, timeZone, truncated }),
+            truncated,
+        };
     });

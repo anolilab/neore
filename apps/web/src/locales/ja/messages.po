@@ -11813,7 +11813,7 @@ msgstr "JSON をダウンロード"
 msgid "Download Markdown"
 msgstr "Markdown をダウンロード"
 
-#: src/features/settings/components/personalization/memory-export-button.tsx:53
+#: src/features/settings/components/personalization/memory-export-button.tsx:61
 msgid "Download memories (Markdown)"
 msgstr "メモリをダウンロード（Markdown）"
 
@@ -26865,7 +26865,8 @@ msgstr "リクエストを準備中…"
 msgid "Preparing the import…"
 msgstr "インポートを準備しています…"
 
-#: src/features/settings/components/personalization/memory-export-button.tsx:53
+#: src/features/settings/components/personalization/memory-export-button.tsx:61
+#: src/features/settings/components/personalization/memory-export-button.tsx:64
 msgid "Preparing your memories…"
 msgstr "メモリを準備しています…"
 
@@ -35283,7 +35284,7 @@ msgstr "差分が大きすぎて保持できません。ファイルとその行
 msgid "The documents the answer should be retrieved from. Used for hit rate, MRR, precision and recall."
 msgstr "回答の取得元となるべきドキュメント。ヒット率、MRR、適合率、再現率の計算に使われます。"
 
-#: src/features/settings/components/personalization/memory-export-button.tsx:57
+#: src/features/settings/components/personalization/memory-export-button.tsx:68
 msgid "The download could not be prepared. Please try again in a moment."
 msgstr "ダウンロードを準備できませんでした。しばらくしてからもう一度お試しください。"
 

@@ -38,8 +38,9 @@ const MemoryExportButton: FC = () => {
         ...useLunoraActionOptions(api.memory.markdown_export.exportMemoriesMarkdown),
         // Lunora actions are not queued: offline, the click fails at once and says so instead of waiting for a connection.
         networkMode: "always",
-        onSuccess: ({ markdown }: { count: number; markdown: string; truncated: boolean }) => {
-            saveMarkdown(markdown, `memories-${new Date().toISOString().slice(0, 10)}.md`);
+        // Named by the day the server dated it (the user's timezone), the same day as its header.
+        onSuccess: ({ day, markdown }: { count: number; day: string; markdown: string; truncated: boolean }) => {
+            saveMarkdown(markdown, `memories-${day}.md`);
         },
         retry: 0,
     });

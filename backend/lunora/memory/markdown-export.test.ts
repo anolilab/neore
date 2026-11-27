@@ -7,8 +7,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import schema from "../schema";
 import type { BotLabel, ExportMemoryRow } from "./export-format";
-import { formatMemoryMarkdown, MEMORY_EXPORT_MAX_ROWS } from "./export-format";
-import { MEMORY_EXPORT_PAGE_ROWS, readExportMemories, readMemoryExportPage, readPinnedMemories, resolveMemoryBotLabels } from "./markdown-export";
+import { formatMemoryMarkdown, MEMORY_EXPORT_MAX_ROWS, MEMORY_EXPORT_SCAN_ROWS } from "./export-format";
+import { readExportMemories, readMemoryExportRows, resolveMemoryBotLabels } from "./markdown-export";
 
 type Harness = ReturnType<typeof lunoraTest>;
 
@@ -102,8 +102,10 @@ describe("formatMemoryMarkdown", () => {
         expect(markdown).toContain("gone — last confirmed 2026-03-01 · learned in chat · a deleted bot");
         expect(markdown).toContain("theirs — last confirmed 2026-03-01 · learned in chat · a shared chat's bot");
         expect(markdown).toContain("old — last confirmed 2026-03-01 · learned in chat · a bot");
-        expect(markdown).toContain(`This file is cut: it holds your pinned memories and the ${String(MEMORY_EXPORT_MAX_ROWS)} most recently saved others.`);
-        expect(markdown).toContain("holds up to 5,000 memories");
+        expect(markdown).toContain(
+            `This file is cut: it holds the pinned memories and the ${String(MEMORY_EXPORT_MAX_ROWS)} most recently saved others among your newest 5,000 memories (by when each was saved, not last confirmed).`,
+        );
+        expect(markdown).toContain("the account data export in Privacy settings holds up to 5,000 memories");
     });
 
     it("labels each source", () => {
@@ -150,11 +152,10 @@ const runner = () => {
     return {
         calls,
         ctx: {
-            runQuery: async (reference: { __lunoraRef: string }, args: unknown) => {
+            runQuery: async (_reference: unknown, args: unknown) => {
                 calls.push(1);
-                const query = reference.__lunoraRef.endsWith(":readPinnedMemories") ? readPinnedMemories : readMemoryExportPage;
 
-                return await harness.run(async (ctx: any) => await ctx.runQuery(query, args));
+                return await harness.run(async (ctx: any) => await ctx.runQuery(readMemoryExportRows, args));
             },
         } as never,
     };
@@ -179,7 +180,7 @@ describe("readExportMemories", () => {
         expect(truncated).toBe(false);
     });
 
-    it("pages past a large count and stops at the cap", async () => {
+    it("stops at the unpinned cap in one read", async () => {
         await insert(MEMORY_EXPORT_MAX_ROWS + 30);
 
         const { calls, ctx } = runner();
@@ -187,8 +188,23 @@ describe("readExportMemories", () => {
 
         expect(rows).toHaveLength(MEMORY_EXPORT_MAX_ROWS);
         expect(truncated).toBe(true);
-        // The pinned scan, then the pages up to the cap and the one that finds it passed.
-        expect(calls).toHaveLength(1 + MEMORY_EXPORT_MAX_ROWS / MEMORY_EXPORT_PAGE_ROWS + 1);
+        expect(calls).toHaveLength(1);
+    });
+
+    it("stops at the scan with many pinned rows, and does not call exactly the scan cut", async () => {
+        await insert(MEMORY_EXPORT_SCAN_ROWS, { pinned: true });
+
+        const exact = await readExportMemories(runner().ctx, "user-1");
+
+        expect(exact.rows).toHaveLength(MEMORY_EXPORT_SCAN_ROWS);
+        expect(exact.truncated).toBe(false);
+
+        await insert(10, { pinned: true });
+
+        const over = await readExportMemories(runner().ctx, "user-1");
+
+        expect(over.rows).toHaveLength(MEMORY_EXPORT_SCAN_ROWS);
+        expect(over.truncated).toBe(true);
     });
 
     it("keeps a pinned row and the newest rows past the cap, and leaves out the oldest unpinned ones", async () => {

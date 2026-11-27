@@ -10,8 +10,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import MemoryExportButton from "./memory-export-button";
 
-const FILENAME = /^memories-\d{4}-\d{2}-\d{2}\.md$/u;
-
 const harness = vi.hoisted(() => {
     return { exportMemories: vi.fn() };
 });
@@ -74,7 +72,7 @@ describe("MemoryExportButton", () => {
     });
 
     it("downloads the Markdown as a .md file", async () => {
-        harness.exportMemories.mockResolvedValue({ count: 1, markdown: "# Your memories\n", truncated: false });
+        harness.exportMemories.mockResolvedValue({ count: 1, day: "2026-03-02", markdown: "# Your memories\n", truncated: false });
         renderButton();
 
         fireEvent.click(screen.getByRole("button", { name: "Download memories (Markdown)" }));
@@ -82,7 +80,7 @@ describe("MemoryExportButton", () => {
         await waitFor(() => {
             expect(clicks()).toHaveLength(1);
         });
-        expect(clicks()[0]?.download).toMatch(FILENAME);
+        expect(clicks()[0]?.download).toBe("memories-2026-03-02.md");
         expect(clicks()[0]?.getAttribute("href")).toBe("blob:memories");
         expect(await blobs[0]?.text()).toBe("# Your memories\n");
         expect(blobs[0]?.type).toBe("text/markdown;charset=utf-8");
