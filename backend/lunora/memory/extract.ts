@@ -1043,7 +1043,7 @@ export const factEvidence = (
 
     // Then the quote has to fit inside one typed steer. Steers carry no offsets in a job scheduled without them: the
     // steered text is one segment then.
-    const segments =
+    const segments: { from: number; steer?: SteerOffset; text: string }[] =
         steers.length === 0
             ? [{ from: turn.steeredFrom, text: steered }]
             : steers.flatMap((steer, index) =>
@@ -1056,7 +1056,7 @@ export const factEvidence = (
         const quote = typedEvidenceQuote(claimed, withoutQuotedLines(segment.text), segment.text, turn.userMessage.slice(0, segment.from));
 
         if (quote !== undefined) {
-            const { steer } = segment as { steer?: SteerOffset };
+            const { steer } = segment;
 
             return link(steer?.messageId !== undefined && turn.threadId !== undefined ? { messageId: steer.messageId } : {}, quote, steer?.at ?? fallbackAt);
         }
