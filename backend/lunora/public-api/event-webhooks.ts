@@ -107,7 +107,8 @@ export const subscribeOn = async (ctx: Pick<MutationCtx, "db">, input: Subscribe
     }
 
     if (!existing) {
-        const { page } = await ctx.db.eventWebhookSubscriptions.findMany({ limit: MAX_SUBSCRIPTIONS, where: { userId: input.userId } });
+        // From the primary: a replica that has not seen a recent subscribe would undercount the slots, and the cap would be exceeded.
+        const { page } = await ctx.db.eventWebhookSubscriptions.findMany({ consistency: "primary", limit: MAX_SUBSCRIPTIONS, where: { userId: input.userId } });
 
         // Expired rows hold a slot until the sweep reaps them, so this account's own are reaped here and do not count against the cap.
         const expired = page.filter((row) => row.expiresAt <= now);
