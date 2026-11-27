@@ -129,10 +129,23 @@ describe("rankMemories", () => {
         expect(Object.keys(rank([candidate("a")], [["a", 1]])[0]!).toSorted((a, b) => a.localeCompare(b))).toEqual([
             "category",
             "confidence",
+            "lastConfirmedAt",
             "memory",
             "memoryId",
             "score",
         ]);
+    });
+
+    it("carries a memory's last confirmation as a time, and only the dates it has", () => {
+        const dated = candidate("a", { eventEnd: "2026-12-05", eventStart: "2026-12-03", lastConfirmedAt: NOW - DAY, validUntil: "2026-12-31" });
+
+        expect(rank([dated], [["a", 1]])[0]).toMatchObject({
+            eventEnd: "2026-12-05",
+            eventStart: "2026-12-03",
+            lastConfirmedAt: NOW - DAY,
+            validUntil: "2026-12-31",
+        });
+        expect(rank([candidate("a", { eventEnd: null, eventStart: "2026-12-03", validUntil: null })], [["a", 1]])[0]).not.toHaveProperty("validUntil");
     });
 });
 
