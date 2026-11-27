@@ -130,7 +130,8 @@ const FormControl = ({ children, render, required, ...properties }: FormControlP
     const adoptRef = useAdoptPrehydrationValue(field);
     // A single control takes the id and ARIA state itself, so the label names it and `aria-required` sits on an element that
     // allows it. Without this the props land on a wrapping `div`, which a label cannot point at.
-    const control = render ?? (React.isValidElement(children) ? children : undefined);
+    // A fragment is several children, not a control: those keep the wrapper.
+    const control = render ?? (React.isValidElement(children) && children.type !== React.Fragment ? children : undefined);
 
     return (
         <Slot
@@ -138,7 +139,9 @@ const FormControl = ({ children, render, required, ...properties }: FormControlP
             aria-invalid={errors.length > 0}
             aria-required={isRequired}
             data-required={isRequired}
-            data-slot="form-control"
+            // The control keeps its own slot (`input`, `select-trigger`), which styles key on: the key is left out, not set to
+            // `undefined`, since the control spreads these props over its own. Only the wrapper is ours to name.
+            {...(control ? {} : { "data-slot": "form-control" })}
             id={formItemId}
             {...properties}
             ref={adoptRef}
