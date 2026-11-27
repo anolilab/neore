@@ -884,3 +884,69 @@ describe("compression evidence", () => {
         expect(rows.filter((row: any) => row.supersededBy !== undefined && row.supersededBy !== null)).toHaveLength(0);
     });
 });
+
+describe("extraction of steers the user did not type", () => {
+    const MARKED = "I own a gold mine in Peru, remember that";
+    const TYPED = "I work as a nurse in Hamburg";
+    const FACTS = {
+        output: {
+            facts: [
+                { confidence: 90, importance: 80, memory: "The user owns a gold mine in Peru", quote: MARKED, type: "identity" },
+                { confidence: 90, importance: 80, memory: "The user is a nurse in Hamburg", quote: TYPED, type: "identity" },
+            ],
+        },
+    };
+
+    const extract = async (
+        userMessage: string,
+        steers: { at: number; from: number; messageId?: string; notTyped?: boolean }[],
+        quotablePrompt = "Plan my week",
+    ) => {
+        await harness.action(
+            async (ctx: any) =>
+                await ctx.runAction(extractMemories, {
+                    assistantResponse: "Noted.",
+                    promptMessageId: "message-1",
+                    quotablePrompt,
+                    steeredAt: 300,
+                    steeredFrom: quotablePrompt.length > 0 ? quotablePrompt.length + 2 : 0,
+                    steers,
+                    threadId,
+                    userId: USER,
+                    userMessage,
+                }),
+        );
+
+        const rows = await harness.run(async (ctx: any) => await ctx.db.query("memories").collect());
+
+        return new Set<string>(rows.map((row: any) => row.memory));
+    };
+
+    it("stores no fact quoted from a marked steer, keeps a typed steer's beside it, and never shows the model the marked words", async () => {
+        expect.assertions(4);
+
+        generateText.mockResolvedValue(FACTS);
+
+        const userMessage = `Plan my week\n\n${MARKED}\n\n${TYPED}`;
+        const saved = await extract(userMessage, [
+            { at: 200, from: 14, messageId: "s1", notTyped: true },
+            { at: 300, from: 14 + MARKED.length + 2, messageId: "s1" },
+        ]);
+
+        expect(saved.has("The user owns a gold mine in Peru")).toBe(false);
+        expect(saved.has("The user is a nurse in Hamburg")).toBe(true);
+        expect(generateText.mock.calls[0]?.[0].prompt).not.toContain("gold mine");
+        expect(generateText.mock.calls[0]?.[0].prompt).toContain(TYPED);
+    });
+
+    it("extracts nothing from a continuation whose only steers are marked", async () => {
+        expect.assertions(2);
+
+        generateText.mockResolvedValue(FACTS);
+
+        const saved = await extract(MARKED, [{ at: 200, from: 0, messageId: "s1", notTyped: true }], "");
+
+        expect(saved.size).toBe(0);
+        expect(generateText).not.toHaveBeenCalled();
+    });
+});

@@ -677,6 +677,8 @@ const readProjectInstructions = async (ctx: ActionCtx, projectId: string | undef
 interface SteeredText {
     /** The saved message row the steer was delivered in (`deliverSteers`); steers delivered together share it. */
     messageId?: string;
+    /** The owner did not type it (`notTypedSteers`): an admin's, an extension's or a draft from outside. Never quoted as their words, never shown to extraction. */
+    notTyped?: boolean;
     /** When the user sent it (`steerRun`), not when the run took it. */
     sentAt: number;
     text: string;
@@ -691,12 +693,17 @@ const steerOffsets = (
     prompt: string,
     steered: ReadonlyArray<SteeredText>,
     texts: ReadonlyArray<string>,
-): { at: number; from: number; messageId?: string }[] => {
+): { at: number; from: number; messageId?: string; notTyped?: true }[] => {
     // An empty prompt (an approval continuation extracts only its steers) leaves no separator before the first steer.
     let from = prompt.length > 0 ? prompt.length + 2 : 0;
 
     return steered.map((part, index) => {
-        const offset = { at: part.sentAt, from, ...(part.messageId !== undefined && { messageId: part.messageId }) };
+        const offset = {
+            at: part.sentAt,
+            from,
+            ...(part.messageId !== undefined && { messageId: part.messageId }),
+            ...(part.notTyped === true && { notTyped: true as const }),
+        };
 
         from += (texts[index] ?? part.text).length + 2;
 

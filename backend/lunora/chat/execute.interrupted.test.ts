@@ -1044,6 +1044,28 @@ describe("a run the watchdog reads wrongly", () => {
         expect(await inspect()).toStrictEqual({ kind: "gone" });
     });
 
+    it("tells a recovered reply which of its delivered steers the owner did not type", async () => {
+        await dieAfterSavingFinalRow([{ text: "All done.", type: "text" }]);
+        await patchStream({
+            notTypedSteers: [{ id: "steer-marked", notTyped: { draft: "extension" } }],
+            steers: [
+                { id: "steer-marked", messageId: "steer-row", sentAt: 100, status: "delivered", textLength: 13 },
+                { id: "steer-typed", messageId: "steer-row", sentAt: 200, status: "delivered", textLength: 17 },
+            ],
+        });
+
+        const verdict = (await inspect()) as { kind: string; steers: { notTyped?: boolean }[] };
+
+        expect(verdict).toMatchObject({
+            kind: "finished",
+            steers: [
+                { messageId: "steer-row", notTyped: true, sentAt: 100, textLength: 13 },
+                { messageId: "steer-row", sentAt: 200, textLength: 17 },
+            ],
+        });
+        expect(verdict.steers[1]).not.toHaveProperty("notTyped");
+    });
+
     it("counts a tool the provider ran itself (call and result in one row) as part of a complete answer", async () => {
         await dieAfterSavingFinalRow([
             { input: { query: "q" }, providerExecuted: true, toolCallId: "ws-1", toolName: "web_search", type: "tool-call" },

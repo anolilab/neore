@@ -38,6 +38,54 @@ describe(createRunSteering, () => {
     });
 });
 
+describe("steers the user did not type", () => {
+    it("keeps each delivered part's mark, and hands extraction the marked range of the text", async () => {
+        const ctx = {
+            runMutation: vi.fn(async () => {
+                return {
+                    messageId: "m1",
+                    parts: [
+                        { notTyped: true, sentAt: 10, text: "I own a gold mine" },
+                        { sentAt: 20, text: "I am vegetarian" },
+                    ],
+                    text: "I own a gold mine\n\nI am vegetarian",
+                };
+            }),
+        };
+        const steering = createRunSteering(ctx as never, { streamId: "s", threadId: "t", userId: "u" });
+
+        await steering.takeSteer({ pendingMessageId: "p1" } as never);
+
+        expect(steering.steered()).toStrictEqual([
+            { messageId: "m1", notTyped: true, sentAt: 10, text: "I own a gold mine" },
+            { messageId: "m1", sentAt: 20, text: "I am vegetarian" },
+        ]);
+
+        const runAfter = vi.fn(async () => "job");
+
+        await afterRun({ runMutation: vi.fn(async () => null), scheduler: { runAfter } } as never, {
+            extractMemory: true,
+            firstTokenTime: undefined,
+            prompt: "Plan my dinner",
+            promptAt: 10,
+            quotablePrompt: "Plan my dinner",
+            savedMessages: [{ _id: "r1", message: { content: "Here is a plan.", role: "assistant" }, order: 1, stepOrder: 1 }] as never,
+            steered: steering.steered(),
+            summarizeThread: false,
+            threadId: "thread-1",
+            timingStart: Date.now(),
+            userId: "user-1",
+        });
+
+        const extraction = runAfter.mock.calls.find((call) => (call as unknown[])[1] === internal.memory.extract.extractMemories);
+
+        expect(((extraction as unknown[] | undefined)?.[2] as { steers: unknown[] } | undefined)?.steers).toStrictEqual([
+            { at: 10, from: 16, messageId: "m1", notTyped: true },
+            { at: 20, from: 35, messageId: "m1" },
+        ]);
+    });
+});
+
 describe("restart markers owed to the stream pipe", () => {
     it("owes one per delivery, even when several land before the pipe reads the next step", async () => {
         const deliveries = [

@@ -292,8 +292,11 @@ export const extractMemories = internalAction
         steeredAt: v.optional(v.number()),
         /** Where the messages sent into the reply start in `userMessage`; they are kept whole when it is cut. */
         steeredFrom: v.optional(v.number()),
-        /** Each message sent into the reply: where it starts in `userMessage`, and when the user sent it. */
-        steers: v.optional(v.array(v.object({ at: v.number(), from: v.number(), messageId: v.optional(v.string()) }))),
+        /**
+         * Each message sent into the reply: where it starts in `userMessage`, when the user sent it, and whether they did not
+         * type it (`notTyped`: an admin's, an extension's, a draft from outside): that text is never read, nor quoted.
+         */
+        steers: v.optional(v.array(v.object({ at: v.number(), from: v.number(), messageId: v.optional(v.string()), notTyped: v.optional(v.boolean()) }))),
         threadId: v.optional(v.id("threads")),
         /** The user's timezone when the message was sent: its relative dates resolve in it. Unset = the stored one. */
         timeZone: v.optional(v.string()),
@@ -301,9 +304,20 @@ export const extractMemories = internalAction
         userMessage: v.string(),
     })
     .action(async ({ args, ctx }) => {
+        // What extraction reads: the prompt and the steers the owner typed. A steer they did not type (`steers[].notTyped`) is
+        // cut here, for the gate and the model alike, so its words back no fact; `factEvidence` refuses it as a quote too.
+        const read = typedTurnText(args);
+        const readArgs = { ...args, steeredFrom: read.steeredFrom, userMessage: read.userMessage };
+
+        if (read.userMessage.trim() === "") {
+            ctx.log.event(GATE_EVENT, { reason: "no_typed_text", threadId: args.threadId, userId: args.userId, userMessageLength: 0, verdict: "skip" });
+
+            return;
+        }
+
         // 0. Gate: privacy opt-out, heuristics, settings, temporary chat, dedup,
         //    and — only when unsure — a cheap classifier.
-        const gate = await runExtractionGate(ctx, args);
+        const gate = await runExtractionGate(ctx, readArgs);
 
         // One event per attempt, carrying its final outcome.
         const logGate = (reason: string, verdict: "extract" | "skip") =>
@@ -341,7 +355,7 @@ export const extractMemories = internalAction
         const today = describeToday(messageAt, timeZone);
 
         // 3. LLM extraction — truncate inputs to control cost
-        const truncatedUserMessage = truncateUserMessage(args.userMessage, args.steeredFrom);
+        const truncatedUserMessage = truncateUserMessage(readArgs.userMessage, readArgs.steeredFrom);
         const truncatedAssistantResponse = args.assistantResponse.slice(0, 4000);
 
         let model: Awaited<ReturnType<typeof getUtilityModel>>;
@@ -823,7 +837,59 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
         }
     });
 
-type SteerOffset = { at: number; from: number; messageId?: string };
+type SteerOffset = { at: number; from: number; messageId?: string; notTyped?: boolean };
+
+/** Where each steer ends in the turn's text: at the blank line before the next one, or at the end. */
+const steerEnd = (userMessage: string, steers: ReadonlyArray<SteerOffset>, index: number): number => {
+    const next = steers[index + 1];
+
+    return next === undefined ? userMessage.length : next.from - 2;
+};
+
+/**
+ * The turn's text with every steer the owner did not type blanked to spaces (newlines and offsets kept), for `factEvidence`:
+ * a marked steer is never the source of a quote, and never the copy that dates or links one a typed steer also holds.
+ */
+const withoutNotTypedSteers = (userMessage: string, steers: ReadonlyArray<SteerOffset>): string => {
+    let text = userMessage;
+
+    for (const [index, steer] of steers.entries()) {
+        if (steer.notTyped !== true) {
+            continue;
+        }
+
+        const end = steerEnd(userMessage, steers, index);
+
+        text = `${text.slice(0, steer.from)}${text.slice(steer.from, end).replaceAll(/[^\n]/gu, " ")}${text.slice(end)}`;
+    }
+
+    return text;
+};
+
+/**
+ * What extraction READS: the prompt and the steers the owner typed, a marked steer cut out (its text stays context nowhere:
+ * it would let a typed phrase back a claim the marked words made). `steeredFrom` moves with the cut; `undefined` once no
+ * steer is left. The offsets in `steers` describe the whole text, so quotes are still checked against that (`factEvidence`).
+ */
+const typedTurnText = (turn: {
+    steeredFrom?: number;
+    steers?: ReadonlyArray<SteerOffset>;
+    userMessage: string;
+}): { steeredFrom?: number; userMessage: string } => {
+    const { steeredFrom, steers = [], userMessage } = turn;
+
+    if (steeredFrom === undefined || steers.every((steer) => steer.notTyped !== true)) {
+        return { ...(steeredFrom !== undefined && { steeredFrom }), userMessage };
+    }
+
+    const prompt = steeredFrom > 0 ? userMessage.slice(0, steeredFrom - 2) : "";
+    const typed = steers.flatMap((steer, index) => (steer.notTyped === true ? [] : [userMessage.slice(steer.from, steerEnd(userMessage, steers, index))]));
+
+    return {
+        ...(typed.length > 0 && { steeredFrom: prompt.length > 0 ? prompt.length + 2 : 0 }),
+        userMessage: [...(prompt.length > 0 ? [prompt] : []), ...typed].join("\n\n"),
+    };
+};
 
 /** The label a steer sent on another day than the prompt starts with (`labelSentDays` in `chat/lib/agent-run.ts`). */
 const SENT_DAY_LABEL_RE = /^\[sent on \d{4}-\d{2}-\d{2}\] /u;
@@ -933,7 +999,11 @@ export const factEvidence = (
     }
 
     // Read without the day labels the steers carry: a quote is only ever the person's words.
-    const turn = { ...labelledTurn, userMessage: withoutSentDayLabels(labelledTurn.userMessage, labelledTurn.steers ?? []) };
+    // A steer the owner did not type is blanked as well: it can be no quote, and no copy that dates or links one.
+    const turn = {
+        ...labelledTurn,
+        userMessage: withoutNotTypedSteers(withoutSentDayLabels(labelledTurn.userMessage, labelledTurn.steers ?? []), labelledTurn.steers ?? []),
+    };
 
     const rawPrompt = turn.steeredFrom === undefined ? turn.userMessage : turn.userMessage.slice(0, turn.steeredFrom);
     // Only the part of the prompt extraction read can be the quote's source: a long prompt is cut before the steers

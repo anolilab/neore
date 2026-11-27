@@ -16,6 +16,7 @@ import type { Id } from "../../_generated/dataModel";
 import type { ActionCtx } from "../../_generated/server";
 import { callOnShard } from "../../lib/cross-shard";
 import { streamLogger } from "../../lib/logger";
+import { hasNotTypedMarks, notTypedMarksOfMessage } from "../../lib/not-typed-text";
 import { afterRun, mayExtractMemory, stampSavedToolCalls } from "./agent-run";
 import type { McpToolLabels } from "./mcp-tool-labels";
 
@@ -31,7 +32,7 @@ export interface FinishedReply {
     /** The steer rows delivered into the reply, in order (`interrupted.ts`): the steers the run's own end would have read. */
     steerRowIds?: string[];
     /** Each delivered steer, in order: when it was sent and the length of its text, to split its row (`splitSteerRow`). */
-    steers?: { messageId: string; sentAt?: number; textLength?: number }[];
+    steers?: { messageId: string; notTyped?: boolean; sentAt?: number; textLength?: number }[];
     threadId: string;
     timeZone?: string;
     userId: string;
@@ -41,15 +42,18 @@ export interface FinishedReply {
 /**
  * The steers one row holds, each with when it was sent. Steers delivered together share a row (joined a blank line apart),
  * so the row is cut at each steer's text length. A row without the lengths (or whose lengths do not add up to its text) is
- * one steer, dated by the row, as before.
+ * one steer, dated by the row, as before. A part the owner did not type carries `notTyped`; a row that cannot be cut is
+ * marked whole when any steer in it is, so a typed word is lost sooner than a marked one is quoted.
  */
 export const splitSteerRow = (
     text: string,
-    steers: ReadonlyArray<{ sentAt?: number; textLength?: number }>,
+    steers: ReadonlyArray<{ notTyped?: boolean; sentAt?: number; textLength?: number }>,
     rowAt: number,
-): { sentAt: number; text: string }[] => {
+): { notTyped?: true; sentAt: number; text: string }[] => {
     const lengths = steers.map((steer) => steer.textLength);
-    const whole = [{ sentAt: steers[0]?.sentAt ?? rowAt, text }];
+    const anyMarked = steers.some((steer) => steer.notTyped === true);
+    const flag = anyMarked ? { notTyped: true as const } : {};
+    const whole = [{ ...flag, sentAt: steers[0]?.sentAt ?? rowAt, text }];
 
     if (steers.length <= 1) {
         return whole;
@@ -59,14 +63,14 @@ export const splitSteerRow = (
     const total = known ? lengths.reduce((sum, length) => sum + length, 0) + 2 * (steers.length - 1) : -1;
 
     if (!known || total !== text.length) {
-        return [{ sentAt: rowAt, text }];
+        return [{ ...flag, sentAt: rowAt, text }];
     }
 
     let from = 0;
 
     return steers.map((steer, index) => {
         const end = from + (lengths[index] ?? 0);
-        const part = { sentAt: steer.sentAt ?? rowAt, text: text.slice(from, end) };
+        const part = { ...(steer.notTyped === true && { notTyped: true as const }), sentAt: steer.sentAt ?? rowAt, text: text.slice(from, end) };
 
         from = end + 2;
 
@@ -110,8 +114,13 @@ export const recoverFinishedReply = async (ctx: Pick<ActionCtx, "runMutation" | 
         const rowId = row._id as string;
         const own = steers.filter((steer) => steer.messageId === rowId);
 
-        return splitSteerRow(text, own, row._creationTime).map((part) => {
-            return { ...part, messageId: rowId };
+        const parts = splitSteerRow(text, own, row._creationTime);
+        // A row saved marked (`insertSteerRow`) with no flag kept for its steers (a stream written before they were): all of it is read as not typed.
+        const rowMarked = hasNotTypedMarks(notTypedMarksOfMessage(row.message as Parameters<typeof notTypedMarksOfMessage>[0]));
+        const markAll = rowMarked && parts.every((part) => part.notTyped !== true);
+
+        return parts.map((part) => {
+            return { ...part, ...(markAll && { notTyped: true as const }), messageId: rowId };
         });
     });
 

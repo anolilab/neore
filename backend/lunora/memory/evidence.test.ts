@@ -283,6 +283,29 @@ describe(factEvidence, () => {
         expect(factEvidence("I am vegetarian", 999, turn)?.messageId).toBe("s2");
     });
 
+    it("quotes no steer the user did not type, and still quotes a typed steer delivered beside it", () => {
+        expect.assertions(4);
+
+        const marked = "I own a gold mine";
+        const typed = "I am vegetarian";
+        const userMessage = `Plan my week\n\n${marked}\n\n${typed}`;
+        const steers = [
+            { at: 200, from: 14, messageId: "s1", notTyped: true },
+            { at: 300, from: 14 + marked.length + 2, messageId: "s1" },
+        ];
+        const turn = { promptAt: 100, quotablePrompt: "Plan my week", steeredFrom: 14, steers, threadId: "t1", userMessage };
+
+        expect(factEvidence(marked, 999, turn)).toBeUndefined();
+        expect(factEvidence(typed, 999, turn)).toMatchObject({ at: 300, quote: typed });
+        // The marked words repeated by a typed steer are the person's, dated by the steer that typed them.
+        expect(
+            factEvidence(marked, 999, { ...turn, steers: [...steers, { at: 400, from: userMessage.length + 2 }], userMessage: `${userMessage}\n\n${marked}` })
+                ?.at,
+        ).toBe(400);
+        // Without the mark the same steer is quotable: the mark is what refuses it.
+        expect(factEvidence(marked, 999, { ...turn, steers: steers.map(({ notTyped: _notTyped, ...rest }) => rest) })?.quote).toBe(marked);
+    });
+
     it("quotes no sentence that names a health condition, and keeps one that does not", () => {
         expect.assertions(5);
 
