@@ -5,7 +5,8 @@
 - **Triggers** — schedule (cron, 1-min polling), webhook (HMAC-SHA256 at
   `/triggers/webhook/{triggerId}`), event (watchers, below). Execution uses headless
   `generateText` with auto-continue; each run creates a new thread tagged with
-  trigger metadata.
+  trigger metadata. A run reads memories but learns none (`learn: false`): its prompt is a payload or a saved instruction,
+  never the owner's words in a chat.
   **Event triggers** (`triggers/events.ts`, sources in `triggers/event-sources/`) are a `triggers` row with
   `eventSource` (the condition: page, time or thread) and `eventState` (the baseline); `nextTriggerAt` is the
   NEXT CHECK, so the shard tick finds a watcher exactly as it finds a schedule. `dispatchDueEventTriggers`

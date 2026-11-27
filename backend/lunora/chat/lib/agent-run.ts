@@ -673,41 +673,6 @@ const readProjectInstructions = async (ctx: ActionCtx, projectId: string | undef
     return project?.instructions ?? [];
 };
 
-/** A saved tool result, cut down for memory extraction. */
-const summariseToolResults = (savedMessages: ReadonlyArray<MessageDoc>): { summary: string; toolName: string }[] => {
-    const toolResults: { summary: string; toolName: string }[] = [];
-
-    for (const savedMessage of savedMessages) {
-        if (!savedMessage.tool || savedMessage.message?.role !== "tool" || !Array.isArray(savedMessage.message.content)) {
-            continue;
-        }
-
-        for (const part of savedMessage.message.content) {
-            if (part.type !== "tool-result") {
-                continue;
-            }
-
-            // A persisted tool-result part carries a discriminated `output`
-            // (see `normalizeToolResult` in agent/mapping.ts). There is no
-            // `content` field on it.
-            const { output } = part;
-            let resultText = "";
-
-            if (output?.type === "text" || output?.type === "error-text") {
-                resultText = output.value;
-            } else if (output?.type === "content") {
-                resultText = output.value.flatMap((c) => (c.type === "text" ? [c.text] : [])).join(" ");
-            }
-
-            if (part.toolName && resultText.length > 20) {
-                toolResults.push({ summary: resultText.slice(0, 500), toolName: part.toolName });
-            }
-        }
-    }
-
-    return toolResults;
-};
-
 /** A message the user sent into a running reply, and when they sent it. */
 interface SteeredText {
     /** The saved message row the steer was delivered in (`deliverSteers`); steers delivered together share it. */
@@ -927,7 +892,6 @@ const scheduleAfterRun = async (ctx: Pick<ActionCtx, "scheduler">, args: Paramet
         return await Promise.allSettled(scheduled);
     }
 
-    const toolResults = summariseToolResults(savedMessages);
     // Each steer as extraction reads it: one sent on another day than the prompt carries that day (`labelSentDays`).
     const steeredTexts = labelSentDays(
         steered.map((part) => part.text),
@@ -957,7 +921,6 @@ const scheduleAfterRun = async (ctx: Pick<ActionCtx, "scheduler">, args: Paramet
                 steeredFrom: prompt.length > 0 ? prompt.length + 2 : 0,
                 steers: steerOffsets(prompt, steered, steeredTexts),
             }),
-            ...(toolResults.length > 0 && { toolResults: toolResults.slice(0, 10) }),
         }),
     );
 

@@ -5,7 +5,8 @@
  * so:
  *
  * - `memory`: memories are retrieved into the system prompt and extracted from
- *   the exchange afterwards. Off for a messenger reply — its sender is a third
+ *   the exchange afterwards (`learn: false` keeps the first and drops the second;
+ *   triggers use it). Off for a messenger reply — its sender is a third
  *   party, who must neither read the owner's memories nor write to them.
  * - `personalization`: `"full"` puts the user's about-me, nickname, profession,
  *   custom instructions and location into the prompt — for runs whose audience
@@ -118,9 +119,14 @@ export interface HeadlessRunOptions {
     goal?: { maxRounds?: number; text: string };
     /** Leave an existing thread's status as it is, instead of marking it active when the run ends. */
     keepThreadStatus?: boolean;
+    /** `false`: memories are still read into the prompt, but nothing is extracted afterwards. Default: extract when `memory` is on. */
+    learn?: boolean;
     /** A step cap for a quick reply. Default: Deep Work's budget, with context compression between steps. */
     maxSteps?: number;
-    /** Retrieve memories before, and extract them after. */
+    /**
+     * Retrieve memories before, and extract them after (unless `learn` is `false`). A headless prompt has no typed words of
+     * the user's to quote, so a run whose prompt is an outside payload must not learn from it.
+     */
     memory: boolean;
     model: string;
     /**
@@ -287,7 +293,8 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
         ctx.runQuery(internal.auth.functions.getUserPreferencesQuery, { userId }),
         loadUserProviderKeys(ctx, userId),
     ]);
-    const extractMemory = options.memory && prefs.memoryEnabled;
+    const readMemory = options.memory && prefs.memoryEnabled;
+    const extractMemory = readMemory && options.learn !== false;
 
     // A run that continues a thread gets that thread's tools too (its linked pull requests); a new thread has none yet.
     const continuedThreadId = "threadId" in options.thread ? options.thread.threadId : undefined;
@@ -375,7 +382,7 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
             userProviderKeys,
         });
 
-        const memoryContext = extractMemory && prompt ? await retrieveMemoryContext(ctx, userId, prompt, options.botId, prefs.timezone) : undefined;
+        const memoryContext = readMemory && prompt ? await retrieveMemoryContext(ctx, userId, prompt, options.botId, prefs.timezone) : undefined;
         // A run that lists none takes the project text chosen without the list's cost, when that differs.
         const runSystem = (instructions.length === 0 && options.projectInstructions?.systemWithoutInstructions) || options.system;
         const extraParts = [runSystem, renderInstructionList(instructions), memoryContext].filter((part): part is string => !!part);
