@@ -20,21 +20,34 @@ synthetic; there are no real people and nothing comes from a public benchmark.
 
 ## What is in it
 
-- 5 personas with 199 to 280 memories each (151 to 204 own active rows). Each has more than the 100 rows of the
+- 5 personas with 199 to 280 memories each (151 to 204 own active rows), and a sixth (`p6`, 221) for the `dated`
+  questions: a copy of the first with 22 rows added, so no row the first 180 questions read changes. Each has more than the 100 rows of the
   candidate window, so which rows reach scoring matters.
 - Types: identity, preference, context, activity, experience. Dated rows (`eventStart` in the past and ahead, `validUntil` in the past, today and
   ahead), older versions of a fact (replaced, expired, or still active but confirmed longer ago), pinned rows, rows of two bots (`bot-a` joins some chats, `bot-b` never does), expired rows,
   low-signal filler, and a few rows with no vector (`noVector`).
-- 180 queries (36 per persona), each labelled with the memory ids a good retrieval returns:
+- 180 queries (36 per persona) and 32 on `p6` (25 `dated`, 7 `abstain` that name a time), each labelled with the memory ids
+  a good retrieval returns:
 
-| Category   | Queries | Label                                                           |
-| ---------- | ------- | --------------------------------------------------------------- |
-| `single`   | 50      | one fact                                                        |
-| `multi`    | 30      | two facts of one topic, learned at different times              |
-| `temporal` | 30      | the event that happened in a named month (on or before `today`) |
-| `update`   | 20      | the newest statement; an older version also exists              |
-| `exact`    | 20      | the one fact holding the exact token the question names         |
-| `abstain`  | 30      | none: the topic was never mentioned, or the token is nobody's   |
+| Category          | Queries | Label                                                              |
+| ----------------- | ------- | ------------------------------------------------------------------ |
+| `single`          | 50      | one fact                                                           |
+| `multi`           | 30      | two facts of one topic, learned at different times                 |
+| `temporal`        | 30      | the event that happened in a named month (on or before `today`)    |
+| `update`          | 20      | the newest statement; an older version also exists                 |
+| `exact`           | 20      | the one fact holding the exact token the question names            |
+| `abstain`         | 30      | none: the topic was never mentioned, or the token is nobody's      |
+| `dated`           | 25      | every event in the asked time, or the one row of its theme         |
+| `abstain` on `p6` | 7       | none: a time and a topic nobody mentioned ("the weather tomorrow") |
+
+The `dated` questions (a third pass, seed `dated`) name a time in English or German: tomorrow, today, yesterday,
+last / next week, next month, December, 3 December, in 3 days, 5 days ago, May 2023, 2023, an ISO day. Each carries the
+`window` it asks about, written in the generator; the expected rows are computed from it, never from the parser, and
+the eval checks the parser reads the same window. Their rows are events (ahead and past, of the asked time and of
+others), periods (`Lived in Leipzig`, 2021 to 2024), and facts with an end date that holds through the window or ends
+before it. A question about a time alone ("what is coming up tomorrow") embeds on an aspect only, as an embedding does
+not know which day tomorrow is. Seven more name a time beside a topic nobody mentioned ("what is the weather like
+tomorrow", "was koche ich heute"), labelled `abstain` and reported as `datedAbstain`, apart from the 30 above.
 
 The `exact` rows are a second pass of the generator with its own seed, so the rows before them are as they were. Each is
 older than the window, embedded, and copied onto a superseded, an expired or a `bot-b` row that must never be the answer.
@@ -46,7 +59,8 @@ expands and normalises, so cosine similarity is meaningful and stable.
 
 - dims 0-15: topic. 16-21: topics nobody has (for `abstain`). 22-27: aspect (who, likes, setup, recent, history, plan).
 - dim 28: a shared background weight, so unrelated texts are not at cosine 0, as with a real model.
-- dims 29-40: month (events and `temporal` queries). 41-63: two noise dims per row. 64-73: one per `exact` fact.
+- dims 29-40: month (events and `temporal` queries). 41-63: two noise dims per row. 64-73: one per `exact` fact. 74-79:
+  the `dated` themes (home, appointments, travel, work, social, contracts).
 - An `exact` question embeds on a topic nobody has (16-21), so the vector search misses its fact by construction: the
   category measures the keyword search, not how often a real embedding misses a token.
 
@@ -70,7 +84,7 @@ hides console output of a passing run; print the table with
 `cd backend && npx vitest run lunora/memory/retrieval-eval.test.ts --silent=false`.
 
 - **Recall@8**: expected ids injected / expected ids. **NDCG@8**: binary gains over the injected order. Both over the
-  150 queries that have a label.
+  150 queries that have a label. `overall` is the first 180 queries; `dated` is reported on its own.
 - **Expected in window**: expected ids that are candidates at all (the window and the vector hits) / expected ids. It separates a row
   that never reaches scoring from a row the ranking loses.
 - **Off-topic rate**: injected rows not in the label / injected rows, over all 150 queries (so an `abstain` query that
@@ -110,6 +124,22 @@ so a short row no longer scores above its share: for "have I read Quillfeather" 
 ranks above the shorter Quillfeather row (both injected). On the
 150-query fixture before the `exact` rows, the earlier changes (newest-rows window, relevance gate, weights) took
 overall Recall@8 0.600 → 0.950 and NDCG@8 0.431 → 0.771.
+
+**The asked time** (`../time-window.ts`), measured with and without it on this fixture (the test prints both):
+
+| Slice        | Recall@8      | NDCG@8        | Off-topic rate | Abstain rate  |
+| ------------ | ------------- | ------------- | -------------- | ------------- |
+| overall      | 0.957 → 0.957 | 0.796 → 0.853 | 0.836 → 0.836  | 0.933 → 0.933 |
+| temporal     | 1.000 → 1.000 | 0.715 → 1.000 | 0.872 → 0.872  |               |
+| dated        | 0.687 → 1.000 | 0.589 → 0.956 | 0.817 → 0.699  |               |
+| datedAbstain |               |               | 1.000 → 1.000  | 0.857 → 0.857 |
+
+Every other category ranks byte for byte as without it: of the 180, only the 30 `temporal` questions and the two that
+say `today` name a time, and the two rank as before. A month's event now ranks first for "what did I do about coffee in
+May". For a day or a week the events of it are found by their date alone (they share no topic with "what did I do last
+week"), but only for a question about the time alone, made of question, agenda and time words (`onlyTime`): with
+every event of the window relevant by its date, the `datedAbstain` rate read 0.000. For a year only the order moves, so "where was I living in 2023" puts the Leipzig period second, behind the
+newer undated home row.
 
 What moved them:
 

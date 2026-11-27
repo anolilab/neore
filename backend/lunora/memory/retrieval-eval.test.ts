@@ -26,7 +26,9 @@ import {
     vectorCutIsFull,
     withSearchHits,
 } from "./retrieve-ranking";
+import type { RankedMemory } from "./retrieve-ranking";
 import { searchTokensOf } from "./search-terms";
+import { timeWindowOf } from "./time-window";
 
 const DAY_MS = 86_400_000;
 
@@ -57,6 +59,8 @@ interface FixtureQuery {
     persona: string;
     tags: Tags;
     text: string;
+    /** The time a `dated` question asks about, as the generator wrote it (never read from the parser). */
+    window?: { end: string; start: string };
 }
 
 interface Fixture {
@@ -65,8 +69,14 @@ interface Fixture {
     queries: FixtureQuery[];
 }
 
-type Category = "abstain" | "exact" | "multi" | "single" | "temporal" | "update";
-const CATEGORIES: Category[] = ["single", "multi", "temporal", "update", "exact", "abstain"];
+type Category = "abstain" | "dated" | "exact" | "multi" | "single" | "temporal" | "update";
+/** A category, or `datedAbstain`: the sixth persona's questions that name a time but ask about something nobody mentioned. */
+type Slice = Category | "datedAbstain";
+const CATEGORIES: Category[] = ["single", "multi", "temporal", "update", "exact", "abstain", "dated"];
+const SLICES: Slice[] = [...CATEGORIES, "datedAbstain"];
+/** The 180 queries of the first five personas; the sixth's (`dated`, `datedAbstain`) are reported on their own, never in `overall`. */
+const isOverall = (query: FixtureQuery): boolean => query.persona !== "p6";
+const sliceOf = (query: FixtureQuery): Slice => (query.persona === "p6" && query.category === "abstain" ? "datedAbstain" : query.category);
 
 const fixture = JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), "__fixtures__/retrieval-eval.json"), "utf8")) as Fixture;
 const { now, today } = fixture.meta;
@@ -105,9 +115,9 @@ const indexSearch = <T extends { _creationTime: number; _id: string; memory: str
 /**
  * One query as retrieval runs it: the window, the vector hits (top K over all of the user's vectors), the keyword hits
  * (one search-index lookup per salient term), the ranking. Without `vectors` no vector search ran (the model refused,
- * the index failed): the window and the keyword hits, ranked by keyword.
+ * the index failed): the window and the keyword hits, ranked by keyword. Without `time` the asked time is not read.
  */
-const run = (query: FixtureQuery, vectors = true): { ids: string[]; inWindow: Set<string> } => {
+const run = (query: FixtureQuery, vectors = true, time = true): { ids: string[]; inWindow: Set<string>; ranked: RankedMemory[] } => {
     const persona = fixture.personas.find((p) => p.id === query.persona)!;
     const rows = persona.memories.map((m) => {
         return {
@@ -179,11 +189,12 @@ const run = (query: FixtureQuery, vectors = true): { ids: string[]; inWindow: Se
         candidates,
         ...keywordSignalsFor(candidates, query.text, lookups),
         now,
+        ...(time && { timeWindow: timeWindowOf(query.text, today) }),
         vectorScores,
         vectorSearched: vectorCutIsFull(scoped),
     });
 
-    return { ids: ranked.map((m) => m.memoryId), inWindow: new Set(candidates.map((m) => m._id)) };
+    return { ids: ranked.map((m) => m.memoryId), inWindow: new Set(candidates.map((m) => m._id)), ranked };
 };
 
 interface Totals {
@@ -255,35 +266,40 @@ interface Floor {
 }
 const BASELINE: Record<"overall" | Category, Floor> & { overall: Required<Floor> & { abstainPrecision: number; abstainRate: number } } = {
     abstain: { offTopicRate: 1 },
+    dated: { inWindow: 1, ndcgAt8: 0.956, offTopicRate: 0.699, recallAt8: 1 },
     exact: { inWindow: 1, ndcgAt8: 1, offTopicRate: 0.048, recallAt8: 1 },
     multi: { inWindow: 1, ndcgAt8: 0.726, offTopicRate: 0.771, recallAt8: 0.883 },
     // Abstain rate 0.933: a bare number is no identifier, so "is parcel 52690 mine" is answered with the user's own
     // parcel note (ends in 77314) instead of nothing.
-    overall: { abstainPrecision: 1, abstainRate: 0.933, inWindow: 1, ndcgAt8: 0.801, offTopicRate: 0.836, recallAt8: 0.957 },
+    overall: { abstainPrecision: 1, abstainRate: 0.933, inWindow: 1, ndcgAt8: 0.853, offTopicRate: 0.836, recallAt8: 0.957 },
     single: { inWindow: 1, ndcgAt8: 0.83, offTopicRate: 0.88, recallAt8: 0.94 },
-    temporal: { inWindow: 1, ndcgAt8: 0.715, offTopicRate: 0.872, recallAt8: 1 },
+    // NDCG@8 0.715 before the asked time was read: the month's event now ranks first.
+    temporal: { inWindow: 1, ndcgAt8: 1, offTopicRate: 0.872, recallAt8: 1 },
     update: { inWindow: 1, ndcgAt8: 0.776, offTopicRate: 0.873, recallAt8: 1 },
 };
 
 describe("memory retrieval eval", () => {
     const overall = empty();
-    const byCategory = new Map(CATEGORIES.map((c) => [c, empty()]));
+    const byCategory = new Map(SLICES.map((c) => [c, empty()]));
 
     for (const query of fixture.queries) {
         const { ids, inWindow } = run(query);
 
-        record(overall, query, ids, inWindow);
-        record(byCategory.get(query.category)!, query, ids, inWindow);
+        if (isOverall(query)) {
+            record(overall, query, ids, inWindow);
+        }
+
+        record(byCategory.get(sliceOf(query))!, query, ids, inWindow);
     }
 
-    const results = { overall: summary(overall), ...Object.fromEntries(CATEGORIES.map((c) => [c, summary(byCategory.get(c)!)])) } as Record<
+    const results = { overall: summary(overall), ...Object.fromEntries(SLICES.map((c) => [c, summary(byCategory.get(c)!)])) } as Record<
         string,
         ReturnType<typeof summary>
     >;
 
     it("covers personas past the candidate window, every type and every category", () => {
-        expect(fixture.personas).toHaveLength(5);
-        expect(fixture.queries).toHaveLength(180);
+        expect(fixture.personas).toHaveLength(6);
+        expect(fixture.queries.filter((query) => isOverall(query))).toHaveLength(180);
 
         for (const persona of fixture.personas) {
             const own = persona.memories.filter((m) => !m.botId && !m.supersededBy);
@@ -371,10 +387,71 @@ describe("memory retrieval eval", () => {
         }
     });
 
+    it("reads the asked time: dated and temporal questions gain, a question naming no time ranks as without it", () => {
+        const without = new Map(SLICES.map((c) => [c, empty()]));
+        const named: string[] = [];
+
+        for (const query of fixture.queries) {
+            const off = run(query, true, false);
+            const window = timeWindowOf(query.text, today);
+
+            record(without.get(sliceOf(query))!, query, off.ids, off.inWindow);
+
+            if (window === undefined) {
+                expect(run(query).ranked, query.id).toEqual(off.ranked);
+            } else if (isOverall(query)) {
+                named.push(query.text);
+            }
+
+            // Each month a temporal question names is the one its event is in; each dated question reads the generator's window.
+            if (query.category === "temporal") {
+                const eventStart = fixture.personas.flatMap((p) => p.memories).find((m) => m.id === query.expected[0])!.eventStart!;
+
+                expect(window && eventStart >= window.start && eventStart <= window.end, query.id).toBe(true);
+            }
+
+            if (query.window) {
+                expect({ end: window?.end, start: window?.start }, query.text).toEqual(query.window);
+            }
+        }
+
+        const before = Object.fromEntries(SLICES.map((c) => [c, summary(without.get(c)!)]));
+
+        // eslint-disable-next-line no-console
+        console.table(
+            Object.fromEntries(
+                SLICES.map((c) => [
+                    c,
+                    {
+                        "abstain rate": `${before[c]!.abstainRate?.toFixed(3) ?? "-"} → ${results[c]!.abstainRate?.toFixed(3) ?? "-"}`,
+                        "NDCG@8": `${before[c]!.ndcgAt8?.toFixed(3) ?? "-"} → ${results[c]!.ndcgAt8?.toFixed(3) ?? "-"}`,
+                        "off-topic rate": `${before[c]!.offTopicRate.toFixed(3)} → ${results[c]!.offTopicRate.toFixed(3)}`,
+                        "Recall@8": `${before[c]!.recallAt8?.toFixed(3) ?? "-"} → ${results[c]!.recallAt8?.toFixed(3) ?? "-"}`,
+                    },
+                ]),
+            ),
+        );
+        // A question naming no time is ranked as without the step (above); of the first 180, only these name one.
+        expect(named.filter((text) => fixture.queries.every((q) => q.text !== text || q.category !== "temporal"))).toEqual([
+            "which instrument do I play and also what did I rehearse today",
+            "what did I rehearse today",
+        ]);
+        expect(named).toHaveLength(32);
+        // Measured 0.687 → 1.000 and 0.589 → 0.956 on this fixture.
+        expect(results.dated!.recallAt8! - before.dated!.recallAt8!).toBeGreaterThanOrEqual(0.2);
+        expect(results.dated!.ndcgAt8! - before.dated!.ndcgAt8!).toBeGreaterThanOrEqual(0.2);
+        // A question naming a time and a topic nobody mentioned injects no more than without the step: 0.857 both ways.
+        expect(results.datedAbstain!.abstainRate!).toBeGreaterThanOrEqual(before.datedAbstain!.abstainRate!);
+    });
+
     it("still finds a memory by its words when no vector search ran", () => {
         const totals = empty();
 
         for (const query of fixture.queries) {
+            if (!isOverall(query)) {
+                continue;
+            }
+
             const { ids, inWindow } = run(query, false);
 
             record(totals, query, ids, inWindow);

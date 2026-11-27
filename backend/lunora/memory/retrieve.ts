@@ -19,6 +19,7 @@ import { loadModelFilterRules } from "../chat/lib/model-filter-rules";
 import { isSearchIndexBuilding } from "../lib/search-index";
 import { gatewayFetch } from "../lib/services";
 import { getMemoryEmbeddingModel, MEMORY_EMBEDDING_MODEL_NAME } from "./dedup";
+import { localDayOf } from "./reflection-logic";
 import {
     CANDIDATE_WINDOW_SIZE,
     fuseSearchHits,
@@ -36,6 +37,7 @@ import {
     withSearchHits,
 } from "./retrieve-ranking";
 import type { RankedMemory } from "./retrieve-ranking";
+import { readTimePhrase, windowOf } from "./time-window";
 
 // ============================================================================
 // Retrieval Types
@@ -58,6 +60,8 @@ export const retrieveRelevantMemories = internalAction
         /** The `search_memory` tool: a lower relevance floor, no score threshold, and `limit` rows instead of the injection cap. */
         search: v.optional(v.boolean()),
         searchText: v.string(),
+        /** The run's timezone, for a time the search names ("last week"). Unset = the user's stored one, read only then. */
+        timeZone: v.optional(v.string()),
         userId: v.string(),
     })
     .output(
@@ -206,7 +210,21 @@ export const retrieveRelevantMemories = internalAction
         const keywordHits = topKeywordHits(lookups, windowMemories.length);
         const candidates = withSearchHits(windowMemories, fuseSearchHits(hitMemories, keywordHits), scope);
 
-        // 5. Score each memory (vector hit, else keyword) and keep the ones to inject, or for a search the ones to return
+        // 5. The time the search asks about ("last week", "im Dezember"), as days of the user's timezone; UTC without one,
+        // or when it cannot be read.
+        const phrase = readTimePhrase(args.searchText);
+        const timeZone =
+            phrase === undefined
+                ? undefined
+                : (args.timeZone ??
+                  (await ctx.runQuery(internal.memory.functions.getUserTimeZone, { userId: args.userId }).catch((error: unknown) => {
+                      console.warn("[memory/retrieve] Timezone read failed, reading the asked time in UTC:", error);
+
+                      return null;
+                  })));
+        const timeWindow = phrase === undefined ? undefined : windowOf(phrase, localDayOf(now, timeZone));
+
+        // 6. Score each memory (vector hit, else keyword) and keep the ones to inject, or for a search the ones to return
         return rankMemories({
             candidates,
             // The whole search text: only the lookups and the embedding are bounded.
@@ -218,6 +236,7 @@ export const retrieveRelevantMemories = internalAction
                 threshold: SEARCH_THRESHOLD,
             }),
             now,
+            ...(timeWindow !== undefined && { timeWindow }),
             vectorScores: vectorScoreMap,
             vectorSearched,
         });

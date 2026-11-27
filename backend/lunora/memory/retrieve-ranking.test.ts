@@ -17,6 +17,7 @@ import {
     SEARCH_MIN_RELEVANCE,
     SEARCH_THRESHOLD,
     selectCandidateWindow,
+    TIME_WEIGHTS,
     topKeywordHits,
     topScopedHits,
     VECTOR_TOP_K,
@@ -424,6 +425,59 @@ describe("rankMemories", () => {
             validUntil: "2026-12-31",
         });
         expect(rank([candidate("a", { eventEnd: null, eventStart: "2026-12-03", validUntil: null })], [["a", 1]])[0]).not.toHaveProperty("validUntil");
+    });
+
+    describe("the asked time", () => {
+        const week = { end: "2026-12-06", onlyTime: true, start: "2026-11-30", today: "2026-11-27" };
+        const timed = (candidates: RankCandidate[], vectorScores: [string, number][], timeWindow = week) =>
+            rankMemories({ candidates, ...keywordSignalsFor(candidates, "zzz"), now: NOW, timeWindow, vectorScores: new Map(vectorScores) });
+        const plain = { confidence: 70, importance: 50, lastConfirmedAt: NOW - 60 * DAY };
+
+        it("ranks an event in the window above the same row without one, and a fact holding through it slightly above", () => {
+            const rows = [
+                candidate("none", plain),
+                candidate("event", { ...plain, eventEnd: "2026-12-01", eventStart: "2026-11-25" }),
+                candidate("holds", { ...plain, validUntil: "2027-01-31" }),
+                candidate("elsewhen", { ...plain, eventStart: "2026-10-01" }),
+            ];
+            const ranked = timed(rows, at({ elsewhen: 0.6, event: 0.6, holds: 0.6, none: 0.6 }));
+            const base = rank([rows[0]!], at({ none: 0.6 }))[0]!.score;
+
+            expect(ranked.map((m) => m.memoryId)).toEqual(["event", "holds", "none", "elsewhen"]);
+            expect(ranked[0]!.score).toBeCloseTo(base + TIME_WEIGHTS.event, 10);
+            expect(ranked[1]!.score).toBeCloseTo(base + TIME_WEIGHTS.holds, 10);
+        });
+
+        it("demotes a fact that ended before the window without dropping it under the threshold", () => {
+            // 0.65 * 0.45 + 0.15 * 0.25 = 0.33 before the demotion, 0.23 after: under the 0.3 threshold, still injected, last.
+            const weak = { ...plain, confidence: 0, importance: 0 };
+            const rows = [candidate("ended", { ...weak, validUntil: "2026-11-29" }), candidate("open", weak)];
+            const ranked = timed(rows, at({ ended: 0.45, open: 0.45 }));
+
+            expect(ranked.map((m) => m.memoryId)).toEqual(["open", "ended"]);
+            expect(ranked[1]!.score).toBeCloseTo(ranked[0]!.score + TIME_WEIGHTS.ended, 10);
+        });
+
+        it("finds an event of a narrow window by its date alone for a question about the time alone, never one of a year", () => {
+            const rows = [candidate("appointment", { ...plain, eventStart: "2026-12-02" }), candidate("other", plain)];
+            const year = { end: "2026-12-31", onlyTime: true, start: "2026-01-01", today: "2026-11-27" };
+
+            expect(timed(rows, []).map((m) => m.memoryId)).toEqual(["appointment"]);
+            expect(timed(rows, [], year)).toEqual([]);
+            // "what is the weather next week": a question naming a topic is not answered by the week's events.
+            expect(timed(rows, [], { ...week, onlyTime: false })).toEqual([]);
+        });
+
+        it("caps the returned score at 1", () => {
+            expect(timed([candidate("a", { eventStart: "2026-12-01" })], at({ a: 1 }))[0]!.score).toBe(1);
+        });
+
+        it("leaves a row without dates as it ranks with no window", () => {
+            const rows = [candidate("a", plain), candidate("b", { ...plain, lastConfirmedAt: NOW }), candidate("c", { confidence: 10 })];
+            const scores = at({ a: 0.5, b: 0.7, c: 0.6 });
+
+            expect(timed(rows, scores)).toEqual(rank(rows, scores));
+        });
     });
 });
 
