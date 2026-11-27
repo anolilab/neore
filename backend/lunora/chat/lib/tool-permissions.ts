@@ -90,7 +90,7 @@ export const toolPermissionKey = (source: ToolSource, toolName: string, owner?: 
  * own provider key on a long sandbox run and can push to their GitHub;
  * `delegateToSubAgent` and `messageWorker` start a background run charged to their task quota —
  * so the user sees the task before anything starts. `watchPullRequest` starts runs that wake the thread later, each one charged like a
- * chat reply. `replyToReviewComment` and `rerunFailedChecks` act on a pull request
+ * chat reply, and `unwatchPullRequest` stops them (text from a pull request must not be able to silence the person's own watch). `replyToReviewComment` and `rerunFailedChecks` act on a pull request
  * as the user (`mergePullRequest` asks every time: it needs a person; so does `signInWithSavedLogin`, which types a saved
  * password for them). Headless callers lose them
  * (`ask` degrades to `off`), which is intended — except a sub-agent's own
@@ -111,6 +111,7 @@ export const BUILTIN_TOOLS_ASK_BY_DEFAULT: ReadonlySet<string> = new Set([
     "requestSecret",
     "rerunFailedChecks",
     "signInWithSavedLogin",
+    "unwatchPullRequest",
     "videoGeneration",
     "watchPullRequest",
 ]);
@@ -146,6 +147,7 @@ export const ALWAYS_ALLOW_REFUSED_BUILTINS: ReadonlySet<string> = new Set([
     "replyToReviewComment",
     "rerunFailedChecks",
     "signInWithSavedLogin",
+    "unwatchPullRequest",
     "videoGeneration",
     "watchPullRequest",
 ]);

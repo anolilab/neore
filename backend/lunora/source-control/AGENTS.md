@@ -55,4 +55,4 @@
   from the host in the prompt); only `finishWatchWake` counts the wake (`wakes`, `lastWakeAt`) and clears the delivered reasons,
   and only those whose occurrence marker is unchanged since the claim. A failed turn releases the lease and changes nothing else.
   The claim refuses a stale run or start, the cap of 5, the 10-minute cooldown, a locked or busy thread. The agent tools
-  `watchPullRequest` (ask by default) and `unwatchPullRequest` use the same linked-pull-request gate as the other PR tools.
+  `watchPullRequest` and `unwatchPullRequest` (both ask by default, never always-allow) use the same linked-pull-request gate as the other PR tools.
