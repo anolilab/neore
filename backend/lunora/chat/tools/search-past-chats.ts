@@ -39,7 +39,6 @@ const modelNote = (output: PastChatsOutput): string => {
         return "The search of past chats is still being prepared after an update; try again in a few minutes.";
     }
 
-    // A full index window: only the best-ranked matching prompts were searched, so an older one may be missing.
     const partial = output.truncated ? " Only the best-ranked matching prompts were searched; an older one may be missing, so try more specific words." : "";
 
     return output.hits.length === 0 ? `No match among the prompts searched.${partial}` : `${PAST_WORDS_NOTE}${partial}`;
