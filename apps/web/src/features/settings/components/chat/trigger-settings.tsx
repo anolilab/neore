@@ -235,6 +235,12 @@ const TriggerForm: FC<TriggerFormProps> = ({ formData, isPending, onCancel, onCh
                 <div className="space-y-1.5">
                     <Label htmlFor={botPickerId}>{t`Run as bot (optional)`}</Label>
                     <Select
+                        items={[
+                            { label: t`No bot`, value: NO_BOT },
+                            ...bots.map((bot) => {
+                                return { label: bot.name, value: bot._id };
+                            }),
+                        ]}
                         onValueChange={(value) => onChange(withBotOptions({ ...formData, botComputer: false, botId: value === NO_BOT ? "" : (value ?? "") }))}
                         value={formData.botId || NO_BOT}
                     >

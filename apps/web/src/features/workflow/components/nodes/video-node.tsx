@@ -30,6 +30,11 @@ const ASPECT_RATIOS: { label: MessageDescriptor; value: string }[] = [
     { label: msg`21:9 (Ultrawide)`, value: "21:9" },
 ];
 
+const MODE_ITEMS = {
+    "text-to-video": <Trans>Text to Video</Trans>,
+    "image-to-video": <Trans>Image to Video</Trans>,
+};
+
 const VideoNodeComponent = (props: NodeProps<Node<VideoNodeData>>) => {
     const { data, id } = props;
     const { i18n, t } = useLingui();
@@ -115,17 +120,16 @@ const VideoNodeComponent = (props: NodeProps<Node<VideoNodeData>>) => {
                     <Label className="text-muted-foreground text-xs">
                         <Trans>Mode</Trans>
                     </Label>
-                    <Select onValueChange={handleModeChange} value={data.mode}>
+                    <Select items={MODE_ITEMS} onValueChange={handleModeChange} value={data.mode}>
                         <SelectTrigger className="nodrag h-8 text-sm">
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="text-to-video">
-                                <Trans>Text to Video</Trans>
-                            </SelectItem>
-                            <SelectItem value="image-to-video">
-                                <Trans>Image to Video</Trans>
-                            </SelectItem>
+                            {Object.entries(MODE_ITEMS).map(([value, label]) => (
+                                <SelectItem key={value} value={value}>
+                                    {label}
+                                </SelectItem>
+                            ))}
                         </SelectContent>
                     </Select>
                 </div>
@@ -177,7 +181,13 @@ const VideoNodeComponent = (props: NodeProps<Node<VideoNodeData>>) => {
                             <Label className="text-muted-foreground text-xs">
                                 <Trans>Aspect Ratio</Trans>
                             </Label>
-                            <Select onValueChange={handleAspectRatioChange} value={data.aspectRatio ?? "16:9"}>
+                            <Select
+                                items={ASPECT_RATIOS.map((ratio) => {
+                                    return { label: i18n._(ratio.label), value: ratio.value };
+                                })}
+                                onValueChange={handleAspectRatioChange}
+                                value={data.aspectRatio ?? "16:9"}
+                            >
                                 <SelectTrigger className="nodrag h-8 text-sm">
                                     <SelectValue />
                                 </SelectTrigger>
@@ -226,7 +236,13 @@ const VideoNodeComponent = (props: NodeProps<Node<VideoNodeData>>) => {
                 <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1.5">
                         <Label className="text-muted-foreground text-xs">FPS</Label>
-                        <Select onValueChange={handleFpsChange} value={String(data.fps ?? 24)}>
+                        <Select
+                            items={currentModelInfo.supportedFps.map((fps) => {
+                                return { label: <Trans>{fps} fps</Trans>, value: String(fps) };
+                            })}
+                            onValueChange={handleFpsChange}
+                            value={String(data.fps ?? 24)}
+                        >
                             <SelectTrigger className="nodrag h-8 text-sm">
                                 <SelectValue />
                             </SelectTrigger>

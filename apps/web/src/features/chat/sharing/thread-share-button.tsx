@@ -86,6 +86,9 @@ const ThreadShareButton: React.FC<ThreadShareButtonProperties> = ({ classes, thr
 
     const handleTabChange = useCallback((value: string) => setTab(value), []);
     const handleInviteEmailChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => setInviteEmail(event.target.value), []);
+    const permissionItems = { admin: t`Admin`, read: t`Read Only`, write: t`Read & Write` };
+    const expirationItems = { "1_day": t`1 Day`, "7_days": t`7 Days`, custom: t`Custom` };
+
     const handleInvitePermissionChange = useCallback((value: Permission | null) => {
         if (value) {
             setInvitePermission(value);
@@ -313,7 +316,7 @@ const ThreadShareButton: React.FC<ThreadShareButtonProperties> = ({ classes, thr
                         </Field.Root>
                         <Field.Root className="space-y-2">
                             <Label htmlFor="permission">{t`Permission Level`}</Label>
-                            <Select onValueChange={handleInvitePermissionChange} value={invitePermission}>
+                            <Select items={permissionItems} onValueChange={handleInvitePermissionChange} value={invitePermission}>
                                 <SelectTrigger>
                                     <SelectValue />
                                 </SelectTrigger>
@@ -326,7 +329,7 @@ const ThreadShareButton: React.FC<ThreadShareButtonProperties> = ({ classes, thr
                         </Field.Root>
                         <Field.Root className="space-y-2">
                             <Label htmlFor="expiration">{t`Expiration`}</Label>
-                            <Select onValueChange={handleExpirationTypeChange} value={expirationType}>
+                            <Select items={expirationItems} onValueChange={handleExpirationTypeChange} value={expirationType}>
                                 <SelectTrigger>
                                     <SelectValue />
                                 </SelectTrigger>

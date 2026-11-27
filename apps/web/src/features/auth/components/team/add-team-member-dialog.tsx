@@ -72,6 +72,10 @@ const AddTeamMemberDialog = ({ className: _className, classNames, onOpenChange, 
         }
     };
 
+    const memberItems = organizationMembers.map((member) => {
+        return { label: member.user.name || member.user.email, value: member.userId };
+    });
+
     return (
         <Dialog onOpenChange={onOpenChange} {...properties}>
             <DialogContent className={classNames?.dialog?.content}>
@@ -89,7 +93,7 @@ const AddTeamMemberDialog = ({ className: _className, classNames, onOpenChange, 
                     {isOrgPending ? (
                         <Skeleton className="h-10 w-full" />
                     ) : (
-                        <Select onValueChange={setSelectedUserId} value={selectedUserId || undefined}>
+                        <Select items={memberItems} onValueChange={setSelectedUserId} value={selectedUserId || undefined}>
                             <SelectTrigger>
                                 <SelectValue placeholder={t`Select a member`} />
                             </SelectTrigger>

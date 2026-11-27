@@ -128,7 +128,13 @@ const GalleryPage = () => {
                             <Search className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
                             <Input className="pl-9" onChange={(e) => setSearchQuery(e.target.value)} placeholder={t`Search workflows...`} value={searchQuery} />
                         </div>
-                        <Select onValueChange={(v) => setSortBy(v as GallerySortOption)} value={sortBy}>
+                        <Select
+                            items={SORT_OPTIONS.map((option) => {
+                                return { label: i18n._(option.label), value: option.value };
+                            })}
+                            onValueChange={(v) => setSortBy(v as GallerySortOption)}
+                            value={sortBy}
+                        >
                             <SelectTrigger className="w-40">
                                 <SelectValue />
                             </SelectTrigger>

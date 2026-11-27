@@ -50,7 +50,13 @@ const TranscriptionNodeComponent = (props: NodeProps<Node<TranscriptionNodeData>
                     <Label className="text-muted-foreground text-xs">
                         <Trans>Language</Trans>
                     </Label>
-                    <Select onValueChange={handleLanguageChange} value={data.language ?? "auto"}>
+                    <Select
+                        items={LANGUAGE_OPTIONS.map((option) => {
+                            return { label: i18n._(option.label), value: option.value };
+                        })}
+                        onValueChange={handleLanguageChange}
+                        value={data.language ?? "auto"}
+                    >
                         <SelectTrigger className="nodrag h-8 text-sm">
                             <SelectValue />
                         </SelectTrigger>

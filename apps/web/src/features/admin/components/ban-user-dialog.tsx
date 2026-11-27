@@ -41,6 +41,10 @@ const BanUserDialog = ({ isBanned, onOpenChange, onSuccess, open, userId, userNa
     const [reason, setReason] = useState("");
     const [duration, setDuration] = useState<string>("86400");
 
+    const durationItems = BAN_DURATIONS.map((d) => {
+        return { label: i18n._(d.label), value: String(d.value) };
+    });
+
     const handleBan = async () => {
         try {
             // `duration` only ever holds a Select value from BAN_DURATIONS, so the
@@ -115,14 +119,14 @@ const BanUserDialog = ({ isBanned, onOpenChange, onSuccess, open, userId, userNa
                 <div className="grid gap-4 py-4">
                     <div className="grid gap-2">
                         <Label htmlFor="duration">{t`Duration`}</Label>
-                        <Select onValueChange={(value) => value && setDuration(value)} value={duration}>
+                        <Select items={durationItems} onValueChange={(value) => value && setDuration(value)} value={duration}>
                             <SelectTrigger id="duration">
                                 <SelectValue placeholder={t`Select duration`} />
                             </SelectTrigger>
                             <SelectContent>
-                                {BAN_DURATIONS.map((d) => (
-                                    <SelectItem key={d.value} value={String(d.value)}>
-                                        {i18n._(d.label)}
+                                {durationItems.map((d) => (
+                                    <SelectItem key={d.value} value={d.value}>
+                                        {d.label}
                                     </SelectItem>
                                 ))}
                             </SelectContent>

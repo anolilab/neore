@@ -89,6 +89,14 @@ const CreateAPIKeyDialog = ({ classNames, onOpenChange, onSuccess, refetch, ...p
 
     const locale = i18n.locale ?? DEFAULT_LOCALE;
     const rtf = useMemo(() => new Intl.RelativeTimeFormat(locale), [locale]);
+    const expiryItems = {
+        "180": rtf.format(180, "day"),
+        "30": rtf.format(30, "day"),
+        "365": rtf.format(365, "day"),
+        "7": rtf.format(7, "day"),
+        "90": rtf.format(90, "day"),
+        none: t`No expiration`,
+    };
 
     return (
         <Dialog onOpenChange={onOpenChange} {...properties}>
@@ -141,7 +149,7 @@ const CreateAPIKeyDialog = ({ classNames, onOpenChange, onSuccess, refetch, ...p
                                     <field.FormItem>
                                         <field.FormLabel className={classNames?.label}>{t`Expires`}</field.FormLabel>
 
-                                        <Select onValueChange={(value) => field.handleChange(value ?? "")} value={field.state.value}>
+                                        <Select items={expiryItems} onValueChange={(value) => field.handleChange(value ?? "")} value={field.state.value}>
                                             <field.FormControl>
                                                 {/* Base UI gives the trigger its own id, so the label's `htmlFor` does not reach it. */}
                                                 <SelectTrigger aria-label={t`Expires`} className={classNames?.input}>

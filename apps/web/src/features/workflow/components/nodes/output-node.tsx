@@ -78,7 +78,13 @@ const OutputNodeComponent = (props: NodeProps<Node<OutputNodeData>>) => {
                     <Label className="text-muted-foreground text-xs">
                         <Trans>Output Type</Trans>
                     </Label>
-                    <Select onValueChange={handleOutputTypeChange} value={data.outputType}>
+                    <Select
+                        items={OUTPUT_TYPES.map((option) => {
+                            return { label: i18n._(option.label), value: option.value };
+                        })}
+                        onValueChange={handleOutputTypeChange}
+                        value={data.outputType}
+                    >
                         <SelectTrigger className="nodrag h-8 text-sm">
                             <SelectValue />
                         </SelectTrigger>
