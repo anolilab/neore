@@ -24,6 +24,22 @@ vi.mock("@lingui/react/macro", () => {
     };
 });
 
+/** Any text that names the first account's suggestion. */
+const MENTIONS_WEEKLY_NOTES = /Weekly notes/;
+
+/** The signed-in account the list reads; a case switches it. */
+const signedIn = vi.hoisted(() => {
+    return { userId: "user-a" };
+});
+
+vi.mock("@/features/auth/hooks/use-auth-session", () => {
+    return {
+        useAuthSession: () => {
+            return { data: { user: { id: signedIn.userId } } };
+        },
+    };
+});
+
 const { calls, state } = vi.hoisted(() => {
     return {
         calls: { accept: [] as unknown[], dismiss: [] as unknown[], failList: false, failNext: false, holdNext: null as Promise<void> | null, lists: 0 },
@@ -106,17 +122,26 @@ const mountList = () => {
 
     // The board is on the page too: it is cached here so the refresh after Accept can be seen.
     client.setQueryData(["getTaskBoard"], { goals: [], tasks: [] });
-    render(
+
+    // A function, so a re-render gets a new element: React skips one that is the very same object.
+    const page = () => (
         <QueryClientProvider client={client}>
             <h1 ref={heading} tabIndex={-1}>
                 Tasks
             </h1>
             <button type="button">New task</button>
             <TaskSuggestions fallbackFocus={heading} />
-        </QueryClientProvider>,
+        </QueryClientProvider>
     );
+    const { rerender } = render(page());
 
-    return { client };
+    return {
+        client,
+        /** Renders the same page again, as the app does when the session changes. */
+        rerenderPage: () => {
+            rerender(page());
+        },
+    };
 };
 
 /** Whether the element holds focus: the focus is what is asserted. */
@@ -131,6 +156,7 @@ beforeEach(() => {
     calls.lists = 0;
     state.live = true;
     state.rows = [];
+    signedIn.userId = "user-a";
 });
 
 describe("TaskSuggestions", () => {
@@ -306,6 +332,35 @@ describe("TaskSuggestions", () => {
 
         await waitFor(() => expect(screen.queryByRole("list")).toBeNull());
         expect(hasFocus(elsewhere)).toBe(true);
+    });
+
+    it("shows nothing of the last account's decisions after an account switch", async () => {
+        state.rows = [row("s1", "Weekly notes")];
+        const { rerenderPage } = mountList();
+
+        fireEvent.click(await screen.findByRole("button", { name: 'Dismiss "Weekly notes"' }));
+        await waitFor(() => expect(screen.getByRole("status", { name: "Suggestion updates" }).textContent).toBe("Suggestion dismissed: Weekly notes"));
+
+        // The sidebar switches the account; the tasks page stays mounted.
+        signedIn.userId = "user-b";
+        rerenderPage();
+
+        expect(screen.getByRole("status", { name: "Suggestion updates" }).textContent).toBe("");
+        expect(screen.queryByText(MENTIONS_WEEKLY_NOTES)).toBeNull();
+    });
+
+    it("clears a failure alert after an account switch", async () => {
+        state.rows = [row("s1", "Weekly notes")];
+        calls.failNext = true;
+        const { rerenderPage } = mountList();
+
+        fireEvent.click(await screen.findByRole("button", { name: 'Accept "Weekly notes"' }));
+        await screen.findByRole("alert");
+
+        signedIn.userId = "user-b";
+        rerenderPage();
+
+        expect(screen.queryByRole("alert")).toBeNull();
     });
 
     it("shows an alert, keeps the row and leaves focus on its button when the call fails", async () => {

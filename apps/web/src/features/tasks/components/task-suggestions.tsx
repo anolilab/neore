@@ -7,6 +7,7 @@ import { CalendarClockIcon } from "lucide-react";
 import type { FC, RefObject } from "react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 
+import { useAuthSession } from "@/features/auth/hooks/use-auth-session";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 import { useScheduleLabel } from "../hooks/use-schedule-label";
@@ -39,7 +40,7 @@ const focusIsLost = (): boolean => document.activeElement === null || document.a
  * A decided row leaves the list at once, without waiting for the live list to say so. Its status region stays mounted
  * with the list empty, so the outcome of the last decision is announced.
  */
-const TaskSuggestions: FC<TaskSuggestionsProps> = ({ fallbackFocus }) => {
+const TaskSuggestionsList: FC<TaskSuggestionsProps> = ({ fallbackFocus }) => {
     const { t } = useLingui();
     const crpc = useCRPC();
     const queryClient = useQueryClient();
@@ -255,6 +256,17 @@ const TaskSuggestions: FC<TaskSuggestionsProps> = ({ fallbackFocus }) => {
             )}
         </section>
     );
+};
+
+/**
+ * The list, mounted once per account (`key` on the user id). An account switch from the sidebar keeps the tasks page
+ * mounted, so what one account's decision left behind (the announced title, the busy row, the queued focus, the decided
+ * and expanded rows) is dropped with the list instead of showing on the next account's page.
+ */
+const TaskSuggestions: FC<TaskSuggestionsProps> = ({ fallbackFocus }) => {
+    const { data: session } = useAuthSession();
+
+    return <TaskSuggestionsList fallbackFocus={fallbackFocus} key={session?.user.id ?? ""} />;
 };
 
 export default TaskSuggestions;
