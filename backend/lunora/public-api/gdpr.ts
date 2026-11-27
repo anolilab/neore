@@ -7,6 +7,7 @@
 import { v } from "lunorash/server";
 
 import type { Doc } from "../_generated/dataModel";
+import type { MutationCtx } from "../_generated/server";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { MAX_SUBSCRIPTIONS } from "./events-webhook";
 
@@ -223,3 +224,12 @@ export const collectEventWebhooksForExport = internalQuery
             }),
         };
     });
+
+/** Erases the account's Events webhook subscriptions, with their callback URLs and secrets (the admin cleanup, `auth/hooks.ts`). */
+export const deleteEventSubscriptionsOf = async (ctx: Pick<MutationCtx, "db">, userId: string): Promise<void> => {
+    const { page } = await ctx.db.eventWebhookSubscriptions.findMany({ consistency: "primary", where: { userId } });
+
+    for (const row of page) {
+        await ctx.db.delete("eventWebhookSubscriptions", row._id);
+    }
+};

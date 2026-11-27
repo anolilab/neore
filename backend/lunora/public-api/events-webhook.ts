@@ -143,8 +143,8 @@ const parseCallbackUrl = (value: unknown): Parsed<CallbackUrl> => {
         return refuse(INVALID_PARAMS, "`delivery.url` must not carry credentials.");
     }
 
-    // A fragment is never sent, so two URLs that differ only in it would be two subscriptions to one callback.
-    if (parsed.hash !== "") {
+    // A fragment is never sent, so two URLs that differ only in it would be two subscriptions to one callback; an empty one ("#") leaves no hash.
+    if (value.includes("#")) {
         return refuse(INVALID_PARAMS, "`delivery.url` must not carry a fragment.");
     }
 

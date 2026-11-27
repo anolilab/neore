@@ -79,6 +79,7 @@ describe("the TTL grant", () => {
 
 describe("events/subscribe params", () => {
     it("refuses a callback URL that carries a fragment, since two fragments would be two subscriptions to one callback", () => {
+        expect(parseSubscribeParams(subscribeWith({}, { url: `${VALID_URL}#` }))).toMatchObject({ ok: false });
         expect(parseSubscribeParams(subscribeWith({}, { url: `${VALID_URL}#one` }))).toMatchObject({ ok: false });
     });
 

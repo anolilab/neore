@@ -35,7 +35,8 @@ import { authLogger } from "../lib/logger";
 import { noteShardActivity } from "../lib/shard-housekeeping";
 import { deleteShardRoute, deleteShardRoutesOf } from "../lib/shard-routes";
 import { dropPushDevicesOf } from "../notifications/push-device-writes";
-import { deleteEventSubscriptionsOf, deleteEventWebhookHostsOf } from "./gdpr";
+import { deleteEventSubscriptionsOf } from "../public-api/gdpr";
+import { deleteEventWebhookHostsOf } from "./gdpr";
 
 /** Emails in the `ADMIN` allowlist, trimmed and lowercased. */
 export const adminEmails = (): string[] =>

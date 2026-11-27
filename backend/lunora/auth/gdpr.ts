@@ -147,12 +147,3 @@ export const deleteEventWebhookHostsOf = async (ctx: Pick<MutationCtx, "db">, us
         await ctx.db.delete("eventWebhookHosts", row._id);
     }
 };
-
-/** Erases the account's Events webhook subscriptions, with their callback URLs and secrets (the admin cleanup, `auth/hooks.ts`). */
-export const deleteEventSubscriptionsOf = async (ctx: Pick<MutationCtx, "db">, userId: string): Promise<void> => {
-    const { page } = await ctx.db.eventWebhookSubscriptions.findMany({ consistency: "primary", where: { userId } });
-
-    for (const row of page) {
-        await ctx.db.delete("eventWebhookSubscriptions", row._id);
-    }
-};
