@@ -463,10 +463,6 @@ export const UNPOLICED_TABLES: Record<string, string> = {
     cronRuns: "cron slot claims; system only",
     documentHistory: "audit trail written by triggers; no client read",
     idempotencyClaims: "internal claims; no client access",
-    mcpEvents:
-        "the Events log (`public-api/events-log.ts`): written by the run end and the approval request, read by `events/poll` and the GDPR erase; all internal on the owner's shard, no client procedure reaches it",
-    mcpEventWatermarks:
-        "the Events log's sequence watermark (`public-api/events-log.ts`): one row per owner, advanced with each append and read by `events/poll`; internal on the owner's shard, no client procedure reaches it",
     invitation: "better-auth organization invitations; org-scoped, checked by org role",
     jwks: "better-auth signing keys",
     member: "organization membership; org-scoped, read to PROVE membership",

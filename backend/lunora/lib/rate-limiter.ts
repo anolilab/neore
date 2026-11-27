@@ -363,9 +363,7 @@ export const RATE_LIMIT_CONFIGS = {
     // Whole-connection inbound cap, on top of the per-sender one below: a group
     // chat or a bot open to many senders shares one owner's key and one budget.
     "messenger/connection:free": Ratelimit.fixedWindow(60, HOUR),
-
     "messenger/connection:premium": Ratelimit.fixedWindow(300, HOUR),
-
     "messenger/disconnect:free": Ratelimit.fixedWindow(10, MINUTE),
     "messenger/disconnect:premium": Ratelimit.fixedWindow(30, MINUTE),
     // Per-platform-sender inbound message cap. Bot owner pays the LLM bill,
@@ -384,7 +382,6 @@ export const RATE_LIMIT_CONFIGS = {
     // private" reply per stranger, so a stranger cannot make the bot spam or
     // spend the owner's platform quota.
     "messenger/pairAttempt": Ratelimit.fixedWindow(5, 15 * MINUTE),
-
     "messenger/pairAttemptConnection": Ratelimit.fixedWindow(30, 15 * MINUTE),
     "messenger/privateNotice": Ratelimit.fixedWindow(1, HOUR),
     // Notifications (`notifications/`): read state and the Daily Brief toggle,
@@ -422,7 +419,6 @@ export const RATE_LIMIT_CONFIGS = {
     "organization/rejectInvite:premium": Ratelimit.fixedWindow(30, MINUTE),
     "organization/removeMember:free": Ratelimit.fixedWindow(5, MINUTE),
     "organization/removeMember:premium": Ratelimit.fixedWindow(15, MINUTE),
-
     "organization/setActive:free": Ratelimit.fixedWindow(10, MINUTE),
     "organization/setActive:premium": Ratelimit.fixedWindow(30, MINUTE),
     "organization/update:free": Ratelimit.fixedWindow(10, MINUTE),
@@ -434,22 +430,21 @@ export const RATE_LIMIT_CONFIGS = {
     // debounce), so it is sized for continuous typing; `agent` is an LLM call.
     "pages/agent:free": Ratelimit.tokenBucket(10, MINUTE, 20),
     "pages/agent:premium": Ratelimit.tokenBucket(30, MINUTE, 60),
-
     "pages/comment:free": Ratelimit.fixedWindow(30, MINUTE),
     "pages/comment:premium": Ratelimit.fixedWindow(100, MINUTE),
     "pages/create:free": Ratelimit.fixedWindow(20, MINUTE),
     "pages/create:premium": Ratelimit.fixedWindow(60, MINUTE),
+
     "pages/delete:free": Ratelimit.fixedWindow(20, MINUTE),
     "pages/delete:premium": Ratelimit.fixedWindow(60, MINUTE),
 
     "pages/presence:free": Ratelimit.fixedWindow(30, MINUTE),
     "pages/presence:premium": Ratelimit.fixedWindow(60, MINUTE),
-
     "pages/save:free": Ratelimit.fixedWindow(90, MINUTE),
-
     "pages/save:premium": Ratelimit.fixedWindow(240, MINUTE),
     "pages/share:free": Ratelimit.fixedWindow(10, MINUTE),
     "pages/share:premium": Ratelimit.fixedWindow(30, MINUTE),
+
     "pages/update:free": Ratelimit.fixedWindow(60, MINUTE),
 
     "pages/update:premium": Ratelimit.fixedWindow(180, MINUTE),
@@ -457,9 +452,7 @@ export const RATE_LIMIT_CONFIGS = {
     "pins/create:free": Ratelimit.fixedWindow(20, MINUTE),
     "pins/create:premium": Ratelimit.fixedWindow(60, MINUTE),
     "pins/delete:free": Ratelimit.fixedWindow(20, MINUTE),
-
     "pins/delete:premium": Ratelimit.fixedWindow(60, MINUTE),
-
     "pins/update:free": Ratelimit.fixedWindow(30, MINUTE),
     "pins/update:premium": Ratelimit.fixedWindow(100, MINUTE),
     premium: Ratelimit.tokenBucket(100, 10 * SECOND, 100),
@@ -471,6 +464,7 @@ export const RATE_LIMIT_CONFIGS = {
     "project/member:free": Ratelimit.fixedWindow(10, MINUTE),
     "project/member:premium": Ratelimit.fixedWindow(30, MINUTE),
     "project/update:free": Ratelimit.fixedWindow(20, MINUTE),
+
     "project/update:premium": Ratelimit.fixedWindow(60, MINUTE),
     // Projects (plural) aliases used by projects/functions.ts
     "projects/create:free": Ratelimit.fixedWindow(5, MINUTE),
@@ -479,7 +473,6 @@ export const RATE_LIMIT_CONFIGS = {
     "projects/delete:free": Ratelimit.fixedWindow(5, MINUTE),
     "projects/delete:premium": Ratelimit.fixedWindow(15, MINUTE),
     "projects/update:free": Ratelimit.fixedWindow(20, MINUTE),
-
     "projects/update:premium": Ratelimit.fixedWindow(60, MINUTE),
     // Prompts limits
     "prompts/create:free": Ratelimit.fixedWindow(10, MINUTE),
