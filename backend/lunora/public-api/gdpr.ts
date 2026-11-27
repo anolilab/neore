@@ -8,7 +8,13 @@ import { v } from "lunorash/server";
 
 import type { Doc } from "../_generated/dataModel";
 import { internalMutation, internalQuery } from "../_generated/server";
-import { MAX_LISTED_APPROVED_HOSTS, MAX_SUBSCRIPTIONS } from "./events-webhook";
+import { MAX_SUBSCRIPTIONS } from "./events-webhook";
+
+/** Host rows read per page of the account export. */
+const EXPORT_HOST_PAGE = 100;
+
+/** The most host rows one export reads: a named ceiling, past which the export says it stopped (`hostsTruncated`). */
+const MAX_EXPORT_HOSTS = 5000;
 
 const BATCH = 200;
 
@@ -174,9 +180,33 @@ export const collectEventWebhooksForExport = internalQuery
         }),
     )
     .query(async ({ args: { userId }, ctx }) => {
-        // One row past the ceiling says whether the owner has more; the export names that instead of dropping them without a word.
-        const { page } = await ctx.db.eventWebhookHosts.findMany({ consistency: "primary", limit: MAX_LISTED_APPROVED_HOSTS + 1, where: { userId } });
-        const hosts = page.slice(0, MAX_LISTED_APPROVED_HOSTS);
+        // Every page until the last; only the named ceiling stops it early, and then the export says so.
+        const hosts: Doc<"eventWebhookHosts">[] = [];
+        let cursor: string | null = null;
+        let hostsTruncated = false;
+
+        for (;;) {
+            const result: { continueCursor?: string | null; isDone: boolean; page: Doc<"eventWebhookHosts">[] } = await ctx.db.eventWebhookHosts.findMany({
+                consistency: "primary",
+                cursor,
+                limit: EXPORT_HOST_PAGE,
+                where: { userId },
+            });
+
+            hosts.push(...result.page);
+
+            if (result.isDone) {
+                break;
+            }
+
+            if (hosts.length >= MAX_EXPORT_HOSTS) {
+                hostsTruncated = true;
+                break;
+            }
+
+            cursor = result.continueCursor ?? null;
+        }
+
         const { page: subscriptions } = await ctx.db.eventWebhookSubscriptions.findMany({
             consistency: "primary",
             limit: MAX_SUBSCRIPTIONS,
@@ -187,7 +217,7 @@ export const collectEventWebhooksForExport = internalQuery
             hosts: hosts.map((row) => {
                 return { createdAt: row.createdAt, host: row.host };
             }),
-            hostsTruncated: page.length > MAX_LISTED_APPROVED_HOSTS,
+            hostsTruncated,
             subscriptions: subscriptions.map((row) => {
                 return { argumentsKey: row.argumentsKey, createdAt: row.createdAt, expiresAt: row.expiresAt, name: row.name, url: row.url };
             }),

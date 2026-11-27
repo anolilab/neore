@@ -43,8 +43,8 @@ describe("collectEventWebhooksForExport", () => {
     });
 });
 
-describe("collectEventWebhooksForExport hosts past the ceiling", () => {
-    it("exports the ceiling's worth of hosts and says so when the owner has more", async () => {
+describe("collectEventWebhooksForExport hosts past one page", () => {
+    it("exports every host, across pages, without saying it was cut", async () => {
         const harness = lunoraTest(schemaWithShardedTables([]) as never);
 
         try {
@@ -59,8 +59,8 @@ describe("collectEventWebhooksForExport hosts past the ceiling", () => {
                 hostsTruncated: boolean;
             };
 
-            expect(exported.hosts).toHaveLength(500);
-            expect(exported.hostsTruncated).toBe(true);
+            expect(exported.hosts).toHaveLength(501);
+            expect(exported.hostsTruncated).toBe(false);
         } finally {
             harness.close();
         }
