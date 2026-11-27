@@ -152,3 +152,14 @@ export const frameMessage = (frame: BrowserFrame): string | undefined => {
         }
     }
 };
+
+/**
+ * A read the server refused for its rate limit: the last picture stays as it was, without a failure note, and the
+ * reader's next read (its timer, or the next agent action past the gap) tries again.
+ */
+export const isRateLimited = (error: unknown): boolean => {
+    const { code, data } = (typeof error === "object" && error !== null ? error : {}) as { code?: unknown; data?: { code?: unknown } | null };
+
+    // A Lunora error carries its code on `.code` or on `.data.code`.
+    return (typeof code === "string" ? code : data?.code) === "TOO_MANY_REQUESTS";
+};

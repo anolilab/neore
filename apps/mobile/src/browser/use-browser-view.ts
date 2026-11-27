@@ -10,7 +10,17 @@ import { useOffline } from "@/offline/offline-context";
 import type { BrowserFrame, BrowserStatus } from "./browser-api";
 import { handBackBrowser, keepBrowserControl, navigateBrowser, readBrowserStatus, readFrame, takeBrowserControl, watchBrowserStatus } from "./browser-api";
 import type { Seen, ViewState } from "./browser-view-state";
-import { frameMessage, frameTrigger, GRANT_END_MARGIN_MS, grantEndOnDevice, otherLeaseEndOnDevice, shouldReadFrame, viewStateOf, withAnswer } from "./browser-view-state";
+import {
+    frameMessage,
+    frameTrigger,
+    GRANT_END_MARGIN_MS,
+    grantEndOnDevice,
+    isRateLimited,
+    otherLeaseEndOnDevice,
+    shouldReadFrame,
+    viewStateOf,
+    withAnswer,
+} from "./browser-view-state";
 import type { ControlSession, ControlState } from "./control-session";
 import { createControlSession, forgetClaim, rememberClaim, rememberedClaim, viewNameFor } from "./control-session";
 import type { FrameReader } from "./frame-reader";
@@ -266,6 +276,10 @@ export const useBrowserView = (threadId: string, userId: string): BrowserView =>
                 // A refusal is the server's answer, not a lost connection.
                 if (isNetworkFailure(failure)) {
                     reportRead("failed");
+                }
+
+                if (isRateLimited(failure)) {
+                    return;
                 }
 
                 setFrameNote(NOT_SHOWN);

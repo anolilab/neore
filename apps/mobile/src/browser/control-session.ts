@@ -165,6 +165,22 @@ export const createControlSession = ({
         set({ ...state, until: Math.max(state.until, answer.until) });
     };
 
+    const handBack = (claim: string, reason: "handed_back" | "left"): void => {
+        // A take waits for this: a renewal of a claim whose hand back is still out would be ended by it.
+        releasing = (async () => {
+            if (!await withCatch(async () => await api.handBack(claim, reason), () => false)) {
+                return;
+            }
+
+            onReleased(claim);
+
+            if (lastClaim === claim) {
+                lastClaim = undefined;
+            }
+        })();
+        settleQuietly(releasing);
+    };
+
     return {
         navigate: async (url) => {
             if (state.kind !== "holding") {
@@ -226,19 +242,7 @@ export const createControlSession = ({
             const { claim } = state;
 
             stop();
-            // A take waits for this: a renewal of a claim whose hand back is still out would be ended by it.
-            releasing = (async () => {
-                if (!await withCatch(async () => await api.handBack(claim, reason), () => false)) {
-                    return;
-                }
-
-                onReleased(claim);
-
-                if (lastClaim === claim) {
-                    lastClaim = undefined;
-                }
-            })();
-            settleQuietly(releasing);
+            handBack(claim, reason);
         },
         state: () => state,
         suspend: () => {
@@ -317,9 +321,13 @@ export const createControlSession = ({
                     return;
                 }
 
-                // No renewal landed for a whole lease: it has ended on the server, so the phone stops showing it.
+                // No renewal answered for a whole lease: the phone stops showing it, and hands it back in case one landed
+                // unanswered and the lease still runs on the server, so the agent need not wait it out.
                 if (deviceNow() >= endsAt) {
+                    const { claim } = state;
+
                     stop(CONTROL_ENDED);
+                    handBack(claim, "left");
 
                     return;
                 }

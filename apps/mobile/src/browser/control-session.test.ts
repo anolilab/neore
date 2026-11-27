@@ -189,9 +189,10 @@ describe(createControlSession, () => {
     it("stops showing control once a whole lease passed with no renewal landing", async () => {
         const clock = { at: NOW };
         const ticks: (() => void)[] = [];
+        const handBack = vi.fn(async () => true);
         const session = createControlSession({
             api: {
-                handBack: vi.fn(async () => true),
+                handBack,
                 keep: vi.fn(async () => {
                     throw new TypeError("Network request failed");
                 }),
@@ -217,6 +218,8 @@ describe(createControlSession, () => {
         clock.at += 1;
         ticks[0]?.();
         expect(session.state()).toStrictEqual({ kind: "idle", message: CONTROL_ENDED });
+        // A renewal may have landed unanswered: the lease is handed back, so the agent need not wait it out.
+        expect(handBack).toHaveBeenCalledWith("c-1", "left");
     });
 
     it("renews a retaken claim while a renewal of the one handed back is still out", async () => {

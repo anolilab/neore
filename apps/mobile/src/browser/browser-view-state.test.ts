@@ -8,6 +8,7 @@ import {
     GRANT_END_MARGIN_MS,
     grantEndOnDevice,
     isOlderStatus,
+    isRateLimited,
     NO_BROWSER,
     NOT_READABLE,
     otherLeaseEndOnDevice,
@@ -126,5 +127,15 @@ describe(withAnswer, () => {
         const seen = { answer: { receivedAt: 10, status: running({ now: 300 }) } };
 
         expect(withAnswer(seen, running({ now: 200 }), 20, 20)).toBe(seen);
+    });
+});
+
+describe(isRateLimited, () => {
+    it("tells a read refused for the rate limit from any other failure", () => {
+        expect(isRateLimited({ code: "TOO_MANY_REQUESTS", message: "Slow down" })).toBe(true);
+        expect(isRateLimited({ data: { code: "TOO_MANY_REQUESTS" }, message: "Slow down" })).toBe(true);
+        expect(isRateLimited({ code: "FORBIDDEN" })).toBe(false);
+        expect(isRateLimited(new TypeError("Network request failed"))).toBe(false);
+        expect(isRateLimited(undefined)).toBe(false);
     });
 });
