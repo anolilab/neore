@@ -35,7 +35,7 @@ import {
     vectorCutIsFull,
     withSearchHits,
 } from "./retrieve-ranking";
-import type { KeywordLookup, RankedMemory } from "./retrieve-ranking";
+import type { RankedMemory } from "./retrieve-ranking";
 
 // ============================================================================
 // Retrieval Types
@@ -109,21 +109,19 @@ export const retrieveRelevantMemories = internalAction
         const keywordLookups =
             terms.length === 0
                 ? Promise.resolve([])
-                : (
-                      ctx.runQuery(internal.memory.functions.searchMemoriesByKeyword, { activeOn: now, ...scope, terms, userId: args.userId }) as Promise<
-                          KeywordLookup<ActiveMemory>[]
-                      >
-                  ).catch((error: unknown) => {
-                      // After a deploy that adds `search_memory_text`, Lunora refuses the index until its backfill covers
-                      // the existing rows: not ready yet rather than a failure, so the vector hits and the window decide.
-                      if (isSearchIndexBuilding(error)) {
-                          ctx.log.event("memory.keyword_search", { preparing: true });
-                      } else {
-                          console.warn("[memory/retrieve] Keyword search failed, continuing without it:", error);
-                      }
+                : ctx
+                      .runQuery(internal.memory.functions.searchMemoriesByKeyword, { activeOn: now, ...scope, terms, userId: args.userId })
+                      .catch((error: unknown) => {
+                          // After a deploy that adds `search_memory_text`, Lunora refuses the index until its backfill covers
+                          // the existing rows: not ready yet rather than a failure, so the vector hits and the window decide.
+                          if (isSearchIndexBuilding(error)) {
+                              ctx.log.event("memory.keyword_search", { preparing: true });
+                          } else {
+                              console.warn("[memory/retrieve] Keyword search failed, continuing without it:", error);
+                          }
 
-                      return [];
-                  });
+                          return [];
+                      });
         // A fact past its end date in the user's timezone is never injected (`activeOn`). The window is the newest
         // rows, not the first by type: the vector hits below add the ones it leaves out.
         const windowMemories = (await ctx.runQuery(internal.memory.functions.getActiveMemoriesForUser, {

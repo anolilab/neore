@@ -1918,6 +1918,33 @@ export const searchMemoriesByKeyword = internalQuery
         timeZone: v.optional(v.string()),
         userId: v.string(),
     })
+    .output(
+        v.array(
+            v.object({
+                complete: v.boolean(),
+                corpusRows: v.number(),
+                // `retrievalRowOf`: what ranking reads of a stored memory.
+                hits: v.array(
+                    v.object({
+                        _creationTime: v.number(),
+                        _id: v.string(),
+                        botId: v.optional(v.id("bots")),
+                        confidence: v.optional(v.number()),
+                        embeddingId: v.optional(v.string()),
+                        eventEnd: v.optional(v.string()),
+                        eventStart: v.optional(v.string()),
+                        importance: v.optional(v.number()),
+                        lastConfirmedAt: v.number(),
+                        memory: v.string(),
+                        pinned: v.boolean(),
+                        type: vMemoryType,
+                        validUntil: v.optional(v.string()),
+                    }),
+                ),
+                term: v.string(),
+            }),
+        ),
+    )
     .query(async ({ args, ctx }) => {
         const today = args.activeOn === undefined ? undefined : localDayOf(args.activeOn, args.timeZone ?? (await userTimeZone(ctx, args.userId)));
 

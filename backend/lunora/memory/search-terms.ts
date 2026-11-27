@@ -65,7 +65,7 @@ const MIN_CODE_LENGTH = 3;
 
 /**
  * The tokens with a digit of every identifier in `text`: letters, then digits, at least 3 of them (`2291` of
- * `KX-2291`, `e4012` of `E4012`, `v2`/`3` of `v2.3`). A number alone never is one: a year, a count, a date
+ * `KX-2291`, `e4012` of `E4012`, `v2` of `v2.3`). A number alone never is one: a year, a count, a date
  * (`2026-11-27`), a decimal or a price; nor a mix that starts with digits, a time, an ordinal or a unit (`5pm`, `21st`,
  * `100km`).
  */
