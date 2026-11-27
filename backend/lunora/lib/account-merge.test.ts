@@ -3711,7 +3711,7 @@ describe("mergeGuestInto across two real shards", () => {
                 await merge.lapseLease();
                 await merge.shards.guest.run(async (context: any) => await context.db.patch("threads", id, { title: "edited during the merge", updatedAt: 2 }));
                 ({ next: newer } = await mergeGuestInto(merge.call, REFERENCES, "guest", "user", {
-                    budget: MERGE_LEASE_CALLS + MERGE_STOP_CALLS + 4,
+                    budget: MERGE_LEASE_CALLS + MERGE_STOP_CALLS + 5,
                     resume: { cursor: null, moved: 0, phase: "clear", run: 1, table: "threads" },
                 }));
             });

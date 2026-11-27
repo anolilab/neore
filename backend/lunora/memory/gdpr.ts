@@ -1,6 +1,7 @@
 /**
- * Memories and reflection digests in the GDPR export; those, the reflection state and the background import jobs (with
- * their stored entries) in account deletion. The import's job and batch rows are erased, never exported: they are a
+ * Memories and reflection digests in the GDPR export; those, the reflection state, the pending cleanups (vectors whose
+ * delete failed, the rest of an older-version delete) and the background import jobs (with their stored entries) in
+ * account deletion. The import's job and batch rows are erased, never exported: they are a
  * short-lived copy of a file the user supplied, deleted when the job ends, and their entries become memories, which are
  * exported. (Chat import's job rows are handled the same way, `chat-import/gdpr.ts`.)
  *
@@ -73,10 +74,25 @@ export const eraseMemoriesForUser = async (ctx: MutationCtx, userId: string): Pr
     return { hasMore: memories.length >= BATCH };
 };
 
+/**
+ * The reflection state, the digests, the import jobs and the cleanup records. A cleanup record whose vector could not be
+ * erased is kept (its job retries it), so those rows stay in the table and the batch cannot be read again from the top: the
+ * walk over them carries a cursor. `cleanupCursor` in is `undefined` for a first call, the cursor a call returned, or `null`
+ * once the records are done (as for the usage scan); out it is the cursor of the next page, `null` when none is left.
+ * `hasMore` is true while records remain past the cursor or any other table has a full batch left.
+ */
 export const deleteUserMemoryReflectionData = internalMutation
-    .input({ userId: v.string() })
-    .output(v.object({ hasMore: v.boolean() }))
-    .mutation(async ({ args: { userId }, ctx }) => {
+    .input({ cleanupCursor: v.optional(v.union(v.string(), v.null())), userId: v.string() })
+    .output(v.object({ cleanupCursor: v.union(v.string(), v.null()), hasMore: v.boolean() }))
+    .mutation(async ({ args: { cleanupCursor, userId }, ctx }) => {
+        const cleanupPage =
+            cleanupCursor === null
+                ? { continueCursor: null, isDone: true, page: [] }
+                : await ctx.db
+                      .query("memoryCleanups")
+                      .withIndex("by_userId", (q) => q.eq("userId", userId))
+                      .paginate({ cursor: cleanupCursor ?? null, numItems: BATCH });
+        const cleanups = cleanupPage.page;
         const [digests, states, importJobs, importBatches] = await Promise.all([
             ctx.db
                 .query("memoryDigests")
@@ -105,12 +121,30 @@ export const deleteUserMemoryReflectionData = internalMutation
             }
         }
 
+        // A recorded vector delete is the only reference left to a vector no memory row points at: erase the vector itself. A
+        // vector that cannot be erased keeps its record, so its cleanup job retries it: that matters more than the leftover record.
+        const kept = new Set<string>();
+
+        for (const row of cleanups) {
+            if (
+                row.kind === "vector" &&
+                row.embeddingId &&
+                !(await eraseEmbeddingRow(ctx, row.embeddingId, `embedding of retired memory ${row.memoryId ?? ""}`))
+            ) {
+                kept.add(row._id);
+            }
+        }
+
         await Promise.all([
+            ...cleanups.filter((row) => !kept.has(row._id)).map((row) => ctx.db.delete("memoryCleanups", row._id)),
             ...digests.map((row) => ctx.db.delete("memoryDigests", row._id)),
             ...states.map((row) => ctx.db.delete("memoryReflectionState", row._id)),
             ...importJobs.map((row) => ctx.db.delete("memoryImportJobs", row._id)),
             ...importBatches.map((row) => ctx.db.delete("memoryImportBatches", row._id)),
         ]);
 
-        return { hasMore: digests.length >= BATCH || states.length >= BATCH || importJobs.length >= BATCH || importBatches.length >= BATCH };
+        return {
+            cleanupCursor: cleanupPage.isDone ? null : cleanupPage.continueCursor,
+            hasMore: !cleanupPage.isDone || digests.length >= BATCH || states.length >= BATCH || importJobs.length >= BATCH || importBatches.length >= BATCH,
+        };
     });
