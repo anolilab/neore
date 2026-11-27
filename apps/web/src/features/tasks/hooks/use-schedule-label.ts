@@ -56,6 +56,11 @@ export const useScheduleLabel = (): ((cronExpression: string) => string) => {
         if (parts.kind === "monthly") {
             const { monthDay } = parts;
 
+            // The scheduler skips a month without the date, so days 29 to 31 do not run every month.
+            if (monthDay > 28) {
+                return t`Day ${monthDay} of the months that have one, at ${time} UTC`;
+            }
+
             return t`Day ${monthDay} of every month at ${time} UTC`;
         }
 

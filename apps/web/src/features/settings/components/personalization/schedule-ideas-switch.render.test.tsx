@@ -23,24 +23,35 @@ vi.mock("sonner", () => {
     return { toast: { error: vi.fn(), success: vi.fn() } };
 });
 
-// The settings cache: a write is applied at once, as the real queue does, and later reads see it.
+// The settings cache: a write is applied at once, as the real hook does, and later reads see it. `mutateAsync` sends the
+// patch it is given; `updateLatest` sends what the cache holds when its queued turn comes, like the real queue.
 vi.mock("@/features/auth/hooks/use-user-settings", async () => {
     const { useSyncExternalStore } = await import("react");
+
+    const apply = (patch: { scheduleIdeasEnabled: boolean }) => {
+        store.value = { ...store.value, ...patch };
+
+        for (const listener of store.listeners) {
+            listener();
+        }
+    };
 
     return {
         useUpdateUserSettings: () => {
             return {
-                updateLatest: (build: (current: Settings | undefined) => { scheduleIdeasEnabled: boolean }) => {
-                    const patch = build(store.value);
-
-                    store.value = { ...store.value, ...patch };
+                mutateAsync: (patch: { scheduleIdeasEnabled: boolean }) => {
+                    apply(patch);
                     store.writes.push(patch.scheduleIdeasEnabled);
 
-                    for (const listener of store.listeners) {
-                        listener();
-                    }
-
                     return Promise.resolve();
+                },
+                updateLatest: (build: (current: Settings | undefined) => { scheduleIdeasEnabled: boolean }) => {
+                    apply(build(store.value));
+
+                    return (async () => {
+                        await Promise.resolve();
+                        store.writes.push(store.value?.scheduleIdeasEnabled === true);
+                    })();
                 },
             };
         },
@@ -121,12 +132,29 @@ describe("ScheduleIdeasSwitch", () => {
         expect(store.writes).toEqual([]);
     });
 
-    it("is disabled while memory is off, even when it was left on", () => {
+    it("can still be turned off while memory is off and it was left on, then cannot be turned back on", () => {
         store.value = { scheduleIdeasEnabled: true };
         render(<ScheduleIdeasSwitch memoryEnabled={false} />);
 
         expect(isOn()).toBe(true);
+        expect(isDisabled()).toBe(false);
+
+        fireEvent.click(control());
+
+        expect(store.writes).toEqual([false]);
+        expect(isOn()).toBe(false);
         expect(isDisabled()).toBe(true);
+    });
+
+    it("sends false and then true for a quick off and on, so the erase of the off save is never skipped", async () => {
+        store.value = { scheduleIdeasEnabled: true };
+        render(<ScheduleIdeasSwitch memoryEnabled />);
+
+        fireEvent.click(control());
+        fireEvent.click(control());
+        await Promise.resolve();
+
+        expect(store.writes).toEqual([false, true]);
     });
 
     it("is disabled until the settings have loaded", () => {

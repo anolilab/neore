@@ -27,9 +27,14 @@ const attempt = async (run: () => Promise<unknown>): Promise<boolean> => {
     }
 };
 
+/** Whether focus has fallen to the page itself, as it does when the focused element is removed. Anywhere else, the person put it there. */
+const focusIsLost = (): boolean => document.activeElement === null || document.activeElement === document.body;
+
 /**
  * The tasks the daily job suggests from the person's own messages: each can be accepted (which creates the task, and the
  * board shows it) or dismissed. Nothing is shown while there are none, which is also the case while the feature is off.
+ * A decided row leaves the list at once, without waiting for the live list to say so. Its status region stays mounted
+ * with the list empty, so the outcome of the last decision is announced.
  */
 const TaskSuggestions: FC<TaskSuggestionsProps> = ({ fallbackFocus }) => {
     const { t } = useLingui();
@@ -41,12 +46,15 @@ const TaskSuggestions: FC<TaskSuggestionsProps> = ({ fallbackFocus }) => {
     // Where focus goes once the decided row has left the list: the neighbouring row (focusable, so it is read out), or the fallback.
     const focusAfter = useRef<{ decided: string; next: string | null } | null>(null);
     const [busyId, setBusyId] = useState<string | null>(null);
+    // Rows decided in this view: hidden at once, and kept hidden if the live list answers once more from before the decision.
+    const [decidedIds, setDecidedIds] = useState<ReadonlyArray<string>>([]);
     const [outcome, setOutcome] = useState<{ kind: "done" | "failed"; text: string } | null>(null);
 
     const listQuery = crpc.tasks.suggestions.listTaskSuggestions.queryOptions({});
     const boardQuery = crpc.tasks.functions.getTaskBoard.queryOptions({});
-    const { data } = useQuery(listQuery);
-    const suggestions = useMemo(() => data ?? [], [data]);
+    const { data, isError, refetch } = useQuery(listQuery);
+    const suggestions = useMemo(() => (data ?? []).filter((suggestion) => !decidedIds.includes(suggestion._id)), [data, decidedIds]);
+    const loadFailed = isError && data === undefined;
     const refresh = {
         onSettled: async () => {
             await queryClient.invalidateQueries({ queryKey: listQuery.queryKey });
@@ -74,19 +82,19 @@ const TaskSuggestions: FC<TaskSuggestionsProps> = ({ fallbackFocus }) => {
 
         focusAfter.current = null;
 
+        // Focus moves only when the removed row still held it. A person who went on to another control meanwhile keeps theirs.
+        if (!focusIsLost()) {
+            return;
+        }
+
         const next = pending.next ? items.current.get(pending.next) : null;
 
         (next ?? fallbackFocus?.current)?.focus();
     }, [suggestions, fallbackFocus]);
 
-    if (outcome === null && suggestions.length === 0) {
-        return null;
-    }
-
-    // One decision at a time, until its row has left the list: a live list can answer one more time from before the
-    // decision, and a second click on the same row would be refused as already decided. The buttons are `aria-disabled`,
-    // not `disabled`, so the one the person used keeps focus.
-    const busy = busyId !== null && suggestions.some((suggestion) => suggestion._id === busyId);
+    // One decision at a time, until it has been answered. The buttons are `aria-disabled`, not `disabled`, so the one the
+    // person used keeps focus.
+    const busy = busyId !== null;
 
     const decide = async (id: string, run: () => Promise<unknown>, done: string, failed: string) => {
         if (busy) {
@@ -102,16 +110,22 @@ const TaskSuggestions: FC<TaskSuggestionsProps> = ({ fallbackFocus }) => {
 
         const worked = await attempt(run);
 
-        if (!worked) {
+        if (worked) {
+            setDecidedIds((current) => [...current, id]);
+        } else {
             focusAfter.current = null;
-            setBusyId(null);
         }
+
+        setBusyId(null);
 
         setOutcome({ kind: worked ? "done" : "failed", text: worked ? done : failed });
     };
 
+    // With nothing to show, the section takes no space of its own (`contents`) but stays mounted for its status region.
+    const showsContent = suggestions.length > 0 || loadFailed || outcome?.kind === "failed";
+
     return (
-        <section aria-labelledby={suggestions.length > 0 ? headingId : undefined} className="space-y-3">
+        <section aria-labelledby={suggestions.length > 0 ? headingId : undefined} className={showsContent ? "space-y-3" : "contents"}>
             {suggestions.length > 0 && (
                 <div className="space-y-1">
                     <h2 className="text-sm font-medium" id={headingId}>
@@ -128,6 +142,20 @@ const TaskSuggestions: FC<TaskSuggestionsProps> = ({ fallbackFocus }) => {
                 <p className="text-destructive text-xs" role="alert">
                     {outcome.text}
                 </p>
+            )}
+            {loadFailed && (
+                <div className="flex flex-wrap items-center gap-3" role="alert">
+                    <p className="text-destructive text-xs">{t`Failed to load the suggested tasks`}</p>
+                    <Button
+                        onClick={() => {
+                            void refetch();
+                        }}
+                        size="sm"
+                        variant="outline"
+                    >
+                        {t`Retry`}
+                    </Button>
+                </div>
             )}
             {suggestions.length > 0 && (
                 <ul className="space-y-2">

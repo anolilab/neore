@@ -736,9 +736,9 @@ for a schema table that is neither policed nor listed:
 | `tasks_functions.runTask` | mutation | authMutation + RL | tasks | owner helper | ok |
 | `tasks_functions.updateGoal` | mutation | authMutation + RL | goals | owner helper | ok |
 | `tasks_functions.updateTask` | mutation | authMutation + RL | goals, skills, tasks | owner helper | ok |
-| `tasks_suggestions.acceptTaskSuggestion` | mutation | authMutation + RL | taskSuggestions, goals, skills, tasks | row.userId == caller (else NOT_FOUND); refused while the switch is off or the row is not pending; creates the task through `insertTask` | ok — new |
+| `tasks_suggestions.acceptTaskSuggestion` | mutation | authMutation + RL | taskSuggestions, goals, skills, tasks | row.userId == caller (else NOT_FOUND); refused while the switch or memory is off or the row is not pending; creates the task through `insertTask` | ok — new |
 | `tasks_suggestions.dismissTaskSuggestion` | mutation | authMutation + RL | taskSuggestions | row.userId == caller (else NOT_FOUND); pending rows only | ok — new |
-| `tasks_suggestions.listTaskSuggestions` | query | authQuery | taskSuggestions | caller-scoped (ctx.user); pending rows only, at most 20; empty while the switch is off | ok — new |
+| `tasks_suggestions.listTaskSuggestions` | query | authQuery | taskSuggestions | caller-scoped (ctx.user); pending rows only, at most 20; empty while the switch or memory is off | ok — new |
 | `triggers_functions.createTrigger` | mutation | authMutation + RL | triggers | caller-scoped (ctx.user); botId must be a bot the caller owns; an event page source must pass the SSRF URL check and a thread source must be a thread the caller can read (owner or grant) | ok |
 | `triggers_functions.deleteTrigger` | mutation | authMutation + RL | triggers | row.userId == caller | ok |
 | `triggers_functions.getTriggerExecutions` | query | authQuery | triggers | row.userId == caller | ok |

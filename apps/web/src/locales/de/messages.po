@@ -693,7 +693,7 @@ msgid "{0} lines"
 msgstr "{0} Zeilen"
 
 #. placeholder {0}: stats.total
-#: src/features/settings/components/personalization/memory-settings.tsx:189
+#: src/features/settings/components/personalization/memory-settings.tsx:192
 msgid "{0} memories"
 msgstr "{0} Erinnerungen"
 
@@ -783,7 +783,7 @@ msgid "{0} on {1}, in {2}"
 msgstr "{0} auf {1}, in {2}"
 
 #. placeholder {0}: stats.pinned
-#: src/features/settings/components/personalization/memory-settings.tsx:190
+#: src/features/settings/components/personalization/memory-settings.tsx:193
 msgid "{0} pinned"
 msgstr "{0} angeheftet"
 
@@ -1024,7 +1024,7 @@ msgstr "{days} Tage"
 msgid "{days}d ago"
 msgstr "vor {days} T."
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:360
+#: src/features/settings/components/personalization/memory-file-import.tsx:388
 msgid "{done} of {total} entries processed"
 msgstr "{done} von {total} Einträgen verarbeitet"
 
@@ -2384,11 +2384,11 @@ msgstr "Akzentfarbe aktualisiert"
 
 #: src/features/auth/components/organization/accept-invitation-card.tsx:192
 #: src/features/auth/components/organization/user-invitations-card.tsx:116
-#: src/features/tasks/components/task-suggestions.tsx:190
+#: src/features/tasks/components/task-suggestions.tsx:213
 msgid "Accept"
 msgstr "Annehmen"
 
-#: src/features/tasks/components/task-suggestions.tsx:178
+#: src/features/tasks/components/task-suggestions.tsx:206
 msgid "Accept \"{title}\""
 msgstr "„{title}“ annehmen"
 
@@ -3520,7 +3520,7 @@ msgid "All"
 msgstr "Alle"
 
 #. placeholder {0}: memories.length
-#: src/features/settings/components/personalization/memory-settings.tsx:211
+#: src/features/settings/components/personalization/memory-settings.tsx:214
 msgid "All ({0})"
 msgstr "Alle ({0})"
 
@@ -6172,7 +6172,7 @@ msgstr "Kanada"
 #: src/features/settings/components/chat/usage-settings.tsx:581
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:416
 #: src/features/settings/components/personalization/memory-item.tsx:351
-#: src/features/settings/components/personalization/memory-settings.tsx:260
+#: src/features/settings/components/personalization/memory-settings.tsx:263
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:381
 #: src/features/settings/connectors/messenger/messenger-setup-dialog.tsx:156
 #: src/features/skills/components/bundle-export-dialog.tsx:219
@@ -6200,7 +6200,7 @@ msgstr "Deep Work abbrechen"
 msgid "Cancel Export"
 msgstr "Export abbrechen"
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:434
+#: src/features/settings/components/personalization/memory-file-import.tsx:462
 msgid "Cancel import"
 msgstr "Import abbrechen"
 
@@ -6820,11 +6820,11 @@ msgstr "Chinesisch (Traditionell)"
 msgid "Choose .md or .zip"
 msgstr ".md oder .zip auswählen"
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:378
+#: src/features/settings/components/personalization/memory-file-import.tsx:406
 msgid "Choose a .txt file with one memory per line, or a .json file with a list of memories. The file can be up to {maxSize}."
 msgstr "Wähle eine .txt-Datei mit einer Erinnerung pro Zeile oder eine .json-Datei mit einer Liste von Erinnerungen. Die Datei darf bis zu {maxSize} groß sein."
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:273
+#: src/features/settings/components/personalization/memory-file-import.tsx:301
 msgid "Choose a .txt or .json file."
 msgstr "Wähle eine .txt- oder .json-Datei."
 
@@ -7085,11 +7085,11 @@ msgstr "Alle löschen"
 msgid "Clear All"
 msgstr "Alle löschen"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:250
+#: src/features/settings/components/personalization/memory-settings.tsx:253
 msgid "Clear All Memories"
 msgstr "Alle Erinnerungen löschen"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:254
+#: src/features/settings/components/personalization/memory-settings.tsx:257
 msgid "Clear all memories?"
 msgstr "Alle Erinnerungen löschen?"
 
@@ -7140,7 +7140,7 @@ msgstr "Tag-Filter zurücksetzen"
 msgid "Clear the queue"
 msgstr "Warteschlange leeren"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:138
+#: src/features/settings/components/personalization/memory-settings.tsx:139
 msgid "Cleared {count} memories"
 msgstr "{count} Erinnerungen gelöscht"
 
@@ -9019,7 +9019,7 @@ msgstr "Der Chat konnte nicht angehängt werden"
 msgid "could not be saved"
 msgstr "konnte nicht gespeichert werden"
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:351
+#: src/features/settings/components/personalization/memory-file-import.tsx:379
 msgid "Could not cancel the import."
 msgstr "Der Import konnte nicht abgebrochen werden."
 
@@ -9173,7 +9173,7 @@ msgstr "Der Workflow konnte nicht exportiert werden"
 msgid "Could not generate a draft. Try again."
 msgstr "Es konnte kein Entwurf erstellt werden. Versuche es erneut."
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:318
+#: src/features/settings/components/personalization/memory-file-import.tsx:346
 msgid "Could not import the file."
 msgstr "Die Datei konnte nicht importiert werden."
 
@@ -9339,11 +9339,11 @@ msgstr "Dieser Chat konnte nicht gelesen werden"
 msgid "Could not read that chat. If it is locked, unlock it first."
 msgstr "Dieser Chat konnte nicht gelesen werden. Ist er gesperrt, entsperre ihn zuerst."
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:306
+#: src/features/settings/components/personalization/memory-file-import.tsx:334
 msgid "Could not read the file."
 msgstr "Die Datei konnte nicht gelesen werden."
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:369
+#: src/features/settings/components/personalization/memory-file-import.tsx:397
 msgid "Could not read the import's progress."
 msgstr "Der Fortschritt des Imports konnte nicht gelesen werden."
 
@@ -10350,9 +10350,13 @@ msgstr "Datum und Uhrzeit"
 msgid "Day"
 msgstr "Tag"
 
-#: src/features/tasks/hooks/use-schedule-label.ts:59
+#: src/features/tasks/hooks/use-schedule-label.ts:64
 msgid "Day {monthDay} of every month at {time} UTC"
 msgstr "Am {monthDay}. jedes Monats um {time} UTC"
+
+#: src/features/tasks/hooks/use-schedule-label.ts:61
+msgid "Day {monthDay} of the months that have one, at {time} UTC"
+msgstr "Am {monthDay}. der Monate, die diesen Tag haben, um {time} UTC"
 
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:131
 msgid "days"
@@ -10734,7 +10738,7 @@ msgstr "Konto löschen"
 msgid "Delete alert \"{ruleName}\""
 msgstr "Alarm \"{ruleName}\" löschen"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:261
+#: src/features/settings/components/personalization/memory-settings.tsx:264
 msgid "Delete All"
 msgstr "Alle löschen"
 
@@ -11498,12 +11502,12 @@ msgstr "Discord Public Key"
 #: src/features/chat/thread/composer-long-text-prompt.tsx:71
 #: src/features/develop/components/guide-view.tsx:141
 #: src/features/devices/components/devices-settings.tsx:389
-#: src/features/tasks/components/task-suggestions.tsx:174
+#: src/features/tasks/components/task-suggestions.tsx:202
 #: src/features/workflow/components/nodes/file-node.tsx:231
 msgid "Dismiss"
 msgstr "Verwerfen"
 
-#: src/features/tasks/components/task-suggestions.tsx:161
+#: src/features/tasks/components/task-suggestions.tsx:189
 msgid "Dismiss \"{title}\""
 msgstr "„{title}“ verwerfen"
 
@@ -12694,7 +12698,7 @@ msgstr "Folgevorschläge aktivieren"
 msgid "Enable for Next Chat"
 msgstr "Für nächsten Chat aktivieren"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:172
+#: src/features/settings/components/personalization/memory-settings.tsx:173
 msgid "Enable memory"
 msgstr "Erinnerungen aktivieren"
 
@@ -13311,7 +13315,7 @@ msgstr "Event"
 msgid "Event ends on"
 msgstr "Ereignis endet am"
 
-#: src/features/tasks/hooks/use-schedule-label.ts:65
+#: src/features/tasks/hooks/use-schedule-label.ts:70
 msgid "Every {weekday} at {time} UTC"
 msgstr "Jeden {weekday} um {time} UTC"
 
@@ -14006,7 +14010,7 @@ msgstr "Tag-Farbe konnte nicht geändert werden"
 msgid "Failed to clear filter rules"
 msgstr "Filterregeln konnten nicht gelöscht werden"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:134
+#: src/features/settings/components/personalization/memory-settings.tsx:135
 msgid "Failed to clear memories"
 msgstr "Erinnerungen konnten nicht gelöscht werden"
 
@@ -14067,7 +14071,7 @@ msgstr "Vorlage konnte nicht erstellt werden"
 msgid "Failed to create tag"
 msgstr "Tag konnte nicht erstellt werden"
 
-#: src/features/tasks/components/task-suggestions.tsx:185
+#: src/features/tasks/components/task-suggestions.tsx:209
 msgid "Failed to create the task"
 msgstr "Die Aufgabe konnte nicht erstellt werden"
 
@@ -14103,7 +14107,7 @@ msgstr "Datei konnte nicht gelöscht werden. Bitte versuch es erneut."
 msgid "Failed to delete files"
 msgstr "Dateien konnten nicht gelöscht werden"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:106
+#: src/features/settings/components/personalization/memory-settings.tsx:107
 msgid "Failed to delete memory"
 msgstr "Erinnerung konnte nicht gelöscht werden"
 
@@ -14191,7 +14195,7 @@ msgstr "Connector konnte nicht getrennt werden"
 msgid "Failed to dismiss the digest"
 msgstr "Die Zusammenfassung konnte nicht ausgeblendet werden"
 
-#: src/features/tasks/components/task-suggestions.tsx:168
+#: src/features/tasks/components/task-suggestions.tsx:196
 msgid "Failed to dismiss the suggestion"
 msgstr "Der Vorschlag konnte nicht verworfen werden"
 
@@ -14299,6 +14303,10 @@ msgstr "Skills konnten nicht geladen werden"
 #: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:482
 msgid "Failed to load spreadsheet"
 msgstr "Tabelle konnte nicht geladen werden"
+
+#: src/features/tasks/components/task-suggestions.tsx:148
+msgid "Failed to load the suggested tasks"
+msgstr "Die vorgeschlagenen Aufgaben konnten nicht geladen werden"
 
 #: src/features/settings/components/chat/usage-settings.tsx:265
 msgid "Failed to load usage data. Ensure the LLM Gateway is running and reachable."
@@ -14628,8 +14636,8 @@ msgstr "Tastenkürzel konnten nicht aktualisiert werden"
 msgid "Failed to update MCP server"
 msgstr "MCP-Server konnte nicht aktualisiert werden"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:117
-#: src/features/settings/components/personalization/memory-settings.tsx:125
+#: src/features/settings/components/personalization/memory-settings.tsx:118
+#: src/features/settings/components/personalization/memory-settings.tsx:126
 msgid "Failed to update memory"
 msgstr "Erinnerung konnte nicht aktualisiert werden"
 
@@ -14657,7 +14665,7 @@ msgstr "Die Pull-Request-Einstellungen konnten nicht aktualisiert werden"
 msgid "Failed to update reply tools"
 msgstr "Antwort-Tools konnten nicht aktualisiert werden"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:149
+#: src/features/settings/components/personalization/memory-settings.tsx:150
 #: src/features/settings/components/personalization/schedule-ideas-switch.tsx:40
 msgid "Failed to update setting"
 msgstr "Einstellung konnte nicht aktualisiert werden"
@@ -15208,7 +15216,7 @@ msgstr "Dateigröße überschreitet {maxSize}"
 msgid "File size too large. Maximum 5MB allowed."
 msgstr "Datei zu groß. Maximal 5 MB erlaubt."
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:382
+#: src/features/settings/components/personalization/memory-file-import.tsx:410
 msgid "File to import"
 msgstr "Zu importierende Datei"
 
@@ -15356,7 +15364,7 @@ msgstr "Nach Typ filtern"
 msgid "Filter condition"
 msgstr "Filterbedingung"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:197
+#: src/features/settings/components/personalization/memory-settings.tsx:200
 msgid "Filter memories by type"
 msgstr "Erinnerungen nach Typ filtern"
 
@@ -17732,7 +17740,7 @@ msgstr "Ideal für einfache Klassifizierung und Extraktion"
 msgid "Ideas"
 msgstr "Ideen"
 
-#: src/features/tasks/components/task-suggestions.tsx:120
+#: src/features/tasks/components/task-suggestions.tsx:134
 msgid "Ideas from your own recent messages. Nothing is created until you accept one."
 msgstr "Ideen aus deinen eigenen letzten Nachrichten. Es wird nichts erstellt, bis du einen Vorschlag annimmst."
 
@@ -18072,7 +18080,7 @@ msgstr "Importiere Unterhaltungen aus ChatGPT, Google Gemini, Claude, einem Neor
 msgid "Import failed"
 msgstr "Import fehlgeschlagen"
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:395
+#: src/features/settings/components/personalization/memory-file-import.tsx:423
 msgid "Import file"
 msgstr "Datei importieren"
 
@@ -18080,7 +18088,7 @@ msgstr "Datei importieren"
 msgid "Import files"
 msgstr "Dateien importieren"
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:420
+#: src/features/settings/components/personalization/memory-file-import.tsx:448
 msgid "Import finished."
 msgstr "Import abgeschlossen."
 
@@ -18094,7 +18102,7 @@ msgstr "Aus Repository importieren"
 msgid "Import from this computer"
 msgstr "Von diesem Computer importieren"
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:375
+#: src/features/settings/components/personalization/memory-file-import.tsx:403
 msgid "Import memories from a file"
 msgstr "Erinnerungen aus einer Datei importieren"
 
@@ -18110,11 +18118,11 @@ msgstr "Notion-Export importieren (.zip)"
 msgid "Import one kind of export at a time."
 msgstr "Importiere jeweils nur eine Art von Export."
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:426
+#: src/features/settings/components/personalization/memory-file-import.tsx:454
 msgid "Import progress"
 msgstr "Importfortschritt"
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:412
+#: src/features/settings/components/personalization/memory-file-import.tsx:440
 msgid "Import result"
 msgstr "Importergebnis"
 
@@ -18164,7 +18172,7 @@ msgstr "{added} Notion-Seite(n) importiert; {skipped} Anhang/Anhänge übersprun
 msgid "Imported {added} Notion page(s)."
 msgstr "{added} Notion-Seite(n) importiert."
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:367
+#: src/features/settings/components/personalization/memory-file-import.tsx:395
 msgid "Imported {imported} · Updated {updated} · Duplicates {duplicates} · Too long {tooLong} · Invalid {invalid}"
 msgstr "Importiert {imported} · Aktualisiert {updated} · Duplikate {duplicates} · Zu lang {tooLong} · Ungültig {invalid}"
 
@@ -18187,7 +18195,7 @@ msgstr "Skill „{0}“ importiert"
 msgid "Importing from {0}..."
 msgstr "Wird aus {0} importiert..."
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:419
+#: src/features/settings/components/personalization/memory-file-import.tsx:447
 msgid "Importing memories…"
 msgstr "Erinnerungen werden importiert…"
 
@@ -21296,7 +21304,7 @@ msgid "memories"
 msgstr "Erinnerungen"
 
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:31
-#: src/features/settings/components/personalization/memory-settings.tsx:223
+#: src/features/settings/components/personalization/memory-settings.tsx:226
 msgid "Memories"
 msgstr "Erinnerungen"
 
@@ -21314,7 +21322,7 @@ msgid "Memories used for this reply ({0})"
 msgstr "Für diese Antwort verwendete Erinnerungen ({0})"
 
 #: src/features/marketing/use-cases/use-case-data.ts:114
-#: src/features/settings/components/personalization/memory-settings.tsx:165
+#: src/features/settings/components/personalization/memory-settings.tsx:166
 #: src/features/settings/lib/settings-keywords.ts:96
 msgid "Memory"
 msgstr "Erinnerungen"
@@ -21323,23 +21331,23 @@ msgstr "Erinnerungen"
 msgid "Memory — what the agent keeps across chats"
 msgstr "Erinnerung – was der Agent über Chats hinweg behält"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:110
+#: src/features/settings/components/personalization/memory-settings.tsx:111
 msgid "Memory deleted"
 msgstr "Erinnerung gelöscht"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:147
+#: src/features/settings/components/personalization/memory-settings.tsx:148
 msgid "Memory disabled"
 msgstr "Erinnerungen deaktiviert"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:147
+#: src/features/settings/components/personalization/memory-settings.tsx:148
 msgid "Memory enabled"
 msgstr "Erinnerungen aktiviert"
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:234
+#: src/features/settings/components/personalization/memory-file-import.tsx:257
 msgid "Memory import finished"
 msgstr "Erinnerungsimport abgeschlossen"
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:234
+#: src/features/settings/components/personalization/memory-file-import.tsx:257
 msgid "Memory import stopped"
 msgstr "Erinnerungsimport gestoppt"
 
@@ -23472,11 +23480,11 @@ msgstr "Keine MCP-Server konfiguriert. Füge einen Server hinzu, um die KI zu er
 msgid "No members in this team yet"
 msgstr "Noch keine Mitglieder in diesem Team"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:239
+#: src/features/settings/components/personalization/memory-settings.tsx:242
 msgid "No memories of this type."
 msgstr "Keine Erinnerungen dieser Art."
 
-#: src/features/settings/components/personalization/memory-settings.tsx:240
+#: src/features/settings/components/personalization/memory-settings.tsx:243
 msgid "No memories yet. The AI will start learning from your conversations automatically."
 msgstr "Noch keine Erinnerungen. Die KI lernt automatisch aus deinen Unterhaltungen."
 
@@ -29541,6 +29549,7 @@ msgstr "wiederholen"
 #: src/features/settings/components/chat/bot-tool-selection.tsx:495
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:493
 #: src/features/tasks/components/task-detail-dialog.tsx:108
+#: src/features/tasks/components/task-suggestions.tsx:156
 #: src/features/workflow/components/nodes/file-node.tsx:221
 #: src/lib/toast.ts:70
 #: src/lib/toast.ts:171
@@ -33828,7 +33837,7 @@ msgstr "Vorgeschlagene Antworten"
 msgid "Suggested next prompt: {nextPromptSuggestion}. Press Tab to insert."
 msgstr "Vorgeschlagene nächste Eingabe: {nextPromptSuggestion}. Zum Übernehmen Tab drücken."
 
-#: src/features/tasks/components/task-suggestions.tsx:118
+#: src/features/tasks/components/task-suggestions.tsx:132
 msgid "Suggested tasks"
 msgstr "Vorgeschlagene Aufgaben"
 
@@ -33836,11 +33845,11 @@ msgstr "Vorgeschlagene Aufgaben"
 msgid "Suggestion available, press Right Arrow to accept"
 msgstr "Vorschlag verfügbar, zum Übernehmen Pfeil nach rechts drücken"
 
-#: src/features/tasks/components/task-suggestions.tsx:167
+#: src/features/tasks/components/task-suggestions.tsx:195
 msgid "Suggestion dismissed: {title}"
 msgstr "Vorschlag verworfen: {title}"
 
-#: src/features/tasks/components/task-suggestions.tsx:124
+#: src/features/tasks/components/task-suggestions.tsx:138
 msgid "Suggestion updates"
 msgstr "Aktualisierungen der Vorschläge"
 
@@ -34251,7 +34260,7 @@ msgstr "Aufgabe"
 msgid "Task approved"
 msgstr "Aufgabe genehmigt"
 
-#: src/features/tasks/components/task-suggestions.tsx:184
+#: src/features/tasks/components/task-suggestions.tsx:209
 msgid "Task created: {title}"
 msgstr "Aufgabe erstellt: {title}"
 
@@ -35022,7 +35031,7 @@ msgstr "Der Plan des Agenten"
 msgid "The agent's tool calls"
 msgstr "Die Tool-Aufrufe des Agenten"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:164
+#: src/features/settings/components/personalization/memory-settings.tsx:165
 msgid "The AI learns from your conversations to personalize its responses, and reflects on what it learned each night. Everything it remembers is listed here — edit, retype, pin or delete any of it."
 msgstr "Die KI lernt aus deinen Unterhaltungen, um ihre Antworten zu personalisieren, und reflektiert jede Nacht, was sie gelernt hat. Alles, woran sie sich erinnert, ist hier aufgelistet – bearbeite, ändere den Typ, hefte an oder lösche beliebige Einträge."
 
@@ -35291,7 +35300,7 @@ msgstr "Die Erweiterung kann als {0} Chats lesen und senden. Du kannst sie jeder
 msgid "The file is larger than {0} KB, which is more than a bundle can be."
 msgstr "Die Datei ist größer als {0} KB, mehr als ein Bundle sein darf."
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:266
+#: src/features/settings/components/personalization/memory-file-import.tsx:294
 msgid "The file is larger than {maxSize}. Choose a smaller file."
 msgstr "Die Datei ist größer als {maxSize}. Wähle eine kleinere Datei."
 
@@ -35452,7 +35461,7 @@ msgstr "die Host-Software ist veraltet"
 msgid "The icons could not be loaded."
 msgstr "Die Symbole konnten nicht geladen werden."
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:368
+#: src/features/settings/components/personalization/memory-file-import.tsx:396
 msgid "The import stopped before it finished."
 msgstr "Der Import wurde beendet, bevor er fertig war."
 
@@ -36787,7 +36796,7 @@ msgid "This will permanently delete {0} anonymous user accounts and all their da
 msgstr "Dies wird {0} anonyme Benutzerkonten und alle ihre Daten dauerhaft löschen. Diese Aktion kann nicht rückgängig gemacht werden."
 
 #. placeholder {0}: memories.length
-#: src/features/settings/components/personalization/memory-settings.tsx:256
+#: src/features/settings/components/personalization/memory-settings.tsx:259
 msgid "This will permanently delete all {0} memories and their daily digests. The AI will start learning fresh from your next conversation."
 msgstr "Dadurch werden alle {0} Erinnerungen und ihre täglichen Zusammenfassungen dauerhaft gelöscht. Die KI lernt ab deiner nächsten Unterhaltung von vorn."
 
@@ -37649,7 +37658,7 @@ msgstr "Versuche, deine Suchbegriffe anzupassen."
 #: src/features/projects/components/project-repositories.tsx:297
 #: src/features/projects/components/repo-rule-file-import.tsx:183
 #: src/features/settings/components/chat/default-models-settings.tsx:455
-#: src/features/settings/components/personalization/memory-file-import.tsx:445
+#: src/features/settings/components/personalization/memory-file-import.tsx:473
 #: src/features/tasks/components/task-form-dialog.tsx:459
 #: src/features/vault/components/site-logins.tsx:480
 #: src/features/vault/components/site-logins.tsx:612
@@ -37749,7 +37758,7 @@ msgstr "Auto-Merge ausschalten?"
 msgid "Turn on memory"
 msgstr "Erinnerung einschalten"
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:400
+#: src/features/settings/components/personalization/memory-file-import.tsx:428
 msgid "Turn on memory to import a file."
 msgstr "Aktiviere Erinnerungen, um eine Datei zu importieren."
 

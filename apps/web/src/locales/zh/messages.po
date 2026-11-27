@@ -693,7 +693,7 @@ msgid "{0} lines"
 msgstr "{0} 行"
 
 #. placeholder {0}: stats.total
-#: src/features/settings/components/personalization/memory-settings.tsx:189
+#: src/features/settings/components/personalization/memory-settings.tsx:192
 msgid "{0} memories"
 msgstr "{0} 条记忆"
 
@@ -783,7 +783,7 @@ msgid "{0} on {1}, in {2}"
 msgstr "{0}，位于 {1}，目录 {2}"
 
 #. placeholder {0}: stats.pinned
-#: src/features/settings/components/personalization/memory-settings.tsx:190
+#: src/features/settings/components/personalization/memory-settings.tsx:193
 msgid "{0} pinned"
 msgstr "{0} 条已置顶"
 
@@ -1024,7 +1024,7 @@ msgstr "{days} 天"
 msgid "{days}d ago"
 msgstr "{days} 天前"
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:360
+#: src/features/settings/components/personalization/memory-file-import.tsx:388
 msgid "{done} of {total} entries processed"
 msgstr "已处理 {done} / {total} 条"
 
@@ -2384,11 +2384,11 @@ msgstr "强调色已更新"
 
 #: src/features/auth/components/organization/accept-invitation-card.tsx:192
 #: src/features/auth/components/organization/user-invitations-card.tsx:116
-#: src/features/tasks/components/task-suggestions.tsx:190
+#: src/features/tasks/components/task-suggestions.tsx:213
 msgid "Accept"
 msgstr "接受"
 
-#: src/features/tasks/components/task-suggestions.tsx:178
+#: src/features/tasks/components/task-suggestions.tsx:206
 msgid "Accept \"{title}\""
 msgstr "接受“{title}”"
 
@@ -3520,7 +3520,7 @@ msgid "All"
 msgstr "全部"
 
 #. placeholder {0}: memories.length
-#: src/features/settings/components/personalization/memory-settings.tsx:211
+#: src/features/settings/components/personalization/memory-settings.tsx:214
 msgid "All ({0})"
 msgstr "全部（{0}）"
 
@@ -6172,7 +6172,7 @@ msgstr "加拿大"
 #: src/features/settings/components/chat/usage-settings.tsx:581
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:416
 #: src/features/settings/components/personalization/memory-item.tsx:351
-#: src/features/settings/components/personalization/memory-settings.tsx:260
+#: src/features/settings/components/personalization/memory-settings.tsx:263
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:381
 #: src/features/settings/connectors/messenger/messenger-setup-dialog.tsx:156
 #: src/features/skills/components/bundle-export-dialog.tsx:219
@@ -6200,7 +6200,7 @@ msgstr "取消深度工作"
 msgid "Cancel Export"
 msgstr "取消导出"
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:434
+#: src/features/settings/components/personalization/memory-file-import.tsx:462
 msgid "Cancel import"
 msgstr "取消导入"
 
@@ -6820,11 +6820,11 @@ msgstr "中文（繁体）"
 msgid "Choose .md or .zip"
 msgstr "选择 .md 或 .zip"
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:378
+#: src/features/settings/components/personalization/memory-file-import.tsx:406
 msgid "Choose a .txt file with one memory per line, or a .json file with a list of memories. The file can be up to {maxSize}."
 msgstr "请选择每行一条记忆的 .txt 文件，或包含记忆列表的 .json 文件。文件大小最多为 {maxSize}。"
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:273
+#: src/features/settings/components/personalization/memory-file-import.tsx:301
 msgid "Choose a .txt or .json file."
 msgstr "请选择 .txt 或 .json 文件。"
 
@@ -7085,11 +7085,11 @@ msgstr "全部清除"
 msgid "Clear All"
 msgstr "全部清除"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:250
+#: src/features/settings/components/personalization/memory-settings.tsx:253
 msgid "Clear All Memories"
 msgstr "清除所有记忆"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:254
+#: src/features/settings/components/personalization/memory-settings.tsx:257
 msgid "Clear all memories?"
 msgstr "清除所有记忆？"
 
@@ -7140,7 +7140,7 @@ msgstr "清除标签筛选"
 msgid "Clear the queue"
 msgstr "清空队列"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:138
+#: src/features/settings/components/personalization/memory-settings.tsx:139
 msgid "Cleared {count} memories"
 msgstr "已清除 {count} 条记忆"
 
@@ -9019,7 +9019,7 @@ msgstr "无法附加该聊天"
 msgid "could not be saved"
 msgstr "无法保存"
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:351
+#: src/features/settings/components/personalization/memory-file-import.tsx:379
 msgid "Could not cancel the import."
 msgstr "无法取消导入。"
 
@@ -9173,7 +9173,7 @@ msgstr "无法导出工作流"
 msgid "Could not generate a draft. Try again."
 msgstr "无法生成草稿，请重试。"
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:318
+#: src/features/settings/components/personalization/memory-file-import.tsx:346
 msgid "Could not import the file."
 msgstr "无法导入该文件。"
 
@@ -9339,11 +9339,11 @@ msgstr "无法读取该聊天"
 msgid "Could not read that chat. If it is locked, unlock it first."
 msgstr "无法读取该聊天。如果已锁定，请先解锁。"
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:306
+#: src/features/settings/components/personalization/memory-file-import.tsx:334
 msgid "Could not read the file."
 msgstr "无法读取该文件。"
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:369
+#: src/features/settings/components/personalization/memory-file-import.tsx:397
 msgid "Could not read the import's progress."
 msgstr "无法读取导入进度。"
 
@@ -10350,9 +10350,13 @@ msgstr "日期和时间"
 msgid "Day"
 msgstr "日期"
 
-#: src/features/tasks/hooks/use-schedule-label.ts:59
+#: src/features/tasks/hooks/use-schedule-label.ts:64
 msgid "Day {monthDay} of every month at {time} UTC"
 msgstr "每月{monthDay}日 {time} UTC"
+
+#: src/features/tasks/hooks/use-schedule-label.ts:61
+msgid "Day {monthDay} of the months that have one, at {time} UTC"
+msgstr "每个有该日期的月份的 {monthDay} 日 {time} UTC"
 
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:131
 msgid "days"
@@ -10734,7 +10738,7 @@ msgstr "删除账号"
 msgid "Delete alert \"{ruleName}\""
 msgstr "删除提醒“{ruleName}”"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:261
+#: src/features/settings/components/personalization/memory-settings.tsx:264
 msgid "Delete All"
 msgstr "全部删除"
 
@@ -11498,12 +11502,12 @@ msgstr "Discord 公钥"
 #: src/features/chat/thread/composer-long-text-prompt.tsx:71
 #: src/features/develop/components/guide-view.tsx:141
 #: src/features/devices/components/devices-settings.tsx:389
-#: src/features/tasks/components/task-suggestions.tsx:174
+#: src/features/tasks/components/task-suggestions.tsx:202
 #: src/features/workflow/components/nodes/file-node.tsx:231
 msgid "Dismiss"
 msgstr "关闭"
 
-#: src/features/tasks/components/task-suggestions.tsx:161
+#: src/features/tasks/components/task-suggestions.tsx:189
 msgid "Dismiss \"{title}\""
 msgstr "关闭“{title}”"
 
@@ -12694,7 +12698,7 @@ msgstr "启用后续建议"
 msgid "Enable for Next Chat"
 msgstr "为下一个聊天启用"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:172
+#: src/features/settings/components/personalization/memory-settings.tsx:173
 msgid "Enable memory"
 msgstr "启用记忆"
 
@@ -13311,7 +13315,7 @@ msgstr "事件"
 msgid "Event ends on"
 msgstr "活动结束于"
 
-#: src/features/tasks/hooks/use-schedule-label.ts:65
+#: src/features/tasks/hooks/use-schedule-label.ts:70
 msgid "Every {weekday} at {time} UTC"
 msgstr "每{weekday} {time} UTC"
 
@@ -14006,7 +14010,7 @@ msgstr "更改标签颜色失败"
 msgid "Failed to clear filter rules"
 msgstr "清除筛选规则失败"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:134
+#: src/features/settings/components/personalization/memory-settings.tsx:135
 msgid "Failed to clear memories"
 msgstr "清除记忆失败"
 
@@ -14067,7 +14071,7 @@ msgstr "创建预设失败"
 msgid "Failed to create tag"
 msgstr "创建标签失败"
 
-#: src/features/tasks/components/task-suggestions.tsx:185
+#: src/features/tasks/components/task-suggestions.tsx:209
 msgid "Failed to create the task"
 msgstr "创建任务失败"
 
@@ -14103,7 +14107,7 @@ msgstr "删除文件失败，请重试。"
 msgid "Failed to delete files"
 msgstr "删除文件失败"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:106
+#: src/features/settings/components/personalization/memory-settings.tsx:107
 msgid "Failed to delete memory"
 msgstr "删除记忆失败"
 
@@ -14191,7 +14195,7 @@ msgstr "断开连接器失败"
 msgid "Failed to dismiss the digest"
 msgstr "关闭摘要失败"
 
-#: src/features/tasks/components/task-suggestions.tsx:168
+#: src/features/tasks/components/task-suggestions.tsx:196
 msgid "Failed to dismiss the suggestion"
 msgstr "关闭建议失败"
 
@@ -14299,6 +14303,10 @@ msgstr "加载技能失败"
 #: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:482
 msgid "Failed to load spreadsheet"
 msgstr "加载电子表格失败"
+
+#: src/features/tasks/components/task-suggestions.tsx:148
+msgid "Failed to load the suggested tasks"
+msgstr "无法加载建议的任务"
 
 #: src/features/settings/components/chat/usage-settings.tsx:265
 msgid "Failed to load usage data. Ensure the LLM Gateway is running and reachable."
@@ -14628,8 +14636,8 @@ msgstr "更新键盘快捷键失败"
 msgid "Failed to update MCP server"
 msgstr "更新 MCP 服务器失败"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:117
-#: src/features/settings/components/personalization/memory-settings.tsx:125
+#: src/features/settings/components/personalization/memory-settings.tsx:118
+#: src/features/settings/components/personalization/memory-settings.tsx:126
 msgid "Failed to update memory"
 msgstr "更新记忆失败"
 
@@ -14657,7 +14665,7 @@ msgstr "无法更新拉取请求设置"
 msgid "Failed to update reply tools"
 msgstr "无法更新回复工具"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:149
+#: src/features/settings/components/personalization/memory-settings.tsx:150
 #: src/features/settings/components/personalization/schedule-ideas-switch.tsx:40
 msgid "Failed to update setting"
 msgstr "更新设置失败"
@@ -15208,7 +15216,7 @@ msgstr "文件大小超过 {maxSize}"
 msgid "File size too large. Maximum 5MB allowed."
 msgstr "文件过大，最大允许 5MB。"
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:382
+#: src/features/settings/components/personalization/memory-file-import.tsx:410
 msgid "File to import"
 msgstr "要导入的文件"
 
@@ -15356,7 +15364,7 @@ msgstr "按类型筛选"
 msgid "Filter condition"
 msgstr "筛选条件"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:197
+#: src/features/settings/components/personalization/memory-settings.tsx:200
 msgid "Filter memories by type"
 msgstr "按类型筛选记忆"
 
@@ -17732,7 +17740,7 @@ msgstr "非常适合简单的分类和提取任务"
 msgid "Ideas"
 msgstr "创意"
 
-#: src/features/tasks/components/task-suggestions.tsx:120
+#: src/features/tasks/components/task-suggestions.tsx:134
 msgid "Ideas from your own recent messages. Nothing is created until you accept one."
 msgstr "根据你自己最近的消息生成的想法。在你接受之前不会创建任何内容。"
 
@@ -18072,7 +18080,7 @@ msgstr "从 ChatGPT、Google Gemini、Claude、Neore 数据导出，或本地 Cl
 msgid "Import failed"
 msgstr "导入失败"
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:395
+#: src/features/settings/components/personalization/memory-file-import.tsx:423
 msgid "Import file"
 msgstr "导入文件"
 
@@ -18080,7 +18088,7 @@ msgstr "导入文件"
 msgid "Import files"
 msgstr "导入文件"
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:420
+#: src/features/settings/components/personalization/memory-file-import.tsx:448
 msgid "Import finished."
 msgstr "导入完成。"
 
@@ -18094,7 +18102,7 @@ msgstr "从仓库导入"
 msgid "Import from this computer"
 msgstr "从此电脑导入"
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:375
+#: src/features/settings/components/personalization/memory-file-import.tsx:403
 msgid "Import memories from a file"
 msgstr "从文件导入记忆"
 
@@ -18110,11 +18118,11 @@ msgstr "导入 Notion 导出文件（.zip）"
 msgid "Import one kind of export at a time."
 msgstr "每次只能导入一种导出。"
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:426
+#: src/features/settings/components/personalization/memory-file-import.tsx:454
 msgid "Import progress"
 msgstr "导入进度"
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:412
+#: src/features/settings/components/personalization/memory-file-import.tsx:440
 msgid "Import result"
 msgstr "导入结果"
 
@@ -18164,7 +18172,7 @@ msgstr "已导入 {added} 个 Notion 页面；跳过了 {skipped} 个附件。"
 msgid "Imported {added} Notion page(s)."
 msgstr "已导入 {added} 个 Notion 页面。"
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:367
+#: src/features/settings/components/personalization/memory-file-import.tsx:395
 msgid "Imported {imported} · Updated {updated} · Duplicates {duplicates} · Too long {tooLong} · Invalid {invalid}"
 msgstr "已导入 {imported} · 已更新 {updated} · 重复 {duplicates} · 过长 {tooLong} · 无效 {invalid}"
 
@@ -18187,7 +18195,7 @@ msgstr "已导入技能“{0}”"
 msgid "Importing from {0}..."
 msgstr "正在从 {0} 导入..."
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:419
+#: src/features/settings/components/personalization/memory-file-import.tsx:447
 msgid "Importing memories…"
 msgstr "正在导入记忆…"
 
@@ -21296,7 +21304,7 @@ msgid "memories"
 msgstr "记忆"
 
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:31
-#: src/features/settings/components/personalization/memory-settings.tsx:223
+#: src/features/settings/components/personalization/memory-settings.tsx:226
 msgid "Memories"
 msgstr "记忆"
 
@@ -21314,7 +21322,7 @@ msgid "Memories used for this reply ({0})"
 msgstr "此回复使用的记忆（{0}）"
 
 #: src/features/marketing/use-cases/use-case-data.ts:114
-#: src/features/settings/components/personalization/memory-settings.tsx:165
+#: src/features/settings/components/personalization/memory-settings.tsx:166
 #: src/features/settings/lib/settings-keywords.ts:96
 msgid "Memory"
 msgstr "记忆"
@@ -21323,23 +21331,23 @@ msgstr "记忆"
 msgid "Memory — what the agent keeps across chats"
 msgstr "记忆——智能体跨聊天保留的内容"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:110
+#: src/features/settings/components/personalization/memory-settings.tsx:111
 msgid "Memory deleted"
 msgstr "记忆已删除"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:147
+#: src/features/settings/components/personalization/memory-settings.tsx:148
 msgid "Memory disabled"
 msgstr "记忆已关闭"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:147
+#: src/features/settings/components/personalization/memory-settings.tsx:148
 msgid "Memory enabled"
 msgstr "记忆已开启"
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:234
+#: src/features/settings/components/personalization/memory-file-import.tsx:257
 msgid "Memory import finished"
 msgstr "记忆导入已完成"
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:234
+#: src/features/settings/components/personalization/memory-file-import.tsx:257
 msgid "Memory import stopped"
 msgstr "记忆导入已停止"
 
@@ -23472,11 +23480,11 @@ msgstr "未配置 MCP 服务器。添加服务器以扩展 AI 能力。"
 msgid "No members in this team yet"
 msgstr "此团队还没有成员"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:239
+#: src/features/settings/components/personalization/memory-settings.tsx:242
 msgid "No memories of this type."
 msgstr "没有此类型的记忆。"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:240
+#: src/features/settings/components/personalization/memory-settings.tsx:243
 msgid "No memories yet. The AI will start learning from your conversations automatically."
 msgstr "还没有记忆。AI 会自动从你的对话中开始学习。"
 
@@ -29541,6 +29549,7 @@ msgstr "重试"
 #: src/features/settings/components/chat/bot-tool-selection.tsx:495
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:493
 #: src/features/tasks/components/task-detail-dialog.tsx:108
+#: src/features/tasks/components/task-suggestions.tsx:156
 #: src/features/workflow/components/nodes/file-node.tsx:221
 #: src/lib/toast.ts:70
 #: src/lib/toast.ts:171
@@ -33828,7 +33837,7 @@ msgstr "建议的答案"
 msgid "Suggested next prompt: {nextPromptSuggestion}. Press Tab to insert."
 msgstr "建议的下一条提示：{nextPromptSuggestion}。按 Tab 键插入。"
 
-#: src/features/tasks/components/task-suggestions.tsx:118
+#: src/features/tasks/components/task-suggestions.tsx:132
 msgid "Suggested tasks"
 msgstr "建议的任务"
 
@@ -33836,11 +33845,11 @@ msgstr "建议的任务"
 msgid "Suggestion available, press Right Arrow to accept"
 msgstr "有可用建议，按右方向键接受"
 
-#: src/features/tasks/components/task-suggestions.tsx:167
+#: src/features/tasks/components/task-suggestions.tsx:195
 msgid "Suggestion dismissed: {title}"
 msgstr "建议已关闭：{title}"
 
-#: src/features/tasks/components/task-suggestions.tsx:124
+#: src/features/tasks/components/task-suggestions.tsx:138
 msgid "Suggestion updates"
 msgstr "建议更新"
 
@@ -34251,7 +34260,7 @@ msgstr "任务"
 msgid "Task approved"
 msgstr "任务已批准"
 
-#: src/features/tasks/components/task-suggestions.tsx:184
+#: src/features/tasks/components/task-suggestions.tsx:209
 msgid "Task created: {title}"
 msgstr "任务已创建：{title}"
 
@@ -35022,7 +35031,7 @@ msgstr "智能体的计划"
 msgid "The agent's tool calls"
 msgstr "智能体的工具调用"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:164
+#: src/features/settings/components/personalization/memory-settings.tsx:165
 msgid "The AI learns from your conversations to personalize its responses, and reflects on what it learned each night. Everything it remembers is listed here — edit, retype, pin or delete any of it."
 msgstr "AI 会从你的对话中学习以个性化回复，并在每晚反思所学内容。它记住的一切都列在这里——你可以编辑、修改类型、置顶或删除其中任何一条。"
 
@@ -35291,7 +35300,7 @@ msgstr "该扩展将能够以 {0} 的身份读取和发送聊天。你可以随�
 msgid "The file is larger than {0} KB, which is more than a bundle can be."
 msgstr "文件大于 {0} KB，超出了捆绑包的大小上限。"
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:266
+#: src/features/settings/components/personalization/memory-file-import.tsx:294
 msgid "The file is larger than {maxSize}. Choose a smaller file."
 msgstr "文件大于 {maxSize}。请选择更小的文件。"
 
@@ -35452,7 +35461,7 @@ msgstr "主机软件已过时"
 msgid "The icons could not be loaded."
 msgstr "无法加载图标。"
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:368
+#: src/features/settings/components/personalization/memory-file-import.tsx:396
 msgid "The import stopped before it finished."
 msgstr "导入在完成前已停止。"
 
@@ -36787,7 +36796,7 @@ msgid "This will permanently delete {0} anonymous user accounts and all their da
 msgstr "这将永久删除 {0} 个匿名用户账号及其所有数据。此操作无法撤销。"
 
 #. placeholder {0}: memories.length
-#: src/features/settings/components/personalization/memory-settings.tsx:256
+#: src/features/settings/components/personalization/memory-settings.tsx:259
 msgid "This will permanently delete all {0} memories and their daily digests. The AI will start learning fresh from your next conversation."
 msgstr "这将永久删除全部 {0} 条记忆及其每日摘要。AI 将从你的下一次对话开始重新学习。"
 
@@ -37649,7 +37658,7 @@ msgstr "尝试调整搜索词。"
 #: src/features/projects/components/project-repositories.tsx:297
 #: src/features/projects/components/repo-rule-file-import.tsx:183
 #: src/features/settings/components/chat/default-models-settings.tsx:455
-#: src/features/settings/components/personalization/memory-file-import.tsx:445
+#: src/features/settings/components/personalization/memory-file-import.tsx:473
 #: src/features/tasks/components/task-form-dialog.tsx:459
 #: src/features/vault/components/site-logins.tsx:480
 #: src/features/vault/components/site-logins.tsx:612
@@ -37749,7 +37758,7 @@ msgstr "要关闭自动合并吗？"
 msgid "Turn on memory"
 msgstr "开启记忆"
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:400
+#: src/features/settings/components/personalization/memory-file-import.tsx:428
 msgid "Turn on memory to import a file."
 msgstr "请先开启记忆，再导入文件。"
 

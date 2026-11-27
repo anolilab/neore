@@ -190,7 +190,7 @@ const TasksPage = () => {
         <div className="mx-auto max-w-7xl space-y-8">
             <header className="flex flex-wrap items-start justify-between gap-4">
                 <div className="space-y-1">
-                    <h1 className="text-xl font-semibold outline-none" id={headingId} ref={titleRef} tabIndex={-1}>
+                    <h1 className="focus:ring-ring/30 text-xl font-semibold outline-none focus:ring-[2px]" id={headingId} ref={titleRef} tabIndex={-1}>
                         {t`Tasks`}
                     </h1>
                     <p className="text-muted-foreground text-sm">

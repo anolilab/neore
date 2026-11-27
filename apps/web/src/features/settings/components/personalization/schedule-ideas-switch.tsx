@@ -14,23 +14,23 @@ interface ScheduleIdeasSwitchProps {
 
 /**
  * Turns the daily suggestions of scheduled tasks on or off. OPT-IN: absent means off, matching the backend's
- * `readScheduleIdeasEnabled`. The job also needs memory on, so the switch is disabled while memory is off, like the
- * other memory controls, and until the settings have loaded.
+ * `readScheduleIdeasEnabled`. The job also needs memory on, so with memory off the switch cannot be turned ON; it can
+ * still be turned OFF, which erases the suggestions waiting (the backend erases them when memory goes off too, but a
+ * switch left on must stay a way out). It is disabled until the settings have loaded.
  *
- * The saved value is the `checked` the switch reports, never the opposite of what this render shows: two taps before a
- * re-render would both send the same value. The write goes through the settings queue, so quick taps land in order.
+ * The saved value is the `checked` the switch reports, sent as it is (`mutateAsync`), never rebuilt from the settings
+ * cache at a queue's turn (`updateLatest`): a quick off then on would reach the server as two `true` writes, and the
+ * erase, which runs on a save of `false`, would never run.
  */
 const ScheduleIdeasSwitch: FC<ScheduleIdeasSwitchProps> = ({ memoryEnabled }) => {
     const { t } = useLingui();
     const { data: userSettings } = useUserSettings();
-    const { updateLatest } = useUpdateUserSettings();
+    const { mutateAsync } = useUpdateUserSettings();
     const enabled = userSettings?.scheduleIdeasEnabled === true;
-    const disabled = userSettings === undefined || !memoryEnabled;
+    const disabled = userSettings === undefined || (!memoryEnabled && !enabled);
 
     const save = (checked: boolean) => {
-        updateLatest(() => {
-            return { scheduleIdeasEnabled: checked };
-        })
+        mutateAsync({ scheduleIdeasEnabled: checked })
             .then(() => {
                 toast.success(checked ? t`Schedule ideas enabled` : t`Schedule ideas disabled`);
 
