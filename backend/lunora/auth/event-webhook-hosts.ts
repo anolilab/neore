@@ -35,6 +35,11 @@ export const listEventWebhookHosts = authQuery
     .input({})
     .output(v.object({ hosts: v.array(v.object({ createdAt: v.number(), host: v.string() })) }))
     .query(async ({ ctx }) => {
+        // Off the owner's shard the rows are not there, so an empty list would read as "no hosts": refuse instead, as add and remove do.
+        if (!onOwnShard(ctx.user.userId)) {
+            throw new LunoraError("FORBIDDEN", "Callback hosts are listed on your own account only.");
+        }
+
         const { page } = await ctx.db.eventWebhookHosts.findMany({ limit: MAX_LISTED_APPROVED_HOSTS, where: { userId: ctx.user.userId } });
 
         return {
