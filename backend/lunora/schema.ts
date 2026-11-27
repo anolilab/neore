@@ -1793,7 +1793,10 @@ export const schema = defineSchema({
         // the type-first order the old by_userId_type read had, so a window still keeps preferences.
         .index("by_userId_botId", ["userId", "botId", "type"])
         // The same scope, active rows only: superseded history never enters a read. `supersededBy` is null for an active row.
-        .index("by_userId_botId_active", ["userId", "botId", "supersededBy", "type"]),
+        .index("by_userId_botId_active", ["userId", "botId", "supersededBy", "type"])
+        // Keyword leg of memory retrieval (memory/retrieve.ts), one lookup per salient term. FTS5 in the user's shard;
+        // its shadow tables are `memories__fts_search_memory_text_*`, which no other index of this table owns.
+        .searchIndex("search_memory_text", { field: "memory", filterFields: ["userId"] }),
 
     // Cleanup a memory write could not finish, written in the same commit as the work that left it so the reference
     // survives a retry that cannot be scheduled or runs out (`memory/functions.ts`, `runMemoryCleanup`).

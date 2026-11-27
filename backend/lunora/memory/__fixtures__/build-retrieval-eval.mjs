@@ -13,8 +13,9 @@ const TYPES = ["identity", "preference", "context", "activity", "experience", "c
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
 // label, event phrase ({d} = the persona's detail), six facts (one per aspect), six questions that paraphrase them,
-// five persona details. Hand-written; `unseen` are questions about topics nobody has.
-const { topics: TOPICS, unseen: UNSEEN } = JSON.parse(readFileSync(new URL("retrieval-eval-phrases.json", import.meta.url), "utf8"));
+// five persona details. Hand-written; `unseen` are questions about topics nobody has; `exact` are facts holding an exact
+// token, a question naming it, and a question naming a token nobody has.
+const { exact: EXACT, topics: TOPICS, unseen: UNSEEN } = JSON.parse(readFileSync(new URL("retrieval-eval-phrases.json", import.meta.url), "utf8"));
 
 const NOW = Date.UTC(2026, 10, 27, 12, 0, 0);
 const hash = (s) => [...s].reduce((h, c) => Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0, 2166136261);
@@ -288,9 +289,67 @@ for (let p = 0; p < PERSONAS; p++) {
     }
 }
 
+// Exact tokens (codes, names, rare words), a second pass with its own seed so the rows above stay as they were. Each
+// fact is old (outside the newest-100 window) and embedded on a dimension of its own (64 + entry); its question embeds
+// on a topic nobody has, so the vector search misses it by construction and only the keyword search can find it. The
+// same text also sits on a superseded, an expired or another bot's row, which must never be the answer. The negative
+// questions name a token nobody has, often beside words a real fact holds.
+const EXACT0 = 64;
+
+for (const [p, persona] of personas.entries()) {
+    const r = rng(`exact-${p}`);
+    const pid = persona.id;
+    const noise = (o) => {
+        o[NOISE0 + between(r, 0, 22)] = 0.3;
+        o[NOISE0 + between(r, 0, 22)] = 0.3;
+
+        return o;
+    };
+    const entries = [0, 1, 2, 3].map((i) => (p * 2 + i) % EXACT.length);
+
+    entries.forEach((j, k) => {
+        const [text, question] = EXACT[j];
+        const id = `${pid}-exact-${j}`;
+        const created = round(380 + r() * 40, 1);
+        const row = { createdDays: created, tags: noise({ [EXACT0 + j]: 1, [COMMON]: 0.5 }), text, type: "context" };
+
+        persona.memories.push({ ageDays: round(30 + r() * 300, 1), confidence: between(r, 65, 90), id, importance: between(r, 40, 70), ...row });
+
+        const shadow = { ageDays: round(created - 1, 1), confidence: between(r, 65, 90), id: `${id}-shadow`, importance: between(r, 40, 70), ...row };
+
+        persona.memories.push(
+            [
+                { ...shadow, supersededBy: id },
+                { ...shadow, validUntil: dayString(NOW - (30 + k * 11) * 86400000) },
+                { ...shadow, botId: "bot-b" },
+            ][k % 3],
+        );
+        queries.push({
+            category: "exact",
+            expected: [id],
+            id: `${pid}-exact-${queries.length}`,
+            persona: pid,
+            tags: noise({ [16 + (j % 6)]: 1, [COMMON]: 0.5 }),
+            text: question,
+            ...(k % 3 === 0 && { asBot: "bot-a" }),
+        });
+    });
+
+    for (const j of entries.slice(0, 2)) {
+        queries.push({
+            category: "abstain",
+            expected: [],
+            id: `${pid}-abstain-${queries.length}`,
+            persona: pid,
+            tags: noise({ [16 + (j % 6)]: 1, [COMMON]: 0.5 }),
+            text: EXACT[j][2],
+        });
+    }
+}
+
 const fixture = {
     meta: {
-        dimensions: 64,
+        dimensions: EXACT0 + EXACT.length,
         now: NOW,
         today: dayString(NOW),
     },
