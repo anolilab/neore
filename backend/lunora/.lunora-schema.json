@@ -11786,6 +11786,12 @@
           "optional": true,
           "unique": false
         },
+        "startedAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "userId": {
           "kind": "string",
           "nullable": false,

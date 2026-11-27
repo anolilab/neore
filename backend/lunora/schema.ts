@@ -1800,6 +1800,9 @@ export const schema = defineSchema({
         ids: v.optional(v.array(v.string())),
         kind: v.union(v.literal("vector"), v.literal("chain"), v.literal("digests")),
         memoryId: v.optional(v.string()),
+        // `digests`: when the delete began. The walk reads only digests written by then; a later one went through
+        // `saveMemoryDigest`'s own checks.
+        startedAt: v.optional(v.number()),
         userId: v.string(),
     })
         .shardBy("userId")

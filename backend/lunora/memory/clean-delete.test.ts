@@ -121,6 +121,7 @@ beforeEach(() => {
 afterEach(() => {
     harness.close();
     vi.restoreAllMocks();
+    vi.useRealTimers();
 });
 
 describe("a retired row loses its vector", () => {
@@ -318,7 +319,7 @@ describe("deleting a memory", () => {
         expect(await run(async (ctx) => await ctx.db.get("memoryDigests", statsOnly))).not.toBeNull();
     });
 
-    it("continues a long chain in a follow-up write until every older version is gone", async () => {
+    it("continues a long chain through its record and job, and the sweep arms another if that job is lost, until every older version is gone", async () => {
         const origin = await seed("version 0");
         let newest = origin.memoryId;
         const first = newest;
@@ -329,14 +330,27 @@ describe("deleting a memory", () => {
 
         await asOwner().mutation(deleteMemory as never, { memoryId: newest } as never);
 
+        // A job is armed for the rest of the walk, and the record is all that is left of it: the root is already deleted, so
+        // a second delete cannot restart the walk.
         expect(continuationJobs()).toHaveLength(1);
+        expect(await cleanups()).toHaveLength(1);
         // The oldest rows are still there until the follow-up runs.
         expect(await rowOf(first)).not.toBeNull();
+
+        // That job is lost: once the record is due, the sweep arms another.
+        await ageCleanups();
+        await sweep();
+        expect(continuationJobs()).toHaveLength(2);
 
         await runCleanup(continuationJobs()[0]?.args);
 
         expect(await rowOf(first)).toBeNull();
-        expect(await run(async (ctx) => await ctx.db.query("memories").collect())).toHaveLength(0);
+        expect(await memoryCount()).toBe(0);
+        expect(await cleanups()).toHaveLength(0);
+
+        // The other job finds the record gone and does nothing.
+        await runCleanup(continuationJobs()[1]?.args);
+        expect(await memoryCount()).toBe(0);
     });
 });
 
@@ -346,6 +360,11 @@ const insertDigest = async (learned: { memory: string; memoryId: string; type: s
     await run(async (ctx) => await ctx.db.insert("memoryDigests", { createdAt, learned, localDay: "2026-09-24", stats: STATS, summary, userId: OWNER }));
 
 const cleanups = async () => await run(async (ctx) => await ctx.db.query("memoryCleanups").collect());
+const cleanupCount = async () => {
+    const rows = await cleanups();
+
+    return rows.length;
+};
 
 /** Makes every pending cleanup due, as a lost job leaves it. */
 const ageCleanups = async () =>
@@ -409,7 +428,7 @@ describe("a digest summary after a delete", () => {
         const unlisted = await insertDigest(
             [{ memory: "owns a bike", memoryId: other.memoryId, type: "preference" }],
             "Merged your tea notes.",
-            Date.now() + 2000,
+            Date.now() - 1000,
         );
 
         await asOwner().mutation(deleteMemory as never, { memoryId: second } as never);
@@ -501,7 +520,7 @@ describe("digests that share a createdAt", () => {
         await asOwner().mutation(deleteMemory as never, { memoryId: gone.memoryId } as never);
 
         // 100 per write: the cleanup goes on until it has read them all, and then it is gone.
-        for (let round = 0; round < 5 && (await cleanups()).length > 0; round += 1) {
+        for (let round = 0; round < 5 && (await cleanupCount()) > 0; round += 1) {
             await runCleanup(cleanupJobs().at(-1)?.args);
         }
 
@@ -655,33 +674,6 @@ describe("a vector delete that cannot be retried", () => {
     });
 });
 
-describe("a long chain whose follow-up is lost", () => {
-    it("leaves a durable cursor, and a job armed for it, that resume the walk", async () => {
-        const origin = await seed("version 0");
-        let newest = origin.memoryId;
-        const first = newest;
-
-        for (let index = 1; index <= 105; index += 1) {
-            newest = await supersede(newest, `version ${index}`);
-        }
-
-        await asOwner().mutation(deleteMemory as never, { memoryId: newest } as never);
-
-        // The root is already deleted, so a second delete cannot restart the walk: the record is all that is left of it.
-        expect(await cleanups()).toHaveLength(1);
-        expect(await rowOf(first)).not.toBeNull();
-
-        // The job for it never ran (lost); the sweep arms another once the record is due.
-        await ageCleanups();
-        await sweep();
-        await runCleanup(cleanupJobs().at(-1)?.args);
-
-        expect(await rowOf(first)).toBeNull();
-        expect(await memoryCount()).toBe(0);
-        expect(await cleanups()).toHaveLength(0);
-    });
-});
-
 describe("an older version walk past a row that points at itself", () => {
     it("erases every older version, not all but the one the self-pointing row's slot hid", async () => {
         const root = await run(async (ctx) => {
@@ -758,38 +750,116 @@ describe("a cleanup step that fails", () => {
         expect(await frontierOf(second.cleanupId)).toHaveLength(1);
     });
 
-    it("moves a failing record behind the others, and gives up on it after a fixed number of attempts, keeping the row", async () => {
+    it("moves a failing record behind the others, backs off from the first failure, and gives up at the last attempt, keeping the row", async () => {
+        const NOW = 1_800_000_000_000;
+
+        vi.useFakeTimers({ now: NOW, toFake: ["Date"] });
+
         const stuck = await seedChain(1);
 
         for (let index = 0; index < 25; index += 1) {
             await run(
-                async (ctx) =>
-                    await ctx.db.insert("memoryCleanups", { attempts: 1, dueAt: Date.now() + 3_600_000, frontier: [], kind: "chain", userId: OWNER }),
+                async (ctx) => await ctx.db.insert("memoryCleanups", { attempts: 1, dueAt: NOW + 3_600_000, frontier: [], kind: "chain", userId: OWNER }),
             );
         }
 
         const healthy = await seedChain(1);
 
-        await run(async (ctx) => await ctx.runMutation(noteMemoryCleanupFailure, { cleanupId: stuck.cleanupId }));
+        const fail = async () => await run(async (ctx) => await ctx.runMutation(noteMemoryCleanupFailure, { cleanupId: stuck.cleanupId }));
+        const first: any = await fail();
+
+        // The first failure backs off by 30 minutes, to the millisecond.
+        expect(first.retryInMs).toBe(30 * 60 * 1000);
+        const backedOff = await cleanupOf(stuck.cleanupId);
+
+        expect(backedOff?.dueAt).toBe(NOW + 30 * 60 * 1000);
+
         await sweep();
 
         // 26 records are not due; the two that are, are armed, the failing one behind them.
         expect(cleanupJobs().map((job) => (job.args as { cleanupId: string }).cleanupId)).toEqual([healthy.cleanupId]);
 
-        let last: any;
+        // Attempts 2 to 11 still retry, the delay doubling up to a day.
+        for (let attempt = 2; attempt <= 11; attempt += 1) {
+            const outcome: any = await fail();
 
-        for (let index = 0; index < 20; index += 1) {
-            last = await run(async (ctx) => await ctx.runMutation(noteMemoryCleanupFailure, { cleanupId: stuck.cleanupId }));
+            expect(outcome.retryInMs).toBe(Math.min(15 * 60 * 1000 * 2 ** attempt, 24 * 60 * 60 * 1000));
         }
 
-        const given = await run(async (ctx) => await ctx.db.get("memoryCleanups", stuck.cleanupId));
+        // The 12th is the last: it gives up, keeps the row, and puts it out of reach.
+        const last: any = await fail();
+        const given = await cleanupOf(stuck.cleanupId);
 
         expect(last.retryInMs).toBeNull();
-        expect(given).not.toBeNull();
-        expect(given?.dueAt).toBeGreaterThan(Date.now() * 1000);
+        expect(given?.attempts).toBe(12);
+        expect(given?.dueAt).toBeGreaterThan(NOW * 1000);
         expect(memoryLogger.error).toHaveBeenCalledWith(expect.stringMatching(GAVE_UP));
         // Count-only: no row text in the log.
         expect(JSON.stringify(vi.mocked(memoryLogger.error).mock.calls)).not.toContain("older 0");
+    });
+
+    it("does nothing for a record that has used its attempts", async () => {
+        const { cleanupId, older } = await seedChain(3);
+
+        await run(async (ctx) => await ctx.db.patch("memoryCleanups", cleanupId, { attempts: 12 }));
+
+        const step: any = await run(async (ctx) => await ctx.runMutation(stepMemoryCleanup, { cleanupId }));
+
+        // Terminal: nothing walked, nothing failed, and the record is as it was, whatever its `dueAt`.
+        expect(step).toMatchObject({ again: false, failed: false });
+        expect(await memoryCount()).toBe(older.length);
+        expect(await frontierOf(cleanupId)).toHaveLength(1);
+    });
+
+    it("counts the lookups of a walk apart from the rows it deletes, and keeps the ids it did not reach", async () => {
+        // 250 ids with no older versions: each costs a read, and none a delete.
+        const cleanupId = await run(async (ctx) => {
+            const ids: Id<"memories">[] = [];
+
+            for (let index = 0; index < 250; index += 1) {
+                const id = await ctx.db.insert("memories", { memory: `gone ${index}`, type: "preference", userId: OWNER });
+
+                await ctx.db.delete("memories", id);
+                ids.push(id);
+            }
+
+            return await ctx.db.insert("memoryCleanups", { dueAt: 0, frontier: ids, kind: "chain", userId: OWNER });
+        });
+
+        const first: any = await run(async (ctx) => await ctx.runMutation(stepMemoryCleanup, { cleanupId }));
+
+        expect(first.again).toBe(true);
+        expect(await frontierOf(cleanupId)).toHaveLength(50);
+
+        const second: any = await run(async (ctx) => await ctx.runMutation(stepMemoryCleanup, { cleanupId }));
+
+        expect(second.again).toBe(false);
+        expect(await cleanupOf(cleanupId)).toBeNull();
+    });
+
+    it("walks only the digests written before the delete began", async () => {
+        const cleanupId = await run(async (ctx) => {
+            const digest = (createdAt: number) =>
+                ctx.db.insert("memoryDigests", { createdAt, learned: [], localDay: "2026-09-24", stats: STATS, summary: "kept or cleared", userId: OWNER });
+
+            await digest(500);
+            await digest(2000);
+
+            return await ctx.db.insert("memoryCleanups", { dueAt: 0, ids: ["gone"], kind: "digests", startedAt: 1000, userId: OWNER });
+        });
+
+        await run(async (ctx) => await ctx.runMutation(stepMemoryCleanup, { cleanupId }));
+
+        const digests = await run(async (ctx) => await ctx.db.query("memoryDigests").collect());
+
+        // The one written after the delete began (saveMemoryDigest checked it) keeps its summary.
+        expect(digests.map((digest) => [digest.createdAt, digest.summary])).toEqual(
+            expect.arrayContaining([
+                [500, ""],
+                [2000, "kept or cleared"],
+            ]),
+        );
+        expect(await cleanupOf(cleanupId)).toBeNull();
     });
 
     it("keeps a cleanup job armed for a record, so an account with no activity is still worked", async () => {

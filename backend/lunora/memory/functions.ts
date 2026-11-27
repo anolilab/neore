@@ -538,6 +538,8 @@ export const retryMemoryVectorDelete = internalMutation
 
 /** Older versions one delete removes per write; a longer chain goes on in a follow-up write. */
 const CHAIN_DELETE_BATCH = 100;
+/** Ids of a chain walk one write looks up (a read each), apart from the rows it deletes; the rest are kept in the record. */
+const CHAIN_LOOKUP_BATCH = 200;
 /** Digests one write cleans; a user with more (a guest merge can copy a whole history in) goes on in a cleanup record. */
 const DIGEST_PAGE = 100;
 
@@ -560,13 +562,19 @@ const removeMemoryRow = async (ctx: MutationCtx, row: Doc<"memories">, userId: s
  * Nor can a creation time bound which digests could have quoted a row: a guest merge re-creates its rows. So every
  * digest of the user loses its summary ({@link DROPPED_DIGEST_SUMMARY}); nothing is regenerated here, and the digest's
  * other fields stay. Resolves the cursor of the next page, or `null` when the user's digests are all done. The cursor
- * orders rows by `createdAt` and then by their own id, so any number of digests sharing a `createdAt` is walked once.
+ * orders rows by `createdAt` and then by their own id, so any number of digests sharing a `createdAt` is walked once; the
+ * walk ends at `startedAt`, when the delete began, so a digest saved after it (which `saveMemoryDigest` checked) is left alone.
  */
-const removeFromDigests = async (ctx: Pick<MutationCtx, "db">, userId: string, ids: ReadonlySet<string>, cursor: string | null): Promise<string | null> => {
+const removeFromDigests = async (
+    ctx: Pick<MutationCtx, "db">,
+    userId: string,
+    ids: ReadonlySet<string>,
+    walk: { cursor: string | null; startedAt: number },
+): Promise<string | null> => {
     const { continueCursor, isDone, page } = await ctx.db
         .query("memoryDigests")
-        .withIndex("by_userId_createdAt", (q) => q.eq("userId", userId))
-        .paginate({ cursor, numItems: DIGEST_PAGE });
+        .withIndex("by_userId_createdAt", (q) => q.eq("userId", userId).lte("createdAt", walk.startedAt))
+        .paginate({ cursor: walk.cursor, numItems: DIGEST_PAGE });
 
     for (const digest of page) {
         const learned = digest.learned.filter((entry) => !ids.has(entry.memoryId));
@@ -612,14 +620,18 @@ const eraseOlderVersions = async (
     const pending: Id<"memories">[] = [];
     const queue = [...frontier];
     let budget = CHAIN_DELETE_BATCH;
+    let lookups = CHAIN_LOOKUP_BATCH;
 
     while (queue.length > 0) {
         const id = queue.shift() as Id<"memories">;
 
-        if (budget <= 0) {
+        // Out of deletes or of lookups (a read per id, however few rows it holds): this id is walked in the follow-up.
+        if (budget <= 0 || lookups <= 0) {
             pending.push(id);
             continue;
         }
+
+        lookups -= 1;
 
         const older = await ctx.db
             .query("memories")
@@ -645,12 +657,19 @@ const eraseOlderVersions = async (
     }
 
     // A step that removed nothing (the rest of a walk that ended) has nothing to take out of the digests.
-    const digestsCursor = removed.size > 0 ? await removeFromDigests(ctx, userId, removed, null) : null;
+    const digestsCursor = removed.size > 0 ? await removeFromDigests(ctx, userId, removed, { cursor: null, startedAt: ctx.now }) : null;
 
     if (digestsCursor !== null) {
         // More digests than one write cleans: the rest is a record of its own, which carries the ids to take out.
         const dueAt = ctx.now + CLEANUP_GRACE_MS;
-        const digestsId = await ctx.db.insert("memoryCleanups", { cursor: digestsCursor, dueAt, ids: [...removed], kind: "digests", userId });
+        const digestsId = await ctx.db.insert("memoryCleanups", {
+            cursor: digestsCursor,
+            dueAt,
+            ids: [...removed],
+            kind: "digests",
+            startedAt: ctx.now,
+            userId,
+        });
 
         await wakeShardForCleanup(ctx, userId, dueAt);
         await armMemoryCleanup(ctx.scheduler, digestsId, userId, 0);
@@ -692,8 +711,9 @@ export const stepMemoryCleanup = internalMutation
     .mutation(async ({ args, ctx }) => {
         const row = await ctx.db.get("memoryCleanups", args.cleanupId);
 
-        if (!row) {
-            return { again: false, failed: false, userId: "" };
+        // Absent, or given up on: nothing to work.
+        if (!row || (row.attempts ?? 0) >= CLEANUP_MAX_ATTEMPTS) {
+            return { again: false, failed: false, userId: row?.userId ?? "" };
         }
 
         if (row.kind === "chain") {
@@ -703,7 +723,7 @@ export const stepMemoryCleanup = internalMutation
         }
 
         if (row.kind === "digests") {
-            const next = await removeFromDigests(ctx, row.userId, new Set(row.ids), row.cursor ?? null);
+            const next = await removeFromDigests(ctx, row.userId, new Set(row.ids), { cursor: row.cursor ?? null, startedAt: row.startedAt ?? ctx.now });
 
             if (next === null) {
                 await ctx.db.delete("memoryCleanups", row._id);
