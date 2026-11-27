@@ -215,12 +215,12 @@ export const repairPlugin = authAction
 
         assertNoToolConfig(entries);
 
+        // Every entry of the file, plannable or not: one that cannot be planned now (its model is gone) still gets an intent row, so
+        // repair cannot finish without it. Its hash is the hash of nothing.
         const planned = await Promise.all(
-            entries
-                .filter((entry) => entry.plan)
-                .map(async (entry) => {
-                    return { contentHash: await entryHash(entry), entryKey: entry.key, kind: entry.kind };
-                }),
+            entries.map(async (entry) => {
+                return { contentHash: await entryHash(entry), entryKey: entry.key, kind: entry.kind };
+            }),
         );
         const begin = async () =>
             await ctx.runMutation(internal.plugins.repair_resume.beginRepair, {
@@ -247,7 +247,14 @@ export const repairPlugin = authAction
         const intentByKey = new Map(begun.missing.map((entry) => [entry.entryKey, entry.intentId] as const));
         const hashByKey = new Map(planned.map((entry) => [entry.entryKey, entry.contentHash] as const));
 
-        assertSelectionImportable(entries, missingKeys);
+        try {
+            assertSelectionImportable(entries, missingKeys);
+        } catch (error) {
+            // An entry that cannot be planned now stays an intent: the install is left for repair, not held under this lease.
+            await ctx.runMutation(internal.plugins.install_steps.markNeedsRepair, { generation: begun.generation, installId: begun.installId });
+
+            throw error;
+        }
 
         const plan = ctx.user.plan ?? undefined;
         const isPremium = plan === "premium" || ctx.user.isAdmin === true;

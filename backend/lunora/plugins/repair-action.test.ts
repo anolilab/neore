@@ -173,4 +173,47 @@ describe("repair through the action", () => {
 
         expect(skills.map((skill: { instructions: string }) => skill.instructions)).toEqual([ANALYST.instructions]);
     });
+
+    it("does not finish the install while an entry the file holds cannot be planned now, and says why", async () => {
+        const unplannable = buildBundleMarkdown({
+            description: "",
+            items: [{ key: "t", kind: "trigger", trigger: { model: "no-such-model", name: "On PR", type: "webhook" } }],
+            name: "Daily brief",
+        });
+        const unplannableHash = await bodyHash(unplannable);
+        const file = withPluginHeader(unplannable, { contentHash: unplannableHash, slug: "daily-brief", version: "1.0.0" });
+
+        // An install that stopped before reaching its only entry: the row exists, no link does.
+        const created = await run(
+            async (context) =>
+                await context.runMutation(procedureAt("plugins_install_steps", "createInstallRow"), {
+                    contentHash: unplannableHash,
+                    pluginSlug: "daily-brief",
+                    userId: OWNER,
+                    version: "1.0.0",
+                }),
+        );
+
+        await run(
+            async (context) =>
+                await context.runMutation(procedureAt("plugins_install_steps", "markNeedsRepair"), {
+                    generation: created.generation,
+                    installId: created.installId,
+                }),
+        );
+
+        await expect(
+            as().action(procedureAt("plugins_repair_resume", "repairPlugin"), {
+                contentHash: unplannableHash,
+                markdown: file,
+                pluginSlug: "daily-brief",
+            } as never),
+        ).rejects.toThrow("not available");
+
+        const after = await run(async (context) => await context.db.pluginInstalls.findFirst({ where: { _id: created.installId } }));
+        const links = await run(async (context) => await context.db.pluginItems.findMany({ where: { installId: created.installId } }));
+
+        expect(after).toMatchObject({ status: "needs-repair" });
+        expect(links.page).toEqual([expect.objectContaining({ entryKey: expect.stringContaining("t"), state: "intent" })]);
+    });
 });
