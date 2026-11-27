@@ -259,14 +259,23 @@ const TaskSuggestionsList: FC<TaskSuggestionsProps> = ({ fallbackFocus }) => {
 };
 
 /**
- * The list, mounted once per account (`key` on the user id). An account switch from the sidebar keeps the tasks page
- * mounted, so what one account's decision left behind (the announced title, the busy row, the queued focus, the decided
- * and expanded rows) is dropped with the list instead of showing on the next account's page.
+ * The list, mounted once per account (`key` follows the last known user id). An account switch from the sidebar keeps
+ * the tasks page mounted, so what one account's decision left behind (the announced title, the busy row, the queued
+ * focus, the decided and expanded rows) is dropped with the list instead of showing on the next account's page.
+ * The key moves only when a different, non-empty id arrives: a failed switch clears the session query cache, so the
+ * session is briefly unavailable for the same account, and a pending decision must survive that.
  */
 const TaskSuggestions: FC<TaskSuggestionsProps> = ({ fallbackFocus }) => {
     const { data: session } = useAuthSession();
+    const userId = session?.user.id;
+    const [known, setKnown] = useState<{ epoch: number; userId: string | null }>({ epoch: 0, userId: null });
 
-    return <TaskSuggestionsList fallbackFocus={fallbackFocus} key={session?.user.id ?? ""} />;
+    // Adjusted while rendering, so the list never paints once under the old account. The first id to arrive is not a switch.
+    if (userId && userId !== known.userId) {
+        setKnown({ epoch: known.userId === null ? known.epoch : known.epoch + 1, userId });
+    }
+
+    return <TaskSuggestionsList fallbackFocus={fallbackFocus} key={known.epoch} />;
 };
 
 export default TaskSuggestions;

@@ -29,13 +29,14 @@ const MENTIONS_WEEKLY_NOTES = /Weekly notes/;
 
 /** The signed-in account the list reads; a case switches it. */
 const signedIn = vi.hoisted(() => {
-    return { userId: "user-a" };
+    return { userId: "user-a" as string | null };
 });
 
 vi.mock("@/features/auth/hooks/use-auth-session", () => {
     return {
         useAuthSession: () => {
-            return { data: { user: { id: signedIn.userId } } };
+            // `null` is the session while it reloads: no data.
+            return { data: signedIn.userId === null ? null : { user: { id: signedIn.userId } } };
         },
     };
 });
@@ -347,6 +348,60 @@ describe("TaskSuggestions", () => {
 
         expect(screen.getByRole("status", { name: "Suggestion updates" }).textContent).toBe("");
         expect(screen.queryByText(MENTIONS_WEEKLY_NOTES)).toBeNull();
+    });
+
+    it("keeps a pending decision while the same account's session reloads", async () => {
+        state.rows = [row("s1", "Weekly notes"), row("s2", "Morning plants")];
+
+        let release: () => void = () => undefined;
+
+        // eslint-disable-next-line unicorn/prefer-promise-with-resolvers
+        calls.holdNext = new Promise<void>((resolve) => {
+            release = resolve;
+        });
+        const { rerenderPage } = mountList();
+
+        fireEvent.click(await screen.findByRole("button", { name: 'Dismiss "Weekly notes"' }));
+        await waitFor(() => expect(calls.dismiss).toHaveLength(1));
+        expect(screen.getByRole("button", { name: 'Accept "Morning plants"' }).getAttribute("aria-disabled")).toBe("true");
+
+        // A failed account switch clears the session for a moment, then the same account is back.
+        signedIn.userId = null;
+        rerenderPage();
+        signedIn.userId = "user-a";
+        rerenderPage();
+
+        expect(screen.getByRole("button", { name: 'Accept "Morning plants"' }).getAttribute("aria-disabled")).toBe("true");
+
+        // The busy list refuses a second decision, so the same one cannot be submitted twice.
+        fireEvent.click(screen.getByRole("button", { name: 'Dismiss "Weekly notes"' }));
+        expect(calls.dismiss).toHaveLength(1);
+
+        release();
+        await waitFor(() => expect(screen.getByRole("status", { name: "Suggestion updates" }).textContent).toBe("Suggestion dismissed: Weekly notes"));
+    });
+
+    it("keeps the last outcome while the same account's session reloads, and clears it for a different account after that", async () => {
+        state.rows = [row("s1", "Weekly notes")];
+        const { rerenderPage } = mountList();
+
+        fireEvent.click(await screen.findByRole("button", { name: 'Dismiss "Weekly notes"' }));
+        await waitFor(() => expect(screen.getByRole("status", { name: "Suggestion updates" }).textContent).toBe("Suggestion dismissed: Weekly notes"));
+
+        signedIn.userId = null;
+        rerenderPage();
+        signedIn.userId = "user-a";
+        rerenderPage();
+
+        expect(screen.getByRole("status", { name: "Suggestion updates" }).textContent).toBe("Suggestion dismissed: Weekly notes");
+
+        // A different account arriving after a reload is still a switch.
+        signedIn.userId = null;
+        rerenderPage();
+        signedIn.userId = "user-b";
+        rerenderPage();
+
+        expect(screen.getByRole("status", { name: "Suggestion updates" }).textContent).toBe("");
     });
 
     it("clears a failure alert after an account switch", async () => {
