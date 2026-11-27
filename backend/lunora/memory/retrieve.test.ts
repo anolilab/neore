@@ -243,7 +243,7 @@ describe("candidates", () => {
         expect(warn).toHaveBeenCalledWith(expect.stringContaining("Vector search failed"), expect.anything());
     });
 
-    it("scores the words of a search past its first 2,000 characters (Qodo 6)", async () => {
+    it("scores the words of a search past its first 2,000 characters", async () => {
         await seed([{ memory: "descaled the kettle" }]);
 
         // The embedding reads the first 2,000 characters; the keyword score reads all of it.

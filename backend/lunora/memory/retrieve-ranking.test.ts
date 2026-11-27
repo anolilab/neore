@@ -78,7 +78,7 @@ describe("rankMemories", () => {
         expect(idsOf(rank([fresh, pinned], at({ fresh: 0.5, pinned: 0.5 })))).toEqual(["fresh", "pinned"]);
     });
 
-    it("counts the share of the search's words the memory holds, not the words it never had (Qodo 8)", () => {
+    it("counts the share of the search's words the memory holds, not the words it never had", () => {
         const rows = [candidate("a", { memory: "likes hiking boots" }), candidate("b", { memory: "likes cooking" })];
         const { keywordScores } = keywordSignalsFor(rows, "hiking cooking baking painting running swimming");
 
@@ -93,14 +93,14 @@ describe("rankMemories", () => {
         ).toBeCloseTo(1, 2);
     });
 
-    it("scores every salient term of the search, past the lookups' six (Qodo 5)", () => {
+    it("scores every salient term of the search, past the lookups' six", () => {
         const searchText = "remember everything regarding wonderful holidays somewhere tropical kettle";
 
         expect(keywordLookupTerms(searchText)).not.toContain("kettle");
         expect(rank([candidate("k", { memory: "descaled the kettle" })], [], searchText).map((m) => m.memoryId)).toEqual(["k"]);
     });
 
-    it("matches whole tokens only: `time` is not `timer` (Qodo 10)", () => {
+    it("matches whole tokens only: `time` is not `timer`", () => {
         const rows = [
             candidate("timer", { memory: "runs a timer" }),
             candidate("both", { memory: "time and timer" }),
@@ -181,7 +181,7 @@ describe("rankMemories", () => {
             expect(ids(rows, "did I order KX-2291", lookups, [["part", 0.2]])).toEqual(["part"]);
         });
 
-        it("gives no keyword relevance at all when the query names an identifier no memory holds (Qodo 2)", () => {
+        it("gives no keyword relevance at all when the query names an identifier no memory holds", () => {
             // A row with no vector is found by words, so only the absent code keeps it out.
             const rows = [candidate("part", { memory: "Placed an order for part KX-2291" })];
             const signals = keywordSignalsFor(rows, "did I order part QZ-5508", [lookup("5508", 0), lookup("order", 1), lookup("part", 1), lookup("qz", 0)]);
@@ -192,7 +192,7 @@ describe("rankMemories", () => {
             expect(rank(rows, [["part", 0.9]], "did I order part QZ-5508").map((m) => m.memoryId)).toEqual(["part"]);
         });
 
-        it("reads a year as a word, not an identifier: it does not turn the rule off (Qodo 3)", () => {
+        it("reads a year as a word, not an identifier: it does not turn the rule off", () => {
             const rows = [candidate("canon", { ...old, memory: "Canon camera serial KX-2291" }), candidate("other", { ...old, memory: "bought a new desk" })];
             const searchText = "serial of the Canon camera I bought in 2019";
             const lookups = [lookup("serial", 1), lookup("camera", 1), lookup("bought", 1), lookup("canon", 1), lookup("2019", 0)];
@@ -200,7 +200,7 @@ describe("rankMemories", () => {
             expect(ids(rows, searchText, lookups)).toEqual(["canon"]);
         });
 
-        it("counts a word rare only by the user's own rows, and only with the query's leading term (Qodo 7)", () => {
+        it("counts a word rare only by the user's own rows, and only with the query's leading term", () => {
             // Several restaurant notes: `restaurant` is not rare however few of them are candidates.
             const restaurants = [
                 candidate("r1", { ...old, memory: "likes the restaurant near the office" }),
@@ -307,7 +307,7 @@ describe("keyword hits", () => {
         return { _id: id, botId, memory };
     };
 
-    it("keeps whole-token, usable, in-scope rows before the cut, so prefix matches cannot crowd them out (Qodo 9)", () => {
+    it("keeps whole-token, usable, in-scope rows before the cut, so prefix matches cannot crowd them out", () => {
         const fetched = [
             ...Array.from({ length: 30 }, (_, i) => row(`prefix-${String(i)}`, `set a timer ${String(i)}`)),
             { ...row("superseded", "time for tea"), supersededBy: "newer" },

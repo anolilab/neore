@@ -3,12 +3,12 @@ import { describe, expect, it } from "vitest";
 import { salientTermsOf, searchTokensOf } from "./search-terms";
 
 describe(searchTokensOf, () => {
-    it("splits Han, kana and Hangul runs into overlapping pairs, as the search index does (Qodo 1)", () => {
+    it("splits Han, kana and Hangul runs into overlapping pairs, as the search index does", () => {
         expect(searchTokensOf("北京大学は東京にある")).toContain("大学");
         expect(searchTokensOf("大学")).toEqual(["大学"]);
     });
 
-    it("keeps the breve and diaeresis of a Cyrillic letter and drops other marks (Qodo 4)", () => {
+    it("keeps the breve and diaeresis of a Cyrillic letter and drops other marks", () => {
         expect(searchTokensOf("Ёж и йод")).toEqual(["ёж", "и", "йод"]);
         expect(searchTokensOf("Café naïve")).toEqual(["cafe", "naive"]);
     });
