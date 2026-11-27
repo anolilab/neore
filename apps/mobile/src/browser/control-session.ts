@@ -1,0 +1,347 @@
+/**
+ * The phone's hold on the thread browser's control lease, outside React: take it, renew it while the screen is open,
+ * and give it back when the screen goes. Nothing is queued: a renewal or hand back that cannot go out now is dropped,
+ * and the server ends a lease nobody renews after one lease interval.
+ */
+import type { BrowserLease } from "@neore/client-runtime";
+import { CONTROL_KEEP_INTERVAL_MS, CONTROL_LEASE_MS, controlRefusalText, leaseHolder } from "@neore/client-runtime";
+
+import { withCatch } from "@/lib/guarded";
+import { settleQuietly } from "@/offline/quietly";
+
+import type { NavigateAnswer, TakeAnswer } from "./browser-api";
+
+export interface ControlApi {
+    handBack: (claim: string, reason: "handed_back" | "left") => Promise<boolean>;
+    keep: (claim: string) => Promise<{ until: number } | null>;
+    navigate: (claim: string, url: string) => Promise<NavigateAnswer>;
+    take: (renews?: string) => Promise<TakeAnswer>;
+}
+
+export type ControlState
+    = | { claim: string; claimId: string; kind: "holding"; until: number }
+        | { kind: "idle"; message?: string }
+        | { kind: "taking" };
+
+export const CONTROL_ENDED = "Your control of the browser ended. The agent may use it again.";
+export const CONTROL_ELSEWHERE = "You took control in another window, so this phone no longer has it.";
+export const CONTROL_OFFLINE = "You are offline, so this phone gave up control. The agent may use the browser again within two minutes.";
+export const CONTROL_FAILED = "Taking control did not work. Try again.";
+
+/** `navigateInControl`'s refusal when the claim no longer holds the lease (the web card tells it apart the same way). */
+const NOT_IN_CONTROL = "You do not have control of the browser.";
+
+export interface ControlSession {
+    navigate: (url: string) => Promise<string | undefined>;
+    /** The live status's lease at the server's clock `now`: the phone stops when it is no longer this claim's. */
+    noteLease: (lease: BrowserLease | undefined, now: number) => void;
+    /** Hand back: `handed_back` from the button, `left` when the screen goes. */
+    release: (reason: "handed_back" | "left") => void;
+    state: () => ControlState;
+    /** The phone went offline: stop at once, and let the server end the lease after its interval. */
+    suspend: () => void;
+    take: () => Promise<void>;
+}
+
+/**
+ * The claim this phone last held, per account and thread, kept across screens: a screen opened again takes back its
+ * own lease (`renews`), which a lease left after going offline or a lost hand back still is, instead of being refused
+ * it as another window's.
+ */
+const heldClaims = new Map<string, string>();
+
+export const rememberedClaim = (key: string): string | undefined => heldClaims.get(key);
+
+/** The phone's own name for its view of a thread's browser, per account and thread, sent with every take. */
+const viewNames = new Map<string, string>();
+
+export const viewNameFor = (key: string, create: () => string): string => {
+    const known = viewNames.get(key);
+
+    if (known !== undefined) {
+        return known;
+    }
+
+    const name = create();
+
+    viewNames.set(key, name);
+
+    return name;
+};
+
+export const rememberClaim = (key: string, claim: string): void => {
+    heldClaims.set(key, claim);
+};
+
+/** Forgets `claim` once it was handed back, unless a newer claim was remembered since. */
+export const forgetClaim = (key: string, claim: string): void => {
+    if (heldClaims.get(key) === claim) {
+        heldClaims.delete(key);
+    }
+};
+
+export const createControlSession = ({
+    api,
+    deviceNow = Date.now,
+    every = (ms, run) => {
+        const timer = setInterval(run, ms);
+
+        return () => clearInterval(timer);
+    },
+    lastClaim: initialClaim,
+    onChange,
+    onClaim = () => {},
+    onReleased = () => {},
+}: {
+    api: ControlApi;
+    /** This device's clock, for when the lease ends unless renewed. */
+    deviceNow?: () => number;
+    every?: (ms: number, run: () => void) => () => void;
+    /** The claim this phone last held on the thread, kept across screens: see {@link rememberClaim}. */
+    lastClaim?: string;
+    onChange: (state: ControlState) => void;
+    /** A claim taken. */
+    onClaim?: (claim: string) => void;
+    /** A claim handed back: only that claim is forgotten, never a newer one taken since. */
+    onReleased?: (claim: string) => void;
+}): ControlSession => {
+    let state: ControlState = { kind: "idle" };
+    let stopKeeping: (() => void) | undefined;
+    /** The last claim this phone held, so taking control again is its own renewal and never `held` from itself. */
+    let lastClaim = initialClaim;
+    /** The hand back still out, if any. */
+    let releasing: Promise<void> | undefined;
+    /** Counts takes: an answer to one that was left (released, suspended, or followed by another) holds nothing. */
+    let attempt = 0;
+
+    /**
+     * When the lease ends on this device's clock unless a renewal lands: a lease that runs out writes nothing, so no
+     * status comes to say so while renewals keep failing.
+     */
+    let endsAt = 0;
+    /** The take whose renewal is out, if any: one left out for a claim handed back never holds up a newer take's. */
+    let keepingFor: number | undefined;
+
+    /** Read through a call: `state` changes while a take awaits, which a narrowed `state.kind` would hide. */
+    const isHolding = (): boolean => state.kind === "holding";
+    const set = (next: ControlState): void => {
+        state = next;
+        onChange(next);
+    };
+    const stop = (message?: string): void => {
+        stopKeeping?.();
+        stopKeeping = undefined;
+        set(message === undefined ? { kind: "idle" } : { kind: "idle", message });
+    };
+    const keep = async (claim: string): Promise<void> => {
+        // One renewal at a time, timed from when it was sent: the server set its end then, not when the answer came.
+        if (keepingFor === attempt) {
+            return;
+        }
+
+        const mine = attempt;
+
+        keepingFor = mine;
+
+        const sentAt = deviceNow();
+        const answer = await withCatch(async () => await api.keep(claim), () => "failed" as const);
+
+        if (keepingFor === mine) {
+            keepingFor = undefined;
+        }
+
+        // A renewal that did not go out changes nothing: the next one tries again, or the lease ends on the server.
+        if (answer === "failed" || state.kind !== "holding" || state.claim !== claim) {
+            return;
+        }
+
+        if (answer === null) {
+            stop(CONTROL_ENDED);
+
+            return;
+        }
+
+        endsAt = Math.max(endsAt, sentAt + CONTROL_LEASE_MS);
+        set({ ...state, until: Math.max(state.until, answer.until) });
+    };
+
+    const handBack = (claim: string, reason: "handed_back" | "left"): void => {
+        // A take waits for this: a renewal of a claim whose hand back is still out would be ended by it.
+        releasing = (async () => {
+            if (!await withCatch(async () => await api.handBack(claim, reason), () => false)) {
+                return;
+            }
+
+            onReleased(claim);
+
+            if (lastClaim === claim) {
+                lastClaim = undefined;
+            }
+        })();
+        settleQuietly(releasing);
+    };
+
+    return {
+        navigate: async (url) => {
+            if (state.kind !== "holding") {
+                return CONTROL_ENDED;
+            }
+
+            const { claim } = state;
+            const sentAt = deviceNow();
+            const answer = await withCatch(async () => await api.navigate(claim, url), () => undefined);
+
+            if (answer === undefined) {
+                return "The page could not be opened. Try again.";
+            }
+
+            const isStillHeld = state.kind === "holding" && state.claim === claim;
+
+            if (answer.status === "refused") {
+                // The lease is gone on the server: the phone stops offering what only its holder may do.
+                if (isStillHeld && answer.error === NOT_IN_CONTROL) {
+                    stop(CONTROL_ENDED);
+
+                    return CONTROL_ENDED;
+                }
+
+                return answer.error;
+            }
+
+            // A page that loaded renewed the lease on the server, no earlier than this was sent.
+            if (isStillHeld && answer.status === "ok") {
+                endsAt = Math.max(endsAt, sentAt + CONTROL_LEASE_MS);
+            }
+
+            return answer.status === "closed" ? "The browser closed while the page loaded." : undefined;
+        },
+        noteLease: (lease, now) => {
+            // Only a status from after the lease was written can name this claim; an older one says nothing about it.
+            if (state.kind !== "holding" || now < state.until - CONTROL_LEASE_MS) {
+                return;
+            }
+
+            const holder = leaseHolder(lease, state.claimId, now);
+
+            if (holder !== "mine") {
+                stop(holder === "other-view" ? CONTROL_ELSEWHERE : CONTROL_ENDED);
+            }
+        },
+        release: (reason) => {
+            if (state.kind === "taking") {
+                attempt += 1;
+                stop();
+
+                return;
+            }
+
+            if (state.kind !== "holding") {
+                return;
+            }
+
+            const { claim } = state;
+
+            stop();
+            handBack(claim, reason);
+        },
+        state: () => state,
+        suspend: () => {
+            if (state.kind === "taking") {
+                attempt += 1;
+            }
+
+            if (state.kind !== "idle") {
+                stop(CONTROL_OFFLINE);
+            }
+        },
+        take: async () => {
+            if (state.kind !== "idle") {
+                return;
+            }
+
+            attempt += 1;
+
+            const mine = attempt;
+
+            set({ kind: "taking" });
+
+            // A hand back still out lands first: a claim it gave back is not named as one to renew (a hand back that
+            // failed keeps it, so a lease left on the server is still the phone's own).
+            if (releasing !== undefined) {
+                await releasing;
+
+                // Left or suspended while that hand back was out: nothing is asked for.
+                if (mine !== attempt) {
+                    return;
+                }
+            }
+
+            // The server starts the lease while this is out: the phone times it from the send, never from the answer.
+            const sentAt = deviceNow();
+            const answer = await withCatch(async () => await api.take(lastClaim), () => undefined);
+
+            if (mine !== attempt) {
+                // Suspended or left meanwhile: a claim that came back anyway is given back at once.
+                // Remembered first: a hand back that cannot go out (offline) leaves a lease the next take must name.
+                if (answer?.status === "ok") {
+                    const { claim } = answer;
+
+                    // Only while no newer take holds the lease: its claim is the one to name, never this stale one.
+                    if (!isHolding()) {
+                        lastClaim = claim;
+                        onClaim(claim);
+                    }
+
+                    // A take waits for it, as for any hand back: a renewal sent meanwhile would be ended by it.
+                    handBack(claim, "left");
+                }
+
+                return;
+            }
+
+            if (answer === undefined) {
+                set({ kind: "idle", message: CONTROL_FAILED });
+
+                return;
+            }
+
+            if (answer.status !== "ok") {
+                set({ kind: "idle", message: controlRefusalText(answer.status) });
+
+                return;
+            }
+
+            lastClaim = answer.claim;
+            onClaim(answer.claim);
+            endsAt = sentAt + CONTROL_LEASE_MS;
+
+            // An answer so late that the lease it gave may have run out holds nothing: the claim goes back.
+            if (deviceNow() >= endsAt) {
+                set({ kind: "idle", message: CONTROL_ENDED });
+                handBack(answer.claim, "left");
+
+                return;
+            }
+
+            set({ claim: answer.claim, claimId: answer.claimId, kind: "holding", until: answer.until });
+            stopKeeping = every(CONTROL_KEEP_INTERVAL_MS, () => {
+                if (state.kind !== "holding") {
+                    return;
+                }
+
+                // No renewal answered for a whole lease: the phone stops showing it, and hands it back in case one landed
+                // unanswered and the lease still runs on the server, so the agent need not wait it out.
+                if (deviceNow() >= endsAt) {
+                    const { claim } = state;
+
+                    stop(CONTROL_ENDED);
+                    handBack(claim, "left");
+
+                    return;
+                }
+
+                settleQuietly(keep(state.claim));
+            });
+        },
+    };
+};

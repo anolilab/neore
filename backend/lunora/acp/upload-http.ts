@@ -233,6 +233,11 @@ export const hostUploadHttpAction = async (context: HttpActionCtx, request: Requ
         return unauthorized();
     }
 
+    // A signed upload is a sign-in too, like a signed turn post: the first one a device without a heartbeat makes sets `lastSeenAt`.
+    if (!verified.seen) {
+        await systemRunners(ownerId).runMutation(internal.devices.internal.recordDeviceSignedUse, { deviceId, userId: ownerId });
+    }
+
     return await inSystemShard(context, ownerId, async (shardCtx) => {
         const post = parseJson(payload);
 

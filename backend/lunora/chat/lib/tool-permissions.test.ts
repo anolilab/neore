@@ -3,6 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
     applyToolPermissions,
+    ALWAYS_ALLOW_REFUSED_BUILTINS,
+    isAlwaysAllowRefused,
     BUILTIN_TOOLS_ASK_BY_DEFAULT,
     clampToolPermission,
     defaultToolPermission,
@@ -99,6 +101,18 @@ describe("paid media default", () => {
             expect(resolveToolPermission(paid, { [`builtin:${name}`]: "auto" })).toBe("auto");
         },
     );
+});
+
+describe("pull request watch tools", () => {
+    it.each(["watchPullRequest", "unwatchPullRequest"])("%s asks by default and is never granted always-allow", (name) => {
+        const tool = { key: toolPermissionKey("builtin", name), source: "builtin" as const };
+
+        expect(BUILTIN_TOOLS_ASK_BY_DEFAULT.has(name)).toBe(true);
+        expect(defaultToolPermission("builtin", undefined, name)).toBe("ask");
+        expect(resolveToolPermission(tool, undefined)).toBe("ask");
+        expect(ALWAYS_ALLOW_REFUSED_BUILTINS.has(name)).toBe(true);
+        expect(isAlwaysAllowRefused(`builtin:${name}`)).toBe(true);
+    });
 });
 
 describe("coding-agent delegation default", () => {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { adminPathFor, settingsLinkSearch, settingsLocation, settingsTabForPath } from "./settings-link";
+import { adminPathFor, anchorFromHash, settingsLinkSearch, settingsLocation, settingsTabForPath } from "./settings-link";
 
 describe("settingsTabForPath", () => {
     it.each([
@@ -50,6 +50,19 @@ describe("settingsTabForPath", () => {
         expect(settingsTabForPath("/dashboard/settingsx")).toBeUndefined();
         expect(settingsTabForPath("/dashboard")).toBeUndefined();
         expect(settingsTabForPath("/chat/abc")).toBeUndefined();
+    });
+});
+
+describe("anchorFromHash", () => {
+    it.each([
+        ["#voice-mode", "voice-mode"],
+        ["voice-mode", "voice-mode"],
+        ["#voice-mode%2Dvoice", "voice-mode-voice"],
+        ["#bad%E0%A4", "bad%E0%A4"],
+        ["#", undefined],
+        ["", undefined],
+    ])("reads %j as the element id %j", (hash, anchor) => {
+        expect(anchorFromHash(hash)).toBe(anchor);
     });
 });
 

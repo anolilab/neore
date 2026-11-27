@@ -4,6 +4,7 @@ import { useCallback } from "react";
 
 import { settingsLinkSearch } from "@/features/settings/lib/settings-link";
 import type { SettingsTab } from "@/features/settings/lib/settings-navigation";
+import { requestSettingsTab } from "@/features/settings/lib/settings-request";
 
 // The registered router type is the widened `createTanstackRouter` return (see `src/router.tsx`), which collapses the
 // search-updater type to `never`; the updater itself only adds the modal's own keys to the current search.
@@ -13,8 +14,25 @@ type SearchUpdater = NonNullable<ComponentProps<typeof Link>["search"]>;
  * A link that opens settings at `tab` over the current page. It stays on the page, so the modal closes back to it, and
  * it is still a real link: it can open in a new tab.
  */
-const SettingsLink: FC<Omit<ComponentProps<typeof Link>, "search" | "to"> & { anchor?: string; tab: SettingsTab }> = ({ anchor, tab, ...properties }) => (
-    <Link {...properties} search={settingsLinkSearch(tab, anchor) as unknown as SearchUpdater} to="." />
+const SettingsLink: FC<Omit<ComponentProps<typeof Link>, "search" | "to"> & { anchor?: string; tab: SettingsTab }> = ({
+    anchor,
+    onClick,
+    tab,
+    ...properties
+}) => (
+    <Link
+        {...properties}
+        onClick={(event) => {
+            onClick?.(event);
+
+            // A plain click opens the tab here; one that opens a new browser tab leaves this modal alone.
+            if (!event.defaultPrevented && event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) {
+                requestSettingsTab(tab, anchor);
+            }
+        }}
+        search={settingsLinkSearch(tab, anchor) as unknown as SearchUpdater}
+        to="."
+    />
 );
 
 /** Opens settings at a tab over the current page, for a control that is not a link. */
@@ -23,6 +41,7 @@ export const useOpenSettings = (): ((tab: SettingsTab, options?: { anchor?: stri
 
     return useCallback(
         (tab: SettingsTab, options?: { anchor?: string; replace?: boolean }) => {
+            requestSettingsTab(tab, options?.anchor);
             void navigate({ replace: options?.replace, search: settingsLinkSearch(tab, options?.anchor) as unknown as SearchUpdater, to: "." });
         },
         [navigate],

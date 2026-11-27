@@ -20,6 +20,7 @@ export const BUILTIN_TOOLS_SAFE_TO_REPEAT: ReadonlySet<string> = new Set([
     "knowledgeSearch",
     "retrieve",
     "searchMemory",
+    "searchPastChats",
     "webSearch",
 ]);
 

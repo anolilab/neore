@@ -212,7 +212,8 @@ const initialiseState: StateCreator<ThreadListUIStore> = (set) => {
         setSearchType: (type) => set({ searchType: type }),
         setSectionCounts: (counts) => set({ sectionCounts: counts }),
         // A selection made in one section would otherwise stay selected, unseen, in the next one, and bulk delete acts on all of it.
-        setSectionFilter: (filter) => set({ sectionFilter: sanitizeSectionFilter(filter), selectedThreadIds: new Set() }),
+        // The shift-click anchor indexes the previous section's rows, so it goes with the selection.
+        setSectionFilter: (filter) => set({ lastSelectedIndex: -1, sectionFilter: sanitizeSectionFilter(filter), selectedThreadIds: new Set() }),
 
         setSelectedCategory: (category) => set({ selectedCategory: category }),
         setSelectedTagIds: (tagIds) => set({ selectedTagIds: tagIds }),

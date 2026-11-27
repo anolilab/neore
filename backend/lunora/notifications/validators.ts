@@ -20,6 +20,7 @@ export const vNotificationType = v.union(
     v.literal("daily_brief"),
     v.literal("usage_alert"),
     v.literal("review_request"),
+    v.literal("device_paired"),
 );
 
 export const vNotificationOutcome = v.union(v.literal("success"), v.literal("failure"));

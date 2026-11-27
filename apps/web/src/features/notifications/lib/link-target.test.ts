@@ -28,6 +28,14 @@ describe("linkTarget", () => {
         });
     });
 
+    it("decodes an encoded fragment, so the modal finds the element it names", () => {
+        const target = linkTarget("/dashboard/settings/app/personalization#voice-mode%2Dvoice");
+
+        expect((target.search as (previous: Record<string, unknown>) => Record<string, unknown>)({})).toMatchObject({
+            settingsAnchor: "voice-mode-voice",
+        });
+    });
+
     it("splits a query into search params, decoded, so the router receives them as search and not as part of the path", () => {
         expect(linkTarget("/develop?repository=octo%2Fhello&number=7")).toEqual({ search: { number: "7", repository: "octo/hello" }, to: "/develop" });
     });

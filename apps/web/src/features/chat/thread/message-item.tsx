@@ -211,7 +211,8 @@ const DefaultAssistantMessage: FC<AssistantMessageRendererProps> = ({ actionBar,
             </span>
             <MessageContentWrapper
                 className={cn(
-                    "message-text col-span-2 col-start-2 row-start-1 text-[length:var(--assistant-body-size)] leading-(--assistant-body-leading) wrap-break-word",
+                    // Full width, not the content wrapper's fit-to-content: cards in a reply (tool approvals, tool calls) span the column.
+                    "message-text col-span-2 col-start-2 row-start-1 w-full text-[length:var(--assistant-body-size)] leading-(--assistant-body-leading) wrap-break-word",
                     hasRateLimitError ? "text-destructive dark:text-red-400" : "text-foreground dark:text-white",
                 )}
             >
