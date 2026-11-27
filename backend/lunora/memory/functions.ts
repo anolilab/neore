@@ -539,9 +539,9 @@ const removeFromDigests = async (ctx: Pick<MutationCtx, "db">, userId: string, i
         }
 
         const listed = learned.length !== digest.learned.length;
-        const summed = digest.summary !== DROPPED_DIGEST_SUMMARY;
+        const hasSummary = digest.summary !== DROPPED_DIGEST_SUMMARY;
 
-        if (listed || summed) {
+        if (listed || hasSummary) {
             await ctx.db.patch("memoryDigests", digest._id, { learned, summary: DROPPED_DIGEST_SUMMARY });
         }
     }
