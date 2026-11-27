@@ -290,11 +290,8 @@ export const createControlSession = ({
                         onClaim(claim);
                     }
 
-                    settleQuietly(async () => {
-                        if (await api.handBack(claim, "left")) {
-                            onReleased(claim);
-                        }
-                    });
+                    // A take waits for it, as for any hand back: a renewal sent meanwhile would be ended by it.
+                    handBack(claim, "left");
                 }
 
                 return;

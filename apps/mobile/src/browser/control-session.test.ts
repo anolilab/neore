@@ -222,6 +222,36 @@ describe(createControlSession, () => {
         expect(handBack).toHaveBeenCalledWith("c-1", "left");
     });
 
+    it("waits for the hand back of a take that answered after it was left before taking again", async () => {
+        const late = Promise.withResolvers<typeof OK>();
+        const handedBack = Promise.withResolvers<boolean>();
+        const take = vi.fn(async () => OK);
+
+        take.mockImplementationOnce(async () => await late.promise);
+
+        const handBack = vi.fn(async () => await handedBack.promise);
+        const { session } = setup({ handBack, take });
+
+        const first = session.take();
+
+        session.suspend();
+        late.resolve(OK);
+        await first;
+        expect(handBack).toHaveBeenCalledWith("c-1", "left");
+
+        const second = session.take();
+
+        await Promise.resolve();
+        // The hand back is still out: nothing is asked for that it could end.
+        expect(take).toHaveBeenCalledTimes(1);
+
+        handedBack.resolve(true);
+        await second;
+        // The claim it gave back is not named as one to renew.
+        expect(take).toHaveBeenLastCalledWith(undefined);
+        expect(session.state()).toMatchObject({ claim: "c-1", kind: "holding" });
+    });
+
     it("renews a retaken claim while a renewal of the one handed back is still out", async () => {
         const stale = Promise.withResolvers<{ until: number }>();
         const keep = vi.fn(async () => {
