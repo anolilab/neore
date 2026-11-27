@@ -2006,6 +2006,12 @@ const editMessageAttached = async (
         }
 
         // The chat's claim is taken with its access check, so the chat's lock waits for the edit's save (`beginThreadAttach`).
+        // An edit starts a new reply, so it waits like a send while a pull request watch is waking this chat: refused before anything is
+        // written (`source-control/pr-watch-wake-lease.ts`), the same thread-keyed check.
+        if ((await context.runQuery(internal.source_control.pr_watch_wake_lease.wakeLeaseHeldFor, { threadId: threadId as Id<"threads"> })) === true) {
+            return Response.json({ code: "PR_WATCH_WAKING", error: "A pull request watch is replying to this chat. Try again in a moment." }, { status: 409 });
+        }
+
         const threadAttach = await beginThreadAttach(context, { fileIds, regenerate: false, threadId, unlockProof, userId });
 
         holder.threadAttach = threadAttach;
