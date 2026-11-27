@@ -235,14 +235,23 @@ const nestedGroups: ThreadGroup[] = [
 
 /** Which thread groups the list gets: the flat five, or the parent with its branch. */
 const groupsInUse = vi.hoisted(() => {
-    return { nested: false };
+    return { nested: false, unloaded: false };
 });
 
 vi.mock("./hooks/use-thread-groups", () => {
     const flat = { isPlaceholderData: false, threadGroups: groups, threadsData: {} };
     const nested = { isPlaceholderData: false, threadGroups: nestedGroups, threadsData: {} };
+    const unloaded = { isPlaceholderData: false, threadGroups: [], threadsData: undefined };
 
-    return { default: () => (groupsInUse.nested ? nested : flat) };
+    return {
+        default: () => {
+            if (groupsInUse.unloaded) {
+                return unloaded;
+            }
+
+            return groupsInUse.nested ? nested : flat;
+        },
+    };
 });
 
 // The real handlers close over the open thread (deleting it moves the route): new functions each time it changes.
@@ -323,6 +332,7 @@ vi.mock("./snooze-until-dialog", () => {
     return { default: () => null };
 });
 
+const { useThreadListUIStore } = await import("./stores/thread-list-ui-store");
 const { default: HierarchicalThreadList } = await import("./hierarchical-thread-list");
 
 const loadingStates: LoadingStates = {
@@ -381,6 +391,7 @@ beforeEach(() => {
         },
     );
     groupsInUse.nested = false;
+    groupsInUse.unloaded = false;
     route.set(`/chat/${first}`);
     pullRequestCounts.set(new Map());
 });
@@ -406,6 +417,15 @@ describe("the sidebar thread list", () => {
         const update = setSelectedThreadIds.mock.calls[0]?.[0] as (previous: Set<string>) => Set<string>;
 
         expect([...update(new Set([first, "hidden-thread"]))]).toStrictEqual([first]);
+    });
+
+    it("shows no section counts while no list is loaded, not the last list's", () => {
+        useThreadListUIStore.setState({ sectionCounts: { active: 4, archived: 1, needsYou: 2, snoozed: 0, working: 1 } });
+        groupsInUse.unloaded = true;
+
+        render(<HierarchicalThreadList {...listProps} currentThreadId={first} />);
+
+        expect(useThreadListUIStore.getState().sectionCounts).toStrictEqual({ active: 0, archived: 0, needsYou: 0, snoozed: 0, working: 0 });
     });
 
     it("keeps a selection gathered across searches while searching", () => {

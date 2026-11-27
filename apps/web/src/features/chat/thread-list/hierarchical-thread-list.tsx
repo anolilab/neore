@@ -38,7 +38,7 @@ import useStableCallback from "./hooks/use-stable-callback";
 import useThreadGroups from "./hooks/use-thread-groups";
 import useThreadHandlers from "./hooks/use-thread-handlers";
 import useThreadListKeyboard from "./hooks/use-thread-list-keyboard";
-import { countSections, filterGroupsBySection, groupsToOpenOnPick, sameSectionCounts } from "./lib/section-filter";
+import { countSections, EMPTY_SECTION_COUNTS, filterGroupsBySection, groupsToOpenOnPick, sameSectionCounts } from "./lib/section-filter";
 import { renameFocusTarget } from "./rename-focus-target";
 import RenameThreadDialog from "./rename-thread-dialog";
 import SnoozeUntilDialog from "./snooze-until-dialog";
@@ -528,12 +528,13 @@ const HierarchicalThreadList: FC<
     }
 
     // The bar's counts are the loaded rows of the unfiltered list; the dock beside the list reads them from the store.
+    // With no list loaded (a switch to another organization still on its way) the counts are none, not the last list's.
     useEffect(() => {
-        if (isSearching || !threadsData) {
+        if (isSearching) {
             return;
         }
 
-        const counts = countSections(allThreadGroups);
+        const counts = threadsData ? countSections(allThreadGroups) : EMPTY_SECTION_COUNTS;
 
         if (!sameSectionCounts(counts, useThreadListUIStore.getState().sectionCounts)) {
             setSectionCounts(counts);
