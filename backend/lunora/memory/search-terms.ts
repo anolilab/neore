@@ -132,6 +132,8 @@ export interface TermIndex {
     tokens: string[];
 }
 
+const WHITESPACE_RE = /^\s+$/u;
+
 /** An identifier as compared: its letters and digits, lowercased, so `QZ-5508`, `QZ 5508` and `QZ5508` are all `qz5508`. */
 export const canonicalOf = (tokens: ReadonlyArray<string>): string => tokens.join("");
 
@@ -144,7 +146,7 @@ export const termIndexOf = (text: string): TermIndex => {
         const canonical = canonicalOf(searchTokensOf(match[0]));
 
         if (canonical !== "") {
-            runs.push({ canonical, spaced: runs.length > 0 && /^\s+$/u.test(normalized.slice(end, match.index)) });
+            runs.push({ canonical, spaced: runs.length > 0 && WHITESPACE_RE.test(normalized.slice(end, match.index)) });
         }
 
         end = match.index + match[0].length;
