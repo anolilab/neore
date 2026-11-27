@@ -177,9 +177,9 @@ const NodeSearchDialogContent = ({ onClose }: Omit<NodeSearchDialogProps, "open"
             <button aria-label={t`Close node search`} className="fixed inset-0 z-50 cursor-default bg-black/20" onClick={onClose} tabIndex={-1} type="button" />
 
             {/* Dialog */}
-            <div className="bg-popover fixed top-[20%] left-1/2 z-50 w-[380px] -translate-x-1/2 overflow-hidden rounded-xl border shadow-2xl">
+            <div className="surface-raised fixed top-[20%] left-1/2 z-50 w-[380px] -translate-x-1/2 overflow-hidden rounded-2xl">
                 {/* Search input */}
-                <div className="border-b px-3 py-2">
+                <div className="border-border/50 border-b px-3 py-2">
                     <label className="block" htmlFor="workflow-node-search">
                         <span className="sr-only">
                             <Trans>Search nodes</Trans>
@@ -212,7 +212,7 @@ const NodeSearchDialogContent = ({ onClose }: Omit<NodeSearchDialogProps, "open"
                                 <button
                                     className={cn(
                                         "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm transition-colors",
-                                        index === selectedIndex ? "bg-accent text-accent-foreground" : "hover:bg-muted/50",
+                                        index === selectedIndex ? "bg-surface-row-active text-foreground" : "hover:bg-surface-row-hover",
                                     )}
                                     key={type}
                                     onClick={() => handleSelect(type)}
@@ -236,7 +236,7 @@ const NodeSearchDialogContent = ({ onClose }: Omit<NodeSearchDialogProps, "open"
                 </div>
 
                 {/* Footer hint */}
-                <div className="text-muted-foreground flex items-center gap-3 border-t px-3 py-1.5 text-[10px]">
+                <div className="text-muted-foreground border-border/50 flex items-center gap-3 border-t px-3 py-2 text-xs">
                     <span>
                         <Trans>
                             <kbd className="rounded border px-1">↑↓</kbd> Navigate

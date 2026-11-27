@@ -344,7 +344,7 @@ const WorkflowCanvasInner = ({
                     <Background color="var(--border)" gap={16} size={1} />
                     <MiniMap
                         ariaLabel={ariaLabelConfig["minimap.ariaLabel"]}
-                        className="!bg-background !border-border"
+                        className="!bg-surface-main !border-border/50 !hidden !rounded-xl sm:!block"
                         maskColor="rgba(0, 0, 0, 0.1)"
                         nodeColor={(node) => NODE_CONFIGS[node.type as WorkflowNodeType]?.color ?? "#6366f1"}
                     />

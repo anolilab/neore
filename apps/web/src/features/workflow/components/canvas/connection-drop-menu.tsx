@@ -139,7 +139,7 @@ const ConnectionDropMenu = ({ onClose, onSelect, position, sourceNodeType }: Con
 
         return (
             <button
-                className="hover:bg-muted/70 flex min-w-[52px] flex-col items-center gap-1.5 rounded-lg p-2 text-center transition-colors"
+                className="hover:bg-surface-row-hover flex min-w-[52px] flex-col items-center gap-1.5 rounded-lg p-2 text-center transition-colors"
                 key={type}
                 onClick={() => onSelect(type)}
                 type="button"
@@ -161,7 +161,7 @@ const ConnectionDropMenu = ({ onClose, onSelect, position, sourceNodeType }: Con
     return (
         <div
             aria-label={t`Create & connect node`}
-            className="bg-popover text-popover-foreground animate-in fade-in-0 zoom-in-95 fixed z-50 w-[280px] rounded-lg border p-2 shadow-lg"
+            className="surface-raised text-popover-foreground animate-in fade-in-0 zoom-in-95 fixed z-50 w-[280px] rounded-xl p-2"
             ref={menuRef}
             role="group"
             style={{ left: position.x, top: position.y }}
@@ -169,16 +169,16 @@ const ConnectionDropMenu = ({ onClose, onSelect, position, sourceNodeType }: Con
             {/* Suggested nodes */}
             {nodeList.suggested.length > 0 && (
                 <>
-                    <p className="text-muted-foreground mb-1.5 px-1 text-[10px] font-medium tracking-wide uppercase">
+                    <p className="text-muted-foreground mb-1.5 px-1 font-mono text-xs">
                         <Trans>Suggested</Trans>
                     </p>
                     <div className="mb-2 grid grid-cols-4 gap-1">{nodeList.suggested.map((type) => renderNode(type))}</div>
-                    <div className="border-border/60 mb-2 border-t" />
+                    <div className="border-border/50 mb-2 border-t" />
                 </>
             )}
 
             {/* All other nodes */}
-            <p className="text-muted-foreground mb-1.5 px-1 text-[10px] font-medium tracking-wide uppercase">
+            <p className="text-muted-foreground mb-1.5 px-1 font-mono text-xs">
                 {nodeList.suggested.length > 0 ? <Trans>All nodes</Trans> : <Trans>Create & connect node</Trans>}
             </p>
             <div className="grid grid-cols-4 gap-1">{nodeList.rest.map((type) => renderNode(type))}</div>

@@ -108,7 +108,7 @@ const VersionHistory = () => {
                     }
                 />
                 <PopoverContent align="end" className="w-80 p-0">
-                    <div className="border-b p-4">
+                    <div className="border-border/50 border-b p-4">
                         <h4 className="font-medium">
                             <Trans>Version History</Trans>
                         </h4>

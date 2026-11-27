@@ -1,6 +1,7 @@
 import { Trans } from "@lingui/react/macro";
 import { isLunoraId } from "@neore/client-runtime";
 import { createFileRoute, redirect } from "@tanstack/react-router";
+import { Loader2, Workflow as WorkflowIcon } from "lucide-react";
 import { useEffect } from "react";
 
 import RouteErrorBoundary from "@/components/error-boundaries/route-error-boundary";
@@ -42,8 +43,9 @@ const WorkflowPage = () => {
 
     if (isLoading) {
         return (
-            <div className="flex h-full items-center justify-center">
-                <div className="text-muted-foreground">
+            <div className="flex h-full items-center justify-center p-6">
+                <div className="text-muted-foreground flex items-center gap-2 text-sm" role="status">
+                    <Loader2 aria-hidden="true" className="size-4 animate-spin" />
                     <Trans>Loading workflow...</Trans>
                 </div>
             </div>
@@ -52,9 +54,14 @@ const WorkflowPage = () => {
 
     if (!workflow) {
         return (
-            <div className="flex h-full items-center justify-center">
-                <div className="text-muted-foreground">
-                    <Trans>Workflow not found</Trans>
+            <div className="flex h-full items-center justify-center p-6">
+                <div className="surface-raised flex flex-col items-center rounded-xl px-8 py-10 text-center">
+                    <div aria-hidden="true" className="surface-well text-muted-foreground mb-3 flex size-12 items-center justify-center rounded-xl">
+                        <WorkflowIcon className="size-6" />
+                    </div>
+                    <h1 className="text-[15px] font-semibold">
+                        <Trans>Workflow not found</Trans>
+                    </h1>
                 </div>
             </div>
         );
@@ -74,10 +81,10 @@ const WorkflowPage = () => {
         <RouteErrorBoundary routeName={route}>
             <>
                 {/* Header */}
-                <header className="flex shrink-0 items-center justify-between border-b px-4 py-2">
-                    <div>
-                        <h1 className="text-lg font-semibold">{workflow.title}</h1>
-                        {workflow.description && <p className="text-muted-foreground text-sm">{workflow.description}</p>}
+                <header className="border-border/50 flex shrink-0 items-center justify-between gap-3 border-b px-4 py-2.5">
+                    <div className="min-w-0">
+                        <h1 className="truncate text-[15px] font-semibold">{workflow.title}</h1>
+                        {workflow.description && <p className="text-muted-foreground truncate text-xs">{workflow.description}</p>}
                     </div>
                     <div className="flex items-center gap-3">
                         {/* Collaborator facepile */}
