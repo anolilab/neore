@@ -294,6 +294,32 @@ describe("repair", () => {
             expect(install).toMatchObject({ partial: true, targetVersion: "1.0.0", version: "1.0.0" });
         });
 
+        it("sends a linked child deleted during the stopped update back to an intent, for a plain repair to make again", async () => {
+            const { installId } = await stoppedUpdate(true);
+
+            const goneId = await run(
+                async (context) =>
+                    await context.db.insert("pluginItems", {
+                        contentHash: HASH,
+                        createdAt: Date.now(),
+                        entryKey: "skill:gone",
+                        installId,
+                        itemId: "skill-that-was-deleted",
+                        kind: "skill",
+                        state: "created",
+                        userId: OWNER,
+                    }),
+            );
+
+            const result = await run(async (context) => await repairRows(context, OWNER, SLUG));
+            const gone = await run(async (context) => await context.db.pluginItems.findFirst({ where: { _id: goneId } }));
+            const install = await run(async (context) => await context.db.pluginInstalls.findFirst({ where: { _id: installId } }));
+
+            expect(result).toMatchObject({ missing: ["skill:gone"], status: "needs-repair" });
+            expect(gone).toMatchObject({ state: "intent" });
+            expect(install).toMatchObject({ status: "needs-repair", version: "1.0.0" });
+        });
+
         it("drops the intent of a new child the update never made, and keeps the install at its old version", async () => {
             const { installId } = await stoppedUpdate(true);
 

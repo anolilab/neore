@@ -376,6 +376,17 @@ describe("rewriting a trigger of any type", () => {
         expect(routes.deleted).toContain(triggerId);
     });
 
+    it("keeps the old webhook and its route when the replacement cannot be made", async () => {
+        const { installId, triggerId } = await installedWith(HOOK);
+
+        await expect(rewrite(installId, { ...DAILY, cronExpression: "not a schedule" })).rejects.toThrow();
+
+        const [after] = await triggers();
+
+        expect(after).toMatchObject({ _id: triggerId, type: "webhook" });
+        expect(routes.deleted).not.toContain(triggerId);
+    });
+
     it("rewrites nothing while the account is being deleted", async () => {
         const { installId } = await installedWith(DAILY);
 

@@ -365,14 +365,16 @@ export const updateTriggerChild = internalMutation
         const schemeChanged = type === "webhook" && (trigger.webhookSignatureScheme ?? "timestamped") !== webhookSignatureScheme;
 
         if (trigger.type !== type || schemeChanged) {
-            // Pending first, as for any rewrite. The delete and the create are one transaction: a failed create leaves the old row.
+            // Pending first, as for any rewrite. The new trigger is made before the old one goes: the old webhook route is a global
+            // write the shard transaction cannot take back, so a create that fails must find it still in place.
             await ctx.db.patch("pluginItems", linkId, { pendingHash: contentHash });
-            await deleteTriggerRows(ctx, trigger._id as Id<"triggers">);
 
             const created = await insertTrigger(ctx, { organizationId: trigger.organizationId, userId }, fields, {
                 pluginInstallId: installId,
                 pluginMarker: markerFor(installId, entryKey),
             });
+
+            await deleteTriggerRows(ctx, trigger._id as Id<"triggers">);
 
             // The link names the new row: export and the account data export find the child by this id.
             await ctx.db.patch("pluginItems", linkId, { contentHash, itemId: created.triggerId, pendingHash: "" });

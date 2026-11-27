@@ -93,7 +93,8 @@ const resolvePending = async (ctx: MutationCtx, installId: string, links: Link[]
 /**
  * An update that stopped part-way. Its children are settled the same way as in an interrupted install: a pending hash is
  * decided from the live content, a new child that exists is linked, and an intent whose child was never made is dropped
- * (an update that runs again makes it). The install returns to `installed` at its OLD version and file hash: whether every
+ * (an update that runs again makes it), and a linked child that is gone goes back to an intent and keeps the install in
+ * `needs-repair`, for a plain repair to make again. Otherwise the install returns to `installed` at its OLD version and file hash: whether every
  * step of the target file ran is not recorded, so the update is run again to finish, and it skips what is already done.
  * Repair never runs while the update's lease is live.
  */
@@ -107,13 +108,21 @@ const repairStoppedUpdate = async (ctx: MutationCtx, install: Doc<"pluginInstall
     const { resolved, unresolved } = await resolvePending(ctx, installId, page as Link[]);
 
     let linked = resolved;
+    const missing: string[] = [];
 
     for (const row of page) {
-        if (row.state !== "intent") {
+        const childId = await childIdByMarker(ctx, row.kind, markerFor(installId, row.entryKey), install.userId);
+
+        if (row.state === "created") {
+            // A linked child deleted while the update was stopped goes back to an intent, and the install waits for a plain repair,
+            // which makes it again from the install's own file. Left linked, every later update would read it as edited and skip it.
+            if (childId === undefined && !row.pendingHash) {
+                await ctx.db.patch("pluginItems", row._id as Id<"pluginItems">, { state: "intent" });
+                missing.push(row.entryKey);
+            }
+
             continue;
         }
-
-        const childId = await childIdByMarker(ctx, row.kind, markerFor(installId, row.entryKey), install.userId);
 
         if (childId === undefined) {
             await ctx.db.delete("pluginItems", row._id as Id<"pluginItems">);
@@ -124,7 +133,7 @@ const repairStoppedUpdate = async (ctx: MutationCtx, install: Doc<"pluginInstall
         linked += 1;
     }
 
-    const status = unresolved.length === 0 ? "installed" : "needs-repair";
+    const status = unresolved.length === 0 && missing.length === 0 ? "installed" : "needs-repair";
 
     // One conditional write on the generation and status read at the start, so a concurrent claim is never overwritten (`STALE_LEASE`).
     // The file hash stays the old file's, so the version stays the old one: a later repair must not promote it to the target. The target
@@ -145,7 +154,7 @@ const repairStoppedUpdate = async (ctx: MutationCtx, install: Doc<"pluginInstall
         install.status,
     );
 
-    return { kept: [], linked, missing: unresolved, moreDropped: false, outdated: true, status };
+    return { kept: [], linked, missing: [...unresolved, ...missing], moreDropped: false, outdated: true, status };
 };
 
 /** Whether repair may start on this install now. An `installing` install is repairable only after its lease expired. */
