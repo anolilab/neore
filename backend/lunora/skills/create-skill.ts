@@ -166,19 +166,20 @@ export const insertSkill = async (ctx: MutationContext, owner: SkillOwner, args:
 };
 
 /** Writes the bookkeeping rows (stats, the owner's enabled row, the first history entry) of a skill that lacks any of them. */
+// Primary reads: a lagging replica must not report a row missing that an earlier try wrote, or the retry inserts a duplicate.
 const ensureSkillRows = async (ctx: MutationContext, skill: Doc<"skills">, enabled: boolean): Promise<void> => {
     const skillId = skill._id as Id<"skills">;
     const { userId } = skill;
 
-    if (!(await ctx.db.skillStats.findFirst({ where: { skillId } }))) {
+    if (!(await ctx.db.skillStats.findFirst({ consistency: "primary", where: { skillId } }))) {
         await ctx.db.insert("skillStats", { skillId, usageCount: 0 });
     }
 
-    if (!(await ctx.db.userSkills.findFirst({ where: { skillId, userId } }))) {
+    if (!(await ctx.db.userSkills.findFirst({ consistency: "primary", where: { skillId, userId } }))) {
         await ctx.db.insert("userSkills", { addedAt: ctx.now, autoRun: false, enabled, skillId, userId });
     }
 
-    if (!(await ctx.db.skillHistory.findFirst({ where: { skillId } }))) {
+    if (!(await ctx.db.skillHistory.findFirst({ consistency: "primary", where: { skillId } }))) {
         await ctx.db.insert("skillHistory", {
             changeType: "created",
             config: skill.config,

@@ -364,7 +364,7 @@ const groupUsing = async (ctx: Pick<MutationCtx, "db">, skillId: string, userId:
 /**
  * Removes an unedited child that the new version no longer has: its row, then its link. A child whose content is not what was
  * installed is refused here too, so the check does not depend on the diff having been current. A skill that a group chat still
- * names, or one shared beyond its owner, is kept (the result is `false`), so the group keeps its participant; the link stays and a later update offers the removal again.
+ * names, or one shared beyond its owner, is kept (the result is `false`), so the group keeps its participant; it is detached (marker cleared, link deleted), so the plugin no longer holds a child its file lacks.
  */
 export const removeChild = internalMutation
     .input({ entryKey: v.string().max(256), generation: v.number(), installId: v.string().max(128), userId: v.string().max(128) })
@@ -386,15 +386,12 @@ export const removeChild = internalMutation
                     throw new LunoraError("CONFLICT", `The skill for "${args.entryKey}" was edited, so it is kept`);
                 }
 
-                // A skill shared beyond its owner may sit in another person's group chat, on a shard this step cannot scan: keep it, detached.
-                if (skillVisibility(skill) !== "private") {
+                // A skill shared beyond its owner may sit in another person's group chat, on a shard this step cannot scan, and a skill
+                // the owner's own group chat names must keep its participant. Either is kept, detached from the plugin that no longer has it.
+                if (skillVisibility(skill) !== "private" || (await groupUsing(ctx, skill._id as string, args.userId))) {
                     await ctx.db.patch("skills", skill._id as Id<"skills">, { pluginInstallId: "", pluginMarker: "" });
                     await ctx.db.delete("pluginItems", link._id as Id<"pluginItems">);
 
-                    return false;
-                }
-
-                if (await groupUsing(ctx, skill._id as string, args.userId)) {
                     return false;
                 }
 

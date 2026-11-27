@@ -160,6 +160,15 @@ describe(isPinShapeValid, () => {
     });
 });
 
+describe("a thread being deleted", () => {
+    it("takes no new pin once its delete has started", async () => {
+        await harness.run(async (context: any) => await context.db.patch("threads", threadId, { deletingAt: Date.now() }));
+
+        await expect(as(OWNER).mutation(createPin as never, { messageId: "m-9", messageRole: "user", threadId } as never)).rejects.toThrow("being deleted");
+        expect(await pinsOf()).toHaveLength(0);
+    });
+});
+
 describe("image pins", () => {
     it("stores an image pin with its image index and storage path and returns it", async () => {
         await as(OWNER).mutation(

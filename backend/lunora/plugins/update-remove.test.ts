@@ -102,7 +102,7 @@ describe("an update that removes a child", () => {
         expect(await run(async (context) => await context.db.pluginItems.findFirst({ where: { _id: intentId } }))).toBeNull();
     });
 
-    it("keeps a skill that a group chat still names, and keeps its link", async () => {
+    it("keeps a skill that a group chat still names, detached from the plugin with its link gone", async () => {
         const { generation, installId, intentId, skillId } = await installed();
 
         await run(async (context) => {
@@ -119,8 +119,11 @@ describe("an update that removes a child", () => {
         );
 
         expect(removed).toBe(false);
-        expect(await run(async (context) => await context.db.skills.findFirst({ where: { _id: skillId } }))).not.toBeNull();
-        expect(await run(async (context) => await context.db.pluginItems.findFirst({ where: { _id: intentId } }))).not.toBeNull();
+        expect(await run(async (context) => await context.db.skills.findFirst({ where: { _id: skillId } }))).toMatchObject({
+            pluginInstallId: "",
+            pluginMarker: "",
+        });
+        expect(await run(async (context) => await context.db.pluginItems.findFirst({ where: { _id: intentId } }))).toBeNull();
     });
 
     it("keeps and detaches a skill shared beyond its owner, which another person's group chat may use", async () => {

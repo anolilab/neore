@@ -205,4 +205,41 @@ describe("plugin install action", () => {
             } as never),
         ).rejects.toThrow("not available");
     });
+
+    it("reports the import's own error, and keeps the install for repair, when the cleanup fails too", async () => {
+        const originalCreate = registry.get("skills_create_skill:createPluginSkill");
+        const originalDelete = registry.get("plugins_install_steps:deleteInstall");
+        const { internalMutation } = await import("../_generated/server");
+        const { v } = await import("lunorash/server");
+
+        registry.set(
+            "skills_create_skill:createPluginSkill",
+            internalMutation
+                .input({ generation: v.optional(v.number()) })
+                .output(v.null())
+                .mutation(async () => {
+                    throw new Error("create exploded");
+                }),
+        );
+        registry.set(
+            "plugins_install_steps:deleteInstall",
+            internalMutation
+                .input({ generation: v.number(), installId: v.string() })
+                .output(v.null())
+                .mutation(async () => {
+                    throw new Error("cleanup exploded");
+                }),
+        );
+
+        try {
+            await expect(
+                as().action(procedureAt("plugins_install_action", "installPlugin"), { contentHash: hash, markdown: pluginFile(hash) } as never),
+            ).rejects.toThrow("create exploded");
+        } finally {
+            registry.set("skills_create_skill:createPluginSkill", originalCreate);
+            registry.set("plugins_install_steps:deleteInstall", originalDelete);
+        }
+
+        expect(await installs()).toEqual([expect.objectContaining({ status: "needs-repair" })]);
+    });
 });

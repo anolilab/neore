@@ -186,17 +186,22 @@ export const installPlugin = authAction
             } catch (error) {
                 // A rate limit keeps the rows created so far, and repair finishes the rest. Rows the rollback could not remove keep the
                 // install as `needs-repair` too; a clean rollback removes it.
-                if (error instanceof BundleImportError && (error.resumable || error.leftBehind.length > 0)) {
-                    await ctx.runMutation(internal.plugins.install_steps.markNeedsRepair, { generation, installId });
-                } else {
-                    // A few links a call, so a large install stays inside one invocation's D1 queries.
-                    let more = true;
+                // The cleanup never replaces the import's own error: a cleanup that fails is swallowed, and the install is kept for repair.
+                try {
+                    if (error instanceof BundleImportError && (error.resumable || error.leftBehind.length > 0)) {
+                        await ctx.runMutation(internal.plugins.install_steps.markNeedsRepair, { generation, installId });
+                    } else {
+                        // A few links a call, so a large install stays inside one invocation's D1 queries.
+                        let more = true;
 
-                    while (more) {
-                        const step = await ctx.runMutation(internal.plugins.install_steps.deleteInstall, { generation, installId });
+                        while (more) {
+                            const step = await ctx.runMutation(internal.plugins.install_steps.deleteInstall, { generation, installId });
 
-                        more = step.hasMore;
+                            more = step.hasMore;
+                        }
                     }
+                } catch {
+                    await ctx.runMutation(internal.plugins.install_steps.markNeedsRepair, { generation, installId }).catch(() => undefined);
                 }
 
                 throw importFailure(error);

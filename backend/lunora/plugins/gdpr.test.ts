@@ -116,7 +116,17 @@ describe("collectPluginsForExport", () => {
             return { _id: id, contentHash: "h", installedAt: 1, pluginSlug: `p-${id}`, status: "installed", updatedAt: 2, userId, version: "1.0.0" };
         };
         const item = (id: string, userId: string) => {
-            return { _id: id, contentHash: "h", createdAt: 3, entryKey: `skill:${id}`, installId: "i1", kind: "skill", state: "created", userId };
+            return {
+                _id: id,
+                contentHash: "h",
+                createdAt: 3,
+                entryKey: `skill:${id}`,
+                installId: "i1",
+                itemId: `child-${id}`,
+                kind: "skill",
+                state: "created",
+                userId,
+            };
         };
         const reader = (all: { userId: string }[]) => {
             return {
@@ -163,6 +173,6 @@ describe("collectPluginsForExport", () => {
         expect(items).toHaveLength(250);
         expect(calls).toBe(2 + 3);
         expect(installs[0]).toEqual({ id: "n0", installedAt: 1, pluginSlug: "p-n0", status: "installed", updatedAt: 2, version: "1.0.0" });
-        expect(items[0]).toEqual({ createdAt: 3, entryKey: "skill:a0", installId: "i1", kind: "skill", state: "created" });
+        expect(items[0]).toEqual({ createdAt: 3, entryKey: "skill:a0", installId: "i1", itemId: "child-a0", kind: "skill", state: "created" });
     });
 });

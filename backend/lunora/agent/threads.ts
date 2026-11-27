@@ -79,7 +79,8 @@ const OWNER_STATE_KEYS = [
 export const threadForViewer = (thread: Doc<"threads">, viewerId: string | undefined): ThreadDoc => {
     const isOwner = thread.userId !== undefined && thread.userId === viewerId;
 
-    return publicThread(isOwner ? thread : (omit(thread, [...OWNER_STATE_KEYS]) as Doc<"threads">));
+    // The plugin install a group chat came from is the owner's bookkeeping, as for a skill (`getSkill`): a viewer sees neither id.
+    return publicThread(isOwner ? thread : (omit(thread, [...OWNER_STATE_KEYS, "pluginInstallId", "pluginMarker"]) as Doc<"threads">));
 };
 
 /**

@@ -69,7 +69,14 @@ export const collectPluginsForExport = internalQuery
             continueCursor: page.isDone || !page.continueCursor ? undefined : `t:${page.continueCursor}`,
             installs: [],
             items: page.page.map((item) => {
-                return { createdAt: item.createdAt, entryKey: item.entryKey, installId: item.installId, kind: item.kind, state: item.state };
+                return {
+                    createdAt: item.createdAt,
+                    entryKey: item.entryKey,
+                    installId: item.installId,
+                    itemId: item.itemId,
+                    kind: item.kind,
+                    state: item.state,
+                };
             }),
             readBytes: size(page.page),
         };
