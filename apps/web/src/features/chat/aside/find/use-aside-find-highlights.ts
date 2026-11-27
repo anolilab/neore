@@ -386,8 +386,7 @@ const useAsideFindHighlights = (
             : undefined;
 
         if (scroller) {
-            // The border box, not the content box: a scrollbar appearing inside the box changes only the content box, and is not a resize.
-            resizer?.observe(scroller, { box: "border-box" });
+            resizer?.observe(scroller);
         } else {
             globalThis.addEventListener("resize", scheduleReveal);
         }
