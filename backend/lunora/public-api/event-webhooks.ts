@@ -166,7 +166,8 @@ export const subscribeOn = async (ctx: Pick<MutationCtx, "db">, input: Subscribe
 
 /** Ends the subscription with this key. An expired row is removed too, but it is not a subscription that was there to end. */
 export const unsubscribeOn = async (ctx: Pick<MutationCtx, "db">, userId: string, keyHash: string, now: number): Promise<boolean> => {
-    const row = await ctx.db.eventWebhookSubscriptions.findFirst({ where: { keyHash, userId } });
+    // From the primary: a subscribe made a moment ago must be found, or its own cancellation reports NotFound.
+    const row = await ctx.db.eventWebhookSubscriptions.findFirst({ consistency: "primary", where: { keyHash, userId } });
 
     if (!row) {
         return false;

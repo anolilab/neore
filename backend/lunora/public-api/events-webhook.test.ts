@@ -78,6 +78,10 @@ describe("the TTL grant", () => {
 });
 
 describe("events/subscribe params", () => {
+    it("refuses a callback URL that carries a fragment, since two fragments would be two subscriptions to one callback", () => {
+        expect(parseSubscribeParams(subscribeWith({}, { url: `${VALID_URL}#one` }))).toMatchObject({ ok: false });
+    });
+
     it("refuses a URL whose canonical form is over the limit, though its raw form is not", () => {
         // Each "é" is one character raw and six in the canonical, percent-encoded form.
         const longPath = `https://${HOST_FOR_LENGTH}/${"é".repeat(340)}`;
