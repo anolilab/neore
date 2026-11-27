@@ -210,7 +210,9 @@ export const chapterDocument = (body: string, styles: ReadonlyArray<string>, lan
     ];
 
     for (const node of head) {
-        frame.head.append(node);
+        // `appendChild`: `append` is typed for a worker's HTML rewriter in the projects that type this file with the Workers library.
+
+        frame.head.appendChild(node);
     }
 
     if (language !== undefined && LANGUAGE.test(language)) {
