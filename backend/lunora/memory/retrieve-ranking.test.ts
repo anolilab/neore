@@ -9,7 +9,7 @@ import {
     KEYWORD_RESERVED_PER_TERM,
     KEYWORD_TOP_K,
     keywordSignalsFor,
-    lookupSearchOf,
+    lookupSearchesOf,
     rankMemories,
     SEARCH_MAX_RESULTS,
     SEARCH_MIN_KEYWORD_RELEVANCE,
@@ -203,7 +203,7 @@ describe("rankMemories", () => {
                 candidate("part", { ...old, memory: "Placed an order for part KX-2291" }),
                 ...["k1", "k2", "k3"].map((id) => candidate(id, { ...old, memory: "Placed an order for a kettle" })),
             ];
-            const lookups = [lookup("kx 2291", 1), lookup("order", 4)];
+            const lookups = [lookup("kx2291", 1), lookup("order", 4)];
 
             expect(keywordSignalsFor(rows, "did I order KX-2291", lookups).rareTermMatches).toEqual(new Set(["part"]));
             // The kettles share `order`, a word four rows hold: the vector search decides them, and it lacks them.
@@ -215,7 +215,7 @@ describe("rankMemories", () => {
             // Rows with no vector are found by words, so only the absent code keeps one out.
             const part = candidate("part", { memory: "Placed an order for part KX-2291" });
 
-            expect(keywordSignalsFor([part], "QZ-5508 part", [lookup("qz 5508", 0), lookup("part", 1)]).keywordScores.size).toBe(0);
+            expect(keywordSignalsFor([part], "QZ-5508 part", [lookup("qz5508", 0), lookup("part", 1)]).keywordScores.size).toBe(0);
             expect(rank([part], [], "QZ-5508 part")).toEqual([]);
             // Relevance by vector still counts.
             expect(rank([part], [["part", 0.9]], "QZ-5508 part").map((m) => m.memoryId)).toEqual(["part"]);
@@ -239,10 +239,30 @@ describe("rankMemories", () => {
             expect(rank([phone, other], [], "who has 555-123-4567").map((m) => m.memoryId)).toEqual(["phone"]);
         });
 
+        it("finds a code however it is written: `QZ-5508`, `QZ 5508` and `QZ5508` each find the others past the vectors", () => {
+            const spellings = ["QZ-5508", "QZ 5508", "QZ5508"];
+
+            for (const asked of spellings) {
+                for (const stored of spellings) {
+                    const row = candidate("part", { ...old, memory: `Ordered part ${stored} for the dishwasher` });
+
+                    expect(ids([row], `did I order ${asked}`, [lookup("qz5508", 1)]), `${asked} finds ${stored}`).toEqual(["part"]);
+                }
+            }
+        });
+
+        it("keeps distinct codes distinct, however they are written", () => {
+            const ab = candidate("ab", { ...old, memory: "Ordered part AB 5508" });
+            const longer = candidate("longer", { ...old, memory: "Ordered part QZ5508-9000" });
+
+            expect(ids([ab], "did I order QZ-5508", [lookup("qz5508", 0)])).toEqual([]);
+            expect(ids([longer], "did I order QZ5508", [lookup("qz5508", 0)])).toEqual([]);
+        });
+
         it("finds every rare identifier the query names past a decisive vector search", () => {
             const kx = candidate("kx", { ...old, memory: "Router serial KX-2291" });
             const wtu = candidate("wtu", { ...old, memory: "Bike frame serial WTU-38817" });
-            const lookups = [lookup("kx 2291", 1), lookup("wtu 38817", 1), lookup("serials", 0)];
+            const lookups = [lookup("kx2291", 1), lookup("wtu38817", 1), lookup("serials", 0)];
 
             expect(ids([kx, wtu], "serials KX-2291 and WTU-38817", lookups).toSorted((a, b) => a.localeCompare(b))).toEqual(["kx", "wtu"]);
         });
@@ -250,7 +270,7 @@ describe("rankMemories", () => {
         it("finds the held code of two the query names, as its rare term", () => {
             const ab = candidate("ab", { ...old, memory: "Ordered part AB-5508" });
             const searchText = "did I order QZ-5508 or AB-5508";
-            const lookups = [lookup("qz 5508", 0), lookup("ab 5508", 1)];
+            const lookups = [lookup("qz5508", 0), lookup("ab5508", 1)];
 
             expect(keywordSignalsFor([ab], searchText, lookups).rareTermMatches).toEqual(new Set(["ab"]));
             expect(ids([ab], searchText, lookups)).toEqual(["ab"]);
@@ -261,9 +281,9 @@ describe("rankMemories", () => {
             const qz = candidate("qz", { ...old, memory: "Ordered part QZ-5508" });
             const searchText = "did I order QZ-5508";
 
-            expect(ids([ab], searchText, [lookup("qz 5508", 0)])).toEqual([]);
-            expect(keywordSignalsFor([ab], searchText, [lookup("qz 5508", 0)]).keywordScores.size).toBe(0);
-            expect(ids([ab, qz], searchText, [lookup("qz 5508", 1)])).toEqual(["qz"]);
+            expect(ids([ab], searchText, [lookup("qz5508", 0)])).toEqual([]);
+            expect(keywordSignalsFor([ab], searchText, [lookup("qz5508", 0)]).keywordScores.size).toBe(0);
+            expect(ids([ab, qz], searchText, [lookup("qz5508", 1)])).toEqual(["qz"]);
         });
 
         it("never counts another bot's rows: a word only they hold is not rare and does not lower this chat's share", () => {
@@ -291,7 +311,7 @@ describe("rankMemories", () => {
 
             expect(searchText.length).toBeGreaterThan(100_000);
             expect(salientTermsOf(searchText).length).toBeLessThanOrEqual(MAX_SCORED_TERMS);
-            expect(ids([part], searchText, [lookup("kx 2291", 1)])).toEqual(["part"]);
+            expect(ids([part], searchText, [lookup("kx2291", 1)])).toEqual(["part"]);
         });
 
         it("reads a plain number as an ordinary term: it never turns keyword relevance off", () => {
@@ -446,7 +466,7 @@ describe("keyword hits", () => {
         const [code] = keywordLookupTerms("did I order QZ-5508");
         const fetched = [row("ab", "Ordered part AB-5508"), row("apart", "QZ order and 5508 later"), row("qz", "Ordered part QZ-5508")];
 
-        expect(code).toEqual({ code: true, term: "qz 5508", tokens: ["qz", "5508"] });
+        expect(code).toEqual({ code: true, term: "qz5508", tokens: ["qz", "5508"] });
         expect(keywordLookupOf(code!, fetched, {}, undefined)).toMatchObject({ corpusRows: 1, hits: [{ _id: "qz" }] });
     });
 
@@ -494,7 +514,14 @@ describe("keyword hits", () => {
         const [serial] = keywordLookupTerms("where is A1-01-02-03-04-05-06-07-08-09-10-11-12-13-14-15-16");
 
         expect(serial!.tokens).toHaveLength(17);
-        expect(lookupSearchOf(serial!).split(" ")).toHaveLength(INDEX_MAX_SEARCH_TERMS);
+        expect(lookupSearchesOf(serial!)[0]!.split(" ")).toHaveLength(INDEX_MAX_SEARCH_TERMS);
+        expect(lookupSearchesOf(serial!).every((search) => search.split(" ").length <= INDEX_MAX_SEARCH_TERMS)).toBe(true);
+    });
+
+    it("searches an identifier as written, joined and split where letters meet digits, a word as itself", () => {
+        expect(lookupSearchesOf({ code: true, tokens: ["qz", "5508"] })).toEqual(["qz 5508", "qz5508"]);
+        expect(lookupSearchesOf({ code: true, tokens: ["qz5508"] })).toEqual(["qz5508", "qz 5508"]);
+        expect(lookupSearchesOf({ code: false, tokens: ["kettle"] })).toEqual(["kettle"]);
     });
 
     it("fuses the vector and keyword hits by rank: a row both found leads, each row once", () => {

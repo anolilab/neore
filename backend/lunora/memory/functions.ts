@@ -27,7 +27,7 @@ import { botOwnerRows } from "./bot-owner";
 import { type MemoryEvidence, newestEvidence, vMemoryEvidence } from "./evidence";
 import { logRedaction, redactMemoryText } from "./redact";
 import { DROPPED_DIGEST_SUMMARY, localDayOf } from "./reflection-logic";
-import { byNewest, isUsableOn, KEYWORD_LOOKUP_LIMIT, keywordLookupOf, lookupSearchOf, mergeScopeWindows, scopesOf } from "./retrieve-ranking";
+import { byNewest, isUsableOn, KEYWORD_LOOKUP_LIMIT, keywordLookupOf, lookupSearchesOf, mergeScopeWindows, scopesOf } from "./retrieve-ranking";
 import { lastConfirmedOf, MEMORY_TYPES, type MemoryType, vMemoryType } from "./taxonomy";
 import { deleteVectorRow, patchMessage } from "../agent/table-writes";
 import { candidatesOnActivePath } from "../agent/branch-rows";
@@ -1953,13 +1953,20 @@ export const searchMemoriesByKeyword = internalQuery
 
         const settled = await Promise.allSettled(
             args.terms.slice(0, MAX_KEYWORD_TERMS).map(async (term) => {
-                // The index ANDs the tokens (a prefix match on the last); `keywordLookupOf` then wants the whole run.
-                const search = lookupSearchOf(term);
-                const rows = await ctx.db
-                    .query("memories")
-                    .withSearchIndex("search_memory_text", (q) => q.search("memory", search).eq("userId", args.userId))
-                    .take(KEYWORD_LOOKUP_LIMIT);
-                const lookup = keywordLookupOf(term, rows, { botId: args.botId, includeUserWide: args.includeUserWide }, today);
+                // One search per spelling; the index ANDs each one's tokens (a prefix match on the last), and
+                // `keywordLookupOf` then wants the whole identifier, however the row writes it.
+                const pages = await Promise.all(
+                    lookupSearchesOf(term).map(
+                        async (search) =>
+                            await ctx.db
+                                .query("memories")
+                                .withSearchIndex("search_memory_text", (q) => q.search("memory", search).eq("userId", args.userId))
+                                .take(KEYWORD_LOOKUP_LIMIT),
+                    ),
+                );
+                const rows = [...new Map(pages.flat().map((row) => [row._id, row])).values()];
+                const complete = pages.every((page) => page.length < KEYWORD_LOOKUP_LIMIT);
+                const lookup = keywordLookupOf(term, rows, { botId: args.botId, includeUserWide: args.includeUserWide }, today, complete);
 
                 return { ...lookup, hits: lookup.hits.map((m) => retrievalRowOf(m)) };
             }),

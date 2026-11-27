@@ -6,7 +6,7 @@
 
 import { bm25Idf, bm25TermFactor, MAX_KEYWORD_TERMS, reciprocalRankFusion, scoreKeywordCandidates } from "../knowledge/hybrid";
 import { factDatesOf } from "./dates";
-import { salientTermsOf, searchTokensOf, termCount, termIndexOf } from "./search-terms";
+import { canonicalOf, salientTermsOf, searchTokensOf, termCount, termIndexOf } from "./search-terms";
 import type { SalientTerm } from "./search-terms";
 
 /**
@@ -197,13 +197,29 @@ export const keywordLookupTerms = (searchText: string): LookupTerm[] =>
 /** The most distinct terms the search index takes in one query. */
 export const INDEX_MAX_SEARCH_TERMS = 16;
 
-/**
- * What one lookup asks the index for: the term's distinct tokens, at most `INDEX_MAX_SEARCH_TERMS` of them. A longer
- * identifier is searched by its first ones, and `keywordLookupOf` still checks the whole run on every row returned.
- */
-export const lookupSearchOf = ({ tokens }: { tokens: ReadonlyArray<string> }): string => [...new Set(tokens)].slice(0, INDEX_MAX_SEARCH_TERMS).join(" ");
+const LETTER_DIGIT_BOUNDARY_RE = /(?<=\p{L})(?=\p{N})|(?<=\p{N})(?=\p{L})/u;
 
-/** A term to look up: the index is asked for its tokens (`lookupSearchOf`), and a row is kept only when it holds them whole. */
+/**
+ * What one lookup asks the index for, each search at most `INDEX_MAX_SEARCH_TERMS` distinct tokens (a longer identifier
+ * is searched by its first ones; `keywordLookupOf` still checks the whole of it on every row returned). A word is
+ * searched as itself. An identifier is searched as written (`qz 5508`), joined (`qz5508`) and split where letters
+ * meet digits, so a memory that spells it another way (`QZ5508` for `QZ-5508`) is found too.
+ */
+export const lookupSearchesOf = ({ code, tokens }: { code: boolean; tokens: ReadonlyArray<string> }): string[] => {
+    const capped = (parts: ReadonlyArray<string>): string => [...new Set(parts)].slice(0, INDEX_MAX_SEARCH_TERMS).join(" ");
+
+    if (!code) {
+        return [capped(tokens)];
+    }
+
+    const joined = canonicalOf(tokens);
+    // As written first: the order is the order the searches are made in.
+    const searches = [capped(tokens), capped([joined]), capped(joined.split(LETTER_DIGIT_BOUNDARY_RE))];
+
+    return searches.filter((search, index) => searches.indexOf(search) === index);
+};
+
+/** A term to look up: the index is asked for its spellings (`lookupSearchesOf`), and a row is kept only when it holds the term whole. */
 export interface LookupTerm {
     /** Part of an identifier (`SalientTerm.code`). */
     code: boolean;
@@ -233,6 +249,8 @@ export const keywordLookupOf = <
     fetched: T[],
     scope: MemoryScope,
     today: string | undefined,
+    /** Whether every search the lookup made returned fewer rows than it reads. */
+    complete: boolean = fetched.length < KEYWORD_LOOKUP_LIMIT,
 ): KeywordLookup<T> => {
     const held = fetched.filter(
         (row) => !row.supersededBy && isUsableOn(row, today) && inScope(row, scope) && termCount(termIndexOf(row.memory), { code, tokens }) > 0,
@@ -240,7 +258,7 @@ export const keywordLookupOf = <
 
     return {
         code,
-        complete: fetched.length < KEYWORD_LOOKUP_LIMIT,
+        complete,
         corpusRows: held.length,
         hits: held.slice(0, KEYWORD_HITS_PER_TERM),
         term,

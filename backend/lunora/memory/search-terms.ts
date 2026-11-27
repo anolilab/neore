@@ -91,20 +91,26 @@ const isIdentifier = (chunk: string): boolean => {
  * one: a year, a count, a price, a decimal or a date (`2026-11-27`); nor a mix that starts with digits, a time, an
  * ordinal or a unit (`5pm`, `21st`, `100km`).
  */
+/** Capital letters, a space, then digits: `QZ 5508`, `ISO 9001`. A lowercase `room 101` stays two words. */
+const SPACED_CODE_RE = /(?<![\p{L}\p{N}])(\p{Lu}{2,5})\s+(\p{N}{3,}(?:[-_/#]\p{N}+)*)(?![\p{L}\p{N}])/gu;
+
 const identifiersOf = (text: string): string[][] => {
     const identifiers = new Map<string, string[]>();
+    const add = (tokens: string[]): void => {
+        // A run longer than the index keeps (256 characters) has no tokens left, and is no identifier anyone can find.
+        if (tokens.length > 0 && !identifiers.has(tokens.join(""))) {
+            identifiers.set(tokens.join(""), tokens);
+        }
+    };
 
     for (const [chunk] of normalize(text).matchAll(CHUNK_RE)) {
-        if (!isIdentifier(chunk)) {
-            continue;
+        if (isIdentifier(chunk)) {
+            add(searchTokensOf(chunk));
         }
+    }
 
-        const tokens = searchTokensOf(chunk);
-
-        // A run longer than the index keeps (256 characters) has no tokens left, and is no identifier anyone can find.
-        if (tokens.length > 0) {
-            identifiers.set(tokens.join(" "), tokens);
-        }
+    for (const [, letters, digits] of text.matchAll(SPACED_CODE_RE)) {
+        add(searchTokensOf(`${letters!} ${digits!}`));
     }
 
     return [...identifiers.values()];
@@ -114,27 +120,45 @@ const identifiersOf = (text: string): string[][] => {
 export interface SalientTerm {
     /** An identifier: a row holds it only as a whole run of its own (`AB-5508` and `QZ-5508-9000` do not hold `QZ-5508`). */
     code: boolean;
-    /** The token, or an identifier's tokens joined by spaces (`qz 5508`). */
+    /** The token, or an identifier's canonical form (`qz5508`, `canonicalOf`). */
     term: string;
     tokens: string[];
 }
 
 /** What matching reads of a memory: its tokens, and the tokens of each run of letters and digits joined by separators. */
 export interface TermIndex {
-    runs: string[][];
+    /** Each run of letters and digits joined by `-`, `_`, `.`, `/` or `#`: its letters and digits, and whether only whitespace parts it from the run before. */
+    runs: { canonical: string; spaced: boolean }[];
     tokens: string[];
 }
 
+/** An identifier as compared: its letters and digits, lowercased, so `QZ-5508`, `QZ 5508` and `QZ5508` are all `qz5508`. */
+export const canonicalOf = (tokens: ReadonlyArray<string>): string => tokens.join("");
+
 export const termIndexOf = (text: string): TermIndex => {
-    return {
-        runs: [...normalize(text).matchAll(CHUNK_RE)].map(([chunk]) => searchTokensOf(chunk)).filter((run) => run.length > 0),
-        tokens: searchTokensOf(text),
-    };
+    const normalized = normalize(text);
+    const runs: TermIndex["runs"] = [];
+    let end = 0;
+
+    for (const match of normalized.matchAll(CHUNK_RE)) {
+        const canonical = canonicalOf(searchTokensOf(match[0]));
+
+        if (canonical !== "") {
+            runs.push({ canonical, spaced: runs.length > 0 && /^\s+$/u.test(normalized.slice(end, match.index)) });
+        }
+
+        end = match.index + match[0].length;
+    }
+
+    return { runs, tokens: searchTokensOf(text) };
 };
 
+/** Runs an identifier may be written across with spaces (`QZ 5508`, `ISO 9001 2015`). */
+const MAX_SPACED_RUNS = 4;
+
 /**
- * How often a memory holds a term: a word as a whole token; an identifier as a whole run, starting and ending where
- * the identifier does, so `QZ-5508` is in `part QZ-5508.` and not in `QZ-5508-9000` or `AB/QZ-5508`.
+ * How often a memory holds a term: a word as a whole token; an identifier as whole runs, joined by spaces only, that
+ * spell it, so `QZ-5508` is in `part QZ 5508.` and `QZ5508`, and not in `AB-5508`, `QZ-5508-9000` or `AB/QZ-5508`.
  */
 export const termCount = (index: TermIndex, term: { code: boolean; tokens: ReadonlyArray<string> }): number => {
     if (term.tokens.length === 0) {
@@ -145,7 +169,31 @@ export const termCount = (index: TermIndex, term: { code: boolean; tokens: Reado
         return index.tokens.filter((token) => token === term.tokens[0]).length;
     }
 
-    return index.runs.filter((run) => run.length === term.tokens.length && run.every((token, position) => token === term.tokens[position])).length;
+    const wanted = canonicalOf(term.tokens);
+    let count = 0;
+
+    for (let start = 0; start < index.runs.length; start += 1) {
+        let spelled = "";
+
+        for (let next = start; next < Math.min(index.runs.length, start + MAX_SPACED_RUNS); next += 1) {
+            if (next > start && !index.runs[next]!.spaced) {
+                break;
+            }
+
+            spelled += index.runs[next]!.canonical;
+
+            if (spelled === wanted) {
+                count += 1;
+                break;
+            }
+
+            if (!wanted.startsWith(spelled)) {
+                break;
+            }
+        }
+    }
+
+    return count;
 };
 
 /** Scoring reads at most this much of a search: a pasted document is not a question, and every term costs a pass. */
@@ -171,7 +219,7 @@ export const salientTermsOf = (searchText: string): SalientTerm[] => {
         })
         .toSorted((a, b) => longestDigits(b.tokens) - longestDigits(a.tokens) || a.position - b.position)
         .map(({ tokens }) => {
-            return { code: true, term: tokens.join(" "), tokens };
+            return { code: true, term: canonicalOf(tokens), tokens };
         });
     // An identifier's tokens are the identifier: its letters (`qz`, `hr`) are no words of their own, or a sibling code
     // (`HR-7501` for `HR-9934`) would share them.

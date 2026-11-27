@@ -16,7 +16,7 @@ import {
     KEYWORD_LOOKUP_LIMIT,
     keywordLookupOf,
     keywordLookupTerms,
-    lookupSearchOf,
+    lookupSearchesOf,
     keywordSignalsFor,
     rankMemories,
     selectCandidateWindow,
@@ -81,6 +81,28 @@ const unitVector = (tags: Tags): number[] => {
 const cosine = (a: number[], b: number[]): number => a.reduce((sum, x, i) => sum + x * b[i]!, 0);
 
 /**
+ * What the search index answers one search with: every row holding each of its tokens (the last as a prefix), most
+ * occurrences first, then newest, cut to what a lookup reads.
+ */
+const indexSearch = <T extends { _creationTime: number; _id: string; memory: string }>(rows: T[], search: string): T[] => {
+    const asked = search.split(" ");
+    const occurrences = (tokens: string[], wanted: string, index: number): number =>
+        tokens.filter((token) => (index === asked.length - 1 ? token.startsWith(wanted) : token === wanted)).length;
+
+    return rows
+        .map((m) => {
+            const tokens = searchTokensOf(m.memory);
+            const counts = asked.map((wanted, index) => occurrences(tokens, wanted, index));
+
+            return { m, tf: counts.every((count) => count > 0) ? counts.reduce((sum, count) => sum + count, 0) : 0 };
+        })
+        .filter(({ tf }) => tf > 0)
+        .toSorted((a, b) => b.tf - a.tf || b.m._creationTime - a.m._creationTime || (a.m._id < b.m._id ? -1 : 1))
+        .slice(0, KEYWORD_LOOKUP_LIMIT)
+        .map(({ m }) => m);
+};
+
+/**
  * One query as retrieval runs it: the window, the vector hits (top K over all of the user's vectors), the keyword hits
  * (one search-index lookup per salient term), the ranking. Without `vectors` no vector search ran (the model refused,
  * the index failed): the window and the keyword hits, ranked by keyword.
@@ -129,23 +151,17 @@ const run = (query: FixtureQuery, vectors = true): { ids: string[]; inWindow: Se
     // ones too) holding all of the term's tokens (the last as a prefix), most occurrences first, then newest, cut to what
     // a lookup reads; the lookup then keeps the whole-token, usable, in-scope rows (`keywordLookupOf`, as production).
     const lookups = keywordLookupTerms(query.text).map((term) => {
-        // What production asks the index for (`lookupSearchOf`): the term's distinct tokens, at most 16.
-        const asked = lookupSearchOf(term).split(" ");
-        const fetched = rows
-            .map((m) => {
-                const tokens = searchTokensOf(m.memory);
-                const counts = asked.map(
-                    (wanted, index) => tokens.filter((token) => (index === asked.length - 1 ? token.startsWith(wanted) : token === wanted)).length,
-                );
+        // What production asks the index for (`lookupSearchesOf`): one search per spelling, each read to the limit.
+        const pages = lookupSearchesOf(term).map((search) => indexSearch(rows, search));
+        const fetched = [...new Map(pages.flat().map((m) => [m._id, m])).values()];
 
-                return { m, tf: counts.every((count) => count > 0) ? counts.reduce((sum, count) => sum + count, 0) : 0 };
-            })
-            .filter(({ tf }) => tf > 0)
-            .toSorted((a, b) => b.tf - a.tf || b.m._creationTime - a.m._creationTime || (a.m._id < b.m._id ? -1 : 1))
-            .slice(0, KEYWORD_LOOKUP_LIMIT)
-            .map(({ m }) => m);
-
-        return keywordLookupOf(term, fetched, scope, today);
+        return keywordLookupOf(
+            term,
+            fetched,
+            scope,
+            today,
+            pages.every((page) => page.length < KEYWORD_LOOKUP_LIMIT),
+        );
     });
 
     // Production adds the hits the window lacks (vector hits read by embedding id, best first, fused with the keyword

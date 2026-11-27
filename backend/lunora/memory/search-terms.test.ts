@@ -21,6 +21,12 @@ describe(termCount, () => {
         expect(termCount(termIndexOf("ordered part QZ-5508."), qz)).toBe(1);
         expect(termCount(termIndexOf("serial QZ-5508-9000"), qz)).toBe(0);
         expect(termCount(termIndexOf("AB/QZ-5508"), qz)).toBe(0);
+        // Written with a space or no separator, it is the same code; a different or longer one is not.
+        expect(termCount(termIndexOf("ordered part QZ 5508"), qz)).toBe(1);
+        expect(termCount(termIndexOf("ordered part QZ5508"), qz)).toBe(1);
+        expect(termCount(termIndexOf("ordered part AB 5508"), qz)).toBe(0);
+        expect(termCount(termIndexOf("serial QZ5508-9000"), { code: true, tokens: ["qz5508"] })).toBe(0);
+        expect(termCount(termIndexOf("part QZ, 5508"), qz)).toBe(0);
         // A run longer than the index keeps has no tokens: two such runs never match.
         expect(termCount(termIndexOf(`B${"7".repeat(300)}`), { code: true, tokens: [] })).toBe(0);
         // And the other way: a longer identifier is not in a row holding the shorter one.
@@ -38,12 +44,12 @@ describe(salientTermsOf, () => {
             salientTermsOf("is it QZ-5508 or AB-5508")
                 .filter(({ code }) => code)
                 .map(({ term }) => term),
-        ).toEqual(["qz 5508", "ab 5508"]);
+        ).toEqual(["qz5508", "ab5508"]);
     });
 
     it("leads with an identifier, then the longest word, and puts a year or a count last", () => {
         expect(salientTermsOf("did I order part QZ-5508 in 2019")).toEqual([
-            { code: true, term: "qz 5508", tokens: ["qz", "5508"] },
+            { code: true, term: "qz5508", tokens: ["qz", "5508"] },
             { code: false, term: "order", tokens: ["order"] },
             { code: false, term: "part", tokens: ["part"] },
             { code: false, term: "2019", tokens: ["2019"] },
@@ -58,6 +64,7 @@ describe(salientTermsOf, () => {
         "3 times",
         "parcel 77314",
         "budget is 15000",
+        "back in room 101",
         "since 2026-11",
         "meeting on 2026-11-27",
         "due 27.11.2026",
@@ -72,13 +79,15 @@ describe(salientTermsOf, () => {
     });
 
     it.each([
-        ["serial WTU-38817", "wtu 38817"],
-        ["ECON-204 notes", "econ 204"],
+        ["serial WTU-38817", "wtu38817"],
+        ["ECON-204 notes", "econ204"],
         ["boiler E4012", "e4012"],
-        ["release v2.3", "v2 3"],
-        ["ticket 12-345", "12 345"],
+        ["release v2.3", "v23"],
+        ["ticket 12-345", "12345"],
         ["my PS5 controller", "ps5"],
-        ["call 555-123-4567", "555 123 4567"],
+        ["call 555-123-4567", "5551234567"],
+        ["part QZ 5508", "qz5508"],
+        ["part QZ5508", "qz5508"],
     ])("reads %s as an identifier", (searchText, term) => {
         expect(salientTermsOf(searchText)[0]).toMatchObject({ code: true, term });
     });
