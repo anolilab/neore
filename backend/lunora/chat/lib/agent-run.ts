@@ -937,8 +937,19 @@ const scheduleAfterRun = async (ctx: Pick<ActionCtx, "scheduler">, args: Paramet
         args.timeZone,
     );
 
+    // A reply that called `remember` may have extracted its prompt in that call (`memory/remember.ts`): the job checks.
+    const calledRemember = savedMessages.some((row) => {
+        const content = (row.message as { content?: unknown } | undefined)?.content;
+
+        return (
+            Array.isArray(content) &&
+            (content as { toolName?: string; type?: string }[]).some((part) => part.type === "tool-call" && part.toolName === "remember")
+        );
+    });
+
     scheduled.push(
         scheduleMemory(internal.memory.extract.extractMemories, {
+            ...(calledRemember && { afterRemember: true }),
             ...(args.botId && { botId: args.botId }),
             assistantResponse: assistantText.slice(0, 4000),
             // When it was said, not when the reply ended or the job runs: a reply or a pause can cross midnight.

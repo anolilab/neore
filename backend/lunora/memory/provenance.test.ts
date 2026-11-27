@@ -412,7 +412,7 @@ describe("evidence gate", () => {
         });
 
         expect(events.filter(([name]) => name === "memory.evidence_gate")).toStrictEqual([
-            ["memory.evidence_gate", { kept: 1, noQuote: 1, quoteRefused: 1, threadId, userId: USER }],
+            ["memory.evidence_gate", { health: 0, kept: 1, noQuote: 1, quoteRefused: 1, threadId, userId: USER }],
         ]);
     });
 });

@@ -187,6 +187,40 @@ describe(afterRun, () => {
         expect((extraction as unknown[])[2]).not.toHaveProperty("toolResults");
     });
 
+    it("marks the extraction of a reply that called remember, and only that one", () => {
+        const runAfter = vi.fn(async () => "job");
+        const ctx = { runMutation: vi.fn(async () => null), scheduler: { runAfter } };
+        const reply = (calls: string) => {
+            return {
+                extractMemory: true,
+                firstTokenTime: undefined,
+                prompt: "Remember that I'm vegan",
+                promptAt: 0,
+                savedMessages: [
+                    {
+                        _id: "c1",
+                        message: { content: [{ input: {}, toolCallId: "call-1", toolName: calls, type: "tool-call" }], role: "assistant" },
+                        order: 1,
+                        stepOrder: 1,
+                    },
+                    { _id: "r1", message: { content: "Noted.", role: "assistant" }, order: 1, stepOrder: 2 },
+                ] as never,
+                steered: [],
+                summarizeThread: false,
+                threadId: "thread-1",
+                timingStart: Date.now(),
+                userId: "user-1",
+            };
+        };
+
+        afterRun(ctx as never, reply("remember"));
+        afterRun(ctx as never, reply("webSearch"));
+
+        const extractions = runAfter.mock.calls.filter((call) => (call as unknown[])[1] === internal.memory.extract.extractMemories);
+
+        expect(extractions.map((call) => ((call as unknown[])[2] as { afterRemember?: boolean }).afterRemember)).toStrictEqual([true, undefined]);
+    });
+
     it("hands each steer's saved message to memory extraction, so a quote from it links there", () => {
         const runAfter = vi.fn(async () => "job");
         const ctx = { runMutation: vi.fn(async () => null), scheduler: { runAfter } };

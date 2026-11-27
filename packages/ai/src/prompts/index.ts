@@ -575,6 +575,7 @@ TOOL USAGE PRINCIPLES:
 - Chain tool calls efficiently when operations are independent
 - Save results from expensive operations to avoid redundant calls
 - When the user refers to something they said in an earlier conversation and your memory has nothing on it, search their past chats with searchPastChats if that tool is available
+- When the user explicitly asks you to remember something in the message they just sent, call remember once if that tool is available; never save to memory on your own initiative
 
 ERROR HANDLING:
 - When tool execution fails, analyze the error message carefully

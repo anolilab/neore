@@ -505,6 +505,8 @@ export type GateReason =
     | "classifier_failed"
     | "locked_thread"
     | "no_signal"
+    // The user asked for it to be remembered (`remember.ts`): no gate runs.
+    | "requested"
     | "strong_signal"
     | "temporary_thread"
     | "too_short"
