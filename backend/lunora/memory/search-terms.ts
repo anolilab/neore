@@ -91,26 +91,20 @@ const isIdentifier = (chunk: string): boolean => {
  * one: a year, a count, a price, a decimal or a date (`2026-11-27`); nor a mix that starts with digits, a time, an
  * ordinal or a unit (`5pm`, `21st`, `100km`).
  */
-/** Capital letters, a space, then digits: `QZ 5508`, `ISO 9001`. A lowercase `room 101` stays two words. */
-const SPACED_CODE_RE = /(?<![\p{L}\p{N}])(\p{Lu}{2,5})\s+(\p{N}{3,}(?:[-_/#]\p{N}+)*)(?![\p{L}\p{N}])/gu;
-
 const identifiersOf = (text: string): string[][] => {
     const identifiers = new Map<string, string[]>();
-    const add = (tokens: string[]): void => {
-        // A run longer than the index keeps (256 characters) has no tokens left, and is no identifier anyone can find.
-        if (tokens.length > 0 && !identifiers.has(tokens.join(""))) {
-            identifiers.set(tokens.join(""), tokens);
-        }
-    };
 
     for (const [chunk] of normalize(text).matchAll(CHUNK_RE)) {
-        if (isIdentifier(chunk)) {
-            add(searchTokensOf(chunk));
+        if (!isIdentifier(chunk)) {
+            continue;
         }
-    }
 
-    for (const [, letters, digits] of text.matchAll(SPACED_CODE_RE)) {
-        add(searchTokensOf(`${letters!} ${digits!}`));
+        const tokens = searchTokensOf(chunk);
+
+        // A run longer than the index keeps (256 characters) has no tokens left, and is no identifier anyone can find.
+        if (tokens.length > 0 && !identifiers.has(canonicalOf(tokens))) {
+            identifiers.set(canonicalOf(tokens), tokens);
+        }
     }
 
     return [...identifiers.values()];
@@ -161,6 +155,8 @@ const MAX_SPACED_RUNS = 4;
 /**
  * How often a memory holds a term: a word as a whole token; an identifier as whole runs, joined by spaces only, that
  * spell it, so `QZ-5508` is in `part QZ 5508.` and `QZ5508`, and not in `AB-5508`, `QZ-5508-9000` or `AB/QZ-5508`.
+ * Spelled across spaces, it must also end there: a next run with a digit (`QZ 5508 9000`, `QZ 5508 B2`) makes it a
+ * longer code.
  */
 export const termCount = (index: TermIndex, term: { code: boolean; tokens: ReadonlyArray<string> }): number => {
     if (term.tokens.length === 0) {
@@ -185,7 +181,12 @@ export const termCount = (index: TermIndex, term: { code: boolean; tokens: Reado
             spelled += index.runs[next]!.canonical;
 
             if (spelled === wanted) {
-                count += 1;
+                const after = index.runs[next + 1];
+
+                if (next === start || after === undefined || !after.spaced || !DIGIT_RE.test(after.canonical)) {
+                    count += 1;
+                }
+
                 break;
             }
 

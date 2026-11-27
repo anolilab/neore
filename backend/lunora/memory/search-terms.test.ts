@@ -27,6 +27,10 @@ describe(termCount, () => {
         expect(termCount(termIndexOf("ordered part AB 5508"), qz)).toBe(0);
         expect(termCount(termIndexOf("serial QZ5508-9000"), { code: true, tokens: ["qz5508"] })).toBe(0);
         expect(termCount(termIndexOf("part QZ, 5508"), qz)).toBe(0);
+        // Spelled across spaces it must end there: a next run with a digit is a longer code.
+        expect(termCount(termIndexOf("serial QZ 5508 9000"), qz)).toBe(0);
+        expect(termCount(termIndexOf("serial QZ 5508 B2"), qz)).toBe(0);
+        expect(termCount(termIndexOf("part QZ 5508 arrived"), qz)).toBe(1);
         // A run longer than the index keeps has no tokens: two such runs never match.
         expect(termCount(termIndexOf(`B${"7".repeat(300)}`), { code: true, tokens: [] })).toBe(0);
         // And the other way: a longer identifier is not in a row holding the shorter one.
@@ -65,6 +69,10 @@ describe(salientTermsOf, () => {
         "parcel 77314",
         "budget is 15000",
         "back in room 101",
+        "part QZ 5508",
+        "my NYC 2023 trip",
+        "at CES 2024",
+        "a BMW 320",
         "since 2026-11",
         "meeting on 2026-11-27",
         "due 27.11.2026",
@@ -86,7 +94,6 @@ describe(salientTermsOf, () => {
         ["ticket 12-345", "12345"],
         ["my PS5 controller", "ps5"],
         ["call 555-123-4567", "5551234567"],
-        ["part QZ 5508", "qz5508"],
         ["part QZ5508", "qz5508"],
     ])("reads %s as an identifier", (searchText, term) => {
         expect(salientTermsOf(searchText)[0]).toMatchObject({ code: true, term });

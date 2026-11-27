@@ -239,16 +239,20 @@ describe("rankMemories", () => {
             expect(rank([phone, other], [], "who has 555-123-4567").map((m) => m.memoryId)).toEqual(["phone"]);
         });
 
-        it("finds a code however it is written: `QZ-5508`, `QZ 5508` and `QZ5508` each find the others past the vectors", () => {
-            const spellings = ["QZ-5508", "QZ 5508", "QZ5508"];
-
-            for (const asked of spellings) {
-                for (const stored of spellings) {
+        it("finds a code however a memory writes it: `QZ-5508` and `QZ5508` each find `QZ-5508`, `QZ 5508` and `QZ5508` past the vectors", () => {
+            for (const asked of ["QZ-5508", "QZ5508"]) {
+                for (const stored of ["QZ-5508", "QZ 5508", "QZ5508"]) {
                     const row = candidate("part", { ...old, memory: `Ordered part ${stored} for the dishwasher` });
 
                     expect(ids([row], `did I order ${asked}`, [lookup("qz5508", 1)]), `${asked} finds ${stored}`).toEqual(["part"]);
                 }
             }
+        });
+
+        it("reads capitals beside a number in a question as words: `my NYC 2023 trip` finds the trip by its words", () => {
+            const trip = candidate("trip", { memory: "NYC trip in March 2023" });
+
+            expect(rank([trip], [], "my NYC 2023 trip").map((m) => m.memoryId)).toEqual(["trip"]);
         });
 
         it("keeps distinct codes distinct, however they are written", () => {
@@ -257,6 +261,9 @@ describe("rankMemories", () => {
 
             expect(ids([ab], "did I order QZ-5508", [lookup("qz5508", 0)])).toEqual([]);
             expect(ids([longer], "did I order QZ5508", [lookup("qz5508", 0)])).toEqual([]);
+            const spacedLonger = candidate("spaced", { ...old, memory: "Ordered part QZ 5508 9000" });
+
+            expect(ids([spacedLonger], "did I order QZ-5508", [lookup("qz5508", 0)])).toEqual([]);
         });
 
         it("finds every rare identifier the query names past a decisive vector search", () => {
