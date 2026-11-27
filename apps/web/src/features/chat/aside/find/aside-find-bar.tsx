@@ -8,7 +8,7 @@ import { useCallback, useDeferredValue, useEffect, useRef, useState } from "reac
 
 import TooltipIconButton from "@/features/chat/components/tooltip-icon-button";
 import { clampIndex, MAX_FIND_QUERY_LENGTH, stepIndex } from "@/features/chat/thread/find/match";
-import { ASIDE_FIND_EVENT } from "@/features/keyboard/lib/aside-find-target";
+import { ASIDE_FIND_EVENT, ASIDE_FIND_HOST_ATTRIBUTE } from "@/features/keyboard/lib/aside-find-target";
 
 import useAsideFindHighlights from "./use-aside-find-highlights";
 
@@ -77,7 +77,12 @@ const AsideFindBar: FC = () => {
 
         if (target?.isConnected) {
             target.focus();
+
+            return;
         }
+
+        // The control that opened the bar can be gone by now (a dismissed row): the panel's section takes the focus instead.
+        barRef.current?.closest<HTMLElement>(`[${CSS.escape(ASIDE_FIND_HOST_ATTRIBUTE)}]`)?.focus();
     }, []);
 
     // Escape from any control in the bar closes it. A listener rather than a JSX handler: the form is not itself interactive.

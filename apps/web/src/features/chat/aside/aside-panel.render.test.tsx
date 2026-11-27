@@ -297,7 +297,8 @@ describe("AsidePanel", () => {
         fireEvent.change(input, { target: { value: "idempotent" } });
         expect(screen.getByText("1 of 2")).toBeTruthy();
 
-        fireEvent.keyDown(input, { isComposing: true, key: "Enter" });
+        // fireEvent does not run the browser's implicit form submit, so the cancelled event is what shows the submit is blocked.
+        expect(fireEvent.keyDown(input, { isComposing: true, key: "Enter" })).toBe(false);
         expect(screen.getByText("1 of 2")).toBeTruthy();
 
         // Safari marks the Enter that ends a composition with keyCode 229, though isComposing is already false. Shift+Enter is the
@@ -480,6 +481,7 @@ describe("AsidePanel", () => {
     });
 
     it("brings the current hit into view when an image above it loads and pushes it out of sight", async () => {
+        vi.useFakeTimers({ toFake: [...REVEAL_TIMERS] });
         // Under the sticky find bar, so the first reveal scrolls it.
         let hitTop = 20;
         const scroll = vi.fn();
@@ -501,17 +503,20 @@ describe("AsidePanel", () => {
                 globalThis.dispatchEvent(new CustomEvent(ASIDE_FIND_EVENT));
             });
             fireEvent.change(screen.getByRole("textbox", { name: "Find in side questions" }), { target: { value: "cat" } });
-            await waitFor(() => expect(scroll).toHaveBeenCalled());
+            await settleReveal();
+            expect(scroll).toHaveBeenCalled();
             scroll.mockClear();
 
             hitTop = 900;
             act(() => {
                 image.dispatchEvent(new Event("load"));
             });
-            await waitFor(() => expect(scroll).toHaveBeenCalled());
+            await settleReveal();
+            expect(scroll).toHaveBeenCalled();
         } finally {
             Reflect.deleteProperty(Element.prototype, "scrollIntoView");
             Reflect.deleteProperty(Range.prototype, "getBoundingClientRect");
+            vi.useRealTimers();
         }
     });
 
@@ -845,40 +850,6 @@ describe("AsidePanel", () => {
         }
     });
 
-    it("does not scroll to the hit that replaces a dismissed selection while its reveal is still pending", async () => {
-        vi.useFakeTimers({ toFake: [...REVEAL_TIMERS] });
-        const hitTop = 20;
-        const scroll = vi.fn();
-        const answered = { answer: "A cat.", id: "a", question: "Why?", status: "answered", token: "tok" } as const;
-
-        useAsideStore.setState({ byThread: { "thread-1": [answered] } });
-        render(<AsidePanel threadId="thread-1" />);
-
-        Object.defineProperty(Element.prototype, "scrollIntoView", { configurable: true, value: scroll });
-        stubHitRects(hitTop);
-
-        try {
-            act(() => {
-                globalThis.dispatchEvent(new CustomEvent(ASIDE_FIND_EVENT));
-            });
-            // The query schedules a reveal for the hit in "a", which is out of sight, and it has not run yet.
-            fireEvent.change(screen.getByRole("textbox", { name: "Find in side questions" }), { target: { value: "cat" } });
-
-            // Before that reveal runs, the entry is dismissed and its place is taken by a hit far below.
-            await act(async () => {
-                useAsideStore.setState({
-                    byThread: { "thread-1": [{ answer: "A cat too.", id: "z", question: "Below?", status: "answered", token: "tok-z" }] },
-                });
-            });
-            await settleReveal();
-            expect(scroll).not.toHaveBeenCalled();
-        } finally {
-            Reflect.deleteProperty(Element.prototype, "scrollIntoView");
-            Reflect.deleteProperty(Range.prototype, "getBoundingClientRect");
-            vi.useRealTimers();
-        }
-    });
-
     it("does not scroll to the hit that replaces a dismissed selection when the dismissal lands inside the reveal delay", async () => {
         vi.useFakeTimers({ toFake: [...REVEAL_TIMERS] });
         const hitTop = 20;
@@ -912,6 +883,28 @@ describe("AsidePanel", () => {
             Reflect.deleteProperty(Range.prototype, "getBoundingClientRect");
             vi.useRealTimers();
         }
+    });
+
+    it("moves focus to the panel when Escape closes the bar after the control that opened it was dismissed", () => {
+        useAsideStore.setState({
+            byThread: { "thread-1": [{ answer: "A cat.", id: "a", question: "Why?", status: "answered", token: "tok" }] },
+        });
+        render(<AsidePanel threadId="thread-1" />);
+        const dismiss = screen.getByRole("button", { name: "Dismiss this side question" });
+
+        dismiss.focus();
+        act(() => {
+            globalThis.dispatchEvent(new CustomEvent(ASIDE_FIND_EVENT));
+        });
+        // Dismissing the row removes the button the bar would otherwise return focus to.
+        fireEvent.click(dismiss);
+        expect(dismiss.isConnected).toBe(false);
+
+        fireEvent.keyDown(screen.getByRole("textbox", { name: "Find in side questions" }), { key: "Escape" });
+
+        expect(screen.queryByRole("textbox", { name: "Find in side questions" })).toBeNull();
+        // eslint-disable-next-line testing-library/no-node-access -- focus placement (document.activeElement) is what this test asserts
+        expect(document.activeElement).toBe(screen.getByRole("region", { name: "Side question" }));
     });
 
     it("keeps the selected hit when the bar is reopened after an earlier entry gains a hit", async () => {
