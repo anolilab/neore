@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { useIsAppActive } from "@/chat/use-app-active";
 import { getClient } from "@/lib/lunora";
 import { isNetworkFailure } from "@/offline/connectivity";
+import { isThreadRefusal } from "@/offline/message-read";
 import { useOffline } from "@/offline/offline-context";
 
 import type { BrowserFrame, BrowserStatus } from "./browser-api";
@@ -49,9 +50,6 @@ export interface BrowserView {
 }
 
 const NOT_SHOWN = "The page could not be shown right now.";
-
-/** The subscription errors that say the caller no longer reads the chat, as `offline/message-read.ts` reads them. */
-const ACCESS_REFUSALS = new Set(["FORBIDDEN", "NOT_FOUND", "THREAD_LOCKED", "UNAUTHORIZED"]);
 
 /**
  * The thread's cloud browser on the phone: the live status, a frame read on every agent action and on a timer while the
@@ -110,7 +108,8 @@ export const useBrowserView = (threadId: string, userId: string): BrowserView =>
                 threadId,
                 (next) => accept(next),
                 (failure) => {
-                    if (failure.code !== undefined && ACCESS_REFUSALS.has(failure.code)) {
+                    // As the chat screen reads them: a lapsed sign-in says nothing about the chat, so it hides nothing.
+                    if (isThreadRefusal(failure)) {
                         setSeen((current) => {
                             return { ...current, refusal: { at: Date.now(), message: failure.message } };
                         });
