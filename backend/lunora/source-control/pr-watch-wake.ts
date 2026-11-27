@@ -68,6 +68,14 @@ const TERMINAL_CODES: ReadonlySet<string> = new Set(["BAD_REQUEST", "FORBIDDEN",
 export const isTerminalWakeError = (error: unknown): boolean =>
     (error instanceof Error && error.name === "AgentRunError") || (error instanceof LunoraError && TERMINAL_CODES.has(error.code));
 
+/**
+ * The only tools a wake turn gets: the two pull request reads. The turn reads text anyone can write on the pull request (titles,
+ * comments, check output) with nobody present, so it must not be able to write anything: no reply, re-run, merge or unwatch, no other
+ * tool that changes the host or the owner's data, and none of the owner's connector or MCP tools. Enforced where the headless run builds its
+ * tools (`toolAllowlist`, applied before the model is given any), not only in the prompt.
+ */
+export const WAKE_TOOL_ALLOWLIST: ReadonlyArray<string> = ["readFailingChecks", "readPullRequest"];
+
 const vReason = v.union(v.literal("checks"), v.literal("conflict"), v.literal("review"));
 const vMarkers = v.object({ checks: v.optional(v.string()), conflict: v.optional(v.string()), review: v.optional(v.string()) });
 
@@ -707,6 +715,7 @@ export const runWatchWake = internalAction
                 personalization: "full",
                 prompt: wakePrompt(args, args.reasons),
                 thread: { threadId: args.threadId },
+                toolAllowlist: WAKE_TOOL_ALLOWLIST,
                 tools: "headless",
                 userId: args.userId,
             });

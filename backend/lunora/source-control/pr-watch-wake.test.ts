@@ -99,11 +99,13 @@ const {
     completeWatchWake,
     finishWatchWake,
     isTerminalWakeError,
+    keepWatchWakeCharge,
     PR_WATCH_MAX_WAKE_FAILURES,
     PR_WATCH_WAKE_LEASE_MS,
     releaseWatchWake,
     runWatchWake,
     startWatchWake,
+    WAKE_TOOL_ALLOWLIST,
     wakePrompt,
 } = await import("./pr-watch-wake");
 
@@ -1013,6 +1015,115 @@ describe("at most one model call per occurrence", () => {
         expect(probe.charges).toBe(2);
         expect(probe.refunds).toBe(1);
         expect(runs).toHaveLength(1);
+    });
+});
+
+describe("the tools of a wake turn", () => {
+    it("are only the pull request reads, passed to the headless run's tool builder", async () => {
+        const { linkId } = await seed();
+
+        await start(linkId);
+        await runJob(enqueued[0]!);
+
+        expect(runs[0]?.toolAllowlist).toEqual(WAKE_TOOL_ALLOWLIST);
+        expect(runs[0]?.tools).toBe("headless");
+        // Without it the owner's connector and MCP tools would be kept: nothing else widens the set.
+        expect(runs[0]?.toolAllowlistKeepsMcp).toBeUndefined();
+        expect(runs[0]?.additionalTools).toBeUndefined();
+    });
+
+    it("leave no write tool and keep the reads: the built set, narrowed by that allowlist, refuses a write", async () => {
+        const { applyToolAllowlist } = await import("../sub-agents/logic");
+        const { PULL_REQUEST_TOOLS } = await import("../chat/lib/tool-builder");
+        const { ToolName } = await import("../chat/tools");
+        // What a run on a thread with a linked pull request would carry: every pull request tool, the watch tools, and others.
+        const built = Object.fromEntries(
+            [...PULL_REQUEST_TOOLS, ToolName.WebSearch, ToolName.ShellExecution, "someMcpTool"].map((name) => [name, { description: name }]),
+        ) as never;
+        const narrowed = applyToolAllowlist(built, WAKE_TOOL_ALLOWLIST);
+        const names = Object.keys(narrowed);
+
+        const byName = (left: string, right: string) => left.localeCompare(right);
+
+        expect(names.toSorted(byName)).toEqual([ToolName.ReadFailingChecks, ToolName.ReadPullRequest].toSorted(byName));
+
+        // Every write or state-changing tool is gone: a call to one finds no such tool.
+        for (const write of [
+            ToolName.ReplyToReviewComment,
+            ToolName.RerunFailedChecks,
+            ToolName.MergePullRequest,
+            ToolName.WatchPullRequest,
+            ToolName.UnwatchPullRequest,
+            ToolName.ShellExecution,
+            "someMcpTool",
+        ]) {
+            expect(narrowed[write]).toBeUndefined();
+        }
+
+        // The reads stay.
+        expect(narrowed[ToolName.ReadPullRequest]).toBeDefined();
+        expect(narrowed[ToolName.ReadFailingChecks]).toBeDefined();
+    });
+});
+
+describe("what a failure before the first generation does to the charge", () => {
+    const failing = (reference: unknown) => async (job: { args: Record<string, any>; options: Record<string, any> }) => {
+        await harness
+            .action(async (ctx: any) => {
+                const real = ctx.runMutation.bind(ctx);
+
+                ctx.runMutation = async (target: unknown, args: unknown) => {
+                    if (target === reference) {
+                        throw new Error("write failed");
+                    }
+
+                    return await real(target, args);
+                };
+
+                await ctx.runAction(runWatchWake, { ...job.args, jobId: job.options.once.jobId });
+            })
+            .catch(() => undefined);
+    };
+
+    it("refunds once when the write that keeps the charge fails, since generation never started", async () => {
+        const { linkId } = await seed();
+
+        await start(linkId);
+        await failing(keepWatchWakeCharge)(enqueued[0]!);
+
+        const row = await rowOf(linkId);
+
+        expect(probe.charges).toBe(1);
+        expect(probe.refunds).toBe(1);
+        expect(row.watchWakeRefund).toMatchObject({ applied: true });
+        expect(row.watch.wakes).toBeUndefined();
+        expect(row.watchWakeFailure).toMatchObject({ attempts: 1 });
+    });
+
+    it("refunds once for a failure while the run is prepared (before its first generation step), and not twice by the lapse handler", async () => {
+        const { linkId } = await seed();
+
+        await start(linkId);
+        probe.failBeforeModel = true;
+        await runJob(enqueued[0]!);
+        expect(probe.refunds).toBe(1);
+
+        await harness.run(async (ctx: any) => await ctx.runMutation(releaseWatchWake, { ...key(linkId), claim: enqueued[0]!.args.claim, claimKey: "job-1" }));
+        expect(probe.refunds).toBe(1);
+    });
+
+    it("keeps the charge for a failure after generation started", async () => {
+        const { linkId } = await seed();
+
+        await start(linkId);
+        probe.fail = true;
+        await runJob(enqueued[0]!);
+
+        const row = await rowOf(linkId);
+
+        expect(probe.charges).toBe(1);
+        expect(probe.refunds).toBe(0);
+        expect(row.watchWakeRefund).toMatchObject({ applied: true });
     });
 });
 
