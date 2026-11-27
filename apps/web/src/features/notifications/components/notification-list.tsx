@@ -119,7 +119,7 @@ const NotificationList: FC<NotificationListProps> = ({ emptyLabel, items, onOpen
                     </>
                 );
                 const rowClass =
-                    "hover:bg-surface-row-hover focus-visible:bg-surface-row-hover flex w-full items-start gap-3 px-3 py-2.5 text-left outline-none transition-colors";
+                    "hover:bg-surface-row-hover focus-visible:bg-surface-row-hover focus-visible:ring-ring flex w-full items-start gap-3 px-3 py-2.5 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-inset";
 
                 return (
                     <li key={item._id}>

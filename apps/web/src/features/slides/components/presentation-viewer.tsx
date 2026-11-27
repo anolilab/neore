@@ -211,7 +211,7 @@ const PresentationViewer = ({
                 {slides.map((slide) => (
                     <div id={`slide-${slide.slideNumber}`} key={slide.slideNumber}>
                         <PresentationSlideCard
-                            className={currentSlideNumber === slide.slideNumber ? "ring-primary/30 ring-2" : ""}
+                            className={currentSlideNumber === slide.slideNumber ? "ring-primary-text ring-2" : ""}
                             onFullScreenClick={(n) => handleOpenFullScreen(n)}
                             presentationTitle={presentationTitle}
                             slide={slide}
@@ -230,7 +230,7 @@ const PresentationViewer = ({
                     {slides.map((slide) => (
                         <div id={`slide-${slide.slideNumber}`} key={slide.slideNumber}>
                             <PresentationSlideCard
-                                className={currentSlideNumber === slide.slideNumber ? "ring-primary/30 ring-2" : ""}
+                                className={currentSlideNumber === slide.slideNumber ? "ring-primary-text ring-2" : ""}
                                 onFullScreenClick={(n) => handleOpenFullScreen(n)}
                                 presentationTitle={presentationTitle}
                                 slide={slide}

@@ -402,8 +402,8 @@ const FullScreenPresentationViewer = ({
                                         <button
                                             aria-current={slideNumber === currentSlide ? "true" : undefined}
                                             aria-label={t`Go to slide ${slideNumber}`}
-                                            className={`h-2.5 w-2.5 rounded-full transition-all duration-200 ${
-                                                slideNumber === currentSlide ? "bg-foreground" : "bg-muted-foreground/30 hover:bg-muted-foreground/60"
+                                            className={`size-2.5 rounded-full transition-[background-color,scale] duration-200 ${
+                                                slideNumber === currentSlide ? "bg-foreground scale-125" : "bg-muted-foreground hover:bg-foreground/70"
                                             }`}
                                             key={slideNumber}
                                             onClick={() => setCurrentSlide(slideNumber)}

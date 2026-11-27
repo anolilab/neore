@@ -222,6 +222,8 @@ const makeDefaultToolCall = (
         // By real names first; the runtime-name key only matches unlabelled (older) parts.
         const meta = toolMeta && mcpInfo ? (toolMeta.get(mcpToolMetaKey(mcpInfo.serverName, mcpInfo.toolName)) ?? toolMeta.get(rawToolName)) : undefined;
         const hasMcpApp = !!meta && !!McpApp && hasOutput;
+        // On the error tint the muted grey is too faint to read; the labels take the card's red there instead.
+        const detailLabelClass = cn("font-mono text-xs", !isError && "text-muted-foreground");
 
         return (
             <div className={cn("surface-edge mb-4 rounded-xl", isError ? "bg-destructive/10" : "bg-surface-panel")}>
@@ -252,7 +254,7 @@ const makeDefaultToolCall = (
                     <div className={cn("border-border/50 border-t p-3 text-sm", isError ? "text-destructive" : "text-foreground")}>
                         {!!part.input && (
                             <div className="mb-2">
-                                <span className="text-muted-foreground font-mono text-xs">{t`Input:`}</span>
+                                <span className={detailLabelClass}>{t`Input:`}</span>
                                 <pre className="mt-1 overflow-x-auto font-mono text-xs whitespace-pre-wrap">
                                     {String(typeof part.input === "string" ? part.input : JSON.stringify(part.input, null, 2))}
                                 </pre>
@@ -260,7 +262,7 @@ const makeDefaultToolCall = (
                         )}
                         {!!part.output && (
                             <div>
-                                <span className="text-muted-foreground font-mono text-xs">{t`Output:`}</span>
+                                <span className={detailLabelClass}>{t`Output:`}</span>
                                 <pre className="mt-1 overflow-x-auto font-mono text-xs whitespace-pre-wrap">
                                     {String(typeof part.output === "string" ? part.output : JSON.stringify(part.output, null, 2))}
                                 </pre>
@@ -268,14 +270,14 @@ const makeDefaultToolCall = (
                         )}
                         {part.output === undefined && part.outputRef && (
                             <div>
-                                <span className="text-muted-foreground font-mono text-xs">{t`Output:`}</span>
+                                <span className={detailLabelClass}>{t`Output:`}</span>
                                 {/* Keyed by the ref: a live update that swaps the part must not show the previous output. */}
                                 <TrimmedToolOutput key={`${part.outputRef.messageId}:${part.outputRef.toolCallId}`} outputRef={part.outputRef} />
                             </div>
                         )}
                         {part.errorText && (
                             <div className="text-destructive">
-                                <span className="text-muted-foreground font-mono text-xs">{t`Error:`}</span>
+                                <span className={detailLabelClass}>{t`Error:`}</span>
                                 <pre className="mt-1 font-mono text-xs whitespace-pre-wrap">{part.errorText}</pre>
                             </div>
                         )}
