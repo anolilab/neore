@@ -49,10 +49,14 @@
   the person, and it merges only the head the approved call names.
 
 - **PR watch wake** (`pr-watch-poll.ts` records, `pr-watch-wake.ts` delivers) — the poller only records owed reasons in
-  `watchPending`. `startWatchWake` (a short scheduled mutation) claims a lease (`watchWakeLeaseUntil`, longer than a queue job
-  may run), charges one round to the daily limits like a task run (a spent limit leaves everything pending, uncounted) and
-  enqueues `runWatchWake` on the jobs queue under a claim-once id. The job runs ONE headless turn in the linked thread (nothing
-  from the host in the prompt); only `finishWatchWake` counts the wake (`wakes`, `lastWakeAt`) and clears the delivered reasons,
-  and only those whose occurrence marker is unchanged since the claim. A failed turn releases the lease and changes nothing else.
-  The claim refuses a stale run or start, the cap of 5, the 10-minute cooldown, a locked or busy thread. The agent tools
-  `watchPullRequest` and `unwatchPullRequest` (both ask by default, never always-allow) use the same linked-pull-request gate as the other PR tools.
+  `watchPending`. `startWatchWake` is an ACTION: it calls `claimWatchWake` (the lease `watchWakeLeaseUntil`, longer than a queue job
+  may run), and only after that commits enqueues `runWatchWake` on the jobs queue under a claim-once id; a failed enqueue releases the
+  lease. In the job, `beginWatchWake` re-checks the lease (its own, still in the future), the watch, the thread (owner, lock, deletion,
+  no reply streaming, still the owner's alone) and charges the round to the daily limits in the same transaction that records the
+  occurrence (`watchWakeCompleted`, state `running`) and the charged limits (`watchWakeRefund`); a spent limit makes the job wait. A turn
+  that fails before the model is refunded once (`watchWakeRefund`, only while the charged window is current). A delivered turn is
+  recorded in `watchWakeCompleted` before settlement; `finishWatchWake` then counts the wake once (against the run it started under)
+  and clears only the reasons whose occurrence marker is unchanged. A claim that finds an unsettled occurrence never generates again
+  for it. A failed turn is recorded in `watchWakeFailure` with the cooldown as retry spacing; the watch stops at the third failure in
+  a row or at once on a terminal error. Locking or deleting the chat waits while a lease is held (`pr-watch-wake-lease.ts`). The agent
+  tools `watchPullRequest` and `unwatchPullRequest` (both ask by default, never always-allow) use the same linked-pull-request gate.

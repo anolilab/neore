@@ -25082,6 +25082,40 @@
                   }
                 ]
               }
+            },
+            "run": {
+              "kind": "string",
+              "nullable": false,
+              "optional": true,
+              "unique": false
+            },
+            "startedAt": {
+              "kind": "number",
+              "nullable": false,
+              "optional": false,
+              "unique": false
+            },
+            "state": {
+              "kind": "union",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "members": [
+                {
+                  "kind": "literal",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "literal": "\"completed\""
+                },
+                {
+                  "kind": "literal",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "literal": "\"running\""
+                }
+              ]
             }
           }
         },
@@ -25171,6 +25205,18 @@
               "unique": false,
               "of": {
                 "kind": "string",
+                "nullable": false,
+                "optional": false,
+                "unique": false
+              }
+            },
+            "windowEnds": {
+              "kind": "array",
+              "nullable": false,
+              "optional": true,
+              "unique": false,
+              "of": {
+                "kind": "number",
                 "nullable": false,
                 "optional": false,
                 "unique": false

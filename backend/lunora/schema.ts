@@ -2761,20 +2761,26 @@ export const schema = defineSchema({
         ),
         // Names one start of the watch: fresh at every start and never the clock, so a poll leased before a stop and restart cannot match the restarted watch (`source-control/pr-watch-poll.ts`).
         watchRun: v.optional(v.string()),
-        // How the wake turns of this watch are failing (`source-control/pr-watch-wake.ts`): when the last one failed, how many failed in a
-        // row (0 after a delivery), when the next try may start, and whether the failure can be cured by trying again ("shared": the chat is no longer the owner's alone, so the watch waits without a failure counted). The watch is
-        // stopped at the third failure in a row or at a terminal one; the last failure stays as history.
-        // A wake turn that ran to its end, recorded before its settlement is tried (`source-control/pr-watch-wake.ts`): the claim, the delivered
-        // reasons with the occurrence markers they came from, and whether the settlement (the count and the clearing) has been applied. While
-        // it is not, no new claim generates for the same reasons; the next claim settles it instead.
+        // The record of one wake turn's occurrence (`source-control/pr-watch-wake.ts`), written before the model is asked: the claim, the run and
+        // start it belongs to, the reasons with the occurrence markers they came from, and where it stands. `running`: the turn was started and
+        // its end is not recorded; `completed`: it ran to its end. `done` is set once it is settled. A claim that finds one that is not done never
+        // generates again for it: a completed one is settled (counted, cleared), a running one is settled as a failed attempt, so one occurrence
+        // costs at most one model call. A record of another run is discarded, and starting a watch discards any.
         watchWakeCompleted: v.optional(
             v.object({
                 claim: v.number(),
                 done: v.boolean(),
                 markers: v.object({ checks: v.optional(v.string()), conflict: v.optional(v.string()), review: v.optional(v.string()) }),
                 reasons: v.array(v.union(v.literal("checks"), v.literal("conflict"), v.literal("review"))),
+                run: v.optional(v.string()),
+                startedAt: v.number(),
+                state: v.union(v.literal("completed"), v.literal("running")),
             }),
         ),
+        // How the wake turns of this watch are failing (`source-control/pr-watch-wake.ts`): when the last one failed, how many failed in a row
+        // (0 after a delivery), when the next try may start, and what kind of failure it was: "retryable", "terminal" (cannot be cured by trying
+        // again), or "shared" (the chat is no longer the owner's alone: the watch waits and no failure is counted). The watch is stopped at the
+        // third failure in a row or at a terminal one; the last failure stays as history.
         watchWakeFailure: v.optional(
             v.object({
                 at: v.number(),
@@ -2786,9 +2792,13 @@ export const schema = defineSchema({
         // The lease a wake turn holds while it is delivered (`source-control/pr-watch-wake.ts`): until when no second delivery may start.
         // Released when the delivery ends; a delivery that never ends frees itself when it lapses.
         watchWakeLeaseUntil: v.optional(v.number()),
-        // The limits a wake turn's round was charged to, kept while a refund for it is owed (a turn that failed before reaching the model).
-        // `applied` is set by the refund, so each obligation is paid at most once; the next charge settles an unpaid one first.
-        watchWakeRefund: v.optional(v.object({ applied: v.boolean(), claim: v.number(), keys: v.array(v.string()) })),
+        // The limits a wake turn's round was charged to, written in the same transaction as the charge: it is owed back until the model is
+        // reached (`applied` is then set without a refund) or the refund is paid. `windowEnds` is when each limit's window ends: a refund after
+        // that is not paid, since the window the charge came from is gone. A job that dies before the model leaves it unpaid, and the claim's
+        // lapse handler or the next charge pays it once.
+        watchWakeRefund: v.optional(
+            v.object({ applied: v.boolean(), claim: v.number(), keys: v.array(v.string()), windowEnds: v.optional(v.array(v.number())) }),
+        ),
     })
         .shardBy("userId")
         .index("by_user_and_repository_number", ["userId", "repository", "number"])

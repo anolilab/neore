@@ -19,6 +19,7 @@ const { enqueued, probe, registry, runs } = vi.hoisted(() => {
             allowRound: true,
             anonymous: false,
             charges: 0,
+            during: undefined as (() => Promise<void>) | undefined,
             enqueueFails: false,
             fail: false,
             failBeforeModel: false,
@@ -81,6 +82,7 @@ vi.mock("../chat/lib/headless-run", () => {
             }
 
             await options.onGenerationStart?.();
+            await probe.during?.();
 
             if (probe.fail) {
                 throw probe.failWith ?? new Error("run failed");
@@ -94,6 +96,7 @@ vi.mock("../chat/lib/headless-run", () => {
 const {
     applyWatchWakeRefund,
     beginWatchWake,
+    completeWatchWake,
     finishWatchWake,
     isTerminalWakeError,
     PR_WATCH_MAX_WAKE_FAILURES,
@@ -134,6 +137,7 @@ beforeEach(() => {
     probe.readLease = undefined;
     probe.refunds = 0;
     probe.refundedKeys = [];
+    probe.during = undefined;
     probe.tier = "premium";
     probe.fail = false;
     probe.failWith = undefined;
@@ -683,7 +687,10 @@ describe("the check right before the turn", () => {
 
     it("answers `run` only while the delivery holds the lease on the same watch", async () => {
         const { job, linkId } = await claimed();
-        const begin = async (claim: number) => await harness.run(async (ctx: any) => await ctx.runMutation(beginWatchWake, { ...key(linkId), claim }));
+        const begin = async (claim: number) =>
+            await harness.run(
+                async (ctx: any) => await ctx.runMutation(beginWatchWake, { ...key(linkId), claim, markers: { checks: "sha-1" }, reasons: ["checks"] }),
+            );
 
         expect(await begin(job.args.claim)).toMatchObject({ charged: expect.any(Array), status: "run" });
         expect(await begin(1)).toEqual({ status: "stale" });
@@ -905,6 +912,207 @@ describe("a chat that stops being the owner's alone", () => {
         expect(row.watchPending).toEqual(["checks"]);
         expect(row.watch.wakes).toBeUndefined();
         expect(row.watchWakeFailure).toMatchObject({ attempts: 0, kind: "shared", retryAt: 0 });
+    });
+});
+
+describe("at most one model call per occurrence", () => {
+    const expireLease = async (linkId: string) => {
+        await harness.run(async (ctx: any) => {
+            await ctx.db.patch("pullRequestThreads", linkId, { watchWakeLeaseUntil: Date.now() - 1000 });
+        });
+    };
+
+    it("does not generate again when the completion write fails every time, and tells the owner on watchWakeFailure", async () => {
+        const { linkId } = await seed();
+
+        await start(linkId);
+        await harness
+            .action(async (ctx: any) => {
+                const real = ctx.runMutation.bind(ctx);
+
+                // The completion write and the settlement both keep failing after the turn ran.
+                ctx.runMutation = async (reference: unknown, args: unknown) => {
+                    if (reference === completeWatchWake || reference === finishWatchWake) {
+                        throw new Error("write failed");
+                    }
+
+                    return await real(reference, args);
+                };
+
+                await ctx.runAction(runWatchWake, { ...enqueued[0]!.args, jobId: enqueued[0]!.options.once.jobId });
+            })
+            .catch(() => undefined);
+
+        const stuck = await rowOf(linkId);
+
+        expect(runs).toHaveLength(1);
+        expect(stuck.watchWakeCompleted).toMatchObject({ done: false, state: "running" });
+
+        // The lease lapses; the next poll does not run the model for the same reasons: the occurrence is settled as a failed attempt.
+        await expireLease(linkId);
+        expect(await start(linkId)).toBe(false);
+
+        const settled = await rowOf(linkId);
+
+        expect(runs).toHaveLength(1);
+        expect(enqueued).toHaveLength(1);
+        expect(settled.watchWakeCompleted).toMatchObject({ done: true });
+        expect(settled.watchWakeFailure).toMatchObject({ attempts: 1, kind: "retryable" });
+        expect(settled.watchPending).toEqual(["checks"]);
+        expect(settled.watch.wakes).toBeUndefined();
+    });
+
+    it("refunds once for a job that died after the charge and before the model, and charges once on the next attempt", async () => {
+        const { linkId } = await seed();
+
+        await start(linkId);
+
+        const job = enqueued[0]!;
+
+        // The job's first step runs (the charge and the occurrence are committed), then it dies before the model.
+        const begun = await harness.run(
+            async (ctx: any) =>
+                await ctx.runMutation(beginWatchWake, { ...key(linkId), claim: job.args.claim, markers: job.args.markers, reasons: job.args.reasons }),
+        );
+
+        expect(begun).toMatchObject({ status: "run" });
+        expect(probe.charges).toBe(1);
+
+        const owed = await rowOf(linkId);
+
+        expect(owed.watchWakeRefund).toMatchObject({ applied: false, keys: ["chat/dailyText:premium", "tasks/dailyRuns:premium"] });
+        expect(owed.watchWakeRefund.windowEnds).toHaveLength(2);
+
+        // The claim's lapse handler reconciles it: refunded once, lease released.
+        const lapse = async () =>
+            await harness.run(async (ctx: any) => await ctx.runMutation(releaseWatchWake, { ...key(linkId), claim: job.args.claim, claimKey: "job-1" }));
+
+        await lapse();
+        await lapse();
+        expect(probe.refunds).toBe(1);
+        const released = await rowOf(linkId);
+
+        expect(released.watchWakeLeaseUntil).toBe(0);
+
+        // The next claim settles the started occurrence as a failed attempt (no second refund), waits its retry time, then charges once.
+        expect(await start(linkId)).toBe(false);
+        expect(probe.refunds).toBe(1);
+
+        const failed = await rowOf(linkId);
+
+        vi.useFakeTimers({ now: failed.watchWakeFailure.retryAt + 1000, toFake: ["Date"] });
+
+        try {
+            expect(await start(linkId)).toBe(true);
+            await runJob(enqueued[1]!);
+        } finally {
+            vi.useRealTimers();
+        }
+
+        expect(probe.charges).toBe(2);
+        expect(probe.refunds).toBe(1);
+        expect(runs).toHaveLength(1);
+    });
+});
+
+describe("a watch stopped or restarted during its turn", () => {
+    it("counts the delivered turn once against the run it started under when the watch is stopped meanwhile", async () => {
+        const { linkId, threadId } = await seed();
+
+        await start(linkId);
+        probe.during = async () => {
+            await harness.run(
+                async (ctx: any) =>
+                    await ctx.runMutation(setPullRequestWatch, { number: 7, repository: "octo/hello", threadId, userId: OWNER, watching: false }),
+            );
+        };
+        await runJob(enqueued[0]!);
+
+        const row = await rowOf(linkId);
+
+        expect(runs).toHaveLength(1);
+        expect(row.watchActive).toBe(false);
+        expect(row.watch.wakes).toBe(1);
+        expect(row.watch.stoppedAt).toBeGreaterThan(0);
+        expect(row.watchWakeLeaseUntil).toBe(0);
+    });
+
+    it("does not count it against a restarted run, which starts with the count it carried", async () => {
+        const { linkId, threadId } = await seed();
+
+        await start(linkId);
+        probe.during = async () => {
+            await harness.run(async (ctx: any) => {
+                for (const watching of [false, true]) {
+                    await ctx.runMutation(setPullRequestWatch, { number: 7, repository: "octo/hello", threadId, userId: OWNER, watching });
+                }
+            });
+        };
+        await runJob(enqueued[0]!);
+
+        const row = await rowOf(linkId);
+
+        expect(row.watchActive).toBe(true);
+        expect(row.watch.wakes).toBeUndefined();
+        expect(row.watch.lastWakeAt).toBeUndefined();
+        expect(row.watchWakeLeaseUntil).toBe(0);
+    });
+});
+
+describe("an occurrence left by another run", () => {
+    it("is discarded when the watch restarts, and the new run's first wake is delivered", async () => {
+        const stale = { claim: 1, done: false, markers: { checks: "sha-1" }, reasons: ["checks"], run: "run-1", startedAt: STARTED_AT, state: "completed" };
+        const { linkId, threadId } = await seed({ watchWakeCompleted: stale });
+
+        // Stopped, then restarted: a new run starts, with the old occurrence discarded and the count untouched.
+        await harness.run(async (ctx: any) => {
+            for (const watching of [false, true]) {
+                await ctx.runMutation(setPullRequestWatch, { number: 7, repository: "octo/hello", threadId, userId: OWNER, watching });
+            }
+        });
+
+        const restarted = await rowOf(linkId);
+
+        expect(restarted.watchWakeCompleted).toMatchObject({ done: true });
+        expect(restarted.watch.wakes).toBeUndefined();
+
+        await harness.run(async (ctx: any) => {
+            await ctx.db.patch("pullRequestThreads", linkId, { watchPending: ["checks"] });
+        });
+        expect(
+            await harness.action(
+                async (ctx: any) => await ctx.runAction(startWatchWake, { linkId, run: restarted.watchRun, startedAt: restarted.watch.startedAt }),
+            ),
+        ).toBe(true);
+        await harness.action(async (ctx: any) => await ctx.runAction(runWatchWake, { ...enqueued[0]!.args, jobId: enqueued[0]!.options.once.jobId }));
+
+        const row = await rowOf(linkId);
+
+        expect(runs).toHaveLength(1);
+        expect(row.watch.wakes).toBe(1);
+    });
+
+    it("is discarded by a claim that finds it belonging to another run, leaving the count and the pending reasons alone", async () => {
+        const stale = {
+            claim: 1,
+            done: false,
+            markers: { checks: "sha-1" },
+            reasons: ["checks"],
+            run: "old-run",
+            startedAt: STARTED_AT - 1,
+            state: "completed",
+        };
+        const { linkId } = await seed({ watchWakeCompleted: stale });
+
+        expect(await start(linkId)).toBe(true);
+
+        const row = await rowOf(linkId);
+
+        // Not settled against this run: nothing was counted, and the claim went on to deliver this run's own reasons.
+        expect(row.watch.wakes).toBeUndefined();
+        expect(row.watchPending).toEqual(["checks"]);
+        expect(row.watchWakeCompleted).toMatchObject({ done: true });
+        expect(enqueued).toHaveLength(1);
     });
 });
 

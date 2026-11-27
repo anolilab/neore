@@ -100,6 +100,25 @@ describe("setPullRequestWatch", () => {
         expect(await call({ number: 8, threadId, userId: OWNER, watching: true })).toStrictEqual({ status: "ok" });
     });
 
+    it("refuses to start a watch in a locked chat or one being deleted, taking no slot, and starts it once unlocked", async () => {
+        const locked = await seedLink(OWNER, 7, {}, { lockedAt: Date.now() });
+        const deleting = await seedLink(OWNER, 8, {}, { deletingAt: Date.now() });
+
+        expect(await call({ number: 7, threadId: locked.threadId, userId: OWNER, watching: true })).toStrictEqual({ status: "thread_locked" });
+        expect(await call({ number: 8, threadId: deleting.threadId, userId: OWNER, watching: true })).toStrictEqual({ status: "thread_unavailable" });
+
+        const refused = await harness.run(async (ctx: any) => await ctx.db.get("pullRequestThreads", locked.linkId));
+
+        expect(refused.watchActive).toBeUndefined();
+        expect(refused.watch).toBeUndefined();
+
+        // Unlocked, the same chat starts it, and no slot had been taken by the refusals.
+        await harness.run(async (ctx: any) => {
+            await ctx.db.patch("threads", locked.threadId, { lockedAt: null });
+        });
+        expect(await call({ number: 7, threadId: locked.threadId, userId: OWNER, watching: true })).toStrictEqual({ status: "ok" });
+    });
+
     it("schedules the new watch's own first poll", async () => {
         const { linkId, threadId } = await seedLink(OWNER, 7, { watchCheckedAt: Date.now() });
         const before = harness.scheduler.list().length;

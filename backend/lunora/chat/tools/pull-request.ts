@@ -58,6 +58,8 @@ const MESSAGES: Record<string, string> = {
     rate_limited: "The host is rate limiting requests. Try again in a few minutes.",
     rejected: "The host refused it.",
     signed_out: "Pull request tools work only in a chat of your own, in a turn you started.",
+    thread_locked: "This chat is locked, so a watch could never wake it. The person has to unlock the chat before a watch can start.",
+    thread_unavailable: "This chat is being deleted, so a watch cannot start in it.",
     too_many: "Too many pull requests are watched already: stop one first.",
     unconfirmed: "The host's answer never came: it may have done it. Check the pull request before trying again.",
     unsupported: "This host does not offer that.",

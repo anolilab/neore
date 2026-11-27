@@ -39,7 +39,7 @@ import { JOB_LEASE_MS } from "../lib/job-once";
 import { threadHasLiveGrant } from "../agent/live-grant";
 import { isDeviceEligibleThread } from "../devices/internal";
 import { isThreadLocked } from "../lib/thread-lock";
-import { chargeRound, loadTaskAccount, refundRoundKeys, roundQuotaKeys, taskAccessProblem } from "../tasks/account";
+import { chargeRound, loadTaskAccount, refundRoundKeys, roundQuotaKeys, roundWindowEnds, taskAccessProblem } from "../tasks/account";
 import { wakeLeaseHeld } from "./pr-watch-wake-lease";
 import { PR_WATCH_MAX_WAKES, PR_WATCH_WAKE_COOLDOWN_MS, type WatchWakeReason } from "./pr-watch-logic";
 
@@ -161,33 +161,59 @@ const pausedForSharing = async (ctx: Pick<MutationCtx, "db" | "now">, link: Doc<
     return true;
 };
 
+type Completed = NonNullable<Doc<"pullRequestThreads">["watchWakeCompleted"]>;
+
 /**
  * The link's fields after a delivered turn is settled: the wake counted once, the delivered reasons cleared (only those whose
- * occurrence marker is unchanged since the claim), the lease released, the failure streak reset and the completion marked done.
+ * occurrence marker is unchanged since the claim), the lease released, the failure streak reset and the occurrence marked done.
  */
-const settledPatch = (
-    link: Doc<"pullRequestThreads">,
-    watch: NonNullable<Doc<"pullRequestThreads">["watch"]>,
-    claim: number,
-    markers: Markers,
-    reasons: ReadonlyArray<WatchWakeReason>,
-    now: number,
-) => {
+const settledPatch = (link: Doc<"pullRequestThreads">, watch: NonNullable<Doc<"pullRequestThreads">["watch"]>, record: Completed, now: number) => {
     return {
         watch: { ...watch, lastWakeAt: now, wakes: (watch.wakes ?? 0) + 1 },
-        watchPending: (link.watchPending ?? []).filter((reason) => !reasons.includes(reason) || currentMarker(watch, reason) !== markers[reason]),
-        watchWakeCompleted: { claim, done: true, markers, reasons: [...reasons] },
+        watchPending: (link.watchPending ?? []).filter((reason) => !record.reasons.includes(reason) || currentMarker(watch, reason) !== record.markers[reason]),
+        watchWakeCompleted: { ...record, done: true, state: "completed" as const },
         watchWakeLeaseUntil: 0,
         // A delivery ends the run of failures (the last one stays as history).
         ...(link.watchWakeFailure !== undefined && {
             watchWakeFailure: {
                 ...link.watchWakeFailure,
                 attempts: 0,
-                kind: link.watchWakeFailure.kind === "shared" ? "retryable" : link.watchWakeFailure.kind,
+                kind: link.watchWakeFailure.kind === "shared" ? ("retryable" as const) : link.watchWakeFailure.kind,
                 retryAt: 0,
             },
         }),
     };
+};
+
+/**
+ * The link's fields after a failed turn: the failure counted and spaced by the cooldown, the watch stopped at the third in a row or at a
+ * terminal error, and the occurrence (when there is one) marked done. `ended` says the watch was stopped.
+ */
+const failedPatch = (link: Doc<"pullRequestThreads">, now: number, terminal: boolean, record: Completed | undefined) => {
+    const attempts = (link.watchWakeFailure?.attempts ?? 0) + 1;
+    const ended = terminal || attempts >= PR_WATCH_MAX_WAKE_FAILURES;
+
+    return {
+        ended,
+        patch: {
+            watchWakeFailure: { at: now, attempts, kind: terminal ? ("terminal" as const) : ("retryable" as const), retryAt: now + PR_WATCH_WAKE_COOLDOWN_MS },
+            watchWakeLeaseUntil: 0,
+            ...(record !== undefined && { watchWakeCompleted: { ...record, done: true } }),
+            ...(ended && link.watch !== undefined && { watch: { ...link.watch, stoppedAt: now }, watchActive: false }),
+        },
+    };
+};
+
+/** Pays the refund owed on the link, once (the obligation is marked applied), and only for limits whose charged window has not ended. */
+const payOwedRefund = async (ctx: MutationCtx, link: Doc<"pullRequestThreads">): Promise<void> => {
+    const owed = link.watchWakeRefund;
+
+    if (owed === undefined || owed.applied) {
+        return;
+    }
+
+    await refundRoundKeys(ctx, link.userId, owed.keys, owed.windowEnds, ctx.now);
+    await ctx.db.patch("pullRequestThreads", link._id, { watchWakeRefund: { ...owed, applied: true } });
 };
 
 /**
@@ -217,14 +243,33 @@ export const claimWatchWake = internalMutation
             return null;
         }
 
-        // A turn that ran to its end but whose settlement never landed is settled now, and nothing is generated for the same reasons: the
-        // model is never asked twice for an occurrence that was delivered.
-        const completed = link.watchWakeCompleted;
+        // An occurrence that is not settled never generates again: one occurrence costs at most one model call.
+        const record = link.watchWakeCompleted;
 
-        if (completed !== undefined && !completed.done) {
-            await ctx.db.patch("pullRequestThreads", link._id, settledPatch(link, link.watch, completed.claim, completed.markers, completed.reasons, ctx.now));
+        if (record !== undefined && !record.done) {
+            // Another run's (the watch was restarted since): discarded, the count and the pending reasons stay as they are.
+            if (record.startedAt !== link.watch.startedAt || record.run !== link.watchRun) {
+                await ctx.db.patch("pullRequestThreads", link._id, { watchWakeCompleted: { ...record, done: true } });
+            } else if (record.state === "completed") {
+                // Ran to its end, settlement never landed: settled now, counted once.
+                await ctx.db.patch("pullRequestThreads", link._id, settledPatch(link, link.watch, record, ctx.now));
 
-            return null;
+                return null;
+            } else {
+                // Started and never recorded as ended (the job died, or the completion write kept failing): settled as a failed attempt, and
+                // the owner sees it on `watchWakeFailure`. A wake may be lost; a second paid turn for it is not run.
+                await payOwedRefund(ctx, link);
+
+                const failed = failedPatch(link, ctx.now, false, record);
+
+                await ctx.db.patch("pullRequestThreads", link._id, failed.patch);
+
+                if (failed.ended) {
+                    ctx.log.event("develop.watch_ended", { attempt: failed.patch.watchWakeFailure.attempts, linkId: String(link._id), reason: "wake_failed" });
+                }
+
+                return null;
+            }
         }
 
         const reasons = link.watchPending ?? [];
@@ -337,7 +382,7 @@ export const startWatchWake = internalAction
  * shared run reservation a headless run takes, only the stream rows read here.
  */
 export const beginWatchWake = internalMutation
-    .input({ ...key, claim: v.number() })
+    .input({ ...key, claim: v.number(), markers: vMarkers, reasons: v.array(vReason) })
     .output(vBegin)
     .mutation(async ({ args, ctx }) => {
         const link = await ctx.db.get("pullRequestThreads", args.linkId);
@@ -386,10 +431,7 @@ export const beginWatchWake = internalMutation
         }
 
         // A refund owed for an earlier turn that failed before the model is paid first, so a new charge never stacks on an unreconciled one.
-        if (link.watchWakeRefund !== undefined && !link.watchWakeRefund.applied) {
-            await refundRoundKeys(ctx, link.userId, link.watchWakeRefund.keys);
-            await ctx.db.patch("pullRequestThreads", link._id, { watchWakeRefund: { ...link.watchWakeRefund, applied: true } });
-        }
+        await payOwedRefund(ctx, link);
 
         // The round is charged to the daily limits only now, right before the model is asked: a job that skips the turn above charged nothing.
         const account = await loadTaskAccount(ctx, link.userId);
@@ -398,38 +440,51 @@ export const beginWatchWake = internalMutation
             return await waits();
         }
 
-        // The exact limits this round was charged to, handed to the job so a refund gives back those and not whatever the plan maps to later.
-        return { charged: roundQuotaKeys(account), status: "run" as const };
+        // The exact limits this round was charged to, and when their windows end, are written in THIS transaction, with the occurrence about
+        // to start: a job that dies after the charge and before the model leaves the refund owed, and a claim that finds the occurrence
+        // started never generates again. The job gets the keys for its own refund path.
+        const charged = roundQuotaKeys(account);
+        const windowEnds = await roundWindowEnds(ctx, link.userId, charged);
+
+        await ctx.db.patch("pullRequestThreads", link._id, {
+            watchWakeCompleted: {
+                claim: args.claim,
+                done: false,
+                markers: args.markers,
+                reasons: args.reasons,
+                startedAt: args.startedAt,
+                state: "running",
+                ...(args.run !== undefined && { run: args.run }),
+            },
+            watchWakeRefund: { applied: false, claim: args.claim, keys: charged, windowEnds },
+        });
+
+        return { charged, status: "run" as const };
     });
 
-/**
- * Records that a turn failed before it reached the model, so its round is owed back: the exact limits the charge took are kept on the
- * link (`watchWakeRefund`) until `applyWatchWakeRefund` pays them. Kept apart from the payment so a payment that fails is not forgotten.
- */
-export const recordWatchWakeRefund = internalMutation
-    .input({ ...key, charged: v.array(v.string()), claim: v.number() })
+/** The model was reached: the round stays charged, so the refund owed for it is closed without a payment. Called before the first generation. */
+export const keepWatchWakeCharge = internalMutation
+    .input({ claim: v.number(), linkId: v.id("pullRequestThreads") })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
         const link = await ctx.db.get("pullRequestThreads", args.linkId);
 
-        if (link !== null && link.watchWakeLeaseUntil === args.claim && args.charged.length > 0) {
-            await ctx.db.patch("pullRequestThreads", link._id, { watchWakeRefund: { applied: false, claim: args.claim, keys: args.charged } });
+        if (link?.watchWakeRefund !== undefined && link.watchWakeRefund.claim === args.claim && !link.watchWakeRefund.applied) {
+            await ctx.db.patch("pullRequestThreads", link._id, { watchWakeRefund: { ...link.watchWakeRefund, applied: true } });
         }
 
         return null;
     });
 
-/** Pays the refund owed on the link, once: the limits it names get one unit back each, then the obligation is marked applied. */
+/** Pays the refund owed on the link, once: the limits it names get one unit back each (while their window is current), then it is marked applied. */
 export const applyWatchWakeRefund = internalMutation
     .input({ linkId: v.id("pullRequestThreads") })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
         const link = await ctx.db.get("pullRequestThreads", args.linkId);
-        const owed = link?.watchWakeRefund;
 
-        if (link !== null && owed !== undefined && !owed.applied) {
-            await refundRoundKeys(ctx, link.userId, owed.keys);
-            await ctx.db.patch("pullRequestThreads", link._id, { watchWakeRefund: { ...owed, applied: true } });
+        if (link !== null) {
+            await payOwedRefund(ctx, link);
         }
 
         return null;
@@ -442,19 +497,19 @@ export const completeWatchWake = internalMutation
     .mutation(async ({ args, ctx }) => {
         const link = await ctx.db.get("pullRequestThreads", args.linkId);
 
-        if (link !== null && link.watchWakeLeaseUntil === args.claim) {
-            await ctx.db.patch("pullRequestThreads", link._id, {
-                watchWakeCompleted: { claim: args.claim, done: false, markers: args.markers, reasons: args.reasons },
-            });
+        if (link?.watchWakeCompleted !== undefined && link.watchWakeCompleted.claim === args.claim && !link.watchWakeCompleted.done) {
+            await ctx.db.patch("pullRequestThreads", link._id, { watchWakeCompleted: { ...link.watchWakeCompleted, state: "completed" } });
         }
 
         return null;
     });
 
 /**
- * Ends a delivery. Releases the lease it holds (a lease that is no longer this claim's is left alone). A delivered wake is counted
- * once (`wakes`, `lastWakeAt`) and its reasons leave `watchPending`, only while the same watch still runs, and only a reason whose
- * occurrence is the one delivered (`markers`): one recorded again while the turn ran stays pending. A failed one changes nothing else.
+ * Ends a delivery. Releases the lease it holds (a lease that is no longer this claim's is left alone) and marks the occurrence done.
+ * A delivered wake is counted once (`wakes`, `lastWakeAt`) against the run it started under, even if that watch was stopped during the
+ * turn, and never against a restarted run; its reasons leave `watchPending`, and only a reason whose occurrence is the one delivered
+ * (`markers`) does: one recorded again while the turn ran stays pending. A failed turn is recorded on `watchWakeFailure` while the watch
+ * still runs; otherwise it changes nothing else.
  */
 export const finishWatchWake = internalMutation
     .input({ ...key, claim: v.number(), delivered: v.boolean(), markers: vMarkers, reasons: v.array(vReason), terminal: v.optional(v.boolean()) })
@@ -466,34 +521,36 @@ export const finishWatchWake = internalMutation
             return null;
         }
 
-        const same =
-            link.watchActive === true &&
-            link.watch !== undefined &&
-            link.watch.stoppedAt === undefined &&
-            link.watch.startedAt === args.startedAt &&
-            link.watchRun === args.run;
+        const record = link.watchWakeCompleted?.claim === args.claim ? link.watchWakeCompleted : undefined;
+        const release = { watchWakeLeaseUntil: 0, ...(record !== undefined && { watchWakeCompleted: { ...record, done: true } }) };
+        const { watch } = link;
+        // The run the turn started under: another run (the watch was restarted) is never counted against or failed.
+        const sameRun = watch !== undefined && watch.startedAt === args.startedAt && link.watchRun === args.run;
 
-        if (!same || link.watch === undefined) {
-            await ctx.db.patch("pullRequestThreads", link._id, { watchWakeLeaseUntil: 0 });
+        if (!sameRun) {
+            await ctx.db.patch("pullRequestThreads", link._id, release);
 
             return null;
         }
 
+        const running = link.watchActive === true && watch.stoppedAt === undefined;
+
         if (!args.delivered) {
+            if (!running) {
+                await ctx.db.patch("pullRequestThreads", link._id, release);
+
+                return null;
+            }
+
             // The turn failed: counted, spaced by the cooldown, and the watch stopped at the third in a row or at a terminal error.
-            const attempts = (link.watchWakeFailure?.attempts ?? 0) + 1;
             const terminal = args.terminal === true;
-            const ended = terminal || attempts >= PR_WATCH_MAX_WAKE_FAILURES;
+            const failed = failedPatch(link, ctx.now, terminal, record);
 
-            await ctx.db.patch("pullRequestThreads", link._id, {
-                watchWakeFailure: { at: ctx.now, attempts, kind: terminal ? "terminal" : "retryable", retryAt: ctx.now + PR_WATCH_WAKE_COOLDOWN_MS },
-                watchWakeLeaseUntil: 0,
-                ...(ended && { watch: { ...link.watch, stoppedAt: ctx.now }, watchActive: false }),
-            });
+            await ctx.db.patch("pullRequestThreads", link._id, failed.patch);
 
-            if (ended) {
+            if (failed.ended) {
                 ctx.log.event("develop.watch_ended", {
-                    attempt: attempts,
+                    attempt: failed.patch.watchWakeFailure.attempts,
                     linkId: String(link._id),
                     reason: terminal ? "wake_failed_terminal" : "wake_failed",
                 });
@@ -502,18 +559,33 @@ export const finishWatchWake = internalMutation
             return null;
         }
 
-        const { watch } = link;
-
         // A thread that is gone or being deleted has nothing to wake: the lease is released and nothing more is written.
         const thread = await ctx.db.get("threads", link.threadId);
 
         if (thread === null || thread.deleted === true || thread.deletingAt !== undefined) {
-            await ctx.db.patch("pullRequestThreads", link._id, { watchWakeLeaseUntil: 0 });
+            await ctx.db.patch("pullRequestThreads", link._id, release);
 
             return null;
         }
 
-        await ctx.db.patch("pullRequestThreads", link._id, settledPatch(link, watch, args.claim, args.markers, args.reasons, ctx.now));
+        await ctx.db.patch(
+            "pullRequestThreads",
+            link._id,
+            settledPatch(
+                link,
+                watch,
+                record ?? {
+                    claim: args.claim,
+                    done: false,
+                    markers: args.markers,
+                    reasons: args.reasons,
+                    startedAt: args.startedAt,
+                    state: "completed",
+                    ...(args.run !== undefined && { run: args.run }),
+                },
+                ctx.now,
+            ),
+        );
 
         return null;
     });
@@ -526,6 +598,11 @@ export const releaseWatchWake = internalMutation
         const link = await ctx.db.get("pullRequestThreads", args.linkId);
 
         if (link !== null && link.watchWakeLeaseUntil === args.claim) {
+            // A job that died after the charge and before the model leaves the refund owed: paid here, once, before the lease is released.
+            if (link.watchWakeRefund?.claim === args.claim) {
+                await payOwedRefund(ctx, link);
+            }
+
             await ctx.db.patch("pullRequestThreads", link._id, { watchWakeLeaseUntil: 0 });
         }
 
@@ -548,23 +625,16 @@ const retried = async (step: () => Promise<void>): Promise<void> => {
 };
 
 /**
- * A round owed back for a turn that failed before the model: recorded on the link first, then paid, each step tried again on its own. A
- * payment that never lands stays recorded, and the next charge pays it first (`beginWatchWake`), so the round is refunded once.
+ * A round owed back for a turn that failed before the model: the obligation was written with the charge, so only the payment is tried
+ * here, again if it fails. A payment that never lands stays owed, and the lapse handler or the next charge pays it, so it is refunded once.
  */
-const owedRefund = async (
-    ctx: Pick<ActionCtx, "runMutation">,
-    identity: { claim: number; linkId: Id<"pullRequestThreads">; run?: string; startedAt: number },
-    charged: string[],
-): Promise<void> => {
+const owedRefund = async (ctx: Pick<ActionCtx, "runMutation">, linkId: Id<"pullRequestThreads">): Promise<void> => {
     try {
         await retried(async () => {
-            await ctx.runMutation(internal.source_control.pr_watch_wake.recordWatchWakeRefund, { ...identity, charged });
-        });
-        await retried(async () => {
-            await ctx.runMutation(internal.source_control.pr_watch_wake.applyWatchWakeRefund, { linkId: identity.linkId });
+            await ctx.runMutation(internal.source_control.pr_watch_wake.applyWatchWakeRefund, { linkId });
         });
     } catch (error) {
-        console.warn("[pr-watch-wake] could not give the round back", { error, linkId: identity.linkId });
+        console.warn("[pr-watch-wake] could not give the round back", { error, linkId });
     }
 };
 
@@ -589,13 +659,11 @@ export const runWatchWake = internalAction
         const identity = { claim: args.claim, linkId: args.linkId, startedAt: args.startedAt, ...(args.run !== undefined && { run: args.run }) };
 
         // Checked again right before the turn: a watch stopped since the claim, a reply that started, a lock or a delete.
-        const may = await ctx.runMutation(internal.source_control.pr_watch_wake.beginWatchWake, identity);
+        const may = await ctx.runMutation(internal.source_control.pr_watch_wake.beginWatchWake, { ...identity, markers: args.markers, reasons: args.reasons });
 
         if (may.status !== "run") {
             return null;
         }
-
-        const { charged } = may;
 
         let delivered = false;
         let terminal = false;
@@ -606,7 +674,9 @@ export const runWatchWake = internalAction
             await runHeadlessAgent(ctx, {
                 memory: false,
                 model: args.model,
-                onGenerationStart: () => {
+                // Recorded before the first generation: the round then stays charged, and a failure from here on is never refunded.
+                onGenerationStart: async () => {
+                    await ctx.runMutation(internal.source_control.pr_watch_wake.keepWatchWakeCharge, { claim: args.claim, linkId: args.linkId });
                     reachedModel = true;
                 },
                 organizationId: args.organizationId,
@@ -623,7 +693,7 @@ export const runWatchWake = internalAction
             terminal = isTerminalWakeError(error);
 
             if (!reachedModel) {
-                await owedRefund(ctx, identity, charged);
+                await owedRefund(ctx, args.linkId);
             }
 
             console.warn("[pr-watch-wake] the wake turn failed", { error, linkId: args.linkId, terminal });

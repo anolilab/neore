@@ -17,6 +17,7 @@ import { internal } from "../_generated/internal";
 import { internalMutation } from "../_generated/server";
 import { runAfterOnShard } from "../lib/shard-scheduler";
 import { loadEligibleThread } from "../devices/internal";
+import { isThreadLocked } from "../lib/thread-lock";
 import { MAX_LENGTH } from "../lib/validators";
 import { PR_WATCH_MAX_WAKES, storedWatchOf } from "./pr-watch-logic";
 
@@ -42,6 +43,8 @@ export const setPullRequestWatch = internalMutation
                 v.literal("not_allowed"),
                 v.literal("not_linked"),
                 v.literal("ok"),
+                v.literal("thread_locked"),
+                v.literal("thread_unavailable"),
                 v.literal("too_many"),
             ),
         }),
@@ -107,6 +110,18 @@ export const setPullRequestWatch = internalMutation
             return { status: "not_allowed" as const };
         }
 
+        // A locked chat sends nothing of its own anywhere and a chat being deleted is going: a watch started there could never wake, so it
+        // is refused with a status the agent can explain, taking no slot and making no poll.
+        const host = await ctx.db.get("threads", link.threadId);
+
+        if (host !== null && isThreadLocked(host)) {
+            return { status: "thread_locked" as const };
+        }
+
+        if (host === null || host.deleted === true || host.deletingAt !== undefined) {
+            return { status: "thread_unavailable" as const };
+        }
+
         // The wake count carries over: a restart must not reset the cap that ends a watch which keeps waking.
         const stored = storedWatchOf({ startedAt: ctx.now, ...(link.watch?.wakes !== undefined && { wakes: link.watch.wakes }) });
 
@@ -120,6 +135,8 @@ export const setPullRequestWatch = internalMutation
             watchRun: crypto.randomUUID(),
             // A restarted watch counts its own failures from the first.
             ...(link.watchReadFailure !== undefined && { watchReadFailure: { ...link.watchReadFailure, attempts: 0 } }),
+            // An occurrence the old run left unsettled is discarded: it must not be settled against this run.
+            ...(link.watchWakeCompleted !== undefined && !link.watchWakeCompleted.done && { watchWakeCompleted: { ...link.watchWakeCompleted, done: true } }),
             // Likewise the wake failures: a restarted watch starts a new streak and is not held back by the old retry time.
             ...(link.watchWakeFailure !== undefined && { watchWakeFailure: { ...link.watchWakeFailure, attempts: 0, retryAt: 0 } }),
         });
