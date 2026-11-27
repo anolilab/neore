@@ -159,7 +159,10 @@ const AsideFindBar: FC = () => {
     let status = "";
 
     if (hasQuery) {
-        status = matchCount > 0 ? t`${activeIndex + 1} of ${matchCount}` : t`No matches`;
+        // A member expression, not the bare name: Lingui then extracts the same "{0} of {1}" message as the thread find bar.
+        const total = { count: matchCount };
+
+        status = matchCount > 0 ? t`${activeIndex + 1} of ${total.count}` : t`No matches`;
     }
 
     return (
