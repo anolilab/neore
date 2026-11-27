@@ -1648,6 +1648,35 @@ describe("reassignGlobalRows", () => {
             }
         });
 
+        it("waits and comes back when the new account holds a live slot for the plugin but no install yet", async () => {
+            const harness = open();
+
+            try {
+                const { guestInstall } = await harness.run(async (context: any) => {
+                    const id = await context.db.insert("pluginInstalls", { ...base, pluginSlug: "shared", userId: "guest" });
+
+                    await context.db.insert("pluginInstallSlots", { createdAt: 0, installId: id, pluginSlug: "shared", userId: "guest" });
+                    // A fresh slot with no install id: another move or a create of the new account's is mid-way.
+                    await context.db.insert("pluginInstallSlots", { createdAt: context.now, pluginSlug: "shared", userId: "user" });
+
+                    return { guestInstall: id };
+                });
+
+                const result = await harness.run(async (context: any) => await mergePluginInstallsPage(context, "guest", "user"));
+                const install = await harness.run(async (context: any) => await context.db.pluginInstalls.findFirst({ where: { _id: guestInstall } }));
+                const { page: slots } = await harness.run(async (context: any) => await context.db.pluginInstallSlots.findMany({}));
+
+                expect(result).toMatchObject({ busy: true, done: false });
+                expect(install).toMatchObject({ generation: 1, userId: "guest" });
+                expect(slots.map((row: any) => [row.userId, row.installId]).toSorted()).toStrictEqual([
+                    ["guest", guestInstall],
+                    ["user", undefined],
+                ]);
+            } finally {
+                harness.close();
+            }
+        });
+
         it("moves the slot with the install", async () => {
             const harness = open();
 

@@ -18,6 +18,8 @@ import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { rateLimitGuard } from "../lib/rate-limiter";
+import { runAfterWithRetry } from "../lib/shard-scheduler";
+import { CLEANUP_RETRY } from "../agent/thread-search-triggers";
 import { heldInstallForShardWrite } from "../plugins/held-install";
 import { refuseWhileErasing } from "../plugins/owner-shard";
 import { isThreadLocked } from "../lib/thread-lock";
@@ -942,7 +944,7 @@ export const purgeTriggerExecutions = internalMutation
         const { more } = await deleteRunBatch(ctx, triggerId as Id<"triggers">);
 
         if (more) {
-            await ctx.scheduler.runAfter(0, internal.triggers.functions.purgeTriggerExecutions, { triggerId });
+            await runAfterWithRetry(ctx.scheduler, 0, internal.triggers.functions.purgeTriggerExecutions, { triggerId }, CLEANUP_RETRY);
         }
 
         return null;
@@ -959,8 +961,9 @@ export const deleteTriggerRows = async (context: MutationCtx, triggerId: Id<"tri
     // Delete the trigger
     await context.db.delete("triggers", triggerId);
 
+    // Retried with no cap: once the trigger row is gone, nothing else would find these runs again.
     if (more) {
-        await context.scheduler.runAfter(0, internal.triggers.functions.purgeTriggerExecutions, { triggerId });
+        await runAfterWithRetry(context.scheduler, 0, internal.triggers.functions.purgeTriggerExecutions, { triggerId }, CLEANUP_RETRY);
     }
 
     // Its webhook replay claims (`lib/claim-once.ts`) expire on their own within minutes, except a

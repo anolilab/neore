@@ -515,10 +515,12 @@ export const deleteAllForThreadIdAsync = internalMutation
             if (!message && !pin && args.pluginGeneration !== undefined) {
                 const install = await ctx.db.pluginInstalls.findFirst({ consistency: "primary", where: { _id: args.pluginInstallId as Id<"pluginInstalls"> } });
 
-                fenced =
-                    !install ||
-                    install.generation !== args.pluginGeneration ||
-                    (args.expectedGroupFingerprint !== undefined && groupFingerprint(group) !== args.expectedGroupFingerprint);
+                // A caller that lost the install writes nothing: the action that took it over decides this group.
+                if (!install || install.generation !== args.pluginGeneration) {
+                    return { isDone: true, kept: true };
+                }
+
+                fenced = args.expectedGroupFingerprint !== undefined && groupFingerprint(group) !== args.expectedGroupFingerprint;
             }
 
             if (message || pin || fenced) {

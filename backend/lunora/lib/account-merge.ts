@@ -2225,6 +2225,12 @@ export const mergePluginInstallsPage = async (ctx: MutationCtx, from: string, to
 
                 continue;
             }
+
+            // The slot move was refused: the new account holds a live slot for the plugin but no install yet (another merge's move is
+            // mid-way, or a create of theirs has not finished). Not a duplicate to drop yet, so the step waits and comes back.
+            busy = true;
+
+            continue;
         }
 
         // A duplicate costs up to two dozen D1 statements (its skills and links are global rows), so it gets a call to itself.

@@ -399,7 +399,9 @@ describe("plugin update with group chats", () => {
             });
 
             expect(page).toMatchObject({ isDone: true, kept: true });
-            expect(await firstGroup()).toMatchObject({ _id: group._id, pluginInstallId: "" });
+            // The caller lost the install, so it writes nothing: the action that took it over decides this group.
+            expect(await firstGroup()).toMatchObject({ _id: group._id, pluginInstallId: group.pluginInstallId, pluginMarker: group.pluginMarker });
+            expect(group.pluginInstallId).toBeTruthy();
         });
 
         it("never stops a later page", async () => {
