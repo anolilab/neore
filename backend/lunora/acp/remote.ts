@@ -300,13 +300,18 @@ export const forkHostThread = authMutation
             throw new LunoraError("BAD_REQUEST", "This agent cannot fork a session.");
         }
 
+        // The new chat is the source chat's own, not the caller's active space: filed under the organization it is in (or the one that caps
+        // it), so that organization's membership and host-agent cap are checked as for any start there (`startHostSessionFor`), and a chat
+        // of a space the caller has left, or whose cap no longer allows an agent on a computer, is refused rather than forked into another.
+        const organizationId = thread.organizationId || thread.capOrganizationId;
         const result = await startHostSessionFor(ctx, userId, {
             agentKey: session.agentKey,
-            clientId: args.clientId,
+            // Keyed by the source chat too: the id is the caller's per click, and one reused for another chat is another fork, not a replay.
+            clientId: `fork:${thread._id}:${args.clientId}`,
             deviceId: session.deviceId,
             folderId: session.folderId,
             forkSessionId: nativeId,
-            organizationId: ctx.user.activeOrganization?.id,
+            ...(organizationId && { organizationId }),
             ...(thread.projectId && { projectId: thread.projectId }),
         });
 

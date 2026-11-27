@@ -16,7 +16,7 @@ import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { GitFork } from "lucide-react";
 import type { FC } from "react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { getLocalizedError } from "@/features/auth/lib/utilities";
@@ -29,7 +29,42 @@ const HostFork: FC<{ capabilities: CapabilityReportInput | undefined; disabled?:
     const [open, setOpen] = useState(false);
     // One id per click, kept while it is retried: a double tap forks once (`clientId`).
     const clientId = useRef<string | undefined>(undefined);
-    const fork = useMutation(crpc.acp.remote.forkHostThread.mutationOptions());
+    // Still on this chat? A fork that finishes after the person moved on is not taken from them silently, nor do they get pulled away.
+    const mounted = useRef(true);
+    const openFork = (forkedThreadId: string) => {
+        void navigate({ params: { threadId: forkedThreadId }, to: "/chat/$threadId" });
+    };
+    // The callbacks are the mutation's own, not `mutate`'s: those do not run once this component has unmounted.
+    const fork = useMutation({
+        ...crpc.acp.remote.forkHostThread.mutationOptions(),
+        onError: (error) => {
+            toast.error(getLocalizedError({ error, t }));
+        },
+        onSuccess: (result) => {
+            clientId.current = undefined;
+            setOpen(false);
+
+            if (result.threadId === undefined) {
+                return;
+            }
+
+            const { threadId: forkedThreadId } = result;
+
+            if (mounted.current) {
+                openFork(forkedThreadId);
+            } else {
+                toast.success(t`The chat was forked.`, { action: { label: t`Open`, onClick: () => openFork(forkedThreadId) } });
+            }
+        },
+    });
+
+    useEffect(() => {
+        mounted.current = true;
+
+        return () => {
+            mounted.current = false;
+        };
+    }, []);
 
     if (!isAvailable(capabilityOf(capabilities, "sessions.fork"))) {
         return null;
@@ -37,23 +72,8 @@ const HostFork: FC<{ capabilities: CapabilityReportInput | undefined; disabled?:
 
     const confirm = () => {
         clientId.current ??= crypto.randomUUID();
-        fork.mutate(
-            // The route's own id type is a branded string; the thread id the composer holds is that thread's.
-            { clientId: clientId.current, threadId: threadId as never },
-            {
-                onError: (error) => {
-                    toast.error(getLocalizedError({ error, t }));
-                },
-                onSuccess: (result) => {
-                    clientId.current = undefined;
-                    setOpen(false);
-
-                    if (result.threadId !== undefined) {
-                        void navigate({ params: { threadId: result.threadId }, to: "/chat/$threadId" });
-                    }
-                },
-            },
-        );
+        // The route's own id type is a branded string; the thread id the composer holds is that thread's.
+        fork.mutate({ clientId: clientId.current, threadId: threadId as never });
     };
 
     return (

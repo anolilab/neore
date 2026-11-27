@@ -123,6 +123,18 @@ const openSession = async (ctx: MutationCtx, device: Doc<"devices">, hostSession
         const requestedNativeId = opened ? existing.nativeSessionId : undefined;
         const reattachFailure = requestedNativeId === undefined ? undefined : reattachFailureOf(requestedNativeId, open);
 
+        // A session started as a fork that the agent did not fork (`fork_unsupported`, `fork_failed`) opened fresh: it holds none of the
+        // source chat's conversation, so the chat is not a branch of it, and the link made when the fork was queued is taken back.
+        if (opened && open.fork?.forked === false) {
+            const { page: links } = await ctx.db.threadRelationships.findMany({ where: { threadId: existing.threadId } });
+
+            for (const link of links) {
+                if (link.branchType === "branch") {
+                    await ctx.db.delete("threadRelationships", link._id);
+                }
+            }
+        }
+
         if (reattachFailure !== undefined) {
             await markReattachFailed(ctx, existing.threadId, reattachFailure);
 

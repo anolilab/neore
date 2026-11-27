@@ -12,7 +12,10 @@ const harness = vi.hoisted(() => {
     return {
         calls: [] as unknown[],
         error: undefined as Error | undefined,
+        hold: undefined as Promise<void> | undefined,
+        release: undefined as (() => void) | undefined,
         navigated: [] as unknown[],
+        successes: [] as { action?: { label: string; onClick: () => void }; message: string }[],
         toasts: [] as string[],
     };
 });
@@ -37,6 +40,9 @@ vi.mock("sonner", () => {
             error: (message: string) => {
                 harness.toasts.push(message);
             },
+            success: (message: string, options?: { action?: { label: string; onClick: () => void } }) => {
+                harness.successes.push({ action: options?.action, message });
+            },
         },
     };
 });
@@ -54,6 +60,10 @@ vi.mock("@/lib/lunora/crpc", () => {
                                 return {
                                     mutationFn: async (args: unknown) => {
                                         harness.calls.push(args);
+
+                                        if (harness.hold !== undefined) {
+                                            await harness.hold;
+                                        }
 
                                         if (harness.error !== undefined) {
                                             throw harness.error;
@@ -87,7 +97,10 @@ const mount = (capabilities: unknown, disabled = false) =>
 beforeEach(() => {
     harness.calls = [];
     harness.error = undefined;
+    harness.hold = undefined;
+    harness.release = undefined;
     harness.navigated = [];
+    harness.successes = [];
     harness.toasts = [];
 });
 
@@ -140,6 +153,31 @@ describe("HostFork", () => {
 
         await waitFor(() => expect(harness.toasts).toEqual(["This agent cannot fork a session."]));
         expect(harness.navigated).toEqual([]);
+    });
+
+    it("offers the new chat in a toast, and does not move the person, when the fork finishes after they left the chat", async () => {
+        const user = userEvent.setup();
+        const view = mount(FORKS);
+
+        harness.hold = new Promise<void>((resolve) => {
+            harness.release = resolve;
+        });
+        await user.click(screen.getByRole("button", { name: "Fork here" }));
+        await screen.findByText(WARNING);
+        await user.click(screen.getAllByRole("button", { name: "Fork here" }).at(-1)!);
+        await waitFor(() => expect(harness.calls).toHaveLength(1));
+
+        // The person moves to another chat while the fork is on its way.
+        view.unmount();
+        harness.release?.();
+
+        await waitFor(() => expect(harness.successes).toHaveLength(1));
+        expect(harness.navigated).toEqual([]);
+        expect(harness.successes[0]?.message).toBe("The chat was forked.");
+        expect(harness.successes[0]?.action?.label).toBe("Open");
+
+        harness.successes[0]?.action?.onClick();
+        expect(harness.navigated).toEqual([{ params: { threadId: "thread-fork" }, to: "/chat/$threadId" }]);
     });
 
     it("is off while the agent is still starting", () => {

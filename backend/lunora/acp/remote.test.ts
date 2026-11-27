@@ -444,6 +444,114 @@ describe("forkHostThread", () => {
         await expect(fork(threadId)).rejects.toThrow("no saved agent session");
     });
 
+    it("files the new chat under the source chat's own organization, not the caller's active one", async () => {
+        const { threadId } = await started();
+
+        await run(async (ctx) => {
+            await ctx.db.insert("member", { createdAt: 0, organizationId: "org-a", role: "member", userId: ownerId });
+            await ctx.db.insert("member", { createdAt: 0, organizationId: "org-b", role: "member", userId: ownerId });
+            await ctx.db.insert("organizationPolicies", {
+                document: JSON.stringify({ permissionCap: "auto", schemaVersion: 1 }),
+                organizationId: "org-a",
+                revision: 1,
+                schemaVersion: 1,
+                updatedAt: Date.now(),
+            });
+            await ctx.db.patch("threads", threadId, { organizationId: "org-a" });
+        });
+        activeOrganization.current = { id: "org-b", name: "Other", role: "member", slug: null };
+
+        const result = (await fork(threadId)) as { threadId: string };
+
+        expect(await fieldOf(result.threadId, "organizationId")).toBe("org-a");
+    });
+
+    it("refuses a chat of an organization the caller is not in now, and one whose cap no longer allows an agent on a computer, whichever organization is active", async () => {
+        const { threadId } = await started();
+
+        await run(async (ctx) => {
+            await ctx.db.patch("threads", threadId, { organizationId: "org-a" });
+        });
+        // No longer a member of the chat's organization, in a space of their own.
+        activeOrganization.current = { id: "org-b", name: "Other", role: "member", slug: null };
+        await expect(fork(threadId, "fork-gone")).rejects.toThrow();
+
+        // A member again, but the organization's cap is below `auto`.
+        await run(async (ctx) => {
+            await ctx.db.insert("member", { createdAt: 0, organizationId: "org-a", role: "member", userId: ownerId });
+            await ctx.db.insert("organizationPolicies", {
+                document: JSON.stringify({ permissionCap: "ask", schemaVersion: 1 }),
+                organizationId: "org-a",
+                revision: 1,
+                schemaVersion: 1,
+                updatedAt: Date.now(),
+            });
+        });
+        activeOrganization.current = null;
+        await expect(fork(threadId, "fork-capped")).rejects.toThrow("Your organization does not allow agents on your computer.");
+        expect(await rows("acpSessions")).toHaveLength(1);
+    });
+
+    it("forks an unrestricted chat for its owner whatever space they have active", async () => {
+        const { threadId } = await started();
+
+        await run(async (ctx) => {
+            await ctx.db.insert("member", { createdAt: 0, organizationId: "org-b", role: "member", userId: ownerId });
+        });
+        activeOrganization.current = { id: "org-b", name: "Other", role: "member", slug: null };
+
+        const result = (await fork(threadId)) as { started: boolean; threadId: string };
+
+        expect(result.started).toBe(true);
+        expect(await fieldOf(result.threadId, "organizationId")).toBeUndefined();
+    });
+
+    it("treats an id reused for another chat as another fork, and still replays it for the same chat", async () => {
+        const { threadId } = await started();
+        const otherDevice = await pairedDevice(ownerId);
+        const second = (await as(ownerId).mutation(
+            remote.startHostSession as never,
+            { agentKey: "claude", clientId: "tap-src-2", deviceId: otherDevice.deviceId, folderId: "f1" } as never,
+        )) as {
+            threadId: string;
+        };
+        const [secondSession] = await rows("acpSessions", { threadId: second.threadId });
+
+        await run(async (ctx) => {
+            await ctx.db.patch("acpSessions", secondSession!._id, { capabilities: FORKABLE, nativeSessionId: "native-2", status: "idle" });
+        });
+
+        const first = (await fork(threadId, "same-tap")) as { started: boolean; threadId: string };
+        const other = (await fork(second.threadId, "same-tap")) as { started: boolean; threadId: string };
+        const again = (await fork(threadId, "same-tap")) as { started: boolean; threadId: string };
+
+        expect(other.started).toBe(true);
+        expect(other.threadId).not.toBe(first.threadId);
+        expect(again).toEqual({ started: false, threadId: first.threadId });
+        expect(await rows("threadRelationships", { threadId: other.threadId })).toMatchObject([{ parentThreadId: second.threadId }]);
+    });
+
+    it.each([
+        ["forked", { forked: true }, 1],
+        ["not forked by an agent that cannot", { forked: false, reason: "fork_unsupported" }, 0],
+        ["not forked, the agent failing", { forked: false, reason: "fork_failed" }, 0],
+    ])("keeps the link to the source only when the agent reports the session %s", async (_name, reported, links) => {
+        const { device, threadId } = await started();
+        const result = (await fork(threadId)) as { threadId: string };
+        const [opening] = await rows("acpSessions", { threadId: result.threadId });
+
+        await run(
+            async (ctx) =>
+                await ctx.runMutation(applyHostEvents, {
+                    deviceId: device.deviceId,
+                    events: [{ ...SESSION_OPEN, fork: reported }],
+                    sessionId: opening?.hostSessionId as string,
+                }),
+        );
+
+        expect(await rows("threadRelationships", { threadId: result.threadId })).toHaveLength(links);
+    });
+
     it("answers a chat that is not the caller's as one that does not exist", async () => {
         const { threadId } = await started();
 
