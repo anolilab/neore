@@ -13,7 +13,7 @@
  * only way in.
  */
 import type { BrowserWorker } from "@cloudflare/playwright";
-import { connect, launch } from "@cloudflare/playwright";
+import { connect, launch, sessions } from "@cloudflare/playwright";
 import { Hono } from "hono";
 import { z } from "zod";
 
@@ -47,6 +47,10 @@ const actionSchema = z.object({
     direction: z.enum(["up", "down"]).optional(),
     expectTarget: z.string().optional(), // click: the `target` of the element the person was shown; refused when it differs
     fullPage: z.boolean().optional(),
+    // screenshot: one over this many bytes is taken again at a lower quality, so it fits the caller's answer.
+    maxBytes: z.int().positive().optional(),
+    // A person's view of the page: a session that cannot be reconnected is gone (404, nothing run), never replaced by a new browser.
+    reconnectOnly: z.boolean().optional(),
     selector: z.string().optional(),
     sessionId: z.string().optional(), // Reconnect to an existing browser session
     strictVisibility: z.boolean().optional(), // click: refuse an element opacity hides too (an approved click); an ordinary click ignores opacity
@@ -289,6 +293,8 @@ interface ActionResult {
     typedSelector?: string;
     typedText?: string;
     url?: string;
+    /** A screenshot's viewport, in CSS pixels: the size the image shows, when it is not of the full page. */
+    viewport?: { height: number; width: number };
 }
 
 const PAGE_TIMEOUT = 30_000;
@@ -347,6 +353,48 @@ const openBrowser = async (
     return { browser, isLaunched: true, sessionId: browser.sessionId() };
 };
 
+/** The `code` of a reconnect-only action's answer when its session could not be reconnected: nothing was launched or run. */
+const SESSION_GONE = "SESSION_GONE";
+
+class SessionGoneError extends Error {}
+
+/**
+ * Reconnects to `sessionId` and nothing else: a person's view of the page must never start a browser the agent would
+ * then pay for, nor stand in for one the provider reaped.
+ */
+const reconnectOnlyTo = async (
+    env: Env,
+    sessionId: string,
+): Promise<{ browser: import("@cloudflare/playwright").Browser; isLaunched: false; sessionId: string }> => {
+    try {
+        return { browser: await connect(env.BROWSER, sessionId), isLaunched: false, sessionId };
+    } catch (error) {
+        // Gone only when the provider no longer lists it: a connect that failed for another reason is a failure (500),
+        // not a closed browser.
+        const active = await sessions(env.BROWSER).catch(() => undefined);
+
+        if (active?.every((session) => session.sessionId !== sessionId) === true) {
+            throw new SessionGoneError();
+        }
+
+        throw error;
+    }
+};
+
+/** `size` as a viewport, or `null` unless both sides are finite positive numbers. */
+const viewportOf = (size: { height: unknown; width: unknown } | null): { height: number; width: number } | null => {
+    const isSide = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value) && value > 0;
+
+    return size !== null && isSide(size.height) && isSide(size.width) ? { height: size.height, width: size.width } : null;
+};
+
+/** The session's page as {@link pageOf} sets it up, or `undefined` when it has none: none is opened. */
+const existingPageOf = async (browser: import("@cloudflare/playwright").Browser): Promise<import("@cloudflare/playwright").Page | undefined> => {
+    const page = browser.contexts()[0]?.pages()[0];
+
+    return page === undefined ? undefined : await pageOf(browser);
+};
+
 /** The session's page (a reconnected session keeps its page), guarded and with the default timeout. */
 const pageOf = async (browser: import("@cloudflare/playwright").Browser): Promise<import("@cloudflare/playwright").Page> => {
     const page = browser.contexts()[0]?.pages()[0] ?? (await browser.newPage());
@@ -360,6 +408,13 @@ const pageOf = async (browser: import("@cloudflare/playwright").Browser): Promis
 const BUSY_SIGNING_IN = "The browser session is signing in with a saved login; try again once that is done";
 
 const BUSY_IN_USE = "The browser session is busy with another call; try the sign-in again once it is done";
+
+/** The qualities a screenshot over the caller's `maxBytes` is taken again at, in turn. */
+const FITTING_QUALITIES = [40, 20];
+
+/** How long a sign-in waits for a session another call holds before it is refused, and how often it asks again. */
+const LOGIN_BUSY_WAIT_MS = 10_000;
+const LOGIN_BUSY_STEP_MS = 250;
 
 const LOCK_UNREACHABLE = "The browser session's lock did not answer in time, so nothing was run; try it again in a moment";
 
@@ -483,9 +538,27 @@ const act = async (env: Env, body: z.infer<typeof actionSchema>, keep?: (work: P
 
 const actHeld = async (
     env: Env,
-    { action, clickMode, direction, expectTarget, fullPage, selector, sessionId, strictVisibility, text, url, visibleOnly }: z.infer<typeof actionSchema>,
+    {
+        action,
+        clickMode,
+        direction,
+        expectTarget,
+        fullPage,
+        maxBytes,
+        reconnectOnly,
+        selector,
+        sessionId,
+        strictVisibility,
+        text,
+        url,
+        visibleOnly,
+    }: z.infer<typeof actionSchema>,
     holds: ReturnType<typeof holdsOf>,
 ): Promise<Response> => {
+    if (reconnectOnly === true && !sessionId) {
+        return Response.json({ error: "A reconnect-only action needs the session it reconnects to", success: false }, { headers: NOT_RUN, status: 400 });
+    }
+
     // Validate URL for navigate action (SSRF protection)
     if (action === "navigate" && url) {
         const urlError = validateUrl(url);
@@ -500,8 +573,19 @@ const actHeld = async (
     let isLaunched: boolean;
 
     try {
-        ({ browser, isLaunched, sessionId: activeSessionId } = await openBrowser(env, sessionId));
+        ({
+            browser,
+            isLaunched,
+            sessionId: activeSessionId,
+        } = reconnectOnly === true && sessionId ? await reconnectOnlyTo(env, sessionId) : await openBrowser(env, sessionId));
     } catch (error) {
+        if (error instanceof SessionGoneError) {
+            return Response.json(
+                { code: SESSION_GONE, error: "The browser session is gone; nothing was run", success: false },
+                { headers: NOT_RUN, status: 404 },
+            );
+        }
+
         return Response.json(
             {
                 error: `Failed to launch browser: ${error instanceof Error ? error.message : String(error)}`,
@@ -547,7 +631,12 @@ const actHeld = async (
             );
         }
 
-        const page = await pageOf(browser);
+        // A person's view of the page never opens one: a browser with no page has nothing to show.
+        const page = reconnectOnly === true ? await existingPageOf(browser) : await pageOf(browser);
+
+        if (page === undefined) {
+            return Response.json({ error: "The browser has no page open; nothing was run", success: false }, { headers: NOT_RUN, status: 422 });
+        }
 
         let result: ActionResult;
 
@@ -752,12 +841,43 @@ const actHeld = async (
                     screenshotBuffer.byteLength > 5 * 1024 * 1024
                         ? await page.screenshot({ fullPage: fullPage ?? false, quality: 60, type: "jpeg" })
                         : screenshotBuffer;
+                // Over the caller's cap: taken again at lower qualities, and refused (nothing sent) if even the lowest does not fit.
+                let fitted = finalBuffer;
+                const cap = maxBytes ?? Infinity;
 
-                const base64 = Buffer.from(finalBuffer).toString("base64");
+                for (const quality of FITTING_QUALITIES) {
+                    if (fitted.byteLength <= cap) {
+                        break;
+                    }
+
+                    fitted = await page.screenshot({ fullPage: fullPage ?? false, quality, type: "jpeg" });
+                }
+
+                if (fitted.byteLength > cap) {
+                    result = { error: "The screenshot is larger than the size asked for, even at the lowest quality", success: false };
+                    break;
+                }
+
+                const base64 = Buffer.from(fitted).toString("base64");
                 const title = await page.title();
                 const currentUrl = page.url();
 
-                result = { screenshot: base64, screenshotFormat: "jpeg", success: true, title, url: currentUrl };
+                // Playwright's own size first; a reconnected session may carry none, so then the page's, which page script can
+                // overwrite: kept only as two finite positive numbers.
+                // Only a person's view of the page (`reconnectOnly`) carries the size: the agent's answer stays as it was.
+                const viewport =
+                    reconnectOnly === true
+                        ? viewportOf(
+                              page.viewportSize() ??
+                                  (await page
+                                      .evaluate(() => {
+                                          return { height: window.innerHeight as unknown, width: window.innerWidth as unknown };
+                                      })
+                                      .catch(() => null)),
+                          )
+                        : null;
+
+                result = { screenshot: base64, screenshotFormat: "jpeg", success: true, title, url: currentUrl, ...(viewport !== null && { viewport }) };
                 break;
             }
 
@@ -1042,7 +1162,30 @@ app.post("/login", async (c) => {
         afterAnswer(c, work);
     });
     // Taken before it connects, and refused while any other call holds the session: nothing is typed unheld.
-    const refused = sessionId ? await holds.take(sessionId) : null;
+    let refused = sessionId ? await holds.take(sessionId) : null;
+
+    // Another call holds the session: wait for it (a person's frame of the page, taken again at lower qualities on a
+    // large page, lets go within a few seconds), then refuse as before. The wait never eats into the time a page load and
+    // the typing need, so a sign-in with the least budget is refused at once rather than timing out after the hold.
+    for (
+        const until = Math.min(Date.now() + LOGIN_BUSY_WAIT_MS, deadline - (MIN_LOGIN_BUDGET_MS - LOGIN_MARGIN_MS));
+        refused === "busy" && sessionId && Date.now() + LOGIN_BUSY_STEP_MS < until;
+    ) {
+        await new Promise((resolve) => {
+            setTimeout(resolve, LOGIN_BUSY_STEP_MS);
+        });
+        // Bounded by what is left of the wait, so a lock slow to answer never runs the sign-in past its deadline. Too
+        // little left to ask, or a lock that did not answer in it: the session was busy, and that is what is said.
+        const left = until - Date.now();
+
+        if (left < LOGIN_BUSY_STEP_MS) {
+            break;
+        }
+
+        const retried = await holds.take(sessionId, left);
+
+        refused = retried === "unreachable" ? "busy" : retried;
+    }
 
     if (refused === "retired") {
         return retiredAnswer("nothing was typed");
