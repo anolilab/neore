@@ -84,8 +84,8 @@
   statement. Like extraction it never matches, confirms or merges into an unpinned row past its end date (the action
   and the save, exact-text check included): the fact is saved beside it.
 - **Provenance** (`memory/evidence.ts`) — `memories.evidence` holds a quote of the user's own words, its thread and
-  message (the prompt's, or the steer's). **Evidence gate:** with `quotablePrompt` set, a fact with no verbatim typed quote is dropped before any
-  save (`memory.evidence_gate`: counts, no text); the extractor reads no tool results; trigger runs pass `learn: false`. A quote is kept only through `evidenceQuote` over the TYPED text
+  message (the prompt's, or the steer's). **Evidence gate:** it fails closed. With no `quotablePrompt` (a headless run: there are no typed words to quote) `extractMemories` returns before it reads, asks the model or stores anything (`memory.extraction_gate`, reason `no_quotable_text`); with it, a fact with no verbatim typed quote is dropped before any
+  save (`memory.evidence_gate`: counts, no text); the extractor reads no tool results; trigger runs pass `learn: false` (a headless run's job would store nothing, so it is only skipped). A quote is kept only through `evidenceQuote` over the TYPED text
   (`chat/lib/attached-text.ts`: no attachment, page capture or guest note; trigger, headless and outside-agent runs
   carry an empty one; a steer the owner did not type is flagged `notTyped` per steer, cut from what extraction reads, and blanked by `factEvidence`); it checks `containsSecret` and its own labels, and drops one naming a health condition. Merges take the
   newer quote, ranked by `evidence.at`: when the words were sent (`promptAt`, or the steer's own `sentAt`, stamped by

@@ -306,6 +306,14 @@ export const extractMemories = internalAction
     .action(async ({ args, ctx }) => {
         // What extraction reads: the prompt and the steers the owner typed. A steer they did not type (`steers[].notTyped`) is
         // cut here, for the gate and the model alike, so its words back no fact; `factEvidence` refuses it as a quote too.
+        // Fails closed: with no quotable text (a headless run, an outside payload) no fact can be backed by the user's own
+        // words, so nothing is read, asked of the model or stored.
+        if (args.quotablePrompt === undefined) {
+            ctx.log.event(GATE_EVENT, { reason: "no_quotable_text", threadId: args.threadId, userId: args.userId, userMessageLength: 0, verdict: "skip" });
+
+            return;
+        }
+
         const read = typedTurnText(args);
         const readArgs = { ...args, steeredFrom: read.steeredFrom, userMessage: read.userMessage };
 
@@ -426,31 +434,28 @@ Extract NEW facts about the user not already covered by <existing_memories>. If 
             return;
         }
 
-        // Evidence gate. Where the prompt can be quoted, a fact is kept only when a verbatim excerpt of the user's own
-        // typed words backs it (`factEvidence`). The model's say-so is not enough: an extractor reading a page, an
-        // attachment or the assistant's answer can be talked into "facts" nobody wrote. A run with no quotable prompt
-        // (`quotablePrompt` unset) is not gated here.
-        if (args.quotablePrompt !== undefined) {
-            // `quoteRefused`: a quote that is not the user's typed words, or one `evidenceQuote` refuses (secret-like, a health condition, too short).
-            const dropped = { noQuote: 0, quoteRefused: 0 };
+        // Evidence gate: a fact is kept only when a verbatim excerpt of the user's own typed words backs it
+        // (`factEvidence`). The model's say-so is not enough: an extractor reading a page, an attachment or the
+        // assistant's answer can be talked into "facts" nobody wrote.
+        // `quoteRefused`: a quote that is not the user's typed words, or one `evidenceQuote` refuses (secret-like, a health condition, too short).
+        const dropped = { noQuote: 0, quoteRefused: 0 };
 
-            extractedFacts = extractedFacts.filter((fact) => {
-                if (factEvidence(fact.quote, args.promptAt ?? Date.now(), args) !== undefined) {
-                    return true;
-                }
-
-                if (fact.quote === undefined || fact.quote.trim() === "") {
-                    dropped.noQuote += 1;
-                } else {
-                    dropped.quoteRefused += 1;
-                }
-
-                return false;
-            });
-
-            if (dropped.noQuote + dropped.quoteRefused > 0) {
-                ctx.log.event(EVIDENCE_GATE_EVENT, { ...dropped, kept: extractedFacts.length, threadId: args.threadId, userId: args.userId });
+        extractedFacts = extractedFacts.filter((fact) => {
+            if (factEvidence(fact.quote, args.promptAt ?? Date.now(), args) !== undefined) {
+                return true;
             }
+
+            if (fact.quote === undefined || fact.quote.trim() === "") {
+                dropped.noQuote += 1;
+            } else {
+                dropped.quoteRefused += 1;
+            }
+
+            return false;
+        });
+
+        if (dropped.noQuote + dropped.quoteRefused > 0) {
+            ctx.log.event(EVIDENCE_GATE_EVENT, { ...dropped, kept: extractedFacts.length, threadId: args.threadId, userId: args.userId });
         }
 
         if (extractedFacts.length === 0) {
@@ -859,8 +864,14 @@ const withoutNotTypedSteers = (userMessage: string, steers: ReadonlyArray<SteerO
         }
 
         const end = steerEnd(userMessage, steers, index);
+        // One space per UTF-16 code unit (a `u` regex would turn an emoji's pair into one), so later offsets still hold.
+        const blanked = text
+            .slice(steer.from, end)
+            .split("\n")
+            .map((line) => " ".repeat(line.length))
+            .join("\n");
 
-        text = `${text.slice(0, steer.from)}${text.slice(steer.from, end).replaceAll(/[^\n]/gu, " ")}${text.slice(end)}`;
+        text = `${text.slice(0, steer.from)}${blanked}${text.slice(end)}`;
     }
 
     return text;
@@ -1007,8 +1018,10 @@ export const factEvidence = (
 
     const rawPrompt = turn.steeredFrom === undefined ? turn.userMessage : turn.userMessage.slice(0, turn.steeredFrom);
     // Only the part of the prompt extraction read can be the quote's source: a long prompt is cut before the steers
-    // (`truncateUserMessage`), and words past the cut that a steer repeats came from that steer.
-    const promptRead = rawPrompt.slice(0, promptCharsRead(labelledTurn.userMessage, labelledTurn.steeredFrom));
+    // (`truncateUserMessage`), and words past the cut that a steer repeats came from that steer. The cut is measured on
+    // the text the model was given (`typedTurnText`: no marked steer), so a long marked steer takes none of the room.
+    const typedRead = typedTurnText(labelledTurn);
+    const promptRead = rawPrompt.slice(0, promptCharsRead(typedRead.userMessage, typedRead.steeredFrom));
     const fromPrompt = evidenceMatchEnd(claimed, promptRead) === undefined ? undefined : typedEvidenceQuote(claimed, quotablePrompt, rawPrompt);
     const steered = turn.steeredFrom === undefined ? undefined : turn.userMessage.slice(turn.steeredFrom);
     const quote =

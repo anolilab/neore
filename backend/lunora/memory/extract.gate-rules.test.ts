@@ -78,7 +78,13 @@ describe("extractMemories when the model filter rules cannot be read", () => {
         await expect(
             harness.action(
                 async (ctx: any) =>
-                    await ctx.runAction(extractMemories, { assistantResponse: "Sure, here is one way.", threadId, userId: USER, userMessage: MESSAGE }),
+                    await ctx.runAction(extractMemories, {
+                        assistantResponse: "Sure, here is one way.",
+                        quotablePrompt: MESSAGE,
+                        threadId,
+                        userId: USER,
+                        userMessage: MESSAGE,
+                    }),
             ),
         ).resolves.toBeUndefined();
 
@@ -89,7 +95,13 @@ describe("extractMemories when the model filter rules cannot be read", () => {
     const run = async () =>
         await harness.action(
             async (ctx: any) =>
-                await ctx.runAction(extractMemories, { assistantResponse: "Sure, here is one way.", threadId, userId: USER, userMessage: MESSAGE }),
+                await ctx.runAction(extractMemories, {
+                    assistantResponse: "Sure, here is one way.",
+                    quotablePrompt: MESSAGE,
+                    threadId,
+                    userId: USER,
+                    userMessage: MESSAGE,
+                }),
         );
     const processedRows = async () => {
         const { page } = await harness.run(async (ctx: any) => await ctx.db.actionCache.findMany({}));
