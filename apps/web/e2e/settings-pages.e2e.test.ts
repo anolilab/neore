@@ -21,6 +21,7 @@ const SETTINGS_LINK_SOURCE = fileURLToPath(new URL("../src/features/settings/lib
 
 /** Every old settings page, as its path below `/dashboard/settings/`, with the modal tab it opens and that tab's English title. */
 const SETTINGS_PAGES = {
+    "api-keys": { tab: "chat-api-keys", title: "API Keys" },
     "app/customization": { tab: "app-customization", title: "Customization" },
     "app/keyboard-shortcuts": { tab: "app-keyboard", title: "Keyboard Shortcuts" },
     "app/personalization": { tab: "chat-personalization", title: "Personalization" },
@@ -31,15 +32,18 @@ const SETTINGS_PAGES = {
     "auth/organizations": { tab: "auth-organizations", title: "Organizations" },
     "auth/security": { tab: "auth-security", title: "Security" },
     "auth/teams": { tab: "auth-teams", title: "Teams" },
+    "billing/limits": { tab: "auth-billing", title: "Billing" },
     "chat/agent": { tab: "chat-agent", title: "Agent" },
     "chat/bots": { tab: "chat-bots", title: "Bots" },
     "chat/devices": { tab: "chat-devices", title: "Devices" },
     "chat/knowledge": { tab: "chat-knowledge", title: "Knowledge Base" },
     "chat/mcp": { tab: "chat-mcp", title: "MCP Servers" },
+    "chat/model": { tab: "chat-models", title: "Models" },
     "chat/model-filters": { tab: "chat-model-filters", title: "Model Restrictions" },
     "chat/models": { tab: "chat-models", title: "Models" },
     "chat/triggers": { tab: "chat-triggers", title: "Triggers" },
     "chat/usage": { tab: "chat-usage", title: "Usage" },
+    "compliance/model-filters": { tab: "chat-model-filters", title: "Model Restrictions" },
     connectors: { tab: "connectors", title: "Connectors" },
     "connectors/messenger": { tab: "connectors-messenger", title: "Messenger" },
     privacy: { tab: "privacy", title: "Privacy & Data" },

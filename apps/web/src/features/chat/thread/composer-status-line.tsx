@@ -1,13 +1,18 @@
 "use client";
 
 import { useLingui } from "@lingui/react/macro";
+import { useUnlockProof } from "@neore/client-runtime";
 import cn from "@neore/ui/utils/cn";
+import { skipToken, useQuery } from "@tanstack/react-query";
 import { Bot, ShieldAlert, Target } from "lucide-react";
 import type { FC, ReactNode } from "react";
 
-import { useChatIsStreaming } from "@/features/chat/core/context/chat-context";
+import { useImpersonating } from "@/features/admin/hooks/use-is-impersonating";
+import { useChatIsStreaming, useChatThread } from "@/features/chat/core/context/chat-context";
 import type { ResearchDepth, SearchMode } from "@/features/chat/core/stores/model-store";
-import { useGoalComposer } from "@/features/chat/goal/goal-store";
+import { getValidThreadId } from "@/features/chat/core/utils/thread-id";
+import { useGoalComposer, usePinOverride } from "@/features/chat/goal/goal-store";
+import { useCRPC } from "@/lib/lunora/crpc";
 
 import { useBotThread } from "./composer-model-selector";
 import { useShownPermissionMode } from "./composer-permission-mode";
@@ -20,6 +25,30 @@ const StatusChip: FC<{ children: ReactNode; className?: string }> = ({ children,
         {children}
     </span>
 );
+
+/**
+ * Whether the chat has a pinned goal the next send will run, read as the send reads it (`send-message.ts`): this tab's
+ * pending override first, else the pin the owner's pinned-goal control keeps cached. It never fetches on its own, so a
+ * chat the viewer does not own, which has no pin cached, shows none. An admin acting as the owner sends without it.
+ */
+const usePinnedGoalShown = (): boolean => {
+    const crpc = useCRPC();
+    const { threadId } = useChatThread();
+    const validThreadId = getValidThreadId(threadId);
+    const unlockProof = useUnlockProof(validThreadId ?? "");
+    const impersonating = useImpersonating();
+    const override = usePinOverride(validThreadId);
+    const { data: cached } = useQuery({
+        ...crpc.chat.goals.functions.getPinnedGoal.queryOptions(validThreadId ? { threadId: validThreadId as never, unlockProof } : skipToken),
+        enabled: false,
+    });
+
+    if (impersonating || !validThreadId) {
+        return false;
+    }
+
+    return Boolean(override === undefined ? cached : override);
+};
 
 interface ComposerStatusLineProps {
     researchDepth: ResearchDepth;
@@ -37,6 +66,7 @@ const ComposerStatusLine: FC<ComposerStatusLineProps> = ({ researchDepth, search
     const { t } = useLingui();
     const { sseStreamState } = useChatIsStreaming();
     const goalOn = useGoalComposer((state) => state.enabled);
+    const pinned = usePinnedGoalShown();
     const permission = useShownPermissionMode();
     const { isBotThread } = useBotThread();
     const searchInfo = useSearchModeInfo(searchMode);
@@ -44,7 +74,7 @@ const ComposerStatusLine: FC<ComposerStatusLineProps> = ({ researchDepth, search
 
     const replying = Boolean(sseStreamState);
     const searching = textMode && searchMode !== "chat";
-    const goal = textMode && goalOn;
+    const goal = textMode && (goalOn || pinned);
     const fullAccess = textMode && permission === "full";
 
     if (!replying && !searching && !goal && !fullAccess && !isBotThread) {
