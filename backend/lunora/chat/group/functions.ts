@@ -19,6 +19,7 @@ import { refuseHostThread } from "../../acp/lib/host-thread";
 import { internalMutation, internalQuery } from "../../_generated/server";
 import { rateLimitGuard } from "../../lib/rate-limiter";
 import { heldInstallForShardWrite } from "../../plugins/held-install";
+import { refuseWhileErasing } from "../../plugins/owner-shard";
 import type { MutationCtx, QueryCtx as QueryContext } from "../../_generated/server";
 import { loadActivePathTail } from "../../agent/branch-rows";
 import { insertThread, patchMessage, patchThread } from "../../agent/table-writes";
@@ -385,6 +386,11 @@ export const createPluginGroupChat = internalMutation
             // one to one is left as it is.
             const stored = existing.groupChat;
 
+            // The patch below writes, so a stale action must not reach it.
+            if (generation !== undefined && stored) {
+                await heldInstallForShardWrite(ctx, pluginInstallId as Id<"pluginInstalls">, generation);
+            }
+
             if (stored) {
                 const gone: string[] = [];
 
@@ -418,6 +424,8 @@ export const createPluginGroupChat = internalMutation
 
             return { threadId: existing._id as string };
         }
+
+        await refuseWhileErasing(ctx, userId);
 
         // A stale action (its lease taken over) must not start a new child: the one it made would be lost to the new holder.
         if (generation !== undefined) {

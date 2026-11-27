@@ -7,6 +7,7 @@ import type { MutationCtx as MutationContext } from "../_generated/server";
 import { internalMutation } from "../_generated/server";
 import { rateLimitGuard } from "../lib/rate-limiter";
 import { heldInstallForShardWrite } from "../plugins/held-install";
+import { refuseWhileErasing } from "../plugins/owner-shard";
 import { systemDb } from "../lib/rls/scope";
 import { MAX_LENGTH } from "../lib/validators";
 import { invalidateSkillsCache } from "./cache";
@@ -212,7 +213,8 @@ export const createPluginSkill = internalMutation
     .output(v.id("skills"))
     .mutation(
         async ({ args: { activeOrganizationId, enabled, generation, isPremium, plan, pluginInstallId, pluginMarker, source, userId, ...fields }, ctx }) => {
-            const existing = await ctx.db.skills.findFirst({ where: { pluginMarker } });
+            // Primary: a lagging replica must not miss a skill an earlier try made, or the retry makes a second one.
+            const existing = await ctx.db.skills.findFirst({ consistency: "primary", where: { pluginMarker } });
 
             if (existing) {
                 if (existing.userId !== userId) {
@@ -223,11 +225,18 @@ export const createPluginSkill = internalMutation
                     throw new LunoraError("CONFLICT", "That plugin skill belongs to another install");
                 }
 
+                // Completing the bookkeeping writes rows, so it is fenced like a create.
+                if (generation !== undefined) {
+                    await heldInstallForShardWrite(ctx, pluginInstallId as Id<"pluginInstalls">, generation);
+                }
+
                 // The skill row commits before its bookkeeping rows, so a retry after a crash completes whatever is missing.
                 await ensureSkillRows(ctx, existing, enabled ?? true);
 
                 return existing._id as Id<"skills">;
             }
+
+            await refuseWhileErasing(ctx, userId);
 
             // A stale action (its lease taken over) must not start a new child: the one it made would be lost to the new holder.
             if (generation !== undefined) {

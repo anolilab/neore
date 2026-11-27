@@ -36,7 +36,7 @@ export const finishUninstall = internalMutation
         keptGroups: v.array(v.string().max(128)).max(300),
         pendingSkills: v.array(v.string().max(128)).max(500),
     })
-    .output(v.object({ kept: v.array(v.string()), removed: v.number() }))
+    .output(v.object({ hasMore: v.boolean(), kept: v.array(v.string()), removed: v.number() }))
     .mutation(
         async ({ args, ctx }) =>
             await finishUninstallRows(ctx, args.installId, args.generation, { keptGroups: args.keptGroups, pendingSkills: args.pendingSkills }),
@@ -100,12 +100,26 @@ export const uninstallPlugin = authAction
             }
         }
 
-        const finished = await ctx.runMutation(internal.plugins.uninstall_action.finishUninstall, {
+        let finished = await ctx.runMutation(internal.plugins.uninstall_action.finishUninstall, {
             generation: begun.generation,
             installId: begun.installId,
             keptGroups,
             pendingSkills: begun.pendingSkills,
         });
+        let finishedKept = finished.kept;
+        let finishedRemoved = finished.removed;
 
-        return { kept: [...kept, ...finished.kept], removed: begun.removed + finished.removed };
+        // A few links a call: go on, with nothing left to settle, until the links and the install are gone.
+        while (finished.hasMore) {
+            finished = await ctx.runMutation(internal.plugins.uninstall_action.finishUninstall, {
+                generation: begun.generation,
+                installId: begun.installId,
+                keptGroups: [],
+                pendingSkills: [],
+            });
+            finishedKept = [...finishedKept, ...finished.kept];
+            finishedRemoved += finished.removed;
+        }
+
+        return { kept: [...kept, ...finishedKept], removed: begun.removed + finishedRemoved };
     });

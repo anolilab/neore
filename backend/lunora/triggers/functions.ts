@@ -19,6 +19,7 @@ import type { MutationCtx } from "../_generated/server";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { rateLimitGuard } from "../lib/rate-limiter";
 import { heldInstallForShardWrite } from "../plugins/held-install";
+import { refuseWhileErasing } from "../plugins/owner-shard";
 import { isThreadLocked } from "../lib/thread-lock";
 import { authAction, authMutation, authQuery, rateLimit } from "../lib/crpc";
 import {
@@ -593,6 +594,8 @@ export const createPluginTrigger = internalMutation
 
             return { triggerId: existing._id as string };
         }
+
+        await refuseWhileErasing(ctx, userId);
 
         // A stale action (its lease taken over) must not start a new child: the one it made would be lost to the new holder.
         if (generation !== undefined) {

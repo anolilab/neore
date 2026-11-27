@@ -2,6 +2,7 @@ import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import schema from "../../schema";
+import { createInstallRow } from "../../plugins/install-steps";
 import { createPluginSkill } from "../../skills/create-skill";
 import { createPluginGroupChat } from "./functions";
 
@@ -126,5 +127,48 @@ describe("plugin group chats", () => {
 
         expect(group.groupChat.participants.map((participant: any) => participant.skillId)).toEqual([a, c, d]);
         expect(group.groupChat.debateRounds).toBe(7);
+    });
+
+    it("does not repoint a found group for an action whose generation the install has moved past", async () => {
+        const { a, b, c, install } = await harness.run(async (context: any) => {
+            const first = await context.runMutation(createPluginSkill, skill("analyst"));
+            const second = await context.runMutation(createPluginSkill, skill("critic"));
+
+            await context.runMutation(createPluginGroupChat, groupInput([first, second]));
+            await context.db.delete("skills", second);
+
+            const row = await context.runMutation(createInstallRow, { contentHash: "a".repeat(64), pluginSlug: "panel", userId: OWNER, version: "1.0.0" });
+
+            await context.db.patch("pluginInstalls", row.installId, { generation: row.generation + 1 });
+
+            return { a: first, b: second, c: await context.runMutation(createPluginSkill, skill("critic-again")), install: row };
+        });
+
+        await expect(
+            harness.run(
+                async (context: any) =>
+                    await context.runMutation(createPluginGroupChat, {
+                        ...groupInput([a, c]),
+                        generation: install.generation,
+                        pluginInstallId: install.installId,
+                    }),
+            ),
+        ).rejects.toThrow("STALE_LEASE");
+
+        const [group] = await groupsWithMarker();
+
+        expect(group.groupChat.participants.map((participant: any) => participant.skillId)).toEqual([a, b]);
+    });
+
+    it("creates no group while the account is being erased", async () => {
+        const first = await harness.run(async (context: any) => await context.runMutation(createPluginSkill, skill("analyst")));
+        const second = await harness.run(async (context: any) => await context.runMutation(createPluginSkill, skill("critic")));
+
+        await harness.run(async (context: any) => await context.db.insert("accountMoves", { createdAt: Date.now(), kind: "erasing", userId: OWNER }));
+
+        await expect(harness.run(async (context: any) => await context.runMutation(createPluginGroupChat, groupInput([first, second])))).rejects.toThrow(
+            "being deleted",
+        );
+        expect(await groupsWithMarker()).toHaveLength(0);
     });
 });

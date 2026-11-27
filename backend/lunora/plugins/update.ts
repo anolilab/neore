@@ -208,7 +208,8 @@ export const updatePlugin = authAction
             );
         }
 
-        // A child whose kind changed is a removal plus a creation under one key. Both halves are skipped when a group chat is on either side.
+        // A child whose kind changed is a removal plus a creation under one key. Both halves are skipped when the old child is a group chat
+        // (a group is never removed in place). A group on the new side was refused above.
         const groupSwap = new Set(
             plan
                 .filter(
@@ -217,22 +218,9 @@ export const updatePlugin = authAction
                         plan.some((other) => other.entryKey === step.entryKey && (other.action === "delete" || other.action === "detach")),
                 )
                 .map((step) => step.entryKey)
-                .filter(
-                    (key) =>
-                        installed.children.find((row) => row.entryKey === key)?.kind === "group" ||
-                        entries.find((entry) => entry.key === key)?.plan?.kind === "group",
-                ),
+                .filter((key) => installed.children.find((row) => row.entryKey === key)?.kind === "group"),
         );
-        const createKeys = new Set(
-            plan
-                .filter(
-                    (step) =>
-                        step.action === "create" &&
-                        !groupSwap.has(step.entryKey) &&
-                        entries.find((entry) => entry.key === step.entryKey)?.plan?.kind !== "group",
-                )
-                .map((step) => step.entryKey),
-        );
+        const createKeys = new Set(plan.filter((step) => step.action === "create" && !groupSwap.has(step.entryKey)).map((step) => step.entryKey));
 
         // Checked before anything is written: a new item the planner blocked must not be dropped while the new version is recorded.
         if (createKeys.size > 0) {
@@ -260,7 +248,7 @@ export const updatePlugin = authAction
                 const child = installed.children.find((row) => row.entryKey === step.entryKey);
 
                 if (step.action === "create") {
-                    // A new group chat needs its participants in the same selection; it is reported until that is handled.
+                    // The creation half of a kind change whose old child is a group chat: reported, not applied.
                     if (!createKeys.has(step.entryKey)) {
                         skipped.push(step);
                     }

@@ -125,27 +125,29 @@ export const markNeedsRepair = internalMutation
         return null;
     });
 
-/** A clean rollback: the install and its links go, once every child is gone. */
+/**
+ * A clean rollback: the install and its links go, once every child is gone. A call deletes at most 10 links (each a read and a delete
+ * against the invocation's D1 queries) and the install only once none are left; `hasMore` tells the caller to call again.
+ */
 export const deleteInstall = internalMutation
     .input({ generation: v.number(), installId: v.string().max(128) })
-    .output(v.null())
+    .output(v.object({ hasMore: v.boolean() }))
     .mutation(async ({ args, ctx }) => {
         await heldInstall(ctx, args.installId as Id<"pluginInstalls">, args.generation);
 
-        // Every link, not one page of them: a link left behind would name an install that no longer exists.
-        for (;;) {
-            const { page: links } = await ctx.db.pluginItems.findMany({ consistency: "primary", where: { installId: args.installId } });
+        const batch = 10;
+        const { page: links } = await ctx.db.pluginItems.findMany({ consistency: "primary", limit: batch + 1, where: { installId: args.installId } });
 
-            if (links.length === 0) {
-                break;
-            }
+        for (const link of links.slice(0, batch)) {
+            await ctx.db.delete("pluginItems", link._id);
+        }
 
-            for (const link of links) {
-                await ctx.db.delete("pluginItems", link._id);
-            }
+        // A link left behind would name an install that no longer exists, so the install goes last.
+        if (links.length > batch) {
+            return { hasMore: true };
         }
 
         await ctx.db.delete("pluginInstalls", args.installId as Id<"pluginInstalls">);
 
-        return null;
+        return { hasMore: false };
     });

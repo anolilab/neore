@@ -189,7 +189,14 @@ export const installPlugin = authAction
                 if (error instanceof BundleImportError && (error.resumable || error.leftBehind.length > 0)) {
                     await ctx.runMutation(internal.plugins.install_steps.markNeedsRepair, { generation, installId });
                 } else {
-                    await ctx.runMutation(internal.plugins.install_steps.deleteInstall, { generation, installId });
+                    // A few links a call, so a large install stays inside one invocation's D1 queries.
+                    let more = true;
+
+                    while (more) {
+                        const step = await ctx.runMutation(internal.plugins.install_steps.deleteInstall, { generation, installId });
+
+                        more = step.hasMore;
+                    }
                 }
 
                 throw importFailure(error);

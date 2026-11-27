@@ -239,9 +239,14 @@ export const claimGroupForDelete = async (ctx: MutationCtx, installId: string, g
 };
 
 export interface UninstallFinished {
+    /** True while links are left: the caller calls again (with no pending skills or kept groups) until it is false. */
+    hasMore: boolean;
     kept: string[];
     removed: number;
 }
+
+/** Links one finish call deletes: each is a read and a delete against the invocation's D1 queries. */
+const LINKS_PER_CALL = 10;
 
 /**
  * The last step: the held-back skills, the links and the install go. Called once the group chats have been deleted. A pending
@@ -261,7 +266,7 @@ export const finishUninstallRows = async (
 
     requireOwnerShard(install.userId, "uninstall");
 
-    const result: UninstallFinished = { kept: [], removed: 0 };
+    const result: Omit<UninstallFinished, "hasMore"> = { kept: [], removed: 0 };
     const usedByKept = new Set<string>();
 
     const keptGroups = options.keptGroups ?? [];
@@ -317,20 +322,18 @@ export const finishUninstallRows = async (
         result.removed += 1;
     }
 
-    // Every link goes, not one page of them: a link left behind would name an install that no longer exists.
-    for (;;) {
-        const { page: links } = await ctx.db.pluginItems.findMany({ consistency: "primary", where: { installId } });
+    const { page: links } = await ctx.db.pluginItems.findMany({ consistency: "primary", limit: LINKS_PER_CALL + 1, where: { installId } });
 
-        if (links.length === 0) {
-            break;
-        }
+    for (const link of links.slice(0, LINKS_PER_CALL)) {
+        await ctx.db.delete("pluginItems", link._id as Id<"pluginItems">);
+    }
 
-        for (const link of links) {
-            await ctx.db.delete("pluginItems", link._id as Id<"pluginItems">);
-        }
+    // A link left behind would name an install that no longer exists, so the install goes last.
+    if (links.length > LINKS_PER_CALL) {
+        return { ...result, hasMore: true };
     }
 
     await ctx.db.delete("pluginInstalls", install._id as Id<"pluginInstalls">);
 
-    return result;
+    return { ...result, hasMore: false };
 };

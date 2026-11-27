@@ -186,4 +186,11 @@ describe("plugin skills", () => {
 
         expect(page).toHaveLength(0);
     });
+
+    it("creates no skill while the account is being erased, so the erasure sweep leaves nothing behind", async () => {
+        await harness.run(async (context: any) => await context.db.insert("accountMoves", { createdAt: Date.now(), kind: "erasing", userId: OWNER }));
+
+        await expect(harness.run(async (context: any) => await context.runMutation(createPluginSkill, pluginInput))).rejects.toThrow("being deleted");
+        expect(await rowsWithMarker()).toHaveLength(0);
+    });
 });
