@@ -206,6 +206,7 @@ const OWNER_TABLES = [
     "knowledgeCollectionLinks",
     "mcpServerGrants",
     "memories",
+    "memoryCleanups",
     "memoryDigests",
     "memoryImportBatches",
     "memoryImportJobs",

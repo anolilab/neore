@@ -115,6 +115,8 @@ const shardSweeps = (): ReadonlyArray<Sweep> => [
     { name: "restoreLiveBotOwners", ref: internal.bots.owner.restoreLiveBotOwners },
     // Once a day, queues the schedule-ideas job for a user who turned it on (`tasks/schedule-ideas.ts`); a no-op for everyone else.
     { name: "dispatchScheduleIdeas", ref: internal.tasks.schedule_ideas.dispatchScheduleIdeas },
+    // Arms a job for a memory cleanup record that is due, its own job having been lost (`memory/functions.ts`, `runMemoryCleanup`).
+    { name: "sweepMemoryCleanups", ref: internal.memory.functions.sweepMemoryCleanups },
     // A guest merge whose queued job ran out of redeliveries is queued again from its saved progress (`lib/account-merge.ts`).
     { name: "resumeStalledGuestMerges", ref: internal.lib.account_merge.resumeStalledGuestMerges },
 ];
@@ -621,6 +623,15 @@ export const runShardTick = internalMutation
             ({ nextCheckAt: mergeCheckAt } = await ctx.runMutation(internal.lib.account_merge.resumeStalledGuestMergesOnTick, {}));
         });
 
+        // Memory cleanups (`memory/functions.ts`) that are due and have no live job: a dormant shard's only way to be worked,
+        // as housekeeping no longer visits it. Resolves the earliest one still to come.
+        let memoryCleanupAt: number | undefined;
+        const cleanupsChecked = await bestEffort("sweepMemoryCleanupsOnTick", async () => {
+            const { nextDueAt } = await ctx.runMutation(internal.memory.functions.sweepMemoryCleanups, {});
+
+            memoryCleanupAt = nextDueAt ?? undefined;
+        });
+
         const { now } = ctx;
         // The earliest export run due here. A read that fails must not stop the re-arming below: the shard is then armed for now, as
         // a reap that failed is.
@@ -669,13 +680,14 @@ export const runShardTick = internalMutation
             repoPoll?.nextPollAt,
             exportRunRead?.deleteAt,
             mergeCheckAt,
+            memoryCleanupAt,
             retentionLater,
             ...stuckChecks.map((row) => row?.stuckCheckAt),
         ].filter((at): at is number => at !== undefined);
 
         // The dispatch cleared this shard's due time; a reap, a merge check, a retention prune or an export-run read that failed recorded
         // no next time, so try again. So does an Events backlog the rounds above did not finish.
-        if (!reaped || !mergesChecked || !pruned || !triggersChecked || exportRunRead === undefined || eventsLeft) {
+        if (!reaped || !mergesChecked || !cleanupsChecked || !pruned || !triggersChecked || exportRunRead === undefined || eventsLeft) {
             candidates.push(now);
         }
 
