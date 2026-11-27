@@ -258,45 +258,45 @@ export enum ToolName {
     RequestSecret = "requestSecret",
 
     RerunFailedChecks = "rerunFailedChecks",
+
     // Content Tools
     Retrieve = "retrieve",
     SaveSecretAsProviderKey = "saveSecretAsProviderKey",
-
     // Memory Tools
     SearchMemory = "searchMemory",
     SetMcpServerSecret = "setMcpServerSecret",
+
     // Sandbox Tools
     ShellExecution = "shellExecution",
+
     // Signing the browser in with a saved login
     SignInWithSavedLogin = "signInWithSavedLogin",
 
     SpotifySearch = "spotifySearch",
-
     StockChart = "stockChart",
-
     // Task Management Tools
     TaskList = "taskList",
+
     // Language Tools
     TextTranslate = "textTranslate",
-    TrendingMovies = "trendingMovies",
 
+    TrendingMovies = "trendingMovies",
     TrendingTv = "trendingTv",
 
     UnwatchPullRequest = "unwatchPullRequest",
     UpdateDesign = "updateDesign",
 
     UpdateDocument = "updateDocument",
-
     UpdateSlide = "updateSlide",
+
     VideoGeneration = "videoGeneration",
 
     VideoSearch = "videoSearch",
-
     // Vision / Analysis Tools
     VisionAnalysis = "visionAnalysis",
-    WatchPullRequest = "watchPullRequest",
 
     // Information Tools
+    WatchPullRequest = "watchPullRequest",
     Weather = "weather",
 
     // Search Tools

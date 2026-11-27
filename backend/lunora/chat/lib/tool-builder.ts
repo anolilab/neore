@@ -423,22 +423,23 @@ const ALL_TOOLS: Record<ToolName, unknown> = {
     // Content Tools
     [ToolName.Retrieve]: retrieveTool,
     [ToolName.SaveSecretAsProviderKey]: saveSecretAsProviderKeyTool,
+
     // Memory Tools
     [ToolName.SearchMemory]: searchMemoryTool,
     [ToolName.SetMcpServerSecret]: setMcpServerSecretTool,
-
     // Sandbox Tools
     [ToolName.ShellExecution]: shellExecutionTool,
     [ToolName.SignInWithSavedLogin]: signInWithSavedLoginTool,
+
     [ToolName.SpotifySearch]: spotifySearchTool,
     [ToolName.StockChart]: stockChartTool,
-
     // Task Management Tools
     [ToolName.TaskList]: taskListTool,
+
     // Language Tools
     [ToolName.TextTranslate]: textTranslateTool,
-    [ToolName.TrendingMovies]: trendingMoviesTool,
 
+    [ToolName.TrendingMovies]: trendingMoviesTool,
     [ToolName.TrendingTv]: trendingTvTool,
 
     [ToolName.UnwatchPullRequest]: unwatchPullRequestTool,
@@ -447,8 +448,8 @@ const ALL_TOOLS: Record<ToolName, unknown> = {
     [ToolName.UpdateDocument]: updateDocumentTool,
 
     [ToolName.UpdateSlide]: updateSlideTool,
-
     [ToolName.VideoGeneration]: videoGenerationTool,
+
     [ToolName.VideoSearch]: videoSearchTool,
 
     // Vision / Analysis Tools
