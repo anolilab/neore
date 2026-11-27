@@ -8,6 +8,8 @@ import {
     SEARCH_MIN_RELEVANCE,
     SEARCH_THRESHOLD,
     selectCandidateWindow,
+    topScopedHits,
+    VECTOR_TOP_K,
     withVectorHits,
 } from "./retrieve-ranking";
 import type { RankCandidate } from "./retrieve-ranking";
@@ -79,24 +81,34 @@ describe("rankMemories", () => {
         expect(rank([candidate("a", text)], [], "hiking boots baking painting running swimming").map((m) => m.memoryId)).toEqual(["a"]);
     });
 
-    it("finds an embedded memory the vector search missed by no words, and one with no vector by its words", () => {
-        const text = { lastConfirmedAt: NOW, memory: "likes hiking boots" };
-        const keywords = (searchText: string, candidates: RankCandidate[]) => keywordScoresFor(candidates, searchText);
+    it("leaves out an old embedded memory a decisive vector search missed, and finds every other one without a hit by its words", () => {
+        const text = { memory: "likes hiking boots" };
         const ids = (candidates: RankCandidate[], vectorSearched: boolean) =>
             rankMemories({
                 candidates,
-                keywordScores: keywords("hiking boots", candidates),
+                keywordScores: keywordScoresFor(candidates, "hiking boots"),
                 now: NOW,
                 vectorScores: new Map(),
                 vectorSearched,
-            }).map((m) => m.memoryId);
-        const embedded = candidate("embedded", { ...text, embeddingId: "emb" });
-        const bare = candidate("bare", text);
+            })
+                .map((m) => m.memoryId)
+                .toSorted((a, b) => a.localeCompare(b));
+        const old = candidate("old", { ...text, embeddingId: "emb-old", lastConfirmedAt: NOW - 30 * DAY });
+        // Written a minute ago: its vector may not be searchable yet.
+        const fresh = candidate("fresh", { ...text, embeddingId: "emb-fresh", lastConfirmedAt: NOW - 60_000 });
+        const bare = candidate("bare", { ...text, lastConfirmedAt: NOW - 30 * DAY });
 
-        // A vector search ran and returned nothing near the embedded row: its words do not make it relevant.
-        expect(ids([embedded, bare], true)).toEqual(["bare"]);
-        // No vector search ran (the model was refused, the index failed): every memory is found by its words.
-        expect(ids([embedded, bare], false).toSorted((a, b) => a.localeCompare(b))).toEqual(["bare", "embedded"]);
+        // The search ran and its hits filled the cut: an old embedded row it lacks is not relevant; a new one or one with no vector is found by words.
+        expect(ids([old, fresh, bare], true)).toEqual(["bare", "fresh"]);
+        // No decisive search (the model was refused, the index or the hit lookup failed, or other bots' rows took the slots): every memory is found by its words.
+        expect(ids([old, fresh, bare], false)).toEqual(["bare", "fresh", "old"]);
+    });
+
+    it("matches a word through the punctuation around it", () => {
+        const rows = [candidate("a", { memory: "Allergic to peanuts, and (tree-nuts)." })];
+
+        expect(keywordScoresFor(rows, "Do I have peanuts?").get("a")).toBeCloseTo(1 / 3, 10);
+        expect(rank(rows, [], "peanuts?").map((m) => m.memoryId)).toEqual(["a"]);
     });
 
     it("uses a vector hit over the keyword score even when the hit is 0, and the keyword score otherwise", () => {
@@ -193,6 +205,22 @@ describe("withVectorHits", () => {
         const hits = [hit("gone", { validUntil: "2026-11-26" }), hit("kept", { pinned: true, validUntil: "2026-11-26" })];
 
         expect(withVectorHits([], hits, { today: "2026-11-27" }).map((m) => m._id)).toEqual(["kept"]);
+    });
+});
+
+describe(topScopedHits, () => {
+    it("keeps the best hits of the chat's own scopes, best first, and drops other bots' rows before the cut", () => {
+        const other = Array.from({ length: 40 }, (_, i) => {
+            return { botId: "bot-b", id: `other-${String(i)}` };
+        });
+        const own = Array.from({ length: VECTOR_TOP_K + 5 }, (_, i) => {
+            return { botId: null, id: `own-${String(i)}` };
+        });
+        const kept = topScopedHits([...other, ...own], {});
+
+        expect(kept).toHaveLength(VECTOR_TOP_K);
+        expect(kept[0]!.id).toBe("own-0");
+        expect(topScopedHits([...other, ...own], { botId: "bot-b" }).map((h) => h.id)).toEqual(other.slice(0, VECTOR_TOP_K).map((h) => h.id));
     });
 });
 

@@ -25,7 +25,9 @@ import {
     SEARCH_MIN_KEYWORD_RELEVANCE,
     SEARCH_MIN_RELEVANCE,
     SEARCH_THRESHOLD,
-    VECTOR_TOP_K,
+    topScopedHits,
+    VECTOR_FETCH_K,
+    vectorCutIsFull,
     withVectorHits,
 } from "./retrieve-ranking";
 import type { RankedMemory } from "./retrieve-ranking";
@@ -100,14 +102,11 @@ export const retrieveRelevantMemories = internalAction
             userId: args.userId,
         })) as ActiveMemory[];
 
-        if (windowMemories.length === 0) {
-            return [];
-        }
-
-        // 3. Try vector search for semantic similarity
+        // 3. Try vector search for semantic similarity. An empty window does not end it: the window is the newest rows
+        // only, and the hits add the ones it left out (an old fact behind many newer, expired ones).
         const vectorScoreMap = new Map<string, number>(); // memoryId → cosine score
         let hitMemories: ActiveMemory[] = [];
-        // Whether a vector search answered: then an embedded memory it did not return is not relevant by words alone.
+        // Whether the search answered with a full in-scope cut: then an old embedded memory it lacks is not relevant.
         let vectorSearched = false;
 
         try {
@@ -135,35 +134,34 @@ export const retrieveRelevantMemories = internalAction
 
                     const vectorResults = await searchVectors(ctx, queryVector, {
                         dimension: dimension as VectorDimension,
-                        limit: VECTOR_TOP_K,
+                        limit: VECTOR_FETCH_K,
                         model: MEMORY_EMBEDDING_MODEL_NAME,
                         searchAllMessagesForUserId: args.userId,
                         table: "memories",
                     });
 
-                    vectorSearched = true;
-
                     if (vectorResults.length > 0) {
                         // Bulk-lookup memory records for the vector hits
                         const embeddingIds = vectorResults.map((r) => r._id as string);
-                        // Every scope of the user comes back (the index holds other bots' rows too); the scope is
-                        // checked below, where a hit becomes a candidate. An expired fact is already left out.
+                        // Every scope of the user comes back (the index holds other bots' rows too, and cannot filter
+                        // on them), so more hits than `VECTOR_TOP_K` were asked for and the best in scope are kept.
+                        // An expired or superseded fact is already left out.
                         const matched = (await ctx.runQuery(internal.memory.functions.getMemoriesByEmbeddingIds, {
                             activeOn: now,
                             embeddingIds,
                             userId: args.userId,
                         })) as (ActiveMemory & { embeddingId: string })[];
-
-                        // Build map: memoryId → cosine score
                         const embeddingScores = new Map(vectorResults.map((r) => [r._id as string, r._score]));
+                        const scopedHits = topScopedHits(matched, scope);
 
-                        for (const mem of matched) {
-                            const score = embeddingScores.get(mem.embeddingId) ?? 0;
-
-                            vectorScoreMap.set(mem._id, score);
+                        // Only now, with every hit resolved, are the scores and hits taken: a lookup that threw above
+                        // leaves them empty and the memories are found by keyword, as with no vector search.
+                        for (const mem of scopedHits) {
+                            vectorScoreMap.set(mem._id, embeddingScores.get(mem.embeddingId) ?? 0);
                         }
 
-                        hitMemories = matched;
+                        hitMemories = scopedHits;
+                        vectorSearched = vectorCutIsFull(scopedHits);
                     }
                 }
             }

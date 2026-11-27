@@ -1261,7 +1261,7 @@ export const confirmMemories = internalMutation
     });
 
 /** Rows one scope's active read reads at most, unless `limit` (one page) is more. */
-const ACTIVE_READ_MAX_ROWS = 1500;
+export const ACTIVE_READ_MAX_ROWS = 1500;
 
 /**
  * Memories a run may read or dedupe against. Without `botId` only the user's own
@@ -1295,49 +1295,66 @@ export const getActiveMemoriesForUser = internalQuery
         // another's window. A null `botId` is the user's own memories.
         const scopes = scopesOf(args);
 
-        // The active-row index, so superseded rows are never read. Paged until `limit` usable rows or the range ends,
-        // so expired rows cannot fill the window; at most `maxRows` rows (or one page), a bounded read.
-        const readRange = async (scope: string | null, type: MemoryType | undefined, maxRows: number): Promise<Doc<"memories">[]> => {
-            const kept: Doc<"memories">[] = [];
-            let cursor: string | null = null;
+        // The active-row index, so superseded rows are never read. The index holds no end date, so an expired row is
+        // dropped after it is read: each range is paged until it has `limit` usable rows or ends. The ranges of a scope
+        // (one, or one per type) share ONE budget of `maxRows` rows (or one page), taken a page per open range per round,
+        // so a type buried in expired rows may use what the others did not need, and the read stays bounded.
+        const readScope = async (scope: string | null, types: ReadonlyArray<MemoryType | undefined>, maxRows: number): Promise<Doc<"memories">[]> => {
+            const ranges = types.map((type) => {
+                return { cursor: null as string | null, done: false, kept: [] as Doc<"memories">[], type };
+            });
+            let read = 0;
 
-            for (let read = 0; read < maxRows && kept.length < limit; read += limit) {
-                const result = await ctx.db
-                    .query("memories")
-                    .withIndex("by_userId_botId_active", (q) => {
-                        const active = q
-                            .eq("userId", args.userId)
-                            .eq("botId", scope as Id<"bots"> | null)
-                            .eq("supersededBy", null);
+            while (read < maxRows) {
+                const open = ranges.filter((range) => !range.done && range.kept.length < limit);
 
-                        return type === undefined ? active : active.eq("type", type);
-                    })
-                    .order("desc")
-                    .paginate({ cursor, numItems: limit });
-
-                kept.push(...result.page.filter((m) => isUsableOn(m, today)));
-
-                if (result.isDone) {
+                if (open.length === 0) {
                     break;
                 }
 
-                cursor = result.continueCursor;
+                const round = open.slice(0, Math.max(1, Math.floor((maxRows - read) / limit)));
+                const pages = await Promise.all(
+                    round.map(
+                        async (range) =>
+                            await ctx.db
+                                .query("memories")
+                                .withIndex("by_userId_botId_active", (q) => {
+                                    const active = q
+                                        .eq("userId", args.userId)
+                                        .eq("botId", scope as Id<"bots"> | null)
+                                        .eq("supersededBy", null);
+
+                                    return range.type === undefined ? active : active.eq("type", range.type);
+                                })
+                                .order("desc")
+                                .paginate({ cursor: range.cursor, numItems: limit }),
+                    ),
+                );
+
+                for (const [index, page] of pages.entries()) {
+                    const range = round[index]!;
+
+                    // An empty page still counts, so the loop always ends.
+                    read += Math.max(page.page.length, 1);
+                    range.kept.push(...page.page.filter((m) => isUsableOn(m, today)));
+                    range.done = page.isDone;
+                    range.cursor = page.continueCursor;
+                }
             }
 
-            return kept;
+            return ranges.flatMap((range) => range.kept);
         };
 
         const perScope = await Promise.all(
             scopes.map(async (scope) => {
                 if (args.newestFirst !== true) {
-                    return await readRange(scope, undefined, Math.max(limit, ACTIVE_READ_MAX_ROWS));
+                    return await readScope(scope, [undefined], Math.max(limit, ACTIVE_READ_MAX_ROWS));
                 }
 
                 // Within a type the index is newest first, so the newest `limit` of the scope are among each type's own.
-                const perType = Math.max(limit, Math.ceil(ACTIVE_READ_MAX_ROWS / MEMORY_TYPES.length));
-                const byType = await Promise.all(MEMORY_TYPES.map(async (type) => await readRange(scope, type, perType)));
+                const rows = await readScope(scope, MEMORY_TYPES, Math.max(limit, ACTIVE_READ_MAX_ROWS));
 
-                return byType.flat().toSorted(byNewest).slice(0, limit);
+                return rows.toSorted(byNewest).slice(0, limit);
             }),
         );
 

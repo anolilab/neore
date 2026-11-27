@@ -4,7 +4,7 @@
  * runs in `retrieve.ts` and in the offline retrieval eval (`retrieval-eval.test.ts`).
  */
 
-const WHITESPACE_RE = /\s+/;
+import { tokenize } from "../knowledge/hybrid";
 
 /**
  * The signals' weights, which add up to 1. Relevance leads: among rows of one topic the cosines are close, so the
@@ -26,9 +26,9 @@ export const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
  * score of `AUTO_INJECT_THRESHOLD`, which only drops a row that is old, unsure and unimportant at once.
  *
  * Tuned on the retrieval eval (`__fixtures__/README.md`): relevant rows start at cosine 0.86 and unrelated ones end
- * at 0.40, so 0.45 leaves a margin over the noise. The keyword floor applies only to a memory with no vector, or to
- * every memory when no vector search ran; the eval's keyword-only run holds Recall@8 there (0.177 at 0.2, 0.165
- * before, 0.015 at 0.35).
+ * at 0.40, so 0.45 leaves a margin over the noise. The keyword floor applies to a memory with no vector, to one whose
+ * vector is new or the search did not fill its cut, and to every memory when no vector search ran; the eval's
+ * keyword-only run holds Recall@8 there (0.177 at 0.2, 0.165 before, 0.015 at 0.35).
  */
 export const INJECT_MIN_RELEVANCE = 0.45;
 export const INJECT_MIN_KEYWORD_RELEVANCE = 0.2;
@@ -48,8 +48,15 @@ export const SEARCH_MAX_RESULTS = 10;
 /** Rows each scope contributes to the candidate window. */
 export const CANDIDATE_WINDOW_SIZE = 100;
 
-/** Vector hits read per search (before superseded rows are dropped). */
+/** Vector hits that count per search: the best ones of the chat's own scopes, after the others are dropped. */
 export const VECTOR_TOP_K = 30;
+
+/**
+ * Hits asked of the index. It holds every bot's rows of the user and has no bot field to filter on, so other bots'
+ * (and superseded or expired) hits can fill the top `VECTOR_TOP_K`: it is asked for three times as many and cut
+ * to `VECTOR_TOP_K` after the scope check (`topScopedHits`).
+ */
+export const VECTOR_FETCH_K = VECTOR_TOP_K * 3;
 
 /** What scoring reads of a memory. */
 export interface RankCandidate {
@@ -144,6 +151,19 @@ export const selectCandidateWindow = <
     return mergeScopeWindows(perScope, limit, byNewest);
 };
 
+/** The best `limit` of the hits (best first) that are rows of a scope the chat reads; the rest are other bots' rows. */
+export const topScopedHits = <T extends { botId?: string | null }>(hits: T[], scope: MemoryScope, limit: number = VECTOR_TOP_K): T[] =>
+    hits.filter((row) => inScope(row, scope)).slice(0, limit);
+
+/**
+ * Whether the in-scope hits fill the cut. Only then is a row missing from them known to be less near than all of
+ * them; a short cut means other bots' rows took the slots or the index had no more, and says nothing of a row it lacks.
+ */
+export const vectorCutIsFull = (scopedHits: ReadonlyArray<unknown>): boolean => scopedHits.length >= VECTOR_TOP_K;
+
+/** How long after it was written or reworded a memory's vector may not be searchable yet (the index syncs after the write). */
+export const VECTOR_SYNC_WINDOW_MS = 10 * 60 * 1000;
+
 /**
  * The candidates to score: the window, plus the vector hits that fall outside it. A hit of another scope (another
  * bot's row) or of a fact past its end date is never added, and a row is a candidate once.
@@ -194,14 +214,11 @@ const computeScore = (memory: RankCandidate, semanticScore: number, now: number)
     return WEIGHTS.semantic * semanticScore + WEIGHTS.confidence * confidenceNorm + WEIGHTS.importance * importanceNorm + WEIGHTS.recency * recency;
 };
 
-/** The words of a search text that count for the keyword fallback. */
-export const searchWordsOf = (searchText: string): Set<string> =>
-    new Set(
-        searchText
-            .toLowerCase()
-            .split(WHITESPACE_RE)
-            .filter((w) => w.length >= 2),
-    );
+/**
+ * The words of a search text that count for the keyword fallback. Through the knowledge search's tokenizer (letters
+ * and numbers only, lowercased, no diacritics), so `peanuts?` and `peanuts` are the same word on both sides.
+ */
+export const searchWordsOf = (searchText: string): Set<string> => new Set(tokenize(searchText).filter((w) => w.length >= 2));
 
 /**
  * Keyword-based semantic score (fallback when no embedding exists).
@@ -211,7 +228,7 @@ export const keywordScore = (memoryText: string, searchWords: Set<string>): numb
         return 0;
     }
 
-    const memoryWords = memoryText.toLowerCase().split(WHITESPACE_RE);
+    const memoryWords = tokenize(memoryText);
     const matchCount = memoryWords.filter((w) => searchWords.has(w)).length;
 
     return memoryWords.length > 0 ? Math.min(matchCount / Math.max(searchWords.size, 1), 1) : 0;
@@ -226,12 +243,14 @@ export const keywordScoresFor = (candidates: RankCandidate[], searchText: string
 
 /**
  * Scores each candidate and keeps the ones to inject. Relevance is a vector hit's cosine similarity; a candidate
- * without a hit falls back to its keyword score, unless a vector search ran (`vectorSearched`) and the memory has
- * a vector: then it was not among the nearest to the search, and its keyword overlap (common words of a question)
- * says nothing more, so it has no relevance. A memory with no vector, or any memory when no vector search ran
- * (the model refused, the index failed), is found by keyword. Under the relevance floor, or under the score
- * threshold, a candidate is left out; the rest is sorted best first and cut to `limit`. `now` is when scoring
- * happens (recency counts from it).
+ * without a hit falls back to its keyword score and the keyword floor, unless the vector search is decisive
+ * (`vectorSearched`: it ran, its hits resolved, and they fill the cut, `vectorCutIsFull`) and the memory has a
+ * vector that is not new: then it was not among the nearest to the search, and its keyword overlap (common words of
+ * a question) says nothing more, so it has no relevance. Absence is no evidence otherwise: a vector written or
+ * reworded within `VECTOR_SYNC_WINDOW_MS` may not be searchable yet, a short cut means other bots' rows took the
+ * slots, and a memory with no vector, or any memory when no vector search ran (the model refused, the index or the
+ * hit lookup failed), is found by keyword. Under the relevance floor, or under the score threshold, a candidate is
+ * left out; the rest is sorted best first and cut to `limit`. `now` is when scoring happens (recency counts from it).
  */
 export const rankMemories = (input: {
     candidates: RankCandidate[];
@@ -244,7 +263,7 @@ export const rankMemories = (input: {
     now: number;
     threshold?: number;
     vectorScores: ReadonlyMap<string, number>;
-    /** A vector search ran and `vectorScores` holds its hits (possibly none). */
+    /** A vector search ran, its hits resolved and filled the cut: an old embedded memory it lacks is not relevant. */
     vectorSearched?: boolean;
 }): RankedMemory[] => {
     const {
@@ -263,8 +282,8 @@ export const rankMemories = (input: {
         candidates
             .map((m) => {
                 const hit = vectorScores.get(m._id);
-                // Embedded, and the vector search missed it: not relevant, whatever words it shares.
-                const missed = hit === undefined && vectorSearched && Boolean(m.embeddingId);
+                // Embedded, not new, and absent from hits that filled the cut: not relevant, whatever words it shares.
+                const missed = hit === undefined && vectorSearched && Boolean(m.embeddingId) && now - m.lastConfirmedAt > VECTOR_SYNC_WINDOW_MS;
                 const semanticScore = hit ?? (missed ? 0 : (keywordScores.get(m._id) ?? 0));
 
                 return {

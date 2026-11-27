@@ -42,10 +42,12 @@ expands and normalises, so cosine similarity is meaningful and stable.
 - dim 28: a shared background weight, so unrelated texts are not at cosine 0, as with a real model.
 - dims 29-40: month (events and `temporal` queries). 41-63: two noise dims per row.
 
-The test simulates the vector step as production runs it: the top `VECTOR_TOP_K` (30) of all of the user's vectors (other bots', expired
-and superseded rows included), the superseded ones then dropped. The candidates are the window plus those hits that fall
-outside it (`withVectorHits`: in scope, in effect); every candidate without a vector hit falls back to the keyword score.
-`now` and `today` come from `meta`, never the clock.
+The test simulates the vector step as production runs it: the top `VECTOR_FETCH_K` (90) of all of the user's vectors (other bots', expired
+and superseded rows included), then the superseded and expired ones dropped and the best `VECTOR_TOP_K` (30) of the chat's own scopes kept
+(`topScopedHits`). The candidates are the window plus those hits that fall outside it (`withVectorHits`: in scope, in effect). A candidate
+without a vector hit falls back to the keyword score, except an embedded row older than `VECTOR_SYNC_WINDOW_MS` when the 30 in-scope hits
+filled the cut (`vectorCutIsFull`): it was not among the nearest, so it has no relevance. The fixture ages are in days, so every row is older
+than the sync window. `now` and `today` come from `meta`, never the clock.
 
 ## Metrics
 

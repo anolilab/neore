@@ -9,7 +9,17 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-import { CANDIDATE_WINDOW_SIZE, keywordScoresFor, rankMemories, selectCandidateWindow, VECTOR_TOP_K, withVectorHits } from "./retrieve-ranking";
+import {
+    CANDIDATE_WINDOW_SIZE,
+    isUsableOn,
+    keywordScoresFor,
+    rankMemories,
+    selectCandidateWindow,
+    topScopedHits,
+    VECTOR_FETCH_K,
+    vectorCutIsFull,
+    withVectorHits,
+} from "./retrieve-ranking";
 
 const DAY_MS = 86_400_000;
 
@@ -89,12 +99,22 @@ const run = (query: FixtureQuery, vectors = true): { ids: string[]; inWindow: Se
             return { cosine: cosine(queryVector, unitVector(m.tags)), id: m.id };
         })
         .toSorted((a, b) => b.cosine - a.cosine || (a.id < b.id ? -1 : 1))
-        .slice(0, vectors ? VECTOR_TOP_K : 0);
+        .slice(0, vectors ? VECTOR_FETCH_K : 0);
     const superseded = new Set(rows.filter((m) => m.supersededBy).map((m) => m.id));
-    const vectorScores = new Map(hits.filter((h) => !superseded.has(h.id)).map((h) => [h.id, h.cosine]));
-
     const scope = { botId: query.asBot, includeUserWide: query.asBot !== undefined };
     const active = rows.filter((m) => !m.supersededBy);
+    // The lookup drops a superseded row and an expired one (not pinned), then production keeps the best VECTOR_TOP_K hits of the chat's own scopes.
+    const byId = new Map(active.filter((m) => isUsableOn(m, today)).map((m) => [m._id, m]));
+    const scoped = topScopedHits(
+        hits
+            .filter((h) => !superseded.has(h.id) && byId.has(h.id))
+            .map((h) => {
+                return { botId: byId.get(h.id)!.botId, ...h };
+            }),
+        scope,
+    );
+    const vectorScores = new Map(scoped.map((h) => [h.id, h.cosine]));
+
     const window = selectCandidateWindow(active, { ...scope, limit: CANDIDATE_WINDOW_SIZE, today });
     // Production adds the hits the window lacks, read by embedding id and kept only in scope and in effect.
     const candidates = withVectorHits(
@@ -103,7 +123,13 @@ const run = (query: FixtureQuery, vectors = true): { ids: string[]; inWindow: Se
         { ...scope, today },
     );
 
-    const ranked = rankMemories({ candidates, keywordScores: keywordScoresFor(candidates, query.text), now, vectorScores, vectorSearched: vectors });
+    const ranked = rankMemories({
+        candidates,
+        keywordScores: keywordScoresFor(candidates, query.text),
+        now,
+        vectorScores,
+        vectorSearched: vectorCutIsFull(scoped),
+    });
 
     return { ids: ranked.map((m) => m.memoryId), inWindow: new Set(candidates.map((m) => m._id)) };
 };

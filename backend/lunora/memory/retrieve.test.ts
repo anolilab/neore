@@ -4,12 +4,15 @@
  * more than the injection does.
  */
 import { lunoraTest } from "@lunora/testing";
+import { v } from "lunorash/server";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { registeredApi, registerModule } from "../../test/registered-api";
+import { internalQuery } from "../_generated/server";
 import schema from "../schema";
+import { ACTIVE_READ_MAX_ROWS } from "./functions";
 import { retrieveRelevantMemories } from "./retrieve";
-import { CANDIDATE_WINDOW_SIZE, SEARCH_MAX_RESULTS } from "./retrieve-ranking";
+import { CANDIDATE_WINDOW_SIZE, SEARCH_MAX_RESULTS, VECTOR_FETCH_K, VECTOR_TOP_K } from "./retrieve-ranking";
 
 const { embedMany, registry, searchVectors } = vi.hoisted(() => {
     return { embedMany: vi.fn(), registry: new Map<string, unknown>(), searchVectors: vi.fn() };
@@ -69,6 +72,7 @@ afterEach(() => {
 interface Seed {
     botId?: string;
     embeddingId?: string;
+    lastConfirmedAt?: number;
     memory: string;
     pinned?: boolean;
     type?: "activity" | "context" | "identity" | "preference";
@@ -90,10 +94,10 @@ const seed = async (rows: Seed[]): Promise<void> => {
     });
 };
 
-/** The vector index answers with these embedding ids and cosine scores, best first. */
+/** The vector index answers with these embedding ids and cosine scores, best first, at most the `limit` asked for. */
 const hits = (...found: [string, number][]) =>
-    searchVectors.mockResolvedValue(
-        found.map(([id, score]) => {
+    searchVectors.mockImplementation(async (_context: unknown, _vector: unknown, args: { limit: number }) =>
+        found.slice(0, args.limit).map(([id, score]) => {
             return { _id: id, _score: score };
         }),
     );
@@ -138,6 +142,89 @@ describe("candidates", () => {
 
         expect(await retrieve()).toEqual([]);
         expect(await retrieve({ botId: "bot-a" })).toEqual(["bot a secret"]);
+    });
+
+    it("searches the vectors when the window is empty", async () => {
+        // One live fact behind more expired rows than the read budget holds: the window is empty, and only the hit reaches it.
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("memories", {
+                embeddingId: "emb-bees",
+                lastConfirmedAt: 0,
+                memory: "keeps bees",
+                source: "auto",
+                type: "activity",
+                updatedAt: 0,
+                userId: USER,
+            });
+
+            for (let i = 0; i < ACTIVE_READ_MAX_ROWS; i += 1) {
+                await ctx.db.insert("memories", {
+                    lastConfirmedAt: 0,
+                    memory: `was in Lisbon, trip ${String(i)}`,
+                    source: "auto",
+                    type: "activity",
+                    updatedAt: 0,
+                    userId: USER,
+                    validUntil: "2020-01-01",
+                });
+            }
+        });
+        hits(["emb-bees", 0.9]);
+
+        expect(await retrieve({ searchText: "do I keep bees" })).toEqual(["keeps bees"]);
+        expect(searchVectors).toHaveBeenCalledTimes(1);
+    });
+
+    it("finds an in-scope memory outside the window when other bots' hits fill the top 30", async () => {
+        const others = Array.from({ length: 40 }, (_, i) => {
+            return { botId: "bot-b", embeddingId: `emb-b-${String(i)}`, memory: `bot b fact ${String(i)}` };
+        });
+
+        await seed([{ embeddingId: "emb-trip", memory: "went to the coast in May", type: "activity" }, ...others, ...filler(CANDIDATE_WINDOW_SIZE + 5)]);
+        // Forty of another bot's rows are nearer than the row: past an index top 30, within what is asked for.
+        hits(...others.map((row, i): [string, number] => [row.embeddingId, 0.99 - i / 1000]), ["emb-trip", 0.9]);
+
+        expect(await retrieve()).toEqual(["went to the coast in May"]);
+        expect(searchVectors).toHaveBeenCalledWith(expect.anything(), expect.anything(), expect.objectContaining({ limit: VECTOR_FETCH_K }));
+    });
+
+    it("finds an old embedded memory by its words when the hit lookup throws", async () => {
+        await seed([{ embeddingId: "emb-peanuts", lastConfirmedAt: 0, memory: "allergic to peanuts" }]);
+        hits(["emb-peanuts", 0.9]);
+
+        const real = registry.get("memory_functions:getMemoriesByEmbeddingIds");
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+        registry.set(
+            "memory_functions:getMemoriesByEmbeddingIds",
+            internalQuery.input({ activeOn: v.optional(v.number()), embeddingIds: v.array(v.string()), userId: v.string() }).query(async () => {
+                throw new Error("lookup failed");
+            }),
+        );
+
+        try {
+            // The search answered but the lookup did not: no hit decided anything, so the memory is found by its words as with no search.
+            expect(await retrieve({ searchText: "peanuts?" })).toEqual(["allergic to peanuts"]);
+            expect(warn).toHaveBeenCalledWith(expect.stringContaining("Vector search failed"), expect.anything());
+        } finally {
+            registry.set("memory_functions:getMemoriesByEmbeddingIds", real);
+        }
+    });
+
+    it("finds a just-written embedded memory the index does not return yet by its words, and leaves out an old one it lacks", async () => {
+        // 30 in-scope hits fill the cut (all under the relevance floor), none of them either of the two rows below.
+        const near = Array.from({ length: VECTOR_TOP_K }, (_, i) => {
+            return { embeddingId: `emb-near-${String(i)}`, memory: `near fact ${String(i)}` };
+        });
+
+        await seed([
+            ...near,
+            { embeddingId: "emb-old", lastConfirmedAt: 0, memory: "adopted a dog named Max" },
+            { embeddingId: "emb-new", memory: "adopted a dog named Rex" },
+        ]);
+        hits(...near.map((row, i): [string, number] => [row.embeddingId, 0.3 - i / 1000]));
+
+        expect(await retrieve({ searchText: "dog named Rex" })).toEqual(["adopted a dog named Rex"]);
     });
 
     it("leaves out a hit on a fact past its end date", async () => {
