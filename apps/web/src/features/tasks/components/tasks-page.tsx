@@ -8,7 +8,7 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@n
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@neore/ui/components/tabs";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Columns3, List, ListChecks, Plus, Target } from "lucide-react";
-import { useCallback, useId, useMemo, useState } from "react";
+import { useCallback, useId, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { useCRPC } from "@/lib/lunora/crpc";
@@ -23,6 +23,7 @@ import TaskCard from "./task-card";
 import TaskDetailDialog from "./task-detail-dialog";
 import TaskFormDialog from "./task-form-dialog";
 import { TaskStatusIcon, useTaskStatusLabels } from "./task-status";
+import TaskSuggestions from "./task-suggestions";
 
 type PendingDelete = { goal: BoardGoal; kind: "goal" } | { kind: "task"; task: BoardTask };
 
@@ -38,6 +39,7 @@ const TasksPage = () => {
     const { t } = useLingui();
     const crpc = useCRPC();
     const headingId = useId();
+    const titleRef = useRef<HTMLHeadingElement>(null);
     const statusLabels = useTaskStatusLabels();
 
     const queryClient = useQueryClient();
@@ -188,7 +190,7 @@ const TasksPage = () => {
         <div className="mx-auto max-w-7xl space-y-8">
             <header className="flex flex-wrap items-start justify-between gap-4">
                 <div className="space-y-1">
-                    <h1 className="text-xl font-semibold" id={headingId}>
+                    <h1 className="focus:ring-ring/30 text-xl font-semibold outline-none focus:ring-[2px]" id={headingId} ref={titleRef} tabIndex={-1}>
                         {t`Tasks`}
                     </h1>
                     <p className="text-muted-foreground text-sm">
@@ -206,6 +208,8 @@ const TasksPage = () => {
                     </Button>
                 </div>
             </header>
+
+            <TaskSuggestions fallbackFocus={titleRef} />
 
             {isLoading && (
                 <p className="text-muted-foreground text-sm" role="status">

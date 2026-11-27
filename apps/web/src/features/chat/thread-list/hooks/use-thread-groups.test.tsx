@@ -156,6 +156,16 @@ describe("project chats while the project list is unavailable", () => {
         expect(titles(view, "Work")).toEqual(["In project"]);
     });
 
+    it("sends a loaded project's archived chats to the archive, not out of the list", () => {
+        state.isPlaceholderData = false;
+        state.projectsAnswered = true;
+        state.projects = [{ _id: "p1", createdAt: 1, title: "Work" }];
+        const view = groupsFor();
+
+        expect(titles(view, "Work")).toEqual(["In project"]);
+        expect(titles(view, "Archived")).toEqual(["Old project chat"]);
+    });
+
     it("does not hold anything once the real thread list has arrived", () => {
         state.isPlaceholderData = false;
         const view = groupsFor();

@@ -41,6 +41,33 @@ const isProvisioned = async (exec: SqlExec, fingerprint: string): Promise<boolea
     }
 };
 
+/**
+ * Columns an earlier build's table lacks. The sweep creates a missing table with every column but never adds one to a table that exists,
+ * so a store provisioned before a column was added gets it here. The marker is written after this, so a failed step is retried.
+ */
+const DUPLICATE_COLUMN = /duplicate column name/iu;
+
+const COLUMNS_ADDED_SINCE: ReadonlyArray<{ column: string; table: string; type: string }> = [{ column: "writerId", table: "pinWriteLeases", type: "TEXT" }];
+
+const addMissingColumns = async (exec: SqlExec): Promise<void> => {
+    for (const { column, table, type } of COLUMNS_ADDED_SINCE) {
+        const columns = await exec.all(`PRAGMA table_info("${table}")`, []);
+
+        if (columns.some((row) => (row as { name?: unknown }).name === column)) {
+            continue;
+        }
+
+        try {
+            await exec.run(`ALTER TABLE "${table}" ADD COLUMN "${column}" ${type}`, []);
+        } catch (error) {
+            // Another isolate added it between the read and this write: the column is there, which is what this step is for.
+            if (!DUPLICATE_COLUMN.test(String(error))) {
+                throw error;
+            }
+        }
+    }
+};
+
 const provision = async (exec: SqlExec): Promise<void> => {
     // `schema` is structurally the same shape, but the tree carries more than
     // one `@lunora`/* copy (see `docs/agents/lunora-upstream.md`), so `TriggerDefinition` here and
@@ -55,6 +82,7 @@ const provision = async (exec: SqlExec): Promise<void> => {
     }
 
     await runD1GlobalTableMigrations(exec, schemaLike);
+    await addMissingColumns(exec);
 
     // Recorded only after the sweep succeeded, so a failed one is retried by
     // the next isolate. Two isolates racing both sweep (idempotent) and both

@@ -22,7 +22,8 @@ const registerDevice = vi.fn(async (_args: unknown) => {
     return { deviceId: "srv-new", secret: "s3cret" };
 });
 const revokeDevice = vi.fn(async (_args: unknown) => null);
-const mutations: Record<string, (args: unknown) => Promise<unknown>> = { registerDevice, revokeDevice };
+const announcePairedDevice = vi.fn(async (_args: unknown) => null);
+const mutations: Record<string, (args: unknown) => Promise<unknown>> = { announcePairedDevice, registerDevice, revokeDevice };
 
 vi.mock("@tanstack/react-query", () => {
     return {
@@ -38,6 +39,11 @@ vi.mock("@/lib/lunora/crpc", () => {
             return {
                 devices: {
                     functions: {
+                        announcePairedDevice: {
+                            mutationOptions: () => {
+                                return { name: "announcePairedDevice" };
+                            },
+                        },
                         registerDevice: {
                             mutationOptions: () => {
                                 return { name: "registerDevice" };
