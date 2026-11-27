@@ -309,7 +309,13 @@ export const extractMemories = internalAction
         // Fails closed: with no quotable text (a headless run, an outside payload) no fact can be backed by the user's own
         // words, so nothing is read, asked of the model or stored.
         if (args.quotablePrompt === undefined) {
-            ctx.log.event(GATE_EVENT, { reason: "no_quotable_text", threadId: args.threadId, userId: args.userId, userMessageLength: 0, verdict: "skip" });
+            ctx.log.event(GATE_EVENT, {
+                reason: "no_quotable_text",
+                threadId: args.threadId,
+                userId: args.userId,
+                userMessageLength: args.userMessage.length,
+                verdict: "skip",
+            });
 
             return;
         }

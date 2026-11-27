@@ -940,7 +940,7 @@ describe("extraction of steers the user did not type", () => {
     });
 
     it("keeps a fact quoted from the prompt when a long marked steer follows, and still refuses the marked steer's words", async () => {
-        expect.assertions(4);
+        expect.assertions(5);
 
         generateText.mockResolvedValue(FACTS);
 
@@ -962,6 +962,10 @@ describe("extraction of steers the user did not type", () => {
         expect(generateText.mock.calls[0]?.[0].prompt).not.toContain("gold mine");
         expect(saved.has("The user is a nurse in Hamburg")).toBe(true);
         expect(saved.has("The user owns a gold mine in Peru")).toBe(false);
+
+        const rows = await harness.run(async (ctx: any) => await ctx.db.query("memories").collect());
+
+        expect(rows.find((row: any) => row.memory === "The user is a nurse in Hamburg")?.evidence?.quote).toBe(TYPED);
     });
 
     it("masks every marked steer whole when an earlier one holds emoji, so no part of a later one can be quoted", async () => {

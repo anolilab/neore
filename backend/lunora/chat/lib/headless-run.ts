@@ -4,10 +4,13 @@
  * so they read the user's settings the same way and differ only where they say
  * so:
  *
- * - `memory`: memories are retrieved into the system prompt. Nothing is stored
- *   from the exchange: it has no typed words of the user's to quote (`learn: false`
- *   skips the job, which triggers use). Off for a messenger reply — its sender is a
- *   third party, who must neither read the owner's memories nor write to them.
+ * - `memory`: memories are retrieved into the system prompt. The run's own prompt is
+ *   never learned from: it has no typed words of the user's to quote, so its
+ *   extraction job (no `quotablePrompt`) stores nothing. Only a message the user
+ *   steers into a paused run can be learned, through the continuation's own
+ *   quotable steers (`learn: false` skips both, which triggers use). Off for a
+ *   messenger reply — its sender is a third party, who must neither read the
+ *   owner's memories nor write to them.
  * - `personalization`: `"full"` puts the user's about-me, nickname, profession,
  *   custom instructions and location into the prompt — for runs whose audience
  *   is the user. `"none"` for a messenger reply: its reader is a third party,
@@ -120,9 +123,9 @@ export interface HeadlessRunOptions {
     /** Leave an existing thread's status as it is, instead of marking it active when the run ends. */
     keepThreadStatus?: boolean;
     /**
-     * `false`: memories are still read into the prompt, and no extraction job is scheduled afterwards. A headless run has no
-     * typed words of the user's to quote, so `extractMemories` stores nothing from its job either way (it fails closed
-     * without a `quotablePrompt`); `false` only saves the job.
+     * `false`: memories are still read into the prompt, and no extraction job is scheduled, nor is the steers' extraction
+     * after a pause. Without it the run's own prompt still stores nothing (`extractMemories` fails closed without a
+     * `quotablePrompt`); only steers the user typed into a paused run can be learned from.
      */
     learn?: boolean;
     /** A step cap for a quick reply. Default: Deep Work's budget, with context compression between steps. */
