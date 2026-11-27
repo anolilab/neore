@@ -150,7 +150,7 @@ const FeedbackAdminPage = () => {
         <div className="flex flex-col gap-3">
             <AdminSection
                 action={
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                         <Button onClick={() => refetch()} size="sm" variant="outline">
                             <RefreshCw aria-hidden="true" className={isFetching ? "size-4 animate-spin" : "size-4"} />
                             {t`Refresh`}

@@ -1,4 +1,4 @@
-import { Card, CardAction, CardDescription, CardHeader, CardTitle } from "@neore/ui/components/card";
+import { Card, CardDescription, CardHeader, CardTitle } from "@neore/ui/components/card";
 import cn from "@neore/ui/utils/cn";
 import type { ComponentProps, ReactNode } from "react";
 
@@ -21,10 +21,13 @@ interface AdminSectionProps {
 export const AdminSection = ({ action, children, className, description, title }: AdminSectionProps) => (
     <Card className={cn("w-full text-start", className)} variant="plain">
         {title ? (
-            <CardHeader className="px-1">
-                <CardTitle className="text-[15px] font-semibold">{title}</CardTitle>
-                {description ? <CardDescription className="text-sm">{description}</CardDescription> : null}
-                {action ? <CardAction className="self-center">{action}</CardAction> : null}
+            // With an action, the heading and the action share a row while there is room and the action wraps under it on a phone.
+            <CardHeader className={cn("px-1", action && "flex flex-wrap items-center justify-between gap-x-4 gap-y-2")}>
+                <div className="min-w-0 flex-1 basis-60 space-y-1.5">
+                    <CardTitle className="text-[15px] font-semibold">{title}</CardTitle>
+                    {description ? <CardDescription className="text-sm">{description}</CardDescription> : null}
+                </div>
+                {action ? <div className="flex max-w-full flex-wrap items-center gap-2">{action}</div> : null}
             </CardHeader>
         ) : null}
         {children ? (

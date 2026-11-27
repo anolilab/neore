@@ -96,10 +96,15 @@ const UserCell = ({ classNames, hideActions, onUserUpdated, user }: UserCellProp
 
                 {!hideActions && (
                     <DropdownMenu>
-                        <DropdownMenuTrigger render={<Button size="icon" variant="ghost" />}>
-                            <MoreHorizontal aria-hidden="true" className="size-4" />
-                            <span className="sr-only">{t`Open menu`}</span>
-                        </DropdownMenuTrigger>
+                        {/* The icon and name go in the button itself: on a phone the menu draws only its `render`. */}
+                        <DropdownMenuTrigger
+                            render={
+                                <Button size="icon" variant="ghost">
+                                    <MoreHorizontal aria-hidden="true" className="size-4" />
+                                    <span className="sr-only">{t`Open menu`}</span>
+                                </Button>
+                            }
+                        />
                         <DropdownMenuContent align="end">
                             <DropdownMenuItem onClick={() => setRoleDialogOpen(true)}>
                                 {user.isAdmin ? (

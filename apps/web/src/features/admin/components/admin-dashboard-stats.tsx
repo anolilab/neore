@@ -138,7 +138,7 @@ const AdminDashboardStats = () => {
             <AdminSection
                 action={
                     <Select onValueChange={(v) => setGrowthFilter(v as typeof growthFilter)} value={growthFilter}>
-                        <SelectTrigger aria-label={t`User Growth (Last 7 Days)`} className="w-[140px]">
+                        <SelectTrigger aria-label={t`Filter by type`} className="w-[140px]">
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
