@@ -2384,11 +2384,11 @@ msgstr "Colore di accento aggiornato"
 
 #: src/features/auth/components/organization/accept-invitation-card.tsx:192
 #: src/features/auth/components/organization/user-invitations-card.tsx:116
-#: src/features/tasks/components/task-suggestions.tsx:213
+#: src/features/tasks/components/task-suggestions.tsx:245
 msgid "Accept"
 msgstr "Accetta"
 
-#: src/features/tasks/components/task-suggestions.tsx:206
+#: src/features/tasks/components/task-suggestions.tsx:238
 msgid "Accept \"{title}\""
 msgstr "Accetta «{title}»"
 
@@ -11502,12 +11502,12 @@ msgstr "Chiave pubblica Discord"
 #: src/features/chat/thread/composer-long-text-prompt.tsx:71
 #: src/features/develop/components/guide-view.tsx:141
 #: src/features/devices/components/devices-settings.tsx:389
-#: src/features/tasks/components/task-suggestions.tsx:202
+#: src/features/tasks/components/task-suggestions.tsx:234
 #: src/features/workflow/components/nodes/file-node.tsx:231
 msgid "Dismiss"
 msgstr "Ignora"
 
-#: src/features/tasks/components/task-suggestions.tsx:189
+#: src/features/tasks/components/task-suggestions.tsx:221
 msgid "Dismiss \"{title}\""
 msgstr "Ignora «{title}»"
 
@@ -14071,7 +14071,7 @@ msgstr "Impossibile creare il preset"
 msgid "Failed to create tag"
 msgstr "Impossibile creare il tag"
 
-#: src/features/tasks/components/task-suggestions.tsx:209
+#: src/features/tasks/components/task-suggestions.tsx:241
 msgid "Failed to create the task"
 msgstr "Impossibile creare l'attività"
 
@@ -14195,7 +14195,7 @@ msgstr "Impossibile disconnettere il connettore"
 msgid "Failed to dismiss the digest"
 msgstr "Impossibile ignorare il riepilogo"
 
-#: src/features/tasks/components/task-suggestions.tsx:196
+#: src/features/tasks/components/task-suggestions.tsx:228
 msgid "Failed to dismiss the suggestion"
 msgstr "Impossibile ignorare il suggerimento"
 
@@ -14304,7 +14304,7 @@ msgstr "Impossibile caricare le skill"
 msgid "Failed to load spreadsheet"
 msgstr "Impossibile caricare il foglio di calcolo"
 
-#: src/features/tasks/components/task-suggestions.tsx:148
+#: src/features/tasks/components/task-suggestions.tsx:153
 msgid "Failed to load the suggested tasks"
 msgstr "Impossibile caricare le attività suggerite"
 
@@ -14666,7 +14666,7 @@ msgid "Failed to update reply tools"
 msgstr "Impossibile aggiornare gli strumenti di risposta"
 
 #: src/features/settings/components/personalization/memory-settings.tsx:150
-#: src/features/settings/components/personalization/schedule-ideas-switch.tsx:40
+#: src/features/settings/components/personalization/schedule-ideas-switch.tsx:41
 msgid "Failed to update setting"
 msgstr "Impossibile aggiornare l'impostazione"
 
@@ -17740,7 +17740,7 @@ msgstr "Ideale per classificazioni ed estrazioni semplici"
 msgid "Ideas"
 msgstr "Idee"
 
-#: src/features/tasks/components/task-suggestions.tsx:134
+#: src/features/tasks/components/task-suggestions.tsx:139
 msgid "Ideas from your own recent messages. Nothing is created until you accept one."
 msgstr "Idee tratte dai tuoi messaggi recenti. Non viene creato nulla finché non ne accetti una."
 
@@ -23415,7 +23415,7 @@ msgstr "Ancora nessuna cronologia"
 msgid "No icon found"
 msgstr "Nessuna icona trovata"
 
-#: src/features/settings/components/personalization/schedule-ideas-switch.tsx:55
+#: src/features/settings/components/personalization/schedule-ideas-switch.tsx:56
 msgid "No ideas are made while memory is off."
 msgstr "Non vengono create idee finché la memoria è disattivata."
 
@@ -24411,7 +24411,7 @@ msgstr "L'onboarding ripartirà alla tua prossima visita alla chat."
 msgid "Onboarding wizard"
 msgstr "Procedura guidata di onboarding"
 
-#: src/features/settings/components/personalization/schedule-ideas-switch.tsx:54
+#: src/features/settings/components/personalization/schedule-ideas-switch.tsx:55
 msgid "Once a day, suggest recurring tasks based only on your own recent messages. Nothing is created until you accept a suggestion. Turning this off deletes the suggestions waiting for you."
 msgstr "Una volta al giorno, suggerisce attività ricorrenti basandosi solo sui tuoi messaggi recenti. Non viene creato nulla finché non accetti un suggerimento. Se lo disattivi, i suggerimenti in attesa vengono eliminati."
 
@@ -29549,7 +29549,7 @@ msgstr "riprova"
 #: src/features/settings/components/chat/bot-tool-selection.tsx:495
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:493
 #: src/features/tasks/components/task-detail-dialog.tsx:108
-#: src/features/tasks/components/task-suggestions.tsx:156
+#: src/features/tasks/components/task-suggestions.tsx:161
 #: src/features/workflow/components/nodes/file-node.tsx:221
 #: src/lib/toast.ts:70
 #: src/lib/toast.ts:171
@@ -30410,11 +30410,11 @@ msgstr "Pianificazione"
 msgid "Schedule {0}"
 msgstr "Pianificazione {0}"
 
-#: src/features/settings/components/personalization/schedule-ideas-switch.tsx:35
+#: src/features/settings/components/personalization/schedule-ideas-switch.tsx:36
 msgid "Schedule ideas disabled"
 msgstr "Idee per attività pianificate disattivate"
 
-#: src/features/settings/components/personalization/schedule-ideas-switch.tsx:35
+#: src/features/settings/components/personalization/schedule-ideas-switch.tsx:36
 msgid "Schedule ideas enabled"
 msgstr "Idee per attività pianificate attivate"
 
@@ -31682,12 +31682,17 @@ msgid "Show a message in the app when a chat waits for your answer or your appro
 msgstr "Mostra un messaggio nell'app quando una chat attende la tua risposta o approvazione."
 
 #: src/features/skills/components/bundle-import-dialog.tsx:99
+#: src/features/tasks/components/task-suggestions.tsx:213
 msgid "Show all"
 msgstr "Mostra tutto"
 
 #: ../../packages/ui/src/components/chat-markdown.tsx:83
 msgid "Show all {lines} lines"
 msgstr "Mostra tutte le {lines} righe"
+
+#: src/features/tasks/components/task-suggestions.tsx:203
+msgid "Show all instructions for \"{title}\""
+msgstr "Mostra tutte le istruzioni di «{title}»"
 
 #: src/features/tasks/components/goal-list.tsx:73
 msgid "Show all tasks"
@@ -31732,8 +31737,13 @@ msgstr "Mostra etichette"
 #: ../../packages/ui/src/components/chat-markdown.tsx:83
 #: src/features/chat/pins/pin-item.tsx:214
 #: src/features/skills/components/bundle-import-dialog.tsx:99
+#: src/features/tasks/components/task-suggestions.tsx:213
 msgid "Show less"
 msgstr "Mostra meno"
+
+#: src/features/tasks/components/task-suggestions.tsx:203
+msgid "Show less of the instructions for \"{title}\""
+msgstr "Mostra meno delle istruzioni di «{title}»"
 
 #: src/features/chat/pins/pin-item.tsx:214
 msgid "Show more"
@@ -33816,7 +33826,7 @@ msgstr "{imported} conversazioni importate da {0}"
 msgid "Suggest innovative solutions to reduce plastic waste"
 msgstr "Suggerisci soluzioni innovative per ridurre i rifiuti di plastica"
 
-#: src/features/settings/components/personalization/schedule-ideas-switch.tsx:49
+#: src/features/settings/components/personalization/schedule-ideas-switch.tsx:50
 msgid "Suggest scheduled tasks"
 msgstr "Suggerisci attività pianificate"
 
@@ -33837,7 +33847,7 @@ msgstr "Risposte suggerite"
 msgid "Suggested next prompt: {nextPromptSuggestion}. Press Tab to insert."
 msgstr "Prossimo prompt suggerito: {nextPromptSuggestion}. Premi Tab per inserirlo."
 
-#: src/features/tasks/components/task-suggestions.tsx:132
+#: src/features/tasks/components/task-suggestions.tsx:137
 msgid "Suggested tasks"
 msgstr "Attività suggerite"
 
@@ -33845,11 +33855,11 @@ msgstr "Attività suggerite"
 msgid "Suggestion available, press Right Arrow to accept"
 msgstr "Suggerimento disponibile, premi Freccia destra per accettarlo"
 
-#: src/features/tasks/components/task-suggestions.tsx:195
+#: src/features/tasks/components/task-suggestions.tsx:227
 msgid "Suggestion dismissed: {title}"
 msgstr "Suggerimento ignorato: {title}"
 
-#: src/features/tasks/components/task-suggestions.tsx:138
+#: src/features/tasks/components/task-suggestions.tsx:143
 msgid "Suggestion updates"
 msgstr "Aggiornamenti dei suggerimenti"
 
@@ -34260,7 +34270,7 @@ msgstr "Attività"
 msgid "Task approved"
 msgstr "Attività approvata"
 
-#: src/features/tasks/components/task-suggestions.tsx:209
+#: src/features/tasks/components/task-suggestions.tsx:241
 msgid "Task created: {title}"
 msgstr "Attività creata: {title}"
 

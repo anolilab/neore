@@ -27,6 +27,9 @@ const attempt = async (run: () => Promise<unknown>): Promise<boolean> => {
     }
 };
 
+/** Instructions up to this long fit the two clamped lines even in the narrowest column, so they get no toggle. */
+const CLAMP_THRESHOLD = 70;
+
 /** Whether focus has fallen to the page itself, as it does when the focused element is removed. Anywhere else, the person put it there. */
 const focusIsLost = (): boolean => document.activeElement === null || document.activeElement === document.body;
 
@@ -49,6 +52,8 @@ const TaskSuggestions: FC<TaskSuggestionsProps> = ({ fallbackFocus }) => {
     // Rows decided in this view: hidden at once, and kept hidden if the live list answers once more from before the decision.
     const [decidedIds, setDecidedIds] = useState<ReadonlyArray<string>>([]);
     const [outcome, setOutcome] = useState<{ kind: "done" | "failed"; text: string } | null>(null);
+    // Rows whose instructions are shown in full. They can run to thousands of characters, and a person must be able to read them before accepting.
+    const [expandedIds, setExpandedIds] = useState<ReadonlyArray<string>>([]);
 
     const listQuery = crpc.tasks.suggestions.listTaskSuggestions.queryOptions({});
     const boardQuery = crpc.tasks.functions.getTaskBoard.queryOptions({});
@@ -161,6 +166,8 @@ const TaskSuggestions: FC<TaskSuggestionsProps> = ({ fallbackFocus }) => {
                 <ul className="space-y-2">
                     {suggestions.map((suggestion) => {
                         const { _id: id, cronExpression, instructions, title } = suggestion;
+                        const expanded = expandedIds.includes(id);
+                        const instructionsId = `${headingId}-instructions-${id}`;
 
                         return (
                             <li
@@ -180,7 +187,32 @@ const TaskSuggestions: FC<TaskSuggestionsProps> = ({ fallbackFocus }) => {
                                         <CalendarClockIcon aria-hidden="true" className="text-muted-foreground h-4 w-4 shrink-0" />
                                         <span className="truncate">{title}</span>
                                     </p>
-                                    <p className="text-muted-foreground line-clamp-2 text-xs">{instructions}</p>
+                                    <p
+                                        className={
+                                            expanded
+                                                ? "text-muted-foreground text-xs break-words whitespace-pre-wrap"
+                                                : "text-muted-foreground line-clamp-2 text-xs"
+                                        }
+                                        id={instructionsId}
+                                    >
+                                        {instructions}
+                                    </p>
+                                    {instructions.length > CLAMP_THRESHOLD && (
+                                        <Button
+                                            aria-controls={instructionsId}
+                                            aria-label={expanded ? t`Show less of the instructions for "${title}"` : t`Show all instructions for "${title}"`}
+                                            className="h-auto px-0 py-0.5"
+                                            onClick={() => {
+                                                setExpandedIds((current) =>
+                                                    current.includes(id) ? current.filter((value) => value !== id) : [...current, id],
+                                                );
+                                            }}
+                                            size="sm"
+                                            variant="link"
+                                        >
+                                            {expanded ? t`Show less` : t`Show all`}
+                                        </Button>
+                                    )}
                                     <p className="text-muted-foreground text-xs">{scheduleLabel(cronExpression)}</p>
                                 </div>
                                 <div className="flex shrink-0 gap-2">

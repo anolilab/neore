@@ -187,6 +187,34 @@ describe("TaskSuggestions", () => {
         expect(screen.getByText("Day 31 of the months that have one, at 09:00 UTC")).toBeTruthy();
     });
 
+    it("clamps long instructions by default, and a button named after the suggestion shows and hides all of them", async () => {
+        const long = `Check the inbox, then ${"summarise every thread and list the follow-ups. ".repeat(40)}Finish.`;
+
+        state.rows = [{ ...row("s1", "Weekly notes"), instructions: long }, row("s2", "Morning plants")];
+        mountList();
+
+        const instructions = await screen.findByText(long);
+
+        expect(instructions.className).toContain("line-clamp-2");
+
+        const show = screen.getByRole("button", { name: 'Show all instructions for "Weekly notes"' });
+
+        // A short suggestion fits its two lines, so it gets no toggle.
+        expect(screen.queryByRole("button", { name: 'Show all instructions for "Morning plants"' })).toBeNull();
+        expect(show.getAttribute("aria-controls")).toBe(instructions.id);
+
+        fireEvent.click(show);
+
+        expect(screen.getByText(long).className).not.toContain("line-clamp");
+        expect(screen.getByText(long).className).toContain("whitespace-pre-wrap");
+        expect(screen.getByText(long).textContent).toBe(long);
+
+        fireEvent.click(screen.getByRole("button", { name: 'Show less of the instructions for "Weekly notes"' }));
+
+        expect(screen.getByText(long).className).toContain("line-clamp-2");
+        expect(screen.getByRole("button", { name: 'Show all instructions for "Weekly notes"' })).toBeTruthy();
+    });
+
     it("takes a decided row off the list at once, and frees the buttons, while the live list has not caught up", async () => {
         state.live = false;
         state.rows = [row("s1", "Weekly notes"), row("s2", "Morning plants")];
