@@ -37,7 +37,12 @@ import { SIGNED_REQUEST_WINDOW_MS } from "../lib/crypto";
 import { httpScheduler } from "../lib/http-scheduler";
 import { checkRateLimit } from "../lib/rate-limiter";
 import { checkSenderPairing } from "./pairing";
-import { isMemoryCommand, MEMORY_COMMAND_OTHER_CHAT_NOTICE, MEMORY_COMMAND_RATE_LIMITED_NOTICE } from "./lib/memory-command";
+import {
+    isMemoryCommand,
+    MEMORY_COMMAND_DISCORD_SLASH_NOTICE,
+    MEMORY_COMMAND_OTHER_CHAT_NOTICE,
+    MEMORY_COMMAND_RATE_LIMITED_NOTICE,
+} from "./lib/memory-command";
 import type { InboundMessage } from "./lib/types";
 import { isFreshInbound, UNSUPPORTED_CONTENT_NOTICE } from "./lib/types";
 import { discordSignedAt, parseDiscordEvent, validateDiscordSignature } from "./platforms/discord";
@@ -133,7 +138,7 @@ const answerMemoryCommand = async (
     };
 
     if (message.direct !== true || message.chatId !== connection.platformChatId) {
-        await sendNotice(MEMORY_COMMAND_OTHER_CHAT_NOTICE);
+        await sendNotice(message.directUnknown === true ? MEMORY_COMMAND_DISCORD_SLASH_NOTICE : MEMORY_COMMAND_OTHER_CHAT_NOTICE);
 
         return;
     }

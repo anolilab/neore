@@ -6,6 +6,7 @@
  * days in the user's timezone (UTC when unset or unknown, as everywhere in memory); the fact dates are stored as local
  * days already and are printed as they are. Evidence quotes are never included.
  */
+import { codePointBoundary } from "../chat/lib/past-chat-snippet";
 import type { ImportApp } from "./import-logic";
 import { isExpired } from "./dates";
 import { localDayOf, resolveTimeZone } from "./reflection-logic";
@@ -53,8 +54,8 @@ const LINE_BREAKS = /[\r\n\u{2028}\u{2029}]+/gu;
 /** One line of text: a memory or a bot name never starts a line (or a heading) of its own. */
 const oneLine = (text: string): string => text.replaceAll(LINE_BREAKS, " ").trim();
 
-/** One line, cut to `max` characters with an ellipsis. */
-const cutTo = (text: string, max: number): string => (text.length > max ? `${text.slice(0, max - 1)}…` : text);
+/** One line, cut to `max` characters with an ellipsis, never through the middle of an emoji (`codePointBoundary`). */
+const cutTo = (text: string, max: number): string => (text.length > max ? `${text.slice(0, codePointBoundary(text, max - 1, "end"))}…` : text);
 
 const scopeOf = (row: ExportMemoryRow, bots: ReadonlyMap<string, BotLabel>, nameMax = Infinity): string => {
     if (row.botId === undefined) {

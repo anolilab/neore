@@ -32,6 +32,9 @@ const row = (fields: Partial<ExportMemoryRow> & { memory: string }): ExportMemor
 
 const NO_BOTS = new Map<string, BotLabel>();
 
+/** The first half of an emoji with its second half cut off. */
+const LONE_HIGH_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])/u;
+
 describe("formatMemoryMarkdown", () => {
     it("lists pinned first, then each type in taxonomy order, with dates, source and scope on one line", () => {
         const markdown = formatMemoryMarkdown(
@@ -195,6 +198,16 @@ describe("formatMemoryDigest", () => {
         expect(digest).not.toContain("y".repeat(100));
         expect(digest).toContain("• short one");
         expect(digest).toContain("• short two");
+    });
+
+    it("never cuts through an emoji at the 200- or 40-character cap", () => {
+        // The emoji's two UTF-16 units straddle the cut: 198 and 38 characters before it, so the cut falls between them.
+        const bots = new Map<string, BotLabel>([["bot", { kind: "named", name: `${"b".repeat(38)}😀tail` }]]);
+        const digest = formatMemoryDigest([row({ botId: "bot", memory: `${"a".repeat(198)}😀tail` })], { bots, now: NOW, timeZone: "UTC", truncated: false });
+
+        expect(digest).toContain(`• ${"a".repeat(198)}… —`);
+        expect(digest).toContain(`bot “${"b".repeat(38)}…”`);
+        expect(digest).not.toMatch(LONE_HIGH_SURROGATE);
     });
 
     it("fits a smaller platform limit, never past the digest's own", () => {

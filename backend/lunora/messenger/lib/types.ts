@@ -15,6 +15,11 @@ export interface InboundMessage {
      * show what is remembered about the owner (`/memory`); absent or false is treated as a group.
      */
     direct?: boolean;
+    /**
+     * The platform names no chat type for this message at all (a Discord gateway message), so it is never `direct`
+     * and the `/memory` notice points to the one way that can be told apart (the slash command).
+     */
+    directUnknown?: true;
     /** Platform-unique id of this message or event — the dedupe key. */
     eventId: string;
     /**

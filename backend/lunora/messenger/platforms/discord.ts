@@ -170,6 +170,7 @@ export const parseDiscordEvent = (body: unknown, signedAtMs: number): { message:
                 chatId: data.channel_id,
                 // A gateway message names no channel type, and a group DM has no `guild_id` either: never one-to-one.
                 direct: false,
+                directUnknown: true,
                 eventId: data.id,
                 kind: inboundKind(data.content, attachments),
                 senderId: data.author.id,

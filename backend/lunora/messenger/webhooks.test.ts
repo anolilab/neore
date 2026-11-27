@@ -408,7 +408,7 @@ describe("Discord through acceptInbound", () => {
     it("answers /memory with the digest only in a one-to-one DM, never in a group DM or from the gateway", async () => {
         const pair = await keyPair();
         const connectionId = await connection("discord", { platformChatId: "D1", platformUserId: SENDER });
-        const { context, scheduledPaths } = httpContext(await keysFor(pair));
+        const { context, scheduled, scheduledPaths } = httpContext(await keysFor(pair));
         const slash = (id: string, channelType: number) =>
             JSON.stringify({
                 channel: { type: channelType },
@@ -426,6 +426,15 @@ describe("Discord through acceptInbound", () => {
         }
 
         expect(scheduledPaths()).toStrictEqual(["messenger_respond:sendMemoryDigest", "messenger_respond:sendNotice", "messenger_respond:sendNotice"]);
+        // A group DM is told to use the direct chat; a gateway message, which names no channel type, to use the slash command.
+        expect(
+            scheduled()
+                .slice(1)
+                .map((entry) => entry.args.text),
+        ).toStrictEqual([
+            "Send /memory in your direct chat with this bot: what it remembers about you is not shown here.",
+            "Use the /memory slash command in your direct message with the bot.",
+        ]);
     });
 
     it("refuses a correctly signed request replayed outside the window", async () => {

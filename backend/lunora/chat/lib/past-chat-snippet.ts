@@ -22,7 +22,7 @@ const WORD_EDGE = 24;
  * `index` moved off the middle of a surrogate pair: back before the pair for a cut's end, past it for a cut's start, so an
  * emoji is kept whole or dropped whole. `length` and `slice` count UTF-16 units, so a plain cut can halve one.
  */
-const codePointBoundary = (text: string, index: number, side: "end" | "start"): number => {
+export const codePointBoundary = (text: string, index: number, side: "end" | "start"): number => {
     // A code point past U+FFFF starting just before `index` is a pair whose second half `index` would cut off.
     if (index <= 0 || index >= text.length || (text.codePointAt(index - 1) ?? 0) <= 0xff_ff) {
         return index;
