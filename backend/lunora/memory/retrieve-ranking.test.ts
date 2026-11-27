@@ -100,6 +100,18 @@ describe("rankMemories", () => {
         expect(rank([candidate("k", { memory: "descaled the kettle" })], [], searchText).map((m) => m.memoryId)).toEqual(["k"]);
     });
 
+    it("matches the index's own tokens: a CJK pair inside a longer run, a Cyrillic letter with its diaeresis", () => {
+        const rows = [
+            candidate("cjk", { memory: "北京大学は東京にある" }),
+            candidate("ru", { memory: "видел ёжика и ёж" }),
+            candidate("e", { memory: "ел еж" }),
+        ];
+
+        expect(rank(rows, [], "大学").map((m) => m.memoryId)).toEqual(["cjk"]);
+        // `ёж` is its own token, not `еж`.
+        expect(rank(rows, [], "ёж").map((m) => m.memoryId)).toEqual(["ru"]);
+    });
+
     it("matches whole tokens only: `time` is not `timer`", () => {
         const rows = [
             candidate("timer", { memory: "runs a timer" }),

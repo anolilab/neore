@@ -89,15 +89,17 @@ current one, both over this fixture.
 
 | Slice    | Recall@8      | NDCG@8        | Expected in window | Off-topic rate | Abstain rate  | Abstain precision |
 | -------- | ------------- | ------------- | ------------------ | -------------- | ------------- | ----------------- |
-| overall  | 0.823 → 0.957 | 0.668 → 0.799 | 0.947 → 1.000      | 0.853 → 0.836  | 0.867 → 0.967 | 0.605 → 1.000     |
+| overall  | 0.823 → 0.957 | 0.668 → 0.799 | 0.947 → 1.000      | 0.853 → 0.836  | 0.867 → 0.933 | 0.605 → 1.000     |
 | single   | 0.940 → 0.940 | 0.830 → 0.822 | 1.000 → 1.000      | 0.880 → 0.880  |               |                   |
 | multi    | 0.883 → 0.883 | 0.726 → 0.725 | 1.000 → 1.000      | 0.771 → 0.771  |               |                   |
 | temporal | 1.000 → 1.000 | 0.715 → 0.715 | 1.000 → 1.000      | 0.872 → 0.872  |               |                   |
 | update   | 1.000 → 1.000 | 0.776 → 0.776 | 1.000 → 1.000      | 0.873 → 0.873  |               |                   |
 | exact    | 0.000 → 1.000 | 0.000 → 1.000 | 0.600 → 1.000      | 1.000 → 0.048  |               |                   |
-| abstain  |               |               |                    | 1.000 → 1.000  | 0.867 → 0.967 | 1.000 → 1.000     |
+| abstain  |               |               |                    | 1.000 → 1.000  | 0.867 → 0.933 | 1.000 → 1.000     |
 
-With no vector search the keyword-only run reads Recall@8 0.160 → 0.603 and abstain rate 0.433 → 0.800. Single NDCG@8
+With no vector search the keyword-only run reads Recall@8 0.160 → 0.603 and abstain rate 0.433 → 0.767. A number alone
+is no identifier, so "is parcel 52690 mine" is answered with the user's own parcel note (ends in 77314) rather than with
+nothing; that one query is the abstain rate's 0.967 → 0.933 (and 0.800 → 0.767 without vectors), and both floors record it. Single NDCG@8
 falls by 0.008 (two queries reorder) because a word the memory never had no longer dilutes the one it does: a row with
 no vector that shares one word of a question whose other words are in no memory scores in full. Its floor stays 0.830,
 within the 0.02 tolerance. On the

@@ -60,15 +60,14 @@ const SEPARATOR_RE = /[-_./#]/gu;
 /** Letters, then digits: `KX-2291`, `E4012`, `ECON-204`. Digits first is an ordinal or a unit (`21st`, `100km`, `1080p`). */
 const LETTERS_THEN_DIGITS_RE = /^\p{L}+[-_./#]?\p{N}/u;
 const DIGIT_RE = /\p{N}/u;
-const NUMBER_RE = /^\p{N}+$/u;
-/** Shorter mixes (`B12`) read as a size or a vitamin more often than as an identifier. */
-const MIN_CODE_LENGTH = 4;
-/** One unbroken run of digits this long (`77314`) is a tracking or serial number; a year or a count is shorter. */
-const MIN_NUMBER_CODE_LENGTH = 5;
+/** `v2.3` and `B12` are identifiers; `v2` is too short to tell from a word. */
+const MIN_CODE_LENGTH = 3;
 
 /**
- * The tokens with a digit of every identifier in `text`: `2291` of `KX-2291`, `e4012` of `E4012`, `77314`. A year, a
- * date (`2026-11-27`), a decimal, a count, an ordinal, a unit or a time is not one.
+ * The tokens with a digit of every identifier in `text`: letters, then digits, at least 3 of them (`2291` of
+ * `KX-2291`, `e4012` of `E4012`, `v2`/`3` of `v2.3`). A number alone never is one: a year, a count, a date
+ * (`2026-11-27`), a decimal or a price; nor a mix that starts with digits, a time, an ordinal or a unit (`5pm`, `21st`,
+ * `100km`).
  */
 const codeTokensOf = (text: string): Set<string> => {
     const codes = new Set<string>();
@@ -76,9 +75,10 @@ const codeTokensOf = (text: string): Set<string> => {
     for (const [chunk] of normalize(text).matchAll(CHUNK_RE)) {
         const mixed = chunk.replaceAll(SEPARATOR_RE, "").length >= MIN_CODE_LENGTH && LETTERS_THEN_DIGITS_RE.test(chunk);
 
-        if (mixed || (chunk.length >= MIN_NUMBER_CODE_LENGTH && NUMBER_RE.test(chunk))) {
+        if (mixed) {
             for (const token of searchTokensOf(chunk)) {
-                if (DIGIT_RE.test(token)) {
+                // A single digit (the `3` of `v2.3`) is too common a token to stand for the identifier.
+                if (token.length > 1 && DIGIT_RE.test(token)) {
                     codes.add(token);
                 }
             }

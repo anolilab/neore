@@ -32,7 +32,7 @@ export const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
  * at 0.40, so 0.45 leaves a margin over the noise. The keyword floor (on the BM25 share, `keywordSignalsFor`) applies
  * to a memory with no vector, to one whose vector is new or the search did not fill its cut, to one holding the query's
  * rare term, and to every memory when no vector search ran. 0.15 is the highest that keeps every category of the eval
- * (multi Recall@8 0.867 at 0.2, 0.883 at 0.15); the keyword-only run reads Recall@8 0.603 and abstain rate 0.800 there.
+ * (multi Recall@8 0.867 at 0.2, 0.883 at 0.15); the keyword-only run reads Recall@8 0.603 and abstain rate 0.767 there.
  */
 export const INJECT_MIN_RELEVANCE = 0.45;
 export const INJECT_MIN_KEYWORD_RELEVANCE = 0.15;
