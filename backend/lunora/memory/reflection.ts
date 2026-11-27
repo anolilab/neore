@@ -56,6 +56,7 @@ import {
     nextReflectionRunAt,
     planActivityUpdate,
     planReflection,
+    reflectionSourceIds,
     promotionToOp,
     REFLECTION_LIMITS,
     REFLECTION_SYSTEM_PROMPT,
@@ -602,7 +603,7 @@ export const saveMemoryDigest = internalMutation
         const learned: typeof args.learned = [];
 
         for (const entry of args.learned) {
-            const row = await ctx.db.get("memories", entry.memoryId as Id<"memories">).catch(() => null);
+            const row = await ctx.db.get("memories", entry.memoryId as Id<"memories">);
 
             if (row && row.userId === args.userId && !row.supersededBy) {
                 learned.push(entry);
@@ -617,7 +618,7 @@ export const saveMemoryDigest = internalMutation
         const toCheck = entriesLost ? [] : (sourceIds ?? []).slice(0, SOURCE_CHECK_CAP);
 
         for (const id of toCheck) {
-            const row = await ctx.db.get("memories", id as Id<"memories">).catch(() => null);
+            const row = await ctx.db.get("memories", id as Id<"memories">);
 
             if (!row || row.userId !== args.userId) {
                 lost = true;
@@ -849,14 +850,8 @@ const reflectScope = async (
     return {
         applied: expiryApplied + result.applied,
         learned,
-        // Everything the synthesis prompt was built from: its summary may quote any of it.
-        sourceIds: [
-            ...new Set([
-                ...learnedToday.map((m) => m.id),
-                ...plan.merges.flatMap((merge) => [merge.survivorId, ...merge.absorbedIds]),
-                ...plan.promotions.flatMap((candidate) => candidate.sourceIds),
-            ]),
-        ],
+        // What the synthesis prompt showed: its summary may quote any of it.
+        sourceIds: reflectionSourceIds(learnedToday, plan),
         stats: {
             // Counted from what is written: a revision whose wording was only a secret resolves nothing.
             contradictionsResolved: countResolvedContradictions(revisedPairs, committedOps),

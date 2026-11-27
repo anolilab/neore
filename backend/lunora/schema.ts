@@ -1781,21 +1781,29 @@ export const schema = defineSchema({
         .index("by_userId_botId_active", ["userId", "botId", "supersededBy", "type"]),
 
     // Cleanup a memory write could not finish, written in the same commit as the work that left it so the reference
-    // survives a retry that cannot be scheduled or runs out; the housekeeping sweep resumes it (`memory/functions.ts`).
+    // survives a retry that cannot be scheduled or runs out (`memory/functions.ts`, `runMemoryCleanup`).
     // `vector`: the embedding of a retired or deleted memory whose delete failed. `chain`: the ids still to walk of a
-    // delete's older versions, after the first write used its budget.
+    // delete's older versions, after the first write used its budget. `digests`: the deleted ids still to take out of the
+    // rest of the user's reflection digests (`ids`, from `fromCreatedAt` on). A scheduler job on the owner's shard works each
+    // record at its `dueAt`; the housekeeping sweep arms any record that is due and has no live job.
     memoryCleanups: defineTable({
+        // Steps that failed. At the cap the record keeps its row and its `dueAt` moves out of reach.
+        attempts: v.optional(v.number()),
+        // When the record is next worked: after a grace period at first, after a backoff once a step failed.
+        dueAt: v.number(),
         embeddingId: v.optional(v.string()),
         frontier: v.optional(v.array(v.id("memories"))),
-        kind: v.union(v.literal("vector"), v.literal("chain")),
+        // `digests`: the deleted memories' ids, and the `createdAt` the walk over the user's digests goes on from (a
+        // position in the rows, not an opaque cursor: a guest merge moves the rows and the record).
+        fromCreatedAt: v.optional(v.number()),
+        ids: v.optional(v.array(v.string())),
+        kind: v.union(v.literal("vector"), v.literal("chain"), v.literal("digests")),
         memoryId: v.optional(v.string()),
-        // Set when the row is written or a pass leaves it pending; the sweep takes rows idle past a grace period.
-        updatedAt: v.number(),
         userId: v.string(),
     })
         .shardBy("userId")
+        .index("by_dueAt", ["dueAt"])
         .index("by_embeddingId", ["embeddingId"])
-        .index("by_updatedAt", ["updatedAt"])
         .index("by_userId", ["userId"]),
 
     // One nightly-reflection digest ("what I learned today") per run. See `memory/reflection.ts`.

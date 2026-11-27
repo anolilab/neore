@@ -4,10 +4,11 @@ import { v } from "lunorash/server";
 import { internal } from "../_generated/internal";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
-import { internalMutation, internalQuery } from "../_generated/server";
+import { internalAction, internalMutation, internalQuery } from "../_generated/server";
 import { isAccountDeletionUnderway } from "../gdpr/deletion-guard";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { memoryLogger } from "../lib/logger";
+import { noteShardDue } from "../lib/shard-housekeeping";
 import { isThreadLocked } from "../lib/thread-lock";
 import { patchById, patchRow, withoutUndefined } from "../lib/patch";
 import { runAfterOnShard } from "../lib/shard-scheduler";
@@ -319,25 +320,62 @@ const VECTOR_DELETE_RETRY_BASE_MS = 60_000;
 
 type OrphanedVector = { embeddingId: string; memoryId: string; userId: string };
 
+/** A record younger than this may still have its scheduled vector retries on its way (1 + 2 + 4 + 8 minutes). */
+const CLEANUP_GRACE_MS = 20 * 60 * 1000;
+/** Failed steps a record gets before it is given up on (kept, never retried again). */
+const CLEANUP_MAX_ATTEMPTS = 12;
+/** 30 minutes after the first failure, doubling to a day: twelve attempts span about a week, so an outage of days is outlasted. */
+const CLEANUP_RETRY_BASE_MS = 15 * 60 * 1000;
+const CLEANUP_RETRY_MAX_MS = 24 * 60 * 60 * 1000;
+/** `dueAt` of a record given up on: the latest date there is, so no pass ever takes it, and the row stays to be found. */
+const CLEANUP_NEVER = 8.64e15;
+
+/**
+ * Wakes the owner's shard for a cleanup record due at `dueAt`: the census's `nextDueAt`, which the minute tick answers with
+ * `runShardTick` for every shard that has one, however long ago its owner was last active (housekeeping stops at 30 days). The
+ * same path the retained-rows prune and the stalled guest merges take. A census write that fails is logged by `noteShardDue`
+ * and never fails the caller.
+ */
+const wakeShardForCleanup = async (ctx: Pick<MutationCtx, "db">, userId: string, dueAt: number): Promise<void> => {
+    await noteShardDue(ctx, dueAt, userId);
+};
+
+/**
+ * Starts a scheduler job on the owner's shard that works one cleanup record: the fast path. A failure to schedule is
+ * logged and never thrown: the record's `dueAt` stays, and the census wake ({@link wakeShardForCleanup}) and the
+ * housekeeping sweep arm it again.
+ */
+const armMemoryCleanup = async (scheduler: unknown, cleanupId: Id<"memoryCleanups">, userId: string, delayMs: number): Promise<void> => {
+    try {
+        await runAfterOnShard(scheduler, delayMs, internal.memory.functions.runMemoryCleanup, { cleanupId }, userId);
+    } catch (error) {
+        memoryLogger.error(`Could not schedule cleanup ${cleanupId} of user ${userId}; the housekeeping sweep will arm it`, error);
+    }
+};
+
 /**
  * Notes a vector whose delete failed in `memoryCleanups`, in the writing transaction: the row that pointed at it is
  * already cleared or gone, so this is the only reference left. The scheduled retries are a fast path; the record is
- * what the housekeeping sweep ({@link sweepMemoryCleanups}) works from when they are lost or give up.
+ * what {@link runMemoryCleanup} works from when they are lost or give up.
  */
-const recordVectorDelete = async (ctx: Pick<MutationCtx, "db" | "now">, orphan: OrphanedVector): Promise<void> => {
+const recordVectorDelete = async (ctx: Pick<MutationCtx, "db" | "now" | "scheduler">, orphan: OrphanedVector): Promise<void> => {
     const [known] = await ctx.db
         .query("memoryCleanups")
         .withIndex("by_embeddingId", (q) => q.eq("embeddingId", orphan.embeddingId))
         .take(1);
 
     if (!known) {
-        await ctx.db.insert("memoryCleanups", {
+        const dueAt = ctx.now + CLEANUP_GRACE_MS;
+        const cleanupId = await ctx.db.insert("memoryCleanups", {
+            dueAt,
             embeddingId: orphan.embeddingId,
             kind: "vector",
             memoryId: orphan.memoryId,
-            updatedAt: ctx.now,
             userId: orphan.userId,
         });
+
+        await wakeShardForCleanup(ctx, orphan.userId, dueAt);
+        await armMemoryCleanup(ctx.scheduler, cleanupId, orphan.userId, CLEANUP_GRACE_MS);
     }
 };
 
@@ -353,11 +391,10 @@ const recordVectorDelete = async (ctx: Pick<MutationCtx, "db" | "now">, orphan: 
  * this same transaction, so the reference is never lost) and retried by
  * {@link retryMemoryVectorDelete} with a growing delay. That retry is scheduled from
  * the mutation, so it exists only if the row delete committed; when it cannot be
- * scheduled, or gives up, the record stays and the housekeeping sweep takes it. An id
- * that names no vector table is logged and skipped, so it can never block deleting the memory.
+ * scheduled, or gives up, the record stays and its own scheduler job works it. A failure to
+ * find the vector's table is handled the same way, never as "gone": the record is what finds it again.
  *
- * Resolves `true` when nothing is left to delete (done, already gone, or an id that can never resolve) and `false`
- * while the vector is still there.
+ * Resolves `true` when nothing is left to delete (done or already gone) and `false` while the vector may still be there.
  */
 const deleteMemoryVector = async (context: MutationCtx, orphan: OrphanedVector, attempt = 1): Promise<boolean> => {
     let vectorId: Id<VectorTableName>;
@@ -374,9 +411,11 @@ const deleteMemoryVector = async (context: MutationCtx, orphan: OrphanedVector, 
         vectorTable = info.tableName;
         vectorId = context.db.asId(info.tableName, orphan.embeddingId);
     } catch (error) {
-        memoryLogger.error(`Memory ${orphan.memoryId} of user ${orphan.userId} points at embedding ${orphan.embeddingId}, which is not a vector row id`, error);
+        // Not told apart from a failed read: the vector may still be there, so the record stays and the cleanup retries it.
+        memoryLogger.error(`Could not find the vector table of embedding ${orphan.embeddingId} of memory ${orphan.memoryId} (user ${orphan.userId})`, error);
+        await recordVectorDelete(context, orphan);
 
-        return true;
+        return false;
     }
 
     try {
@@ -393,7 +432,7 @@ const deleteMemoryVector = async (context: MutationCtx, orphan: OrphanedVector, 
 
         if (attempt >= VECTOR_DELETE_ATTEMPTS) {
             memoryLogger.error(
-                `Giving up the scheduled retries of the vector of memory ${orphan.memoryId}: embedding ${orphan.embeddingId} of user ${orphan.userId} stays recorded for the housekeeping sweep`,
+                `Giving up the scheduled retries of the vector of memory ${orphan.memoryId}: embedding ${orphan.embeddingId} of user ${orphan.userId} stays recorded for its cleanup job`,
                 error,
             );
 
@@ -408,7 +447,7 @@ const deleteMemoryVector = async (context: MutationCtx, orphan: OrphanedVector, 
                 attempt: attempt + 1,
             });
         } catch (scheduleError) {
-            memoryLogger.error(`Could not schedule the retry of embedding ${orphan.embeddingId}; the housekeeping sweep will retry it`, scheduleError);
+            memoryLogger.error(`Could not schedule the retry of embedding ${orphan.embeddingId}; its cleanup record covers it`, scheduleError);
         }
 
         return false;
@@ -499,10 +538,8 @@ export const retryMemoryVectorDelete = internalMutation
 
 /** Older versions one delete removes per write; a longer chain goes on in a follow-up write. */
 const CHAIN_DELETE_BATCH = 100;
-/** The reflection digests of one user kept at most (`DIGESTS_KEPT` in `reflection.ts`) plus room. */
-const DIGEST_SCAN = 100;
-/** Attempts the follow-up write of a long chain gets from the scheduler before only the sweep is left. */
-const CHAIN_RETRY = { backoff: "exponential", baseMs: 30_000, maxAttempts: 5 } as const;
+/** Digests one write cleans; a user with more (a guest merge can copy a whole history in) goes on in a cleanup record. */
+const DIGEST_PAGE = 100;
 
 /** Removes a row and, after it, its vector (a vector with no row can be found by a retry; a row pointing at a gone vector cannot). */
 const removeMemoryRow = async (ctx: MutationCtx, row: Doc<"memories">, userId: string): Promise<void> => {
@@ -514,22 +551,24 @@ const removeMemoryRow = async (ctx: MutationCtx, row: Doc<"memories">, userId: s
 };
 
 /**
- * Takes the deleted memories out of the user's reflection digests. An entry of a deleted id goes; a digest whose entries
- * all went is removed, one that still has others keeps them (and its other fields), without its summary.
+ * Takes the deleted memories out of one page ({@link DIGEST_PAGE}) of the user's reflection digests, from `fromCreatedAt`
+ * on. An entry of a deleted id goes; a digest whose entries all went is removed, one that still has others keeps them
+ * (and its other fields), without its summary.
  *
  * A digest's summary is model-written text with no pointer to the memories it drew on, so a deleted memory's wording can
  * sit in it with or without an entry in `learned` (a merge or a promotion puts rows in it that the list never names).
  * Nor can a creation time bound which digests could have quoted a row: a guest merge re-creates its rows. So every
- * digest of the user loses its summary ({@link DROPPED_DIGEST_SUMMARY}), at most {@link DIGEST_SCAN} rows; nothing is
- * regenerated here, and the digest's other fields stay.
+ * digest of the user loses its summary ({@link DROPPED_DIGEST_SUMMARY}); nothing is regenerated here, and the digest's
+ * other fields stay. Resolves where the next page starts (the `createdAt` of the first digest left), or `null` when the
+ * user's digests are all done. A position, not a cursor: it stays right after a guest merge moves the rows.
  */
-const removeFromDigests = async (ctx: Pick<MutationCtx, "db">, userId: string, ids: ReadonlySet<string>): Promise<void> => {
-    const digests = await ctx.db
+const removeFromDigests = async (ctx: Pick<MutationCtx, "db">, userId: string, ids: ReadonlySet<string>, fromCreatedAt: number): Promise<number | null> => {
+    const rows = await ctx.db
         .query("memoryDigests")
-        .withIndex("by_userId_createdAt", (q) => q.eq("userId", userId))
-        .take(DIGEST_SCAN);
+        .withIndex("by_userId_createdAt", (q) => q.eq("userId", userId).gte("createdAt", fromCreatedAt))
+        .take(DIGEST_PAGE + 1);
 
-    for (const digest of digests) {
+    for (const digest of rows.slice(0, DIGEST_PAGE)) {
         const learned = digest.learned.filter((entry) => !ids.has(entry.memoryId));
 
         if (learned.length === 0 && digest.learned.length > 0) {
@@ -545,25 +584,30 @@ const removeFromDigests = async (ctx: Pick<MutationCtx, "db">, userId: string, i
             await ctx.db.patch("memoryDigests", digest._id, { learned, summary: DROPPED_DIGEST_SUMMARY });
         }
     }
+
+    return rows[DIGEST_PAGE]?.createdAt ?? null;
 };
 
 /**
  * Removes the older versions of the memories in `frontier` (ids already deleted, or about to be): every row that was
  * superseded by one of them, and so on back, with their vectors and digest entries. Rows are found by the pointer the
  * newer row left in `supersededBy`, so a merge or a promotion by reflection is followed as well as a belief revision.
- * At most {@link CHAIN_DELETE_BATCH} rows per call; what is left is written to a `memoryCleanups` row in this same
- * write (the ids still to walk, so a lost follow-up cannot strand them: the root is already gone and cannot be deleted
- * again to restart the walk) and continued on the owner's shard with a retry policy. A failed follow-up leaves the row
- * for {@link sweepMemoryCleanups}; a repeat finds the same rows (a deleted row is gone, the next read starts from the
- * survivors). `cleanupId` is the row a follow-up or the sweep continues: it is moved on, or removed once nothing is left.
+ *
+ * One call is ONE write and nothing in it catches an error: the rows it deletes, their digest entries and the saved
+ * frontier move together, or the write throws and none of it happened (the callers' failure handling is outside it, in
+ * {@link runMemoryCleanup}). At most {@link CHAIN_DELETE_BATCH} rows per call. What is left is kept in a `memoryCleanups`
+ * row of the same write (the ids still to walk: the root is already gone, so a lost follow-up could not otherwise
+ * restart the walk), and its id comes back so the caller can continue; `cleanupId` is the row a follow-up continues,
+ * moved on or removed once nothing is left. A repeat finds the same rows (a deleted row is gone, the next read starts
+ * from the survivors).
  */
 const eraseOlderVersions = async (
     ctx: MutationCtx,
     userId: string,
     frontier: ReadonlyArray<Id<"memories">>,
     deleted: ReadonlyArray<string>,
-    options: { cleanupId?: Id<"memoryCleanups"> } = {},
-): Promise<number> => {
+    cleanupId?: Id<"memoryCleanups">,
+): Promise<{ cleanupId: Id<"memoryCleanups"> | null; olderVersions: number }> => {
     const removed = new Set<string>(deleted);
     const pending: Id<"memories">[] = [];
     const queue = [...frontier];
@@ -599,87 +643,185 @@ const eraseOlderVersions = async (
         }
     }
 
-    await removeFromDigests(ctx, userId, removed);
+    // A step that removed nothing (the rest of a walk that ended) has nothing to take out of the digests.
+    const digestsFrom = removed.size > 0 ? await removeFromDigests(ctx, userId, removed, 0) : null;
 
-    if (pending.length === 0) {
-        if (options.cleanupId) {
-            await ctx.db.delete("memoryCleanups", options.cleanupId);
-        }
-    } else {
-        let { cleanupId } = options;
+    if (digestsFrom !== null) {
+        // More digests than one write cleans: the rest is a record of its own, which carries the ids to take out.
+        const dueAt = ctx.now + CLEANUP_GRACE_MS;
+        const digestsId = await ctx.db.insert("memoryCleanups", { dueAt, fromCreatedAt: digestsFrom, ids: [...removed], kind: "digests", userId });
 
-        if (cleanupId) {
-            await ctx.db.patch("memoryCleanups", cleanupId, { frontier: pending, updatedAt: ctx.now });
-        } else {
-            cleanupId = await ctx.db.insert("memoryCleanups", { frontier: pending, kind: "chain", updatedAt: ctx.now, userId });
-        }
-
-        try {
-            await runAfterOnShard(ctx.scheduler, 0, internal.memory.functions.continueMemoryChainDelete, { cleanupId }, userId, CHAIN_RETRY);
-        } catch (error) {
-            memoryLogger.error(`Could not schedule the rest of the older-version delete for user ${userId}; the housekeeping sweep will resume it`, error);
-        }
+        await wakeShardForCleanup(ctx, userId, dueAt);
+        await armMemoryCleanup(ctx.scheduler, digestsId, userId, 0);
     }
 
-    return removed.size - deleted.length;
+    const olderVersions = removed.size - deleted.length;
+
+    if (pending.length === 0) {
+        if (cleanupId) {
+            await ctx.db.delete("memoryCleanups", cleanupId);
+        }
+
+        return { cleanupId: null, olderVersions };
+    }
+
+    // Due after the grace period, as a safety net: the job that continues the walk is armed by the caller.
+    const dueAt = ctx.now + CLEANUP_GRACE_MS;
+
+    await wakeShardForCleanup(ctx, userId, dueAt);
+
+    if (cleanupId) {
+        await ctx.db.patch("memoryCleanups", cleanupId, { dueAt, frontier: pending });
+
+        return { cleanupId, olderVersions };
+    }
+
+    return { cleanupId: await ctx.db.insert("memoryCleanups", { dueAt, frontier: pending, kind: "chain", userId }), olderVersions };
 };
 
-/** The rest of a long chain's delete (`eraseOlderVersions`), from its `memoryCleanups` row; a row already finished is a no-op. */
-export const continueMemoryChainDelete = internalMutation
+/**
+ * ONE step of one cleanup record, in its own write: a vector delete is tried again, a long chain's delete moves on by one
+ * batch, the walk over a user's digests by one page. Atomic: it deletes rows, cleans their digest entries and moves the saved frontier together or throws and changes
+ * nothing, so {@link runMemoryCleanup} can count the failure and try the record again. A record already finished is a no-op.
+ * `again` asks for another step now; `failed` is a vector that is still there.
+ */
+export const stepMemoryCleanup = internalMutation
     .input({ cleanupId: v.id("memoryCleanups") })
-    .output(v.null())
+    .output(v.object({ again: v.boolean(), failed: v.boolean(), userId: v.string() }))
     .mutation(async ({ args, ctx }) => {
         const row = await ctx.db.get("memoryCleanups", args.cleanupId);
 
-        if (row?.kind === "chain") {
-            await eraseOlderVersions(ctx, row.userId, row.frontier ?? [], [], { cleanupId: row._id });
+        if (!row) {
+            return { again: false, failed: false, userId: "" };
+        }
+
+        if (row.kind === "chain") {
+            const next = await eraseOlderVersions(ctx, row.userId, row.frontier ?? [], [], row._id);
+
+            return { again: next.cleanupId !== null, failed: false, userId: row.userId };
+        }
+
+        if (row.kind === "digests") {
+            const next = await removeFromDigests(ctx, row.userId, new Set(row.ids ?? []), row.fromCreatedAt ?? 0);
+
+            if (next === null) {
+                await ctx.db.delete("memoryCleanups", row._id);
+            } else {
+                await ctx.db.patch("memoryCleanups", row._id, { dueAt: ctx.now + CLEANUP_GRACE_MS, fromCreatedAt: next });
+                await wakeShardForCleanup(ctx, row.userId, ctx.now + CLEANUP_GRACE_MS);
+            }
+
+            return { again: next !== null, failed: false, userId: row.userId };
+        }
+
+        // A record that names no vector has nothing to retry.
+        if (!row.embeddingId) {
+            await ctx.db.delete("memoryCleanups", row._id);
+
+            return { again: false, failed: false, userId: row.userId };
+        }
+
+        const done = await resumeVectorDelete(ctx, { embeddingId: row.embeddingId, memoryId: row.memoryId ?? "", userId: row.userId }, VECTOR_DELETE_ATTEMPTS);
+
+        return { again: false, failed: !done, userId: row.userId };
+    });
+
+/**
+ * Counts a failed step of a cleanup record and moves the record to the back of the line (`dueAt` out by a backoff, so
+ * the oldest-first sweep reaches the others). At {@link CLEANUP_MAX_ATTEMPTS} it is given up on: the row stays, so it can be
+ * found, its `dueAt` is out of reach, and one error with the counts is logged. `retryInMs` is `null` when no retry is due.
+ */
+export const noteMemoryCleanupFailure = internalMutation
+    .input({ cleanupId: v.id("memoryCleanups") })
+    .output(v.object({ retryInMs: v.union(v.number(), v.null()), userId: v.string() }))
+    .mutation(async ({ args, ctx }) => {
+        const row = await ctx.db.get("memoryCleanups", args.cleanupId);
+
+        if (!row) {
+            return { retryInMs: null, userId: "" };
+        }
+
+        const attempts = (row.attempts ?? 0) + 1;
+
+        if (attempts >= CLEANUP_MAX_ATTEMPTS) {
+            await ctx.db.patch("memoryCleanups", row._id, { attempts, dueAt: CLEANUP_NEVER });
+            memoryLogger.error(`Gave up a ${row.kind} memory cleanup after ${attempts} failed attempts; its record ${row._id} stays`);
+
+            return { retryInMs: null, userId: row.userId };
+        }
+
+        const retryInMs = Math.min(CLEANUP_RETRY_BASE_MS * 2 ** attempts, CLEANUP_RETRY_MAX_MS);
+
+        await ctx.db.patch("memoryCleanups", row._id, { attempts, dueAt: ctx.now + retryInMs });
+        await wakeShardForCleanup(ctx, row.userId, ctx.now + retryInMs);
+
+        return { retryInMs, userId: row.userId };
+    });
+
+/**
+ * The scheduler job that works one cleanup record (armed when the record is made, by the housekeeping sweep, and by
+ * itself). Each step is its own write ({@link stepMemoryCleanup}); an error is caught here, outside the write, so what
+ * the step did is rolled back whole before the failure is counted and the record is armed again with a backoff.
+ */
+export const runMemoryCleanup = internalAction
+    .input({ cleanupId: v.id("memoryCleanups") })
+    .output(v.null())
+    .action(async ({ args, ctx }) => {
+        let step: { again: boolean; failed: boolean; userId: string } | undefined;
+
+        try {
+            step = await ctx.runMutation(internal.memory.functions.stepMemoryCleanup, args);
+        } catch (error) {
+            memoryLogger.error(`A step of memory cleanup ${args.cleanupId} failed and was rolled back`, error);
+        }
+
+        if (step && !step.failed) {
+            if (step.again) {
+                await armMemoryCleanup(ctx.scheduler, args.cleanupId, step.userId, 0);
+            }
+
+            return null;
+        }
+
+        const failure = await ctx.runMutation(internal.memory.functions.noteMemoryCleanupFailure, args);
+
+        if (failure.retryInMs !== null) {
+            await armMemoryCleanup(ctx.scheduler, args.cleanupId, failure.userId, failure.retryInMs);
         }
 
         return null;
     });
 
-/** Cleanup rows one housekeeping pass takes; a backlog drains over the next passes. */
+/** Cleanup records one housekeeping pass arms. */
 const CLEANUP_SWEEP_BATCH = 20;
-/** A record younger than this may still have a scheduled retry on its way, so the sweep leaves it. */
-const CLEANUP_GRACE_MS = 20 * 60 * 1000;
 
 /**
- * Housekeeping sweep (`shardSweeps()`): picks up what the scheduled retries did not finish. A recorded vector delete is
- * tried again; a long chain's delete continues from its saved ids. A record that still cannot be finished is kept and
- * moved to the back of the line, so one stuck row never holds up the rest.
+ * Housekeeping sweep (`shardSweeps()`) and the shard tick's (`runShardTick`, which reaches a shard past the housekeeping
+ * horizon): arms a job for each cleanup record that is due (its own job having been lost, or never scheduled) and pushes the
+ * record's `dueAt` out by the grace period. It deletes nothing: the work, with its failure handling, is the job's. A record
+ * given up on is never due. Resolves the earliest `dueAt` still to come, which the tick re-arms the shard for.
  */
 export const sweepMemoryCleanups = internalMutation
     .input({})
-    .output(v.null())
+    .output(v.object({ nextDueAt: v.union(v.number(), v.null()) }))
     .mutation(async ({ ctx }) => {
         const rows = await ctx.db
             .query("memoryCleanups")
-            .withIndex("by_updatedAt", (q) => q.lte("updatedAt", ctx.now - CLEANUP_GRACE_MS))
+            .withIndex("by_dueAt", (q) => q.lte("dueAt", ctx.now))
             .take(CLEANUP_SWEEP_BATCH);
 
         for (const row of rows) {
-            try {
-                if (row.kind === "chain") {
-                    await eraseOlderVersions(ctx, row.userId, row.frontier ?? [], [], { cleanupId: row._id });
-                } else if (row.embeddingId) {
-                    const done = await resumeVectorDelete(
-                        ctx,
-                        { embeddingId: row.embeddingId, memoryId: row.memoryId ?? "", userId: row.userId },
-                        VECTOR_DELETE_ATTEMPTS,
-                    );
-
-                    if (!done) {
-                        await ctx.db.patch("memoryCleanups", row._id, { updatedAt: ctx.now });
-                    }
-                } else {
-                    await ctx.db.delete("memoryCleanups", row._id);
-                }
-            } catch (error) {
-                memoryLogger.error(`A memory cleanup (${row.kind}) of user ${row.userId} failed; it stays recorded`, error);
-            }
+            await ctx.db.patch("memoryCleanups", row._id, { dueAt: ctx.now + CLEANUP_GRACE_MS });
+            await armMemoryCleanup(ctx.scheduler, row._id, row.userId, 0);
         }
 
-        return null;
+        // Past a full batch there are more due: the shard is woken again at once.
+        const [next] = await ctx.db
+            .query("memoryCleanups")
+            .withIndex("by_dueAt", (q) => q.lt("dueAt", CLEANUP_NEVER))
+            .take(1);
+
+        return { nextDueAt: next ? (rows.length === CLEANUP_SWEEP_BATCH ? ctx.now : next.dueAt) : null };
     });
 
 /**
@@ -698,7 +840,11 @@ export const deleteMemory = authMutation
 
         await removeMemoryRow(context, memory, userId);
 
-        const olderVersions = await eraseOlderVersions(context, userId, [memory._id], [memory._id]);
+        const { cleanupId, olderVersions } = await eraseOlderVersions(context, userId, [memory._id], [memory._id]);
+
+        if (cleanupId) {
+            await armMemoryCleanup(context.scheduler, cleanupId, userId, 0);
+        }
 
         context.log.event("memory.delete_memory", { hadEmbedding: Boolean(memory.embeddingId), olderVersions });
 

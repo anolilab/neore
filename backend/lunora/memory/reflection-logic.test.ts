@@ -25,6 +25,7 @@ import {
     planReflection,
     promotionToOp,
     reflectionJitterMinutes,
+    reflectionSourceIds,
     REFLECTION_LIMITS,
     type ReflectionMemory,
     resolveTimeZone,
@@ -566,5 +567,29 @@ describe("zone formatters", () => {
     it("reads an unknown zone as UTC", () => {
         expect(resolveTimeZone("Not/AZone")).toBe("UTC");
         expect(localParts(NOW, "Not/AZone")).toStrictEqual({ day: 23, hour: 1, minute: 0, month: 9, year: 2026 });
+    });
+});
+
+describe(reflectionSourceIds, () => {
+    it("lists only the day's memories the prompt shows, with every merge member and promotion source", () => {
+        const learned = Array.from({ length: REFLECTION_LIMITS.maxDigestItems + 3 }, (_, index) => ({ id: `learned-${String(index)}` }));
+        const ids = reflectionSourceIds(learned, {
+            merges: [{ absorbedIds: ["absorbed"], survivorId: "survivor", texts: ["a", "b"], type: "preference" }],
+            promotions: [{ sourceIds: ["source-a", "source-b"], texts: ["a", "b"] }],
+        });
+        const prompt = buildReflectionPrompt({
+            learnedToday: learned.map((entry) => entry.id),
+            merges: [],
+            promotions: [],
+            threadTitles: [],
+        });
+
+        // The prompt cuts the day's list at its limit; the sources follow the same cut.
+        expect(ids).toEqual(
+            expect.arrayContaining(["learned-0", `learned-${String(REFLECTION_LIMITS.maxDigestItems - 1)}`, "absorbed", "survivor", "source-a", "source-b"]),
+        );
+        expect(ids).not.toContain(`learned-${String(REFLECTION_LIMITS.maxDigestItems)}`);
+        expect(prompt).not.toContain(`learned-${String(REFLECTION_LIMITS.maxDigestItems)}`);
+        expect(ids).toHaveLength(REFLECTION_LIMITS.maxDigestItems + 4);
     });
 });

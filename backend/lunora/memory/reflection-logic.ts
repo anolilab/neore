@@ -758,6 +758,22 @@ export interface ReflectionPromptInput {
     threadTitles: string[];
 }
 
+/**
+ * The memories the synthesis prompt shows, so the ones a digest summary can have quoted: the first
+ * `maxDigestItems` of the day's, every merge member and every promotion source. A memory the prompt cut is not one.
+ */
+export const reflectionSourceIds = (
+    learnedToday: ReadonlyArray<{ id: string }>,
+    plan: Pick<ReflectionPlan, "merges" | "promotions">,
+    limits: Pick<ReflectionLimits, "maxDigestItems"> = REFLECTION_LIMITS,
+): string[] => [
+    ...new Set([
+        ...learnedToday.slice(0, limits.maxDigestItems).map((memory) => memory.id),
+        ...plan.merges.flatMap((merge) => [merge.survivorId, ...merge.absorbedIds]),
+        ...plan.promotions.flatMap((candidate) => candidate.sourceIds),
+    ]),
+];
+
 /** Values are JSON-encoded so a memory cannot close the data block and speak as the prompt. */
 export const buildReflectionPrompt = (
     input: ReflectionPromptInput,
