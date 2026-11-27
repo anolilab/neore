@@ -168,7 +168,7 @@ const CanvasVersionHistory: FC<CanvasVersionHistoryProps> = ({ document }) => {
     return (
         <div className="flex h-full flex-col">
             {/* Header */}
-            <div className="flex items-center gap-2 border-b px-4 py-2">
+            <div className="border-border/50 flex items-center gap-2 border-b px-4 py-2">
                 <button
                     className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-sm transition-colors"
                     onClick={handleBack}
@@ -182,9 +182,9 @@ const CanvasVersionHistory: FC<CanvasVersionHistoryProps> = ({ document }) => {
             {/* Content */}
             <div className="flex flex-1 overflow-hidden">
                 {/* Version list */}
-                <div className="w-48 shrink-0 overflow-auto border-r">
+                <div className="border-border/50 w-48 shrink-0 overflow-auto border-r">
                     <div className="p-2">
-                        <h4 className="text-muted-foreground mb-2 px-2 text-xs font-medium uppercase">{t`Versions`}</h4>
+                        <h4 className="text-muted-foreground mb-2 px-2 font-mono text-xs">{t`Versions`}</h4>
                         {versions?.map((v) => {
                             const isSelected = selectedVersion === v.version;
 

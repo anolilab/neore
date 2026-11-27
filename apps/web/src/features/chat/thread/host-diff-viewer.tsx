@@ -196,8 +196,8 @@ const DiffFileView = memo(({ commented, file, fileIndex, messageId, selection, s
     };
 
     return (
-        <section aria-label={t`Changes to ${file.path}`} className="border-border rounded-md border">
-            <div className="bg-muted/50 flex items-center justify-between gap-2 px-3 py-1">
+        <section aria-label={t`Changes to ${file.path}`} className="surface-raised overflow-hidden rounded-xl">
+            <div className="border-border/50 flex items-center justify-between gap-2 border-b px-3 py-1">
                 <h3 className="min-w-0 truncate font-mono text-xs font-medium">{file.path}</h3>
                 <Button
                     aria-label={t`Comment on the whole file ${file.path}`}

@@ -22,7 +22,7 @@ const ComposerAskAside: FC = () => {
                 render={
                     <Button
                         aria-label={t`Ask a side question`}
-                        className="bg-sidebar border-border dark:border-sidebar-border/15 hover:bg-accent/50 dark:hover:bg-sidebar-accent/30 text-foreground h-7 gap-1 px-2 dark:text-white"
+                        className="bg-surface-row border-border/50 hover:bg-surface-row-hover text-foreground h-7 gap-1 px-2"
                         onClick={openAside}
                         size="sm"
                         type="button"

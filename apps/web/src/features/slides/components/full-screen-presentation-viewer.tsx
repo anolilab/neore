@@ -282,17 +282,17 @@ const FullScreenPresentationViewer = ({
             tabIndex={-1}
         >
             {/* Top Controls Bar */}
-            <div className="flex-shrink-0 border-b border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
+            <div className="bg-surface-main border-border/50 flex-shrink-0 border-b">
                 <div className="flex items-center justify-between p-4">
                     <div className="flex items-center gap-3">
-                        <div className="relative flex-shrink-0 rounded-lg border border-zinc-300 bg-zinc-200/60 p-2 dark:border-zinc-700 dark:bg-zinc-900">
-                            <Presentation className="h-5 w-5 text-zinc-500 dark:text-zinc-400" />
+                        <div className="surface-well relative flex-shrink-0 rounded-lg p-2">
+                            <Presentation className="text-muted-foreground h-5 w-5" />
                         </div>
 
                         {(presentationTitle || totalSlides > 0) && (
                             <div>
-                                <h1 className="text-base font-medium text-zinc-900 dark:text-zinc-100">{presentationTitle ?? t`Presentation`}</h1>
-                                <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                                <h1 className="text-base font-medium">{presentationTitle ?? t`Presentation`}</h1>
+                                <p className="text-muted-foreground text-sm">
                                     <Trans>
                                         Slide {currentSlide} of {totalSlides}
                                     </Trans>
@@ -353,11 +353,11 @@ const FullScreenPresentationViewer = ({
             )}
 
             {/* Main Content Area */}
-            <div className="flex min-h-0 flex-1 items-center justify-center bg-zinc-100 p-2 dark:bg-zinc-900">
+            <div className="bg-background flex min-h-0 flex-1 items-center justify-center p-2">
                 {isLoading || !currentSlideData ? (
                     <div className="text-center">
                         <Skeleton className="mx-auto mb-4 h-12 w-12 rounded-full" />
-                        <p className="text-zinc-700 dark:text-zinc-300">
+                        <p className="text-muted-foreground">
                             <Trans>Loading presentation...</Trans>
                         </p>
                     </div>
@@ -403,9 +403,7 @@ const FullScreenPresentationViewer = ({
                                             aria-current={slideNumber === currentSlide ? "true" : undefined}
                                             aria-label={t`Go to slide ${slideNumber}`}
                                             className={`h-2.5 w-2.5 rounded-full transition-all duration-200 ${
-                                                slideNumber === currentSlide
-                                                    ? "bg-black dark:bg-white"
-                                                    : "bg-zinc-300 hover:bg-zinc-400 dark:bg-zinc-600 dark:hover:bg-zinc-500"
+                                                slideNumber === currentSlide ? "bg-foreground" : "bg-muted-foreground/30 hover:bg-muted-foreground/60"
                                             }`}
                                             key={slideNumber}
                                             onClick={() => setCurrentSlide(slideNumber)}

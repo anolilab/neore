@@ -766,7 +766,7 @@ msgid "{0} of {1} tasks done"
 msgstr "已完成 {0}/{1} 个任务"
 
 #. placeholder {0}: parallelSelectedIds.size
-#: src/components/model-picker/model-picker.tsx:1392
+#: src/components/model-picker/model-picker.tsx:1388
 msgid "{0} of {MAX_PARALLEL} selected"
 msgstr "已选择 {0}/{MAX_PARALLEL} 个"
 
@@ -1240,7 +1240,7 @@ msgstr "{itemCount, plural, other {{nodeName}：# 项，对象}}"
 msgid "{itemCount, plural, one {# item} other {# items}}"
 msgstr "{itemCount, plural, other {# 项}}"
 
-#: src/components/model-picker/model-picker.tsx:1093
+#: src/components/model-picker/model-picker.tsx:1089
 msgid "{label} added to starred"
 msgstr "已将 {label} 加入星标"
 
@@ -1276,7 +1276,7 @@ msgid "{label} is not connected."
 msgstr "{label} 未连接。"
 
 #. placeholder {0}: ids.length
-#: src/components/model-picker/model-picker.tsx:1033
+#: src/components/model-picker/model-picker.tsx:1029
 msgid "{label} moved to position {position} of {0} in starred"
 msgstr "{label}已移至星标中的第{position}位（共{0}位）"
 
@@ -1288,7 +1288,7 @@ msgstr "{label} 拒绝了此请求。你的账号可能没有访问权限，或�
 msgid "{label} refused this. Your account may lack access."
 msgstr "{label} 拒绝了此操作。你的账号可能没有访问权限。"
 
-#: src/components/model-picker/model-picker.tsx:1093
+#: src/components/model-picker/model-picker.tsx:1089
 msgid "{label} removed from starred"
 msgstr "已将 {label} 移出星标"
 
@@ -1418,7 +1418,7 @@ msgstr "{name} 未及时响应。请在该电脑上打开桌面应用后重试�
 msgid "{name} disconnected"
 msgstr "{name} 已断开连接"
 
-#: src/components/model-picker/model-picker.tsx:860
+#: src/components/model-picker/model-picker.tsx:856
 msgid "{name} hidden from the model picker"
 msgstr "已在模型选择器中隐藏 {name}"
 
@@ -2496,7 +2496,7 @@ msgstr "操作"
 msgid "Action Log"
 msgstr "操作日志"
 
-#: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:428
+#: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:420
 #: src/features/evals/components/dataset-panel.tsx:149
 msgid "Actions"
 msgstr "操作"
@@ -3401,7 +3401,7 @@ msgstr "AI 视频生成"
 msgid "AI-assisted bug triage with full recording context"
 msgstr "借助完整录制上下文进行 AI 辅助的缺陷分诊"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:434
+#: ../../packages/chat-ui/src/chat/message-content.tsx:415
 msgid "AI-generated"
 msgstr "AI生成"
 
@@ -3526,8 +3526,8 @@ msgstr "垂直对齐（V）"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:731
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:793
-#: src/components/model-picker/model-picker.tsx:1239
-#: src/components/model-picker/model-picker.tsx:1317
+#: src/components/model-picker/model-picker.tsx:1235
+#: src/components/model-picker/model-picker.tsx:1313
 #: src/features/chat/thread-list/thread-list-filter-menu.tsx:120
 #: src/features/marketing/components/tutorials-page.tsx:130
 #: src/features/settings/components/chat/models-settings.tsx:419
@@ -3619,7 +3619,7 @@ msgid "All MCP servers active"
 msgstr "所有 MCP 服务器已启用"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:677
-#: src/components/model-picker/model-picker.tsx:1187
+#: src/components/model-picker/model-picker.tsx:1183
 #: src/features/marketing/components/model-detail-page.tsx:165
 msgid "All models"
 msgstr "所有模型"
@@ -3727,11 +3727,11 @@ msgstr "全部使用场景"
 msgid "All Users"
 msgstr "所有用户"
 
-#: src/features/chat/thread/tool-approval.tsx:169
+#: src/features/chat/thread/tool-approval.tsx:167
 msgid "Allow \"{tool}\" from {server}?"
 msgstr "允许来自 {server} 的“{tool}”吗？"
 
-#: src/features/chat/thread/tool-approval.tsx:169
+#: src/features/chat/thread/tool-approval.tsx:167
 msgid "Allow \"{tool}\"?"
 msgstr "允许“{tool}”吗？"
 
@@ -3740,18 +3740,18 @@ msgid "Allow \"delete_files\" from the drafts server?"
 msgstr "允许草稿服务器的“delete_files”吗？"
 
 #: src/features/chat/thread/tool-approval.tsx:138
-msgid "Allow {tool} for 1 hour"
-msgstr "允许 {tool} 1 小时"
+#~ msgid "Allow {tool} for 1 hour"
+#~ msgstr "允许 {tool} 1 小时"
 
 #: src/features/chat/thread/tool-approval.tsx:142
-msgid "Allow {tool} for today"
-msgstr "允许 {tool} 今天"
+#~ msgid "Allow {tool} for today"
+#~ msgstr "允许 {tool} 今天"
 
-#: src/features/chat/thread/tool-approval.tsx:140
+#: src/features/chat/thread/tool-approval.tsx:134
 msgid "Allow for 1 hour"
 msgstr "允许 1 小时"
 
-#: src/features/chat/thread/tool-approval.tsx:144
+#: src/features/chat/thread/tool-approval.tsx:140
 msgid "Allow for today"
 msgstr "允许今天"
 
@@ -3813,12 +3813,12 @@ msgstr "同时在看"
 msgid "Always"
 msgstr "始终"
 
-#: src/features/chat/thread/tool-approval.tsx:134
+#: src/features/chat/thread/tool-approval.tsx:128
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:35
 msgid "Always allow"
 msgstr "始终允许"
 
-#: src/features/chat/thread/tool-approval.tsx:132
+#: src/features/chat/thread/tool-approval.tsx:126
 msgid "Always allow {tool}"
 msgstr "始终允许 {tool}"
 
@@ -3906,7 +3906,7 @@ msgstr "发生错误"
 msgid "An error occurred during One Tap sign in"
 msgstr "One Tap 登录时出错"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1282
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1263
 msgid "An error occurred while generating the response."
 msgstr "生成回复时发生错误。"
 
@@ -4244,7 +4244,7 @@ msgid "Applies to"
 msgstr "适用于"
 
 #: src/features/canvas/canvas-panel.tsx:120
-#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:333
+#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:331
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:430
 #: src/features/prompts/components/prompt-optimize-dialog.tsx:212
 msgid "Apply"
@@ -4308,14 +4308,14 @@ msgid "Approvals in Neore: a tool you set to Ask stops before it runs, and you d
 msgstr "Neore 中的批准：设为“询问”的工具会在运行前暂停，由你结合确切的输入决定。"
 
 #: src/features/auth/components/device-approval.tsx:242
-#: src/features/chat/thread/tool-approval.tsx:126
+#: src/features/chat/thread/tool-approval.tsx:120
 #: src/features/develop/components/review-panel.tsx:64
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:32
 #: src/features/tasks/components/task-detail-dialog.tsx:104
 msgid "Approve"
 msgstr "批准"
 
-#: src/features/chat/thread/tool-approval.tsx:124
+#: src/features/chat/thread/tool-approval.tsx:118
 msgid "Approve {tool} once"
 msgstr "批准一次 {tool}"
 
@@ -4793,7 +4793,7 @@ msgid "Auckland"
 msgstr "奥克兰"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:781
-#: src/components/model-picker/model-picker.tsx:1291
+#: src/components/model-picker/model-picker.tsx:1287
 #: src/features/chat/sidebar/usage-card.tsx:131
 #: src/features/chat/thread/composer.tsx:133
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:85
@@ -5757,13 +5757,13 @@ msgstr "浏览并恢复工作流的历史版本。"
 msgid "Browse, fork, and remix workflows shared by the community"
 msgstr "浏览、复刻并改编社区分享的工作流"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:824
+#: ../../packages/chat-ui/src/chat/message-content.tsx:805
 #: src/features/chat/browser-live-view/browser-live-view.tsx:1038
 #: src/features/chat/browser-live-view/browser-live-view.tsx:1267
 msgid "Browser"
 msgstr "浏览器"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:847
+#: ../../packages/chat-ui/src/chat/message-content.tsx:828
 msgid "Browser action failed"
 msgstr "浏览器操作失败"
 
@@ -5779,7 +5779,7 @@ msgstr "浏览器点击设置已更新"
 msgid "Browser Clicks"
 msgstr "浏览器点击"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:845
+#: ../../packages/chat-ui/src/chat/message-content.tsx:826
 msgid "Browser error"
 msgstr "浏览器错误"
 
@@ -5788,7 +5788,7 @@ msgid "Browser notes"
 msgstr "浏览器说明"
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:262
-#: ../../packages/chat-ui/src/chat/message-content.tsx:802
+#: ../../packages/chat-ui/src/chat/message-content.tsx:783
 #: src/features/chat/image-gallery/thread-image-gallery.tsx:72
 msgid "Browser screenshot"
 msgstr "浏览器截图"
@@ -5797,7 +5797,7 @@ msgstr "浏览器截图"
 msgid "Browser Session"
 msgstr "浏览器会话"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:751
+#: ../../packages/chat-ui/src/chat/message-content.tsx:732
 msgid "Browser working..."
 msgstr "浏览器运行中..."
 
@@ -6782,7 +6782,7 @@ msgstr "检查中"
 msgid "Checking code, a draft or a plan for mistakes."
 msgstr "检查代码、草稿或计划中的错误。"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:451
+#: ../../packages/chat-ui/src/chat/message-content.tsx:432
 msgid "Checking image safety..."
 msgstr "正在检查图片安全性..."
 
@@ -7184,7 +7184,7 @@ msgstr "点击"
 msgid "Click \"{selector}\""
 msgstr "点击“{selector}”"
 
-#: src/components/model-picker/model-picker.tsx:1350
+#: src/components/model-picker/model-picker.tsx:1346
 msgid "Click ★ on any model in All models to add it here."
 msgstr "在“所有模型”中点击任意模型上的 ★ 即可添加到这里。"
 
@@ -7224,7 +7224,7 @@ msgstr "点击编辑"
 msgid "Click to edit..."
 msgstr "点击编辑..."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:743
+#: ../../packages/chat-ui/src/chat/message-content.tsx:724
 msgid "Clicking element..."
 msgstr "正在点击元素..."
 
@@ -7268,7 +7268,7 @@ msgstr "克隆或新建…"
 #: ../../packages/ui/src/components/sheet.tsx:75
 #: src/components/command-palette.tsx:1097
 #: src/features/admin/components/user-sessions-dialog.tsx:159
-#: src/features/canvas/canvas-panel.tsx:835
+#: src/features/canvas/canvas-panel.tsx:839
 #: src/features/canvas/pdf-preview-panel.tsx:105
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:868
 #: src/features/develop/components/thread-pull-requests.tsx:396
@@ -7303,7 +7303,7 @@ msgstr "关闭查找"
 msgid "Close full screen"
 msgstr "退出全屏"
 
-#: src/features/canvas/canvas-panel.tsx:788
+#: src/features/canvas/canvas-panel.tsx:792
 msgid "Close history"
 msgstr "关闭历史记录"
 
@@ -7372,7 +7372,7 @@ msgstr "Cloudflare Workers AI 模型在 Cloudflare 有可用容量的任何地�
 #: src/features/auth/components/device-code-parts.tsx:46
 #: src/features/auth/components/device-code-parts.tsx:80
 #: src/features/auth/components/device-code-parts.tsx:134
-#: src/features/canvas/canvas-panel.tsx:770
+#: src/features/canvas/canvas-panel.tsx:774
 #: src/features/chat/thread/composer-search-mode.tsx:57
 #: src/features/code/components/code-workspace.tsx:219
 #: src/features/layout/components/workspace-switch.tsx:48
@@ -7396,7 +7396,7 @@ msgstr "代码执行"
 msgid "Code execution and sandbox files"
 msgstr "代码执行和沙盒文件"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:719
+#: ../../packages/chat-ui/src/chat/message-content.tsx:700
 msgid "Code execution failed"
 msgstr "代码执行失败"
 
@@ -7420,7 +7420,7 @@ msgstr "你的账号暂时无法使用代码模式。"
 msgid "Code navigation"
 msgstr "代码导航"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:671
+#: ../../packages/chat-ui/src/chat/message-content.tsx:652
 #: src/features/chat/image-gallery/thread-image-gallery.tsx:76
 msgid "Code output"
 msgstr "代码输出"
@@ -7438,7 +7438,7 @@ msgstr "代码审查小组"
 msgid "Code Sandbox"
 msgstr "代码沙箱"
 
-#: src/features/canvas/canvas-panel.tsx:763
+#: src/features/canvas/canvas-panel.tsx:767
 msgid "Code view"
 msgstr "代码视图"
 
@@ -7665,7 +7665,7 @@ msgstr "命令不能超过 {SKILL_SLUG_MAX} 个字符"
 msgid "Command Palette"
 msgstr "命令面板"
 
-#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:553
+#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:545
 msgid "Commands"
 msgstr "命令"
 
@@ -8110,7 +8110,7 @@ msgstr "已配置"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:882
 #: ../../packages/ui/src/components/confirm-dialog.tsx:29
-#: src/components/model-picker/model-picker.tsx:1414
+#: src/components/model-picker/model-picker.tsx:1410
 msgid "Confirm"
 msgstr "确认"
 
@@ -8824,7 +8824,7 @@ msgstr "复制为纯文本"
 msgid "Copy command: {label}"
 msgstr "复制命令：{label}"
 
-#: src/features/canvas/canvas-panel.tsx:803
+#: src/features/canvas/canvas-panel.tsx:807
 msgid "Copy content"
 msgstr "复制内容"
 
@@ -9466,7 +9466,7 @@ msgstr "无法保存登录信息。"
 msgid "Could not save the memories"
 msgstr "无法保存记忆"
 
-#: src/components/model-picker/model-picker.tsx:1036
+#: src/components/model-picker/model-picker.tsx:1032
 msgid "Could not save the new order for {label}"
 msgstr "无法保存{label}的新顺序"
 
@@ -9907,7 +9907,7 @@ msgstr "正在创建机器人…"
 msgid "Creating branch..."
 msgstr "正在创建分支..."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:361
+#: ../../packages/chat-ui/src/chat/message-content.tsx:342
 msgid "Creating slides..."
 msgstr "正在创建幻灯片..."
 
@@ -10630,7 +10630,7 @@ msgstr "默认模型已更新"
 msgid "Default Models"
 msgstr "默认模型"
 
-#: src/components/model-picker/model-picker.tsx:1302
+#: src/components/model-picker/model-picker.tsx:1298
 msgid "Default order"
 msgstr "默认顺序"
 
@@ -11079,12 +11079,12 @@ msgid "Density updated"
 msgstr "密度已更新"
 
 #: src/features/auth/components/device-approval.tsx:233
-#: src/features/chat/thread/tool-approval.tsx:130
+#: src/features/chat/thread/tool-approval.tsx:124
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:34
 msgid "Deny"
 msgstr "拒绝"
 
-#: src/features/chat/thread/tool-approval.tsx:128
+#: src/features/chat/thread/tool-approval.tsx:122
 msgid "Deny {tool}"
 msgstr "拒绝 {tool}"
 
@@ -11641,7 +11641,7 @@ msgid "Do you want to add more rows?"
 msgstr "要添加更多行吗？"
 
 #: ../../packages/chat-ui/src/chat/document-artifact.tsx:44
-#: ../../packages/chat-ui/src/chat/message-content.tsx:336
+#: ../../packages/chat-ui/src/chat/message-content.tsx:317
 #: ../../packages/ui/src/components/file-renderers/docx-preview.tsx:115
 #: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:182
 msgid "Document"
@@ -11742,8 +11742,8 @@ msgstr "下载"
 #: ../../packages/ui/src/components/media-preview-dialog.tsx:183
 #: ../../packages/ui/src/components/save-file-button.tsx:27
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:82
-#: src/features/canvas/canvas-panel.tsx:811
-#: src/features/canvas/canvas-panel.tsx:828
+#: src/features/canvas/canvas-panel.tsx:815
+#: src/features/canvas/canvas-panel.tsx:832
 #: src/features/download/components/download-page.tsx:120
 #: src/features/skills/components/bundle-export-dialog.tsx:227
 #: src/features/workflow/components/nodes/node-expand-modal.tsx:300
@@ -11756,7 +11756,7 @@ msgid "Download — Neore Desktop"
 msgstr "下载 — Neore Desktop"
 
 #. placeholder {0}: part.filename
-#: ../../packages/chat-ui/src/chat/message-content.tsx:492
+#: ../../packages/chat-ui/src/chat/message-content.tsx:473
 msgid "Download {0}"
 msgstr "下载 {0}"
 
@@ -11791,7 +11791,7 @@ msgstr "以 JSON 格式下载你所有个人数据的副本（GDPR 第 20 条—
 msgid "Download a model"
 msgstr "下载模型"
 
-#: src/features/canvas/canvas-panel.tsx:819
+#: src/features/canvas/canvas-panel.tsx:823
 msgid "Download as CSV"
 msgstr "下载为 CSV"
 
@@ -11799,7 +11799,7 @@ msgstr "下载为 CSV"
 msgid "Download as Markdown"
 msgstr "下载为 Markdown"
 
-#: src/features/canvas/canvas-panel.tsx:823
+#: src/features/canvas/canvas-panel.tsx:827
 msgid "Download as XLSX"
 msgstr "下载为 XLSX"
 
@@ -11815,7 +11815,7 @@ msgstr "下载文档"
 msgid "Download Export"
 msgstr "下载导出"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:531
+#: ../../packages/chat-ui/src/chat/message-content.tsx:512
 #: ../../packages/ui/src/components/file-renderers/generic-file-card.tsx:88
 msgid "Download file"
 msgstr "下载文件"
@@ -11825,8 +11825,8 @@ msgstr "下载文件"
 msgid "Download for {0}"
 msgstr "下载 {0} 版"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:492
-#: ../../packages/chat-ui/src/chat/message-content.tsx:499
+#: ../../packages/chat-ui/src/chat/message-content.tsx:473
+#: ../../packages/chat-ui/src/chat/message-content.tsx:480
 msgid "Download image"
 msgstr "下载图像"
 
@@ -12092,7 +12092,7 @@ msgstr "例如：财务规划"
 msgid "e.g., Make it more concise, add technical details, improve clarity, add examples..."
 msgstr "例如：更简洁、添加技术细节、提高清晰度、添加示例..."
 
-#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:244
+#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:242
 msgid "e.g., Make it more concise, add technical details, improve clarity..."
 msgstr "例如：更简洁、添加技术细节、提高清晰度..."
 
@@ -12100,7 +12100,7 @@ msgstr "例如：更简洁、添加技术细节、提高清晰度..."
 msgid "e.g., Make it more concise, require markdown output, add safety rules..."
 msgstr "例如：更简洁、要求 Markdown 输出、添加安全规则..."
 
-#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:307
+#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:305
 msgid "e.g., Make it stricter about JSON output, add a code example..."
 msgstr "例如：对 JSON 输出更严格、添加代码示例..."
 
@@ -12222,7 +12222,7 @@ msgid "Edge-guided generation"
 msgstr "边缘引导生成"
 
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:141
-#: src/features/canvas/canvas-panel.tsx:783
+#: src/features/canvas/canvas-panel.tsx:787
 #: src/features/chat/host/host-composer.tsx:1060
 #: src/features/chat/thread-list/group-header.tsx:178
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:799
@@ -13264,7 +13264,7 @@ msgstr "错误率"
 msgid "Error trace:"
 msgstr "错误追踪："
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:297
+#: ../../packages/chat-ui/src/chat/message-content.tsx:278
 msgid "Error:"
 msgstr "错误："
 
@@ -13545,7 +13545,7 @@ msgstr "正在执行工具..."
 msgid "Execution"
 msgstr "执行"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:709
+#: ../../packages/chat-ui/src/chat/message-content.tsx:690
 msgid "Execution failed"
 msgstr "执行失败"
 
@@ -13570,7 +13570,7 @@ msgstr "存在"
 msgid "Exit {0}"
 msgstr "退出码 {0}"
 
-#: src/features/canvas/canvas-panel.tsx:832
+#: src/features/canvas/canvas-panel.tsx:836
 msgid "Exit fullscreen"
 msgstr "退出全屏"
 
@@ -13893,11 +13893,11 @@ msgstr "提取页面"
 msgid "Extract subject"
 msgstr "提取主体"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:815
+#: ../../packages/chat-ui/src/chat/message-content.tsx:796
 msgid "Extracted"
 msgstr "已提取"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:744
+#: ../../packages/chat-ui/src/chat/message-content.tsx:725
 msgid "Extracting content..."
 msgstr "正在提取内容..."
 
@@ -14625,8 +14625,8 @@ msgstr "更新收藏失败"
 msgid "Failed to update favorite status"
 msgstr "更新收藏状态失败"
 
-#: src/components/model-picker/model-picker.tsx:855
-#: src/components/model-picker/model-picker.tsx:864
+#: src/components/model-picker/model-picker.tsx:851
+#: src/components/model-picker/model-picker.tsx:860
 #: src/features/settings/components/chat/model-filter-settings.tsx:56
 #: src/features/settings/components/chat/model-filter-settings.tsx:67
 msgid "Failed to update filter rules"
@@ -16113,7 +16113,7 @@ msgstr "通栏主视觉"
 msgid "Full-width promotional"
 msgstr "通栏宣传图"
 
-#: src/features/canvas/canvas-panel.tsx:832
+#: src/features/canvas/canvas-panel.tsx:836
 msgid "Fullscreen"
 msgstr "全屏"
 
@@ -16340,7 +16340,7 @@ msgstr "生成的视频"
 msgid "Generated videos will appear here. Start by describing what you want to create in the composer below."
 msgstr "生成的视频将显示在这里。在下方输入框中描述你想创作的内容即可开始。"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:546
+#: ../../packages/chat-ui/src/chat/message-content.tsx:527
 msgid "Generating audio..."
 msgstr "正在生成音频..."
 
@@ -16348,12 +16348,12 @@ msgstr "正在生成音频..."
 msgid "Generating draft…"
 msgstr "正在生成草稿…"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:547
+#: ../../packages/chat-ui/src/chat/message-content.tsx:528
 #: src/features/chat/thread/media-gallery-view.tsx:405
 msgid "Generating image..."
 msgstr "正在生成图像..."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:358
+#: ../../packages/chat-ui/src/chat/message-content.tsx:339
 msgid "Generating presentation..."
 msgstr "正在生成演示文稿..."
 
@@ -16361,7 +16361,7 @@ msgstr "正在生成演示文稿..."
 msgid "Generating response"
 msgstr "正在生成回复"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:548
+#: ../../packages/chat-ui/src/chat/message-content.tsx:529
 #: src/features/chat/thread/media-gallery-view.tsx:405
 msgid "Generating video..."
 msgstr "正在生成视频..."
@@ -17055,7 +17055,7 @@ msgstr "访客账号"
 msgid "Guest accounts"
 msgstr "访客账号"
 
-#: src/components/model-picker/model-picker.tsx:1141
+#: src/components/model-picker/model-picker.tsx:1137
 msgid "Guest accounts use free models only."
 msgstr "访客账号只能使用免费模型。"
 
@@ -17255,7 +17255,7 @@ msgstr "在模型选择器中隐藏"
 msgid "Hide {fieldLabel}"
 msgstr "隐藏{fieldLabel}"
 
-#: src/components/model-picker/model-picker.tsx:1326
+#: src/components/model-picker/model-picker.tsx:1322
 msgid "Hide {name} from model picker"
 msgstr "在模型选择器中隐藏 {name}"
 
@@ -17786,14 +17786,14 @@ msgid "illustration"
 msgstr "插画"
 
 #: ../../packages/chat-ui/src/chat/document-artifact.tsx:42
-#: ../../packages/chat-ui/src/chat/message-content.tsx:483
+#: ../../packages/chat-ui/src/chat/message-content.tsx:464
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:755
 #: ../../packages/ui/src/components/ai-elements/attachments-utilities.tsx:47
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:107
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:109
 #: ../../packages/ui/src/components/canvas-editor/canvas-element-palette.tsx:330
 #: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:343
-#: src/components/model-picker/model-picker.tsx:1265
+#: src/components/model-picker/model-picker.tsx:1261
 #: src/features/chat/image-gallery/thread-image-gallery.tsx:80
 #: src/features/chat/sidebar/usage-card.tsx:129
 #: src/features/chat/thread/composer.tsx:131
@@ -18148,7 +18148,7 @@ msgstr "导入工作流"
 msgid "Import workflow (ZIP or JSON)"
 msgstr "导入工作流 (ZIP 或 JSON)"
 
-#: src/features/canvas/canvas-panel.tsx:796
+#: src/features/canvas/canvas-panel.tsx:800
 msgid "Import XLSX"
 msgstr "导入 XLSX"
 
@@ -18207,7 +18207,7 @@ msgstr "正在导入记忆…"
 msgid "Imprint"
 msgstr "法律声明"
 
-#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:343
+#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:341
 msgid "Improve"
 msgstr "优化"
 
@@ -18252,7 +18252,7 @@ msgstr "运动动态优于 Kling 2.x"
 msgid "Improved multimodal reasoning"
 msgstr "多模态推理能力提升"
 
-#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:261
+#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:259
 msgid "Improved Prompt"
 msgstr "优化后的提示词"
 
@@ -18280,7 +18280,7 @@ msgstr "正在优化提示词..."
 msgid "Improving your prompt..."
 msgstr "正在优化你的提示词..."
 
-#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:340
+#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:338
 msgid "Improving..."
 msgstr "正在优化..."
 
@@ -18493,7 +18493,7 @@ msgstr "输入模板"
 msgid "Input tokens"
 msgstr "输入 token"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:274
+#: ../../packages/chat-ui/src/chat/message-content.tsx:255
 msgid "Input:"
 msgstr "输入："
 
@@ -18509,7 +18509,7 @@ msgstr "在右侧插入列"
 msgid "Insert column before"
 msgstr "在左侧插入列"
 
-#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:617
+#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:609
 msgid "Insert Prompt"
 msgstr "插入提示词"
 
@@ -18821,7 +18821,7 @@ msgstr "邀请"
 msgid "Invoke a skill"
 msgstr "调用技能"
 
-#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:650
+#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:642
 msgid "Invoke Skill"
 msgstr "调用技能"
 
@@ -18916,7 +18916,7 @@ msgstr "它打开的会话与自己的不同，因此已移交对话"
 msgid "It was not saved. Paste it again and save."
 msgstr "未保存。请再次粘贴并保存。"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:457
+#: ../../packages/chat-ui/src/chat/message-content.tsx:438
 msgid "It will be visible once approved by a moderator"
 msgstr "经审核员批准后即可显示"
 
@@ -19469,7 +19469,7 @@ msgstr "最后在线：{lastSeen}"
 msgid "Last skipped run"
 msgstr "上次跳过的运行"
 
-#: src/features/slides/components/full-screen-presentation-viewer.tsx:432
+#: src/features/slides/components/full-screen-presentation-viewer.tsx:430
 msgid "Last slide"
 msgstr "最后一张幻灯片"
 
@@ -20172,7 +20172,7 @@ msgstr "正在加载数据集…"
 msgid "Loading devices..."
 msgstr "正在加载设备..."
 
-#: src/features/canvas/canvas-panel.tsx:851
+#: src/features/canvas/canvas-panel.tsx:855
 msgid "Loading document..."
 msgstr "正在加载文档..."
 
@@ -20183,7 +20183,7 @@ msgstr "正在加载文档…"
 #: src/features/canvas/canvas-panel.tsx:102
 #: src/features/canvas/canvas-panel.tsx:293
 #: src/features/canvas/canvas-panel.tsx:370
-#: src/features/canvas/canvas-panel.tsx:855
+#: src/features/canvas/canvas-panel.tsx:859
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:916
 msgid "Loading editor..."
 msgstr "正在加载编辑器..."
@@ -20198,7 +20198,7 @@ msgstr "正在加载编辑器…"
 msgid "Loading feedback"
 msgstr "正在加载反馈"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:380
+#: ../../packages/chat-ui/src/chat/message-content.tsx:361
 #: ../../packages/ui/src/components/file-renderers/fetched-text-preview.tsx:67
 msgid "Loading file…"
 msgstr "正在加载文件…"
@@ -20405,7 +20405,7 @@ msgstr "正在加载你的服务器、连接器和电脑…"
 #: ../../packages/chat-ui/src/threads/thread-list.tsx:178
 #: ../../packages/ui/src/components/elevenlabs/mic-selector.tsx:62
 #: src/components/default-loading.tsx:8
-#: src/features/canvas/canvas-panel.tsx:747
+#: src/features/canvas/canvas-panel.tsx:751
 #: src/features/changelog/components/changelog-panel.tsx:109
 #: src/features/chat/split/chat-split-view.tsx:213
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:874
@@ -20422,7 +20422,7 @@ msgstr "正在加载你的服务器、连接器和电脑…"
 msgid "Loading..."
 msgstr "正在加载..."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:383
+#: ../../packages/chat-ui/src/chat/message-content.tsx:364
 #: src/features/admin/components/admin-provider-cache-row.tsx:85
 #: src/features/auth/components/device-approval.tsx:349
 #: src/features/chat/thread/memory-usage-action.tsx:46
@@ -20505,7 +20505,7 @@ msgid "Locked chats do not reveal their project, so some may be missing here."
 msgstr "已锁定的聊天不会显示其所属项目，因此这里可能缺少部分聊天。"
 
 #. placeholder {0}: getModelModeName(anchorMode)
-#: src/components/model-picker/model-picker.tsx:1397
+#: src/components/model-picker/model-picker.tsx:1393
 msgid "Locked to {0} models"
 msgstr "已锁定为{0}模型"
 
@@ -20872,7 +20872,7 @@ msgstr "马耳他语（马耳他）"
 msgid "Manage Consent Preferences"
 msgstr "管理同意偏好"
 
-#: src/components/model-picker/model-picker.tsx:867
+#: src/components/model-picker/model-picker.tsx:863
 msgid "Manage hidden labs"
 msgstr "管理已隐藏的实验室"
 
@@ -21099,7 +21099,7 @@ msgid "Max size: {size} • Max {maxFiles} files"
 msgstr "最大大小：{size} • 最多 {maxFiles} 个文件"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:859
-#: src/components/model-picker/model-picker.tsx:1391
+#: src/components/model-picker/model-picker.tsx:1387
 msgid "Maximum {MAX_PARALLEL} models reached"
 msgstr "已达到 {MAX_PARALLEL} 个模型的上限"
 
@@ -22460,7 +22460,7 @@ msgstr "名称"
 msgid "Name"
 msgstr "名称"
 
-#: src/components/model-picker/model-picker.tsx:1303
+#: src/components/model-picker/model-picker.tsx:1299
 msgid "Name (A to Z)"
 msgstr "名称（A 到 Z）"
 
@@ -22607,11 +22607,11 @@ msgstr "浏览对话"
 msgid "navigate within each column"
 msgstr "在每列中导航"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:816
+#: ../../packages/chat-ui/src/chat/message-content.tsx:797
 msgid "Navigated"
 msgstr "已导航"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:751
+#: ../../packages/chat-ui/src/chat/message-content.tsx:732
 msgid "Navigating to {target}..."
 msgstr "正在导航到 {target}..."
 
@@ -22906,7 +22906,7 @@ msgstr "新建数据集"
 msgid "New Export"
 msgstr "新建导出"
 
-#: src/components/model-picker/model-picker.tsx:1304
+#: src/components/model-picker/model-picker.tsx:1300
 msgid "New first"
 msgstr "最新优先"
 
@@ -23090,7 +23090,7 @@ msgstr "下一个问题"
 
 #: ../../packages/ui/src/components/carousel.tsx:171
 #: ../../packages/ui/src/components/file-renderers/pptx-preview.tsx:283
-#: src/features/slides/components/full-screen-presentation-viewer.tsx:421
+#: src/features/slides/components/full-screen-presentation-viewer.tsx:419
 msgid "Next slide"
 msgstr "下一张幻灯片"
 
@@ -23516,7 +23516,7 @@ msgid "No models found matching your filters."
 msgstr "未找到符合筛选条件的模型。"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:825
-#: src/components/model-picker/model-picker.tsx:1355
+#: src/components/model-picker/model-picker.tsx:1351
 msgid "No models found."
 msgstr "未找到模型。"
 
@@ -23688,7 +23688,7 @@ msgstr "还没有回复"
 msgid "No results"
 msgstr "无结果"
 
-#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:678
+#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:670
 msgid "No results found"
 msgstr "未找到结果"
 
@@ -23762,7 +23762,7 @@ msgid "No speech detected. Hands-free mode stopped."
 msgstr "未检测到语音。免提模式已停止。"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:818
-#: src/components/model-picker/model-picker.tsx:1348
+#: src/components/model-picker/model-picker.tsx:1344
 msgid "No starred models"
 msgstr "没有星标模型"
 
@@ -23869,7 +23869,7 @@ msgstr "未配置变量。添加变量以自定义此对话的提示词内容。
 msgid "No variables detected. Use {VARIABLE_PLACEHOLDER} syntax to add dynamic content."
 msgstr "未检测到变量。使用 {VARIABLE_PLACEHOLDER} 语法添加动态内容。"
 
-#: src/features/chat/thread/composer-tiptap/variable-autocomplete-popup.tsx:236
+#: src/features/chat/thread/composer-tiptap/variable-autocomplete-popup.tsx:228
 #: src/features/prompts/components/variable-autocomplete.tsx:135
 msgid "No variables found"
 msgstr "未找到变量"
@@ -24100,7 +24100,7 @@ msgstr "备注：{0}"
 msgid "Note: Modules are applied per conversation, not per message. Enable only the modules you need to optimize token usage."
 msgstr "注意：模块按对话而非按消息应用。仅启用你需要的模块以优化 token 用量。"
 
-#: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:486
+#: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:478
 msgid "Nothing found"
 msgstr "未找到结果"
 
@@ -24686,7 +24686,7 @@ msgstr "哎呀！出错了"
 msgid "Opacity"
 msgstr "不透明度"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:796
+#: ../../packages/chat-ui/src/chat/message-content.tsx:777
 #: src/components/command-palette.tsx:1089
 #: src/features/chat/link-preview/link-preview-card.tsx:117
 #: src/features/develop/components/pull-request-actions-panel.tsx:112
@@ -25620,7 +25620,7 @@ msgstr "已过时"
 msgid "Outpaint"
 msgstr "扩图"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:646
+#: ../../packages/chat-ui/src/chat/message-content.tsx:627
 #: ../../packages/ui/src/components/ai-elements/context.tsx:277
 #: src/components/model-picker/model-picker.tsx:261
 #: src/features/devices/components/device-tool-call.tsx:173
@@ -25684,8 +25684,8 @@ msgstr "输出类型"
 msgid "Output-format focused"
 msgstr "侧重输出格式"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:282
-#: ../../packages/chat-ui/src/chat/message-content.tsx:290
+#: ../../packages/chat-ui/src/chat/message-content.tsx:263
+#: ../../packages/chat-ui/src/chat/message-content.tsx:271
 msgid "Output:"
 msgstr "输出："
 
@@ -25729,7 +25729,7 @@ msgstr "owner/name"
 msgid "Pacific Time (US & Canada)"
 msgstr "太平洋时间（美国和加拿大）"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:750
+#: ../../packages/chat-ui/src/chat/message-content.tsx:731
 msgid "page"
 msgstr "页面"
 
@@ -25860,7 +25860,7 @@ msgid "Paraguay"
 msgstr "巴拉圭"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:709
-#: src/components/model-picker/model-picker.tsx:1217
+#: src/components/model-picker/model-picker.tsx:1213
 msgid "Parallel"
 msgstr "并行"
 
@@ -25895,7 +25895,7 @@ msgstr "属于循环依赖的一部分"
 
 #: src/features/chat/group/create-group-chat-button.tsx:191
 #: src/features/chat/group/group-participant-bar.tsx:138
-#: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:400
+#: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:392
 msgid "Participants"
 msgstr "参与者"
 
@@ -26979,8 +26979,8 @@ msgstr "预览版"
 #: ../../packages/ui/src/components/ai-elements/web-preview.tsx:163
 #: ../../packages/ui/src/components/media-preview-dialog.tsx:62
 #: ../../packages/ui/src/components/media-preview-dialog.tsx:139
-#: src/features/canvas/canvas-panel.tsx:778
-#: src/features/canvas/canvas-panel.tsx:783
+#: src/features/canvas/canvas-panel.tsx:782
+#: src/features/canvas/canvas-panel.tsx:787
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:790
 #: src/features/prompts/components/variable-fill-dialog.tsx:174
 #: src/features/settings/components/personalization/memory-import-dialog.tsx:317
@@ -27099,11 +27099,11 @@ msgstr "上一个版本"
 msgid "Price per 1M tokens"
 msgstr "每百万 token 价格"
 
-#: src/components/model-picker/model-picker.tsx:1306
+#: src/components/model-picker/model-picker.tsx:1302
 msgid "Price: high to low"
 msgstr "价格：从高到低"
 
-#: src/components/model-picker/model-picker.tsx:1305
+#: src/components/model-picker/model-picker.tsx:1301
 msgid "Price: low to high"
 msgstr "价格：从低到高"
 
@@ -27500,7 +27500,7 @@ msgstr "提示词已删除"
 msgid "Prompt format"
 msgstr "提示词格式"
 
-#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:358
+#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:355
 msgid "Prompt improved"
 msgstr "提示词已优化"
 
@@ -27563,7 +27563,7 @@ msgstr "提示词已更新"
 msgid "Prompt updated with optimized content"
 msgstr "已用优化后的内容更新提示词"
 
-#: src/features/chat/thread/composer-tiptap/variable-autocomplete-popup.tsx:243
+#: src/features/chat/thread/composer-tiptap/variable-autocomplete-popup.tsx:235
 #: src/features/prompts/components/variable-autocomplete.tsx:146
 msgid "Prompt Variables"
 msgstr "提示词变量"
@@ -28535,7 +28535,7 @@ msgstr "引用"
 msgid "References"
 msgstr "参考"
 
-#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:317
+#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:315
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:360
 #: src/features/skills/components/skill-builder-dialog.tsx:279
 #: src/features/skills/components/skill-builder-dialog.tsx:307
@@ -28546,7 +28546,7 @@ msgstr "改进"
 msgid "Refine Edge Detection"
 msgstr "精细边缘检测"
 
-#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:297
+#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:295
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:342
 msgid "Refine with feedback (optional)"
 msgstr "根据反馈改进（可选）"
@@ -30041,7 +30041,7 @@ msgstr "运行你的工作流后，可在此查看执行历史。"
 msgid "Running"
 msgstr "运行中"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:607
+#: ../../packages/chat-ui/src/chat/message-content.tsx:588
 msgid "Running code..."
 msgstr "正在运行代码..."
 
@@ -30049,7 +30049,7 @@ msgstr "正在运行代码..."
 msgid "Running on {device}…"
 msgstr "正在 {device} 上运行…"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:251
+#: ../../packages/chat-ui/src/chat/message-content.tsx:239
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:258
 #: src/features/workflow/components/canvas/workflow-controls.tsx:622
 #: src/features/workflow/components/nodes/base-node.tsx:263
@@ -30473,7 +30473,7 @@ msgid "Screen capture failed. Please try again."
 msgstr "屏幕截取失败。请重试。"
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:118
-#: ../../packages/chat-ui/src/chat/message-content.tsx:792
+#: ../../packages/chat-ui/src/chat/message-content.tsx:773
 msgid "Screenshot"
 msgstr "截图"
 
@@ -30568,7 +30568,7 @@ msgstr "搜索“{searchQuery}”失败。请重试。"
 msgid "Search fields..."
 msgstr "搜索字段..."
 
-#: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:392
+#: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:384
 msgid "Search files and chats..."
 msgstr "搜索文件和聊天..."
 
@@ -30643,7 +30643,7 @@ msgid "Search models by name, ID, or provider..."
 msgstr "按名称、ID 或提供商搜索模型..."
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:642
-#: src/components/model-picker/model-picker.tsx:1157
+#: src/components/model-picker/model-picker.tsx:1153
 msgid "Search models..."
 msgstr "搜索模型..."
 
@@ -30764,7 +30764,7 @@ msgstr "搜索对话（{focusSearchShortcut}）"
 msgid "Search threads, navigate, or perform actions..."
 msgstr "搜索对话、导航或执行操作..."
 
-#: src/features/chat/thread/composer-tiptap/variable-autocomplete-popup.tsx:230
+#: src/features/chat/thread/composer-tiptap/variable-autocomplete-popup.tsx:222
 #: src/features/prompts/components/variable-autocomplete.tsx:264
 msgid "Search variables..."
 msgstr "搜索变量..."
@@ -30998,6 +30998,7 @@ msgid "Select mode"
 msgstr "选择模式"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker-button.tsx:211
+#: src/components/model-picker/model-picker-button.tsx:243
 msgid "Select model"
 msgstr "选择模型"
 
@@ -31829,7 +31830,7 @@ msgstr "显示时间戳"
 msgid "Show up to {rowLimit} rows ({byteCount} bytes)"
 msgstr "最多显示 {rowLimit} 行（{byteCount} 字节）"
 
-#: src/features/chat/thread/tool-approval.tsx:115
+#: src/features/chat/thread/tool-approval.tsx:111
 msgid "Show what it will send"
 msgstr "显示将要发送的内容"
 
@@ -31963,7 +31964,7 @@ msgstr "登录 Neore 桌面应用"
 msgid "Sign in to unlock all models"
 msgstr "登录以解锁所有模型"
 
-#: src/components/model-picker/model-picker.tsx:1148
+#: src/components/model-picker/model-picker.tsx:1144
 msgid "Sign in to unlock all models."
 msgstr "登录以解锁所有模型。"
 
@@ -32113,7 +32114,7 @@ msgid "Singapore"
 msgstr "新加坡"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:696
-#: src/components/model-picker/model-picker.tsx:1205
+#: src/components/model-picker/model-picker.tsx:1201
 msgid "Single"
 msgstr "单个"
 
@@ -32330,7 +32331,7 @@ msgstr "幻灯片 {streamingSlideNumber}"
 msgid "Slide title"
 msgstr "幻灯片标题"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1205
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1186
 msgid "Slide updated"
 msgstr "幻灯片已更新"
 
@@ -32493,7 +32494,7 @@ msgstr "扎实的通用能力"
 msgid "Solid performance across most task types"
 msgstr "在大多数任务类型上表现扎实"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:701
+#: ../../packages/chat-ui/src/chat/message-content.tsx:682
 msgid "Some images from this run could not be saved."
 msgstr "此次运行中的部分图像无法保存。"
 
@@ -32555,7 +32556,7 @@ msgstr "降序"
 msgid "Sort direction"
 msgstr "排序方向"
 
-#: src/components/model-picker/model-picker.tsx:1296
+#: src/components/model-picker/model-picker.tsx:1292
 msgid "Sort models"
 msgstr "排序模型"
 
@@ -32592,7 +32593,7 @@ msgstr "已开启音效"
 msgid "Source"
 msgstr "来源"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1351
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1332
 #: src/features/chat/thread/message-content.tsx:161
 msgid "Source {index}"
 msgstr "来源 {index}"
@@ -32945,7 +32946,7 @@ msgid "starred"
 msgstr "已加星标"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:661
-#: src/components/model-picker/model-picker.tsx:1174
+#: src/components/model-picker/model-picker.tsx:1170
 msgid "Starred"
 msgstr "星标"
 
@@ -33762,7 +33763,7 @@ msgid "Style-consistent video generation guided by reference images to maintain 
 msgstr "以参考图像引导、保持视觉连贯的风格一致视频生成"
 
 #. placeholder {0}: styleLabels.user[style].label
-#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:234
+#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:233
 msgid "Style: {0}"
 msgstr "风格：{0}"
 
@@ -33816,7 +33817,7 @@ msgstr "提交审查"
 msgid "Submitting…"
 msgstr "正在提交…"
 
-#: src/components/model-picker/model-picker.tsx:1144
+#: src/components/model-picker/model-picker.tsx:1140
 msgid "Subscribe for $8/mo to unlock all models."
 msgstr "以 $8/月订阅，解锁所有模型。"
 
@@ -34040,7 +34041,7 @@ msgstr "只需一个参数即可在 OpenAI、Google、Anthropic 等之间切换�
 msgid "switch model"
 msgstr "切换模型"
 
-#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:574
+#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:566
 msgid "Switch Model"
 msgstr "切换模型"
 
@@ -34236,7 +34237,7 @@ msgstr "轮流发言"
 msgid "Taking control is not available while impersonating."
 msgstr "模拟登录期间无法接管控制。"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:745
+#: ../../packages/chat-ui/src/chat/message-content.tsx:726
 msgid "Taking screenshot..."
 msgstr "正在截图..."
 
@@ -34617,7 +34618,7 @@ msgstr "文本"
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:743
 #: ../../packages/ui/src/components/canvas-editor/canvas-element-palette.tsx:317
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:351
-#: src/components/model-picker/model-picker.tsx:1252
+#: src/components/model-picker/model-picker.tsx:1248
 #: src/features/chat/sidebar/usage-card.tsx:128
 #: src/features/chat/thread/composer.tsx:130
 #: src/features/marketing/components/landing-footer.tsx:164
@@ -35492,7 +35493,7 @@ msgstr "导入在完成前已停止。"
 msgid "The imported file appears to be empty."
 msgstr "导入的文件似乎是空的。"
 
-#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:290
+#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:288
 msgid "The improved prompt will appear here..."
 msgstr "优化后的提示词将显示在这里..."
 
@@ -35842,7 +35843,7 @@ msgstr "规则文件夹中还有 {0, plural, other {# 个}}文件未在此列表
 msgid "The run goes where you chose: a new chat each time, the same chat as before, or the same chat with a fresh context."
 msgstr "运行将按你的选择进行：每次新建聊天、沿用之前的聊天，或沿用同一聊天但使用全新上下文。"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:827
+#: ../../packages/chat-ui/src/chat/message-content.tsx:808
 msgid "The screenshot could not be saved."
 msgstr "无法保存屏幕截图。"
 
@@ -36086,7 +36087,7 @@ msgid "Thinking-enabled vision-language model"
 msgstr "支持思考的视觉语言模型"
 
 #: ../../packages/chat-ui/src/chat/auto-continue-status.tsx:54
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1267
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1248
 #: ../../packages/ui/src/components/ai-elements/reasoning.tsx:114
 #: src/features/chat/thread/streaming-placeholder.tsx:808
 msgid "Thinking..."
@@ -36446,7 +36447,7 @@ msgstr "此主机被 ~/.ssh/config 中的 Match 规则使用，Neore 不会对�
 msgid "This host uses {key} in ~/.ssh/config, which Neore does not support."
 msgstr "此主机在 ~/.ssh/config 中使用了 {key}，Neore 不支持该设置。"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:456
+#: ../../packages/chat-ui/src/chat/message-content.tsx:437
 msgid "This image has been flagged for review"
 msgstr "此图像已被标记待审核"
 
@@ -37850,7 +37851,7 @@ msgstr "你的账号当前已启用双重验证，为账号增加了一层额外
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:125
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:720
-#: src/components/model-picker/model-picker.tsx:1228
+#: src/components/model-picker/model-picker.tsx:1224
 #: src/features/devices/components/device-tool-call.tsx:118
 msgid "Type"
 msgstr "类型"
@@ -37899,7 +37900,7 @@ msgstr "输入你的消息..."
 msgid "Typeface for the whole interface. Code blocks always stay monospace."
 msgstr "整个界面的字体。代码块始终保持等宽。"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:746
+#: ../../packages/chat-ui/src/chat/message-content.tsx:727
 msgid "Typing text..."
 msgstr "正在输入文本..."
 
@@ -38055,7 +38056,7 @@ msgstr "下划线"
 #: ../../packages/ui/src/components/canvas-editor/fabric-canvas-editor.tsx:604
 #: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:290
 #: ../../packages/ui/src/components/tiptap-editor.tsx:183
-#: src/components/model-picker/model-picker.tsx:862
+#: src/components/model-picker/model-picker.tsx:858
 #: src/features/canvas/canvas-panel.tsx:245
 #: src/features/canvas/components/canvas-ai-diff-banner.tsx:51
 #: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:186
@@ -38235,7 +38236,7 @@ msgstr "取消发布"
 msgid "Unread"
 msgstr "未读"
 
-#: src/features/canvas/canvas-panel.tsx:749
+#: src/features/canvas/canvas-panel.tsx:753
 msgid "Unsaved changes"
 msgstr "未保存的更改"
 
@@ -38427,11 +38428,11 @@ msgstr "更新的 OpenAI 前沿性能"
 msgid "Updated reasoning capabilities over the original R1"
 msgstr "相比原版 R1 推理能力更新"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1203
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1184
 msgid "Updated slide"
 msgstr "已更新幻灯片"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1203
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1184
 msgid "Updated slide {slideNumber}"
 msgstr "已更新第 {slideNumber} 张幻灯片"
 
@@ -38564,7 +38565,7 @@ msgstr "上传图像 / 视频"
 msgid "Upload Logo"
 msgstr "上传徽标"
 
-#: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:440
+#: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:432
 msgid "Upload new file"
 msgstr "上传新文件"
 
@@ -39182,7 +39183,7 @@ msgstr "版本 {0} 的内容"
 msgid "Version {position} of {total}"
 msgstr "第 {position}/{total} 个版本"
 
-#: src/features/canvas/canvas-panel.tsx:788
+#: src/features/canvas/canvas-panel.tsx:792
 #: src/features/pages/components/page-version-panel.tsx:81
 #: src/features/pages/components/page-version-panel.tsx:83
 #: src/features/pages/components/page-view.tsx:448
@@ -39250,7 +39251,7 @@ msgid "video"
 msgstr "视频"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:767
-#: src/components/model-picker/model-picker.tsx:1278
+#: src/components/model-picker/model-picker.tsx:1274
 #: src/features/chat/sidebar/usage-card.tsx:130
 #: src/features/chat/thread/composer.tsx:132
 #: src/features/marketing/components/landing-footer.tsx:166

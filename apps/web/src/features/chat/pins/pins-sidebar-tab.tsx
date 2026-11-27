@@ -28,7 +28,7 @@ const PinsSidebarTab: FC<PinsSidebarTabProps> = ({ threadId }) => {
         return (
             <motion.div
                 animate={{ opacity: 1 }}
-                className="text-brand-black/60 dark:text-brand-white/60 border-sidebar-border/50 bg-sidebar-accent/30 flex h-full items-center justify-center rounded-md border p-6 text-center"
+                className="text-muted-foreground surface-well flex h-full items-center justify-center rounded-xl p-6 text-center"
                 initial={{ opacity: 0 }}
                 transition={{ duration: 0.2 }}
             >
@@ -43,7 +43,7 @@ const PinsSidebarTab: FC<PinsSidebarTabProps> = ({ threadId }) => {
                 {Array.from({ length: 3 }, (_, i) => (
                     <motion.div
                         animate={{ opacity: 1 }}
-                        className="border-border rounded-md border px-3 pt-2.5 pb-2"
+                        className="surface-raised rounded-xl px-3 pt-2.5 pb-2"
                         initial={{ opacity: 0 }}
                         key={i}
                         transition={{ delay: i * 0.05, duration: 0.2 }}
