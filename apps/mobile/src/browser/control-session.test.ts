@@ -219,6 +219,60 @@ describe(createControlSession, () => {
         expect(session.state()).toStrictEqual({ kind: "idle", message: CONTROL_ENDED });
     });
 
+    it("counts a page that loaded as a renewal, from when it was asked for", async () => {
+        const clock = { at: NOW };
+        const ticks: (() => void)[] = [];
+        const session = createControlSession({
+            api: {
+                handBack: vi.fn(async () => true),
+                keep: vi.fn(async () => {
+                    throw new TypeError("Network request failed");
+                }),
+                navigate: vi.fn(async () => {
+                    clock.at += 5000;
+
+                    return { status: "ok" as const };
+                }),
+                take: vi.fn(async () => OK),
+            },
+            deviceNow: () => clock.at,
+            every: (_ms, run) => {
+                ticks.push(run);
+
+                return () => {};
+            },
+            onChange: () => {},
+        });
+
+        await session.take();
+        clock.at += 60_000;
+        await expect(session.navigate("https://example.com")).resolves.toBeUndefined();
+
+        // The lease taken at NOW would have ended; the one the page renewed, asked for at NOW + 60 s, has not.
+        clock.at = NOW + 60_000 + CONTROL_LEASE_MS - 1;
+        ticks[0]?.();
+        expect(session.state().kind).toBe("holding");
+
+        clock.at += 1;
+        ticks[0]?.();
+        expect(session.state()).toStrictEqual({ kind: "idle", message: CONTROL_ENDED });
+    });
+
+    it("stops holding when opening a page finds the lease gone, but keeps it for any other refusal", async () => {
+        const navigate = vi.fn(async () => {
+            return { error: "The page you opened is still loading.", status: "refused" as const };
+        });
+        const { session } = setup({ navigate });
+
+        await session.take();
+        await expect(session.navigate("https://example.com")).resolves.toBe("The page you opened is still loading.");
+        expect(session.state().kind).toBe("holding");
+
+        navigate.mockResolvedValueOnce({ error: "You do not have control of the browser.", status: "refused" as const });
+        await expect(session.navigate("https://example.com")).resolves.toBe(CONTROL_ENDED);
+        expect(session.state()).toStrictEqual({ kind: "idle", message: CONTROL_ENDED });
+    });
+
     it("waits for a hand back still out before a retake, and names no claim it gave back", async () => {
         const handBack = Promise.withResolvers<boolean>();
         const take = vi.fn(async () => OK);

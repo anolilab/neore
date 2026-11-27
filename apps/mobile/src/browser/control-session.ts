@@ -28,6 +28,9 @@ export const CONTROL_ELSEWHERE = "You took control in another window, so this ph
 export const CONTROL_OFFLINE = "You are offline, so this phone gave up control. The agent may use the browser again within two minutes.";
 export const CONTROL_FAILED = "Taking control did not work. Try again.";
 
+/** `navigateInControl`'s refusal when the claim no longer holds the lease (the web card tells it apart the same way). */
+const NOT_IN_CONTROL = "You do not have control of the browser.";
+
 export interface ControlSession {
     navigate: (url: string) => Promise<string | undefined>;
     /** The live status's lease at the server's clock `now`: the phone stops when it is no longer this claim's. */
@@ -164,14 +167,29 @@ export const createControlSession = ({
             }
 
             const { claim } = state;
+            const sentAt = deviceNow();
             const answer = await withCatch(async () => await api.navigate(claim, url), () => undefined);
 
             if (answer === undefined) {
                 return "The page could not be opened. Try again.";
             }
 
+            const isStillHeld = state.kind === "holding" && state.claim === claim;
+
             if (answer.status === "refused") {
+                // The lease is gone on the server: the phone stops offering what only its holder may do.
+                if (answer.error === NOT_IN_CONTROL && isStillHeld) {
+                    stop(CONTROL_ENDED);
+
+                    return CONTROL_ENDED;
+                }
+
                 return answer.error;
+            }
+
+            // A page that loaded renewed the lease on the server, no earlier than this was sent.
+            if (answer.status === "ok" && isStillHeld) {
+                endsAt = Math.max(endsAt, sentAt + CONTROL_LEASE_MS);
             }
 
             return answer.status === "closed" ? "The browser closed while the page loaded." : undefined;

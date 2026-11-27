@@ -9,8 +9,11 @@ import { settleQuietly } from "@/offline/quietly";
 /** How often a frame is read while the screen is open and nothing else asked for one. */
 export const FRAME_REFRESH_MS = 10_000;
 
-/** A read asked for this soon after the last one waits: a busy agent's actions would spend the hour's reads. */
-export const FRAME_MIN_GAP_MS = 3000;
+/**
+ * A read asked for this soon after the last one waits: at most 12 a minute, what `browser/frame`'s free bucket refills,
+ * so a busy agent's actions never run the phone out of reads.
+ */
+export const FRAME_MIN_GAP_MS = 5000;
 
 export interface FrameReaderOptions<T> {
     after?: (ms: number, run: () => void) => () => void;
