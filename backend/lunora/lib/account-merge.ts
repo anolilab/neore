@@ -2174,10 +2174,18 @@ export const mergePluginInstallsPage = async (ctx: MutationCtx, from: string, to
             continue;
         }
 
+        // A duplicate costs up to two dozen D1 statements (its skills and links are global rows), so it gets a call to itself.
+        if (statements > 2) {
+            return { done: false, statements };
+        }
+
         const skills = await ctx.db.skills.findMany({ limit: PLUGIN_MERGE_CHILDREN + 1, where: { pluginInstallId: installId } });
+
+        statements += 1;
 
         for (const skill of skills.page.slice(0, PLUGIN_MERGE_CHILDREN)) {
             await ctx.db.patch("skills", skill._id as Id<"skills">, { pluginInstallId: "", pluginMarker: "" });
+            statements += 1;
         }
 
         const triggers = await ctx.db
@@ -2217,6 +2225,8 @@ export const mergePluginInstallsPage = async (ctx: MutationCtx, from: string, to
 
         await ctx.db.delete("pluginInstalls", install._id);
         statements += 1;
+
+        return { done: false, statements };
     }
 
     return { done: page.length <= PLUGIN_MERGE_INSTALLS, statements };

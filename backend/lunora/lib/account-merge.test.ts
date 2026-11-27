@@ -51,6 +51,7 @@ import {
 } from "./account-merge";
 import {
     GLOBAL_USER_COLUMNS,
+    mergePluginInstallsPage,
     GLOBAL_USER_TABLES_NOT_REASSIGNED,
     firstTableWithGuestRows,
     handOverOrganizationContributors,
@@ -1345,6 +1346,77 @@ describe("reassignGlobalRows", () => {
             expect(installs.some((row: any) => row._id === guestShared)).toBe(false);
             expect(links.map((row: any) => [row.installId, row.userId])).toStrictEqual([[guestOnly, "user"]]);
             expect(skill).toMatchObject({ pluginInstallId: "", pluginMarker: "" });
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("gives each duplicate plugin install a call of its own, so no call sends more than 50 D1 statements", async () => {
+        const harness = lunoraTest(schemaWithShardedTables([...Object.keys(GLOBAL_USER_COLUMNS), "shardActivity"]) as never);
+
+        try {
+            await harness.run(async (context: any) => {
+                for (const slug of ["one", "two", "three"]) {
+                    const base = {
+                        contentHash: "a".repeat(64),
+                        createdAt: 0,
+                        generation: 1,
+                        pluginSlug: slug,
+                        status: "installed" as const,
+                        updatedAt: 0,
+                        version: "1.0.0",
+                    };
+
+                    await context.db.insert("pluginInstalls", { ...base, userId: "user" });
+
+                    const guestId = await context.db.insert("pluginInstalls", { ...base, userId: "guest" });
+
+                    for (let index = 0; index < 12; index += 1) {
+                        await context.db.insert("pluginItems", {
+                            contentHash: "b".repeat(64),
+                            createdAt: 0,
+                            entryKey: `skill:${String(index)}`,
+                            installId: guestId,
+                            kind: "skill",
+                            state: "created",
+                            userId: "guest",
+                        });
+                        await context.db.insert("skills", {
+                            description: "d",
+                            instructions: "i",
+                            name: `${slug}-${String(index)}`,
+                            pluginInstallId: guestId,
+                            pluginMarker: `${guestId}:skill:${String(index)}`,
+                            slug: `${slug}-${String(index)}`,
+                            userId: "user",
+                        });
+                    }
+                }
+            });
+
+            const counts: number[] = [];
+
+            await harness.run(async (context: any) => await mergePluginInstallsPage(context, "guest", "user"));
+
+            const { page: afterFirst } = await harness.run(async (context: any) => await context.db.pluginInstalls.findMany({ where: { userId: "guest" } }));
+
+            // One duplicate per call: the first call drops one of the three, never all of them.
+            expect(afterFirst).toHaveLength(2);
+
+            for (let call = 0; call < 20; call += 1) {
+                const result = await harness.run(async (context: any) => await mergePluginInstallsPage(context, "guest", "user"));
+
+                counts.push(result.statements);
+
+                if (result.done) {
+                    break;
+                }
+            }
+
+            const { page: left } = await harness.run(async (context: any) => await context.db.pluginInstalls.findMany({ where: { userId: "guest" } }));
+
+            expect(left).toStrictEqual([]);
+            expect(Math.max(...counts)).toBeLessThanOrEqual(50);
         } finally {
             harness.close();
         }
