@@ -29,8 +29,9 @@ export const pastChatTitle = (title: string): string => {
  * characters (an ellipsis marks each cut end), with `<` escaped. Terms are matched without regard to case; a term the
  * text does not hold as written (a search folds accents and widths) starts the excerpt at the beginning.
  */
-export const pastChatSnippet = (typed: string, terms: ReadonlyArray<string>, max = PAST_CHAT_SNIPPET_MAX): string => {
+export const pastChatSnippet = (typed: string, terms: ReadonlyArray<string>): string => {
     const line = oneLine(typed);
+    const max = PAST_CHAT_SNIPPET_MAX;
 
     if (line.length <= max) {
         return line;

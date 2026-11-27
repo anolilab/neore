@@ -86,7 +86,7 @@ export const searchPastChats = internalQuery
 
         const collect = async (window: number) => {
             const { filled, messages } = await context.runQuery(internal.agent.messages.typedTextSearch, { limit: window, text, userId });
-            const typed = messages.flatMap((message: TypedPromptRow) => {
+            const typed = messages.flatMap((message) => {
                 const prompt = sentPromptOf(message);
 
                 // A prompt with a not-typed mark holds words the person did not write. Every query word must match, as the index does.
