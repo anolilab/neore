@@ -14,6 +14,7 @@ export const OPTIONS = {
     cron: { type: "string" },
     cursor: { type: "string" },
     device: { type: "boolean" },
+    effort: { type: "string" },
     help: { short: "h", type: "boolean" },
     input: { short: "i", type: "string" },
     instructions: { type: "string" },
@@ -70,8 +71,19 @@ const WAIT_COMMANDS: ReadonlySet<string> = new Set(["thread send", "thread start
 /** The blocking flag of a command that has one instead of `--wait`. */
 const WAIT_INSTEAD: Readonly<Record<string, string>> = { chat: "--no-stream", "skills run": "--no-stream", "tasks run": "`neore tasks status <id>`" };
 
+/** The commands `--effort` reaches: the two that send one prompt to a thread. Any other would drop it while a billed run starts. */
+const EFFORT_COMMANDS: ReadonlySet<string> = WAIT_COMMANDS;
+
+const refuseEffortElsewhere = ({ command, flags }: ParsedCommand): void => {
+    if (flags.effort !== undefined && !flags.help && !EFFORT_COMMANDS.has(command)) {
+        throw new UsageError(`\`${command}\` has no --effort. It is for \`thread start\` and \`thread send\`.`);
+    }
+};
+
 export const parseCommand = (argv: ReadonlyArray<string>): ParsedCommand => {
     const parsed = parseWords(argv);
+
+    refuseEffortElsewhere(parsed);
 
     if (parsed.flags.wait && !parsed.flags.help && !WAIT_COMMANDS.has(parsed.command)) {
         const instead = WAIT_INSTEAD[parsed.command];
@@ -140,6 +152,24 @@ export const limitFlag = (flags: Flags): number | undefined => {
 
     if (!Number.isSafeInteger(value) || value < 1 || value > 100) {
         throw new UsageError("--limit must be an integer between 1 and 100.");
+    }
+
+    return value;
+};
+
+const EFFORT_DIGITS = /^\d{1,3}$/u;
+
+/** `--effort` as an integer in 0..100, the scale of the app's reasoning-effort slider. */
+export const effortFlag = (flags: Flags): number | undefined => {
+    if (flags.effort === undefined) {
+        return undefined;
+    }
+
+    // Digits only: `1e2`, ` 5` and `0x10` are numbers to `Number` but not what a person typed as a level.
+    const value = Number(flags.effort);
+
+    if (!EFFORT_DIGITS.test(flags.effort) || value > 100) {
+        throw new UsageError("--effort must be an integer between 0 and 100.");
     }
 
     return value;
