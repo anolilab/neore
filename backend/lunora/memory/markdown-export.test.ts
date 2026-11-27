@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import schema from "../schema";
 import type { BotLabel, ExportMemoryRow } from "./export-format";
 import { formatMemoryMarkdown, MEMORY_EXPORT_MAX_ROWS, MEMORY_EXPORT_SCAN_ROWS } from "./export-format";
-import { MEMORY_EXPORT_PAGE_ROWS, readExportMemories, readMemoryExportPage, resolveMemoryBotLabels } from "./markdown-export";
+import { MEMORY_EXPORT_PAGE_ROWS, readBotLabels, readExportMemories, readMemoryExportPage, resolveMemoryBotLabels } from "./markdown-export";
 
 type Harness = ReturnType<typeof lunoraTest>;
 
@@ -287,5 +287,45 @@ describe("resolveMemoryBotLabels", () => {
             ["deleted", undefined],
             ["unknown", undefined],
         ]);
+    });
+
+    it("labels 300 distinct bots in one call", async () => {
+        const botIds = await harness.run(async (ctx: any) => {
+            const ids: string[] = [];
+
+            for (let index = 0; index < 300; index += 1) {
+                ids.push(
+                    await ctx.db.insert("bots", {
+                        computerEnabled: false,
+                        createdAt: 1,
+                        instructions: "",
+                        model: "m",
+                        name: `Bot ${String(index)}`,
+                        updatedAt: 1,
+                        userId: "user-1",
+                    }),
+                );
+            }
+
+            return ids;
+        });
+        let calls = 0;
+        const ctx = {
+            runQuery: async (_reference: unknown, args: unknown) => {
+                calls += 1;
+
+                return await harness.run(async (inner: any) => await inner.runQuery(resolveMemoryBotLabels, args));
+            },
+        } as never;
+
+        const labels = await readBotLabels(
+            ctx,
+            "user-1",
+            botIds.map((botId) => row({ botId, memory: botId })),
+        );
+
+        expect(calls).toBe(1);
+        expect(labels.size).toBe(300);
+        expect(labels.get(botIds[299] as string)).toStrictEqual({ kind: "named", name: "Bot 299" });
     });
 });

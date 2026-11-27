@@ -5,13 +5,13 @@
  * meanwhile, a failure is said next to it, and an answer that arrives after another account signed in is never saved.
  */
 import { onlineManager, QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import MemoryExportButton from "./memory-export-button";
 
 const harness = vi.hoisted(() => {
-    return { exportMemories: vi.fn(), userId: "user-1" };
+    return { exportMemories: vi.fn(), userId: "user-1" as string | undefined };
 });
 
 vi.mock("@lingui/react/macro", () => {
@@ -22,10 +22,23 @@ vi.mock("@lingui/react/macro", () => {
     };
 });
 
-vi.mock("@/features/auth/hooks/use-auth-session", () => {
+// The session store, read when the answer arrives: `userId` is whoever is signed in at that moment.
+vi.mock("@/features/auth/lib/auth-ui-provider", () => {
     return {
-        useAuthSession: () => {
-            return { data: { user: { id: harness.userId } } };
+        useAuth: () => {
+            return {
+                authClient: {
+                    $store: {
+                        atoms: {
+                            session: {
+                                get: () => {
+                                    return { data: harness.userId === undefined ? null : { user: { id: harness.userId } } };
+                                },
+                            },
+                        },
+                    },
+                },
+            };
         },
     };
 });
@@ -146,7 +159,8 @@ describe("MemoryExportButton", () => {
         expect(clicks()).toHaveLength(0);
     });
 
-    it("drops an answer that arrives after another account signed in", async () => {
+    /** Holds the action's answer until the test releases it. */
+    const heldAnswer = (): ((value: unknown) => void) => {
         let answer: (value: unknown) => void = () => {};
 
         harness.exportMemories.mockReturnValue(
@@ -156,21 +170,44 @@ describe("MemoryExportButton", () => {
             }),
         );
 
-        const client = queryClient();
-        const { rerender } = renderButton(client);
+        return (value) => {
+            answer(value);
+        };
+    };
+
+    const ANSWER = { count: 1, day: "2026-03-02", markdown: "# Your memories\n", truncated: false };
+
+    it.each([
+        ["another account signed in", "user-2"],
+        ["the account signed out", undefined],
+    ])("drops an answer that arrives after %s", async (_case, nextUserId) => {
+        const answer = heldAnswer();
+
+        renderButton();
+        fireEvent.click(screen.getByRole("button", { name: "Download memories (Markdown)" }));
+        await screen.findByRole("button", { name: "Preparing your memories…" });
+
+        harness.userId = nextUserId;
+        answer(ANSWER);
+
+        await screen.findByRole("button", { name: "Download memories (Markdown)" });
+        expect(clicks()).toHaveLength(0);
+        expect(blobs).toHaveLength(0);
+    });
+
+    it("saves nothing when the button left the page before the answer", async () => {
+        const answer = heldAnswer();
+        const { unmount } = renderButton();
 
         fireEvent.click(screen.getByRole("button", { name: "Download memories (Markdown)" }));
         await screen.findByRole("button", { name: "Preparing your memories…" });
 
-        harness.userId = "user-2";
-        rerender(
-            <QueryClientProvider client={client}>
-                <MemoryExportButton />
-            </QueryClientProvider>,
-        );
-        answer({ count: 1, day: "2026-03-02", markdown: "# Your memories\n", truncated: false });
+        unmount();
+        // `act` lets the answer's promise chain run to the end before the assertions.
+        await act(async () => {
+            answer(ANSWER);
+        });
 
-        await screen.findByRole("button", { name: "Download memories (Markdown)" });
         expect(clicks()).toHaveLength(0);
         expect(blobs).toHaveLength(0);
     });

@@ -68,6 +68,9 @@ export const readMemoryExportPage = internalQuery
         return { cursor: page.continueCursor, isDone: page.isDone, rows: page.page.map((m) => toExportRow(m)) };
     });
 
+/** Bots read at once by `resolveMemoryBotLabels`, so a user with many bots never builds one oversized read. */
+const BOT_LABEL_BATCH = 100;
+
 /**
  * What each bot of the user's memories is called: the user's own bot by name; otherwise its `botOwners` row says
  * whether another user owns it (a shared chat's bot) or it was deleted, and no row leaves it unknown.
@@ -84,7 +87,13 @@ export const resolveMemoryBotLabels = internalQuery
         ),
     )
     .query(async ({ args, ctx }) => {
-        const bots = await Promise.all(args.botIds.map(async (id) => await ctx.db.get("bots", id as Id<"bots">)));
+        const bots: (Doc<"bots"> | null)[] = [];
+
+        // Every bot of the export in this one call, read a batch at a time (`botOwnerRows` batches its own reads).
+        for (let start = 0; start < args.botIds.length; start += BOT_LABEL_BATCH) {
+            bots.push(...(await Promise.all(args.botIds.slice(start, start + BOT_LABEL_BATCH).map(async (id) => await ctx.db.get("bots", id as Id<"bots">)))));
+        }
+
         const names = new Map(bots.filter((bot): bot is Doc<"bots"> => bot !== null && bot.userId === args.userId).map((bot) => [bot._id as string, bot.name]));
         const owners = await botOwnerRows(
             ctx,
@@ -107,9 +116,6 @@ export const resolveMemoryBotLabels = internalQuery
             return { botId, kind: owner.ownerId !== args.userId && !owner.deleted ? ("shared" as const) : ("deleted" as const) };
         });
     });
-
-/** Bot ids one label lookup takes, so a user with many bots never builds one oversized read. */
-const BOT_LABEL_BATCH = 100;
 
 /**
  * The user's pinned memories and newest unpinned ones among their newest {@link MEMORY_EXPORT_SCAN_ROWS} active rows,
@@ -149,22 +155,17 @@ export const readExportMemories = async (ctx: Pick<ActionCtx, "runQuery">, userI
     };
 };
 
-const readBotLabels = async (ctx: Pick<ActionCtx, "runQuery">, userId: string, rows: ReadonlyArray<ExportMemoryRow>): Promise<Map<string, BotLabel>> => {
+/** Every distinct bot of the rows, labelled in ONE call: the action's calls stay fixed however many bots there are. */
+export const readBotLabels = async (ctx: Pick<ActionCtx, "runQuery">, userId: string, rows: ReadonlyArray<ExportMemoryRow>): Promise<Map<string, BotLabel>> => {
     const botIds = [...new Set(rows.map((row) => row.botId).filter((id): id is string => id !== undefined))];
-    const labels = new Map<string, BotLabel>();
 
-    for (let start = 0; start < botIds.length; start += BOT_LABEL_BATCH) {
-        const batch = await ctx.runQuery(internal.memory.markdown_export.resolveMemoryBotLabels, {
-            botIds: botIds.slice(start, start + BOT_LABEL_BATCH),
-            userId,
-        });
-
-        for (const { botId, kind, name } of batch) {
-            labels.set(botId, kind === "named" ? { kind, name: name ?? "" } : { kind });
-        }
+    if (botIds.length === 0) {
+        return new Map();
     }
 
-    return labels;
+    const labels = await ctx.runQuery(internal.memory.markdown_export.resolveMemoryBotLabels, { botIds, userId });
+
+    return new Map(labels.map(({ botId, kind, name }): [string, BotLabel] => [botId, kind === "named" ? { kind, name: name ?? "" } : { kind }]));
 };
 
 /**

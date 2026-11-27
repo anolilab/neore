@@ -11813,7 +11813,7 @@ msgstr "下载 JSON"
 msgid "Download Markdown"
 msgstr "下载 Markdown"
 
-#: src/features/settings/components/personalization/memory-export-button.tsx:83
+#: src/features/settings/components/personalization/memory-export-button.tsx:89
 msgid "Download memories (Markdown)"
 msgstr "下载记忆（Markdown）"
 
@@ -26865,8 +26865,8 @@ msgstr "正在准备请求…"
 msgid "Preparing the import…"
 msgstr "正在准备导入…"
 
-#: src/features/settings/components/personalization/memory-export-button.tsx:83
-#: src/features/settings/components/personalization/memory-export-button.tsx:86
+#: src/features/settings/components/personalization/memory-export-button.tsx:89
+#: src/features/settings/components/personalization/memory-export-button.tsx:92
 msgid "Preparing your memories…"
 msgstr "正在准备你的记忆…"
 
@@ -35284,7 +35284,7 @@ msgstr "差异过大，无法保留。这里显示文件及其行数。"
 msgid "The documents the answer should be retrieved from. Used for hit rate, MRR, precision and recall."
 msgstr "答案应检索自的文档。用于计算命中率、MRR、精确率和召回率。"
 
-#: src/features/settings/components/personalization/memory-export-button.tsx:90
+#: src/features/settings/components/personalization/memory-export-button.tsx:96
 msgid "The download could not be prepared. Please try again in a moment."
 msgstr "无法准备下载。请稍后再试。"
 

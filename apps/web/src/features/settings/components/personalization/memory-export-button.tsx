@@ -8,7 +8,7 @@ import { DownloadIcon } from "lucide-react";
 import type { FC } from "react";
 import { useEffect, useId, useRef } from "react";
 
-import { useAuthSession } from "@/features/auth/hooks/use-auth-session";
+import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import { useLunoraActionOptions } from "@/lib/lunora/crpc";
 
 /** Hand the text to the browser as a `.md` download. */
@@ -35,37 +35,41 @@ const saveMarkdown = (markdown: string, filename: string): void => {
 const MemoryExportButton: FC = () => {
     const { t } = useLingui();
     const errorId = useId();
-    const { data: session } = useAuthSession();
-    const userId = session?.user.id;
-    // Who is signed in now, read when the answer arrives: the effect keeps it current, never a read during render.
-    const currentUserId = useRef(userId);
+    const { authClient } = useAuth();
+    // Cleared by the unmount cleanup: an answer that arrives after the button left the page saves nothing.
+    const mounted = useRef(false);
 
     useEffect(() => {
-        currentUserId.current = userId;
-    }, [userId]);
+        mounted.current = true;
 
-    const { error, isPending, mutate } = useMutation({
+        return () => {
+            mounted.current = false;
+        };
+    }, []);
+
+    const { error, isPending, mutateAsync } = useMutation({
         ...useLunoraActionOptions(api.memory.markdown_export.exportMemoriesMarkdown),
         // Lunora actions are not queued: offline, the click fails at once and says so instead of waiting for a connection.
         networkMode: "always",
-        onMutate: () => {
-            return { startedBy: currentUserId.current };
-        },
-        // Named by the day the server dated it (the user's timezone), the same day as its header. An answer that
-        // arrives after another account signed in is the previous person's memories: it is dropped, never saved.
-        onSuccess: (
-            { day, markdown }: { count: number; day: string; markdown: string; truncated: boolean },
-            _variables: Record<string, never>,
-            started: { startedBy: string | undefined } | undefined,
-        ) => {
-            if (started?.startedBy !== currentUserId.current) {
-                return;
-            }
-
-            saveMarkdown(markdown, `memories-${day}.md`);
-        },
         retry: 0,
     });
+
+    // Who is signed in at this moment, read from the session store itself rather than a value a render left behind.
+    const signedInUserId = (): string | undefined => authClient.$store.atoms.session?.get().data?.user.id;
+
+    const download = async (): Promise<void> => {
+        const startedBy = signedInUserId();
+        // A failure is shown from the mutation's own `error`; here it only means there is nothing to save.
+        const result = await mutateAsync({}).catch(() => undefined);
+
+        // The previous person's memories, if the account changed or signed out meanwhile: dropped, never saved.
+        if (result === undefined || !mounted.current || startedBy === undefined || signedInUserId() !== startedBy) {
+            return;
+        }
+
+        // Named by the day the server dated it (the user's timezone), the same day as its header.
+        saveMarkdown(result.markdown, `memories-${result.day}.md`);
+    };
 
     return (
         <div className="space-y-1">
@@ -76,7 +80,9 @@ const MemoryExportButton: FC = () => {
                 disabled={isPending}
                 // The button keeps focus while the file is prepared, so the keyboard is not sent back to the page.
                 focusableWhenDisabled
-                onClick={() => mutate({})}
+                onClick={() => {
+                    void download();
+                }}
                 variant="outline"
             >
                 <DownloadIcon aria-hidden="true" className="mr-2 h-4 w-4" />
