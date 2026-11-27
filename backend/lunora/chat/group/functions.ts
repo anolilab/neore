@@ -35,6 +35,7 @@ import type { GroupChat, GroupChatMode } from "./validators";
 import { vGroupChatMode } from "./validators";
 import { admitSkills } from "../../lib/rls/scope";
 import { MAX_LENGTH } from "../../lib/validators";
+import { refuseWhileWaking } from "../../source-control/pr-watch-wake-lease";
 import { callerRestrictsFull, ownerNewChatMode } from "../lib/new-chat-mode";
 import type { ThreadPermissionMode } from "../lib/thread-permission-mode";
 
@@ -482,6 +483,8 @@ export const updateGroupChat = authMutation
 
         const options = requireGroupOptions({ debateRounds, mode, skillIds, synthesizerSkillId });
 
+        // A pull request watch is writing to this chat: it does not become a group chat until it is done.
+        await refuseWhileWaking(ctx, userId, threadId);
         await requireUsableSkills(ctx, added, { organizationId: ctx.user.activeOrganization?.id, userId });
 
         const { now } = ctx;

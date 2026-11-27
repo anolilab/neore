@@ -10,6 +10,7 @@ const HEADLINES: Record<string, { failure?: string; success: string }> = {
     coding_agent: { failure: "Coding agent run failed", success: "Coding agent run finished" },
     daily_brief: { success: "Your daily brief" },
     data_export: { failure: "Data export failed", success: "Your data export is ready" },
+    device_paired: { success: "A new device signed in" },
     eval: { failure: "Eval run failed", success: "Eval run finished" },
     review_request: { success: "Your review was requested" },
     secret_request: { success: "The assistant is asking for a secret" },
