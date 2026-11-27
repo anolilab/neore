@@ -10,6 +10,7 @@ import { deleteVectorRow } from "../agent/table-writes";
 import type { Id } from "../_generated/dataModel";
 import { memoryLogger } from "../lib/logger";
 import schema from "../schema";
+import { BATCH } from "../gdpr/batch";
 import { deleteUserMemoryReflectionData } from "./gdpr";
 import {
     deleteMemory,
@@ -1068,5 +1069,52 @@ describe("erasing an account", () => {
 
         expect(await vectorExists(old.embeddingId)).toBe(false);
         expect(await cleanups()).toHaveLength(0);
+    });
+
+    it("walks every cleanup record when more than a batch cannot be erased, and ends", async () => {
+        const total = BATCH + 30;
+        const embeddings = await run(async (ctx) => {
+            const ids: Id<"embeddings_768">[] = [];
+
+            for (let index = 0; index < total; index += 1) {
+                const embeddingId = await ctx.db.insert("embeddings_768", {
+                    model: "m",
+                    table: "memories",
+                    userId: OWNER,
+                    vector: Array.from({ length: 768 }, (_, position) => position / 768),
+                });
+
+                await ctx.db.insert("memoryCleanups", { dueAt: 0, embeddingId, kind: "vector", memoryId: `memory-${index}`, userId: OWNER });
+                ids.push(embeddingId);
+            }
+
+            return ids;
+        });
+
+        // The index is down for every vector delete of the erasure.
+        vi.mocked(deleteVectorRow).mockClear();
+        vi.mocked(deleteVectorRow).mockRejectedValue(new Error("vector index unavailable"));
+
+        let cursor: string | null | undefined;
+        let rounds = 0;
+
+        for (; rounds < 10; rounds += 1) {
+            const result: any = await run(async (ctx) => await ctx.runMutation(deleteUserMemoryReflectionData, { cleanupCursor: cursor, userId: OWNER }));
+
+            ({ cleanupCursor: cursor } = result);
+
+            if (!result.hasMore) {
+                break;
+            }
+        }
+
+        const tried = new Set(vi.mocked(deleteVectorRow).mock.calls.map(([, id]) => id));
+
+        vi.mocked(deleteVectorRow).mockReset();
+
+        // Two calls (a batch and the rest); each record's vector was tried, the last included, and every record is kept.
+        expect(rounds).toBe(1);
+        expect(embeddings.every((id) => tried.has(id))).toBe(true);
+        expect(await cleanups()).toHaveLength(total);
     });
 });

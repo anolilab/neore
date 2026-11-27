@@ -74,15 +74,26 @@ export const eraseMemoriesForUser = async (ctx: MutationCtx, userId: string): Pr
     return { hasMore: memories.length >= BATCH };
 };
 
+/**
+ * The reflection state, the digests, the import jobs and the cleanup records. A cleanup record whose vector could not be
+ * erased is kept (its job retries it), so those rows stay in the table and the batch cannot be read again from the top: the
+ * walk over them carries a cursor. `cleanupCursor` in is `undefined` for a first call, the cursor a call returned, or `null`
+ * once the records are done (as for the usage scan); out it is the cursor of the next page, `null` when none is left.
+ * `hasMore` is true while records remain past the cursor or any other table has a full batch left.
+ */
 export const deleteUserMemoryReflectionData = internalMutation
-    .input({ userId: v.string() })
-    .output(v.object({ hasMore: v.boolean() }))
-    .mutation(async ({ args: { userId }, ctx }) => {
-        const [cleanups, digests, states, importJobs, importBatches] = await Promise.all([
-            ctx.db
-                .query("memoryCleanups")
-                .withIndex("by_userId", (q) => q.eq("userId", userId))
-                .take(BATCH),
+    .input({ cleanupCursor: v.optional(v.union(v.string(), v.null())), userId: v.string() })
+    .output(v.object({ cleanupCursor: v.union(v.string(), v.null()), hasMore: v.boolean() }))
+    .mutation(async ({ args: { cleanupCursor, userId }, ctx }) => {
+        const cleanupPage =
+            cleanupCursor === null
+                ? { continueCursor: null, isDone: true, page: [] }
+                : await ctx.db
+                      .query("memoryCleanups")
+                      .withIndex("by_userId", (q) => q.eq("userId", userId))
+                      .paginate({ cursor: cleanupCursor ?? null, numItems: BATCH });
+        const cleanups = cleanupPage.page;
+        const [digests, states, importJobs, importBatches] = await Promise.all([
             ctx.db
                 .query("memoryDigests")
                 .withIndex("by_userId_createdAt", (q) => q.eq("userId", userId))
@@ -133,11 +144,7 @@ export const deleteUserMemoryReflectionData = internalMutation
         ]);
 
         return {
-            hasMore:
-                (cleanups.length >= BATCH && kept.size < cleanups.length) ||
-                digests.length >= BATCH ||
-                states.length >= BATCH ||
-                importJobs.length >= BATCH ||
-                importBatches.length >= BATCH,
+            cleanupCursor: cleanupPage.isDone ? null : cleanupPage.continueCursor,
+            hasMore: !cleanupPage.isDone || digests.length >= BATCH || states.length >= BATCH || importJobs.length >= BATCH || importBatches.length >= BATCH,
         };
     });
