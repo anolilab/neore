@@ -5,7 +5,7 @@
  * A subscription holds a `scanSeq`: the last log position it has been scanned to. Part 2a scans nothing, so the position is
  * where the subscription started; part 2b's sweep moves it, and the cursor the client persists is derived from it.
  */
-import { v } from "lunorash/server";
+import { LunoraError, v } from "lunorash/server";
 
 import type { MutationCtx } from "../_generated/server";
 import { internalMutation } from "../_generated/server";
@@ -88,7 +88,9 @@ export const subscribeOn = async (ctx: Pick<MutationCtx, "db">, input: Subscribe
     if (existing && existing.expiresAt > now) {
         await ctx.db.patch("eventWebhookSubscriptions", existing._id, { expiresAt, secretCiphertext: input.secretCiphertext, updatedAt: now });
         // A dormant shard is reaped only when the tick reaches it: wake it at this expiry (`lib/shard-housekeeping.ts`).
-        await noteShardDue(ctx, expiresAt + 1, input.userId);
+        if (!(await noteShardDue(ctx, expiresAt + 1, input.userId))) {
+            throw new LunoraError("INTERNAL", "The subscription's expiry wake could not be written, so it is not stored; retry the subscribe.");
+        }
 
         return { cursorSeq: existing.scanSeq, expiresAt, kind: "granted", truncated: false };
     }
@@ -150,7 +152,9 @@ export const subscribeOn = async (ctx: Pick<MutationCtx, "db">, input: Subscribe
     }
 
     // A dormant shard is reaped only when the tick reaches it: wake it at this expiry (`lib/shard-housekeeping.ts`).
-    await noteShardDue(ctx, expiresAt + 1, input.userId);
+    if (!(await noteShardDue(ctx, expiresAt + 1, input.userId))) {
+        throw new LunoraError("INTERNAL", "The subscription's expiry wake could not be written, so it is not stored; retry the subscribe.");
+    }
 
     return { cursorSeq: scanSeq, expiresAt, kind: "granted", truncated };
 };
