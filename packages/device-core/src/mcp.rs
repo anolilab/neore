@@ -1160,6 +1160,60 @@ sleep 1"#
         }
     }
 
+    /// A server that reaches a host on the person's own network (here a listener on the loopback, which Off blocks
+    /// like any other address) needs its tier set to On. On opens the network and nothing else: the filesystem
+    /// sandbox stays as it is.
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    #[test]
+    fn a_server_set_to_on_reaches_a_local_host_and_keeps_its_filesystem_confinement() {
+        if !sandbox_or_skip() {
+            return;
+        }
+
+        if !Path::new("/bin/bash").exists() {
+            eprintln!("skipping: no /bin/bash for the /dev/tcp probe");
+            return;
+        }
+
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+
+        std::thread::spawn(move || {
+            for stream in listener.incoming().flatten() {
+                drop(stream);
+            }
+        });
+
+        let folders = Folders::new("mcp-on");
+        let probe = format!(
+            r#"
+            (/bin/bash -c 'exec 3<>/dev/tcp/127.0.0.1/{port}') 2>/dev/null && printf 'net:open ' || printf 'net:blocked '
+            (echo x > "$OUTSIDE/bad.txt") 2>/dev/null && printf 'outside:WROTE ' || printf 'outside:denied '
+            (cat "$FAKEHOME/secret.txt") 2>/dev/null && printf 'LEAKED ' || printf 'home:hidden '
+        "#
+        );
+        let read = |network| {
+            let config = probing_server("on", &folders, &probe, network);
+            let policy = folders.policy(network);
+
+            probe_output(&config, Some(&policy), &folders.base.join("state"))
+        };
+
+        let off = read(NetworkTier::Off);
+
+        assert!(off.contains("net:blocked"), "{off}");
+
+        let on = read(NetworkTier::On);
+
+        assert!(on.contains("net:open"), "{on}");
+        assert!(
+            on.contains("outside:denied") && on.contains("home:hidden"),
+            "{on}"
+        );
+        assert!(!on.contains("WROTE") && !on.contains("LEAKED"), "{on}");
+        assert!(!folders.outside.join("bad.txt").exists());
+    }
+
     #[test]
     fn a_missing_sandbox_refuses_the_server_unless_the_user_allowed_it() {
         // The planning every start goes through, on a computer posed as having no sandbox.

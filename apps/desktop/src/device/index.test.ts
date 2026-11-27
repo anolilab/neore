@@ -429,6 +429,13 @@ describe("relay channels (the site window)", () => {
         expect(() => invoke(LOCAL_CHANNEL.copyDiagnostics, siteEvent(), "dev_1")).toThrow("device: not the device window");
         expect(core.promptAnswer).not.toHaveBeenCalled();
     });
+
+    it("refuse a settings write from the site, so the page can never add a server or change its network tier", () => {
+        const update = JSON.stringify({ mcpServers: [{ command: "x", name: "lan", network: "on" }] });
+
+        expect(() => invoke(LOCAL_CHANNEL.settingsUpdate, siteEvent(), update)).toThrow("device: not the device window");
+        expect(core.settingsUpdate).not.toHaveBeenCalled();
+    });
 });
 
 describe("add-project machines (the site window)", () => {
