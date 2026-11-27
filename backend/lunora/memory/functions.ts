@@ -27,7 +27,7 @@ import { botOwnerRows } from "./bot-owner";
 import { type MemoryEvidence, newestEvidence, vMemoryEvidence } from "./evidence";
 import { logRedaction, redactMemoryText } from "./redact";
 import { DROPPED_DIGEST_SUMMARY, localDayOf } from "./reflection-logic";
-import { byNewest, isUsableOn, KEYWORD_LOOKUP_LIMIT, keywordLookupOf, mergeScopeWindows, scopesOf } from "./retrieve-ranking";
+import { byNewest, isUsableOn, KEYWORD_LOOKUP_LIMIT, keywordLookupOf, lookupSearchOf, mergeScopeWindows, scopesOf } from "./retrieve-ranking";
 import { lastConfirmedOf, MEMORY_TYPES, type MemoryType, vMemoryType } from "./taxonomy";
 import { deleteVectorRow, patchMessage } from "../agent/table-writes";
 import { candidatesOnActivePath } from "../agent/branch-rows";
@@ -1953,8 +1953,8 @@ export const searchMemoriesByKeyword = internalQuery
 
         const settled = await Promise.allSettled(
             args.terms.slice(0, MAX_KEYWORD_TERMS).map(async (term) => {
-                // The index ANDs the tokens (a prefix match on the last); `keywordLookupOf` then wants them adjacent.
-                const search = term.tokens.join(" ");
+                // The index ANDs the tokens (a prefix match on the last); `keywordLookupOf` then wants the whole run.
+                const search = lookupSearchOf(term);
                 const rows = await ctx.db
                     .query("memories")
                     .withSearchIndex("search_memory_text", (q) => q.search("memory", search).eq("userId", args.userId))

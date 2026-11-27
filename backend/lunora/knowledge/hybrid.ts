@@ -135,14 +135,15 @@ export interface KeywordTermHits<T extends KeywordCandidate = KeywordCandidate> 
  * Term frequency is floored at 1: the index returned the chunk for that term, so
  * it matches even where our tokenizer disagrees with the index (e.g. CJK bigrams).
  * `tokenize` and `wholeTokens` let a caller with its own tokens count only whole
- * matches; knowledge uses neither.
+ * matches, and `documentFrequency` gives a term's row count when the hits are a
+ * cut of them; knowledge uses none of them.
  */
 export const scoreKeywordCandidates = <T extends KeywordCandidate>(
     termHits: KeywordTermHits<T>[],
     corpusSize: number,
-    options: { tokenize?: (text: string) => string[]; wholeTokens?: boolean } = {},
+    options: { documentFrequency?: (term: string) => number | undefined; tokenize?: (text: string) => string[]; wholeTokens?: boolean } = {},
 ): { candidate: T; score: number }[] => {
-    const { tokenize: tokenizeWith = tokenize, wholeTokens = false } = options;
+    const { documentFrequency, tokenize: tokenizeWith = tokenize, wholeTokens = false } = options;
     const candidates = new Map<string, { candidate: T; matchedTerms: Set<string>; tokens: string[] }>();
 
     for (const { hits, term } of termHits) {
@@ -172,7 +173,8 @@ export const scoreKeywordCandidates = <T extends KeywordCandidate>(
     const idf = new Map<string, number>();
 
     for (const { hits, term } of termHits) {
-        const df = hits.length;
+        // A caller that counted the term's rows beyond the hits it passes gives that count; the hits are a lower bound.
+        const df = Math.max(hits.length, documentFrequency?.(term) ?? 0);
         const n = Math.max(corpusSize, df, candidates.size);
 
         idf.set(term, bm25Idf(df, n));

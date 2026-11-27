@@ -101,7 +101,10 @@ const identifiersOf = (text: string): string[][] => {
 
         const tokens = searchTokensOf(chunk);
 
-        identifiers.set(tokens.join(" "), tokens);
+        // A run longer than the index keeps (256 characters) has no tokens left, and is no identifier anyone can find.
+        if (tokens.length > 0) {
+            identifiers.set(tokens.join(" "), tokens);
+        }
     }
 
     return [...identifiers.values()];
@@ -124,7 +127,7 @@ export interface TermIndex {
 
 export const termIndexOf = (text: string): TermIndex => {
     return {
-        runs: [...normalize(text).matchAll(CHUNK_RE)].map(([chunk]) => searchTokensOf(chunk)),
+        runs: [...normalize(text).matchAll(CHUNK_RE)].map(([chunk]) => searchTokensOf(chunk)).filter((run) => run.length > 0),
         tokens: searchTokensOf(text),
     };
 };
@@ -134,6 +137,10 @@ export const termIndexOf = (text: string): TermIndex => {
  * the identifier does, so `QZ-5508` is in `part QZ-5508.` and not in `QZ-5508-9000` or `AB/QZ-5508`.
  */
 export const termCount = (index: TermIndex, term: { code: boolean; tokens: ReadonlyArray<string> }): number => {
+    if (term.tokens.length === 0) {
+        return 0;
+    }
+
     if (!term.code) {
         return index.tokens.filter((token) => token === term.tokens[0]).length;
     }

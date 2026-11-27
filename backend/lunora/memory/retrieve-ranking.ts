@@ -194,7 +194,16 @@ export const keywordLookupTerms = (searchText: string): LookupTerm[] =>
             return { code, term, tokens };
         });
 
-/** A term to look up: the index is asked for all of `tokens`, and a row is kept only when it holds them in order. */
+/** The most distinct terms the search index takes in one query. */
+export const INDEX_MAX_SEARCH_TERMS = 16;
+
+/**
+ * What one lookup asks the index for: the term's distinct tokens, at most `INDEX_MAX_SEARCH_TERMS` of them. A longer
+ * identifier is searched by its first ones, and `keywordLookupOf` still checks the whole run on every row returned.
+ */
+export const lookupSearchOf = ({ tokens }: { tokens: ReadonlyArray<string> }): string => [...new Set(tokens)].slice(0, INDEX_MAX_SEARCH_TERMS).join(" ");
+
+/** A term to look up: the index is asked for its tokens (`lookupSearchOf`), and a row is kept only when it holds them whole. */
 export interface LookupTerm {
     /** Part of an identifier (`SalientTerm.code`). */
     code: boolean;
@@ -264,7 +273,11 @@ export const topKeywordHits = <T extends { _id: string; memory: string }>(
         ...lookups.filter(({ code }) => code).flatMap(({ hits }) => hits),
         ...lookups.filter(({ code }) => !code).flatMap(({ hits }) => hits.slice(0, KEYWORD_RESERVED_PER_TERM)),
     ];
-    const ranked = scoreKeywordCandidates(termHits, Math.max(corpusSize, CANDIDATE_WINDOW_SIZE), { tokenize: searchTokensOf, wholeTokens: true }).map(
+    // BM25 over what the lookups counted: a term's df is its lookup's in-scope row count (the hits are cut at 20), and N
+    // the most rows any of that tells of. The chat's whole active row count is not read here, so N is a lower bound.
+    const rows = new Map(lookups.map(({ corpusRows, term }) => [term, corpusRows]));
+    const n = Math.max(corpusSize, CANDIDATE_WINDOW_SIZE, ...rows.values());
+    const ranked = scoreKeywordCandidates(termHits, n, { documentFrequency: (term) => rows.get(term), tokenize: searchTokensOf, wholeTokens: true }).map(
         ({ candidate }) => candidate.row,
     );
     const kept = new Map<string, T>();
@@ -338,9 +351,10 @@ const computeScore = (memory: RankCandidate, semanticScore: number, now: number)
 };
 
 /**
- * A term at most this many usable rows of the user hold is rare (its lookup, which reads the whole user, says how
- * many). A row holding the query's rare term counts by its words even where the vector search says otherwise:
- * embeddings miss exact tokens (a code, a name, a rare word), which is what such a term usually is.
+ * A term at most this many usable rows of the chat's scopes hold is rare: its lookup counts them (`corpusRows`, another
+ * bot's rows never), and only a `complete` lookup, one the index answered with fewer rows than it reads, knows the
+ * count is all of them. A row holding the query's rare term counts by its words even where the vector search says
+ * otherwise: embeddings miss exact tokens (a code, a name, a rare word), which is what such a term usually is.
  */
 export const RARE_TERM_MAX_ROWS = 2;
 

@@ -21,12 +21,18 @@ describe(termCount, () => {
         expect(termCount(termIndexOf("ordered part QZ-5508."), qz)).toBe(1);
         expect(termCount(termIndexOf("serial QZ-5508-9000"), qz)).toBe(0);
         expect(termCount(termIndexOf("AB/QZ-5508"), qz)).toBe(0);
+        // A run longer than the index keeps has no tokens: two such runs never match.
+        expect(termCount(termIndexOf(`B${"7".repeat(300)}`), { code: true, tokens: [] })).toBe(0);
         // And the other way: a longer identifier is not in a row holding the shorter one.
         expect(termCount(termIndexOf("ordered part QZ-5508"), { code: true, tokens: ["qz", "5508", "9000"] })).toBe(0);
     });
 });
 
 describe(salientTermsOf, () => {
+    it("drops an identifier longer than the index keeps", () => {
+        expect(salientTermsOf(`code A${"1".repeat(300)}`).some(({ code }) => code)).toBe(false);
+    });
+
     it("keeps every identifier, two sharing a part included", () => {
         expect(
             salientTermsOf("is it QZ-5508 or AB-5508")

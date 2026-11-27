@@ -16,6 +16,7 @@ import {
     KEYWORD_LOOKUP_LIMIT,
     keywordLookupOf,
     keywordLookupTerms,
+    lookupSearchOf,
     keywordSignalsFor,
     rankMemories,
     selectCandidateWindow,
@@ -128,11 +129,13 @@ const run = (query: FixtureQuery, vectors = true): { ids: string[]; inWindow: Se
     // ones too) holding all of the term's tokens (the last as a prefix), most occurrences first, then newest, cut to what
     // a lookup reads; the lookup then keeps the whole-token, usable, in-scope rows (`keywordLookupOf`, as production).
     const lookups = keywordLookupTerms(query.text).map((term) => {
+        // What production asks the index for (`lookupSearchOf`): the term's distinct tokens, at most 16.
+        const asked = lookupSearchOf(term).split(" ");
         const fetched = rows
             .map((m) => {
                 const tokens = searchTokensOf(m.memory);
-                const counts = term.tokens.map(
-                    (wanted, index) => tokens.filter((token) => (index === term.tokens.length - 1 ? token.startsWith(wanted) : token === wanted)).length,
+                const counts = asked.map(
+                    (wanted, index) => tokens.filter((token) => (index === asked.length - 1 ? token.startsWith(wanted) : token === wanted)).length,
                 );
 
                 return { m, tf: counts.every((count) => count > 0) ? counts.reduce((sum, count) => sum + count, 0) : 0 };

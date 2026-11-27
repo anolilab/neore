@@ -5,8 +5,11 @@ import {
     KEYWORD_LOOKUP_LIMIT,
     keywordLookupOf,
     keywordLookupTerms,
+    INDEX_MAX_SEARCH_TERMS,
+    KEYWORD_RESERVED_PER_TERM,
     KEYWORD_TOP_K,
     keywordSignalsFor,
+    lookupSearchOf,
     rankMemories,
     SEARCH_MAX_RESULTS,
     SEARCH_MIN_KEYWORD_RELEVANCE,
@@ -463,6 +466,27 @@ describe("keyword hits", () => {
         expect(kept[0]!._id).toBe("long");
         // The first rows of each other term are kept too, whatever BM25 says of them.
         expect(kept.map((h) => h._id)).toEqual(expect.arrayContaining(["s0", "s1", "s2", "s20", "s21", "s22"]));
+    });
+
+    it("ranks a word with more than 20 matches as common: its df is the lookup's count, not the 20 hits it keeps", () => {
+        const common = Array.from({ length: 20 }, (_, i) => row(`d${String(i)}`, "dishwasher"));
+        const rarer = Array.from({ length: 20 }, (_, i) => row(`k${String(i)}`, "kettle"));
+        const lookups = [
+            { code: false, complete: false, corpusRows: 45, hits: common, term: "dishwasher" },
+            { code: false, complete: true, corpusRows: 20, hits: rarer, term: "kettle" },
+        ];
+        // Past each term's three reserved rows, the rarer term's rows come first.
+        const next = topKeywordHits(lookups, 0, 2 * KEYWORD_RESERVED_PER_TERM + 4).slice(2 * KEYWORD_RESERVED_PER_TERM);
+
+        expect(next).toHaveLength(4);
+        expect(next.every((h) => h._id.startsWith("k"))).toBe(true);
+    });
+
+    it("asks the index for at most 16 distinct tokens of a long identifier", () => {
+        const [serial] = keywordLookupTerms("where is A1-01-02-03-04-05-06-07-08-09-10-11-12-13-14-15-16");
+
+        expect(serial!.tokens).toHaveLength(17);
+        expect(lookupSearchOf(serial!).split(" ")).toHaveLength(INDEX_MAX_SEARCH_TERMS);
     });
 
     it("fuses the vector and keyword hits by rank: a row both found leads, each row once", () => {
