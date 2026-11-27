@@ -51,6 +51,15 @@ const SETTINGS_PAGES = {
 
 type SettingsPath = keyof typeof SETTINGS_PAGES;
 
+/**
+ * One old path per tab: a second path to a tab already loaded renders the same tab again, and its redirect is the
+ * table's (`settings-link.test.ts`), so it adds a full page load and nothing else. The sweep's loads are what the
+ * shared dev backend has to carry, and it runs out of room toward the end of a longer one.
+ */
+const SWEPT_PATHS = (Object.keys(SETTINGS_PAGES) as SettingsPath[]).filter(
+    (path, index, paths) => paths.findIndex((other) => SETTINGS_PAGES[other].tab === SETTINGS_PAGES[path].tab) === index,
+);
+
 // `"app/customization": "app-customization",` or `connectors: "connectors",`
 const PAIR_RE = /^ +(?:"([^"]+)"|([a-z]+)): "([^"]+)",$/gmu;
 
@@ -162,7 +171,7 @@ const sweepSettingsPages = async (page: Page, locale: string): Promise<Record<st
     const errors = collectErrors(page);
     const errorsByPage: Record<string, string[]> = {};
 
-    for (const path of Object.keys(SETTINGS_PAGES) as SettingsPath[]) {
+    for (const path of SWEPT_PATHS) {
         await test.step(path, async () => {
             await loadSettingsPage(page, path, () => {
                 errors.length = 0;
