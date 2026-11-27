@@ -197,9 +197,13 @@ describe("thread relationships", () => {
             } as never),
         ).rejects.toThrow();
 
+        // A request naming no type is stored as a comparison, never as the internal mutation's default `branch`.
         await as(STRANGER).mutation(procedureAt("chat_functions", "createThreadRelationshipPublic"), { parentThreadId: mine, threadId: mineToo } as never);
 
-        expect(await run(async (context) => await context.db.query("threadRelationships").collect())).toHaveLength(1);
+        const links = await run(async (context) => await context.db.query("threadRelationships").collect());
+
+        expect(links).toHaveLength(1);
+        expect(links[0]).toMatchObject({ branchType: "comparison" });
     });
 
     it("getChildThreads leaves out a child the caller does not own, even when a relationship row names it", async () => {

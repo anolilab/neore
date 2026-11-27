@@ -297,7 +297,7 @@ describe("searchPastChats", () => {
                 const here = await insertThread(context, { title: "Today" });
                 const plain = await insertThread(context, { title: "Plain" });
                 const rows: [string, Parameters<typeof insertUntaggedThread>[3]][] = [
-                    // What the public relationship mutation can write.
+                    // What the public relationship mutation writes (a comparison), and a link stored with no type.
                     ["Comparison link", { links: ["comparison"] }],
                     ["Untyped link", { links: [undefined] }],
                     // An import linked to a chat, even through a branch link.

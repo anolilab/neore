@@ -2752,7 +2752,8 @@ export const createThreadRelationship = internalMutation
 /**
  * Public auth mutation — called from the browser during comparison thread creation. It writes comparison links only: a
  * branch or side chat link is the server's own record that it copied a chat's rows (`branchThread`, `side-chat.ts`), which
- * the past-chat search trusts (`past-chats.ts#COPY_LINKS`). A link with no type is still accepted, and trusted by nothing.
+ * the past-chat search trusts (`past-chats.ts#COPY_LINKS`). A request that names no type is stored as a comparison too: the
+ * internal mutation would store it as a branch.
  */
 export const createThreadRelationshipPublic = authMutation
     .use(rateLimit("chat/create"))
@@ -2773,13 +2774,13 @@ export const createThreadRelationshipPublic = authMutation
 
         await context.runMutation(internal.chat.functions.createThreadRelationship, {
             branchPoint: args.branchPoint,
-            branchType: args.branchType,
+            branchType: "comparison",
             parentThreadId: args.parentThreadId,
             threadId: args.threadId,
         });
 
         context.log.event("chat.create_thread_relationship", {
-            branchType: args.branchType ?? null,
+            branchType: "comparison",
             hasBranchPoint: args.branchPoint !== undefined,
         });
     });
