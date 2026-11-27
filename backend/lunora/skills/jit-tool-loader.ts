@@ -46,6 +46,7 @@ const TOOL_REGISTRY: ToolDescriptor[] = [
     { category: "search", description: "Search YouTube videos", name: "youtubeSearch" },
     { category: "knowledge", description: "Search user's knowledge base", name: "knowledgeSearch" },
     { category: "knowledge", description: "Search user's memories", name: "searchMemory" },
+    { category: "knowledge", description: "Search what the user typed in earlier chats", name: "searchPastChats" },
     { category: "creation", description: "Create a text document artifact", name: "createDocument" },
     { category: "creation", description: "Update an existing document", name: "updateDocument" },
     { category: "creation", description: "Create a design canvas", name: "createDesign" },

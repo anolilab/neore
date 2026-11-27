@@ -3535,7 +3535,7 @@ export const SENT_PROMPT_LINEAGE_READS = 64;
  * text sent on. `typedText` (`typedTextOf`) leaves those parts out of a row that has typed parts beside them, so only the
  * person's own words list, and a row of nothing but such parts has no `typedText`.
  */
-const sentPromptOf = (message: TypedPromptRow): { draftFrom: DraftFrom | undefined; typed: string } | undefined => {
+export const sentPromptOf = (message: TypedPromptRow): { draftFrom: DraftFrom | undefined; typed: string } | undefined => {
     const stored = message.message as { content?: unknown; role?: string } | undefined;
     const typed = message.typedText;
 
@@ -3550,7 +3550,7 @@ const sentPromptOf = (message: TypedPromptRow): { draftFrom: DraftFrom | undefin
  * Whether the search may list a thread's prompts: the caller's own chat, not trashed, deleted for good (`deletingAt`,
  * erased in batches after the delete), locked or temporary. The same rule as the thread search (`isSearchEligible`).
  */
-const listsSentPrompts = (thread: ThreadDoc | null, userId: string): thread is ThreadDoc =>
+export const listsSentPrompts = (thread: ThreadDoc | null, userId: string): thread is ThreadDoc =>
     thread !== null && thread.userId === userId && !thread.deleted && thread.deletingAt === undefined && !isThreadLocked(thread) && thread.isTemporary !== true;
 
 /** Lunora's answer for a search index whose backfill has not yet covered the table (`SEARCH_INDEX_BUILDING`, 503). */

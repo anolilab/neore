@@ -43,16 +43,16 @@ const eventDays = (start: string | undefined, end: string | undefined): string |
 };
 
 /**
- * The user's timezone, read beside the search to date each memory. A failed read dates them in UTC: the memories the
- * search found still reach the model.
+ * The user's timezone, read beside a search to date what it found. A failed read dates them in UTC: what the search
+ * found still reaches the model. `tool` names the caller in the warning.
  */
-const readTimeZone = async (context: ToolContext, userId: string, onUserShard: boolean): Promise<string | null> => {
+export const readTimeZone = async (context: ToolContext, userId: string, onUserShard: boolean, tool = "search_memory"): Promise<string | null> => {
     try {
         return onUserShard
             ? await context.runQuery(internal.memory.functions.getUserTimeZone, { userId })
             : await callOnShard(internal.memory.functions.getUserTimeZone, { userId }, { shardKey: userId });
     } catch (error) {
-        console.warn("[search_memory] Timezone read failed, dating memories in UTC:", error);
+        console.warn(`[${tool}] Timezone read failed, dating results in UTC:`, error);
 
         return null;
     }
