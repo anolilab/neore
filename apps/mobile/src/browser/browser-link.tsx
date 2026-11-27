@@ -4,8 +4,10 @@ import { Text } from "react-native";
 
 import { getClient } from "@/lib/lunora";
 
-import { watchBrowserStatus } from "./browser-api";
-import { browserLinkUntil } from "./browser-view-state";
+import type { BrowserStatus } from "./browser-api";
+import { readBrowserStatus, watchBrowserStatus } from "./browser-api";
+import { browserLinkUntil, GRANT_END_MARGIN_MS } from "./browser-view-state";
+import { readUntilAnswered, watchGrantEnd } from "./grant-end";
 
 /** A link to the chat's browser screen, shown only while the agent's cloud browser runs in the chat. */
 export const BrowserLink = ({ threadId }: { threadId: string }) => {
@@ -35,10 +37,29 @@ export const BrowserLink = ({ threadId }: { threadId: string }) => {
             return undefined;
         }
 
-        // A newer status clears this timer and sets its own.
-        const timer = setTimeout(setShown, Math.max(0, shown.until - Date.now()), undefined);
+        // The link goes at the grant's end; at its real end the status is read once, as the screen does, since a renewed
+        // grant pushes nothing. A newer status replaces both.
+        let stopRead: (() => void) | undefined;
+        const stopWait = watchGrantEnd({
+            endsAt: shown.until,
+            onEnd: () => setShown(undefined),
+            reread: () => {
+                stopRead = readUntilAnswered({
+                    onAnswer: (status: BrowserStatus) => {
+                        const until = browserLinkUntil(status, Date.now());
 
-        return () => clearTimeout(timer);
+                        setShown(until === undefined ? undefined : { threadId: shown.threadId, until });
+                    },
+                    read: async () => await readBrowserStatus(getClient(), shown.threadId),
+                });
+            },
+            rereadAt: shown.until + GRANT_END_MARGIN_MS,
+        });
+
+        return () => {
+            stopWait();
+            stopRead?.();
+        };
     }, [shown]);
 
     if (shown?.threadId !== threadId) {
@@ -46,7 +67,7 @@ export const BrowserLink = ({ threadId }: { threadId: string }) => {
     }
 
     return (
-        <Link accessibilityRole="button" href={{ params: { threadId }, pathname: "/browser/[threadId]" }} style={{ minHeight: 44, padding: 12 }}>
+        <Link accessibilityRole="link" href={{ params: { threadId }, pathname: "/browser/[threadId]" }} style={{ minHeight: 44, padding: 12 }}>
             <Text style={{ fontWeight: "600" }}>View the agent&apos;s browser</Text>
         </Link>
     );

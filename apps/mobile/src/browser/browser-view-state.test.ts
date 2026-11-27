@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { BrowserStatus } from "./browser-api";
 import {
+    BROWSER_CLOSED,
     browserLinkUntil,
     CONTROLLED_BY_OTHER,
     frameMessage,
@@ -30,6 +31,11 @@ describe(viewStateOf, () => {
         expect(viewStateOf({ kind: "denied", now: 1 }, undefined)).toStrictEqual({ kind: "ended", message: NOT_READABLE });
         expect(viewStateOf(undefined, "NOT_FOUND")).toStrictEqual({ kind: "ended", message: NOT_READABLE });
         expect(viewStateOf(running({ control: { byYou: false, until: 200 } }), undefined)).toStrictEqual({ kind: "hidden", message: CONTROLLED_BY_OTHER });
+    });
+
+    it("shows a browser a frame read found gone as closed, until the status names another", () => {
+        expect(viewStateOf(running(), undefined, false, "b-1")).toStrictEqual({ kind: "ended", message: BROWSER_CLOSED });
+        expect(viewStateOf(running({ browserId: "b-2" }), undefined, false, "b-1").kind).toBe("ready");
     });
 
     it("shows the page again once another person's lease ran out on the server's clock, and to the person who holds it", () => {

@@ -15,12 +15,15 @@ export type ViewState
 export const NO_BROWSER = "No browser is open in this chat. It opens when the agent browses a page; ask it to open one first.";
 export const NOT_READABLE = "This chat's browser cannot be shown. The chat may be locked, or no longer shared with you.";
 export const CONTROLLED_BY_OTHER = "Someone else is controlling this browser. The page is hidden until they hand it back.";
+export const BROWSER_CLOSED = "The browser has closed.";
 
 /**
  * `isExpired`: the grant this status was read under has ended (its `accessUntil` passed). A live status is re-run only
  * by a write, not by the clock, so the screen stops showing it then, as every later answer would be a denial.
+ * `closedBrowserId`: a browser a frame read found gone while the status still says it runs (the provider lost it before
+ * the row knew): that browser is shown as closed until the status names another.
  */
-export const viewStateOf = (status: BrowserStatus | undefined, error: string | undefined, isExpired = false): ViewState => {
+export const viewStateOf = (status: BrowserStatus | undefined, error: string | undefined, isExpired = false, closedBrowserId?: string): ViewState => {
     if (error !== undefined || isExpired) {
         return { kind: "ended", message: NOT_READABLE };
     }
@@ -35,6 +38,10 @@ export const viewStateOf = (status: BrowserStatus | undefined, error: string | u
 
     if (status.kind === "none") {
         return { kind: "ended", message: NO_BROWSER };
+    }
+
+    if (status.browserId === closedBrowserId) {
+        return { kind: "ended", message: BROWSER_CLOSED };
     }
 
     if (status.control !== undefined && !status.control.byYou && status.control.until > status.now) {
@@ -154,7 +161,7 @@ export const frameMessage = (frame: BrowserFrame): string | undefined => {
             return CONTROLLED_BY_OTHER;
         }
         case "ended": {
-            return "The browser has closed.";
+            return BROWSER_CLOSED;
         }
         case "ok": {
             return undefined;

@@ -67,6 +67,8 @@ export const useBrowserView = (threadId: string, userId: string): BrowserView =>
     const [expiredAnswer, setExpiredAnswer] = useState<BrowserStatus | undefined>(undefined);
     const [frame, setFrame] = useState<ShownFrame | undefined>(undefined);
     const [frameNote, setFrameNote] = useState<string | undefined>(undefined);
+    /** A browser a frame read found gone while the status still says it runs. */
+    const [closedBrowserId, setClosedBrowserId] = useState<string | undefined>(undefined);
     const [control, setControl] = useState<ControlState>({ kind: "idle" });
     const [session] = useState<ControlSession>(() => {
         const client = getClient();
@@ -188,7 +190,7 @@ export const useBrowserView = (threadId: string, userId: string): BrowserView =>
         return reread();
     }, [isExpired, refreshTick, threadId]);
 
-    const view = viewStateOf(status, error, status !== undefined && expiredAnswer === status);
+    const view = viewStateOf(status, error, status !== undefined && expiredAnswer === status, closedBrowserId);
     const isHolding = control.kind === "holding";
     const browserId = status?.kind === "running" ? status.browserId : undefined;
 
@@ -267,9 +269,10 @@ export const useBrowserView = (threadId: string, userId: string): BrowserView =>
                     setFrame(undefined);
                 }
 
-                // The browser is gone: a lease the phone holds on it would only keep the agent waiting.
+                // The browser is gone: the screen shows it closed, stops reading it, and hands back a lease the phone holds
+                // on it (the ended view's effect), which would only keep the agent waiting.
                 if (read.status === "ended") {
-                    session.release("left");
+                    setClosedBrowserId(browserId);
                 }
             },
             onFailure: (failure) => {
