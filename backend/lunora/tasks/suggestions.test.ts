@@ -66,7 +66,7 @@ const as = (userId: string) => harness.withIdentity({ userId } as never);
 
 const setSwitch = async (userId: string, enabled: boolean | undefined): Promise<void> => {
     await harness.run(async (ctx: any) => {
-        await ctx.db.insert("userSettings", { userId, ...(enabled !== undefined && { scheduleIdeasEnabled: enabled }) });
+        await ctx.db.insert("userSettings", { memoryEnabled: true, userId, ...(enabled !== undefined && { scheduleIdeasEnabled: enabled }) });
     });
 };
 
@@ -289,6 +289,36 @@ describe("storing", () => {
 
         expect(rows).toHaveLength(1);
         expect(rows[0]).toMatchObject({ status: "pending", title: "Kept" });
+    });
+
+    it("stores nothing once memory is off, even with the switch on", async () => {
+        await setSwitch(A, true);
+        await harness.run(async (ctx: any) => {
+            const [settings] = await ctx.db.query("userSettings").collect();
+
+            await ctx.db.patch("userSettings", settings._id, { memoryEnabled: false });
+        });
+
+        await expect(insert(A, [proposal()])).resolves.toEqual({ inserted: 0 });
+        expect(await rowsOf("taskSuggestions", A)).toHaveLength(0);
+    });
+
+    it("drops a schedule that fires more often than hourly, and keeps an hourly or slower one", async () => {
+        await setSwitch(A, true);
+
+        await expect(
+            insert(A, [
+                proposal({ cronExpression: "* * * * *", title: "Every minute" }),
+                proposal({ cronExpression: "*/10 * * * *", title: "Every ten minutes" }),
+                proposal({ cronExpression: "0,30 * * * *", title: "Twice an hour" }),
+                proposal({ cronExpression: "0 9 * * 1", title: "Weekly" }),
+                proposal({ cronExpression: "15 * * * *", title: "Hourly" }),
+            ]),
+        ).resolves.toEqual({ inserted: 2 });
+
+        const stored = await rowsOf("taskSuggestions", A);
+
+        expect(stored.map((row) => row.title).toSorted((a, b) => a.localeCompare(b))).toEqual(["Hourly", "Weekly"]);
     });
 
     it("drops a schedule that matches no date, and one an accept would refuse as too long", async () => {

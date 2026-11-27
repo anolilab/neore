@@ -1,7 +1,8 @@
 # TASKS — AGENT NOTES
 
 The rules for working in `backend/lunora/tasks/`: agent-run tasks with a verifier, their repair rounds, and
-recurring tasks. State machine and idempotency are explained at the top of `internal.ts`.
+recurring tasks. State machine and idempotency are explained at the top of `internal.ts`. The daily schedule
+ideas job (`schedule-ideas*.ts`): read `docs/agents/tasks-schedule-ideas.md` before touching it.
 
 ## RUNNING A ROUND
 
@@ -94,7 +95,5 @@ recurring tasks. State machine and idempotency are explained at the top of `inte
   before the run, and the run passes `contextOptions: { recentMessages: 0 }` (`runHeadlessAgent`'s
   `freshContext`), which also skips the thread summary. Do not use `statelessMode` for this: it skips the order
   bookkeeping.
-- A new run thread is filed in `tasks.projectId` from `onThread`, so a run that fails is filed too. A deleted
-  project leaves the thread unfiled rather than failing the run.
-- `tasks.reasoningEffort` is on the chat's 0-100 scale (the effort slider) and wins over the skill's. A coding-agent
-  task takes none.
+- A new run thread is filed in `tasks.projectId` from `onThread` (so a failed run is filed too); a deleted project leaves it unfiled.
+- `tasks.reasoningEffort` is on the chat's 0-100 scale (the effort slider) and wins over the skill's; a coding-agent task takes none.
