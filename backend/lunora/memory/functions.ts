@@ -1973,8 +1973,24 @@ export const searchMemoriesByKeyword = internalQuery
         }
 
         if (failed.length > 0) {
-            // One term the index refused loses only that term (no query text in the event).
+            // One term the index refused loses only that term. The cause is logged, never the term: it is the user's words.
+            const causes = failed.map(({ reason }) => {
+                return {
+                    ...(reason instanceof LunoraError && { code: reason.code }),
+                    message: reason instanceof Error ? reason.message : String(reason),
+                    name: reason instanceof Error ? reason.name : typeof reason,
+                };
+            });
+
             ctx.log.event("memory.keyword_lookup_failed", { failed: failed.length, terms: settled.length });
+
+            if (failed.length === settled.length) {
+                memoryLogger.error(`Every keyword lookup failed (${String(failed.length)} terms)`, causes);
+            } else {
+                for (const cause of causes) {
+                    memoryLogger.warn("A keyword lookup failed; the other terms still count", cause);
+                }
+            }
         }
 
         return settled.flatMap((result) => (result.status === "fulfilled" ? [result.value] : []));

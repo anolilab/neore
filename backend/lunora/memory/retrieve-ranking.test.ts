@@ -239,6 +239,14 @@ describe("rankMemories", () => {
             expect(rank([phone, other], [], "who has 555-123-4567").map((m) => m.memoryId)).toEqual(["phone"]);
         });
 
+        it("finds every rare identifier the query names past a decisive vector search", () => {
+            const kx = candidate("kx", { ...old, memory: "Router serial KX-2291" });
+            const wtu = candidate("wtu", { ...old, memory: "Bike frame serial WTU-38817" });
+            const lookups = [lookup("kx 2291", 1), lookup("wtu 38817", 1), lookup("serials", 0)];
+
+            expect(ids([kx, wtu], "serials KX-2291 and WTU-38817", lookups).toSorted((a, b) => a.localeCompare(b))).toEqual(["kx", "wtu"]);
+        });
+
         it("finds the held code of two the query names, as its rare term", () => {
             const ab = candidate("ab", { ...old, memory: "Ordered part AB-5508" });
             const searchText = "did I order QZ-5508 or AB-5508";

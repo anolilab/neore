@@ -359,11 +359,11 @@ const computeScore = (memory: RankCandidate, semanticScore: number, now: number)
 export const RARE_TERM_MAX_ROWS = 2;
 
 /**
- * The query's rare term: its first identifier the memory holds, or else the rarest looked-up term (the earlier on a
- * tie), when that term's lookup read every row holding it and at most `RARE_TERM_MAX_ROWS` usable rows of the chat do.
- * An identifier no row holds is never one, so a query naming only such codes has no rare-term match.
+ * The query's rare terms: every identifier it names that the memory holds rarely, or, naming none, the rarest looked-up
+ * word (the earlier on a tie). Rare means the term's lookup read every row holding it and at most `RARE_TERM_MAX_ROWS`
+ * usable rows of the chat do. An identifier no row holds is never one.
  */
-const rareTermOf = (terms: SalientTerm[], corpus: ReadonlyMap<string, { complete: boolean; corpusRows: number }>): string | undefined => {
+const rareTermsOf = (terms: SalientTerm[], corpus: ReadonlyMap<string, { complete: boolean; corpusRows: number }>): string[] => {
     const rareRows = (term: string): number | undefined => {
         const lookup = corpus.get(term);
 
@@ -371,9 +371,9 @@ const rareTermOf = (terms: SalientTerm[], corpus: ReadonlyMap<string, { complete
     };
     const codes = terms.filter(({ code }) => code);
 
-    // A query naming identifiers looks only at them: the first one the memory holds that rarely, or none at all.
+    // A query naming identifiers looks only at them, each one it names ("serials KX-2291 and WTU-38817").
     if (codes.length > 0) {
-        return codes.find(({ term }) => rareRows(term) !== undefined)?.term;
+        return codes.filter(({ term }) => rareRows(term) !== undefined).map(({ term }) => term);
     }
 
     let rarest: { held: number; term: string } | undefined;
@@ -386,7 +386,7 @@ const rareTermOf = (terms: SalientTerm[], corpus: ReadonlyMap<string, { complete
         }
     }
 
-    return rarest?.term;
+    return rarest === undefined ? [] : [rarest.term];
 };
 
 /** Terms a row must share with a query that names an identifier the memory does not hold. */
@@ -430,7 +430,7 @@ export interface KeywordSignals {
  * - An identifier the memory does not hold (`QZ-5508`, `COVID-19`) counts in the denominator at the IDF of a term no row
  *   holds, the highest: a row that shares only common words with such a query keeps a smaller share, and one sharing
  *   several of them can still clear the floor.
- * - The rare term (`rareTermOf`) is never an absent identifier. A rare-term match holds it, and, for a word, the
+ * - A rare term (`rareTermsOf`) is never an absent identifier. A rare-term match holds one, and, for a word, the
  *   leading term too, so a row sharing only one ordinary word with the query is not one.
  */
 export const keywordSignalsFor = (
@@ -484,9 +484,9 @@ export const keywordSignalsFor = (
         dropOneWordMatches(keywordScores, terms, termHits);
     }
 
-    const rareTerm = leading.code || inMemory(leading.term, leadingHits.length) ? rareTermOf(terms, corpus) : undefined;
+    const rareTerms = new Set(leading.code || inMemory(leading.term, leadingHits.length) ? rareTermsOf(terms, corpus) : []);
     const leadingIds = new Set(leadingHits.map((hit) => hit.id));
-    const rareHits = termHits.find(({ term }) => term === rareTerm)?.hits ?? [];
+    const rareHits = termHits.filter(({ term }) => rareTerms.has(term)).flatMap(({ hits }) => hits);
 
     for (const hit of rareHits) {
         // An identifier is distinctive on its own; a rare word needs the query's leading word beside it.
