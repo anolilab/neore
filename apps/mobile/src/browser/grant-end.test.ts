@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { drainMicrotasks } from "@/lib/drain-microtasks";
+
 import { readUntilAnswered, REREAD_RETRIES, REREAD_RETRY_MS, watchGrantEnd } from "./grant-end";
 
 const setup = (endsAt: number, rereadAt?: number) => {
@@ -75,21 +77,25 @@ describe(readUntilAnswered, () => {
             read,
         });
 
-        await vi.waitFor(() => expect(waits).toHaveLength(1));
+        await drainMicrotasks();
+
+        expect(waits).toHaveLength(1);
         expect(waits[0]?.ms).toBe(REREAD_RETRY_MS);
 
         clock.at = 6000;
         waits[0]?.run();
-        await vi.waitFor(() => expect(onAnswer).toHaveBeenCalledWith("renewed", 6000));
+        await drainMicrotasks();
+        expect(onAnswer).toHaveBeenCalledWith("renewed", 6000);
     });
 
-    it("gives up after its retries, and answers nothing once cancelled", async () => {
+    it("gives up after its retries", async () => {
         const waits: (() => void)[] = [];
         const read = vi.fn(async () => {
             throw new Error("down");
         });
         const onAnswer = vi.fn();
-        const stop = readUntilAnswered({
+
+        readUntilAnswered({
             after: (_ms, run) => {
                 waits.push(run);
 
@@ -104,17 +110,31 @@ describe(readUntilAnswered, () => {
                 return;
             }
 
-            await vi.waitFor(() => expect(waits).toHaveLength(index + 1));
+            await drainMicrotasks();
+
+            expect(waits).toHaveLength(index + 1);
             waits[index]?.();
             await retry(index + 1);
         };
 
         await retry(0);
 
-        await vi.waitFor(() => expect(read).toHaveBeenCalledTimes(REREAD_RETRIES + 1));
+        await drainMicrotasks();
+
+        // Every failure has settled: no retry is armed past the limit, and nothing answered.
+        expect(read).toHaveBeenCalledTimes(REREAD_RETRIES + 1);
         expect(waits).toHaveLength(REREAD_RETRIES);
+        expect(onAnswer).not.toHaveBeenCalled();
+    });
+
+    it("answers nothing once cancelled, even for a read that succeeds after", async () => {
+        const late = Promise.withResolvers<string>();
+        const onAnswer = vi.fn();
+        const stop = readUntilAnswered({ onAnswer, read: async () => await late.promise });
 
         stop();
+        late.resolve("renewed");
+        await drainMicrotasks();
         expect(onAnswer).not.toHaveBeenCalled();
     });
 });

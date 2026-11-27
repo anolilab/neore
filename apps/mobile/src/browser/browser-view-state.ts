@@ -10,26 +10,34 @@ export type ViewState
         | { kind: "ended"; message: string }
     /** Another person drives the browser: no one else sees the page meanwhile. */
         | { kind: "hidden"; message: string }
+    /** The first status read failed (not a refusal): nothing is known yet, and the person may try again. */
+        | { kind: "failed"; message: string }
         | { canControl: boolean; currentUrl?: string; kind: "ready" };
 
 export const NO_BROWSER = "No browser is open in this chat. It opens when the agent browses a page; ask it to open one first.";
 export const NOT_READABLE = "This chat's browser cannot be shown. The chat may be locked, or no longer shared with you.";
 export const CONTROLLED_BY_OTHER = "Someone else is controlling this browser. The page is hidden until they hand it back.";
 export const BROWSER_CLOSED = "The browser has closed.";
+export const LOAD_FAILED = "The browser could not be loaded. Try again in a moment.";
 
 /**
  * `isExpired`: the grant this status was read under has ended (its `accessUntil` passed). A live status is re-run only
  * by a write, not by the clock, so the screen stops showing it then, as every later answer would be a denial.
  * `closedBrowserId`: a browser a frame read found gone while the status still says it runs (the provider lost it before
- * the row knew): that browser is shown as closed until the status names another.
+ * the row knew): that browser is shown as closed until the status names another. `isLoadFailed`: the status could not
+ * be read (not a refusal); it says so only while no status was ever read, and a later failure leaves the page shown.
  */
-export const viewStateOf = (status: BrowserStatus | undefined, error: string | undefined, isExpired = false, closedBrowserId?: string): ViewState => {
+export const viewStateOf = (
+    status: BrowserStatus | undefined,
+    error: string | undefined,
+    { closedBrowserId, isExpired = false, isLoadFailed = false }: { closedBrowserId?: string; isExpired?: boolean; isLoadFailed?: boolean } = {},
+): ViewState => {
     if (error !== undefined || isExpired) {
         return { kind: "ended", message: NOT_READABLE };
     }
 
     if (status === undefined) {
-        return { kind: "connecting" };
+        return isLoadFailed ? { kind: "failed", message: LOAD_FAILED } : { kind: "connecting" };
     }
 
     if (status.kind === "denied") {

@@ -45,16 +45,21 @@ const HeldControls = ({ isBlocked, onOpened, session }: { isBlocked: boolean; on
             return;
         }
 
+        const startedWith = session.state();
+        const claim = startedWith.kind === "holding" ? startedWith.claim : undefined;
+
         setIsOpening(true);
         setOpenError(undefined);
         await withFinally(
             async () => {
                 const refused = await session.navigate(address.trim());
+                const now = session.state();
 
                 setOpenError(refused);
                 onOpened();
 
-                if (refused !== undefined) {
+                // Only while this panel still holds the same claim: one handed back or left meanwhile announces nothing.
+                if (refused !== undefined && now.kind === "holding" && now.claim === claim) {
                     AccessibilityInfo.announceForAccessibility(refused);
                 }
             },
@@ -80,7 +85,13 @@ const HeldControls = ({ isBlocked, onOpened, session }: { isBlocked: boolean; on
                 <Text style={{ color: "#fff" }}>{isOpening ? "Opening..." : "Open address"}</Text>
             </Pressable>
             {openError === undefined ? null : <Text accessibilityRole="alert">{openError}</Text>}
-            <Pressable accessibilityRole="button" onPress={() => session.release("handed_back")} style={{ ...BUTTON, backgroundColor: "#555" }}>
+            <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ disabled: isBlocked }}
+                disabled={isBlocked}
+                onPress={() => session.release("handed_back")}
+                style={{ ...BUTTON, backgroundColor: "#555" }}
+            >
                 <Text style={{ color: "#fff" }}>Hand back to the agent</Text>
             </Pressable>
         </>
@@ -116,9 +127,9 @@ const ControlPanel = ({ control, onOpened, session }: { control: ControlState; o
 };
 
 const BrowserScreen = ({ threadId, userId }: { threadId: string; userId: string }) => {
-    const { control, frame, frameNote, refresh, session, view } = useBrowserView(threadId, userId);
+    const { control, frame, frameNote, refresh, retry, session, view } = useBrowserView(threadId, userId);
     const isReady = view.kind === "ready";
-    const message = view.kind === "ended" || view.kind === "hidden" ? view.message : undefined;
+    const message = view.kind === "connecting" || view.kind === "ready" ? undefined : view.message;
 
     return (
         <View style={{ flex: 1 }}>
@@ -126,6 +137,13 @@ const BrowserScreen = ({ threadId, userId }: { threadId: string; userId: string 
             <ScrollView contentContainerStyle={{ gap: 12, padding: 16 }}>
                 {view.kind === "connecting" ? <Text accessibilityRole="progressbar">Connecting to the browser...</Text> : null}
                 {message === undefined ? null : <Text accessibilityRole="text">{message}</Text>}
+                {view.kind === "failed"
+                    ? (
+                        <Pressable accessibilityRole="button" onPress={retry} style={BUTTON}>
+                            <Text style={{ color: "#fff" }}>Try again</Text>
+                        </Pressable>
+                    )
+                    : null}
                 {isReady && view.currentUrl !== undefined
                     ? (
                         <Text numberOfLines={1} selectable style={{ color: "#555" }}>

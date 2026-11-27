@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { drainMicrotasks } from "@/lib/drain-microtasks";
+
 import type { BrowserStatus } from "./browser-api";
 import { watchBrowserLink } from "./browser-link-watch";
 import { GRANT_END_MARGIN_MS } from "./browser-view-state";
@@ -63,7 +65,8 @@ describe(watchBrowserLink, () => {
         // At the real end the status is read once: the grant was renewed, so the link comes back.
         advanceTo(60_000);
         expect(read).toHaveBeenCalledTimes(1);
-        await vi.waitFor(() => expect(shown).toStrictEqual([true, false, true]));
+        await drainMicrotasks();
+        expect(shown).toStrictEqual([true, false, true]);
     });
 
     it("hides the owner's link when the browser goes idle with no new status, and shows it again if it was kept alive", async () => {
@@ -85,7 +88,8 @@ describe(watchBrowserLink, () => {
 
         advanceTo(100_000 + GRANT_END_MARGIN_MS);
         expect(read).toHaveBeenCalledTimes(1);
-        await vi.waitFor(() => expect(shown).toStrictEqual([true, false, true]));
+        await drainMicrotasks();
+        expect(shown).toStrictEqual([true, false, true]);
     });
 
     it("keeps the owner's link while the browser runs, and drops it for a stopped browser or a failed query", () => {

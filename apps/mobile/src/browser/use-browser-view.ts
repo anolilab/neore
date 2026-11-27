@@ -3,10 +3,12 @@ import { useIsFocused } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 
 import { useIsAppActive } from "@/chat/use-app-active";
+import { withCatch } from "@/lib/guarded";
 import { getClient } from "@/lib/lunora";
 import { isNetworkFailure } from "@/offline/connectivity";
 import { isThreadRefusal } from "@/offline/message-read";
 import { useOffline } from "@/offline/offline-context";
+import { settleQuietly } from "@/offline/quietly";
 
 import type { BrowserFrame, BrowserStatus } from "./browser-api";
 import { handBackBrowser, keepBrowserControl, navigateBrowser, readBrowserStatus, readFrame, takeBrowserControl, watchBrowserStatus } from "./browser-api";
@@ -47,11 +49,33 @@ export interface BrowserView {
     frameNote: string | undefined;
     /** Reads a frame now: after the person opened a page, which the status does not show. */
     refresh: () => void;
+    /** Reads the status again, after the first read failed. */
+    retry: () => void;
     session: ControlSession;
     view: ViewState;
 }
 
 const NOT_SHOWN = "The page could not be shown right now.";
+
+/**
+ * When each account's last frame read began, kept past any one screen: a screen back in front starts a new reader, and
+ * the reads it may make are counted per account on the server.
+ */
+const lastFrameReads = new Map<string, { at: number }>();
+
+const lastFrameReadOf = (userId: string): { at: number } => {
+    const known = lastFrameReads.get(userId);
+
+    if (known !== undefined) {
+        return known;
+    }
+
+    const fresh = { at: -Infinity };
+
+    lastFrameReads.set(userId, fresh);
+
+    return fresh;
+};
 
 /**
  * The thread's cloud browser on the phone: the live status, a frame read on every agent action and on a timer while the
@@ -67,6 +91,8 @@ export const useBrowserView = (threadId: string, userId: string): BrowserView =>
     const [expiredAnswer, setExpiredAnswer] = useState<BrowserStatus | undefined>(undefined);
     const [frame, setFrame] = useState<ShownFrame | undefined>(undefined);
     const [frameNote, setFrameNote] = useState<string | undefined>(undefined);
+    /** The status could not be read (not a refusal): shown only while no status was ever read. */
+    const [isLoadFailed, setIsLoadFailed] = useState(false);
     /** A browser a frame read found gone while the status still says it runs. */
     const [closedBrowserId, setClosedBrowserId] = useState<string | undefined>(undefined);
     const [control, setControl] = useState<ControlState>({ kind: "idle" });
@@ -100,6 +126,11 @@ export const useBrowserView = (threadId: string, userId: string): BrowserView =>
     /** A status read past the subscription (a grant's end or a renewal pushes nothing to it), tried again on failure. */
     const reread = (): () => void =>
         readUntilAnswered({ onAnswer: (next, startedAt) => accept(next, startedAt), read: async () => await readBrowserStatus(getClient(), threadId) });
+    /** The chat refused this reader: the page goes, and the ended view's effect hands back a lease the phone holds. */
+    const refuse = (message: string): void =>
+        setSeen((current) => {
+            return { ...current, refusal: { at: Date.now(), message } };
+        });
 
     // Only a refusal of the chat hides the page; any other subscription error (a lost connection resumes on its own,
     // a server hiccup) leaves the last page and its "Last synced" time on screen.
@@ -112,9 +143,10 @@ export const useBrowserView = (threadId: string, userId: string): BrowserView =>
                 (failure) => {
                     // As the chat screen reads them: a lapsed sign-in says nothing about the chat, so it hides nothing.
                     if (isThreadRefusal(failure)) {
-                        setSeen((current) => {
-                            return { ...current, refusal: { at: Date.now(), message: failure.message } };
-                        });
+                        refuse(failure.message);
+                    } else {
+                        // Said only while no status was read yet: after one, the last page stays on screen.
+                        setIsLoadFailed(true);
                     }
                 },
             ),
@@ -189,7 +221,7 @@ export const useBrowserView = (threadId: string, userId: string): BrowserView =>
         return next.isDue ? reread() : undefined;
     }, [isExpired, refreshTick, threadId]);
 
-    const view = viewStateOf(status, error, status !== undefined && expiredAnswer === status, closedBrowserId);
+    const view = viewStateOf(status, error, { closedBrowserId, isExpired: status !== undefined && expiredAnswer === status, isLoadFailed });
     const isHolding = control.kind === "holding";
     const browserId = status?.kind === "running" ? status.browserId : undefined;
 
@@ -257,6 +289,7 @@ export const useBrowserView = (threadId: string, userId: string): BrowserView =>
         }
 
         const started = startFrameReader<BrowserFrame>({
+            lastRead: lastFrameReadOf(userId),
             onAnswer: (read) => {
                 reportRead("succeeded");
                 setFrameNote(frameMessage(read));
@@ -284,6 +317,14 @@ export const useBrowserView = (threadId: string, userId: string): BrowserView =>
                     return;
                 }
 
+                // Refused for the chat: the picture goes at once, before the status says so too.
+                if (isThreadRefusal(failure)) {
+                    setFrame(undefined);
+                    refuse(failure instanceof Error ? failure.message : NOT_SHOWN);
+
+                    return;
+                }
+
                 setFrameNote(NOT_SHOWN);
             },
             read: async () => await readFrame(getClient(), threadId),
@@ -295,7 +336,7 @@ export const useBrowserView = (threadId: string, userId: string): BrowserView =>
             started.stop();
             reader.current = undefined;
         };
-    }, [browserId, isReading, reportRead, session, threadId]);
+    }, [browserId, isReading, reportRead, session, threadId, userId]);
 
     const isShown = view.kind === "ready" && frame !== undefined && frame.browserId === browserId;
 
@@ -304,6 +345,20 @@ export const useBrowserView = (threadId: string, userId: string): BrowserView =>
         frame: isShown ? frame : undefined,
         frameNote: view.kind === "ready" ? frameNote : undefined,
         refresh: () => setNudge((count) => count + 1),
+        retry: () => {
+            setIsLoadFailed(false);
+            settleQuietly(async () => {
+                const startedAt = Date.now();
+                const next = await withCatch(async () => await readBrowserStatus(getClient(), threadId), () => undefined);
+
+                // A read that failed again says so again; the person may try once more.
+                if (next === undefined) {
+                    setIsLoadFailed(true);
+                } else {
+                    accept(next, startedAt);
+                }
+            });
+        },
         session,
         view,
     };

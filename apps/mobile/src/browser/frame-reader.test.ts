@@ -1,11 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { drainMicrotasks } from "@/lib/drain-microtasks";
+
 import { FRAME_MIN_GAP_MS, FRAME_REFRESH_MS, startFrameReader } from "./frame-reader";
 
-const setup = () => {
+const setup = (lastRead?: { at: number }) => {
     const clock = { at: 100_000 };
     const ticks: (() => void)[] = [];
-    const waits: { ms: number; run: () => void }[] = [];
+    const waits: { cancel: ReturnType<typeof vi.fn>; ms: number; run: () => void }[] = [];
     const cancel = vi.fn();
     const pending: { reject: (error: unknown) => void; resolve: (value: string) => void }[] = [];
     const read = vi.fn(
@@ -18,9 +20,11 @@ const setup = () => {
     const onFailure = vi.fn();
     const reader = startFrameReader({
         after: (ms, run) => {
-            waits.push({ ms, run });
+            const wait = { cancel: vi.fn(), ms, run };
 
-            return () => {};
+            waits.push(wait);
+
+            return wait.cancel;
         },
         every: (ms, run) => {
             expect(ms).toBe(FRAME_REFRESH_MS);
@@ -28,6 +32,7 @@ const setup = () => {
 
             return cancel;
         },
+        lastRead,
         now: () => clock.at,
         onAnswer,
         onFailure,
@@ -43,7 +48,8 @@ describe(startFrameReader, () => {
 
         expect(read).toHaveBeenCalledTimes(1);
         pending[0]?.resolve("first");
-        await vi.waitFor(() => expect(onAnswer).toHaveBeenCalledWith("first"));
+        await drainMicrotasks();
+        expect(onAnswer).toHaveBeenCalledWith("first");
 
         clock.at += FRAME_REFRESH_MS;
         tick();
@@ -61,7 +67,8 @@ describe(startFrameReader, () => {
         expect(read).toHaveBeenCalledTimes(1);
 
         pending[0]?.resolve("slow");
-        await vi.waitFor(() => expect(onAnswer).toHaveBeenCalledWith("slow"));
+        await drainMicrotasks();
+        expect(onAnswer).toHaveBeenCalledWith("slow");
 
         clock.at += FRAME_REFRESH_MS;
         tick();
@@ -77,7 +84,8 @@ describe(startFrameReader, () => {
 
         clock.at += FRAME_MIN_GAP_MS;
         pending[0]?.resolve("first");
-        await vi.waitFor(() => expect(read).toHaveBeenCalledTimes(2));
+        await drainMicrotasks();
+        expect(read).toHaveBeenCalledTimes(2);
         // The read out was not thrown away for the newer one.
         expect(onAnswer).toHaveBeenCalledWith("first");
     });
@@ -86,24 +94,45 @@ describe(startFrameReader, () => {
         const { clock, pending, read, reader, waits } = setup();
 
         pending[0]?.resolve("first");
-        await vi.waitFor(() => expect(read).toHaveBeenCalledTimes(1));
-        await Promise.resolve();
+        await drainMicrotasks();
 
         clock.at += 1000;
         reader.request();
         expect(read).toHaveBeenCalledTimes(1);
         expect(waits[0]?.ms).toBe(FRAME_MIN_GAP_MS - 1000);
 
+        clock.at += FRAME_MIN_GAP_MS - 1000;
         waits[0]?.run();
         expect(read).toHaveBeenCalledTimes(2);
     });
 
-    it("drops a read that answers or fails after the reader stopped, and hands a failure to its handler otherwise", async () => {
+    it("checks the gap again when its timer fires, and drops an armed timer once a read starts", async () => {
+        const { clock, pending, read, reader, waits } = setup();
+
+        pending[0]?.resolve("first");
+        await drainMicrotasks();
+
+        clock.at += 1000;
+        reader.request();
+
+        // A timer that fires early still finds the gap open: it waits again, and reads nothing yet.
+        waits[0]?.run();
+        expect(read).toHaveBeenCalledTimes(1);
+        expect(waits[1]?.ms).toBe(FRAME_MIN_GAP_MS - 1000);
+
+        // Past the gap, a request reads at once, and the timer still armed is dropped: it cannot start a second read.
+        clock.at += FRAME_MIN_GAP_MS;
+        reader.request();
+        expect(read).toHaveBeenCalledTimes(2);
+        expect(waits[1]?.cancel).toHaveBeenCalled();
+    });
+
+    it("drops a read that fails after the reader stopped, and hands a failure to its handler otherwise", async () => {
         const first = setup();
 
         first.reader.stop();
         first.pending[0]?.reject(new Error("late"));
-        await Promise.resolve();
+        await drainMicrotasks();
         expect(first.onAnswer).not.toHaveBeenCalled();
         expect(first.onFailure).not.toHaveBeenCalled();
 
@@ -111,19 +140,42 @@ describe(startFrameReader, () => {
         const error = new TypeError("Network request failed");
 
         second.pending[0]?.reject(error);
-        await vi.waitFor(() => expect(second.onFailure).toHaveBeenCalledWith(error));
+        await drainMicrotasks();
+        expect(second.onFailure).toHaveBeenCalledWith(error);
+    });
+
+    it("drops a read that answers after the reader stopped", async () => {
+        const { onAnswer, pending, reader } = setup();
+
+        reader.stop();
+        pending[0]?.resolve("late");
+        await drainMicrotasks();
+        expect(onAnswer).not.toHaveBeenCalled();
     });
 
     it("holds the gap for the timer too: a tick just after a read waits", async () => {
         const { clock, pending, read, tick, waits } = setup();
 
         pending[0]?.resolve("first");
-        await vi.waitFor(() => expect(read).toHaveBeenCalledTimes(1));
-        await Promise.resolve();
+        await drainMicrotasks();
 
         clock.at += 1000;
         tick();
         expect(read).toHaveBeenCalledTimes(1);
         expect(waits.at(-1)?.ms).toBe(FRAME_MIN_GAP_MS - 1000);
+    });
+
+    it("holds the gap across readers: one started just after another's read waits it out, and shares its read time", () => {
+        const lastRead = { at: 100_000 - 1000 };
+        const { clock, read, waits } = setup(lastRead);
+
+        // The screen came back to the front a second after the last reader read: no read yet.
+        expect(read).not.toHaveBeenCalled();
+        expect(waits[0]?.ms).toBe(FRAME_MIN_GAP_MS - 1000);
+
+        clock.at += FRAME_MIN_GAP_MS - 1000;
+        waits[0]?.run();
+        expect(read).toHaveBeenCalledTimes(1);
+        expect(lastRead.at).toBe(clock.at);
     });
 });

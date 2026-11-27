@@ -13,6 +13,7 @@ import {
     isOlderStatus,
     isRateLimited,
     isReadDue,
+    LOAD_FAILED,
     NO_BROWSER,
     NOT_READABLE,
     otherLeaseEndOnDevice,
@@ -28,6 +29,9 @@ const running = (fields: Partial<Extract<BrowserStatus, { kind: "running" }>> = 
 describe(viewStateOf, () => {
     it("shows each state on its own: connecting, ready, no browser, not readable, someone else in control", () => {
         expect(viewStateOf(undefined, undefined)).toStrictEqual({ kind: "connecting" });
+        expect(viewStateOf(undefined, undefined, { isLoadFailed: true })).toStrictEqual({ kind: "failed", message: LOAD_FAILED });
+        // A failure after a status was read leaves the page shown.
+        expect(viewStateOf(running(), undefined, { isLoadFailed: true }).kind).toBe("ready");
         expect(viewStateOf(running(), undefined)).toStrictEqual({ canControl: true, currentUrl: "https://example.com", kind: "ready" });
         expect(viewStateOf({ kind: "none", now: 1 }, undefined)).toStrictEqual({ kind: "ended", message: NO_BROWSER });
         expect(viewStateOf({ kind: "denied", now: 1 }, undefined)).toStrictEqual({ kind: "ended", message: NOT_READABLE });
@@ -36,8 +40,8 @@ describe(viewStateOf, () => {
     });
 
     it("shows a browser a frame read found gone as closed, until the status names another", () => {
-        expect(viewStateOf(running(), undefined, false, "b-1")).toStrictEqual({ kind: "ended", message: BROWSER_CLOSED });
-        expect(viewStateOf(running({ browserId: "b-2" }), undefined, false, "b-1").kind).toBe("ready");
+        expect(viewStateOf(running(), undefined, { closedBrowserId: "b-1" })).toStrictEqual({ kind: "ended", message: BROWSER_CLOSED });
+        expect(viewStateOf(running({ browserId: "b-2" }), undefined, { closedBrowserId: "b-1" }).kind).toBe("ready");
     });
 
     it("shows the page again once another person's lease ran out on the server's clock, and to the person who holds it", () => {
@@ -89,7 +93,7 @@ describe("a grantee's answers", () => {
         // Early by the margin: the answer's way here must not keep the page up past the end.
         expect(grantEndOnDevice(status, 5000)).toBe(5060 - GRANT_END_MARGIN_MS);
         expect(grantEndOnDevice(running(), 5000)).toBeUndefined();
-        expect(viewStateOf(status, undefined, true)).toStrictEqual({ kind: "ended", message: NOT_READABLE });
+        expect(viewStateOf(status, undefined, { isExpired: true })).toStrictEqual({ kind: "ended", message: NOT_READABLE });
     });
 
     it("never lets an older grant's answer replace a newer denial", () => {

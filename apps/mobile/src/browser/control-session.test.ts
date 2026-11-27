@@ -1,6 +1,8 @@
 import { CONTROL_KEEP_INTERVAL_MS, CONTROL_LEASE_MS } from "@neore/client-runtime";
 import { describe, expect, it, vi } from "vitest";
 
+import { drainMicrotasks } from "@/lib/drain-microtasks";
+
 import type { ControlApi, ControlState } from "./control-session";
 import { CONTROL_ELSEWHERE, CONTROL_ENDED, CONTROL_OFFLINE, createControlSession, forgetClaim, rememberClaim, rememberedClaim } from "./control-session";
 
@@ -46,7 +48,8 @@ describe(createControlSession, () => {
         expect(session.state()).toStrictEqual({ claim: "c-1", claimId: "id-1", kind: "holding", until: OK.until });
 
         tick();
-        await vi.waitFor(() => expect(session.state()).toMatchObject({ until: NOW + 2 * CONTROL_LEASE_MS }));
+        await drainMicrotasks();
+        expect(session.state()).toMatchObject({ until: NOW + 2 * CONTROL_LEASE_MS });
         expect(api.keep).toHaveBeenCalledWith("c-1");
 
         await expect(session.navigate("https://example.com")).resolves.toBeUndefined();
@@ -97,7 +100,8 @@ describe(createControlSession, () => {
         await taking;
 
         expect(onClaim).toHaveBeenCalledWith("c-1");
-        await vi.waitFor(() => expect(api.handBack).toHaveBeenCalledWith("c-1", "left"));
+        await drainMicrotasks();
+        expect(api.handBack).toHaveBeenCalledWith("c-1", "left");
         expect(onReleased).not.toHaveBeenCalled();
     });
 
@@ -120,7 +124,9 @@ describe(createControlSession, () => {
         await session.take();
         tick();
 
-        await vi.waitFor(() => expect(session.state()).toStrictEqual({ kind: "idle", message: CONTROL_ENDED }));
+        await drainMicrotasks();
+
+        expect(session.state()).toStrictEqual({ kind: "idle", message: CONTROL_ENDED });
     });
 
     it("stops at once when another of the person's views took the lease, but not on a status from before its claim", async () => {
@@ -169,7 +175,8 @@ describe(createControlSession, () => {
         expect(onClaim).toHaveBeenLastCalledWith("c-1");
 
         session.release("handed_back");
-        await vi.waitFor(() => expect(onReleased).toHaveBeenCalledWith("c-1"));
+        await drainMicrotasks();
+        expect(onReleased).toHaveBeenCalledWith("c-1");
     });
 
     it("keeps the claim per account and thread across screens until it is handed back", () => {
@@ -241,7 +248,7 @@ describe(createControlSession, () => {
 
         const second = session.take();
 
-        await Promise.resolve();
+        await drainMicrotasks();
         // The hand back is still out: nothing is asked for that it could end.
         expect(take).toHaveBeenCalledTimes(1);
 
@@ -273,11 +280,55 @@ describe(createControlSession, () => {
         tick();
 
         expect(keep).toHaveBeenLastCalledWith("c-2");
-        await vi.waitFor(() => expect(session.state()).toMatchObject({ claim: "c-2", until: NOW + 2 * CONTROL_LEASE_MS }));
+        await drainMicrotasks();
+        expect(session.state()).toMatchObject({ claim: "c-2", until: NOW + 2 * CONTROL_LEASE_MS });
 
         // The old renewal answering late changes nothing for the new claim.
         stale.resolve({ until: NOW + 9 * CONTROL_LEASE_MS });
-        await vi.waitFor(() => expect(session.state()).toMatchObject({ claim: "c-2", until: NOW + 2 * CONTROL_LEASE_MS }));
+        await drainMicrotasks();
+        expect(session.state()).toMatchObject({ claim: "c-2", until: NOW + 2 * CONTROL_LEASE_MS });
+    });
+
+    it("times the lease from when the take was sent, and holds nothing for an answer that came after it ran out", async () => {
+        const clock = { at: NOW };
+        const ticks: (() => void)[] = [];
+        const handBack = vi.fn(async () => true);
+        const take = vi.fn(async () => {
+            clock.at += 90_000;
+
+            return OK;
+        });
+        const make = () =>
+            createControlSession({
+                api: { handBack, keep: vi.fn(async () => null), navigate: vi.fn(), take },
+                deviceNow: () => clock.at,
+                every: (_ms, run) => {
+                    ticks.push(run);
+
+                    return () => {};
+                },
+                onChange: () => {},
+            });
+        const slow = make();
+
+        // Answered 90 s after it was sent: the lease ends 120 s after the send, not 120 s after the answer.
+        await slow.take();
+        expect(slow.state().kind).toBe("holding");
+        clock.at = NOW + CONTROL_LEASE_MS;
+        ticks.at(-1)?.();
+        expect(slow.state()).toStrictEqual({ kind: "idle", message: CONTROL_ENDED });
+
+        take.mockImplementationOnce(async () => {
+            clock.at += CONTROL_LEASE_MS;
+
+            return { ...OK, claim: "c-late" };
+        });
+
+        const late = make();
+
+        await late.take();
+        expect(late.state()).toStrictEqual({ kind: "idle", message: CONTROL_ENDED });
+        expect(handBack).toHaveBeenCalledWith("c-late", "left");
     });
 
     it("counts a page that loaded as a renewal, from when it was asked for", async () => {
@@ -355,7 +406,7 @@ describe(createControlSession, () => {
 
         const retaking = session.take();
 
-        await Promise.resolve();
+        await drainMicrotasks();
         expect(take).toHaveBeenCalledTimes(1);
 
         handBack.resolve(true);
@@ -411,7 +462,9 @@ describe(createControlSession, () => {
         });
         const abandoned = session.take();
 
-        await vi.waitFor(() => expect(take).toHaveBeenCalledTimes(1));
+        await drainMicrotasks();
+
+        expect(take).toHaveBeenCalledTimes(1);
         session.release("left");
         await session.take();
         first.resolve(OK);
@@ -453,7 +506,8 @@ describe(createControlSession, () => {
         // The answer is slow: the lease still ends a whole lease after the renewal was SENT.
         clock.at = NOW + 60_000;
         answer.resolve({ until: NOW + 150_000 });
-        await vi.waitFor(() => expect(session.state()).toMatchObject({ until: NOW + 150_000 }));
+        await drainMicrotasks();
+        expect(session.state()).toMatchObject({ until: NOW + 150_000 });
 
         clock.at = NOW + 30_000 + CONTROL_LEASE_MS;
         ticks[0]?.();

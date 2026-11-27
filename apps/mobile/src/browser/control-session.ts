@@ -276,6 +276,8 @@ export const createControlSession = ({
                 }
             }
 
+            // The server starts the lease while this is out: the phone times it from the send, never from the answer.
+            const sentAt = deviceNow();
             const answer = await withCatch(async () => await api.take(lastClaim), () => undefined);
 
             if (mine !== attempt) {
@@ -311,8 +313,17 @@ export const createControlSession = ({
 
             lastClaim = answer.claim;
             onClaim(answer.claim);
+            endsAt = sentAt + CONTROL_LEASE_MS;
+
+            // An answer so late that the lease it gave may have run out holds nothing: the claim goes back.
+            if (deviceNow() >= endsAt) {
+                set({ kind: "idle", message: CONTROL_ENDED });
+                handBack(answer.claim, "left");
+
+                return;
+            }
+
             set({ claim: answer.claim, claimId: answer.claimId, kind: "holding", until: answer.until });
-            endsAt = deviceNow() + CONTROL_LEASE_MS;
             stopKeeping = every(CONTROL_KEEP_INTERVAL_MS, () => {
                 if (state.kind !== "holding") {
                     return;
