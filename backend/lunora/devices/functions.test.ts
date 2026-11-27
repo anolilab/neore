@@ -1733,6 +1733,21 @@ describe("the pending device alert sweep", () => {
         expect(await alertsOf(owner)).toHaveLength(1);
     });
 
+    it("tells the owner of a signed-in device revoked before its announcement, and not of one cancelled before it signed in", async () => {
+        const owner = await insertUser();
+        const signedIn = await register(owner);
+
+        await as(owner).mutation(functions.heartbeatDevice as never, { deviceId: signedIn.deviceId } as never);
+        const cancelled = (await as(owner).mutation(functions.registerDevice as never, { name: "Phone", platform: "linux" } as never)) as { deviceId: string };
+
+        await as(owner).mutation(functions.revokeDevice as never, { deviceId: signedIn.deviceId } as never);
+        await as(owner).mutation(functions.revokeDevice as never, { deviceId: cancelled.deviceId } as never);
+
+        const alerts = await alertsOf(owner);
+
+        expect(alerts.map((alert) => alert.title)).toEqual(["Laptop"]);
+    });
+
     it("does not tell the owner of a pairing that never signed in, as one cancelled on the computer", async () => {
         const owner = await insertUser();
 
