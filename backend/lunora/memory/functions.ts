@@ -42,6 +42,7 @@ import { findLiveGrant, threadSharedWithOthers } from "../agent/live-grant";
 import { messageCarriesGuestText, promptCannotBeQuoted } from "../chat/lib/attached-text";
 import type { typedTextOf } from "../chat/lib/attached-text";
 import { GOAL_CONTINUATION_AGENT } from "../chat/goals/shared";
+import { isTypedChatKind } from "../chat/lib/typed-chat-kind";
 
 /**
  * Whether the user turned memory on. OPT-IN: absent means off. Memory extraction reads every
@@ -89,8 +90,8 @@ const isFreshPrompt = (rows: ReadonlyArray<{ replyId?: string; status: string }>
  * before the extractor runs and again inside every write of the request (`saveMemoryBatch`, `reviseExtractedMemory`,
  * `confirmMemories`), so a chat shared, locked or switched off, or a prompt answered by another run, meanwhile writes nothing.
  * The chat must be the owner's alone: not shared (an expired grant does not count), public, a group, a messenger
- * conversation, temporary, locked or being deleted, nor a sub-agent's or worker's thread, which carries none of its
- * parent's privacy state. The prompt must be the owner's own typed, fresh words.
+ * conversation, temporary, locked or being deleted, nor a chat an agent runs in (a sub-agent's or worker's, which carries
+ * none of its parent's privacy state, a task's, a trigger's). The prompt must be the owner's own typed, fresh words.
  */
 export const checkRequestedSource = async (
     ctx: Pick<QueryCtx, "db">,
@@ -102,10 +103,6 @@ export const checkRequestedSource = async (
     }
 
     const thread = await ctx.db.get("threads", source.threadId);
-    const childRun = await ctx.db
-        .query("subAgentRuns")
-        .withIndex("by_childThreadId", (q) => q.eq("childThreadId", source.threadId as string))
-        .first();
 
     if (
         !thread ||
@@ -118,7 +115,8 @@ export const checkRequestedSource = async (
         thread.externalThreadId !== undefined ||
         thread.messengerConnectionId !== undefined ||
         isThreadLocked(thread) ||
-        childRun !== null ||
+        // A tagged chat must be one a person types into (`isTypedChatKind`): a sub-agent's, worker's, task's, trigger's or eval's is not.
+        ((thread.tags ?? []).length > 0 && !isTypedChatKind(thread)) ||
         (await threadSharedWithOthers(ctx, source.threadId, source.userId, now))
     ) {
         return { refused: "not_private" };

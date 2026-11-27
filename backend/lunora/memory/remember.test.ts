@@ -88,7 +88,8 @@ const setUp = async (setup: Setup = {}) =>
         const botId = setup.botId
             ? await ctx.db.insert("bots", { computerEnabled: false, instructions: "", model: "m", name: "Chef", userId: USER })
             : undefined;
-        const threadId = await ctx.db.insert("threads", { botId, status: "active", userId: USER, ...setup.thread });
+        const tags = setup.subAgentChild ? ["sub-agent"] : ["chat"];
+        const threadId = await ctx.db.insert("threads", { botId, status: "active", tags, userId: USER, ...setup.thread });
         const content = setup.prompt ?? ASK;
         // The row's text is the message as sent, attachments included.
         const text = typeof content === "string" ? content : (content as { text: string }[]).map((part) => part.text).join("\n\n");
@@ -116,19 +117,6 @@ const setUp = async (setup: Setup = {}) =>
                 threadId,
                 tool: false,
                 ...row,
-            });
-        }
-
-        if (setup.subAgentChild) {
-            await ctx.db.insert("subAgentRuns", {
-                childThreadId: threadId,
-                createdAt: 0,
-                depth: 1,
-                parentThreadId: "parent",
-                status: "running",
-                task: "t",
-                updatedAt: 0,
-                userId: USER,
             });
         }
 
@@ -280,6 +268,7 @@ describe(rememberFactFor, () => {
         ["a temporary chat", { thread: { isTemporary: true } }, "not_private"],
         ["a locked chat", { thread: { lockedAt: 1 } }, "not_private"],
         ["a sub-agent's or worker's thread", { subAgentChild: true as const }, "not_private"],
+        ["a task's thread", { thread: { tags: ["task"] } }, "not_private"],
         ["a row that is not the user's prompt", { promptRow: { message: { content: ASK, role: "assistant" } } }, "not_your_words"],
         // A regenerate, or a prompt a task or sub-agent wrote: its earlier reply belongs to another run.
         ["a prompt another run answered first", { replies: [{ replyId: undefined }] }, "not_your_words"],
