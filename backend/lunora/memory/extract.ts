@@ -329,6 +329,21 @@ export const extractMemories = internalAction
             return;
         }
 
+        // An empty quotable prompt (an outside-agent prompt, a collaborator's one the user regenerated) with no typed steer
+        // left leaves nothing to quote: `factEvidence` would drop every fact, so the gate, the classifier and the model are
+        // not run for it. A typed steer keeps the turn going.
+        if (args.quotablePrompt.trim() === "" && read.steeredFrom === undefined) {
+            ctx.log.event(GATE_EVENT, {
+                reason: "no_quotable_text",
+                threadId: args.threadId,
+                userId: args.userId,
+                userMessageLength: args.userMessage.length,
+                verdict: "skip",
+            });
+
+            return;
+        }
+
         // 0. Gate: privacy opt-out, heuristics, settings, temporary chat, dedup,
         //    and — only when unsure — a cheap classifier.
         const gate = await runExtractionGate(ctx, readArgs);

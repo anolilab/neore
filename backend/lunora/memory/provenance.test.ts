@@ -272,13 +272,58 @@ describe("evidence gate", () => {
         ).toStrictEqual([]);
     });
 
-    it("keeps nothing from a prompt that is not the user's own words, which carries an empty quotable text", async () => {
+    it("keeps nothing from a prompt that is not the user's own words, and never asks the model", async () => {
         expect.assertions(2);
 
-        // An outside agent's, or a collaborator's, prompt: the words are real, but they are not the user's.
-        expect(
-            await run({ facts: [fact("The user is a nurse in Hamburg", "I work as a nurse in Hamburg")], quotablePrompt: "", userMessage: MESSAGE }),
-        ).toStrictEqual([]);
+        // An outside agent's, or a collaborator's, prompt: the words are real, but they are not the user's. With no typed
+        // steer either, nothing can be quoted, so the turn stops before the gate and the model.
+        generateText.mockResolvedValue({
+            output: { facts: [fact("The user is a nurse in Hamburg", "I work as a nurse in Hamburg")] },
+        });
+
+        await harness.action(
+            async (ctx: any) =>
+                await ctx.runAction(extractMemories, {
+                    assistantResponse: "Noted.",
+                    promptMessageId: "message-1",
+                    quotablePrompt: "",
+                    threadId,
+                    userId: USER,
+                    userMessage: MESSAGE,
+                }),
+        );
+
+        expect(generateText).not.toHaveBeenCalled();
+        expect(await harness.run(async (ctx: any) => await ctx.db.query("memories").collect())).toStrictEqual([]);
+    });
+
+    it("keeps a fact quoted from a typed steer when the prompt itself carries no quotable text", async () => {
+        expect.assertions(2);
+
+        const steer = "I work as a nurse in Hamburg, please remember that";
+
+        generateText.mockResolvedValue({
+            output: { facts: [fact("The user is a nurse in Hamburg", "I work as a nurse in Hamburg")] },
+        });
+
+        await harness.action(
+            async (ctx: any) =>
+                await ctx.runAction(extractMemories, {
+                    assistantResponse: "Noted.",
+                    quotablePrompt: "",
+                    steeredAt: 200,
+                    steeredFrom: 0,
+                    steers: [{ at: 200, from: 0, messageId: "steer-1" }],
+                    threadId,
+                    userId: USER,
+                    userMessage: steer,
+                }),
+        );
+
+        const rows = await harness.run(async (ctx: any) => await ctx.db.query("memories").collect());
+
+        expect(rows.map((row: any) => row.memory)).toStrictEqual(["The user is a nurse in Hamburg"]);
+        expect(rows[0]?.evidence).toMatchObject({ messageId: "steer-1", quote: "I work as a nurse in Hamburg" });
     });
 
     it("counts what it drops by reason and logs no text", async () => {

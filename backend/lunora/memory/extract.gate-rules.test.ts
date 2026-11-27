@@ -71,6 +71,48 @@ afterEach(() => {
     loadModelFilterRules.mockReset();
 });
 
+describe("extractMemories with an empty quotable prompt", () => {
+    const runWith = async (extra: Record<string, unknown>) =>
+        await harness.action(
+            async (ctx: any) =>
+                await ctx.runAction(extractMemories, {
+                    assistantResponse: "Sure, here is one way.",
+                    quotablePrompt: "",
+                    threadId,
+                    userId: USER,
+                    userMessage: MESSAGE,
+                    ...extra,
+                }),
+        );
+
+    it("runs no gate, classifier or model call when no typed steer is left", async () => {
+        loadModelFilterRules.mockResolvedValue({});
+        generateText.mockResolvedValue({ output: { facts: [], remember: true } });
+
+        await expect(runWith({})).resolves.toBeUndefined();
+
+        expect(loadModelFilterRules).not.toHaveBeenCalled();
+        expect(generateText).not.toHaveBeenCalled();
+
+        const { page } = await harness.run(async (ctx: any) => await ctx.db.actionCache.findMany({}));
+
+        expect(page.filter((row: any) => row.name === "memory.processedExchange")).toHaveLength(0);
+    });
+
+    it("still reads a typed steer: the gate and the model run on its text", async () => {
+        const steer = "Actually I am vegetarian, please remember that about me";
+
+        loadModelFilterRules.mockResolvedValue({});
+        generateText.mockResolvedValue({ output: { facts: [], remember: true } });
+
+        await runWith({ steeredFrom: 0, steers: [{ at: 100, from: 0 }], userMessage: steer });
+
+        expect(loadModelFilterRules).toHaveBeenCalled();
+        expect(generateText).toHaveBeenCalled();
+        expect(generateText.mock.calls.some(([call]) => JSON.stringify(call).includes(steer))).toBe(true);
+    });
+});
+
 describe("extractMemories when the model filter rules cannot be read", () => {
     it("does not crash: the classifier fails open and the extraction skips quietly", async () => {
         loadModelFilterRules.mockRejectedValue(new NoAllowedUtilityModelError());
