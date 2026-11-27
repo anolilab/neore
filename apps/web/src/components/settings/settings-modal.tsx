@@ -168,6 +168,9 @@ const AnonymousUpgradeGate: FC<{ label: string }> = ({ label }) => {
     );
 };
 
+/** The tabs a guest may use but a visitor with no session may not: there is no account behind them to show. */
+const SESSION_TABS: ReadonlyArray<SettingsTab> = ["auth-account", "auth-security"];
+
 export const SettingsModal: FC = () => {
     const { i18n, t } = useLingui();
     const navigate = useNavigate();
@@ -178,7 +181,10 @@ export const SettingsModal: FC = () => {
     const { data: activeOrganization } = useAuthActiveOrganization();
     // A guest, or signed out (the chat is reachable signed out under invite-only), locks the account tabs. A session
     // read still pending or failed is unknown, not signed out, so it locks nothing.
-    const isAnonymous = hasNoAccount(useAuthSession());
+    const session = useAuthSession();
+    const isAnonymous = hasNoAccount(session);
+    // A guest has an account to manage (its sessions, deleting its data); signed out there is none, so those tabs lock too.
+    const isSignedOut = isAnonymous && !session.data?.user;
 
     const { close, isOpen, open } = useModalState("settings");
     // Once opened, stay mounted so the Dialog's Activity component can
@@ -441,7 +447,7 @@ export const SettingsModal: FC = () => {
             return new Set();
         }
 
-        const locked = new Set<SettingsTab>();
+        const locked = new Set<SettingsTab>(isSignedOut ? SESSION_TABS : []);
 
         for (const group of navigationGroups) {
             for (const item of group.items) {
@@ -452,7 +458,7 @@ export const SettingsModal: FC = () => {
         }
 
         return locked;
-    }, [isAnonymous, navigationGroups]);
+    }, [isAnonymous, isSignedOut, navigationGroups]);
 
     // Loads a tab's chunk and data ahead of opening it; a tab the navigation locks for a guest loads nothing.
     const previewTab = (tab: SettingsTab) => {
@@ -649,16 +655,12 @@ export const SettingsModal: FC = () => {
                                         {group.items.map((item) => {
                                             const Icon = item.icon;
                                             const isActive = currentTab === item.tab;
-                                            const isLocked = isAnonymous && item.requiresAuth;
+                                            const isLocked = lockedTabs.has(item.tab);
 
-                                            let stateClassName = "text-muted-foreground web:hover:bg-surface-row-hover hover:text-foreground";
-
-                                            if (isActive) {
-                                                // The light nav is white like the row-active fill, so light uses the pressed-in well instead.
-                                                stateClassName = "bg-surface-well dark:bg-surface-row-active text-foreground";
-                                            } else if (isLocked) {
-                                                stateClassName = "text-muted-foreground/40 web:hover:bg-surface-row-hover hover:text-muted-foreground";
-                                            }
+                                            // The light nav is white like the row-active fill, so light uses the pressed-in well instead.
+                                            const stateClassName = isActive
+                                                ? "bg-surface-well dark:bg-surface-row-active text-foreground"
+                                                : "text-muted-foreground web:hover:bg-surface-row-hover hover:text-foreground";
 
                                             return (
                                                 <button
@@ -681,7 +683,8 @@ export const SettingsModal: FC = () => {
                                                 >
                                                     <Icon aria-hidden="true" className="size-4" />
                                                     <span className="flex-1 text-left">{item.label}</span>
-                                                    {isLocked && <Lock className="h-3 w-3 shrink-0 opacity-50" />}
+                                                    {/* The lock marks it; the label stays readable, since it still opens the tab's sign-in prompt. */}
+                                                    {isLocked && <Lock aria-hidden="true" className="h-3 w-3 shrink-0" />}
                                                 </button>
                                             );
                                         })}
