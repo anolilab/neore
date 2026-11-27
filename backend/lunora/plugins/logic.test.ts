@@ -160,6 +160,7 @@ describe("version order and downgrades", () => {
 
     it("flags a move to an older version as a downgrade", () => {
         expect(isDowngrade("2.0.0", "1.9.9")).toBe(true);
+        expect(isDowngrade("1.0.9007199254740993", "1.0.9007199254740992")).toBe(true);
         expect(isDowngrade("1.0.0", "1.0.1")).toBe(false);
     });
 

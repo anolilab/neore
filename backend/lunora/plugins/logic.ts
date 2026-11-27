@@ -192,14 +192,16 @@ export const compareVersions = (a: string, b: string): number => {
         throw new Error(`not a major.minor.patch version: ${malformed}`);
     }
 
-    const left = a.split(".").map(Number);
-    const right = b.split(".").map(Number);
+    // BigInt, not Number: a component past 2^53 would round, and two different versions would compare equal.
+    const left = a.split(".").map(BigInt);
+    const right = b.split(".").map(BigInt);
 
     for (let index = 0; index < 3; index += 1) {
-        const difference = (left[index] ?? 0) - (right[index] ?? 0);
+        const l = left[index] ?? 0n;
+        const r = right[index] ?? 0n;
 
-        if (difference !== 0) {
-            return difference;
+        if (l !== r) {
+            return l > r ? 1 : -1;
         }
     }
 
