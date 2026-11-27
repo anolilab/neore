@@ -998,20 +998,24 @@ describe("forkHostThread", () => {
     });
 
     describe("a fork the agent could not make", () => {
-        const open = async (device: { deviceId: string }, threadId: string, fork: Row) => {
+        const open = async (device: { deviceId: string }, threadId: string, reported: Row) => {
             const [opening] = await rows("acpSessions", { threadId });
 
             await run(
                 async (ctx) =>
                     await ctx.runMutation(applyHostEvents, {
                         deviceId: device.deviceId,
-                        events: [{ ...SESSION_OPEN, fork }],
+                        events: [{ ...SESSION_OPEN, fork: reported }],
                         sessionId: opening?.hostSessionId as string,
                     }),
             );
         };
-        const dividersOf = async (threadId: string) =>
-            (await rows("messages", { threadId })).filter((message) => agentSwitchOf(message as never) !== undefined);
+        const rowsWithDividers = async (threadId: string) => {
+            const found = await rows("messages", { threadId });
+
+            return found.filter((message) => agentSwitchOf(message as never) !== undefined);
+        };
+        const dividersOf = async (threadId: string) => await rowsWithDividers(threadId);
         const handoffOf = async (threadId: string) => await run(async (ctx) => await pendingHandoffOf(ctx, (await ctx.db.get("threads", threadId)) as never));
 
         it("marks the copied history with a divider and carries a summary of it into the first turn", async () => {
