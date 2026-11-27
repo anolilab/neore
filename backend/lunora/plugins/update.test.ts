@@ -1,11 +1,13 @@
 import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import { measureDb } from "../../test/db-cost";
 import { ROOT_SHARD_KEY, runInShard } from "../lib/shard-context";
 import schema from "../schema";
 import { createPluginSkill } from "../skills/create-skill";
 import { skillRowHash } from "./entry-hash";
 import { createInstallRow, recordIntent } from "./install-steps";
+import { loadOwnSlugs } from "./repair-resume";
 import { loadInstalledForUpdate } from "./update";
 import { markerFor } from "./logic";
 
@@ -131,5 +133,83 @@ describe("update: the installed children and their live hashes", () => {
                 async () => await run(async (context) => await context.runQuery(loadInstalledForUpdate, { pluginSlug: SLUG, userId: OWNER })),
             ),
         ).rejects.toThrow("owner's shard");
+    });
+
+    describe("reads a plugin's skills in pages, not one read a link", () => {
+        const SKILLS = 9;
+
+        /** An install with nine linked skills, each created as the install made it. */
+        const installWithSkills = async () => {
+            const { generation, installId } = await run(
+                async (context) => await context.runMutation(createInstallRow, { contentHash: HASH, pluginSlug: SLUG, userId: OWNER, version: "1.0.0" }),
+            );
+
+            for (let index = 0; index < SKILLS; index += 1) {
+                const fields = { ...ANALYST, name: `Analyst ${index}`, slug: `analyst-${index}` };
+                const entryKey = `skill:analyst-${index}`;
+
+                await run(
+                    async (context) =>
+                        await context.runMutation(recordIntent, {
+                            contentHash: await skillRowHash(fields),
+                            entryKey,
+                            generation,
+                            installId,
+                            kind: "skill",
+                            userId: OWNER,
+                        }),
+                );
+                await run(
+                    async (context) =>
+                        await context.runMutation(createPluginSkill, {
+                            ...fields,
+                            isPremium: true,
+                            plan: "premium",
+                            pluginInstallId: installId,
+                            pluginMarker: markerFor(installId, entryKey),
+                            source: { type: "plugin" as const, version: "1.0.0" },
+                            userId: OWNER,
+                        }),
+                );
+            }
+
+            return { installId };
+        };
+
+        /** Marks every link of the install `created`, as the install's own run does once each child exists. */
+        const linkAll = async (installId: string) =>
+            await run(async (context) => {
+                const { page } = await context.db.pluginItems.findMany({ where: { installId } });
+
+                for (const row of page) {
+                    await context.db.patch("pluginItems", row._id, { state: "created" });
+                }
+            });
+
+        it("loads the installed children with one page read of the skills", async () => {
+            await installWithSkills();
+
+            const { cost, result } = await measureDb(
+                async () => await run(async (context) => await context.runQuery(loadInstalledForUpdate, { pluginSlug: SLUG, userId: OWNER })),
+            );
+
+            expect(result.children).toHaveLength(SKILLS);
+            expect(result.ownSlugs).toHaveLength(SKILLS);
+            expect(result.children.every((child: { contentHash: string; currentHash: string }) => child.currentHash === child.contentHash)).toBe(true);
+            expect(cost.byTable.skills).toBeLessThanOrEqual(1);
+        });
+
+        it("loads the own slugs with one page read of the skills", async () => {
+            const { installId } = await installWithSkills();
+
+            await linkAll(installId);
+
+            const { cost, result } = await measureDb(
+                async () => await run(async (context) => await context.runQuery(loadOwnSlugs, { pluginSlug: SLUG, userId: OWNER })),
+            );
+
+            expect(result).toHaveLength(SKILLS);
+            expect(cost.byTable.skills).toBeLessThanOrEqual(1);
+        });
     });
 });

@@ -99,25 +99,31 @@ describe("the plugin queries over linked children", () => {
         expect(await select(skillIds)).toBeNull();
     });
 
-    it("reads each skill once when it loads the install for an update", async () => {
+    it("reads the skills in one page, not one read a link, when it loads the install for an update", async () => {
         await installed(["a", "b", "c"]);
 
         const reads = await run(async (context) => {
-            let count = 0;
-            const real = context.db.skills.findFirst.bind(context.db.skills);
+            const counts = { findFirst: 0, findMany: 0 };
+            const realFirst = context.db.skills.findFirst.bind(context.db.skills);
+            const realMany = context.db.skills.findMany.bind(context.db.skills);
 
             context.db.skills.findFirst = async (query: never) => {
-                count += 1;
+                counts.findFirst += 1;
 
-                return await real(query);
+                return await realFirst(query);
+            };
+            context.db.skills.findMany = async (query: never) => {
+                counts.findMany += 1;
+
+                return await realMany(query);
             };
 
             await context.runQuery(loadInstalledForUpdate, { pluginSlug: SLUG, userId: OWNER });
 
-            return count;
+            return counts;
         });
 
-        // One read per skill link: the row gives the hash, the slug and the visibility.
-        expect(reads).toBe(3);
+        // The page read gives each skill's hash, slug and visibility.
+        expect(reads).toEqual({ findFirst: 0, findMany: 1 });
     });
 });

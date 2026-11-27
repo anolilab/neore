@@ -23,7 +23,7 @@ import { skillVisibility } from "../skills/access";
 import { indexedGroupNames } from "../chat/group/skill-index";
 import { fileEntryKeys, freedSkills } from "./early-removal";
 import type { SureSkill } from "./early-removal";
-import { liveHashOf } from "./live-hash";
+import { liveHashOf, pluginSkillsByKey } from "./live-hash";
 import type { SkillKeyCache } from "./live-hash";
 import { diffUpdate, isDowngrade, markerFor } from "./logic";
 import type { UpdateAction } from "./logic";
@@ -81,13 +81,19 @@ export const loadInstalledForUpdate = internalQuery
         const sureToGo: SureSkill[] = [];
 
         const skillKeys: SkillKeyCache = new Map();
+        const skills = await pluginSkillsByKey(ctx, installId);
+
+        // Every skill of the install is known before the first group chat is hashed, so a group's participants never read a skill.
+        for (const [entryKey, skill] of skills) {
+            skillKeys.set(skill._id as string, entryKey);
+        }
 
         for (const link of page) {
             let currentHash: string;
 
             if (link.kind === "skill") {
-                // Read once: the row gives the live hash, the slug and the visibility.
-                const skill = await ctx.db.skills.findFirst({ consistency: "primary", where: { pluginMarker: markerFor(installId, link.entryKey) } });
+                // The row gives the live hash, the slug and the visibility.
+                const skill = skills.get(link.entryKey);
 
                 currentHash = skill ? await skillRowHash(skill) : "missing";
 
@@ -112,7 +118,7 @@ export const loadInstalledForUpdate = internalQuery
                     }
                 }
             } else {
-                currentHash = await liveHashOf(ctx, installId, link, skillKeys);
+                currentHash = await liveHashOf(ctx, installId, link, skillKeys, skills);
             }
 
             let triggerType = "";

@@ -22,7 +22,8 @@ import { childOps, importFailure } from "./install-ops";
 import { entryHash } from "./entry-hash";
 import { refuseUnderKillSwitch } from "./gate";
 import { heldInstall, patchInstallIf, STALE } from "./held-install";
-import { LEASE_MS, markerFor } from "./logic";
+import { pluginSkillsByKey } from "./live-hash";
+import { LEASE_MS } from "./logic";
 import { refuseWhileErasing, requireOwnerShard } from "./owner-shard";
 import { childIdByMarker, repairableNow, repairRows } from "./repair";
 import { vPluginItemKind } from "./validators";
@@ -242,12 +243,14 @@ export const loadOwnSlugs = internalQuery
         const { page } = await ctx.db.pluginItems.findMany({ consistency: "primary", where: { installId } });
         const slugs: { entryKey: string; slug: string }[] = [];
 
+        const skills = await pluginSkillsByKey(ctx, installId);
+
         for (const link of page) {
             if (link.kind !== "skill" || link.state !== "created") {
                 continue;
             }
 
-            const skill = await ctx.db.skills.findFirst({ consistency: "primary", where: { pluginMarker: markerFor(installId, link.entryKey) } });
+            const skill = skills.get(link.entryKey);
 
             if (skill && skill.userId === args.userId) {
                 slugs.push({ entryKey: link.entryKey, slug: skill.slug });

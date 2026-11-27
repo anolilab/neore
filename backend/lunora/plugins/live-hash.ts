@@ -2,7 +2,7 @@
  * The live content hash of an installed child, read from the child's row. Update and export both use it, so a child counts as
  * edited or unedited the same way in both. A child whose row is gone reads as "missing", which is never unedited.
  */
-import type { Id } from "../_generated/dataModel";
+import type { Doc, Id } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
 import { groupRowHash, skillRowHash, triggerRowHash } from "./entry-hash";
 import { markerFor, parseMarker } from "./logic";
@@ -14,11 +14,54 @@ import type { ChildKind } from "./logic";
  */
 export type SkillKeyCache = Map<string, string | undefined>;
 
-export const liveHashOf = async (ctx: QueryCtx, installId: string, link: { entryKey: string; kind: ChildKind }, skillKeys?: SkillKeyCache): Promise<string> => {
+/** An install's skills by entry key, as {@link pluginSkillsByKey} reads them. */
+export type PluginSkills = ReadonlyMap<string, Doc<"skills">>;
+
+/**
+ * Every skill of one install by entry key, read from the primary in pages by `pluginInstallId` (25 skills a statement), instead of one
+ * read per link. A skill whose marker names another install is left out. A link whose key is absent has no skill.
+ */
+export const pluginSkillsByKey = async (ctx: Pick<QueryCtx, "db">, installId: string): Promise<PluginSkills> => {
+    const skills = new Map<string, Doc<"skills">>();
+    let cursor: string | null = null;
+
+    for (;;) {
+        const result: { continueCursor?: string | null; isDone: boolean; page: Doc<"skills">[] } = await ctx.db.skills.findMany({
+            consistency: "primary",
+            cursor,
+            where: { pluginInstallId: installId },
+        });
+
+        for (const skill of result.page) {
+            const parsed = parseMarker(skill.pluginMarker ?? "");
+
+            if (parsed?.installId === installId && !skills.has(parsed.entryKey)) {
+                skills.set(parsed.entryKey, skill);
+            }
+        }
+
+        if (result.isDone || !result.continueCursor) {
+            return skills;
+        }
+
+        cursor = result.continueCursor;
+    }
+};
+
+/**
+ * `skills` is the install's skills read once by {@link pluginSkillsByKey}: a skill link is then answered from it, with no read.
+ */
+export const liveHashOf = async (
+    ctx: QueryCtx,
+    installId: string,
+    link: { entryKey: string; kind: ChildKind },
+    skillKeys?: SkillKeyCache,
+    skills?: PluginSkills,
+): Promise<string> => {
     const marker = markerFor(installId, link.entryKey);
 
     if (link.kind === "skill") {
-        const skill = await ctx.db.skills.findFirst({ consistency: "primary", where: { pluginMarker: marker } });
+        const skill = skills ? skills.get(link.entryKey) : await ctx.db.skills.findFirst({ consistency: "primary", where: { pluginMarker: marker } });
 
         return skill ? await skillRowHash(skill) : "missing";
     }

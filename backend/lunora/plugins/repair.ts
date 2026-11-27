@@ -12,7 +12,8 @@ import { LunoraError } from "lunorash/server";
 
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
-import { liveHashOf } from "./live-hash";
+import { liveHashOf, pluginSkillsByKey } from "./live-hash";
+import type { PluginSkills, SkillKeyCache } from "./live-hash";
 import { requireOwnerShard } from "./owner-shard";
 import { patchRow } from "../lib/patch";
 import { patchInstallIf, STALE } from "./held-install";
@@ -20,9 +21,16 @@ import { markerFor } from "./logic";
 import type { ChildKind } from "./logic";
 
 /** The id of the child that carries a marker, if it exists and belongs to the owner. */
-export const childIdByMarker = async (ctx: MutationCtx, kind: ChildKind, marker: string, userId: string): Promise<string | undefined> => {
+export const childIdByMarker = async (
+    ctx: MutationCtx,
+    kind: ChildKind,
+    marker: string,
+    userId: string,
+    skills?: { entryKey: string; skills: PluginSkills },
+): Promise<string | undefined> => {
     if (kind === "skill") {
-        const skill = await ctx.db.skills.findFirst({ consistency: "primary", where: { pluginMarker: marker } });
+        // With the install's skills read once, a skill link is answered from them with no read.
+        const skill = skills ? skills.skills.get(skills.entryKey) : await ctx.db.skills.findFirst({ consistency: "primary", where: { pluginMarker: marker } });
 
         return skill && skill.userId === userId ? (skill._id as string) : undefined;
     }
@@ -65,16 +73,22 @@ type Link = {
  * Decides each link that has a pending hash from its child's live content: a live hash equal to the pending hash means the
  * write finished (recorded); equal to the installed hash means it never wrote (cleared). Anything else is unresolved.
  */
-const resolvePending = async (ctx: MutationCtx, installId: string, links: Link[]): Promise<{ resolved: number; unresolved: string[] }> => {
+const resolvePending = async (
+    ctx: MutationCtx,
+    installId: string,
+    links: Link[],
+    skills: PluginSkills,
+): Promise<{ resolved: number; unresolved: string[] }> => {
     let resolved = 0;
     const unresolved: string[] = [];
+    const skillKeys: SkillKeyCache = new Map([...skills].map(([entryKey, skill]) => [skill._id as string, entryKey] as const));
 
     for (const link of links) {
         if (!link.pendingHash || link.state !== "created") {
             continue;
         }
 
-        const live = await liveHashOf(ctx, installId, link);
+        const live = await liveHashOf(ctx, installId, link, skillKeys, skills);
 
         if (live === link.pendingHash) {
             await ctx.db.patch("pluginItems", link._id as Id<"pluginItems">, { contentHash: link.pendingHash, pendingHash: "" });
@@ -105,13 +119,14 @@ const repairStoppedUpdate = async (ctx: MutationCtx, install: Doc<"pluginInstall
 
     const installId = install._id as string;
     const { page } = await ctx.db.pluginItems.findMany({ consistency: "primary", where: { installId } });
-    const { resolved, unresolved } = await resolvePending(ctx, installId, page as Link[]);
+    const skills = await pluginSkillsByKey(ctx, installId);
+    const { resolved, unresolved } = await resolvePending(ctx, installId, page as Link[], skills);
 
     let linked = resolved;
     const missing: string[] = [];
 
     for (const row of page) {
-        const childId = await childIdByMarker(ctx, row.kind, markerFor(installId, row.entryKey), install.userId);
+        const childId = await childIdByMarker(ctx, row.kind, markerFor(installId, row.entryKey), install.userId, { entryKey: row.entryKey, skills });
 
         if (row.state === "created") {
             // A linked child deleted while the update was stopped goes back to an intent, and the install waits for a plain repair,
@@ -301,6 +316,8 @@ export const repairRows = async (
 
     let linked = 0;
     const missing: string[] = [];
+    // Read after the dropped children were detached, so a detached skill is not seen as a child.
+    const skills = await pluginSkillsByKey(ctx, installId);
 
     // A row marked `created` whose child is gone (a rollback removed it, or the person did) goes back to `intent`.
     for (const row of page) {
@@ -308,7 +325,7 @@ export const repairRows = async (
             continue;
         }
 
-        if ((await childIdByMarker(ctx, row.kind, markerFor(installId, row.entryKey), userId)) !== undefined) {
+        if ((await childIdByMarker(ctx, row.kind, markerFor(installId, row.entryKey), userId, { entryKey: row.entryKey, skills })) !== undefined) {
             continue;
         }
 
@@ -316,7 +333,7 @@ export const repairRows = async (
         missing.push(row.entryKey);
     }
 
-    const { unresolved } = await resolvePending(ctx, installId, page.filter((row) => !missing.includes(row.entryKey)) as Link[]);
+    const { unresolved } = await resolvePending(ctx, installId, page.filter((row) => !missing.includes(row.entryKey)) as Link[], skills);
 
     missing.push(...unresolved);
 
@@ -325,7 +342,7 @@ export const repairRows = async (
             continue;
         }
 
-        const childId = await childIdByMarker(ctx, row.kind, markerFor(installId, row.entryKey), userId);
+        const childId = await childIdByMarker(ctx, row.kind, markerFor(installId, row.entryKey), userId, { entryKey: row.entryKey, skills });
 
         if (childId === undefined) {
             if (!missing.includes(row.entryKey)) {
