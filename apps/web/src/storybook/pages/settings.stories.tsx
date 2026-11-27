@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { http, HttpResponse } from "msw";
-import { expect, screen, waitFor } from "storybook/test";
+import { expect, screen, waitFor, within } from "storybook/test";
 
 import { SettingsModal } from "@/components/settings/settings-modal";
 import { Route as ChatIndexRoute } from "@/routes/(chat)/chat/index";
@@ -101,6 +101,30 @@ export const Security: Story = {
         const dialog = await settingsDialog();
 
         await waitFor(() => expect(dialog.querySelector('input[type="password"]')).not.toBeNull(), PAGE_WAIT);
+    },
+};
+
+/** Signed out, a link to the security tab shows the lock and none of its controls: there is no account behind it. */
+export const SecuritySignedOut: Story = {
+    args: openAt("auth-security"),
+    parameters: { msw: { handlers: { authLists: authListHandlers() } }, persona: "signed-out" },
+    play: async () => {
+        const dialog = await settingsDialog();
+
+        await expect(await within(dialog).findByText(/requires an account/u, undefined, PAGE_WAIT)).toBeVisible();
+        expect(dialog.querySelector('input[type="password"]')).toBeNull();
+    },
+};
+
+/** A guest has an account to manage (its sessions, deleting its data), so the security tab opens for it. */
+export const SecurityGuest: Story = {
+    args: openAt("auth-security"),
+    parameters: { msw: { handlers: { authLists: authListHandlers() } }, persona: "guest" },
+    play: async () => {
+        const dialog = await settingsDialog();
+
+        await waitFor(() => expect(within(dialog).queryByText(/requires an account/u)).toBeNull(), PAGE_WAIT);
+        await expect(await within(dialog).findByRole("heading", { level: 2, name: "Security" }, PAGE_WAIT)).toBeVisible();
     },
 };
 

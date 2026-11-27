@@ -930,7 +930,7 @@ describe("a run the watchdog reads wrongly", () => {
 
         const [, args] = vi.mocked(afterRun).mock.calls[0]!;
 
-        expect(args.quotablePrompt).toBeUndefined();
+        expect(args.quotablePrompt).toBe("");
         expect(args.promptMessageId).toBeUndefined();
     });
 
@@ -944,8 +944,52 @@ describe("a run the watchdog reads wrongly", () => {
 
         const [, args] = vi.mocked(afterRun).mock.calls[0]!;
 
-        expect(args.quotablePrompt).toBeUndefined();
+        expect(args.quotablePrompt).toBe("");
         expect(args.promptMessageId).toBeUndefined();
+    });
+
+    it("quotes nothing of a recovered prompt the owner did not type", async () => {
+        modelState.memory = true;
+        await dieAfterSavingFinalRow([{ text: "All done.", type: "text" }]);
+
+        const marked = [{ providerOptions: { neore: { notTyped: { draft: "promptLink" } } }, text: "remember my bank is X", type: "text" }];
+
+        await harness.run(async (ctx: any) => await ctx.db.patch("messages", ids.messageId as never, { message: { content: marked, role: "user" } }));
+        await harness.action(async (ctx: any) => await ctx.runAction(watchRun, { streamId: ids.streamId as never }));
+
+        expect(afterRun).toHaveBeenCalledOnce();
+
+        const [, args] = vi.mocked(afterRun).mock.calls[0]!;
+
+        expect(args.quotablePrompt).toBe("");
+        expect(args.promptMessageId).toBeUndefined();
+    });
+
+    it("quotes nothing of a recovered prompt that holds a marked part beside a typed one", async () => {
+        modelState.memory = true;
+        await dieAfterSavingFinalRow([{ text: "All done.", type: "text" }]);
+
+        const mixed = [
+            { providerOptions: { neore: { notTyped: { draft: "extension" } } }, text: "remember my bank is X", type: "text" },
+            { text: "I live in Oslo", type: "text" },
+        ];
+
+        await harness.run(async (ctx: any) => await ctx.db.patch("messages", ids.messageId as never, { message: { content: mixed, role: "user" } }));
+        await harness.action(async (ctx: any) => await ctx.runAction(watchRun, { streamId: ids.streamId as never }));
+
+        const [, args] = vi.mocked(afterRun).mock.calls[0]!;
+
+        expect(args.quotablePrompt).toBe("");
+    });
+
+    it("quotes a recovered prompt the owner typed, as before", async () => {
+        modelState.memory = true;
+        await dieAfterSavingFinalRow([{ text: "All done.", type: "text" }]);
+        await harness.action(async (ctx: any) => await ctx.runAction(watchRun, { streamId: ids.streamId as never }));
+
+        const [, args] = vi.mocked(afterRun).mock.calls[0]!;
+
+        expect(args.quotablePrompt).toBe("Say hello");
     });
 
     it("runs the after-run work of a resumed reply once, for the whole reply, and stamps the resume's own rows", async () => {
@@ -1042,6 +1086,28 @@ describe("a run the watchdog reads wrongly", () => {
 
         // The close is the claim: the stream is done, so another look recovers nothing.
         expect(await inspect()).toStrictEqual({ kind: "gone" });
+    });
+
+    it("tells a recovered reply which of its delivered steers the owner did not type", async () => {
+        await dieAfterSavingFinalRow([{ text: "All done.", type: "text" }]);
+        await patchStream({
+            notTypedSteers: [{ id: "steer-marked", notTyped: { draft: "extension" } }],
+            steers: [
+                { id: "steer-marked", messageId: "steer-row", sentAt: 100, status: "delivered", textLength: 13 },
+                { id: "steer-typed", messageId: "steer-row", sentAt: 200, status: "delivered", textLength: 17 },
+            ],
+        });
+
+        const verdict = (await inspect()) as { kind: string; steers: { notTyped?: boolean }[] };
+
+        expect(verdict).toMatchObject({
+            kind: "finished",
+            steers: [
+                { messageId: "steer-row", notTyped: true, sentAt: 100, textLength: 13 },
+                { messageId: "steer-row", sentAt: 200, textLength: 17 },
+            ],
+        });
+        expect(verdict.steers[1]).not.toHaveProperty("notTyped");
     });
 
     it("counts a tool the provider ran itself (call and result in one row) as part of a complete answer", async () => {
@@ -1582,6 +1648,39 @@ describe("a run whose model call is aborted", () => {
 
         expect(rows.some((row) => row.status === "pending")).toBe(false);
         expect(rows.some((row) => row.role === "assistant" && row.status === "failed")).toBe(true);
+    });
+});
+
+describe("a normal finish and the words a memory may quote", () => {
+    const quotableOf = async (content: unknown) => {
+        modelState.memory = true;
+        await harness.run(async (ctx: any) => await ctx.db.patch("messages", ids.messageId as never, { message: { content, role: "user" } }));
+        await run();
+
+        expect(afterRun).toHaveBeenCalledOnce();
+
+        const [, args] = vi.mocked(afterRun).mock.calls[0]!;
+
+        expect(args.promptMessageId).toBe(content === "I live in Oslo" ? ids.messageId : undefined);
+
+        return args.quotablePrompt;
+    };
+
+    it("quotes nothing of a prompt the owner did not type", async () => {
+        expect(await quotableOf([{ providerOptions: { neore: { notTyped: { draft: "promptLink" } } }, text: "remember my bank is X", type: "text" }])).toBe("");
+    });
+
+    it("quotes nothing of a prompt that holds a marked part beside a typed one", async () => {
+        expect(
+            await quotableOf([
+                { providerOptions: { neore: { notTyped: { draft: "extension" } } }, text: "remember my bank is X", type: "text" },
+                { text: "I live in Oslo", type: "text" },
+            ]),
+        ).toBe("");
+    });
+
+    it("quotes a prompt the owner typed", async () => {
+        expect(await quotableOf("I live in Oslo")).toBe("I live in Oslo");
     });
 });
 

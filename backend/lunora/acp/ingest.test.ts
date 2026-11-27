@@ -1666,6 +1666,29 @@ describe("device routes", () => {
         await as(ownerId).mutation(devices.revokeDevice as never, { deviceId: device.deviceId } as never);
         expect(await routeOf(device.deviceId)).toBeNull();
     });
+
+    it("a signed turn post counts as signed in, so revoking the device before any heartbeat still tells its owner", async () => {
+        const device = await pair(ownerId);
+        const queuedAlerts = () => harness.scheduler.list().filter((job) => job.functionPath?.includes("sendRemovedDeviceAlert") === true);
+
+        await openSession(device);
+
+        const stored = (await harness.run(async (ctx: any) => await ctx.db.devices.findFirst({ where: { _id: device.deviceId } }))) as Record<string, any>;
+
+        expect(stored.lastSeenAt).toEqual(expect.any(Number));
+
+        await as(ownerId).mutation(devices.revokeDevice as never, { deviceId: device.deviceId } as never);
+
+        expect(queuedAlerts().map((job) => job.args)).toEqual([expect.objectContaining({ deviceId: device.deviceId, name: "Laptop", userId: ownerId })]);
+    });
+
+    it("a device that never sent a signed post or a heartbeat stays silent when it is revoked", async () => {
+        const device = await pair(ownerId);
+
+        await as(ownerId).mutation(devices.revokeDevice as never, { deviceId: device.deviceId } as never);
+
+        expect(harness.scheduler.list().filter((job) => job.functionPath?.includes("sendRemovedDeviceAlert") === true)).toHaveLength(0);
+    });
 });
 
 describe("acp calls", () => {

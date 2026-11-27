@@ -490,6 +490,7 @@ const AddServer: FC<{ desktopId: string; onAdded: () => void }> = ({ desktopId, 
     const crpc = useCRPC();
     const register = useMutation(crpc.devices.functions.registerDevice.mutationOptions());
     const revoke = useMutation(crpc.devices.functions.revokeDevice.mutationOptions());
+    const announcePaired = useMutation(crpc.devices.functions.announcePairedDevice.mutationOptions());
     const [busy, setBusy] = useState(false);
 
     const add = async (form: HTMLFormElement): Promise<void> => {
@@ -519,6 +520,8 @@ const AddServer: FC<{ desktopId: string; onAdded: () => void }> = ({ desktopId, 
                 return;
             }
 
+            // Confirmed on this computer: the owner is told now (`announcePairedDevice`), never for a pairing that was cancelled.
+            void announcePaired.mutateAsync({ deviceId: deviceId as Id<"devices"> }).catch(() => undefined);
             form.reset();
             onAdded();
             toast.success(t`Server added. Choose which of its folders to share in the desktop app.`);
@@ -587,6 +590,7 @@ const DevicesSettings: FC = () => {
     const { data: devices } = useQuery(crpc.devices.functions.listDevices.queryOptions({}));
     const register = useMutation(crpc.devices.functions.registerDevice.mutationOptions());
     const revoke = useMutation(crpc.devices.functions.revokeDevice.mutationOptions());
+    const announcePaired = useMutation(crpc.devices.functions.announcePairedDevice.mutationOptions());
 
     // Once, and again on each change of the shell (a reconnect in the background, say): the buttons follow it.
     useEffect(
@@ -623,6 +627,8 @@ const DevicesSettings: FC = () => {
                 return;
             }
 
+            // Confirmed on this computer: the owner is told now (`announcePairedDevice`), never for a pairing that was cancelled.
+            void announcePaired.mutateAsync({ deviceId: deviceId as Id<"devices"> }).catch(() => undefined);
             globalThis.dispatchEvent(new Event(DEVICE_PAIRED_EVENT));
             setNative(await getNativeDeviceStatus());
             toast.success(t`This computer is paired. Choose which folders to share in the desktop app.`);
