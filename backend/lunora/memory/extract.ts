@@ -306,6 +306,7 @@ export const extractMemories = internalAction
     .action(async ({ args, ctx }) => {
         // What extraction reads: the prompt and the steers the owner typed. A steer they did not type (`steers[].notTyped`) is
         // cut here, for the gate and the model alike, so its words back no fact; `factEvidence` refuses it as a quote too.
+        // A prompt that is not the owner's (empty `quotablePrompt`) is cut the same way: only the typed steers are read.
         // Fails closed: with no quotable text (a headless run, an outside payload) no fact can be backed by the user's own
         // words, so nothing is read, asked of the model or stored.
         if (args.quotablePrompt === undefined) {
@@ -323,15 +324,9 @@ export const extractMemories = internalAction
         const read = typedTurnText(args);
         const readArgs = { ...args, steeredFrom: read.steeredFrom, userMessage: read.userMessage };
 
-        if (read.userMessage.trim() === "") {
-            ctx.log.event(GATE_EVENT, { reason: "no_typed_text", threadId: args.threadId, userId: args.userId, userMessageLength: 0, verdict: "skip" });
-
-            return;
-        }
-
         // An empty quotable prompt (an outside-agent prompt, a collaborator's one the user regenerated) with no typed steer
         // left leaves nothing to quote: `factEvidence` would drop every fact, so the gate, the classifier and the model are
-        // not run for it. A typed steer keeps the turn going.
+        // not run for it. A typed steer keeps the turn going, and then `read` holds only the typed steers (`typedTurnText`).
         if (args.quotablePrompt.trim() === "" && read.steeredFrom === undefined) {
             ctx.log.event(GATE_EVENT, {
                 reason: "no_quotable_text",
@@ -340,6 +335,12 @@ export const extractMemories = internalAction
                 userMessageLength: args.userMessage.length,
                 verdict: "skip",
             });
+
+            return;
+        }
+
+        if (read.userMessage.trim() === "") {
+            ctx.log.event(GATE_EVENT, { reason: "no_typed_text", threadId: args.threadId, userId: args.userId, userMessageLength: 0, verdict: "skip" });
 
             return;
         }
@@ -902,19 +903,29 @@ const withoutNotTypedSteers = (userMessage: string, steers: ReadonlyArray<SteerO
  * What extraction READS: the prompt and the steers the owner typed, a marked steer cut out (its text stays context nowhere:
  * it would let a typed phrase back a claim the marked words made). `steeredFrom` moves with the cut; `undefined` once no
  * steer is left. The offsets in `steers` describe the whole text, so quotes are still checked against that (`factEvidence`).
+ *
+ * A prompt that is not the owner's words (`quotablePrompt` empty: an outside agent's, or a collaborator's one the owner
+ * regenerated) is cut out the same way, and not kept as "context": the model could draw a claim from it and pair it with
+ * a quote from a typed steer. Only the typed steers are read then; with none, the text is empty.
  */
 const typedTurnText = (turn: {
+    quotablePrompt?: string;
     steeredFrom?: number;
     steers?: ReadonlyArray<SteerOffset>;
     userMessage: string;
 }): { steeredFrom?: number; userMessage: string } => {
-    const { steeredFrom, steers = [], userMessage } = turn;
+    const { quotablePrompt, steeredFrom, steers = [], userMessage } = turn;
+    const promptIsNotTheirs = quotablePrompt !== undefined && quotablePrompt.trim() === "";
 
-    if (steeredFrom === undefined || steers.every((steer) => steer.notTyped !== true)) {
-        return { ...(steeredFrom !== undefined && { steeredFrom }), userMessage };
+    if (steeredFrom === undefined) {
+        return { userMessage: promptIsNotTheirs ? "" : userMessage };
     }
 
-    const prompt = steeredFrom > 0 ? userMessage.slice(0, steeredFrom - 2) : "";
+    if (!promptIsNotTheirs && steers.every((steer) => steer.notTyped !== true)) {
+        return { steeredFrom, userMessage };
+    }
+
+    const prompt = promptIsNotTheirs || steeredFrom <= 0 ? "" : userMessage.slice(0, steeredFrom - 2);
     const typed = steers.flatMap((steer, index) => (steer.notTyped === true ? [] : [userMessage.slice(steer.from, steerEnd(userMessage, steers, index))]));
 
     return {
