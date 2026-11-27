@@ -1,4 +1,5 @@
 import "@xyflow/react/dist/style.css";
+import "./workflow-canvas.css";
 
 import { useLingui } from "@lingui/react/macro";
 import type { Connection, Edge } from "@xyflow/react";

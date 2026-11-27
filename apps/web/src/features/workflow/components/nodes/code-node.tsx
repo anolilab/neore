@@ -38,11 +38,11 @@ const CodeNodeComponent = (props: NodeProps<Node<CodeNodeData>>) => {
         <BaseNode {...props} color={config.color} icon={<Code className="size-4" />} inputs={config.handles.inputs} outputs={config.handles.outputs}>
             <div className="space-y-3">
                 <div className="space-y-1.5">
-                    <Label className="text-muted-foreground text-xs">
+                    <Label className="text-muted-foreground text-xs" htmlFor={`${id}-language`}>
                         <Trans>Language</Trans>
                     </Label>
                     <Select onValueChange={handleLanguageChange} value={data.language}>
-                        <SelectTrigger className="nodrag h-8 text-sm">
+                        <SelectTrigger className="nodrag h-8 text-sm" id={`${id}-language`}>
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -56,11 +56,18 @@ const CodeNodeComponent = (props: NodeProps<Node<CodeNodeData>>) => {
                 </div>
 
                 <div className="space-y-1.5">
-                    <Label className="text-muted-foreground text-xs">
+                    <Label className="text-muted-foreground text-xs" id={`${id}-code-label`}>
                         <Trans>Code</Trans>
                     </Label>
                     <div className="nodrag">
-                        <CodemirrorCompact height="120px" language={data.language} onChange={handleCodeChange} showLineNumbers value={data.code} />
+                        <CodemirrorCompact
+                            ariaLabelledBy={`${id}-code-label`}
+                            height="120px"
+                            language={data.language}
+                            onChange={handleCodeChange}
+                            showLineNumbers
+                            value={data.code}
+                        />
                     </div>
                 </div>
             </div>

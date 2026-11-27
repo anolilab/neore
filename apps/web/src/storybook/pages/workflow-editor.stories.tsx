@@ -45,9 +45,22 @@ type Story = StoryObj<typeof meta>;
 
 /** An existing workflow, nothing selected. */
 export const Editor: Story = {
-    play: async ({ canvas }) => {
+    play: async ({ canvas, canvasElement }) => {
         await expect(await canvas.findByRole("heading", { name: "Product photo set" }, PAGE_WAIT)).toBeVisible();
         await expect(await canvas.findByRole("button", { name: "Show run history" }, PAGE_WAIT)).toBeVisible();
+        // The Result node's type is `output`, a class React Flow styles for its own built-in node: its wrapper must stay bare
+        // (no white fill behind the card, no centred text), and the card's selects keep the label above them as their name.
+        const wrapper = await waitFor(() => {
+            const found = canvasElement.querySelector<HTMLElement>(".react-flow__node-output");
+
+            expect(found).not.toBeNull();
+
+            return found as HTMLElement;
+        }, PAGE_WAIT);
+
+        await expect(getComputedStyle(wrapper).backgroundColor).toBe("rgba(0, 0, 0, 0)");
+        await expect(getComputedStyle(wrapper).textAlign).not.toBe("center");
+        await expect(await canvas.findByRole("combobox", { name: "Output Type" }, PAGE_WAIT)).toBeVisible();
     },
 };
 
