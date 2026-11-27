@@ -44,6 +44,7 @@ import { withoutQuotedLines } from "../chat/lib/attached-text";
 import { loadModelFilterRules, ModelFilterRulesUnavailableError } from "../chat/lib/model-filter-rules";
 import { lowReasoningUtilityOptions } from "../chat/lib/reasoning-options";
 import { gatewayFetch, type ServiceFetch } from "../lib/services";
+import { runAfterOnShard } from "../lib/shard-scheduler";
 import { getUtilityModel, NoAllowedUtilityModelError } from "../lib/utility-model";
 import {
     type BeliefRevisionAnswer,
@@ -58,8 +59,8 @@ import {
     saveMemoryVectors,
     type SimilarMemoryResult,
 } from "./dedup";
-import { evidenceMatchEnd, type MemoryEvidence, statesHealthCondition, typedEvidenceQuote } from "./evidence";
-import { REMEMBER_SCOPE, type RequestedRefusal, vRequestedRefusal } from "./functions";
+import { evidenceMatchEnd, type MemoryEvidence, typedEvidenceQuote } from "./evidence";
+import { type RequestedRefusal, vRequestedRefusal } from "./functions";
 import { logRedaction, redactMemoryFacts, redactMemoryText, type RedactionCounts } from "./redact";
 import {
     describeFactDates,
@@ -95,7 +96,8 @@ Guidelines:
 
 ${MEMORY_TYPE_GUIDE}
 
-NEVER extract: passwords, API keys, tokens, credit card numbers, SSNs, medical diagnoses, or other sensitive PII.`;
+NEVER extract: passwords, API keys, tokens, credit card numbers, SSNs, medical diagnoses, or other sensitive PII.
+Set "sensitive": true on any fact you do return that is about the user's health: a physical or mental condition, a diagnosis, symptoms, a treatment, or a medication (by its name or not). Such a fact is never kept. A job, a field of study or a workplace in medicine or health is not sensitive.`;
 
 const BELIEF_REVISION_SYSTEM_PROMPT = `A new fact may conflict with or duplicate an existing memory. Decide what to do.
 
@@ -126,6 +128,8 @@ const extractedFactSchema = z.object({
     importance: z.int().min(30).max(100),
     memory: z.string(),
     quote: z.string().optional(),
+    /** About the user's health (a condition, diagnosis, treatment or medication): never kept, whoever asked. */
+    sensitive: z.boolean().optional(),
     type: z.enum(MEMORY_TYPES),
     validUntil: z.string().optional().describe("Last day the fact holds, YYYY-MM-DD; omit for lasting or yearly facts"),
 });
@@ -146,6 +150,10 @@ export type ExtractionOutcome = {
 };
 
 const NOT_ASKED: ExtractionOutcome = { asked: false, facts: [], refused: 0 };
+
+/** How long, and how often, a job waits for a `remember` call still running on its prompt before it reads the prompt itself. */
+const REMEMBER_WAIT_MS = 30_000;
+const REMEMBER_WAITS = 3;
 
 /**
  * The rule a requested run adds: it is the turn's one extraction, so it finds every fact as usual, and marks the ones the
@@ -311,6 +319,8 @@ export const extractMemories = internalAction
          * quote comes from it or from the messages steered in; unset (a trigger's payload, a headless run) keeps none.
          */
         quotablePrompt: v.optional(v.string()),
+        /** How often this job already waited for a `remember` call still running on the prompt. */
+        rememberWaits: v.optional(v.number()),
         /** A requested run's reply (its first stream): every write checks the prompt is still answered only by it. */
         replyKey: v.optional(v.string()),
         /**
@@ -335,15 +345,29 @@ export const extractMemories = internalAction
     })
     .output(v.object({ asked: v.boolean(), blocked: v.optional(vRequestedRefusal), facts: v.array(vRunFact), refused: v.number() }))
     .action(async ({ args: input, ctx }): Promise<ExtractionOutcome> => {
-        // A `remember` call extracted this prompt already when it still holds the prompt's claim (it releases it when it wrote
-        // nothing): the prompt is then cut as one that is not quotable, and only steers are read. One keyed read, made for every
-        // job with a typed prompt, so no path of the reply (a pause, a resume, a recovery) can miss that the call ran.
-        const promptHandled =
-            !input.requested &&
-            input.promptMessageId !== undefined &&
-            (input.quotablePrompt ?? "").trim() !== "" &&
-            (await ctx.runQuery(internal.lib.claim_once.claimHeld, { key: input.promptMessageId, scope: REMEMBER_SCOPE }));
-        const args = promptHandled ? { ...input, quotablePrompt: "" } : input;
+        // A `remember` call extracts the prompt it was made in (`remember.ts`). One keyed read of its claim, made for every job with a
+        // typed prompt, so no path of the reply (a pause, a resume, a recovery) can miss that the call ran: handled, the prompt is
+        // cut as one that is not quotable and only steers are read; still running, the job waits for it a few times before it
+        // reads the prompt itself, so a call that fails late never costs the turn its facts; none (or given back), as usual.
+        const remembered =
+            !input.requested && input.promptMessageId !== undefined && (input.quotablePrompt ?? "").trim() !== ""
+                ? await ctx.runQuery(internal.memory.functions.rememberClaimState, { promptMessageId: input.promptMessageId })
+                : "none";
+        const waits = input.rememberWaits ?? 0;
+
+        if (remembered === "pending" && waits < REMEMBER_WAITS) {
+            await runAfterOnShard(
+                ctx.scheduler,
+                REMEMBER_WAIT_MS,
+                internal.memory.extract.extractMemories,
+                { ...input, rememberWaits: waits + 1 },
+                input.userId,
+            );
+
+            return NOT_ASKED;
+        }
+
+        const args = remembered === "done" ? { ...input, quotablePrompt: "" } : input;
 
         // What extraction reads: the prompt and the steers the owner typed. A steer they did not type (`steers[].notTyped`) is
         // cut here, for the gate and the model alike, so its words back no fact; `factEvidence` refuses it as a quote too.
@@ -521,11 +545,11 @@ ${args.requested ? REQUESTED_RULE : "Extract NEW facts about the user not alread
         // (`factEvidence`). The model's say-so is not enough: an extractor reading a page, an attachment or the
         // assistant's answer can be talked into "facts" nobody wrote.
         // `quoteRefused`: a quote that is not the user's typed words, or one `evidenceQuote` refuses (secret-like, a health condition, too short).
-        // `health`: a fact whose own wording names a health condition, whatever its quote says.
+        // `health`: a fact the extractor marked as about the user's health (`sensitive`), in any language, whoever asked.
         const dropped = { health: 0, noQuote: 0, quoteRefused: 0 };
 
         extractedFacts = extractedFacts.filter((fact) => {
-            if (statesHealthCondition(fact.memory)) {
+            if (fact.sensitive === true) {
                 dropped.health += 1;
 
                 return false;

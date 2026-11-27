@@ -51,13 +51,12 @@ export const rememberResultOf = (outcome: ExtractionOutcome): { keepClaim: boole
     }
 
     if (outcome.facts.length > 0) {
-        const asked = outcome.facts.filter((fact) => fact.asked);
+        // Saved whenever anything new was written, asked or not (each listed fact says which); already known only when every
+        // fact found was a row that already held it.
         let status: RememberStatus = "saved";
 
-        if (asked.length === 0) {
-            status = "nothing_asked";
-        } else if (asked.every((fact) => fact.status === "known")) {
-            status = "already_known";
+        if (outcome.facts.every((fact) => fact.status === "known")) {
+            status = outcome.facts.some((fact) => fact.asked) ? "already_known" : "nothing_asked";
         }
 
         return { keepClaim: true, result: { facts: outcome.facts, status, ...(outcome.blocked !== undefined && { stopped: outcome.blocked }) } };
@@ -134,7 +133,9 @@ export const rememberFactFor = async (ctx: ActionCtx, args: Omit<SourceArgs, "no
 
     const claim = { key: args.promptMessageId, scope: REMEMBER_SCOPE };
 
-    if (!(await ctx.runMutation(internal.lib.claim_once.claimKey, { ...claim, ttlMs: REMEMBER_CLAIM_TTL_MS, userId: args.userId }))) {
+    const claimedAt = await ctx.runMutation(internal.lib.claim_once.claimKeyFenced, { ...claim, ttlMs: REMEMBER_CLAIM_TTL_MS, userId: args.userId });
+
+    if (claimedAt === null) {
         return { facts: [], status: "already_requested" };
     }
 
@@ -155,16 +156,17 @@ export const rememberFactFor = async (ctx: ActionCtx, args: Omit<SourceArgs, "no
             userMessage: raw,
         });
     } catch (error) {
-        await ctx.runMutation(internal.lib.claim_once.releaseKey, claim);
+        await ctx.runMutation(internal.lib.claim_once.releaseKey, { ...claim, claimedAt });
 
         throw error;
     }
 
     const { keepClaim, result } = rememberResultOf(outcome);
 
-    if (!keepClaim) {
-        await ctx.runMutation(internal.lib.claim_once.releaseKey, claim);
-    }
+    // Handled, so the reply's own extraction leaves the prompt alone; or given back, so it reads the prompt as usual.
+    await (keepClaim
+        ? ctx.runMutation(internal.memory.functions.markRememberDone, { claimedAt, promptMessageId: args.promptMessageId })
+        : ctx.runMutation(internal.lib.claim_once.releaseKey, { ...claim, claimedAt }));
 
     return result;
 };

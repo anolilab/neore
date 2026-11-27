@@ -10,7 +10,7 @@ import schema from "../schema";
 import { documentTextPart } from "../chat/lib/attached-text";
 import { addMessagesHandler } from "../agent/messages";
 import { extractMemories } from "./extract";
-import { reviseExtractedMemory, saveMemoryBatch } from "./functions";
+import { saveMemoryBatch } from "./functions";
 import { rememberFactFor, rememberResultOf } from "./remember";
 
 const { generateText, registry } = vi.hoisted(() => {
@@ -53,7 +53,7 @@ const USER = "user-a";
 const REPLY = "stream-1";
 const ASK = "Remember this: I'm vegan, please.";
 
-type Fact = { asked?: boolean; memory: string; quote: string; validUntil?: string };
+type Fact = { asked?: boolean; memory: string; quote: string; sensitive?: boolean; validUntil?: string };
 
 /** The extractor's answer: each fact as a preference stated plainly, asked for unless it says otherwise. */
 const answer = (facts: ReadonlyArray<Fact>) => {
@@ -430,11 +430,66 @@ describe(rememberFactFor, () => {
         expect(rows.map((row) => row.source)).toStrictEqual(["requested"]);
     });
 
-    it("refuses a fact whose own wording names a health condition, whatever its quote says", async () => {
-        answer([{ memory: "User has diabetes", quote: "I'm off sugar" }]);
+    it("refuses a fact the extractor marks as about the user's health, and keeps a job in the field", async () => {
+        answer([{ memory: "User takes Prozac", quote: "I take Prozac", sensitive: true }]);
 
-        await expect(remember(await setUp({ prompt: "Remember: I'm off sugar" }))).resolves.toStrictEqual({ facts: [], status: "refused" });
+        await expect(remember(await setUp({ prompt: "Remember I take Prozac" }))).resolves.toStrictEqual({ facts: [], status: "refused" });
         expect(await memories()).toHaveLength(0);
+
+        harness.close();
+        harness = lunoraTest(schema as never);
+        // Unmarked, a job in the field is kept. (A quote the quote check reads as health, "cancer research" or "therapist"
+        // among them, is still refused by it, as on main.)
+        answer([{ memory: "User works as a nurse", quote: "I work as a nurse" }]);
+
+        await expect(remember(await setUp({ prompt: "Remember I work as a nurse" }))).resolves.toMatchObject({ status: "saved" });
+    });
+
+    it("reads past the reply's own rows: 60 tool rows before the call leave the prompt fresh", async () => {
+        answer([{ memory: "User is vegan", quote: "I'm vegan" }]);
+
+        const replies = Array.from({ length: 60 }, () => {
+            return { replyId: REPLY };
+        });
+
+        await expect(remember(await setUp({ replies }))).resolves.toMatchObject({ status: "saved" });
+    });
+
+    it("still extracts the turn when the remember call's model failed", async () => {
+        generateText.mockRejectedValueOnce(new Error("model down"));
+
+        const ids = await setUp();
+
+        await expect(remember(ids)).resolves.toMatchObject({ status: "unavailable" });
+
+        answer([{ asked: false, memory: "User is vegan", quote: "I'm vegan" }]);
+        await harness.action(async (ctx: any) => {
+            await ctx.runAction(extractMemories, extraction(ids));
+        });
+
+        expect(await memories()).toHaveLength(1);
+    });
+
+    it("waits for a remember call still running instead of reading or dropping the prompt", async () => {
+        answer([{ asked: false, memory: "User is vegan", quote: "I'm vegan" }]);
+
+        const ids = await setUp();
+
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("idempotencyClaims", { claimedAt: 1, expiresAt: Number.MAX_SAFE_INTEGER, key: ids.promptMessageId, scope: "memory-remember" });
+        });
+        await harness.action(async (ctx: any) => {
+            await ctx.runAction(extractMemories, extraction(ids));
+        });
+
+        expect(generateText).not.toHaveBeenCalled();
+
+        // Past its last wait the job reads the prompt as usual: a call that never ended never costs the turn its facts.
+        await harness.action(async (ctx: any) => {
+            await ctx.runAction(extractMemories, { ...extraction(ids), rememberWaits: 3 });
+        });
+
+        expect(await memories()).toHaveLength(1);
     });
 
     describe("a requested save's row that already holds the fact", () => {
@@ -529,28 +584,6 @@ describe(rememberFactFor, () => {
             expect(await memories()).toHaveLength(1);
         });
     });
-
-    it("refuses a revision whose merged wording names a health condition, leaving the row as it was", async () => {
-        const row = await harness.run(
-            async (ctx: any) => await ctx.db.insert("memories", { memory: "User likes tea", source: "auto", type: "preference", updatedAt: 1, userId: USER }),
-        );
-        const applied = await harness.action(
-            async (ctx: any) =>
-                await ctx.runMutation(reviseExtractedMemory, {
-                    base: "User likes tea",
-                    confidence: 90,
-                    lastConfirmedAt: 2,
-                    memory: "User likes tea and has diabetes",
-                    memoryId: row,
-                    userId: USER,
-                }),
-        );
-
-        const [stored] = await memories();
-
-        expect(applied).toBe(false);
-        expect(stored?.memory).toBe("User likes tea");
-    });
 });
 
 describe(rememberResultOf, () => {
@@ -561,6 +594,14 @@ describe(rememberResultOf, () => {
             keepClaim: true,
             result: { facts: [vegan], status: "saved", stopped: "memory_off" },
         });
+    });
+
+    it("says saved when anything new was written, though what was asked was already known", () => {
+        const known = { asked: true, memory: "User is vegan", status: "known" as const };
+        const nurse = { asked: false, memory: "User works as a nurse", status: "saved" as const };
+
+        expect(rememberResultOf({ asked: true, facts: [known, nurse], refused: 0 }).result.status).toBe("saved");
+        expect(rememberResultOf({ asked: true, facts: [known], refused: 0 }).result.status).toBe("already_known");
     });
 
     it("gives a refusal before any write as the reason, and leaves the prompt to a later call", () => {

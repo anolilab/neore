@@ -25,7 +25,7 @@ import {
     vImportApp,
 } from "./import-logic";
 import { botOwnerRows } from "./bot-owner";
-import { type MemoryEvidence, newestEvidence, statesHealthCondition, vMemoryEvidence } from "./evidence";
+import { type MemoryEvidence, newestEvidence, vMemoryEvidence } from "./evidence";
 import { logRedaction, redactMemoryText } from "./redact";
 import { DROPPED_DIGEST_SUMMARY, localDayOf } from "./reflection-logic";
 import { byNewest, isUsableOn, KEYWORD_LOOKUP_LIMIT, keywordLookupOf, lookupSearchesOf, mergeScopeWindows, scopesOf } from "./retrieve-ranking";
@@ -43,6 +43,7 @@ import { messageCarriesGuestText, promptCannotBeQuoted } from "../chat/lib/attac
 import type { typedTextOf } from "../chat/lib/attached-text";
 import { GOAL_CONTINUATION_AGENT } from "../chat/goals/shared";
 import { isTypedChatKind } from "../chat/lib/typed-chat-kind";
+import { claimRow, recordClaimResult } from "../lib/claim-once";
 
 /**
  * Whether the user turned memory on. OPT-IN: absent means off. Memory extraction reads every
@@ -74,8 +75,32 @@ export type RequestedRefusal = Infer<typeof vRequestedRefusal>;
  */
 export const REMEMBER_SCOPE = "memory-remember";
 
-/** Rows under a prompt the fresh-send check reads; more than this is not a fresh prompt. */
-const PROMPT_REPLY_ROWS_READ = 50;
+/** The `result` a remember request records on its claim once it wrote something or found nothing asked: the prompt is handled. */
+const REMEMBER_DONE = "done";
+
+/** Where a prompt's remember request stands: none (or given back), still running, or handled (`REMEMBER_DONE`). */
+export const rememberClaimState = internalQuery
+    .input({ promptMessageId: v.string() })
+    .output(v.union(v.literal("none"), v.literal("pending"), v.literal("done")))
+    .query(async ({ args, ctx }) => {
+        const row = await claimRow(ctx, REMEMBER_SCOPE, args.promptMessageId);
+
+        if (!row) {
+            return "none" as const;
+        }
+
+        return row.result === REMEMBER_DONE ? ("done" as const) : ("pending" as const);
+    });
+
+/** Marks the claim `claimedAt` handled; `false` when that claim no longer holds the prompt. */
+export const markRememberDone = internalMutation
+    .input({ claimedAt: v.number(), promptMessageId: v.string() })
+    .output(v.boolean())
+    .mutation(async ({ args, ctx }) => await recordClaimResult(ctx, REMEMBER_SCOPE, args.promptMessageId, args.claimedAt, REMEMBER_DONE));
+
+/** Rows under a prompt the fresh-send check reads per page, and the pages it reads before it gives up on the prompt. */
+const PROMPT_REPLY_PAGE_ROWS = 100;
+const PROMPT_REPLY_PAGES = 10;
 
 /**
  * Whether the rows under a prompt (its `order`, after it) are only this reply's: its saved rows (`replyId`, the reply's first
@@ -139,12 +164,29 @@ export const checkRequestedSource = async (
         return { refused: "not_your_words" };
     }
 
-    const replies = await ctx.db
-        .query("messages")
-        .withIndex("by_threadId_order_stepOrder", (q) => q.eq("threadId", source.threadId).eq("order", prompt.order).gt("stepOrder", prompt.stepOrder))
-        .take(PROMPT_REPLY_ROWS_READ + 1);
+    // Page by page, stopping at the first row of another run: the reply's own rows never count against the prompt, however
+    // many tool steps it ran before the call.
+    let cursor: string | null = null;
 
-    return replies.length > PROMPT_REPLY_ROWS_READ || !isFreshPrompt(replies, source.replyKey) ? { refused: "not_your_words" } : { prompt, thread };
+    for (let page = 0; page < PROMPT_REPLY_PAGES; page += 1) {
+        const rows = await ctx.db
+            .query("messages")
+            .withIndex("by_threadId_order_stepOrder", (q) => q.eq("threadId", source.threadId).eq("order", prompt.order).gt("stepOrder", prompt.stepOrder))
+            .paginate({ cursor, numItems: PROMPT_REPLY_PAGE_ROWS });
+
+        if (!isFreshPrompt(rows.page, source.replyKey)) {
+            return { refused: "not_your_words" };
+        }
+
+        if (rows.isDone) {
+            return { prompt, thread };
+        }
+
+        cursor = rows.continueCursor;
+    }
+
+    // More rows than a reply writes: no fresh prompt.
+    return { refused: "not_your_words" };
 };
 
 /** Most memories one user-facing read looks at. */
@@ -1784,11 +1826,11 @@ export const reviseExtractedMemory = internalMutation
             return false;
         }
 
-        // The backstops, as in `insertMemory` and the extraction gate: a revision that is nothing but a secret, or whose merged
-        // wording names a health condition, does not apply, so the caller saves the fact as new, as for any that cannot apply.
+        // The backstop, as in `insertMemory`: a revision that is nothing but a secret does not apply, so the caller saves
+        // the fact as new, as for any revision that cannot apply.
         const memory = redactMemoryText(args.memory);
 
-        if (row.memory !== args.base || memory === null || statesHealthCondition(memory)) {
+        if (row.memory !== args.base || memory === null) {
             return false;
         }
 

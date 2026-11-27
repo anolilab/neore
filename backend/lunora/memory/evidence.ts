@@ -127,42 +127,6 @@ const HEALTH_PATTERNS: ReadonlyArray<RegExp> = [
 const mentionsHealth = (text: string): boolean =>
     [text, text.replaceAll(INVISIBLE_RE, "")].some((reading) => HEALTH_PATTERNS.some((pattern) => pattern.test(reading.normalize("NFKC"))));
 
-/**
- * Named health conditions, and medicines that name one by what they treat. Narrower than the quote's {@link HEALTH_PATTERNS}
- * on purpose: a fact's own wording is checked here, and a profession, a field of study or a place ("a physical therapist",
- * "studies psychology", "works at a hospital", "a doctorate") is no condition.
- */
-const CONDITION_PATTERNS: ReadonlyArray<RegExp> = [
-    /\b(?:diabet\w*|cancer|tumou?rs?|leuka?emia|lymphoma|depression|bipolar)\b/iu,
-    /\b(?:schizophreni\w*|adhd|autis\w*|ptsd|ocd|anorexi\w*|bulimi\w*)\b/iu,
-    /\b(?:hiv|aids|hepatitis|herpes|asthma|epilep\w*|migraines?|hypertension)\b/iu,
-    /\b(?:lupus|arthritis|dementia|alzheimer\w*|parkinson\w*|crohn\w*|co?eliac)\b/iu,
-    /\b(?:fibromyalgia|endometriosis|psoriasis|krebs|zuckerkrankheit)\b/iu,
-    /\b(?:multiple sclerosis|long covid|anxiety disorder|eating disorder|heart disease|heart failure)\b/iu,
-    /\b(?:high blood pressure|high cholesterol)\b/iu,
-];
-const MEDICATION_RE = /\b(?:insulin|antidepressants?|antipsychotics?|chemo(?:therapy)?|metformin|methadone|ssris?|medication|meds)\b/iu;
-/** How a fact states that the user lives with a condition: has it, was diagnosed with it, is treated for it. */
-const HAS_CONDITION_RE =
-    /\b(?:has|have|had|having|diagnosed|suffers?|suffering|lives? with|living with|treated|treatment|recovering|battling|hat|habe|leidet|diagnostiziert)\b/iu;
-/** How a fact states that the user takes a medicine. */
-const TAKES_MEDICATION_RE = /\b(?:takes?|taking|took|prescribed|on|nimmt)\b/iu;
-
-/**
- * Whether a fact's own wording states that the user has, was diagnosed with, suffers from or is treated for a named condition,
- * or takes medication: health information memory never keeps. Read as written and with invisible characters dropped, as
- * the quote check reads (`dia\u200Bbetes`).
- */
-export const statesHealthCondition = (text: string): boolean =>
-    [text, text.replaceAll(INVISIBLE_RE, "")].some((reading) => {
-        const folded = reading.normalize("NFKC");
-
-        return (
-            (CONDITION_PATTERNS.some((pattern) => pattern.test(folded)) && HAS_CONDITION_RE.test(folded)) ||
-            (MEDICATION_RE.test(folded) && TAKES_MEDICATION_RE.test(folded))
-        );
-    });
-
 // `%` stays inside a token: a percent-encoded token (`%2F`) is one token, not pieces too short to read as a key.
 const TOKEN_SPLIT_RE = /[^\w+/=%-]+/u;
 const DIGIT_RE = /\d/u;
