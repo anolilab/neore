@@ -160,3 +160,57 @@ describe("a schedule below an inserted skill, through the action path", () => {
         expect(after[0]).toMatchObject({ cronExpression: DIGEST.cronExpression, enabled: before[0].enabled, name: DIGEST.name });
     });
 });
+
+describe("a changed webhook trigger", () => {
+    let harness: ReturnType<typeof lunoraTest>;
+
+    const HOOK = { model: DIGEST.model, name: "Hook", type: "webhook" as const };
+    const hookFile = async (name: string, version: string) => {
+        const body = buildBundleMarkdown({
+            description: "",
+            items: [
+                { key: "analyst", kind: "skill" as const, skill: skill("analyst") },
+                { key: "hook", kind: "trigger" as const, trigger: { ...HOOK, name } },
+            ],
+            name: "Daily brief",
+        });
+        const contentHash = await bodyHash(body);
+
+        return { contentHash, markdown: withPluginHeader(body, { contentHash, slug: SLUG, version }) };
+    };
+
+    beforeEach(async () => {
+        harness = lunoraTest(schemaWithShardedTables(["skills", "skillStats", "userSkills", "skillHistory"]) as never);
+
+        const first = await hookFile("Hook", "1.0.0");
+
+        await harness.withIdentity({ userId: OWNER } as never).action(procedureAt("plugins_install_action", "installPlugin"), {
+            contentHash: first.contentHash,
+            markdown: first.markdown,
+        } as never);
+    });
+
+    afterEach(() => {
+        harness.close();
+    });
+
+    it("is refused before anything is written, so the install does not claim a version it does not hold", async () => {
+        const as = () => harness.withIdentity({ userId: OWNER } as never);
+        const next = await hookFile("Renamed hook", "1.1.0");
+        const preview = (await as().action(procedureAt("plugins_update", "previewUpdate"), { markdown: next.markdown } as never)) as PreviewResult;
+
+        await expect(
+            as().action(procedureAt("plugins_update", "updatePlugin"), {
+                confirmDowngrade: false,
+                contentHash: next.contentHash,
+                expectedGeneration: preview.generation,
+                expectedInstallId: preview.installId,
+                markdown: next.markdown,
+            } as never),
+        ).rejects.toThrow("Uninstall the plugin and install the new version");
+
+        const { page } = await harness.run(async (context: any) => await context.db.pluginInstalls.findMany({ where: { userId: OWNER } }));
+
+        expect(page[0]).toMatchObject({ status: "installed", version: "1.0.0" });
+    });
+});

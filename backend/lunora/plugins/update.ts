@@ -218,6 +218,25 @@ export const updatePlugin = authAction
             );
         }
 
+        // The same for a changed child that cannot be rewritten in place (a webhook or event trigger, a group chat): it would be skipped while
+        // the new version and file hash are recorded, and every later preview would offer the same update again.
+        const unrewritable = plan.filter((step) => {
+            const entry = entries.find((candidate) => candidate.key === step.entryKey);
+
+            if (step.action === "report-group") {
+                return entry !== undefined;
+            }
+
+            return step.action === "update" && entry?.plan?.kind === "trigger" && entry.plan.create.type !== "schedule";
+        });
+
+        if (unrewritable.length > 0) {
+            throw new LunoraError(
+                "UNPROCESSABLE",
+                `This version changes ${unrewritable.map((step) => step.entryKey).join(", ")}, which an update cannot rewrite in place yet. Uninstall the plugin and install the new version instead.`,
+            );
+        }
+
         // A child whose kind changed is a removal plus a creation under one key. Both halves are skipped when the old child is a group chat
         // (a group is never removed in place). A group on the new side was refused above.
         const groupSwap = new Set(
