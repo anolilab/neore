@@ -13,6 +13,16 @@ export const isDeviceOutdated = (device: Pick<Doc<"devices">, "hostProtocol">): 
 export const isDeviceOnline = (device: Pick<Doc<"devices">, "lastSeenAt">, now: number): boolean =>
     device.lastSeenAt !== undefined && now - device.lastSeenAt <= DEVICE_ONLINE_WINDOW_MS;
 
+/**
+ * Records that a device signed a request. A signed request proves its computer holds the secret and is in use, so this sets
+ * `lastSeenAt` when no heartbeat or manifest has set it yet. Later requests leave it to the heartbeat, which keeps it current.
+ */
+export const recordFirstSignedUse = async (ctx: Pick<MutationCtx, "db">, device: Pick<Doc<"devices">, "_id" | "lastSeenAt">, now: number): Promise<void> => {
+    if (device.lastSeenAt === undefined) {
+        await ctx.db.patch("devices", device._id, { lastSeenAt: now });
+    }
+};
+
 const ACP_TOOL_NAMES: ReadonlySet<string> = new Set(ACP_TOOLS);
 
 /** A coding-agent call (`acp_start`, `acp_send`, `acp_cancel`, `acp_permission_answer`, `acp_set_config`), not a device tool. */

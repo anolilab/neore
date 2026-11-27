@@ -2200,6 +2200,10 @@ msgstr "A project holds at most {limit} rule files. Remove one first."
 msgid "A public http or https address. The first check only records how the page looks. Only the first 1 MiB of a page is read."
 msgstr "A public http or https address. The first check only records how the page looks. Only the first 1 MiB of a page is read."
 
+#: src/features/notifications/lib/notification-labels.ts:56
+msgid "A new device signed in"
+msgstr "A new device signed in"
+
 #: src/features/notifications/lib/notification-labels.ts:40
 msgid "A question is waiting for you"
 msgstr "A question is waiting for you"

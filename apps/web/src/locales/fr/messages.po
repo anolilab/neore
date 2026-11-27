@@ -2201,6 +2201,10 @@ msgstr "Un projet contient au maximum {limit} fichiers de règles. Supprimez-en 
 msgid "A public http or https address. The first check only records how the page looks. Only the first 1 MiB of a page is read."
 msgstr "Une adresse http ou https publique. La première vérification enregistre seulement l’apparence de la page. Seul le premier 1 Mio d’une page est lu."
 
+#: src/features/notifications/lib/notification-labels.ts:56
+msgid "A new device signed in"
+msgstr "Un nouvel appareil s'est connecté"
+
 #: src/features/notifications/lib/notification-labels.ts:40
 msgid "A question is waiting for you"
 msgstr "Une question vous attend"

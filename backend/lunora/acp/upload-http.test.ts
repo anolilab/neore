@@ -52,6 +52,7 @@ const { HOST_MEDIA_MAX_BYTES, HOST_UPLOAD_PATH, HOST_UPLOAD_PAYLOAD_HEADER, HOST
 
 registerModule(registry, "lib_shard_routes", await import("../lib/shard-routes"));
 registerModule(registry, "acp_upload", await import("./upload"));
+registerModule(registry, "devices_internal", await import("../devices/internal"));
 registerModule(registry, "lib_claim_once", await import("../lib/claim-once"));
 registerModule(registry, "lib_rate_limiter_mutations", await import("../lib/rate-limiter-mutations"));
 
@@ -226,6 +227,28 @@ describe("a signed upload from a paired computer", () => {
 
         expect(await statusOf(request.clone())).toBe(201);
         expect(await statusOf(request.clone())).toBe(401);
+    });
+
+    it("a signed create is a sign-in: revoking the device before any heartbeat still queues its owner's alert", async () => {
+        const owner = await pair(await insertUser());
+        const storedDevice = async () =>
+            (await harness.run(async (ctx: any) => await ctx.db.devices.findFirst({ where: { _id: owner.deviceId } }))) as { lastSeenAt?: number };
+        // This file's registry leaves `functionPath` empty, so a queued removed-device alert is told apart by its args: only it carries a `name`.
+        const queuedAlerts = () => harness.scheduler.list().filter((job) => (job.args as { name?: string }).name !== undefined);
+
+        const before = await storedDevice();
+
+        expect(before.lastSeenAt).toBeUndefined();
+
+        await create(owner);
+
+        const after = await storedDevice();
+
+        expect(after.lastSeenAt).toEqual(expect.any(Number));
+
+        await as(owner.userId).mutation(devices.revokeDevice as never, { deviceId: owner.deviceId } as never);
+
+        expect(queuedAlerts().map((job) => job.args)).toEqual([expect.objectContaining({ deviceId: owner.deviceId, name: "Laptop", userId: owner.userId })]);
     });
 
     it("refuses a stale signature on every method, without touching storage", async () => {
