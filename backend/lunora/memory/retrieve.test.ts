@@ -1,0 +1,172 @@
+/**
+ * The retrieval action, end to end over the test database: the candidates are the newest rows plus the vector
+ * hits outside them (in scope only), a row with no relevance is not injected, and `search_memory`'s search finds
+ * more than the injection does.
+ */
+import { lunoraTest } from "@lunora/testing";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { registeredApi, registerModule } from "../../test/registered-api";
+import schema from "../schema";
+import { retrieveRelevantMemories } from "./retrieve";
+import { CANDIDATE_WINDOW_SIZE, SEARCH_MAX_RESULTS } from "./retrieve-ranking";
+
+const { embedMany, registry, searchVectors } = vi.hoisted(() => {
+    return { embedMany: vi.fn(), registry: new Map<string, unknown>(), searchVectors: vi.fn() };
+});
+
+vi.mock("../_generated/api", async (importOriginal) => registeredApi(await importOriginal(), registry));
+vi.mock("../_generated/internal", async (importOriginal) => registeredApi(await importOriginal(), registry));
+vi.mock("../chat/lib/model-filter-rules", () => {
+    return {
+        loadModelFilterRules: async () => {
+            return {};
+        },
+    };
+});
+vi.mock("../lib/services", () => {
+    return { gatewayFetch: () => async () => new Response("{}") };
+});
+vi.mock("../agent/client/search", () => {
+    return { embedMany };
+});
+vi.mock("../agent/vector/index", async (importOriginal) => {
+    return { ...(await importOriginal<typeof import("../agent/vector/index")>()), searchVectors };
+});
+vi.mock("../chat/lib/gateway-embedding-model", () => {
+    return {
+        createGatewayEmbeddingModel: () => {
+            return {};
+        },
+        embeddingModelAllowed: () => true,
+    };
+});
+
+const USER = "user-a";
+/** The search's embedding: any 128-dimension vector, since the vector index is replaced. */
+const QUERY_VECTOR = Array.from({ length: 128 }, (_, axis) => (axis === 0 ? 1 : 0));
+
+let harness: ReturnType<typeof lunoraTest>;
+
+beforeAll(async () => {
+    registerModule(registry, "memory_functions", await import("./functions"));
+});
+
+beforeEach(async () => {
+    harness = lunoraTest(schema as never);
+    embedMany.mockResolvedValue({ embeddings: [QUERY_VECTOR] });
+    searchVectors.mockResolvedValue([]);
+    await harness.run(async (ctx: any) => {
+        await ctx.db.insert("userSettings", { memoryEnabled: true, timezone: "UTC", userId: USER });
+    });
+});
+
+afterEach(() => {
+    harness.close();
+    vi.resetAllMocks();
+});
+
+interface Seed {
+    botId?: string;
+    embeddingId?: string;
+    memory: string;
+    pinned?: boolean;
+    type?: "activity" | "context" | "identity" | "preference";
+    validUntil?: string;
+}
+
+const seed = async (rows: Seed[]): Promise<void> => {
+    await harness.run(async (ctx: any) => {
+        for (const row of rows) {
+            await ctx.db.insert("memories", {
+                lastConfirmedAt: Date.now(),
+                source: "auto",
+                type: "preference",
+                updatedAt: Date.now(),
+                userId: USER,
+                ...row,
+            });
+        }
+    });
+};
+
+/** The vector index answers with these embedding ids and cosine scores, best first. */
+const hits = (...found: [string, number][]) =>
+    searchVectors.mockResolvedValue(
+        found.map(([id, score]) => {
+            return { _id: id, _score: score };
+        }),
+    );
+
+const retrieve = async (args: { botId?: string; limit?: number; search?: boolean; searchText?: string } = {}): Promise<string[]> => {
+    const rows = (await harness.action(
+        async (ctx: any) => await ctx.runAction(retrieveRelevantMemories, { searchText: "what did I do on my trip", userId: USER, ...args }),
+    )) as { memory: string }[];
+
+    return rows.map((row) => row.memory);
+};
+
+/** More rows than the window holds, all newer than whatever is seeded before them and unrelated to any search. */
+const filler = (count: number): Seed[] =>
+    Array.from({ length: count }, (_, i) => {
+        return { memory: `unrelated filler ${String(i)}`, type: i % 2 === 0 ? "preference" : "identity" };
+    });
+
+describe("candidates", () => {
+    it("injects a relevant activity row of a user with more rows than the window", async () => {
+        await seed([{ embeddingId: "emb-trip", memory: "went to the coast in May", type: "activity" }, ...filler(CANDIDATE_WINDOW_SIZE + 20)]);
+        hits(["emb-trip", 0.9]);
+
+        // The row is not among the newest 100 and sorts last by type; the vector hit still makes it a candidate.
+        expect(await retrieve()).toEqual(["went to the coast in May"]);
+    });
+
+    it("does not inject an unrelated recent or pinned row", async () => {
+        await seed([{ memory: "likes tea" }, { memory: "always answers in German", pinned: true, type: "identity" }]);
+
+        expect(await retrieve({ searchText: "plan my week" })).toEqual([]);
+    });
+
+    it("never adds a hit on another bot's row, in a plain chat or as another bot", async () => {
+        await seed([
+            { memory: "likes tea" },
+            { botId: "bot-a", embeddingId: "emb-a", memory: "bot a secret" },
+            { botId: "bot-b", embeddingId: "emb-b", memory: "bot b secret" },
+            ...filler(CANDIDATE_WINDOW_SIZE + 5),
+        ]);
+        hits(["emb-b", 0.95], ["emb-a", 0.9]);
+
+        expect(await retrieve()).toEqual([]);
+        expect(await retrieve({ botId: "bot-a" })).toEqual(["bot a secret"]);
+    });
+
+    it("leaves out a hit on a fact past its end date", async () => {
+        await seed([{ embeddingId: "emb-old", memory: "trip next week", type: "activity", validUntil: "2020-01-01" }, ...filler(CANDIDATE_WINDOW_SIZE + 5)]);
+        hits(["emb-old", 0.95]);
+
+        expect(await retrieve()).toEqual([]);
+    });
+});
+
+describe("search", () => {
+    it("returns a memory below the injection floor, which the injection leaves out", async () => {
+        await seed([{ embeddingId: "emb-loose", memory: "keeps a garden" }]);
+        hits(["emb-loose", 0.4]);
+
+        expect(await retrieve()).toEqual([]);
+        expect(await retrieve({ limit: 5, search: true })).toEqual(["keeps a garden"]);
+    });
+
+    it("returns up to its own limit, past the 8 injected", async () => {
+        const rows = Array.from({ length: 12 }, (_, i) => {
+            return { embeddingId: `emb-${String(i)}`, memory: `fact ${String(i)}` };
+        });
+
+        await seed(rows);
+        hits(...rows.map((row, i): [string, number] => [row.embeddingId, 0.9 - i / 100]));
+
+        expect(await retrieve()).toHaveLength(8);
+        expect(await retrieve({ limit: 10, search: true })).toHaveLength(SEARCH_MAX_RESULTS);
+        expect(await retrieve({ limit: 3, search: true })).toHaveLength(3);
+    });
+});
