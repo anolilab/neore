@@ -14,7 +14,7 @@ vi.mock("../lib/rate-limiter", async (importOriginal) => {
         createRatelimit: (key: string) => {
             return {
                 getRemaining: async () => {
-                    return { remaining: 5, reset: 5000 };
+                    return { remaining: 5, reset: key.startsWith("chat/") ? 5000 : 7000 };
                 },
                 refund: async () => {
                     refunded.push(key);
@@ -55,6 +55,6 @@ describe("refundRoundKeys", () => {
 
 describe("roundWindowEnds", () => {
     it("reads the end of each limit's current window, in the order of the keys", async () => {
-        expect(await roundWindowEnds(CTX, "u", KEYS)).toEqual([5000, 5000]);
+        expect(await roundWindowEnds(CTX, "u", KEYS)).toEqual([5000, 7000]);
     });
 });

@@ -39,7 +39,9 @@ import { enqueueJob } from "../lib/job-queue";
 import { JOB_LEASE_MS } from "../lib/job-once";
 import { threadHasLiveGrant } from "../agent/live-grant";
 import { isDeviceEligibleThread } from "../devices/internal";
+import { deleteMessage, getMaxMessage } from "../agent/messages";
 import { isThreadLocked } from "../lib/thread-lock";
+import { readOrganizationPermissionCap } from "../auth/lib/permission-cap-read";
 import { chargeRound, loadTaskAccount, refundRoundKeys, roundQuotaKeys, roundWindowEnds, taskAccessProblem } from "../tasks/account";
 import { wakeLeaseHeld } from "./pr-watch-wake-lease";
 import { isTaskModelAllowed } from "../tasks/logic";
@@ -57,6 +59,9 @@ export const PR_WATCH_WAKE_LEASE_MS = JOB_LEASE_MS + 5 * 60 * 1000;
 export const PR_WATCH_MAX_WAKE_FAILURES = 3;
 /** Tries of the settlement alone (never the model) when it fails after the turn ran. */
 const FINISH_RETRIES = 2;
+/** Pages of 64 messages one rollback deletes: a wake turn writes a handful. */
+const ROLLBACK_PAGES = 20;
+const ROLLBACK_PAGE_SIZE = 64;
 
 /**
  * Whether trying again would fail the same way: a refusal the run raised itself (`AgentRunError`: a plan that does not cover the model,
@@ -82,7 +87,7 @@ const vMarkers = v.object({ checks: v.optional(v.string()), conflict: v.optional
 const vBegin = v.union(
     v.object({ status: v.literal("stale") }),
     v.object({ status: v.literal("wait") }),
-    v.object({ charged: v.array(v.string()), model: v.string(), status: v.literal("run") }),
+    v.object({ charged: v.array(v.string()), markOrder: v.number(), model: v.string(), status: v.literal("run") }),
 );
 
 const vTurn = v.object({
@@ -501,6 +506,24 @@ export const beginWatchWake = internalMutation
             return { status: "wait" as const };
         }
 
+        // An organization that caps its runs below `auto` leaves a headless run no tool it may use (an `ask` tool is removed where nobody can
+        // answer), and the wake needs its read tools to see the pull request: no round is charged for a turn that cannot do its job. The cap is
+        // read as a run reads it (the chat's organization, else the one a temporary chat started in); a policy that cannot be read caps at `ask`.
+        // Handled like an unavailable model: nothing charged or counted, the lease released, the reasons kept, the owner told once.
+        const capOrganizationId = wakeThread?.organizationId ?? wakeThread?.capOrganizationId;
+
+        if (capOrganizationId && (await readOrganizationPermissionCap(ctx, capOrganizationId)) !== "auto") {
+            if (link.watchWakeFailure?.kind !== "unavailable") {
+                await ctx.db.patch("pullRequestThreads", link._id, {
+                    watchWakeFailure: { at: ctx.now, attempts: link.watchWakeFailure?.attempts ?? 0, kind: "unavailable", retryAt: 0 },
+                });
+            }
+
+            await ctx.db.patch("pullRequestThreads", link._id, { watchWakeLeaseUntil: 0 });
+
+            return { status: "wait" as const };
+        }
+
         // A refund owed for an earlier turn that failed before the model is paid first, so a new charge never stacks on an unreconciled one.
         await payOwedRefund(ctx, link);
 
@@ -527,11 +550,16 @@ export const beginWatchWake = internalMutation
         // The exact limits this round was charged to, and when their windows end, are written in THIS transaction, with the occurrence about
         // to start: a job that dies after the charge and before the model leaves the refund owed, and a claim that finds the occurrence
         // started never generates again. The job gets the keys for its own refund path.
+        // Where the chat stands when the turn starts: a turn that fails or is fenced is rolled back to this, row by row (`rollBackWakeMessages`).
+        const newest = await getMaxMessage(ctx, link.threadId);
+        const markOrder = newest?.order ?? -1;
+
         await ctx.db.patch("pullRequestThreads", link._id, {
             watchWakeCompleted: {
                 claim: args.claim,
                 done: false,
                 markers: args.markers,
+                markOrder,
                 reasons: args.reasons,
                 startedAt: args.startedAt,
                 state: "running",
@@ -540,7 +568,7 @@ export const beginWatchWake = internalMutation
             watchWakeRefund: { applied: false, claim: args.claim, keys: charged, windowEnds },
         });
 
-        return { charged, model, status: "run" as const };
+        return { charged, markOrder, model, status: "run" as const };
     });
 
 /**
@@ -810,6 +838,43 @@ const owedRefund = async (ctx: Pick<ActionCtx, "runMutation">, linkId: Id<"pullR
     }
 };
 
+/**
+ * Rolls the chat back to where the turn found it: every message after `markOrder` is deleted, through the same delete helper
+ * (`deleteMessage`, which releases the rows' embeddings and file references) a run's aborted rows use, a page at a time. The turn's prompt and any partial reply go, so a failed or fenced turn leaves no trace and a
+ * retry does not add the wake to the chat again. Done while the lease is still held, before the failure is recorded; a step that fails
+ * is logged and the rows stay (the chat can show the wake twice, never lose its own messages: only rows after the mark are touched).
+ */
+/** One page of the rollback: the chat's messages after `markOrder`, deleted one at a time (a delete releases file references read-modify-write). */
+export const deleteWakeMessages = internalMutation
+    .input({ markOrder: v.number(), threadId: v.id("threads") })
+    .output(v.object({ isDone: v.boolean() }))
+    .mutation(async ({ args, ctx }) => {
+        const rows = await ctx.db
+            .query("messages")
+            .withIndex("by_threadId_order_stepOrder", (q) => q.eq("threadId", args.threadId).gt("order", args.markOrder))
+            .take(ROLLBACK_PAGE_SIZE);
+
+        for (const row of rows) {
+            await deleteMessage(ctx, row);
+        }
+
+        return { isDone: rows.length < ROLLBACK_PAGE_SIZE };
+    });
+
+const rollBackWakeMessages = async (ctx: Pick<ActionCtx, "runMutation">, threadId: string, markOrder: number): Promise<void> => {
+    try {
+        for (let page = 0; page < ROLLBACK_PAGES; page += 1) {
+            const result = await ctx.runMutation(internal.source_control.pr_watch_wake.deleteWakeMessages, { markOrder, threadId: threadId as Id<"threads"> });
+
+            if (result.isDone) {
+                return;
+            }
+        }
+    } catch (error) {
+        console.warn("[pr-watch-wake] could not roll the wake back out of the chat", { error, threadId });
+    }
+};
+
 /** The job: runs the turn in the thread, then counts it. A turn that fails is released uncounted, for a later try. */
 export const runWatchWake = internalAction
     .input({
@@ -857,8 +922,9 @@ export const runWatchWake = internalAction
                 fence,
                 memory: false,
                 model: may.model,
-                // Recorded before the first generation: the round then stays charged, and a failure from here on is never refunded.
-                onGenerationStart: async () => {
+                // Recorded at the first provider request, after the agent's own setup (context, saving the prompt): the round then stays
+                // charged, and a failure from here on is never refunded. A failure in that setup is still refunded.
+                onModelRequest: async () => {
                     const kept = await ctx.runMutation(internal.source_control.pr_watch_wake.keepWatchWakeCharge, { claim: args.claim, linkId: args.linkId });
 
                     // The chat changed since the job's first check: the model is not asked (the run stops here), and nothing is counted.
@@ -903,11 +969,17 @@ export const runWatchWake = internalAction
         // Stopped by the fence (the lease lapsed or no longer matches, the watch stopped, or the chat was locked or deleted): released and
         // closed with nothing counted. The reasons stay pending, and the occurrence keeps its model-reached mark.
         if (fenced) {
+            await rollBackWakeMessages(ctx, args.threadId, may.markOrder);
             await retried(async () => {
                 await ctx.runMutation(internal.source_control.pr_watch_wake.fencedWatchWake, { claim: args.claim, linkId: args.linkId });
             });
 
             return null;
+        }
+
+        // A turn that failed leaves nothing in the chat either: rolled back before the failure is recorded.
+        if (!delivered) {
+            await rollBackWakeMessages(ctx, args.threadId, may.markOrder);
         }
 
         // A turn that ran to its end is recorded durably BEFORE its settlement is tried, so a settlement that keeps failing is settled by a

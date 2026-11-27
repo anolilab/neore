@@ -189,6 +189,12 @@ export interface HeadlessRunOptions {
      * that must give something back when a run never started tells the two apart with it.
      */
     onGenerationStart?: () => Promise<void> | void;
+    /**
+     * Called once, from the first step's `prepareStep`: after the agent has finished its own setup for the turn (context retrieval,
+     * saving the prompt) and immediately before the provider request. A failure before it never reached the provider; one that throws here
+     * stops the run before the request. For a caller that must keep a charge only once the provider is really asked (a wake turn).
+     */
+    onModelRequest?: () => Promise<void> | void;
     /** Called with the new thread's id before generation starts, so a failure can still point at it. */
     onThread?: (threadId: string) => Promise<void> | void;
     /**
@@ -523,6 +529,22 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
 
             throw error;
         };
+
+        if (options.onModelRequest) {
+            const { onModelRequest } = options;
+            const inner = generateArgs.prepareStep as ((step: unknown) => unknown) | undefined;
+            let requested = false;
+
+            generateArgs.prepareStep = async (step: unknown) => {
+                if (!requested) {
+                    requested = true;
+                    await onModelRequest();
+                }
+
+                return await inner?.(step);
+            };
+        }
+
         const result = await thread.generateText(generateArgs as never, callOptions).catch(wakeOnFailure);
         const text = result.text ?? "";
         // When the prompt was saved, which the generation does after preparing its context: "tomorrow" in it is read against that day.

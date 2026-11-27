@@ -1014,15 +1014,6 @@ const runChatStartOnShard = async (
         messageContent.unshift(formatPageContextPart(pageContext));
     }
 
-    // A pull request watch is waking this chat (`source-control/pr-watch-wake-lease.ts`): the reply waits, refused before anything is written,
-    // so no half of a reply is saved. The same held-lease check the lock and the delete use.
-    if (
-        validThreadId &&
-        (await context.runQuery(internal.source_control.pr_watch_wake_lease.wakeLeaseHeldFor, { threadId: validThreadId as Id<"threads"> })) === true
-    ) {
-        return Response.json({ code: "PR_WATCH_WAKING", error: "A pull request watch is replying to this chat. Try again in a moment." }, { status: 409 });
-    }
-
     // Continuing a thread needs write access to it. Nothing checked this: the
     // continue branch below saved the prompt into whatever thread id it was
     // handed, so a signed-in caller could post into — and trigger replies in —
@@ -1102,6 +1093,17 @@ const runChatStartOnShard = async (
 
     if (access?.isWorker) {
         return workerThreadResponse();
+    }
+
+    // A pull request watch is waking this chat (`source-control/pr-watch-wake-lease.ts`): the reply waits, refused before anything is written,
+    // so no half of a reply is saved. Asked only of a caller the access gate let in (a stranger gets the answer any inaccessible thread gets,
+    // and learns nothing of a wake), and with the same held-lease check the lock and the delete use.
+    if (
+        validThreadId &&
+        access?.outcome === "ok" &&
+        (await context.runQuery(internal.source_control.pr_watch_wake_lease.wakeLeaseHeldFor, { threadId: validThreadId as Id<"threads"> })) === true
+    ) {
+        return Response.json({ code: "PR_WATCH_WAKING", error: "A pull request watch is replying to this chat. Try again in a moment." }, { status: 409 });
     }
 
     // A goal spends the owner's budget over several rounds, so an impersonating admin cannot start one: refused here, before

@@ -950,6 +950,51 @@ describe("runHeadlessAgent onGenerationStart", () => {
     });
 });
 
+describe("runHeadlessAgent onModelRequest", () => {
+    const run = async (onModelRequest: () => void) =>
+        await runHeadlessAgent(fakeCtx(), {
+            memory: false,
+            model: "test-model",
+            onModelRequest,
+            organizationId: null,
+            origin: "lead",
+            personalization: "full",
+            prompt: "Do the thing",
+            thread: { title: "Trigger: x" },
+            tools: "none",
+            userId: "owner",
+        });
+
+    beforeEach(() => {
+        seen.failAt = undefined;
+        seen.prepareSteps.length = 0;
+    });
+
+    it("is not called until the first provider step, and only once", async () => {
+        const requested = vi.fn();
+
+        await run(requested);
+
+        // The agent's setup is done and the run is about to ask the provider: the first step's prepareStep announces it.
+        expect(requested).not.toHaveBeenCalled();
+
+        const prepare = seen.prepareSteps[0] as (step: unknown) => Promise<unknown>;
+
+        await prepare({ messages: [], stepNumber: 0 });
+        await prepare({ messages: [], stepNumber: 1 });
+
+        expect(requested).toHaveBeenCalledTimes(1);
+    });
+
+    it("is not called when the agent's setup fails before the provider is asked", async () => {
+        const requested = vi.fn();
+
+        seen.failAt = "generate";
+        await expect(run(requested)).rejects.toThrow("model call failed");
+        expect(requested).not.toHaveBeenCalled();
+    });
+});
+
 describe("runHeadlessAgent with a goal and memory", () => {
     beforeEach(() => {
         seen.failAt = undefined;

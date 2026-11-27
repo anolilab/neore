@@ -2885,6 +2885,9 @@ export const schema = defineSchema({
                 claim: v.number(),
                 done: v.boolean(),
                 markers: v.object({ checks: v.optional(v.string()), conflict: v.optional(v.string()), review: v.optional(v.string()) }),
+                // The order of the chat's newest message when the turn started: a turn that fails or is fenced is rolled back to it, so its prompt
+                // and any partial reply leave no trace and a retry does not repeat them in the chat.
+                markOrder: v.optional(v.number()),
                 // Set when the charge is kept, right before the model is asked, and kept through any settlement: the model may have generated
                 // for this occurrence, so no new paid turn is admitted for the same markers.
                 modelReached: v.optional(v.boolean()),

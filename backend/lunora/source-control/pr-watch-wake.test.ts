@@ -30,6 +30,7 @@ const { enqueued, probe, registry, runs } = vi.hoisted(() => {
             failWith: undefined as unknown,
             generated: 0,
             leaseSeenAtEnqueue: undefined as number | undefined,
+            onSave: undefined as ((options: Record<string, any>) => Promise<void>) | undefined,
             readLease: undefined as ((linkId: string) => Promise<number | undefined>) | undefined,
             refundedKeys: [] as string[][],
             refunds: 0,
@@ -96,8 +97,10 @@ vi.mock("../chat/lib/headless-run", () => {
             }
 
             await probe.beforeStart?.();
-            await options.onGenerationStart?.();
+            await options.onModelRequest?.();
             probe.generated += 1;
+            // As the run does: the prompt and a reply are saved into the thread.
+            await probe.onSave?.(options);
             await probe.during?.();
 
             // As the run does: asked after the step, and a failing fence ends the run there.
@@ -147,6 +150,7 @@ let harness: ReturnType<typeof lunoraTest>;
 
 beforeAll(async () => {
     registerModule(registry, "source_control_pr_watch_wake", await import("./pr-watch-wake"));
+    registerModule(registry, "agent_messages", await import("../agent/messages"));
 });
 
 beforeEach(() => {
@@ -163,6 +167,7 @@ beforeEach(() => {
     probe.refundedKeys = [];
     probe.during = undefined;
     probe.beforeStart = undefined;
+    probe.onSave = undefined;
     probe.generated = 0;
     probe.windowReads = 0;
     probe.endsBefore = [Date.now() + 3_600_000, Date.now() + 3_600_000];
@@ -1324,6 +1329,57 @@ describe("the model of the turn", () => {
     });
 });
 
+describe("an organization that caps runs below auto", () => {
+    const policy = async (cap: "ask" | "auto" | "off") =>
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("organizationPolicies", {
+                document: JSON.stringify({ permissionCap: cap, schemaVersion: 1 }),
+                organizationId: "org-1",
+                revision: 1,
+                schemaVersion: 1,
+                updatedAt: 0,
+            });
+        });
+
+    it.each(["ask", "off"] as const)("charges nothing and runs no turn under a %s cap, and keeps the reasons pending", async (cap) => {
+        const { linkId, threadId } = await seed();
+
+        await start(linkId);
+        await policy(cap);
+        await harness.run(async (ctx: any) => {
+            await ctx.db.patch("threads", threadId, { organizationId: "org-1" });
+        });
+        await runJob(enqueued[0]!);
+
+        const row = await rowOf(linkId);
+
+        expect(runs).toHaveLength(0);
+        expect(probe.charges).toBe(0);
+        expect(row.watchWakeLeaseUntil).toBe(0);
+        expect(row.watchPending).toEqual(["checks"]);
+        expect(row.watch.wakes).toBeUndefined();
+        expect(row.watchWakeCompleted).toBeUndefined();
+        expect(row.watchWakeFailure).toMatchObject({ attempts: 0, kind: "unavailable", retryAt: 0 });
+    });
+
+    it("runs the turn under an auto cap", async () => {
+        const { linkId, threadId } = await seed();
+
+        await start(linkId);
+        await policy("auto");
+        await harness.run(async (ctx: any) => {
+            await ctx.db.patch("threads", threadId, { organizationId: "org-1" });
+        });
+        await runJob(enqueued[0]!);
+
+        expect(runs).toHaveLength(1);
+        expect(probe.charges).toBe(1);
+        const row = await rowOf(linkId);
+
+        expect(row.watchPending).toEqual([]);
+    });
+});
+
 describe("an unavailable model at the claim", () => {
     it("enqueues nothing on repeated polls before the retry time, notes it once, and delivers once the model is allowed again", async () => {
         const { linkId, threadId } = await seed();
@@ -1500,6 +1556,149 @@ describe("a completion checkpoint that cannot be written", () => {
 
         // Nothing is owed or left to claim again: a later poll makes no second turn.
         expect(await start(linkId)).toBe(false);
+        expect(runs).toHaveLength(1);
+    });
+});
+
+describe("a failed or fenced turn leaves no trace in the chat", () => {
+    const messagesOf = async (threadId: string) =>
+        await harness.run(async (ctx: any) => {
+            const rows = await ctx.db.query("messages").collect();
+
+            return rows.filter((row: any) => row.threadId === threadId).length;
+        });
+
+    /** What the run writes: the wake prompt and a reply, after the chat's newest row. */
+    const savesRows = (threadId: string) => async () => {
+        await harness.run(async (ctx: any) => {
+            const rows = await ctx.db.query("messages").collect();
+            const order = Math.max(-1, ...rows.filter((row: any) => row.threadId === threadId).map((row: any) => row.order)) + 1;
+
+            for (const [step, role] of ["user", "assistant"].entries()) {
+                await ctx.db.insert("messages", {
+                    message: { content: role === "user" ? "[Pull request watch] wake" : [{ text: "partial", type: "text" }], role },
+                    order,
+                    status: "success",
+                    stepOrder: step,
+                    text: "wake",
+                    threadId,
+                    tool: false,
+                    userId: OWNER,
+                });
+            }
+        });
+    };
+
+    const seedWithHistory = async () => {
+        const made = await seed();
+
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("messages", {
+                message: { content: "earlier", role: "user" },
+                order: 0,
+                status: "success",
+                stepOrder: 0,
+                text: "earlier",
+                threadId: made.threadId,
+                tool: false,
+                userId: OWNER,
+            });
+        });
+
+        return made;
+    };
+
+    it("rolls back the prompt and partial reply of a turn that fails after writing them, and the retry that succeeds writes one wake", async () => {
+        const { linkId, threadId } = await seedWithHistory();
+
+        probe.onSave = savesRows(threadId);
+        await start(linkId);
+        probe.fail = true;
+        await runJob(enqueued[0]!);
+        probe.fail = false;
+
+        // The chat is as it was: only its own earlier message.
+        expect(await messagesOf(threadId)).toBe(1);
+        expect(runs).toHaveLength(1);
+
+        // The failure is past: a new head makes a new occurrence, and the retry succeeds, writing the wake once.
+        await harness.run(async (ctx: any) => {
+            const row = await ctx.db.get("pullRequestThreads", linkId);
+
+            await ctx.db.patch("pullRequestThreads", linkId, { watch: { ...row.watch, checksHeadSha: "sha-9", headSha: "sha-9" } });
+        });
+        vi.useFakeTimers({ now: Date.now() + PR_WATCH_WAKE_COOLDOWN_MS + 60_000, toFake: ["Date"] });
+
+        try {
+            expect(await start(linkId)).toBe(true);
+            await runJob(enqueued[1]!);
+        } finally {
+            vi.useRealTimers();
+        }
+
+        // The earlier message and one wake (its prompt and reply).
+        expect(await messagesOf(threadId)).toBe(3);
+        expect(runs).toHaveLength(2);
+    });
+
+    it("rolls back a turn the fence stopped, so it leaves no rows", async () => {
+        const { linkId, threadId } = await seedWithHistory();
+
+        probe.onSave = savesRows(threadId);
+        await start(linkId);
+
+        const claim = enqueued[0]!.args.claim as number;
+
+        probe.during = async () => {
+            await harness.run(async (ctx: any) => {
+                await ctx.db.patch("pullRequestThreads", linkId, { watchWakeLeaseUntil: claim + 12_345 });
+            });
+        };
+        await runJob(enqueued[0]!);
+
+        expect(await messagesOf(threadId)).toBe(1);
+    });
+
+    it("keeps the messages of a turn that is delivered", async () => {
+        const { linkId, threadId } = await seedWithHistory();
+
+        probe.onSave = savesRows(threadId);
+        await start(linkId);
+        await runJob(enqueued[0]!);
+
+        expect(await messagesOf(threadId)).toBe(3);
+    });
+});
+
+describe("a turn that failed after the model was asked", () => {
+    it("is not paid for or run a second time once its retry time has passed", async () => {
+        const { linkId } = await seed();
+
+        await start(linkId);
+        probe.fail = true;
+        await runJob(enqueued[0]!);
+        probe.fail = false;
+
+        const failed = await rowOf(linkId);
+
+        expect(probe.charges).toBe(1);
+        expect(probe.refunds).toBe(0);
+        expect(runs).toHaveLength(1);
+        expect(failed.watchWakeCompleted).toMatchObject({ modelReached: true });
+
+        vi.useFakeTimers({ now: failed.watchWakeFailure.retryAt + 1000, toFake: ["Date"] });
+
+        try {
+            await start(linkId);
+
+            if (enqueued[1] !== undefined) {
+                await runJob(enqueued[1]);
+            }
+        } finally {
+            vi.useRealTimers();
+        }
+
+        expect(probe.charges).toBe(1);
         expect(runs).toHaveLength(1);
     });
 });
