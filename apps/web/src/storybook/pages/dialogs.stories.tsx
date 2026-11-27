@@ -240,15 +240,9 @@ const VariableFillRequired = () => (
     <VariableFillDialog existingValues={{}} onCancel={noop} onUse={noop} onUseAnyway={noop} open prompt={REQUIRED_VARIABLES_PROMPT} />
 );
 
-/**
- * The tag field is the `emblor` tag input, whose remove buttons and suggestion trigger have no names and take none from
- * outside. Its own fix is a follow-up; until then these two stories leave that one field out of the check.
- */
-const TAG_INPUT_A11Y = { context: { exclude: ["[data-slot=form-item]:has(#tags)"] } };
-
 export const PromptForm: Story = {
     args: { levels: levelsOf(PromptFormNew) },
-    parameters: { a11y: TAG_INPUT_A11Y, msw: { handlers: handlers(...promptsFixtures()) } },
+    parameters: { msw: { handlers: handlers(...promptsFixtures()) } },
     play: async () => {
         await dialog(/prompt/iu);
     },
@@ -256,7 +250,7 @@ export const PromptForm: Story = {
 
 export const PromptFormEditing: Story = {
     args: { levels: levelsOf(PromptFormEdit) },
-    parameters: { a11y: TAG_INPUT_A11Y, msw: { handlers: handlers(...promptsFixtures()) } },
+    parameters: { msw: { handlers: handlers(...promptsFixtures()) } },
     play: async () => {
         await dialog(/prompt/iu);
     },
