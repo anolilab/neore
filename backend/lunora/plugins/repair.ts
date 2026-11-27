@@ -147,8 +147,11 @@ const repairStoppedUpdate = async (ctx: MutationCtx, install: Doc<"pluginInstall
 export const repairableNow = (install: { leaseUntil?: number; status: string }, now: number): boolean =>
     install.status === "needs-repair" || (install.status === "installing" && (install.leaseUntil === undefined || install.leaseUntil <= now));
 
-/** Dropped children handled per call: each costs a patch and a link delete, and a mutation has a statement budget. */
-export const DETACH_PER_CALL = 8;
+/**
+ * Dropped children handled per call. Each costs about three global statements (the skill read, its patch, the link delete), and
+ * a call that detached anything does nothing else (see `more` below), so five stay far inside the statement budget.
+ */
+export const DETACH_PER_CALL = 5;
 
 /**
  * An update kept for repair holds the new file's hash, so a `created` link whose key the file no longer has is a child the
@@ -209,7 +212,9 @@ const detachDropped = async (
         await ctx.db.delete("pluginItems", row._id as Id<"pluginItems">);
     }
 
-    return { kept, more: false };
+    // A call that detached anything ends there: the link and intent work waits for the next call, so the two never share one
+    // call's statement budget.
+    return { kept, more: handled > 0 };
 };
 
 /** Links every intent row whose child exists, and returns the install to `installed` once nothing is missing. */
@@ -303,6 +308,8 @@ export const repairRows = async (ctx: MutationCtx, userId: string, pluginSlug: s
             install.generation,
             {
                 generation: install.generation + 1,
+                // Every child now matches the file it finishes at (the missing ones made, the dropped ones detached).
+                partial: false,
                 status: "installed",
                 ...(install.targetVersion !== undefined && { targetVersion: version }),
                 updatedAt: ctx.now,

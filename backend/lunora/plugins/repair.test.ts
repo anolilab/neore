@@ -140,13 +140,14 @@ describe("repair", () => {
         );
 
         await run(async (context) => await context.runMutation(markNeedsRepair, { generation, installId }));
-        await run(async (context) => await context.db.patch("pluginInstalls", installId, { targetVersion: "1.1.0" }));
+        await run(async (context) => await context.db.patch("pluginInstalls", installId, { partial: true, targetVersion: "1.1.0" }));
         await run(async (context) => await repairRows(context, OWNER, SLUG));
 
         const install = await run(async (context) => await context.db.pluginInstalls.findFirst({ where: { _id: installId } }));
 
         // The target version reads as none once it equals the version; a removal would replace the whole row, which cannot be conditional.
-        expect(install).toMatchObject({ status: "installed", targetVersion: "1.1.0", version: "1.1.0" });
+        // A finished repair has every child its file holds, so the partial mark from the interrupted update goes.
+        expect(install).toMatchObject({ partial: false, status: "installed", targetVersion: "1.1.0", version: "1.1.0" });
     });
 
     it("loses to a claim made after its read, and writes nothing over it", async () => {
@@ -445,9 +446,12 @@ describe("repair", () => {
 
             await run(async (context) => await context.runMutation(markNeedsRepair, { generation: first.generation, installId: first.installId }));
 
+            // The detach takes a call of its own; the next one links and finishes.
+            const detached = await run(async (context) => await repairRows(context, OWNER, SLUG, new Set(["skill:keep"])));
             const result = await run(async (context) => await repairRows(context, OWNER, SLUG, new Set(["skill:keep"])));
 
-            expect(result).toMatchObject({ kept: ["skill:drop"], moreDropped: false, status: "installed" });
+            expect(detached).toMatchObject({ kept: ["skill:drop"], moreDropped: true, status: "needs-repair" });
+            expect(result).toMatchObject({ kept: [], moreDropped: false, status: "installed" });
             expect(await linkKeys(first.installId)).toEqual(["skill:keep"]);
             expect(await run(async (context) => await context.db.skills.findFirst({ where: { _id: droppedId } }))).toMatchObject({ pluginMarker: "" });
         });
@@ -472,6 +476,7 @@ describe("repair", () => {
             );
             await run(async (context) => await context.runMutation(markNeedsRepair, { generation: first.generation, installId: first.installId }));
 
+            await run(async (context) => await repairRows(context, OWNER, SLUG, new Set<string>()));
             const result = await run(async (context) => await repairRows(context, OWNER, SLUG, new Set<string>()));
 
             expect(result).toMatchObject({ missing: [], status: "installed" });
@@ -493,9 +498,12 @@ describe("repair", () => {
             expect(one.kept).toHaveLength(DETACH_PER_CALL);
 
             const two = await run(async (context) => await repairRows(context, OWNER, SLUG, new Set<string>()));
+            const three = await run(async (context) => await repairRows(context, OWNER, SLUG, new Set<string>()));
 
-            expect(two).toMatchObject({ moreDropped: false, status: "installed" });
+            // A call that detached anything ends there, so the last two children are followed by a call that finishes.
+            expect(two).toMatchObject({ moreDropped: true, status: "needs-repair" });
             expect(two.kept).toHaveLength(2);
+            expect(three).toMatchObject({ kept: [], moreDropped: false, status: "installed" });
         });
     });
 });

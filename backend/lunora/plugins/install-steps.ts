@@ -104,6 +104,8 @@ export const finishInstall = internalMutation
         const version = install.targetVersion ?? install.version;
 
         await patchInstallIf(ctx, args.installId as Id<"pluginInstalls">, args.generation, {
+            // A finished install or repair has every child its file holds, so an earlier partial update no longer applies.
+            partial: false,
             status: "installed",
             ...(install.targetVersion !== undefined && { targetVersion: version }),
             updatedAt: ctx.now,
