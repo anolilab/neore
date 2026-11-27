@@ -110,4 +110,29 @@ describe(watchBrowserLink, () => {
         advanceTo(40_000);
         expect(read).not.toHaveBeenCalled();
     });
+
+    it("never lets a read at the grant's end that answers after a newer live status undo it", async () => {
+        const { advanceTo, after, now } = timers();
+        const shown: boolean[] = [];
+        const late = Promise.withResolvers<BrowserStatus>();
+        const link = watchBrowserLink({
+            after,
+            now,
+            onChange: (isShown) => {
+                shown.push(isShown);
+            },
+            read: async () => await late.promise,
+        });
+
+        link.show(running({ accessUntil: 60_000, now: 0 }));
+        advanceTo(60_000);
+        // The read is out when the browser closes: the live status hides the link.
+        link.show({ kind: "none", now: 60_000 } as BrowserStatus);
+        late.resolve(running({ accessUntil: 120_000, now: 60_000 }));
+        await new Promise((resolve) => {
+            setTimeout(resolve, 0);
+        });
+
+        expect(shown).toStrictEqual([true, false, false]);
+    });
 });

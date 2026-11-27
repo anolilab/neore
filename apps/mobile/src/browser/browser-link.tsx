@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Text } from "react-native";
 
 import { getClient } from "@/lib/lunora";
+import { isThreadRefusal } from "@/offline/message-read";
 
 import { readBrowserStatus, watchBrowserStatus } from "./browser-api";
 import { watchBrowserLink } from "./browser-link-watch";
@@ -17,7 +18,13 @@ export const BrowserLink = ({ threadId }: { threadId: string }) => {
             onChange: (isShown) => setShownIn(isShown ? threadId : undefined),
             read: async () => await readBrowserStatus(getClient(), threadId),
         });
-        const stopStatus = watchBrowserStatus(getClient(), threadId, link.show, () => link.show(undefined));
+        // As the browser screen reads them: only a refusal of the chat hides the link; a lapsed sign-in or a server hiccup
+        // leaves it as it was.
+        const stopStatus = watchBrowserStatus(getClient(), threadId, link.show, (failure) => {
+            if (isThreadRefusal(failure)) {
+                link.show(undefined);
+            }
+        });
 
         return () => {
             stopStatus();

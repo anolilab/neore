@@ -869,7 +869,8 @@ const Chat = () => {
     return (
         <View onLayout={measureTopOffset} ref={rootRef} style={{ flex: 1 }}>
             <OfflineBanner syncedAt={syncedAt} />
-            {threadId === undefined ? null : <BrowserLink threadId={threadId} />}
+            {/* Keyed by the account too: another account's sign-in starts the link afresh, with none of the last one's answers. */}
+            {threadId === undefined ? null : <BrowserLink key={`${accountId ?? "none"}:${threadId}`} threadId={threadId} />}
             <KeyboardAvoidingView behavior="padding" keyboardVerticalOffset={topOffset} style={{ flex: 1 }}>
                 <View
                     onLayout={(event) => {

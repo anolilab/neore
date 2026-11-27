@@ -8,7 +8,10 @@ import { browserLinkUntil, GRANT_END_MARGIN_MS } from "./browser-view-state";
 import { readUntilAnswered, watchGrantEnd } from "./grant-end";
 
 export interface BrowserLinkWatch {
-    /** A status from the live query; `undefined` when it failed. */
+    /**
+     * A status from the live query; `undefined` when the chat was refused. It cancels a read still out for the one before,
+     * so an older answer never undoes it.
+     */
     show: (status: BrowserStatus | undefined) => void;
     stop: () => void;
 }
