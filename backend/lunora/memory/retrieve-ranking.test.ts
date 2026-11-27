@@ -1,16 +1,18 @@
 import { describe, expect, it } from "vitest";
 
 import {
-    keywordScoresFor,
+    fuseSearchHits,
+    keywordSignalsFor,
     rankMemories,
     SEARCH_MAX_RESULTS,
     SEARCH_MIN_KEYWORD_RELEVANCE,
     SEARCH_MIN_RELEVANCE,
     SEARCH_THRESHOLD,
     selectCandidateWindow,
+    topKeywordHits,
     topScopedHits,
     VECTOR_TOP_K,
-    withVectorHits,
+    withSearchHits,
 } from "./retrieve-ranking";
 import type { RankCandidate } from "./retrieve-ranking";
 
@@ -30,7 +32,7 @@ const candidate = (id: string, patch: Partial<RankCandidate> = {}): RankCandidat
 };
 
 const rank = (candidates: RankCandidate[], vectorScores: [string, number][] = [], searchText = "zzz") =>
-    rankMemories({ candidates, keywordScores: keywordScoresFor(candidates, searchText), now: NOW, vectorScores: new Map(vectorScores) });
+    rankMemories({ candidates, ...keywordSignalsFor(candidates, searchText), now: NOW, vectorScores: new Map(vectorScores) });
 
 /** Cosine scores by id, as the vector search returns them. */
 const at = (scores: Record<string, number>): [string, number][] => Object.entries(scores);
@@ -73,10 +75,10 @@ describe("rankMemories", () => {
         expect(idsOf(rank([fresh, pinned], at({ fresh: 0.5, pinned: 0.5 })))).toEqual(["fresh", "pinned"]);
     });
 
-    it("asks for a fifth of the search's words of a memory with no vector hit", () => {
+    it("asks for a share of the search's words of a memory with no vector hit", () => {
         const text = { lastConfirmedAt: NOW, memory: "likes hiking boots" };
 
-        // 1 of 6 words is under the keyword floor of 0.2; 2 of 6 is over it.
+        // 1 of 6 words (IDF-weighted, 0.14) is under the keyword floor of 0.15; 2 of 6 (0.28) is over it.
         expect(rank([candidate("a", text)], [], "hiking cooking baking painting running swimming")).toEqual([]);
         expect(rank([candidate("a", text)], [], "hiking boots baking painting running swimming").map((m) => m.memoryId)).toEqual(["a"]);
     });
@@ -86,7 +88,7 @@ describe("rankMemories", () => {
         const ids = (candidates: RankCandidate[], vectorSearched: boolean) =>
             rankMemories({
                 candidates,
-                keywordScores: keywordScoresFor(candidates, "hiking boots"),
+                ...keywordSignalsFor(candidates, "hiking boots"),
                 now: NOW,
                 vectorScores: new Map(),
                 vectorSearched,
@@ -107,15 +109,37 @@ describe("rankMemories", () => {
     it("matches a word through the punctuation around it", () => {
         const rows = [candidate("a", { memory: "Allergic to peanuts, and (tree-nuts)." })];
 
-        expect(keywordScoresFor(rows, "Do I have peanuts?").get("a")).toBeCloseTo(1 / 3, 10);
+        // `do`, `I` and `have` are stopwords: `peanuts` is the whole search.
+        expect(keywordSignalsFor(rows, "Do I have peanuts?").keywordScores.get("a")).toBeCloseTo(1, 10);
         expect(rank(rows, [], "peanuts?").map((m) => m.memoryId)).toEqual(["a"]);
     });
 
-    it("uses a vector hit over the keyword score even when the hit is 0, and the keyword score otherwise", () => {
-        const text = { lastConfirmedAt: 0, memory: "hiking boots" };
+    it("uses a vector hit over the keyword score even when the hit is 0, unless the memory holds a rare term", () => {
+        // Three rows hold both words, so neither is rare.
+        const rows = ["a", "b", "c"].map((id) => candidate(id, { lastConfirmedAt: 0, memory: "hiking boots" }));
 
-        expect(rank([candidate("a", text)], [["a", 0]], "hiking boots")).toEqual([]);
-        expect(rank([candidate("a", text)], [], "hiking boots")[0]!.score).toBeCloseTo(0.65 + 0.2, 10);
+        expect(idsOf(rank(rows, [["a", 0]], "hiking boots"))).toEqual(["b", "c"]);
+        expect(rank(rows, [], "hiking boots")[0]!.score).toBeCloseTo(0.65 + 0.2, 10);
+    });
+
+    it("finds a memory holding the query's rare term past a decisive vector search or a low cosine, and none when the query names another code", () => {
+        const old = { embeddingId: "emb", lastConfirmedAt: NOW - 30 * DAY };
+        const rows = [
+            candidate("part", { ...old, memory: "Placed an order for part KX-2291" }),
+            ...["k1", "k2", "k3"].map((id) => candidate(id, { ...old, memory: "Placed an order for a kettle" })),
+        ];
+        const ids = (searchText: string, vectorScores: [string, number][] = []) =>
+            rankMemories({ candidates: rows, ...keywordSignalsFor(rows, searchText), now: NOW, vectorScores: new Map(vectorScores), vectorSearched: true }).map(
+                (m) => m.memoryId,
+            );
+
+        expect(keywordSignalsFor(rows, "did I order KX-2291").rareTermMatches).toEqual(new Set(["part"]));
+        // The kettles share `order`, a word three rows hold: the vector search decides them, and it lacks them.
+        expect(ids("did I order KX-2291")).toEqual(["part"]);
+        expect(ids("did I order KX-2291", [["part", 0.2]])).toEqual(["part"]);
+        // `5508` is the query's most distinctive term and no row holds it: the words it shares with the part decide nothing.
+        expect(keywordSignalsFor(rows, "did I order part QZ-5508").rareTermMatches).toEqual(new Set());
+        expect(ids("did I order part QZ-5508")).toEqual([]);
     });
 
     it("keeps the 8 best, best first, and keeps candidate order among equal scores", () => {
@@ -195,7 +219,31 @@ describe("selectCandidateWindow", () => {
     });
 });
 
-describe("withVectorHits", () => {
+describe("keyword hits", () => {
+    const row = (id: string, memory: string, botId: string | null = null) => {
+        return { _id: id, botId, memory };
+    };
+
+    it("drops another bot's rows before the cut, and keeps the best by BM25", () => {
+        const termRows = [
+            { hits: [row("other", "KX-2291 spare", "bot-b"), row("own", "ordered KX-2291 for the dishwasher"), row("plain", "KX notes")], term: "kx" },
+            { hits: [row("own", "ordered KX-2291 for the dishwasher"), row("other", "KX-2291 spare", "bot-b")], term: "2291" },
+        ];
+
+        expect(topKeywordHits(termRows, {}, 0).map((h) => h._id)).toEqual(["own", "plain"]);
+        expect(topKeywordHits(termRows, {}, 0, 1).map((h) => h._id)).toEqual(["own"]);
+        expect(topKeywordHits(termRows, { botId: "bot-b" }, 0).map((h) => h._id)).toEqual(["other"]);
+    });
+
+    it("fuses the vector and keyword hits by rank: a row both found leads, each row once", () => {
+        const [a, b, c, d] = ["a", "b", "c", "d"].map((id) => row(id, id));
+
+        expect(fuseSearchHits([a!, b!, c!], [c!, d!]).map((h) => h._id)).toEqual(["c", "a", "b", "d"]);
+        expect(fuseSearchHits([], [d!, a!]).map((h) => h._id)).toEqual(["d", "a"]);
+    });
+});
+
+describe("withSearchHits", () => {
     const hit = (id: string, patch: Partial<RankCandidate & { botId: string | null; validUntil: string }> = {}) => {
         return { ...candidate(id), botId: null as string | null, ...patch };
     };
@@ -203,21 +251,21 @@ describe("withVectorHits", () => {
     it("adds a hit the window left out, once", () => {
         const window = [hit("a"), hit("b")];
 
-        expect(withVectorHits(window, [hit("b"), hit("old"), hit("old")], {}).map((m) => m._id)).toEqual(["a", "b", "old"]);
+        expect(withSearchHits(window, [hit("b"), hit("old"), hit("old")], {}).map((m) => m._id)).toEqual(["a", "b", "old"]);
     });
 
     it("never adds a hit on another bot's row, nor on a bot's row in a plain chat", () => {
         const hits = [hit("own"), hit("bot-a", { botId: "bot-a" }), hit("bot-b", { botId: "bot-b" })];
 
-        expect(withVectorHits([], hits, {}).map((m) => m._id)).toEqual(["own"]);
-        expect(withVectorHits([], hits, { botId: "bot-a" }).map((m) => m._id)).toEqual(["bot-a"]);
-        expect(withVectorHits([], hits, { botId: "bot-a", includeUserWide: true }).map((m) => m._id)).toEqual(["own", "bot-a"]);
+        expect(withSearchHits([], hits, {}).map((m) => m._id)).toEqual(["own"]);
+        expect(withSearchHits([], hits, { botId: "bot-a" }).map((m) => m._id)).toEqual(["bot-a"]);
+        expect(withSearchHits([], hits, { botId: "bot-a", includeUserWide: true }).map((m) => m._id)).toEqual(["own", "bot-a"]);
     });
 
     it("leaves out an unpinned fact past its end date", () => {
         const hits = [hit("gone", { validUntil: "2026-11-26" }), hit("kept", { pinned: true, validUntil: "2026-11-26" })];
 
-        expect(withVectorHits([], hits, { today: "2026-11-27" }).map((m) => m._id)).toEqual(["kept"]);
+        expect(withSearchHits([], hits, { today: "2026-11-27" }).map((m) => m._id)).toEqual(["kept"]);
     });
 });
 
@@ -241,7 +289,7 @@ describe("search ranking", () => {
     const search = (candidates: RankCandidate[], vectorScores: [string, number][], limit: number) =>
         rankMemories({
             candidates,
-            keywordScores: keywordScoresFor(candidates, "zzz"),
+            ...keywordSignalsFor(candidates, "zzz"),
             limit,
             minKeywordRelevance: SEARCH_MIN_KEYWORD_RELEVANCE,
             minRelevance: SEARCH_MIN_RELEVANCE,

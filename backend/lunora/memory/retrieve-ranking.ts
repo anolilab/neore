@@ -4,7 +4,7 @@
  * runs in `retrieve.ts` and in the offline retrieval eval (`retrieval-eval.test.ts`).
  */
 
-import { tokenize } from "../knowledge/hybrid";
+import { bm25Idf, extractKeywordTerms, reciprocalRankFusion, scoreKeywordCandidates, tokenize } from "../knowledge/hybrid";
 import { factDatesOf } from "./dates";
 
 /**
@@ -27,12 +27,13 @@ export const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
  * score of `AUTO_INJECT_THRESHOLD`, which only drops a row that is old, unsure and unimportant at once.
  *
  * Tuned on the retrieval eval (`__fixtures__/README.md`): relevant rows start at cosine 0.86 and unrelated ones end
- * at 0.40, so 0.45 leaves a margin over the noise. The keyword floor applies to a memory with no vector, to one whose
- * vector is new or the search did not fill its cut, and to every memory when no vector search ran; the eval's
- * keyword-only run holds Recall@8 there (0.185 at 0.2, 0.165 before, 0.015 at 0.35).
+ * at 0.40, so 0.45 leaves a margin over the noise. The keyword floor (on the BM25 share, `keywordSignalsFor`) applies
+ * to a memory with no vector, to one whose vector is new or the search did not fill its cut, to one holding the query's
+ * rare term, and to every memory when no vector search ran. 0.15 is the highest that keeps every category of the eval
+ * (multi Recall@8 0.867 at 0.2, 0.883 at 0.15); the keyword-only run reads Recall@8 0.550 and abstain rate 0.633 there.
  */
 export const INJECT_MIN_RELEVANCE = 0.45;
-export const INJECT_MIN_KEYWORD_RELEVANCE = 0.2;
+export const INJECT_MIN_KEYWORD_RELEVANCE = 0.15;
 export const AUTO_INJECT_THRESHOLD = 0.3;
 export const MAX_AUTO_INJECT = 8;
 
@@ -41,7 +42,7 @@ export const MAX_AUTO_INJECT = 8;
  * a relevant memory is found however old or unsure it is. Pinned memories need relevance here too.
  */
 export const SEARCH_MIN_RELEVANCE = 0.35;
-export const SEARCH_MIN_KEYWORD_RELEVANCE = 0.15;
+export const SEARCH_MIN_KEYWORD_RELEVANCE = 0.1;
 export const SEARCH_THRESHOLD = 0;
 /** The most rows `search_memory` returns. */
 export const SEARCH_MAX_RESULTS = 10;
@@ -170,14 +171,50 @@ export const topScopedHits = <T extends { botId?: string | null }>(hits: T[], sc
  */
 export const vectorCutIsFull = (scopedHits: ReadonlyArray<unknown>): boolean => scopedHits.length >= VECTOR_TOP_K;
 
+/** Rows one keyword lookup asks of the search index; a retrieval makes one per salient term, at most `MAX_KEYWORD_TERMS`. */
+export const KEYWORD_HITS_PER_TERM = 20;
+
+/** Keyword hits that count per search: the best by BM25, of the chat's own scopes. */
+export const KEYWORD_TOP_K = VECTOR_TOP_K;
+
+/**
+ * The best `limit` keyword hits of the chat's own scopes, best first by BM25 over what the lookups returned. A row of
+ * another bot is dropped before scoring, as the vector hits are; the lookup already left out superseded and expired rows.
+ */
+export const topKeywordHits = <T extends { _id: string; botId?: string | null; memory: string }>(
+    termRows: { hits: T[]; term: string }[],
+    scope: MemoryScope,
+    corpusSize: number,
+    limit: number = KEYWORD_TOP_K,
+): T[] => {
+    const termHits = termRows.map(({ hits, term }) => {
+        return {
+            hits: hits
+                .filter((row) => inScope(row, scope))
+                .map((row) => {
+                    return { content: row.memory, id: row._id, row };
+                }),
+            term,
+        };
+    });
+
+    return scoreKeywordCandidates(termHits, Math.max(corpusSize, CANDIDATE_WINDOW_SIZE))
+        .slice(0, limit)
+        .map(({ candidate }) => candidate.row);
+};
+
+/** The vector hits and the keyword hits as one list, by Reciprocal Rank Fusion of their ranks; a row is in it once. */
+export const fuseSearchHits = <T extends { _id: string }>(vectorHits: T[], keywordHits: T[]): T[] =>
+    reciprocalRankFusion([vectorHits, keywordHits], (row) => row._id).map(({ item }) => item);
+
 /** How long after it was written or reworded a memory's vector may not be searchable yet (the index syncs after the write). */
 export const VECTOR_SYNC_WINDOW_MS = 10 * 60 * 1000;
 
 /**
- * The candidates to score: the window, plus the vector hits that fall outside it. A hit of another scope (another
- * bot's row) or of a fact past its end date is never added, and a row is a candidate once.
+ * The candidates to score: the window, plus the search hits (vector and keyword, fused) that fall outside it. A hit of
+ * another scope (another bot's row) or of a fact past its end date is never added, and a row is a candidate once.
  */
-export const withVectorHits = <T extends RankCandidate & { botId?: string | null; validUntil?: string | null }>(
+export const withSearchHits = <T extends RankCandidate & { botId?: string | null; validUntil?: string | null }>(
     window: T[],
     hits: T[],
     options: MemoryScope & { today?: string },
@@ -224,42 +261,81 @@ const computeScore = (memory: RankCandidate, semanticScore: number, now: number)
 };
 
 /**
- * The words of a search text that count for the keyword fallback. Through the knowledge search's tokenizer (letters
- * and numbers only, lowercased, no diacritics), so `peanuts?` and `peanuts` are the same word on both sides.
+ * A query term at most this many candidates hold is rare. A row holding the query's rarest term, when it is rare,
+ * counts by its words even where the vector search says otherwise: embeddings miss exact tokens (a code, a name, a
+ * rare word), which is what such a term usually is.
  */
-export const searchWordsOf = (searchText: string): Set<string> => new Set(tokenize(searchText).filter((w) => w.length >= 2));
+export const RARE_TERM_MAX_ROWS = 2;
+
+/** What the keyword side knows of each candidate. */
+export interface KeywordSignals {
+    /** BM25 over the candidates, as a share of the most the query's terms could score (0-1). */
+    keywordScores: Map<string, number>;
+    /** The candidates holding the query's rarest term, when at most `RARE_TERM_MAX_ROWS` hold it. */
+    rareTermMatches: Set<string>;
+}
 
 /**
- * Keyword-based semantic score (fallback when no embedding exists).
+ * The keyword signals of every candidate. The query's salient terms (`extractKeywordTerms`: no stopwords, codes
+ * first) are matched as whole tokens, not by the index's prefix (`time` would read `timer`), and scored with BM25 over
+ * the candidates, counted as at least a window of rows so a short list does not make every term look rare. The score is
+ * divided by the sum of the terms' IDF, what a row holding each term once at average length scores, so it reads as the
+ * IDF-weighted share of the query's terms a row holds. When no candidate holds the query's most distinctive term (a
+ * code such as `QZ-5508`, else its longest word), the query names something the memory does not have: then no row is
+ * a rare-term match, whatever common word it shares.
  */
-export const keywordScore = (memoryText: string, searchWords: Set<string>): number => {
-    if (searchWords.size === 0) {
-        return 0;
+export const keywordSignalsFor = (candidates: RankCandidate[], searchText: string): KeywordSignals => {
+    const keywordScores = new Map<string, number>();
+    const rareTermMatches = new Set<string>();
+    const terms = extractKeywordTerms(searchText);
+
+    if (terms.length === 0) {
+        return { keywordScores, rareTermMatches };
     }
 
-    const memoryWords = tokenize(memoryText);
-    const matchCount = memoryWords.filter((w) => searchWords.has(w)).length;
+    const rows = candidates.map((m) => {
+        return { content: m.memory, id: m._id, tokens: tokenize(m.memory) };
+    });
+    const termHits = terms.map((term) => {
+        return { hits: rows.filter((row) => row.tokens.includes(term)), term };
+    });
+    const corpusSize = Math.max(candidates.length, CANDIDATE_WINDOW_SIZE);
+    const most = termHits.reduce((sum, { hits }) => sum + bm25Idf(hits.length, corpusSize), 0);
 
-    return memoryWords.length > 0 ? Math.min(matchCount / Math.max(searchWords.size, 1), 1) : 0;
-};
+    for (const { candidate, score } of scoreKeywordCandidates(termHits, corpusSize)) {
+        keywordScores.set(candidate.id, Math.min(score / most, 1));
+    }
 
-/** The keyword score of every candidate, by id. */
-export const keywordScoresFor = (candidates: RankCandidate[], searchText: string): Map<string, number> => {
-    const searchWords = searchWordsOf(searchText);
+    const matched = termHits.filter(({ hits }) => hits.length > 0);
+    const rarest = Math.min(...matched.map(({ hits }) => hits.length));
+    // `extractKeywordTerms` puts the most distinctive term first (a code, else the longest word).
+    const namesOther = termHits[0]?.hits.length === 0;
 
-    return new Map(candidates.map((m) => [m._id, keywordScore(m.memory, searchWords)]));
+    if (!namesOther && rarest <= RARE_TERM_MAX_ROWS) {
+        for (const { hits } of matched) {
+            if (hits.length === rarest) {
+                for (const hit of hits) {
+                    rareTermMatches.add(hit.id);
+                }
+            }
+        }
+    }
+
+    return { keywordScores, rareTermMatches };
 };
 
 /**
  * Scores each candidate and keeps the ones to inject. Relevance is a vector hit's cosine similarity; a candidate
- * without a hit falls back to its keyword score and the keyword floor, unless the vector search is decisive
- * (`vectorSearched`: it ran, its hits resolved, and they fill the cut, `vectorCutIsFull`) and the memory has a
+ * without a hit falls back to its keyword score (`keywordSignalsFor`) and the keyword floor, unless the vector search
+ * is decisive (`vectorSearched`: it ran, its hits resolved, and they fill the cut, `vectorCutIsFull`) and the memory has a
  * vector that is not new: then it was not among the nearest to the search, and its keyword overlap (common words of
  * a question) says nothing more, so it has no relevance. Absence is no evidence otherwise: a vector written or
  * reworded within `VECTOR_SYNC_WINDOW_MS` may not be searchable yet, a short cut means other bots' rows took the
  * slots, and a memory with no vector, or any memory when no vector search ran (the model refused, the index or the
- * hit lookup failed), is found by keyword. Under the relevance floor, or under the score threshold, a candidate is
- * left out; the rest is sorted best first and cut to `limit`. `now` is when scoring happens (recency counts from it).
+ * hit lookup failed), is found by keyword. A candidate holding the query's rare term (`rareTermMatches`) is also
+ * found by keyword, whatever the vector search says of it: it takes the better of the two. Under the relevance floor,
+ * or under the score threshold, a candidate is left out; the rest is sorted best first and cut to `limit`. `now` is
+ * when scoring happens (recency counts from it).
  */
 export const rankMemories = (input: {
     candidates: RankCandidate[];
@@ -270,6 +346,8 @@ export const rankMemories = (input: {
     /** The least cosine similarity a vector hit needs before the other terms count. */
     minRelevance?: number;
     now: number;
+    /** Candidates holding the query's rare term: found by keyword even when the vector search lacks them or scores them low. */
+    rareTermMatches?: ReadonlySet<string>;
     threshold?: number;
     vectorScores: ReadonlyMap<string, number>;
     /** A vector search ran, its hits resolved and filled the cut: an old embedded memory it lacks is not relevant. */
@@ -282,6 +360,7 @@ export const rankMemories = (input: {
         minKeywordRelevance = INJECT_MIN_KEYWORD_RELEVANCE,
         minRelevance = INJECT_MIN_RELEVANCE,
         now,
+        rareTermMatches = new Set<string>(),
         threshold = AUTO_INJECT_THRESHOLD,
         vectorScores,
         vectorSearched = false,
@@ -293,25 +372,27 @@ export const rankMemories = (input: {
                 const hit = vectorScores.get(m._id);
                 // Embedded, not new, and absent from hits that filled the cut: not relevant, whatever words it shares.
                 const missed = hit === undefined && vectorSearched && Boolean(m.embeddingId) && now - m.lastConfirmedAt > VECTOR_SYNC_WINDOW_MS;
-                const semanticScore = hit ?? (missed ? 0 : (keywordScores.get(m._id) ?? 0));
+                const byVector = hit !== undefined && hit >= minRelevance ? hit : undefined;
+                const keyword = keywordScores.get(m._id) ?? 0;
+                const byKeyword = ((hit === undefined && !missed) || rareTermMatches.has(m._id)) && keyword >= minKeywordRelevance ? keyword : undefined;
+                const semanticScore = Math.max(byVector ?? 0, byKeyword ?? 0);
 
                 return {
                     category: m.type,
                     confidence: m.confidence ?? 70,
-                    floor: hit === undefined && !missed ? minKeywordRelevance : minRelevance,
                     lastConfirmedAt: m.lastConfirmedAt,
                     memory: m.memory,
                     memoryId: m._id,
+                    relevant: byVector !== undefined || byKeyword !== undefined,
                     score: computeScore(m, semanticScore, now),
-                    semanticScore,
                     ...factDatesOf(m),
                 };
             })
             // Confidence, importance and recency only order what is relevant: a fresh, pinned or confident row
             // with no relevance never clears the bar on those terms alone.
-            .filter((m) => m.semanticScore >= m.floor && m.score >= threshold)
+            .filter((m) => m.relevant && m.score >= threshold)
             .toSorted((a, b) => b.score - a.score)
             .slice(0, limit)
-            .map(({ floor: _floor, semanticScore: _semanticScore, ...ranked }) => ranked)
+            .map(({ relevant: _relevant, ...ranked }) => ranked)
     );
 };

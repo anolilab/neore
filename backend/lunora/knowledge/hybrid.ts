@@ -105,6 +105,9 @@ const termFrequency = (tokens: string[], term: string): number => {
     return Math.max(1, tf);
 };
 
+/** BM25's inverse document frequency of a term `df` of `n` documents hold; never negative. */
+export const bm25Idf = (df: number, n: number): number => Math.log(1 + (n - df + 0.5) / (df + 0.5));
+
 export interface KeywordCandidate {
     content: string;
     id: string;
@@ -161,7 +164,7 @@ export const scoreKeywordCandidates = <T extends KeywordCandidate>(termHits: Key
         const df = hits.length;
         const n = Math.max(corpusSize, df, candidates.size);
 
-        idf.set(term, Math.log(1 + (n - df + 0.5) / (df + 0.5)));
+        idf.set(term, bm25Idf(df, n));
     }
 
     const scored: { candidate: T; score: number }[] = [];

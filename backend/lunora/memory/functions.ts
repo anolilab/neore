@@ -27,7 +27,7 @@ import { botOwnerRows } from "./bot-owner";
 import { type MemoryEvidence, newestEvidence, vMemoryEvidence } from "./evidence";
 import { logRedaction, redactMemoryText } from "./redact";
 import { DROPPED_DIGEST_SUMMARY, localDayOf } from "./reflection-logic";
-import { byNewest, isUsableOn, mergeScopeWindows, scopesOf } from "./retrieve-ranking";
+import { byNewest, isUsableOn, KEYWORD_HITS_PER_TERM, mergeScopeWindows, scopesOf } from "./retrieve-ranking";
 import { lastConfirmedOf, MEMORY_TYPES, type MemoryType, vMemoryType } from "./taxonomy";
 import { deleteVectorRow, patchMessage } from "../agent/table-writes";
 import { candidatesOnActivePath } from "../agent/branch-rows";
@@ -35,6 +35,7 @@ import { requireOwnedThread, resolveThreadReadAccess } from "../agent/thread-rea
 import { getVectorIdInfo, type VectorTableId, type VectorTableName } from "../agent/vector/tables";
 import { parentKeyOf } from "../lib/rls/scope";
 import { MAX_LENGTH } from "../lib/validators";
+import { MAX_KEYWORD_TERMS } from "../knowledge/hybrid";
 import { findLiveGrant } from "../agent/live-grant";
 
 /**
@@ -1852,6 +1853,23 @@ export const getMemoryByEmbeddingId = internalQuery.input({ embeddingId: v.strin
     };
 });
 
+/** What retrieval reads of a stored memory. */
+const retrievalRowOf = (memory: Doc<"memories">) => {
+    return {
+        _creationTime: memory._creationTime,
+        _id: memory._id as string,
+        botId: memory.botId,
+        confidence: memory.confidence,
+        embeddingId: memory.embeddingId,
+        importance: memory.importance,
+        lastConfirmedAt: lastConfirmedOf(memory),
+        memory: memory.memory,
+        pinned: memory.pinned === true,
+        type: memory.type,
+        ...factDatesOf(memory),
+    };
+};
+
 export const getMemoriesByEmbeddingIds = internalQuery
     .input({
         /** As in `getActiveMemoriesForUser`: an unpinned fact past its end date on that day is left out. */
@@ -1878,23 +1896,43 @@ export const getMemoriesByEmbeddingIds = internalQuery
                     return null;
                 }
 
-                return {
-                    _creationTime: memory._creationTime,
-                    _id: memory._id as string,
-                    botId: memory.botId,
-                    confidence: memory.confidence,
-                    embeddingId,
-                    importance: memory.importance,
-                    lastConfirmedAt: lastConfirmedOf(memory),
-                    memory: memory.memory,
-                    pinned: memory.pinned === true,
-                    type: memory.type,
-                    ...factDatesOf(memory),
-                };
+                return { ...retrievalRowOf(memory), embeddingId };
             }),
         );
 
         return settled.filter((r): r is NonNullable<typeof r> => r !== null);
+    });
+
+/**
+ * The keyword leg of retrieval: one search-index lookup per term (at most `MAX_KEYWORD_TERMS`, each
+ * `KEYWORD_HITS_PER_TERM` rows), over the user's own rows. As in `getMemoriesByEmbeddingIds`, a superseded row and an
+ * unpinned fact past its end date are left out; the caller drops rows of a bot the chat does not read and scores the rest.
+ */
+export const searchMemoriesByKeyword = internalQuery
+    .input({
+        activeOn: v.optional(v.number()),
+        terms: v.array(v.string()),
+        timeZone: v.optional(v.string()),
+        userId: v.string(),
+    })
+    .query(async ({ args, ctx }) => {
+        const today = args.activeOn === undefined ? undefined : localDayOf(args.activeOn, args.timeZone ?? (await userTimeZone(ctx, args.userId)));
+
+        return await Promise.all(
+            args.terms.slice(0, MAX_KEYWORD_TERMS).map(async (term) => {
+                const rows = await ctx.db
+                    .query("memories")
+                    .withSearchIndex("search_memory_text", (q) => q.search("memory", term).eq("userId", args.userId))
+                    .take(KEYWORD_HITS_PER_TERM);
+
+                return {
+                    hits: rows
+                        .filter((m) => !m.supersededBy && (today === undefined || m.pinned === true || !isExpired(m, today)))
+                        .map((m) => retrievalRowOf(m)),
+                    term,
+                };
+            }),
+        );
     });
 
 export const getMemoryById = internalQuery.input({ memoryId: v.id("memories") }).query(async ({ args, ctx }) => ctx.db.get("memories", args.memoryId));

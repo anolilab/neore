@@ -227,6 +227,58 @@ describe("candidates", () => {
         expect(await retrieve({ searchText: "dog named Rex" })).toEqual(["adopted a dog named Rex"]);
     });
 
+    it("finds an old memory outside the window by a rare word the vector search misses, and when the embedding fails", async () => {
+        const part = "ordered replacement part KX-2291 for the dishwasher";
+
+        await seed([{ embeddingId: "emb-part", lastConfirmedAt: 0, memory: part }, ...filler(CANDIDATE_WINDOW_SIZE + 5)]);
+
+        // The index answers nothing near it, and the row is older than the newest 100: only the keyword search reaches it.
+        expect(await retrieve({ searchText: "did I already order KX-2291" })).toEqual([part]);
+
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+        embedMany.mockRejectedValue(new Error("gateway down"));
+
+        expect(await retrieve({ searchText: "did I already order KX-2291" })).toEqual([part]);
+        expect(warn).toHaveBeenCalledWith(expect.stringContaining("Vector search failed"), expect.anything());
+    });
+
+    it("never finds by keyword a superseded row, a fact past its end date, or another bot's row", async () => {
+        await harness.run(async (ctx: any) => {
+            const base = { lastConfirmedAt: 0, source: "auto", type: "preference", updatedAt: 0, userId: USER };
+            const newer = await ctx.db.insert("memories", { ...base, memory: "rides a bike" });
+
+            await ctx.db.insert("memories", { ...base, memory: "bike serial WTU-38817, old note", supersededBy: newer });
+            await ctx.db.insert("memories", { ...base, memory: "bike serial WTU-38817, lapsed", validUntil: "2020-01-01" });
+            await ctx.db.insert("memories", { ...base, botId: "bot-b", memory: "bike serial WTU-38817, bot b" });
+        });
+
+        expect(await retrieve({ searchText: "whose serial is WTU-38817" })).toEqual([]);
+        expect(await retrieve({ botId: "bot-b", searchText: "whose serial is WTU-38817" })).toEqual(["bike serial WTU-38817, bot b"]);
+    });
+
+    it("keeps the vector hits when the keyword search throws", async () => {
+        await seed([{ embeddingId: "emb-trip", memory: "went to the coast in May", type: "activity" }]);
+        hits(["emb-trip", 0.9]);
+
+        const real = registry.get("memory_functions:searchMemoriesByKeyword");
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+        registry.set(
+            "memory_functions:searchMemoriesByKeyword",
+            internalQuery.input({ activeOn: v.optional(v.number()), terms: v.array(v.string()), userId: v.string() }).query(async () => {
+                throw new Error("index unavailable");
+            }),
+        );
+
+        try {
+            expect(await retrieve()).toEqual(["went to the coast in May"]);
+            expect(warn).toHaveBeenCalledWith(expect.stringContaining("Keyword search failed"), expect.anything());
+        } finally {
+            registry.set("memory_functions:searchMemoriesByKeyword", real);
+        }
+    });
+
     it("leaves out a hit on a fact past its end date", async () => {
         await seed([{ embeddingId: "emb-old", memory: "trip next week", type: "activity", validUntil: "2020-01-01" }, ...filler(CANDIDATE_WINDOW_SIZE + 5)]);
         hits(["emb-old", 0.95]);
