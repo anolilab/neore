@@ -2,7 +2,7 @@ import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import schema from "../schema";
-import { createPluginTrigger } from "../triggers/functions";
+import { createPluginTrigger, purgeTriggerExecutions, TRIGGER_RUN_BATCH } from "../triggers/functions";
 import { triggerRowHash } from "./entry-hash";
 import { createInstallRow, finishInstall, recordCreated, recordIntent } from "./install-steps";
 import { markerFor } from "./logic";
@@ -194,22 +194,32 @@ describe("uninstall of triggers", () => {
         expect(await run(async (context) => await context.db.pluginInstalls.findFirst({ where: { _id: begun.installId } }))).toBeNull();
     });
 
-    it("clears a trigger with very many runs a page a call, without deleting it early", async () => {
+    it("deletes a trigger with very many runs in one call and leaves the rest to a scheduled purge", async () => {
         const { triggerIds } = await installed(1);
         const [triggerId] = triggerIds;
 
-        await addRuns(triggerId!, 205);
+        await addRuns(triggerId!, 1000);
 
         const begun = await run(async (context) => await uninstallRows(context, OWNER, SLUG));
         const first = await run(async (context) => await finishUninstallRows(context, begun.installId, begun.generation, { pendingSkills: [] }));
 
-        expect(first).toMatchObject({ hasMore: true, removed: 0 });
-        expect(await run(async (context) => await context.db.triggers.findFirst({ where: { _id: triggerId } }))).not.toBeNull();
-
-        const rest = await finishAll(begun.installId, begun.generation);
-
-        expect(rest.removed).toBe(1);
+        expect(first).toMatchObject({ removed: 1 });
         expect(await run(async (context) => await context.db.triggers.findFirst({ where: { _id: triggerId } }))).toBeNull();
+
+        const left = async () => {
+            const { page } = await run(async (context) => await context.db.triggerExecutions.findMany({ where: { triggerId } }));
+
+            return page.length;
+        };
+
+        expect(await left()).toBe(1000 - TRIGGER_RUN_BATCH);
+        expect(harness.scheduler.list().map((job) => job.args)).toContainEqual({ triggerId });
+
+        for (let call = 0; call < 10 && (await left()) > 0; call += 1) {
+            await run(async (context) => await context.runMutation(purgeTriggerExecutions, { triggerId }));
+        }
+
+        expect(await left()).toBe(0);
         expect(await run(async (context) => await context.db.pluginInstalls.findFirst({ where: { _id: begun.installId } }))).toBeNull();
     });
 });

@@ -916,24 +916,55 @@ export const rotateWebhookSecret = authMutation
         return { previousSecretExpiresAt, webhookSecret: plaintextSecret };
     });
 
-/**
- * Removes a trigger the caller has already been checked to own: its execution logs, its claims and its shard route.
- * Returns how many execution logs went. `deleteTrigger` rate-limits first; the bundle rollback does not.
- */
-export const deleteTriggerRows = async (context: MutationCtx, triggerId: Id<"triggers">): Promise<number> => {
-    // Delete associated execution logs
-    const executions = await context.db
+/** Runs of one trigger a single call deletes; a trigger with more hands the rest to `purgeTriggerExecutions`. */
+export const TRIGGER_RUN_BATCH = 200;
+
+/** Deletes up to one batch of a trigger's runs and says whether more may remain. */
+const deleteRunBatch = async (context: MutationCtx, triggerId: Id<"triggers">): Promise<{ deleted: number; more: boolean }> => {
+    const runs = await context.db
         .query("triggerExecutions")
         .withIndex("by_triggerId_startedAt", (q) => q.eq("triggerId", triggerId))
-        .collect();
+        .take(TRIGGER_RUN_BATCH);
 
-    // Its webhook replay claims (`lib/claim-once.ts`) expire on their own within minutes, except a
-    // `gitlab-token` trigger's delivery claims, which last for years: one batch is cleared here, the rest on the scheduler.
-    await Promise.allSettled(executions.map((row) => context.db.delete("triggerExecutions", row._id)));
+    await Promise.all(runs.map((row) => context.db.delete("triggerExecutions", row._id)));
+
+    return { deleted: runs.length, more: runs.length >= TRIGGER_RUN_BATCH };
+};
+
+/**
+ * What a deleted trigger's run history has left past its first batch: one batch per call, rescheduling itself while batches come
+ * back full. The trigger row is already gone, so every read of a run (which starts from its trigger) no longer reaches these.
+ */
+export const purgeTriggerExecutions = internalMutation
+    .input({ triggerId: v.string().max(200) })
+    .output(v.null())
+    .mutation(async ({ args: { triggerId }, ctx }) => {
+        const { more } = await deleteRunBatch(ctx, triggerId as Id<"triggers">);
+
+        if (more) {
+            await ctx.scheduler.runAfter(0, internal.triggers.functions.purgeTriggerExecutions, { triggerId });
+        }
+
+        return null;
+    });
+
+/**
+ * Removes a trigger the caller has already been checked to own: its claims, its shard route and one batch of its run history
+ * (the rest goes on the scheduler). Returns how many runs went in this call. `deleteTrigger` rate-limits first; the bundle
+ * rollback does not.
+ */
+export const deleteTriggerRows = async (context: MutationCtx, triggerId: Id<"triggers">): Promise<number> => {
+    const { deleted, more } = await deleteRunBatch(context, triggerId);
 
     // Delete the trigger
     await context.db.delete("triggers", triggerId);
 
+    if (more) {
+        await context.scheduler.runAfter(0, internal.triggers.functions.purgeTriggerExecutions, { triggerId });
+    }
+
+    // Its webhook replay claims (`lib/claim-once.ts`) expire on their own within minutes, except a
+    // `gitlab-token` trigger's delivery claims, which last for years: one batch is cleared here, the rest on the scheduler.
     const deliveryPrefix = `${triggerId}:`;
 
     if (await releaseClaimsWithPrefix(context, TRIGGER_DELIVERY_SCOPE, deliveryPrefix, CLAIM_PREFIX_BATCH)) {
@@ -942,7 +973,7 @@ export const deleteTriggerRows = async (context: MutationCtx, triggerId: Id<"tri
 
     await deleteShardRoute(context, "trigger", triggerId);
 
-    return executions.length;
+    return deleted;
 };
 
 /** Delete a trigger */

@@ -256,19 +256,16 @@ export interface UninstallFinished {
  */
 export const SKILLS_PER_CALL = 3;
 
-/** Triggers one finish call handles. A delete reads the trigger's runs and its claims and deletes its webhook route (a D1 statement). */
+/** Triggers one finish call handles. A delete reads one batch of the trigger's runs and its claims and deletes its webhook route (a D1 statement). */
 export const TRIGGERS_PER_CALL = 3;
-
-/** Runs of one trigger a finish call deletes. A trigger with more keeps its place, and the next call deletes the next page. */
-const EXECUTIONS_PER_CALL = 200;
 
 /** Links one finish call deletes: each is a read and a delete against the invocation's D1 queries. */
 const LINKS_PER_CALL = 10;
 
 /**
- * Handles up to `TRIGGERS_PER_CALL` triggers still attached to the install. An unedited one is deleted with its runs and webhook
- * route; an edited one (or one without a link) is kept, detached and off, and reported. A trigger with many runs loses one page
- * of them and stays attached, so the next call goes on. Returns true while triggers are left.
+ * Handles up to `TRIGGERS_PER_CALL` triggers still attached to the install. An unedited one is deleted with its webhook route
+ * and one batch of its runs (`deleteTriggerRows` schedules the rest); an edited one (or one without a link) is kept, detached
+ * and off, and reported. Returns true while triggers are left.
  */
 const finishTriggers = async (ctx: MutationCtx, installId: string, userId: string, result: Omit<UninstallFinished, "hasMore">): Promise<boolean> => {
     const triggers = await ctx.db
@@ -281,7 +278,6 @@ const finishTriggers = async (ctx: MutationCtx, installId: string, userId: strin
     }
 
     const links = await readAllPages(async (cursor) => await ctx.db.pluginItems.findMany({ consistency: "primary", cursor, where: { installId } }));
-    let partial = false;
 
     for (const trigger of triggers.slice(0, TRIGGERS_PER_CALL)) {
         const triggerId = trigger._id as Id<"triggers">;
@@ -293,25 +289,11 @@ const finishTriggers = async (ctx: MutationCtx, installId: string, userId: strin
             continue;
         }
 
-        const runs = await ctx.db
-            .query("triggerExecutions")
-            .withIndex("by_triggerId_startedAt", (q) => q.eq("triggerId", triggerId))
-            .take(EXECUTIONS_PER_CALL + 1);
-
-        if (runs.length > EXECUTIONS_PER_CALL) {
-            for (const run of runs.slice(0, EXECUTIONS_PER_CALL)) {
-                await ctx.db.delete("triggerExecutions", run._id);
-            }
-
-            partial = true;
-            continue;
-        }
-
         await deleteTriggerRows(ctx, triggerId);
         result.removed += 1;
     }
 
-    return partial || triggers.length > TRIGGERS_PER_CALL;
+    return triggers.length > TRIGGERS_PER_CALL;
 };
 
 /**
