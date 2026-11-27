@@ -278,7 +278,9 @@ const withHarness = async <T>(body: (ctx: any) => Promise<T>): Promise<T> => {
     }
 };
 
-describe("the user.emailCanonical backfill", () => {
+// Each test runs a whole harness (a fresh database and a cold import) inside a shard that shares its machine with the others. Under that
+// load several take 2 to 6 seconds alone, past the 5-second default, which is why the shard failed on a timeout rather than an assertion.
+describe("the user.emailCanonical backfill", { timeout: 30_000 }, () => {
     it("fills a row that predates the column with the auth plugin's canonical address, and leaves a filled row alone", async () => {
         expect.assertions(3);
 
