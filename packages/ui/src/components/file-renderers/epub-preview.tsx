@@ -16,8 +16,9 @@
  */
 
 import { useLingui } from "@lingui/react/macro";
+import { isFetchableUrl, useFetchableOrigins } from "@ui/hooks/use-fetchable-origins";
 import cn from "@ui/utils/cn";
-import { assertOfficeZipWithinLimits, OFFICE_ZIP_MAX_UNCOMPRESSED_BYTES } from "@ui/utils/office-zip-limits";
+import { assertOfficeZipWithinLimits, OFFICE_ZIP_MAX_ENTRIES, OFFICE_ZIP_MAX_UNCOMPRESSED_BYTES } from "@ui/utils/office-zip-limits";
 import { saveOnClick } from "@ui/utils/save-from-url";
 import { BookOpen, ChevronLeft, ChevronRight, Download } from "lucide-react";
 import type { FC } from "react";
@@ -42,6 +43,49 @@ type Load = { status: "failed" } | { status: "loading" } | { book: OpenedEpub; s
 
 const TooLarge = new Error("too large");
 
+/** The zip guard's refusals that say a book is too big (the rest say it is not a book): shown as too large, not as a failure. */
+const OVERSIZE_MESSAGE = /too large|too many entries/iu;
+
+/** The body, read as it arrives and refused once it passes `maxBytes`: a missing or understated length cannot make it all be held. */
+const readCapped = async (response: Response, maxBytes: number): Promise<ArrayBuffer> => {
+    const reader = response.body?.getReader();
+
+    if (reader === undefined) {
+        const buffer = await response.arrayBuffer();
+
+        if (buffer.byteLength > maxBytes) {
+            throw TooLarge;
+        }
+
+        return buffer;
+    }
+
+    const chunks: Uint8Array[] = [];
+    let total = 0;
+
+    for (let chunk = await reader.read(); !chunk.done; chunk = await reader.read()) {
+        total += chunk.value.byteLength;
+
+        if (total > maxBytes) {
+            await reader.cancel();
+
+            throw TooLarge;
+        }
+
+        chunks.push(chunk.value);
+    }
+
+    const bytes = new Uint8Array(total);
+    let at = 0;
+
+    for (const chunk of chunks) {
+        bytes.set(chunk, at);
+        at += chunk.byteLength;
+    }
+
+    return bytes.buffer;
+};
+
 const fetchBook = async (url: string, maxBytes: number, signal: AbortSignal): Promise<OpenedEpub> => {
     const response = await fetch(url, { signal });
 
@@ -56,19 +100,29 @@ const fetchBook = async (url: string, maxBytes: number, signal: AbortSignal): Pr
         throw TooLarge;
     }
 
-    const buffer = await response.arrayBuffer();
+    const buffer = await readCapped(response, maxBytes);
 
-    if (buffer.byteLength > maxBytes) {
-        throw TooLarge;
+    try {
+        // The caller's cap, for what the archive expands to as well: the guard's own default is the office-file one.
+        await assertOfficeZipWithinLimits(buffer, { maxBytes, maxEntries: OFFICE_ZIP_MAX_ENTRIES });
+    } catch (error) {
+        const message = error instanceof Error ? error.message : "";
+
+        throw OVERSIZE_MESSAGE.test(message) ? TooLarge : error;
     }
-
-    await assertOfficeZipWithinLimits(buffer);
 
     return await openEpub(new Uint8Array(buffer));
 };
 
+/** A chapter's read waits at most this long: a stalled picture or style sheet ends in the failure card, not an empty frame. */
+const CHAPTER_DEADLINE_MS = 30_000;
+
 const EpubPreview: FC<EpubPreviewProps> = memo(({ className, filename, maxBytes = OFFICE_ZIP_MAX_UNCOMPRESSED_BYTES, url }) => {
     const { t } = useLingui();
+    // Only the app's own file addresses are read (the same allowance the PDF viewer has): a file part or sandbox output that names another
+    // origin, a loopback service or a scheme the app does not serve is refused without a request.
+    const origins = useFetchableOrigins();
+    const refused = !isFetchableUrl(url, origins);
     // The result carries the URL it belongs to: a book from an earlier file is never shown for this one.
     const [loaded, setLoaded] = useState<{ load: Load; url: string }>({ load: { status: "loading" }, url });
     const [shown, setShown] = useState<{ doc: string; id: string; url: string } | undefined>();
@@ -77,6 +131,10 @@ const EpubPreview: FC<EpubPreviewProps> = memo(({ className, filename, maxBytes 
     const index = position.url === url ? position.index : 0;
 
     useEffect(() => {
+        if (refused) {
+            return undefined;
+        }
+
         const controller = new AbortController();
         let opened: OpenedEpub | undefined;
         let cancelled = false;
@@ -93,7 +151,15 @@ const EpubPreview: FC<EpubPreviewProps> = memo(({ className, filename, maxBytes 
                     return;
                 }
 
-                setLoaded({ load: opened.chapters.length > 0 ? { book: opened, status: "ready" } : { status: "failed" }, url });
+                // A book with nothing to read is not kept: its parsed archive goes with it.
+                if (opened.chapters.length === 0) {
+                    opened.destroy();
+                    setLoaded({ load: { status: "failed" }, url });
+
+                    return;
+                }
+
+                setLoaded({ load: { book: opened, status: "ready" }, url });
             } catch (error) {
                 if (!cancelled) {
                     setLoaded({ load: error === TooLarge ? { status: "too-large" } : { status: "failed" }, url });
@@ -111,7 +177,7 @@ const EpubPreview: FC<EpubPreviewProps> = memo(({ className, filename, maxBytes 
             controller.abort();
             opened?.destroy();
         };
-    }, [maxBytes, url]);
+    }, [maxBytes, refused, url]);
 
     const chapter = load.status === "ready" ? load.book.chapters[index] : undefined;
     const chapterId = chapter?.id;
@@ -123,18 +189,31 @@ const EpubPreview: FC<EpubPreviewProps> = memo(({ className, filename, maxBytes 
         }
 
         let cancelled = false;
+        const controller = new AbortController();
+        let timer: ReturnType<typeof setTimeout> | undefined;
 
         const show = async (): Promise<void> => {
             try {
-                const doc = await book.read(chapterId);
+                // Raced with a deadline as well as handed the signal: the parser's own reads take no signal, so a stalled one must not hold this.
+                const timeout = new Promise<never>((_resolve, reject) => {
+                    timer = setTimeout(() => {
+                        controller.abort();
+                        reject(new Error("chapter read timed out"));
+                    }, CHAPTER_DEADLINE_MS);
+                });
+                const doc = await Promise.race([book.read(chapterId, controller.signal), timeout]);
 
                 if (!cancelled) {
                     setShown({ doc, id: chapterId, url });
                 }
             } catch {
                 if (!cancelled) {
+                    // The book is no use now: its archive is released with the failure, not at an unmount that may be long off.
+                    book.destroy();
                     setLoaded({ load: { status: "failed" }, url });
                 }
+            } finally {
+                clearTimeout(timer);
             }
         };
 
@@ -142,14 +221,18 @@ const EpubPreview: FC<EpubPreviewProps> = memo(({ className, filename, maxBytes 
 
         return () => {
             cancelled = true;
+            clearTimeout(timer);
+            controller.abort();
         };
     }, [book, chapterId, url]);
 
-    if (load.status === "failed" || load.status === "too-large") {
+    const tooLarge = !refused && load.status === "too-large";
+
+    if (refused || load.status === "failed" || tooLarge) {
         return (
             <GenericFileCard
                 className={className}
-                description={load.status === "too-large" ? t`Too large to preview · Click to download` : t`Could not preview · Click to download`}
+                description={tooLarge ? t`Too large to preview · Click to download` : t`Could not preview · Click to download`}
                 filename={filename}
                 mediaType={EPUB_MEDIA_TYPE}
                 url={url}

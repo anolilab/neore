@@ -11,7 +11,16 @@ import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const book = vi.hoisted(() => {
-    return { opened: 0, reads: [] as string[], throwOnOpen: false };
+    return {
+        chapters: 3,
+        destroyed: 0,
+        guard: undefined as Error | undefined,
+        guardArgs: [] as unknown[],
+        opened: 0,
+        reads: [] as string[],
+        stall: false,
+        throwOnOpen: false,
+    };
 });
 
 // eslint-disable-next-line no-restricted-syntax -- no macro transform in this package's vitest; nothing to inject into
@@ -35,10 +44,16 @@ vi.mock("./epub-book", () => {
             }
 
             return {
-                chapters: [{ id: "c1", title: "Beginning" }, { id: "c2" }, { id: "c3", title: "End" }],
-                destroy: () => {},
+                chapters: [{ id: "c1", title: "Beginning" }, { id: "c2" }, { id: "c3", title: "End" }].slice(0, book.chapters),
+                destroy: () => {
+                    book.destroyed += 1;
+                },
                 read: async (id: string) => {
                     book.reads.push(id);
+
+                    if (book.stall) {
+                        await new Promise(() => {});
+                    }
 
                     return `<body>chapter ${id}${id === "c2" ? "<script>window.ran = true</script>" : ""}</body>`;
                 },
@@ -50,12 +65,24 @@ vi.mock("./epub-book", () => {
 // The zip guard looks inside a real archive; the stand-in bytes below are not one.
 // eslint-disable-next-line no-restricted-syntax -- see above
 vi.mock("@ui/utils/office-zip-limits", () => {
-    return { assertOfficeZipWithinLimits: async () => {}, OFFICE_ZIP_MAX_UNCOMPRESSED_BYTES: 50 * 1024 * 1024 };
+    return {
+        assertOfficeZipWithinLimits: async (_buffer: ArrayBuffer, limits: unknown) => {
+            book.guardArgs.push(limits);
+
+            if (book.guard !== undefined) {
+                throw book.guard;
+            }
+        },
+        OFFICE_ZIP_MAX_ENTRIES: 2000,
+        OFFICE_ZIP_MAX_UNCOMPRESSED_BYTES: 50 * 1024 * 1024,
+    };
 });
 
 const { default: EpubPreview } = await import("./epub-preview");
+const { FetchableOriginsProvider } = await import("./fetchable-origins-provider");
 
-const URL_OF_BOOK = "https://files.example/book.epub?sig=1";
+const ORIGIN = "https://files.example";
+const URL_OF_BOOK = `${ORIGIN}/book.epub?sig=1`;
 
 const view = { container: undefined as unknown as HTMLDivElement, fetched: 0, root: undefined as unknown as Root };
 
@@ -67,9 +94,13 @@ const answer = (body: BodyInit, headers: Record<string, string> = {}) => {
     });
 };
 
-const mount = async (props: { maxBytes?: number } = {}) => {
+const mount = async (props: { maxBytes?: number; url?: string } = {}) => {
     await act(async () => {
-        view.root.render(<EpubPreview filename="book.epub" url={URL_OF_BOOK} {...props} />);
+        view.root.render(
+            <FetchableOriginsProvider origins={[ORIGIN]}>
+                <EpubPreview filename="book.epub" url={URL_OF_BOOK} {...props} />
+            </FetchableOriginsProvider>,
+        );
     });
     // The fetch, the parse and the first chapter each settle in a later turn.
     await act(async () => {
@@ -86,8 +117,13 @@ const click = async (target: HTMLElement) => {
 };
 
 beforeEach(() => {
+    book.chapters = 3;
+    book.destroyed = 0;
+    book.guard = undefined;
+    book.guardArgs = [];
     book.opened = 0;
     book.reads = [];
+    book.stall = false;
     book.throwOnOpen = false;
     view.fetched = 0;
     view.container = document.createElement("div");
@@ -177,5 +213,109 @@ describe("EpubPreview size cap", () => {
 
         expect(view.container.textContent).toContain("Could not preview");
         expect(view.container.querySelector("iframe")).toBeNull();
+    });
+});
+
+describe("EpubPreview address", () => {
+    it.each([
+        ["another origin", "https://evil.example/book.epub"],
+        ["a loopback service", "http://127.0.0.1:8080/book.epub"],
+        ["a scheme the app does not serve", "ftp://files.example/book.epub"],
+        ["a file address", "file:///etc/passwd"],
+    ])("refuses %s without a request", async (_name, url) => {
+        answer(new Uint8Array([1]));
+        await mount({ url });
+
+        expect(view.container.textContent).toContain("Could not preview");
+        expect(view.container.querySelector("iframe")).toBeNull();
+        expect(view.fetched).toBe(0);
+        expect(book.opened).toBe(0);
+    });
+
+    it("reads the app's own file address", async () => {
+        answer(new Uint8Array([1]));
+        await mount();
+
+        expect(view.fetched).toBe(1);
+        expect(view.container.querySelector("iframe")).not.toBeNull();
+    });
+});
+
+describe("EpubPreview size", () => {
+    it("holds the archive to the same cap as the download, not the guard's default", async () => {
+        answer(new Uint8Array(10));
+        await mount({ maxBytes: 1000 });
+
+        expect(book.guardArgs).toEqual([{ maxBytes: 1000, maxEntries: 2000 }]);
+    });
+
+    it.each(["Archive expands too large", "Archive has too many entries"])("shows %s as too large to preview, not as a failure", async (message) => {
+        book.guard = new Error(message);
+        answer(new Uint8Array(10));
+        await mount();
+
+        expect(view.container.textContent).toContain("Too large to preview");
+        expect(book.opened).toBe(0);
+    });
+
+    it("shows an archive that is not a book as a failure", async () => {
+        book.guard = new Error("Not a ZIP archive");
+        answer(new Uint8Array(10));
+        await mount();
+
+        expect(view.container.textContent).toContain("Could not preview");
+    });
+
+    it("stops reading a body that passes the cap without ever declaring a length", async () => {
+        let pulled = 0;
+        const stream = new ReadableStream<Uint8Array>({
+            pull(controller) {
+                pulled += 1;
+                controller.enqueue(new Uint8Array(400));
+
+                if (pulled > 50) {
+                    controller.close();
+                }
+            },
+        });
+
+        vi.stubGlobal("fetch", async () => new Response(stream, { status: 200 }));
+        await mount({ maxBytes: 1000 });
+
+        expect(view.container.textContent).toContain("Too large to preview");
+        // Cancelled soon after the cap, not read to its end.
+        expect(pulled).toBeLessThan(10);
+    });
+});
+
+describe("EpubPreview failures", () => {
+    it("releases a book with nothing to read", async () => {
+        book.chapters = 0;
+        answer(new Uint8Array([1]));
+        await mount();
+
+        expect(view.container.textContent).toContain("Could not preview");
+        expect(book.destroyed).toBe(1);
+    });
+
+    it("ends a chapter whose read stalls in the failure card, and releases the book", async () => {
+        vi.useFakeTimers();
+
+        try {
+            book.stall = true;
+            answer(new Uint8Array([1]));
+            await mount();
+            await act(async () => {
+                vi.advanceTimersByTime(30_001);
+            });
+            await act(async () => {
+                await Promise.resolve();
+            });
+
+            expect(view.container.textContent).toContain("Could not preview");
+            expect(book.destroyed).toBeGreaterThanOrEqual(1);
+        } finally {
+            vi.useRealTimers();
+        }
     });
 });
