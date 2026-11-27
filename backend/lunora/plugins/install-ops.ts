@@ -86,9 +86,19 @@ export const childOps = (ctx: ActionCtx, options: ChildOptions): BundleOps => {
             // A create can throw after its first write (a skill's row commits before its bookkeeping rows), leaving a child that is in
             // no rollback list. It is found by its marker and removed like a child whose link failed; one that cannot be removed is named.
             if (!lostLease && !(error instanceof Error && error.message.includes("STALE_LEASE"))) {
+                // A failed lookup is not an absent child: the child may exist, so it is named and the install is kept for repair.
+                let lookupFailed = false;
                 const childId = await ctx
                     .runMutation(internal.plugins.repair_resume.childIdForMarker, { kind, marker: markerFor(installId, key), userId })
-                    .catch(() => null);
+                    .catch(() => {
+                        lookupFailed = true;
+
+                        return null;
+                    });
+
+                if (lookupFailed && !lostLease) {
+                    throw new BundleImportError(error instanceof Error ? error.message : "The child could not be created", [key]);
+                }
 
                 if (childId !== null) {
                     const removed = await remove(childId, kind)

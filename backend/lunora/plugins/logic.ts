@@ -124,7 +124,7 @@ export const diffUpdate = (installed: ReadonlyArray<InstalledChild>, incoming: R
             plan.push({ action: edited ? "detach" : "delete", entryKey: entry.entryKey }, { action: "create", entryKey: entry.entryKey });
         } else if (edited) {
             plan.push({ action: "keep-edited", entryKey: entry.entryKey });
-        } else if (entry.contentHash === child.contentHash) {
+        } else if (entry.contentHash === child.contentHash && child.currentHash === child.contentHash) {
             plan.push({ action: "same", entryKey: entry.entryKey });
         } else {
             plan.push({ action: "update", entryKey: entry.entryKey });

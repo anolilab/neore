@@ -212,6 +212,42 @@ describe("repair: taking over a stopped install", () => {
         expect(page).toStrictEqual([]);
     });
 
+    it("does not hand out children to create in the call that settles a stopped update", async () => {
+        const first = await run(
+            async (context) => await context.runMutation(createInstallRow, { contentHash: HASH, pluginSlug: SLUG, userId: OWNER, version: "1.0.0" }),
+        );
+
+        await run(
+            async (context) =>
+                await context.runMutation(recordIntent, {
+                    contentHash: HASH,
+                    entryKey: "skill:ghost",
+                    generation: first.generation,
+                    installId: first.installId,
+                    kind: "skill",
+                    userId: OWNER,
+                }),
+        );
+        // The skill was linked, then deleted while the update was stopped.
+        await run(async (context) => {
+            const { page } = await context.db.pluginItems.findMany({ where: { installId: first.installId } });
+
+            await context.db.patch("pluginItems", page[0]._id, { itemId: "gone", state: "created" });
+        });
+        await run(
+            async (context) =>
+                await context.db.patch("pluginInstalls", first.installId, { leaseUntil: Date.now() - 1000, status: "updating", targetVersion: "1.1.0" }),
+        );
+
+        const begun = await run(async (context) => await beginRepairRows(context, OWNER, SLUG, "e".repeat(64)));
+        const install = await run(async (context) => await context.db.pluginInstalls.findFirst({ where: { _id: first.installId } }));
+
+        expect(begun.missing).toEqual([]);
+        expect(begun.unresolved).toEqual(["skill:ghost"]);
+        expect(begun.status).toBe("needs-repair");
+        expect(install).toMatchObject({ status: "needs-repair", version: "1.0.0" });
+    });
+
     it("refuses another file for an install that is not updating", async () => {
         const first = await run(
             async (context) => await context.runMutation(createInstallRow, { contentHash: HASH, pluginSlug: SLUG, userId: OWNER, version: "1.0.0" }),

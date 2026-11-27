@@ -421,6 +421,13 @@ export const updatePlugin = authAction
 
                 importDone = true;
                 applied.push(...created.map((item) => item.key));
+
+                // A new webhook's secret is issued at creation. It is returned with the result, never on a failure.
+                for (const item of created) {
+                    if (item.webhookSecret !== undefined) {
+                        webhookSecrets.push({ entryKey: item.key, secret: item.webhookSecret });
+                    }
+                }
             }
 
             for (const step of groupRewrites) {

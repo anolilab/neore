@@ -161,6 +161,32 @@ describe("a schedule below an inserted skill, through the action path", () => {
         expect(after[0]).toMatchObject({ cronExpression: DIGEST.cronExpression, enabled: before[0].enabled, name: DIGEST.name });
     });
 
+    it("returns the secret of a webhook that the update adds under a new key", async () => {
+        const body = buildBundleMarkdown({
+            description: "",
+            items: [
+                { key: "analyst", kind: "skill" as const, skill: skill("analyst") },
+                { key: "digest", kind: "trigger" as const, trigger: DIGEST },
+                { key: "hook", kind: "trigger" as const, trigger: { model: DIGEST.model, name: "New hook", type: "webhook" as const } },
+            ],
+            name: "Daily brief",
+        });
+        const contentHash = await bodyHash(body);
+        const markdown = withPluginHeader(body, { contentHash, slug: SLUG, version: "1.1.0" });
+        const preview = (await as().action(procedureAt("plugins_update", "previewUpdate"), { markdown } as never)) as PreviewResult;
+        const result = (await as().action(procedureAt("plugins_update", "updatePlugin"), {
+            confirmDowngrade: false,
+            contentHash,
+            expectedGeneration: preview.generation,
+            expectedInstallId: preview.installId,
+            markdown,
+        } as never)) as UpdateResult & { webhookSecrets: { entryKey: string; secret: string }[] };
+
+        expect(result.applied).toContain("trigger:hook");
+        expect(result.webhookSecrets).toHaveLength(1);
+        expect(result.webhookSecrets[0]).toMatchObject({ entryKey: "trigger:hook" });
+    });
+
     it("rewrites a changed schedule in place, and a schedule that becomes a webhook is replaced and returns its secret once", async () => {
         const before = await schedules();
         const changed = buildBundleMarkdown({

@@ -154,7 +154,11 @@ export const beginRepairRows = async (
         throw new LunoraError("NOT_FOUND", `The plugin "${pluginSlug}" is not installed`);
     }
 
-    if (result.status === "installed" || missing.length === 0 || result.moreDropped) {
+    // A call that settles a stopped update creates nothing: its file was not checked against the install, so it may hold other
+    // content than the stored hash. A child it turned back into an intent is made by the next call, with the install's own file.
+    const settledUpdate = install.status === "updating";
+
+    if (result.status === "installed" || missing.length === 0 || result.moreDropped || settledUpdate) {
         return {
             existing,
             generation: current.generation,
@@ -165,7 +169,7 @@ export const beginRepairRows = async (
             moreDropped: result.moreDropped,
             outdated: result.outdated,
             status: result.status,
-            unresolved,
+            unresolved: settledUpdate ? result.missing : unresolved,
         };
     }
 

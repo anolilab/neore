@@ -143,6 +143,10 @@ describe("diffUpdate", () => {
         ]);
     });
 
+    it("restores a child that holds its pending content when the file is back at the recorded content", () => {
+        expect(diffUpdate([child("a", { currentHash: "h2", pendingHash: "h2" })], [incoming("a", "h1")])).toEqual([{ action: "update", entryKey: "a" }]);
+    });
+
     it("does not treat a child caught mid-update as edited, so the update finishes it rather than keeping it", () => {
         expect(diffUpdate([child("a", { currentHash: "h2", pendingHash: "h2" })], [incoming("a", "h2")])).toEqual([{ action: "update", entryKey: "a" }]);
     });

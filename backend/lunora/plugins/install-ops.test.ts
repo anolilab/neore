@@ -99,6 +99,22 @@ describe("child operations", () => {
         expect(calls).toEqual(["createSkill", "childFor", "remove"]);
     });
 
+    it("names the child in leftBehind when the create failed and its marker lookup fails too", async () => {
+        const ops = opsWith(async (ref) => {
+            if (ref === "createSkill") {
+                throw new Error("bookkeeping failed");
+            }
+
+            if (ref === "childFor") {
+                throw new Error("database busy");
+            }
+
+            return null;
+        });
+
+        await expect(ops.createSkill(SKILL, "skill:a")).rejects.toMatchObject({ leftBehind: ["skill:a"], name: "BundleImportError" });
+    });
+
     it("names a half-made child in leftBehind when it cannot be removed", async () => {
         const ops = opsWith(async (ref) => {
             if (ref === "createSkill") {
