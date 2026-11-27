@@ -2528,7 +2528,9 @@ export const schema = defineSchema({
         version: v.string(),
     })
         .global()
-        .index("by_user_and_slug", ["userId", "pluginSlug"]),
+        // Unique: one install per person and plugin, held by the database. Named anew because an existing D1 table keeps an index
+        // of the same name and columns as it was created (the old non-unique `by_user_and_slug`).
+        .index("by_user_and_plugin_slug", ["userId", "pluginSlug"], { unique: true }),
 
     pluginItems: defineTable({
         contentHash: v.string(),

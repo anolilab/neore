@@ -8,6 +8,7 @@ import { v, LunoraError } from "lunorash/server";
 
 import type { Id } from "../_generated/dataModel";
 import { internalMutation } from "../_generated/server";
+import { isUniqueViolation } from "../lib/error-helpers";
 import { heldInstall, heldInstallForShardWrite, patchInstallIf } from "./held-install";
 import { refuseWhileErasing, requireOwnerShard } from "./owner-shard";
 import { LEASE_MS } from "./logic";
@@ -32,19 +33,30 @@ export const createInstallRow = internalMutation
         }
 
         const { now } = ctx;
-        const installId = await ctx.db.insert("pluginInstalls", {
-            contentHash: args.contentHash,
-            generation: 1,
-            installedAt: now,
-            leaseUntil: now + LEASE_MS,
-            pluginSlug: args.pluginSlug,
-            status: "installing",
-            updatedAt: now,
-            userId: args.userId,
-            version: args.version,
-        });
+        let installId: string;
 
-        return { generation: 1, installId: installId as string };
+        try {
+            installId = await ctx.db.insert("pluginInstalls", {
+                contentHash: args.contentHash,
+                generation: 1,
+                installedAt: now,
+                leaseUntil: now + LEASE_MS,
+                pluginSlug: args.pluginSlug,
+                status: "installing",
+                updatedAt: now,
+                userId: args.userId,
+                version: args.version,
+            });
+        } catch (error) {
+            // A second create that read before the first one wrote: the unique index (`by_user_and_plugin_slug`) refuses it.
+            if (isUniqueViolation(error)) {
+                throw new LunoraError("CONFLICT", `The plugin "${args.pluginSlug}" is already installed. Uninstall it first.`);
+            }
+
+            throw error;
+        }
+
+        return { generation: 1, installId };
     });
 
 export const recordIntent = internalMutation

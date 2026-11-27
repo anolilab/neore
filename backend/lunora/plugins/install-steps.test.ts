@@ -34,6 +34,15 @@ describe("install steps", () => {
         await expect(run(async (context) => await context.runMutation(createInstallRow, start))).rejects.toThrow("already installed");
     });
 
+    it("holds one install per person and plugin in the database, not only in the read before the insert", async () => {
+        await run(async (context) => await context.runMutation(createInstallRow, start));
+
+        const row = { contentHash: HASH, generation: 1, installedAt: 0, pluginSlug: "daily-brief", status: "installing", updatedAt: 0, version: "1.0.0" };
+
+        await expect(run(async (context) => await context.db.insert("pluginInstalls", { ...row, userId: OWNER }))).rejects.toMatchObject({ kind: "unique" });
+        await run(async (context) => await context.db.insert("pluginInstalls", { ...row, userId: "owner-b" }));
+    });
+
     it("keeps a child when the rollback that deletes it no longer holds the install", async () => {
         const { generation, installId } = await run(async (context) => await context.runMutation(createInstallRow, start));
         const skillId = await run(

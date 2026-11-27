@@ -1592,6 +1592,130 @@ describe("reassignGlobalRows", () => {
         }
     });
 
+    describe("plugin installs and the unique index", () => {
+        const base = { contentHash: "a".repeat(64), createdAt: 0, generation: 1, status: "installed" as const, updatedAt: 0, version: "1.0.0" };
+        const open = () => lunoraTest(schemaWithShardedTables([...Object.keys(GLOBAL_USER_COLUMNS), "shardActivity"]) as never);
+
+        it("takes the drop path when the move meets an install the new account gained since the read", async () => {
+            const harness = open();
+
+            try {
+                const guestInstall = await harness.run(async (context: any) => {
+                    await context.db.insert("pluginInstalls", { ...base, pluginSlug: "shared", userId: "user" });
+
+                    return await context.db.insert("pluginInstalls", { ...base, pluginSlug: "shared", userId: "guest" });
+                });
+
+                // The target read misses the new account's install, as a read that ran before its create would.
+                const blind = (context: any) => {
+                    const installs = {
+                        ...context.db.pluginInstalls,
+                        findFirst: async (options: any) => (options.where?.userId === "user" ? null : await context.db.pluginInstalls.findFirst(options)),
+                    };
+
+                    return {
+                        ...context,
+                        db: new Proxy(context.db, { get: (target, key) => (key === "pluginInstalls" ? installs : Reflect.get(target, key)) }),
+                    };
+                };
+
+                const first = await harness.run(async (context: any) => await mergePluginInstallsPage(blind(context), "guest", "user"));
+
+                expect(first.done).toBe(false);
+
+                for (let call = 0; call < 10; call += 1) {
+                    const { done } = await harness.run(async (context: any) => await mergePluginInstallsPage(context, "guest", "user"));
+
+                    if (done) {
+                        break;
+                    }
+                }
+
+                const { page } = await harness.run(async (context: any) => await context.db.pluginInstalls.findMany({}));
+
+                expect(page.map((row: any) => [row.userId, row.pluginSlug])).toStrictEqual([["user", "shared"]]);
+                expect(page.some((row: any) => row._id === guestInstall)).toBe(false);
+            } finally {
+                harness.close();
+            }
+        });
+
+        it("skips an install an action holds, asks to be tried again, and finishes once the lease has ended", async () => {
+            const harness = open();
+
+            try {
+                const { held, settled } = await harness.run(async (context: any) => {
+                    const heldId = await context.db.insert("pluginInstalls", {
+                        ...base,
+                        leaseUntil: context.now + 60_000,
+                        pluginSlug: "busy",
+                        status: "updating",
+                        userId: "guest",
+                    });
+                    const settledId = await context.db.insert("pluginInstalls", { ...base, pluginSlug: "idle", userId: "guest" });
+
+                    return { held: heldId, settled: settledId };
+                });
+
+                const result = await harness.run(async (context: any) => await mergePluginInstallsPage(context, "guest", "user"));
+                const { page: mid } = await harness.run(async (context: any) => await context.db.pluginInstalls.findMany({}));
+
+                expect(result).toMatchObject({ busy: true, done: false });
+                expect(mid.find((row: any) => row._id === held)).toMatchObject({ generation: 1, userId: "guest" });
+                expect(mid.find((row: any) => row._id === settled)).toMatchObject({ userId: "user" });
+
+                await harness.run(async (context: any) => {
+                    await context.db.patch("pluginInstalls", held, { leaseUntil: 1, status: "installed" });
+                });
+
+                const after = await harness.run(async (context: any) => await mergePluginInstallsPage(context, "guest", "user"));
+                const { page: end } = await harness.run(async (context: any) => await context.db.pluginInstalls.findMany({}));
+
+                expect(after.busy).toBeUndefined();
+                expect(end.every((row: any) => row.userId === "user")).toBe(true);
+            } finally {
+                harness.close();
+            }
+        });
+
+        it("keeps an install an action took over between the merge's read and its write", async () => {
+            const harness = open();
+
+            try {
+                const id = await harness.run(
+                    async (context: any) => await context.db.insert("pluginInstalls", { ...base, pluginSlug: "taken", userId: "guest" }),
+                );
+
+                // The merge reads generation 1; by its write an action has moved the row to generation 2.
+                const racing = (context: any) => {
+                    const installs = {
+                        ...context.db.pluginInstalls,
+                        findMany: async (options: any) => {
+                            const read = await context.db.pluginInstalls.findMany(options);
+
+                            await context.db.patch("pluginInstalls", id, { generation: 2 });
+
+                            return read;
+                        },
+                    };
+
+                    return {
+                        ...context,
+                        db: new Proxy(context.db, { get: (target, key) => (key === "pluginInstalls" ? installs : Reflect.get(target, key)) }),
+                    };
+                };
+
+                const result = await harness.run(async (context: any) => await mergePluginInstallsPage(racing(context), "guest", "user"));
+                const row = await harness.run(async (context: any) => await context.db.pluginInstalls.findFirst({ where: { _id: id } }));
+
+                expect(result).toMatchObject({ busy: true, done: false });
+                expect(row).toMatchObject({ generation: 2, userId: "guest" });
+            } finally {
+                harness.close();
+            }
+        });
+    });
+
     it("moves a guest's rule-file rows a few per call, each read charged whole, until all are the new account's", async () => {
         const harness = lunoraTest(schemaWithShardedTables([...Object.keys(GLOBAL_USER_COLUMNS), "shardActivity"]) as never);
 
