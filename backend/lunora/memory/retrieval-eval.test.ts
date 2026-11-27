@@ -230,7 +230,7 @@ interface Floor {
 const BASELINE: Record<"overall" | Category, Floor> & { overall: Required<Floor> & { abstainPrecision: number; abstainRate: number } } = {
     abstain: { offTopicRate: 1 },
     exact: { inWindow: 1, ndcgAt8: 1, offTopicRate: 0.091, recallAt8: 1 },
-    multi: { inWindow: 1, ndcgAt8: 0.725, offTopicRate: 0.771, recallAt8: 0.883 },
+    multi: { inWindow: 1, ndcgAt8: 0.726, offTopicRate: 0.771, recallAt8: 0.883 },
     overall: { abstainPrecision: 1, abstainRate: 0.967, inWindow: 1, ndcgAt8: 0.801, offTopicRate: 0.836, recallAt8: 0.957 },
     single: { inWindow: 1, ndcgAt8: 0.83, offTopicRate: 0.88, recallAt8: 0.94 },
     temporal: { inWindow: 1, ndcgAt8: 0.715, offTopicRate: 0.872, recallAt8: 1 },
