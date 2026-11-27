@@ -38,7 +38,16 @@ const EPUB_PREFIX = /^epub:/u;
 const DOT_SLASH = /^\.\//u;
 
 /** A path in a link without its `epub:` prefix, leading `./` and `#fragment`. */
-const pathOf = (href: string): string => (href.replace(EPUB_PREFIX, "").split("#", 1)[0] ?? "").replace(DOT_SLASH, "");
+const pathOf = (href: string): string => {
+    const bare = (href.replace(EPUB_PREFIX, "").split("#", 1)[0] ?? "").replace(DOT_SLASH, "");
+
+    try {
+        // A name written with escapes (`my%20chapter.xhtml`) is the file stored under its plain name.
+        return decodeURIComponent(bare);
+    } catch {
+        return bare;
+    }
+};
 
 /**
  * The table of contents' labels by spine item. The spine spells a path from the book's root and the table of contents from its own folder,
@@ -178,6 +187,8 @@ interface AssetReader {
     refused: () => boolean;
     /** Charges a text that is to go into the document (a style sheet, after its addresses are rewritten) to the budget and the count; `false` when it does not fit. */
     spend: (length: number) => boolean;
+    /** As `spend`, for a sheet whose `data:` pictures were already charged when they were read: only the rest of its text is charged now. */
+    spendSheet: (length: number) => boolean;
     /** A text file of the archive. */
     text: (path: string) => Promise<string | undefined>;
 }
@@ -185,6 +196,8 @@ interface AssetReader {
 const assetReader = (zip: JSZip, signal?: AbortSignal): AssetReader => {
     const budget = { files: MAX_ASSETS_PER_CHAPTER, left: MAX_INLINED_CHARS };
     let refusedSheet = false;
+    // The cost of pictures already counted against a sheet: they are charged once, when read, not again as part of the sheet.
+    let chargedForSheets = 0;
     // What each file became, and what it costs each time it is written into the document.
     const seen = new Map<string, { cost: number; url: string } | undefined>();
 
@@ -246,6 +259,29 @@ const assetReader = (zip: JSZip, signal?: AbortSignal): AssetReader => {
 
             budget.files -= 1;
             budget.left -= length;
+
+            return true;
+        },
+        spendSheet: (length) => {
+            let counted = 0;
+
+            for (const item of seen.values()) {
+                counted += item?.cost ?? 0;
+            }
+
+            const inlined = counted - chargedForSheets;
+            const rest = Math.max(0, length - inlined);
+
+            chargedForSheets += inlined;
+
+            if (budget.files <= 0 || rest > budget.left) {
+                refusedSheet = true;
+
+                return false;
+            }
+
+            budget.files -= 1;
+            budget.left -= rest;
 
             return true;
         },
@@ -320,7 +356,11 @@ const LOADING_ATTRIBUTES: ReadonlyArray<string> = ["action", "background", "data
 const REFERENCE_ATTRIBUTES: ReadonlyArray<string> = ["href", "xlink:href"];
 /** Elements that load or frame another document: none is wanted in a chapter, and the policy refuses what they would load. */
 const EMBEDDING_ELEMENTS = "iframe, frame, frameset, object, embed, link";
+/** Elements a walk of the markup does not enter or that rewrite an attribute after the document is loaded: a template's content is a separate fragment (a declarative shadow root renders it), and SVG animation can set an `href` or `target` later. */
+const DEFERRING_ELEMENTS = "template, set, animate, animatetransform, animatemotion";
+const SPLIT_CANDIDATE = /[\s,]+/u;
 const SELF_CONTAINED = /^\s*(?:data:|#)/iu;
+const SINGLE_DATA_CANDIDATE = /^\s*data:\S*(?:\s+[\d.]+[wx])?\s*$/iu;
 
 /**
  * Takes out of parsed chapter markup what could reach beyond it: every `<meta>` and `<base>` (a refresh directive moves a frame with no script
@@ -333,13 +373,20 @@ const neutralize = (root: Element): void => {
         element.remove();
     }
 
-    for (const element of root.querySelectorAll(EMBEDDING_ELEMENTS)) {
+    for (const element of root.querySelectorAll(`${EMBEDDING_ELEMENTS}, ${DEFERRING_ELEMENTS}`)) {
         element.remove();
     }
 
     for (const element of root.querySelectorAll("*")) {
         for (const name of LOADING_ATTRIBUTES) {
             if (element.hasAttribute(name) && !SELF_CONTAINED.test(element.getAttribute(name) ?? "")) {
+                element.removeAttribute(name);
+            }
+        }
+
+        // A `srcset` is a list: it starts with a data address and may still name others after it, so it stays only as one data candidate.
+        for (const name of ["imagesrcset", "srcset"]) {
+            if (element.hasAttribute(name) && !SINGLE_DATA_CANDIDATE.test(element.getAttribute(name) ?? "")) {
                 element.removeAttribute(name);
             }
         }
@@ -424,6 +471,34 @@ export const chapterDocument = (markup: string, styles: ReadonlyArray<string>, l
 };
 
 /** A chapter read from the archive: its markup with its pictures inlined, and its styles, in the order the chapter names them. */
+
+/**
+ * A chapter's markup as an HTML document. A chapter is XHTML: it is read as XML first, so a self-closing `<span/>` or `<title/>` means what it
+ * says, and moved into an HTML document (which serializes as HTML, where `<div/>` would open a div); one that is not well-formed XML is read
+ * as HTML, as a browser would.
+ */
+const parseChapter = (source: string): Document => {
+    const html = new DOMParser().parseFromString("<!doctype html><html><head></head><body></body></html>", "text/html");
+    const xml = new DOMParser().parseFromString(source, "application/xhtml+xml");
+
+    if (xml.querySelector("parsererror") !== null || xml.documentElement.localName !== "html") {
+        return new DOMParser().parseFromString(source, "text/html");
+    }
+
+    for (const [from, to] of [
+        [xml.querySelector("head"), html.head],
+        [xml.querySelector("body"), html.body],
+    ] as const) {
+        const children = [...(from?.childNodes ?? [])];
+
+        for (const node of children) {
+            to.appendChild(html.importNode(node, true));
+        }
+    }
+
+    return html;
+};
+
 const readChapter = async (chapterPath: string, reader: AssetReader): Promise<{ markup: string; styles: string[] }> => {
     const source = await reader.text(chapterPath);
 
@@ -436,7 +511,7 @@ const readChapter = async (chapterPath: string, reader: AssetReader): Promise<{ 
     }
 
     const directory = directoryOf(chapterPath);
-    const parsed = new DOMParser().parseFromString(source, "text/html");
+    const parsed = parseChapter(source);
     const styles: string[] = [];
 
     for (const link of parsed.querySelectorAll('link[rel~="stylesheet" i][href]')) {
@@ -452,7 +527,7 @@ const readChapter = async (chapterPath: string, reader: AssetReader): Promise<{ 
             const sheet = await inlineStylesheetUrls(text, directoryOf(path), reader);
 
             // A sheet that does not fit is left out whole, not cut: half a sheet would style a chapter wrongly.
-            if (reader.spend(sheet.length)) {
+            if (reader.spendSheet(sheet.length)) {
                 styles.push(sheet);
             }
         }
@@ -469,7 +544,7 @@ const readChapter = async (chapterPath: string, reader: AssetReader): Promise<{ 
         }
 
         const sheet = await inlineStylesheetUrls(style.textContent ?? "", directory, reader);
-        const kept = reader.spend(sheet.length) ? sheet : "";
+        const kept = reader.spendSheet(sheet.length) ? sheet : "";
 
         if (inHead) {
             // A rule the chapter defines in its head (`p { white-space: pre-wrap }`) is kept, rewritten and charged like any sheet, and goes
@@ -491,6 +566,23 @@ const readChapter = async (chapterPath: string, reader: AssetReader): Promise<{ 
             if (url !== undefined) {
                 element.setAttribute(name, url);
             }
+        }
+    }
+
+    // A picture an inline `style` names, and the first candidate of a `srcset` an `img` has no `src` beside.
+    for (const element of parsed.body.querySelectorAll("[style], img[srcset]:not([src])")) {
+        const style = element.getAttribute("style");
+
+        if (style !== null && style.includes("url(") && !reader.refused()) {
+            element.setAttribute("style", await inlineStylesheetUrls(style, directory, reader));
+        }
+
+        const first = element.localName === "img" ? element.getAttribute("srcset")?.trim().split(SPLIT_CANDIDATE, 1)[0] : undefined;
+        const path = first === undefined ? undefined : resolveInArchive(first, directory);
+        const url = path === undefined ? undefined : await reader.dataUrl(path);
+
+        if (url !== undefined) {
+            element.setAttribute("src", url);
         }
     }
 

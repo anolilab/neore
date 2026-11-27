@@ -28,6 +28,8 @@ interface SampleChapter {
     head?: string;
     id: string;
     label?: string;
+    /** The name the file is stored under in the archive, when it is not the one the manifest writes. */
+    stored?: string;
 }
 
 interface SampleOptions {
@@ -64,7 +66,7 @@ const book = async ({ chapters, files = {}, language = "en" }: SampleOptions): P
 
     for (const chapter of chapters) {
         zip.file(
-            `OEBPS/${chapter.file}`,
+            `OEBPS/${chapter.stored ?? chapter.file}`,
             `<?xml version="1.0"?><html xmlns="http://www.w3.org/1999/xhtml"><head><title>t</title>${chapter.head ?? ""}</head><body>${chapter.body}</body></html>`,
         );
     }
@@ -430,6 +432,59 @@ describe("chapterDocument", () => {
         expect(frame.querySelectorAll("iframe, object, embed, link")).toHaveLength(0);
         expect(frame.querySelector('img[src^="data:image/png"]')).not.toBeNull();
         expect(frame.querySelector('use[href="#local"]')).not.toBeNull();
+    });
+
+    it("leaves no remote address of any kind in the markup a chapter becomes: srcset lists, pictures, posters, objects, templates, animations and inline styles", () => {
+        const frame = parse(
+            chapterDocument(
+                [
+                    '<img src="https://evil.example/a.png" srcset="data:image/png;base64,AAAA 1x, https://evil.example/b.png 2x" alt="x">',
+                    '<picture><source srcset="https://evil.example/c.webp 1x" type="image/webp"><img srcset="https://evil.example/d.png" alt="y"></picture>',
+                    '<video poster="https://evil.example/p.png"><source src="https://evil.example/v.mp4"><track src="https://evil.example/t.vtt"></video>',
+                    '<object data="https://evil.example/o.swf"></object><link rel="preload" href="https://evil.example/l.css" as="style">',
+                    '<p style="background:url(https://evil.example/s.png)">s</p>',
+                    '<template shadowrootmode="open"><a href="https://evil.example/" target="_self">t</a></template>',
+                    '<svg><a href="#x"><set attributeName="href" to="https://evil.example/"/></a><animate attributeName="href" to="https://evil.example/"/></svg>',
+                ].join(""),
+                [],
+            ),
+        );
+
+        expect(frame.documentElement.outerHTML).not.toContain("evil.example");
+        expect(frame.querySelector("template")).toBeNull();
+        expect(frame.querySelectorAll("set, animate")).toHaveLength(0);
+        // The one candidate that is a data address is not what was removed: a list that names anything else goes whole.
+        expect(frame.querySelector("img")?.hasAttribute("srcset")).toBe(false);
+    });
+
+    it("reads a chapter written as XHTML as XHTML: a self-closing span does not wrap what follows", async () => {
+        const opened = await openEpub(
+            await book({ chapters: [{ body: '<p><span id="page-3"/>after the marker</p><p>second</p>', file: "one.xhtml", id: "c1" }] }),
+            folder.path,
+        );
+        const frame = parse(await opened.read("c1"));
+
+        expect(frame.querySelectorAll("p")).toHaveLength(2);
+        expect(frame.querySelector("span")?.textContent).toBe("");
+        opened.destroy();
+    });
+
+    it("finds a chapter whose name is written with escapes, and draws an inline-style picture from the archive", async () => {
+        const opened = await openEpub(
+            await book({
+                chapters: [
+                    { body: '<div style="background-image:url(images/p.png)">x</div>', file: "my%20chapter.xhtml", id: "c1", stored: "my chapter.xhtml" },
+                ],
+                files: { "images/p.png": PNG },
+            }),
+            folder.path,
+        );
+
+        // The archive stores the file under its plain name; the picture of the inline style comes from the archive too.
+        const frame = parse(await opened.read("c1"));
+
+        expect(frame.querySelector("div")?.getAttribute("style")).toContain("data:image/png;base64,");
+        opened.destroy();
     });
 
     it("makes every anchor's target _blank, whatever the chapter wrote, so a link cannot navigate the frame", () => {

@@ -90,6 +90,9 @@ const fetchBook = async (url: string, maxBytes: number, signal: AbortSignal): Pr
     const response = await fetch(url, { signal });
 
     if (!response.ok) {
+        // An error answer may stream: it is let go, not left holding the connection.
+        await response.body?.cancel().catch(() => undefined);
+
         throw new Error(`HTTP ${response.status}`);
     }
 
@@ -130,7 +133,7 @@ const EpubPreview: FC<EpubPreviewProps> = memo(({ className, filename, maxBytes 
     // one, and a book whose load was torn down (the effect's cleanup destroys it) is not one to show again if the same file comes back.
     const key = `${url}\n${String(maxBytes)}`;
     const [loaded, setLoaded] = useState<{ key: string; load: Load }>({ key, load: { status: "loading" } });
-    const [shown, setShown] = useState<{ book: OpenedEpub; doc: string; id: string; key: string } | undefined>();
+    const [shown, setShown] = useState<{ book: OpenedEpub; doc: string; failed?: boolean; id: string; key: string } | undefined>();
     const [position, setPosition] = useState({ index: 0, key });
     const isLive = loaded.key === key && !(loaded.load.status === "ready" && loaded.load.book.destroyed);
     const load: Load = isLive ? loaded.load : { status: "loading" };
@@ -227,9 +230,9 @@ const EpubPreview: FC<EpubPreviewProps> = memo(({ className, filename, maxBytes 
                 }
             } catch {
                 if (!cancelled) {
-                    // The book is no use now: its archive is released with the failure, not at an unmount that may be long off.
-                    book.destroy();
-                    setLoaded({ key, load: { status: "failed" } });
+                    // This chapter could not be read (it is missing from the archive, too large, or stalled): the others still can be, so the book
+                    // is kept and only this chapter is marked.
+                    setShown({ book, doc: "", failed: true, id: chapterId, key });
                 }
             } finally {
                 clearTimeout(timer);
@@ -302,6 +305,11 @@ const EpubPreview: FC<EpubPreviewProps> = memo(({ className, filename, maxBytes 
                         srcDoc={shown !== undefined && shown.book === book && shown.id === chapterId && shown.key === key ? shown.doc : undefined}
                         title={chapter?.title ?? label}
                     />
+                    {shown?.failed === true && shown.book === book && shown.id === chapterId && shown.key === key && (
+                        <p className="text-destructive px-3 py-1 text-xs" role="status">
+                            {t`Could not preview · Click to download`}
+                        </p>
+                    )}
                     <div className="bg-muted/50 flex items-center justify-between gap-2 border-t px-3 py-1.5">
                         <button
                             aria-label={t`Previous chapter`}

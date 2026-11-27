@@ -321,7 +321,7 @@ describe("EpubPreview failures", () => {
         expect(book.destroyed).toBe(1);
     });
 
-    it("ends a chapter whose read stalls in the failure card, and releases the book", async () => {
+    it("marks a chapter whose read stalls as failed, keeps the book, and lets the person go on to another chapter", async () => {
         vi.useFakeTimers();
 
         try {
@@ -336,7 +336,15 @@ describe("EpubPreview failures", () => {
             });
 
             expect(view.container.textContent).toContain("Could not preview");
-            expect(book.destroyed).toBeGreaterThanOrEqual(1);
+            expect(view.container.querySelector("iframe")).not.toBeNull();
+            expect(book.destroyed).toBe(0);
+
+            book.stall = false;
+            await click(button("Next chapter"));
+            await act(async () => {
+                await Promise.resolve();
+            });
+            expect(frame().getAttribute("srcdoc")).toContain("chapter c2");
         } finally {
             vi.useRealTimers();
         }
