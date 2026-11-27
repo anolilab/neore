@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { ROOT_SHARD_KEY, runInShard } from "../lib/shard-context";
 import schema from "../schema";
+import { removeImportedItem } from "../skills/bundle";
 import { createInstallRow, deleteInstall, finishInstall, markNeedsRepair, recordCreated, recordIntent } from "./install-steps";
 
 const OWNER = "owner-a";
@@ -31,6 +32,22 @@ describe("install steps", () => {
         await run(async (context) => await context.runMutation(createInstallRow, start));
 
         await expect(run(async (context) => await context.runMutation(createInstallRow, start))).rejects.toThrow("already installed");
+    });
+
+    it("keeps a child when the rollback that deletes it no longer holds the install", async () => {
+        const { generation, installId } = await run(async (context) => await context.runMutation(createInstallRow, start));
+        const skillId = await run(
+            async (context) => await context.db.insert("skills", { description: "d", instructions: "i", name: "Kept", slug: "kept", userId: OWNER }),
+        );
+
+        const outcome = await run(
+            async (context) =>
+                await context.runMutation(removeImportedItem, { id: skillId, kind: "skill", lease: { generation: generation + 1, installId }, userId: OWNER }),
+        );
+        const skill = await run(async (context) => await context.db.skills.findFirst({ where: { _id: skillId } }));
+
+        expect(outcome).toStrictEqual({ kept: true, leaseLost: true });
+        expect(skill).not.toBeNull();
     });
 
     it("refuses to start an install on the root shard or another person's shard", async () => {

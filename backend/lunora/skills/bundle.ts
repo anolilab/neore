@@ -38,6 +38,7 @@ import { authAction, authQuery, rateLimit } from "../lib/crpc";
 import { MAX_LENGTH } from "../lib/validators";
 import type { BundleItem, SkillSource } from "./bundle-format";
 import { withPluginHeader } from "../plugins/export";
+import { heldInstall } from "../plugins/held-install";
 import { bodyHash } from "../plugins/logic";
 import { BUNDLE_LIMITS, buildBundleMarkdown, groupItemOf, parseBundleMarkdown, skillItemOf, triggerItemOf } from "./bundle-format";
 import type { PlanEntry, PlanEnv } from "./bundle-plan";
@@ -551,12 +552,27 @@ export const exportBundle = authAction
  * and soft-fail an import that is already half done. An item that is already gone is a success.
  */
 export const removeImportedItem = internalMutation
-    .input({ id: v.string().max(MAX_LENGTH.id), kind: vKind, userId: v.string().max(MAX_LENGTH.id) })
-    .output(v.object({ kept: v.boolean() }))
-    .mutation(async ({ args: { id, kind, userId }, ctx }) => {
+    .input({
+        id: v.string().max(MAX_LENGTH.id),
+        kind: vKind,
+        // A plugin rollback: the delete happens only while the action still holds the install, checked in this same mutation so a
+        // repair that took over cannot have linked the child in between. A lost lease keeps the child for that repair.
+        lease: v.optional(v.object({ generation: v.number(), installId: v.string().max(MAX_LENGTH.id) })),
+        userId: v.string().max(MAX_LENGTH.id),
+    })
+    .output(v.object({ kept: v.boolean(), leaseLost: v.optional(v.boolean()) }))
+    .mutation(async ({ args: { id, kind, lease, userId }, ctx }) => {
         const forbidden = (): never => {
             throw new LunoraError("FORBIDDEN", "Not authorized to remove this item");
         };
+
+        if (lease) {
+            try {
+                await heldInstall(ctx, lease.installId as Id<"pluginInstalls">, lease.generation);
+            } catch {
+                return { kept: true, leaseLost: true };
+            }
+        }
 
         if (kind === "skill") {
             const skill = await ctx.db.skills.findFirst({ where: { _id: id as Id<"skills"> } });

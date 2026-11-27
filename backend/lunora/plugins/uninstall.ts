@@ -281,7 +281,16 @@ export const finishUninstallRows = async (
     for (const skillId of pendingSkills) {
         const skill = await ctx.db.skills.findFirst({ where: { _id: skillId as Id<"skills"> } });
 
-        if (!skill || skill.pluginInstallId !== installId) {
+        if (!skill) {
+            continue;
+        }
+
+        // Detached already, with the kept group that names it (`detachKeptGroup`): still reported as kept.
+        if (skill.pluginInstallId !== installId) {
+            if (usedByKept.has(skillId)) {
+                result.kept.push(skill.name);
+            }
+
             continue;
         }
 

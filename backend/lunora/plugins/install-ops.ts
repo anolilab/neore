@@ -58,19 +58,20 @@ export const childOps = (ctx: ActionCtx, options: ChildOptions): BundleOps => {
         }
     };
 
-    // A create that failed for another reason can follow a takeover, so each delete first asks whether this action still holds the install.
-    const remove = async <T>(run: () => Promise<T>): Promise<T | undefined> => {
+    // A create that failed for another reason can follow a takeover, so each delete checks, in the mutation that deletes, that this
+    // action still holds the install.
+    const remove = async (id: string, kind: ChildKind): Promise<{ kept: boolean; leaseLost?: boolean } | undefined> => {
         if (lostLease) {
             return undefined;
         }
 
-        if (!(await ctx.runMutation(internal.plugins.repair_resume.holdsLease, { generation, installId }))) {
-            lostLease = true;
+        const outcome = await ctx.runMutation(internal.skills.bundle.removeImportedItem, { id, kind, lease: { generation, installId }, userId });
 
-            return undefined;
+        if (outcome.leaseLost === true) {
+            lostLease = true;
         }
 
-        return await run();
+        return outcome;
     };
 
     /** One child: its intent first, then the create, then its link to the child. */
@@ -86,10 +87,13 @@ export const childOps = (ctx: ActionCtx, options: ChildOptions): BundleOps => {
             // The child is not in the import's rollback list yet, so it is removed here. A lost lease keeps it: its marker lets the
             // new holder's repair link it. A child that cannot be removed is named, so the install is kept for repair.
             if (!lostLease) {
-                const removed = await ctx
-                    .runMutation(internal.skills.bundle.removeImportedItem, { id: created.id, kind, userId })
-                    .then((outcome) => (outcome as { kept?: boolean } | undefined)?.kept !== true)
+                const removed = await remove(created.id, kind)
+                    .then((outcome) => outcome !== undefined && !outcome.kept)
                     .catch(() => false);
+
+                if (lostLease) {
+                    throw error;
+                }
 
                 if (!removed) {
                     throw new BundleImportError(error instanceof Error ? error.message : "The child could not be linked", [key]);
@@ -152,11 +156,8 @@ export const childOps = (ctx: ActionCtx, options: ChildOptions): BundleOps => {
 
             return { triggerId: created.id, ...(created.webhookSecret !== undefined && { webhookSecret: created.webhookSecret }) };
         },
-        deleteGroupChat: async (threadId) =>
-            await remove(async () => await ctx.runMutation(internal.skills.bundle.removeImportedItem, { id: threadId, kind: "group", userId })),
-        deleteSkill: async (skillId) =>
-            await remove(async () => await ctx.runMutation(internal.skills.bundle.removeImportedItem, { id: skillId, kind: "skill", userId })),
-        deleteTrigger: async (triggerId) =>
-            await remove(async () => await ctx.runMutation(internal.skills.bundle.removeImportedItem, { id: triggerId, kind: "trigger", userId })),
+        deleteGroupChat: async (threadId) => await remove(threadId, "group"),
+        deleteSkill: async (skillId) => await remove(skillId, "skill"),
+        deleteTrigger: async (triggerId) => await remove(triggerId, "trigger"),
     };
 };

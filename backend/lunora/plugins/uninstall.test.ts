@@ -392,7 +392,7 @@ describe("uninstall", () => {
                 await finishUninstallRows(context, begun.installId, begun.generation, { keptGroups: [threadId], pendingSkills: begun.pendingSkills }),
         );
 
-        expect(finished).toMatchObject({ kept: ["Late panel"], removed: 0 });
+        expect(finished).toMatchObject({ kept: ["Late panel", "Analyst"], removed: 0 });
         expect(await run(async (context) => await context.db.skills.findFirst({ where: { _id: skillId } }))).toMatchObject({
             pluginInstallId: "",
             pluginMarker: "",

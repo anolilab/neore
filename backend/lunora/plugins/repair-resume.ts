@@ -130,20 +130,6 @@ export const beginRepairRows = async (
     return { existing, generation, installId, linked: result.linked, missing, status: "needs-repair", unresolved };
 };
 
-/** Whether the caller still holds the install: its generation is current and its lease has not run out. Rollback asks before it deletes. */
-export const holdsLease = internalMutation
-    .input({ generation: v.number(), installId: v.string().max(128) })
-    .output(v.boolean())
-    .mutation(async ({ args, ctx }) => {
-        try {
-            await heldInstall(ctx, args.installId as Id<"pluginInstalls">, args.generation);
-
-            return true;
-        } catch {
-            return false;
-        }
-    });
-
 /** A child repair is about to create is baselined on the plan that creates it, which may differ from the install's (a slug taken since). */
 export const setIntentHash = internalMutation
     .input({ contentHash: v.string().max(128), generation: v.number(), installId: v.string().max(128), intentId: v.string().max(128) })

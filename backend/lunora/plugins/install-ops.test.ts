@@ -8,7 +8,7 @@ vi.mock("../_generated/internal", () => {
     return {
         internal: {
             chat: { group: { functions: { createPluginGroupChat: "createGroup" } } },
-            plugins: { install_steps: { recordCreated: "recordCreated" }, repair_resume: { holdsLease: "holds" } },
+            plugins: { install_steps: { recordCreated: "recordCreated" } },
             skills: { bundle: { removeImportedItem: "remove" }, create_skill: { createPluginSkill: "createSkill" } },
             triggers: { functions: { createPluginTrigger: "createTrigger" } },
         },
@@ -25,10 +25,6 @@ describe("child operations", () => {
 
             if (ref === "recordCreated" && calls.filter((call) => call === "recordCreated").length === 2) {
                 throw new LunoraError("CONFLICT", "STALE_LEASE: this install was taken over by another action");
-            }
-
-            if (ref === "holds") {
-                return true;
             }
 
             return ref === "createSkill" ? `skill-${String(calls.length)}` : null;
@@ -68,10 +64,6 @@ describe("child operations", () => {
                 throw new Error("database busy");
             }
 
-            if (ref === "holds") {
-                return true;
-            }
-
             return ref === "createSkill" ? "skill-1" : { kept: false };
         });
 
@@ -85,7 +77,7 @@ describe("child operations", () => {
                 throw new Error("database busy");
             }
 
-            return ref === "holds" ? true : "skill-1";
+            return "skill-1";
         });
 
         await expect(ops.createSkill(SKILL, "skill:a")).rejects.toMatchObject({ leftBehind: ["skill:a"], name: "BundleImportError" });
@@ -107,21 +99,24 @@ describe("child operations", () => {
         expect(calls).not.toContain("remove");
     });
 
-    it("deletes nothing when another action holds the install by now, even though no step reported a stale lease", async () => {
+    it("stops deleting once the delete reports that another action holds the install, though no step reported a stale lease", async () => {
         const calls: string[] = [];
         const ops = opsWith(async (ref) => {
             calls.push(ref);
 
-            return ref === "holds" ? false : null;
+            return { kept: true, leaseLost: true };
         });
 
         await ops.deleteSkill("skill-1");
+        await ops.deleteSkill("skill-2");
 
-        expect(calls).toEqual(["holds"]);
+        expect(calls).toEqual(["remove"]);
     });
 
-    it("deletes while it still holds the lease", async () => {
-        const runMutation = vi.fn(async (ref: string) => (ref === "holds" ? true : null));
+    it("passes its lease to the delete, which checks it in the same mutation", async () => {
+        const runMutation = vi.fn(async () => {
+            return { kept: false };
+        });
         const ops = childOps({ runMutation } as never, {
             generation: 1,
             installId: "install",
@@ -133,7 +128,7 @@ describe("child operations", () => {
 
         await ops.deleteSkill("skill-1");
 
-        expect(runMutation).toHaveBeenCalledWith("remove", { id: "skill-1", kind: "skill", userId: "owner" });
+        expect(runMutation).toHaveBeenCalledWith("remove", { id: "skill-1", kind: "skill", lease: { generation: 1, installId: "install" }, userId: "owner" });
     });
 });
 
