@@ -920,7 +920,7 @@ describe("AsidePanel", () => {
         }
     });
 
-    it("does not scroll to another hit when a streamed answer adds a match before the selected one", async () => {
+    it("keeps the selected hit when a streamed answer adds a match before it, and reveals only that hit", async () => {
         vi.useFakeTimers({ toFake: [...REVEAL_TIMERS] });
         const scroll = vi.fn();
 
@@ -952,7 +952,9 @@ describe("AsidePanel", () => {
                 screen.getByText("A cat. A cat.").textContent = "Cat! A cat. A cat.";
             });
             await settleReveal();
-            expect(scroll).not.toHaveBeenCalled();
+            // The selected hit is still the one it was, now third of three, and it has moved out of sight, so it alone is revealed.
+            expect(screen.getByText("3 of 3")).toBeDefined();
+            expect(scroll).toHaveBeenCalledTimes(1);
         } finally {
             Reflect.deleteProperty(Element.prototype, "scrollIntoView");
             Reflect.deleteProperty(Range.prototype, "getBoundingClientRect");
@@ -980,6 +982,46 @@ describe("AsidePanel", () => {
         expect(screen.queryByRole("textbox", { name: "Find in side questions" })).toBeNull();
         // eslint-disable-next-line testing-library/no-node-access -- focus placement (document.activeElement) is what this test asserts
         expect(document.activeElement).toBe(screen.getByRole("region", { name: "Side question" }));
+    });
+
+    it("does not scroll to the hit that replaces a dismissed selection while its reveal is still pending", async () => {
+        vi.useFakeTimers({ toFake: [...REVEAL_TIMERS] });
+        const hitTop = 20;
+        const scroll = vi.fn();
+        const answered = { answer: "A cat.", id: "a", question: "Why?", status: "answered", token: "tok" } as const;
+
+        useAsideStore.setState({ byThread: { "thread-1": [answered] } });
+        render(<AsidePanel threadId="thread-1" />);
+
+        Object.defineProperty(Element.prototype, "scrollIntoView", { configurable: true, value: scroll });
+        Object.defineProperty(Range.prototype, "getBoundingClientRect", {
+            configurable: true,
+            value: function rectOfHit(this: Range) {
+                // eslint-disable-next-line unicorn/no-this-outside-of-class -- the rect depends on which range is asked, which only the receiver says
+                return rectAt(this.startContainer.textContent?.includes("too") ? 900 : hitTop);
+            },
+        });
+
+        try {
+            act(() => {
+                globalThis.dispatchEvent(new CustomEvent(ASIDE_FIND_EVENT));
+            });
+            // The query schedules a reveal for the hit in "a", which is out of sight, and it has not run yet.
+            fireEvent.change(screen.getByRole("textbox", { name: "Find in side questions" }), { target: { value: "cat" } });
+
+            // Before that reveal runs, the entry is dismissed and its place is taken by a hit far below.
+            await act(async () => {
+                useAsideStore.setState({
+                    byThread: { "thread-1": [{ answer: "A cat too.", id: "z", question: "Below?", status: "answered", token: "tok-z" }] },
+                });
+            });
+            await settleReveal();
+            expect(scroll).not.toHaveBeenCalled();
+        } finally {
+            Reflect.deleteProperty(Element.prototype, "scrollIntoView");
+            Reflect.deleteProperty(Range.prototype, "getBoundingClientRect");
+            vi.useRealTimers();
+        }
     });
 
     it("keeps the selected hit when the bar is reopened after an earlier entry gains a hit", async () => {

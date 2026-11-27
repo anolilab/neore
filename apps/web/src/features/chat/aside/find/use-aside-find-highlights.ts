@@ -201,24 +201,63 @@ const entryOf = (range: Range | undefined): string | undefined =>
 interface Anchor {
     entryId: string | undefined;
     occurrence: number;
-    /** Characters from the start of the entry's text to the hit: the hit keeps it while the text around it is rewritten. */
-    textOffset: number | undefined;
+    place: TextPlace | undefined;
 }
 
-/** How far into its entry's text a hit starts, or undefined when it is not in an entry. */
-const textOffsetOf = (range: Range | undefined): number | undefined => {
-    const row = range?.startContainer.parentElement?.closest<HTMLElement>(`[${CSS.escape(ASIDE_ENTRY_ATTRIBUTE)}]`);
+/**
+ * Where a hit sits in its entry's text, measured from both ends. An edit before the hit moves `start` and keeps `tail`; an edit
+ * after it does the reverse. A hit is found again by either, so a streamed rewrite on one side does not lose it.
+ */
+interface TextPlace {
+    /** Characters from the start of the entry's text to the hit. */
+    start: number;
+    /** Characters from the hit to the end of the entry's text. */
+    tail: number;
+}
 
-    if (!range || !row) {
-        return undefined;
+type Placer = (range: Range | undefined) => TextPlace | undefined;
+
+/** One entry's text: how many of its characters come before each text node, and how many it has in all. */
+interface EntryText {
+    before: Map<Node, number>;
+    length: number;
+}
+
+const measureEntry = (row: HTMLElement): EntryText => {
+    const before = new Map<Node, number>();
+    const walker = document.createTreeWalker(row, NodeFilter.SHOW_TEXT);
+    let length = 0;
+
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        before.set(node, length);
+        length += node.nodeValue?.length ?? 0;
     }
 
-    const lead = document.createRange();
+    return { before, length };
+};
 
-    lead.setStart(row, 0);
-    lead.setEnd(range.startContainer, range.startOffset);
+/** A placer for one rescan: each entry is walked once, however many of its hits are placed. */
+const placerFor = (): Placer => {
+    const entries = new Map<HTMLElement, EntryText>();
 
-    return lead.toString().length;
+    return (range) => {
+        const row = range?.startContainer.parentElement?.closest<HTMLElement>(`[${CSS.escape(ASIDE_ENTRY_ATTRIBUTE)}]`);
+
+        if (!range || !row) {
+            return undefined;
+        }
+
+        let entry = entries.get(row);
+
+        if (!entry) {
+            entry = measureEntry(row);
+            entries.set(row, entry);
+        }
+
+        const start = (entry.before.get(range.startContainer) ?? 0) + range.startOffset;
+
+        return { start, tail: entry.length - start };
+    };
 };
 
 /** The selected hit: its anchor, the flat position it last held, and the navigation that selected it. */
@@ -228,31 +267,40 @@ interface Selection {
     position: number;
 }
 
-const anchorAt = (all: Range[], position: number): Anchor => {
+const anchorAt = (all: Range[], position: number, place: Placer): Anchor => {
     const entryId = entryOf(all[position]);
 
     return {
         entryId,
         occurrence: all.slice(0, position).filter((range) => entryOf(range) === entryId).length,
-        textOffset: textOffsetOf(all[position]),
+        place: place(all[position]),
     };
 };
 
-/** Whether two selections name the same hit: the same entry, and the same place in its text. */
-const isSameAnchor = (a: Anchor | undefined, b: Anchor | undefined): boolean => a?.entryId === b?.entryId && a?.textOffset === b?.textOffset;
+/**
+ * Whether two selections name the same hit: the same entry, and the same place in its text from either end. Two different
+ * hits in one entry cannot share both, so a match on either measure is the same hit.
+ */
+const isSameAnchor = (a: Anchor | undefined, b: Anchor | undefined): boolean =>
+    a?.entryId === b?.entryId && (a?.place?.start === b?.place?.start || a?.place?.tail === b?.place?.tail);
 
-/** Where the anchored hit sits in the rescanned list, or undefined when its entry is gone. */
-const positionOf = (all: Range[], anchor: Anchor): number | undefined => {
+/**
+ * Where the anchored hit sits in the rescanned list, or undefined when its entry is gone. It is found by its place from the
+ * entry's start, then from its end. Only when neither still names a hit does the occurrence it was take its place.
+ */
+const positionOf = (all: Range[], anchor: Anchor, place: Placer): number | undefined => {
     const positions = all.flatMap((range, position) => (entryOf(range) === anchor.entryId ? [position] : []));
 
     if (positions.length === 0) {
         return undefined;
     }
 
-    // The hit that still starts at the same place in its entry. When the text before it changed, the occurrence it was.
-    const exact = positions.find((position) => textOffsetOf(all[position]) === anchor.textOffset);
+    const placed = positions.map((position) => place(all[position]));
+    const fromStart = placed.findIndex((found) => found?.start === anchor.place?.start);
+    const fromEnd = placed.findIndex((found) => found?.tail === anchor.place?.tail);
+    const found = fromStart === -1 ? fromEnd : fromStart;
 
-    return exact ?? positions[Math.min(anchor.occurrence, positions.length - 1)];
+    return positions[found === -1 ? Math.min(anchor.occurrence, positions.length - 1) : found];
 };
 
 /**
@@ -302,14 +350,15 @@ const useAsideFindHighlights = (
         const apply = (): Range | undefined => {
             const all = collectAsideRanges(host, query);
             const state = selection.current;
+            const place = placerFor();
             // The hit is followed through the rescan. Once its entry is gone, the selection takes the hit now at the position it last held.
-            const followed = state.anchor === undefined ? undefined : positionOf(all, state.anchor);
+            const followed = state.anchor === undefined ? undefined : positionOf(all, state.anchor, place);
             const position = all.length > 0 ? (followed ?? clampIndex(state.position, all.length)) : undefined;
             const current = position === undefined ? undefined : all[position];
 
             if (position !== undefined) {
                 state.position = position;
-                state.anchor = anchorAt(all, position);
+                state.anchor = anchorAt(all, position, place);
             }
 
             setHighlights(all, current, ASIDE_HIGHLIGHTS);
