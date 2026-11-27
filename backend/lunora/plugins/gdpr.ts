@@ -9,10 +9,10 @@ import { internalQuery, type MutationCtx } from "../_generated/server";
 import { type BatchResult, deleteOneByOne } from "../gdpr/batch";
 
 /**
- * Rows per table per call. Both tables are `.global()`, so every delete is a D1 statement and one invocation allows about 50:
- * two reads and up to 2 x 20 deletes stay under it.
+ * Rows per table per call. Both tables are `.global()`, so every delete reads its row and then deletes it (two D1 statements) and
+ * one invocation allows about 50: two page reads and up to 2 x 10 deletes at two each is 42.
  */
-const PAGE = 20;
+const PAGE = 10;
 
 /** One batch of the person's links and installs. `hasMore` while either table may hold more; the workflow calls again. */
 export const erasePluginsForUser = async (ctx: MutationCtx, userId: string): Promise<BatchResult> => {
@@ -25,46 +25,28 @@ export const erasePluginsForUser = async (ctx: MutationCtx, userId: string): Pro
     return { hasMore: items.length >= PAGE || installs.length >= PAGE };
 };
 
-/** Rows read per page for the export. */
-const EXPORT_PAGE = 500;
+/** Links read per page for the export. */
+const EXPORT_PAGE = 100;
 
-interface RowPage<T> {
-    continueCursor?: string | null;
-    isDone: boolean;
-    page: T[];
-}
+/** Installs a person can hold: one per plugin, so the list is small and read whole with the first page. */
+const EXPORT_INSTALLS = 500;
 
-/** Every row a read matches, a page at a time, from the primary (a single read stops at a page). */
-const readAll = async <T>(read: (cursor: string | null) => Promise<RowPage<T>>): Promise<T[]> => {
-    const rows: T[] = [];
-    let cursor: string | null = null;
-
-    for (;;) {
-        const result: RowPage<T> = await read(cursor);
-
-        rows.push(...result.page);
-
-        if (result.isDone || !result.continueCursor) {
-            return rows;
-        }
-
-        cursor = result.continueCursor;
-    }
-};
-
-/** The person's plugin installs and the links of their entries, for the account export. No content hashes: they say nothing about the person. */
+/**
+ * One page of the person's plugin links for the account export, and, with the first page, their installs. The export action reads
+ * the pages itself (no workflow step result carries them, which a persisted step caps at 1 MiB). No content hashes: they say
+ * nothing about the person.
+ */
 export const collectPluginsForExport = internalQuery
-    .input({ userId: v.string() })
-    .output(v.object({ installs: v.array(v.any()), items: v.array(v.any()) }))
-    .query(async ({ args: { userId }, ctx }) => {
-        const installs = await readAll(
-            async (cursor) => await ctx.db.pluginInstalls.findMany({ consistency: "primary", cursor, limit: EXPORT_PAGE, where: { userId } }),
-        );
-        const items = await readAll(
-            async (cursor) => await ctx.db.pluginItems.findMany({ consistency: "primary", cursor, limit: EXPORT_PAGE, where: { userId } }),
-        );
+    .input({ cursor: v.optional(v.string().max(512)), userId: v.string() })
+    .output(v.object({ continueCursor: v.optional(v.string()), installs: v.array(v.any()), items: v.array(v.any()) }))
+    .query(async ({ args: { cursor, userId }, ctx }) => {
+        const installPage =
+            cursor === undefined ? await ctx.db.pluginInstalls.findMany({ consistency: "primary", limit: EXPORT_INSTALLS, where: { userId } }) : undefined;
+        const installs = installPage?.page ?? [];
+        const page = await ctx.db.pluginItems.findMany({ consistency: "primary", cursor: cursor ?? null, limit: EXPORT_PAGE, where: { userId } });
 
         return {
+            continueCursor: page.isDone || !page.continueCursor ? undefined : page.continueCursor,
             installs: installs.map((install) => {
                 return {
                     id: install._id,
@@ -75,7 +57,7 @@ export const collectPluginsForExport = internalQuery
                     version: install.version,
                 };
             }),
-            items: items.map((item) => {
+            items: page.page.map((item) => {
                 return { createdAt: item.createdAt, entryKey: item.entryKey, installId: item.installId, kind: item.kind, state: item.state };
             }),
         };

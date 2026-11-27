@@ -8,7 +8,6 @@ import { v, LunoraError } from "lunorash/server";
 
 import type { Id } from "../_generated/dataModel";
 import { internalMutation } from "../_generated/server";
-import { patchRow } from "../lib/patch";
 import { heldInstall, heldInstallForShardWrite, patchInstallIf } from "./held-install";
 import { requireOwnerShard } from "./owner-shard";
 import { LEASE_MS } from "./logic";
@@ -97,20 +96,16 @@ export const finishInstall = internalMutation
         const install = await heldInstall(ctx, args.installId as Id<"pluginInstalls">, args.generation);
 
         // An update kept for repair holds its target version: finishing it makes that the installed version, to match the new file's hash.
+        // The target version is not removed (a removal is a replace of the row, which cannot be conditional); it is set equal to the
+        // version, so it reads the same as none (`targetVersion ?? version`) and the whole write stays one conditional patch.
+        const version = install.targetVersion ?? install.version;
+
         await patchInstallIf(ctx, args.installId as Id<"pluginInstalls">, args.generation, {
             status: "installed",
+            ...(install.targetVersion !== undefined && { targetVersion: version }),
             updatedAt: ctx.now,
-            version: install.targetVersion ?? install.version,
+            version,
         });
-
-        // Only the removal of the held target version follows; the conditional write above has already decided who holds the install.
-        if (install.targetVersion !== undefined) {
-            const written = await ctx.db.pluginInstalls.findFirst({ where: { _id: args.installId as Id<"pluginInstalls"> } });
-
-            if (written && written.generation === args.generation) {
-                await patchRow(ctx.db, "pluginInstalls", written, { targetVersion: undefined });
-            }
-        }
 
         return null;
     });

@@ -130,8 +130,8 @@ describe("repair", () => {
 
         const install = await run(async (context) => await context.db.pluginInstalls.findFirst({ where: { _id: installId } }));
 
-        expect(install).toMatchObject({ status: "installed", version: "1.1.0" });
-        expect(install?.targetVersion).toBeUndefined();
+        // The write is one conditional patch, which cannot remove a field: the target is set equal to the version, which reads as none.
+        expect(install).toMatchObject({ status: "installed", targetVersion: "1.1.0", version: "1.1.0" });
     });
 
     it("sets the target version when repair finds nothing missing", async () => {

@@ -309,7 +309,10 @@ describe("applying an update", () => {
                     userId: OWNER,
                 }),
         );
-        await run(async (context) => await context.runMutation(failUpdate, { contentHash: HASH, createKeys: [], generation, installId, keepForRepair: false }));
+        await run(
+            async (context) =>
+                await context.runMutation(failUpdate, { contentHash: HASH, createKeys: ["skill:new"], generation, installId, keepForRepair: false }),
+        );
 
         const install = await run(async (context) => await context.db.pluginInstalls.findFirst({ where: { _id: installId } }));
         const links = await run(async (context) => {
@@ -430,6 +433,58 @@ describe("applying an update", () => {
         expect(await run(async (context) => await context.db.pluginInstalls.findFirst({ where: { _id: installId } }))).toMatchObject({
             generation: generation + 1,
             status: "needs-repair",
+        });
+    });
+
+    it("failUpdate removes only the links of its own attempt, not an intent for a key it did not create", async () => {
+        const { installId } = await installed();
+        const generation = await run(
+            async (context) => await context.runMutation(beginUpdate, { expectedGeneration: 1, installId, targetVersion: "1.1.0", userId: OWNER }),
+        );
+
+        for (const entryKey of ["skill:new", "skill:other"]) {
+            await run(
+                async (context) =>
+                    await context.db.insert("pluginItems", {
+                        contentHash: HASH,
+                        createdAt: Date.now(),
+                        entryKey,
+                        installId,
+                        kind: "skill",
+                        state: "intent",
+                        userId: OWNER,
+                    }),
+            );
+        }
+
+        await run(
+            async (context) =>
+                await context.runMutation(failUpdate, { contentHash: HASH, createKeys: ["skill:new"], generation, installId, keepForRepair: false }),
+        );
+
+        const links = await run(async (context) => {
+            const { page } = await context.db.pluginItems.findMany({ where: { installId } });
+
+            return page.map((row: { entryKey: string }) => row.entryKey).toSorted((a: string, b: string) => a.localeCompare(b));
+        });
+
+        expect(links).toStrictEqual(["skill:analyst", "skill:other"]);
+    });
+
+    it("finishing an install kept for repair makes its target the version in one conditional write, and keeps the generation", async () => {
+        const { installId } = await installed();
+        const generation = await run(
+            async (context) => await context.runMutation(beginUpdate, { expectedGeneration: 1, installId, targetVersion: "1.1.0", userId: OWNER }),
+        );
+
+        await run(async (context) => await context.runMutation(failUpdate, { contentHash: HASH, createKeys: [], generation, installId, keepForRepair: true }));
+        await run(async (context) => await context.runMutation(finishInstall, { generation, installId }));
+
+        expect(await run(async (context) => await context.db.pluginInstalls.findFirst({ where: { _id: installId } }))).toMatchObject({
+            generation,
+            status: "installed",
+            targetVersion: "1.1.0",
+            version: "1.1.0",
         });
     });
 });

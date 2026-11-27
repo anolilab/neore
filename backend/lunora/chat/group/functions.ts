@@ -365,7 +365,7 @@ export const createPluginGroupChat = internalMutation
     })
     .output(v.object({ threadId: v.string() }))
     .mutation(async ({ args: { plan, pluginInstallId, pluginMarker, userId, ...fields }, ctx }) => {
-        const { debateRounds, mode, organizationId, skillIds, synthesizerSkillId } = fields;
+        const { organizationId, skillIds } = fields;
         const existing = await ctx.db
             .query("threads")
             .withIndex("by_plugin_marker", (q) => q.eq("pluginMarker", pluginMarker))
@@ -376,26 +376,41 @@ export const createPluginGroupChat = internalMutation
                 throw new LunoraError("FORBIDDEN", "That plugin group belongs to another account");
             }
 
-            // A repair recreates a deleted skill under a new id: the group found by its marker follows the skills it is given now,
-            // or it would keep naming the deleted one, which a turn silently drops.
+            // A repair recreates a deleted skill under a new id: a participant whose skill is gone is pointed at the skill given in its
+            // place, or the group would keep naming the deleted one, which a turn silently drops. Nothing else is touched: the owner's
+            // own choices (participants they added or removed, the options, the synthesizer) stay, and a group that cannot be matched
+            // one to one is left as it is.
             const stored = existing.groupChat;
 
-            if (
-                stored &&
-                (stored.participants.length !== skillIds.length || stored.participants.some((participant) => !skillIds.includes(participant.skillId)))
-            ) {
-                const options = requireGroupOptions({ debateRounds, mode, skillIds, synthesizerSkillId });
+            if (stored) {
+                const gone: string[] = [];
 
-                await requireUsableSkills(ctx, skillIds, { organizationId, userId }, false);
-                await ctx.db.patch("threads", existing._id, {
-                    groupChat: {
-                        ...stored,
-                        ...options,
-                        participants: skillIds.map(
-                            (skillId) => stored.participants.find((participant) => participant.skillId === skillId) ?? { addedAt: ctx.now, skillId },
-                        ),
-                    },
-                });
+                for (const participant of stored.participants) {
+                    if (!(await ctx.db.skills.findFirst({ where: { _id: participant.skillId as Id<"skills"> } }))) {
+                        gone.push(participant.skillId);
+                    }
+                }
+
+                const present = new Set(stored.participants.map((participant) => participant.skillId));
+                const fresh = skillIds.filter((skillId) => !present.has(skillId));
+
+                if (gone.length > 0 && gone.length === fresh.length) {
+                    const replacement = new Map(gone.map((skillId, index) => [skillId, fresh[index]!]));
+
+                    await requireUsableSkills(ctx, fresh, { organizationId, userId }, false);
+                    await ctx.db.patch("threads", existing._id, {
+                        groupChat: {
+                            ...stored,
+                            ...(stored.synthesizerSkillId !== undefined &&
+                                replacement.has(stored.synthesizerSkillId) && { synthesizerSkillId: replacement.get(stored.synthesizerSkillId) }),
+                            participants: stored.participants.map((participant) => {
+                                const next = replacement.get(participant.skillId);
+
+                                return next === undefined ? participant : { addedAt: participant.addedAt, skillId: next };
+                            }),
+                        },
+                    });
+                }
             }
 
             return { threadId: existing._id as string };

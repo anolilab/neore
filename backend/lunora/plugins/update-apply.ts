@@ -224,19 +224,21 @@ export const failUpdate = internalMutation
             return null;
         }
 
-        // The install row first, conditionally: a stale caller then stops before it touches the links.
-        await patchInstallIf(ctx, args.installId as Id<"pluginInstalls">, args.generation, { status: "installed", updatedAt: ctx.now });
-
         const { page } = await ctx.db.pluginItems.findMany({ where: { installId: args.installId } });
 
+        // Only the links of this attempt: its intents (an intent has no child yet) and the links of the children it created whose
+        // rollback removed the child. The install is released afterwards, so no new update can record links while this runs.
         for (const row of page) {
-            if (
-                row.state === "intent" ||
-                (row.state === "created" && args.createKeys.includes(row.entryKey) && !(await childExists(ctx, row, args.installId)))
-            ) {
+            if (!args.createKeys.includes(row.entryKey)) {
+                continue;
+            }
+
+            if (row.state === "intent" || (row.state === "created" && !(await childExists(ctx, row, args.installId)))) {
                 await ctx.db.delete("pluginItems", row._id as Id<"pluginItems">);
             }
         }
+
+        await patchInstallIf(ctx, args.installId as Id<"pluginInstalls">, args.generation, { status: "installed", updatedAt: ctx.now });
 
         return null;
     });

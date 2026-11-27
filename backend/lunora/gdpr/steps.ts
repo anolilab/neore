@@ -748,8 +748,6 @@ export const generateExportFile = internalAction
         // Pages, their comments and grants (`pages/gdpr.ts`). Optional for the
         // same in-flight-replay reason as `threadTags`.
         pages: v.optional(v.any()),
-        // The person's plugin installs and entry links (`plugins/gdpr.ts`). Optional for the same in-flight-replay reason.
-        plugins: v.optional(v.any()),
         profile: v.any(),
         prompts: v.any(),
         // AI guides of pull requests (`source-control/gdpr.ts`). Optional for the same in-flight-replay reason.
@@ -805,6 +803,28 @@ export const generateExportFile = internalAction
                 async (cursor) => await context.runQuery(internal.acp.gdpr.collectAcpSessionsForExport, { cursor, userId: args.userId }),
                 MAX_EXPORT_BYTES,
             ));
+        // The plugin installs and links (`plugins/gdpr.ts`), read here a page per query so no workflow step result carries them.
+        const plugins: { installs: unknown[]; items: unknown[] } = { installs: [], items: [] };
+
+        for (let cursor: string | undefined; ;) {
+            const page: { continueCursor?: string; installs: unknown[]; items: unknown[] } = await context.runQuery(
+                internal.plugins.gdpr.collectPluginsForExport,
+                {
+                    cursor,
+                    userId: args.userId,
+                },
+            );
+
+            plugins.installs.push(...page.installs);
+            plugins.items.push(...page.items);
+
+            if (page.continueCursor === undefined) {
+                break;
+            }
+
+            cursor = page.continueCursor;
+        }
+
         // The project repositories share the action's read budget with the ACP sessions. Their rows cannot be cut short,
         // so a set too large for what is left fails with PAYLOAD_TOO_LARGE (a floor keeps a small set exportable even past
         // the ACP sessions); their projects' details past the budget are marked as left out. The trigger history, which
@@ -970,7 +990,7 @@ export const generateExportFile = internalAction
             memories: args.memories ?? { digests: [], memories: [] },
             notifications: args.notifications ?? { notifications: [], pushSubscriptions: [] },
             pages: args.pages ?? { comments: [], favorites: [], grants: [], pages: [] },
-            plugins: args.plugins ?? { installs: [], items: [] },
+            plugins,
             profile: args.profile,
             projectRepositories,
             projects: ownedWithRules.projects,

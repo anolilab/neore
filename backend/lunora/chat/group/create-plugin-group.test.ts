@@ -102,4 +102,29 @@ describe("plugin group chats", () => {
         expect(group.groupChat.participants.map((participant: any) => participant.skillId)).toEqual([a, c]);
         expect(group.groupChat.participants.some((participant: any) => participant.skillId === b)).toBe(false);
     });
+
+    it("leaves the owner's own edits to a found group alone: only a deleted participant is replaced", async () => {
+        const { a, c, d } = await harness.run(async (context: any) => {
+            const first = await context.runMutation(createPluginSkill, skill("analyst"));
+            const second = await context.runMutation(createPluginSkill, skill("critic"));
+            const extra = await context.runMutation(createPluginSkill, skill("extra"));
+            const { threadId } = await context.runMutation(createPluginGroupChat, groupInput([first, second]));
+            const thread = await context.db.threads.findFirst({ where: { _id: threadId } });
+
+            // The owner added a third participant and set a round count; then one plugin skill is deleted and recreated.
+            await context.db.patch("threads", threadId, {
+                groupChat: { ...thread.groupChat, debateRounds: 7, participants: [...thread.groupChat.participants, { addedAt: 1, skillId: extra }] },
+            });
+            await context.db.delete("skills", second);
+
+            return { a: first, c: await context.runMutation(createPluginSkill, skill("critic-again")), d: extra };
+        });
+
+        await harness.run(async (context: any) => await context.runMutation(createPluginGroupChat, groupInput([a, c])));
+
+        const [group] = await groupsWithMarker();
+
+        expect(group.groupChat.participants.map((participant: any) => participant.skillId)).toEqual([a, c, d]);
+        expect(group.groupChat.debateRounds).toBe(7);
+    });
 });
