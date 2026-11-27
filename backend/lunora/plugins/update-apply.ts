@@ -10,11 +10,15 @@
  */
 import { LunoraError, v } from "lunorash/server";
 
+import { assertCronExpression, assertCustomModelRunnable, deleteTriggerRows } from "../triggers/functions";
+
 import type { Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { internalMutation } from "../_generated/server";
 import { withoutUndefined } from "../lib/patch";
-import { skillRowHash } from "./entry-hash";
+import { skillRowHash, triggerRowHash } from "./entry-hash";
+import { deleteSkillRows } from "../skills/functions";
+import { ensureSlugUnique, validateSlug } from "../skills/validators";
 import { LEASE_MS, markerFor } from "./logic";
 
 const STALE = "STALE_LEASE: this install was taken over by another action";
@@ -69,6 +73,7 @@ export const updateSkillChild = internalMutation
         installId: v.string().max(128),
         instructions: v.string().max(65536),
         name: v.string().max(256),
+        slug: v.string().max(256),
         tags: v.optional(v.array(v.string().max(256))),
         variables: v.optional(v.any()),
         version: v.optional(v.string().max(64)),
@@ -95,9 +100,19 @@ export const updateSkillChild = internalMutation
             throw new LunoraError("CONFLICT", `The skill for "${args.entryKey}" was edited, so it is kept as it is`);
         }
 
+        // The planned slug gets the same checks skill creation gives it: a reserved or malformed slug is refused, and so is one another skill now holds.
+        const slugValidation = validateSlug(args.slug);
+
+        if (!slugValidation.valid) {
+            throw new LunoraError("BAD_REQUEST", slugValidation.errors.join(", "));
+        }
+
+        await ensureSlugUnique(ctx, skill.userId, args.slug, skill._id);
+
         // Pending first: if the write below stops, repair sees a child that matches neither hash and knows an update was half done.
         await ctx.db.patch("pluginItems", link._id as Id<"pluginItems">, { pendingHash: args.contentHash });
 
+        // The slug is part of the content hash, so the row must take the planned slug or it reads as edited on the next update.
         await ctx.db.patch(
             "skills",
             skill._id as Id<"skills">,
@@ -108,6 +123,7 @@ export const updateSkillChild = internalMutation
                 icon: args.icon,
                 instructions: args.instructions,
                 name: args.name,
+                slug: args.slug,
                 tags: args.tags,
                 updatedAt: ctx.now,
                 variables: args.variables,
@@ -121,16 +137,196 @@ export const updateSkillChild = internalMutation
     });
 
 export const finishUpdate = internalMutation
-    .input({ generation: v.number(), installId: v.string().max(128), version: v.string().max(32) })
+    .input({ contentHash: v.string().max(128), generation: v.number(), installId: v.string().max(128), version: v.string().max(32) })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
         await heldInstall(ctx, args.installId as Id<"pluginInstalls">, args.generation);
 
         await ctx.db.patch("pluginInstalls", args.installId as Id<"pluginInstalls">, {
+            contentHash: args.contentHash,
             status: "installed",
             updatedAt: ctx.now,
             version: args.version,
         });
+
+        return null;
+    });
+
+/**
+ * Rewrites one unedited schedule trigger in place. The trigger is switched off: a changed trigger must be read and re-enabled by
+ * the person, so new content never runs unseen. Only schedule triggers are updated here; a webhook or an event trigger is
+ * reported as skipped.
+ *
+ * A field the new version leaves out keeps its old value, so the trigger then reads as edited (the safe side).
+ */
+export const updateTriggerChild = internalMutation
+    .input({
+        contentHash: v.string().max(128),
+        cronExpression: v.optional(v.string().max(256)),
+        description: v.optional(v.string().max(4096)),
+        entryKey: v.string().max(256),
+        generation: v.number(),
+        inputTemplate: v.optional(v.string().max(65536)),
+        installId: v.string().max(128),
+        model: v.string().max(256),
+        name: v.string().max(256),
+        searchMode: v.optional(v.string().max(256)),
+        systemPrompt: v.optional(v.string().max(65536)),
+        timezone: v.optional(v.string().max(128)),
+        userId: v.string().max(128),
+    })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        await heldInstall(ctx, args.installId as Id<"pluginInstalls">, args.generation);
+
+        const { page } = await ctx.db.pluginItems.findMany({ where: { installId: args.installId } });
+        const link = page.find((row) => row.entryKey === args.entryKey && row.kind === "trigger");
+
+        if (!link || link.state !== "created") {
+            throw new LunoraError("CONFLICT", `The child "${args.entryKey}" is not a linked trigger of this plugin`);
+        }
+
+        const trigger = await ctx.db
+            .query("triggers")
+            .withIndex("by_plugin_marker", (q) => q.eq("pluginMarker", markerFor(args.installId, args.entryKey)))
+            .first();
+
+        if (!trigger || trigger.userId !== args.userId) {
+            throw new LunoraError("CONFLICT", `The trigger for "${args.entryKey}" is missing`);
+        }
+
+        if (trigger.type !== "schedule") {
+            throw new LunoraError("CONFLICT", `"${args.entryKey}" is not a schedule trigger, so it is not updated in place`);
+        }
+
+        if ((await triggerRowHash(trigger)) !== link.contentHash) {
+            throw new LunoraError("CONFLICT", `The trigger for "${args.entryKey}" was edited, so it is kept as it is`);
+        }
+
+        if (args.cronExpression !== undefined) {
+            assertCronExpression(args.cronExpression);
+        }
+
+        // The same model check the create path makes: a custom model must be one the owner may run.
+        await assertCustomModelRunnable(ctx, args.model, args.userId);
+
+        await ctx.db.patch("pluginItems", link._id as Id<"pluginItems">, { pendingHash: args.contentHash });
+
+        await ctx.db.patch(
+            "triggers",
+            trigger._id as Id<"triggers">,
+            withoutUndefined({
+                cronExpression: args.cronExpression,
+                description: args.description,
+                enabled: false,
+                inputTemplate: args.inputTemplate,
+                model: args.model,
+                name: args.name,
+                searchMode: args.searchMode,
+                systemPrompt: args.systemPrompt,
+                timezone: args.timezone,
+                updatedAt: ctx.now,
+            }),
+        );
+
+        await ctx.db.patch("pluginItems", link._id as Id<"pluginItems">, { contentHash: args.contentHash, pendingHash: "" });
+
+        return null;
+    });
+
+/** The child's link, by its entry key, after the generation check. */
+const linkFor = async (ctx: Pick<MutationCtx, "db">, installId: string, entryKey: string) => {
+    const { page } = await ctx.db.pluginItems.findMany({ where: { installId } });
+
+    return page.find((row) => row.entryKey === entryKey);
+};
+
+/**
+ * Removes an unedited child that the new version no longer has: its row, then its link. A child whose content is not what was
+ * installed is refused here too, so the check does not depend on the diff having been current.
+ */
+export const removeChild = internalMutation
+    .input({ entryKey: v.string().max(256), generation: v.number(), installId: v.string().max(128), userId: v.string().max(128) })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        await heldInstall(ctx, args.installId as Id<"pluginInstalls">, args.generation);
+
+        const link = await linkFor(ctx, args.installId, args.entryKey);
+
+        if (!link) {
+            return null;
+        }
+
+        if (link.kind === "skill") {
+            const skill = await ctx.db.skills.findFirst({ where: { pluginMarker: markerFor(args.installId, args.entryKey) } });
+
+            if (skill && skill.userId === args.userId) {
+                if ((await skillRowHash(skill)) !== link.contentHash) {
+                    throw new LunoraError("CONFLICT", `The skill for "${args.entryKey}" was edited, so it is kept`);
+                }
+
+                await deleteSkillRows(ctx, skill._id as Id<"skills">, args.userId);
+            }
+        } else if (link.kind === "trigger") {
+            const trigger = await ctx.db
+                .query("triggers")
+                .withIndex("by_plugin_marker", (q) => q.eq("pluginMarker", markerFor(args.installId, args.entryKey)))
+                .first();
+
+            if (trigger && trigger.userId === args.userId) {
+                if ((await triggerRowHash(trigger)) !== link.contentHash) {
+                    throw new LunoraError("CONFLICT", `The trigger for "${args.entryKey}" was edited, so it is kept`);
+                }
+
+                await deleteTriggerRows(ctx, trigger._id as Id<"triggers">);
+            }
+        } else {
+            throw new LunoraError("CONFLICT", `"${args.entryKey}" is a group chat, which is not removed in place`);
+        }
+
+        await ctx.db.delete("pluginItems", link._id as Id<"pluginItems">);
+
+        return null;
+    });
+
+/**
+ * Keeps an edited child that the new version no longer has: its marker fields are cleared, so no later sweep finds it, and a
+ * trigger is switched off. The link is marked detached.
+ */
+export const detachChild = internalMutation
+    .input({ entryKey: v.string().max(256), generation: v.number(), installId: v.string().max(128), userId: v.string().max(128) })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        await heldInstall(ctx, args.installId as Id<"pluginInstalls">, args.generation);
+
+        const link = await linkFor(ctx, args.installId, args.entryKey);
+
+        if (!link) {
+            return null;
+        }
+
+        const marker = markerFor(args.installId, args.entryKey);
+
+        if (link.kind === "skill") {
+            const skill = await ctx.db.skills.findFirst({ where: { pluginMarker: marker } });
+
+            if (skill && skill.userId === args.userId) {
+                await ctx.db.patch("skills", skill._id as Id<"skills">, { pluginInstallId: "", pluginMarker: "" });
+            }
+        } else if (link.kind === "trigger") {
+            const trigger = await ctx.db
+                .query("triggers")
+                .withIndex("by_plugin_marker", (q) => q.eq("pluginMarker", marker))
+                .first();
+
+            if (trigger && trigger.userId === args.userId) {
+                await ctx.db.patch("triggers", trigger._id as Id<"triggers">, { enabled: false, pluginInstallId: "", pluginMarker: "" });
+            }
+        } else {
+            throw new LunoraError("CONFLICT", `"${args.entryKey}" is a group chat, which is not detached in place`);
+        }
+
+        await ctx.db.patch("pluginItems", link._id as Id<"pluginItems">, { state: "detached" });
 
         return null;
     });
