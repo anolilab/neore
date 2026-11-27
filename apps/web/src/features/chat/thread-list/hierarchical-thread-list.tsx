@@ -38,7 +38,7 @@ import useStableCallback from "./hooks/use-stable-callback";
 import useThreadGroups from "./hooks/use-thread-groups";
 import useThreadHandlers from "./hooks/use-thread-handlers";
 import useThreadListKeyboard from "./hooks/use-thread-list-keyboard";
-import { countSections, filterGroupsBySection, groupsToOpenOnPick, sameSectionCounts } from "./lib/section-filter";
+import { countSections, EMPTY_SECTION_COUNTS, filterGroupsBySection, groupsToOpenOnPick, sameSectionCounts } from "./lib/section-filter";
 import { renameFocusTarget } from "./rename-focus-target";
 import RenameThreadDialog from "./rename-thread-dialog";
 import SnoozeUntilDialog from "./snooze-until-dialog";
@@ -497,9 +497,10 @@ const HierarchicalThreadList: FC<
     );
 
     // A selection made while searching spans every section; once search closes, the rows the section hides drop out of it, so
-    // bulk delete never takes a thread the list no longer shows. Collapsed groups still count as shown.
+    // bulk delete never takes a thread the list no longer shows. Collapsed groups still count as shown. While searching the list
+    // is the results alone (none while they load), so a selection gathered across searches is left alone until search closes.
     useEffect(() => {
-        if (selectedThreadIds.size === 0) {
+        if (isSearching || !threadsData || selectedThreadIds.size === 0) {
             return;
         }
 
@@ -514,7 +515,7 @@ const HierarchicalThreadList: FC<
         if ([...selectedThreadIds].some((id) => !shown.has(id))) {
             setSelectedThreadIds((previous) => new Set([...previous].filter((id) => shown.has(id))));
         }
-    }, [filteredGroups, selectedThreadIds, setSelectedThreadIds]);
+    }, [filteredGroups, isSearching, selectedThreadIds, setSelectedThreadIds, threadsData]);
 
     // The same groups keep the same list: a new array re-derives every row's inputs (the pull request counts' ids among them) for nothing.
     // Adjusted during render, as `previousInputs` in the list's owner does, so the list and the groups change together.
@@ -527,12 +528,13 @@ const HierarchicalThreadList: FC<
     }
 
     // The bar's counts are the loaded rows of the unfiltered list; the dock beside the list reads them from the store.
+    // With no list loaded (a switch to another organization still on its way) the counts are none, not the last list's.
     useEffect(() => {
-        if (isSearching || !threadsData) {
+        if (isSearching) {
             return;
         }
 
-        const counts = countSections(allThreadGroups);
+        const counts = threadsData ? countSections(allThreadGroups) : EMPTY_SECTION_COUNTS;
 
         if (!sameSectionCounts(counts, useThreadListUIStore.getState().sectionCounts)) {
             setSectionCounts(counts);

@@ -116,3 +116,40 @@ export const chargeRound = async (ctx: MutationCtx, userId: string, account: Tas
 
     return true;
 };
+
+/** When the window each of the limits is in now ends, in the order of `keys`: read right after a charge, it is the end of the window the charge came from. */
+export const roundWindowEnds = async (ctx: Pick<MutationCtx, "db">, userId: string, keys: ReadonlyArray<string>): Promise<number[]> => {
+    const ends: number[] = [];
+
+    for (const key of keys) {
+        const { reset } = await createRatelimit(key, ctx.db as never).getRemaining(userId);
+
+        ends.push(reset);
+    }
+
+    return ends;
+};
+
+/**
+ * Gives back one unit to each of the named limits that is still in the window the charge came from: the exact keys a charge took
+ * (`roundQuotaKeys` at the time), not a set derived again from the account now, and only while that window has not ended (`windowEnds`,
+ * from {@link roundWindowEnds}), since the limiter's refund names no window and would otherwise credit a later one. A limit whose window
+ * end is not known is refunded as before: the limiter leaves a window that has rolled over alone.
+ */
+export const refundRoundKeys = async (
+    ctx: MutationCtx,
+    userId: string,
+    keys: ReadonlyArray<string>,
+    windowEnds?: ReadonlyArray<number>,
+    now: number = Date.now(),
+): Promise<void> => {
+    for (const [index, key] of keys.entries()) {
+        const end = windowEnds?.[index];
+
+        if (end !== undefined && end <= now) {
+            continue;
+        }
+
+        await createRatelimit(key, ctx.db as never).refund(userId);
+    }
+};

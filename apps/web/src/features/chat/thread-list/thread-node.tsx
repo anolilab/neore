@@ -142,6 +142,20 @@ const getArchiveTooltip = (isArchiving: boolean, status: string | undefined): Me
     return status === "archived" ? msg`Unarchive thread` : msg`Archive thread`;
 };
 
+const shortDateFormats = new Map<string, Intl.DateTimeFormat>();
+
+/** One formatter per locale for the "older than a week" date, shared by every row instead of built on each render. */
+const shortDateFormat = (locale: string): Intl.DateTimeFormat => {
+    let format = shortDateFormats.get(locale);
+
+    if (!format) {
+        format = new Intl.DateTimeFormat(locale, { day: "numeric", month: "short" });
+        shortDateFormats.set(locale, format);
+    }
+
+    return format;
+};
+
 const ThreadNodeChildren: FC<{
     expandedThreads: Set<string>;
     handleCreateBranch: (threadId: string) => void;
@@ -362,7 +376,7 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
     const formatElapsed = (elapsed: Elapsed): string => {
         switch (elapsed.kind) {
             case "date": {
-                return new Intl.DateTimeFormat(i18n.locale, { day: "numeric", month: "short" }).format(elapsed.value);
+                return shortDateFormat(i18n.locale).format(elapsed.value);
             }
             case "day": {
                 const days = elapsed.value;
