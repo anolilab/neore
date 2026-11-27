@@ -196,14 +196,16 @@ export const chapterDocument = (body: string, styles: ReadonlyArray<string>, lan
         return element;
     };
 
-    frame.head.append(
+    const head: Node[] = [
         // eslint-disable-next-line unicorn/text-encoding-identifier-case -- the HTML label; `utf8` is not the one a document names
         make("meta", { charset: "utf-8" }),
         make("meta", { content: FRAME_POLICY, "http-equiv": "Content-Security-Policy" }),
         make("base", { target: "_blank" }),
         make("style", {}, BASE_STYLE),
         ...styles.map((style) => make("style", {}, safeStylesheet(style))),
-    );
+    ];
+
+    frame.head.append(...head);
 
     if (language !== undefined && LANGUAGE.test(language)) {
         frame.documentElement.setAttribute("lang", language);

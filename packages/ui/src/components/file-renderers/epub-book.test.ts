@@ -94,7 +94,7 @@ describe("chapterDocument", () => {
         expect(policy[0]?.getAttribute("content")).toBe(FRAME_POLICY);
         expect([...parsed.head.children].map((element) => element.tagName)).toEqual(["META", "META", "BASE", "STYLE", "STYLE"]);
         // The policy precedes every style of the head.
-        expect(policy[0]?.compareDocumentPosition(parsed.head.querySelector("style") as Node) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect((policy[0] as Element).compareDocumentPosition(parsed.head.querySelector("style") as Node) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
         expect(parsed.querySelector("base")?.getAttribute("target")).toBe("_blank");
         expect(parsed.head.querySelectorAll("style")[1]?.textContent).toBe("p{color:red}");
         expect(parsed.body.outerHTML).toBe("<body><p>text</p></body>");
