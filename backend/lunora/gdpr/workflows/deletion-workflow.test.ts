@@ -224,6 +224,30 @@ describe("account deletion workflow: order", () => {
         before("delete-auth-records", "delete-user-follow-rows-final");
         before("delete-user-identity", "purge-user-document-history");
         before("purge-user-document-history", "erase-post-hog-person");
+        // A plugin skill create that passed its erasing check before the first sweeps can commit after them: the sweeps repeat while the
+        // erasing marker is still set, and before the audited deletes' history is purged.
+        before("delete-user-skills", "delete-user-skills-final");
+        before("delete-user-plugins", "delete-user-plugins-final");
+        before("delete-auth-records", "delete-user-skills-final");
+        before("delete-user-skills-final", "purge-user-document-history");
+        before("delete-user-plugins-final", "purge-user-document-history");
+        before("delete-user-plugins-final", "end-account-erasure");
+    });
+
+    it("sweeps skills and plugins a second time, with the same bounded batches", async () => {
+        answer = (ref, round) => {
+            return { cursor: null, hasMore: ref === "gdpr_steps_deletion_steps:deleteUserPlugins" && round !== 2 && round < 5 };
+        };
+        await execute();
+
+        const skills = runs().filter((entry) => entry.ref === "gdpr_steps_deletion_steps:deleteUserSkills");
+        const plugins = runs().filter((entry) => entry.ref === "gdpr_steps_deletion_steps:deleteUserPlugins");
+
+        expect(skills).toHaveLength(2);
+        expect(new Set(skills.map((entry) => entry.dedupId)).size).toBe(2);
+        // Every batch of both sweeps has its own dispatch id.
+        expect(new Set(plugins.map((entry) => entry.dedupId)).size).toBe(plugins.length);
+        expect(plugins.length).toBeGreaterThanOrEqual(3);
     });
 
     it("uses each durable step name once, since the names key the durable log", async () => {

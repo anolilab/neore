@@ -947,6 +947,28 @@ export const accountDeletionWorkflowConfig: WorkflowConfig<DeletionParams, void>
                     { dedupId: stepDedupId(scope, "delete-user-identity", round) },
                 ),
         );
+        // A plugin skill create that passed its erasing check just before the first skill and plugin sweeps can still commit its global
+        // rows after them. Nothing new is admitted from here, so these repeat the sweeps and take what landed late. Before the history
+        // purge, because the skill deletes are audited.
+        await context.step.do(
+            "delete-user-skills-final",
+            async () =>
+                await context.run(
+                    internal.gdpr.steps.deletion_steps.deleteUserSkills,
+                    { userId: args.userId },
+                    { dedupId: stepDedupId(scope, "delete-user-skills-final") },
+                ),
+        );
+        await drain(
+            "delete-user-plugins-final",
+            async (round) =>
+                await context.run(
+                    internal.gdpr.steps.deletion_steps.deleteUserPlugins,
+                    { userId: args.userId },
+                    { dedupId: stepDedupId(scope, "delete-user-plugins-final", round) },
+                ),
+        );
+
         // Last data step: every audited delete above wrote a `documentHistory` snapshot.
         await drain(
             "purge-user-document-history",
