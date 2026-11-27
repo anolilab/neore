@@ -52,7 +52,7 @@ msgid "\"{0}\" has variables that need values."
 msgstr "「{0}」には値の入力が必要な変数があります。"
 
 #. placeholder {0}: task.title
-#: src/features/tasks/components/tasks-page.tsx:122
+#: src/features/tasks/components/tasks-page.tsx:124
 msgid "\"{0}\" will start once its dependencies are done"
 msgstr "「{0}」は依存タスクの完了後に開始されます"
 
@@ -135,7 +135,7 @@ msgstr "（既定）"
 msgid "(deleted case)"
 msgstr "（削除されたケース）"
 
-#: src/features/tasks/components/tasks-page.tsx:172
+#: src/features/tasks/components/tasks-page.tsx:174
 msgid "(deleted task)"
 msgstr "（削除されたタスク）"
 
@@ -241,7 +241,7 @@ msgstr "（共有）"
 msgid "(too large)"
 msgstr "（大きすぎます）"
 
-#: src/features/tasks/components/tasks-page.tsx:182
+#: src/features/tasks/components/tasks-page.tsx:184
 msgid "(unavailable skill)"
 msgstr "（利用できないスキル）"
 
@@ -1526,7 +1526,7 @@ msgstr "{resultCount, plural, other {# 件の結果}}"
 msgid "{resultCount} results"
 msgstr "{resultCount} 件の結果"
 
-#: src/features/tasks/components/tasks-page.tsx:218
+#: src/features/tasks/components/tasks-page.tsx:222
 msgid "{reviewCount} tasks need your review"
 msgstr "{reviewCount} 件のタスクがレビュー待ちです"
 
@@ -2384,8 +2384,13 @@ msgstr "アクセントカラーを更新しました"
 
 #: src/features/auth/components/organization/accept-invitation-card.tsx:192
 #: src/features/auth/components/organization/user-invitations-card.tsx:116
+#: src/features/tasks/components/task-suggestions.tsx:190
 msgid "Accept"
 msgstr "承諾"
+
+#: src/features/tasks/components/task-suggestions.tsx:178
+msgid "Accept \"{title}\""
+msgstr "「{title}」を承諾"
 
 #: src/features/auth/components/organization/accept-invitation-card.tsx:157
 msgid "Accept Invitation"
@@ -3285,7 +3290,7 @@ msgstr "MoE の効率性を備えた Alibaba の次世代コードモデルを�
 msgid "agents"
 msgstr "エージェント"
 
-#: src/features/tasks/components/tasks-page.tsx:195
+#: src/features/tasks/components/tasks-page.tsx:197
 msgid "Agents work your tasks on their own. A verifier checks each result against its success criteria, and anything it will not pass comes back to you."
 msgstr "エージェントがタスクを自律的に処理します。検証役が各結果を成功基準と照らし合わせ、合格しなかったものはあなたに戻されます。"
 
@@ -3683,7 +3688,7 @@ msgstr "すべてのサーバー"
 msgid "All shards measured."
 msgstr "すべてのシャードの測定が完了しました。"
 
-#: src/features/tasks/components/tasks-page.tsx:251
+#: src/features/tasks/components/tasks-page.tsx:255
 msgid "All tasks"
 msgstr "すべてのタスク"
 
@@ -5518,7 +5523,7 @@ msgstr "ブルー"
 msgid "Blue Channel"
 msgstr "青チャンネル"
 
-#: src/features/tasks/components/tasks-page.tsx:258
+#: src/features/tasks/components/tasks-page.tsx:262
 msgid "Board"
 msgstr "ボード"
 
@@ -9662,7 +9667,7 @@ msgstr "api.slack.com/apps で Events API を有効にした Slack アプリを�
 msgid "Create a tag…"
 msgstr "タグを作成…"
 
-#: src/features/tasks/components/tasks-page.tsx:243
+#: src/features/tasks/components/tasks-page.tsx:247
 msgid "Create a task, give it success criteria, and run it. You can chain tasks with dependencies and repeat them on a schedule."
 msgstr "タスクを作成し、成功基準を設定して実行します。依存関係でタスクをつなげたり、スケジュールで繰り返したりできます。"
 
@@ -10345,6 +10350,10 @@ msgstr "日付と時刻"
 msgid "Day"
 msgstr "日"
 
+#: src/features/tasks/hooks/use-schedule-label.ts:59
+msgid "Day {monthDay} of every month at {time} UTC"
+msgstr "毎月{monthDay}日 {time} UTC"
+
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:131
 msgid "days"
 msgstr "日"
@@ -10658,7 +10667,7 @@ msgstr "委任された{0}の作業はこのモデルで実行されます。"
 #: src/features/skills/components/skill-list.tsx:311
 #: src/features/tasks/components/goal-list.tsx:54
 #: src/features/tasks/components/task-card.tsx:113
-#: src/features/tasks/components/tasks-page.tsx:330
+#: src/features/tasks/components/tasks-page.tsx:334
 #: src/features/vault/components/site-logins.tsx:655
 msgid "Delete"
 msgstr "削除"
@@ -10764,7 +10773,7 @@ msgstr "データセット「{0}」を削除しますか？"
 msgid "Delete File"
 msgstr "ファイルを削除"
 
-#: src/features/tasks/components/tasks-page.tsx:340
+#: src/features/tasks/components/tasks-page.tsx:344
 msgid "Delete goal \"{deleteTitle}\"?"
 msgstr "目標「{deleteTitle}」を削除しますか？"
 
@@ -10893,7 +10902,7 @@ msgstr "タグを削除"
 msgid "Delete tag {0}"
 msgstr "タグ {0} を削除"
 
-#: src/features/tasks/components/tasks-page.tsx:340
+#: src/features/tasks/components/tasks-page.tsx:344
 msgid "Delete task \"{deleteTitle}\"?"
 msgstr "タスク「{deleteTitle}」を削除しますか？"
 
@@ -11489,9 +11498,14 @@ msgstr "Discord 公開鍵"
 #: src/features/chat/thread/composer-long-text-prompt.tsx:71
 #: src/features/develop/components/guide-view.tsx:141
 #: src/features/devices/components/devices-settings.tsx:389
+#: src/features/tasks/components/task-suggestions.tsx:174
 #: src/features/workflow/components/nodes/file-node.tsx:231
 msgid "Dismiss"
 msgstr "閉じる"
+
+#: src/features/tasks/components/task-suggestions.tsx:161
+msgid "Dismiss \"{title}\""
+msgstr "「{title}」を閉じる"
 
 #: src/features/settings/components/personalization/memory-digest-card.tsx:54
 msgid "Dismiss digest"
@@ -13297,6 +13311,10 @@ msgstr "イベント"
 msgid "Event ends on"
 msgstr "イベント終了日"
 
+#: src/features/tasks/hooks/use-schedule-label.ts:65
+msgid "Every {weekday} at {time} UTC"
+msgstr "毎週{weekday} {time} UTC"
+
 #: src/features/settings/components/chat/trigger-settings.tsx:174
 msgid "Every 6 hours"
 msgstr "6 時間ごと"
@@ -13309,7 +13327,12 @@ msgstr "このボットのすべてのチャットとスケジュール実行は
 msgid "Every chat, unless its project sets the role."
 msgstr "プロジェクトでロールが設定されていない限り、すべてのチャット。"
 
+#: src/features/tasks/hooks/use-schedule-label.ts:49
+msgid "Every day at {time} UTC"
+msgstr "毎日 {time} UTC"
+
 #: src/features/tasks/components/task-form-dialog.tsx:126
+#: src/features/tasks/hooks/use-schedule-label.ts:19
 msgid "Every day at 09:00 UTC"
 msgstr "毎日 09:00 UTC"
 
@@ -13318,8 +13341,13 @@ msgid "Every day at 8 AM"
 msgstr "毎日午前 8 時"
 
 #: src/features/tasks/components/task-form-dialog.tsx:127
+#: src/features/tasks/hooks/use-schedule-label.ts:23
 msgid "Every hour"
 msgstr "毎時"
+
+#: src/features/tasks/hooks/use-schedule-label.ts:43
+msgid "Every hour at minute {minute}"
+msgstr "毎時 {minute}分"
 
 #: src/features/marketing/components/landing-page.tsx:206
 msgid "Every leading AI model. One conversation."
@@ -13966,7 +13994,7 @@ msgstr "ユーザーを利用停止にできませんでした"
 msgid "Failed to cancel export"
 msgstr "エクスポートをキャンセルできませんでした"
 
-#: src/features/tasks/components/tasks-page.tsx:128
+#: src/features/tasks/components/tasks-page.tsx:130
 msgid "Failed to cancel the task"
 msgstr "タスクをキャンセルできませんでした"
 
@@ -14039,6 +14067,10 @@ msgstr "プリセットを作成できませんでした"
 msgid "Failed to create tag"
 msgstr "タグを作成できませんでした"
 
+#: src/features/tasks/components/task-suggestions.tsx:185
+msgid "Failed to create the task"
+msgstr "タスクを作成できませんでした"
+
 #: src/features/settings/components/chat/trigger-settings.tsx:539
 msgid "Failed to create trigger"
 msgstr "トリガーを作成できませんでした"
@@ -14047,7 +14079,7 @@ msgstr "トリガーを作成できませんでした"
 msgid "Failed to cut to clipboard"
 msgstr "クリップボードに切り取れませんでした"
 
-#: src/features/tasks/components/tasks-page.tsx:152
+#: src/features/tasks/components/tasks-page.tsx:154
 msgid "Failed to delete"
 msgstr "削除できませんでした"
 
@@ -14158,6 +14190,10 @@ msgstr "コネクタを切断できませんでした"
 #: src/features/settings/components/personalization/memory-digest-card.tsx:32
 msgid "Failed to dismiss the digest"
 msgstr "ダイジェストを閉じられませんでした"
+
+#: src/features/tasks/components/task-suggestions.tsx:168
+msgid "Failed to dismiss the suggestion"
+msgstr "提案を閉じられませんでした"
 
 #: src/features/settings/components/privacy/data-export.tsx:69
 msgid "Failed to download export"
@@ -14506,7 +14542,7 @@ msgstr "接続を開始できませんでした"
 msgid "Failed to start the run"
 msgstr "実行を開始できませんでした"
 
-#: src/features/tasks/components/tasks-page.tsx:125
+#: src/features/tasks/components/tasks-page.tsx:127
 msgid "Failed to start the task"
 msgstr "タスクを開始できませんでした"
 
@@ -14622,6 +14658,7 @@ msgid "Failed to update reply tools"
 msgstr "返信ツールを更新できませんでした"
 
 #: src/features/settings/components/personalization/memory-settings.tsx:149
+#: src/features/settings/components/personalization/schedule-ideas-switch.tsx:40
 msgid "Failed to update setting"
 msgstr "設定を更新できませんでした"
 
@@ -16626,7 +16663,7 @@ msgstr "目標：{goalTitle}"
 msgid "Goal: run until done"
 msgstr "目標: 完了するまで実行"
 
-#: src/features/tasks/components/tasks-page.tsx:224
+#: src/features/tasks/components/tasks-page.tsx:228
 msgid "Goals"
 msgstr "目標"
 
@@ -17694,6 +17731,10 @@ msgstr "シンプルな分類や抽出に最適"
 #: src/features/chat/thread/thread-welcome-suggestions.tsx:72
 msgid "Ideas"
 msgstr "アイデア"
+
+#: src/features/tasks/components/task-suggestions.tsx:120
+msgid "Ideas from your own recent messages. Nothing is created until you accept one."
+msgstr "あなた自身の最近のメッセージから得たアイデアです。承諾するまで何も作成されません。"
 
 #: src/features/settings/components/personalization/memory-types.ts:28
 msgid "Identity"
@@ -19943,7 +19984,7 @@ msgstr "リンク中…"
 msgid "Linux"
 msgstr "Linux"
 
-#: src/features/tasks/components/tasks-page.tsx:262
+#: src/features/tasks/components/tasks-page.tsx:266
 msgid "List"
 msgstr "リスト"
 
@@ -20282,7 +20323,7 @@ msgstr "スプレッドシートを読み込んでいます…"
 msgid "Loading statistics…"
 msgstr "統計を読み込み中…"
 
-#: src/features/tasks/components/tasks-page.tsx:212
+#: src/features/tasks/components/tasks-page.tsx:216
 msgid "Loading tasks…"
 msgstr "タスクを読み込んでいます…"
 
@@ -21967,6 +22008,7 @@ msgid "Mon"
 msgstr "月"
 
 #: src/features/tasks/components/task-form-dialog.tsx:130
+#: src/features/tasks/hooks/use-schedule-label.ts:31
 msgid "Mondays at 09:00 UTC"
 msgstr "毎週月曜日 09:00 UTC"
 
@@ -22858,7 +22900,7 @@ msgid "New first"
 msgstr "新しい順"
 
 #: src/features/tasks/components/goal-form-dialog.tsx:73
-#: src/features/tasks/components/tasks-page.tsx:201
+#: src/features/tasks/components/tasks-page.tsx:203
 msgid "New goal"
 msgstr "新しい目標"
 
@@ -22924,7 +22966,7 @@ msgid "New tag"
 msgstr "新しいタグ"
 
 #: src/features/tasks/components/task-form-dialog.tsx:206
-#: src/features/tasks/components/tasks-page.tsx:205
+#: src/features/tasks/components/tasks-page.tsx:207
 msgid "New task"
 msgstr "新しいタスク"
 
@@ -23365,6 +23407,10 @@ msgstr "履歴はまだありません"
 msgid "No icon found"
 msgstr "アイコンが見つかりません"
 
+#: src/features/settings/components/personalization/schedule-ideas-switch.tsx:55
+msgid "No ideas are made while memory is off."
+msgstr "メモリーがオフの間は、アイデアは作成されません。"
+
 #: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:171
 #: src/features/chat/thread/media-gallery-view.tsx:353
 msgid "No images yet"
@@ -23720,7 +23766,7 @@ msgstr "要約はありません。「生成」をクリックして作成して
 msgid "No tags yet"
 msgstr "タグはまだありません"
 
-#: src/features/tasks/components/tasks-page.tsx:242
+#: src/features/tasks/components/tasks-page.tsx:246
 msgid "No tasks yet"
 msgstr "タスクはまだありません"
 
@@ -24356,6 +24402,10 @@ msgstr "次回チャットを開いたときにオンボーディングが再開
 #: src/features/onboarding/components/onboarding-dialog.tsx:312
 msgid "Onboarding wizard"
 msgstr "オンボーディングウィザード"
+
+#: src/features/settings/components/personalization/schedule-ideas-switch.tsx:54
+msgid "Once a day, suggest recurring tasks based only on your own recent messages. Nothing is created until you accept a suggestion. Turning this off deletes the suggestions waiting for you."
+msgstr "1日に1回、あなた自身の最近のメッセージだけをもとに、繰り返しタスクを提案します。提案を承諾するまで何も作成されません。オフにすると、待機中の提案は削除されます。"
 
 #: src/features/marketing/use-cases/use-case-data.ts:123
 msgid "Once a night, for users active that day, a reflection pass merges duplicates and promotes repeated facts."
@@ -29031,6 +29081,10 @@ msgstr "繰り返し"
 msgid "Repeats ({0} UTC)"
 msgstr "繰り返し（{0} UTC）"
 
+#: src/features/tasks/hooks/use-schedule-label.ts:37
+msgid "Repeats ({cronExpression} UTC)"
+msgstr "繰り返し（{cronExpression} UTC）"
+
 #: src/features/settings/components/chat/api-keys-settings.tsx:397
 msgid "Replace"
 msgstr "置換"
@@ -30346,6 +30400,14 @@ msgstr "スケジュール"
 #: src/features/skills/components/bundle-export-dialog.tsx:185
 msgid "Schedule {0}"
 msgstr "スケジュール {0}"
+
+#: src/features/settings/components/personalization/schedule-ideas-switch.tsx:35
+msgid "Schedule ideas disabled"
+msgstr "スケジュールのアイデアをオフにしました"
+
+#: src/features/settings/components/personalization/schedule-ideas-switch.tsx:35
+msgid "Schedule ideas enabled"
+msgstr "スケジュールのアイデアをオンにしました"
 
 #: src/features/skills/components/bundle-import-dialog.tsx:55
 msgid "Schedule or webhook"
@@ -33745,6 +33807,10 @@ msgstr "{0} から {imported} 件の会話をインポートしました"
 msgid "Suggest innovative solutions to reduce plastic waste"
 msgstr "プラスチックごみを減らす革新的な解決策を提案する"
 
+#: src/features/settings/components/personalization/schedule-ideas-switch.tsx:49
+msgid "Suggest scheduled tasks"
+msgstr "予定タスクを提案する"
+
 #: src/features/chat/thread/thread-welcome-suggestions.tsx:108
 msgid "Suggest video ideas for a tech YouTube channel"
 msgstr "テック系 YouTube チャンネルの動画アイデアを提案する"
@@ -33762,9 +33828,21 @@ msgstr "回答の候補"
 msgid "Suggested next prompt: {nextPromptSuggestion}. Press Tab to insert."
 msgstr "次のプロンプトの提案: {nextPromptSuggestion}。Tab キーで挿入します。"
 
+#: src/features/tasks/components/task-suggestions.tsx:118
+msgid "Suggested tasks"
+msgstr "提案されたタスク"
+
 #: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:689
 msgid "Suggestion available, press Right Arrow to accept"
 msgstr "候補があります。右矢印キーで確定します"
+
+#: src/features/tasks/components/task-suggestions.tsx:167
+msgid "Suggestion dismissed: {title}"
+msgstr "提案を閉じました：{title}"
+
+#: src/features/tasks/components/task-suggestions.tsx:124
+msgid "Suggestion updates"
+msgstr "提案の更新"
 
 #: src/features/settings/lib/settings-keywords.ts:33
 msgid "suggestions"
@@ -34173,6 +34251,10 @@ msgstr "タスク"
 msgid "Task approved"
 msgstr "タスクを承認しました"
 
+#: src/features/tasks/components/task-suggestions.tsx:184
+msgid "Task created: {title}"
+msgstr "タスクを作成しました：{title}"
+
 #: src/features/tasks/components/task-detail-dialog.tsx:211
 msgid "Task details, your review and the run history."
 msgstr "タスクの詳細、あなたのレビュー、実行履歴。"
@@ -34223,18 +34305,18 @@ msgstr "タスクを再実行の待機列に追加しました"
 msgid "Task rejected"
 msgstr "タスクを却下しました"
 
-#: src/features/tasks/components/tasks-page.tsx:255
+#: src/features/tasks/components/tasks-page.tsx:259
 msgid "Task views"
 msgstr "タスクの表示"
 
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:34
 #: src/features/layout/components/sidebar-shortcut.tsx:101
-#: src/features/tasks/components/tasks-page.tsx:192
+#: src/features/tasks/components/tasks-page.tsx:194
 msgid "Tasks"
 msgstr "タスク"
 
 #. placeholder {0}: goalTitleById.get(selectedGoalId) ?? ""
-#: src/features/tasks/components/tasks-page.tsx:251
+#: src/features/tasks/components/tasks-page.tsx:255
 msgid "Tasks for {0}"
 msgstr "{0} のタスク"
 
@@ -35265,7 +35347,7 @@ msgstr "無料プランには、厳選された高速・低コストなモデル
 msgid "The full system prompt to send to the model..."
 msgstr "モデルに送信する完全なシステムプロンプト..."
 
-#: src/features/tasks/components/tasks-page.tsx:333
+#: src/features/tasks/components/tasks-page.tsx:337
 msgid "The goal is removed; its tasks stay, without a goal."
 msgstr "目標は削除されます。タスクは目標なしの状態で残ります。"
 
@@ -35768,7 +35850,7 @@ msgstr "サブエージェントを開始できませんでした。"
 msgid "The tag \"{pendingDeleteName}\" will be removed from every chat that has it. The chats themselves are not deleted."
 msgstr "タグ「{pendingDeleteName}」は、このタグが付いたすべてのチャットから削除されます。チャット自体は削除されません。"
 
-#: src/features/tasks/components/tasks-page.tsx:334
+#: src/features/tasks/components/tasks-page.tsx:338
 msgid "The task and its run history are removed. Tasks that depend on it stop waiting for it."
 msgstr "タスクとその実行履歴が削除されます。このタスクに依存するタスクは待機しなくなります。"
 
@@ -39827,7 +39909,12 @@ msgstr "WeChat Token"
 msgid "Wed"
 msgstr "水"
 
+#: src/features/tasks/hooks/use-schedule-label.ts:53
+msgid "Weekdays at {time} UTC"
+msgstr "平日 {time} UTC"
+
 #: src/features/tasks/components/task-form-dialog.tsx:129
+#: src/features/tasks/hooks/use-schedule-label.ts:27
 msgid "Weekdays at 09:00 UTC"
 msgstr "平日 09:00 UTC"
 

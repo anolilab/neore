@@ -52,7 +52,7 @@ msgid "\"{0}\" has variables that need values."
 msgstr "“{0}” 中有变量需要填写。"
 
 #. placeholder {0}: task.title
-#: src/features/tasks/components/tasks-page.tsx:122
+#: src/features/tasks/components/tasks-page.tsx:124
 msgid "\"{0}\" will start once its dependencies are done"
 msgstr "“{0}” 将在其依赖项完成后开始"
 
@@ -135,7 +135,7 @@ msgstr "（默认）"
 msgid "(deleted case)"
 msgstr "（已删除的用例）"
 
-#: src/features/tasks/components/tasks-page.tsx:172
+#: src/features/tasks/components/tasks-page.tsx:174
 msgid "(deleted task)"
 msgstr "（已删除的任务）"
 
@@ -241,7 +241,7 @@ msgstr "（共享）"
 msgid "(too large)"
 msgstr "（太大）"
 
-#: src/features/tasks/components/tasks-page.tsx:182
+#: src/features/tasks/components/tasks-page.tsx:184
 msgid "(unavailable skill)"
 msgstr "（技能不可用）"
 
@@ -1526,7 +1526,7 @@ msgstr "{resultCount, plural, other {# 条结果}}"
 msgid "{resultCount} results"
 msgstr "{resultCount} 个结果"
 
-#: src/features/tasks/components/tasks-page.tsx:218
+#: src/features/tasks/components/tasks-page.tsx:222
 msgid "{reviewCount} tasks need your review"
 msgstr "{reviewCount} 个任务需要你审核"
 
@@ -2384,8 +2384,13 @@ msgstr "强调色已更新"
 
 #: src/features/auth/components/organization/accept-invitation-card.tsx:192
 #: src/features/auth/components/organization/user-invitations-card.tsx:116
+#: src/features/tasks/components/task-suggestions.tsx:190
 msgid "Accept"
 msgstr "接受"
+
+#: src/features/tasks/components/task-suggestions.tsx:178
+msgid "Accept \"{title}\""
+msgstr "接受“{title}”"
 
 #: src/features/auth/components/organization/accept-invitation-card.tsx:157
 msgid "Accept Invitation"
@@ -3285,7 +3290,7 @@ msgstr "需要阿里巴巴新一代 MoE 高效代码模型的智能体编程工�
 msgid "agents"
 msgstr "智能体"
 
-#: src/features/tasks/components/tasks-page.tsx:195
+#: src/features/tasks/components/tasks-page.tsx:197
 msgid "Agents work your tasks on their own. A verifier checks each result against its success criteria, and anything it will not pass comes back to you."
 msgstr "智能体会自主处理你的任务。验证器会根据成功标准检查每个结果，未通过的会退回给你。"
 
@@ -3683,7 +3688,7 @@ msgstr "所有服务器"
 msgid "All shards measured."
 msgstr "所有分片均已测量。"
 
-#: src/features/tasks/components/tasks-page.tsx:251
+#: src/features/tasks/components/tasks-page.tsx:255
 msgid "All tasks"
 msgstr "所有任务"
 
@@ -5518,7 +5523,7 @@ msgstr "蓝色"
 msgid "Blue Channel"
 msgstr "蓝色通道"
 
-#: src/features/tasks/components/tasks-page.tsx:258
+#: src/features/tasks/components/tasks-page.tsx:262
 msgid "Board"
 msgstr "看板"
 
@@ -9662,7 +9667,7 @@ msgstr "在 api.slack.com/apps 创建一个启用了 Events API 的 Slack 应用
 msgid "Create a tag…"
 msgstr "创建标签…"
 
-#: src/features/tasks/components/tasks-page.tsx:243
+#: src/features/tasks/components/tasks-page.tsx:247
 msgid "Create a task, give it success criteria, and run it. You can chain tasks with dependencies and repeat them on a schedule."
 msgstr "创建任务，设定成功标准并运行。你可以通过依赖关系串联任务，并按计划重复执行。"
 
@@ -10345,6 +10350,10 @@ msgstr "日期和时间"
 msgid "Day"
 msgstr "日期"
 
+#: src/features/tasks/hooks/use-schedule-label.ts:59
+msgid "Day {monthDay} of every month at {time} UTC"
+msgstr "每月{monthDay}日 {time} UTC"
+
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:131
 msgid "days"
 msgstr "天"
@@ -10658,7 +10667,7 @@ msgstr "委派的{0}工作在此模型上运行。"
 #: src/features/skills/components/skill-list.tsx:311
 #: src/features/tasks/components/goal-list.tsx:54
 #: src/features/tasks/components/task-card.tsx:113
-#: src/features/tasks/components/tasks-page.tsx:330
+#: src/features/tasks/components/tasks-page.tsx:334
 #: src/features/vault/components/site-logins.tsx:655
 msgid "Delete"
 msgstr "删除"
@@ -10764,7 +10773,7 @@ msgstr "删除数据集“{0}”？"
 msgid "Delete File"
 msgstr "删除文件"
 
-#: src/features/tasks/components/tasks-page.tsx:340
+#: src/features/tasks/components/tasks-page.tsx:344
 msgid "Delete goal \"{deleteTitle}\"?"
 msgstr "删除目标“{deleteTitle}”？"
 
@@ -10893,7 +10902,7 @@ msgstr "删除标签"
 msgid "Delete tag {0}"
 msgstr "删除标签 {0}"
 
-#: src/features/tasks/components/tasks-page.tsx:340
+#: src/features/tasks/components/tasks-page.tsx:344
 msgid "Delete task \"{deleteTitle}\"?"
 msgstr "删除任务“{deleteTitle}”？"
 
@@ -11489,9 +11498,14 @@ msgstr "Discord 公钥"
 #: src/features/chat/thread/composer-long-text-prompt.tsx:71
 #: src/features/develop/components/guide-view.tsx:141
 #: src/features/devices/components/devices-settings.tsx:389
+#: src/features/tasks/components/task-suggestions.tsx:174
 #: src/features/workflow/components/nodes/file-node.tsx:231
 msgid "Dismiss"
 msgstr "关闭"
+
+#: src/features/tasks/components/task-suggestions.tsx:161
+msgid "Dismiss \"{title}\""
+msgstr "关闭“{title}”"
 
 #: src/features/settings/components/personalization/memory-digest-card.tsx:54
 msgid "Dismiss digest"
@@ -13297,6 +13311,10 @@ msgstr "事件"
 msgid "Event ends on"
 msgstr "活动结束于"
 
+#: src/features/tasks/hooks/use-schedule-label.ts:65
+msgid "Every {weekday} at {time} UTC"
+msgstr "每{weekday} {time} UTC"
+
 #: src/features/settings/components/chat/trigger-settings.tsx:174
 msgid "Every 6 hours"
 msgstr "每 6 小时"
@@ -13309,7 +13327,12 @@ msgstr "此机器人的每次聊天和计划运行只获得这些工具。你的
 msgid "Every chat, unless its project sets the role."
 msgstr "所有聊天，除非其项目设置了该角色。"
 
+#: src/features/tasks/hooks/use-schedule-label.ts:49
+msgid "Every day at {time} UTC"
+msgstr "每天 {time} UTC"
+
 #: src/features/tasks/components/task-form-dialog.tsx:126
+#: src/features/tasks/hooks/use-schedule-label.ts:19
 msgid "Every day at 09:00 UTC"
 msgstr "每天 09:00 UTC"
 
@@ -13318,8 +13341,13 @@ msgid "Every day at 8 AM"
 msgstr "每天早上 8 点"
 
 #: src/features/tasks/components/task-form-dialog.tsx:127
+#: src/features/tasks/hooks/use-schedule-label.ts:23
 msgid "Every hour"
 msgstr "每小时"
+
+#: src/features/tasks/hooks/use-schedule-label.ts:43
+msgid "Every hour at minute {minute}"
+msgstr "每小时，第 {minute} 分钟"
 
 #: src/features/marketing/components/landing-page.tsx:206
 msgid "Every leading AI model. One conversation."
@@ -13966,7 +13994,7 @@ msgstr "封禁用户失败"
 msgid "Failed to cancel export"
 msgstr "取消导出失败"
 
-#: src/features/tasks/components/tasks-page.tsx:128
+#: src/features/tasks/components/tasks-page.tsx:130
 msgid "Failed to cancel the task"
 msgstr "取消任务失败"
 
@@ -14039,6 +14067,10 @@ msgstr "创建预设失败"
 msgid "Failed to create tag"
 msgstr "创建标签失败"
 
+#: src/features/tasks/components/task-suggestions.tsx:185
+msgid "Failed to create the task"
+msgstr "创建任务失败"
+
 #: src/features/settings/components/chat/trigger-settings.tsx:539
 msgid "Failed to create trigger"
 msgstr "创建触发器失败"
@@ -14047,7 +14079,7 @@ msgstr "创建触发器失败"
 msgid "Failed to cut to clipboard"
 msgstr "剪切到剪贴板失败"
 
-#: src/features/tasks/components/tasks-page.tsx:152
+#: src/features/tasks/components/tasks-page.tsx:154
 msgid "Failed to delete"
 msgstr "删除失败"
 
@@ -14158,6 +14190,10 @@ msgstr "断开连接器失败"
 #: src/features/settings/components/personalization/memory-digest-card.tsx:32
 msgid "Failed to dismiss the digest"
 msgstr "关闭摘要失败"
+
+#: src/features/tasks/components/task-suggestions.tsx:168
+msgid "Failed to dismiss the suggestion"
+msgstr "关闭建议失败"
 
 #: src/features/settings/components/privacy/data-export.tsx:69
 msgid "Failed to download export"
@@ -14506,7 +14542,7 @@ msgstr "开始连接失败"
 msgid "Failed to start the run"
 msgstr "开始运行失败"
 
-#: src/features/tasks/components/tasks-page.tsx:125
+#: src/features/tasks/components/tasks-page.tsx:127
 msgid "Failed to start the task"
 msgstr "开始任务失败"
 
@@ -14622,6 +14658,7 @@ msgid "Failed to update reply tools"
 msgstr "无法更新回复工具"
 
 #: src/features/settings/components/personalization/memory-settings.tsx:149
+#: src/features/settings/components/personalization/schedule-ideas-switch.tsx:40
 msgid "Failed to update setting"
 msgstr "更新设置失败"
 
@@ -16626,7 +16663,7 @@ msgstr "目标：{goalTitle}"
 msgid "Goal: run until done"
 msgstr "目标：运行直至完成"
 
-#: src/features/tasks/components/tasks-page.tsx:224
+#: src/features/tasks/components/tasks-page.tsx:228
 msgid "Goals"
 msgstr "目标"
 
@@ -17694,6 +17731,10 @@ msgstr "非常适合简单的分类和提取任务"
 #: src/features/chat/thread/thread-welcome-suggestions.tsx:72
 msgid "Ideas"
 msgstr "创意"
+
+#: src/features/tasks/components/task-suggestions.tsx:120
+msgid "Ideas from your own recent messages. Nothing is created until you accept one."
+msgstr "根据你自己最近的消息生成的想法。在你接受之前不会创建任何内容。"
 
 #: src/features/settings/components/personalization/memory-types.ts:28
 msgid "Identity"
@@ -19943,7 +19984,7 @@ msgstr "正在关联…"
 msgid "Linux"
 msgstr "Linux"
 
-#: src/features/tasks/components/tasks-page.tsx:262
+#: src/features/tasks/components/tasks-page.tsx:266
 msgid "List"
 msgstr "列表"
 
@@ -20282,7 +20323,7 @@ msgstr "正在加载电子表格…"
 msgid "Loading statistics…"
 msgstr "正在加载统计数据…"
 
-#: src/features/tasks/components/tasks-page.tsx:212
+#: src/features/tasks/components/tasks-page.tsx:216
 msgid "Loading tasks…"
 msgstr "正在加载任务…"
 
@@ -21967,6 +22008,7 @@ msgid "Mon"
 msgstr "周一"
 
 #: src/features/tasks/components/task-form-dialog.tsx:130
+#: src/features/tasks/hooks/use-schedule-label.ts:31
 msgid "Mondays at 09:00 UTC"
 msgstr "每周一 09:00 UTC"
 
@@ -22858,7 +22900,7 @@ msgid "New first"
 msgstr "最新优先"
 
 #: src/features/tasks/components/goal-form-dialog.tsx:73
-#: src/features/tasks/components/tasks-page.tsx:201
+#: src/features/tasks/components/tasks-page.tsx:203
 msgid "New goal"
 msgstr "新建目标"
 
@@ -22924,7 +22966,7 @@ msgid "New tag"
 msgstr "新标签"
 
 #: src/features/tasks/components/task-form-dialog.tsx:206
-#: src/features/tasks/components/tasks-page.tsx:205
+#: src/features/tasks/components/tasks-page.tsx:207
 msgid "New task"
 msgstr "新建任务"
 
@@ -23365,6 +23407,10 @@ msgstr "还没有历史记录"
 msgid "No icon found"
 msgstr "未找到图标"
 
+#: src/features/settings/components/personalization/schedule-ideas-switch.tsx:55
+msgid "No ideas are made while memory is off."
+msgstr "记忆关闭时不会生成想法。"
+
 #: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:171
 #: src/features/chat/thread/media-gallery-view.tsx:353
 msgid "No images yet"
@@ -23720,7 +23766,7 @@ msgstr "暂无摘要。点击“生成”来创建一个。"
 msgid "No tags yet"
 msgstr "还没有标签"
 
-#: src/features/tasks/components/tasks-page.tsx:242
+#: src/features/tasks/components/tasks-page.tsx:246
 msgid "No tasks yet"
 msgstr "还没有任务"
 
@@ -24356,6 +24402,10 @@ msgstr "下次访问聊天时将重新开始新手引导。"
 #: src/features/onboarding/components/onboarding-dialog.tsx:312
 msgid "Onboarding wizard"
 msgstr "新手引导向导"
+
+#: src/features/settings/components/personalization/schedule-ideas-switch.tsx:54
+msgid "Once a day, suggest recurring tasks based only on your own recent messages. Nothing is created until you accept a suggestion. Turning this off deletes the suggestions waiting for you."
+msgstr "每天根据你自己最近的消息建议一次重复任务。在你接受建议之前不会创建任何内容。关闭此项会删除等待处理的建议。"
 
 #: src/features/marketing/use-cases/use-case-data.ts:123
 msgid "Once a night, for users active that day, a reflection pass merges duplicates and promotes repeated facts."
@@ -29031,6 +29081,10 @@ msgstr "重复"
 msgid "Repeats ({0} UTC)"
 msgstr "重复（{0} UTC）"
 
+#: src/features/tasks/hooks/use-schedule-label.ts:37
+msgid "Repeats ({cronExpression} UTC)"
+msgstr "重复（{cronExpression} UTC）"
+
 #: src/features/settings/components/chat/api-keys-settings.tsx:397
 msgid "Replace"
 msgstr "替换"
@@ -30346,6 +30400,14 @@ msgstr "计划"
 #: src/features/skills/components/bundle-export-dialog.tsx:185
 msgid "Schedule {0}"
 msgstr "计划 {0}"
+
+#: src/features/settings/components/personalization/schedule-ideas-switch.tsx:35
+msgid "Schedule ideas disabled"
+msgstr "已关闭计划任务建议"
+
+#: src/features/settings/components/personalization/schedule-ideas-switch.tsx:35
+msgid "Schedule ideas enabled"
+msgstr "已开启计划任务建议"
 
 #: src/features/skills/components/bundle-import-dialog.tsx:55
 msgid "Schedule or webhook"
@@ -33745,6 +33807,10 @@ msgstr "已成功从 {0} 导入 {imported} 个对话"
 msgid "Suggest innovative solutions to reduce plastic waste"
 msgstr "提出减少塑料垃圾的创新方案"
 
+#: src/features/settings/components/personalization/schedule-ideas-switch.tsx:49
+msgid "Suggest scheduled tasks"
+msgstr "建议计划任务"
+
 #: src/features/chat/thread/thread-welcome-suggestions.tsx:108
 msgid "Suggest video ideas for a tech YouTube channel"
 msgstr "为科技类 YouTube 频道提供视频创意"
@@ -33762,9 +33828,21 @@ msgstr "建议的答案"
 msgid "Suggested next prompt: {nextPromptSuggestion}. Press Tab to insert."
 msgstr "建议的下一条提示：{nextPromptSuggestion}。按 Tab 键插入。"
 
+#: src/features/tasks/components/task-suggestions.tsx:118
+msgid "Suggested tasks"
+msgstr "建议的任务"
+
 #: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:689
 msgid "Suggestion available, press Right Arrow to accept"
 msgstr "有可用建议，按右方向键接受"
+
+#: src/features/tasks/components/task-suggestions.tsx:167
+msgid "Suggestion dismissed: {title}"
+msgstr "建议已关闭：{title}"
+
+#: src/features/tasks/components/task-suggestions.tsx:124
+msgid "Suggestion updates"
+msgstr "建议更新"
 
 #: src/features/settings/lib/settings-keywords.ts:33
 msgid "suggestions"
@@ -34173,6 +34251,10 @@ msgstr "任务"
 msgid "Task approved"
 msgstr "任务已批准"
 
+#: src/features/tasks/components/task-suggestions.tsx:184
+msgid "Task created: {title}"
+msgstr "任务已创建：{title}"
+
 #: src/features/tasks/components/task-detail-dialog.tsx:211
 msgid "Task details, your review and the run history."
 msgstr "任务详情、你的审核以及运行历史。"
@@ -34223,18 +34305,18 @@ msgstr "任务已排队等待再次运行"
 msgid "Task rejected"
 msgstr "任务已拒绝"
 
-#: src/features/tasks/components/tasks-page.tsx:255
+#: src/features/tasks/components/tasks-page.tsx:259
 msgid "Task views"
 msgstr "任务视图"
 
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:34
 #: src/features/layout/components/sidebar-shortcut.tsx:101
-#: src/features/tasks/components/tasks-page.tsx:192
+#: src/features/tasks/components/tasks-page.tsx:194
 msgid "Tasks"
 msgstr "任务"
 
 #. placeholder {0}: goalTitleById.get(selectedGoalId) ?? ""
-#: src/features/tasks/components/tasks-page.tsx:251
+#: src/features/tasks/components/tasks-page.tsx:255
 msgid "Tasks for {0}"
 msgstr "{0} 的任务"
 
@@ -35265,7 +35347,7 @@ msgstr "免费方案包括：在精选的快速、低成本模型上每天 20 �
 msgid "The full system prompt to send to the model..."
 msgstr "发送给模型的完整系统提示词..."
 
-#: src/features/tasks/components/tasks-page.tsx:333
+#: src/features/tasks/components/tasks-page.tsx:337
 msgid "The goal is removed; its tasks stay, without a goal."
 msgstr "目标将被删除；其任务会保留，但不再属于任何目标。"
 
@@ -35768,7 +35850,7 @@ msgstr "子代理无法启动。"
 msgid "The tag \"{pendingDeleteName}\" will be removed from every chat that has it. The chats themselves are not deleted."
 msgstr "标签“{pendingDeleteName}”将从所有使用它的聊天中移除。聊天本身不会被删除。"
 
-#: src/features/tasks/components/tasks-page.tsx:334
+#: src/features/tasks/components/tasks-page.tsx:338
 msgid "The task and its run history are removed. Tasks that depend on it stop waiting for it."
 msgstr "任务及其运行历史将被删除。依赖它的任务将不再等待它。"
 
@@ -39827,7 +39909,12 @@ msgstr "WeChat Token"
 msgid "Wed"
 msgstr "周三"
 
+#: src/features/tasks/hooks/use-schedule-label.ts:53
+msgid "Weekdays at {time} UTC"
+msgstr "工作日 {time} UTC"
+
 #: src/features/tasks/components/task-form-dialog.tsx:129
+#: src/features/tasks/hooks/use-schedule-label.ts:27
 msgid "Weekdays at 09:00 UTC"
 msgstr "工作日 09:00 UTC"
 

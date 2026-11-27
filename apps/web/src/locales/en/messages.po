@@ -51,7 +51,7 @@ msgid "\"{0}\" has variables that need values."
 msgstr "\"{0}\" has variables that need values."
 
 #. placeholder {0}: task.title
-#: src/features/tasks/components/tasks-page.tsx:122
+#: src/features/tasks/components/tasks-page.tsx:124
 msgid "\"{0}\" will start once its dependencies are done"
 msgstr "\"{0}\" will start once its dependencies are done"
 
@@ -134,7 +134,7 @@ msgstr "(default)"
 msgid "(deleted case)"
 msgstr "(deleted case)"
 
-#: src/features/tasks/components/tasks-page.tsx:172
+#: src/features/tasks/components/tasks-page.tsx:174
 msgid "(deleted task)"
 msgstr "(deleted task)"
 
@@ -240,7 +240,7 @@ msgstr "(shared)"
 msgid "(too large)"
 msgstr "(too large)"
 
-#: src/features/tasks/components/tasks-page.tsx:182
+#: src/features/tasks/components/tasks-page.tsx:184
 msgid "(unavailable skill)"
 msgstr "(unavailable skill)"
 
@@ -1525,7 +1525,7 @@ msgstr "{resultCount, plural, one {# result} other {# results}}"
 msgid "{resultCount} results"
 msgstr "{resultCount} results"
 
-#: src/features/tasks/components/tasks-page.tsx:218
+#: src/features/tasks/components/tasks-page.tsx:222
 msgid "{reviewCount} tasks need your review"
 msgstr "{reviewCount} tasks need your review"
 
@@ -2383,8 +2383,13 @@ msgstr "Accent color updated"
 
 #: src/features/auth/components/organization/accept-invitation-card.tsx:192
 #: src/features/auth/components/organization/user-invitations-card.tsx:116
+#: src/features/tasks/components/task-suggestions.tsx:190
 msgid "Accept"
 msgstr "Accept"
+
+#: src/features/tasks/components/task-suggestions.tsx:178
+msgid "Accept \"{title}\""
+msgstr "Accept \"{title}\""
 
 #: src/features/auth/components/organization/accept-invitation-card.tsx:157
 msgid "Accept Invitation"
@@ -3284,7 +3289,7 @@ msgstr "Agentic coding workflows requiring Alibaba's next-gen code model with Mo
 msgid "agents"
 msgstr "agents"
 
-#: src/features/tasks/components/tasks-page.tsx:195
+#: src/features/tasks/components/tasks-page.tsx:197
 msgid "Agents work your tasks on their own. A verifier checks each result against its success criteria, and anything it will not pass comes back to you."
 msgstr "Agents work your tasks on their own. A verifier checks each result against its success criteria, and anything it will not pass comes back to you."
 
@@ -3682,7 +3687,7 @@ msgstr "All Servers"
 msgid "All shards measured."
 msgstr "All shards measured."
 
-#: src/features/tasks/components/tasks-page.tsx:251
+#: src/features/tasks/components/tasks-page.tsx:255
 msgid "All tasks"
 msgstr "All tasks"
 
@@ -5517,7 +5522,7 @@ msgstr "Blue"
 msgid "Blue Channel"
 msgstr "Blue Channel"
 
-#: src/features/tasks/components/tasks-page.tsx:258
+#: src/features/tasks/components/tasks-page.tsx:262
 msgid "Board"
 msgstr "Board"
 
@@ -9661,7 +9666,7 @@ msgstr "Create a Slack App at api.slack.com/apps with Events API enabled."
 msgid "Create a tag…"
 msgstr "Create a tag…"
 
-#: src/features/tasks/components/tasks-page.tsx:243
+#: src/features/tasks/components/tasks-page.tsx:247
 msgid "Create a task, give it success criteria, and run it. You can chain tasks with dependencies and repeat them on a schedule."
 msgstr "Create a task, give it success criteria, and run it. You can chain tasks with dependencies and repeat them on a schedule."
 
@@ -10344,6 +10349,10 @@ msgstr "Date and time"
 msgid "Day"
 msgstr "Day"
 
+#: src/features/tasks/hooks/use-schedule-label.ts:59
+msgid "Day {monthDay} of every month at {time} UTC"
+msgstr "Day {monthDay} of every month at {time} UTC"
+
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:131
 msgid "days"
 msgstr "days"
@@ -10657,7 +10666,7 @@ msgstr "Delegated {0} work runs on this model."
 #: src/features/skills/components/skill-list.tsx:311
 #: src/features/tasks/components/goal-list.tsx:54
 #: src/features/tasks/components/task-card.tsx:113
-#: src/features/tasks/components/tasks-page.tsx:330
+#: src/features/tasks/components/tasks-page.tsx:334
 #: src/features/vault/components/site-logins.tsx:655
 msgid "Delete"
 msgstr "Delete"
@@ -10763,7 +10772,7 @@ msgstr "Delete dataset \"{0}\"?"
 msgid "Delete File"
 msgstr "Delete File"
 
-#: src/features/tasks/components/tasks-page.tsx:340
+#: src/features/tasks/components/tasks-page.tsx:344
 msgid "Delete goal \"{deleteTitle}\"?"
 msgstr "Delete goal \"{deleteTitle}\"?"
 
@@ -10892,7 +10901,7 @@ msgstr "Delete tag"
 msgid "Delete tag {0}"
 msgstr "Delete tag {0}"
 
-#: src/features/tasks/components/tasks-page.tsx:340
+#: src/features/tasks/components/tasks-page.tsx:344
 msgid "Delete task \"{deleteTitle}\"?"
 msgstr "Delete task \"{deleteTitle}\"?"
 
@@ -11488,9 +11497,14 @@ msgstr "Discord Public Key"
 #: src/features/chat/thread/composer-long-text-prompt.tsx:71
 #: src/features/develop/components/guide-view.tsx:141
 #: src/features/devices/components/devices-settings.tsx:389
+#: src/features/tasks/components/task-suggestions.tsx:174
 #: src/features/workflow/components/nodes/file-node.tsx:231
 msgid "Dismiss"
 msgstr "Dismiss"
+
+#: src/features/tasks/components/task-suggestions.tsx:161
+msgid "Dismiss \"{title}\""
+msgstr "Dismiss \"{title}\""
 
 #: src/features/settings/components/personalization/memory-digest-card.tsx:54
 msgid "Dismiss digest"
@@ -13296,6 +13310,10 @@ msgstr "Event"
 msgid "Event ends on"
 msgstr "Event ends on"
 
+#: src/features/tasks/hooks/use-schedule-label.ts:65
+msgid "Every {weekday} at {time} UTC"
+msgstr "Every {weekday} at {time} UTC"
+
 #: src/features/settings/components/chat/trigger-settings.tsx:174
 msgid "Every 6 hours"
 msgstr "Every 6 hours"
@@ -13308,7 +13326,12 @@ msgstr "Every chat and scheduled run of this bot gets only these tools. Your too
 msgid "Every chat, unless its project sets the role."
 msgstr "Every chat, unless its project sets the role."
 
+#: src/features/tasks/hooks/use-schedule-label.ts:49
+msgid "Every day at {time} UTC"
+msgstr "Every day at {time} UTC"
+
 #: src/features/tasks/components/task-form-dialog.tsx:126
+#: src/features/tasks/hooks/use-schedule-label.ts:19
 msgid "Every day at 09:00 UTC"
 msgstr "Every day at 09:00 UTC"
 
@@ -13317,8 +13340,13 @@ msgid "Every day at 8 AM"
 msgstr "Every day at 8 AM"
 
 #: src/features/tasks/components/task-form-dialog.tsx:127
+#: src/features/tasks/hooks/use-schedule-label.ts:23
 msgid "Every hour"
 msgstr "Every hour"
+
+#: src/features/tasks/hooks/use-schedule-label.ts:43
+msgid "Every hour at minute {minute}"
+msgstr "Every hour at minute {minute}"
 
 #: src/features/marketing/components/landing-page.tsx:206
 msgid "Every leading AI model. One conversation."
@@ -13965,7 +13993,7 @@ msgstr "Failed to ban user"
 msgid "Failed to cancel export"
 msgstr "Failed to cancel export"
 
-#: src/features/tasks/components/tasks-page.tsx:128
+#: src/features/tasks/components/tasks-page.tsx:130
 msgid "Failed to cancel the task"
 msgstr "Failed to cancel the task"
 
@@ -14038,6 +14066,10 @@ msgstr "Failed to create preset"
 msgid "Failed to create tag"
 msgstr "Failed to create tag"
 
+#: src/features/tasks/components/task-suggestions.tsx:185
+msgid "Failed to create the task"
+msgstr "Failed to create the task"
+
 #: src/features/settings/components/chat/trigger-settings.tsx:539
 msgid "Failed to create trigger"
 msgstr "Failed to create trigger"
@@ -14046,7 +14078,7 @@ msgstr "Failed to create trigger"
 msgid "Failed to cut to clipboard"
 msgstr "Failed to cut to clipboard"
 
-#: src/features/tasks/components/tasks-page.tsx:152
+#: src/features/tasks/components/tasks-page.tsx:154
 msgid "Failed to delete"
 msgstr "Failed to delete"
 
@@ -14157,6 +14189,10 @@ msgstr "Failed to disconnect connector"
 #: src/features/settings/components/personalization/memory-digest-card.tsx:32
 msgid "Failed to dismiss the digest"
 msgstr "Failed to dismiss the digest"
+
+#: src/features/tasks/components/task-suggestions.tsx:168
+msgid "Failed to dismiss the suggestion"
+msgstr "Failed to dismiss the suggestion"
 
 #: src/features/settings/components/privacy/data-export.tsx:69
 msgid "Failed to download export"
@@ -14505,7 +14541,7 @@ msgstr "Failed to start the connection"
 msgid "Failed to start the run"
 msgstr "Failed to start the run"
 
-#: src/features/tasks/components/tasks-page.tsx:125
+#: src/features/tasks/components/tasks-page.tsx:127
 msgid "Failed to start the task"
 msgstr "Failed to start the task"
 
@@ -14621,6 +14657,7 @@ msgid "Failed to update reply tools"
 msgstr "Failed to update reply tools"
 
 #: src/features/settings/components/personalization/memory-settings.tsx:149
+#: src/features/settings/components/personalization/schedule-ideas-switch.tsx:40
 msgid "Failed to update setting"
 msgstr "Failed to update setting"
 
@@ -16625,7 +16662,7 @@ msgstr "Goal: {goalTitle}"
 msgid "Goal: run until done"
 msgstr "Goal: run until done"
 
-#: src/features/tasks/components/tasks-page.tsx:224
+#: src/features/tasks/components/tasks-page.tsx:228
 msgid "Goals"
 msgstr "Goals"
 
@@ -17693,6 +17730,10 @@ msgstr "Ideal for simple classification and extraction"
 #: src/features/chat/thread/thread-welcome-suggestions.tsx:72
 msgid "Ideas"
 msgstr "Ideas"
+
+#: src/features/tasks/components/task-suggestions.tsx:120
+msgid "Ideas from your own recent messages. Nothing is created until you accept one."
+msgstr "Ideas from your own recent messages. Nothing is created until you accept one."
 
 #: src/features/settings/components/personalization/memory-types.ts:28
 msgid "Identity"
@@ -19942,7 +19983,7 @@ msgstr "Linking…"
 msgid "Linux"
 msgstr "Linux"
 
-#: src/features/tasks/components/tasks-page.tsx:262
+#: src/features/tasks/components/tasks-page.tsx:266
 msgid "List"
 msgstr "List"
 
@@ -20281,7 +20322,7 @@ msgstr "Loading spreadsheet…"
 msgid "Loading statistics…"
 msgstr "Loading statistics…"
 
-#: src/features/tasks/components/tasks-page.tsx:212
+#: src/features/tasks/components/tasks-page.tsx:216
 msgid "Loading tasks…"
 msgstr "Loading tasks…"
 
@@ -21966,6 +22007,7 @@ msgid "Mon"
 msgstr "Mon"
 
 #: src/features/tasks/components/task-form-dialog.tsx:130
+#: src/features/tasks/hooks/use-schedule-label.ts:31
 msgid "Mondays at 09:00 UTC"
 msgstr "Mondays at 09:00 UTC"
 
@@ -22857,7 +22899,7 @@ msgid "New first"
 msgstr "New first"
 
 #: src/features/tasks/components/goal-form-dialog.tsx:73
-#: src/features/tasks/components/tasks-page.tsx:201
+#: src/features/tasks/components/tasks-page.tsx:203
 msgid "New goal"
 msgstr "New goal"
 
@@ -22923,7 +22965,7 @@ msgid "New tag"
 msgstr "New tag"
 
 #: src/features/tasks/components/task-form-dialog.tsx:206
-#: src/features/tasks/components/tasks-page.tsx:205
+#: src/features/tasks/components/tasks-page.tsx:207
 msgid "New task"
 msgstr "New task"
 
@@ -23364,6 +23406,10 @@ msgstr "No history yet"
 msgid "No icon found"
 msgstr "No icon found"
 
+#: src/features/settings/components/personalization/schedule-ideas-switch.tsx:55
+msgid "No ideas are made while memory is off."
+msgstr "No ideas are made while memory is off."
+
 #: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:171
 #: src/features/chat/thread/media-gallery-view.tsx:353
 msgid "No images yet"
@@ -23719,7 +23765,7 @@ msgstr "No summary available. Click \"Generate\" to create one."
 msgid "No tags yet"
 msgstr "No tags yet"
 
-#: src/features/tasks/components/tasks-page.tsx:242
+#: src/features/tasks/components/tasks-page.tsx:246
 msgid "No tasks yet"
 msgstr "No tasks yet"
 
@@ -24355,6 +24401,10 @@ msgstr "Onboarding will restart on your next visit to chat."
 #: src/features/onboarding/components/onboarding-dialog.tsx:312
 msgid "Onboarding wizard"
 msgstr "Onboarding wizard"
+
+#: src/features/settings/components/personalization/schedule-ideas-switch.tsx:54
+msgid "Once a day, suggest recurring tasks based only on your own recent messages. Nothing is created until you accept a suggestion. Turning this off deletes the suggestions waiting for you."
+msgstr "Once a day, suggest recurring tasks based only on your own recent messages. Nothing is created until you accept a suggestion. Turning this off deletes the suggestions waiting for you."
 
 #: src/features/marketing/use-cases/use-case-data.ts:123
 msgid "Once a night, for users active that day, a reflection pass merges duplicates and promotes repeated facts."
@@ -29030,6 +29080,10 @@ msgstr "Repeat"
 msgid "Repeats ({0} UTC)"
 msgstr "Repeats ({0} UTC)"
 
+#: src/features/tasks/hooks/use-schedule-label.ts:37
+msgid "Repeats ({cronExpression} UTC)"
+msgstr "Repeats ({cronExpression} UTC)"
+
 #: src/features/settings/components/chat/api-keys-settings.tsx:397
 msgid "Replace"
 msgstr "Replace"
@@ -30345,6 +30399,14 @@ msgstr "Schedule"
 #: src/features/skills/components/bundle-export-dialog.tsx:185
 msgid "Schedule {0}"
 msgstr "Schedule {0}"
+
+#: src/features/settings/components/personalization/schedule-ideas-switch.tsx:35
+msgid "Schedule ideas disabled"
+msgstr "Schedule ideas disabled"
+
+#: src/features/settings/components/personalization/schedule-ideas-switch.tsx:35
+msgid "Schedule ideas enabled"
+msgstr "Schedule ideas enabled"
 
 #: src/features/skills/components/bundle-import-dialog.tsx:55
 msgid "Schedule or webhook"
@@ -33744,6 +33806,10 @@ msgstr "Successfully imported {imported} conversations from {0}"
 msgid "Suggest innovative solutions to reduce plastic waste"
 msgstr "Suggest innovative solutions to reduce plastic waste"
 
+#: src/features/settings/components/personalization/schedule-ideas-switch.tsx:49
+msgid "Suggest scheduled tasks"
+msgstr "Suggest scheduled tasks"
+
 #: src/features/chat/thread/thread-welcome-suggestions.tsx:108
 msgid "Suggest video ideas for a tech YouTube channel"
 msgstr "Suggest video ideas for a tech YouTube channel"
@@ -33761,9 +33827,21 @@ msgstr "Suggested answers"
 msgid "Suggested next prompt: {nextPromptSuggestion}. Press Tab to insert."
 msgstr "Suggested next prompt: {nextPromptSuggestion}. Press Tab to insert."
 
+#: src/features/tasks/components/task-suggestions.tsx:118
+msgid "Suggested tasks"
+msgstr "Suggested tasks"
+
 #: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:689
 msgid "Suggestion available, press Right Arrow to accept"
 msgstr "Suggestion available, press Right Arrow to accept"
+
+#: src/features/tasks/components/task-suggestions.tsx:167
+msgid "Suggestion dismissed: {title}"
+msgstr "Suggestion dismissed: {title}"
+
+#: src/features/tasks/components/task-suggestions.tsx:124
+msgid "Suggestion updates"
+msgstr "Suggestion updates"
 
 #: src/features/settings/lib/settings-keywords.ts:33
 msgid "suggestions"
@@ -34172,6 +34250,10 @@ msgstr "Task"
 msgid "Task approved"
 msgstr "Task approved"
 
+#: src/features/tasks/components/task-suggestions.tsx:184
+msgid "Task created: {title}"
+msgstr "Task created: {title}"
+
 #: src/features/tasks/components/task-detail-dialog.tsx:211
 msgid "Task details, your review and the run history."
 msgstr "Task details, your review and the run history."
@@ -34222,18 +34304,18 @@ msgstr "Task queued for another run"
 msgid "Task rejected"
 msgstr "Task rejected"
 
-#: src/features/tasks/components/tasks-page.tsx:255
+#: src/features/tasks/components/tasks-page.tsx:259
 msgid "Task views"
 msgstr "Task views"
 
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:34
 #: src/features/layout/components/sidebar-shortcut.tsx:101
-#: src/features/tasks/components/tasks-page.tsx:192
+#: src/features/tasks/components/tasks-page.tsx:194
 msgid "Tasks"
 msgstr "Tasks"
 
 #. placeholder {0}: goalTitleById.get(selectedGoalId) ?? ""
-#: src/features/tasks/components/tasks-page.tsx:251
+#: src/features/tasks/components/tasks-page.tsx:255
 msgid "Tasks for {0}"
 msgstr "Tasks for {0}"
 
@@ -35264,7 +35346,7 @@ msgstr "The free plan includes 20 text messages a day on a curated set of fast, 
 msgid "The full system prompt to send to the model..."
 msgstr "The full system prompt to send to the model..."
 
-#: src/features/tasks/components/tasks-page.tsx:333
+#: src/features/tasks/components/tasks-page.tsx:337
 msgid "The goal is removed; its tasks stay, without a goal."
 msgstr "The goal is removed; its tasks stay, without a goal."
 
@@ -35767,7 +35849,7 @@ msgstr "The sub-agent could not start."
 msgid "The tag \"{pendingDeleteName}\" will be removed from every chat that has it. The chats themselves are not deleted."
 msgstr "The tag \"{pendingDeleteName}\" will be removed from every chat that has it. The chats themselves are not deleted."
 
-#: src/features/tasks/components/tasks-page.tsx:334
+#: src/features/tasks/components/tasks-page.tsx:338
 msgid "The task and its run history are removed. Tasks that depend on it stop waiting for it."
 msgstr "The task and its run history are removed. Tasks that depend on it stop waiting for it."
 
@@ -39826,7 +39908,12 @@ msgstr "WeChat Token"
 msgid "Wed"
 msgstr "Wed"
 
+#: src/features/tasks/hooks/use-schedule-label.ts:53
+msgid "Weekdays at {time} UTC"
+msgstr "Weekdays at {time} UTC"
+
 #: src/features/tasks/components/task-form-dialog.tsx:129
+#: src/features/tasks/hooks/use-schedule-label.ts:27
 msgid "Weekdays at 09:00 UTC"
 msgstr "Weekdays at 09:00 UTC"
 

@@ -1,0 +1,202 @@
+"use client";
+
+import { useLingui } from "@lingui/react/macro";
+import { Button } from "@neore/ui/components/button";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { CalendarClockIcon } from "lucide-react";
+import type { FC, RefObject } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
+
+import { useCRPC } from "@/lib/lunora/crpc";
+
+import { useScheduleLabel } from "../hooks/use-schedule-label";
+
+interface TaskSuggestionsProps {
+    /** The element that takes focus when the last suggestion leaves the list, so focus is not lost with it. */
+    fallbackFocus?: RefObject<HTMLElement | null>;
+}
+
+/** Runs a call and answers whether it worked. A module-level helper: the compiler bails on `try` in a component. */
+const attempt = async (run: () => Promise<unknown>): Promise<boolean> => {
+    try {
+        await run();
+
+        return true;
+    } catch {
+        return false;
+    }
+};
+
+/**
+ * The tasks the daily job suggests from the person's own messages: each can be accepted (which creates the task, and the
+ * board shows it) or dismissed. Nothing is shown while there are none, which is also the case while the feature is off.
+ */
+const TaskSuggestions: FC<TaskSuggestionsProps> = ({ fallbackFocus }) => {
+    const { t } = useLingui();
+    const crpc = useCRPC();
+    const queryClient = useQueryClient();
+    const scheduleLabel = useScheduleLabel();
+    const headingId = useId();
+    const items = useRef(new Map<string, HTMLLIElement>());
+    // Where focus goes once the decided row has left the list: the neighbouring row (focusable, so it is read out), or the fallback.
+    const focusAfter = useRef<{ decided: string; next: string | null } | null>(null);
+    const [busyId, setBusyId] = useState<string | null>(null);
+    const [outcome, setOutcome] = useState<{ kind: "done" | "failed"; text: string } | null>(null);
+
+    const listQuery = crpc.tasks.suggestions.listTaskSuggestions.queryOptions({});
+    const boardQuery = crpc.tasks.functions.getTaskBoard.queryOptions({});
+    const { data } = useQuery(listQuery);
+    const suggestions = useMemo(() => data ?? [], [data]);
+    const refresh = {
+        onSettled: async () => {
+            await queryClient.invalidateQueries({ queryKey: listQuery.queryKey });
+        },
+    };
+    const accept = useMutation(
+        crpc.tasks.suggestions.acceptTaskSuggestion.mutationOptions({
+            onSettled: async () => {
+                // The accepted task joins the board the page shows.
+                await Promise.all([
+                    queryClient.invalidateQueries({ queryKey: listQuery.queryKey }),
+                    queryClient.invalidateQueries({ queryKey: boardQuery.queryKey }),
+                ]);
+            },
+        }),
+    );
+    const dismiss = useMutation(crpc.tasks.suggestions.dismissTaskSuggestion.mutationOptions(refresh));
+
+    useEffect(() => {
+        const pending = focusAfter.current;
+
+        if (!pending || suggestions.some((suggestion) => suggestion._id === pending.decided)) {
+            return;
+        }
+
+        focusAfter.current = null;
+
+        const next = pending.next ? items.current.get(pending.next) : null;
+
+        (next ?? fallbackFocus?.current)?.focus();
+    }, [suggestions, fallbackFocus]);
+
+    if (outcome === null && suggestions.length === 0) {
+        return null;
+    }
+
+    // One decision at a time, until its row has left the list: a live list can answer one more time from before the
+    // decision, and a second click on the same row would be refused as already decided. The buttons are `aria-disabled`,
+    // not `disabled`, so the one the person used keeps focus.
+    const busy = busyId !== null && suggestions.some((suggestion) => suggestion._id === busyId);
+
+    const decide = async (id: string, run: () => Promise<unknown>, done: string, failed: string) => {
+        if (busy) {
+            return;
+        }
+
+        const index = suggestions.findIndex((suggestion) => suggestion._id === id);
+        const neighbour = suggestions[index + 1] ?? suggestions[index - 1];
+
+        setBusyId(id);
+        setOutcome(null);
+        focusAfter.current = { decided: id, next: neighbour ? neighbour._id : null };
+
+        const worked = await attempt(run);
+
+        if (!worked) {
+            focusAfter.current = null;
+            setBusyId(null);
+        }
+
+        setOutcome({ kind: worked ? "done" : "failed", text: worked ? done : failed });
+    };
+
+    return (
+        <section aria-labelledby={suggestions.length > 0 ? headingId : undefined} className="space-y-3">
+            {suggestions.length > 0 && (
+                <div className="space-y-1">
+                    <h2 className="text-sm font-medium" id={headingId}>
+                        {t`Suggested tasks`}
+                    </h2>
+                    <p className="text-muted-foreground text-xs">{t`Ideas from your own recent messages. Nothing is created until you accept one.`}</p>
+                </div>
+            )}
+            {/* The status and the alert stay mounted while a decision is announced, even when it removes the last row. */}
+            <p aria-label={t`Suggestion updates`} className="sr-only" role="status">
+                {outcome?.kind === "done" ? outcome.text : ""}
+            </p>
+            {outcome?.kind === "failed" && (
+                <p className="text-destructive text-xs" role="alert">
+                    {outcome.text}
+                </p>
+            )}
+            {suggestions.length > 0 && (
+                <ul className="space-y-2">
+                    {suggestions.map((suggestion) => {
+                        const { _id: id, cronExpression, instructions, title } = suggestion;
+
+                        return (
+                            <li
+                                className="bg-card flex flex-wrap items-start justify-between gap-3 rounded-lg border p-3 outline-offset-2"
+                                key={id}
+                                ref={(element) => {
+                                    if (element) {
+                                        items.current.set(id, element);
+                                    } else {
+                                        items.current.delete(id);
+                                    }
+                                }}
+                                tabIndex={-1}
+                            >
+                                <div className="min-w-0 flex-1 space-y-1">
+                                    <p className="flex items-center gap-2 text-sm font-medium">
+                                        <CalendarClockIcon aria-hidden="true" className="text-muted-foreground h-4 w-4 shrink-0" />
+                                        <span className="truncate">{title}</span>
+                                    </p>
+                                    <p className="text-muted-foreground line-clamp-2 text-xs">{instructions}</p>
+                                    <p className="text-muted-foreground text-xs">{scheduleLabel(cronExpression)}</p>
+                                </div>
+                                <div className="flex shrink-0 gap-2">
+                                    <Button
+                                        aria-disabled={busy}
+                                        aria-label={t`Dismiss "${title}"`}
+                                        className="aria-disabled:opacity-50"
+                                        onClick={() =>
+                                            decide(
+                                                id,
+                                                async () => await dismiss.mutateAsync({ suggestionId: suggestion._id }),
+                                                t`Suggestion dismissed: ${title}`,
+                                                t`Failed to dismiss the suggestion`,
+                                            )
+                                        }
+                                        size="sm"
+                                        variant="outline"
+                                    >
+                                        {t`Dismiss`}
+                                    </Button>
+                                    <Button
+                                        aria-disabled={busy}
+                                        aria-label={t`Accept "${title}"`}
+                                        className="aria-disabled:opacity-50"
+                                        onClick={() =>
+                                            decide(
+                                                id,
+                                                async () => await accept.mutateAsync({ suggestionId: suggestion._id }),
+                                                t`Task created: ${title}`,
+                                                t`Failed to create the task`,
+                                            )
+                                        }
+                                        size="sm"
+                                    >
+                                        {t`Accept`}
+                                    </Button>
+                                </div>
+                            </li>
+                        );
+                    })}
+                </ul>
+            )}
+        </section>
+    );
+};
+
+export default TaskSuggestions;
