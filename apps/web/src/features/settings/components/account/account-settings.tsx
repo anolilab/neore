@@ -19,6 +19,7 @@ import { createLanguageList } from "@/features/chat/core/utils/language-utilitie
 import { DEFAULT_SPEECH_VOICE, SPEECH_VOICES, speechVoiceLabel } from "@/features/chat/voice-mode/tts-availability";
 import { useLayoutState, useUserPreferences } from "@/features/layout/hooks/use-ui-state";
 import NotificationSettings from "@/features/notifications/components/notification-settings";
+import ChatActionConfirmControls from "@/features/settings/components/chat/chat-action-confirm-settings";
 import ChatLifecycleControls from "@/features/settings/components/chat/chat-lifecycle-settings";
 
 // BCP 47 defaults for each supported UI locale. Hoisted to avoid recreation on every render.
@@ -87,8 +88,13 @@ const AccountSettings: FC = () => {
     const isResumeLastChat = userSettings?.resumeLastChat === true;
     // Absent means on: a reply interrupted by a deploy or crash continues by itself.
     const isResumeInterruptedRuns = userSettings?.resumeInterruptedRuns !== false;
+    // Absent means on: a reply paused by a usage limit resumes by itself once the limit resets.
+    const isResumeAfterUsageLimit = userSettings?.resumeAfterUsageLimit !== false;
+    // Opt-in: absent means off.
+    const isSnoozeUntilUsageLimitReset = userSettings?.snoozeUntilUsageLimitReset === true;
     // Opt-in: absent means a message sent during a coding agent's turn waits in the queue behind it.
     const isHostFollowUpSteer = userSettings?.hostFollowUpSteer === true;
+    const isFollowUpSteer = userSettings?.followUpSteer === true;
     // Opt-in: absent means off.
     const isComposerVimMode = userSettings?.composerVimMode === true;
 
@@ -554,6 +560,54 @@ const AccountSettings: FC = () => {
                     </div>
                     <div className="flex items-center justify-between">
                         <div className="space-y-0.5">
+                            <Label className="text-base font-medium" htmlFor="resume-after-usage-limit">
+                                {t`Resume after a usage limit`}
+                            </Label>
+                            <p className="text-muted-foreground text-sm" id="resume-after-usage-limit-description">
+                                {t`When a reply pauses because a usage limit was reached, it resumes by itself once the limit resets. Off: it waits until you resume it.`}
+                            </p>
+                        </div>
+                        <Switch
+                            aria-describedby="resume-after-usage-limit-description"
+                            checked={isResumeAfterUsageLimit}
+                            id="resume-after-usage-limit"
+                            onCheckedChange={(checked) => {
+                                handleUpdateSetting(
+                                    "resumeAfterUsageLimit",
+                                    checked,
+                                    checked ? t`Paused replies will resume when the limit resets` : t`Paused replies will wait for you to resume them`,
+                                    // Ordered with the settings queue: a quick second toggle cannot be overwritten by the first write landing last.
+                                    true,
+                                );
+                            }}
+                        />
+                    </div>
+                    <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
+                            <Label className="text-base font-medium" htmlFor="snooze-until-usage-limit-reset">
+                                {t`Snooze chats until the limit resets`}
+                            </Label>
+                            <p className="text-muted-foreground text-sm" id="snooze-until-usage-limit-reset-description">
+                                {t`When a reply pauses because a usage limit was reached and the provider says when it resets, its chat leaves your active list until then.`}
+                            </p>
+                        </div>
+                        <Switch
+                            aria-describedby="snooze-until-usage-limit-reset-description"
+                            checked={isSnoozeUntilUsageLimitReset}
+                            id="snooze-until-usage-limit-reset"
+                            onCheckedChange={(checked) => {
+                                handleUpdateSetting(
+                                    "snoozeUntilUsageLimitReset",
+                                    checked,
+                                    checked ? t`Chats paused by a usage limit will be snoozed` : t`Chats paused by a usage limit will not be snoozed`,
+                                    // Ordered with the settings queue, as the resume switch above.
+                                    true,
+                                );
+                            }}
+                        />
+                    </div>
+                    <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
                             <Label className="text-base font-medium" htmlFor="host-follow-up-steer">
                                 {t`Send during a coding agent's turn`}
                             </Label>
@@ -570,6 +624,28 @@ const AccountSettings: FC = () => {
                                     "hostFollowUpSteer",
                                     checked,
                                     checked ? t`Messages will interrupt the agent's turn` : t`Messages will wait for the agent's turn to end`,
+                                );
+                            }}
+                        />
+                    </div>
+                    <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
+                            <Label className="text-base font-medium" htmlFor="follow-up-steer">
+                                {t`Send while a reply is writing`}
+                            </Label>
+                            <p className="text-muted-foreground text-sm" id="follow-up-steer-description">
+                                {t`Off: a message you send while a reply is streaming waits in the queue and goes after it. On: it joins the reply at its next step.`}
+                            </p>
+                        </div>
+                        <Switch
+                            aria-describedby="follow-up-steer-description"
+                            checked={isFollowUpSteer}
+                            id="follow-up-steer"
+                            onCheckedChange={(checked) => {
+                                handleUpdateSetting(
+                                    "followUpSteer",
+                                    checked,
+                                    checked ? t`Messages will join the reply as it writes` : t`Messages will wait for the reply to finish`,
                                 );
                             }}
                         />
@@ -626,6 +702,7 @@ const AccountSettings: FC = () => {
                         <p className="text-muted-foreground text-xs">{t`Range: 1 hour to 7 days (168 hours)`}</p>
                     </div>
                     <ChatLifecycleControls />
+                    <ChatActionConfirmControls />
                 </CardContent>
             </SettingsCard>
 

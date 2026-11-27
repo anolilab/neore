@@ -7,9 +7,11 @@ import { internalAction, internalMutation, internalQuery, type MutationCtx as Mu
 import { query } from "../lib/crpc";
 import { getAuthUserIdentity } from "../auth";
 import { deleteHumanChecksOfThread } from "../browser/gdpr";
+import { eraseThreadPinsAndRoutesBatch } from "../chat/gdpr";
 import { deleteFollowRowsOfThread } from "../chat/follows/functions";
 import { dropQueuedSteersForThread } from "../chat/lib/steer-cleanup";
 import { revokeGuestLinksForThread, withdrawGuestLinksForThread } from "../chat/lib/guest-link-store";
+import { followupDispatchInFlight } from "./followup-suggestions";
 import { revokeThreadGrants } from "./sharing";
 import { deleteThreadSecrets } from "../chat/lib/secret-requests";
 import { deleteToolApprovalRunsForThread } from "../chat/lib/tool-approval-cleanup";
@@ -25,6 +27,7 @@ import { assert } from "../lib/error-helpers";
 import { patchById, patchRow, withoutUndefined } from "../lib/patch";
 import { paginationOptionsValidator, MAX_LENGTH } from "../lib/validators";
 import { endHostThread, restoreHostThread } from "../acp/lib/thread-removed";
+import { settleOwedMergesOf } from "../source-control/pr-thread-links";
 import { deleteMessage } from "./messages";
 import { deleteChatFileLinksForThread } from "./files";
 import { deleteStreamsPageForThreadId } from "./streams";
@@ -34,11 +37,16 @@ import { type ThreadDoc, vPaginationResult, vThreadCreateFields, vThreadDoc as v
 import { systemDb } from "../lib/rls/scope";
 import { readPasscodeRow } from "./thread-passcode";
 import { clearAwaitingInput, patchThread } from "./table-writes";
+import { deleteMcpEventsOfThread, hasMcpEventsOfThread } from "../public-api/events-log";
+import { runAfterOnShard } from "../lib/shard-scheduler";
 import { deletePullRequestLinksOfThread, setLinksThreadDeleted } from "../source-control/pr-thread-links";
 import { deleteThreadSummaries } from "./thread-summaries";
+import { SEARCH_INTERNAL_FIELDS } from "./thread-search-plan";
 
 export const publicThread = (thread: Doc<"threads">): ThreadDoc => {
-    const result = omit(thread, ["parentThreadIds"]);
+    // The palette-search vector ids are internal (`agent/thread-search.ts`): no client reads them.
+    // The owed-merge flag and its saved scan place are the sweep's bookkeeping (`source-control/pr-state.ts`): no client reads them.
+    const result = omit(thread, ["parentThreadIds", ...SEARCH_INTERNAL_FIELDS, "mergeOwed", "mergeOwedScan"]);
 
     // `vThreadDoc` types `projectId` as a plain string, and `Id<"projects">` is a
     // branded `string`, so the widening needs no cast — the branch stays only to
@@ -57,7 +65,16 @@ export const publicThread = (thread: Doc<"threads">): ThreadDoc => {
  * Unread, snooze and "needs you" belong to the thread's OWNER, as does the organization a temporary chat was started in; the
  * row is shared with grantees, who must not see (or act on) them. Reads that can reach a grantee return the row through here.
  */
-const OWNER_STATE_KEYS = ["awaitingInput", "capOrganizationId", "lastReplyAt", "lastViewedAt", "permissionMode", "snoozeChosenAt", "snoozedUntil"] as const;
+const OWNER_STATE_KEYS = [
+    "awaitingInput",
+    "capOrganizationId",
+    "lastReplyAt",
+    "lastViewedAt",
+    "permissionMode",
+    "pinnedGoal",
+    "snoozeChosenAt",
+    "snoozedUntil",
+] as const;
 
 export const threadForViewer = (thread: Doc<"threads">, viewerId: string | undefined): ThreadDoc => {
     const isOwner = thread.userId !== undefined && thread.userId === viewerId;
@@ -337,10 +354,19 @@ export const searchThreadTitles = query
 
 /** The archive write itself, shared by manual archive and the auto-archive sweep (`auto-archive.ts`). */
 export const markThreadArchived = async (context: MutationContext, threadId: Id<"threads">): Promise<void> => {
+    const thread = await context.db.get("threads", threadId);
+
     await context.db.patch("threads", threadId, {
+        archivedAt: context.now,
         status: "archived",
         updatedAt: context.now,
     });
+
+    // Every archive is final for the chat: its owed merges settle with it, so reopening the chat cannot archive it again for them.
+    if (thread?.userId !== undefined) {
+        await settleOwedMergesOf(context, thread.userId, threadId, context.now);
+    }
+
     // A guest link is for a thread in use: archiving withdraws it and what guests left on it.
     await withdrawGuestLinksForThread(context, threadId);
 };
@@ -408,6 +434,7 @@ const deleteThreadArgs = {
     deltaCursor: v.optional(v.string()),
     limit: v.optional(v.number()),
     messagesDone: v.optional(v.boolean()),
+    pinsDone: v.optional(v.boolean()),
     streamOrder: v.optional(v.number()),
     streamsDone: v.optional(v.boolean()),
     threadId: v.id("threads"),
@@ -453,7 +480,18 @@ export const deleteAllForThreadIdAsync = internalMutation
             });
         }
 
-        const isDone = messagesResult.isDone && streamResult.isDone;
+        const messagesAndStreamsDone = messagesResult.isDone && streamResult.isDone;
+        // Every deletion of a thread, single, bulk or hard, comes through here: its pins and the routes to it go too (`chat/gdpr.ts`).
+        // One batch per pass, after the messages and streams, so a heavily pinned thread never empties in one transaction.
+        let pinsDone = args.pinsDone ?? false;
+
+        if (messagesAndStreamsDone && !pinsDone) {
+            const { hasMore } = await eraseThreadPinsAndRoutesBatch(ctx, args.threadId);
+
+            pinsDone = !hasMore;
+        }
+
+        const isDone = messagesAndStreamsDone && pinsDone;
 
         if (isDone) {
             // The thread is fully gone, so its expiry marker goes with it. Until now the
@@ -474,13 +512,14 @@ export const deleteAllForThreadIdAsync = internalMutation
             }
 
             await deleteThreadSummaries(ctx, args.threadId);
-            // A chat deleted for good without passing the trash keeps no grant either.
-            await revokeThreadGrants(ctx, args.threadId);
+            // A chat deleted for good without passing the trash keeps no grant either, nor any grant's revision.
+            await revokeThreadGrants(ctx, args.threadId, { purge: true });
         } else {
             await ctx.scheduler.runAfter(0, internal.agent.threads.deleteAllForThreadIdAsync, {
                 cursor: messagesResult.cursor,
                 deltaCursor: streamResult.deltaCursor,
                 messagesDone: messagesResult.isDone,
+                pinsDone,
                 streamOrder: streamResult.streamOrder,
                 streamsDone: streamResult.isDone,
                 threadId: args.threadId,
@@ -494,6 +533,12 @@ async function deletePageForThreadIdHandler(context: MutationContext, args: Dele
     // A coding agent's live turn and session end before the first page of messages goes: the ingest keeps taking
     // posts into the thread until the session is ended, and a paged delete leaves it standing for several calls.
     if (args.cursor === undefined) {
+        // The first deletion-state write. A suggestion claim is checked in this same transaction (the thread's own shard), so the
+        // delete refuses rather than removing the chat under a model request. Once the thread is marked deleting, no claim can start.
+        if (await followupDispatchInFlight(context, args.threadId)) {
+            throw new LunoraError("CONFLICT", "A suggestion is being generated for this chat. Try again in a moment.");
+        }
+
         const host = await context.db.get("threads", args.threadId);
 
         if (host) {
@@ -564,6 +609,11 @@ async function deletePageForThreadIdHandler(context: MutationContext, args: Dele
         const thread = await context.db.get("threads", args.threadId);
 
         if (thread) {
+            // The thread's Events (`public-api/events-log.ts`), one batch per call; the thread goes once none are left.
+            if (thread.userId !== undefined && !(await deleteMcpEventsOfThread(context, thread.userId, args.threadId))) {
+                return { cursor: messages.continueCursor, isDone: false };
+            }
+
             // The pull requests it was attached to or opened name it; a link to a deleted thread is a dead one.
             await deletePullRequestLinksOfThread(context, thread.userId, args.threadId);
 
@@ -778,6 +828,11 @@ export const softDeleteThread = internalMutation
     .input({ threadId: v.id("threads") })
     .output(v.from(vThreadDocument))
     .mutation(async ({ args, ctx }) => {
+        // Checked in the same transaction as the trash write: a suggestion claim held here refuses the trash (see the delete writer).
+        if (await followupDispatchInFlight(ctx, args.threadId)) {
+            throw new LunoraError("CONFLICT", "A suggestion is being generated for this chat. Try again in a moment.");
+        }
+
         const oldThread = await ctx.db.get("threads", args.threadId);
 
         assert(oldThread, `Thread ${args.threadId} not found`);
@@ -786,6 +841,19 @@ export const softDeleteThread = internalMutation
             deletedAt: ctx.now,
             updatedAt: ctx.now,
         });
+
+        // The chat's run and approval events go with it, as its delete removes them: a poll that passed a hidden event has moved its
+        // cursor on, so a restored chat could never get it back. One batch here; the rest by a scheduled batch (`deleteTrashedThreadEvents`).
+        if (oldThread.userId !== undefined && !(await deleteMcpEventsOfThread(ctx, oldThread.userId, args.threadId))) {
+            await runAfterOnShard(
+                ctx.scheduler,
+                0,
+                internal.public_api.events.deleteTrashedThreadEvents,
+                { threadId: args.threadId, userId: oldThread.userId },
+                oldThread.userId,
+            );
+        }
+
         await setLinksThreadDeleted(ctx, oldThread.userId, args.threadId, true);
         // A coding agent's turn does not outlive the thread it writes into, nor does a goal.
         await endHostThread(ctx, oldThread, ctx.now);
@@ -801,16 +869,31 @@ export const softDeleteThread = internalMutation
 
 export const restoreThread = internalMutation
     .input({ threadId: v.id("threads") })
-    .output(v.from(vThreadDocument))
+    .output(v.object({ before: v.from(vThreadDocument), restored: v.boolean(), thread: v.from(vThreadDocument) }))
     .mutation(async ({ args, ctx }) => {
         const oldThread = await ctx.db.get("threads", args.threadId);
 
         assert(oldThread, `Thread ${args.threadId} not found`);
+
+        // A chat that is already live is not restored again: an overlapping restore reports `restored: false`, so only one of them
+        // records the restore in history.
+        if (oldThread.deleted !== true) {
+            return { before: publicThread(oldThread), restored: false, thread: publicThread(oldThread) };
+        }
+
+        // A chat's events go with the trash, but the trash's leftover batches may not have run. A restored chat must not show them, so
+        // restore refuses while any remain: `undoDeleteThread` drains them first, in its own transaction. The drain removes every event of
+        // the trashed chat, including any recorded while it sat in the trash, so none survives a restore.
+        if (oldThread.userId !== undefined && (await hasMcpEventsOfThread(ctx, oldThread.userId, args.threadId))) {
+            throw new LunoraError("CONFLICT", "This chat's activity is still being cleared from the trash. Try restoring it again in a moment.");
+        }
+
         await patchRow(ctx.db, "threads", oldThread, {
             deleted: false,
             deletedAt: undefined,
             updatedAt: ctx.now,
         });
+
         await setLinksThreadDeleted(ctx, oldThread.userId, args.threadId, false);
 
         // The session the delete ended, if this is a coding agent's thread, can take turns again.
@@ -821,7 +904,7 @@ export const restoreThread = internalMutation
         const newThread = (await ctx.db.get("threads", args.threadId))!;
 
         // Re-add to aggregates when restored
-        return publicThread(newThread);
+        return { before: publicThread(oldThread), restored: true, thread: publicThread(newThread) };
     });
 
 // Thread settings update
@@ -866,7 +949,7 @@ export const updateThreadSettings = internalMutation
 export const createThreadRelationship = internalMutation
     .input({
         branchPoint: v.optional(v.number()),
-        branchType: v.optional(v.union(v.literal("branch"), v.literal("continuation"), v.literal("comparison"))),
+        branchType: v.optional(v.union(v.literal("branch"), v.literal("continuation"), v.literal("comparison"), v.literal("side"))),
         parentThreadId: v.id("threads"),
         threadId: v.id("threads"),
         userId: v.optional(v.string()),
@@ -938,7 +1021,9 @@ export const getThreadRelationship = query
                 _creationTime: v.number(),
                 _id: v.id("threadRelationships"),
                 branchPoint: v.optional(v.number()),
-                branchType: v.optional(v.union(v.literal("branch"), v.literal("continuation"), v.literal("comparison"), v.literal("subagent"))),
+                branchType: v.optional(
+                    v.union(v.literal("branch"), v.literal("continuation"), v.literal("comparison"), v.literal("side"), v.literal("subagent")),
+                ),
                 createdAt: v.number(),
                 parentThreadId: v.id("threads"),
                 threadId: v.id("threads"),
@@ -961,7 +1046,9 @@ export const getChildThreads = query
                 _creationTime: v.number(),
                 _id: v.id("threadRelationships"),
                 branchPoint: v.optional(v.number()),
-                branchType: v.optional(v.union(v.literal("branch"), v.literal("continuation"), v.literal("comparison"), v.literal("subagent"))),
+                branchType: v.optional(
+                    v.union(v.literal("branch"), v.literal("continuation"), v.literal("comparison"), v.literal("side"), v.literal("subagent")),
+                ),
                 createdAt: v.number(),
                 parentThreadId: v.id("threads"),
                 threadId: v.id("threads"),
@@ -1014,7 +1101,9 @@ export const listAllThreadRelationships = internalQuery
                 _creationTime: v.number(),
                 _id: v.id("threadRelationships"),
                 branchPoint: v.optional(v.number()),
-                branchType: v.optional(v.union(v.literal("branch"), v.literal("continuation"), v.literal("comparison"), v.literal("subagent"))),
+                branchType: v.optional(
+                    v.union(v.literal("branch"), v.literal("continuation"), v.literal("comparison"), v.literal("side"), v.literal("subagent")),
+                ),
                 createdAt: v.number(),
                 parentThreadId: v.id("threads"),
                 threadId: v.id("threads"),

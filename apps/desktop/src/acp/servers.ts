@@ -226,6 +226,11 @@ export class ServerAgents {
         }
     }
 
+    /** Resolves once the running-turns file of every server with a runtime is written. Builds no runtime. */
+    public async persisted(): Promise<void> {
+        await Promise.all(Array.from(this.runtimes.values(), async (runtime) => await runtime.poster.persisted()));
+    }
+
     private async runRemoval(deviceId: string): Promise<void> {
         try {
             await this.drop(deviceId);

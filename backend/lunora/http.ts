@@ -221,6 +221,10 @@ app.post("/source-control/webhook/:watchId", async (c) => {
     return await routeWatchWebhook(c.var.lunora, c.req.raw, c.req.param("watchId"));
 });
 
+// The hand back of a page that closes while its person controls the agent's browser: a beacon, so no session. The
+// body is the claim's signed release token, which names the shard (`browser/release-http.ts`).
+app.post("/browser/release", httpAction(lazy(async () => await import("./browser/release-http"), "releaseControlHttpAction")));
+
 // A paired computer's coding-agent turn output (no CORS/session — signed with the device secret). It finds the
 // owner's shard itself (`acp/http.ts`).
 app.post("/hosts/ingest", httpAction(lazy(async () => await import("./acp/http"), "hostIngestHttpAction")));
@@ -265,6 +269,12 @@ app.post("/gateway/notifications", httpAction(lazy(async () => await import("./c
 
 // Operator bootstrap for invite-only sign-up; bearer `LUNORA_ADMIN_TOKEN`.
 app.post("/admin/seed-invitations", httpAction(lazy(async () => await import("./auth/seed-invitations-http"), "seedInvitationsHttpAction")));
+
+// Checks every account, then fills `user.emailCanonical` one id per call from that check; the deploy drives it. Bearer `LUNORA_ADMIN_TOKEN`.
+app.post(
+    "/admin/backfill-email-canonical",
+    httpAction(lazy(async () => await import("./auth/email-canonical-backfill-http"), "emailCanonicalBackfillHttpAction")),
+);
 
 // The e2e suite's invitations. 404 anywhere but a local development stack
 // holding `E2E_SEED_TOKEN` — see `auth/e2e-seed-http.ts`.
@@ -330,7 +340,7 @@ app.get("/api/health", async (c) =>
 /**
  * Worker-signed download URLs — `<PUBLIC_ORIGIN>/<key>?exp&method&bucket&sig`,
  * minted by `ctx.storage.getSignedUrl`. Keys contain slashes
- * (`agent-files/<hash>`), so this is a catch-all, and therefore registered
+ * (`agent-files/<hash>/<uuid>`), so this is a catch-all, and therefore registered
  * LAST: every real route above wins. An unsigned request falls through to the
  * 404 below. See `lib/signed-storage.ts`.
  */

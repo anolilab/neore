@@ -526,10 +526,13 @@ export const setProjectRuleFiles = authMutation
 
 export const getProject = authQuery
     .input({
+        // `primary`: a caller that reads "not there" as proof (the mobile reconnect check) reads the authoritative row; a replica
+        // that lags a fresh share would otherwise answer no project for one that exists.
+        primary: v.optional(v.boolean()),
         projectId: v.id("projects"),
     })
-    .query(async ({ args: { projectId }, ctx: context }) => {
-        const project = await readableProject(context, projectId as Id<"projects">, context.user.userId);
+    .query(async ({ args: { primary, projectId }, ctx: context }) => {
+        const project = await readableProject(context, projectId as Id<"projects">, context.user.userId, { primary: primary === true });
 
         return project && forViewer(project, context.user.userId);
     });
@@ -899,6 +902,52 @@ const REPO_LOOKUP_LIMIT = MAX_PROJECT_REPOSITORIES;
 
 /** Pages of {@link IDS_PER_READ} memberships one URL lookup reads: 900 organizations, a bound no member reaches. */
 const MEMBERSHIP_PAGES = 10;
+
+/**
+ * Those of `within` that are the caller's OWN projects listing `repo` (any form `normalizeRepoUrl` takes), oldest first;
+ * none for a URL it refuses. Only ids: the caller decides each project with `writableProject`. What a start made outside a
+ * project, such as a pull-request guide, files its thread under on a computer limited to some projects
+ * (`source-control/guide-host.ts`). Reading only the computer's projects keeps a matching one from being crowded out by
+ * the person's other projects listing the same URL; a project lists a URL once, so `within` bounds the rows.
+ */
+export const ownProjectIdsListingRepo = async (
+    context: QueryCtx,
+    userId: string,
+    repo: string,
+    within: ReadonlyArray<Id<"projects">>,
+): Promise<Id<"projects">[]> => {
+    let url: string;
+
+    try {
+        url = normalizeRepoUrl(repo);
+    } catch {
+        return [];
+    }
+
+    const projectIds = [...new Set(within)];
+    const batches: Id<"projects">[][] = [];
+
+    for (let start = 0; start < projectIds.length; start += IDS_PER_READ) {
+        batches.push(projectIds.slice(start, start + IDS_PER_READ));
+    }
+
+    const pages = await Promise.all(
+        batches.map(async (batch) =>
+            storedPage(
+                await context.db.projectRepositories.findMany({
+                    consistency: "primary",
+                    limit: batch.length,
+                    where: { projectId: { in: batch }, url, userId },
+                }),
+            ).page.filter((row) => isRepoRow(row)),
+        ),
+    );
+
+    return pages
+        .flat()
+        .toSorted((a, b) => a._creationTime - b._creationTime)
+        .map((row) => row.projectId);
+};
 
 /**
  * The oldest project the caller can read that lists this repository, or `null`: a run picker reopened on a saved run

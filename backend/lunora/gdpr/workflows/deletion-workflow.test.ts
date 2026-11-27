@@ -40,6 +40,11 @@ const workflowContext = () => {
 
         rounds.set(entry.ref, round);
 
+        // The owner sweep reports the owner shards it fenced; the fake reports none unless a test says so.
+        if (entry.ref === "gdpr_steps:erasePinsOnOwnerShards") {
+            return { owners: [], ...(answer(entry.ref, round, args) as object) };
+        }
+
         return answer(entry.ref, round, args);
     };
 
@@ -77,7 +82,7 @@ beforeEach(() => {
     failOn = undefined;
     rounds.clear();
     answer = () => {
-        return { cursor: null, hasMore: false };
+        return { cursor: null, hasMore: false, owners: [] };
     };
 });
 
@@ -268,7 +273,7 @@ describe("account deletion workflow: targets", () => {
         }
 
         // Billing is keyed by the reference id, not the user id.
-        expect(runs().find((entry) => entry.ref === "billing_gdpr:cancelBilling")?.args).toStrictEqual({ referenceId: USER });
+        expect(runs().find((entry) => entry.ref === "billing_gdpr:cancelBilling")?.args).toStrictEqual({ erase: true, referenceId: USER });
 
         const reports = runs().filter((item) => item.ref === "gdpr_functions:updateRequestProgress");
 
@@ -409,7 +414,8 @@ const replayingContext = (
                 }
 
                 if (!isProgress) {
-                    return { cursor: null, hasMore: false };
+                    // The owner sweeps report the owner shards they fenced; this fake fenced none.
+                    return { cursor: null, hasMore: false, owners: [] };
                 }
 
                 const from = args["fromStatus"] as string[] | undefined;
@@ -451,6 +457,7 @@ const replayingContext = (
                     inStep = false;
                 }
             },
+            sleep: async () => undefined,
         },
     };
 };
@@ -535,7 +542,9 @@ describe("account deletion workflow: usage exports", () => {
         const purges = runs().filter((entry) => isPurge(entry.ref));
 
         expect(purges.map((entry) => entry.args["force"])).toStrictEqual([false, false, false]);
-        expect(sleeps).toStrictEqual(["1 minute", "1 minute"]);
+        // The usage-export waits, plus the grace wait every deletion takes before its routes are drained.
+        expect(sleeps.filter((duration) => duration === "1 minute")).toHaveLength(2);
+        expect(sleeps.filter((duration) => duration === "2 minutes")).toHaveLength(1);
         expect(completionIndex()).toBeGreaterThan(-1);
         // Completion is recorded only after the final purge, so the request is never complete while a purge is still pending.
         const lastPurgeAt = trace.findLastIndex((entry) => entry.kind === "run" && isPurge(entry.ref));
@@ -581,8 +590,108 @@ describe("account deletion workflow: usage exports", () => {
 
         expect(purges).toHaveLength(121);
         expect(purges.at(-1)?.args["force"]).toBe(true);
-        expect(sleeps).toHaveLength(120);
-        expect(sleeps.every((duration) => duration === "1 minute")).toBe(true);
+        expect(sleeps.filter((duration) => duration === "1 minute")).toHaveLength(120);
+        expect(sleeps.filter((duration) => duration === "2 minutes")).toHaveLength(1);
         expect(completionIndex()).toBeGreaterThan(-1);
+    });
+});
+
+describe("account deletion workflow: the owner-shard sweep", () => {
+    it("with no shared-pin routes, still waits the grace period and sweeps again, since a write admitted earlier can create a route later", async () => {
+        // The first sweep reports no routes; the grace wait and the second sweep still run.
+        await execute();
+
+        expect(stepNames()).toContain("erase-pins-on-owner-shards-0");
+        expect(stepNames()).toContain("erase-pins-grace");
+        expect(stepNames()).toContain("erase-pins-on-owner-shards-again-0");
+        expect(sleeps).toContain("2 minutes");
+    });
+
+    it("sweeps the owner shards, waits the grace period, sweeps again, and only then drains the routes", async () => {
+        // The first sweep finds a shared-pin route, so its owner shard is fenced and swept again.
+        answer = (ref) =>
+            ref === "gdpr_steps:erasePinsOnOwnerShards" ? { cursor: null, hasMore: false, owners: ["owner-a"] } : { cursor: null, hasMore: false, owners: [] };
+        await execute();
+
+        const names = stepNames();
+        const first = names.indexOf("erase-pins-on-owner-shards-0");
+        const grace = names.indexOf("erase-pins-grace");
+        const again = names.indexOf("erase-pins-on-owner-shards-again-0");
+        const drain = names.indexOf("delete-user-shared-pin-routes");
+
+        // Each step runs once, in this order: a pin that commits after the first sweep is found by the second, while its route still exists.
+        expect([first, grace, again, drain].every((index) => index >= 0)).toBe(true);
+        expect(first).toBeLessThan(grace);
+        expect(grace).toBeLessThan(again);
+        expect(again).toBeLessThan(drain);
+        expect(sleeps).toContain("2 minutes");
+    });
+});
+
+describe("account deletion workflow: the owner fences outlive the route drain", () => {
+    it("lifts the fences before the routes are drained, on every owner either sweep fenced", async () => {
+        // Both sweeps fence owner shards; the replay fake reports the owners it fenced.
+        answer = (ref) => {
+            if (ref === "gdpr_steps:erasePinsOnOwnerShards") {
+                return { cursor: null, hasMore: false, owners: ["owner-a", "owner-b"] };
+            }
+
+            return { cursor: null, hasMore: false, owners: [] };
+        };
+
+        await execute();
+
+        const names = stepNames();
+        const drain = names.indexOf("delete-user-shared-pin-routes");
+        const release = names.indexOf("release-pin-fences-0");
+
+        // The owners are known only while their routes exist, so the release comes after the second sweep and before the drain removes them.
+        const again = names.indexOf("erase-pins-on-owner-shards-again-0");
+
+        expect(release).toBeGreaterThan(-1);
+        expect(release).toBeGreaterThan(again);
+        expect(release).toBeLessThan(drain);
+
+        const releaseRun = runs().find((entry) => entry.ref === "gdpr_steps:releasePinFences");
+
+        expect(releaseRun?.args).toStrictEqual({ owners: ["owner-a", "owner-b"], userId: USER });
+    });
+
+    it("does not lift the fences in the second sweep, so no write is admitted between the sweeps and the drain", async () => {
+        await execute();
+
+        const secondSweep = runs().find((entry) => entry.ref === "gdpr_steps:erasePinsOnOwnerShards" && entry.dedupId?.includes("again"));
+
+        expect(secondSweep?.args).not.toHaveProperty("release");
+    });
+
+    it("pages each owner sweep, one step per page, carrying the cursor forward, and releases every owner it fenced", async () => {
+        // Each pass has two pages: the first returns a cursor, the second is the last. Both passes fence owners on each page.
+        answer = (ref, _round, args) => {
+            if (ref !== "gdpr_steps:erasePinsOnOwnerShards") {
+                return { cursor: null, hasMore: false, owners: [] };
+            }
+
+            if (args["cursor"] === null) {
+                return { cursor: "page-2", hasMore: true, owners: ["owner-a"] };
+            }
+
+            return { cursor: null, hasMore: false, owners: ["owner-b"] };
+        };
+
+        await execute();
+
+        const names = stepNames();
+
+        expect(names).toContain("erase-pins-on-owner-shards-1");
+        expect(names).toContain("erase-pins-on-owner-shards-again-1");
+
+        const sweeps = runs().filter((entry) => entry.ref === "gdpr_steps:erasePinsOnOwnerShards");
+
+        expect(sweeps.map((entry) => entry.args["cursor"])).toStrictEqual([null, "page-2", null, "page-2"]);
+
+        const releaseRun = runs().find((entry) => entry.ref === "gdpr_steps:releasePinFences");
+
+        expect(releaseRun?.args).toStrictEqual({ owners: ["owner-a", "owner-b"], userId: USER });
     });
 });

@@ -25,6 +25,7 @@ import {
     listMessagesByThreadId,
     listMessagesByThreadIdHandler,
     textSearch,
+    typedTextSearch,
 } from "./messages";
 import { list as listStreams } from "./streams";
 import { getDocument, getDocumentsByThread, updateDocument } from "./documents";
@@ -161,6 +162,7 @@ beforeEach(async () => {
             text: "salary figures for the year",
             threadId: lockedId,
             tool: false,
+            typedText: "salary figures for the year",
             userId: OWNER,
         });
         await ctx.db.insert("messages", {
@@ -170,6 +172,7 @@ beforeEach(async () => {
             text: "salary open note",
             threadId: openId,
             tool: false,
+            typedText: "salary open note",
             userId: OWNER,
         });
         await ctx.db.insert("documents", {
@@ -334,6 +337,14 @@ describe("message reads", () => {
         expect(read.map((hit) => hit.threadId)).toEqual([lockedId]);
     });
 
+    it("typedTextSearch never returns a locked chat's prompt to the composer's prompt search", async () => {
+        const { messages: hits }: { messages: { threadId: string }[] } = await run(
+            async (ctx) => await ctx.runQuery(typedTextSearch, { limit: 10, text: "salary", userId: OWNER }),
+        );
+
+        expect(hits.map((hit) => hit.threadId)).toEqual([openId]);
+    });
+
     it("streams are not read for a locked chat without its proof", async () => {
         expect(await as(OWNER).query(listStreams as never, { statuses: ["streaming"], threadId: lockedId } as never)).toEqual([]);
         const streams: any[] = await as(OWNER).query(
@@ -355,10 +366,48 @@ describe("documents", () => {
     it("getDocument refuses the owner without a proof and returns the document with one", async () => {
         const documentId = await run(async (ctx) => await firstDocumentId(ctx, lockedId));
 
-        await expect(as(OWNER).query(getDocument as never, { documentId } as never)).rejects.toMatchObject({ data: { code: THREAD_LOCKED_CODE } });
-        const doc: any = await as(OWNER).query(getDocument as never, { documentId, unlockProof: await proofFor() } as never);
+        await expect(as(OWNER).query(getDocument as never, { documentId, threadId: lockedId } as never)).rejects.toMatchObject({
+            data: { code: THREAD_LOCKED_CODE },
+        });
+        const doc: any = await as(OWNER).query(getDocument as never, { documentId, threadId: lockedId, unlockProof: await proofFor() } as never);
 
         expect(doc.title).toBe("Salary doc");
+    });
+
+    it("lets a thread member read the thread's document, and only while the grant stands", async () => {
+        const { documentId, grantId, threadId } = await run(async (ctx: any) => {
+            const sharedThreadId = await ctx.db.insert("threads", { mode: "text", model: "gpt-4o", status: "active", title: "Shared", userId: OWNER });
+            const sharedDocumentId = await ctx.db.insert("documents", {
+                kind: "text",
+                messageId: "m-doc",
+                status: "idle",
+                threadId: sharedThreadId,
+                title: "Shared plan",
+                userId: OWNER,
+                version: 1,
+            });
+            const sharedGrantId = await ctx.db.insert("threadAccess", {
+                grantedAt: 0,
+                grantedBy: OWNER,
+                permission: "read",
+                threadId: sharedThreadId,
+                userId: "user-member",
+            });
+
+            return { documentId: sharedDocumentId, grantId: sharedGrantId, threadId: sharedThreadId };
+        });
+        const read = async (userId: string) => await as(userId).query(getDocument as never, { documentId, threadId } as never);
+
+        expect(await read("user-member")).toMatchObject({ canEdit: false, title: "Shared plan" });
+        expect(await read("user-stranger")).toBeNull();
+
+        // Without the thread (a document opened outside a chat), only the author reads it.
+        expect(await as(OWNER).query(getDocument as never, { documentId } as never)).toMatchObject({ title: "Shared plan" });
+        expect(await as("user-member").query(getDocument as never, { documentId } as never)).toBeNull();
+
+        await run(async (ctx: any) => await ctx.db.delete("threadAccess", grantId));
+
+        expect(await read("user-member")).toBeNull();
     });
 });
 

@@ -3,9 +3,11 @@
  * Creates and configures tools for chat streaming context
  */
 import { isToolCallUnsupportedModel, staticUnsupportedModels } from "@neore/ai/models";
-import type { LanguageModel, ToolSet } from "ai";
+import type { LanguageModel, Tool, ToolSet } from "ai";
 
 import { toolsLogger } from "../../lib/logger";
+import { INSTRUCTION_READ_TOOL } from "../../projects/rule-files";
+import { instructionReadTool } from "../tools/instruction-read";
 import {
     academicSearchTool,
     askUserTool,
@@ -54,6 +56,7 @@ import {
     saveSecretAsProviderKeyTool,
     searchMemoryTool,
     setMcpServerSecretTool,
+    signInWithSavedLoginTool,
     shellExecutionTool,
     spotifySearchTool,
     stockChartTool,
@@ -168,6 +171,7 @@ const SEARCH_MODE_TOOLS: Record<SearchMode, ToolName[]> = {
     chat: [
         ToolName.CodeExecution,
         ToolName.Browser,
+        ToolName.SignInWithSavedLogin,
         ToolName.DateTime,
         ...SANDBOX_TOOLS,
         ...CODING_AGENT_TOOLS,
@@ -222,6 +226,7 @@ const SEARCH_MODE_TOOLS: Record<SearchMode, ToolName[]> = {
         ToolName.CodeExecution,
         ToolName.CurrencyConverter,
         ToolName.Browser,
+        ToolName.SignInWithSavedLogin,
         ...SANDBOX_TOOLS,
         ...SUB_AGENT_TOOLS,
         ...DOCUMENT_TOOLS,
@@ -420,6 +425,7 @@ const ALL_TOOLS: Record<ToolName, unknown> = {
     [ToolName.SetMcpServerSecret]: setMcpServerSecretTool,
     // Sandbox Tools
     [ToolName.ShellExecution]: shellExecutionTool,
+    [ToolName.SignInWithSavedLogin]: signInWithSavedLoginTool,
 
     [ToolName.SpotifySearch]: spotifySearchTool,
     [ToolName.StockChart]: stockChartTool,
@@ -456,10 +462,23 @@ const ALL_TOOLS: Record<ToolName, unknown> = {
 };
 
 /**
+ * The built-in tool named `name`, whether or not a run offers it: its `toModelOutput` formats a saved result of it for a
+ * later model call (`agent/client/tool-approval.ts#withApprovedToolModelOutputs`), which a call offering no tools, or a
+ * tool switched off since, must format all the same. `undefined` for any other name (MCP, device, connector tools).
+ */
+export const builtInToolNamed = (name: string): Tool | undefined => {
+    if (name === INSTRUCTION_READ_TOOL) {
+        return instructionReadTool([]) as Tool;
+    }
+
+    return Object.hasOwn(ALL_TOOLS, name) ? (ALL_TOOLS[name as ToolName] as Tool) : undefined;
+};
+
+/**
  * Tools grouped by category
  */
 const TOOLS_BY_CATEGORY = {
-    browser: [ToolName.Browser],
+    browser: [ToolName.Browser, ToolName.SignInWithSavedLogin],
     codeExecution: [ToolName.CodeExecution],
     codingAgent: [ToolName.DelegateToCodingAgent],
     computation: [ToolName.WolframAlpha],

@@ -76,7 +76,7 @@ const exportIo = (requestId: string, userId: string, overrides: Partial<UsageExp
     const run = async (function_: unknown, args: unknown) => (await harness.run(async (ctx: any) => await ctx.runMutation(function_, args))) as never;
 
     return {
-        clear: async () => await run(clearUsageExportPieces, { requestId, userId }),
+        clear: async (_name, keepRun) => await run(clearUsageExportPieces, { keepRun, requestId, userId }),
         clearVerified: async (_name, pass) => await run(clearVerifiedUsagePieces, { pass, requestId, userId }),
         countRows: async (_name, page) =>
             (await harness.run(async (ctx: any) => await ctx.runQuery(countUsageRowsPage, { cursor: page.cursor, cutoff: page.cutoff, userId }))) as never,
@@ -526,6 +526,24 @@ describe("the usage export, as steps", () => {
 
         expect(Object.keys(parsed)).toEqual(["profile", "watchedRepositories", "usageDaily"]);
         expect(parsed["usageDaily"]).toEqual([{ date: "2026-02-01", replies: 1 }]);
+    });
+
+    it("splices the usage object's rows and organization ledger in as the file's last keys, and both parse back", () => {
+        const head = JSON.stringify({ profile: { id: A }, watchedRepositories: { watched: [] } }, null, 2);
+        const ledger = [{ at: 1, costMicrodollars: 2, organizationId: "org-1", projectKey: "p", tokens: 3 }];
+        const usage = `{"usageDaily":${JSON.stringify([{ date: "2026-02-01", replies: 1 }])},"organizationReplies":${JSON.stringify(ledger)}}`;
+        const parsed = JSON.parse(spliceUsageJson(head, usage)) as Record<string, unknown>;
+
+        expect(Object.keys(parsed)).toEqual(["profile", "watchedRepositories", "usageDaily", "organizationReplies"]);
+        expect(parsed["usageDaily"]).toEqual([{ date: "2026-02-01", replies: 1 }]);
+        expect(parsed["organizationReplies"]).toEqual(ledger);
+    });
+
+    it("splices a usage object stored before the ledger was in it as the usage rows alone", () => {
+        const head = JSON.stringify({ profile: { id: A } }, null, 2);
+        const parsed = JSON.parse(spliceUsageJson(head, JSON.stringify([{ date: "2026-02-01", replies: 1 }]))) as Record<string, unknown>;
+
+        expect(Object.keys(parsed)).toEqual(["profile", "usageDaily"]);
     });
 
     it("keeps a user west of UTC on its first pass when a live reply is dated their yesterday", async () => {

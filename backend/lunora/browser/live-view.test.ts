@@ -8,11 +8,16 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 
 import type { Id } from "../_generated/dataModel";
 import { registeredApi, registerModule } from "../../test/registered-api";
-import { internalQuery } from "../lib/crpc";
+import { createThreadAccess, deleteThreadAccess, updateThreadAccess } from "../agent/sharing";
+import { applyLimit } from "../lib/rate-limiter-mutations";
+import { internalMutation, internalQuery } from "../lib/crpc";
 import schema from "../schema";
 import { getBrowserActions } from "../chat/functions";
 import { logAction } from "./functions";
 import { controlHolder, getThreadBrowser, handBack, keepControl, navigateInControl, openLiveView, takeControl } from "./live-view";
+import { releaseControlHttpAction } from "./release-http";
+import { runInShard } from "../lib/shard-context";
+import { releaseTokenFor } from "./release-token";
 import { BROWSER_IDLE_REAP_MS, browserIdOf, BROWSER_REAP_MARGIN_MS, CONTROL_IDLE_MS, RENDERER_CALL_SETTLE_MS, rendererCallHold } from "./live-view-logic";
 
 const OWNER = "user-owner";
@@ -21,10 +26,19 @@ const STRANGER = "user-stranger";
 const WRITER = "user-writer";
 /** The frozen clock every test reads, in the code and in the assertions alike. */
 const NOW = Date.UTC(2026, 10, 20, 12);
+/** No browser the reader may watch, and a caller who does not read the chat: the server's clock and nothing else. */
+const NO_BROWSER = { kind: "none", now: expect.any(Number) };
+const DENIED = { kind: "denied", now: expect.any(Number) };
+/** A denial to someone who is not the owner and had a grant: it names their grant's last revision. */
+const DENIED_AT = (revision: number) => {
+    return { ...DENIED, revision };
+};
 /** The provider session ids the tests use: a browser name a client sees must hold neither. */
 const PROVIDER_SESSION_ID = /s-[12]/u;
 /** What a lease's holder looks like on the row: a SHA-256 HMAC in hex. */
 const HOLDER = /^[\da-f]{64}$/u;
+/** A claim's public name in the status: a truncated SHA-256 in hex. */
+const CLAIM_ID = /^[\da-f]{32}$/u;
 /** The backend's signing secret: the key of a lease's opaque holder. */
 const SIGNING_SECRET = "browser-control-test-secret";
 const VIEW_URL = "https://live.browser.run/ui/view?mode=tab&wss=live.browser.run/api/devtools/browser/s-1?jwt=signed";
@@ -72,19 +86,36 @@ vi.mock("../lib/crpc-auth-helpers", async (importOriginal) => {
 
 // A read replica that still holds a grant the primary no longer has: every grant read that does not ask for the
 // primary gets `replica.grant` while it is set, the way a lagging replica answers after an admin removed a reader.
+// `afterPrimary` runs once after the next primary grant read, as a write that commits right after it.
 const { replica } = vi.hoisted(() => {
-    return { replica: {} as { grant?: Record<string, unknown> } };
+    return { replica: {} as { afterPrimary?: () => Promise<void>; grant?: Record<string, unknown> } };
 });
 
 vi.mock("../agent/thread-read-access", async (importOriginal) => {
     const original = await importOriginal<typeof import("../agent/thread-read-access")>();
     const lagging = (context: any): any => {
-        const findFirst = async (query: { consistency?: string }) =>
-            query.consistency !== "primary" && replica.grant !== undefined ? replica.grant : await context.db.threadAccess.findFirst(query);
+        // The access read takes the grant's live copy from a page of them (`agent/live-grant.ts`).
+        const findMany = async (query: { consistency?: string }) => {
+            if (query.consistency !== "primary" && replica.grant !== undefined) {
+                return { continueCursor: null, isDone: true, page: replica.grant === null ? [] : [replica.grant] };
+            }
+
+            const result = await context.db.threadAccess.findMany(query);
+            const after = query.consistency === "primary" ? replica.afterPrimary : undefined;
+
+            if (after !== undefined) {
+                delete replica.afterPrimary;
+                await after();
+            }
+
+            return result;
+        };
         const db = new Proxy(context.db, {
             get: (target, key) =>
                 key === "threadAccess"
-                    ? new Proxy(target.threadAccess, { get: (table, name) => (name === "findFirst" ? findFirst : table[name]) })
+                    ? new Proxy(target.threadAccess, {
+                          get: (table, name) => (name === "findMany" ? findMany : table[name]),
+                      })
                     : target[key],
         });
 
@@ -130,8 +161,41 @@ vi.mock("@neore/service-sdk/browser-renderer", async (importOriginal) => {
     };
 });
 
+// The release route crosses to the shard its token names as the system: here, straight into the harness, and the
+// shard it asked for is kept for the test to check.
+const { releaseLimit, releaseShards } = vi.hoisted(() => {
+    return { releaseLimit: { down: false, keys: [] as string[], limited: false }, releaseShards: [] as string[] };
+});
+
+vi.mock("../lib/http-shard", async (importOriginal) => {
+    return {
+        ...(await importOriginal<typeof import("../lib/http-shard")>()),
+        inSystemShard: async (_context: unknown, shardKey: string, handler: (context: unknown) => Promise<unknown>) => {
+            releaseShards.push(shardKey);
+
+            return await handler({
+                runMutation: async (reference: unknown, args: unknown) => await harness.run(async (ctx: any) => await ctx.runMutation(reference, args)),
+            });
+        },
+    };
+});
+
 vi.mock("../lib/rate-limiter", async (importOriginal) => {
-    return { ...(await importOriginal<typeof import("../lib/rate-limiter")>()), rateLimitGuard: async () => undefined };
+    return {
+        ...(await importOriginal<typeof import("../lib/rate-limiter")>()),
+        // The release route's per-address limit: `releaseLimit.limited` refuses it, and `down` is a limiter outage, answered as
+        // the caller's `failMode` says (closed unless it asks for open).
+        checkRateLimit: async (_context: unknown, _operation: string, options?: { failMode?: "closed" | "open"; key?: string }) => {
+            releaseLimit.keys.push(options?.key ?? "");
+
+            if (releaseLimit.down) {
+                return { ok: options?.failMode === "open" };
+            }
+
+            return { ok: !releaseLimit.limited };
+        },
+        rateLimitGuard: async () => undefined,
+    };
 });
 
 let harness: ReturnType<typeof lunoraTest>;
@@ -192,6 +256,7 @@ beforeAll(async () => {
     registerModule(registry, "agent_threads", await import("../agent/threads"));
     registerModule(registry, "browser_functions", await import("./functions"));
     registerModule(registry, "browser_live_view", await import("./live-view"));
+    registerModule(registry, "lib_rate_limiter_mutations", await import("../lib/rate-limiter-mutations"));
 }, 30_000);
 
 beforeEach(async () => {
@@ -214,7 +279,12 @@ beforeEach(async () => {
 });
 
 afterEach(() => {
+    releaseShards.length = 0;
+    releaseLimit.down = false;
+    releaseLimit.keys.length = 0;
+    releaseLimit.limited = false;
     delete replica.grant;
+    delete replica.afterPrimary;
     impersonation.by = undefined;
     actionStart.hook = undefined;
     rendererStart.hook = undefined;
@@ -244,7 +314,7 @@ describe("a running browser", () => {
     it("gives a caller who cannot read the thread no status and no URL, and never asks the provider", async () => {
         await addSession();
 
-        await expect(statusFor(STRANGER)).resolves.toBeNull();
+        await expect(statusFor(STRANGER)).resolves.toStrictEqual(DENIED);
         await expect(open(STRANGER)).rejects.toMatchObject({ code: "NOT_FOUND" });
         expect(fetchMock).not.toHaveBeenCalled();
     });
@@ -253,17 +323,17 @@ describe("a running browser", () => {
         await addSession();
         await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId, { lockedAt: 1 }));
 
-        await expect(statusFor(OWNER)).resolves.toBeNull();
+        await expect(statusFor(OWNER)).resolves.toStrictEqual(DENIED);
         await expect(open(OWNER)).rejects.toMatchObject({ code: "NOT_FOUND" });
         expect(fetchMock).not.toHaveBeenCalled();
     });
 
-    it("gives nothing for a trashed thread, to its owner or a reader", async () => {
+    it("gives nothing for a trashed thread, to its owner or a reader: its status says they do not read it", async () => {
         await addSession();
         await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId, { deleted: true }));
 
-        await expect(statusFor(OWNER)).resolves.toBeNull();
-        await expect(statusFor(READER)).resolves.toBeNull();
+        await expect(statusFor(OWNER)).resolves.toStrictEqual(DENIED);
+        await expect(statusFor(READER)).resolves.toStrictEqual(DENIED_AT(0));
         await expect(open(READER)).resolves.toEqual({ status: "ended" });
         expect(fetchMock).not.toHaveBeenCalled();
     });
@@ -278,6 +348,7 @@ describe("a running browser", () => {
             canControl: true,
             currentUrl: "https://example.com/login",
             idleUntil: heldUntil,
+            kind: "running",
             // The server's clock, so a client tells a lease's end without a clock of its own.
             now: NOW,
         });
@@ -297,12 +368,91 @@ describe("a running browser", () => {
         await expect(statusFor(READER)).resolves.toMatchObject({ accessUntil: expiresAt });
         // The owner's access does not end.
         await expect(statusFor(OWNER)).resolves.not.toHaveProperty("accessUntil");
+        // With no browser running the answer still says when the grant ends: which answer a card holds as newest never
+        // hides the grant's end.
+        await harness.run(async (ctx: any) => {
+            const session = await ctx.db.query("browserSessions").first();
+
+            await ctx.db.patch("browserSessions", session._id, { completedAt: NOW, status: "completed" });
+        });
+        await expect(statusFor(READER)).resolves.toStrictEqual({ ...NO_BROWSER, accessUntil: expiresAt, revision: 0 });
+        await expect(statusFor(OWNER)).resolves.toStrictEqual(NO_BROWSER);
 
         vi.setSystemTime(expiresAt + 1);
 
-        await expect(statusFor(READER)).resolves.toBeNull();
+        // An end the clock reached writes nothing: a grant from before revisions has none to name.
+        await expect(statusFor(READER)).resolves.toStrictEqual(DENIED);
         await expect(open(READER)).rejects.toMatchObject({ code: "NOT_FOUND" });
         expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it("names the grant's revision on a reader's answers: a removal's denial a higher one than a replica that still holds the grant", async () => {
+        await addSession();
+        await harness.run(async (ctx: any) => {
+            const grant = await ctx.db.threadAccess.findFirst({ where: { threadId, userId: READER } });
+
+            await ctx.runMutation(updateThreadAccess, { accessId: grant._id, expiresAt: NOW + 60_000 });
+        });
+        await expect(statusFor(READER)).resolves.toMatchObject({ kind: "running", revision: 1 });
+        await expect(statusFor(OWNER)).resolves.not.toHaveProperty("revision");
+
+        await harness.run(async (ctx: any) => {
+            const grant = await ctx.db.threadAccess.findFirst({ where: { threadId, userId: READER } });
+
+            replica.grant = grant;
+            await ctx.runMutation(deleteThreadAccess, { accessId: grant._id });
+        });
+
+        // The replica's read still shows the page, on a later clock, but with the grant's older revision.
+        vi.setSystemTime(NOW + 1000);
+        await expect(statusFor(READER)).resolves.toMatchObject({ currentUrl: "https://example.com/login", kind: "running", now: NOW + 1000, revision: 1 });
+
+        delete replica.grant;
+        // Advanced before and after the delete: past any revision a change racing the removal put on the row.
+        await expect(statusFor(READER)).resolves.toStrictEqual(DENIED_AT(3));
+
+        // A grant given again continues past the removal.
+        await harness.run(
+            async (ctx: any) => await ctx.runMutation(createThreadAccess, { grantedBy: OWNER, ownerId: OWNER, permission: "read", threadId, userId: READER }),
+        );
+        await expect(statusFor(READER)).resolves.toMatchObject({ kind: "running", revision: 4 });
+    });
+
+    it("decides a reader's denial on the primary: a re-grant a replica has not seen yet reads as the grant it is", async () => {
+        await addSession();
+        await harness.run(async (ctx: any) => {
+            const grant = await ctx.db.threadAccess.findFirst({ where: { threadId, userId: READER } });
+
+            await ctx.runMutation(deleteThreadAccess, { accessId: grant._id });
+            await ctx.runMutation(createThreadAccess, { grantedBy: OWNER, ownerId: OWNER, permission: "read", threadId, userId: READER });
+        });
+
+        // A replica that saw the removal but not the grant given again: its denial would name the new grant's revision.
+        replica.grant = null as never;
+        await expect(statusFor(READER)).resolves.toMatchObject({ currentUrl: "https://example.com/login", kind: "running", revision: 3 });
+    });
+
+    it("names a denial a revision read after the primary denial: a re-grant and its removal right after it do not leave it older", async () => {
+        await addSession();
+        await harness.run(async (ctx: any) => {
+            const grant = await ctx.db.threadAccess.findFirst({ where: { threadId, userId: READER } });
+
+            await ctx.runMutation(deleteThreadAccess, { accessId: grant._id });
+        });
+        await expect(statusFor(READER)).resolves.toStrictEqual(DENIED_AT(2));
+
+        // The replica already denies; a re-grant and its removal commit right after the primary read denied too.
+        replica.afterPrimary = async () =>
+            await harness.run(async (ctx: any) => {
+                await ctx.runMutation(createThreadAccess, { grantedBy: OWNER, ownerId: OWNER, permission: "read", threadId, userId: READER });
+
+                const grant = await ctx.db.threadAccess.findFirst({ where: { threadId, userId: READER } });
+
+                await ctx.runMutation(deleteThreadAccess, { accessId: grant._id });
+            });
+
+        // The re-grant took 3, its removal 4 and 5: the denial names 5, not the 2 a count read before the grant would.
+        await expect(statusFor(READER)).resolves.toStrictEqual(DENIED_AT(5));
     });
 
     it("mints no view for a reader an admin removed, while a replica still holds their grant", async () => {
@@ -473,7 +623,7 @@ describe("a browser that ended", () => {
     it("gives no status and no URL once its row is closed", async () => {
         await addSession({ completedAt: NOW, status: "completed" });
 
-        await expect(statusFor(OWNER)).resolves.toBeNull();
+        await expect(statusFor(OWNER)).resolves.toStrictEqual(NO_BROWSER);
         await expect(open(OWNER)).resolves.toEqual({ status: "ended" });
         expect(fetchMock).not.toHaveBeenCalled();
     });
@@ -481,7 +631,7 @@ describe("a browser that ended", () => {
     it("gives no status and no URL once it sat idle past the provider's reap", async () => {
         await addSession({ lastActivityAt: NOW - BROWSER_IDLE_REAP_MS - 1000 });
 
-        await expect(statusFor(OWNER)).resolves.toBeNull();
+        await expect(statusFor(OWNER)).resolves.toStrictEqual(NO_BROWSER);
         await expect(open(OWNER)).resolves.toEqual({ status: "ended" });
         expect(fetchMock).not.toHaveBeenCalled();
     });
@@ -526,7 +676,7 @@ describe("a browser that ended", () => {
     ])("gives nothing for %s", async (_name, fields) => {
         await addSession(fields);
 
-        await expect(statusFor(OWNER)).resolves.toBeNull();
+        await expect(statusFor(OWNER)).resolves.toStrictEqual(NO_BROWSER);
         await expect(open(OWNER)).resolves.toEqual({ status: "ended" });
         expect(fetchMock).not.toHaveBeenCalled();
     });
@@ -1017,6 +1167,209 @@ describe("taking control of the browser", () => {
     });
 });
 
+describe("a closing page's hand back", () => {
+    const take = async (userId: string): Promise<any> => await as(userId).action(takeControl as never, { threadId } as never);
+    const lease = async (): Promise<any> => {
+        const session: any = await harness.run(async (ctx: any) => await ctx.db.query("browserSessions").first());
+
+        return session.control;
+    };
+    const release = async (token: string, ip?: string): Promise<number> => {
+        const headers = ip === undefined ? undefined : { "cf-connecting-ip": ip };
+        const response = await releaseControlHttpAction(
+            {} as never,
+            new Request("https://backend.test/browser/release", { body: token, headers, method: "POST" }),
+        );
+
+        return response.status;
+    };
+
+    beforeEach(() => {
+        fetchMock.mockImplementation(async () => answer(200, { devtoolsFrontendUrl: VIEW_URL, id: "v-1" }));
+    });
+
+    it("names the lease's claim to its holder alone, so a tab sees at once that another of theirs took over", async () => {
+        await addSession();
+        const first = await take(OWNER);
+
+        expect(first.claimId).toMatch(CLAIM_ID);
+        await expect(statusFor(OWNER)).resolves.toMatchObject({ control: { byYou: true, claimIds: [first.claimId] } });
+        await expect(statusFor(READER)).resolves.not.toHaveProperty("control.claimIds");
+
+        const second = await take(OWNER);
+
+        await expect(statusFor(OWNER)).resolves.toMatchObject({ control: { claimIds: [second.claimId] } });
+    });
+
+    it("ends the lease its token names, once, on the owner's shard, without a session", async () => {
+        await addSession();
+        const taken = await take(WRITER);
+
+        expect(taken.release).toEqual(expect.any(String));
+        await expect(release(taken.release)).resolves.toBe(204);
+        expect(releaseShards).toEqual([OWNER]);
+        await expect(named(await lease())).resolves.toMatchObject({ by: WRITER, claim: taken.claim, ended: "left", until: NOW });
+
+        // A beacon sent twice changes nothing more.
+        const ended = await lease();
+
+        await expect(release(taken.release)).resolves.toBe(204);
+        await expect(lease()).resolves.toEqual(ended);
+    });
+
+    it("ends a collaborator's lease on the owner's shard when the collaborator opened the shared thread's browser", async () => {
+        // The collaborator's first action opened the browser: the row names them, but it lives on the owner's shard.
+        await addSession({ userId: WRITER });
+        const taken = await take(WRITER);
+
+        await expect(release(taken.release)).resolves.toBe(204);
+        expect(releaseShards).toEqual([OWNER]);
+        await expect(named(await lease())).resolves.toMatchObject({ by: WRITER, claim: taken.claim, ended: "left" });
+    });
+
+    it("names the shard serving the claim, where the session row is, in the token", async () => {
+        await addSession({ userId: WRITER });
+        const taken = await runInShard("owner-shard", async () => await take(WRITER));
+
+        await expect(release(taken.release)).resolves.toBe(204);
+        expect(releaseShards).toEqual(["owner-shard"]);
+    });
+
+    it("never ends a newer claim: another tab's of the same person, or someone else's", async () => {
+        await addSession();
+        const first = await take(OWNER);
+        const second = await take(OWNER);
+
+        await expect(release(first.release)).resolves.toBe(204);
+        await expect(lease()).resolves.toMatchObject({ claim: second.claim });
+        await expect(lease()).resolves.not.toHaveProperty("ended");
+
+        await release(second.release);
+        const writer = await take(WRITER);
+
+        await expect(release(second.release)).resolves.toBe(204);
+        await expect(named(await lease())).resolves.toMatchObject({ by: WRITER, claim: writer.claim });
+        await expect(lease()).resolves.not.toHaveProperty("ended");
+    });
+
+    it("only notes how the view closed when its claim is being replaced by a renewal, which then decides", async () => {
+        await addSession();
+        const first = await take(OWNER);
+        const held = await lease();
+
+        // A renewal of the lease is still being minted under a new claim: the closing view's claim is `renewing`.
+        await harness.run(async (ctx: any) => {
+            const session = await ctx.db.query("browserSessions").first();
+
+            await ctx.db.patch("browserSessions", session._id, {
+                control: { by: held.by, claim: "claim-renewal", renewing: first.claim, since: NOW, until: NOW + CONTROL_IDLE_MS },
+            });
+        });
+
+        await expect(release(first.release)).resolves.toBe(204);
+        await expect(lease()).resolves.toMatchObject({ claim: "claim-renewal", renewingEnded: "left" });
+        await expect(lease()).resolves.not.toHaveProperty("ended");
+        await expect(lease()).resolves.not.toHaveProperty("renewing");
+    });
+
+    it("ends the lease as handed back when the page closed while the person's own hand back was out, once", async () => {
+        await addSession();
+        const taken = await take(WRITER);
+
+        await expect(release(`${taken.release}\nhanded_back`)).resolves.toBe(204);
+        await expect(named(await lease())).resolves.toMatchObject({ by: WRITER, claim: taken.claim, ended: "handed_back", until: NOW });
+
+        // The hand back's own mutation lands after the beacon: it changes nothing, and still answers for its claim.
+        const ended = await lease();
+
+        await expect(giveBack(WRITER, "handed_back", taken.claim)).resolves.toBe(true);
+        await expect(lease()).resolves.toEqual(ended);
+    });
+
+    it("refuses a body that names any other way to close, and ends nothing", async () => {
+        await addSession();
+        const taken = await take(OWNER);
+        const held = await lease();
+
+        await expect(release(`${taken.release}\nidle`)).resolves.toBe(401);
+        await expect(release(`${taken.release}\nleft\nleft`)).resolves.toBe(401);
+        await expect(lease()).resolves.toEqual(held);
+    });
+
+    it("leaves a lease that already lapsed as it is", async () => {
+        await addSession();
+        const taken = await take(OWNER);
+
+        vi.setSystemTime(NOW + CONTROL_IDLE_MS + 1);
+        const lapsed = await lease();
+
+        await expect(release(taken.release)).resolves.toBe(204);
+        await expect(lease()).resolves.toEqual(lapsed);
+    });
+
+    it("charges an IPv6 sender by its /64, so stepping through its addresses buys no fresh allowance", async () => {
+        await addSession();
+        const taken = await take(OWNER);
+
+        await release(taken.release, "2001:db8:1:2::1");
+        await release(taken.release, "2001:db8:1:2:ffff::9");
+        await release(taken.release, "203.0.113.7");
+
+        expect(releaseLimit.keys).toHaveLength(3);
+        expect(releaseLimit.keys[0]).toBe(releaseLimit.keys[1]);
+        expect(releaseLimit.keys[2]).toBe("203.0.113.7");
+    });
+
+    it("refuses a proven token while the limiter is down, so no replay reaches the owner's shard", async () => {
+        await addSession();
+        const taken = await take(OWNER);
+
+        releaseLimit.down = true;
+        await expect(release(taken.release)).resolves.toBe(429);
+        await expect(release(taken.release)).resolves.toBe(429);
+        expect(releaseShards).toEqual([]);
+        await expect(lease()).resolves.not.toHaveProperty("ended");
+    });
+
+    it("refuses a sender over its limit once the token is proven, and ends nothing", async () => {
+        await addSession();
+        const taken = await take(OWNER);
+
+        releaseLimit.limited = true;
+        await expect(release(taken.release)).resolves.toBe(429);
+        expect(releaseShards).toEqual([]);
+        await expect(lease()).resolves.not.toHaveProperty("ended");
+        // A token naming another thread's claim ends nothing here either.
+        releaseLimit.limited = false;
+        const elsewhere = await releaseTokenFor({ claim: taken.claim, shardKey: OWNER, threadId: "other-thread" });
+
+        await expect(release(elsewhere!)).resolves.toBe(204);
+        await expect(lease()).resolves.not.toHaveProperty("ended");
+    });
+
+    it("refuses a token this backend did not sign, and one changed in any part", async () => {
+        await addSession();
+        const taken = await take(OWNER);
+        const [version, payload, signature] = (taken.release as string).split(".") as [string, string, string];
+        const flipped = (hex: string): string => `${hex.slice(0, -1)}${hex.endsWith("0") ? "1" : "0"}`;
+
+        for (const token of [
+            "",
+            "nonsense",
+            `${version}.${flipped(payload)}.${signature}`,
+            `${version}.${payload}.${flipped(signature)}`,
+            `${taken.release}.x`,
+        ]) {
+            await expect(release(token)).resolves.toBe(401);
+        }
+
+        vi.stubEnv("STORAGE_SIGNING_SECRET", `${SIGNING_SECRET}-rotated`);
+        await expect(release(taken.release)).resolves.toBe(401);
+        expect(releaseShards).toEqual([]);
+        await expect(lease()).resolves.not.toHaveProperty("ended");
+    });
+});
+
 describe("opening a page while in control", () => {
     const take = async (userId: string): Promise<any> => await as(userId).action(takeControl as never, { threadId } as never);
     const navigate = async (userId: string, url = "https://example.com/next"): Promise<any> =>
@@ -1035,6 +1388,89 @@ describe("opening a page while in control", () => {
 
         expect(after.currentUrl).toBe("https://example.com/login");
         expect(after.control).not.toHaveProperty("navigatingUntil");
+    });
+
+    it("forgets a browser the renderer retired for good, and tells the person it is gone", async () => {
+        await addSession();
+        await take(OWNER);
+        renderer.mockResolvedValueOnce({ data: undefined, error: { code: "SESSION_RETIRED", success: false }, response: { ok: false, status: 410 } });
+
+        await expect(navigate(OWNER)).resolves.toEqual({ status: "closed" });
+        await expect(session()).resolves.toMatchObject({ providerSessionId: "cf-browser-rendering" });
+    });
+
+    it("gives back the charge of a navigation the renderer ran none of even when logging it fails", async () => {
+        const key = "browser_functions:logAction";
+        const logging = registry.get(key);
+
+        await addSession();
+        await take(OWNER);
+        // The hour's 240 spent, this navigation's unit with them (the guard that takes it is stubbed here).
+        await harness.run(async (ctx: any) => await applyLimit(ctx, { count: 240, identifier: OWNER, key: "browser/control:free" }));
+        renderer.mockResolvedValueOnce({ data: undefined, error: { code: "SESSION_RETIRED", success: false }, response: { ok: false, status: 410 } });
+        registry.set(
+            key,
+            internalMutation.input({ sessionId: v.string() }).mutation(async () => {
+                throw new Error("log failed");
+            }),
+        );
+
+        try {
+            await expect(navigate(OWNER)).rejects.toThrow("log failed");
+        } finally {
+            registry.set(key, logging);
+        }
+
+        await expect(harness.run(async (ctx: any) => await applyLimit(ctx, { identifier: OWNER, key: "browser/control:free" }))).resolves.toMatchObject({
+            ok: true,
+        });
+    });
+
+    it("keeps the browser a navigation whose hold the renderer lost names, and tells the person the page may have opened", async () => {
+        const lost =
+            "The browser session's hold could not be confirmed for the whole action, so its result is withheld. The action may have run: look at the page before you repeat it";
+
+        await addSession();
+        await take(OWNER);
+        // The row's browser could not be reconnected: the renderer opened the page in a new one, then lost the hold.
+        renderer.mockResolvedValueOnce({
+            data: undefined,
+            error: { error: lost, sessionId: "s-2", success: false },
+            response: { headers: new Headers(), ok: false, status: 503 },
+        });
+
+        await expect(navigate(OWNER)).resolves.toEqual({ status: "closed" });
+        await expect(session()).resolves.toMatchObject({ providerSessionId: "s-2" });
+    });
+
+    it("tells the person a page may have opened when the renderer lost the hold of a navigation on the row's own browser", async () => {
+        const lost =
+            "The browser session's hold could not be confirmed for the whole action, so its result is withheld. The action may have run: look at the page before you repeat it";
+
+        await addSession();
+        await take(OWNER);
+        renderer.mockResolvedValueOnce({
+            data: undefined,
+            error: { error: lost, sessionId: "s-1", success: false },
+            response: { headers: new Headers(), ok: false, status: 503 },
+        });
+
+        await expect(navigate(OWNER)).resolves.toEqual({ error: lost, status: "refused" });
+        await expect(session()).resolves.toMatchObject({ providerSessionId: "s-1" });
+    });
+
+    it("gives back the person's charge for a navigation the renderer ran none of because it retired the browser", async () => {
+        await addSession();
+        await take(OWNER);
+        // The hour's 240 spent, this navigation's unit with them (the guard that takes it is stubbed here).
+        await harness.run(async (ctx: any) => await applyLimit(ctx, { count: 240, identifier: OWNER, key: "browser/control:free" }));
+        renderer.mockResolvedValueOnce({ data: undefined, error: { code: "SESSION_RETIRED", success: false }, response: { ok: false, status: 410 } });
+
+        await expect(navigate(OWNER)).resolves.toEqual({ status: "closed" });
+        // That unit was given back.
+        await expect(harness.run(async (ctx: any) => await applyLimit(ctx, { identifier: OWNER, key: "browser/control:free" }))).resolves.toMatchObject({
+            ok: true,
+        });
     });
 
     it("refuses someone who does not hold control, and a page the owner's lists or the address guard block", async () => {
@@ -1251,7 +1687,7 @@ describe("opening a page while in control", () => {
         expect(after.providerSessionId).toBe("cf-browser-rendering");
         // The agent's next action hears that the person's browser was closed, not that they went idle.
         expect(after.control).toMatchObject({ ended: "browser_closed", until: NOW });
-        await expect(statusFor(OWNER)).resolves.toBeNull();
+        await expect(statusFor(OWNER)).resolves.toStrictEqual(NO_BROWSER);
     });
 
     it("ends the page's hold when its audit row could not be written, so a hand back mid-load still ends", async () => {

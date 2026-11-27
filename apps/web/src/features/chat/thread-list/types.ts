@@ -103,4 +103,4 @@ export interface HierarchicalThreadListProperties {
 }
 
 // Define a minimal type for threadRelationships to avoid deep type recursion
-export type MinimalThreadRelationship = { parentThreadId?: string; threadId: string };
+export type MinimalThreadRelationship = { branchType?: string; parentThreadId?: string; threadId: string };

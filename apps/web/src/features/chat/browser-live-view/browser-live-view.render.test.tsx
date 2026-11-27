@@ -1,5 +1,5 @@
 import { api } from "@neore/backend/api";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { focusManager, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
@@ -17,6 +17,10 @@ vi.mock("@lingui/react/macro", () => {
     };
 });
 
+vi.mock("@/lib/env", () => {
+    return { default: { VITE_LUNORA_URL: "https://backend.example.test" } };
+});
+
 const { backend } = vi.hoisted(() => {
     return {
         backend: {
@@ -25,12 +29,20 @@ const { backend } = vi.hoisted(() => {
                 browserId: string;
                 canControl?: boolean;
                 /** `claim`: the lease's claim, `claim-1` when left out; a read that names a claim is told whether it matches. */
-                control?: { byYou: boolean; claim?: string; until: number };
+                control?: { byYou: boolean; claim?: string; claimIds?: string[]; until: number };
                 currentUrl?: string;
                 idleUntil: number;
                 /** The server's clock at the answer; this device's when left out. */
                 now?: number;
+                /** The caller's grant revision the read saw (a grantee's answers carry it). */
+                revision?: number;
             } | null,
+            /** While set, the live query answers this (a push), whatever `browser` says. */
+            liveAnswer: undefined as unknown,
+            /** While set, a read past the subscription answers this (a replica's copy), whatever `browser` says. */
+            oneShotAnswer: undefined as unknown,
+            /** While set, a read past the subscription fails with it; the subscription still answers. */
+            oneShotError: undefined as Error | undefined,
             handBack: vi.fn(),
             /** Per hand back reason, whether it was sent `onlineOnly` (refused offline instead of queued). */
             onlineOnly: {} as Record<string, boolean | undefined>,
@@ -40,12 +52,19 @@ const { backend } = vi.hoisted(() => {
             navigate: vi.fn(),
             /** When set, the status read fails with it. */
             statusError: undefined as Error | undefined,
+            /** When set, only this thread's status read fails (with a network error). */
+            failingThread: undefined as string | undefined,
+            /** When set, this thread's status reads never answer. */
+            pendingThread: undefined as string | undefined,
             /** When set, a one-off status read waits: each pushes here how to fail it, and none answers otherwise. */
             heldReads: undefined as ((error: Error) => void)[] | undefined,
             open: vi.fn(),
             take: vi.fn(),
             /** How often the status was read; `oneOffReads`: of those, the reads that were not the live query's. */
             oneOffReads: 0,
+            /** While set, the live query's refetch answers its last push again, as a subscription does with nothing new. */
+            replayLive: false,
+            lastLive: undefined as unknown,
             statusReads: 0,
         },
     };
@@ -85,13 +104,41 @@ vi.mock("@/lib/lunora/crpc", () => {
                             },
                         },
                         getThreadBrowser: {
-                            queryOptions: (args: { claim?: string }, options?: { live?: boolean }) => {
+                            queryOptions: (args: { claim?: string; threadId?: string }, options?: { live?: boolean }) => {
                                 return {
                                     queryFn: async () => {
                                         backend.statusReads += 1;
 
+                                        if (args.threadId !== undefined && args.threadId === backend.pendingThread) {
+                                            return await new Promise(() => {
+                                                // Never answers.
+                                            });
+                                        }
+
+                                        if (args.threadId !== undefined && args.threadId === backend.failingThread) {
+                                            throw new Error("network");
+                                        }
+
+                                        if (options?.live === false && backend.oneShotError !== undefined) {
+                                            backend.oneOffReads += 1;
+
+                                            throw backend.oneShotError;
+                                        }
+
+                                        if (options?.live === false && backend.oneShotAnswer !== undefined) {
+                                            backend.oneOffReads += 1;
+
+                                            return backend.oneShotAnswer;
+                                        }
+
+                                        if (options?.live !== false && backend.liveAnswer !== undefined) {
+                                            return backend.liveAnswer;
+                                        }
+
                                         if (options?.live === false) {
                                             backend.oneOffReads += 1;
+                                        } else if (backend.replayLive && backend.lastLive !== undefined) {
+                                            return backend.lastLive;
                                         }
 
                                         const held = backend.heldReads;
@@ -107,19 +154,25 @@ vi.mock("@/lib/lunora/crpc", () => {
                                         }
 
                                         if (backend.browser === null) {
-                                            return null;
+                                            return { kind: "none", now: Date.now() };
                                         }
 
                                         const { control, ...browser } = backend.browser;
                                         const { claim = "claim-1", ...named } = control ?? { byYou: false, until: 0 };
-
-                                        return {
+                                        const answer = {
+                                            kind: "running",
                                             now: Date.now(),
                                             ...browser,
                                             ...(control !== undefined && {
                                                 control: { ...named, ...(args.claim !== undefined && { byClaim: named.byYou && claim === args.claim }) },
                                             }),
                                         };
+
+                                        if (options?.live !== false) {
+                                            backend.lastLive = answer;
+                                        }
+
+                                        return answer;
                                     },
                                     queryKey: ["browser", args],
                                 };
@@ -173,10 +226,18 @@ afterEach(async () => {
     setVisibility("visible");
     backend.browser = null;
     backend.statusError = undefined;
+    backend.failingThread = undefined;
+    backend.pendingThread = undefined;
     backend.heldReads = undefined;
     backend.statusReads = 0;
     backend.oneOffReads = 0;
+    backend.replayLive = false;
+    backend.lastLive = undefined;
+    backend.liveAnswer = undefined;
+    backend.oneShotAnswer = undefined;
+    backend.oneShotError = undefined;
     backend.impersonating = false;
+    Reflect.deleteProperty(navigator, "sendBeacon");
 });
 
 beforeEach(() => {
@@ -263,7 +324,7 @@ describe("BrowserLiveView", () => {
 
         await userEvent.click(await screen.findByRole("button", { name: "Watch live" }));
         await screen.findByTitle(LIVE_VIEW);
-        const readsBefore = backend.statusReads;
+        const liveReadsBefore = backend.statusReads - backend.oneOffReads;
 
         // Past the grant's end the server answers nothing.
         backend.browser = null;
@@ -272,7 +333,8 @@ describe("BrowserLiveView", () => {
         });
         expect(screen.queryByRole("region", { name: "Browser" })).toBeNull();
         expect(screen.queryByText("https://example.com/login")).toBeNull();
-        expect(backend.statusReads).toBeGreaterThan(readsBefore);
+        // The live query was asked again, not only the read past it.
+        expect(backend.statusReads - backend.oneOffReads).toBeGreaterThan(liveReadsBefore);
     });
 
     it("stays gone once a reader's grant ends, though asking again answers the same last push", async () => {
@@ -283,6 +345,7 @@ describe("BrowserLiveView", () => {
         backend.browser = { accessUntil: pushedAt + 10_000, browserId: "b-1", idleUntil: pushedAt + 600_000, now: pushedAt };
         mountCard();
         await screen.findByRole("region", { name: "Browser" });
+        const liveReadsBefore = backend.statusReads - backend.oneOffReads;
 
         await act(async () => {
             await vi.advanceTimersByTimeAsync(10_100);
@@ -297,7 +360,172 @@ describe("BrowserLiveView", () => {
             expect(screen.queryByRole("region", { name: "Browser" })).toBeNull();
         }
 
-        expect(backend.statusReads).toBeGreaterThan(1);
+        expect(backend.statusReads - backend.oneOffReads).toBeGreaterThan(liveReadsBefore);
+    });
+
+    it("comes back when a read past the subscription sees the grant renewed, which pushes nothing", async () => {
+        vi.useFakeTimers({ shouldAdvanceTime: true });
+        backend.replayLive = true;
+        backend.browser = { accessUntil: Date.now() + 10_000, browserId: "b-1", idleUntil: Date.now() + 600_000 };
+        mountCard();
+        await screen.findByRole("region", { name: "Browser" });
+
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(10_100);
+        });
+        expect(screen.queryByRole("region", { name: "Browser" })).toBeNull();
+
+        // Renewed for an hour: the subscription still answers its last push, so only the read past it on focus sees it.
+        backend.browser = { accessUntil: Date.now() + 3_600_000, browserId: "b-1", idleUntil: Date.now() + 600_000 };
+        await act(async () => {
+            focusManager.setFocused(false);
+            focusManager.setFocused(true);
+        });
+
+        // Back with its control entry point, which the "Needs you" card offers on the same read.
+        expect(await screen.findByRole("region", { name: "Browser" })).toBeTruthy();
+    });
+
+    it("stays gone after the grant's end though a read sampled before it arrives later, until one sampled after it", async () => {
+        vi.useFakeTimers({ shouldAdvanceTime: true });
+        const page = "https://example.com/login";
+        const readAt = Date.now();
+        const runningAt = (now: number, accessUntil: number) => {
+            return { accessUntil, browserId: "b-1", canControl: true, currentUrl: page, idleUntil: now + 600_000, kind: "running", now, revision: 1 };
+        };
+
+        backend.browser = {
+            accessUntil: readAt + 10_000,
+            browserId: "b-1",
+            canControl: true,
+            currentUrl: page,
+            idleUntil: readAt + 600_000,
+            now: readAt,
+            revision: 1,
+        };
+        mountCard();
+        expect(await screen.findByText(page)).toBeTruthy();
+
+        // The end passes; a read sent before it (same grant, a later server clock than the last push) arrives after it.
+        backend.oneShotAnswer = runningAt(readAt + 5000, readAt + 10_000);
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(10_100);
+        });
+        await act(async () => {
+            focusManager.setFocused(false);
+            focusManager.setFocused(true);
+            await vi.advanceTimersByTimeAsync(100);
+        });
+
+        expect(backend.oneOffReads).toBeGreaterThan(0);
+        expect(screen.queryByText(page)).toBeNull();
+        expect(screen.queryByRole("button", { name: "Watch live" })).toBeNull();
+
+        // A renewal, read after the end, shows it again.
+        backend.oneShotAnswer = runningAt(readAt + 10_500, readAt + 3_600_000);
+        await act(async () => {
+            focusManager.setFocused(false);
+            focusManager.setFocused(true);
+        });
+
+        expect(await screen.findByText(page)).toBeTruthy();
+    });
+
+    it("keeps a grant's end from an answer of no browser: a running answer sampled before that end, arriving after it, shows nothing", async () => {
+        vi.useFakeTimers({ shouldAdvanceTime: true });
+        const page = "https://example.com/login";
+        const readAt = Date.now();
+
+        // No browser runs yet: the answers still name when the grant ends.
+        backend.liveAnswer = { accessUntil: readAt + 10_000, kind: "none", now: readAt, revision: 1 };
+        backend.oneShotAnswer = backend.liveAnswer;
+        mountCard();
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(100);
+        });
+        expect(screen.queryByText(page)).toBeNull();
+
+        // The end passes; a read sent before it (a browser had started, same grant) arrives after it.
+        backend.oneShotAnswer = {
+            accessUntil: readAt + 10_000,
+            browserId: "b-1",
+            canControl: true,
+            currentUrl: page,
+            idleUntil: readAt + 600_000,
+            kind: "running",
+            now: readAt + 5000,
+            revision: 1,
+        };
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(10_100);
+        });
+        await act(async () => {
+            focusManager.setFocused(false);
+            focusManager.setFocused(true);
+            await vi.advanceTimersByTimeAsync(100);
+        });
+
+        expect(backend.oneOffReads).toBeGreaterThan(0);
+        expect(screen.queryByText(page)).toBeNull();
+        expect(screen.queryByRole("button", { name: "Watch live" })).toBeNull();
+    });
+
+    it("stays gone after a removal though a read past the subscription, from a copy of the grant that has not seen it, answers later", async () => {
+        vi.useFakeTimers({ shouldAdvanceTime: true });
+        const page = "https://example.com/login";
+        const runningAt = (now: number, revision: number) => {
+            return {
+                accessUntil: now + 3_600_000,
+                browserId: "b-1",
+                canControl: true,
+                currentUrl: page,
+                idleUntil: now + 600_000,
+                kind: "running",
+                now,
+                revision,
+            };
+        };
+
+        backend.browser = {
+            accessUntil: Date.now() + 3_600_000,
+            browserId: "b-1",
+            canControl: true,
+            currentUrl: page,
+            idleUntil: Date.now() + 600_000,
+            revision: 1,
+        };
+        const queryClient = mountCard();
+
+        expect(await screen.findByText(page)).toBeTruthy();
+
+        // The removal pushes a denial with the removal's revision; a copy of the grant that lags still answers a read past
+        // the subscription with the page, on a later server clock, but with the grant's older revision.
+        backend.liveAnswer = { kind: "denied", now: Date.now(), revision: 2 };
+        backend.oneShotAnswer = runningAt(Date.now() + 5000, 1);
+        await act(async () => {
+            await queryClient.refetchQueries({ exact: true, queryKey: ["browser", { threadId: THREAD }] });
+        });
+        await act(async () => {
+            focusManager.setFocused(false);
+            focusManager.setFocused(true);
+            await vi.advanceTimersByTimeAsync(100);
+        });
+
+        expect(backend.oneOffReads).toBeGreaterThan(0);
+        expect(screen.queryByRole("region", { name: "Browser" })).toBeNull();
+        expect(screen.queryByText(page)).toBeNull();
+        expect(screen.queryByRole("button", { name: "Watch live" })).toBeNull();
+        expect(screen.queryByRole("button", { name: "Take control" })).toBeNull();
+
+        // A renewal pushes nothing but advances the revision: the next read past the subscription shows the card again.
+        backend.oneShotAnswer = runningAt(Date.now() + 6000, 3);
+        await act(async () => {
+            focusManager.setFocused(false);
+            focusManager.setFocused(true);
+        });
+
+        expect(await screen.findByText(page)).toBeTruthy();
+        expect(screen.getByRole("button", { name: "Watch live" })).toBeTruthy();
     });
 
     it("waits for a grant that ends weeks from now without waking up again and again, and leaves when it ends", async () => {
@@ -561,6 +789,38 @@ describe("BrowserLiveView", () => {
         expect(screen.queryByRole("alert")).toBeNull();
     });
 
+    it("shows no error for a healthy chat it switches to from one whose status read failed", async () => {
+        const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+        const other = "thread-2" as never;
+        const idleUntil = Date.now() + 600_000;
+
+        // The other chat's status was read before this chat's failed (an older answer), and its new read is still out.
+        queryClient.setQueryData(
+            ["browser", { threadId: other }],
+            { browserId: "b-2", currentUrl: "https://example.com/other", idleUntil, kind: "running", now: Date.now() },
+            {
+                updatedAt: Date.now() - 60_000,
+            },
+        );
+        backend.failingThread = THREAD;
+        backend.pendingThread = other;
+
+        const { rerender, unmount } = render(<BrowserLiveView threadId={THREAD} />, {
+            wrapper: ({ children }: { children: ReactNode }) => <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>,
+        });
+
+        rendered.unmount = unmount;
+
+        const alert = await screen.findByRole("alert");
+
+        expect(alert.textContent).toBe("Whether the agent is using a browser could not be checked.");
+
+        rerender(<BrowserLiveView threadId={other} />);
+
+        expect(await screen.findByRole("button", { name: "Watch live" })).toBeTruthy();
+        expect(screen.queryByRole("alert")).toBeNull();
+    });
+
     it("says the status could not be read when a refetch fails after an answer of no browser", async () => {
         const queryClient = mountCard();
 
@@ -607,11 +867,179 @@ describe("BrowserLiveView", () => {
         expect(screen.queryByText("https://example.com/login")).toBeNull();
         expect(alert.textContent).toBe("Whether the agent is using a browser could not be checked.");
 
+        // The subscription comes back with only its last push, no answer newer than the failure: Try again reads past it.
         backend.statusError = undefined;
+        backend.replayLive = true;
         await userEvent.click(screen.getByRole("button", { name: "Try again" }));
 
         expect(await screen.findByRole("button", { name: "Watch live" })).toBeTruthy();
         expect(screen.queryByTitle(LIVE_VIEW)).toBeNull();
+    });
+
+    it("closes the page when a status read fails within the millisecond the last answer came", async () => {
+        const at = Date.now();
+
+        backend.browser = { browserId: "b-1", currentUrl: "https://example.com/login", idleUntil: at + 600_000 };
+        // Every read, the answer and the failure after it, lands on one millisecond.
+        vi.spyOn(Date, "now").mockReturnValue(at);
+        const queryClient = mountCard();
+
+        expect(await screen.findByText("https://example.com/login")).toBeTruthy();
+
+        backend.statusError = new Error("network");
+        await act(async () => {
+            await queryClient.refetchQueries();
+        });
+
+        const alert = await screen.findByRole("alert");
+
+        expect(screen.queryByText("https://example.com/login")).toBeNull();
+        expect(alert.textContent).toBe("Whether the agent is using a browser could not be checked.");
+    });
+
+    it("keeps an open view when only a read past the healthy subscription fails", async () => {
+        vi.useFakeTimers({ shouldAdvanceTime: true });
+        backend.browser = { accessUntil: Date.now() + 3_600_000, browserId: "b-1", currentUrl: "https://example.com/login", idleUntil: Date.now() + 600_000 };
+        backend.open.mockResolvedValue({ connectBy: Date.now() + 60_000, status: "ok", url: URL });
+        mountCard();
+
+        await userEvent.click(await screen.findByRole("button", { name: "Watch live" }));
+        await screen.findByTitle(LIVE_VIEW);
+
+        // A grantee's status is read past the subscription on focus; that read fails, while the subscription, healthy,
+        // answers its last push again.
+        const readsBefore = backend.oneOffReads;
+
+        backend.replayLive = true;
+        backend.oneShotError = new Error("network");
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(1000);
+        });
+        await act(async () => {
+            focusManager.setFocused(false);
+            focusManager.setFocused(true);
+        });
+        await vi.waitFor(() => {
+            expect(backend.oneOffReads).toBeGreaterThan(readsBefore);
+        });
+        // The failure reaches the card on a later task: the fake clock runs it.
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(0);
+        });
+
+        expect(screen.queryByRole("alert")).toBeNull();
+        expect(screen.getByTitle(LIVE_VIEW)).toBeTruthy();
+    });
+
+    it("reads the status once past its subscription when it recovers, and comes back on what that read says", async () => {
+        backend.browser = { browserId: "b-1", currentUrl: "https://example.com/login", idleUntil: Date.now() + 600_000 };
+        const queryClient = mountCard();
+        const live = { exact: true, queryKey: ["browser", { threadId: THREAD }] };
+
+        expect(await screen.findByRole("button", { name: "Watch live" })).toBeTruthy();
+
+        backend.statusError = new Error("network");
+        await act(async () => {
+            await queryClient.refetchQueries(live);
+        });
+        const alert = await screen.findByRole("alert");
+
+        expect(alert.textContent).toBe("Whether the agent is using a browser could not be checked.");
+
+        // The subscription comes back with only its last push: the card reads once past it, with no Try again.
+        const readsBefore = backend.oneOffReads;
+
+        backend.statusError = undefined;
+        backend.replayLive = true;
+        await act(async () => {
+            await queryClient.refetchQueries(live);
+        });
+
+        expect(await screen.findByRole("button", { name: "Watch live" })).toBeTruthy();
+        expect(screen.queryByRole("alert")).toBeNull();
+        expect(backend.oneOffReads).toBe(readsBefore + 1);
+    });
+
+    it("keeps the failure when the read past a recovered subscription fails too, and still reads again on Try again", async () => {
+        backend.browser = { browserId: "b-1", currentUrl: "https://example.com/login", idleUntil: Date.now() + 600_000 };
+        const queryClient = mountCard();
+        const live = { exact: true, queryKey: ["browser", { threadId: THREAD }] };
+
+        expect(await screen.findByRole("button", { name: "Watch live" })).toBeTruthy();
+
+        backend.statusError = new Error("network");
+        await act(async () => {
+            await queryClient.refetchQueries(live);
+        });
+        await screen.findByRole("alert");
+
+        // The subscription replays its last push, which answers; the one read past it still fails.
+        const readsBefore = backend.oneOffReads;
+
+        backend.replayLive = true;
+        await act(async () => {
+            await queryClient.refetchQueries(live);
+        });
+        await vi.waitFor(() => {
+            expect(backend.oneOffReads).toBe(readsBefore + 1);
+            expect(queryClient.isFetching()).toBe(0);
+        });
+
+        expect(screen.getByRole("alert").textContent).toBe("Whether the agent is using a browser could not be checked.");
+        expect(screen.queryByRole("button", { name: "Watch live" })).toBeNull();
+
+        backend.statusError = undefined;
+        await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+
+        expect(await screen.findByRole("button", { name: "Watch live" })).toBeTruthy();
+    });
+
+    it("reads once more past a recovered subscription when the read it joined was sent before the recovery and fails", async () => {
+        vi.useFakeTimers({ shouldAdvanceTime: true });
+        backend.browser = { browserId: "b-1", currentUrl: "https://example.com/login", idleUntil: Date.now() + 600_000 };
+        const queryClient = mountCard();
+        const live = { exact: true, queryKey: ["browser", { threadId: THREAD }] };
+
+        expect(await screen.findByRole("button", { name: "Watch live" })).toBeTruthy();
+
+        backend.statusError = new Error("network");
+        await act(async () => {
+            await queryClient.refetchQueries(live);
+        });
+        await screen.findByRole("alert");
+
+        // Try again sends a read past the subscription, which is still out when the subscription comes back.
+        const held: ((error: Error) => void)[] = [];
+        const readsBefore = backend.oneOffReads;
+
+        backend.heldReads = held;
+        await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+        await vi.waitFor(() => {
+            expect(held).toHaveLength(1);
+        });
+
+        backend.statusError = undefined;
+        backend.replayLive = true;
+        await act(async () => {
+            await queryClient.refetchQueries(live);
+        });
+        // The query client hands the recovered answer to the card on a later task: the fake clock runs it.
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(0);
+        });
+
+        // The card's read past the recovered subscription joined the one still out.
+        expect(backend.oneOffReads).toBe(readsBefore + 1);
+
+        // The read sent before the recovery fails: the card reads once more, and comes back on that answer.
+        backend.heldReads = undefined;
+        await act(async () => {
+            held[0]?.(new Error("network"));
+        });
+
+        expect(await screen.findByRole("button", { name: "Watch live" })).toBeTruthy();
+        expect(screen.queryByRole("alert")).toBeNull();
+        expect(backend.oneOffReads).toBe(readsBefore + 2);
     });
 
     it("renews a frame that loaded only after its deadline, and offers a retry once the renewal does not connect either", async () => {
@@ -914,6 +1342,146 @@ describe("BrowserLiveView", () => {
             expect(backend.handBack.mock.calls.map(([args]) => args)).toEqual([{ claim: "claim-1", reason: "left", threadId: THREAD }]);
             expect(screen.queryByTitle(CONTROL_VIEW)).toBeNull();
             expect(screen.queryByText("Opening the live view…")).toBeNull();
+        });
+
+        it("sends the claim's release token as a beacon when the page closes, which outlives the page", async () => {
+            controllable();
+            const beacon = vi.fn((_url: string | globalThis.URL, _body?: BodyInit | null) => true);
+
+            Object.defineProperty(navigator, "sendBeacon", { configurable: true, value: beacon });
+            const queryClient = mountCard();
+            const until = Date.now() + 120_000;
+
+            backend.take.mockResolvedValueOnce({
+                claim: "claim-1",
+                claimId: "id-1",
+                connectBy: Date.now() + 60_000,
+                release: "release-1",
+                status: "ok",
+                until,
+                url: CONTROL_URL,
+            });
+            await userEvent.click(await screen.findByRole("button", { name: "Take control" }));
+            await push(queryClient, { ...backend.browser!, control: { byYou: true, until } });
+            fireEvent.load(await screen.findByTitle(CONTROL_VIEW));
+
+            await act(async () => {
+                globalThis.dispatchEvent(new Event("pagehide"));
+            });
+
+            expect(beacon).toHaveBeenCalledOnce();
+            expect(String(beacon.mock.calls[0]?.[0])).toBe("https://backend.example.test/browser/release");
+            expect(beacon.mock.calls[0]?.[1]).toBe("release-1");
+            // The mutation still goes too: whichever lands first ends the lease, the other changes nothing.
+            expect(backend.handBack.mock.calls.map(([args]) => args)).toEqual([{ claim: "claim-1", reason: "left", threadId: THREAD }]);
+        });
+
+        it("closes the interactive view as soon as the status names another tab's claim, without handing it back", async () => {
+            controllable();
+            const queryClient = mountCard();
+            const until = Date.now() + 120_000;
+
+            backend.take.mockResolvedValueOnce({ claim: "claim-1", claimId: "id-1", connectBy: Date.now() + 60_000, status: "ok", until, url: CONTROL_URL });
+            await userEvent.click(await screen.findByRole("button", { name: "Take control" }));
+            await push(queryClient, { ...backend.browser!, control: { byYou: true, claimIds: ["id-1"], until } });
+            fireEvent.load(await screen.findByTitle(CONTROL_VIEW));
+            expect(screen.getByTitle(CONTROL_VIEW)).toBeTruthy();
+
+            // The person took control in another tab: the lease is theirs still, under that tab's claim.
+            await push(queryClient, { ...backend.browser!, control: { byYou: true, claimIds: ["id-2"], until } });
+
+            expect(await screen.findByText("You no longer have control of the browser.")).toBeTruthy();
+            expect(screen.queryByTitle(CONTROL_VIEW)).toBeNull();
+            expect(backend.keep).not.toHaveBeenCalled();
+            expect(backend.handBack).not.toHaveBeenCalled();
+        });
+
+        it("keeps control when a status older than its claim names another, or its own renewal's claim is named first", async () => {
+            vi.useFakeTimers({ shouldAdvanceTime: true });
+            controllable();
+            const queryClient = mountCard();
+            const until = Date.now() + 90_000;
+            const renewal: ((value: unknown) => void)[] = [];
+
+            backend.take.mockResolvedValueOnce({ claim: "claim-1", claimId: "id-1", connectBy: Date.now() + 60_000, status: "ok", until, url: CONTROL_URL });
+            await userEvent.click(await screen.findByRole("button", { name: "Take control" }));
+            await push(queryClient, { ...backend.browser!, control: { byYou: true, claimIds: ["id-1"], until } });
+            await screen.findByTitle(CONTROL_VIEW);
+            // A status read before this tab's claim was written says nothing about it.
+            await push(queryClient, { ...backend.browser!, control: { byYou: true, claimIds: ["id-0"], until }, now: Date.now() - 10_000 });
+            expect(screen.getByTitle(CONTROL_VIEW)).toBeTruthy();
+
+            backend.take.mockImplementationOnce(
+                async () =>
+                    await new Promise((resolve) => {
+                        renewal.push(resolve);
+                    }),
+            );
+            // The URL never connected: its renewal is minted, and the server names the new claim before it answers.
+            await act(async () => {
+                await vi.advanceTimersByTimeAsync(61_000);
+            });
+            expect(backend.take).toHaveBeenCalledTimes(2);
+            await push(queryClient, { ...backend.browser!, control: { byYou: true, claimIds: ["id-2"], until: Date.now() + 120_000 }, now: Date.now() });
+            await act(async () => {
+                await vi.advanceTimersByTimeAsync(10);
+            });
+            // The renewal is still being minted: this tab's view stays, waiting for its answer.
+            expect(screen.queryByText("You no longer have control of the browser.")).toBeNull();
+
+            await act(async () => {
+                renewal[0]?.({ claim: "claim-2", claimId: "id-2", connectBy: Date.now() + 60_000, status: "ok", until: Date.now() + 120_000, url: OTHER_URL });
+            });
+            expect(frameSource()).toBe(OTHER_URL);
+            expect(screen.queryByText("You no longer have control of the browser.")).toBeNull();
+            expect(backend.handBack).not.toHaveBeenCalled();
+        });
+
+        it("sends a hand back beacon when the page closes while the person's own hand back is out", async () => {
+            controllable();
+            const beacon = vi.fn((_url: string | globalThis.URL, _body?: BodyInit | null) => true);
+
+            Object.defineProperty(navigator, "sendBeacon", { configurable: true, value: beacon });
+            const handedBack: ((value: boolean) => void)[] = [];
+
+            backend.handBack.mockImplementation(
+                async () =>
+                    await new Promise((resolve) => {
+                        handedBack.push(resolve);
+                    }),
+            );
+            const queryClient = mountCard();
+            const until = Date.now() + 120_000;
+
+            backend.take.mockResolvedValueOnce({
+                claim: "claim-1",
+                claimId: "id-1",
+                connectBy: Date.now() + 60_000,
+                release: "release-1",
+                status: "ok",
+                until,
+                url: CONTROL_URL,
+            });
+            await userEvent.click(await screen.findByRole("button", { name: "Take control" }));
+            await push(queryClient, { ...backend.browser!, control: { byYou: true, until } });
+            fireEvent.load(await screen.findByTitle(CONTROL_VIEW));
+            await userEvent.click(screen.getByRole("button", { name: "Hand back" }));
+
+            await act(async () => {
+                globalThis.dispatchEvent(new Event("pagehide"));
+            });
+
+            // The close may cut the hand back's mutation off: the beacon outlives the page, and says it was handed back.
+            expect(beacon).toHaveBeenCalledOnce();
+            expect(beacon.mock.calls[0]?.[1]).toBe("release-1\nhanded_back");
+            // The page's own leave says so too, so neither request that lands first tells the agent the person left.
+            expect(backend.handBack.mock.calls.map(([args]) => args.reason)).toEqual(["handed_back", "handed_back"]);
+
+            await act(async () => {
+                for (const resolve of handedBack) {
+                    resolve(true);
+                }
+            });
         });
 
         it("ignores a page answer that comes back after control moved on to a new lease", async () => {

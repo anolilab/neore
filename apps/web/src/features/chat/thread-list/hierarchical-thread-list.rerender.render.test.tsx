@@ -56,6 +56,11 @@ vi.mock("@/features/admin/hooks/use-is-impersonating", () => {
     return { useImpersonating: () => false };
 });
 
+// The delete-confirmation setting is read through settings this test does not serve: delete asks, as before the settings load.
+vi.mock("./hooks/use-confirm-before-delete", () => {
+    return { useConfirmBeforeDelete: () => true };
+});
+
 // The options menu reads the follow state; these tests are about the row, not the follow items.
 vi.mock("../follows/use-thread-follow", () => {
     return {
@@ -82,7 +87,7 @@ vi.mock("@lingui/react/macro", () => {
 });
 
 vi.mock("@neore/backend/api", () => {
-    return { api: { chat: { functions: {} } } };
+    return { api: { chat: { functions: {}, side_chat: { createSideChat: {} } } } };
 });
 
 vi.mock("@tanstack/react-router", () => {
@@ -104,8 +109,13 @@ vi.mock("@tanstack/react-router", () => {
 
 vi.mock("@tanstack/react-query", () => {
     return {
+        // Queries answer with nothing: the rows under test read their data from the props and the stores, not from these.
+        skipToken: Symbol("skipToken"),
         useMutation: () => {
             return { isPending: false, mutate: () => {}, mutateAsync: async () => {} };
+        },
+        useQuery: () => {
+            return { data: undefined, isLoading: false, isPending: false };
         },
         useQueryClient: () => {
             return {};

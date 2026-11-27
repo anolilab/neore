@@ -15,6 +15,7 @@ import { loadActivePathTail } from "../../agent/branch-rows";
 import { isToolApprovalRunExpired } from "./tool-approval-cleanup";
 import type { ToolRunConfig } from "./tool-run-config";
 import { admitOwnedThread, resolveThreadReadAccess } from "../../agent/thread-read-access";
+import { findLiveGrant } from "../../agent/live-grant";
 import { throwThreadLocked } from "../../lib/thread-lock";
 
 export type ToolApprovalDecision = "always" | "approve" | "deny" | "hour" | "today";
@@ -159,7 +160,7 @@ const canWriteThread = async (ctx: Pick<MutationCtx, "db">, thread: Doc<"threads
         return true;
     }
 
-    const access = await ctx.db.threadAccess.findFirst({ where: { threadId: thread._id, userId: callerId } });
+    const access = await findLiveGrant(ctx, thread._id, callerId);
 
     return !!access && (access.permission === "write" || access.permission === "admin") && (!access.expiresAt || access.expiresAt >= Date.now());
 };

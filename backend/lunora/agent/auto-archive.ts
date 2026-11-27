@@ -18,11 +18,23 @@ import { pendingApprovalCutoff } from "../chat/lib/tool-approval-cleanup";
 import { currentUserShard } from "../lib/shard-context";
 import type { ScanPage } from "../lib/scan-pages";
 import { MAX_LENGTH } from "../lib/validators";
-import { type AutoArchiveCandidate, autoArchiveCutoff, isAutoArchiveDays, runArchivePass, selectAutoArchiveDue } from "./auto-archive-logic";
+import {
+    type AutoArchiveCandidate,
+    autoArchiveCutoff,
+    isAutoArchiveDays,
+    isArchivable,
+    isOpenPullRequestForArchive,
+    keepsOpenPullRequestChats,
+    runArchivePass,
+    selectAutoArchiveDue,
+} from "./auto-archive-logic";
+import { noteMergeAttemptRow, settleMergedLinkRow, settleOwedMergesOf, someLinkOfThread } from "../source-control/pr-thread-links";
 import { markThreadArchived } from "./threads";
 
 /** Threads archived per pass. The rest wait for the next pass, which is idempotent. */
 const ARCHIVE_BATCH = 100;
+/** Pull request links read per thread. A full page keeps the thread: a closed link may hide an open one past it. */
+const PULL_REQUEST_LINK_READ = 100;
 /** Index rows read per page, and per pass before the pass hands its cursor to a follow-up run. */
 const PAGE_SIZE = 200;
 const READ_BUDGET = 1000;
@@ -90,13 +102,86 @@ const threadHasLiveGuestLink = async (ctx: MutationCtx, threadId: Id<"threads">)
     return live.length > 0;
 };
 
+/** The thread's project pin state, read per thread (not from a capped list of pinned projects). */
+const pinnedProjectIdsOf = async (ctx: MutationCtx, thread: Doc<"threads">): Promise<Set<string>> => {
+    const project = thread.projectId ? await ctx.db.projects.findFirst({ where: { _id: thread.projectId } }) : null;
+
+    return new Set<string>(project && project.pinnedAt !== undefined && thread.projectId ? [thread.projectId] : []);
+};
+
+/** True when something keeps the thread from archiving whatever its age: a live stream, a request waiting on the owner, or a live guest link. */
+const archiveBlocked = async (ctx: MutationCtx, threadId: Id<"threads">): Promise<boolean> =>
+    (await threadHasLiveStream(ctx, threadId)) || (await threadWaitsOnPerson(ctx, threadId)) || (await threadHasLiveGuestLink(ctx, threadId));
+
 /**
- * Archives one thread if, as read now, it is still due. The eligibility check runs
+ * True when the thread's owner keeps open-pull-request chats (the default) and the thread has a linked pull request that
+ * is open, by the stored state. Reads the links only, never the host. A thread with no link returns before the settings read,
+ * so a chat without a pull request is decided exactly as before.
+ */
+const threadKeptForOpenPullRequest = async (ctx: MutationCtx, userId: string | undefined, threadId: Id<"threads">): Promise<boolean> => {
+    if (userId === undefined) {
+        return false;
+    }
+
+    // One link past the bound, so exactly `PULL_REQUEST_LINK_READ` links reads as complete, not truncated.
+    const read = await ctx.db
+        .query("pullRequestThreads")
+        .withIndex("by_user_and_threadId", (q) => q.eq("userId", userId).eq("threadId", threadId))
+        .take(PULL_REQUEST_LINK_READ + 1);
+    const truncated = read.length > PULL_REQUEST_LINK_READ;
+    const links = read.slice(0, PULL_REQUEST_LINK_READ);
+
+    if (!truncated && links.every((link) => !isOpenPullRequestForArchive(link))) {
+        return false;
+    }
+
+    const settings = await ctx.db
+        .query("userSettings")
+        .withIndex("by_userId", (q) => q.eq("userId", userId))
+        .unique();
+
+    return keepsOpenPullRequestChats(settings?.keepOpenPullRequestChats) && (truncated || links.some((link) => isOpenPullRequestForArchive(link)));
+};
+
+/**
+ * Archives one thread if, as read now, it is still due at `cutoff`. The eligibility check runs
  * on the fresh row, its project's pin state, its live streams and any request waiting on the owner, in the same
  * transaction as the write, so nothing that happened after the scan is overwritten.
  */
+const archiveThreadIfDue = async (ctx: MutationCtx, threadId: Id<"threads">, cutoff: number): Promise<boolean> => {
+    const thread = await ctx.db.get("threads", threadId);
+
+    if (!thread) {
+        return false;
+    }
+
+    const pinnedProjectIds = await pinnedProjectIdsOf(ctx, thread);
+
+    // The row checks run first, so a thread that is not due never reads its streams.
+    const due = selectAutoArchiveDue([candidateOf(thread)], cutoff, { liveThreadIds: new Set<string>(), pinnedProjectIds }, 1);
+
+    if (due.length === 0 || (await archiveBlocked(ctx, threadId)) || (await threadKeptForOpenPullRequest(ctx, thread.userId, threadId))) {
+        return false;
+    }
+
+    await markThreadArchived(ctx, threadId);
+
+    return true;
+};
+
 export const archiveIfStillIdle = internalMutation
     .input({ cutoff: v.number(), threadId: v.id("threads") })
+    .output(v.boolean())
+    .mutation(async ({ args, ctx }) => await archiveThreadIfDue(ctx, args.threadId, args.cutoff));
+
+/**
+ * Archives a chat that a closed pull request made due (`source-control/pr-state.ts`). The owner's settings are read here, in the
+ * same transaction as the decision, so a setting changed after the job was scheduled decides it. The idle archive runs only
+ * with auto-archive on, and a raised threshold keeps the chat. Then an owed merge of the chat archives it, with merged-chat
+ * archiving on, whatever the idle setting. An archive settles the chat's owed merges with it.
+ */
+export const archiveClosedLinkChat = internalMutation
+    .input({ threadId: v.id("threads") })
     .output(v.boolean())
     .mutation(async ({ args, ctx }) => {
         const thread = await ctx.db.get("threads", args.threadId);
@@ -105,26 +190,214 @@ export const archiveIfStillIdle = internalMutation
             return false;
         }
 
-        // The project pin is read per thread, not from a capped list of pinned projects.
-        const project = thread.projectId ? await ctx.db.projects.findFirst({ where: { _id: thread.projectId } }) : null;
-        const pinnedProjectIds = new Set<string>(project && project.pinnedAt !== undefined && thread.projectId ? [thread.projectId] : []);
+        const settings = await ctx.db
+            .query("userSettings")
+            .withIndex("by_userId", (q) => q.eq("userId", thread.userId))
+            .unique();
+        const days = settings?.autoArchiveAfterDays;
 
-        // The row checks run first, so a thread that is not due never reads its streams.
-        const due = selectAutoArchiveDue([candidateOf(thread)], args.cutoff, { liveThreadIds: new Set<string>(), pinnedProjectIds }, 1);
+        if (isAutoArchiveDays(days) && days !== 0) {
+            const archived = await archiveThreadIfDue(ctx, args.threadId, autoArchiveCutoff(ctx.now, days));
 
-        if (
-            due.length === 0 ||
-            (await threadHasLiveStream(ctx, args.threadId)) ||
-            (await threadWaitsOnPerson(ctx, args.threadId)) ||
-            (await threadHasLiveGuestLink(ctx, args.threadId))
-        ) {
+            if (archived) {
+                ctx.log.event("chat.auto_archive", { archived: 1, reason: "pull_request_closed" });
+
+                return true;
+            }
+        }
+
+        // A request that kept the chat open may just have closed: a merge the chat still owes may now archive it.
+        if (thread.userId === undefined) {
             return false;
         }
 
-        await markThreadArchived(ctx, args.threadId);
+        // Only with merged-chat archiving on is there an owed merge to archive for: the scan is skipped otherwise.
+        if (settings?.autoArchiveMergedChats !== true || settings.autoArchiveMergedChatsSince === undefined) {
+            return false;
+        }
 
-        return true;
+        // The merged archive logs its own event (`merged_pull_request`), so this one is not logged again as a closed request.
+        return await archiveOwedMergesOf(ctx, thread.userId, args.threadId);
     });
+
+type MergedArchiveArgs = {
+    linkId: Id<"pullRequestThreads">;
+    number: number;
+    repository: string;
+    threadId: Id<"threads">;
+};
+
+/** One archive attempt for an owed merge. The caller settles the link when the answer is final. */
+const attemptMergedArchive = async (ctx: MutationCtx, args: MergedArchiveArgs): Promise<"archived" | "busy" | "declined" | "link-declined"> => {
+    const thread = await ctx.db.get("threads", args.threadId);
+
+    // A thread with no owner holds no links, so there is nothing to merge into.
+    if (!thread || thread.userId === undefined) {
+        return "declined";
+    }
+
+    const settings = await ctx.db
+        .query("userSettings")
+        .withIndex("by_userId", (q) => q.eq("userId", thread.userId))
+        .unique();
+
+    if (settings?.autoArchiveMergedChats !== true) {
+        return "declined";
+    }
+
+    // Set by the settings write when the owner turned the setting on; a merge before it owes nothing.
+    const since = settings.autoArchiveMergedChatsSince;
+
+    // The one link the merge owed this chat, read by id: the cost does not grow with the links of the pull request.
+    const link = await ctx.db.get("pullRequestThreads", args.linkId);
+
+    if (
+        !link ||
+        link.userId !== thread.userId ||
+        link.threadId !== args.threadId ||
+        link.repository !== args.repository ||
+        link.number !== args.number ||
+        link.mergedAt === undefined ||
+        link.mergeSettledAt !== undefined ||
+        since === undefined ||
+        link.mergedAt < since
+    ) {
+        // About this link alone (its merge predates the opt-in, say): the chat's other merges are not decided by it.
+        return "link-declined";
+    }
+
+    // A merge that certainly predates the chat's last archive was covered by it: a reopened chat is not archived again for it. The
+    // host's bound is exclusive (the merge came before it), so it may equal the archive's time. The recording time is inclusive (the
+    // merge came no later than it), so it must fall strictly before the archive. The host's bound is known only to the second; the
+    // recording time is kept even without a host time, and matters when the archive's bounded settlement left this merge owed.
+    const { archivedAt } = thread;
+    const coveredByHost = link.mergedBefore !== undefined && archivedAt !== undefined && link.mergedBefore <= archivedAt;
+    const coveredByRecording = link.mergeRecordedAt !== undefined && archivedAt !== undefined && link.mergeRecordedAt < archivedAt;
+
+    if (coveredByHost || coveredByRecording) {
+        return "link-declined";
+    }
+
+    const pinnedProjectIds = await pinnedProjectIdsOf(ctx, thread);
+
+    // Judged as if the run were over: a pin or any other permanent reason declines this merge for good, even while a run is
+    // going, so unpinning the chat later cannot archive it for a merge that came while it was pinned. A run only defers.
+    const candidate = candidateOf(thread);
+    const judged = thread.status === "running" ? { ...candidate, status: "active" } : candidate;
+
+    if (!isArchivable(judged, { liveThreadIds: new Set<string>(), pinnedProjectIds })) {
+        return "declined";
+    }
+
+    // The same open-pull-request rule as the idle archive: a chat with another open link stays. The merge stays owed (busy):
+    // when that link closes, the close handler tries again (`archiveClosedLinkChat`).
+    if (keepsOpenPullRequestChats(settings?.keepOpenPullRequestChats) && (await threadHasOpenLink(ctx, thread.userId, args.threadId))) {
+        return "busy";
+    }
+
+    if (thread.status === "running") {
+        return "busy";
+    }
+
+    if (await archiveBlocked(ctx, args.threadId)) {
+        return "busy";
+    }
+
+    await markThreadArchived(ctx, args.threadId);
+
+    return "archived";
+};
+
+/**
+ * One owed merge's archive and its settlement: the attempt, the link's settle, and (for a thread-wide answer) the chat's other
+ * owed merges. Shared by the mutation and the close handler, so both settle the same way.
+ */
+const runMergedArchive = async (ctx: MutationCtx, args: MergedArchiveArgs): Promise<"archived" | "busy" | "declined"> => {
+    // An attempt for a link already settled is stale (an earlier answer decided it): it must not settle the chat's other links,
+    // which may belong to a merge recorded since and still owed an attempt of its own.
+    const current = await ctx.db.get("pullRequestThreads", args.linkId);
+
+    if (current?.mergeSettledAt !== undefined) {
+        return "declined";
+    }
+
+    const outcome = await attemptMergedArchive(ctx, args);
+
+    if (outcome === "archived") {
+        ctx.log.event("chat.auto_archive", { archived: 1, reason: "merged_pull_request" });
+    } else {
+        // A kept chat is visible too: busy (a run, a request waiting on the owner, an open link) or declined (a guard or the setting).
+        ctx.log.event("chat.merged_archive_kept", { outcome });
+    }
+
+    if (outcome === "busy") {
+        await noteMergeAttemptRow(ctx, args.linkId, ctx.now);
+    } else {
+        await settleMergedLinkRow(ctx, args.linkId, ctx.now);
+    }
+
+    // A thread-wide final answer (archived, or a pin or other permanent reason) holds for the whole chat, so every other owed
+    // link of the chat settles with it. A link-only decline settles just this link: another merge may still be eligible.
+    if (outcome === "archived" || outcome === "declined") {
+        await settleOwedSiblingRows(ctx, args.linkId, args.threadId, ctx.now);
+    }
+
+    return outcome === "link-declined" ? "declined" : outcome;
+};
+
+/**
+ * Archives the chat for the first of its owed merges that is now eligible. A busy answer is thread-wide (a run, a request waiting on
+ * the owner, an open request), so it holds for the other owed merges too: the walk stops there and leaves them owed. A decline about
+ * one link keeps the walk going.
+ */
+const archiveOwedMergesOf = async (ctx: MutationCtx, userId: string, threadId: Id<"threads">): Promise<boolean> => {
+    let archived = false;
+
+    await someLinkOfThread(ctx, userId, threadId, async (row) => {
+        if (row.mergedAt === undefined || row.mergeSettledAt !== undefined) {
+            return false;
+        }
+
+        const outcome = await runMergedArchive(ctx, { linkId: row._id, number: row.number, repository: row.repository, threadId });
+
+        if (outcome === "archived") {
+            archived = true;
+        }
+
+        return outcome === "archived" || outcome === "busy";
+    });
+
+    return archived;
+};
+
+/**
+ * Archives a chat linked to a pull request that has just merged, when the owner turned on `autoArchiveMergedChats`.
+ * Called by `source-control` for each link the merge owes (`recordMergedPullRequest`), so a chat the person reopens later
+ * is not archived again. The same guards as the idle archive keep the thread, re-read here. The answer says what to do
+ * with the owed link: `archived` and `declined` are final, and settle the link in this transaction; `busy` (a run, a
+ * request waiting on the owner, or a live guest link) is not, so the next read tries again.
+ */
+export const archiveMergedThread = internalMutation
+    .input({ linkId: v.id("pullRequestThreads"), number: v.number(), repository: v.string().max(MAX_LENGTH.short), threadId: v.id("threads") })
+    .output(v.union(v.literal("archived"), v.literal("busy"), v.literal("declined")))
+    .mutation(async ({ args, ctx }) => await runMergedArchive(ctx, args));
+
+const settleOwedSiblingRows = async (ctx: MutationCtx, linkId: Id<"pullRequestThreads">, threadId: Id<"threads">, at: number): Promise<void> => {
+    const link = await ctx.db.get("pullRequestThreads", linkId);
+
+    if (!link) {
+        return;
+    }
+
+    await settleOwedMergesOf(ctx, link.userId, threadId, at);
+};
+
+/**
+ * Whether the chat has any open linked request, read over every one of its links and stopping at the first open one. A merge
+ * is not declined by a read cut short (the idle rule's bounded read keeps the chat instead).
+ */
+const threadHasOpenLink = async (ctx: MutationCtx, userId: string, threadId: Id<"threads">): Promise<boolean> =>
+    await someLinkOfThread(ctx, userId, threadId, (row) => isOpenPullRequestForArchive(row));
 
 const runAutoArchivePass = async (ctx: MutationCtx, cursor: string | null): Promise<void> => {
     const userId = currentUserShard();

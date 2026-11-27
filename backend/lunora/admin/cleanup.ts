@@ -180,12 +180,20 @@ export const executeCleanup = adminAction
                     const onUserShard = { shardKey: userId };
                     const threads = await callOnShard(internal.admin.cleanup.getUserThreads, { userId }, onUserShard);
 
-                    await Promise.allSettled(
+                    const threadResults = await Promise.allSettled(
                         threads.map(
                             async (thread: { _id: string }) =>
                                 await callOnShard(internal.agent.threads.deleteAllForThreadIdAsync, { threadId: thread._id as Id<"threads"> }, onUserShard),
                         ),
                     );
+
+                    // A thread refused (a suggestion is being sent to a model) keeps the account: deleting the user record now would leave
+                    // that thread and its messages with no owner. The account is counted as failed and a later pass deletes it.
+                    const refused = threadResults.find((result) => result.status === "rejected");
+
+                    if (refused?.status === "rejected") {
+                        throw new LunoraError("CONFLICT", "A thread of this account could not be deleted, so the account is kept", { cause: refused.reason });
+                    }
 
                     // `auth_hooks.cascadeDeleteUser` already deletes the session and
                     // account rows, by index, along with the other four user-owned tables — so
@@ -468,6 +476,14 @@ const censusCursorValidator = v.object({
 });
 
 /**
+ * The longest census cursor the encoder can return. Measured with the largest values every field allows: ten pending shards, each
+ * with the full breakdown (4 groups × 7 age bands) and twenty carried largest-row counts, sealed, came to 70,527 characters. The bound is
+ * about twice that, far below the 1 MiB request cap. A cursor longer than this is never a legitimate continuation, so the input refuses it.
+ * `cursor-size` in the census tests keeps the worst case under this bound.
+ */
+export const CENSUS_CURSOR_MAX_LENGTH = 131_072;
+
+/**
  * The opaque string an admin call returns and takes back, sealed (AES-GCM, its own key purpose): the shard keys and
  * index positions in it name users and threads, and the browser that holds it can neither read nor alter it.
  */
@@ -537,7 +553,7 @@ const readShardPage =
  */
 export const getShardFootprint = adminAction
     .use(rateLimit("admin/read"))
-    .input({ cursor: v.optional(v.string()) })
+    .input({ cursor: v.optional(v.string().max(CENSUS_CURSOR_MAX_LENGTH)) })
     .output(
         v.object({
             abandonedShards: v.number(),

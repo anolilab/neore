@@ -16,6 +16,7 @@ const running = lunora(api.browser.live_view.getThreadBrowser, {
     canControl: true,
     currentUrl: "https://example.com/account/login",
     idleUntil: STORY_NOW + 60_000,
+    kind: "running",
     now: STORY_NOW,
 });
 
@@ -100,7 +101,9 @@ export const RateLimited: Story = {
 
 /** No browser runs for the thread: nothing is shown. */
 export const NoBrowser: Story = {
-    parameters: { msw: { handlers: { lunora: lunoraHandlers(...userFixtures(), lunora(api.browser.live_view.getThreadBrowser, null)) } } },
+    parameters: {
+        msw: { handlers: { lunora: lunoraHandlers(...userFixtures(), lunora(api.browser.live_view.getThreadBrowser, { kind: "none", now: STORY_NOW })) } },
+    },
     play: async ({ canvas }) => {
         await lunoraAnswered(api.browser.live_view.getThreadBrowser);
         await expect(canvas.queryByRole("region", { name: "Browser" })).toBeNull();
@@ -150,12 +153,20 @@ const controlledBy = (byYou: boolean, until = STORY_NOW + 120_000) =>
         control: { byYou, until },
         currentUrl: "https://example.com/account/login",
         idleUntil: until,
+        kind: "running",
         now: STORY_NOW,
     });
 
 /** `takeControl` gives the lease until `until` (story time). */
 const tookControl = (until = STORY_NOW + 120_000) =>
-    lunora(api.browser.live_view.takeControl, { claim: "claim-1", connectBy: STORY_NOW + 60_000, status: "ok" as const, until, url: CONTROL_VIEW });
+    lunora(api.browser.live_view.takeControl, {
+        claim: "claim-1",
+        claimId: "claim-id-1",
+        connectBy: STORY_NOW + 60_000,
+        status: "ok" as const,
+        until,
+        url: CONTROL_VIEW,
+    });
 
 const controlHandlers = (status: ReturnType<typeof controlledBy>, ...overrides: ReturnType<typeof lunora>[]) =>
     lunoraHandlers(

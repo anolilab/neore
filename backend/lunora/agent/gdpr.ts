@@ -4,11 +4,23 @@
  * the orchestrator's mutation and the writes are the owner's, not the GDPR module's.
  * Batching follows `gdpr/batch.ts`: at most `BATCH` rows per table, `{ hasMore }` back.
  */
-import type { Id } from "../_generated/dataModel";
-import type { MutationCtx } from "../_generated/server";
+import { LunoraError, v } from "lunorash/server";
+
+import type { Doc, Id } from "../_generated/dataModel";
+import { internal } from "../_generated/internal";
+import { internalAction, internalMutation, internalQuery, type MutationCtx } from "../_generated/server";
 import { BATCH, type BatchResult, deleteParentsWithChildren, full } from "../gdpr/batch";
+import { browserExportUserPrefix } from "../browser/export-pages";
+import { withDependency } from "../lib/dependency";
 import { gdprLogger } from "../lib/logger";
+import { patchRow } from "../lib/patch";
+import { storedRow, storedRows } from "../lib/stored-row";
+import { countedWorkflowFileIds } from "../workflow/images";
+import { changeRefcount, ensureChatFileMetadata } from "./files";
+import { MAX_LENGTH } from "../lib/validators";
+import { GRANT_PAGE_STATEMENTS, WRITE_STATEMENTS } from "./grant-revision";
 import { eraseProjectRuleFilesForUser, eraseProjectsRuleFiles, markProjectsRuleFilesErasing, RULE_FILE_ROWS_PER_PAGE } from "../projects/gdpr";
+import { erasePinsNamingDocuments } from "../chat/gdpr";
 import { deleteVectorRow } from "./table-writes";
 import type { VectorTableName } from "./vector/tables";
 
@@ -76,6 +88,237 @@ export const eraseChatFileAccessForUser = async (ctx: MutationCtx, userId: strin
     return { hasMore: full(rows) };
 };
 
+/** Chat-file ids one export page reads (`collectGrantedChatFileIdsForExport`, and the walks of a user's threads and messages). */
+export const CHAT_FILE_EXPORT_PAGE = 100;
+
+/** A chat file's name and media type are cut to these lengths in the export, so one page of rows has a bounded size. */
+export const CHAT_FILE_NAME_MAX = 512;
+export const CHAT_FILE_TYPE_MAX = 255;
+/** A content hash is a SHA-256 in hex (64 characters); a longer one was not made by an upload, and is cut so a row stays small. */
+export const CHAT_FILE_HASH_MAX = 128;
+
+/**
+ * Messages read per query when looking for their files. A message row is read whole (there is no index on `fileIds`), and a message can
+ * be large, so the page is small: each query stays well inside the export action's read budget.
+ */
+export const CHAT_FILE_MESSAGE_PAGE = 20;
+
+/** The UTF-8 bytes a row takes as the query reads it: the unit the export's read budget counts in. */
+const rowBytes = (row: unknown): number => new TextEncoder().encode(JSON.stringify(row)).byteLength;
+
+/**
+ * One page of the ids of the files the user holds a grant for (`chatFileAccess`): their uploads and generated images. The grant is
+ * what makes a file theirs; the row itself is shared by content and has no owner. The caller walks it to its end.
+ *
+ * The links of their chats (`chatFileThreads`) are not read here. A link outlives the message that named the file (a deleted message
+ * releases the file's reference, not its link), so a link names files the chat no longer holds. The messages name what is still there
+ * (`collectMessageFileIdsForExport`).
+ */
+export const collectGrantedChatFileIdsForExport = internalQuery
+    .input({
+        cursor: v.optional(v.union(v.string().max(MAX_LENGTH.cursor), v.null())),
+        userId: v.string().max(MAX_LENGTH.id),
+    })
+    .output(
+        v.object({
+            cursor: v.union(v.string(), v.null()),
+            ids: v.array(v.string()),
+            // The bytes the query read: each grant row, as stored. The export action meters its walk against a budget with this.
+            readBytes: v.number(),
+        }),
+    )
+    .query(async ({ args: { cursor, userId }, ctx }) => {
+        // Primary, so a grant made moments before the export is in it (a lagging replica could omit it).
+        const grants = await ctx.db.chatFileAccess.findMany({
+            consistency: "primary",
+            cursor: cursor ?? null,
+            limit: CHAT_FILE_EXPORT_PAGE,
+            where: { userId },
+        });
+
+        return {
+            cursor: grants.isDone ? null : grants.continueCursor,
+            ids: grants.page.map((grant) => grant.fileId),
+            readBytes: grants.page.reduce((total, grant) => total + rowBytes(grant), 0),
+        };
+    });
+
+/** One page of the owner's thread ids, for walking their messages (`collectAllMessageFileIds`). */
+export const collectThreadIdsForExport = internalQuery
+    .input({
+        cursor: v.optional(v.union(v.string().max(MAX_LENGTH.cursor), v.null())),
+        userId: v.string().max(MAX_LENGTH.id),
+    })
+    .output(
+        v.object({
+            cursor: v.union(v.string(), v.null()),
+            ids: v.array(v.string()),
+            readBytes: v.number(),
+        }),
+    )
+    .query(async ({ args: { cursor, userId }, ctx }) => {
+        const page = await ctx.db
+            .query("threads")
+            .withIndex("by_user_and_status", (q) => q.eq("userId", userId))
+            .paginate({ cursor: cursor ?? null, numItems: CHAT_FILE_EXPORT_PAGE });
+
+        return {
+            cursor: page.isDone ? null : page.continueCursor,
+            ids: page.page.map((thread) => thread._id),
+            readBytes: page.page.reduce((total, thread) => total + rowBytes(thread), 0),
+        };
+    });
+
+/** One page of the file ids named by one thread's messages (`collectAllMessageFileIds` walks each thread's messages). */
+export const collectMessageFileIdsForExport = internalQuery
+    .input({
+        cursor: v.optional(v.union(v.string().max(MAX_LENGTH.cursor), v.null())),
+        threadId: v.id("threads"),
+    })
+    .output(
+        v.object({
+            cursor: v.union(v.string(), v.null()),
+            ids: v.array(v.string()),
+            readBytes: v.number(),
+        }),
+    )
+    .query(async ({ args: { cursor, threadId }, ctx }) => {
+        const page = await ctx.db
+            .query("messages")
+            .withIndex("by_threadId_order_stepOrder", (q) => q.eq("threadId", threadId))
+            .paginate({ cursor: cursor ?? null, numItems: CHAT_FILE_MESSAGE_PAGE });
+
+        return {
+            cursor: page.isDone ? null : page.continueCursor,
+            ids: page.page.flatMap((message) => message.fileIds ?? []),
+            readBytes: page.page.reduce((total, message) => total + rowBytes(message), 0),
+        };
+    });
+
+/**
+ * The metadata of the given chat files, read in one query from `chatFileMetadata` (the caller passes at most one chunk of ids). Metadata
+ * only, as a vault file's is: the bytes stay out of the export, and the file row, which holds the extracted text, is not read. A file
+ * whose metadata is already gone is left out (its row is erased with it).
+ */
+export const chatFileMetadataForExport = internalQuery
+    .input({ fileIds: v.array(v.id("chatFiles")) })
+    .output(
+        v.object({
+            // The bytes the query read: each metadata row, as stored. The export action meters its chunks against a budget with this.
+            readBytes: v.number(),
+            rows: v.array(
+                v.object({
+                    createdAt: v.number(),
+                    filename: v.optional(v.string()),
+                    filenameCut: v.boolean(),
+                    hash: v.string(),
+                    id: v.string(),
+                    mediaType: v.string(),
+                }),
+            ),
+        }),
+    )
+    .query(async ({ args: { fileIds }, ctx }) => {
+        if (fileIds.length === 0) {
+            return { readBytes: 0, rows: [] };
+        }
+
+        // Primary, as the grants are: a file uploaded moments before the export must be in it.
+        const { page } = await ctx.db.chatFileMetadata.findMany({ consistency: "primary", where: { fileId: { in: fileIds } } });
+        const readRows = storedRows(page);
+        const readBytes = readRows.reduce((total, row) => total + rowBytes(row), 0);
+        // Two stores of the same bytes at once can each write a metadata row, so a file may have two: the export lists it once.
+        const seen = new Set<string>();
+        const rowsOf = readRows.filter((row) => {
+            if (seen.has(row.fileId)) {
+                return false;
+            }
+
+            seen.add(row.fileId);
+
+            return true;
+        });
+
+        return {
+            readBytes,
+            rows: rowsOf.map((row) => chatFileExportRow(row)),
+        };
+    });
+
+/** A file's row in the export, with its name, type and hash cut to their limits. */
+const chatFileExportRow = (row: { createdAt: number; fileId: string; filename?: string; hash: string; mediaType: string }) => {
+    return {
+        createdAt: row.createdAt,
+        filename: row.filename?.slice(0, CHAT_FILE_NAME_MAX),
+        filenameCut: (row.filename?.length ?? 0) > CHAT_FILE_NAME_MAX,
+        hash: row.hash.slice(0, CHAT_FILE_HASH_MAX),
+        id: row.fileId,
+        mediaType: row.mediaType.slice(0, CHAT_FILE_TYPE_MAX),
+    };
+};
+
+/**
+ * The export's view of files that have none: stored before `chatFileMetadata` was written, or whose write did not land. Each file row is
+ * read and its metadata written (`ensureChatFileMetadata`), then answered as {@link chatFileMetadataForExport} answers. The export action
+ * calls this for the ids that query found nothing for (`agent/export-pages.ts#readChunkMetadata`), so a file is never left out for the
+ * want of a row.
+ */
+export const repairChatFileMetadataForExport = internalMutation
+    .input({ fileIds: v.array(v.id("chatFiles")) })
+    .output(
+        v.object({
+            readBytes: v.number(),
+            rows: v.array(
+                v.object({
+                    createdAt: v.number(),
+                    filename: v.optional(v.string()),
+                    filenameCut: v.boolean(),
+                    hash: v.string(),
+                    id: v.string(),
+                    mediaType: v.string(),
+                }),
+            ),
+        }),
+    )
+    .mutation(async ({ args: { fileIds }, ctx }) => {
+        let readBytes = 0;
+        const rows = [];
+
+        for (const fileId of fileIds) {
+            // Primary: a lagging replica can still return a file the reaper has just deleted, and the repair would write its metadata.
+            const file = storedRow(await ctx.db.chatFiles.findFirst({ consistency: "primary", where: { _id: fileId } }));
+
+            if (!file) {
+                continue;
+            }
+
+            // The whole row is read, as the metadata query's reads are counted: the export meters these against its budget.
+            readBytes += rowBytes(file);
+            readBytes += await ensureChatFileMetadata(ctx, file);
+
+            // A reaper that deleted the file between the read and the write leaves the metadata just written orphaned: check the file
+            // row again, at primary, and take the metadata back if it is gone. (The reaper also clears its file's metadata after the row.)
+            const stillThere = storedRow(await ctx.db.chatFiles.findFirst({ consistency: "primary", where: { _id: fileId } }));
+
+            // This read is a whole row too, and the same mutation: its bytes count against the export's budget like the first.
+            readBytes += stillThere ? rowBytes(stillThere) : 0;
+
+            if (!stillThere) {
+                const { page: orphans } = await ctx.db.chatFileMetadata.findMany({ consistency: "primary", where: { fileId } });
+
+                await Promise.all(orphans.map(async (row) => await ctx.db.delete("chatFileMetadata", row._id)));
+
+                continue;
+            }
+
+            rows.push(
+                chatFileExportRow({ createdAt: file._creationTime, fileId: file._id, filename: file.filename, hash: file.hash, mediaType: file.mediaType }),
+            );
+        }
+
+        return { readBytes, rows };
+    });
+
 /** The file-to-chat links of the user's own chats (`chatFileThreads`, keyed by owner). */
 export const eraseChatFileThreadsForUser = async (ctx: MutationCtx, userId: string): Promise<BatchResult> => {
     const rows = await ctx.db
@@ -100,10 +343,12 @@ export const eraseThreadMetadataForUser = async (ctx: MutationCtx, userId: strin
             .withIndex("by_userId_expiresAt", (q) => q.eq("userId", userId))
             .collect(),
         // `.global()`: the grants this user HOLDS and the grants others hold on
-        // this user's threads — the second set is orphaned once the threads go.
-        Promise.all([ctx.db.threadAccess.findMany({ where: { userId } }), ctx.db.threadAccess.findMany({ where: { ownerId: userId } })]).then(
-            ([held, given]) => [...held.page, ...given.page.filter((grant) => grant.userId !== userId)],
-        ),
+        // this user's threads — the second set is orphaned once the threads go. From the primary: a replica that has
+        // not seen a grant written just before would leave it behind.
+        Promise.all([
+            ctx.db.threadAccess.findMany({ consistency: "primary", where: { userId } }),
+            ctx.db.threadAccess.findMany({ consistency: "primary", where: { ownerId: userId } }),
+        ]).then(([held, given]) => [...held.page, ...given.page.filter((grant) => grant.userId !== userId)]),
     ]);
 
     await Promise.all([
@@ -113,7 +358,119 @@ export const eraseThreadMetadataForUser = async (ctx: MutationCtx, userId: strin
     ]);
 };
 
-/** One thread's follow-up suggestions, context summaries and invites, one batch each. `true` when any batch came back full. */
+/** Grant revisions each of {@link eraseGrantRevisionsForUser}'s two reads takes: both reads and every delete within `GRANT_PAGE_STATEMENTS`. */
+const GRANT_REVISIONS_ERASED = Math.floor((GRANT_PAGE_STATEMENTS - 2) / (2 * WRITE_STATEMENTS));
+
+/**
+ * One batch of the grant revisions (`agent/grant-revision.ts`) of grants the user held or gave. They outlive the grants,
+ * so a user shared on many chats has many: drained a batch at a time. Read from the primary: a short page ends the
+ * erasure, and a lagging replica's short page would leave a revision written just before behind.
+ */
+export const eraseGrantRevisionsForUser = async (ctx: MutationCtx, userId: string): Promise<BatchResult> => {
+    const [{ page: held }, { page: given }] = await Promise.all([
+        ctx.db.threadAccessRevisions.findMany({ consistency: "primary", limit: GRANT_REVISIONS_ERASED, where: { userId } }),
+        ctx.db.threadAccessRevisions.findMany({ consistency: "primary", limit: GRANT_REVISIONS_ERASED, where: { ownerId: userId } }),
+    ]);
+    const rows = [...held, ...given.filter((row) => row.userId !== userId)];
+
+    await Promise.all(rows.map(async (row) => await ctx.db.delete("threadAccessRevisions", row._id)));
+
+    return { hasMore: held.length >= GRANT_REVISIONS_ERASED || given.length >= GRANT_REVISIONS_ERASED };
+};
+
+/** Grant revisions one {@link collectGrantRevisionsForExport} page reads (one D1 query). */
+export const GRANT_REVISIONS_EXPORT_PAGE = 500;
+
+/**
+ * One page of the grant revisions (`agent/grant-revision.ts`) of grants the user held: which chat they were shared on,
+ * and how often that grant was written. Never the revisions of grants on the user's own chats: those name the people
+ * they shared with, which is their data, not the user's (the page export keeps to the same rule). From the primary, a
+ * page at a time until `cursor` is `null`: a lagging replica's short page would end the export early.
+ */
+export const collectGrantRevisionsForExport = internalQuery
+    .input({ cursor: v.optional(v.string()), userId: v.string() })
+    .output(
+        v.object({
+            cursor: v.union(v.string(), v.null()),
+            revisions: v.array(v.object({ revision: v.number(), threadId: v.string() })),
+        }),
+    )
+    .query(async ({ args: { cursor, userId }, ctx }) => {
+        const result = await ctx.db.threadAccessRevisions.findMany({
+            consistency: "primary",
+            ...(cursor !== undefined && { cursor }),
+            limit: GRANT_REVISIONS_EXPORT_PAGE,
+            where: { userId },
+        });
+
+        return {
+            cursor: result.isDone ? null : result.continueCursor,
+            // A count a merge is folding holds its tombstone (negated): the revision it stands for.
+            revisions: storedRows(result.page).map((row) => {
+                return { revision: Math.abs(row.revision), threadId: row.threadId };
+            }),
+        };
+    });
+
+/** The most a stored grant-revision page can be: {@link GRANT_REVISIONS_EXPORT_PAGE} rows of a chat id and a count, with room. */
+const GRANT_REVISIONS_PAGE_MAX_BYTES = 256 * 1024;
+
+/**
+ * One page of the grant revisions the user held ({@link collectGrantRevisionsForExport}), read in this action's own query and
+ * stored at `key` (`export-pages.ts#grantRevisionsExportPageKey`); only its `next` cursor goes back to the workflow, so no step
+ * result or dispatch body carries the rows. As `browser/gdpr.ts#storeBrowserExportPage`: nothing is stored once the run has
+ * stopped (`usage/gdpr.ts#exportRunStopped`), and a page whose write ends after it stopped is deleted again.
+ */
+export const storeGrantRevisionsExportPage = internalAction
+    .input({
+        cursor: v.optional(v.string()),
+        key: v.string(),
+        runKey: v.string().max(MAX_LENGTH.key),
+        userId: v.string().max(MAX_LENGTH.id),
+    })
+    .output(v.object({ next: v.optional(v.string()) }))
+    .action(async ({ args: { cursor, key, runKey, userId }, ctx }) => {
+        // Only ever under the user's own export prefix: a key anywhere else would write another account's object.
+        if (!key.startsWith(browserExportUserPrefix(userId))) {
+            throw new LunoraError("FORBIDDEN", "A grant revision page belongs under the user's own export prefix");
+        }
+
+        const stopIfRunStopped = async (): Promise<void> => {
+            if ((await ctx.runQuery(internal.usage.gdpr.exportRunStopped, { runKey, userId })) !== true) {
+                return;
+            }
+
+            await withDependency("file storage", () => ctx.storage.delete(key));
+
+            throw new LunoraError("CONFLICT", "The export has stopped: its request ended or the account's deletion is underway");
+        };
+
+        await stopIfRunStopped();
+
+        const page = (await ctx.runQuery(internal.agent.gdpr.collectGrantRevisionsForExport, { ...(cursor !== undefined && { cursor }), userId })) as {
+            cursor: string | null;
+            revisions: { revision: number; threadId: string }[];
+        };
+        const blob = new Blob([JSON.stringify({ revisions: page.revisions })], { type: "application/json" });
+
+        await withDependency("file storage", () =>
+            ctx.storage.store(key, blob, {
+                allowedContentTypes: ["application/json"],
+                contentType: "application/json",
+                maxSize: GRANT_REVISIONS_PAGE_MAX_BYTES,
+            }),
+        );
+
+        await stopIfRunStopped();
+
+        return page.cursor === null ? {} : { next: page.cursor };
+    });
+
+/**
+ * One thread's follow-up suggestions, context summaries and invites, one batch each. `true` when any batch came back
+ * full. Not its grant revisions: the thread's delete purges them (`revokeThreadGrantsJob`), and
+ * {@link eraseGrantRevisionsForUser} those of the user's chats, each within an invocation's D1 queries.
+ */
 export const eraseThreadSuggestionsAndInvites = async (ctx: MutationCtx, threadId: Id<"threads">): Promise<boolean> => {
     const [suggestions, summaries, { page: invites }] = await Promise.all([
         ctx.db
@@ -175,6 +532,54 @@ export const eraseProjectsForUser = async (ctx: MutationCtx, userId: string): Pr
     }
 
     return await eraseProjectRuleFilesForUser(ctx, userId);
+};
+
+/** A workflow with no nodes: what a project's workflow becomes once its chat files are released. */
+const EMPTY_WORKFLOW = { edges: [], nodes: [] };
+
+/** The projects one round releases, so a large account stays inside one mutation. The next round picks up the rest. */
+const PROJECTS_RELEASED_PER_ROUND = 20;
+
+/**
+ * The chat files the user's projects hold (image nodes and reference media), released while the owner still holds their grants: a file
+ * is counted only while the owner holds a grant for it (`workflow/images.ts#countedWorkflowFileIds`), so this runs before
+ * `eraseChatFileAccessForUser`. Once it does, nothing is counted and the release is a no-op. A project whose files are released has its
+ * workflow emptied in the same write, so a retried round releases nothing twice. The project rows go in `eraseProjectsForUser`.
+ */
+export const releaseProjectImagesForUser = async (ctx: MutationCtx, userId: string): Promise<BatchResult> => {
+    let cursor: string | null = null;
+    let released = 0;
+    let more = true;
+
+    while (more) {
+        const page = (await ctx.db.projects.findMany({ consistency: "primary", cursor, limit: BATCH, where: { userId } })) as {
+            continueCursor: string;
+            isDone: boolean;
+            page: Doc<"projects">[];
+        };
+
+        for (const project of page.page) {
+            const { previous } = await countedWorkflowFileIds(ctx.db, userId, project.workflowContent, undefined);
+
+            if (previous.length === 0) {
+                continue;
+            }
+
+            await changeRefcount(ctx, previous, []);
+            await patchRow(ctx.db, "projects", project, { workflowContent: EMPTY_WORKFLOW });
+
+            released += 1;
+
+            if (released >= PROJECTS_RELEASED_PER_ROUND) {
+                return { hasMore: true };
+            }
+        }
+
+        more = !page.isDone;
+        cursor = page.isDone ? null : page.continueCursor;
+    }
+
+    return { hasMore: false };
 };
 
 /** Deletes a batch of executions, each after its node rows; `true` when one was left for the next round. */
@@ -241,8 +646,13 @@ export const eraseDocumentsForUser = async (ctx: MutationCtx, userId: string): P
         .withIndex("by_userId", (q) => q.eq("userId", userId))
         .take(BATCH);
 
+    // A pin names its document, so each document's pins go first (the chat module owns them). A document whose pins are not all gone yet
+    // stays for the next round, so no single call deletes an unbounded pin set.
+    const drained = await erasePinsNamingDocuments(ctx, documents);
+    const ready = documents.filter((documentRow) => drained.has(documentRow._id));
+
     const hasMore = await deleteParentsWithChildren(
-        documents,
+        ready,
         async (documentRow) =>
             await ctx.db
                 .query("documentVersions")
@@ -254,5 +664,5 @@ export const eraseDocumentsForUser = async (ctx: MutationCtx, userId: string): P
         },
     );
 
-    return { hasMore };
+    return { hasMore: hasMore || ready.length < documents.length };
 };

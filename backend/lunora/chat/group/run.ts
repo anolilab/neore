@@ -39,8 +39,10 @@ import type { Id } from "../../_generated/dataModel";
 import type { ActionCtx } from "../../_generated/server";
 import type { ResearchDepth } from "../../agent/client/create-tool";
 import { MAX_ATTACHED_FILES } from "../../agent/file-attach-claim";
+import { callOnShard } from "../../lib/cross-shard";
 import { streamLogger } from "../../lib/logger";
 import { gatewayFetch, type ServiceFetch } from "../../lib/services";
+import { onUserShard } from "../lib/daily-limit";
 import { defaultModelUnderRules, getUtilityModel, readsImagesAndCallsTools } from "../../lib/utility-model";
 import { resolveReasoningEffort, resolveSkillModel } from "../../skills/slash-command";
 import type { AwaitingInput, RunContext } from "../lib/agent-run";
@@ -49,7 +51,7 @@ import {
     AgentRunError,
     buildRunStreamArgs,
     loadModelFilterRules,
-    resolveBackupModelId,
+    resolveBackupModelIds,
     endStoppedRun,
     finishRun,
     loadRunContext,
@@ -310,9 +312,9 @@ const runSpeaker = async (
         setRunReplyKey(ctx, turn.replyKey);
         setRunOrganizationId(ctx, turn.permissionOrganizationId);
 
-        const backupModelId = await resolveBackupModelId(ctx, turn.userId, turn.prefs.backupModel, model, modelFilterRules);
+        const backupModelIds = await resolveBackupModelIds(ctx, turn.userId, turn.prefs.backupModels, model, modelFilterRules);
         const agent = await getAgent(model, {
-            backupModelId,
+            backupModelIds,
             customProvider,
             gateway: gatewayFetch(ctx),
             language: turn.prefs.language,
@@ -365,7 +367,7 @@ const runSpeaker = async (
         });
         const streamTextArgs: Record<string, unknown> = {
             ...buildRunStreamArgs({
-                backupModelId,
+                backupModelIds,
                 hasTools: Object.keys(toolResult.tools).length > 0,
                 model,
                 reasoningEffort,
@@ -573,6 +575,19 @@ const shiftQueue = (queue: TurnQueue): { next: { skillId: string; step?: GroupSt
 const isQueueEmpty = (queue: TurnQueue): boolean => (queue.kind === "steps" ? queue.steps : queue.queue).length === 0;
 
 /**
+ * Takes the daily Text unit for a speaker after the first. `/chat/start` charged the turn's first reply; each further one is a
+ * full agent run of its own. The unit is taken on the paying user's own shard: this turn runs on the thread owner's, so a charge
+ * made here would draw on the owner's counter for the member.
+ */
+const takeFurtherSpeakerUnit = async (ctx: ActionCtx, turn: TurnContext): Promise<boolean> => {
+    const chargeArgs = { kind: "Text" as const, organizationId: turn.organizationId, userId: turn.userId };
+
+    return onUserShard(turn.userId)
+        ? await ctx.runMutation(internal.chat.daily_charge.chargeDailyUnit, chargeArgs)
+        : await callOnShard(internal.chat.daily_charge.chargeDailyUnit, chargeArgs, { shardKey: turn.userId });
+};
+
+/**
  * Run `queue` in order until it is empty, the per-turn cap is reached, the
  * user pressed stop, or a speaker paused for an approval. Closes the stream
  * unless a pause already did.
@@ -585,6 +600,9 @@ const runQueue = async (
     const spoken = [...start.spokenSkillIds];
     let queue = boundedQueue(start.plan, spoken);
     let continueFrom = start.continueFromMessageId;
+    // The end the closing chunk records: none for a stop (a stopped run writes no event). A quota that ends the turn after a reply was
+    // delivered still succeeds: that reply went out, and the stream closes as done.
+    let runEnd: "succeeded" | "failed" | undefined = "succeeded";
 
     while (!isQueueEmpty(queue)) {
         const { next, rest } = shiftQueue(queue);
@@ -602,15 +620,12 @@ const runQueue = async (
             spoken.length > 0 &&
             (await ctx.runQuery(internal.chat.group.functions.isGroupStopRequested, { since: turn.turnStartedAt, threadId: turn.threadId }))
         ) {
+            runEnd = undefined;
+
             break;
         }
 
-        // `/chat/start` charged the turn's first reply; each further one is a
-        // full agent run of its own and costs one more unit of the daily quota.
-        if (
-            spoken.length > 0 &&
-            !(await ctx.runMutation(internal.chat.daily_charge.chargeDailyUnit, { kind: "Text", organizationId: turn.organizationId, userId: turn.userId }))
-        ) {
+        if (spoken.length > 0 && !(await takeFurtherSpeakerUnit(ctx, turn))) {
             streamLogger.debug("[GroupChat] Daily limit reached; ending the turn early", { spoken: spoken.length, threadId: turn.threadId });
 
             break;
@@ -647,14 +662,9 @@ const runQueue = async (
         continueFrom = lastMessageId ?? continueFrom;
     }
 
-    // Every way past the speaker loop that is not a pause or a stop lands here, the repeated-call guard's included: the turn
-    // succeeded, so its end is recorded in the Events log by the chunk that closes the stream.
-    await ctx.runMutation(internal.chat.streaming.persistent.library.addChunk, {
-        final: true,
-        runEnd: "succeeded",
-        streamId: turn.streamId as Id<"persistentStreams">,
-        text: "",
-    });
+    // Every way past the speaker loop that is not a pause lands here and closes the stream. The end it records is `runEnd`: a stop
+    // records none, and the rest (a quota refusal after a delivered reply, and the repeated-call guard's stop included) succeed.
+    await closeGroupTurnStream(ctx, turn, runEnd);
 
     await setThreadStatus(ctx, turn.threadId, "active", { replied: true });
     // The turn is over for good (a pause or a stop returned before this): its saved references go with it.
@@ -741,6 +751,23 @@ const loadTurnContext = async (
         userId,
         userProviderKeys: runContext.userProviderKeys,
     };
+};
+
+/**
+ * The chunk that closes a group turn's stream. `runEnd` is the end it records in the Events log; `undefined` records none, which
+ * is what a stop does. A paused turn returns before this is called, so it writes nothing.
+ */
+export const closeGroupTurnStream = async (
+    ctx: Pick<ActionCtx, "runMutation">,
+    turn: Pick<TurnContext, "streamId">,
+    runEnd: "succeeded" | "failed" | undefined,
+): Promise<void> => {
+    await ctx.runMutation(internal.chat.streaming.persistent.library.addChunk, {
+        final: true,
+        ...(runEnd !== undefined && { runEnd }),
+        streamId: turn.streamId as Id<"persistentStreams">,
+        text: "",
+    });
 };
 
 /**

@@ -85,27 +85,70 @@ export const toolPermissionKey = (source: ToolSource, toolName: string, owner?: 
 };
 
 /**
- * Built-ins that default to `ask`. `delegateToCodingAgent` spends the user's
+ * Built-ins that default to `ask`. `canvasAI` and the paid generation tools (imageGeneration, imageEditing, videoGeneration,
+ * musicGeneration) ask too: a default `auto` would run a paid call with no approval for anyone who has not set an override. `delegateToCodingAgent` spends the user's
  * own provider key on a long sandbox run and can push to their GitHub;
  * `delegateToSubAgent` and `messageWorker` start a background run charged to their task quota —
  * so the user sees the task before anything starts. `replyToReviewComment` and `rerunFailedChecks` act on a pull request
- * as the user (`mergePullRequest` asks every time: it needs a person). Headless callers lose them
+ * as the user (`mergePullRequest` asks every time: it needs a person; so does `signInWithSavedLogin`, which types a saved
+ * password for them). Headless callers lose them
  * (`ask` degrades to `off`), which is intended — except a sub-agent's own
  * delegation, which inherits the consent its parent call was given
  * (`sub-agents/execute.ts`).
  */
 export const BUILTIN_TOOLS_ASK_BY_DEFAULT: ReadonlySet<string> = new Set([
     "askUser",
+    "canvasAI",
     "delegateToCodingAgent",
     "delegateToSubAgent",
+    "imageEditing",
+    "imageGeneration",
     "mergePullRequest",
     "messageWorker",
+    "musicGeneration",
     "replyToReviewComment",
     "requestSecret",
     "rerunFailedChecks",
+    "signInWithSavedLogin",
+    "videoGeneration",
 ]);
 
 const SUB_AGENT_BUILTINS: ReadonlySet<string> = new Set(["delegateToSubAgent", "messageWorker"]);
+
+/**
+ * Built-ins that "Always allow" never grants. Each one spends money or sends something out as the person, and a stored
+ * `auto` would let every later call run unasked. An `always` answer for them is refused and the call still asks; an hour
+ * or today allow is unaffected.
+ *
+ * - imageGeneration, imageEditing, videoGeneration, musicGeneration: paid per generation on a metered provider (FAL),
+ *   each one counted against the user's daily bucket.
+ * - canvasAI: its generate and style operations call the same image generation and editing actions, so it is paid too.
+ * - delegateToCodingAgent: spends the user's own provider key on a sandbox run that can push to their GitHub.
+ * - delegateToSubAgent, messageWorker: start a run charged to the task quota, or send more work to a worker.
+ * - replyToReviewComment: posts a comment on a pull request as the person.
+ * - rerunFailedChecks: re-runs checks on a pull request with the person's GitHub access.
+ * - mergePullRequest: merges a pull request as the person.
+ * - signInWithSavedLogin: types a saved password for the person into a site.
+ *
+ * `tool-permissions.grants.test.ts` checks that every name here is a real built-in.
+ */
+export const ALWAYS_ALLOW_REFUSED_BUILTINS: ReadonlySet<string> = new Set([
+    "canvasAI",
+    "delegateToCodingAgent",
+    "delegateToSubAgent",
+    "imageEditing",
+    "imageGeneration",
+    "mergePullRequest",
+    "messageWorker",
+    "musicGeneration",
+    "replyToReviewComment",
+    "rerunFailedChecks",
+    "signInWithSavedLogin",
+    "videoGeneration",
+]);
+
+/** Whether an `always` answer for this permission key is refused: a built-in listed in {@link ALWAYS_ALLOW_REFUSED_BUILTINS}. */
+export const isAlwaysAllowRefused = (key: string): boolean => key.startsWith("builtin:") && ALWAYS_ALLOW_REFUSED_BUILTINS.has(key.slice("builtin:".length));
 
 export { BUILTIN_TOOLS_NEEDING_A_PERSON } from "./person-tools";
 
@@ -340,6 +383,27 @@ const needsApprovalUnless =
     };
 
 /**
+ * An `ask` tool that reads its target before it asks (`looksBeforeAsk`, the browser's clicks): its own `needsApproval` runs with
+ * `asking` set, so its read is kept for the approved click, and the call always asks. A read that throws still asks; its
+ * empty record then refuses the approved click.
+ */
+const askAfterLook = (own: OwnApproval): OwnApproval =>
+    async function needsApprovalAfterLook(this: unknown, input: unknown, options: NeedsApprovalOptions): Promise<boolean> {
+        try {
+            if (typeof own === "function") {
+                await (own as (this: unknown, input: unknown, options: unknown) => unknown).call(this, input, { ...options, asking: true });
+            }
+        } catch {
+            // The read failed: the call still asks, and its record stays empty.
+        }
+
+        // Always asks. A call whose preread skipped the look (no action budget then) must not reach `execute` unapproved: a budget
+        // freed before `execute` would let an ordinary-looking click run that nobody approved. The approval is then refused at
+        // `execute` (no record), which fails closed.
+        return true;
+    } as OwnApproval;
+
+/**
  * A timed allow's check: once the grant has lapsed the call asks (unless the quick check clears it), and it still asks
  * whenever the tool's own check does. A tool can decide per call that a person must click (a message to a worker on a
  * computer), and neither a grant nor the quick check lifts that.
@@ -356,11 +420,36 @@ const withLapse = (own: OwnApproval, expiresAt: number, afterLapse: AfterLapse):
     }
 
     return function needsApprovalOrLapsed(this: unknown, input: never, options: never) {
-        const ownAnswer = (own as (this: unknown, input: never, options: never) => boolean | Promise<boolean>).call(this, input, options);
-        const settle = (asked: boolean): boolean | Promise<boolean> => asked || lapsed(input, options);
+        // A call made after the lapse asks, so the tool's own check is asked as an ask is (`asking`): its decision keeps the
+        // target it reads, and the approved click is checked against it. A call inside the grant is looked at as before.
+        const isLapsed = Date.now() >= expiresAt;
+        const ownOptions = isLapsed ? ({ ...(options as NeedsApprovalOptions), asking: true } as never) : options;
+        const ownAnswer = (own as (this: unknown, input: never, options: never) => boolean | Promise<boolean>).call(this, input, ownOptions);
+        // The grant can run out during the tool's own check (a renderer read takes seconds). A check that started inside the grant
+        // ran without asking, so it recorded nothing: it runs again, asking, so the approved click has a target to be checked against.
+        const settle = async (asked: boolean): Promise<boolean> => {
+            if (asked) {
+                return true;
+            }
+
+            const isLapsedNow = await lapsed(input, options);
+
+            if (isLapsedNow && !isLapsed) {
+                try {
+                    await (own as (this: unknown, input: never, options: never) => unknown).call(this, input, {
+                        ...(options as NeedsApprovalOptions),
+                        asking: true,
+                    } as never);
+                } catch {
+                    // The look failed: the call still asks, and its record stays empty.
+                }
+            }
+
+            return isLapsedNow;
+        };
 
         return typeof ownAnswer === "boolean" ? settle(ownAnswer) : ownAnswer.then(settle);
-    } as OwnApproval;
+    } as unknown as OwnApproval;
 };
 
 /**
@@ -405,7 +494,16 @@ export const applyToolPermissions = (
 
         if (mode === "ask") {
             requiresApproval.push(name);
-            result[name] = { ...tool, needsApproval: check ? needsApprovalUnless(check, descriptor) : true } as ToolSet[string];
+
+            let askAnswer: OwnApproval = true;
+
+            if (check) {
+                askAnswer = needsApprovalUnless(check, descriptor);
+            } else if ((tool as { looksBeforeAsk?: boolean }).looksBeforeAsk === true) {
+                askAnswer = askAfterLook(tool.needsApproval);
+            }
+
+            result[name] = { ...tool, needsApproval: askAnswer } as ToolSet[string];
             continue;
         }
 

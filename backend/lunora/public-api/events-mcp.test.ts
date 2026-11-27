@@ -57,12 +57,21 @@ const pollingWith = (poll: (request: PollRequest) => Promise<PollResponse>) => {
 
 describe("discovery", () => {
     it("advertises the extension as a capability with empty settings, and no top-level events capability", async () => {
-        const { body } = await serve(modern("server/discover"));
+        const { body } = await serve(
+            modern("server/discover"),
+            pollingWith(async () => pollBody),
+        );
         const { capabilities } = body["result"];
 
         expect(capabilities.extensions).toStrictEqual({ [EVENT_EXTENSION_ID]: {} });
         expect(capabilities).not.toHaveProperty("events");
         expect(body["result"].resultType).toBe("complete");
+    });
+
+    it("does not advertise the extension where no Events poll is configured, since its methods are refused there", async () => {
+        const { body } = await serve(modern("server/discover"));
+
+        expect(body["result"].capabilities).not.toHaveProperty("extensions");
     });
 });
 
@@ -102,6 +111,15 @@ describe("negotiation", () => {
         expect(status).toBe(200);
     });
 
+    it("answers webhook methods with -32601 when the endpoint wires no webhook dependency", async () => {
+        const { body } = await serve(
+            modern("events/subscribe", { _meta: OFFER, name: "run.completed" }, "run.completed"),
+            pollingWith(async () => pollBody),
+        );
+
+        expect(body["error"].code).toBe(-32_601);
+    });
+
     it("answers push (events/stream) with -32601 even when negotiated", async () => {
         const { body } = await serve(
             modern("events/stream", { _meta: OFFER, name: "run.completed" }, "run.completed"),
@@ -110,14 +128,131 @@ describe("negotiation", () => {
 
         expect(body["error"].code).toBe(-32_601);
     });
+});
 
-    it("answers webhook methods with -32601 when the endpoint wires no webhook dependency", async () => {
-        const { body } = await serve(
-            modern("events/subscribe", { _meta: OFFER, name: "run.completed" }, "run.completed"),
-            pollingWith(async () => pollBody),
-        );
+describe("the read allowance a poll draws on", () => {
+    it("is not drawn by the protocol layer for a valid poll: the router charges it once the key's scope passes", async () => {
+        const charge = vi.fn(async () => undefined);
+        const request = modern("events/poll", { _meta: OFFER, cursor: null, name: "run.completed" }, "run.completed");
 
-        expect(body["error"].code).toBe(-32_601);
+        await serveMcp(request.body, {
+            ...dependenciesWith(
+                request,
+                pollingWith(async () => pollBody),
+            ),
+            chargeProtocolCall: charge,
+        });
+
+        expect(charge).not.toHaveBeenCalled();
+    });
+
+    it("is drawn for a malformed poll, which never reaches the router", async () => {
+        const charge = vi.fn(async () => undefined);
+        const request = modern("events/poll", { _meta: OFFER, cursor: null }, "run.completed");
+
+        await serveMcp(request.body, {
+            ...dependenciesWith(
+                request,
+                pollingWith(async () => pollBody),
+            ),
+            chargeProtocolCall: charge,
+        });
+
+        expect(charge).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe("an unsupported poll's read allowance", () => {
+    it("is drawn: a request that did not offer the extension is refused as an unknown method, and still uses the allowance", async () => {
+        const charge = vi.fn(async () => undefined);
+        // No `_meta` offer: the extension was not negotiated, so the poll is refused before the router.
+        const request = modern("events/poll", { cursor: null, name: "run.completed" }, "run.completed");
+
+        const response = await serveMcp(request.body, {
+            ...dependenciesWith(
+                request,
+                pollingWith(async () => pollBody),
+            ),
+            chargeProtocolCall: charge,
+        });
+
+        expect(charge).toHaveBeenCalledTimes(1);
+        expect(await response.json()).toMatchObject({ error: { code: expect.any(Number) } });
+    });
+});
+
+describe("an Events list's read allowance", () => {
+    it("is drawn once when the list is answered", async () => {
+        const charge = vi.fn(async () => undefined);
+        const request = modern("events/list", { _meta: OFFER });
+
+        await serveMcp(request.body, {
+            ...dependenciesWith(
+                request,
+                pollingWith(async () => pollBody),
+            ),
+            chargeProtocolCall: charge,
+        });
+
+        expect(charge).toHaveBeenCalledTimes(1);
+    });
+
+    it("is drawn once when the list is refused as unsupported", async () => {
+        const charge = vi.fn(async () => undefined);
+        const request = modern("events/list", {});
+
+        await serveMcp(request.body, {
+            ...dependenciesWith(
+                request,
+                pollingWith(async () => pollBody),
+            ),
+            chargeProtocolCall: charge,
+        });
+
+        expect(charge).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe("an Events notification's read allowance", () => {
+    it("is drawn: a notification gets no answer, but it is still a call", async () => {
+        const charge = vi.fn(async () => undefined);
+        const request = modern("events/poll", { _meta: OFFER, cursor: null, name: "run.completed" }, "run.completed");
+        // The same message without its id: a notification, which the dispatcher answers with 202 and no body.
+        const notification = JSON.parse(request.body) as Record<string, unknown>;
+
+        delete notification["id"];
+        const body = JSON.stringify(notification);
+
+        const response = await serveMcp(body, {
+            ...dependenciesWith(
+                request,
+                pollingWith(async () => pollBody),
+            ),
+            chargeProtocolCall: charge,
+        });
+
+        expect(response.status).toBe(202);
+        expect(charge).toHaveBeenCalledTimes(1);
+    });
+
+    it("gets no body even when the allowance is spent, since a notification is never answered", async () => {
+        const request = modern("events/poll", { _meta: OFFER, cursor: null, name: "run.completed" }, "run.completed");
+        const notification = JSON.parse(request.body) as Record<string, unknown>;
+
+        delete notification["id"];
+
+        const response = await serveMcp(JSON.stringify(notification), {
+            ...dependenciesWith(
+                request,
+                pollingWith(async () => pollBody),
+            ),
+            chargeProtocolCall: async () => {
+                throw new PublicApiError("rate_limited", "Too many requests.", { details: { retryAfterSeconds: 30 } });
+            },
+        });
+
+        expect(response.status).toBe(202);
+        expect(await response.text()).toBe("");
     });
 });
 
@@ -203,6 +338,17 @@ describe("events/poll", () => {
         expect(body["result"]).toStrictEqual({ ...pollBody, resultType: "complete" });
     });
 
+    it("sends each event's timestamp as an ISO 8601 string, not epoch milliseconds", async () => {
+        const event = { data: { threadId: "t1" }, eventId: "run:s1", name: "run.completed", timestamp: Date.UTC(2026, 1, 19, 15, 30) };
+        const poll = pollingWith(async () => {
+            return { ...pollBody, events: [event] };
+        });
+
+        const { body } = await serve(modern("events/poll", { _meta: OFFER, cursor: null, name: "run.completed" }, "run.completed"), poll);
+
+        expect(body["result"]["events"]).toStrictEqual([{ ...event, timestamp: "2026-02-19T15:30:00.000Z" }]);
+    });
+
     it("passes the cursor, the bounds and the threadId filter through, with the spec's defaults", async () => {
         const poll = pollingWith(async () => pollBody);
 
@@ -246,6 +392,17 @@ describe("events/poll", () => {
         expect(forbidden.body["result"]).toBeUndefined();
     });
 
+    it("answers Forbidden, not a server error, for a suspended account's poll", async () => {
+        const suspended = pollingWith(async () => {
+            throw new PublicApiError("forbidden", "Your account has been suspended");
+        });
+
+        const { body } = await serve(modern("events/poll", { _meta: OFFER, cursor: null, name: "run.completed" }, "run.completed"), suspended);
+
+        expect(body["error"]).toMatchObject({ code: -32_024, data: { reason: "forbidden" }, message: "Your account has been suspended" });
+        expect(body["result"]).toBeUndefined();
+    });
+
     it("refuses a request whose Mcp-Name header is not the event name, as a header mismatch", async () => {
         const poll = pollingWith(async () => pollBody);
         const { body, status } = await serve(modern("events/poll", { _meta: OFFER, name: "run.completed" }, "run.failed"), poll);
@@ -253,5 +410,41 @@ describe("events/poll", () => {
         expect(status).toBe(400);
         expect(body["error"].code).toBe(-32_020);
         expect(poll.poll).not.toHaveBeenCalled();
+    });
+});
+
+describe("a read allowance spent on an Events call", () => {
+    it("answers the call with its own request id as a rate-limit error, not a REST body", async () => {
+        const limited = async (): Promise<void> => {
+            throw new PublicApiError("rate_limited", "Too many requests for this API key.", { retryAfterSeconds: 2 });
+        };
+
+        for (const request of [modern("events/list", { _meta: OFFER }), modern("events/poll", { name: "run.completed" }, "run.completed")]) {
+            const response = await serveMcp(request.body, {
+                ...dependenciesWith(
+                    request,
+                    pollingWith(async () => pollBody),
+                ),
+                chargeProtocolCall: limited,
+            });
+            const body = (await response.json()) as Record<string, any>;
+
+            expect(response.status).toBe(429);
+            expect(body["id"]).toBe(1);
+            expect(body["error"]).toMatchObject({ code: -32_025, data: { reason: "rate_limited", retryAfterSeconds: 2 } });
+        }
+    });
+});
+
+describe("an Events call that fails inside the router", () => {
+    it("answers with a JSON-RPC error carrying the request's id, not a REST body", async () => {
+        const failing = pollingWith(async () => {
+            throw new PublicApiError("internal_error", "An unexpected error occurred.");
+        });
+        const { body, status } = await serve(modern("events/poll", { _meta: OFFER, name: "run.completed" }, "run.completed"), failing);
+
+        expect(status).toBe(500);
+        expect(body["id"]).toBe(1);
+        expect(body["error"]).toMatchObject({ code: -32_603, data: { reason: "internal_error" }, message: "An unexpected error occurred." });
     });
 });

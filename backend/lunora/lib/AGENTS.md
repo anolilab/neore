@@ -55,13 +55,24 @@
   procedures take the staged object by `uploadId` alone, rebuild its key from
   the caller's identity and check the REAL bytes (`takeStagedUpload`: size cap,
   allowlist, leading bytes, then the staging object is deleted) —
-  `file.finalizeChatUpload` dedupes into `agent-files/<sha256>`,
+  `file.finalizeChatUpload` dedupes by hash into `chatFiles` (each new upload its own `agent-files/<sha256>/<uuid>`),
   `vault_functions.saveVaultFile` moves it to a server-minted key (5 MB cap),
   `chat_import_functions.startImportJob` hands the staging key to the import
   workflow, which deletes it when done. The route schedules a reap of each
   staging key an hour after its upload is created; the shard housekeeping sweep
   (`file.sweepStagedChatUploads`) is the backstop and also drops upload state
   untouched for an hour. There is no signed `PUT` path any more.
+
+- **Guest merges** (`lib/account-merge.ts`; [reference](../../../docs/agents/guest-merge.md)): keep every step safe
+  to run twice; save progress through `releaseMergeLease`, never from the job payload; every writing step checks the
+  lease generation first. Import markers, progress records and the pins-left signal never get a time to live. Every
+  stop (cap, sweep drop, erasure, gone account, shared store) ends its markers and keeps the guest. Every step that
+  writes guest data on the new account's side, or takes a copy back, checks both erasing markers first
+  (`stoppedForErasure`); what moved before stays the new account's. A copy of a row the guest deleted (before or
+  during the clear) is taken back only while it matches its import marker; the marker stays. Trigger- or sync-kept
+  fields (`DERIVED_FIELDS`) stay out of digests and keep the new shard's value. A run-cap stop leaves a stop record,
+  read before any lease or record. A row the new shard keeps (`kept`) is read past, and the `guest` step then stops
+  for good, keeping the guest.
 
 - **Secret detection** — `lib/secret-redaction.ts` (`redactSecrets`, `containsSecret`)
   is the one detector for provider keys, JWTs, `Bearer` values, private key blocks,

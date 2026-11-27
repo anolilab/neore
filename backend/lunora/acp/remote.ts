@@ -13,18 +13,21 @@ import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { insertThread } from "../agent/table-writes";
 import { stopHostTurn } from "./lib/finish";
-import { claimOnce } from "../lib/claim-once";
+import { claimFence, claimRow, recordClaimResult } from "../lib/claim-once";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { MAX_LENGTH } from "../lib/validators";
 import { createAcpCall } from "../devices/lib/acp-call";
+import { isDeviceInScope } from "../devices/lib/scope";
 import { ACP_CLAIM_WINDOW_MS } from "../devices/lib/constants";
 import { countOpenCalls, isDeviceOnline, isDeviceOutdated } from "../devices/lib/state";
 import { withdrawSend } from "./lib/withdraw";
 import { isHostRunThread } from "./lib/host-thread";
 import { hostOrganizationRefusal } from "./lib/organization-cap";
 import { sessionOfThread } from "./lib/sessions";
-import { offerOf, startFailureMessage, webSessionId } from "./lib/start";
+import { projectRunnerOf, runnerStillOffered } from "./lib/project-runner";
+import { HOST_START_OUT_OF_SCOPE, offerOf, startFailureMessage, webSessionId } from "./lib/start";
 import { openHostSession } from "./lib/start-session";
+import { readableProject, writableProject } from "../projects/functions";
 import { fitsIdBytes, vPendingPermission } from "./validators";
 
 /** A double tap, or a retry after a lost answer, within this is the same start. */
@@ -105,33 +108,101 @@ export interface StartHostSessionInput {
     folderId: string;
     /** The caller's verified active organization (`ctx.user.activeOrganization`), unset in the personal space. */
     organizationId?: string;
+    /** The project the thread is filed under; the start then remembers its runner there (`lib/project-runner.ts`). */
+    projectId?: Id<"projects">;
 }
+
+/**
+ * What a start whose claim was already taken answers: the session the first try made, so a lost answer is found again.
+ * `requested` is the project the first try was for, as the claim read once by the caller recorded it (a claim from before that
+ * was recorded has none: those starts took no project). A retry naming another project is not the same start, so it is refused
+ * rather than handed the first try's thread, whichever computer it names: the session is looked up on that computer only.
+ */
+const answerRetry = async (
+    ctx: MutationCtx,
+    deviceId: Id<"devices">,
+    hostSessionId: string,
+    requested: string,
+    projectId: string,
+): Promise<{ started: boolean; threadId?: string }> => {
+    if (requested !== projectId) {
+        throw new LunoraError("BAD_REQUEST", "That start was made for another project. Start it again from the project it was made in.");
+    }
+
+    const first = await ctx.db.acpSessions.findFirst({ where: { deviceId, hostSessionId } });
+
+    return { started: false, ...(first && { threadId: first.threadId as string }) };
+};
 
 /** The body of {@link startHostSession}, callable from another mutation that starts an agent for its own purpose. */
 export const startHostSessionFor = async (ctx: MutationCtx, userId: string, args: StartHostSessionInput): Promise<{ started: boolean; threadId?: string }> => {
-    const device = await ctx.db.devices.findFirst({ where: { _id: args.deviceId, userId } });
+    // From the primary: the device's pairing and project scope decide the start, and a replica can still show them as they were.
+    const device = await ctx.db.devices.findFirst({ consistency: "primary", where: { _id: args.deviceId, userId } });
     const offer = offerOf(device, args.agentKey, args.folderId);
 
     if (!device?.encryptedSecret || !offer) {
         throw new LunoraError("BAD_REQUEST", "That agent is not approved for that folder on this computer. Approve it in the desktop app first.");
     }
 
+    // The session id comes from the client id, so a retry finds the first try's session whatever it became since.
+    const hostSessionId = await webSessionId(userId, args.clientId, { kind: "start" });
+    const startKey = `${userId}:${args.clientId}`;
+    // Checked before the claim: a project the caller may not file into refuses the start and gives nothing up. From the primary:
+    // the project's organization decides whose cap holds the start, and a replica can still show the one it just moved out of.
+    const project = args.projectId ? await writableProject(ctx, args.projectId, userId, { primary: true }) : null;
+    // The first try's claim, read once: a retry is judged by what this one read recorded, so a claim lapsing between two reads
+    // cannot make the same start look like another.
+    const firstTry = await claimRow(ctx, "host-start", startKey);
+    // A computer limited to some projects starts threads only in those, the rule a switch and its tools follow (`devices/lib/scope.ts`):
+    // a thread with no project is in none of them.
+    let refusal: LunoraError | null = null;
+
+    if (args.projectId && !project) {
+        refusal = new LunoraError("FORBIDDEN", "Project not found or access denied");
+    } else if (!isDeviceInScope(device, project?._id)) {
+        refusal = new LunoraError(
+            "BAD_REQUEST",
+            project
+                ? "That computer is not allowed in this project. Change which projects it may be used in, in its settings."
+                : "That computer may only be used in some projects. Start the agent from one of them, or change this in its settings.",
+            { data: { code: HOST_START_OUT_OF_SCOPE } },
+        );
+    }
+
+    if (refusal) {
+        // A retry of a start that went through, its project deleted or closed to the computer since: the first try's thread is still the answer.
+        if (firstTry) {
+            return await answerRetry(ctx, device._id, hostSessionId, firstTry.result ?? "", args.projectId ?? "");
+        }
+
+        throw refusal;
+    }
+
     if (!isDeviceOnline(device, ctx.now)) {
         throw new LunoraError("BAD_REQUEST", "That computer is not online.");
     }
 
-    // The session id comes from the client id, so a retry finds the first try's session whatever it became since.
-    const hostSessionId = await webSessionId(userId, args.clientId, { kind: "start" });
-
-    if (!(await claimOnce(ctx, "host-start", `${userId}:${args.clientId}`, START_CLAIM_TTL_MS, userId))) {
-        // The first try's answer may have been lost: hand back the session it made.
-        const first = await ctx.db.acpSessions.findFirst({ where: { deviceId: device._id, hostSessionId } });
-
-        return { started: false, ...(first && { threadId: first.threadId as string }) };
+    if (firstTry) {
+        return await answerRetry(ctx, device._id, hostSessionId, firstTry.result ?? "", project?._id ?? "");
     }
 
+    // No live claim was read above, and none can be taken in between: this transaction is the only writer of it.
+    const claimedAt = await claimFence(ctx, "host-start", startKey, { ttlMs: START_CLAIM_TTL_MS, userId });
+
+    if (claimedAt === null) {
+        throw new LunoraError("CONFLICT", "That start is already being made.");
+    }
+
+    // The project this start is for is kept on its claim, so a retry is judged by it and not by where the thread is filed now.
+    await recordClaimResult(ctx, "host-start", startKey, claimedAt, project?._id ?? "");
+
+    // A project of an organization files its thread under that organization, whatever space the start came from, so the
+    // organization's cap holds the thread. Otherwise the thread is filed under the caller's organization: a project moved
+    // out of one keeps `organizationId: ""`, which is no organization.
+    const organizationId = project?.organizationId || args.organizationId;
+
     // After the claim, so a retry of a start that went through still finds its session. Throwing gives the claim back.
-    const refused = await hostOrganizationRefusal(ctx, args.organizationId, userId);
+    const refused = await hostOrganizationRefusal(ctx, organizationId, userId);
 
     if (refused) {
         throw new LunoraError("FORBIDDEN", refused);
@@ -142,7 +213,8 @@ export const startHostSessionFor = async (ctx: MutationCtx, userId: string, args
         createdBy: userId,
         mode: "text",
         model: offer.agentKey,
-        ...(args.organizationId && { organizationId: args.organizationId }),
+        ...(project && { projectId: project._id }),
+        ...(organizationId && { organizationId }),
         runner: "host",
         status: "active",
         tags: ["chat", "host"],
@@ -158,6 +230,7 @@ export const startHostSessionFor = async (ctx: MutationCtx, userId: string, args
         throw new LunoraError("BAD_REQUEST", startFailureMessage(call.error));
     }
 
+    // The project's default is recorded when the agent opens (`acp/ingest.ts`), not here: a start the computer refuses leaves it.
     return { started: true, threadId: threadId as string };
 };
 
@@ -173,6 +246,7 @@ export const startHostSession = authMutation
         clientId: v.string().max(MAX_LENGTH.id),
         deviceId: v.id("devices"),
         folderId: v.string().max(128),
+        projectId: v.optional(v.id("projects")),
     })
     .output(v.object({ started: v.boolean(), threadId: v.optional(v.string()) }))
     .mutation(async ({ args, ctx }) => {
@@ -181,6 +255,37 @@ export const startHostSession = authMutation
         ctx.log.event("acp.start_host_session", { started: result.started });
 
         return result;
+    });
+
+/**
+ * The computer and agent a new thread in `projectId` starts on by default for the caller: the runner its last host
+ * thread used, or null when there is none, or the computer no longer is the caller's or no longer offers that pair.
+ */
+export const getProjectRunnerDefault = authQuery
+    .input({ projectId: v.id("projects") })
+    .output(v.union(v.object({ agentKey: v.string(), deviceId: v.string(), folderId: v.string() }), v.null()))
+    .query(async ({ args, ctx }) => {
+        const { userId } = ctx.user;
+        // From the primary: a membership revoked a moment ago must not hand back the saved runner from a lagging replica.
+        const project = await readableProject(ctx, args.projectId, userId, { primary: true });
+
+        if (!project) {
+            ctx.log.event("acp.get_project_runner_default", { found: false });
+
+            return null;
+        }
+
+        const settings = project.organizationId ? await ctx.db.userSettings.findFirst({ where: { userId } }) : null;
+        const runner = projectRunnerOf(project, settings);
+        const deviceId = runner ? ctx.db.normalizeId("devices", runner.deviceId) : null;
+        // From the primary too, as the start reads it: an unpaired computer or a narrowed project scope must not be preselected.
+        const device = deviceId ? await ctx.db.devices.findFirst({ consistency: "primary", where: { _id: deviceId, userId } }) : null;
+
+        const offered = runner !== null && runnerStillOffered(device, runner, project._id);
+
+        ctx.log.event("acp.get_project_runner_default", { found: offered });
+
+        return offered ? runner : null;
     });
 
 /**

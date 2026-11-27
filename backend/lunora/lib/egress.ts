@@ -235,6 +235,8 @@ export const isCloudflareAddress = (address: string): boolean => {
 /** The socket a connection runs on. The shape of `connect()` from `cloudflare:sockets`, which the caller passes in. */
 export interface EgressSocket {
     close: () => Promise<void>;
+    /** Settles once the connection is up (for a TLS socket, once its handshake is done) or has failed. */
+    opened: Promise<unknown>;
     readable: ReadableStream<Uint8Array>;
     startTls: (options: { expectedServerHostname: string }) => EgressSocket;
     writable: WritableStream<Uint8Array>;
@@ -446,9 +448,31 @@ const readStatus = async (socket: EgressSocket): Promise<number> => {
     }
 };
 
+/** The share of the whole deadline one address may spend on its connection and TLS setup. */
+const ADDRESS_SHARE = 3;
+
 /**
- * POSTs `request.body` to `request.url` at the first checked address, and returns the status. A 3xx is returned as it is.
- * Any refusal, failure or timeout throws an `EgressError` with a code and no URL or body in the message.
+ * How long one address may take to connect and finish TLS setup. An address with another one after it gets a third of the
+ * whole deadline, so one that drops packets leaves time for the next; the last address gets all the time left. Never more
+ * than the time left before the deadline.
+ */
+export const addressTimeoutMs = (timeoutMs: number, remainingMs: number, hasNext: boolean): number =>
+    Math.max(0, hasNext ? Math.min(Math.ceil(timeoutMs / ADDRESS_SHARE), remainingMs) : remainingMs);
+
+/**
+ * The errors raised when one address did not finish its connection and TLS setup in its share of the deadline. Plain
+ * errors, not `EgressError`s, so the next address is tried.
+ */
+const addressTimeouts = new WeakSet<Error>();
+
+/**
+ * POSTs `request.body` to `request.url` and returns the status. A 3xx is returned as it is. The addresses are tried in the
+ * order the lookup gave them, all of them already checked: a connection or TLS setup that fails, before any byte of the
+ * request is written, closes that address's sockets and moves on to the next one, within the same deadline. Each address
+ * with another one after it gets at most `addressTimeoutMs` for its connection and TLS setup, so one that never answers does
+ * not use the whole deadline; the last one gets all the time left. Once writing has begun, a failure is final, even one on the first write: bytes may already have reached the
+ * receiver, so no receiver gets the request twice. Any refusal, failure or timeout throws an `EgressError` with a code and no URL or body in the
+ * message.
  */
 export const postCheckedHttps = async (request: EgressRequest, dependencies: EgressDependencies): Promise<EgressResponse> => {
     const target = parseTarget(request.url);
@@ -456,30 +480,102 @@ export const postCheckedHttps = async (request: EgressRequest, dependencies: Egr
     assertHeaders(request.headers);
 
     const timeoutMs = request.timeoutMs ?? EGRESS_TIMEOUT_MS;
+    const startedAt = Date.now();
     const controller = new AbortController();
     const opened: EgressSocket[] = [];
     const closeAll = async (): Promise<void> => {
         await Promise.all(opened.map(async (socket) => await socket.close().catch(() => undefined)));
     };
-
-    const attempt = async (): Promise<EgressResponse> => {
-        const [address] = await resolveChecked(target.hostname, dependencies, controller.signal);
-
-        // The deadline can pass while a lookup is in flight. Cleanup has already run by then, so open nothing.
+    const assertInTime = (): void => {
+        // The deadline can pass while a lookup or a connection is in flight. Cleanup has already run by then, so open nothing more.
         if (controller.signal.aborted) {
             throw new EgressError("timeout", "The request timed out.");
         }
+    };
 
-        const plain = dependencies.connect({ hostname: address as string, port: HTTPS_PORT }, { allowHalfOpen: false, secureTransport: "starttls" });
+    /**
+     * Opens a TLS connection to one checked address and waits until it is up; nothing is written yet. On any failure, this
+     * address's sockets are closed before the error is thrown, so a later address never runs beside an open one.
+     */
+    const open = async (address: string, hasNext: boolean): Promise<EgressSocket> => {
+        const sockets: EgressSocket[] = [];
+        let addressTimer: ReturnType<typeof setTimeout> | undefined;
+        const limit = new Promise<never>((_resolve, reject) => {
+            addressTimer = setTimeout(
+                () => {
+                    const error = new Error("The address did not answer in time.");
 
-        opened.push(plain);
+                    addressTimeouts.add(error);
+                    reject(error);
+                },
+                addressTimeoutMs(timeoutMs, startedAt + timeoutMs - Date.now(), hasNext),
+            );
+        });
 
-        const socket = plain.startTls({ expectedServerHostname: target.hostname });
+        // Raced, not awaited alone: a rejection after the address is up must not surface as unhandled.
+        limit.catch(() => undefined);
 
-        opened.push(socket);
-        await writeRequest(socket, target, request);
+        try {
+            const plain = dependencies.connect({ hostname: address, port: HTTPS_PORT }, { allowHalfOpen: false, secureTransport: "starttls" });
 
-        return { status: await readStatus(socket) };
+            sockets.push(plain);
+            opened.push(plain);
+            await Promise.race([plain.opened, limit]);
+            assertInTime();
+
+            // The certificate is checked against the URL's host name, whichever address the connection went to.
+            const socket = plain.startTls({ expectedServerHostname: target.hostname });
+
+            sockets.push(socket);
+            opened.push(socket);
+            await Promise.race([socket.opened, limit]);
+            assertInTime();
+
+            return socket;
+        } catch (error) {
+            // Started before the next address is tried, not awaited: a graceful close may never finish, and the deadline is one for all addresses.
+            for (const socket of sockets) {
+                void socket.close().catch(() => undefined);
+            }
+
+            throw error;
+        } finally {
+            clearTimeout(addressTimer);
+        }
+    };
+
+    const attempt = async (): Promise<EgressResponse> => {
+        const addresses = await resolveChecked(target.hostname, dependencies, controller.signal);
+        let lastError: unknown;
+
+        for (const [index, address] of addresses.entries()) {
+            assertInTime();
+
+            let socket: EgressSocket;
+
+            try {
+                socket = await open(address, index < addresses.length - 1);
+            } catch (error) {
+                if (error instanceof EgressError) {
+                    throw error;
+                }
+
+                lastError = error;
+                continue;
+            }
+
+            // From the first write on, a failure is final: the receiver may already hold part or all of the request.
+            await writeRequest(socket, target, request);
+
+            return { status: await readStatus(socket) };
+        }
+
+        // Every address was silent: that is the request timing out, not a refused connection.
+        if (lastError instanceof Error && addressTimeouts.has(lastError)) {
+            throw new EgressError("timeout", "The request timed out.");
+        }
+
+        throw lastError;
     };
 
     // A socket failure from connect, TLS, write or read is not part of the caller's contract: it comes back as bad_response.

@@ -18,6 +18,15 @@ export const isAutoArchiveDays = (value: number | undefined): value is number =>
 /** The `updatedAt` below which a thread counts as idle. `updatedAt` moves on every activity and on archive itself. */
 export const autoArchiveCutoff = (now: number, days: number): number => now - days * DAY_MS;
 
+/**
+ * Whether a linked pull request keeps its thread out of auto-archive. Only a closed or merged one lets it go: a link the
+ * refresh has not read yet (no `state`) counts as open, so a thread is never archived on a guess.
+ */
+export const isOpenPullRequestForArchive = (link: { state?: "open" | "closed" | "merged" }): boolean => link.state !== "closed" && link.state !== "merged";
+
+/** The "Keep chats with an open pull request" setting. Absent means on; only an explicit `false` turns it off. */
+export const keepsOpenPullRequestChats = (setting: boolean | undefined): boolean => setting !== false;
+
 export interface AutoArchiveCandidate {
     _id: string;
     deleted?: boolean;
@@ -36,10 +45,22 @@ export interface AutoArchiveExclusions {
 }
 
 /**
- * The threads one sweep may archive, in the order given, at most `limit`. Never
- * archived: already archived, running, deleted, temporary (they expire on
- * their own), pinned, in a pinned project, or with a live stream. A thread
- * with no `updatedAt` is not idle by definition, so it stays.
+ * True when no archive pass may archive the thread, idle or not: already archived, running, deleted, temporary (they
+ * expire on their own), pinned, in a pinned project, or with a live stream. Both the idle sweep and the merged-chat
+ * path decide through this, so they cannot disagree about what stays.
+ */
+export const isArchivable = (thread: AutoArchiveCandidate, exclusions: AutoArchiveExclusions): boolean =>
+    thread.status !== "archived" &&
+    thread.status !== "running" &&
+    thread.deleted !== true &&
+    thread.isTemporary !== true &&
+    thread.pinnedAt === undefined &&
+    (thread.projectId === undefined || !exclusions.pinnedProjectIds.has(thread.projectId)) &&
+    !exclusions.liveThreadIds.has(thread._id);
+
+/**
+ * The threads one sweep may archive, in the order given, at most `limit`: the archivable ones (`isArchivable`) that are
+ * idle. A thread with no `updatedAt` is not idle by definition, so it stays.
  */
 export const selectAutoArchiveDue = (
     candidates: ReadonlyArray<AutoArchiveCandidate>,
@@ -48,18 +69,7 @@ export const selectAutoArchiveDue = (
     limit: number,
 ): string[] =>
     candidates
-        .filter(
-            (thread) =>
-                thread.status !== "archived" &&
-                thread.status !== "running" &&
-                thread.deleted !== true &&
-                thread.isTemporary !== true &&
-                thread.pinnedAt === undefined &&
-                (thread.projectId === undefined || !exclusions.pinnedProjectIds.has(thread.projectId)) &&
-                !exclusions.liveThreadIds.has(thread._id) &&
-                thread.updatedAt !== undefined &&
-                thread.updatedAt < cutoff,
-        )
+        .filter((thread) => isArchivable(thread, exclusions) && thread.updatedAt !== undefined && thread.updatedAt < cutoff)
         .slice(0, limit)
         .map((thread) => thread._id);
 

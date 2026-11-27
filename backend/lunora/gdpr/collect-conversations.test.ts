@@ -15,11 +15,12 @@ import { describe, expect, it, vi } from "vitest";
 import { registeredApi } from "../../test/registered-api";
 
 import { listGuestLinksForExport, listGuestNotesForExport } from "../chat/guest-links";
+import { listPinsForExport, listSharedPinRoutesForExport } from "../chat/pins/functions";
 import { listMessagesByThreadIdAdmitted } from "../agent/messages";
 import { listThreadSummariesForExport } from "../agent/thread-summaries";
 import { getThreadInternal, listThreadsByUserIdInternal } from "../agent/threads";
 import schema from "../schema";
-import { collectConversations, collectThreadTags } from "./steps";
+import { collectConversations, collectSharedPins, collectThreadTags } from "./steps";
 
 /**
  * The harness's `ctx.runQuery` takes the REGISTERED procedure object, not a
@@ -30,6 +31,24 @@ const registry = vi.hoisted(() => new Map<string, unknown>());
 
 vi.mock("../_generated/api", async (importOriginal) => registeredApi(await importOriginal(), registry));
 vi.mock("../_generated/internal", async (importOriginal) => registeredApi(await importOriginal(), registry));
+
+// The harness is one database for every shard, so a call to another shard runs in the harness under test.
+const shard = vi.hoisted(() => {
+    return { harness: undefined as any, unreachableThreadId: undefined as string | undefined };
+});
+
+vi.mock("../lib/cross-shard", () => {
+    return {
+        callOnShard: async (reference: never, args: never) => {
+            // A test can make one thread's owner shard unreachable.
+            if (shard.unreachableThreadId !== undefined && (args as { threadId?: string }).threadId === shard.unreachableThreadId) {
+                throw new Error("the owner's shard cannot be reached");
+            }
+
+            return await shard.harness.run(async (ctx: any) => await ctx.runQuery(reference, args));
+        },
+    };
+});
 
 const THREADS = 3;
 const MESSAGES_PER_THREAD = 12;
@@ -42,6 +61,7 @@ describe("collectConversations", () => {
         registry.set("agent_thread_summaries:listThreadSummariesForExport", listThreadSummariesForExport);
         registry.set("chat_guest_links:listGuestNotesForExport", listGuestNotesForExport);
         registry.set("chat_guest_links:listGuestLinksForExport", listGuestLinksForExport);
+        registry.set("chat_pins_functions:listPinsForExport", listPinsForExport);
 
         const harness = lunoraTest(schema as never);
 
@@ -64,6 +84,20 @@ describe("collectConversations", () => {
                                 userId: "user-1",
                             });
                         }
+
+                        // The owner's note on a message, and a pin a collaborator made on the same thread: only the owner's comes out.
+                        await context.db.insert("threadPins", {
+                            createdAt: 7,
+                            messageId: "t0-m1",
+                            messageRole: "assistant",
+                            note: "keep this",
+                            selectedText: "t0-m1",
+                            threadId,
+                            updatedAt: 8,
+                            userId: "user-1",
+                        });
+
+                        await context.db.insert("threadPins", { createdAt: 9, messageRole: "user", threadId, updatedAt: 9, userId: "user-2" });
                     } else if (t === 1) {
                         // A link no guest has written on yet is still the owner's data.
                         await context.db.insert("threadGuestLinks", { createdAt: 5, expiresAt: 6, linkHash: "h1", threadId, userId: "user-1" });
@@ -101,7 +135,7 @@ describe("collectConversations", () => {
             // Internal functions are unreachable from the harness's external
             // boundary, as in production — dispatch it the way the workflow does.
             const conversations = await harness.action(async (context: any) => await context.runAction(collectConversations, { userId: "user-1" }));
-            const exported = conversations as { messages: { text?: string }[]; thread: { title?: string } }[];
+            const exported = conversations as { messages: { text?: string }[]; pins: unknown[]; thread: { title?: string } }[];
 
             expect(exported).toHaveLength(THREADS);
             expect(exported.flatMap((conversation) => conversation.messages)).toHaveLength(THREADS * MESSAGES_PER_THREAD);
@@ -124,6 +158,11 @@ describe("collectConversations", () => {
             expect(new Set(guestNotes?.map((note) => JSON.stringify(note)))).toEqual(
                 new Set([JSON.stringify({ createdAt: 0, status: "held", text: "a guest note" })]),
             );
+            // The owner's pins go with the thread: its note and the message it quotes, and not a collaborator's pin.
+            expect(first?.pins).toStrictEqual([
+                expect.objectContaining({ createdAt: 7, messageId: "t0-m1", messageRole: "assistant", note: "keep this", selectedText: "t0-m1" }),
+            ]);
+            expect(exported.find((conversation) => conversation.messages[0]?.text === "t1-m0")?.pins).toStrictEqual([]);
             // Each thread's links go with it, without their token hashes.
             expect((first as { guestLinks?: unknown[] } | undefined)?.guestLinks).toEqual([{ createdAt: 0, expiresAt: 1 }]);
             expect(exported.find((conversation) => conversation.messages[0]?.text === "t1-m0")).toMatchObject({ guestLinks: [{ createdAt: 5, expiresAt: 6 }] });
@@ -145,6 +184,7 @@ describe("collectConversations", () => {
         registry.set("agent_thread_summaries:listThreadSummariesForExport", listThreadSummariesForExport);
         registry.set("chat_guest_links:listGuestNotesForExport", listGuestNotesForExport);
         registry.set("chat_guest_links:listGuestLinksForExport", listGuestLinksForExport);
+        registry.set("chat_pins_functions:listPinsForExport", listPinsForExport);
 
         const harness = lunoraTest(schema as never);
 
@@ -197,6 +237,7 @@ describe("collectConversations", () => {
         registry.set("agent_thread_summaries:listThreadSummariesForExport", listThreadSummariesForExport);
         registry.set("chat_guest_links:listGuestNotesForExport", listGuestNotesForExport);
         registry.set("chat_guest_links:listGuestLinksForExport", listGuestLinksForExport);
+        registry.set("chat_pins_functions:listPinsForExport", listPinsForExport);
 
         const harness = lunoraTest(schema as never);
 
@@ -297,6 +338,114 @@ describe("collectConversations", () => {
  * owner's export (plan note, GDPR open question 5). The export is only ever
  * built for the user the workflow names, so another user's locked chat stays out.
  */
+describe("collectSharedPins", () => {
+    it("reads a collaborator's pins on each thread they pinned, from the owner, after their grant is gone, and skips a pin with no route", async () => {
+        registry.set("chat_pins_functions:listPinsForExport", listPinsForExport);
+        registry.set("chat_pins_functions:listSharedPinRoutesForExport", listSharedPinRoutesForExport);
+
+        const harness = lunoraTest(schema as never);
+
+        shard.harness = harness;
+
+        try {
+            const threadId = await harness.run(async (context: any) => {
+                const sharedThreadId = await context.db.insert("threads", {
+                    mode: "text",
+                    model: "gpt-4o",
+                    status: "active",
+                    title: "Shared",
+                    userId: "user-owner",
+                });
+
+                await context.db.insert("threadPins", {
+                    createdAt: 3,
+                    messageId: "m-1",
+                    messageRole: "assistant",
+                    note: "collaborator note",
+                    selectedText: "quoted",
+                    threadId: sharedThreadId,
+                    updatedAt: 4,
+                    userId: "user-collab",
+                });
+                // The route outlives the grant: the collaborator holds no grant on this thread any more.
+                await context.db.insert("sharedPinRoutes", { createdAt: 0, ownerId: "user-owner", threadId: sharedThreadId, userId: "user-collab" });
+
+                // A pin written before routes were recorded has no route, so it is not found from here.
+                const legacyThreadId = await context.db.insert("threads", {
+                    mode: "text",
+                    model: "gpt-4o",
+                    status: "active",
+                    title: "Legacy",
+                    userId: "user-owner",
+                });
+
+                await context.db.insert("threadPins", {
+                    createdAt: 5,
+                    messageRole: "assistant",
+                    note: "unrouted note",
+                    threadId: legacyThreadId,
+                    updatedAt: 5,
+                    userId: "user-collab",
+                });
+
+                return sharedThreadId;
+            });
+
+            const shared = await harness.action(async (context: any) => await context.runAction(collectSharedPins, { userId: "user-collab" }));
+
+            expect(shared).toStrictEqual([{ pins: [expect.objectContaining({ messageId: "m-1", note: "collaborator note" })], threadId }]);
+        } finally {
+            shard.harness = undefined;
+            harness.close();
+        }
+    });
+
+    it("lists a shared thread whose owner shard cannot be read as unreadable, and still exports the others", async () => {
+        registry.set("chat_pins_functions:listPinsForExport", listPinsForExport);
+        registry.set("chat_pins_functions:listSharedPinRoutesForExport", listSharedPinRoutesForExport);
+
+        const harness = lunoraTest(schema as never);
+
+        shard.harness = harness;
+
+        try {
+            const [readableId, unreachableId] = await harness.run(async (context: any) => {
+                const ids: string[] = [];
+
+                for (const title of ["Readable", "Unreachable"]) {
+                    const threadId = await context.db.insert("threads", { mode: "text", model: "gpt-4o", status: "active", title, userId: "user-owner" });
+
+                    await context.db.insert("threadPins", {
+                        createdAt: 3,
+                        messageId: `m-${title}`,
+                        messageRole: "assistant",
+                        note: `${title} note`,
+                        threadId,
+                        updatedAt: 4,
+                        userId: "user-collab",
+                    });
+                    await context.db.insert("sharedPinRoutes", { createdAt: 0, ownerId: "user-owner", threadId, userId: "user-collab" });
+                    ids.push(threadId);
+                }
+
+                return ids;
+            });
+
+            shard.unreachableThreadId = unreachableId;
+
+            const shared = await harness.action(async (context: any) => await context.runAction(collectSharedPins, { userId: "user-collab" }));
+
+            expect(shared).toHaveLength(2);
+            expect(shared).toContainEqual({ pins: [expect.objectContaining({ note: "Readable note" })], threadId: readableId });
+            expect(shared).toContainEqual({ pins: [], threadId: unreachableId, unreadable: true });
+        } finally {
+            shard.unreachableThreadId = undefined;
+            shard.harness = undefined;
+            harness.close();
+        }
+    });
+});
+
 describe("collectConversations: a locked chat", () => {
     const LOCKED_TITLE = "Secret plan";
 
@@ -308,6 +457,7 @@ describe("collectConversations: a locked chat", () => {
         registry.set("agent_thread_summaries:listThreadSummariesForExport", listThreadSummariesForExport);
         registry.set("chat_guest_links:listGuestNotesForExport", listGuestNotesForExport);
         registry.set("chat_guest_links:listGuestLinksForExport", listGuestLinksForExport);
+        registry.set("chat_pins_functions:listPinsForExport", listPinsForExport);
     };
 
     it("exports the owner's locked chat with its title and every message", async () => {

@@ -55,7 +55,7 @@ import { claimToolApproval, findPendingApprovalOnLatestTurn, SUB_AGENT_RUN_ENDED
 import { denyToolApprovalRun, purgeExpiredToolApprovalRunsForUser } from "./lib/tool-approval-cleanup";
 import { listBuiltInTools } from "./lib/tool-builder";
 import type { ToolPermissionMode } from "./lib/tool-permissions";
-import { defaultToolPermission, toolPermissionKey } from "./lib/tool-permissions";
+import { defaultToolPermission, isAlwaysAllowRefused, toolPermissionKey } from "./lib/tool-permissions";
 import { resumeClaimedRun } from "./lib/tool-approval-resume";
 import { connectorTrustId, liveTrustedServers, MAX_TRUSTED_SERVERS, mcpTrustId } from "./lib/low-risk-trust";
 import { vToolRunConfig } from "./lib/tool-run-config";
@@ -71,6 +71,7 @@ import type { ApprovalKind } from "../public-api/events-catalog";
 import { recordMcpEvent } from "../public-api/events-log";
 import { chainStarterLabel } from "../sub-agents/logic";
 import { markRunAwaiting } from "../sub-agents/functions";
+import { threadHasLiveGrant } from "../agent/live-grant";
 
 const vToolPermissionMode = v.union(v.literal("auto"), v.literal("ask"), v.literal("off"));
 const vToolPermissions = v.record(v.string(), vToolPermissionMode);
@@ -151,9 +152,8 @@ const quickCheckAllowed = async (
     }
 
     const thread = await ctx.db.get("threads", threadId);
-    const grant = await ctx.db.threadAccess.findFirst({ where: { threadId } });
 
-    if (!isDeviceEligibleThread(thread, userId, grant !== null)) {
+    if (!isDeviceEligibleThread(thread, userId, await threadHasLiveGrant(ctx, threadId))) {
         return false;
     }
 
@@ -822,14 +822,25 @@ export const recordPendingToolApprovals = internalMutation
                 return questionIds.has(approvalId) ? "question" : "approval";
             };
 
-            for (const approvalId of uniqueIds) {
-                await recordMcpEvent(ctx, {
-                    data: { kind: kindOf(approvalId), requestId: approvalId, threadId },
-                    eventId: `${APPROVAL_REQUESTED_EVENT}:${approvalId}`,
-                    name: APPROVAL_REQUESTED_EVENT,
-                    timestamp: createdAt,
-                    userId: ownerId,
-                });
+            // A thread that is gone, or has no owner, gets no event: nobody can answer its requests, and a deleted thread's events go
+            // with it, which only an owned thread's delete does (`agent/threads.ts`). None is recorded for it. Nor for a trashed chat: its
+            // events are removed with the trash, and one recorded behind that removal would be found by its restore.
+            if (thread?.userId !== undefined && thread.deleted !== true) {
+                // Keyed by the request's own row, not its approval id: a tool call id can repeat in a later turn, and a repeat is a new
+                // request that must still reach the log. `recordedIds` is in the order of `uniqueIds`.
+                for (const [index, approvalId] of [...uniqueIds].entries()) {
+                    if (approvalId.length > MAX_APPROVAL_ID_LENGTH) {
+                        continue;
+                    }
+
+                    await recordMcpEvent(ctx, {
+                        data: { kind: kindOf(approvalId), requestId: approvalId, threadId },
+                        eventId: `${APPROVAL_REQUESTED_EVENT}:${recordedIds[index]!}`,
+                        name: APPROVAL_REQUESTED_EVENT,
+                        timestamp: createdAt,
+                        userId: ownerId,
+                    });
+                }
             }
 
             // A question the owner was asked in this thread stays the thing it waits on: an approval does not overwrite it.
@@ -888,8 +899,8 @@ export const recordPendingToolApprovals = internalMutation
     );
 
 /**
- * What an answer leaves behind for next time: `always` stores `auto` for the tool, `hour` / `today` a time-boxed
- * allow. `key` is the permission key recorded when the tool was built; a snapshot without one approves a plain or
+ * What an answer leaves behind for next time: `always` stores `auto` for the tool (refused for the tools in
+ * `ALWAYS_ALLOW_REFUSED_BUILTINS`), `hour` / `today` a time-boxed allow. `key` is the permission key recorded when the tool was built; a snapshot without one approves a plain or
  * "always" answer once and stores nothing rather than guessing, and refuses `hour` / `today`, which it could not keep.
  */
 export const recordApprovalPreference = async (ctx: PreferenceCtx, decision: ToolApprovalDecision, key: string | undefined): Promise<void> => {
@@ -904,6 +915,18 @@ export const recordApprovalPreference = async (ctx: PreferenceCtx, decision: Too
     }
 
     if (decision === "always") {
+        // A tool that spends money or sends out as the person is never stored as `auto`: the throw rolls the claim back,
+        // so the call still waits for an answer. Hour and today allows are not refused here.
+        if (isAlwaysAllowRefused(key)) {
+            // A person-only tool takes no timed allow either, so the message offers only the single approval.
+            throw new LunoraError(
+                "BAD_REQUEST",
+                isGrantableKey(key)
+                    ? "This tool asks every time: approve this call, or allow it for an hour or today"
+                    : "This tool asks every time: approve this call",
+            );
+        }
+
         await writeToolPermission(ctx, key, "auto");
         await writeToolGrant(ctx, key, null);
     } else if (decision === "hour" || decision === "today") {
@@ -922,6 +945,9 @@ export const recordApprovalPreference = async (ctx: PreferenceCtx, decision: Too
     }
 };
 
+/** The longest approval id an answer accepts. A longer request is recorded as no event: a poll could not carry its id, so it is not kept. */
+export const MAX_APPROVAL_ID_LENGTH = 256;
+
 /**
  * Answer a pending tool-approval request and resume the agent run.
  *
@@ -938,7 +964,7 @@ export const recordApprovalPreference = async (ctx: PreferenceCtx, decision: Too
 export const respondToToolApproval = authMutation
     .use(rateLimit("chat/stream"))
     .input({
-        approvalId: v.string().check((value) => value.length > 0 && value.length <= 256, { message: "Invalid approval id" }),
+        approvalId: v.string().check((value) => value.length > 0 && value.length <= MAX_APPROVAL_ID_LENGTH, { message: "Invalid approval id" }),
         decision: v.union(v.literal("approve"), v.literal("deny"), v.literal("always"), v.literal("hour"), v.literal("today")),
         threadId: v.id("threads"),
         unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),

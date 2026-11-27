@@ -9,17 +9,23 @@ import type { Id } from "../_generated/dataModel";
 import { internalQuery } from "../_generated/server";
 import { listActivePathPage } from "../agent/branches";
 import { listMessagesByThreadIdHandler } from "../agent/messages";
-import { getThreadInvitesWithAccessCheckHandler, grantOwnerForThread, listThreadAccessHandler } from "../agent/sharing";
-import { meetsThreadPermission } from "../agent/thread-read-access";
+import {
+    getThreadInvitesWithAccessCheckHandler,
+    grantOwnerForThread,
+    listThreadAccessHandler,
+    refuseGrantOnMergingOwner,
+    throwOwnerMerging,
+} from "../agent/sharing";
+import { meetsThreadPermission, type ThreadPermission } from "../agent/thread-read-access";
 import { checkThreadAccessBatchHandler } from "../agent/threads";
 import { toUIMessages } from "../agent/ui-messages";
 import type { MessageDoc } from "../agent/validators";
 import { vThreadDocFields } from "../agent/validators";
 import { callOnShard } from "../lib/cross-shard";
-import { ensureThreadFollowDefault } from "./follows/functions";
+import { ensureThreadFollowDefault, withdrawThreadFollowDefault } from "./follows/functions";
 import { authAction, authMutation, authQuery, publicAction, rateLimit } from "../lib/crpc";
 import { rateLimitGuard, shareLinkBucket } from "../lib/rate-limiter";
-import { deleteShardRoute, setShardRoute, shardRouteOwner } from "../lib/shard-routes";
+import { deleteShardRoute, mergedGuestTarget, setShardRoute, shardRouteOwner } from "../lib/shard-routes";
 import { admitThread, systemDb } from "../lib/rls/scope";
 import { loadNsfwStatuses, MAX_PUBLIC_THREAD_ROWS, toPublicThreadMessages, vPublicThreadMessage } from "./lib/public-thread";
 import { isThreadLocked } from "../lib/thread-lock";
@@ -390,6 +396,9 @@ export const acceptThreadInvite = authMutation
             throw new LunoraError("BAD_REQUEST", "Invite has expired");
         }
 
+        // The client routes this chat to `ownerId`: an invite of a merging guest names a shard the merge is emptying.
+        await refuseGrantOnMergingOwner(context, ownerId);
+
         // Check if user already has access
         const existingAccess = await context.runQuery(internal.agent.sharing.getThreadAccess, {
             threadId: invite.threadId,
@@ -399,19 +408,34 @@ export const acceptThreadInvite = authMutation
         // An invite only raises access; lowering goes through the grant editors.
         const kept = existingAccess ? meetsThreadPermission(existingAccess.permission, invite.permission) : false;
 
+        // The grant this accept wrote, if any: taken back below when the owner's merge started meanwhile.
+        let written: { accessId: Id<"threadAccess">; previous?: ThreadPermission; revision: number } | undefined;
+
+        // The role the grant gives after this accept, when it already gave as much.
+        let keptPermission = kept ? existingAccess?.permission : undefined;
+
         if (existingAccess) {
             if (!kept) {
-                await context.runMutation(internal.agent.sharing.updateThreadAccess, {
+                // The role replaced is the one the conditional write read, not this earlier read: a change between the
+                // two is what an undo must restore, and one that already gives as much is kept.
+                const raised = await context.runMutation(internal.agent.sharing.raiseInviteGrant, {
                     accessId: existingAccess._id,
                     permission: invite.permission,
                 });
+
+                if (raised.kind === "raised") {
+                    written = { accessId: existingAccess._id, previous: raised.previous, revision: raised.revision };
+                } else {
+                    keptPermission = raised.permission;
+                }
             }
         } else {
             // Create new access
-            await context.runMutation(internal.agent.sharing.createThreadAccess, {
+            written = await context.runMutation(internal.agent.sharing.createThreadAccess, {
                 grantedBy: invite.invitedBy,
                 ownerId,
                 permission: invite.permission,
+                requireAccounts: true,
                 threadId: invite.threadId,
                 userId,
             });
@@ -419,7 +443,27 @@ export const acceptThreadInvite = authMutation
 
         // A person invited to a thread follows it from the moment they accept; an explicit choice made before is kept.
         // Written before the invite is marked accepted, so a failed write leaves the invite pending and the accept retryable.
-        await ensureThreadFollowDefault(context, { now: context.now, state: "on", threadId: invite.threadId, userId });
+        const followed = await ensureThreadFollowDefault(context, { now: context.now, state: "on", threadId: invite.threadId, userId });
+
+        // The merge may have started since the check above. Refused, the invite stays pending and is opened again later, so
+        // the grant write and the follow, which committed on their own (`.global()` writes are not one transaction), are
+        // taken back first: a refusal leaves no grant it gave and no follow of a chat not joined; a follow that stood
+        // before this call, or one the person changed since, is kept. Not under the chat's revoke hold
+        // (`holdFollowupRevoke`): that lease is on the chat's row, on the owner's shard, and this runs on the invitee's;
+        // the grant taken back is this call's.
+        // The mark seen decides the refusal: the merge may end before a second look, and its grant is already taken back.
+        if ((await mergedGuestTarget(context, ownerId)) !== null) {
+            if (written !== undefined) {
+                await context.runMutation(internal.agent.sharing.undoInviteGrant, written);
+            }
+
+            // Only while it is still the default written here: a choice the person made since is theirs and is kept.
+            if (followed !== null) {
+                await withdrawThreadFollowDefault(context, followed);
+            }
+
+            throwOwnerMerging();
+        }
 
         // Mark invite as accepted
         await context.runMutation(internal.agent.sharing.updateThreadInvite, {
@@ -429,11 +473,15 @@ export const acceptThreadInvite = authMutation
             status: "accepted",
         });
 
-        context.log.event("chat.accept_thread_invite", { alreadyHadAccess: Boolean(existingAccess), kept, permission: invite.permission });
+        context.log.event("chat.accept_thread_invite", {
+            alreadyHadAccess: Boolean(existingAccess),
+            kept: keptPermission !== undefined,
+            permission: invite.permission,
+        });
 
         return {
             ownerId,
-            permission: existingAccess && kept ? existingAccess.permission : invite.permission,
+            permission: keptPermission ?? invite.permission,
             threadId: invite.threadId,
         };
     });
@@ -465,27 +513,46 @@ export const removeThreadAccess = authMutation
             throw new LunoraError("BAD_REQUEST", "Cannot remove thread owner");
         }
 
-        const access = await context.runQuery(internal.agent.sharing.getThreadAccess, {
-            threadId,
-            userId: targetUserId,
-        });
+        // The removal holds the chat's suggestion requests back while the grant goes: a request in flight is waited for, as a delete
+        // waits for it, and none can start on the chat until the hold is released (`holdFollowupRevoke`). The grant is global, so the
+        // hold cannot share its transaction; the hold is what closes the window.
+        const revokeClaim = await context.runMutation(internal.agent.followup_suggestions.holdFollowupRevoke, { threadId });
 
-        // A person who leaves the thread loses their follow row. The admin's view cannot read another person's row (owner-only
-        // RLS), so the trusted internal mutation deletes it. Before the grant: the writes commit separately, and a failed
-        // cleanup must leave the grant in place so the removal can be retried.
-        await context.runMutation(internal.chat.follows.functions.deleteFollowRowOfRemovedMember, { threadId, userId: targetUserId });
-
-        if (access) {
-            await context.runMutation(internal.agent.sharing.deleteThreadAccess, {
-                accessId: access._id,
-            });
+        if (revokeClaim === null) {
+            throw new LunoraError("CONFLICT", "A suggestion is being generated for this chat. Try again in a moment.");
         }
 
-        // Again once the grant is gone: a change the member made between the two writes wrote a row back, and with no grant
-        // `setThreadFollow`'s primary check now refuses any further one.
-        await context.runMutation(internal.chat.follows.functions.deleteFollowRowOfRemovedMember, { threadId, userId: targetUserId });
+        try {
+            const access = await context.runQuery(internal.agent.sharing.getThreadAccess, {
+                threadId,
+                userId: targetUserId,
+            });
 
-        context.log.event("chat.remove_thread_access", { removed: Boolean(access) });
+            // A person who leaves the thread loses their follow row. The admin's view cannot read another person's row (owner-only
+            // RLS), so the trusted internal mutation deletes it. Before the grant: the writes commit separately, and a failed
+            // cleanup must leave the grant in place so the removal can be retried.
+            await context.runMutation(internal.chat.follows.functions.deleteFollowRowOfRemovedMember, { threadId, userId: targetUserId });
+
+            if (access) {
+                // Renewed right before the grant goes: the steps above may have taken a while, and a hold that lapsed would let a request
+                // start on the chat before the grant is deleted. A hold that cannot be renewed stops the removal.
+                if (!(await context.runMutation(internal.agent.followup_suggestions.renewFollowupRevoke, { claimedAt: revokeClaim, threadId }))) {
+                    throw new LunoraError("CONFLICT", "A suggestion is being generated for this chat. Try again in a moment.");
+                }
+
+                await context.runMutation(internal.agent.sharing.deleteThreadAccess, {
+                    accessId: access._id,
+                });
+            }
+
+            // Again once the grant is gone: a change the member made between the two writes wrote a row back, and with no grant
+            // `setThreadFollow`'s primary check now refuses any further one.
+            await context.runMutation(internal.chat.follows.functions.deleteFollowRowOfRemovedMember, { threadId, userId: targetUserId });
+
+            context.log.event("chat.remove_thread_access", { removed: Boolean(access) });
+        } finally {
+            await context.runMutation(internal.agent.followup_suggestions.releaseFollowupRevoke, { claimedAt: revokeClaim, threadId });
+        }
     });
 
 // Toggle thread public visibility

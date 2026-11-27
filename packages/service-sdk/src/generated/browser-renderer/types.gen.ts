@@ -4,6 +4,71 @@ export type ClientOptions = {
     baseUrl: `${string}://${string}` | (string & {});
 };
 
+export type BrowserLoginRequest = {
+    /**
+     * The time the caller gives the whole call, browser setup included; nothing is typed once too little of it is left
+     */
+    budgetMs?: number;
+    /**
+     * The login page; its origin must be exactly `origin`
+     */
+    url: string;
+    /**
+     * The exact `https://` origin the login was saved for (scheme, host and port, no path); nothing is typed on any other
+     */
+    origin: string;
+    username: string;
+    /**
+     * Typed into a password field only; never returned. A shorter one is refused: it could not be kept out of the results
+     */
+    password: string;
+    /**
+     * Reconnect to an existing browser session
+     */
+    sessionId?: string;
+};
+
+export type BrowserLoginResponse = {
+    success?: boolean;
+    sessionId?: string;
+    url?: string;
+    title?: string;
+    /**
+     * The form's own POST went out to the login's origin with the password. It can be true on a failure (the step after it failed): do not send it again. False when it was not sent
+     */
+    submitted?: boolean;
+    /**
+     * The site signs in from a script that reads the password field, which only ever holds a stand-in: nothing was sent, and trying again cannot help
+     */
+    scriptSignIn?: boolean;
+    /**
+     * The browser session is gone and no sessionId is returned: the password could not be cleared from the page within the hold, so the page and the session were closed (the close was confirmed), or the session named could not be reconnected
+     */
+    sessionClosed?: boolean;
+    /**
+     * The browser session had to be closed, but its close failed or did not end within the hold: it may still be open and must not be used again. No sessionId is returned
+     */
+    sessionCloseUnconfirmed?: boolean;
+    /**
+     * A password field is still on the page after sending: the sign-in may have failed
+     */
+    passwordFieldRemains?: boolean;
+    error?: string;
+};
+
+export type BrowserLoginErrorResponse = {
+    success: false;
+    error: string;
+    /**
+     * The session named could not be reconnected and is gone; nothing was typed
+     */
+    sessionClosed?: boolean;
+    /**
+     * The browser session of this call (the one named, when it was reconnected), which holds no password: the sign-in failed before anything was typed
+     */
+    sessionId?: string;
+};
+
 export type BrowserActionRequest = {
     /**
      * The browser action to execute
@@ -30,6 +95,22 @@ export type BrowserActionRequest = {
      */
     fullPage?: boolean;
     /**
+     * Click: the target fingerprint of the element the person was shown; the click is refused when the element differs
+     */
+    expectTarget?: string;
+    /**
+     * Click, with `expectTarget`: "page" checks and clicks in the page; "all" checks, then makes a real click
+     */
+    clickMode?: "page" | "pointer" | "all";
+    /**
+     * Click: refuse an element that opacity hides too (an approved click, the one a person saw); an ordinary click ignores opacity
+     */
+    strictVisibility?: boolean;
+    /**
+     * Extract with a selector: return the rendered text, leaving out hidden descendants
+     */
+    visibleOnly?: boolean;
+    /**
      * JavaScript to evaluate (max 5000 chars)
      */
     script?: string;
@@ -53,6 +134,34 @@ export type BrowserActionResponse = {
      * Extracted text content
      */
     content?: string;
+    /**
+     * Accessible name of the extracted control, when it is not its text (visibleOnly reads only)
+     */
+    label?: string;
+    /**
+     * The accessible name was cut short
+     */
+    labelTruncated?: boolean;
+    /**
+     * A click was refused because its target changed since it was checked; nothing was clicked
+     */
+    targetChanged?: boolean;
+    /**
+     * Fingerprint of the extracted element (visibleOnly reads only)
+     */
+    target?: string;
+    /**
+     * The element is on a checkout (visibleOnly reads only)
+     */
+    checkout?: boolean;
+    /**
+     * One of the element's name sources is exactly a bare subscription word (visibleOnly reads only)
+     */
+    subscribeLike?: boolean;
+    /**
+     * One of the element's name sources is exactly a submit word (visibleOnly reads only)
+     */
+    submitLike?: boolean;
     truncated?: boolean;
     clickedSelector?: string;
     typedText?: string;
@@ -73,6 +182,21 @@ export type BrowserActionResponse = {
 export type HealthResponse = {
     status?: string;
     service?: string;
+};
+
+export type SessionRetiredResponse = {
+    code: 'SESSION_RETIRED';
+    error: string;
+    success: false;
+};
+
+export type ActionWithheldResponse = {
+    success: false;
+    error: string;
+    /**
+     * The browser session the action ran on, kept for the caller; absent when the lost hold closed it
+     */
+    sessionId?: string;
 };
 
 export type ErrorResponse = {
@@ -97,9 +221,21 @@ export type BrowserActionErrors = {
      */
     401: ErrorResponse;
     /**
+     * The browser session is signing in with a saved login; nothing was run, and the action can be tried again once that is done
+     */
+    409: ErrorResponse;
+    /**
+     * The browser session was retired for good (a sign-in on it ended without confirming its page clean); nothing was run. Start a new session: call again without `sessionId`
+     */
+    410: SessionRetiredResponse;
+    /**
      * Internal server error
      */
     500: ErrorResponse;
+    /**
+     * With the `x-browser-action: not-run` header, nothing was run (the browser session's lock did not answer in time, or the session was refused) and the action can be tried again. Without it, the action's hold could not be confirmed for its whole run, so its result is withheld: the action may have run, so look at the page (a screenshot or an extract on `sessionId`, the browser it kept, when given) before repeating it
+     */
+    503: ActionWithheldResponse;
 };
 
 export type BrowserActionError = BrowserActionErrors[keyof BrowserActionErrors];
@@ -112,6 +248,51 @@ export type BrowserActionResponses = {
 };
 
 export type BrowserActionResponse2 = BrowserActionResponses[keyof BrowserActionResponses];
+
+export type BrowserLoginData = {
+    body: BrowserLoginRequest;
+    path?: never;
+    query?: never;
+    url: '/login';
+};
+
+export type BrowserLoginErrors = {
+    /**
+     * Invalid request
+     */
+    400: ErrorResponse;
+    /**
+     * The browser session is busy with another call, of any isolate; nothing was typed
+     */
+    409: BrowserLoginErrorResponse;
+    /**
+     * The browser session was retired for good; nothing was typed. Start a new session: call again without `sessionId`
+     */
+    410: SessionRetiredResponse;
+    /**
+     * Internal server error
+     */
+    500: BrowserLoginErrorResponse;
+    /**
+     * The browser session's lock did not answer in time; nothing was typed
+     */
+    503: BrowserLoginErrorResponse;
+    /**
+     * The browser did not start within the budget; nothing was typed
+     */
+    504: BrowserLoginErrorResponse;
+};
+
+export type BrowserLoginError = BrowserLoginErrors[keyof BrowserLoginErrors];
+
+export type BrowserLoginResponses = {
+    /**
+     * Login result; never carries the password
+     */
+    200: BrowserLoginResponse;
+};
+
+export type BrowserLoginResponse2 = BrowserLoginResponses[keyof BrowserLoginResponses];
 
 export type GetHealthData = {
     body?: never;

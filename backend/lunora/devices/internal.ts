@@ -19,6 +19,7 @@ import { MAX_LENGTH } from "../lib/validators";
 import {
     DEVICE_CALL_DEADLINE_MS,
     DEVICE_CALL_RETENTION_MS,
+    isGlobalInstructionsTool,
     MAX_DEVICE_INPUT_BYTES,
     MAX_DEVICES_PER_USER,
     MAX_OPEN_CALLS_PER_DEVICE,
@@ -33,6 +34,7 @@ import { clearMachineFromProjects } from "../projects/machine-location";
 import { runAfterWithRetry } from "../lib/shard-scheduler";
 import { countOpenCalls, isAcpTool, isDeviceOnline, isDeviceOutdated, isTerminalCallStatus, OPEN_CALL_STATUSES } from "./lib/state";
 import { vDeviceCallStatus, vDeviceManifestTool, vDevicePlatform, vDeviceTaintSource } from "./validators";
+import { threadHasLiveGrant } from "../agent/live-grant";
 
 type ThreadRow = Pick<Doc<"threads">, "deleted" | "externalThreadId" | "groupChat" | "isPublic" | "userId">;
 
@@ -53,9 +55,8 @@ export const isDeviceEligibleThread = (thread: ThreadRow | null, userId: string,
 /** The thread when {@link isDeviceEligibleThread} admits it for this user (a grant is looked up here), else null. */
 export const loadEligibleThread = async (ctx: Pick<QueryCtx, "db">, threadId: Doc<"threads">["_id"], userId: string): Promise<Doc<"threads"> | null> => {
     const thread = await ctx.db.get("threads", threadId);
-    const grant = await ctx.db.threadAccess.findFirst({ where: { threadId } });
 
-    return isDeviceEligibleThread(thread, userId, grant !== null) ? thread : null;
+    return isDeviceEligibleThread(thread, userId, await threadHasLiveGrant(ctx, threadId)) ? thread : null;
 };
 
 /**
@@ -139,6 +140,11 @@ export const createDeviceCall = internalMutation
     .output(vCreateResult)
     .mutation(async ({ args, ctx }) => {
         const { deviceId, threadId, toolName, userId } = args;
+
+        // Started only from project settings (`global-instructions.ts`), whose prompt says the agent did not ask: a chat never signs one.
+        if (isGlobalInstructionsTool(toolName)) {
+            return { error: "ineligible" as const };
+        }
 
         if (utf8Length(args.input) > MAX_DEVICE_INPUT_BYTES) {
             return { error: "input_too_large" as const };

@@ -34,6 +34,7 @@ import { getLocalizedError } from "@/features/auth/lib/utilities";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 import { fitTitle, importRuleFiles, needsMode, unreservedTitle } from "../lib/rule-file-import";
+import ComputerRuleFileImport from "./computer-rule-file-import";
 import type { RepoImportResult } from "./repo-rule-file-import";
 import RepoRuleFileImport from "./repo-rule-file-import";
 
@@ -476,6 +477,8 @@ const ProjectRuleFiles: FC<{
     const latest = useRef({ draft, keptLegacyId, revision: data?.revision ?? "", savedFiles });
     // Bumped by Discard: an import still reading then adds nothing.
     const importGeneration = useRef(0);
+    // Aborted by Discard, so an import waiting on someone else (a computer's approval) ends then, not when they answer.
+    const importDiscard = useRef<AbortController | undefined>(undefined);
     // Bumped by each import that adds drafts: a save it lands during keeps them, and does not say the list is saved.
     const importsApplied = useRef(0);
     // Bumped by each import that leaves a note, drafts or not: a save it lands during keeps the note.
@@ -496,13 +499,15 @@ const ProjectRuleFiles: FC<{
         setImportNote("");
     };
 
-    const applyImport = (read: RepoImportResult) => {
+    /** Adds what was read and says what was left out; gives back the paths of those added. */
+    const applyImport = (read: RepoImportResult): string[] => {
         // Onto the list as it is now: edits typed, a save or a list read while the files were read stay, and only the
         // room left now is taken. A file a save would refuse for its length, or for the list's size with those before
         // it, is left out and said, as the save would measure it.
         const now = latest.current;
         const base = now.draft ?? now.savedFiles;
         const added: RuleFileDraft[] = [];
+        const addedPaths: string[] = [];
         const skipped = [...read.skipped];
         const tooLarge: string[] = [];
         let bytes = ruleFilesStoredBytes(
@@ -531,6 +536,7 @@ const ProjectRuleFiles: FC<{
                 tooLarge.push(path);
             } else {
                 added.push(draftFile);
+                addedPaths.push(path);
                 titles.add(title);
                 shortened += title === unreserved ? 0 : 1;
                 renamed += unreserved === file.title ? 0 : 1;
@@ -549,7 +555,10 @@ const ProjectRuleFiles: FC<{
         }
 
         const toSet = added.filter((file) => needsMode(file)).length;
-        const noneFound = read.imported.length === 0 && read.unreadable.length === 0 && read.notRead === 0 ? [t`No Markdown files were found to import.`] : [];
+        const noneFound =
+            read.imported.length === 0 && read.unreadable.length === 0 && read.refused.length === 0 && read.notRead === 0
+                ? [t`No Markdown files were found to import.`]
+                : [];
         const addedNote =
             added.length > 0 ? [t`${plural(added.length, { one: "# rule file imported.", other: "# rule files imported." })} Review, then save.`] : noneFound;
         const setNote = t`${plural(toSet, { one: "# file says nothing about when it applies", other: "# files say nothing about when they apply" })}: set a description or another mode.`;
@@ -568,7 +577,11 @@ const ProjectRuleFiles: FC<{
         const left = t`${plural(skippedCount, { one: "# file was left out.", other: "# files were left out." })} A project holds at most ${limit} rule files. Left out: ${skippedNames}.`;
         const unreadableCount = read.unreadable.length;
         const unreadableNames = named(read.unreadable);
-        const unreadable = t`${plural(unreadableCount, { one: "# file could not be read", other: "# files could not be read" })}: gone from the repository or too large. Not read: ${unreadableNames}.`;
+        // The reason inside each form: in some languages its words agree with how many files there are.
+        const unreadable = t`${plural(unreadableCount, { one: "# file could not be read: it is gone from the repository or too large.", other: "# files could not be read: they are gone from the repository or too large." })} Not read: ${unreadableNames}.`;
+        const refusedCount = read.refused.length;
+        const refusedNames = named(read.refused);
+        const refusedNote = t`${plural(refusedCount, { one: "# link could not be followed to a file the repository listed.", other: "# links could not be followed to a file the repository listed." })} Not read: ${refusedNames}.`;
         const { duplicates } = read;
         const duplicatesNote = t`${plural(duplicates, { one: "# file was left out as the same file as another picked", other: "# files were left out as the same file as another picked" })}: the same text would apply twice.`;
         const notRead = t`${plural(read.notRead, { one: "# file was not read this time", other: "# files were not read this time" })}: import again to add the rest.`;
@@ -593,28 +606,48 @@ const ProjectRuleFiles: FC<{
                 ...(tooLarge.length > 0 ? [tooLargeNote] : []),
                 ...(duplicates > 0 ? [duplicatesNote] : []),
                 ...(read.unreadable.length > 0 ? [unreadable] : []),
+                ...(read.refused.length > 0 ? [refusedNote] : []),
                 ...(read.notRead > 0 ? [notRead] : []),
             ].join(" "),
         );
+
+        return addedPaths;
     };
 
     /**
      * Adds what `read` imports as unsaved drafts, up to the project's limit; the person saves them like any edit. One
-     * import at a time: one asked for while another reads is dropped.
+     * import at a time: one asked for while another reads is dropped. `onApplied` hears the paths added, so a panel
+     * keeps those the project had no room for picked. `discarded` is aborted by a Discard, which frees the editor at once.
      */
-    const runImport = (read: (isCurrent: () => boolean) => Promise<RepoImportResult | null>) => {
+    const runImport = (
+        read: (isCurrent: () => boolean, discarded: AbortSignal) => Promise<RepoImportResult | null>,
+        onApplied?: (added: ReadonlyArray<string>) => void,
+    ) => {
         if (importing) {
             return;
         }
 
         const generation = importGeneration.current;
+        const discard = new AbortController();
 
         const isCurrent = () => generation === importGeneration.current;
 
+        importDiscard.current = discard;
         setImporting(true);
-        read(isCurrent)
+        read(isCurrent, discard.signal)
             // An import a Discard overtook adds nothing.
-            .then((result) => (result && isCurrent() ? applyImport(result) : undefined))
+            .then((result) => {
+                if (!result || !isCurrent()) {
+                    return undefined;
+                }
+
+                // Applied first: an optional call skips its arguments when there is no one to hear.
+                const added = applyImport(result);
+
+                onApplied?.(added);
+
+                return undefined;
+            })
             .catch(() => {
                 // One a Discard overtook says nothing either.
                 if (!isCurrent()) {
@@ -624,7 +657,19 @@ const ProjectRuleFiles: FC<{
                 importNotes.current += 1;
                 setImportNote(t`The files could not be read.`);
             })
-            .then(() => setImporting(false))
+            // One a Discard overtook was freed by it: another may be running by now.
+            .then(() => {
+                // Ended: a later Discard has nothing of it to abort.
+                if (importDiscard.current === discard) {
+                    importDiscard.current = undefined;
+                }
+
+                if (isCurrent()) {
+                    setImporting(false);
+                }
+
+                return undefined;
+            })
             .catch(() => undefined);
     };
 
@@ -638,7 +683,7 @@ const ProjectRuleFiles: FC<{
 
         if (picked.length > 0) {
             runImport(async () => {
-                return { ...(await importRuleFiles(picked, MAX_RULE_FILES)), duplicates: 0, notRead: 0, unreadable: [] };
+                return { ...(await importRuleFiles(picked, MAX_RULE_FILES)), duplicates: 0, notRead: 0, refused: [], unreadable: [] };
             });
         }
     };
@@ -956,6 +1001,7 @@ const ProjectRuleFiles: FC<{
                             type="file"
                             {...{ directory: "", webkitdirectory: "" }}
                         />
+                        <ComputerRuleFileImport disabled={importing || files.length >= MAX_RULE_FILES} runImport={runImport} />
                         {draft && (
                             <>
                                 <Button
@@ -979,6 +1025,9 @@ const ProjectRuleFiles: FC<{
                                         refetch().catch(() => undefined);
                                         // An import still reading is discarded with the rest.
                                         importGeneration.current += 1;
+                                        importDiscard.current?.abort();
+                                        importDiscard.current = undefined;
+                                        setImporting(false);
                                         setDraft(null);
                                         setImportNote("");
                                         setBlocked(false);

@@ -68,7 +68,9 @@ beforeAll(async () => {
     registerModule(registry, "chat_guest_links", guestLinks);
     registerModule(registry, "agent_thread_lock", lock);
     registerModule(registry, "agent_threads", await import("../agent/threads"));
+    registerModule(registry, "agent_followup_suggestions", await import("../agent/followup-suggestions"));
     registerModule(registry, "lib_document_history", await import("../lib/document-history"));
+    registerModule(registry, "public_api_events", await import("../public-api/events"));
 }, 60_000);
 
 beforeEach(async () => {
@@ -131,7 +133,7 @@ describe("an admin impersonating the owner", () => {
         await expectOpenChatUntouched();
 
         await harness.run(async (ctx: any) => await ctx.db.patch("threads", lockedId, { deleted: true, deletedAt: 1 }));
-        await expect(asOwner().mutation(chat.undoDeleteThread as never, { threadId: lockedId } as never)).rejects.toThrow(IMPERSONATING);
+        await expect(asOwner().action(chat.undoDeleteThread as never, { threadId: lockedId } as never)).rejects.toThrow(IMPERSONATING);
         expect(await thread(lockedId)).toMatchObject({ deleted: true });
     });
 
@@ -174,7 +176,7 @@ describe("the owner themselves", () => {
         await asOwner().mutation(chat.softDeleteThread as never, { threadId: openId } as never);
         expect(await thread(openId)).toMatchObject({ deleted: true });
 
-        await asOwner().mutation(chat.undoDeleteThread as never, { threadId: openId } as never);
+        await asOwner().action(chat.undoDeleteThread as never, { threadId: openId } as never);
         expect(await thread(openId)).not.toHaveProperty("deleted", true);
     });
 

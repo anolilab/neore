@@ -61,7 +61,16 @@ export interface PullRequestDetail extends PullRequestRef {
     deletions: number;
     draft: boolean;
     headBranch: string;
+    /**
+     * Whether the head branch lives in this same repository, by the host's repository identity: `false` for a fork, and for a head
+     * whose repository the host no longer reports (a deleted fork). Never inferred from branch names or commits.
+     */
+    headInBaseRepository: boolean;
     headSha: string;
+    /** When the host merged it, if it did. Absent until then. */
+    mergedAt?: number;
+    /** Whether it merges cleanly, when the host says so on this same read (`unknown` while the host still works it out). */
+    mergeState?: MergeState;
     state: "closed" | "merged" | "open";
     title: string;
     updatedAt: number;
@@ -156,6 +165,17 @@ export const MERGE_METHODS = ["merge", "squash", "rebase"] as const;
 
 export type MergeMethod = (typeof MERGE_METHODS)[number];
 
+/**
+ * How a pull request's head commit compares with its base branch, from the host comparing the two (not the host's
+ * mergeability, which says `behind` only where branch protection asks for an up-to-date branch).
+ */
+export interface BranchComparison {
+    /** Commits on the head that the base does not have. */
+    aheadBy: number;
+    /** Commits on the base that the head does not have: above 0, the branch is behind. */
+    behindBy: number;
+}
+
 /** What the host says of the change's mergeability; the host's rules, not ours, decide at merge time. */
 export type MergeState = "behind" | "blocked" | "clean" | "conflicting" | "draft" | "unknown" | "unstable";
 
@@ -227,6 +247,11 @@ export type ReviewState = "approved" | "changes_requested" | "commented" | "dism
 
 /** One submitted review: its verdict and its top-level text. Line comments are in the review threads. */
 export interface PullRequestReview {
+    /** The reviewer's standing on the repository as the host names it (`OWNER`, `MEMBER`, `COLLABORATOR`, ...), when it says. */
+    authorAssociation?: string;
+    /** The host's stable id for the reviewer, when it names one: a login can change hands, an id does not. */
+    authorId?: string;
+    /** Empty when the host names no reviewer (a deleted account). */
     authorLogin: string;
     body: string;
     id: string;
@@ -240,6 +265,8 @@ export interface ThreadComment {
     createdAt: number;
     /** The host's id for the comment: the one a reply addresses. */
     id: string;
+    /** The comment's page on the host, when the host gives one on its own web origin. */
+    url?: string;
 }
 
 export interface ReviewThread {

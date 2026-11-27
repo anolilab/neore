@@ -47,3 +47,24 @@
   under a project. Older usage, and any reply the totals backfill counted,
   shows under "No project" until the project-history backfill ships (a later
   part). Do not file a project row for a reply the live record did not count.
+- **Organization view releases whole cohort-weeks** — every number
+  `getOrganizationProjectUsage` returns is a sum of cells (one cohort's closed
+  UTC week, Monday to Monday), each shown only when every member of the cohort
+  was active that week, and a project named only with five members
+  (`releaseCells`). A sealed cohort (`sealedCohortsOf`) that lost a member shows
+  with the members it has (owner's decision, 2026-11-23), never with fewer than
+  three (`MIN_MEMBERS_SHORT_COHORT`: a member reading two would subtract their
+  own spend); one with a member being erased is withheld. A closed week must never change: an organization
+  row is written only within `ORGANIZATION_RECORD_LATE_MS` of its reply, and
+  the view ends that long (and a margin) before now. A new write to
+  `usageOrganizationReplies` keeps both. A guest merge moves older rows only
+  with the guest's own cohort (`handOverOrganizationContributors`, the merge's
+  first, lease-checked `contributors` phase, runs before the copy); where the
+  account already has an entry, the guest's goes. Every
+  guest row still moves: an older one that cannot join the guest's cohort is
+  held (`heldFrom`), kept for export and erasure until retention prunes it, and
+  never read by the view or the reconcile; the hold is decided at a row's
+  first import, and the clear's re-import keeps it. A marked entry
+  (`mergedFrom`) withholds its cohort and blocks re-booking the guest until
+  the merge's `global` step settles it, after its clear emptied the guest's
+  shard; a merge that never gets there keeps the mark.

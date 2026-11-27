@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import schema from "../schema";
 import { pendingApprovalCutoff } from "../chat/lib/tool-approval-cleanup";
 import { MAX_LENGTH } from "../lib/validators";
-import { archiveIfStillIdle, autoArchiveContinue } from "./auto-archive";
+import { archiveClosedLinkChat, archiveIfStillIdle, autoArchiveContinue } from "./auto-archive";
 
 type Harness = ReturnType<typeof lunoraTest>;
 
@@ -202,5 +202,114 @@ describe("archiveIfStillIdle and live guest links", () => {
 
     it("archives an idle thread whose guest link has lapsed", async () => {
         expect(await archiveWithGuestLink(1)).toBe(true);
+    });
+});
+
+describe("archiveClosedLinkChat reads the owner's setting when it runs", () => {
+    const DAY = 86_400_000;
+
+    /** An idle thread last updated `updatedAt`, and the owner's auto-archive threshold in days (absent = off). */
+    const runClosedLinkChat = (days: number | undefined, updatedAt: number) =>
+        harness.run(async (ctx: any) => {
+            const threadId = await ctx.db.insert("threads", { mode: "text", model: "gpt-4o", status: "active", title: "Old", updatedAt, userId: OWNER });
+
+            if (days !== undefined) {
+                await ctx.db.insert("userSettings", { autoArchiveAfterDays: days, userId: OWNER });
+            }
+
+            return await ctx.runMutation(archiveClosedLinkChat, { threadId });
+        });
+
+    it("archives an idle chat whose link closed, while auto-archive is on", async () => {
+        expect(await runClosedLinkChat(30, 1)).toBe(true);
+    });
+
+    it("keeps the chat when auto-archive was turned off after the job was scheduled", async () => {
+        expect(await runClosedLinkChat(undefined, 1)).toBe(false);
+    });
+
+    it("keeps the chat when the threshold was raised after the job was scheduled", async () => {
+        // Idle for 20 days: due under the 10-day threshold the job was scheduled with, not under the 30-day one it runs with.
+        expect(await runClosedLinkChat(30, Date.now() - 20 * DAY)).toBe(false);
+    });
+});
+
+describe("archiveIfStillIdle and linked pull requests", () => {
+    type PullState = "open" | "closed" | "merged";
+
+    /** An idle thread, with a pull request link in `state` (absent = the refresh has not read it yet), and the setting as given (absent = never set). */
+    const archiveWithPullRequest = (options: { keepSetting?: boolean; link: boolean; state?: PullState }) =>
+        harness.run(async (ctx: any) => {
+            const threadId = await ctx.db.insert("threads", { mode: "text", model: "gpt-4o", status: "active", title: "Old", updatedAt: 1, userId: OWNER });
+
+            if (options.keepSetting !== undefined) {
+                await ctx.db.insert("userSettings", { keepOpenPullRequestChats: options.keepSetting, userId: OWNER });
+            }
+
+            if (options.link) {
+                await ctx.db.insert("pullRequestThreads", {
+                    createdAt: 0,
+                    kind: "attached",
+                    number: 7,
+                    repository: "acme/app",
+                    threadId,
+                    title: "Add the thing",
+                    url: "https://example.test/acme/app/pull/7",
+                    userId: OWNER,
+                    ...(options.state !== undefined && { state: options.state }),
+                });
+            }
+
+            return await ctx.runMutation(archiveIfStillIdle, { cutoff: CUTOFF, threadId });
+        });
+
+    it("keeps an idle chat with an open pull request when the setting is on", async () => {
+        expect(await archiveWithPullRequest({ keepSetting: true, link: true, state: "open" })).toBe(false);
+    });
+
+    it("keeps an idle chat with an open pull request when the setting was never set (on by default)", async () => {
+        expect(await archiveWithPullRequest({ link: true, state: "open" })).toBe(false);
+    });
+
+    it("archives an idle chat with an open pull request when the setting is off", async () => {
+        expect(await archiveWithPullRequest({ keepSetting: false, link: true, state: "open" })).toBe(true);
+    });
+
+    it("archives an idle chat with no pull request, with the setting on or off", async () => {
+        expect(await archiveWithPullRequest({ keepSetting: true, link: false })).toBe(true);
+        expect(await archiveWithPullRequest({ keepSetting: false, link: false })).toBe(true);
+    });
+
+    it("archives an idle chat whose pull request is closed or merged", async () => {
+        expect(await archiveWithPullRequest({ link: true, state: "closed" })).toBe(true);
+        expect(await archiveWithPullRequest({ link: true, state: "merged" })).toBe(true);
+    });
+
+    it("keeps an idle chat whose pull request state the refresh has not read yet", async () => {
+        expect(await archiveWithPullRequest({ link: true })).toBe(false);
+    });
+
+    it("archives an idle chat whose exactly 100 linked pull requests are all closed", async () => {
+        const archived = await harness.run(async (ctx: any) => {
+            const threadId = await ctx.db.insert("threads", { mode: "text", model: "gpt-4o", status: "active", title: "Old", updatedAt: 1, userId: OWNER });
+
+            for (let index = 0; index < 100; index += 1) {
+                await ctx.db.insert("pullRequestThreads", {
+                    createdAt: 0,
+                    kind: "opened",
+                    number: index + 1,
+                    repository: "acme/app",
+                    state: "closed",
+                    threadId,
+                    title: "Done",
+                    url: `https://example.test/acme/app/pull/${index + 1}`,
+                    userId: OWNER,
+                });
+            }
+
+            return await ctx.runMutation(archiveIfStillIdle, { cutoff: CUTOFF, threadId });
+        });
+
+        expect(archived).toBe(true);
     });
 });

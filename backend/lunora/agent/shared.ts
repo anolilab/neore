@@ -1,54 +1,18 @@
-import type { JSONValue } from "@ai-sdk/provider";
-import { getErrorMessage } from "@ai-sdk/provider";
 import type {
     CustomPart,
     FilePart,
     ImagePart,
     ReasoningFilePart,
     ReasoningPart,
-    Tool,
     ToolApprovalRequest,
     ToolCallPart,
-    ToolResultOutput,
     ToolResultPart,
 } from "@ai-sdk/provider-utils";
 import type { ModelMessage, TextPart, UIDataTypes, UIMessagePart, UITools } from "ai";
 
+import type { TypedTextOptions } from "../chat/lib/attached-text";
+import { typedTextOf } from "../chat/lib/attached-text";
 import type { Message, MessageContentParts } from "./validators";
-
-/**
- * Helper function to create a tool model output for approval responses.
- * @see ai `src/prompt/create-tool-model-output.ts`
- */
-export const createToolModelOutput = async ({
-    errorMode,
-    input,
-    output,
-    tool,
-    toolCallId,
-}: {
-    errorMode: "none" | "text" | "json";
-    input: unknown;
-    output: unknown;
-    tool: Tool | undefined;
-    toolCallId: string;
-}): Promise<ToolResultOutput> => {
-    if (errorMode === "text") {
-        return { type: "error-text", value: getErrorMessage(output) };
-    }
-
-    if (errorMode === "json") {
-        return { type: "error-json", value: toJSONValue(output) };
-    }
-
-    if (tool?.toModelOutput) {
-        return await tool.toModelOutput({ input, output, toolCallId });
-    }
-
-    return typeof output === "string" ? { type: "text", value: output } : { type: "json", value: toJSONValue(output) };
-};
-
-const toJSONValue = (value: unknown): JSONValue => (value === undefined ? null : (value as JSONValue));
 
 export const DEFAULT_RECENT_MESSAGES = 100;
 
@@ -82,6 +46,22 @@ export const extractText = (message: Message | ModelMessage) => {
     }
 
     return undefined;
+};
+
+/**
+ * The `typedText` column: what the person typed into a user message (`typedTextOf`: no attached document or page, no
+ * quote, no guest's note, no outside agent's text, no placeholder), which the composer's prompt search indexes
+ * (`typed_text_search`). Unset for every other row, for a row with nothing typed, and for a row kept out of search (no
+ * `text`), so the index and `text` agree on what is searchable. `text` stays the message as it was sent.
+ */
+export const typedTextColumn = (message: Message | ModelMessage | undefined, text: string | undefined, options?: TypedTextOptions): string | undefined => {
+    if (text === undefined) {
+        return undefined;
+    }
+
+    const typed = typedTextOf(message as Parameters<typeof typedTextOf>[0], options).trim();
+
+    return typed === "" ? undefined : typed;
 };
 
 /**

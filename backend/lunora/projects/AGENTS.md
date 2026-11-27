@@ -87,7 +87,7 @@
   what that listing offers, by the blob SHA it gave (a link's only when, followed again, it ends there: never as another listed file's SHA, so a
   refused link stays refused; each hop a host request), never through the contents API. Each action stays within `HOST_FETCHES_PER_IMPORT` host requests, every redirect
   hop (`beforeRedirect`, charged after its origin is checked) and a 401's repeat included (`fetchBudget`, under the Workers 50-subrequest cap with its
-  own lookups): past it a link is `budget`, a file `not_read`, a listing whose walk is cut `host_error`, never a thrown error. A symlink is followed
+  own lookups): past it a link is `budget`, a file `not_read`, a listing whose walk is cut `budget_spent`, never a thrown error. A symlink is followed
   only to another path of the same listing (a root file or the listed folder's), inside the repository (`resolveLinkTarget`); any other is listed
   `refused` with why (`LinkRefusal`) and its target never read; a listing holds at most `MAX_LISTED_FOLDER_FILES` of the folder's files, by path, and
   counts the rest (`omitted`). They read only `isImportablePath` paths (root `AGENTS.md`/`CLAUDE.md`/`GEMINI.md`, Markdown right in one `RULE_FOLDERS`

@@ -39,6 +39,11 @@ export type ToolCtx = ActionContext & {
     /** Controls search depth/thoroughness for web search and deep research tools */
     researchDepth?: ResearchDepth;
     /**
+     * The source of every tool this run offers the model (`ToolSource`), one entry per tool, from the permission keys
+     * `buildAgentTools` gave them (`setRunToolSources`). Unset: the run never said, which refuses a login.
+     */
+    runToolSources?: ReadonlyArray<string>;
+    /**
      * What the saved-login verdict needs of the turn and only the run knows (`vault/site-login-turn.ts`), set whole by
      * `setRunTurn` or not at all: unset (a run path that records none) is no answer, and refuses a login.
      */

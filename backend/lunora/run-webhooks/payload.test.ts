@@ -53,6 +53,10 @@ describe("runWebhookUrlProblem", () => {
         expect(runWebhookUrlProblem("https://example.com/hooks/neore")).toBeNull();
     });
 
+    it("accepts the standard https port written out", () => {
+        expect(runWebhookUrlProblem("https://example.com:443/hooks/neore")).toBeNull();
+    });
+
     it.each([
         // The refusal needs a plain http URL, so this one literal is allowed to be http.
         // eslint-disable-next-line unicorn/prefer-https
@@ -65,6 +69,7 @@ describe("runWebhookUrlProblem", () => {
         ["a username in the URL", "https://reviewer@example.com/hook"],
         ["not a URL", "example.com/hook"],
         ["a file URL", "file:///etc/passwd"],
+        ["a port delivery cannot use", "https://example.com:8443/hook"],
     ])("refuses %s", (_label, url) => {
         expect(runWebhookUrlProblem(url)).not.toBeNull();
     });

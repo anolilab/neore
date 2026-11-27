@@ -3,7 +3,7 @@ import { v } from "lunorash/server";
 import { LunoraError } from "lunorash/server";
 
 import { api } from "../_generated/api";
-import type { Id } from "../_generated/dataModel";
+import type { Doc, Id } from "../_generated/dataModel";
 import type { ActionCtx as ActionContext, MutationCtx as MutationContext, QueryCtx as QueryContext } from "../_generated/server";
 
 import { internal } from "../_generated/internal";
@@ -34,11 +34,12 @@ import { runAfterOnShard } from "../lib/shard-scheduler";
 import { patchRow, withoutUndefined } from "../lib/patch";
 import { MAX_LENGTH } from "../lib/validators";
 import { liveTrustedServers } from "../chat/lib/low-risk-trust";
+import { callerRestrictsFull } from "../chat/lib/new-chat-mode";
 import { normalizeSearchDomainBlocklist } from "../chat/tools/search-domains";
-import { backupFilterRejection, eligibleBackupModel } from "../chat/lib/backup-model";
+import { backupFilterRejection, eligibleBackupModel, MAX_BACKUP_MODELS, storedBackupModels } from "../chat/lib/backup-model";
 import { allowsPaidModel, byokPaysFor, paidModelRefusal } from "../chat/lib/paid-model";
 import { normalizeModelNicknames } from "./lib/model-nicknames";
-import { changesPersonalization } from "./lib/personalization";
+import { changesPersonalization, PERSONALIZATION_FIELDS } from "./lib/personalization";
 import { isValidShortcut } from "./lib/shortcut";
 import { roleConfigRefusal } from "../sub-agents/role-settings";
 import { withRole } from "../sub-agents/roles";
@@ -152,6 +153,68 @@ const applyRateLimit = async (context: ActionContext | MutationContext, limitNam
  */
 export type SettingsTable = "aiUserPreferences" | "userSettings";
 
+/**
+ * Refuses a backup list a chat reply could not use: more than `MAX_BACKUP_MODELS`, a repeat, or a model that is not a
+ * registry text model, that the user's model filters exclude, or that their plan cannot run. An entry already saved is
+ * not checked again, so a list holding one that has since been retired can still be reordered or shortened; runs skip
+ * it (`resolveBackupModelIds`).
+ */
+const assertBackupModelsAllowed = async (context: MutationContext, userId: string, backupModels: string[], saved: string[]): Promise<void> => {
+    if (backupModels.length > MAX_BACKUP_MODELS) {
+        throw new LunoraError("BAD_REQUEST", `At most ${MAX_BACKUP_MODELS} backup models`);
+    }
+
+    if (new Set(backupModels).size !== backupModels.length) {
+        throw new LunoraError("BAD_REQUEST", "A backup model is listed twice");
+    }
+
+    const added = backupModels.filter((id) => !saved.includes(id));
+
+    if (added.length === 0) {
+        return;
+    }
+
+    const preferences = await context.db
+        .query("aiUserPreferences")
+        .withIndex("by_userId", (q) => q.eq("userId", userId))
+        .unique();
+    let plan: Awaited<ReturnType<typeof readUserRunPlan>> | undefined;
+
+    for (const id of added) {
+        const backup = eligibleBackupModel(id, "");
+
+        if (!backup) {
+            throw new LunoraError("BAD_REQUEST", "Not a model that can be used as a backup");
+        }
+
+        // The user's model filters as they stand: the gateway would answer MODEL_BLOCKED for a backup they exclude.
+        const excluded = backupFilterRejection(backup, preferences?.modelFilterRules ?? undefined);
+
+        if (excluded) {
+            throw new LunoraError("BAD_REQUEST", `Your model filters exclude this backup model: ${excluded}`);
+        }
+
+        // The run's own gate (`canRunPaidModel`): a backup the plan cannot run would be dropped at run time.
+        const allowed = await allowsPaidModel(
+            backup,
+            async () => {
+                plan ??= await readUserRunPlan(context, userId);
+
+                return plan;
+            },
+            async () => {
+                const entry = (preferences?.providerApiKeys as Record<string, { enabled?: boolean; encryptedKey?: string }> | undefined)?.[backup.provider];
+
+                return Boolean(entry?.enabled && entry.encryptedKey);
+            },
+        );
+
+        if (!allowed) {
+            throw new LunoraError("BAD_REQUEST", paidModelRefusal(backup.name ?? backup.id, byokPaysFor(backup)));
+        }
+    }
+};
+
 const settingsUpsert = async (tableName: SettingsTable, { args: inputArguments, ctx: context }: { args: Record<string, unknown>; ctx: MutationContext }) => {
     const user = await getSessionUser(context);
     const userId = user?.userId;
@@ -237,40 +300,28 @@ const settingsUpsert = async (tableName: SettingsTable, { args: inputArguments, 
             toStore.searchDomainBlocklist = domains;
         }
 
-        // A backup model must be one a chat reply can run on; "" clears it.
-        if (typeof toStore.backupModel === "string" && toStore.backupModel !== "") {
-            const backup = eligibleBackupModel(toStore.backupModel, "");
+        const backupModelsBase = toStore.backupModelsBase as string[] | undefined;
 
-            if (!backup) {
-                throw new LunoraError("BAD_REQUEST", "Not a model that can be used as a backup");
+        delete toStore.backupModelsBase;
+
+        // The backup list and the single value saved before it are kept in step: a write of either sets both, so a reader
+        // of either sees the same first backup. An older client writes `backupModel` alone, and that edits only the first
+        // entry: a model replaces it (and leaves its later place), "" removes it, and the rest of the list stays.
+        if (Array.isArray(toStore.backupModels) || typeof toStore.backupModel === "string") {
+            const saved = storedBackupModels(settings as Doc<"userSettings"> | null);
+
+            if (backupModelsBase !== undefined && (backupModelsBase.length !== saved.length || backupModelsBase.some((id, index) => id !== saved[index]))) {
+                throw new LunoraError("CONFLICT", "Your backup models were changed elsewhere. Reload them and try again.");
             }
 
-            const preferences = await context.db
-                .query("aiUserPreferences")
-                .withIndex("by_userId", (q) => q.eq("userId", userId))
-                .unique();
+            const single = toStore.backupModel as string;
+            const backupModels = Array.isArray(toStore.backupModels)
+                ? (toStore.backupModels as string[])
+                : [single, ...saved.slice(1).filter((id) => id !== single)].filter(Boolean);
 
-            // The user's model filters as they stand: the gateway would answer MODEL_BLOCKED for a backup they exclude.
-            const excluded = backupFilterRejection(backup, preferences?.modelFilterRules ?? undefined);
-
-            if (excluded) {
-                throw new LunoraError("BAD_REQUEST", `Your model filters exclude this backup model: ${excluded}`);
-            }
-
-            // The run's own gate (`canRunPaidModel`): a backup the plan cannot run would be dropped at run time.
-            const allowed = await allowsPaidModel(
-                backup,
-                async () => await readUserRunPlan(context, userId),
-                async () => {
-                    const entry = (preferences?.providerApiKeys as Record<string, { enabled?: boolean; encryptedKey?: string }> | undefined)?.[backup.provider];
-
-                    return Boolean(entry?.enabled && entry.encryptedKey);
-                },
-            );
-
-            if (!allowed) {
-                throw new LunoraError("BAD_REQUEST", paidModelRefusal(backup.name ?? backup.id, byokPaysFor(backup)));
-            }
+            await assertBackupModelsAllowed(context, userId, backupModels, saved);
+            toStore.backupModels = backupModels;
+            toStore.backupModel = backupModels[0] ?? "";
         }
 
         if (toStore.modelNicknames && typeof toStore.modelNicknames === "object") {
@@ -315,6 +366,11 @@ const settingsUpsert = async (tableName: SettingsTable, { args: inputArguments, 
     // on the user's own shard, where they live.
     if (tableName === "userSettings" && toStore.threadSummariesEnabled !== undefined && toStore.threadSummariesEnabled !== true) {
         await runAfterOnShard(context.scheduler, 0, internal.agent.thread_summaries.eraseUserThreadSummaries, { before: now, userId }, userId);
+    }
+
+    // Schedule ideas are opt-in too: switching them off erases the suggestions waiting to be accepted (`tasks/suggestions.ts`).
+    if (tableName === "userSettings" && toStore.scheduleIdeasEnabled !== undefined && toStore.scheduleIdeasEnabled !== true) {
+        await runAfterOnShard(context.scheduler, 0, internal.tasks.suggestions.eraseUserTaskSuggestions, { before: now, userId }, userId);
     }
 };
 
@@ -985,7 +1041,37 @@ export const updateUserSettings = authMutation
     .input(userSettingsFieldsWithoutUserId)
     .mutation(async (options) => {
         const { ctx } = options;
+        const { userId } = ctx.user;
+        const before = await ctx.db
+            .query("userSettings")
+            .withIndex("by_userId", (q) => q.eq("userId", userId))
+            .unique();
+
+        // The default mode of new chats is the owner's to set by hand: neither an admin acting as them nor a grant session (an app or the
+        // browser extension) may change it, since the default would then reach every chat they start (`callerRestrictsFull`).
+        if (options.args.defaultPermissionMode !== undefined && (await callerRestrictsFull(ctx))) {
+            throw new LunoraError("FORBIDDEN", "The default permission mode cannot be changed from an impersonated or grant session");
+        }
+
+        // Turning merged-chat archiving on archives the owner's chats as their pull requests merge: only the owner may turn it on, as
+        // with the default mode. Turning it off is always allowed.
+        if (options.args.autoArchiveMergedChats === true && (await callerRestrictsFull(ctx))) {
+            throw new LunoraError("FORBIDDEN", "Merged-chat archiving cannot be turned on from an impersonated or grant session");
+        }
+
         const result = await settingsUpsert("userSettings", options);
+
+        // Turning the merged-chat archive on stamps when: only merges from then on archive a chat (`agent/auto-archive.ts`).
+        if (options.args.autoArchiveMergedChats === true && before?.autoArchiveMergedChats !== true) {
+            const after = await ctx.db
+                .query("userSettings")
+                .withIndex("by_userId", (q) => q.eq("userId", userId))
+                .unique();
+
+            if (after) {
+                await patchRow(ctx.db, "userSettings", after, { autoArchiveMergedChatsSince: ctx.now });
+            }
+        }
 
         ctx.log.event("auth.update_user_settings", { fieldCount: Object.keys(options.args).length });
 
@@ -1027,6 +1113,49 @@ export const setSubAgentRole = authMutation
     });
 
 /**
+ * The user's review of personalization an admin wrote while acting as them: "Keep as mine" drops
+ * `personalizationByImpersonator`, so it counts as their own words again (`auth/lib/personalization.ts`). An own edit
+ * never clears the mark; only this does, and never from an impersonated session.
+ */
+export const keepPersonalization = authMutation
+    .use(rateLimit("settings/update"))
+    // Every personalization field as the user reviewed it (absent = empty): one changed since is refused, never kept unseen.
+    .input({
+        seen: v.object({
+            aboutMe: v.optional(v.string().max(MAX_LENGTH.document)),
+            customInstructions: v.optional(v.string().max(MAX_LENGTH.document)),
+            language: v.optional(v.string().max(MAX_LENGTH.document)),
+            location: v.optional(v.string().max(MAX_LENGTH.document)),
+            nickname: v.optional(v.string().max(MAX_LENGTH.document)),
+            profession: v.optional(v.string().max(MAX_LENGTH.document)),
+        }),
+    })
+    .output(v.null())
+    .mutation(async ({ args: { seen }, ctx }) => {
+        if (ctx.user.impersonatedBy) {
+            throw new LunoraError("FORBIDDEN", "Personalization cannot be kept as the user's while impersonating");
+        }
+
+        const settings = await ctx.db
+            .query("userSettings")
+            .withIndex("by_userId", (q) => q.eq("userId", ctx.user.userId))
+            .unique();
+
+        if (
+            changesPersonalization(settings as Record<string, unknown> | null, Object.fromEntries(PERSONALIZATION_FIELDS.map((field) => [field, seen[field]])))
+        ) {
+            throw new LunoraError("CONFLICT", "Your personalization changed since you looked at it. Review it again.");
+        }
+
+        if (settings?.personalizationByImpersonator) {
+            await patchRow(ctx.db, "userSettings", settings, { personalizationByImpersonator: undefined });
+            ctx.log.event("auth.keep_personalization", {});
+        }
+
+        return null;
+    });
+
+/**
  * The user's web-search blocklist, for the search tool. Unlike `getUserPreferencesQuery`
  * it has no fallback: a failed read throws, so the tool fails closed rather than searching unfiltered.
  */
@@ -1042,7 +1171,12 @@ export const getSearchDomainBlocklistQuery = internalQuery
         return userSettings?.searchDomainBlocklist ?? [];
     });
 
-export const getUserSettings = query.input({}).query(async (options) => await settingsGet("userSettings", options));
+export const getUserSettings = query.input({}).query(async (options) => {
+    const settings = await settingsGet("userSettings", options);
+
+    // A row saved before the list existed holds only `backupModel`; a reader of the list gets the backup it names.
+    return settings && { ...settings, backupModels: storedBackupModels(settings) };
+});
 
 export const updateAIUserPreferences = authMutation
     .use(rateLimit("settings/update"))
@@ -1117,7 +1251,7 @@ export const getUserPreferencesQuery = internalQuery
         v.object({
             aboutMe: v.optional(v.string()),
             autoCompactThreshold: v.optional(v.number()),
-            backupModel: v.optional(v.string()),
+            backupModels: v.array(v.string()),
             customInstructions: v.optional(v.string()),
             dictationLanguage: v.optional(v.string()),
             language: v.optional(v.string()),
@@ -1126,7 +1260,9 @@ export const getUserPreferencesQuery = internalQuery
             nickname: v.optional(v.string()),
             personalizationByImpersonator: v.boolean(),
             profession: v.optional(v.string()),
+            resumeAfterUsageLimit: v.optional(v.boolean()),
             resumeInterruptedRuns: v.optional(v.boolean()),
+            snoozeUntilUsageLimitReset: v.optional(v.boolean()),
             threadSummariesEnabled: v.boolean(),
             threadTitleInstructions: v.optional(v.string()),
             timezone: v.optional(v.string()),
@@ -1142,7 +1278,7 @@ export const getUserPreferencesQuery = internalQuery
             return {
                 aboutMe: userSettings?.aboutMe ?? undefined,
                 autoCompactThreshold: userSettings?.autoCompactThreshold || undefined, // 0 and absent are both off
-                backupModel: userSettings?.backupModel ?? undefined,
+                backupModels: storedBackupModels(userSettings),
                 customInstructions: userSettings?.customInstructions ?? undefined,
                 dictationLanguage: userSettings?.dictationLanguage ?? undefined,
                 language: userSettings?.language ?? undefined,
@@ -1151,7 +1287,9 @@ export const getUserPreferencesQuery = internalQuery
                 nickname: userSettings?.nickname ?? undefined,
                 personalizationByImpersonator: userSettings?.personalizationByImpersonator === true,
                 profession: userSettings?.profession ?? undefined,
+                resumeAfterUsageLimit: userSettings?.resumeAfterUsageLimit ?? undefined,
                 resumeInterruptedRuns: userSettings?.resumeInterruptedRuns ?? undefined,
+                snoozeUntilUsageLimitReset: userSettings?.snoozeUntilUsageLimitReset ?? undefined,
                 threadSummariesEnabled: userSettings?.threadSummariesEnabled === true, // Opt-in; see agent/thread-summaries.ts
                 threadTitleInstructions: userSettings?.threadTitleInstructions ?? undefined,
                 timezone: userSettings?.timezone ?? undefined,
@@ -1159,7 +1297,7 @@ export const getUserPreferencesQuery = internalQuery
         } catch {
             return {
                 aboutMe: undefined,
-                backupModel: undefined,
+                backupModels: [],
                 customInstructions: undefined,
                 dictationLanguage: undefined,
                 language: undefined,
@@ -1169,6 +1307,8 @@ export const getUserPreferencesQuery = internalQuery
                 // A failed read carries no personalization, so nothing an admin wrote reaches the prompt.
                 personalizationByImpersonator: false,
                 profession: undefined,
+                // A failed read resumes as an absent setting does (`readUsageLimitPreferences`): on, with no snooze.
+                resumeAfterUsageLimit: true,
                 // A failed read is not an absent setting: the resume is off for it (`readResumeInterruptedRuns`).
                 resumeInterruptedRuns: false,
                 threadSummariesEnabled: false,

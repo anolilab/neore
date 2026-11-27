@@ -302,8 +302,8 @@ fn probe_folder() -> Result<PathBuf, String> {
     static COUNTER: AtomicU64 = AtomicU64::new(0);
 
     let folder = std::env::temp_dir().join(format!(
-        "neore-acp-probe-{}-{}-{}",
-        std::process::id(),
+        "{}{}-{}",
+        probe_prefix(),
         now_ms(),
         COUNTER.fetch_add(1, Ordering::Relaxed)
     ));
@@ -313,8 +313,51 @@ fn probe_folder() -> Result<PathBuf, String> {
     std::os::unix::fs::DirBuilderExt::mode(&mut builder, 0o700);
 
     builder.create(&folder).map_err(|error| error.to_string())?;
+    #[cfg(test)]
+    created_probes().insert(folder.clone());
 
     Ok(folder)
+}
+
+/// Every probe folder [`probe_folder`] made in this test process, by the exact path it returned.
+#[cfg(test)]
+fn created_probes() -> std::sync::MutexGuard<'static, BTreeSet<PathBuf>> {
+    static CREATED: std::sync::Mutex<BTreeSet<PathBuf>> = std::sync::Mutex::new(BTreeSet::new());
+
+    CREATED
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
+/// The start of every probe folder's name this process makes.
+fn probe_prefix() -> String {
+    format!("neore-acp-probe-{}-", std::process::id())
+}
+
+/// The probe folder `plan` names, for a test to remove, only when it is provably one this process made: the plan is
+/// a probe, its path is one [`probe_folder`] returned and is still a folder, not a link, and its real path (the temp
+/// folder may sit behind a link) is directly in the real temp folder with this process's probe prefix. Anything else
+/// is left alone, so a plan that wrongly names a real folder fails its test without deleting that folder.
+#[cfg(test)]
+pub(crate) fn probe_scratch(plan: &SpawnPlan) -> Option<crate::test_dir::TestDir> {
+    let path = Path::new(&plan.cwd);
+
+    if !plan.scratch
+        || !created_probes().contains(path)
+        || !fs::symlink_metadata(path).is_ok_and(|meta| meta.is_dir())
+    {
+        return None;
+    }
+
+    let real = fs::canonicalize(&plan.cwd).ok()?;
+    let temp = fs::canonicalize(std::env::temp_dir()).ok()?;
+    let named = real
+        .file_name()
+        .and_then(|name| name.to_str())
+        .is_some_and(|name| name.starts_with(&probe_prefix()));
+
+    (named && real.parent() == Some(temp.as_path()) && real.is_dir())
+        .then(|| crate::test_dir::TestDir::adopt(real))
 }
 
 /// Names of variables that decide which code a program runs besides the ones it names: where it is found, its
@@ -832,10 +875,10 @@ impl DeviceState {
 mod tests {
     use super::*;
     use crate::store::Settings;
+    use crate::test_dir::TestDir;
 
-    fn state(name: &str) -> (DeviceState, PathBuf) {
-        let dir = std::env::temp_dir().join(format!("neore-acp-{name}-{}", std::process::id()));
-        let _ = fs::remove_dir_all(&dir);
+    fn state(name: &str) -> (DeviceState, TestDir) {
+        let dir = TestDir::at(&format!("acp-{name}"));
         fs::create_dir_all(&dir).unwrap();
 
         (DeviceState::new(&dir, Box::new(|_| {})), dir)
@@ -933,7 +976,7 @@ mod tests {
 
     #[test]
     fn a_refused_variable_is_not_stored_and_its_error_has_no_value() {
-        let (state, dir) = state("refuse");
+        let (state, _dir) = state("refuse");
 
         save(&state, "alpha");
         let error =
@@ -944,13 +987,11 @@ mod tests {
         assert!(!error.contains("super-secret-value"));
         assert!(state.acp_view().env_names.is_empty());
         assert!(state.acp_view().agents[0].env_names.is_empty());
-
-        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]
     fn a_variable_reaches_its_agent_and_no_other() {
-        let (state, dir) = state("scope");
+        let (state, _dir) = state("scope");
 
         save(&state, "alpha");
         save(&state, "beta");
@@ -962,17 +1003,13 @@ mod tests {
             state.acp_spawn_plan("alpha", None).unwrap(),
             state.acp_spawn_plan("beta", None).unwrap(),
         );
+        let _probes = (probe_scratch(&alpha_plan), probe_scratch(&beta_plan));
         let (alpha, beta) = (alpha_plan.env.0.clone(), beta_plan.env.0.clone());
-
-        let _ = fs::remove_dir_all(&alpha_plan.cwd);
-        let _ = fs::remove_dir_all(&beta_plan.cwd);
 
         assert_eq!(alpha.get("ONLY_ALPHA").map(String::as_str), Some("a1"));
         assert_eq!(alpha.get("FOR_ALL").map(String::as_str), Some("g1"));
         assert!(!beta.contains_key("ONLY_ALPHA"));
         assert_eq!(beta.get("FOR_ALL").map(String::as_str), Some("b-wins"));
-
-        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]
@@ -989,9 +1026,9 @@ mod tests {
         assert!(!view.contains("sentinel-value"));
         assert!(!format!("{:?}", state.settings()).contains("sentinel-value"));
         let plan = state.acp_spawn_plan("alpha", None).unwrap();
+        let _probe = probe_scratch(&plan);
 
         assert!(!format!("{plan:?}").contains("sentinel-value"));
-        let _ = fs::remove_dir_all(&plan.cwd);
 
         // The values are stored (owner-only, in device.json) so the next start still has them.
         let stored = crate::store::load(&dir.join("device.json"));
@@ -1006,8 +1043,6 @@ mod tests {
 
         let audit = fs::read_to_string(dir.join("device-audit.jsonl")).unwrap_or_default();
         assert!(!audit.contains("sentinel-value"));
-
-        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]
@@ -1078,6 +1113,63 @@ mod tests {
     }
 
     #[test]
+    fn a_test_removes_only_a_probe_folder_it_can_prove_is_one() {
+        let (_state, dir) = state("probe-scratch");
+        let plan = |cwd: &Path, scratch: bool| SpawnPlan {
+            args: Vec::new(),
+            command: String::new(),
+            cwd: cwd.to_string_lossy().into_owned(),
+            env: EnvVars::default(),
+            scratch,
+            secret_names: Vec::new(),
+        };
+        let probe = TestDir::adopt(probe_folder().unwrap());
+        let escape = probe.join("..").join(dir.file_name().unwrap());
+
+        assert!(
+            probe_scratch(&plan(&dir, true)).is_none(),
+            "not probe-named"
+        );
+        assert!(
+            probe_scratch(&plan(&escape, true)).is_none(),
+            "`..` out of a probe"
+        );
+        assert!(
+            probe_scratch(&plan(&probe, false)).is_none(),
+            "not a probe plan"
+        );
+
+        #[cfg(unix)]
+        {
+            let link = TestDir::adopt(std::env::temp_dir().join(format!("{}link", probe_prefix())));
+
+            std::os::unix::fs::symlink(&*dir, &link).unwrap();
+            assert!(
+                probe_scratch(&plan(&link, true)).is_none(),
+                "a probe-named link"
+            );
+        }
+
+        #[cfg(unix)]
+        {
+            let other = TestDir::adopt(probe_folder().unwrap());
+            let swapped = TestDir::adopt(probe_folder().unwrap());
+
+            fs::remove_dir(&swapped).unwrap();
+            std::os::unix::fs::symlink(&*other, &swapped).unwrap();
+            assert!(
+                probe_scratch(&plan(&swapped, true)).is_none(),
+                "a link to another probe folder"
+            );
+            assert!(other.is_dir(), "the other probe folder stays");
+        }
+
+        assert!(dir.is_dir() && probe.is_dir(), "nothing was removed");
+        drop(probe_scratch(&plan(&probe, true)).unwrap());
+        assert!(!probe.exists(), "a real probe folder is removed");
+    }
+
+    #[test]
     fn a_probe_runs_in_a_scratch_folder_and_a_session_in_a_real_one() {
         let (state, dir) = state("plan");
         let work = dir.join("work");
@@ -1088,13 +1180,12 @@ mod tests {
 
         let probe = state.acp_spawn_plan("alpha", None).unwrap();
         let again = state.acp_spawn_plan("alpha", None).unwrap();
+        let _probes = (probe_scratch(&probe), probe_scratch(&again));
         assert!(probe.scratch && !probe.cwd.starts_with(dir.to_str().unwrap()));
         assert!(Path::new(&probe.cwd).starts_with(std::env::temp_dir()));
         assert!(fs::read_dir(&probe.cwd).unwrap().next().is_none());
         assert_ne!(probe.cwd, again.cwd, "each probe has a folder of its own");
         assert!(!dir.join("acp-probe").exists());
-        let _ = fs::remove_dir_all(&probe.cwd);
-        let _ = fs::remove_dir_all(&again.cwd);
 
         let session = state
             .acp_spawn_plan("alpha", Some(work.to_str().unwrap()))
@@ -1111,25 +1202,21 @@ mod tests {
             .acp_spawn_plan("alpha", Some("/nonexistent/neore"))
             .is_err());
         assert!(state.acp_spawn_plan("nobody", None).is_err());
-
-        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]
     fn only_the_variables_the_user_set_are_named_as_secrets() {
-        let (state, dir) = state("secrets");
+        let (state, _dir) = state("secrets");
 
         save(&state, "alpha");
         set_env(&state, Some("alpha"), "API_KEY", "k-1234").unwrap();
         set_env(&state, None, "HTTPS_PROXY", "http://proxy").unwrap();
 
         let plan = state.acp_spawn_plan("alpha", None).unwrap();
+        let _probe = probe_scratch(&plan);
 
         assert_eq!(plan.secret_names, vec!["API_KEY", "HTTPS_PROXY"]);
         assert!(plan.env.0.contains_key("API_KEY"));
-
-        let _ = fs::remove_dir_all(&plan.cwd);
-        let _ = fs::remove_dir_all(&dir);
     }
 
     #[cfg(unix)]
@@ -1223,13 +1310,11 @@ mod tests {
                 "{name} keeps an approval"
             );
         }
-
-        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]
     fn agents_are_validated_and_removal_takes_the_variables_along() {
-        let (state, dir) = state("agents");
+        let (state, _dir) = state("agents");
 
         assert!(state
             .acp_update(update(
@@ -1256,8 +1341,6 @@ mod tests {
             .unwrap();
         assert!(state.acp_view().agents.is_empty());
         assert!(set_env(&state, Some("alpha"), "K", "v").is_err());
-
-        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]
@@ -1284,8 +1367,6 @@ mod tests {
         assert!(ask("beta", &one).is_err());
         // A path that does not exist is refused too.
         assert!(ask("alpha", &dir.join("missing")).is_err());
-
-        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]
@@ -1319,8 +1400,6 @@ mod tests {
             state.acp_read_media("alpha", one.to_str().unwrap(), "../two/chart.png"),
             MediaRead::Refused
         ));
-
-        let _ = fs::remove_dir_all(&dir);
     }
 
     #[cfg(unix)]
@@ -1348,8 +1427,6 @@ mod tests {
             state.acp_read_media("alpha", one.to_str().unwrap(), "chart.png"),
             MediaRead::Refused
         ));
-
-        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]
@@ -1384,8 +1461,6 @@ mod tests {
         assert!(restarted
             .acp_spawn_plan("alpha", Some(work.to_str().unwrap()))
             .is_err());
-
-        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]
@@ -1416,8 +1491,6 @@ mod tests {
             .acp_update(update(r#"{"op":"removeAgent","key":"alpha"}"#))
             .unwrap();
         assert!(state.acp_view().consents.is_empty());
-
-        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]
@@ -1444,8 +1517,6 @@ mod tests {
                 "{folder}"
             );
         }
-
-        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]
@@ -1509,7 +1580,5 @@ mod tests {
 
         assert!(audit.contains("acp: Run curl") && audit.contains("deny"));
         assert!(!audit.contains("sentinel-token"));
-
-        let _ = fs::remove_dir_all(&dir);
     }
 }

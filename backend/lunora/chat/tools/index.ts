@@ -40,6 +40,7 @@ import requestSecretTool from "./request-secret";
 import retrieveTool from "./retrieve";
 import { saveSecretAsProviderKeyTool, setMcpServerSecretTool } from "./use-secret";
 import searchMemoryTool from "./search-memory";
+import signInWithSavedLoginTool from "./site-login";
 import shellExecutionTool from "./shell-execution";
 import spotifySearchTool from "./spotify-search";
 import stockChartTool from "./stock-chart";
@@ -115,6 +116,7 @@ export type { RetrievedContent } from "./retrieve";
 export { default as retrieveTool } from "./retrieve";
 export { default as searchMemoryTool } from "./search-memory";
 export { default as shellExecutionTool } from "./shell-execution";
+export { default as signInWithSavedLoginTool } from "./site-login";
 export type { SpotifyAlbum, SpotifyArtist, SpotifyPlaylist, SpotifyShow, SpotifyTrack } from "./spotify-search";
 export { default as spotifySearchTool } from "./spotify-search";
 export type { StockNews, StockPrice, StockQuote } from "./stock-chart";
@@ -251,6 +253,9 @@ export enum ToolName {
     // Sandbox Tools
     ShellExecution = "shellExecution",
 
+    // Signing the browser in with a saved login
+    SignInWithSavedLogin = "signInWithSavedLogin",
+
     SpotifySearch = "spotifySearch",
     StockChart = "stockChart",
     // Task Management Tools
@@ -362,6 +367,7 @@ export const getAllTools = () => {
         [ToolName.SearchMemory]: searchMemoryTool,
         [ToolName.SetMcpServerSecret]: setMcpServerSecretTool,
         [ToolName.ShellExecution]: shellExecutionTool,
+        [ToolName.SignInWithSavedLogin]: signInWithSavedLoginTool,
         [ToolName.SpotifySearch]: spotifySearchTool,
         [ToolName.StockChart]: stockChartTool,
         [ToolName.TaskList]: taskListTool,

@@ -16,14 +16,19 @@ import type { QueryCtx } from "../_generated/server";
 import { meetsThreadPermission, resolveThreadReadAccess } from "../agent/thread-read-access";
 import { BROWSER_LIVE_VIEW_API_TOKEN, CLOUDFLARE_ACCOUNT_ID } from "../env";
 import { authAction, authMutation, authQuery, internalMutation, internalQuery, rateLimit } from "../lib/crpc";
+import { MAX_LENGTH } from "../lib/validators";
 import { throwForbidden, throwThreadNotFound } from "../lib/error-helpers";
 import { hmacSha256Hex, timingSafeEqual } from "../lib/crypto";
 import { fetchWithDeadline } from "../lib/fetch-timeout";
+import { getRateLimitKey, getUserTier } from "../lib/rate-limiter";
 import { systemDb } from "../lib/rls/scope";
 import { isServiceBound, serviceFetch } from "../lib/services";
 import { validateDomain } from "../chat/tools/utilities";
+import { lastGrantRevision } from "../agent/grant-revision";
 import { activeThreadSession } from "./functions";
+import { claimIdOf, releaseTokenFor } from "./release-token";
 import { patchRow } from "../lib/patch";
+import { currentShard, ROOT_SHARD_KEY } from "../lib/shard-context";
 import {
     browserAliveUntil,
     browserIdOf,
@@ -38,6 +43,10 @@ import {
     watchableSessionId,
 } from "./live-view-logic";
 
+/**
+ * `revision`, on a grantee's answer that reads the chat: the revision of their grant this read saw
+ * (`agent/grant-revision.ts`). Absent for the owner.
+ */
 type ReaderBrowser =
     | {
           accessUntil?: number;
@@ -50,10 +59,21 @@ type ReaderBrowser =
           idleUntil: number;
           kind: "watchable";
           providerSessionId: string;
+          revision?: number;
           session: Doc<"browserSessions">;
+          /**
+           * The shard the session row is on: the one serving this read (the thread owner's). Never the row's `userId`, which names whoever opened
+           * the browser (a collaborator's first action in a shared thread opens it on the owner's shard).
+           */
+          shardKey: string;
       }
-    | { kind: "denied" }
-    | { kind: "none" };
+    /** `owner`: the caller owns the chat (a locked one), so the denial names no grant. */
+    | { kind: "denied"; owner?: true }
+    /**
+     * `accessUntil`: as on a watchable browser, so a grantee's every readable answer says when the grant ends. `trashed`:
+     * the chat is in the bin, which the status answers as `denied` (the ask's card hides on it like on a lock).
+     */
+    | { accessUntil?: number; kind: "none"; revision?: number; trashed?: true };
 
 /**
  * Who holds a lease, as `browserSessions.control.by` stores it: a keyed hash of the session and the person, never their
@@ -85,7 +105,7 @@ const settled = <C extends { renewing?: string; renewingEnded?: string }>({
  * Takes, keeps and drives no browser while an admin acts as the owner: the browser is signed in to the owner's sites,
  * and what is opened in it is recorded as the owner's own. `handBack` stays open, so a lease can always be ended.
  */
-const refuseImpersonation = (impersonatedBy: string | null | undefined): void => {
+export const refuseImpersonation = (impersonatedBy: string | null | undefined): void => {
     if (impersonatedBy) {
         throw new LunoraError("FORBIDDEN", "The browser cannot be controlled while impersonating");
     }
@@ -121,12 +141,17 @@ const readerBrowser = async (
     const access = await resolveThreadReadAccess(ctx, threadId, userId, undefined, options);
 
     if (access?.kind !== "full") {
-        return { kind: "denied" };
+        return access?.thread.userId === userId ? { kind: "denied", owner: true } : { kind: "denied" };
     }
+
+    const grant = {
+        ...(access.expiresAt !== undefined && { accessUntil: access.expiresAt }),
+        ...(access.revision !== undefined && { revision: access.revision }),
+    };
 
     // A trashed chat shows its browser to no one, like every other read of a trashed thread.
     if (access.thread.deleted === true) {
-        return { kind: "none" };
+        return { ...grant, kind: "none", trashed: true };
     }
 
     // The same row the agent's next action uses (`getActiveSession`), so the view is of the browser the agent drives.
@@ -134,11 +159,11 @@ const readerBrowser = async (
     const providerSessionId = watchableSessionId(session, now);
 
     if (session === null || providerSessionId === undefined) {
-        return { kind: "none" };
+        return { ...grant, kind: "none" };
     }
 
     return {
-        ...(access.expiresAt !== undefined && { accessUntil: access.expiresAt }),
+        ...grant,
         browserId: await browserIdOf(session._id, providerSessionId),
         canControl: meetsThreadPermission(access.permission, "write"),
         ...(controlStateOf(session, now) === "person" &&
@@ -148,44 +173,106 @@ const readerBrowser = async (
         kind: "watchable",
         providerSessionId,
         session,
+        shardKey: currentShard() ?? access.thread.userId ?? ROOT_SHARD_KEY,
     };
 };
 
 /**
- * The thread's running cloud browser, or `null`. A grantee's read goes through the thread decision, then past row-level
- * security. `accessUntil` is when a grantee's grant ends: a live query is re-run only by a write to what it read, not
- * by the clock, so the client stops showing the status then and asks again, and every answer after it is `null`.
+ * The status read's browser and the grant revision its answer names. The read is on the replica; a denial of a grantee
+ * is decided again on the primary (a re-grant a replica has not seen yet reads as the grant it is), and the count is
+ * read after that denial, so the revision it names is at least as new as the denial: a re-grant and its removal that
+ * commit between the two reads leave no grant answer the card would keep over it. A denial names the caller's last
+ * revision (a removal advanced it); the owner's names none (they hold no grant).
+ */
+const statusBrowser = async (
+    ctx: QueryCtx & { user: { userId: string } },
+    threadId: Id<"threads">,
+    now: number,
+): Promise<{ browser: ReaderBrowser; revision?: number }> => {
+    const { userId } = ctx.user;
+    const replica = await readerBrowser(ctx, threadId, userId, now);
+
+    if (replica.kind !== "denied") {
+        return replica.revision === undefined ? { browser: replica } : { browser: replica, revision: replica.revision };
+    }
+
+    if (replica.owner === true) {
+        return { browser: replica };
+    }
+
+    const browser = await readerBrowser(ctx, threadId, userId, now, { primary: true });
+    let revision = browser.kind === "denied" ? await lastGrantRevision(ctx, threadId, userId) : browser.revision;
+
+    if (browser.kind === "denied" && browser.owner === true) {
+        revision = undefined;
+    }
+
+    return revision === undefined ? { browser } : { browser, revision };
+};
+
+/** The public names of the claims that name `lease`: its own, and the one a renewal still being minted replaces. */
+const leaseClaimIds = async (lease: { claim: string; renewing?: string }): Promise<string[]> =>
+    await Promise.all([lease.claim, ...(lease.renewing === undefined ? [] : [lease.renewing])].map(async (claim: string) => await claimIdOf(claim)));
+
+/**
+ * The thread's running cloud browser (`kind: "running"`); `none`: no browser running that the reader may watch;
+ * `denied`: the caller does not read the chat now (a non-reader, a locked or trashed chat, a grant that ended). The
+ * last two carry nothing of the thread or its browser, only the server's clock `now`, which every answer carries so a
+ * client orders a one-shot read against a live push. A grantee's read goes through the thread decision, then past
+ * row-level security. `accessUntil` (on `running` and `none`, so on every answer a grantee reads the chat by) is when a
+ * grantee's grant ends: a live query is re-run only by a write to what it read, not by the clock, so the client stops
+ * showing the status then and asks again, and every answer after it is `denied`. Which answer is newest never decides
+ * whether the grant's end is known. `revision`, on every answer to a grantee: the revision of their grant the read saw,
+ * on a denial their grant's last one, none when they never had one (`agent/grant-revision.ts`). A removal advances it and pushes a denial, a renewal
+ * advances it and pushes nothing, so a client drops any answer older than the highest revision it has seen: a one-shot
+ * read from a replica that still holds a removed grant answers on a later clock, but with the older revision.
  */
 export const getThreadBrowser = authQuery
     /** `claim`: a view's own claim. The answer then says whether the lease is that view's, not only the caller's. */
-    .input({ claim: v.optional(v.string()), threadId: v.id("threads") })
+    .input({ claim: v.optional(v.string().max(MAX_LENGTH.short)), threadId: v.id("threads") })
     .output(
         v.union(
-            v.null(),
+            v.object({ kind: v.literal("denied"), now: v.number(), revision: v.optional(v.number()) }),
+            v.object({ accessUntil: v.optional(v.number()), kind: v.literal("none"), now: v.number(), revision: v.optional(v.number()) }),
             v.object({
                 accessUntil: v.optional(v.number()),
                 browserId: v.string(),
                 canControl: v.boolean(),
                 /**
                  * A person drives the browser until `until`; `byYou`: the caller (from any of their tabs). `byClaim`, only
-                 * with a `claim` asked for: the lease is the one that claim names, and not handed back.
+                 * with a `claim` asked for: the lease is the one that claim names, and not handed back. `claimIds`, only
+                 * when it is the caller's: the public names (`claimIdOf`) of the claims that name the lease (its own, and
+                 * the one a renewal still being minted replaces), so a tab tells at once that another of the caller's
+                 * tabs took it over.
                  */
-                control: v.optional(v.object({ byClaim: v.optional(v.boolean()), byYou: v.boolean(), until: v.number() })),
+                control: v.optional(
+                    v.object({ byClaim: v.optional(v.boolean()), byYou: v.boolean(), claimIds: v.optional(v.array(v.string())), until: v.number() }),
+                ),
                 currentUrl: v.optional(v.string()),
                 idleUntil: v.number(),
+                kind: v.literal("running"),
                 /**
                  * The server's clock at this answer. A lease that runs out writes nothing, so no new answer comes when it
                  * ends: the client compares `control.until` with this clock, not its own, and needs no second read.
                  */
                 now: v.number(),
+                revision: v.optional(v.number()),
             }),
         ),
     )
     .query(async ({ args: { claim, threadId }, ctx }) => {
-        const browser = await readerBrowser(ctx, threadId, ctx.user.userId, ctx.now);
+        const { browser, revision: answered } = await statusBrowser(ctx, threadId, ctx.now);
+        const revision = answered === undefined ? {} : { revision: answered };
 
-        if (browser.kind !== "watchable") {
-            return null;
+        // A trashed chat is read by no one, the person who trashed it included: the "Needs you" card hides its site and
+        // page on it whether or not its own ask still reads (a settled ask's card no longer subscribes to the ask).
+
+        if (browser.kind === "denied" || (browser.kind === "none" && browser.trashed === true)) {
+            return { ...revision, kind: "denied" as const, now: ctx.now };
+        }
+
+        if (browser.kind === "none") {
+            return { ...(browser.accessUntil !== undefined && { accessUntil: browser.accessUntil }), ...revision, kind: "none" as const, now: ctx.now };
         }
 
         const { control } = browser;
@@ -199,12 +286,15 @@ export const getThreadBrowser = authQuery
                 control: {
                     ...(claim !== undefined && { byClaim: control.byCaller && lease?.ended === undefined && claimNames(lease, claim) }),
                     byYou: control.byCaller,
+                    ...(control.byCaller && lease !== undefined && { claimIds: await leaseClaimIds(lease) }),
                     until: control.until,
                 },
             }),
             currentUrl: browser.currentUrl,
             idleUntil: browser.idleUntil,
+            kind: "running" as const,
             now: ctx.now,
+            ...revision,
         };
     });
 
@@ -234,7 +324,7 @@ export const getReaderBrowser = internalQuery
         const browser = await readerBrowser(ctx, threadId, userId, Math.max(ctx.now, at ?? 0), { primary: true });
 
         if (browser.kind !== "watchable") {
-            return browser;
+            return { kind: browser.kind };
         }
 
         return {
@@ -384,6 +474,8 @@ export const claimControl = internalMutation
                 providerSessionId: v.string(),
                 /** An earlier lease ended and the agent was not told yet: a dropped claim puts that note back. */
                 returned: v.optional(v.union(v.literal("browser_closed"), v.literal("handed_back"), v.literal("idle"), v.literal("left"))),
+                /** The thread owner's shard, where the session row is: a closing page's hand back is sent there. */
+                shardKey: v.string(),
                 /** When the lease this claim wrote ends unrenewed. */
                 until: v.number(),
             }),
@@ -442,6 +534,7 @@ export const claimControl = internalMutation
                 kind: "ok" as const,
                 previousClaim: current.renewing ?? current.claim,
                 providerSessionId: browser.providerSessionId,
+                shardKey: browser.shardKey,
                 until,
                 ...(current.ended !== undefined && { handedBack: current.ended }),
             };
@@ -454,7 +547,15 @@ export const claimControl = internalMutation
             control: { by, claim, since: ctx.now, until },
         });
 
-        return { claim, fresh: true, kind: "ok" as const, providerSessionId: browser.providerSessionId, until, ...(returned !== undefined && { returned }) };
+        return {
+            claim,
+            fresh: true,
+            kind: "ok" as const,
+            providerSessionId: browser.providerSessionId,
+            shardKey: browser.shardKey,
+            until,
+            ...(returned !== undefined && { returned }),
+        };
     });
 
 /**
@@ -564,15 +665,25 @@ export const settleControlClaim = internalMutation
  */
 export const takeControl = authAction
     /** `renews`: the claim of the view this refreshes (its URL expired unconnected), so a renewal is told from a takeover. */
-    .input({ renews: v.optional(v.string()), threadId: v.id("threads") })
+    .input({ renews: v.optional(v.string().max(MAX_LENGTH.short)), threadId: v.id("threads") })
     .use(rateLimit("browser/liveView"))
     .output(
         v.union(
             /**
              * `claim` names this lease: the view passes it to `keepControl`, `handBack` and `navigateInControl`. `until`:
              * when the lease ends unrenewed, on the server's clock, so the view need not wait for a status read to know.
+             * `claimId`: the claim's public name, as the live status shows it. `release`: the token a closing page sends
+             * to `POST /browser/release` (a beacon carries no session), good for this claim's lease alone.
              */
-            v.object({ claim: v.string(), connectBy: v.number(), status: v.literal("ok"), until: v.number(), url: v.string() }),
+            v.object({
+                claim: v.string(),
+                claimId: v.string(),
+                connectBy: v.number(),
+                release: v.optional(v.string()),
+                status: v.literal("ok"),
+                until: v.number(),
+                url: v.string(),
+            }),
             v.object({ status: v.union(v.literal("busy"), v.literal("ended"), v.literal("taken"), v.literal("unavailable")) }),
         ),
     )
@@ -687,7 +798,17 @@ export const takeControl = authAction
 
         ctx.log.event("browser.control_taken", { ok: true, reason: claim.fresh ? "fresh" : "renewed" });
 
-        return { claim: claim.claim, connectBy: Date.now() + LIVE_VIEW_CONNECT_DEADLINE_MS, status: "ok" as const, until: claim.until, url };
+        const release = await releaseTokenFor({ claim: claim.claim, shardKey: claim.shardKey, threadId });
+
+        return {
+            claim: claim.claim,
+            claimId: await claimIdOf(claim.claim),
+            connectBy: Date.now() + LIVE_VIEW_CONNECT_DEADLINE_MS,
+            ...(release !== undefined && { release }),
+            status: "ok" as const,
+            until: claim.until,
+            url,
+        };
     });
 
 /**
@@ -695,7 +816,7 @@ export const takeControl = authAction
  * `claim` is not the lease's: another of their tabs took control since, and this view must close.
  */
 export const keepControl = authMutation
-    .input({ claim: v.string(), threadId: v.id("threads") })
+    .input({ claim: v.string().max(MAX_LENGTH.short), threadId: v.id("threads") })
     .use(rateLimit("browser/control"))
     .output(v.union(v.null(), v.object({ until: v.number() })))
     .mutation(async ({ args: { claim, threadId }, ctx }) => {
@@ -726,6 +847,44 @@ export const keepControl = authMutation
     });
 
 /**
+ * Ends the lease `claim` names, the way its view closed, as {@link handBack} does. `again`: a send again of a hand back
+ * that already landed; `renewing`: the view a renewal is replacing closed, which only records how; `undefined`: the
+ * lease is not that claim's (another person's, a newer claim, or lapsed), or `isHolder` refused it.
+ */
+const returnLease = async (
+    db: Parameters<typeof patchRow>[0],
+    session: Doc<"browserSessions"> | null,
+    claim: string,
+    reason: "handed_back" | "left",
+    now: number,
+    isHolder: (session: Doc<"browserSessions">) => Promise<boolean>,
+): Promise<"again" | "ended" | "renewing" | undefined> => {
+    // A send again of a hand back that already landed (its answer did not get through): it changes nothing.
+    if (session?.control?.claim === claim && (session.control.ended === "handed_back" || session.control.ended === "left") && (await isHolder(session))) {
+        return "again";
+    }
+
+    if (session === null || !claimNames(session.control, claim) || controlStateOf(session, now) !== "person" || !(await isHolder(session))) {
+        return undefined;
+    }
+
+    // A view a renewal is replacing closed: the renewal decides (another tab of the person's may be taking over), and
+    // ends the lease the way this view closed if it fails, as no view holds it then.
+    if (session.control.claim !== claim) {
+        await patchRow(db, "browserSessions", session, { control: { ...settled(session.control), renewingEnded: reason } });
+
+        return "renewing";
+    }
+
+    // A page the person asked for is still loading: the agent waits for it too, then the lease ends with it.
+    const until = Math.max(now, session.control.navigatingUntil ?? 0);
+
+    await patchRow(db, "browserSessions", session, { ...activeNow(session, now), control: { ...session.control, ended: reason, until } });
+
+    return "ended";
+};
+
+/**
  * The person gives the browser back (`handed_back`) or left the view (`left`); the agent's next action is told. Takes
  * no thread decision and no rate limit: it only ends the caller's own lease, and only the one `claim` names, so an
  * older tab of theirs closing never ends the lease a newer tab took. Answers whether that claim's lease is handed back
@@ -733,47 +892,43 @@ export const keepControl = authMutation
  * of the person's tabs took over, or the lease ran out), so the view does not say it handed anything back.
  */
 export const handBack = authMutation
+    .input({ claim: v.string().max(MAX_LENGTH.short), reason: v.union(v.literal("handed_back"), v.literal("left")), threadId: v.id("threads") })
+    .output(v.boolean())
+    .mutation(async ({ args: { claim, reason, threadId }, ctx }) => {
+        const db = systemDb(ctx);
+        const ended = await returnLease(
+            db,
+            await activeThreadSession(db, threadId),
+            claim,
+            reason,
+            ctx.now,
+            async (session) => await holdsLease(session, ctx.user.userId),
+        );
+
+        if (ended === "ended") {
+            ctx.log.event("browser.control_returned", { reason });
+        }
+
+        return ended === "ended" || ended === "again";
+    });
+
+/**
+ * A closing page's hand back (`POST /browser/release`), which carries no session: the route verified the release token
+ * `takeControl` gave the claim's holder alone, and this runs on the shard it names. It ends only the lease that claim
+ * names, as `handBack` would: `left`, or `handed_back` for a page that closed while the person's own hand back was
+ * still out. A newer claim, or a lease already ended, is left as it is.
+ */
+export const releaseControl = internalMutation
     .input({ claim: v.string(), reason: v.union(v.literal("handed_back"), v.literal("left")), threadId: v.id("threads") })
     .output(v.boolean())
     .mutation(async ({ args: { claim, reason, threadId }, ctx }) => {
-        const session = await activeThreadSession(systemDb(ctx), threadId);
+        const ended = await returnLease(ctx.db, await activeThreadSession(ctx.db, threadId), claim, reason, ctx.now, async () => true);
 
-        // A send again of a hand back that already landed (its answer did not get through): it changes nothing.
-        if (
-            session?.control?.claim === claim &&
-            (session.control.ended === "handed_back" || session.control.ended === "left") &&
-            (await holdsLease(session, ctx.user.userId))
-        ) {
-            return true;
-        }
-
-        if (
-            session !== null &&
-            claimNames(session.control, claim) &&
-            controlStateOf(session, ctx.now) === "person" &&
-            (await holdsLease(session, ctx.user.userId))
-        ) {
-            // A view a renewal is replacing closed: the renewal decides (another tab of the person's may be taking
-            // over), and ends the lease the way this view closed if it fails, as no view holds it then.
-            if (session.control.claim !== claim) {
-                await patchRow(systemDb(ctx), "browserSessions", session, { control: { ...settled(session.control), renewingEnded: reason } });
-
-                return false;
-            }
-
-            // A page the person asked for is still loading: the agent waits for it too, then the lease ends with it.
-            const until = Math.max(ctx.now, session.control.navigatingUntil ?? 0);
-
-            await patchRow(systemDb(ctx), "browserSessions", session, {
-                ...activeNow(session, ctx.now),
-                control: { ...session.control, ended: reason, until },
-            });
+        if (ended === "ended") {
             ctx.log.event("browser.control_returned", { reason });
-
-            return true;
         }
 
-        return false;
+        return ended === "ended" || ended === "again";
     });
 
 /**
@@ -783,7 +938,7 @@ export const handBack = authMutation
  * interactive view lets them follow any link, so a redirect is no different from a click.
  */
 export const navigateInControl = authAction
-    .input({ claim: v.string(), threadId: v.id("threads"), url: v.string().max(2048) })
+    .input({ claim: v.string().max(MAX_LENGTH.short), threadId: v.id("threads"), url: v.string().max(2048) })
     .use(rateLimit("browser/control"))
     .output(
         v.union(
@@ -826,17 +981,28 @@ export const navigateInControl = authAction
         // and one too late for any of it is not sent (no answer, like a call that failed: the browser is left as it is).
         const budget = rendererCallBudget(navigation.navigatingUntil, startedAt);
         const signal = budget === 0 ? undefined : AbortSignal.timeout(budget);
-        const { data } =
+        const { data, error, response } =
             signal === undefined
-                ? { data: undefined }
+                ? { data: undefined, error: undefined, response: undefined }
                 : await browserAction({
                       body: { action: "navigate", sessionId: navigation.providerSessionId, url },
                       client,
                       signal,
                   }).catch(() => {
-                      return { data: undefined };
+                      return { data: undefined, error: undefined, response: undefined };
                   });
         const result = data as BrowserActionResponse | undefined;
+        // The renderer retired the browser for good: the row forgets it, so the next action opens a new one.
+        const isRetired = response?.status === 410;
+        // The renderer lost the call's hold while the page loaded (a 503 that ran something): the page may have opened,
+        // and the browser it names (a new one, when the row's could not be reconnected) stays the row's.
+        const withheld =
+            response?.status === 503 && response.headers?.get?.("x-browser-action") !== "not-run"
+                ? ((error ?? {}) as { error?: unknown; sessionId?: unknown })
+                : undefined;
+        const withheldSessionId = typeof withheld?.sessionId === "string" ? withheld.sessionId : undefined;
+        const withheldError = typeof withheld?.error === "string" ? withheld.error : undefined;
+
         // A call cut off at its deadline may still be loading the page in the renderer: its hold runs out on its own, so
         // the agent never acts while it lands. The signal, as the clock may lag the timer that fired it.
         const mayStillLoad = signal !== undefined && result === undefined && (signal.aborted || Date.now() >= startedAt + budget);
@@ -849,37 +1015,58 @@ export const navigateInControl = authAction
         let logged: { replaced: boolean } | undefined;
 
         try {
-            logged = await ctx.runMutation(internal.browser.functions.logAction, {
-                action: "navigate",
-                actor: navigation.byOwner ? "owner" : "collaborator",
-                durationMs: Date.now() - startedAt,
-                ...(result?.success !== true && { errorMessage: result?.error ?? "The page could not be opened." }),
-                ...(result !== undefined && { providerSessionId: result.sessionId ?? NO_PROVIDER_SESSION }),
-                sessionId: navigation.sessionId,
-                startedAt,
-                startedWithProviderSessionId: navigation.providerSessionId,
-                success: result?.success === true,
-                target: url,
-            });
-        } finally {
-            if (!mayStillLoad) {
-                await ctx.runMutation(internal.browser.live_view.endControlNavigation, {
-                    at: Date.now(),
-                    navigatingUntil: navigation.navigatingUntil,
+            try {
+                logged = await ctx.runMutation(internal.browser.functions.logAction, {
+                    action: "navigate",
+                    actor: navigation.byOwner ? "owner" : "collaborator",
+                    durationMs: Date.now() - startedAt,
+                    ...(result?.success !== true && { errorMessage: result?.error ?? withheldError ?? "The page could not be opened." }),
+                    ...((result !== undefined || isRetired) && { providerSessionId: result?.sessionId ?? NO_PROVIDER_SESSION }),
+                    ...(withheldSessionId !== undefined && { providerSessionId: withheldSessionId }),
                     sessionId: navigation.sessionId,
-                    userId,
+                    startedAt,
+                    startedWithProviderSessionId: navigation.providerSessionId,
+                    success: result?.success === true,
+                    target: url,
                 });
+            } finally {
+                if (!mayStillLoad) {
+                    await ctx.runMutation(internal.browser.live_view.endControlNavigation, {
+                        at: Date.now(),
+                        navigatingUntil: navigation.navigatingUntil,
+                        sessionId: navigation.sessionId,
+                        userId,
+                    });
+                }
+            }
+        } finally {
+            // The renderer opened nothing (the session was retired, or its lock refused the call): the person's charge for
+            // this navigation is given back, as the agent's is (`chat/tools/browser-node.ts`). After the row is logged and
+            // the hold ended, whether or not those writes succeed, and a refund that fails is let go: it never keeps a
+            // hold or a retired browser on the row, nor hides their error.
+            if (isRetired || response?.headers?.get?.("x-browser-action") === "not-run") {
+                await ctx
+                    .runMutation(internal.lib.rate_limiter_mutations.refundRateLimit, {
+                        identifier: userId,
+                        key: getRateLimitKey("browser/control", getUserTier({ plan: ctx.user.plan })),
+                    })
+                    .catch(() => undefined);
             }
         }
 
         // The row was closed or moved on to another browser meanwhile (`replaced` covers both), or the renderer opened
         // the page in a new browser (the old one expired), which ended the lease: the person's view shows a browser gone.
-        if (logged?.replaced === true || (result?.success === true && (result.sessionId ?? NO_PROVIDER_SESSION) !== navigation.providerSessionId)) {
+        if (
+            logged?.replaced === true ||
+            isRetired ||
+            (result?.success === true && (result.sessionId ?? NO_PROVIDER_SESSION) !== navigation.providerSessionId) ||
+            (withheldSessionId !== undefined && withheldSessionId !== navigation.providerSessionId)
+        ) {
             return { status: "closed" as const };
         }
 
         if (result?.success !== true) {
-            return { error: result?.error ?? "The page could not be opened.", status: "refused" as const };
+            return { error: result?.error ?? withheldError ?? "The page could not be opened.", status: "refused" as const };
         }
 
         return { status: "ok" as const, ...(result.url !== undefined && { url: result.url }) };

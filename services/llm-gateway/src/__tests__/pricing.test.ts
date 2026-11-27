@@ -155,6 +155,7 @@ describe("extractPricing (provider-keyed models.dev document)", () => {
     it("prices a bare model id in USD per million tokens, skipping a provider that lists it without a cost", () => {
         expect(extractPricing(fixture, "claude-sonnet-4-5")).toStrictEqual({
             cachedInputPerMillion: 0.3,
+            cacheWritePerMillion: 3.75,
             contextWindow: 200_000,
             inputPerMillion: 3,
             outputPerMillion: 15,
@@ -247,8 +248,8 @@ describe("PricingService.getPricing cache", () => {
         const { keys } = await pricingKv.list({ prefix: "pricing:" });
 
         expect(keys.map((key) => key.name).toSorted((a, b) => a.localeCompare(b))).toStrictEqual([
-            "pricing:v2:provider-a:same-model",
-            "pricing:v2:provider-b:same-model",
+            "pricing:v3:provider-a:same-model",
+            "pricing:v3:provider-b:same-model",
         ]);
     });
 });

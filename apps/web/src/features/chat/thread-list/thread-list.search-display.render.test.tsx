@@ -42,6 +42,19 @@ const lingui = vi.hoisted(() => {
     return { i18n: { _: (value: string) => value }, t };
 });
 
+// The chat-action confirmations are read from settings this test does not serve: every action asks, as before the settings load.
+vi.mock("./hooks/use-confirm-before-delete", () => {
+    return { useConfirmBeforeDelete: () => true };
+});
+vi.mock("@/features/auth/hooks/use-user-settings", async (importOriginal) => {
+    return {
+        ...(await importOriginal<typeof import("@/features/auth/hooks/use-user-settings")>()),
+        useUserSettings: () => {
+            return { data: undefined };
+        },
+    };
+});
+
 // The options menu reads the follow state; these tests are about the row, not the follow items.
 vi.mock("../follows/use-thread-follow", () => {
     return {
@@ -60,7 +73,7 @@ vi.mock("@lingui/react/macro", () => {
 });
 
 vi.mock("@neore/backend/api", () => {
-    return { api: { chat: { functions: {} } } };
+    return { api: { chat: { functions: {}, side_chat: { createSideChat: {} } } } };
 });
 
 vi.mock("@tanstack/react-router", () => {
@@ -130,6 +143,16 @@ vi.mock("@/lib/lunora/crpc", () => {
         useCRPC: () => {
             return {
                 agent: entry,
+                auth: {
+                    functions: {
+                        // The user's settings are not part of these searches: the query answers nothing.
+                        getUserSettings: {
+                            queryOptions: () => {
+                                return { queryFn: async () => undefined, queryKey: ["userSettings"] };
+                            },
+                        },
+                    },
+                },
                 chat: {
                     composite: {
                         getThreadListData: {

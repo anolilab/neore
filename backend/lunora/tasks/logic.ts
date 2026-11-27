@@ -26,6 +26,9 @@ export const MAX_REPAIR_ROUNDS_LIMIT = 5;
 
 export const TASK_TITLE_MAX = 200;
 
+/** Longest schedule a task holds; a suggestion over it could never be accepted, so it is never stored. */
+export const TASK_SCHEDULE_MAX = 100;
+
 export const TASK_INSTRUCTIONS_MAX = 20_000;
 
 export const TASK_CRITERIA_MAX = 5000;
@@ -38,6 +41,15 @@ export const MAX_DEPENDENCIES = 20;
 export const MAX_TASKS_PER_USER = 500;
 
 export const MAX_GOALS_PER_USER = 100;
+
+/** Suggestions listed (and kept pending) per user; a decided row is not listed. */
+export const MAX_PENDING_SUGGESTIONS = 20;
+
+/** Decided suggestions kept per user and per status (accepted, dismissed); deciding one more removes the ones decided longest ago above it. */
+export const MAX_DECIDED_SUGGESTIONS_PER_STATUS = 100;
+
+/** Chats one suggestion names as its source. */
+export const MAX_SUGGESTION_SOURCES = 5;
 
 /** Recurring tasks per user: each one is an unattended agent run on a timer. */
 export const MAX_RECURRING_TASKS_PER_USER = 20;

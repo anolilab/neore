@@ -2,6 +2,8 @@
  * `_generated/architecture.{json,ts}` is not committed, and Alchemy bundles
  * `src/server.ts` -> `_generated/app.ts` -> `architecture.js`. `apps/web build` does not run the
  * backend's codegen, so the deploy has to, or a clean checkout fails to bundle the backend.
+ * The Storybook job runs it as well: its stories import backend modules that read `_generated`, and a full
+ * `build-storybook` fails on the unresolved import without it.
  * The Preview workflow deploys Storybook alone (`alchemy-storybook.run.ts`), which bundles no backend.
  */
 import { readFileSync } from "node:fs";
@@ -27,8 +29,9 @@ const previewLines = read("preview.yml")
     .filter((line) => !NOT_A_COMMAND.test(line));
 
 describe("backend codegen before Alchemy", () => {
-    const codegen = deploy.indexOf("pnpm --filter @neore/backend run codegen");
     const parallelStart = deploy.indexOf("- parallel:");
+    // The Storybook job runs codegen too, earlier in the file: take the deploy job's.
+    const codegen = deploy.indexOf("pnpm --filter @neore/backend run codegen", parallelStart);
     // The Storybook job builds the packages too, earlier in the file: take the deploy job's build.
     const packages = deploy.indexOf("build:packages", parallelStart);
     // The parallel block ends where the next step at its own indent begins.
@@ -52,6 +55,18 @@ describe("backend codegen before Alchemy", () => {
         expect(packages).toBeLessThan(parallelEnd);
         expect(codegen).toBeGreaterThan(packages);
         expect(codegen).toBeLessThan(branchEnd);
+    });
+
+    it("runs in the Storybook job before its build: the stories import modules that read `_generated`", () => {
+        const storybookJob = deploy.indexOf("build-storybook:");
+        const storybookCodegen = deploy.indexOf("pnpm --filter @neore/backend run codegen", storybookJob);
+        const storybookBuild = deploy.indexOf("pnpm --filter @neore/web run build-storybook", storybookJob);
+
+        expect(storybookJob).toBeGreaterThan(-1);
+        expect(storybookCodegen).toBeGreaterThan(storybookJob);
+        expect(storybookBuild).toBeGreaterThan(storybookCodegen);
+        // Still inside the Storybook job, before the deploy job starts.
+        expect(storybookBuild).toBeLessThan(deploy.indexOf("deploy-cloudflare:"));
     });
 
     it("leaves the preview out: its one deploy is the Storybook stack, never the app", () => {

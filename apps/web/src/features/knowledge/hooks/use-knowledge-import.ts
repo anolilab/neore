@@ -8,7 +8,7 @@ import { useCallback, useState } from "react";
 import { toast } from "sonner";
 
 import type { DocumentCandidate, EncodedDocument } from "@/features/knowledge/lib/documents";
-import { encodeDocument, MAX_DOCUMENTS_PER_IMPORT, toBatches } from "@/features/knowledge/lib/documents";
+import { encodeDocument, MAX_DOCUMENTS_PER_IMPORT, MAX_REQUEST_DOCUMENT_BYTES, toBatches } from "@/features/knowledge/lib/documents";
 import { classifyImportBatchError, knowledgeErrorKind } from "@/features/knowledge/lib/import-batch-error";
 import { listArchiveEntries, notionDocuments } from "@/features/knowledge/lib/notion-export";
 import { useCRPC, useLunoraActionOptions } from "@/lib/lunora/crpc";
@@ -21,6 +21,12 @@ export type CollectionId = Id<"knowledgeCollections">;
 
 /** How often one rate-limited batch is sent again before it counts as failed. */
 const MAX_BATCH_RETRIES = 3;
+
+/** Documents encoded and sized together before the page gets a turn; a few large files at once can take a long time. */
+const IMPORT_SLICE_DOCUMENTS = 5;
+
+/** The largest document one request takes, in KB, for the message that names it. */
+const REQUEST_DOCUMENT_KB = MAX_REQUEST_DOCUMENT_BYTES / 1024;
 
 const wait = async (ms: number): Promise<void> => {
     await new Promise<void>((resolve) => {
@@ -95,16 +101,20 @@ const useKnowledgeImport = (onChange: () => void) => {
             const limited = candidates.slice(0, MAX_DOCUMENTS_PER_IMPORT);
             let added = 0;
             let failed = 0;
+            let tooLarge = 0;
             let quotaReached = false;
 
             setProgress({ done: 0, total: limited.length });
 
             try {
-                // Encode in slices of one batch at most, so memory holds one batch at a time.
-                for (let start = 0; start < limited.length; start += 25) {
+                // Encode a few documents at a time, so memory holds little at once, and yield to the page between slices: sizing a
+                // document's JSON is synchronous work, and a slice of large files would otherwise freeze the tab.
+                for (let start = 0; start < limited.length; start += IMPORT_SLICE_DOCUMENTS) {
+                    await wait(0);
+
                     // A file that cannot be read counts as failed; the rest still go.
                     const slice = await Promise.all(
-                        limited.slice(start, start + 25).map(async (candidate) => {
+                        limited.slice(start, start + IMPORT_SLICE_DOCUMENTS).map(async (candidate) => {
                             try {
                                 return await encodeDocument(candidate);
                             } catch (error) {
@@ -118,7 +128,13 @@ const useKnowledgeImport = (onChange: () => void) => {
 
                     failed += slice.length - encoded.length;
 
-                    for (const batch of toBatches(encoded)) {
+                    const { batches, oversize } = toBatches(encoded);
+
+                    tooLarge += oversize.length;
+                    // Set-aside documents are processed too: the count moves even for a slice that sends no batch.
+                    setProgress({ done: added + failed + tooLarge, total: limited.length });
+
+                    for (const batch of batches) {
                         const result = await sendBatch(async () => await addDocuments({ collectionId, documents: batch }));
 
                         if (result.ok) {
@@ -128,7 +144,7 @@ const useKnowledgeImport = (onChange: () => void) => {
                             quotaReached = result.quota;
                         }
 
-                        setProgress({ done: added + failed, total: limited.length });
+                        setProgress({ done: added + failed + tooLarge, total: limited.length });
 
                         if (quotaReached) {
                             break;
@@ -137,7 +153,7 @@ const useKnowledgeImport = (onChange: () => void) => {
 
                     // The quota is full: every later batch would fail the same way.
                     if (quotaReached) {
-                        failed = limited.length - added;
+                        failed = limited.length - added - tooLarge;
                         break;
                     }
                 }
@@ -150,6 +166,10 @@ const useKnowledgeImport = (onChange: () => void) => {
                 toast.error(t`Your knowledge base is full. ${failed} document(s) were not added.`);
             } else if (failed > 0) {
                 toast.error(t`${failed} document(s) could not be added.`);
+            }
+
+            if (tooLarge > 0) {
+                toast.error(t`Skipped ${tooLarge} document(s) over ${REQUEST_DOCUMENT_KB} KB once encoded.`);
             }
 
             if (candidates.length > limited.length) {

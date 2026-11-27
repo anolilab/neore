@@ -1092,18 +1092,25 @@ describe("project rule files imported from the project's repository", () => {
         expect(screen.getByText("The rules folder holds 7 more files than this list shows.")).toBeTruthy();
     });
 
-    it("says why the repository could not be read and adds nothing", async () => {
+    it.each([
+        ["not_connected", "Connect GitHub in Settings → Connectors to import from a repository."],
+        // Redirects spent the listing's requests: a retry meets the same ones, so it is not called GitHub not answering.
+        [
+            "budget_spent",
+            "The repository's listing took too long to read. Try again; if it keeps happening, give the project the repository's current address, or add the file directly with Import files.",
+        ],
+    ])("says why the repository could not be read (%s) and adds nothing", async (status, said) => {
         const user = userEvent.setup();
 
         backend.repos = [REPO];
-        backend.repoList.mockResolvedValue({ status: "not_connected" });
+        backend.repoList.mockResolvedValue({ status });
         renderEditor();
         await user.click(await screen.findByRole("button", { name: "Import from repository" }));
         await user.click(screen.getByRole("button", { name: "Find files" }));
 
         const alert = await screen.findByRole("alert");
 
-        expect(alert.textContent).toBe("Connect GitHub in Settings → Connectors to import from a repository.");
+        expect(alert.textContent).toBe(said);
         expect(screen.getAllByRole("textbox", { name: "Name" })).toHaveLength(2);
     });
 
@@ -1703,14 +1710,23 @@ describe("project rule files imported from the project's repository", () => {
         ).toBeTruthy();
     });
 
-    it("names the files the read refused", async () => {
+    it.each([
+        {
+            reads: { "rules/big.md": "too_large", "rules/gone.md": "missing", "rules/link.md": "refused" },
+            said: "1 rule file imported. Review, then save. 2 files could not be read: they are gone from the repository or too large. Not read: rules/big.md and rules/gone.md. 1 link could not be followed to a file the repository listed. Not read: rules/link.md.",
+        },
+        {
+            reads: { "rules/gone.md": "missing", "rules/link.md": "refused", "rules/other.md": "refused" },
+            said: "1 rule file imported. Review, then save. 1 file could not be read: it is gone from the repository or too large. Not read: rules/gone.md. 2 links could not be followed to a file the repository listed. Not read: rules/link.md and rules/other.md.",
+        },
+    ])("names the files the read could not read apart from the links it refused, one or several", async ({ reads, said }) => {
         const user = userEvent.setup();
 
         backend.repos = [REPO];
         backend.listed = { canEdit: true, files: [], revision: "r1" };
         backend.repoList.mockResolvedValue({
             commit: COMMIT,
-            files: ["AGENTS.md", "rules/big.md", "rules/gone.md", "rules/link.md"].map((path) => {
+            files: ["AGENTS.md", ...Object.keys(reads)].map((path) => {
                 return { path, size: 10, tooLarge: false };
             }),
             status: "ok",
@@ -1719,9 +1735,9 @@ describe("project rule files imported from the project's repository", () => {
         backend.repoRead.mockResolvedValue({
             files: [
                 { path: "AGENTS.md", status: "ok", text: "Use pnpm." },
-                { path: "rules/big.md", status: "too_large" },
-                { path: "rules/gone.md", status: "missing" },
-                { path: "rules/link.md", status: "refused" },
+                ...Object.entries(reads).map(([path, status]) => {
+                    return { path, status };
+                }),
             ],
             status: "ok",
         });
@@ -1730,11 +1746,7 @@ describe("project rule files imported from the project's repository", () => {
         await user.click(screen.getByRole("button", { name: "Find files" }));
         await user.click(await screen.findByRole("button", { name: "Import selected" }));
 
-        expect(
-            await screen.findByText(
-                "1 rule file imported. Review, then save. 3 files could not be read: gone from the repository or too large. Not read: rules/big.md, rules/gone.md, and rules/link.md.",
-            ),
-        ).toBeTruthy();
+        expect(await screen.findByText(said)).toBeTruthy();
     });
 
     it("ticks a link to another listed file off, says which, and reads one file of the same blob however both are picked", async () => {

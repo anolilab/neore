@@ -498,9 +498,9 @@ describe("residual account-deletion steps on D1", () => {
 
         const queued = new Map(jobsQueueMessages.map(({ body }) => [JSON.stringify(body.args), body.functionPath]));
 
-        expect(queued.get(JSON.stringify({ referenceId: "oPaid" }))).toBe("billing_gdpr:cancelBilling");
-        expect(queued.get(JSON.stringify({ referenceId: "oGone" }))).toBe("billing_gdpr:cancelBilling");
-        expect(queued.get(JSON.stringify({ referenceId: "oLast" }))).toBe("billing_gdpr:cancelBilling");
+        expect(queued.get(JSON.stringify({ erase: false, referenceId: "oPaid" }))).toBe("billing_gdpr:cancelBilling");
+        expect(queued.get(JSON.stringify({ erase: false, referenceId: "oGone" }))).toBe("billing_gdpr:cancelBilling");
+        expect(queued.get(JSON.stringify({ erase: false, referenceId: "oLast" }))).toBe("billing_gdpr:cancelBilling");
         expect(queued.get(JSON.stringify({ organizationId: "oShared" }))).toBe("billing_seats:syncTeamSeats");
         expect(queued.has(JSON.stringify({ referenceId: "oShared" }))).toBe(false);
     });

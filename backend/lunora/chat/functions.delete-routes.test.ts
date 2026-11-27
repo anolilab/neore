@@ -19,6 +19,7 @@ beforeAll(async () => {
     registerModule(registry, "chat_functions", await import("./functions"));
     registerModule(registry, "acp_functions", await import("../acp/functions"));
     registerModule(registry, "agent_threads", await import("../agent/threads"));
+    registerModule(registry, "agent_followup_suggestions", await import("../agent/followup-suggestions"));
     registerModule(registry, "lib_document_history", await import("../lib/document-history"));
 });
 

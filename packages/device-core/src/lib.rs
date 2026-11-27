@@ -34,6 +34,7 @@ pub mod engine;
 pub mod envelope;
 pub mod frame;
 pub mod fs;
+pub mod global_instructions;
 #[cfg(feature = "headless")]
 pub mod headless;
 #[cfg(feature = "keychain")]
@@ -53,6 +54,9 @@ pub mod shell;
 pub mod ssh;
 #[cfg(feature = "keychain")]
 pub mod store;
+#[cfg(any(test, feature = "test-support"))]
+#[doc(hidden)]
+pub mod test_dir;
 
 #[cfg(feature = "keychain")]
 pub use engine::{DeviceState, Event, Sink};

@@ -59,6 +59,105 @@ describe("a thread waiting on an expired request", () => {
             return row.awaitingInput;
         });
 
+    it("ends an expired headless pause's run as failed, since no stream would time out for it", async () => {
+        const threadId = await waiting();
+
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("toolApprovalRuns", {
+                approvalId: "headless-old",
+                config: { ...CONFIG, replyKey: "headless:run-1" },
+                createdAt: NOW - PENDING_APPROVAL_TTL_MS - 1,
+                status: "pending",
+                threadId,
+                userId: "u1",
+            });
+        });
+        await harness.run(async (ctx: any) => await purgeExpiredToolApprovalRuns(ctx, NOW));
+
+        const ends = await harness.run(async (ctx: any) => {
+            const { page } = await ctx.db.mcpEvents.findMany({ limit: 10, where: { userId: "u1" } });
+
+            return page.map((row: { eventId: string; name: string }) => [row.eventId, row.name]);
+        });
+
+        expect(ends).toStrictEqual([["run:headless:run-1", "run.failed"]]);
+    });
+
+    it("does not fail a headless run while another of its requests is still open, since the run may have resumed", async () => {
+        const threadId = await waiting();
+
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("toolApprovalRuns", {
+                approvalId: "headless-expired",
+                config: { ...CONFIG, replyKey: "headless:run-2" },
+                createdAt: NOW - PENDING_APPROVAL_TTL_MS - 1,
+                status: "pending",
+                threadId,
+                userId: "u1",
+            });
+            await ctx.db.insert("toolApprovalRuns", {
+                approvalId: "headless-open",
+                config: { ...CONFIG, replyKey: "headless:run-2" },
+                createdAt: NOW,
+                status: "pending",
+                threadId,
+                userId: "u1",
+            });
+        });
+        await harness.run(async (ctx: any) => await purgeExpiredToolApprovalRuns(ctx, NOW));
+
+        const ends = await harness.run(async (ctx: any) => {
+            const { page } = await ctx.db.mcpEvents.findMany({ limit: 10, where: { userId: "u1" } });
+
+            return page.map((row: { eventId: string }) => row.eventId);
+        });
+
+        expect(ends).toStrictEqual([]);
+    });
+
+    it("ends each of several expired headless runs on one thread, from a single read of that thread", async () => {
+        const threadId = await waiting();
+
+        await harness.run(async (ctx: any) => {
+            for (const run of ["a", "b"]) {
+                await ctx.db.insert("toolApprovalRuns", {
+                    approvalId: `headless-${run}`,
+                    config: { ...CONFIG, replyKey: `headless:run-${run}` },
+                    createdAt: NOW - PENDING_APPROVAL_TTL_MS - 1,
+                    status: "pending",
+                    threadId,
+                    userId: "u1",
+                });
+            }
+        });
+        // Counts the purge's reads of the approval table: the three status selects, one `releaseExpiredPauses` read for the thread,
+        // and the headless expiry check's single read for it. A per-request read would add one more for each expired run.
+        const { approvalReads, ends } = (await harness.run(async (ctx: any) => {
+            const tableReads: string[] = [];
+            const query = ctx.db.query.bind(ctx.db);
+
+            ctx.db.query = (table: string) => {
+                if (table === "toolApprovalRuns") {
+                    tableReads.push(table);
+                }
+
+                return query(table);
+            };
+            await purgeExpiredToolApprovalRuns(ctx, NOW);
+            ctx.db.query = query;
+
+            const { page } = await ctx.db.mcpEvents.findMany({ limit: 10, where: { userId: "u1" } });
+
+            return {
+                approvalReads: tableReads,
+                ends: page.map((row: { eventId: string }) => row.eventId).toSorted((a: string, b: string) => a.localeCompare(b)),
+            };
+        })) as { approvalReads: string[]; ends: string[] };
+
+        expect(ends).toStrictEqual(["run:headless:run-a", "run:headless:run-b"]);
+        expect(approvalReads).toHaveLength(5);
+    });
+
     it("stops waiting once its last pending request is purged", async () => {
         const threadId = await waiting();
 

@@ -5,6 +5,7 @@ import { internal } from "../_generated/internal";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { internalMutation, internalQuery } from "../_generated/server";
+import { isAccountDeletionUnderway } from "../gdpr/deletion-guard";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { memoryLogger } from "../lib/logger";
 import { isThreadLocked } from "../lib/thread-lock";
@@ -14,6 +15,7 @@ import { dateColumns, factDatesOf, hasFactDates, isExpired, normalizeFactDates, 
 import {
     type ImportApp,
     importDedupKey,
+    IMPORT_ACCOUNT_DELETING_MESSAGE,
     IMPORT_MEMORY_OFF_MESSAGE,
     IMPORT_WIDE_WINDOW_ROWS,
     IMPORTED_CONFIDENCE,
@@ -31,7 +33,7 @@ import { requireOwnedThread, resolveThreadReadAccess } from "../agent/thread-rea
 import { getVectorIdInfo, type VectorTableId, type VectorTableName } from "../agent/vector/tables";
 import { parentKeyOf } from "../lib/rls/scope";
 import { MAX_LENGTH } from "../lib/validators";
-import { storedRow } from "../lib/stored-row";
+import { findLiveGrant } from "../agent/live-grant";
 
 /**
  * Whether the user turned memory on. OPT-IN: absent means off. Memory extraction reads every
@@ -202,7 +204,7 @@ export const listUserMemories = authQuery
 /** Whether `userId` holds an unexpired grant to another person's thread (`threadAccess`, global, so readable from any shard). */
 const holdsThreadGrant = async (context: Pick<QueryCtx, "db">, threadId: string, userId: string): Promise<boolean> => {
     // Primary: a replica that lags a revocation would still show the grant.
-    const grant = storedRow(await context.db.threadAccess.findFirst({ consistency: "primary", where: { threadId: threadId as Id<"threads">, userId } }));
+    const grant = await findLiveGrant(context, threadId as Id<"threads">, userId, { primary: true });
 
     return grant !== null && (grant.expiresAt === undefined || grant.expiresAt >= Date.now());
 };
@@ -845,6 +847,8 @@ export const saveImportedMemoryBatch = internalMutation
                 type: vMemoryType,
             }),
         ),
+        // The background file import sets it: a batch claimed before an account deletion must write nothing once it is under way.
+        refuseDuringDeletion: v.optional(v.boolean()),
         userId: v.string(),
     })
     .output(
@@ -869,6 +873,11 @@ export const saveImportedMemoryBatch = internalMutation
 
         if (!(await readMemoryEnabled(ctx, args.userId))) {
             throw new LunoraError("FORBIDDEN", IMPORT_MEMORY_OFF_MESSAGE);
+        }
+
+        // In the writing mutation, so a save and the deletion sweep never interleave: nothing is written once deletion is under way.
+        if (args.refuseDuringDeletion === true && (await isAccountDeletionUnderway(ctx, args.userId))) {
+            throw new LunoraError("FORBIDDEN", IMPORT_ACCOUNT_DELETING_MESSAGE);
         }
 
         const today = localDayOf(now, await userTimeZone(ctx, args.userId));
@@ -1069,7 +1078,7 @@ export const saveImportedMemoryBatch = internalMutation
         const finished = (list: (ImportOutcome | undefined)[]): ImportOutcome[] =>
             list.map((outcome) => {
                 if (!outcome) {
-                    throw new Error("[memory/import] A fact was left without an outcome");
+                    throw new LunoraError("INTERNAL", "[memory/import] A fact was left without an outcome");
                 }
 
                 return outcome;

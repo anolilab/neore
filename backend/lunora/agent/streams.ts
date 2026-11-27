@@ -18,6 +18,7 @@ import { patchThread } from "./table-writes";
 import { isLockedWithoutProof } from "./thread-passcode";
 import { MAX_LENGTH } from "../lib/validators";
 import { mergedStream, stream } from "../lib/streams";
+import { deleteMcpEventsOfThread } from "../public-api/events-log";
 import { streamDeltasFields, streamingMessagesFieldsWithoutState } from "../schema";
 import { deriveUIMessagesFromDeltas, fromUIMessages, type MessageWithMetadataInternal, type StreamDelta, type StreamMessage } from "./client";
 import { vStreamDelta, vStreamMessage } from "./validators";
@@ -132,6 +133,9 @@ export const create = internalMutation
     .output(v.id("streamingMessages"))
     .mutation(async ({ args, ctx }) => {
         const state = { kind: "streaming" as const, lastHeartbeat: ctx.now };
+        // A row with no owner is one no owner-scoped cleanup finds, so the thread's owner fills it in when the caller gave none. A caller's
+        // own `userId` is kept: a shared chat's reply may be written for a collaborator.
+        const thread = await ctx.db.get("threads", args.threadId);
         // `stateKind` mirrors `state.kind` and is what the
         // `threadId_state_order_stepOrder` index actually reads — Lunora cannot
         // index a nested path. Every write of one must write the other.
@@ -139,14 +143,13 @@ export const create = internalMutation
             ...args,
             state,
             stateKind: state.kind,
+            userId: args.userId ?? thread?.userId,
         });
         const timeoutFunctionId = await ctx.scheduler.runAfter(TIMEOUT_INTERVAL, internal.agent.streams.timeoutStream, { streamId });
 
         await ctx.db.patch("streamingMessages", streamId, { state: { ...state, timeoutFnId: timeoutFunctionId }, stateKind: state.kind });
 
         // Update thread status to "running" when stream starts
-        const thread = await ctx.db.get("threads", args.threadId);
-
         if (thread && thread.status === "active") {
             await patchThread(ctx.db, args.threadId, { status: "running", updatedAt: ctx.now });
         }
@@ -539,8 +542,11 @@ export const deleteAllStreamsForThreadIdAsync = internalMutation
     .mutation(async ({ args, ctx }) => {
         const result = await deleteStreamsPageForThreadId(ctx, args);
 
-        // The thread goes once its follow rows are gone (`chat/follows/functions.ts`); until then this re-runs.
-        if (result.isDone && (await deleteFollowRowsOfThread(ctx, args.threadId))) {
+        // The thread goes once its follow rows and its Events (`public-api/events-log.ts`) are gone; until then this re-runs.
+        const thread = await ctx.db.get("threads", args.threadId);
+        const eventsGone = thread?.userId === undefined || (await deleteMcpEventsOfThread(ctx, thread.userId, args.threadId));
+
+        if (result.isDone && eventsGone && (await deleteFollowRowsOfThread(ctx, args.threadId))) {
             await ctx.db.delete("threads", args.threadId);
         } else {
             await ctx.scheduler.runAfter(0, internal.agent.streams.deleteAllStreamsForThreadIdAsync, {

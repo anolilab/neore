@@ -250,6 +250,8 @@ const handleMcp = async (routes: ReadonlyArray<RouteDefinition>, c: Context<Luno
                     // The Events log is a thread's record: a key reads it with `threads:read`, the scope its thread reads take. Without
                     // it the call is refused, not answered with an empty list.
                     assertScopes(identity, { scopes: [["threads", "read"]] });
+                    // Charged once the key may read the log: a refused poll (no scope) draws on nothing.
+                    await chargeProtocolCall();
 
                     // The cursor is the key owner's own: another user's, or an edited one, is not a position in this log.
                     const fromSeq = poll.cursor === null ? undefined : await decodeEventCursor(BETTER_AUTH_SECRET, identity.userId, poll.cursor);
@@ -258,6 +260,8 @@ const handleMcp = async (routes: ReadonlyArray<RouteDefinition>, c: Context<Luno
                         throw new PublicApiError("invalid_request", "`cursor` is not one this key was given.");
                     }
 
+                    // The log's own errors (a suspended account's ban, for one) are procedure errors: mapped as every route maps them, so the
+                    // dispatcher sees a `PublicApiError` it can answer, not a raw `LunoraError`.
                     const outcome = await inShard(
                         c.var.lunora,
                         identity.userId,
@@ -270,7 +274,9 @@ const handleMcp = async (routes: ReadonlyArray<RouteDefinition>, c: Context<Luno
                                 ...(poll.threadId !== undefined && { threadId: poll.threadId }),
                                 userId: identity.userId,
                             }),
-                    );
+                    ).catch((error: unknown) => {
+                        throw fromProcedureError(error);
+                    });
 
                     return {
                         cursor: await encodeEventCursor(BETTER_AUTH_SECRET, identity.userId, outcome.nextSeq),

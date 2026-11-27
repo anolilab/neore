@@ -20,8 +20,9 @@ import { pollEvents } from "./events-poll";
 
 const SECRET = "test-secret";
 
-const run = (seq: number, timestamp: number, threadId = "t1", name = RUN_COMPLETED_EVENT): StoredEvent => {
+const run = (seq: number, timestamp: number, threadId = "t1", name = RUN_COMPLETED_EVENT, createdAt = timestamp): StoredEvent => {
     return {
+        createdAt,
         data: { finishedAt: timestamp, outcome: "succeeded", threadId },
         eventId: `run:${seq}`,
         name,
@@ -35,7 +36,7 @@ const logOf = (rows: StoredEvent[]): EventLogStore => {
     return {
         after: async (afterSeq, limit) => rows.filter((row) => row.seq > afterSeq).slice(0, limit),
         latestSeq: async () => rows.at(-1)?.seq ?? 0,
-        oldestSeq: async () => rows[0]?.seq,
+        prunedThrough: async () => 0,
     };
 };
 
@@ -117,12 +118,24 @@ describe("events/poll over a log", () => {
 
     it("reports truncated and resumes from the oldest kept position when the cursor is older than the window", async () => {
         // Seqs 1 to 4 were pruned by retention; the cursor still names seq 1.
-        const log = logOf([run(5, 500), run(6, 600), run(7, 700)]);
+        const log = { ...logOf([run(5, 500), run(6, 600), run(7, 700)]), prunedThrough: async () => 4 };
         const outcome = await pollEvents(log, { fromSeq: 1, maxEvents: 50, name: RUN_COMPLETED_EVENT, now: NOW });
 
         expect(outcome.truncated).toBe(true);
         expect(outcome.nextSeq).toBe(7);
         expect(outcome.events.map((event) => event.eventId)).toStrictEqual(["run:5", "run:6", "run:7"]);
+    });
+
+    it("refuses a poll that may return no events, since its cursor could never move past the first match", async () => {
+        const log = logOf([run(1, 100)]);
+
+        await expect(pollEvents(log, { fromSeq: 0, maxEvents: 0, name: RUN_COMPLETED_EVENT, now: NOW })).rejects.toThrow("at least 1");
+    });
+
+    it.each([-1, NaN, Infinity])("refuses a window of %s ms, which would read every event as older than the floor", async (maxAgeMs) => {
+        const log = logOf([run(1, 100)]);
+
+        await expect(pollEvents(log, { fromSeq: 0, maxAgeMs, maxEvents: 50, name: RUN_COMPLETED_EVENT, now: NOW })).rejects.toThrow("maxAgeMs");
     });
 
     it("caps a batch at maxEvents, keeps the cursor before the first event not sent, and says hasMore", async () => {
@@ -163,6 +176,25 @@ describe("events/poll over a log", () => {
         expect(outcome.events.map((event) => event.eventId)).toStrictEqual(["run:2"]);
         expect(outcome.truncated).toBe(true);
         expect(outcome.nextSeq).toBe(2);
+    });
+
+    it("keeps an event recorded late for the window from when the log took it, though it happened long before", async () => {
+        // Happened 10 s before `now` (old by its upstream time), but recorded at `now`: the log keeps it, so the poll returns it.
+        const log = logOf([run(1, 1000, "t1", RUN_COMPLETED_EVENT, NOW - 100)]);
+        const outcome = await pollEvents(log, { fromSeq: 0, maxAgeMs: 1000, maxEvents: 50, name: RUN_COMPLETED_EVENT, now: NOW });
+
+        expect(outcome.events.map((event) => event.eventId)).toStrictEqual(["run:1"]);
+        expect(outcome.events[0]?.timestamp).toBe(1000);
+        expect(outcome.truncated).toBe(false);
+    });
+
+    it("does not report a gap for an old event of another name or thread, which the caller never asked for", async () => {
+        const log = logOf([run(1, 5000, "t1", RUN_FAILED_EVENT), run(2, 5100, "t2"), run(3, 9500)]);
+        const outcome = await pollEvents(log, { fromSeq: 0, maxAgeMs: 1000, maxEvents: 50, name: RUN_COMPLETED_EVENT, now: NOW, threadId: "t1" });
+
+        expect(outcome.events.map((event) => event.eventId)).toStrictEqual(["run:3"]);
+        expect(outcome.truncated).toBe(false);
+        expect(outcome.nextSeq).toBe(3);
     });
 
     it("stops a scan that matches nothing and reports hasMore, so one poll cannot read the whole log", async () => {
@@ -264,27 +296,47 @@ describe("the event log's recorder", () => {
         expect(rows.filter((row) => row["userId"] === "user").map((row) => [row["eventId"], row["seq"], row["createdAt"]])).toStrictEqual([
             ["run:own1", 1, 777],
             ["run:own2", 2, 777],
-            ["run:g1", 3, 9],
-            ["run:g2", 4, 10],
+            ["run:g1", 3, 777],
+            ["run:g2", 4, 777],
         ]);
         expect(watermarks.find((row) => row["userId"] === "user")?.["seq"]).toBe(4);
     });
 });
 
 describe("events/poll over a log whose rows are all gone", () => {
-    it("reports truncated and resumes at the log's end when the cursor is behind it", async () => {
-        const store: EventLogStore = { after: async () => [], latestSeq: async () => 10, oldestSeq: async () => undefined };
+    it("reports no gap for a cursor behind rows a chat's removal took out, since retention expired none of them", async () => {
+        const store: EventLogStore = { after: async () => [], latestSeq: async () => 10, prunedThrough: async () => 0 };
 
         expect(await pollEvents(store, { fromSeq: 4, maxEvents: 10, name: RUN_COMPLETED_EVENT, now: NOW })).toStrictEqual({
             events: [],
             hasMore: false,
-            nextSeq: 10,
+            nextSeq: 4,
+            truncated: false,
+        });
+    });
+
+    it("does not report a gap when a chat's removal took out the oldest rows, so a poll from zero reads on from the first kept one", async () => {
+        // Seqs 1 and 2 belonged to a chat the user deleted: their rows are gone, but retention expired none of them.
+        const log = { ...logOf([run(3, 300), run(4, 400), run(5, 500)]), prunedThrough: async () => 0 };
+        const outcome = await pollEvents(log, { fromSeq: 0, maxEvents: 50, name: RUN_COMPLETED_EVENT, now: NOW });
+
+        expect(outcome.truncated).toBe(false);
+        expect(outcome.events.map((event) => event.eventId)).toStrictEqual(["run:3", "run:4", "run:5"]);
+    });
+
+    it("reports truncated and resumes at the retention position when the cursor is behind it", async () => {
+        const store: EventLogStore = { after: async () => [], latestSeq: async () => 10, prunedThrough: async () => 8 };
+
+        expect(await pollEvents(store, { fromSeq: 4, maxEvents: 10, name: RUN_COMPLETED_EVENT, now: NOW })).toStrictEqual({
+            events: [],
+            hasMore: false,
+            nextSeq: 8,
             truncated: true,
         });
     });
 
     it("is not truncated for a cursor already at the log's end", async () => {
-        const store: EventLogStore = { after: async () => [], latestSeq: async () => 10, oldestSeq: async () => undefined };
+        const store: EventLogStore = { after: async () => [], latestSeq: async () => 10, prunedThrough: async () => 0 };
 
         expect(await pollEvents(store, { fromSeq: 10, maxEvents: 10, name: RUN_COMPLETED_EVENT, now: NOW })).toStrictEqual({
             events: [],

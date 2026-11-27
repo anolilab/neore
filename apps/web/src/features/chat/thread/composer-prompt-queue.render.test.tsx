@@ -5,7 +5,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 import type { QueuedChatPrompt } from "@/features/chat/core/stores/prompt-queue-store";
-import { usePromptQueueStore } from "@/features/chat/core/stores/prompt-queue-store";
+import { clearPromptQueues, usePromptQueueStore } from "@/features/chat/core/stores/prompt-queue-store";
+import { useQueueEditStore } from "@/features/chat/core/stores/queue-edit-store";
 import { EMPTY_PROMPT_QUEUE, serializePromptQueue } from "@/features/chat/core/utils/prompt-queue";
 import { clearSendStarting, isSendStarting, markSendStarting } from "@/features/chat/core/utils/send-in-flight";
 
@@ -151,6 +152,7 @@ describe("composer prompt queue", () => {
         withdrawSteer.mockReset();
         toast.showInfo.mockReset();
         usePromptQueueStore.setState({ offlineHolds: {}, queues: {} });
+        useQueueEditStore.setState({ editing: {}, failedSave: {}, held: {} });
 
         // A test that failed midway can leave a send marked as starting in the thread.
         while (isSendStarting(chat.threadId)) {
@@ -708,6 +710,484 @@ describe("composer prompt queue", () => {
 
         fireEvent.click(screen.getByRole("button", { name: "Send next" }));
         await vi.waitFor(() => expect(chat.sendMessage).toHaveBeenCalledWith("three", [], { draftFrom: undefined }));
+    });
+
+    it("edits a queued message in place, keeps its place, and leaves it unchanged on Escape or an empty text", () => {
+        const { enqueue, setPaused } = usePromptQueueStore.getState();
+
+        for (const text of ["one", "two", "three"]) {
+            enqueue(chat.threadId, { attachments: [], text });
+        }
+
+        setPaused(chat.threadId, true);
+        render(<ComposerPromptQueue />);
+
+        const texts = () => usePromptQueueStore.getState().queues[chat.threadId]?.items.map((item) => item.text);
+
+        fireEvent.click(screen.getByLabelText("Edit queued message 2"));
+        fireEvent.change(screen.getByLabelText("Edit queued message 2"), { target: { value: "two, edited" } });
+        fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+        expect(texts()).toEqual(["one", "two, edited", "three"]);
+
+        fireEvent.click(screen.getByLabelText("Edit queued message 1"));
+        fireEvent.change(screen.getByLabelText("Edit queued message 1"), { target: { value: "dropped" } });
+        fireEvent.keyDown(screen.getByLabelText("Edit queued message 1"), { key: "Escape" });
+
+        expect(texts()).toEqual(["one", "two, edited", "three"]);
+
+        fireEvent.click(screen.getByLabelText("Edit queued message 3"));
+        fireEvent.change(screen.getByLabelText("Edit queued message 3"), { target: { value: " ".repeat(3) } });
+
+        expect((screen.getByRole("button", { name: "Save" }) as HTMLButtonElement).disabled).toBe(true);
+
+        fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+        expect(texts()).toEqual(["one", "two, edited", "three"]);
+    });
+
+    it("returns focus to the message's Edit button when its editor closes, on Escape and after a save", () => {
+        const { enqueue, setPaused } = usePromptQueueStore.getState();
+
+        for (const text of ["one", "two"]) {
+            enqueue(chat.threadId, { attachments: [], text });
+        }
+
+        setPaused(chat.threadId, true);
+        render(<ComposerPromptQueue />);
+
+        fireEvent.click(screen.getByLabelText("Edit queued message 1"));
+        fireEvent.keyDown(screen.getByLabelText("Edit queued message 1"), { key: "Escape" });
+
+        // Focus placement (document.activeElement) is what this test asserts.
+        // eslint-disable-next-line testing-library/no-node-access
+        expect(document.activeElement).toBe(screen.getByLabelText("Edit queued message 1"));
+
+        fireEvent.click(screen.getByLabelText("Edit queued message 2"));
+        fireEvent.change(screen.getByLabelText("Edit queued message 2"), { target: { value: "two, changed" } });
+        fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+        // eslint-disable-next-line testing-library/no-node-access
+        expect(document.activeElement).toBe(screen.getByLabelText("Edit queued message 2"));
+    });
+
+    it("refuses to save a draft that is only hidden characters, and keeps the old text", () => {
+        const { enqueue, setPaused } = usePromptQueueStore.getState();
+
+        enqueue(chat.threadId, { attachments: [], text: "kept" });
+        setPaused(chat.threadId, true);
+        render(<ComposerPromptQueue />);
+
+        fireEvent.click(screen.getByLabelText("Edit queued message 1"));
+        fireEvent.change(screen.getByLabelText("Edit queued message 1"), { target: { value: "​" } });
+
+        expect((screen.getByRole("button", { name: "Save" }) as HTMLButtonElement).disabled).toBe(true);
+
+        // The keyboard save is refused the same way: the editor stays open, and the queued text is kept.
+        fireEvent.keyDown(screen.getByLabelText("Edit queued message 1"), { ctrlKey: true, key: "Enter" });
+
+        expect(screen.getByLabelText("Edit queued message 1")).toBeTruthy();
+        expect(usePromptQueueStore.getState().queues[chat.threadId]?.items.map((item) => item.text)).toEqual(["kept"]);
+    });
+
+    it("holds the head's send while its text is open, and sends the edited text once the edit closes", async () => {
+        const { enqueue, setPaused } = usePromptQueueStore.getState();
+
+        enqueue(chat.threadId, { attachments: [], text: "one" });
+        setPaused(chat.threadId, true);
+        render(<ComposerPromptQueue />);
+
+        fireEvent.click(screen.getByLabelText("Edit queued message 1"));
+        fireEvent.change(screen.getByLabelText("Edit queued message 1"), { target: { value: "one, fixed" } });
+
+        expect((screen.getByRole("button", { name: "Send next" }) as HTMLButtonElement).disabled).toBe(true);
+
+        fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+        expect(usePromptQueueStore.getState().queues[chat.threadId]?.items.map((item) => item.text)).toEqual(["one, fixed"]);
+
+        fireEvent.click(screen.getByRole("button", { name: "Send next" }));
+        await vi.waitFor(() => expect(chat.sendMessage).toHaveBeenCalledWith("one, fixed", [], { draftFrom: undefined }));
+    });
+
+    it("keeps an unsaved draft when its chip remounts", () => {
+        const { enqueue, setPaused } = usePromptQueueStore.getState();
+
+        enqueue(chat.threadId, { attachments: [], text: "draft me" });
+        setPaused(chat.threadId, true);
+
+        const { unmount } = render(<ComposerPromptQueue />);
+
+        fireEvent.click(screen.getByLabelText("Edit queued message 1"));
+        fireEvent.change(screen.getByLabelText("Edit queued message 1"), { target: { value: "typed, not saved" } });
+        unmount();
+
+        render(<ComposerPromptQueue />);
+
+        expect((screen.getByLabelText("Edit queued message 1") as HTMLTextAreaElement).value).toBe("typed, not saved");
+    });
+
+    it("keeps one open editor per thread: another message's Edit waits, and the open draft is not replaced", () => {
+        const { enqueue, setPaused } = usePromptQueueStore.getState();
+
+        for (const text of ["one", "two"]) {
+            enqueue(chat.threadId, { attachments: [], text });
+        }
+
+        setPaused(chat.threadId, true);
+        render(<ComposerPromptQueue />);
+
+        fireEvent.click(screen.getByLabelText("Edit queued message 1"));
+        fireEvent.change(screen.getByLabelText("Edit queued message 1"), { target: { value: "one, typed" } });
+
+        expect((screen.getByLabelText("Edit queued message 2") as HTMLButtonElement).disabled).toBe(true);
+
+        // The store itself refuses a second editor, whatever the caller.
+        useQueueEditStore.getState().start(chat.threadId, "some-other-id", "replacement");
+
+        expect((screen.getByLabelText("Edit queued message 1") as HTMLTextAreaElement).value).toBe("one, typed");
+    });
+
+    it("does not send another thread's head when the chat switches while this thread's head is being edited", async () => {
+        chat.error = undefined;
+
+        const { enqueue, setPaused } = usePromptQueueStore.getState();
+
+        enqueue("thread-1", { attachments: [], text: "one" });
+        setPaused("thread-1", true);
+        enqueue("thread-2", { attachments: [], text: "other thread's head" });
+
+        chat.threadId = "thread-1";
+
+        const { rerender } = render(<ComposerPromptQueue />);
+
+        fireEvent.click(screen.getByLabelText("Edit queued message 1"));
+
+        chat.threadId = "thread-2";
+        rerender(<ComposerPromptQueue />);
+
+        await act(async () => {
+            await Promise.resolve();
+        });
+
+        expect(chat.sendMessage).not.toHaveBeenCalled();
+    });
+
+    it("drops an open editor with the queues when the session ends, so the thread's next message can be edited", () => {
+        const { enqueue, setPaused } = usePromptQueueStore.getState();
+
+        enqueue(chat.threadId, { attachments: [], text: "one" });
+        setPaused(chat.threadId, true);
+
+        const { rerender } = render(<ComposerPromptQueue />);
+
+        fireEvent.click(screen.getByLabelText("Edit queued message 1"));
+
+        clearPromptQueues();
+
+        enqueue(chat.threadId, { attachments: [], text: "fresh" });
+        setPaused(chat.threadId, true);
+        rerender(<ComposerPromptQueue />);
+
+        expect((screen.getByLabelText("Edit queued message 1") as HTMLButtonElement).disabled).toBe(false);
+    });
+
+    it("saving an edit does not count as a new arrival: an idle, unpaused queue left unsent stays unsent", async () => {
+        chat.error = undefined;
+
+        const { enqueue } = usePromptQueueStore.getState();
+
+        // Queued before the chip mounts: the queue is idle and unpaused, and nothing in it has arrived since the mount.
+        enqueue(chat.threadId, { attachments: [], text: "one" });
+        enqueue(chat.threadId, { attachments: [], text: "two" });
+        render(<ComposerPromptQueue />);
+
+        fireEvent.click(screen.getByLabelText("Edit queued message 2"));
+        fireEvent.change(screen.getByLabelText("Edit queued message 2"), { target: { value: "two, edited" } });
+        fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+        await act(async () => {
+            await Promise.resolve();
+        });
+
+        expect(chat.sendMessage).not.toHaveBeenCalled();
+    });
+
+    it("sends nothing when an edit of a paused head is cancelled", async () => {
+        const { enqueue, setPaused } = usePromptQueueStore.getState();
+
+        enqueue(chat.threadId, { attachments: [], text: "one" });
+        setPaused(chat.threadId, true);
+        render(<ComposerPromptQueue />);
+
+        fireEvent.click(screen.getByLabelText("Edit queued message 1"));
+        fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+        await act(async () => {
+            await Promise.resolve();
+        });
+
+        expect(chat.sendMessage).not.toHaveBeenCalled();
+    });
+
+    it("busy send retry: a send requested during a busy send runs once, when the busy send sent nothing", async () => {
+        chat.error = undefined;
+
+        let finish: (value: { outcome: "withdrawn" }) => void = () => {};
+
+        // The lib target has no `Promise.withResolvers` yet.
+        // eslint-disable-next-line unicorn/prefer-promise-with-resolvers
+        const promise = new Promise<{ outcome: "withdrawn" }>((resolve: (value: PromiseLike<{ outcome: "withdrawn" }> | { outcome: "withdrawn" }) => void) => {
+            finish = resolve;
+        });
+
+        withdrawSteer.mockReturnValue(promise);
+
+        const view = render(<ComposerPromptQueue />);
+
+        // The arrival starts a send, which waits on the steer withdrawal: that call holds the flag.
+        await act(async () => {
+            usePromptQueueStore.getState().enqueue(chat.threadId, { attachments: [], steer: { id: "steer-1", streamId: "stream-1" }, text: "steered" });
+        });
+
+        // The reply fails meanwhile, so the arrival's call may not send; Send next asks for one during that call.
+        chat.error = new Error("the reply failed");
+        view.rerender(<ComposerPromptQueue />);
+        fireEvent.click(screen.getByRole("button", { name: "Send next" }));
+
+        await act(async () => {
+            finish({ outcome: "withdrawn" });
+        });
+
+        // Send next is explicit: it goes despite the error, once.
+        await waitFor(() => expect(chat.sendMessage).toHaveBeenCalledTimes(1));
+        expect(chat.sendMessage).toHaveBeenCalledWith("steered", [], { draftFrom: undefined });
+    });
+
+    it("busy send retry: a send requested during a busy send is dropped when the busy send sends, so nothing goes twice", async () => {
+        chat.error = undefined;
+
+        let finish: (value: { outcome: "withdrawn" }) => void = () => {};
+
+        // The lib target has no `Promise.withResolvers` yet.
+        // eslint-disable-next-line unicorn/prefer-promise-with-resolvers
+        const promise = new Promise<{ outcome: "withdrawn" }>((resolve: (value: PromiseLike<{ outcome: "withdrawn" }> | { outcome: "withdrawn" }) => void) => {
+            finish = resolve;
+        });
+
+        withdrawSteer.mockReturnValue(promise);
+
+        render(<ComposerPromptQueue />);
+
+        await act(async () => {
+            usePromptQueueStore.getState().enqueue(chat.threadId, { attachments: [], steer: { id: "steer-1", streamId: "stream-1" }, text: "steered" });
+        });
+
+        fireEvent.click(screen.getByRole("button", { name: "Send next" }));
+
+        await act(async () => {
+            finish({ outcome: "withdrawn" });
+        });
+
+        await act(async () => {
+            await Promise.resolve();
+        });
+
+        expect(chat.sendMessage).toHaveBeenCalledTimes(1);
+    });
+
+    it("sends a send held for a chat when the user comes back to it while it is idle", async () => {
+        chat.error = undefined;
+        chat.threadId = "thread-1";
+
+        usePromptQueueStore.getState().enqueue("thread-2", { attachments: [], text: "held for two" });
+
+        useQueueEditStore.getState().holdSend("thread-2", false);
+
+        const view = render(<ComposerPromptQueue />);
+
+        chat.threadId = "thread-2";
+        view.rerender(<ComposerPromptQueue />);
+
+        await waitFor(() => expect(chat.sendMessage).toHaveBeenCalledWith("held for two", [], { draftFrom: undefined }));
+    });
+
+    it("moving another message ahead of an open head edit does not release the edit's held send", async () => {
+        chat.error = undefined;
+
+        const { enqueue } = usePromptQueueStore.getState();
+
+        // Queued before the chip mounts: idle and unpaused, nothing has arrived since the mount.
+        enqueue(chat.threadId, { attachments: [], text: "one" });
+        enqueue(chat.threadId, { attachments: [], text: "two" });
+        const headId = usePromptQueueStore.getState().queues[chat.threadId]?.items[0]?.id;
+
+        render(<ComposerPromptQueue />);
+
+        fireEvent.click(screen.getByLabelText("Edit queued message 1"));
+        useQueueEditStore.getState().holdSend(chat.threadId, false, headId);
+
+        // "two" moves ahead of the edited head: the head changes, but the edit is still open.
+        fireEvent.click(screen.getByLabelText("Move queued message 2 up"));
+
+        await act(async () => {
+            await Promise.resolve();
+        });
+
+        expect(chat.sendMessage).not.toHaveBeenCalled();
+        expect(screen.getByLabelText("Edit queued message 2")).toBeTruthy();
+    });
+
+    it("a chat that mounts idle sends the send held for it, so a remount after its reply ended is not stalled", async () => {
+        chat.error = undefined;
+        chat.threadId = "thread-2";
+
+        usePromptQueueStore.getState().enqueue("thread-2", { attachments: [], text: "held on remount" });
+        useQueueEditStore.getState().holdSend("thread-2", false);
+
+        render(<ComposerPromptQueue />);
+
+        await waitFor(() => expect(chat.sendMessage).toHaveBeenCalledWith("held on remount", [], { draftFrom: undefined }));
+    });
+
+    it("an explicit held send does not clear a pause a failed permission-mode save set", async () => {
+        const { enqueue, setPaused } = usePromptQueueStore.getState();
+
+        enqueue(chat.threadId, { attachments: [], text: "one" });
+        setPaused(chat.threadId, true);
+        useQueueEditStore.getState().markFailedSave(chat.threadId, true);
+        render(<ComposerPromptQueue />);
+
+        fireEvent.click(screen.getByLabelText("Edit queued message 1"));
+        useQueueEditStore.getState().holdSend(chat.threadId, true);
+        fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+        await act(async () => {
+            await Promise.resolve();
+        });
+
+        expect(chat.sendMessage).not.toHaveBeenCalled();
+        expect(usePromptQueueStore.getState().queues[chat.threadId]?.paused).toBe(true);
+    });
+
+    it("an explicit held send does not lift a Stop's pause when no chat error is set", async () => {
+        chat.error = undefined;
+
+        const { enqueue, setPaused } = usePromptQueueStore.getState();
+
+        enqueue(chat.threadId, { attachments: [], text: "one" });
+        setPaused(chat.threadId, true);
+        render(<ComposerPromptQueue />);
+
+        fireEvent.click(screen.getByLabelText("Edit queued message 1"));
+        useQueueEditStore.getState().holdSend(chat.threadId, true);
+        fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+        await act(async () => {
+            await Promise.resolve();
+        });
+
+        expect(chat.sendMessage).not.toHaveBeenCalled();
+        expect(usePromptQueueStore.getState().queues[chat.threadId]?.paused).toBe(true);
+    });
+
+    it("a reply that ends in an error sends an explicit held send, reading the queue's live pause", async () => {
+        chat.error = undefined;
+        chat.isStreaming = true;
+
+        usePromptQueueStore.getState().enqueue(chat.threadId, { attachments: [], text: "held through the error" });
+        useQueueEditStore.getState().holdSend(chat.threadId, true);
+
+        const view = render(<ComposerPromptQueue />);
+
+        // The reply fails and ends: the queue may be paused in the same commit, so the release must not use the render's value.
+        chat.error = new Error("the reply failed");
+        chat.isStreaming = false;
+        view.rerender(<ComposerPromptQueue />);
+
+        await waitFor(() => expect(chat.sendMessage).toHaveBeenCalledWith("held through the error", [], { draftFrom: undefined }));
+    });
+
+    it("an explicit held send does not lift a manual Stop's pause, even with a chat error set", async () => {
+        chat.error = new Error("the reply failed");
+
+        const { enqueue, setPaused } = usePromptQueueStore.getState();
+
+        enqueue(chat.threadId, { attachments: [], text: "one" });
+        // A manual Stop pauses without the error's mark.
+        setPaused(chat.threadId, true);
+        render(<ComposerPromptQueue />);
+
+        fireEvent.click(screen.getByLabelText("Edit queued message 1"));
+        useQueueEditStore.getState().holdSend(chat.threadId, true);
+        fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+        await act(async () => {
+            await Promise.resolve();
+        });
+
+        expect(chat.sendMessage).not.toHaveBeenCalled();
+        expect(usePromptQueueStore.getState().queues[chat.threadId]?.paused).toBe(true);
+    });
+
+    it("Send next replaces a hold the queue left, so a later error cannot send it unasked", async () => {
+        const { enqueue, setPaused } = usePromptQueueStore.getState();
+
+        enqueue(chat.threadId, { attachments: [], text: "one" });
+        setPaused(chat.threadId, true);
+        useQueueEditStore.getState().holdSend(chat.threadId, true);
+        render(<ComposerPromptQueue />);
+
+        fireEvent.click(screen.getByRole("button", { name: "Send next" }));
+
+        await waitFor(() => expect(chat.sendMessage).toHaveBeenCalledWith("one", [], { draftFrom: undefined }));
+        expect(useQueueEditStore.getState().held[chat.threadId]).toBeUndefined();
+    });
+
+    it("a hold for an edited message moves to the message's new id on save, so its send fulfils it", async () => {
+        const { enqueue, setPaused } = usePromptQueueStore.getState();
+
+        enqueue(chat.threadId, { attachments: [], text: "one" });
+        setPaused(chat.threadId, true);
+        render(<ComposerPromptQueue />);
+
+        const oldId = usePromptQueueStore.getState().queues[chat.threadId]?.items[0]?.id;
+
+        fireEvent.click(screen.getByLabelText("Edit queued message 1"));
+        useQueueEditStore.getState().holdSend(chat.threadId, true, oldId);
+        fireEvent.change(screen.getByLabelText("Edit queued message 1"), { target: { value: "one, edited" } });
+        fireEvent.click(screen.getByRole("button", { name: "Save" }));
+        fireEvent.click(screen.getByRole("button", { name: "Send next" }));
+
+        await waitFor(() => expect(chat.sendMessage).toHaveBeenCalledWith("one, edited", [], { draftFrom: undefined }));
+        expect(useQueueEditStore.getState().held[chat.threadId]).toBeUndefined();
+    });
+
+    it("closing an edit after another message moved ahead of it sends nothing: the hold names the edited message", async () => {
+        chat.error = undefined;
+
+        const { enqueue } = usePromptQueueStore.getState();
+
+        // Queued before the chip mounts: idle and unpaused, nothing has arrived since the mount.
+        enqueue(chat.threadId, { attachments: [], text: "one" });
+        enqueue(chat.threadId, { attachments: [], text: "two" });
+        const headId = usePromptQueueStore.getState().queues[chat.threadId]?.items[0]?.id;
+
+        render(<ComposerPromptQueue />);
+
+        fireEvent.click(screen.getByLabelText("Edit queued message 1"));
+        useQueueEditStore.getState().holdSend(chat.threadId, true, headId);
+
+        // "two" moves ahead of the edited "one", then the edit is cancelled.
+        fireEvent.click(screen.getByLabelText("Move queued message 2 up"));
+        fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+        await act(async () => {
+            await Promise.resolve();
+        });
+
+        expect(chat.sendMessage).not.toHaveBeenCalled();
+        expect(useQueueEditStore.getState().held[chat.threadId]?.id).toBe(headId);
     });
 
     it("moves a dropped message to where it lands in the queue", async () => {

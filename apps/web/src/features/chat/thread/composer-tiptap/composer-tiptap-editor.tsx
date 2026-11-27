@@ -45,8 +45,9 @@ import type { EmojiShortcodeMatch } from "./extensions/emoji-shortcode";
 import EmojiShortcode from "./extensions/emoji-shortcode";
 import type { FileMentionMatch } from "./extensions/file-mention";
 import FileMention from "./extensions/file-mention";
-import GhostCompletion from "./extensions/ghost-completion";
+import GhostCompletion, { getGhostCompletion } from "./extensions/ghost-completion";
 import PromptHistoryKeys from "./extensions/prompt-history-keys";
+import PromptSearchKey from "./extensions/prompt-search-key";
 import QuoteChip, { refreshQuoteChipLabels } from "./extensions/quote-chip";
 import type { SlashCommandMatch } from "./extensions/slash-command";
 import SlashCommand from "./extensions/slash-command";
@@ -93,6 +94,21 @@ export interface ComposerTiptapEditorProps {
     /** Max height in rows (approximate) */
     maxRows?: number;
 
+    /**
+     * The suggestion is held back while the composer holds attachments: it is hidden now, and its record is kept, so a prompt the
+     * person dismissed stays dismissed when the attachments go.
+     */
+    nextPromptHeld?: boolean;
+
+    /** The chat the suggestion belongs to: the same text in another chat is placed again. */
+    nextPromptScope?: string | null;
+
+    /**
+     * The suggested next prompt after a reply, shown as ghost text in an empty composer: Tab inserts it, Escape or typing
+     * dismisses it. Set once per reply; `null` clears it.
+     */
+    nextPromptSuggestion?: string | null;
+
     /** Called when cancel/stop is clicked */
     onCancel?: () => void;
 
@@ -104,8 +120,15 @@ export interface ComposerTiptapEditorProps {
      * Escape). Returns the text to show, or `null` to let the key through.
      */
     onHistoryNavigate?: (direction: PromptHistoryDirection) => string | null;
+
     /** Called on paste (for file and long text handling) */
     onPaste?: (e: React.ClipboardEvent) => void;
+
+    /**
+     * Ctrl+R: opens the search over the person's sent prompts. Returns `true` when it opened, so the key is taken; omit it
+     * (or return `false`) and Ctrl+R stays the browser's reload.
+     */
+    onPromptSearch?: () => boolean;
     /** Called when a chat is selected from the @ popup, to attach its text */
     onSelectChat?: (chat: ChatReference) => void;
     /** Called when "Upload new file" is selected from the @ popup */
@@ -114,6 +137,7 @@ export interface ComposerTiptapEditorProps {
     onSelectVaultFile?: (file: VaultFileRef) => void;
     /** Called on submit (Enter without Shift) */
     onSubmit: () => void;
+
     /** Placeholder text */
     placeholder?: string;
 
@@ -187,6 +211,7 @@ const ComposerTiptapEditor = ({
     onCancel,
     onChange,
     onHistoryNavigate,
+    onPromptSearch,
     isHistoryRecalled,
     onPaste,
     onSelectChat,
@@ -194,6 +219,9 @@ const ComposerTiptapEditor = ({
     onSelectVaultFile,
     onSubmit,
     placeholder: placeholderProp,
+    nextPromptScope = null,
+    nextPromptHeld = false,
+    nextPromptSuggestion = null,
     ref,
     requestCompletion,
     suggestions = true,
@@ -288,11 +316,11 @@ const ComposerTiptapEditor = ({
     // shortcuts read the options captured when the editor was built, so a handler assigned onto it later is lost; the
     // extensions read this ref at key time instead. No popup check here: an open popup (one with items) takes Enter, the
     // arrows and Escape on `window` in the capture phase, and a match without items must still let Enter send.
-    const keyHandlersRef = useRef({ isStreaming, onCancel, onHistoryNavigate, onSubmit });
+    const keyHandlersRef = useRef({ isStreaming, onCancel, onHistoryNavigate, onPromptSearch, onSubmit });
 
     useLayoutEffect(() => {
-        keyHandlersRef.current = { isStreaming, onCancel, onHistoryNavigate, onSubmit };
-    }, [isStreaming, onCancel, onHistoryNavigate, onSubmit]);
+        keyHandlersRef.current = { isStreaming, onCancel, onHistoryNavigate, onPromptSearch, onSubmit };
+    }, [isStreaming, onCancel, onHistoryNavigate, onPromptSearch, onSubmit]);
 
     // Create editor
     const editor = useEditor({
@@ -339,6 +367,21 @@ const ComposerTiptapEditor = ({
             // eslint-disable-next-line react-hooks/refs -- tiptap calls these options from editor events, never during render
             PromptHistoryKeys.configure({
                 onNavigate: (direction: PromptHistoryDirection) => keyHandlersRef.current.onHistoryNavigate?.(direction) ?? null,
+            }),
+            // eslint-disable-next-line react-hooks/refs -- tiptap calls these options from editor events, never during render
+            PromptSearchKey.configure({
+                onOpen: () => {
+                    const opened = keyHandlersRef.current.onPromptSearch?.() ?? false;
+
+                    // An open suggestion list takes the arrows, Enter and Escape on `window`; it closes so the search gets them.
+                    if (opened) {
+                        setSlashMatch(null);
+                        setFileMentionMatch(null);
+                        setVariableMatch(null);
+                    }
+
+                    return opened;
+                },
             }),
             // eslint-disable-next-line react-hooks/refs -- tiptap calls these options from editor events, never during render
             SubmitOnEnter.configure({
@@ -635,6 +678,9 @@ const ComposerTiptapEditor = ({
     const ghostPropsRef = useRef({ disabled, isStreaming, popupOpen: false });
     const requestCompletionRef = useRef(requestCompletion);
     const lastAnnouncedAtRef = useRef<number | null>(null);
+    // The prompt last placed, by chat and text: the same text for another chat is said again.
+    // `dismissed` is set only when the person removes the prompt (typing or Escape): a pause hides it without dismissing it.
+    const lastPlacedPromptRef = useRef<{ dismissed: boolean; scope: string | null; text: string } | null>(null);
     const hasCompletionSource = Boolean(requestCompletion);
     // A shortcode being typed counts as a popup, open or not yet, so the ghost does not finish it while it is typed. A bare
     // colon, or the colon that closes a finished `:dog:`, has an empty query and is not typing one.
@@ -645,6 +691,86 @@ const ComposerTiptapEditor = ({
     useEffect(() => {
         requestCompletionRef.current = requestCompletion;
     }, [requestCompletion]);
+
+    // The suggested next prompt is its own ghost source: the as-you-type controller clears what it does not own (on focus,
+    // for instance). It is placed when the suggestion arrives, once: typing dismisses it, and clearing the draft does not
+    // bring it back, because this runs only when the suggestion changes.
+    const promptAnnouncementText = nextPromptSuggestion ? t`Suggested next prompt: ${nextPromptSuggestion}. Press Tab to insert.` : "";
+
+    useEffect(() => {
+        if (!editor || editor.isDestroyed) {
+            return undefined;
+        }
+
+        // A disabled composer holds no prompt, because Tab would otherwise insert it into a draft that cannot be edited.
+        if (!nextPromptSuggestion || disabled || nextPromptHeld || readComposerText(editor) !== "") {
+            editor.commands.setSuggestedPrompt(null);
+            // The cleanup below cancels this suggestion's clear timer, so its line is cleared here instead of being left in the live region.
+            // A completion's announcement is kept: the as-you-type completion it describes is still on screen.
+            setGhostAnnouncement((current) => (current === ghostAnnouncementText ? current : ""));
+
+            // A reply without a suggestion starts over. A pause or a draft does not: a prompt dismissed in this reply stays dismissed.
+            if (!nextPromptSuggestion) {
+                lastPlacedPromptRef.current = null;
+            }
+
+            return undefined;
+        }
+
+        // Placed once per reply: a dismissal (typing or Escape) is not undone by a pause or a cleared draft.
+        if (
+            lastPlacedPromptRef.current?.dismissed &&
+            lastPlacedPromptRef.current.scope === nextPromptScope &&
+            lastPlacedPromptRef.current.text === nextPromptSuggestion
+        ) {
+            return undefined;
+        }
+
+        editor.commands.setSuggestedPrompt(nextPromptSuggestion);
+
+        // The same text for another chat is already what the live region holds, so it would not be said again: it is cleared, and said
+        // in a later task.
+        const sameTextForAnotherChat = lastPlacedPromptRef.current?.text === nextPromptSuggestion && lastPlacedPromptRef.current.scope !== nextPromptScope;
+
+        lastPlacedPromptRef.current = { dismissed: false, scope: nextPromptScope, text: nextPromptSuggestion };
+
+        let restoreAnnouncement: ReturnType<typeof setTimeout> | undefined;
+
+        if (sameTextForAnotherChat) {
+            setGhostAnnouncement("");
+            restoreAnnouncement = setTimeout(setGhostAnnouncement, 0, promptAnnouncementText);
+        } else {
+            setGhostAnnouncement(promptAnnouncementText);
+        }
+
+        const clearAnnouncement = setTimeout(setGhostAnnouncement, ANNOUNCEMENT_CLEAR_MS, "");
+
+        // Typing or Escape removes the prompt, and its line goes with it rather than when the timer runs out. The placement above
+        // is not seen: this listener is added after it.
+        const onTransaction = () => {
+            if (getGhostCompletion(editor.state)?.kind === "prompt") {
+                return;
+            }
+
+            // The person removed it (typing or Escape): it is dismissed for this reply, so a pause does not bring it back.
+            if (lastPlacedPromptRef.current) {
+                lastPlacedPromptRef.current.dismissed = true;
+            }
+
+            editor.off("transaction", onTransaction);
+            clearTimeout(clearAnnouncement);
+            clearTimeout(restoreAnnouncement);
+            setGhostAnnouncement("");
+        };
+
+        editor.on("transaction", onTransaction);
+
+        return () => {
+            editor.off("transaction", onTransaction);
+            clearTimeout(clearAnnouncement);
+            clearTimeout(restoreAnnouncement);
+        };
+    }, [disabled, editor, ghostAnnouncementText, nextPromptHeld, nextPromptScope, nextPromptSuggestion, promptAnnouncementText]);
 
     useEffect(() => {
         if (!editor || !hasCompletionSource) {
@@ -758,8 +884,8 @@ const ComposerTiptapEditor = ({
                 </span>
             )}
 
-            {/* The ghost itself is aria-hidden; this says once in a while that Right Arrow would accept one. */}
-            {hasCompletionSource && (
+            {/* The ghost itself is aria-hidden; this says once in a while that a ghost is there to accept. */}
+            {(hasCompletionSource || Boolean(nextPromptSuggestion)) && (
                 <span aria-live="polite" className="sr-only" role="status">
                     {ghostAnnouncement}
                 </span>

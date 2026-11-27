@@ -4,7 +4,7 @@
  * nothing is sent, the draft stays, and the sign-in prompt opens.
  */
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { Editor } from "@tiptap/core";
 import { StarterKit } from "@tiptap/starter-kit";
 import type { ReactNode, Ref } from "react";
@@ -18,6 +18,8 @@ import { usePromptQueueStore } from "@/features/chat/core/stores/prompt-queue-st
 import { requestComposerRestore } from "@/features/chat/core/utils/composer-restore";
 import { requestComposerSubmit } from "@/features/chat/core/utils/composer-submit";
 import { clearSendStarting, markSendStarting } from "@/features/chat/core/utils/send-in-flight";
+import { setDraftBound } from "@/features/chat/split/composer-drafts";
+import { prefillComposer } from "@/features/chat/thread/composer-prefill";
 
 import type { ComposerInputAreaRef } from "./composer-input-area";
 import type { ComposerTiptapEditorRef } from "./composer-tiptap/composer-tiptap-editor";
@@ -38,6 +40,8 @@ const harness = vi.hoisted(() => {
         sendMessage: vi.fn(async () => undefined),
         /** The input row's editor; none by default, as a composer before the editor loads. */
         editor: null as ComposerTiptapEditorRef | null,
+        /** The person's `followUpSteer` default: a text-only send during a reply steers into it. */
+        followUpSteer: false,
         showError: vi.fn(),
         showInfo: vi.fn(),
         sseStreamState: null as string | null,
@@ -100,6 +104,7 @@ vi.mock("@/features/chat/core/context/chat-context", () => {
         useChatActions: () => {
             return { cancelStream: vi.fn(), jwtToken: "", sendMessage: harness.sendMessage };
         },
+        useChatIsRunning: () => harness.isStreaming,
         useChatIsStreaming: () => {
             return { isStreaming: harness.isStreaming, sseStreamState: harness.sseStreamState };
         },
@@ -111,6 +116,14 @@ vi.mock("@/features/chat/core/context/chat-context", () => {
         },
         useChatThread: () => {
             return { isNewThread: harness.threadId === undefined, threadId: harness.threadId };
+        },
+    };
+});
+
+vi.mock("@/features/auth/hooks/use-user-settings", () => {
+    return {
+        useUserSettings: () => {
+            return { data: harness.followUpSteer ? { followUpSteer: true } : null };
         },
     };
 });
@@ -171,12 +184,14 @@ vi.mock("./composer-tiptap/use-composer-autocomplete", () => {
 
 const InputArea = ({
     onPaste,
+    onQueue,
     onSteer,
     onSubmit,
     ref,
     value,
 }: {
     onPaste?: (event: unknown) => void;
+    onQueue?: () => void;
     onSteer?: () => void;
     onSubmit: () => void;
     ref?: Ref<ComposerInputAreaRef>;
@@ -194,6 +209,11 @@ const InputArea = ({
             <button onClick={onSubmit} type="button">
                 Send message
             </button>
+            {onQueue && (
+                <button onClick={onQueue} type="button">
+                    Queue message
+                </button>
+            )}
             {onSteer && (
                 <button onClick={onSteer} type="button">
                     Steer
@@ -465,6 +485,295 @@ describe("ComposerInput while the connection is down", () => {
 
         expect(harness.sendMessage).not.toHaveBeenCalled();
         expect(usePromptQueueStore.getState().queues["thread-1"]?.items.map((item: QueuedChatPrompt) => item.text)).toStrictEqual(["a follow-up"]);
+    });
+});
+
+describe("ComposerInput follow-up steer default", () => {
+    beforeEach(() => {
+        harness.mustSignIn = false;
+        harness.isStreaming = true;
+        harness.sseStreamState = "stream-1";
+        harness.threadId = "thread-1";
+        harness.runner = { groups: { turns: { followUp: { kind: "steer" } } } };
+        usePromptQueueStore.setState({ offlineHolds: {}, queues: {} });
+        useChatUIStore.getState().setComposerText("a follow-up");
+    });
+
+    afterEach(() => {
+        harness.followUpSteer = false;
+        harness.isStreaming = false;
+        harness.runner = null;
+        harness.sseStreamState = null;
+        harness.threadId = undefined;
+        useChatUIStore.getState().clearComposer();
+        vi.clearAllMocks();
+    });
+
+    it("steers a text-only follow-up into the reply when the person's default is on", () => {
+        harness.followUpSteer = true;
+
+        renderComposer();
+        fireEvent.click(screen.getByRole("button", { name: "Send message" }));
+
+        expect(harness.sendMessage).not.toHaveBeenCalled();
+
+        const items = usePromptQueueStore.getState().queues["thread-1"]?.items ?? [];
+
+        expect(items).toHaveLength(1);
+        expect(items[0]).toMatchObject({ steer: { pending: true, streamId: "stream-1" }, text: "a follow-up" });
+    });
+
+    it("queues the follow-up as before when the person's default is off", () => {
+        renderComposer();
+        fireEvent.click(screen.getByRole("button", { name: "Send message" }));
+
+        expect(harness.sendMessage).not.toHaveBeenCalled();
+
+        const items = usePromptQueueStore.getState().queues["thread-1"]?.items ?? [];
+
+        expect(items).toHaveLength(1);
+        expect(items[0]?.steer).toBeUndefined();
+        expect(items[0]?.text).toBe("a follow-up");
+    });
+
+    it("keeps the queue button a queue even when the person's default is on", () => {
+        harness.followUpSteer = true;
+
+        renderComposer();
+        fireEvent.click(screen.getByRole("button", { name: "Queue message" }));
+
+        const items = usePromptQueueStore.getState().queues["thread-1"]?.items ?? [];
+
+        expect(items).toHaveLength(1);
+        expect(items[0]?.steer).toBeUndefined();
+        expect(items[0]?.text).toBe("a follow-up");
+    });
+
+    it("queues a follow-up that carries a reference, so the reference is not dropped by a steer", () => {
+        harness.followUpSteer = true;
+        useChatUIStore.setState({ attachedReferences: [{ id: "ref-1" }] as never });
+
+        renderComposer();
+        fireEvent.click(screen.getByRole("button", { name: "Send message" }));
+
+        const items = usePromptQueueStore.getState().queues["thread-1"]?.items ?? [];
+
+        expect(items).toHaveLength(1);
+        expect(items[0]?.steer).toBeUndefined();
+        expect(items[0]?.references).toHaveLength(1);
+        useChatUIStore.setState({ attachedReferences: [] });
+    });
+
+    it("queues a guest's follow-up under invite-only, even when the default is on", () => {
+        harness.followUpSteer = true;
+        harness.mustSignIn = true;
+
+        renderComposer();
+        fireEvent.click(screen.getByRole("button", { name: "Send message" }));
+
+        const items = usePromptQueueStore.getState().queues["thread-1"]?.items ?? [];
+
+        expect(items).toHaveLength(1);
+        expect(items[0]?.steer).toBeUndefined();
+    });
+});
+
+describe("ComposerInput fix prompts from the pull request chip", () => {
+    beforeEach(() => {
+        harness.mustSignIn = false;
+        harness.threadId = "thread-1";
+        // The thread's stored draft is back: the composer takes prompts from then on.
+        setDraftBound("thread-1", true);
+        useChatUIStore.getState().setComposerText("");
+    });
+
+    afterEach(() => {
+        useChatUIStore.getState().clearComposer();
+        harness.threadId = undefined;
+        vi.clearAllMocks();
+    });
+
+    it("puts a prompt for its thread into the thread composer, not sent", () => {
+        renderComposer();
+        act(() => {
+            prefillComposer("thread-1", "Fix checks on octo/hello#7");
+        });
+
+        expect(useChatUIStore.getState().composerText).toContain("Fix checks on octo/hello#7");
+        expect(harness.sendMessage).not.toHaveBeenCalled();
+    });
+
+    it("puts a prompt for its thread into a comparison parent's shared composer, not sent", () => {
+        const onSubmitOverride = vi.fn(async () => undefined);
+
+        renderComposer({ onSubmitOverride });
+        act(() => {
+            prefillComposer("thread-1", "Resolve conflicts with main");
+        });
+
+        expect(useChatUIStore.getState().composerText).toContain("Resolve conflicts with main");
+        expect(onSubmitOverride).not.toHaveBeenCalled();
+    });
+
+    it("holds a prompt from a comparison parent's shared composer until the thread's stored draft is back", () => {
+        setDraftBound("thread-1", false);
+        renderComposer({ onSubmitOverride: vi.fn(async () => undefined) });
+        act(() => {
+            prefillComposer("thread-1", "Resolve conflicts with main");
+        });
+
+        // Text in the composer now would keep the saved draft out, and be stored in its place.
+        expect(useChatUIStore.getState().composerText).toBe("");
+
+        act(() => {
+            setDraftBound("thread-1", true);
+        });
+
+        expect(useChatUIStore.getState().composerText).toContain("Resolve conflicts with main");
+    });
+
+    it("leaves a prompt for another thread alone", () => {
+        renderComposer({ onSubmitOverride: vi.fn(async () => undefined) });
+        act(() => {
+            prefillComposer("thread-2", "Address review");
+        });
+
+        expect(useChatUIStore.getState().composerText).toBe("");
+    });
+
+    it("marks a fix prompt as not typed, since it quotes the host", () => {
+        renderComposer();
+        act(() => {
+            prefillComposer("thread-1", "Fix checks on octo/hello#7");
+        });
+
+        expect(useChatUIStore.getState().composerDraftFrom).toBe("suggestion");
+    });
+
+    it("keeps a fix prompt that arrived while a comparison send ran, and drops only the sent text", async () => {
+        let finish: () => void = () => {};
+        const onSubmitOverride = vi.fn(
+            async () =>
+                await new Promise<undefined>((resolve) => {
+                    finish = () => resolve(undefined);
+                }),
+        );
+
+        useChatUIStore.getState().setComposerText("compare these");
+        renderComposer({ onSubmitOverride });
+        fireEvent.click(screen.getByRole("button", { name: "Send message" }));
+
+        expect(onSubmitOverride).toHaveBeenCalledWith("compare these", [], undefined);
+
+        act(() => {
+            prefillComposer("thread-1", "Resolve conflicts with main");
+        });
+        await act(async () => {
+            finish();
+        });
+
+        expect(useChatUIStore.getState().composerText).toBe("Resolve conflicts with main");
+    });
+
+    it("drops the sent text and files when the sent text ended in a space and a fix prompt arrived", async () => {
+        let finish: () => void = () => {};
+        const onSubmitOverride = vi.fn(
+            async () =>
+                await new Promise<undefined>((resolve) => {
+                    finish = () => resolve(undefined);
+                }),
+        );
+
+        useChatUIStore.getState().setComposerText("compare these ");
+        useChatUIStore.setState({
+            composerAttachments: [{ file: new File(["x"], "notes.txt"), id: "file-1", name: "notes.txt", status: "complete", type: "document" }],
+        });
+        renderComposer({ onSubmitOverride });
+        fireEvent.click(screen.getByRole("button", { name: "Send message" }));
+
+        expect(onSubmitOverride).toHaveBeenCalledWith("compare these ", expect.any(Array), undefined);
+
+        act(() => {
+            prefillComposer("thread-1", "Resolve conflicts with main");
+        });
+        await act(async () => {
+            finish();
+        });
+
+        expect(useChatUIStore.getState().composerText).toBe("Resolve conflicts with main");
+        expect(useChatUIStore.getState().composerAttachments).toStrictEqual([]);
+    });
+
+    it("adds a prompt quoting hidden characters once, also on a second click", () => {
+        renderComposer();
+        act(() => {
+            prefillComposer("thread-1", "Fix checks\u{200B} on octo/hello#7");
+        });
+        act(() => {
+            prefillComposer("thread-1", "Fix checks\u{200B} on octo/hello#7");
+        });
+
+        expect(useChatUIStore.getState().composerText).toBe("Fix checks on octo/hello#7");
+    });
+
+    it("empties a draft edited while its comparison send ran, so the sent message does not stay to go out twice", async () => {
+        let finish: () => void = () => {};
+        const onSubmitOverride = vi.fn(
+            async () =>
+                await new Promise<undefined>((resolve) => {
+                    finish = () => resolve(undefined);
+                }),
+        );
+
+        useChatUIStore.getState().setComposerText("compare these");
+        renderComposer({ onSubmitOverride });
+        fireEvent.click(screen.getByRole("button", { name: "Send message" }));
+        act(() => {
+            useChatUIStore.getState().setComposerText("compare those");
+        });
+        await act(async () => {
+            finish();
+        });
+
+        expect(useChatUIStore.getState().composerText).toBe("");
+    });
+
+    it("keeps a fix prompt that arrived after the draft was edited during its comparison send, and drops the edit", async () => {
+        let finish: () => void = () => {};
+        const onSubmitOverride = vi.fn(
+            async () =>
+                await new Promise<undefined>((resolve) => {
+                    finish = () => resolve(undefined);
+                }),
+        );
+
+        useChatUIStore.getState().setComposerText("compare these");
+        renderComposer({ onSubmitOverride });
+        fireEvent.click(screen.getByRole("button", { name: "Send message" }));
+        act(() => {
+            useChatUIStore.getState().setComposerText("compare those");
+        });
+        act(() => {
+            prefillComposer("thread-1", "Resolve conflicts with main");
+        });
+        await act(async () => {
+            finish();
+        });
+
+        expect(useChatUIStore.getState().composerText).toBe("Resolve conflicts with main");
+        expect(useChatUIStore.getState().composerDraftFrom).toBe("suggestion");
+    });
+
+    it("still empties the draft after a comparison send when nothing joined it", async () => {
+        const onSubmitOverride = vi.fn(async () => undefined);
+
+        useChatUIStore.getState().setComposerText("compare these");
+        renderComposer({ onSubmitOverride });
+        fireEvent.click(screen.getByRole("button", { name: "Send message" }));
+
+        await waitFor(() => {
+            expect(useChatUIStore.getState().composerText).toBe("");
+        });
     });
 });
 

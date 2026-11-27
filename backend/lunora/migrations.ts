@@ -1,5 +1,7 @@
 import { defineMigration } from "lunorash/server";
 
+import { typedTextColumn } from "./agent/shared";
+import type { Message } from "./agent/validators";
 import { getMaxSteps } from "./chat/lib/auto-continue";
 
 /**
@@ -320,4 +322,112 @@ export const addRunArgsSystemContext = defineMigration({
     table: "persistentStreams",
     // `undefined` leaves every row untouched (`MigrationTransform`).
     up: () => undefined,
+});
+
+/**
+ * A session's stored purchase looks (`browserSessions.purchaseLooks`) gained an optional `browser`: the renderer session the look
+ * was read on (`browser/functions.ts#recordPurchaseLook`). Nothing to fill: a look without it reads as another browser, so its
+ * approved click is refused (`browser-node.ts`). A no-op, so `lunora prepare` records the added optional key in the baseline.
+ */
+export const addPurchaseLookBrowser = defineMigration({
+    id: "add-purchase-look-browser",
+    table: "browserSessions",
+    // `undefined` leaves every row untouched (`MigrationTransform`).
+    up: () => undefined,
+});
+
+/**
+ * Messages gained an optional `typedText` (`agent/shared.ts#typedTextColumn`) and its `typed_text_search` index, which the
+ * composer's prompt search reads. This fills it on rows saved before it, by the same rule every write uses
+ * (`typedTextColumn` over the stored `message` parts, never the flattened `text`), so an older prompt can be found too.
+ * An unmarked row in a messenger thread is read as messenger's text (its attachment lines are not typed), which takes one
+ * read of the thread, made only for a row whose typed text that changes.
+ * A row with nothing typed (only a quote, an attachment or a placeholder), a non-user row and a row kept out of search
+ * (no `text`) stay unset, as do rows that already have the column. Only `typedText` is added: `text`, the deletion
+ * marks and the thread's lock are copied through, and the search still drops a locked or deleted row when it reads.
+ *
+ * The runner walks each shard on its own, `batchSize` rows per batch, and records its cursor after every batch, so a run
+ * stopped by a batch cap or a failure resumes where it left off. A batch is one read of 32 rows and one rewrite per
+ * changed row. There is no `down`: a rollback cannot tell a filled row from one a write stamped after this ran.
+ *
+ * `deploy.yml` runs it after each deploy, with every other migration in this file (`scripts/run-data-migrations.ts`).
+ * Until it has run, the prompt search finds only prompts sent after the deploy.
+ */
+export const backfillMessageTypedText = defineMigration({
+    batchSize: 32,
+    id: "backfill-message-typed-text",
+    table: "messages",
+    up: async (document, context) => {
+        if (document.typedText !== undefined) {
+            return undefined;
+        }
+
+        const message = document.message as Message | undefined;
+        const text = document.text as string | undefined;
+        let typedText = typedTextColumn(message, text);
+
+        // A messenger row saved before its part was marked (`messengerTextPart`) reads as typed up to its attachment lines
+        // only in a messenger thread; anywhere else such a line was typed. The thread is read only when that would change.
+        const asMessenger = typedTextColumn(message, text, { messengerOrigin: true });
+
+        if (asMessenger !== typedText && typeof document.threadId === "string") {
+            const thread = await context.db.get("threads", document.threadId);
+
+            if (thread?.messengerConnectionId !== undefined && thread?.messengerConnectionId !== null) {
+                typedText = asMessenger;
+            }
+        }
+
+        // `undefined` leaves the row untouched: skipped, not rewritten (`MigrationTransform`).
+        return typedText === undefined ? undefined : { ...document, typedText };
+    },
+});
+
+/**
+ * A person's organization-project runner defaults (`userSettings.projectRunnerDefaults`, `acp/lib/project-runner.ts`)
+ * gained an optional `threadAt`, the start time of the thread an entry came from. Nothing to fill: an entry without it is
+ * read as older than any thread and any move. A no-op, so `lunora prepare` records the added optional key in the baseline.
+ */
+export const addProjectRunnerThreadAt = defineMigration({
+    id: "add-project-runner-thread-at",
+    table: "userSettings",
+    // `undefined` leaves every row untouched (`MigrationTransform`).
+    up: () => undefined,
+});
+
+/**
+ * Each entry of `userSettings.projectRunnerDefaults` gained an optional `threadId`, the id of the thread it came from: of two
+ * threads started in the same millisecond, the one with the greater id keeps the default (`agent/table-writes.ts#runnerReplaces`).
+ * Nothing to fill: an entry without it loses a tie. A no-op, so `lunora prepare` records the added optional key in the baseline.
+ */
+export const addProjectRunnerThreadId = defineMigration({
+    id: "add-project-runner-thread-id",
+    table: "userSettings",
+    // `undefined` leaves every row untouched (`MigrationTransform`).
+    up: () => undefined,
+});
+
+/**
+ * `pullRequestThreads.watchActive` (true exactly while a watch runs) is what `setPullRequestWatch` counts a person's
+ * watches through (`by_user_and_watchActive`). A watch started before that field has a `watch` with no `stoppedAt` and no
+ * flag, so the count could not see it. This sets `watchActive: true` on such a row: a running watch on a live thread.
+ * A stopped watch, a watch on a deleted thread, a row without a watch and a row already flagged are left as they are,
+ * and only `watchActive` is added: `watch`, `watchPending` and every other field are copied through.
+ *
+ * Idempotent: a flagged row is skipped, so a second run changes nothing. There is no `down`: a rollback cannot tell a
+ * filled row from one a watch start flagged after this ran.
+ */
+export const backfillPullRequestWatchActive = defineMigration({
+    id: "backfill-pull-request-watch-active",
+    table: "pullRequestThreads",
+    // `undefined` leaves the row untouched: skipped, not rewritten (`MigrationTransform`).
+    up: (document) => {
+        const watch = document.watch as { stoppedAt?: number } | null | undefined;
+
+        if (!watch || watch.stoppedAt !== undefined || document.threadDeleted === true || document.watchActive === true) {
+            return undefined;
+        }
+
+        return { ...document, watchActive: true };
+    },
 });

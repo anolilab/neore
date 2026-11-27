@@ -461,6 +461,7 @@ pub mod test_keychain {
 mod tests {
     use super::test_keychain::{self, holds};
     use super::*;
+    use crate::test_dir::TestDir;
 
     fn pairing(device_id: &str, secret: &str) -> Settings {
         Settings {
@@ -473,16 +474,17 @@ mod tests {
         }
     }
 
-    fn temp_file(name: &str) -> std::path::PathBuf {
-        let dir = std::env::temp_dir().join(format!("neore-device-{name}-{}", std::process::id()));
-        let _ = fs::remove_dir_all(&dir);
-        dir.join("device.json")
+    fn temp_file(name: &str) -> (TestDir, std::path::PathBuf) {
+        let dir = TestDir::at(&format!("device-{name}"));
+        let path = dir.join("device.json");
+
+        (dir, path)
     }
 
     #[test]
     fn the_secret_lives_in_the_keychain_not_the_file() {
         test_keychain::install();
-        let path = temp_file("keychain");
+        let (_dir, path) = temp_file("keychain");
 
         save(&path, &pairing("kc-1", "secret-kc")).unwrap();
 
@@ -494,7 +496,7 @@ mod tests {
     #[test]
     fn migrates_an_inline_secret_into_the_keychain() {
         test_keychain::install();
-        let path = temp_file("migrate");
+        let (_dir, path) = temp_file("migrate");
         fs::create_dir_all(path.parent().unwrap()).unwrap();
         fs::write(
             &path,
@@ -510,7 +512,7 @@ mod tests {
     #[test]
     fn keeps_the_secret_in_the_file_when_the_keychain_refuses() {
         test_keychain::install();
-        let path = temp_file("fallback");
+        let (_dir, path) = temp_file("fallback");
 
         save(&path, &pairing("unavailable-1", "fallback-secret")).unwrap();
 
@@ -521,7 +523,7 @@ mod tests {
     #[test]
     fn a_replaced_pairing_drops_its_keychain_entry() {
         test_keychain::install();
-        let path = temp_file("replace");
+        let (_dir, path) = temp_file("replace");
 
         save(&path, &pairing("old-1", "old-secret")).unwrap();
         save(&path, &pairing("new-1", "new-secret")).unwrap();
@@ -533,7 +535,7 @@ mod tests {
     #[test]
     fn a_failed_save_keeps_the_previous_secret() {
         test_keychain::install();
-        let path = temp_file("rollback");
+        let (_dir, path) = temp_file("rollback");
 
         save(&path, &pairing("rb-1", "old-secret")).unwrap();
         fs::create_dir(path.with_extension("json.tmp")).unwrap();
@@ -571,7 +573,7 @@ mod tests {
     #[test]
     fn each_server_keeps_its_own_secret_in_the_keychain() {
         test_keychain::install();
-        let path = temp_file("hosts");
+        let (_dir, path) = temp_file("hosts");
         let settings = with_hosts(
             "hk-desktop",
             "desktop-secret",
@@ -592,7 +594,7 @@ mod tests {
     #[test]
     fn a_removed_server_drops_its_keychain_entry_and_the_rest_stay() {
         test_keychain::install();
-        let path = temp_file("host-removed");
+        let (_dir, path) = temp_file("host-removed");
 
         save(
             &path,
@@ -625,7 +627,7 @@ mod tests {
     #[test]
     fn dropping_the_pairing_drops_the_servers_it_held() {
         test_keychain::install();
-        let path = temp_file("host-unpair");
+        let (_dir, path) = temp_file("host-unpair");
         let paired = with_hosts(
             "hu-desktop",
             "desktop-secret",
@@ -641,7 +643,7 @@ mod tests {
     #[test]
     fn a_failed_save_keeps_a_servers_previous_secret() {
         test_keychain::install();
-        let path = temp_file("host-rollback");
+        let (_dir, path) = temp_file("host-rollback");
 
         save(
             &path,
@@ -661,7 +663,7 @@ mod tests {
     #[test]
     fn a_servers_secret_stays_in_the_file_when_the_keychain_refuses() {
         test_keychain::install();
-        let path = temp_file("host-fallback");
+        let (_dir, path) = temp_file("host-fallback");
         let settings = with_hosts(
             "hf-desktop",
             "d",
@@ -677,10 +679,7 @@ mod tests {
     #[test]
     fn round_trips_owner_only() {
         test_keychain::install();
-        let path = std::env::temp_dir().join(format!(
-            "neore-device-store-{}/device.json",
-            std::process::id()
-        ));
+        let (_dir, path) = temp_file("store");
         let settings = Settings {
             allow_rules: vec!["fs_read".into()],
             pairing: Some(Pairing {
@@ -766,7 +765,7 @@ mod tests {
 
     #[test]
     fn a_damaged_file_is_moved_aside_before_the_defaults_are_used() {
-        let path = temp_file("damaged");
+        let (_dir, path) = temp_file("damaged");
         fs::create_dir_all(path.parent().unwrap()).unwrap();
         fs::write(&path, "{ not json").unwrap();
 
@@ -779,7 +778,5 @@ mod tests {
             .filter(|name| name.starts_with("device.json.corrupt-"))
             .count();
         assert_eq!(aside, 1);
-
-        let _ = fs::remove_dir_all(path.parent().unwrap());
     }
 }

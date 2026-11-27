@@ -21,13 +21,15 @@ import { importRuleTexts, isWholeInstructionFile } from "../lib/rule-file-import
 
 /**
  * What a repository import read: the files as the upload import turns them into drafts (`skipped`: the paths past the
- * room), the paths it could not read, how many it had no requests left for (`notRead`), which another import reads, and
- * picks left out as the same file as another picked (`duplicates`: a link such as `CLAUDE.md → AGENTS.md`, whose text
- * would apply twice).
+ * room), the paths it could not read (gone or too large), the links it refused to follow (`refused`: one that, followed
+ * again, no longer leads to a file the listing offered, or whose target could not be read again), how many it had no requests left for (`notRead`), which another
+ * import reads, and picks left out as the same file as another picked (`duplicates`: a link such as
+ * `CLAUDE.md → AGENTS.md`, whose text would apply twice).
  */
 export interface RepoImportResult extends ImportedRuleTexts {
     duplicates: number;
     notRead: number;
+    refused: string[];
     unreadable: string[];
 }
 
@@ -53,7 +55,7 @@ interface Listing {
     truncated: boolean;
 }
 
-type Failure = "forbidden" | "host_error" | "needs_reconnect" | "not_connected" | "not_found" | "rate_limited" | "unsupported_host";
+type Failure = "budget_spent" | "forbidden" | "host_error" | "needs_reconnect" | "not_connected" | "not_found" | "rate_limited" | "unsupported_host";
 
 const HOST_PREFIX = /^https:\/\/[^/]+\//u;
 const GIT_SUFFIX = /\.git$/u;
@@ -224,6 +226,9 @@ const RepoRuleFileImport: FC<{
     const shownFailure = failure?.repoId === chosen.id ? failure.reason : undefined;
 
     const failureText: Record<Failure | "unknown", string> = {
+        // Redirects (a renamed repository) or a 401's repeat after a token refresh spent its requests: only the second
+        // passes on a retry, so it says to try again first and names the address for when it keeps happening.
+        budget_spent: t`The repository's listing took too long to read. Try again; if it keeps happening, give the project the repository's current address, or add the file directly with Import files.`,
         forbidden: t`Your GitHub account cannot read this repository.`,
         host_error: t`GitHub did not answer. Try again in a moment.`,
         needs_reconnect: t`Your GitHub sign-in has expired. Connect GitHub again in Settings → Connectors.`,
@@ -361,7 +366,8 @@ const RepoRuleFileImport: FC<{
                 // Those still ticked: the note says to import them again.
                 notRead: notRead.filter((path) => stillPicked.includes(path)).length,
                 skipped: [...read.skipped, ...all.slice(MAX_RULE_FILES)],
-                unreadable: outcome.files.flatMap((file) => (file.status === "ok" || file.status === "not_read" ? [] : [file.path])),
+                refused: outcome.files.flatMap((file) => (file.status === "refused" ? [file.path] : [])),
+                unreadable: outcome.files.flatMap((file) => (file.status === "missing" || file.status === "too_large" ? [file.path] : [])),
             };
         });
     };

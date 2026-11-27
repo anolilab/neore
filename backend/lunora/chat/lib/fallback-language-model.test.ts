@@ -1,7 +1,7 @@
 import type { LanguageModelV3, LanguageModelV3CallOptions } from "@ai-sdk/provider";
 import { describe, expect, it, vi } from "vitest";
 
-import { FallbackLanguageModel, isInfraFailure } from "./fallback-language-model";
+import { type FallbackBackup, FallbackLanguageModel, isInfraFailure } from "./fallback-language-model";
 
 const OPTIONS = { prompt: [] } as unknown as LanguageModelV3CallOptions;
 
@@ -37,7 +37,7 @@ describe("FallbackLanguageModel", () => {
         it("retries once on the backup after an infra failure", async () => {
             const primary = fakeModel("primary", gatewayError("infra"));
             const backup = fakeModel("backup");
-            const result = await new FallbackLanguageModel(primary, backup)[method](OPTIONS);
+            const result = await new FallbackLanguageModel(primary, [{ model: backup }])[method](OPTIONS);
 
             expect(primary[method]).toHaveBeenCalledTimes(1);
             expect(backup[method]).toHaveBeenCalledTimes(1);
@@ -49,7 +49,7 @@ describe("FallbackLanguageModel", () => {
             const primary = fakeModel("primary", error);
             const backup = fakeModel("backup");
 
-            await expect(new FallbackLanguageModel(primary, backup)[method](OPTIONS)).rejects.toBe(error);
+            await expect(new FallbackLanguageModel(primary, [{ model: backup }])[method](OPTIONS)).rejects.toBe(error);
 
             expect(primary[method]).toHaveBeenCalledTimes(1);
             expect(backup[method]).not.toHaveBeenCalled();
@@ -59,7 +59,7 @@ describe("FallbackLanguageModel", () => {
             const primary = fakeModel("primary", new Error("boom"));
             const backup = fakeModel("backup");
 
-            await expect(new FallbackLanguageModel(primary, backup)[method](OPTIONS)).rejects.toThrow("boom");
+            await expect(new FallbackLanguageModel(primary, [{ model: backup }])[method](OPTIONS)).rejects.toThrow("boom");
 
             expect(backup[method]).not.toHaveBeenCalled();
         });
@@ -69,7 +69,7 @@ describe("FallbackLanguageModel", () => {
             const backup = fakeModel("backup");
             const stopped = AbortSignal.abort();
 
-            await expect(new FallbackLanguageModel(primary, backup)[method]({ ...OPTIONS, abortSignal: stopped })).rejects.toThrow();
+            await expect(new FallbackLanguageModel(primary, [{ model: backup }])[method]({ ...OPTIONS, abortSignal: stopped })).rejects.toThrow();
 
             expect(backup[method]).not.toHaveBeenCalled();
         });
@@ -79,7 +79,7 @@ describe("FallbackLanguageModel", () => {
             const primary = fakeModel("primary", gatewayError("infra"));
             const backup = fakeModel("backup", backupError);
 
-            await expect(new FallbackLanguageModel(primary, backup)[method](OPTIONS)).rejects.toBe(backupError);
+            await expect(new FallbackLanguageModel(primary, [{ model: backup }])[method](OPTIONS)).rejects.toBe(backupError);
 
             expect(primary[method]).toHaveBeenCalledTimes(1);
             expect(backup[method]).toHaveBeenCalledTimes(1);
@@ -89,7 +89,7 @@ describe("FallbackLanguageModel", () => {
             const primary = fakeModel("primary");
             const backup = fakeModel("backup");
 
-            await new FallbackLanguageModel(primary, backup)[method](OPTIONS);
+            await new FallbackLanguageModel(primary, [{ model: backup }])[method](OPTIONS);
 
             expect(primary[method]).toHaveBeenCalledTimes(1);
             expect(backup[method]).not.toHaveBeenCalled();
@@ -110,7 +110,7 @@ describe("FallbackLanguageModel", () => {
         });
 
         const backup = fakeModel("backup");
-        const model = new FallbackLanguageModel(primary, backup);
+        const model = new FallbackLanguageModel(primary, [{ model: backup }]);
 
         await model.doStream(OPTIONS);
 
@@ -134,7 +134,7 @@ describe("FallbackLanguageModel", () => {
 
         const backup = fakeModel("backup");
 
-        await new FallbackLanguageModel(primary, backup).doStream(OPTIONS);
+        await new FallbackLanguageModel(primary, [{ model: backup }]).doStream(OPTIONS);
 
         expect(backup.doStream).toHaveBeenCalledTimes(1);
     });
@@ -166,7 +166,7 @@ describe("FallbackLanguageModel", () => {
             return { stream: new ReadableStream({ start: (controller) => controller.close() }) };
         });
 
-        await new FallbackLanguageModel(primary, backup).doStream(OPTIONS);
+        await new FallbackLanguageModel(primary, [{ model: backup }]).doStream(OPTIONS);
 
         expect(order).toEqual(["cancel", "backup"]);
     });
@@ -183,7 +183,7 @@ describe("FallbackLanguageModel", () => {
         });
 
         const backup = fakeModel("backup");
-        const result = await new FallbackLanguageModel(primary, backup).doStream(OPTIONS);
+        const result = await new FallbackLanguageModel(primary, [{ model: backup }]).doStream(OPTIONS);
         const reader = result.stream.getReader();
 
         const first = await reader.read();
@@ -196,7 +196,7 @@ describe("FallbackLanguageModel", () => {
         const error = gatewayError("infra");
         const primary = fakeModel("primary", error);
         const backup = fakeModel("backup");
-        const model = new FallbackLanguageModel(primary, backup, { backupSupportsTools: false });
+        const model = new FallbackLanguageModel(primary, [{ model: backup, supportsTools: false }]);
 
         await expect(model.doGenerate({ ...OPTIONS, tools: [{ inputSchema: {}, name: "t", type: "function" }] })).rejects.toBe(error);
         expect(backup.doGenerate).not.toHaveBeenCalled();
@@ -209,24 +209,24 @@ describe("FallbackLanguageModel", () => {
         const reasoningOptions = { openai: { reasoningEffort: "high", user: "u1" }, openrouter: { reasoning: { effort: "high" } } };
         const withOptions = { ...OPTIONS, providerOptions: reasoningOptions } as unknown as LanguageModelV3CallOptions;
 
-        const backupOptions = async (traits: ConstructorParameters<typeof FallbackLanguageModel>[2]) => {
+        const backupOptions = async (traits: Omit<FallbackBackup, "model">) => {
             const backup = fakeModel("backup");
 
-            await new FallbackLanguageModel(fakeModel("primary", gatewayError("infra")), backup, traits).doGenerate(withOptions);
+            await new FallbackLanguageModel(fakeModel("primary", gatewayError("infra")), [{ model: backup, ...traits }]).doGenerate(withOptions);
 
             return (backup.doGenerate.mock.calls[0]![0] as LanguageModelV3CallOptions).providerOptions;
         };
 
         it("sends a non-reasoning backup no reasoning option and none of another provider's", async () => {
-            expect(await backupOptions({ backupProviderKey: "openai", backupSupportsReasoning: false })).toEqual({ openai: { user: "u1" } });
+            expect(await backupOptions({ providerKey: "openai", supportsReasoning: false })).toEqual({ openai: { user: "u1" } });
         });
 
         it("drops the options altogether when nothing is left for the backup's provider", async () => {
-            expect(await backupOptions({ backupProviderKey: "google", backupSupportsReasoning: true })).toBeUndefined();
+            expect(await backupOptions({ providerKey: "google", supportsReasoning: true })).toBeUndefined();
         });
 
         it("keeps reasoning options for a backup that supports them on the same provider", async () => {
-            expect(await backupOptions({ backupProviderKey: "openai", backupSupportsReasoning: true })).toEqual({
+            expect(await backupOptions({ providerKey: "openai", supportsReasoning: true })).toEqual({
                 openai: { reasoningEffort: "high", user: "u1" },
             });
         });
@@ -234,7 +234,7 @@ describe("FallbackLanguageModel", () => {
         it("leaves the primary's own call untouched", async () => {
             const primary = fakeModel("primary");
 
-            await new FallbackLanguageModel(primary, fakeModel("backup"), { backupProviderKey: "google" }).doGenerate(withOptions);
+            await new FallbackLanguageModel(primary, [{ model: fakeModel("backup"), providerKey: "google" }]).doGenerate(withOptions);
 
             expect((primary.doGenerate.mock.calls[0]![0] as LanguageModelV3CallOptions).providerOptions).toBe(reasoningOptions);
         });
@@ -244,7 +244,7 @@ describe("FallbackLanguageModel", () => {
         it.each(["doGenerate", "doStream"] as const)("%s: later steps go straight to the backup, not through the failing primary", async (method) => {
             const primary = fakeModel("primary", gatewayError("infra"));
             const backup = fakeModel("backup");
-            const model = new FallbackLanguageModel(primary, backup);
+            const model = new FallbackLanguageModel(primary, [{ model: backup }]);
 
             await model[method](OPTIONS);
             await model[method](OPTIONS);
@@ -257,7 +257,7 @@ describe("FallbackLanguageModel", () => {
 
         it("still tries the primary for a step the backup could not take", async () => {
             const primary = fakeModel("primary", gatewayError("infra"));
-            const model = new FallbackLanguageModel(primary, fakeModel("backup"), { backupSupportsImages: false });
+            const model = new FallbackLanguageModel(primary, [{ model: fakeModel("backup"), supportsImages: false }]);
             const image = {
                 ...OPTIONS,
                 prompt: [{ content: [{ data: "x", mediaType: "image/png", type: "file" }], role: "user" }],
@@ -281,7 +281,7 @@ describe("FallbackLanguageModel", () => {
             const error = gatewayError("infra");
             const backup = fakeModel("backup");
 
-            await expect(new FallbackLanguageModel(fakeModel("primary", error), backup)[method](huge)).rejects.toBe(error);
+            await expect(new FallbackLanguageModel(fakeModel("primary", error), [{ model: backup }])[method](huge)).rejects.toBe(error);
 
             expect(backup[method]).not.toHaveBeenCalled();
         });
@@ -289,7 +289,7 @@ describe("FallbackLanguageModel", () => {
         it("falls back for a prompt that fits", async () => {
             const backup = fakeModel("backup");
 
-            await new FallbackLanguageModel(fakeModel("primary", gatewayError("infra")), backup).doGenerate(OPTIONS);
+            await new FallbackLanguageModel(fakeModel("primary", gatewayError("infra")), [{ model: backup }]).doGenerate(OPTIONS);
 
             expect(backup.doGenerate).toHaveBeenCalledTimes(1);
         });
@@ -304,7 +304,7 @@ describe("FallbackLanguageModel", () => {
             const error = gatewayError("infra");
             const backup = fakeModel("backup");
 
-            await expect(new FallbackLanguageModel(fakeModel("primary", error), backup, { backupSupportsImages: false })[method](image)).rejects.toBe(error);
+            await expect(new FallbackLanguageModel(fakeModel("primary", error), [{ model: backup, supportsImages: false }])[method](image)).rejects.toBe(error);
 
             expect(backup[method]).not.toHaveBeenCalled();
         });
@@ -313,7 +313,7 @@ describe("FallbackLanguageModel", () => {
             const error = gatewayError("infra");
             const backup = fakeModel("backup");
 
-            await expect(new FallbackLanguageModel(fakeModel("primary", error), backup, { backupSupportsFiles: false }).doGenerate(pdf)).rejects.toBe(error);
+            await expect(new FallbackLanguageModel(fakeModel("primary", error), [{ model: backup, supportsFiles: false }]).doGenerate(pdf)).rejects.toBe(error);
 
             expect(backup.doGenerate).not.toHaveBeenCalled();
         });
@@ -321,28 +321,155 @@ describe("FallbackLanguageModel", () => {
         it("still falls back for the same attachments when the backup supports them", async () => {
             const backup = fakeModel("backup");
 
-            await new FallbackLanguageModel(fakeModel("primary", gatewayError("infra")), backup).doGenerate(image);
+            await new FallbackLanguageModel(fakeModel("primary", gatewayError("infra")), [{ model: backup }]).doGenerate(image);
 
             expect(backup.doGenerate).toHaveBeenCalledTimes(1);
         });
 
-        it("canServe is the rule prompt sizing asks too", () => {
-            const model = new FallbackLanguageModel(fakeModel("primary"), fakeModel("backup"), { backupSupportsImages: false });
+        it("backupsServing is the rule prompt sizing asks too", () => {
+            const model = new FallbackLanguageModel(fakeModel("primary"), [
+                { model: fakeModel("blind"), supportsImages: false },
+                { model: fakeModel("sighted") },
+            ]);
 
-            expect(model.canServe({ hasTools: false, messages: [{ content: [{ image: "x", type: "image" }], role: "user" }] })).toBe(false);
-            expect(model.canServe({ hasTools: false, messages: [{ content: "hi", role: "user" }] })).toBe(true);
+            expect(model.backupsServing({ hasTools: false, messages: [{ content: [{ image: "x", type: "image" }], role: "user" }] })).toEqual(["sighted"]);
+            expect(model.backupsServing({ hasTools: false, messages: [{ content: "hi", role: "user" }] })).toEqual(["blind", "sighted"]);
+        });
+    });
+
+    describe("several backups", () => {
+        it.each(["doGenerate", "doStream"] as const)("%s: tries them in order until one answers", async (method) => {
+            const primary = fakeModel("primary", gatewayError("infra"));
+            const first = fakeModel("first", gatewayError("infra"));
+            const second = fakeModel("second");
+            const third = fakeModel("third");
+            const model = new FallbackLanguageModel(primary, [{ model: first }, { model: second }, { model: third }]);
+
+            await model[method](OPTIONS);
+
+            expect(first[method]).toHaveBeenCalledTimes(1);
+            expect(second[method]).toHaveBeenCalledTimes(1);
+            expect(third[method]).not.toHaveBeenCalled();
+            expect(model.modelId).toBe("second");
+        });
+
+        it.each(["doGenerate", "doStream"] as const)("%s: surfaces the last backup's error when every one fails", async (method) => {
+            const lastError = gatewayError("infra");
+            const model = new FallbackLanguageModel(fakeModel("primary", gatewayError("infra")), [
+                { model: fakeModel("first", gatewayError("infra")) },
+                { model: fakeModel("second", lastError) },
+            ]);
+
+            await expect(model[method](OPTIONS)).rejects.toBe(lastError);
+        });
+
+        it("skips a backup that cannot take the call and goes on to the next", async () => {
+            const blind = fakeModel("blind");
+            const sighted = fakeModel("sighted");
+            const image = {
+                ...OPTIONS,
+                prompt: [{ content: [{ data: "x", mediaType: "image/png", type: "file" }], role: "user" }],
+            } as unknown as LanguageModelV3CallOptions;
+
+            await new FallbackLanguageModel(fakeModel("primary", gatewayError("infra")), [
+                { model: blind, supportsImages: false },
+                { model: sighted },
+            ]).doGenerate(image);
+
+            expect(blind.doGenerate).not.toHaveBeenCalled();
+            expect(sighted.doGenerate).toHaveBeenCalledTimes(1);
+        });
+
+        it("does not move on after a failure that is not the gateway's infra classification", async () => {
+            const error = gatewayError("content_policy");
+            const second = fakeModel("second");
+            const model = new FallbackLanguageModel(fakeModel("primary", gatewayError("infra")), [{ model: fakeModel("first", error) }, { model: second }]);
+
+            await expect(model.doGenerate(OPTIONS)).rejects.toBe(error);
+            expect(second.doGenerate).not.toHaveBeenCalled();
+        });
+
+        it("stops hopping once the run is stopped", async () => {
+            const stopping = new AbortController();
+            const first = fakeModel("first");
+            const second = fakeModel("second");
+
+            first.doGenerate.mockImplementation(async () => {
+                stopping.abort();
+
+                throw gatewayError("infra");
+            });
+
+            const model = new FallbackLanguageModel(fakeModel("primary", gatewayError("infra")), [{ model: first }, { model: second }]);
+
+            await expect(model.doGenerate({ ...OPTIONS, abortSignal: stopping.signal })).rejects.toThrow();
+            expect(second.doGenerate).not.toHaveBeenCalled();
+        });
+
+        it("starts later steps on the backup that answered", async () => {
+            const primary = fakeModel("primary", gatewayError("infra"));
+            const first = fakeModel("first", gatewayError("infra"));
+            const second = fakeModel("second");
+            const model = new FallbackLanguageModel(primary, [{ model: first }, { model: second }]);
+
+            await model.doGenerate(OPTIONS);
+            await model.doGenerate(OPTIONS);
+
+            expect(primary.doGenerate).toHaveBeenCalledTimes(1);
+            expect(first.doGenerate).toHaveBeenCalledTimes(1);
+            expect(second.doGenerate).toHaveBeenCalledTimes(2);
+        });
+
+        it("tries the primary first for a step the backup it landed on cannot take", async () => {
+            const primary = fakeModel("primary", gatewayError("infra"));
+            const blind = fakeModel("blind");
+            const sighted = fakeModel("sighted");
+            const model = new FallbackLanguageModel(primary, [{ model: blind, supportsImages: false }, { model: sighted }]);
+            const image = {
+                ...OPTIONS,
+                prompt: [{ content: [{ data: "x", mediaType: "image/png", type: "file" }], role: "user" }],
+            } as unknown as LanguageModelV3CallOptions;
+
+            await model.doGenerate(OPTIONS);
+            await model.doGenerate(image);
+
+            expect(primary.doGenerate).toHaveBeenCalledTimes(2);
+            expect(blind.doGenerate).toHaveBeenCalledTimes(1);
+            expect(sighted.doGenerate).toHaveBeenCalledTimes(1);
+        });
+
+        it("moves on when a backup's stream errors before its first content part", async () => {
+            const first = fakeModel("first");
+
+            first.doStream.mockImplementation(async () => {
+                return {
+                    stream: new ReadableStream({
+                        pull(controller) {
+                            controller.error(gatewayError("infra"));
+                        },
+                    }),
+                };
+            });
+
+            const second = fakeModel("second");
+            const model = new FallbackLanguageModel(fakeModel("primary", gatewayError("infra")), [{ model: first }, { model: second }]);
+
+            await model.doStream(OPTIONS);
+
+            expect(second.doStream).toHaveBeenCalledTimes(1);
+            expect(model.modelId).toBe("second");
         });
     });
 
     it("presents itself as the primary model until a call falls back", async () => {
         const primary = fakeModel("primary");
-        const model = new FallbackLanguageModel(primary, fakeModel("backup"));
+        const model = new FallbackLanguageModel(primary, [{ model: fakeModel("backup") }]);
 
         expect(model.modelId).toBe("primary");
         expect(model.provider).toBe("gateway/test");
         expect(model.supportedUrls).toBe(primary.supportedUrls);
 
-        const failing = new FallbackLanguageModel(fakeModel("primary", gatewayError("infra")), fakeModel("backup"));
+        const failing = new FallbackLanguageModel(fakeModel("primary", gatewayError("infra")), [{ model: fakeModel("backup") }]);
 
         await failing.doGenerate(OPTIONS);
 

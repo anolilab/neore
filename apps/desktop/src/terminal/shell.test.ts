@@ -1,8 +1,8 @@
-import { mkdirSync, mkdtempSync, realpathSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it } from "vitest";
 
 import { readFolder, resolveShell, resolveSsh, shellEnvironment, sshEnvironment, sshTerminalAvailability, terminalAvailability } from "./shell";
 
@@ -179,6 +179,10 @@ describe("readFolder", () => {
     // The temporary directory is itself behind a link on macOS (`/var` → `/private/var`).
     const created = mkdtempSync(path.join(tmpdir(), "neore-folder-"));
     const directory = realpathSync(created);
+
+    afterAll(() => {
+        rmSync(created, { force: true, recursive: true });
+    });
 
     it("accepts an existing directory", () => {
         expect(readFolder(directory)).toBe(directory);

@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@neore/ui/components/switch";
 import { Textarea } from "@neore/ui/components/textarea";
 import type { FC } from "react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { useUpdateUserSettings, useUserSettings } from "@/features/auth/hooks/use-user-settings";
@@ -27,6 +27,9 @@ const ChatLifecycleControls: FC = () => {
     const { t } = useLingui();
     const { data: userSettings } = useUserSettings();
     const updateUserSettings = useUpdateUserSettings();
+    // Each toggle's write is queued and sends the cached value when its turn comes, so a quick second toggle can save the
+    // newer value under the first toggle's message. Only the newest toggle announces what was saved.
+    const toggles = useRef(0);
     // The textarea's text while it differs from the saved list; `undefined` shows the saved list.
     const [blocklistDraft, setBlocklistDraft] = useState<string | undefined>(undefined);
 
@@ -99,6 +102,66 @@ const ChatLifecycleControls: FC = () => {
                         ))}
                     </SelectContent>
                 </Select>
+            </div>
+
+            <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                    <Label className="text-base font-medium" htmlFor="auto-archive-merged-chats">
+                        {t`Auto-archive merged chats`}
+                    </Label>
+                    <p className="text-muted-foreground text-sm" id="auto-archive-merged-chats-description">
+                        {t`Archive a chat when its linked pull request is merged. Archived chats stay searchable.`}
+                    </p>
+                </div>
+                <Switch
+                    // Off until the settings load: a write queued before then could take the server's old value and drop the choice.
+                    aria-describedby="auto-archive-merged-chats-description"
+                    checked={userSettings?.autoArchiveMergedChats === true}
+                    disabled={userSettings === undefined}
+                    id="auto-archive-merged-chats"
+                    onCheckedChange={(checked) => {
+                        // The queued path: a quick second toggle must not be overtaken by the first write.
+                        toggles.current += 1;
+                        const toggle = toggles.current;
+
+                        updateUserSettings
+                            .updateLatest(() => {
+                                return { autoArchiveMergedChats: checked };
+                            })
+                            .then(() => {
+                                if (toggle === toggles.current) {
+                                    toast.success(checked ? t`Merged chats will be archived` : t`Merged chats stay as they are`);
+                                }
+
+                                return undefined;
+                            })
+                            .catch((error: unknown) => {
+                                toast.error(error instanceof Error && error.message ? error.message : t`Failed to save settings`);
+                            });
+                    }}
+                />
+            </div>
+
+            <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                    <Label className="text-base font-medium" htmlFor="keep-open-pull-request-chats">
+                        {t`Keep chats with an open pull request`}
+                    </Label>
+                    <p className="text-muted-foreground text-sm" id="keep-open-pull-request-chats-description">
+                        {t`Auto-archive skips a chat while it is linked to a pull request that is still open.`}
+                    </p>
+                </div>
+                <Switch
+                    aria-describedby="keep-open-pull-request-chats-description"
+                    checked={userSettings?.keepOpenPullRequestChats !== false}
+                    id="keep-open-pull-request-chats"
+                    onCheckedChange={(checked) => {
+                        save(
+                            { keepOpenPullRequestChats: checked },
+                            checked ? t`Chats with an open pull request are kept` : t`Chats with an open pull request can be archived`,
+                        );
+                    }}
+                />
             </div>
 
             <div className="space-y-2">

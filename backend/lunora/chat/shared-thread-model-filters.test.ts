@@ -47,6 +47,7 @@ const REACHED = "getAgent reached";
 beforeAll(async () => {
     registerModule(registry, "agent_threads", await import("../agent/threads"));
     registerModule(registry, "auth_functions", await import("../auth/functions"));
+    registerModule(registry, "agent_followup_suggestions", await import("../agent/followup-suggestions"));
 });
 
 let harness: ReturnType<typeof lunoraTest>;
@@ -128,6 +129,16 @@ describe("generateFollowupSuggestionsForThread, whose prompt carries the caller'
             expect.any(String),
             expect.objectContaining({ modelFilterRules: { denyDataCollection: true, requireZDR: true } }),
         );
+    });
+
+    // The owner pays when the collaborator turned suggestions off, but the prompt still carries the collaborator's messages.
+    it("still applies the collaborator's rules when they turned suggestions off and the owner pays", async () => {
+        state.rules = { [COLLABORATOR]: { allowedModels: ["some/other-model"] }, [OWNER]: {} };
+        await harness.run(async (ctx: any) => await ctx.db.insert("userSettings", { enableFollowupSuggestions: false, userId: COLLABORATOR }));
+
+        await followups();
+
+        expect(getAgent).not.toHaveBeenCalled();
     });
 });
 

@@ -1,6 +1,6 @@
 /**
  * Fallback Language Model — LanguageModelV3 that runs a call on the user's
- * backup model when the primary fails with an infrastructure error.
+ * backup models, in order, when the primary fails with an infrastructure error.
  *
  * Only the gateway's own classification counts (`error.fallbackReason`, see
  * `GatewayLanguageModel`): a content-policy or context-overflow failure would
@@ -10,7 +10,8 @@
  * The retry is made only for a call that failed before it produced anything:
  * the rejection of `doGenerate()` / `doStream()` itself, or a stream that errors
  * before its first content part. Once a part has been handed on, the agent has
- * consumed it and cannot be handed another reply.
+ * consumed it and cannot be handed another reply. A backup that fails the same
+ * way hands the call to the next one; the last failure surfaces.
  *
  * `modelId` / `provider` follow the model that served the latest call, so the
  * message the agent persists names the model that wrote it.
@@ -74,6 +75,22 @@ export const providerOptionsForBackup = (
 export const isInfraFailure = (error: unknown): boolean =>
     typeof error === "object" && error !== null && (error as { fallbackReason?: unknown }).fallbackReason === "infra";
 
+/** One backup model of a chain, with what it can take on a call (registry traits, read by `getAgent`). */
+export interface FallbackBackup {
+    model: LanguageModelV3;
+    providerKey?: string;
+    supportsFiles?: boolean;
+    supportsImages?: boolean;
+    supportsReasoning?: boolean;
+    supportsTools?: boolean;
+}
+
+interface Slot {
+    capabilities: BackupCapabilities;
+    model: LanguageModelV3;
+    traits: { providerKey?: string; supportsReasoning?: boolean };
+}
+
 export class FallbackLanguageModel implements LanguageModelV3 {
     readonly specificationVersion = "v3" as const;
 
@@ -81,42 +98,26 @@ export class FallbackLanguageModel implements LanguageModelV3 {
 
     private readonly primary: LanguageModelV3;
 
-    private readonly backup: LanguageModelV3;
-
-    private readonly backupCapabilities: BackupCapabilities;
+    private readonly backups: ReadonlyArray<Slot>;
 
     private active: LanguageModelV3;
 
     /**
-     * Set once a call fell back on an infrastructure failure, and kept for the life of this instance. A wrapper is built
-     * per run (\`getAgent\` makes a new one for every run, group turn and continuation, never shared across users), so
-     * the later steps of that run go straight to the backup instead of each waiting on the failing primary first.
+     * The backup the latest fallback landed on (an index into `backups`), kept for the life of this instance. A wrapper is
+     * built per run (\`getAgent\` makes a new one for every run, group turn and continuation, never shared across users), so
+     * the later steps of that run start there instead of each waiting on the failing models before it.
      */
-    private onBackup = false;
+    private onBackup: number | undefined;
 
-    private readonly backupTraits: { providerKey?: string; supportsReasoning?: boolean };
-
-    constructor(
-        primary: LanguageModelV3,
-        backup: LanguageModelV3,
-        {
-            backupProviderKey,
-            backupSupportsFiles = true,
-            backupSupportsImages = true,
-            backupSupportsReasoning,
-            backupSupportsTools = true,
-        }: {
-            backupProviderKey?: string;
-            backupSupportsFiles?: boolean;
-            backupSupportsImages?: boolean;
-            backupSupportsReasoning?: boolean;
-            backupSupportsTools?: boolean;
-        } = {},
-    ) {
-        this.backupTraits = { providerKey: backupProviderKey, supportsReasoning: backupSupportsReasoning };
+    constructor(primary: LanguageModelV3, backups: ReadonlyArray<FallbackBackup>) {
         this.primary = primary;
-        this.backup = backup;
-        this.backupCapabilities = { files: backupSupportsFiles, images: backupSupportsImages, tools: backupSupportsTools };
+        this.backups = backups.map((backup) => {
+            return {
+                capabilities: { files: backup.supportsFiles ?? true, images: backup.supportsImages ?? true, tools: backup.supportsTools ?? true },
+                model: backup.model,
+                traits: { providerKey: backup.providerKey, supportsReasoning: backup.supportsReasoning },
+            };
+        });
         this.active = primary;
         this.supportedUrls = primary.supportedUrls;
     }
@@ -126,13 +127,12 @@ export class FallbackLanguageModel implements LanguageModelV3 {
         return this.primary.modelId;
     }
 
-    /** Whether the backup could take a call carrying these tools and messages: the one rule for switching and for sizing the prompt. */
-    canServe(call: { hasTools: boolean; messages: unknown }): boolean {
-        return backupCanServe(this.backupCapabilities, call);
-    }
-
-    get backupModelId(): string {
-        return this.backup.modelId;
+    /**
+     * The backups that could take a call carrying these tools and messages, in order: the one rule for switching and for
+     * sizing the prompt, which must fit the smallest window among them.
+     */
+    backupsServing(call: { hasTools: boolean; messages: unknown }): string[] {
+        return this.backups.filter((slot) => backupCanServe(slot.capabilities, call)).map((slot) => slot.model.modelId);
     }
 
     get provider(): string {
@@ -144,134 +144,159 @@ export class FallbackLanguageModel implements LanguageModelV3 {
     }
 
     async doGenerate(options: LanguageModelV3CallOptions): Promise<LanguageModelV3GenerateResult> {
-        if (this.onBackup && this.canTakeCall(options)) {
-            this.active = this.backup;
+        let index = this.firstAttempt(options);
 
-            return await this.backup.doGenerate(this.optionsForBackup(options));
-        }
+        while (true) {
+            const model = this.modelAt(index);
 
-        this.active = this.primary;
+            this.active = model;
 
-        try {
-            return await this.primary.doGenerate(options);
-        } catch (error) {
-            if (!this.shouldFallBack(error, options)) {
-                throw error;
+            try {
+                return await model.doGenerate(this.optionsFor(index, options));
+            } catch (error) {
+                index = this.nextAttempt(index, error, options);
             }
-
-            this.switchToBackup(error);
-
-            return await this.backup.doGenerate(this.optionsForBackup(options));
         }
     }
 
     async doStream(options: LanguageModelV3CallOptions): Promise<LanguageModelV3StreamResult> {
-        if (this.onBackup && this.canTakeCall(options)) {
-            this.active = this.backup;
+        let index = this.firstAttempt(options);
 
-            return await this.backup.doStream(this.optionsForBackup(options));
-        }
+        while (true) {
+            const model = this.modelAt(index);
 
-        this.active = this.primary;
+            this.active = model;
 
-        let result: LanguageModelV3StreamResult;
+            let result: LanguageModelV3StreamResult;
 
-        try {
-            result = await this.primary.doStream(options);
-        } catch (error) {
-            if (!this.shouldFallBack(error, options)) {
-                throw error;
+            try {
+                result = await model.doStream(this.optionsFor(index, options));
+            } catch (error) {
+                index = this.nextAttempt(index, error, options);
+
+                continue;
             }
 
-            this.switchToBackup(error);
-
-            return await this.backup.doStream(this.optionsForBackup(options));
-        }
-
-        // The gateway reports a provider failure after its 200 as an error event, so look at the stream up to its first visible part before committing to it.
-        const reader = result.stream.getReader();
-        const head: LanguageModelV3StreamPart[] = [];
-
-        try {
-            while (true) {
-                const { done, value } = await reader.read();
-
-                if (done) {
-                    break;
-                }
-
-                head.push(value);
-
-                if (isVisiblePart(value)) {
-                    break;
-                }
-            }
-        } catch (error) {
-            if (!this.shouldFallBack(error, options)) {
-                throw error;
+            // The last backup's stream is handed on as it is: nothing is left to fall back to.
+            if (index >= 0 && this.nextServing(index, options) === undefined) {
+                return result;
             }
 
-            // Release the abandoned primary stream before the backup starts.
-            await reader.cancel().catch(() => undefined);
-            this.switchToBackup(error);
+            // The gateway reports a provider failure after its 200 as an error event, so look at the stream up to its first visible part before committing to it.
+            const reader = result.stream.getReader();
+            const head: LanguageModelV3StreamPart[] = [];
 
-            return await this.backup.doStream(this.optionsForBackup(options));
+            try {
+                while (true) {
+                    const { done, value } = await reader.read();
+
+                    if (done) {
+                        break;
+                    }
+
+                    head.push(value);
+
+                    if (isVisiblePart(value)) {
+                        break;
+                    }
+                }
+            } catch (error) {
+                index = this.nextAttempt(index, error, options);
+                // Release the abandoned stream before the next model starts.
+                await reader.cancel().catch(() => undefined);
+
+                continue;
+            }
+
+            const stream = new ReadableStream<LanguageModelV3StreamPart>({
+                cancel: (reason) => reader.cancel(reason),
+                pull: async (controller) => {
+                    const buffered = head.shift();
+
+                    if (buffered) {
+                        controller.enqueue(buffered);
+
+                        return;
+                    }
+
+                    const { done, value } = await reader.read();
+
+                    if (done) {
+                        controller.close();
+                    } else {
+                        controller.enqueue(value);
+                    }
+                },
+            });
+
+            return { ...result, stream };
         }
-
-        const stream = new ReadableStream<LanguageModelV3StreamPart>({
-            cancel: (reason) => reader.cancel(reason),
-            pull: async (controller) => {
-                const buffered = head.shift();
-
-                if (buffered) {
-                    controller.enqueue(buffered);
-
-                    return;
-                }
-
-                const { done, value } = await reader.read();
-
-                if (done) {
-                    controller.close();
-                } else {
-                    controller.enqueue(value);
-                }
-            },
-        });
-
-        return { ...result, stream };
     }
 
-    /** A stopped run must not hop to the backup, whatever the error said, and a backup that cannot call tools cannot take a call that carries them. */
-    private shouldFallBack(error: unknown, options: LanguageModelV3CallOptions): boolean {
-        if (!isInfraFailure(error) || options.abortSignal?.aborted === true) {
-            return false;
-        }
-
-        // A call the backup could not take keeps the primary's own error.
-        return this.canTakeCall(options);
+    /** The model at `index`: -1 is the primary, and 0 and up index `backups`. */
+    private modelAt(index: number): LanguageModelV3 {
+        return index < 0 ? this.primary : this.backups[index]!.model;
     }
 
     /**
-     * The final word on whether the backup can take this call, whatever sizing and compression did before: it supports
-     * the tools and attachments in it (\`canServe\`), and the prompt fits its context window (the estimator and the
-     * 95% line the gateway's overflow rule uses). A prompt sized for a larger primary would only fail again on the backup.
+     * Where a call starts: the backup an earlier step landed on, when it can take this call; otherwise the primary, so a
+     * step that backup cannot take still gets the whole chain after the primary, earlier backups included.
      */
-    private canTakeCall(options: LanguageModelV3CallOptions): boolean {
-        if (!this.canServe({ hasTools: (options.tools?.length ?? 0) > 0, messages: options.prompt })) {
+    private firstAttempt(options: LanguageModelV3CallOptions): number {
+        return this.onBackup !== undefined && this.canTakeCall(this.onBackup, options) ? this.onBackup : -1;
+    }
+
+    /**
+     * The model to try after `index` failed with `error`, or a throw of that error: only an infrastructure failure moves on,
+     * a stopped run never does (checked before every hop), and a call no later backup can take keeps the error it got.
+     */
+    private nextAttempt(index: number, error: unknown, options: LanguageModelV3CallOptions): number {
+        if (!isInfraFailure(error) || options.abortSignal?.aborted === true) {
+            throw error;
+        }
+
+        const next = this.nextServing(index, options);
+
+        if (next === undefined) {
+            throw error;
+        }
+
+        streamLogger.warn(
+            `[FallbackModel] ${this.modelAt(index).modelId} failed with an infrastructure error, retrying on backup ${next + 1} of ${this.backups.length} (${this.modelAt(next).modelId}):`,
+            error,
+        );
+        this.onBackup = next;
+
+        return next;
+    }
+
+    /** The first backup after `index` that can take the call. */
+    private nextServing(index: number, options: LanguageModelV3CallOptions): number | undefined {
+        for (let next = index + 1; next < this.backups.length; next += 1) {
+            if (this.canTakeCall(next, options)) {
+                return next;
+            }
+        }
+
+        return undefined;
+    }
+
+    /**
+     * The final word on whether a backup can take this call, whatever sizing and compression did before: it supports
+     * the tools and attachments in it (\`backupCanServe\`), and the prompt fits its context window (the estimator and the
+     * 95% line the gateway's overflow rule uses). A prompt sized for a larger model would only fail again on it.
+     */
+    private canTakeCall(index: number, options: LanguageModelV3CallOptions): boolean {
+        const slot = this.backups[index]!;
+
+        if (!backupCanServe(slot.capabilities, { hasTools: (options.tools?.length ?? 0) > 0, messages: options.prompt })) {
             return false;
         }
 
-        return estimateTokens(options.prompt as never) <= getModelContextWindow(this.backup.modelId) * 0.95;
+        return estimateTokens(options.prompt as never) <= getModelContextWindow(slot.model.modelId) * 0.95;
     }
 
-    private optionsForBackup(options: LanguageModelV3CallOptions): LanguageModelV3CallOptions {
-        return { ...options, providerOptions: providerOptionsForBackup(options.providerOptions, this.backupTraits) };
-    }
-
-    private switchToBackup(error: unknown): void {
-        streamLogger.warn(`[FallbackModel] ${this.primary.modelId} failed with an infrastructure error, retrying on ${this.backup.modelId}:`, error);
-        this.active = this.backup;
-        this.onBackup = true;
+    private optionsFor(index: number, options: LanguageModelV3CallOptions): LanguageModelV3CallOptions {
+        return index < 0 ? options : { ...options, providerOptions: providerOptionsForBackup(options.providerOptions, this.backups[index]!.traits) };
     }
 }

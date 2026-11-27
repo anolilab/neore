@@ -49,6 +49,7 @@ import {
     eraseChatFileAccessForUser,
     eraseChatFileThreadsForUser,
     eraseStreamingMessagesForUser,
+    eraseGrantRevisionsForUser,
     eraseThreadSummariesForUser,
     eraseWorkflowExecutionsForProject,
     eraseWorkflowExecutionsForUser,
@@ -318,6 +319,12 @@ export const deleteUserThreadSummaries = internalMutation
     .output(vBatchResult)
     .mutation(async ({ args: { userId }, ctx: context }): Promise<BatchResult> => await eraseThreadSummariesForUser(context, userId));
 
+/** The revisions of grants the user held or gave, which outlive the grants (`agent/gdpr.ts`). */
+export const deleteUserGrantRevisions = internalMutation
+    .input({ userId: v.string() })
+    .output(vBatchResult)
+    .mutation(async ({ args: { userId }, ctx: context }): Promise<BatchResult> => await eraseGrantRevisionsForUser(context, userId));
+
 /** Streaming-message rows outlive their thread when a stream is abandoned (`agent/gdpr.ts`). */
 export const deleteUserStreamingMessages = internalMutation
     .input({ userId: v.string() })
@@ -482,7 +489,7 @@ export const deleteUserIdentity = internalMutation
                 const remainingMembers = await context.db.member.count({ organizationId });
                 const action = teamBillingOnAccountDeletion({ isPurchaser: purchasedIds.has(organizationId), remainingMembers });
 
-                await (action === "cancel" ? queueOrganizationBillingCancel(organizationId) : queueSeatSync(organizationId));
+                await (action === "cancel" ? queueOrganizationBillingCancel(organizationId, false) : queueSeatSync(organizationId));
             }),
         );
 

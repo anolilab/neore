@@ -23,6 +23,7 @@ import { toast } from "sonner";
 import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
 import { allowPromptQueueRestore, selectThreadQueue, usePromptQueueStore } from "@/features/chat/core/stores/prompt-queue-store";
 import { cleanPromptText } from "@/features/chat/core/utils/prompt-queue";
+import { useComposerPrefill } from "@/features/chat/thread/composer-prefill";
 import ContextUsageMeter from "@/features/chat/thread/context-usage-meter";
 import { useCRPC, useLunoraAuth } from "@/lib/lunora/crpc";
 
@@ -201,6 +202,8 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
     const refusals = useRef(0);
     // The box's text as the last change left it, read by a send that finishes after the person has typed.
     const boxText = useRef("");
+    // The fix prompts added while a direct send runs (`null` when none runs): they were not sent, so they outlast it.
+    const prefillsDuringSend = useRef<string[] | null>(null);
     // `mayBeTaken`: a send under the id failed in a way that does not say the backend refused it, so it may have started a turn.
     const attempt = useRef<{ id: string; mayBeTaken?: boolean; text: string } | undefined>(undefined);
     // Mirrors `attempt.current?.mayBeTaken` for render: a direct send whose answer was lost may be the turn running now.
@@ -467,7 +470,13 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
         }
 
         const refusalsBefore = refusals.current;
+
+        prefillsDuringSend.current = queuedId === undefined && draft !== undefined ? [] : null;
+
         const result = await sendHostMessage({ requestId, text: prompt, threadId });
+        const prefills = prefillsDuringSend.current ?? [];
+
+        prefillsDuringSend.current = null;
 
         if (result.ok) {
             // A direct send's retry id is spent when it lands; a queued message never used it, so the draft's id is kept.
@@ -481,10 +490,22 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
             dispatch({ duplicate: result.duplicate, itemId: queuedId, streamId: result.streamId, type: "accepted" });
 
             // Only a textarea send has a draft; Continue sends a fixed prompt and leaves the box alone. A draft typed while the
-            // send was pending is not the one sent: the box and any refusal stay as they are.
-            if (queuedId === undefined && draft !== undefined && boxText.current === draft) {
-                boxText.current = "";
-                setText("");
+            // send was pending is not the one sent: the box and any refusal stay as they are. A fix prompt added meanwhile
+            // (the header's chip) was not sent either, but the sent text before it was: that text goes, so it is not sent twice,
+            // and the prompts stay. If the draft was also edited, what is left is the sent message: only the prompts stay.
+            if (queuedId === undefined && draft !== undefined && (boxText.current === draft || prefills.length > 0)) {
+                const now = boxText.current;
+                const sent = draft.trimEnd();
+                let rest = "";
+
+                if (now !== draft) {
+                    rest = now.startsWith(sent) ? now.slice(sent.length).trimStart() : prefills.filter((prefill) => now.includes(prefill)).join("\n");
+                }
+
+                // An unchanged box gets no text effect to place the caret, so none waits for a later edit.
+                pendingCursor.current = rest === "" || rest === now ? undefined : rest.length;
+                boxText.current = rest;
+                setText(rest);
 
                 if (refusals.current === refusalsBefore) {
                     setRefusedPaste(false);
@@ -781,6 +802,30 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
         boxText.current = next.text;
         setText(next.text);
     };
+
+    // A fix prompt from the header's pull request chip (`composer-prefill.ts`): added after the draft, never sent, cleaned of
+    // hidden characters as typed text is. One that would make the draft too long to send is refused, as a command pick is.
+    useComposerPrefill(threadId, (prefill) => {
+        const { current } = boxText;
+        const { text: prompt } = stripHiddenText(prefill);
+
+        if (!current.includes(prompt)) {
+            const { text: clean } = stripHiddenText(current.trim() === "" ? prompt : `${current.trimEnd()}\n${prompt}`, { keepTrailingJoiner: true });
+
+            if (clean.length > MAX_HOST_PROMPT_CHARS) {
+                toast.error(messages.too_large);
+
+                return;
+            }
+
+            prefillsDuringSend.current?.push(prompt);
+            pendingCursor.current = clean.length;
+            boxText.current = clean;
+            setText(clean);
+        }
+
+        boxRef.current?.focus();
+    });
 
     // A caret move that lands in another slash query lists other commands: the highlight starts again at the first, as an edit does.
     // A move within the same query keeps it.

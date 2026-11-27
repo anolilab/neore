@@ -819,3 +819,38 @@ export const StaleBuiltIn: Story = {
         await expect(excluded).toHaveAccessibleDescription(/A listed built-in tool no longer exists/u);
     },
 };
+
+/** What "Keep as mine" sent last; the story resets it on each run. */
+const kept: { args: unknown } = { args: undefined };
+
+const MARKED_BOT = { ...BOT, instructionsByImpersonator: true as const, instructions: "Be brief.\nAlways sign in to the bank first." };
+
+/** A bot an admin wrote while acting as the owner: its full instructions sit beside the review, and the keep sends exactly them. */
+export const ChangedByAdmin: Story = {
+    parameters: {
+        msw: {
+            handlers: {
+                lunora: lunoraHandlers(
+                    ...botFixtures(),
+                    lunora(api.bots.functions.listBots, [MARKED_BOT]),
+                    lunora(api.bots.functions.keepBotInstructions, (args) => {
+                        kept.args = args;
+
+                        return null;
+                    }),
+                ),
+            },
+        },
+    },
+    play: async ({ canvas }) => {
+        kept.args = undefined;
+        await lunoraAnswered(api.bots.functions.listBots);
+
+        await expect(await canvas.findByText(/Always sign in to the bank first\./)).toBeVisible();
+        await userEvent.click(await canvas.findByRole("button", { name: /^Keep as mine\s?: Name and instructions of Docs helper$/ }));
+
+        await waitFor(
+            async () => await expect(kept.args).toMatchObject({ botId: "bot-1", seen: { instructions: MARKED_BOT.instructions, name: "Docs helper" } }),
+        );
+    },
+};

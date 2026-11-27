@@ -2,12 +2,37 @@ import { LunoraError, v } from "lunorash/server";
 
 import { buildUsageJson, spliceUsageJson, usageObjectKey } from "./usage-export-steps";
 import { readStoredText } from "../lib/storage-read";
+import {
+    CHAT_FILE_METADATA_CHUNK,
+    capChatFiles,
+    chatFileMeter,
+    chatFileSectionBudget,
+    collectAllChatFileMetadata,
+    grantRevisionsExportPageKey,
+    readAllGrantRevisionPages,
+    readChunkMetadata,
+    collectAllMessageFileIds,
+    textBytes,
+    walkIds,
+    withChatFiles,
+} from "../agent/export-pages";
 import { USAGE_EXPORT_BYTES } from "../usage/gdpr";
+import { callOnShard } from "../lib/cross-shard";
+import { collectOrganizationReplyPages } from "../usage/organization";
 import { collectAcpSessionPages } from "../acp/gdpr";
+import { BROWSER_EXPORT_BYTES, browserExportPageKey, readAllBrowserPages } from "../browser/export-pages";
+import { readAllTaskSuggestionPages, taskSuggestionsExportPageKey, taskSuggestionsSectionBudget } from "../tasks/export-pages";
 import { collectAllFeedback } from "../feedback/gdpr";
 import { collectAllTriggers } from "../triggers/export-pages";
 import { attachProjectRuleFiles, collectAllOwnedProjects, collectAllRepositories } from "../projects/export-pages";
-import { feedbackReadBudget, projectDetailsReadBudget, repositoriesReadBudget, threadFollowsReadBudget, triggerReadBudget } from "./read-budget";
+import {
+    chatFilesReadBudget,
+    feedbackReadBudget,
+    projectDetailsReadBudget,
+    repositoriesReadBudget,
+    threadFollowsReadBudget,
+    triggerReadBudget,
+} from "./read-budget";
 import { collectAllThreadFollows } from "../chat/follows/export-pages";
 import { internal } from "../_generated/internal";
 import type { Doc, Id } from "../_generated/dataModel";
@@ -17,6 +42,15 @@ import { queueEmail } from "../email/mailer";
 import { SITE_URL } from "../env";
 import { withDependency } from "../lib/dependency";
 import { storedPage, storedRows } from "../lib/stored-row";
+
+/**
+ * The organization ledger the export holds, in bytes. Past it the oldest rows are cut and the file says so (`organizationRepliesCut`), so
+ * the rest of the export still succeeds.
+ */
+const ORGANIZATION_REPLY_EXPORT_BYTES = 4 * 1024 * 1024;
+
+/** The stored usage object's keys and braces around its two arrays: a few dozen bytes, allowed for in the read limit. */
+const USAGE_OBJECT_WRAPPER_BYTES = 1024;
 
 const TRAILING_SLASH = /\/$/;
 
@@ -137,6 +171,7 @@ const projectThread = (
         Doc<"threads">,
         | "_creationTime"
         | "activeLeafMessageId"
+        | "archivedAt"
         | "category"
         | "lastViewedAt"
         | "model"
@@ -157,6 +192,8 @@ const projectThread = (
         // Where the user last pointed the branch switcher. Unset for a thread that never branched. A re-import
         // uses it to keep only the replies the user kept, rather than every alternative (`parsers/neore.ts`).
         activeLeafMessageId: thread.activeLeafMessageId,
+        // When the chat was last archived (set by any archive, kept on reopen). Unset for a chat never archived.
+        archivedAt: thread.archivedAt,
         category: thread.category,
         createdAt: thread._creationTime,
         lastViewedAt: thread.lastViewedAt,
@@ -239,6 +276,21 @@ export const collectConversations = internalAction.input({ userId: v.string() })
             text?: string;
             tool?: boolean;
         }[];
+        /** The owner's own pins on the thread: what each pins, the note on it and the text it quotes (`chat/pins/functions.ts`). */
+        pins: {
+            _id: string;
+            createdAt: number;
+            documentId?: string;
+            documentKind?: string;
+            imageIndex?: number;
+            imageKey?: string;
+            kind?: "document" | "image" | "message";
+            messageId?: string;
+            messageRole: string;
+            note?: string;
+            selectedText?: string;
+            updatedAt: number;
+        }[];
         thread: {
             _id: string;
             activeLeafMessageId?: string;
@@ -273,7 +325,7 @@ export const collectConversations = internalAction.input({ userId: v.string() })
 
         // Process current batch of threads
         for (const listed of threads.page) {
-            let collected: Omit<(typeof conversations)[number], "guestLinks" | "guestNotes"> | undefined;
+            let collected: Omit<(typeof conversations)[number], "guestLinks" | "guestNotes" | "pins"> | undefined;
 
             try {
                 // A locked chat is listed as its stub (no title, no model, no tags). The export
@@ -337,7 +389,12 @@ export const collectConversations = internalAction.input({ userId: v.string() })
                         ? []
                         : await readAllPages(async (cursor) => await context.runQuery(internal.chat.guest_links.listGuestNotesForExport, { cursor, threadId }));
 
-                conversations.push({ ...collected, guestLinks, guestNotes });
+                // The owner's pins, read by the owner's id: a pin someone else made on a shared thread is theirs to export.
+                const pins = await readAllPages(
+                    async (cursor) => await context.runQuery(internal.chat.pins.functions.listPinsForExport, { cursor, threadId, userId }),
+                );
+
+                conversations.push({ ...collected, guestLinks, guestNotes, pins });
             }
         }
 
@@ -355,6 +412,105 @@ export const collectConversations = internalAction.input({ userId: v.string() })
 
     return conversations;
 });
+
+/**
+ * The pins the caller made on threads other people shared with them. Such a thread and its pins live on its owner's shard, so the
+ * pins are read there, page by page, by the caller's own id. A thread's pins that the caller made nothing on are left out.
+ */
+export const collectSharedPins = internalAction.input({ userId: v.string() }).action(async ({ args: { userId }, ctx: context }) => {
+    const routes = await readAllPages(async (cursor) => await context.runQuery(internal.chat.pins.functions.listSharedPinRoutesForExport, { cursor, userId }));
+    const shared: { pins: unknown[]; threadId: string; unreadable?: true }[] = [];
+
+    const seen = new Set<string>();
+
+    for (const route of routes) {
+        // A thread is read once, even if two routes name it (a replica can miss the first insert).
+        if (seen.has(route.threadId)) {
+            continue;
+        }
+
+        seen.add(route.threadId);
+
+        let pins: unknown[];
+
+        try {
+            pins = await readAllPages(
+                async (cursor) =>
+                    await callOnShard(
+                        internal.chat.pins.functions.listPinsForExport,
+                        { cursor, threadId: route.threadId as Id<"threads">, userId },
+                        { shardKey: route.ownerId },
+                    ),
+            );
+        } catch (error) {
+            // One owner's shard that cannot be read (an unreachable shard, a thread removed mid-read) must not fail the whole export:
+            // the thread is listed as unreadable, so the file says its pins were not included rather than dropping them silently.
+            gdprLogger.error(`Failed to read shared pins for thread ${route.threadId}:`, error);
+            shared.push({ pins: [], threadId: route.threadId, unreadable: true });
+            continue;
+        }
+
+        if (pins.length > 0) {
+            shared.push({ pins, threadId: route.threadId });
+        }
+    }
+
+    return shared;
+});
+
+/**
+ * Erases the caller's pins on the threads other people own, from each owner's shard, before the routes that find them are removed
+ * (`gdpr/workflows/deletion-workflow.ts`). A collaborator's pins are written on the owner's shard, so the caller's own shard holds none.
+ *
+ * One page of routes per call, so no result carries every owner at once: the workflow repeats the call from `cursor` while `hasMore`.
+ */
+export const erasePinsOnOwnerShards = internalAction
+    .input({ cursor: v.union(v.string(), v.null()), userId: v.string() })
+    .output(v.object({ cursor: v.union(v.string(), v.null()), hasMore: v.boolean(), owners: v.array(v.string()) }))
+    .action(async ({ args: { cursor, userId }, ctx: context }) => {
+        const result = await context.runQuery(internal.chat.pins.functions.listSharedPinRoutesForExport, { cursor, userId });
+        const routes = result.page;
+        const owners = [...new Set(routes.map((route) => route.ownerId))];
+
+        // Each owner shard is fenced before it is swept, and stays fenced until the routes are gone (`releasePinFences`): a pin write of
+        // this account on that shard is refused in its own transaction for the whole erasure, so nothing it commits can escape the sweep.
+        for (const ownerId of owners) {
+            await callOnShard(internal.lib.account_moves.fencePinsOnShardFor, { userId }, { shardKey: ownerId });
+        }
+
+        for (const route of routes) {
+            // One batch per call on the owner's shard: repeat until none is left.
+            let more = true;
+
+            while (more) {
+                const erased = await callOnShard(
+                    internal.chat.pins.functions.eraseUserPinsOnThread,
+                    { threadId: route.threadId as Id<"threads">, userId },
+                    { shardKey: route.ownerId },
+                );
+
+                more = erased.hasMore;
+            }
+        }
+
+        return { cursor: result.continueCursor, hasMore: !result.isDone, owners };
+    });
+
+/**
+ * Lifts the erasure's fences on the owner shards (`gdpr/workflows/deletion-workflow.ts`), before the routes are drained: the owners are
+ * read from those routes, so a fresh instance could not find them afterwards. A pin write is still refused once lifted, since the erasing
+ * marker is live until the erasure ends. The workflow calls it in batches of owners.
+ */
+export const releasePinFences = internalAction
+    .input({ owners: v.array(v.string()), userId: v.string() })
+    .output(v.null())
+    .action(async ({ args: { owners, userId } }) => {
+        for (const ownerId of owners) {
+            await callOnShard(internal.lib.account_moves.unfencePinsOnShardFor, { userId }, { shardKey: ownerId });
+        }
+
+        return null;
+    });
 
 export const collectFiles = internalQuery
     .input({ userId: v.string() })
@@ -385,6 +541,7 @@ export const collectFiles = internalQuery
                 v.object({
                     createdAt: v.number(),
                     label: v.optional(v.string()),
+                    signInUrl: v.optional(v.string()),
                     site: v.string(),
                     teammateIds: v.array(v.id("bots")),
                     updatedAt: v.number(),
@@ -433,6 +590,7 @@ export const collectFiles = internalQuery
                 return {
                     createdAt: login.createdAt,
                     label: login.label,
+                    signInUrl: login.signInUrl,
                     site: login.origin,
                     teammateIds: login.teammateIds ?? [],
                     updatedAt: login.updatedAt,
@@ -559,6 +717,12 @@ export const generateExportFile = internalAction
         // Bots, their persona and computer settings (`bots/gdpr.ts`). Optional for
         // the same in-flight-replay reason as `threadTags`.
         bots: v.optional(v.any()),
+        // The workflow stopped at `BROWSER_EXPORT_PAGES` with history left: the section is marked as cut.
+        browserCut: v.optional(v.boolean()),
+        // How many browser pages the workflow stored under `browserPrefix` (`browser/export-pages.ts`), read here. Optional for
+        // the same in-flight-replay reason as `threadTags`.
+        browserPages: v.optional(v.number()),
+        browserPrefix: v.optional(v.string()),
         // Coding-agent runs (`coding-agents/gdpr.ts`). Optional for the same
         // in-flight-replay reason as `threadTags`.
         codingAgentRuns: v.optional(v.any()),
@@ -570,6 +734,11 @@ export const generateExportFile = internalAction
         // the same in-flight-replay reason as `threadTags`.
         evals: v.optional(v.any()),
         files: v.any(),
+        // How many grant-revision pages the workflow stored under `browserPrefix` (`agent/export-pages.ts`), every one of them,
+        // read here. Optional for the same in-flight-replay reason as `threadTags`: absent is no page.
+        grantRevisionPages: v.optional(v.number()),
+        // The owner's Events log: their run and approval events (`public-api/gdpr.ts`). Optional for the same reason.
+        mcpEvents: v.optional(v.any()),
         // Memories (superseded history included) and reflection digests
         // (`memory/gdpr.ts`). Optional for the same in-flight-replay reason as `threadTags`.
         memories: v.optional(v.any()),
@@ -596,9 +765,16 @@ export const generateExportFile = internalAction
         // The outbound run webhook's URL and switch, never its secret (`run-webhooks/gdpr.ts`). Optional for the same reason.
         runWebhooks: v.optional(v.any()),
         settings: v.any(),
+        // The pins the caller made on threads shared with them, read from each owner's shard (`collectSharedPins`). Optional for
+        // the same in-flight-replay reason as `threadTags`.
+        sharedThreadPins: v.optional(v.any()),
         // Goals and tasks with their run history (`tasks/gdpr.ts`). Optional for
         // the same in-flight-replay reason as `threadTags`.
         tasks: v.optional(v.any()),
+        // How many suggestion pages the workflow stored under `browserPrefix` (`tasks/export-pages.ts`), read here, and whether the
+        // history went on past its page cap. Optional so a step queued with an earlier signature still validates: absent is no page.
+        taskSuggestionPages: v.optional(v.number()),
+        taskSuggestionsCut: v.optional(v.boolean()),
         // Optional so an export workflow already in flight when this shipped
         // still replays against the new signature.
         threadTags: v.optional(v.any()),
@@ -612,9 +788,14 @@ export const generateExportFile = internalAction
     })
     .action(async ({ args, ctx: context }) => {
         const activity = args.activity as { knowledgeCollections?: unknown[]; subAgentRuns?: unknown[]; usageDaily?: unknown[] } | undefined;
-        // The usage JSON, already read and checked by `prepareUsageForExport` in its own action. It is spliced into the file as
-        // text, so this action does not read it against its own budget.
-        const usageJson = args.usageKey === undefined ? undefined : await readStoredText(context.storage, args.usageKey, { maxBytes: USAGE_EXPORT_BYTES });
+        // The usage JSON, already read and checked by `prepareUsageForExport` in its own action: the usage rows and the organization ledger.
+        // It is spliced into the file as text, so this action does not read it against its own budget.
+        const usageJson =
+            args.usageKey === undefined
+                ? undefined
+                : await readStoredText(context.storage, args.usageKey, {
+                      maxBytes: USAGE_EXPORT_BYTES + ORGANIZATION_REPLY_EXPORT_BYTES + USAGE_OBJECT_WRAPPER_BYTES,
+                  });
         // Read here, a page per query, so no workflow step result or action argument carries the history.
         const acpSessions =
             args.acpSessions ??
@@ -689,9 +870,86 @@ export const generateExportFile = internalAction
             ),
             PROJECT_CONTEXT_EXPORT_BYTES,
         );
+        // The browser pages, read from their objects, so neither this action's arguments nor its read budget carry them.
+        // Held to its share of the file: past it the section is cut and says so, and the rest of the export is written.
+        const { browserCut, browserPages, browserPrefix } = args;
+        const grantRevisionPages = args.grantRevisionPages ?? 0;
+
+        // The revisions of the grants the user held, every page the workflow stored under the run's prefix (`agent/export-pages.ts`),
+        // read from their objects: none is cut, and neither this action's arguments nor its read budget carry them.
+        // A count of pages with nowhere to read them from fails the export rather than writing it without them.
+        if (browserPrefix === undefined && grantRevisionPages > 0) {
+            throw new Error("The grant revisions' pages were stored without a prefix to read them from");
+        }
+
+        const grantRevisions =
+            browserPrefix === undefined
+                ? { revisions: [] }
+                : await readAllGrantRevisionPages(
+                      async (page) => await readStoredText(context.storage, grantRevisionsExportPageKey(browserPrefix, page), { maxBytes: MAX_EXPORT_BYTES }),
+                      grantRevisionPages,
+                  );
+        const taskSuggestionPages = args.taskSuggestionPages ?? 0;
+
+        // The task suggestions, every page the workflow stored under the run's prefix (`tasks/export-pages.ts`), read from their objects.
+        // A count of pages with nowhere to read them from fails the export rather than writing it without them.
+        if (browserPrefix === undefined && taskSuggestionPages > 0) {
+            throw new Error("The task suggestions' pages were stored without a prefix to read them from");
+        }
+
+        const browser =
+            browserPrefix === undefined || browserPages === undefined
+                ? { actions: [], extensions: [], humanChecks: [], sessions: [] }
+                : await readAllBrowserPages(
+                      async (page) => await readStoredText(context.storage, browserExportPageKey(browserPrefix, page), { maxBytes: MAX_EXPORT_BYTES }),
+                      browserPages,
+                      BROWSER_EXPORT_BYTES,
+                      browserCut === true,
+                  );
+        // The user's chat files (uploads and generated images), metadata only: the files behind their grants and the files their messages
+        // name (`agent/export-pages.ts`), read here a page per query, as the sections above are. The walks and the metadata reads share
+        // one budget of bytes and queries, what every section above left of the action's read budget (`read-budget.ts`); past it the
+        // section is cut and flagged. The grants' metadata is read before the message walk, so a long history cannot leave them out.
+        const chatFileRead = await collectAllChatFileMetadata(
+            async (meter) =>
+                await walkIds(
+                    async (cursor) => await context.runQuery(internal.agent.gdpr.collectGrantedChatFileIdsForExport, { cursor, userId: args.userId }),
+                    meter,
+                ),
+            async (meter) =>
+                await collectAllMessageFileIds(
+                    async (cursor) => await context.runQuery(internal.agent.gdpr.collectThreadIdsForExport, { cursor, userId: args.userId }),
+                    async (threadId, cursor) =>
+                        await context.runQuery(internal.agent.gdpr.collectMessageFileIdsForExport, { cursor, threadId: threadId as Id<"threads"> }),
+                    meter,
+                ),
+            // A file with no metadata row (stored before it was written) is repaired here, from its file row (`agent/gdpr.ts`).
+            async (fileIds, bytesLeft, queriesLeft) =>
+                await readChunkMetadata(
+                    fileIds,
+                    bytesLeft,
+                    queriesLeft,
+                    async (ids) => await context.runQuery(internal.agent.gdpr.chatFileMetadataForExport, { fileIds: ids as Id<"chatFiles">[] }),
+                    // One file per repair mutation (`readChunkMetadata`): each reads its file row whole.
+                    async (id) => await context.runMutation(internal.agent.gdpr.repairChatFileMetadataForExport, { fileIds: [id as Id<"chatFiles">] }),
+                ),
+            CHAT_FILE_METADATA_CHUNK,
+            chatFileMeter(
+                chatFilesReadBudget(
+                    earlierReadBytes +
+                        repositories.readBytes +
+                        feedback.readBytes +
+                        ownedProjects.readBytes +
+                        threadFollows.readBytes +
+                        triggers.readBytes +
+                        ownedWithRules.readBytes,
+                ),
+            ),
+        );
         const exportData = {
             acpSessions,
             bots: args.bots ?? { bots: [] },
+            browser,
             codingAgentRuns: args.codingAgentRuns ?? [],
             conversations: args.conversations,
             dataSubject: {
@@ -704,7 +962,9 @@ export const generateExportFile = internalAction
             exportVersion: "1.0",
             feedback: feedback.section,
             files: args.files,
+            grantRevisions,
             knowledgeCollections: activity?.knowledgeCollections ?? [],
+            mcpEvents: args.mcpEvents ?? { events: [] },
             memories: args.memories ?? { digests: [], memories: [] },
             notifications: args.notifications ?? { notifications: [], pushSubscriptions: [] },
             pages: args.pages ?? { comments: [], favorites: [], grants: [], pages: [] },
@@ -717,18 +977,49 @@ export const generateExportFile = internalAction
             reviewDrafts: args.reviewDrafts ?? { drafts: [] },
             runWebhooks: args.runWebhooks ?? { runWebhooks: [] },
             settings: args.settings,
+            sharedThreadPins: args.sharedThreadPins ?? [],
             subAgentRuns: activity?.subAgentRuns ?? [],
+            // The suggestion history is added below, once what the rest of the file leaves for it is known.
             tasks: args.tasks ?? { goals: [], tasks: [] },
             threadFollows: threadFollows.section,
             threadTags: args.threadTags ?? [],
             triggers: { triggers: triggers.triggers },
-            // An export from before the usage pieces existed carries its rows in `activity`; otherwise the usage JSON is spliced in below.
-            ...(usageJson === undefined && { usageDaily: activity?.usageDaily ?? [] }),
+            // An export from before the usage pieces existed carries its rows in `activity`, and no ledger; otherwise the usage JSON is spliced
+            // in below, with the ledger.
+            ...(usageJson === undefined && { organizationReplies: [], organizationRepliesCut: false, usageDaily: activity?.usageDaily ?? [] }),
+            // A usage JSON stored before the ledger was in it holds the rows alone: the ledger is then empty, and nothing was cut.
+            ...(usageJson?.startsWith("[") && { organizationReplies: [], organizationRepliesCut: false }),
             watchedRepositories: args.watchedRepositories ?? { watched: [] },
         };
 
-        const head = JSON.stringify(exportData, null, 2);
-        // The usage JSON is an array already, so it is written as the file's last key rather than parsed and serialized again.
+        const usageBytes = usageJson === undefined ? 0 : textBytes(usageJson);
+        // The task suggestions, every page the workflow stored under the run's prefix (`tasks/export-pages.ts`), read from their objects.
+        // They take what every section above leaves under the file's size limit (usage JSON included), up to their own share: past it the
+        // history is cut and flagged (`taskSuggestionsCut`: the rows after the last page kept, accepted ones first, are left out) and the export is
+        // still written. The chat-file section below takes what is left after them.
+        const suggestions =
+            browserPrefix === undefined
+                ? { cut: false, taskSuggestions: [] }
+                : await readAllTaskSuggestionPages(
+                      async (page) => await readStoredText(context.storage, taskSuggestionsExportPageKey(browserPrefix, page), { maxBytes: MAX_EXPORT_BYTES }),
+                      taskSuggestionPages,
+                      taskSuggestionsSectionBudget(textBytes(JSON.stringify(exportData, null, 2)) + usageBytes, MAX_EXPORT_BYTES),
+                      args.taskSuggestionsCut === true,
+                  );
+
+        // The rest of the export, serialized without the chat-file section. The section takes what the rest leaves under the file's size
+        // limit (usage JSON included, as it is spliced in), so the file is never written past it: a large history is cut and flagged.
+        const rest = JSON.stringify(
+            { ...exportData, tasks: { ...exportData.tasks, taskSuggestions: suggestions.taskSuggestions, taskSuggestionsCut: suggestions.cut } },
+            null,
+            2,
+        );
+        const restBytes = textBytes(rest) + usageBytes;
+        const chatFileCapped = capChatFiles(chatFileRead.rows, chatFileSectionBudget(restBytes, MAX_EXPORT_BYTES));
+        // Cut by the byte cap, by the file's size limit or by the read budget: each way the section says so.
+        const chatFiles = { files: chatFileCapped.files, truncated: chatFileCapped.truncated || chatFileRead.truncated };
+        const head = withChatFiles(rest, chatFiles);
+        // The usage JSON is written as the file's last keys rather than parsed and serialized again.
         const jsonString = usageJson === undefined ? head : spliceUsageJson(head, usageJson);
         const blob = new Blob([jsonString], { type: "application/json" });
 
@@ -775,8 +1066,18 @@ export const prepareUsageForExport = internalAction
             return null;
         }
 
+        // The organization ledger, read here in this action's own read budget, a page at a time on the member's shard: its newest rows that fit
+        // the budget (`organizationRepliesCut` says whether older ones were left out). It is stored in the usage object, so its record, its
+        // confirmation and its purge are the usage object's.
+        const ledger = await collectOrganizationReplyPages(
+            async (cursor) => await callOnShard(internal.usage.organization.collectOrganizationRepliesForExport, { cursor, userId }, { shardKey: userId }),
+            ORGANIZATION_REPLY_EXPORT_BYTES,
+        );
+
         const key = usageObjectKey(requestId);
-        const blob = new Blob([text], { type: "application/json" });
+        const blob = new Blob([`{"usageDaily":${text},"organizationReplies":${JSON.stringify(ledger.rows)},"organizationRepliesCut":${String(ledger.cut)}}`], {
+            type: "application/json",
+        });
 
         // Recorded before the object is written, so a run that dies after this is found by the sweep (`usage/gdpr.ts`).
         await context.runMutation(internal.usage.gdpr.recordUsageFile, { key, requestId, userId });

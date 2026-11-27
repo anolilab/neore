@@ -34,7 +34,7 @@ export interface UsagePageSummary {
  * clear the pieces.
  */
 export interface UsageExportIo {
-    clear: (name: string) => Promise<{ hasMore: boolean }>;
+    clear: (name: string, keepRun: boolean) => Promise<{ hasMore: boolean }>;
     clearVerified: (name: string, pass: number) => Promise<{ hasMore: boolean }>;
     countRows: (name: string, args: { cursor: string | null; cutoff: string }) => Promise<{ backfill: string; closed: ClosedTotals; cursor: string | null }>;
     pause: (name: string) => Promise<void>;
@@ -92,7 +92,7 @@ export const collectUsageExport = async (io: UsageExportIo): Promise<{ pass: num
             const counted = await countPass(io, pass, cutoff);
 
             if (pages.backfillMoved || counted.backfillMoved || !sameTotals(counted.totals, pages.closed) || counted.backfill !== pages.backfill) {
-                await clearUsagePieces(io, `usage-p${String(pass)}-discard`);
+                await clearUsagePieces(io, `usage-p${String(pass)}-discard`, true);
                 continue;
             }
 
@@ -105,7 +105,7 @@ export const collectUsageExport = async (io: UsageExportIo): Promise<{ pass: num
             const final = await countPass(io, pass, cutoff, "final");
 
             if (final.backfillMoved || !sameTotals(final.totals, pages.closed) || final.backfill !== pages.backfill) {
-                await clearUsagePieces(io, `usage-p${String(pass)}-discard`);
+                await clearUsagePieces(io, `usage-p${String(pass)}-discard`, true);
                 continue;
             }
 
@@ -116,11 +116,14 @@ export const collectUsageExport = async (io: UsageExportIo): Promise<{ pass: num
     throw new UsageExportError("changed");
 };
 
-/** Clears a run's pieces: one batch per step, until none is left. */
-export const clearUsagePieces = async (io: UsageExportIo, label = "usage-clear"): Promise<void> => {
+/**
+ * Clears a run's pieces: one batch per step, until none is left. A discarded pass keeps the run's record (`keepRun`): the run goes on,
+ * and its browser pages are already stored, so a run killed before its next piece is still found by the sweep.
+ */
+export const clearUsagePieces = async (io: UsageExportIo, label = "usage-clear", keepRun = false): Promise<void> => {
     for (let round = 0; ; round += 1) {
         const name = `${label}-${String(round)}`;
-        const { hasMore } = await io.step(name, async () => await io.clear(name));
+        const { hasMore } = await io.step(name, async () => await io.clear(name, keepRun));
 
         if (!hasMore) {
             return;
@@ -356,13 +359,28 @@ export const assembleUsageExport = async (
 };
 
 /**
- * The export file's JSON with the usage array as its last key. `head` is the file's JSON without usage (its object, closed by
- * its final brace); `usageJson` is the usage array, already JSON. The usage is spliced in as text, so it is not parsed again.
+ * The export file's JSON with `name` as its last key, its value already JSON. `head` is the file's JSON so far (its object, closed by
+ * its final brace); `json` is the value, spliced in as text so it is not parsed again.
  */
-export const spliceUsageJson = (head: string, usageJson: string): string => {
+export const spliceArrayKey = (head: string, name: string, json: string): string => {
     const open = head.slice(0, head.lastIndexOf("}")).trimEnd();
 
-    return `${open},\n  "usageDaily": ${usageJson}\n}`;
+    return `${open},\n  "${name}": ${json}\n}`;
+};
+
+/**
+ * The export file's JSON with the usage as its last keys. `usage` is the stored usage JSON: an object of its members (`usageDaily`
+ * and `organizationReplies`, from `prepareUsageForExport`), whose members are spliced in; or, for a usage object stored before the
+ * ledger was in it, the usage array alone, spliced as `usageDaily`.
+ */
+export const spliceUsageJson = (head: string, usage: string): string => {
+    if (usage.startsWith("[")) {
+        return spliceArrayKey(head, "usageDaily", usage);
+    }
+
+    const open = head.slice(0, head.lastIndexOf("}")).trimEnd();
+
+    return `${open},\n  ${usage.slice(1, -1).trim()}\n}`;
 };
 
 /**

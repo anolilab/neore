@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { loadHomeOverview } from "../../home/overview";
 import schema from "../../schema";
-import { recordPendingToolApprovals } from "../tool-permissions";
+import { MAX_APPROVAL_ID_LENGTH, recordPendingToolApprovals } from "../tool-permissions";
 import { claimToolApproval, collectApprovalRequestIds } from "./tool-approval-claim";
 import { PENDING_APPROVAL_TTL_MS } from "./tool-approval-cleanup";
 
@@ -236,6 +236,29 @@ describe("a collaborator's paused turn", () => {
 
         expect(home.approvals.map((approval: { approvalId: string }) => approval.approvalId)).toContain("approval-2");
         await expect(claim(OWNER, "approve", "approval-2")).resolves.toMatchObject({ kind: "claimed", ownerId: OWNER });
+    });
+});
+
+describe("the Events log's record of a pause", () => {
+    it("keeps an id an answer accepts as an event, and records none for one past the answer's limit", async () => {
+        const longId = "a".repeat(MAX_APPROVAL_ID_LENGTH + 1);
+        const shortId = "a".repeat(MAX_APPROVAL_ID_LENGTH);
+
+        await insertMessage(2, { content: "tidy up", role: "user" });
+        await insertMessage(3, assistantWithRequest(shortId), true);
+        await insertMessage(4, { content: "again", role: "user" });
+        await insertMessage(5, assistantWithRequest(longId), true);
+
+        const count = async (approvalIds: string[]) => {
+            await harness.run(async (ctx: any) => await ctx.runMutation(recordPendingToolApprovals, { approvalIds, config: CONFIG, threadId, userId: OWNER }));
+
+            const events = await harness.run(async (ctx: any) => await ctx.db.query("mcpEvents").collect());
+
+            return events.length;
+        };
+
+        expect(await count([shortId])).toBe(1);
+        expect(await count([longId])).toBe(1);
     });
 });
 
