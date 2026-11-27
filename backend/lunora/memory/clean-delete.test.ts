@@ -337,20 +337,50 @@ describe("deleting a memory", () => {
         // The oldest rows are still there until the follow-up runs.
         expect(await rowOf(first)).not.toBeNull();
 
-        // That job is lost: once the record is due, the sweep arms another.
+        // That job is lost: once the record is due, the sweep arms another, and that one completes the cleanup.
         await ageCleanups();
         await sweep();
         expect(continuationJobs()).toHaveLength(2);
 
-        await runCleanup(continuationJobs()[0]?.args);
+        await runCleanup(continuationJobs()[1]?.args);
 
         expect(await rowOf(first)).toBeNull();
         expect(await memoryCount()).toBe(0);
         expect(await cleanups()).toHaveLength(0);
 
-        // The other job finds the record gone and does nothing.
-        await runCleanup(continuationJobs()[1]?.args);
+        // The original job turns up late, finds the record gone and does nothing.
+        await runCleanup(continuationJobs()[0]?.args);
         expect(await memoryCount()).toBe(0);
+        expect(await cleanups()).toHaveLength(0);
+    });
+
+    it("keeps the summary of a digest saved after the delete while a long chain goes on", async () => {
+        const START = 1_800_000_000_000;
+
+        vi.useFakeTimers({ now: START, toFake: ["Date"] });
+
+        const origin = await seed("version 0");
+        let newest = origin.memoryId;
+
+        for (let index = 1; index <= 105; index += 1) {
+            newest = await supersede(newest, `version ${index}`);
+        }
+
+        await asOwner().mutation(deleteMemory as never, { memoryId: newest } as never);
+
+        // A digest the reflection saves after the delete, before the rest of the chain is erased.
+        const fresh = await insertDigest([], "Learned that you like jasmine tea.", START + 1000);
+
+        vi.setSystemTime(START + 60_000);
+        await runCleanup(continuationJobs()[0]?.args);
+
+        // The chain is done, and the digest, written after the delete began, kept its summary.
+        expect(await memoryCount()).toBe(0);
+        expect(await cleanups()).toHaveLength(0);
+
+        const digest = await run(async (ctx) => await ctx.db.get("memoryDigests", fresh));
+
+        expect(digest?.summary).toBe("Learned that you like jasmine tea.");
     });
 });
 

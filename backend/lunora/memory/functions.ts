@@ -614,7 +614,8 @@ const eraseOlderVersions = async (
     userId: string,
     frontier: ReadonlyArray<Id<"memories">>,
     deleted: ReadonlyArray<string>,
-    cleanupId?: Id<"memoryCleanups">,
+    cleanupId: Id<"memoryCleanups"> | undefined,
+    startedAt: number,
 ): Promise<{ cleanupId: Id<"memoryCleanups"> | null; olderVersions: number }> => {
     const removed = new Set<string>(deleted);
     const pending: Id<"memories">[] = [];
@@ -657,7 +658,7 @@ const eraseOlderVersions = async (
     }
 
     // A step that removed nothing (the rest of a walk that ended) has nothing to take out of the digests.
-    const digestsCursor = removed.size > 0 ? await removeFromDigests(ctx, userId, removed, { cursor: null, startedAt: ctx.now }) : null;
+    const digestsCursor = removed.size > 0 ? await removeFromDigests(ctx, userId, removed, { cursor: null, startedAt }) : null;
 
     if (digestsCursor !== null) {
         // More digests than one write cleans: the rest is a record of its own, which carries the ids to take out.
@@ -667,7 +668,7 @@ const eraseOlderVersions = async (
             dueAt,
             ids: [...removed],
             kind: "digests",
-            startedAt: ctx.now,
+            startedAt,
             userId,
         });
 
@@ -696,7 +697,7 @@ const eraseOlderVersions = async (
         return { cleanupId, olderVersions };
     }
 
-    return { cleanupId: await ctx.db.insert("memoryCleanups", { dueAt, frontier: pending, kind: "chain", userId }), olderVersions };
+    return { cleanupId: await ctx.db.insert("memoryCleanups", { dueAt, frontier: pending, kind: "chain", startedAt, userId }), olderVersions };
 };
 
 /**
@@ -717,7 +718,7 @@ export const stepMemoryCleanup = internalMutation
         }
 
         if (row.kind === "chain") {
-            const next = await eraseOlderVersions(ctx, row.userId, row.frontier ?? [], [], row._id);
+            const next = await eraseOlderVersions(ctx, row.userId, row.frontier ?? [], [], row._id, row.startedAt ?? ctx.now);
 
             return { again: next.cleanupId !== null, failed: false, userId: row.userId };
         }
@@ -865,7 +866,7 @@ export const deleteMemory = authMutation
 
         await removeMemoryRow(context, memory, userId);
 
-        const { cleanupId, olderVersions } = await eraseOlderVersions(context, userId, [memory._id], [memory._id]);
+        const { cleanupId, olderVersions } = await eraseOlderVersions(context, userId, [memory._id], [memory._id], undefined, context.now);
 
         if (cleanupId) {
             await armMemoryCleanup(context.scheduler, cleanupId, userId, 0);
