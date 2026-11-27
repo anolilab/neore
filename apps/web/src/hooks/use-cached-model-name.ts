@@ -14,7 +14,9 @@ import type { GatewayModelsResponse } from "./use-gateway-models";
 const useCachedModelName = (modelId: string | undefined): string | undefined => {
     const queryClient = useQueryClient();
     const subscribe = useCallback((onChange: () => void) => queryClient.getQueryCache().subscribe(onChange), [queryClient]);
-    const catalog = useSyncExternalStore(subscribe, () => queryClient.getQueryData<GatewayModelsResponse>(GATEWAY_MODELS_QUERY_KEY));
+    const read = () => queryClient.getQueryData<GatewayModelsResponse>(GATEWAY_MODELS_QUERY_KEY);
+    // The server renders from the same cache, so it reads the same snapshot.
+    const catalog = useSyncExternalStore(subscribe, read, read);
 
     return modelId === undefined ? undefined : catalog?.data.find((model) => model.id === modelId)?.name;
 };

@@ -1671,7 +1671,7 @@ describe("main window reveal and saved state", () => {
             const finished = (): void => guardOf(win, "did-finish-load")?.({ preventDefault: () => {} }, "");
             const appearanceFile = path.join(userData, APPEARANCE_FILE);
 
-            expect(win.options).toMatchObject({ backgroundColor: "#f2f2f2" });
+            expect(win.options).toMatchObject({ backgroundColor: "#f0efeb" });
 
             win.webContents.loadURL("data:text/html,recovery");
             finished();

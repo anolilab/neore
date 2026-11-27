@@ -207,7 +207,7 @@ export const WebPreviewConsole = ({ children, className, logs = EMPTY_LOGS, ...p
                                 className={cn(
                                     "text-xs",
                                     log.level === "error" && "text-destructive",
-                                    log.level === "warn" && "text-yellow-700 dark:text-yellow-500",
+                                    log.level === "warn" && "text-yellow-800 dark:text-yellow-500",
                                     log.level === "log" && "text-foreground",
                                 )}
                                 key={`${log.timestamp.getTime()}-${index}`}

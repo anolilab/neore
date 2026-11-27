@@ -41,7 +41,7 @@ const DeleteAccountCardView = ({ className, classNames, isPending }: Omit<Delete
     // Deletion runs as the GDPR workflow, which starts erasing as soon as it is
     // requested — there is no grace period to cancel within. While it runs the
     // account still signs in, so say so instead of offering a second request.
-    const { data: gdprStatus } = useQuery(crpc.gdpr.functions.getGdprStatus.queryOptions({}));
+    const { data: gdprStatus, isPending: isStatusPending } = useQuery(crpc.gdpr.functions.getGdprStatus.queryOptions({}));
     const deletionStatus = gdprStatus?.deletion?.status;
     const isDeletionInProgress = deletionStatus === "pending" || deletionStatus === "processing";
 
@@ -52,7 +52,8 @@ const DeleteAccountCardView = ({ className, classNames, isPending }: Omit<Delete
                     control={
                         <Button
                             className={cn(classNames?.button, classNames?.destructiveButton)}
-                            disabled={isDeletionInProgress}
+                            // Not before the card and the deletion status have loaded: one may already be running.
+                            disabled={isPending || isStatusPending || isDeletionInProgress}
                             onClick={() => {
                                 setShowDialog(true);
                             }}

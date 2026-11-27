@@ -36,7 +36,7 @@ export type AccentPreset = {
 };
 
 /** Surfaces from `global.css` — `--brand-frost` / `--brand-white` (light), `--brand-ink` / `--card` (dark). */
-const LIGHT_SURFACES = { background: "#f2f2f2", card: "#ffffff" } as const;
+const LIGHT_SURFACES = { background: "#f0efeb", card: "#fffefc" } as const;
 const DARK_SURFACES = { background: "#0e0f11", card: "#16181b" } as const;
 
 const WHITE = "#ffffff";

@@ -37,7 +37,7 @@ const SURFACES = {
     contrastDark: ["#000000"],
     contrastLight: ["#ffffff"],
     dark: ["#0e0f11", "#16181b"],
-    light: ["#f2f2f2", "#ffffff"],
+    light: ["#f0efeb", "#fffefc"],
 } as const;
 
 const HEX = /^#[\da-f]{6}$/;

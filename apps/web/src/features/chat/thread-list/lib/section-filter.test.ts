@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { BranchNode, GroupType, ThreadGroup } from "../types";
-import { countSections, filterGroupsBySection, nextSectionFilter, sanitizeSectionFilter } from "./section-filter";
+import { countSections, filterGroupsBySection, groupsToOpenOnPick, nextSectionFilter, sanitizeSectionFilter } from "./section-filter";
 
 const node = (threadId: string, children: BranchNode[] = []): BranchNode => {
     return { branchPoint: 0, branchType: "root", children, createdAt: 0, depth: 0, status: "idle", threadId, title: threadId };
@@ -62,23 +62,23 @@ describe("filterGroupsBySection", () => {
         expect(second).toBe(pinned);
     });
 
-    it("shows one derived section alone and opens it when it is collapsed", () => {
+    it("shows one derived section alone, collapsed or not as its own chevron left it", () => {
         const shown = filterGroupsBySection(groups, ["archived"], undefined);
 
-        expect(shown).toHaveLength(1);
-        expect(shown[0]?.isCollapsed).toBe(false);
-        expect(shown[0]?.threads).toHaveLength(2);
+        expect(shown).toEqual([archived]);
     });
 
     it("shows several sections at once", () => {
         expect(filterGroupsBySection(groups, ["working", "snoozed"], undefined)).toEqual([working, snoozed]);
     });
 
-    it("opens every picked derived section that is collapsed, not only a section picked alone", () => {
+    it("names the collapsed groups a pick newly shows, every one of them, and none it already showed", () => {
         const collapsedSnoozed = group("snoozed", [node("s1")], true);
-        const shown = filterGroupsBySection([working, collapsedSnoozed, archived], ["working", "snoozed", "archived"], undefined);
+        const all = [working, collapsedSnoozed, archived, today];
 
-        expect(shown.map((item) => item.isCollapsed)).toEqual([false, false, false]);
+        expect(groupsToOpenOnPick(all, ["active"], ["working", "snoozed", "archived"])).toEqual([collapsedSnoozed, archived]);
+        expect(groupsToOpenOnPick(all, ["archived"], ["snoozed", "archived"])).toEqual([collapsedSnoozed]);
+        expect(groupsToOpenOnPick(all, ["archived"], ["archived"])).toEqual([]);
     });
 
     it("leaves a collapsed date group under Active as the person left it", () => {

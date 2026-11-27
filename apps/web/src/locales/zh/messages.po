@@ -2373,14 +2373,14 @@ msgstr "关于 {0}"
 msgid "about {0} (opens in a new tab)"
 msgstr "关于 {0}（在新标签页中打开）"
 
-#: src/features/settings/lib/settings-keywords.ts:92
+#: src/features/settings/lib/settings-keywords.ts:109
 msgid "about me"
 msgstr "关于我"
 
 #: src/features/settings/components/personalization/personalization-settings.tsx:224
-#: src/features/settings/lib/settings-keywords.ts:90
-#: src/features/settings/lib/settings-keywords.ts:91
-#: src/features/settings/lib/settings-keywords.ts:92
+#: src/features/settings/lib/settings-keywords.ts:107
+#: src/features/settings/lib/settings-keywords.ts:108
+#: src/features/settings/lib/settings-keywords.ts:109
 msgid "About You"
 msgstr "关于你"
 
@@ -2601,7 +2601,7 @@ msgstr "添加评论"
 msgid "Add a member from your organization to <0>{0}</0>"
 msgstr "从你的组织中添加成员到 <0>{0}</0>"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:250
+#: src/features/auth/components/organization/billing-settings-card.tsx:257
 #: src/features/auth/components/team/team-settings-dialog.tsx:191
 msgid "Add a model..."
 msgstr "添加模型..."
@@ -2790,8 +2790,8 @@ msgid "Add picked frame as image node"
 msgstr "将选取的帧添加为图片节点"
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:147
-#: src/features/chat/thread-list/thread-list-dock.tsx:116
-#: src/features/chat/thread-list/thread-list-dock.tsx:126
+#: src/features/chat/thread-list/thread-list-dock.tsx:120
+#: src/features/chat/thread-list/thread-list-dock.tsx:130
 #: src/features/projects/components/add-project-dialog.tsx:691
 msgid "Add project"
 msgstr "添加项目"
@@ -3764,7 +3764,7 @@ msgstr "允许一次"
 msgid "Allow this site ({0})"
 msgstr "允许此网站（{0}）"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:221
+#: src/features/auth/components/organization/billing-settings-card.tsx:228
 #: src/features/auth/components/team/team-settings-dialog.tsx:170
 msgid "Allowed AI Models"
 msgstr "允许的 AI 模型"
@@ -3774,10 +3774,12 @@ msgid "Allowed for a limited time"
 msgstr "限时允许"
 
 #: src/features/settings/components/chat/model-filter-settings.tsx:206
+#: src/features/settings/lib/settings-keywords.ts:98
 msgid "Allowed Providers"
 msgstr "允许的提供商"
 
 #: src/features/settings/components/chat/model-filter-settings.tsx:175
+#: src/features/settings/lib/settings-keywords.ts:95
 msgid "Allowed Regions"
 msgstr "允许的地区"
 
@@ -3957,7 +3959,7 @@ msgstr "分析型"
 msgid "Analytical (deep structure)"
 msgstr "分析型（深层结构）"
 
-#: src/features/settings/lib/settings-keywords.ts:116
+#: src/features/settings/lib/settings-keywords.ts:137
 msgid "analytics"
 msgstr "分析"
 
@@ -4284,8 +4286,8 @@ msgstr "应用风格"
 msgid "Applying..."
 msgstr "正在应用..."
 
-#: src/features/settings/lib/settings-keywords.ts:105
-#: src/features/settings/lib/settings-keywords.ts:106
+#: src/features/settings/lib/settings-keywords.ts:122
+#: src/features/settings/lib/settings-keywords.ts:123
 msgid "approval"
 msgstr "审批"
 
@@ -4605,7 +4607,7 @@ msgstr "希望在开源、易用模型中获得 Krea 美学品质的艺术家"
 msgid "Asc"
 msgstr "升序"
 
-#: src/features/settings/lib/settings-keywords.ts:105
+#: src/features/settings/lib/settings-keywords.ts:122
 msgid "ask"
 msgstr "询问"
 
@@ -4847,7 +4849,7 @@ msgstr "身份验证"
 msgid "Authentication Required"
 msgstr "需要身份验证"
 
-#: src/features/settings/lib/settings-keywords.ts:105
+#: src/features/settings/lib/settings-keywords.ts:122
 msgid "auto"
 msgstr "自动"
 
@@ -5115,7 +5117,7 @@ msgstr "返回设置分区"
 msgid "Back to workflows"
 msgstr "返回工作流"
 
-#: src/features/settings/lib/settings-keywords.ts:92
+#: src/features/settings/lib/settings-keywords.ts:109
 msgid "background"
 msgstr "后台"
 
@@ -5127,7 +5129,7 @@ msgstr "背景颜色（可选）"
 msgid "Background Removal"
 msgstr "背景移除"
 
-#: src/features/settings/lib/settings-keywords.ts:113
+#: src/features/settings/lib/settings-keywords.ts:134
 msgid "backup"
 msgstr "备份"
 
@@ -5458,19 +5460,18 @@ msgstr "费用计入你自己的 API 密钥，而非你的积分。"
 msgid "Billing"
 msgstr "账单"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:317
+#: src/features/auth/components/organization/billing-settings-card.tsx:324
 msgid "Billing details for this organization"
 msgstr "此组织的账单详情"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:195
-#: src/features/auth/components/organization/billing-settings-card.tsx:201
+#: src/features/auth/components/organization/billing-settings-card.tsx:220
 msgid "Billing Email"
 msgstr "账单邮箱"
 
 #: src/features/auth/components/organization/billing-settings-card.tsx:137
-#: src/features/auth/components/organization/billing-settings-card.tsx:278
-#: src/features/auth/components/organization/billing-settings-card.tsx:318
-#: src/features/auth/components/organization/billing-settings-card.tsx:341
+#: src/features/auth/components/organization/billing-settings-card.tsx:285
+#: src/features/auth/components/organization/billing-settings-card.tsx:325
+#: src/features/auth/components/organization/billing-settings-card.tsx:348
 msgid "Billing Settings"
 msgstr "账单设置"
 
@@ -5482,7 +5483,7 @@ msgstr "账单设置已更新"
 msgid "Binary"
 msgstr "二进制"
 
-#: src/features/settings/lib/settings-keywords.ts:92
+#: src/features/settings/lib/settings-keywords.ts:109
 msgid "bio"
 msgstr "简介"
 
@@ -5513,14 +5514,17 @@ msgid "Blocked"
 msgstr "已屏蔽"
 
 #: src/features/settings/components/chat/model-filter-settings.tsx:282
+#: src/features/settings/lib/settings-keywords.ts:100
 msgid "Blocked Models"
 msgstr "已屏蔽的模型"
 
 #: src/features/settings/components/chat/model-filter-settings.tsx:226
+#: src/features/settings/lib/settings-keywords.ts:99
 msgid "Blocked Providers"
 msgstr "已屏蔽的提供商"
 
 #: src/features/settings/components/chat/model-filter-settings.tsx:200
+#: src/features/settings/lib/settings-keywords.ts:96
 msgid "Blocked Regions"
 msgstr "已屏蔽的地区"
 
@@ -5743,7 +5747,7 @@ msgstr "自带密钥（BYOK）"
 msgid "Broad style range from photorealism to illustration"
 msgstr "从照片级真实到插画的广泛风格范围"
 
-#: src/features/settings/lib/settings-keywords.ts:86
+#: src/features/settings/lib/settings-keywords.ts:92
 msgid "browse"
 msgstr "浏览"
 
@@ -5835,6 +5839,7 @@ msgid "Budget alert deleted"
 msgstr "预算提醒已删除"
 
 #: src/features/settings/components/chat/usage-settings.tsx:410
+#: src/features/settings/lib/settings-keywords.ts:129
 msgid "Budget Alerts"
 msgstr "预算提醒"
 
@@ -5884,7 +5889,7 @@ msgstr "生成前内置推理"
 
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:369
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:370
-#: src/features/settings/lib/settings-keywords.ts:105
+#: src/features/settings/lib/settings-keywords.ts:122
 msgid "Built-in tools"
 msgstr "内置工具"
 
@@ -6057,7 +6062,7 @@ msgstr "缓存命中率"
 msgid "Cached input"
 msgstr "缓存输入"
 
-#: src/features/settings/lib/settings-keywords.ts:90
+#: src/features/settings/lib/settings-keywords.ts:107
 msgid "call me"
 msgstr "称呼我"
 
@@ -6378,7 +6383,7 @@ msgstr "加泰罗尼亚语"
 msgid "Catalan (Spain)"
 msgstr "加泰罗尼亚语（西班牙）"
 
-#: src/features/settings/lib/settings-keywords.ts:86
+#: src/features/settings/lib/settings-keywords.ts:92
 msgid "catalog"
 msgstr "目录"
 
@@ -6649,7 +6654,7 @@ msgstr "聊天文字大小"
 msgid "Chat text size updated"
 msgstr "聊天文字大小已更新"
 
-#: src/features/settings/lib/settings-keywords.ts:98
+#: src/features/settings/lib/settings-keywords.ts:115
 msgid "chat titles"
 msgstr "聊天标题"
 
@@ -6665,7 +6670,7 @@ msgstr "通过 Feishu 或 Lark 自建应用机器人与 AI 聊天，支持私聊
 msgid "Chat, create, <0>and build.</0>"
 msgstr "聊天、创作，<0>动手构建。</0>"
 
-#: src/features/settings/lib/settings-keywords.ts:114
+#: src/features/settings/lib/settings-keywords.ts:135
 msgid "chatgpt"
 msgstr "chatgpt"
 
@@ -7046,7 +7051,7 @@ msgstr "流通供应量"
 msgid "city"
 msgstr "城市"
 
-#: src/features/settings/lib/settings-keywords.ts:114
+#: src/features/settings/lib/settings-keywords.ts:135
 msgid "claude"
 msgstr "claude"
 
@@ -7422,7 +7427,7 @@ msgstr "代码导航"
 msgid "Code output"
 msgstr "代码输出"
 
-#: src/features/settings/lib/settings-keywords.ts:102
+#: src/features/settings/lib/settings-keywords.ts:119
 msgid "code review"
 msgstr "代码审查"
 
@@ -8077,7 +8082,7 @@ msgid "Configure team settings"
 msgstr "配置团队设置"
 
 #: src/features/auth/components/organization/billing-settings-card.tsx:136
-#: src/features/auth/components/organization/billing-settings-card.tsx:276
+#: src/features/auth/components/organization/billing-settings-card.tsx:283
 msgid "Configure the billing contact and available AI models"
 msgstr "配置账单联系人和可用的 AI 模型"
 
@@ -8418,7 +8423,7 @@ msgstr "连接器已断开。如果提供商的设置中仍列有它，请在那
 msgid "Connector: {0}"
 msgstr "连接器：{0}"
 
-#: src/features/settings/lib/settings-keywords.ts:86
+#: src/features/settings/lib/settings-keywords.ts:92
 msgid "connectors"
 msgstr "连接器"
 
@@ -8434,7 +8439,7 @@ msgid "Connectors talk to each provider's own MCP server over OAuth 2.0. Your to
 msgstr "连接器通过 OAuth 2.0 与各提供商自己的 MCP 服务器通信。你的 token 加密存储，AI 在使用可能更改数据的工具前会先询问，断开连接即撤销访问权限。"
 
 #: src/features/settings/components/privacy/consent-preferences.tsx:17
-#: src/features/settings/lib/settings-keywords.ts:116
+#: src/features/settings/lib/settings-keywords.ts:137
 msgid "Consent Preferences"
 msgstr "同意偏好"
 
@@ -8762,7 +8767,7 @@ msgstr "转换为 TypeScript"
 msgid "Converting..."
 msgstr "正在转换..."
 
-#: src/features/settings/lib/settings-keywords.ts:116
+#: src/features/settings/lib/settings-keywords.ts:137
 msgid "cookies"
 msgstr "cookie"
 
@@ -8967,6 +8972,7 @@ msgid "Cost {display}"
 msgstr "费用 {display}"
 
 #: src/features/settings/components/chat/usage-settings.tsx:308
+#: src/features/settings/lib/settings-keywords.ts:127
 msgid "Cost by Model"
 msgstr "按模型统计费用"
 
@@ -9302,7 +9308,7 @@ msgstr "无法加载此记忆的来源。"
 msgid "Could not load your activity."
 msgstr "无法加载你的活动。"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:323
+#: src/features/auth/components/organization/billing-settings-card.tsx:330
 msgid "Could not load your organization's billing details. Try again later."
 msgstr "无法加载你所在组织的账单详情。请稍后重试。"
 
@@ -9981,7 +9987,7 @@ msgid "Credits"
 msgstr "积分"
 
 #: src/features/auth/components/organization/billing-settings-card.tsx:190
-#: src/features/auth/components/organization/billing-settings-card.tsx:346
+#: src/features/auth/components/organization/billing-settings-card.tsx:353
 msgid "Credits per user:"
 msgstr "每位用户的积分："
 
@@ -10080,7 +10086,7 @@ msgid "Current Prompt Variables"
 msgstr "当前提示词变量"
 
 #: src/features/auth/components/organization/billing-settings-card.tsx:187
-#: src/features/auth/components/organization/billing-settings-card.tsx:345
+#: src/features/auth/components/organization/billing-settings-card.tsx:352
 msgid "Current tier:"
 msgstr "当前等级："
 
@@ -10123,7 +10129,7 @@ msgstr "自定义端点"
 msgid "Custom Endpoints"
 msgstr "自定义端点"
 
-#: src/features/settings/lib/settings-keywords.ts:94
+#: src/features/settings/lib/settings-keywords.ts:111
 msgid "custom instructions"
 msgstr "自定义指令"
 
@@ -10133,7 +10139,7 @@ msgstr "自定义指令"
 
 #: src/features/settings/components/personalization/personalization-settings.tsx:317
 #: src/features/settings/components/personalization/personalization-settings.tsx:331
-#: src/features/settings/lib/settings-keywords.ts:96
+#: src/features/settings/lib/settings-keywords.ts:113
 msgid "Custom Instructions"
 msgstr "自定义指令"
 
@@ -10266,6 +10272,7 @@ msgid "Daily cost (microdollars)"
 msgstr "每日费用（微美元）"
 
 #: src/features/settings/components/chat/usage-settings.tsx:352
+#: src/features/settings/lib/settings-keywords.ts:128
 msgid "Daily Cost Trend"
 msgstr "每日费用趋势"
 
@@ -10319,12 +10326,12 @@ msgid "Data & Analysis"
 msgstr "数据与分析"
 
 #: src/features/settings/components/privacy/data-access.tsx:21
-#: src/features/settings/lib/settings-keywords.ts:115
+#: src/features/settings/lib/settings-keywords.ts:136
 msgid "Data Access Summary"
 msgstr "数据访问摘要"
 
 #: src/features/settings/components/privacy/data-export.tsx:99
-#: src/features/settings/lib/settings-keywords.ts:113
+#: src/features/settings/lib/settings-keywords.ts:134
 msgid "Data Export"
 msgstr "数据导出"
 
@@ -10659,7 +10666,7 @@ msgstr "角度"
 msgid "Delayed"
 msgstr "延误"
 
-#: src/features/settings/lib/settings-keywords.ts:102
+#: src/features/settings/lib/settings-keywords.ts:119
 msgid "delegate"
 msgstr "委派"
 
@@ -10752,8 +10759,8 @@ msgstr "删除 {name}"
 msgid "Delete {title}"
 msgstr "删除 {title}"
 
-#: src/features/auth/components/settings/account/delete-account-card.tsx:62
-#: src/features/auth/components/settings/account/delete-account-card.tsx:75
+#: src/features/auth/components/settings/account/delete-account-card.tsx:63
+#: src/features/auth/components/settings/account/delete-account-card.tsx:76
 #: src/features/auth/components/settings/account/delete-account-dialog.tsx:98
 #: src/features/auth/components/settings/account/delete-account-dialog.tsx:153
 msgid "Delete Account"
@@ -10865,7 +10872,7 @@ msgstr "删除预设"
 msgid "Delete preset?"
 msgstr "删除预设？"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1194
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1213
 msgid "Delete Project"
 msgstr "删除项目"
 
@@ -11087,6 +11094,7 @@ msgstr "拒绝 {tool}"
 
 #: src/features/settings/components/chat/model-filter-settings.tsx:356
 #: src/features/settings/components/chat/model-filter-settings.tsx:368
+#: src/features/settings/lib/settings-keywords.ts:103
 msgid "Deny Data Collection"
 msgstr "拒绝数据收集"
 
@@ -11361,6 +11369,7 @@ msgid "Development"
 msgstr "开发"
 
 #: src/features/devices/components/devices-settings.tsx:712
+#: src/features/settings/lib/settings-keywords.ts:89
 msgid "Device activity"
 msgstr "设备活动"
 
@@ -11729,7 +11738,7 @@ msgstr "双击重命名"
 msgid "down"
 msgstr "向下"
 
-#: src/features/settings/lib/settings-keywords.ts:113
+#: src/features/settings/lib/settings-keywords.ts:134
 msgid "download"
 msgstr "下载"
 
@@ -12945,7 +12954,7 @@ msgstr "请输入有效的 AWS 区域，例如 us-east-1"
 msgid "Enter an API version such as v1 or 2024-10-21"
 msgstr "请输入 API 版本，例如 v1 或 2024-10-21"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:206
+#: src/features/auth/components/organization/billing-settings-card.tsx:209
 msgid "Enter billing email"
 msgstr "输入账单邮箱"
 
@@ -14126,7 +14135,7 @@ msgstr "删除通行密钥失败"
 msgid "Failed to delete preset"
 msgstr "删除预设失败"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:553
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:572
 msgid "Failed to delete project"
 msgstr "删除项目失败"
 
@@ -14324,7 +14333,7 @@ msgstr "将对话设为永久失败"
 msgid "Failed to move file"
 msgstr "移动文件失败"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:838
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:857
 #: src/features/projects/components/move-to-project-dialog.tsx:38
 msgid "Failed to move thread"
 msgstr "移动对话失败"
@@ -15074,7 +15083,7 @@ msgid "Favicon"
 msgstr "网站图标"
 
 #: src/features/settings/components/chat/favorite-models-settings.tsx:121
-#: src/features/settings/lib/settings-keywords.ts:88
+#: src/features/settings/lib/settings-keywords.ts:105
 msgid "Favorite models"
 msgstr "常用模型"
 
@@ -15704,7 +15713,7 @@ msgstr "用于此模型"
 msgid "Forest"
 msgstr "森林"
 
-#: src/features/settings/lib/settings-keywords.ts:99
+#: src/features/settings/lib/settings-keywords.ts:116
 msgid "forget"
 msgstr "忘记"
 
@@ -16148,8 +16157,8 @@ msgstr "网关版块"
 msgid "Gaussian Blur"
 msgstr "高斯模糊"
 
-#: src/features/settings/lib/settings-keywords.ts:113
-#: src/features/settings/lib/settings-keywords.ts:115
+#: src/features/settings/lib/settings-keywords.ts:134
+#: src/features/settings/lib/settings-keywords.ts:136
 msgid "gdpr"
 msgstr "gdpr"
 
@@ -16157,7 +16166,7 @@ msgstr "gdpr"
 msgid "GDPR Requests:"
 msgstr "GDPR 请求："
 
-#: src/features/settings/lib/settings-keywords.ts:114
+#: src/features/settings/lib/settings-keywords.ts:135
 msgid "gemini"
 msgstr "gemini"
 
@@ -17244,6 +17253,7 @@ msgid "Hidden characters were removed from your message."
 msgstr "已从你的消息中移除隐藏字符。"
 
 #: src/features/settings/components/chat/model-filter-settings.tsx:251
+#: src/features/settings/lib/settings-keywords.ts:101
 msgid "Hidden in Model Picker"
 msgstr "在模型选择器中隐藏"
 
@@ -17617,7 +17627,7 @@ msgid "How often the agent retries with the verifier's feedback before asking yo
 msgstr "在请你审核之前，智能体根据验证器反馈重试的次数。"
 
 #: src/features/settings/components/personalization/personalization-settings.tsx:352
-#: src/features/settings/lib/settings-keywords.ts:98
+#: src/features/settings/lib/settings-keywords.ts:115
 msgid "How should titles be written?"
 msgstr "标题应如何撰写？"
 
@@ -17630,11 +17640,12 @@ msgid "How to merge"
 msgstr "合并方式"
 
 #: src/features/settings/components/chat/trigger-settings.tsx:1050
+#: src/features/settings/lib/settings-keywords.ts:125
 msgid "How Triggers Work"
 msgstr "触发器的工作原理"
 
 #: src/features/settings/components/personalization/personalization-settings.tsx:327
-#: src/features/settings/lib/settings-keywords.ts:95
+#: src/features/settings/lib/settings-keywords.ts:112
 msgid "How would you like the AI to respond?"
 msgstr "你希望 AI 如何回复？"
 
@@ -18063,7 +18074,7 @@ msgid "Import complete!"
 msgstr "导入完成！"
 
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:333
-#: src/features/settings/lib/settings-keywords.ts:114
+#: src/features/settings/lib/settings-keywords.ts:135
 msgid "Import Conversations"
 msgstr "导入对话"
 
@@ -18529,7 +18540,7 @@ msgstr "Instagram 帖子"
 msgid "Instagram Story"
 msgstr "Instagram 快拍"
 
-#: src/features/settings/lib/settings-keywords.ts:86
+#: src/features/settings/lib/settings-keywords.ts:92
 msgid "install"
 msgstr "安装"
 
@@ -18568,7 +18579,7 @@ msgstr "指令型"
 msgid "Instruction files"
 msgstr "指令文件"
 
-#: src/features/settings/lib/settings-keywords.ts:103
+#: src/features/settings/lib/settings-keywords.ts:120
 msgid "instructions"
 msgstr "指令"
 
@@ -18606,7 +18617,7 @@ msgstr "给 AI 的指令..."
 msgid "Instructions must be {INSTRUCTIONS_MAX} characters or less"
 msgstr "指令不能超过 {INSTRUCTIONS_MAX} 个字符"
 
-#: src/features/settings/lib/settings-keywords.ts:86
+#: src/features/settings/lib/settings-keywords.ts:92
 msgid "integrations"
 msgstr "集成"
 
@@ -18661,7 +18672,7 @@ msgstr "被中断的回复将停止"
 msgid "Intimate, street photography"
 msgstr "亲近感，街头摄影"
 
-#: src/features/settings/lib/settings-keywords.ts:100
+#: src/features/settings/lib/settings-keywords.ts:117
 msgid "intro"
 msgstr "简介"
 
@@ -18979,7 +18990,7 @@ msgstr "爪哇语"
 msgid "Javanese (Indonesia)"
 msgstr "爪哇语（印度尼西亚）"
 
-#: src/features/settings/lib/settings-keywords.ts:91
+#: src/features/settings/lib/settings-keywords.ts:108
 msgid "job"
 msgstr "作业"
 
@@ -19751,7 +19762,7 @@ msgstr "从左到右（LTR）"
 msgid "Left: this version. Right: the page now."
 msgstr "左侧：此版本。右侧：当前页面。"
 
-#: src/features/settings/lib/settings-keywords.ts:117
+#: src/features/settings/lib/settings-keywords.ts:138
 msgid "legal"
 msgstr "法律"
 
@@ -20356,7 +20367,7 @@ msgstr "正在加载此验证…"
 msgid "Loading threads"
 msgstr "正在加载对话"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:944
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:963
 msgid "Loading threads..."
 msgstr "正在加载对话..."
 
@@ -21124,7 +21135,7 @@ msgid "MCP"
 msgstr "MCP"
 
 #: src/features/settings/components/chat/mcp/server-catalog.tsx:160
-#: src/features/settings/lib/settings-keywords.ts:86
+#: src/features/settings/lib/settings-keywords.ts:92
 msgid "MCP Registry"
 msgstr "MCP 注册表"
 
@@ -21171,7 +21182,7 @@ msgstr "MCP 服务器"
 
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:386
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:387
-#: src/features/settings/lib/settings-keywords.ts:106
+#: src/features/settings/lib/settings-keywords.ts:123
 msgid "MCP tools"
 msgstr "MCP 工具"
 
@@ -21295,7 +21306,7 @@ msgstr "{organizationName} 的成员可以附加此集合，AI 也可以为他�
 msgid "Members of your active organization can use it."
 msgstr "你当前组织的成员可以使用它。"
 
-#: src/features/settings/lib/settings-keywords.ts:99
+#: src/features/settings/lib/settings-keywords.ts:116
 msgid "memories"
 msgstr "记忆"
 
@@ -21319,7 +21330,7 @@ msgstr "此回复使用的记忆（{0}）"
 
 #: src/features/marketing/use-cases/use-case-data.ts:114
 #: src/features/settings/components/personalization/memory-settings.tsx:165
-#: src/features/settings/lib/settings-keywords.ts:99
+#: src/features/settings/lib/settings-keywords.ts:116
 msgid "Memory"
 msgstr "记忆"
 
@@ -21551,6 +21562,7 @@ msgid "Messenger Bots"
 msgstr "即时通讯机器人"
 
 #: src/features/settings/connectors/messenger/messenger-page.tsx:99
+#: src/features/settings/lib/settings-keywords.ts:132
 msgid "Messenger Integration"
 msgstr "即时通讯集成"
 
@@ -21606,7 +21618,7 @@ msgstr "麦克风访问被拒绝。请在浏览器设置中允许访问麦克风
 msgid "Microsoft App ID of your Azure Bot"
 msgstr "你的 Azure Bot 的 Microsoft App ID"
 
-#: src/features/settings/lib/settings-keywords.ts:114
+#: src/features/settings/lib/settings-keywords.ts:135
 msgid "migrate"
 msgstr "迁移"
 
@@ -21885,7 +21897,7 @@ msgstr "模型筛选"
 msgid "Model info"
 msgstr "模型信息"
 
-#: src/features/settings/lib/settings-keywords.ts:102
+#: src/features/settings/lib/settings-keywords.ts:119
 msgid "Model per kind of work"
 msgstr "按工作类型选择模型"
 
@@ -22081,7 +22093,7 @@ msgstr "多"
 
 #: src/features/settings/components/personalization/personalization-settings.tsx:299
 #: src/features/settings/components/personalization/personalization-settings.tsx:303
-#: src/features/settings/lib/settings-keywords.ts:92
+#: src/features/settings/lib/settings-keywords.ts:109
 msgid "More About You"
 msgstr "关于你的更多信息"
 
@@ -22389,7 +22401,7 @@ msgstr "静音"
 msgid "Mute thread"
 msgstr "将对话静音"
 
-#: src/features/settings/lib/settings-keywords.ts:113
+#: src/features/settings/lib/settings-keywords.ts:134
 msgid "my data"
 msgstr "我的数据"
 
@@ -22428,7 +22440,7 @@ msgid "n/a"
 msgstr "不适用"
 
 #: src/features/settings/lib/settings-keywords.ts:26
-#: src/features/settings/lib/settings-keywords.ts:90
+#: src/features/settings/lib/settings-keywords.ts:107
 msgid "name"
 msgstr "名称"
 
@@ -22496,7 +22508,7 @@ msgstr "标签 {0} 的名称"
 msgid "Name:"
 msgstr "姓名："
 
-#: src/features/settings/lib/settings-keywords.ts:98
+#: src/features/settings/lib/settings-keywords.ts:115
 msgid "naming"
 msgstr "命名"
 
@@ -22831,6 +22843,7 @@ msgid "New Azure Bots are single-tenant: set the Teams Tenant ID key, or replies
 msgstr "新的 Azure Bot 为单租户：请设置 Teams 租户 ID 密钥，否则回复无法通过身份验证。"
 
 #: src/features/settings/components/chat/bots-settings.tsx:376
+#: src/features/settings/lib/settings-keywords.ts:84
 msgid "New bot"
 msgstr "新建机器人"
 
@@ -23003,8 +23016,8 @@ msgid "New thread"
 msgstr "新建对话"
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:150
-#: src/features/chat/thread-list/thread-list-dock.tsx:132
-#: src/features/chat/thread-list/thread-list-dock.tsx:142
+#: src/features/chat/thread-list/thread-list-dock.tsx:136
+#: src/features/chat/thread-list/thread-list-dock.tsx:146
 msgid "New Thread"
 msgstr "新建对话"
 
@@ -23151,7 +23164,7 @@ msgstr "尼加拉瓜"
 
 #: src/features/settings/components/chat/favorite-models-settings.tsx:56
 #: src/features/settings/components/personalization/personalization-settings.tsx:272
-#: src/features/settings/lib/settings-keywords.ts:90
+#: src/features/settings/lib/settings-keywords.ts:107
 msgid "Nickname"
 msgstr "昵称"
 
@@ -23488,7 +23501,7 @@ msgstr "还没有记忆。AI 会自动从你的对话中开始学习。"
 msgid "No message of yours is loaded in this conversation"
 msgstr "此对话中未加载你的任何消息"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:992
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1011
 msgid "No messages found for"
 msgstr "未找到消息："
 
@@ -23798,7 +23811,7 @@ msgstr "无可显示的文本。"
 msgid "No thread has worked on this {requestNoun} yet."
 msgstr "还没有对话处理过此{requestNoun}。"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:992
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1011
 msgid "No threads found for"
 msgstr "未找到对话："
 
@@ -23806,16 +23819,16 @@ msgstr "未找到对话："
 msgid "No threads in this group"
 msgstr "此分组中没有对话"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:958
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:977
 msgid "No threads in this section"
 msgstr "此分区中没有对话"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:607
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:626
 msgid "No threads were active in that date range."
 msgstr "该日期范围内没有活跃的对话。"
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:263
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:969
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:988
 msgid "No threads yet"
 msgstr "还没有对话"
 
@@ -24229,11 +24242,11 @@ msgstr "物体编辑器"
 msgid "Object Prompt"
 msgstr "物体提示词"
 
-#: src/features/settings/lib/settings-keywords.ts:91
+#: src/features/settings/lib/settings-keywords.ts:108
 msgid "occupation"
 msgstr "职业"
 
-#: src/features/settings/lib/settings-keywords.ts:105
+#: src/features/settings/lib/settings-keywords.ts:122
 msgid "off"
 msgstr "关"
 
@@ -24387,7 +24400,7 @@ msgid "On-premise option"
 msgstr "本地部署选项"
 
 #: src/features/settings/components/personalization/personalization-settings.tsx:389
-#: src/features/settings/lib/settings-keywords.ts:100
+#: src/features/settings/lib/settings-keywords.ts:117
 msgid "Onboarding"
 msgstr "新手引导"
 
@@ -24546,7 +24559,7 @@ msgstr "仅在一次运行中"
 msgid "Only listed tools"
 msgstr "仅列出的工具"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:340
+#: src/features/auth/components/organization/billing-settings-card.tsx:347
 msgid "Only organization owners can manage billing settings"
 msgstr "只有组织所有者才能管理账单设置"
 
@@ -26225,7 +26238,7 @@ msgstr "WhatsApp Cloud API 的永久（系统用户）访问令牌"
 msgid "Permanently delete this organization and all its data"
 msgstr "永久删除此组织及其所有数据"
 
-#: src/features/auth/components/settings/account/delete-account-card.tsx:69
+#: src/features/auth/components/settings/account/delete-account-card.tsx:70
 msgid "Permanently delete your account and all associated data"
 msgstr "永久删除你的账号及所有相关数据"
 
@@ -26254,8 +26267,8 @@ msgstr "权限模式：{0}"
 msgid "Permission requests from the agent"
 msgstr "来自智能体的权限请求"
 
-#: src/features/settings/lib/settings-keywords.ts:105
-#: src/features/settings/lib/settings-keywords.ts:106
+#: src/features/settings/lib/settings-keywords.ts:122
+#: src/features/settings/lib/settings-keywords.ts:123
 msgid "permissions"
 msgstr "权限"
 
@@ -26271,7 +26284,7 @@ msgstr "波斯语"
 msgid "Persian (Iran)"
 msgstr "波斯语（伊朗）"
 
-#: src/features/settings/lib/settings-keywords.ts:103
+#: src/features/settings/lib/settings-keywords.ts:120
 msgid "persona"
 msgstr "角色设定"
 
@@ -26388,7 +26401,7 @@ msgstr "选取位置（秒）"
 msgid "Picked frame wire (remove it)"
 msgstr "选取帧的连线（移除）"
 
-#: src/features/settings/lib/settings-keywords.ts:88
+#: src/features/settings/lib/settings-keywords.ts:105
 msgid "picker"
 msgstr "选择器"
 
@@ -26462,7 +26475,7 @@ msgstr "固定到右侧"
 msgid "Pink"
 msgstr "粉色"
 
-#: src/features/settings/lib/settings-keywords.ts:88
+#: src/features/settings/lib/settings-keywords.ts:105
 msgid "pinned"
 msgstr "已固定"
 
@@ -26916,9 +26929,9 @@ msgstr "预设已更新"
 msgid "Presets"
 msgstr "预设"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:971
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:984
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1010
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:990
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1003
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1029
 msgid "Press ? for keyboard shortcuts"
 msgstr "按 ? 查看键盘快捷键"
 
@@ -27146,6 +27159,8 @@ msgstr "隐私"
 #: src/features/settings/components/account/account-settings.tsx:165
 #: src/features/settings/components/chat/model-filter-settings.tsx:334
 #: src/features/settings/lib/settings-keywords.ts:26
+#: src/features/settings/lib/settings-keywords.ts:102
+#: src/features/settings/lib/settings-keywords.ts:103
 #: src/features/settings/lib/settings-navigation.ts:146
 msgid "Privacy"
 msgstr "隐私"
@@ -27156,7 +27171,7 @@ msgid "Privacy & Data"
 msgstr "隐私与数据"
 
 #: src/features/settings/components/privacy/privacy-policy.tsx:16
-#: src/features/settings/lib/settings-keywords.ts:117
+#: src/features/settings/lib/settings-keywords.ts:138
 msgid "Privacy Policy"
 msgstr "隐私政策"
 
@@ -27278,7 +27293,7 @@ msgid "Productivity"
 msgstr "效率"
 
 #: src/features/settings/components/personalization/personalization-settings.tsx:294
-#: src/features/settings/lib/settings-keywords.ts:91
+#: src/features/settings/lib/settings-keywords.ts:108
 msgid "Profession"
 msgstr "职业"
 
@@ -27355,7 +27370,7 @@ msgstr "专业级编辑精度"
 msgid "Professionals who need versatile, high-quality image creation from descriptive text prompts"
 msgstr "适合需要根据描述性文本提示词生成多样、高质量图像的专业人士"
 
-#: src/features/settings/lib/settings-keywords.ts:115
+#: src/features/settings/lib/settings-keywords.ts:136
 msgid "profile"
 msgstr "个人资料"
 
@@ -27440,7 +27455,7 @@ msgstr "提供此设备的项目"
 msgid "Promote to Admin"
 msgstr "提升为管理员"
 
-#: src/features/settings/lib/settings-keywords.ts:103
+#: src/features/settings/lib/settings-keywords.ts:120
 msgid "prompt"
 msgstr "提示词"
 
@@ -27638,6 +27653,9 @@ msgid "Provider removed"
 msgstr "已移除提供商"
 
 #: src/features/settings/components/chat/model-filter-settings.tsx:205
+#: src/features/settings/lib/settings-keywords.ts:97
+#: src/features/settings/lib/settings-keywords.ts:98
+#: src/features/settings/lib/settings-keywords.ts:99
 msgid "Provider Restrictions"
 msgstr "提供商限制"
 
@@ -28609,6 +28627,9 @@ msgid "region"
 msgstr "地区"
 
 #: src/features/settings/components/chat/model-filter-settings.tsx:150
+#: src/features/settings/lib/settings-keywords.ts:94
+#: src/features/settings/lib/settings-keywords.ts:95
+#: src/features/settings/lib/settings-keywords.ts:96
 msgid "Region Restrictions"
 msgstr "地区限制"
 
@@ -28757,7 +28778,7 @@ msgstr "重新加载预览"
 msgid "Reload their version"
 msgstr "重新加载对方的版本"
 
-#: src/features/settings/lib/settings-keywords.ts:99
+#: src/features/settings/lib/settings-keywords.ts:116
 msgid "remember"
 msgstr "记住"
 
@@ -28820,7 +28841,7 @@ msgstr "移除 {fileName}"
 msgid "Remove {label}"
 msgstr "移除 {label}"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:229
+#: src/features/auth/components/organization/billing-settings-card.tsx:236
 #: src/features/auth/components/team/team-settings-dialog.tsx:177
 msgid "Remove {model}"
 msgstr "移除 {model}"
@@ -29797,7 +29818,7 @@ msgstr "角色已更新"
 msgid "Role Updates"
 msgstr "角色变更"
 
-#: src/features/settings/lib/settings-keywords.ts:102
+#: src/features/settings/lib/settings-keywords.ts:119
 msgid "roles"
 msgstr "角色"
 
@@ -30177,7 +30198,7 @@ msgstr "沙特阿拉伯"
 #: ../../packages/ui/src/components/inline-edit.tsx:119
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:118
 #: src/features/auth/components/organization/billing-settings-card.tsx:133
-#: src/features/auth/components/organization/billing-settings-card.tsx:273
+#: src/features/auth/components/organization/billing-settings-card.tsx:280
 #: src/features/auth/components/organization/organization-name-card.tsx:100
 #: src/features/auth/components/organization/organization-name-card.tsx:155
 #: src/features/auth/components/organization/organization-slug-card.tsx:105
@@ -30503,7 +30524,7 @@ msgstr "搜索"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:241
 #: src/features/chat/signed-out/signed-out-chat.tsx:141
-#: src/features/chat/thread-list/thread-list-dock.tsx:91
+#: src/features/chat/thread-list/thread-list-dock.tsx:95
 #: src/features/chat/thread/thread-welcome-suggestions.tsx:93
 msgid "Search"
 msgstr "搜索"
@@ -30551,7 +30572,7 @@ msgstr "搜索数据..."
 msgid "Search depth: {0}"
 msgstr "搜索深度：{0}"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:983
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1002
 msgid "Search failed for \"{searchQuery}\". Try again."
 msgstr "搜索“{searchQuery}”失败。请重试。"
 
@@ -30796,7 +30817,7 @@ msgstr "仅搜索了最新消息"
 msgid "Searching"
 msgstr "正在搜索"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1000
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1019
 msgid "Searching..."
 msgstr "正在搜索..."
 
@@ -31083,7 +31104,7 @@ msgstr "选择到最后一列"
 msgid "Select to top of table"
 msgstr "选择到表格顶部"
 
-#: src/features/auth/components/organization/billing-settings-card.tsx:220
+#: src/features/auth/components/organization/billing-settings-card.tsx:227
 msgid "Select which AI models organization members can use. Leave empty for enterprise to allow all models."
 msgstr "选择组织成员可以使用的 AI 模型。企业版留空则允许所有模型。"
 
@@ -31409,11 +31430,12 @@ msgstr "Server-Sent Events（SSE）"
 msgid "Serverless Postgres database with branching"
 msgstr "支持分支的 Serverless Postgres 数据库"
 
-#: src/features/settings/lib/settings-keywords.ts:106
+#: src/features/settings/lib/settings-keywords.ts:123
 msgid "servers"
 msgstr "服务器"
 
 #: src/features/devices/components/devices-settings.tsx:705
+#: src/features/settings/lib/settings-keywords.ts:88
 msgid "Servers over SSH"
 msgstr "SSH 服务器"
 
@@ -32930,7 +32952,7 @@ msgstr "星形"
 msgid "Star a model in the model picker and it shows up here."
 msgstr "在模型选择器中为模型加星标，它就会显示在这里。"
 
-#: src/features/settings/lib/settings-keywords.ts:88
+#: src/features/settings/lib/settings-keywords.ts:105
 msgid "starred"
 msgstr "已加星标"
 
@@ -32991,7 +33013,7 @@ msgstr "新建聊天即可开始"
 msgid "Start a new context: earlier messages are no longer sent to the model"
 msgstr "开始新的上下文：之前的消息不再发送给模型"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:970
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:989
 msgid "Start a new conversation to create your first thread"
 msgstr "开始聊天，创建你的第一个对话"
 
@@ -33703,7 +33725,7 @@ msgstr "出色的视觉推理与理解"
 msgid "Strongest reasoning in the GLM family"
 msgstr "GLM 系列中最强的推理能力"
 
-#: src/features/settings/lib/settings-keywords.ts:94
+#: src/features/settings/lib/settings-keywords.ts:111
 #: src/features/workflow/templates/index.ts:217
 msgid "style"
 msgstr "风格"
@@ -33764,7 +33786,7 @@ msgstr "风格化结果"
 msgid "stylized animation"
 msgstr "风格化动画"
 
-#: src/features/settings/lib/settings-keywords.ts:102
+#: src/features/settings/lib/settings-keywords.ts:119
 msgid "sub-agent"
 msgstr "子代理"
 
@@ -34114,7 +34136,7 @@ msgstr "系统默认"
 msgid "System message:"
 msgstr "系统消息："
 
-#: src/features/settings/lib/settings-keywords.ts:94
+#: src/features/settings/lib/settings-keywords.ts:111
 msgid "system prompt"
 msgstr "系统提示词"
 
@@ -34134,7 +34156,7 @@ msgid "System prompt applied"
 msgstr "系统提示词已应用"
 
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:275
-#: src/features/settings/lib/settings-keywords.ts:103
+#: src/features/settings/lib/settings-keywords.ts:120
 msgid "System Prompt Presets"
 msgstr "系统提示词预设"
 
@@ -34553,7 +34575,7 @@ msgstr "已启用临时模式"
 msgid "Temporary mode enabled ({0})"
 msgstr "已启用临时模式（{0}）"
 
-#: src/features/settings/lib/settings-keywords.ts:117
+#: src/features/settings/lib/settings-keywords.ts:138
 msgid "terms"
 msgstr "条款"
 
@@ -35491,7 +35513,7 @@ msgstr "优化后的提示词将显示在这里..."
 msgid "The keys you have set now."
 msgstr "你当前设置的按键。"
 
-#: src/features/auth/components/settings/account/delete-account-card.tsx:71
+#: src/features/auth/components/settings/account/delete-account-card.tsx:72
 msgid "The last deletion request failed. You can request it again."
 msgstr "上次删除请求失败。你可以再次请求。"
 
@@ -36814,7 +36836,7 @@ msgstr "这将永久删除 {0} 个匿名用户账号及其所有数据。此操�
 msgid "This will permanently delete all {0} memories and their daily digests. The AI will start learning fresh from your next conversation."
 msgstr "这将永久删除全部 {0} 条记忆及其每日摘要。AI 将从你的下一次对话开始重新学习。"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1184
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1203
 msgid "This will permanently delete the project and all associated threads. This action cannot be undone."
 msgstr "这将永久删除该项目及所有相关对话。此操作无法撤销。"
 
@@ -36940,12 +36962,12 @@ msgstr "对话统计"
 msgid "Thread summary"
 msgstr "对话摘要"
 
-#: src/features/settings/lib/settings-keywords.ts:98
+#: src/features/settings/lib/settings-keywords.ts:115
 msgid "thread titles"
 msgstr "对话标题"
 
 #: src/features/settings/components/personalization/personalization-settings.tsx:347
-#: src/features/settings/lib/settings-keywords.ts:98
+#: src/features/settings/lib/settings-keywords.ts:115
 msgid "Thread Titles"
 msgstr "对话标题"
 
@@ -37215,7 +37237,7 @@ msgstr "使用你自己的端点消耗的 token 不计入积分，但每日消�
 msgid "Tokyo"
 msgstr "东京"
 
-#: src/features/settings/lib/settings-keywords.ts:94
+#: src/features/settings/lib/settings-keywords.ts:111
 msgid "tone"
 msgstr "语气"
 
@@ -37435,7 +37457,7 @@ msgstr "追踪每一个 token 和每一美元。"
 msgid "Track your LLM token usage, cost, and set budget alerts"
 msgstr "追踪你的 LLM token 用量和成本，并设置预算提醒"
 
-#: src/features/settings/lib/settings-keywords.ts:116
+#: src/features/settings/lib/settings-keywords.ts:137
 msgid "tracking"
 msgstr "追踪"
 
@@ -37725,11 +37747,11 @@ msgstr "试用 Neore"
 msgid "Try searching for a different term."
 msgstr "尝试搜索其他词。"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1006
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1025
 msgid "Try searching in message content"
 msgstr "尝试搜索消息内容"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1006
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1025
 msgid "Try searching in thread titles or summaries"
 msgstr "尝试搜索对话标题或摘要"
 
@@ -37789,7 +37811,7 @@ msgstr "请先开启记忆，再导入文件。"
 msgid "Turns these tools off:"
 msgstr "关闭以下工具："
 
-#: src/features/settings/lib/settings-keywords.ts:100
+#: src/features/settings/lib/settings-keywords.ts:117
 msgid "tutorial"
 msgstr "教程"
 
@@ -38468,7 +38490,7 @@ msgstr "升级到 Pro"
 msgid "Upgrade to Pro, monthly"
 msgstr "升级为 Pro（按月）"
 
-#: src/features/settings/lib/settings-keywords.ts:114
+#: src/features/settings/lib/settings-keywords.ts:135
 msgid "upload"
 msgstr "上传"
 
@@ -39967,7 +39989,7 @@ msgstr "欢迎回来"
 msgid "Welcome to Neore"
 msgstr "欢迎使用 Neore"
 
-#: src/features/settings/lib/settings-keywords.ts:100
+#: src/features/settings/lib/settings-keywords.ts:117
 msgid "welcome tour"
 msgstr "欢迎导览"
 
@@ -40110,7 +40132,7 @@ msgstr "监视内容"
 msgid "What users sent from the app, newest first"
 msgstr "用户从应用发送的内容，最新的在前"
 
-#: src/features/settings/lib/settings-keywords.ts:115
+#: src/features/settings/lib/settings-keywords.ts:136
 msgid "what we store"
 msgstr "我们存储的内容"
 
@@ -40336,7 +40358,7 @@ msgstr "如果不提供，则使用你的 SSH 代理和默认密钥。暂不支�
 msgid "Wix developer docs, Velo code assistance, and site management"
 msgstr "Wix 开发者文档、Velo 代码辅助和网站管理"
 
-#: src/features/settings/lib/settings-keywords.ts:91
+#: src/features/settings/lib/settings-keywords.ts:108
 msgid "work"
 msgstr "工作"
 
@@ -40907,7 +40929,7 @@ msgstr "你对此聊天的访问权限已结束。"
 msgid "Your account already has the maximum number of API keys, so the command line was not signed in. Revoke one in Settings, then run `neore login --device` again."
 msgstr "你的账户已达 API 密钥数量上限，因此命令行未登录。请在设置中撤销一个，然后再次运行 `neore login --device`。"
 
-#: src/features/auth/components/settings/account/delete-account-card.tsx:68
+#: src/features/auth/components/settings/account/delete-account-card.tsx:69
 msgid "Your account and all associated data are being deleted. This cannot be cancelled."
 msgstr "你的账号及所有相关数据正在被删除，此操作无法取消。"
 
@@ -40950,6 +40972,7 @@ msgid "Your backup models were changed in another tab. The saved list is shown a
 msgstr "你的备用模型已在另一个标签页中更改。已重新显示保存的列表。"
 
 #: src/features/settings/components/chat/bots-settings.tsx:461
+#: src/features/settings/lib/settings-keywords.ts:85
 msgid "Your bots"
 msgstr "你的机器人"
 
@@ -41360,6 +41383,7 @@ msgstr "Z.AI 视觉增强的旗舰模型"
 
 #: src/features/settings/components/chat/model-filter-settings.tsx:339
 #: src/features/settings/components/chat/model-filter-settings.tsx:351
+#: src/features/settings/lib/settings-keywords.ts:102
 msgid "Zero Data Retention (ZDR)"
 msgstr "零数据保留（ZDR）"
 

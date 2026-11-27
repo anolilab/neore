@@ -79,6 +79,17 @@ export const countSections = (groups: ReadonlyArray<ThreadGroup>): SectionCounts
     return counts;
 };
 
+/**
+ * The collapsed groups of the sections `next` picks that `previous` did not: picking a section is asking to see it, so the list opens
+ * those once. After that the group's own chevron decides.
+ */
+export const groupsToOpenOnPick = (groups: ReadonlyArray<ThreadGroup>, previous: ReadonlyArray<SectionKey>, next: ReadonlyArray<SectionKey>): ThreadGroup[] =>
+    groups.filter((group) => {
+        const section = sectionOfGroup(group);
+
+        return section !== "active" && group.isCollapsed === true && next.includes(section) && !previous.includes(section);
+    });
+
 export const sameSectionCounts = (left: SectionCounts, right: SectionCounts): boolean => SECTION_KEYS.every((key) => left[key] === right[key]);
 
 const containsThread = (node: BranchNode, threadId: string): boolean =>
@@ -105,9 +116,7 @@ export const filterGroupsBySection = (
         const section = sectionOfGroup(group);
 
         if (showsGroup(filter, section)) {
-            const isPicked = section !== "active" && filter.includes(section);
-
-            result.push(isPicked && group.isCollapsed === true ? { ...group, isCollapsed: false } : group);
+            result.push(group);
         } else if (openThreadId !== undefined) {
             const root = group.threads.find((thread) => containsThread(thread, openThreadId));
 

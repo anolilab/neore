@@ -71,7 +71,7 @@ const ChatPage = () => {
     }, [navigate, shareToken]);
 
     useEffect(() => {
-        const supportedParams = new Set(["initialMessage", "promptId", "redirectReason", "settings", "settingsTab"]);
+        const supportedParams = new Set(["initialMessage", "promptId", "redirectReason", "settings", "settingsAnchor", "settingsTab"]);
         const searchParams = new URLSearchParams(location.search);
         const unsupportedParams: string[] = [];
 

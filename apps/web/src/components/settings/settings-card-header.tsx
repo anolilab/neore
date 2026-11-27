@@ -25,6 +25,8 @@ const SettingsCardHeader = ({ className, classNames, description, isPending, tit
         <CardHeader className={cn(classNames?.header, className)}>
             {isPending ? (
                 <>
+                    {/* The heading stays for the outline while it loads: a row's heading under it would otherwise skip a level. */}
+                    {title && <CardTitle className="sr-only">{title}</CardTitle>}
                     <Skeleton className={cn("my-0.5 h-5 w-1/3 md:h-5.5", classNames?.skeleton)} />
 
                     {description && <Skeleton className={cn("mt-1.5 mb-0.5 h-3 w-2/3 md:h-3.5", classNames?.skeleton)} />}
