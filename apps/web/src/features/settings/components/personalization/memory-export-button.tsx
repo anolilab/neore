@@ -6,8 +6,9 @@ import { Button } from "@neore/ui/components/button";
 import { useMutation } from "@tanstack/react-query";
 import { DownloadIcon } from "lucide-react";
 import type { FC } from "react";
-import { useId } from "react";
+import { useEffect, useId, useRef } from "react";
 
+import { useAuthSession } from "@/features/auth/hooks/use-auth-session";
 import { useLunoraActionOptions } from "@/lib/lunora/crpc";
 
 /** Hand the text to the browser as a `.md` download. */
@@ -34,12 +35,33 @@ const saveMarkdown = (markdown: string, filename: string): void => {
 const MemoryExportButton: FC = () => {
     const { t } = useLingui();
     const errorId = useId();
+    const { data: session } = useAuthSession();
+    const userId = session?.user.id;
+    // Who is signed in now, read when the answer arrives: the effect keeps it current, never a read during render.
+    const currentUserId = useRef(userId);
+
+    useEffect(() => {
+        currentUserId.current = userId;
+    }, [userId]);
+
     const { error, isPending, mutate } = useMutation({
         ...useLunoraActionOptions(api.memory.markdown_export.exportMemoriesMarkdown),
         // Lunora actions are not queued: offline, the click fails at once and says so instead of waiting for a connection.
         networkMode: "always",
-        // Named by the day the server dated it (the user's timezone), the same day as its header.
-        onSuccess: ({ day, markdown }: { count: number; day: string; markdown: string; truncated: boolean }) => {
+        onMutate: () => {
+            return { startedBy: currentUserId.current };
+        },
+        // Named by the day the server dated it (the user's timezone), the same day as its header. An answer that
+        // arrives after another account signed in is the previous person's memories: it is dropped, never saved.
+        onSuccess: (
+            { day, markdown }: { count: number; day: string; markdown: string; truncated: boolean },
+            _variables: Record<string, never>,
+            started: { startedBy: string | undefined } | undefined,
+        ) => {
+            if (started?.startedBy !== currentUserId.current) {
+                return;
+            }
+
             saveMarkdown(markdown, `memories-${day}.md`);
         },
         retry: 0,

@@ -2,7 +2,7 @@
 
 /**
  * `<MemoryExportButton>`: a click downloads the server's Markdown as a `.md` file, the button is busy (and keeps focus)
- * meanwhile, and a failure is said next to it.
+ * meanwhile, a failure is said next to it, and an answer that arrives after another account signed in is never saved.
  */
 import { onlineManager, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
@@ -11,13 +11,21 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import MemoryExportButton from "./memory-export-button";
 
 const harness = vi.hoisted(() => {
-    return { exportMemories: vi.fn() };
+    return { exportMemories: vi.fn(), userId: "user-1" };
 });
 
 vi.mock("@lingui/react/macro", () => {
     return {
         useLingui: () => {
             return { t: (strings: TemplateStringsArray, ...values: unknown[]) => String.raw({ raw: strings }, ...values) };
+        },
+    };
+});
+
+vi.mock("@/features/auth/hooks/use-auth-session", () => {
+    return {
+        useAuthSession: () => {
+            return { data: { user: { id: harness.userId } } };
         },
     };
 });
@@ -30,9 +38,11 @@ vi.mock("@/lib/lunora/crpc", () => {
     };
 });
 
-const renderButton = () =>
+const queryClient = (): QueryClient => new QueryClient({ defaultOptions: { mutations: { retry: false } } });
+
+const renderButton = (client: QueryClient = queryClient()) =>
     render(
-        <QueryClientProvider client={new QueryClient({ defaultOptions: { mutations: { retry: false } } })}>
+        <QueryClientProvider client={client}>
             <MemoryExportButton />
         </QueryClientProvider>,
     );
@@ -65,6 +75,7 @@ describe("MemoryExportButton", () => {
     });
 
     afterEach(() => {
+        harness.userId = "user-1";
         onlineManager.setOnline(true);
         vi.unstubAllGlobals();
         vi.restoreAllMocks();
@@ -133,5 +144,34 @@ describe("MemoryExportButton", () => {
         expect(alert.textContent).toContain("The download could not be prepared.");
         expect(screen.getByRole("button", { name: "Download memories (Markdown)" }).getAttribute("aria-describedby")).toBe(alert.id);
         expect(clicks()).toHaveLength(0);
+    });
+
+    it("drops an answer that arrives after another account signed in", async () => {
+        let answer: (value: unknown) => void = () => {};
+
+        harness.exportMemories.mockReturnValue(
+            // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- the app's TypeScript lib predates `Promise.withResolvers`
+            new Promise((resolve) => {
+                answer = resolve;
+            }),
+        );
+
+        const client = queryClient();
+        const { rerender } = renderButton(client);
+
+        fireEvent.click(screen.getByRole("button", { name: "Download memories (Markdown)" }));
+        await screen.findByRole("button", { name: "Preparing your memories…" });
+
+        harness.userId = "user-2";
+        rerender(
+            <QueryClientProvider client={client}>
+                <MemoryExportButton />
+            </QueryClientProvider>,
+        );
+        answer({ count: 1, day: "2026-03-02", markdown: "# Your memories\n", truncated: false });
+
+        await screen.findByRole("button", { name: "Download memories (Markdown)" });
+        expect(clicks()).toHaveLength(0);
+        expect(blobs).toHaveLength(0);
     });
 });

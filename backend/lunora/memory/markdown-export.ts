@@ -3,8 +3,8 @@
  * active rows: superseded history is in the account data export (`./gdpr.ts`). It works with memory off, so the user
  * can still see what is stored.
  *
- * One read of the newest {@link MEMORY_EXPORT_SCAN_ROWS} active rows (there is no pinned index), split in memory: every
- * pinned row among them, and the {@link MEMORY_EXPORT_MAX_ROWS} newest others. "Newest" is when a row was saved, not when
+ * The newest {@link MEMORY_EXPORT_SCAN_ROWS} active rows (there is no pinned index), read a page per call and split in
+ * memory: every pinned row among them, and the {@link MEMORY_EXPORT_MAX_ROWS} newest others. "Newest" is when a row was saved, not when
  * it was last confirmed: a deliberate bound, so a cut drops the oldest saved rows and the file says it is cut.
  */
 import { v } from "lunorash/server";
@@ -47,26 +47,25 @@ const toExportRow = (m: Doc<"memories">): ExportMemoryRow => {
     };
 };
 
-/**
- * The user's pinned memories and newest unpinned ones among their newest {@link MEMORY_EXPORT_SCAN_ROWS} active rows,
- * and whether any active row was left out. One row past the scan is read, so exactly the scan is not reported as cut.
- */
-export const readMemoryExportRows = internalQuery
-    .input({ userId: v.string() })
-    .output(v.object({ rows: v.array(vExportRow), truncated: v.boolean() }))
+/** Rows one `readMemoryExportPage` call reads at most: six of them cover the scan and the row past it. */
+export const MEMORY_EXPORT_PAGE_ROWS = 1000;
+
+/** One page of the user's active memories, newest first. */
+export const readMemoryExportPage = internalQuery
+    .input({
+        cursor: v.union(v.string(), v.null()),
+        numItems: v.number().check((n) => Number.isSafeInteger(n) && n > 0 && n <= MEMORY_EXPORT_PAGE_ROWS, { message: "numItems out of range" }),
+        userId: v.string(),
+    })
+    .output(v.object({ cursor: v.union(v.string(), v.null()), isDone: v.boolean(), rows: v.array(vExportRow) }))
     .query(async ({ args, ctx }) => {
-        const scanned = await ctx.db
+        const page = await ctx.db
             .query("memories")
             .withIndex("by_userId_supersededBy", (q) => q.eq("userId", args.userId).eq("supersededBy", null))
             .order("desc")
-            .take(MEMORY_EXPORT_SCAN_ROWS + 1);
-        const read = scanned.slice(0, MEMORY_EXPORT_SCAN_ROWS);
-        const unpinned = read.filter((m) => m.pinned !== true);
+            .paginate({ cursor: args.cursor, numItems: args.numItems });
 
-        return {
-            rows: [...read.filter((m) => m.pinned === true), ...unpinned.slice(0, MEMORY_EXPORT_MAX_ROWS)].map((m) => toExportRow(m)),
-            truncated: scanned.length > MEMORY_EXPORT_SCAN_ROWS || unpinned.length > MEMORY_EXPORT_MAX_ROWS,
-        };
+        return { cursor: page.continueCursor, isDone: page.isDone, rows: page.page.map((m) => toExportRow(m)) };
     });
 
 /**
@@ -112,9 +111,43 @@ export const resolveMemoryBotLabels = internalQuery
 /** Bot ids one label lookup takes, so a user with many bots never builds one oversized read. */
 const BOT_LABEL_BATCH = 100;
 
-/** The rows an export holds, pinned first (`readMemoryExportRows`). */
-export const readExportMemories = async (ctx: Pick<ActionCtx, "runQuery">, userId: string): Promise<{ rows: ExportMemoryRow[]; truncated: boolean }> =>
-    await ctx.runQuery(internal.memory.markdown_export.readMemoryExportRows, { userId });
+/**
+ * The user's pinned memories and newest unpinned ones among their newest {@link MEMORY_EXPORT_SCAN_ROWS} active rows,
+ * and whether any active row was left out. Read a page of at most {@link MEMORY_EXPORT_PAGE_ROWS} per call, so no
+ * single read grows with the account; one row past the scan is read, so exactly the scan is not reported as cut.
+ */
+export const readExportMemories = async (ctx: Pick<ActionCtx, "runQuery">, userId: string): Promise<{ rows: ExportMemoryRow[]; truncated: boolean }> => {
+    const pinned: ExportMemoryRow[] = [];
+    const unpinned: ExportMemoryRow[] = [];
+    let cursor: string | null = null;
+    let read = 0;
+
+    while (read <= MEMORY_EXPORT_SCAN_ROWS) {
+        const page: { cursor: string | null; isDone: boolean; rows: ExportMemoryRow[] } = await ctx.runQuery(
+            internal.memory.markdown_export.readMemoryExportPage,
+            { cursor, numItems: Math.min(MEMORY_EXPORT_PAGE_ROWS, MEMORY_EXPORT_SCAN_ROWS + 1 - read), userId },
+        );
+
+        for (const row of page.rows) {
+            read += 1;
+
+            if (read <= MEMORY_EXPORT_SCAN_ROWS) {
+                (row.pinned ? pinned : unpinned).push(row);
+            }
+        }
+
+        if (page.isDone || page.rows.length === 0) {
+            break;
+        }
+
+        cursor = page.cursor;
+    }
+
+    return {
+        rows: [...pinned, ...unpinned.slice(0, MEMORY_EXPORT_MAX_ROWS)],
+        truncated: read > MEMORY_EXPORT_SCAN_ROWS || unpinned.length > MEMORY_EXPORT_MAX_ROWS,
+    };
+};
 
 const readBotLabels = async (ctx: Pick<ActionCtx, "runQuery">, userId: string, rows: ReadonlyArray<ExportMemoryRow>): Promise<Map<string, BotLabel>> => {
     const botIds = [...new Set(rows.map((row) => row.botId).filter((id): id is string => id !== undefined))];

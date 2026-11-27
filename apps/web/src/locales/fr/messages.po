@@ -11813,7 +11813,7 @@ msgstr "Télécharger en JSON"
 msgid "Download Markdown"
 msgstr "Télécharger en Markdown"
 
-#: src/features/settings/components/personalization/memory-export-button.tsx:61
+#: src/features/settings/components/personalization/memory-export-button.tsx:83
 msgid "Download memories (Markdown)"
 msgstr "Télécharger les souvenirs (Markdown)"
 
@@ -26865,8 +26865,8 @@ msgstr "Préparation d’une requête…"
 msgid "Preparing the import…"
 msgstr "Préparation de l’importation…"
 
-#: src/features/settings/components/personalization/memory-export-button.tsx:61
-#: src/features/settings/components/personalization/memory-export-button.tsx:64
+#: src/features/settings/components/personalization/memory-export-button.tsx:83
+#: src/features/settings/components/personalization/memory-export-button.tsx:86
 msgid "Preparing your memories…"
 msgstr "Préparation de vos souvenirs…"
 
@@ -35284,7 +35284,7 @@ msgstr "Le diff est trop volumineux pour être conservé. Les fichiers et leur n
 msgid "The documents the answer should be retrieved from. Used for hit rate, MRR, precision and recall."
 msgstr "Les documents à partir desquels la réponse doit être récupérée. Utilisés pour le taux de réussite, le MRR, la précision et le rappel."
 
-#: src/features/settings/components/personalization/memory-export-button.tsx:68
+#: src/features/settings/components/personalization/memory-export-button.tsx:90
 msgid "The download could not be prepared. Please try again in a moment."
 msgstr "Le téléchargement n'a pas pu être préparé. Veuillez réessayer dans un instant."
 

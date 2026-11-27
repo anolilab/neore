@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import schema from "../schema";
 import type { BotLabel, ExportMemoryRow } from "./export-format";
 import { formatMemoryMarkdown, MEMORY_EXPORT_MAX_ROWS, MEMORY_EXPORT_SCAN_ROWS } from "./export-format";
-import { readExportMemories, readMemoryExportRows, resolveMemoryBotLabels } from "./markdown-export";
+import { MEMORY_EXPORT_PAGE_ROWS, readExportMemories, readMemoryExportPage, resolveMemoryBotLabels } from "./markdown-export";
 
 type Harness = ReturnType<typeof lunoraTest>;
 
@@ -155,7 +155,7 @@ const runner = () => {
             runQuery: async (_reference: unknown, args: unknown) => {
                 calls.push(1);
 
-                return await harness.run(async (ctx: any) => await ctx.runQuery(readMemoryExportRows, args));
+                return await harness.run(async (ctx: any) => await ctx.runQuery(readMemoryExportPage, args));
             },
         } as never,
     };
@@ -180,7 +180,7 @@ describe("readExportMemories", () => {
         expect(truncated).toBe(false);
     });
 
-    it("stops at the unpinned cap in one read", async () => {
+    it("stops at the unpinned cap, a page per read", async () => {
         await insert(MEMORY_EXPORT_MAX_ROWS + 30);
 
         const { calls, ctx } = runner();
@@ -188,7 +188,7 @@ describe("readExportMemories", () => {
 
         expect(rows).toHaveLength(MEMORY_EXPORT_MAX_ROWS);
         expect(truncated).toBe(true);
-        expect(calls).toHaveLength(1);
+        expect(calls).toHaveLength(Math.ceil((MEMORY_EXPORT_MAX_ROWS + 30) / MEMORY_EXPORT_PAGE_ROWS));
     });
 
     it("stops at the scan with many pinned rows, and does not call exactly the scan cut", async () => {
@@ -201,10 +201,13 @@ describe("readExportMemories", () => {
 
         await insert(10, { pinned: true });
 
-        const over = await readExportMemories(runner().ctx, "user-1");
+        const { calls, ctx } = runner();
+        const over = await readExportMemories(ctx, "user-1");
 
         expect(over.rows).toHaveLength(MEMORY_EXPORT_SCAN_ROWS);
         expect(over.truncated).toBe(true);
+        // Five full pages and the one row past the scan: never more than the scan plus one.
+        expect(calls).toHaveLength(MEMORY_EXPORT_SCAN_ROWS / MEMORY_EXPORT_PAGE_ROWS + 1);
     });
 
     it("keeps a pinned row and the newest rows past the cap, and leaves out the oldest unpinned ones", async () => {
