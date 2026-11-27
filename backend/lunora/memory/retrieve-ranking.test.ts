@@ -200,7 +200,7 @@ describe("rankMemories", () => {
                 candidate("part", { ...old, memory: "Placed an order for part KX-2291" }),
                 ...["k1", "k2", "k3"].map((id) => candidate(id, { ...old, memory: "Placed an order for a kettle" })),
             ];
-            const lookups = [lookup("2291", 1), lookup("order", 4), lookup("kx", 1)];
+            const lookups = [lookup("kx 2291", 1), lookup("order", 4)];
 
             expect(keywordSignalsFor(rows, "did I order KX-2291", lookups).rareTermMatches).toEqual(new Set(["part"]));
             // The kettles share `order`, a word four rows hold: the vector search decides them, and it lacks them.
@@ -208,15 +208,41 @@ describe("rankMemories", () => {
             expect(ids(rows, "did I order KX-2291", lookups, [["part", 0.2]])).toEqual(["part"]);
         });
 
-        it("gives no keyword relevance at all when the query names an identifier no memory holds", () => {
-            // A row with no vector is found by words, so only the absent code keeps it out.
-            const rows = [candidate("part", { memory: "Placed an order for part KX-2291" })];
-            const signals = keywordSignalsFor(rows, "did I order part QZ-5508", [lookup("5508", 0), lookup("order", 1), lookup("part", 1), lookup("qz", 0)]);
+        it("weighs an identifier the memory does not hold: one shared word is not enough, two can be", () => {
+            // Rows with no vector are found by words, so only the absent code keeps one out.
+            const part = candidate("part", { memory: "Placed an order for part KX-2291" });
 
-            expect(signals.keywordScores.size).toBe(0);
-            expect(rank(rows, [], "did I order part QZ-5508")).toEqual([]);
+            expect(keywordSignalsFor([part], "QZ-5508 part", [lookup("qz 5508", 0), lookup("part", 1)]).keywordScores.size).toBe(0);
+            expect(rank([part], [], "QZ-5508 part")).toEqual([]);
             // Relevance by vector still counts.
-            expect(rank(rows, [["part", 0.9]], "did I order part QZ-5508").map((m) => m.memoryId)).toEqual(["part"]);
+            expect(rank([part], [["part", 0.9]], "QZ-5508 part").map((m) => m.memoryId)).toEqual(["part"]);
+
+            // An everyday code the memory never had does not wipe a row that shares the question's real words.
+            const booster = candidate("booster", { memory: "the doctor said the booster can wait until spring" });
+
+            expect(rank([booster], [], "my covid-19 booster, what did the doctor say").map((m) => m.memoryId)).toEqual(["booster"]);
+            // The absent code still weighs in the share: lower than the same row for the question without it.
+            expect(keywordSignalsFor([booster], "my covid-19 booster, what did the doctor say").keywordScores.get("booster")).toBeLessThan(
+                keywordSignalsFor([booster], "my booster, what did the doctor say").keywordScores.get("booster")!,
+            );
+        });
+
+        it("finds a memory holding the console or the phone number the query names", () => {
+            const ps5 = candidate("ps5", { memory: "bought a PS5 with a two year warranty" });
+            const phone = candidate("phone", { memory: "the plumber's number is 555-123-4567" });
+            const other = candidate("other", { memory: "the plumber's number is 555-123-9999" });
+
+            expect(rank([ps5], [], "is my PS5 still under warranty").map((m) => m.memoryId)).toEqual(["ps5"]);
+            expect(rank([phone, other], [], "who has 555-123-4567").map((m) => m.memoryId)).toEqual(["phone"]);
+        });
+
+        it("finds the held code of two the query names, as its rare term", () => {
+            const ab = candidate("ab", { ...old, memory: "Ordered part AB-5508" });
+            const searchText = "did I order QZ-5508 or AB-5508";
+            const lookups = [lookup("qz 5508", 0), lookup("ab 5508", 1)];
+
+            expect(keywordSignalsFor([ab], searchText, lookups).rareTermMatches).toEqual(new Set(["ab"]));
+            expect(ids([ab], searchText, lookups)).toEqual(["ab"]);
         });
 
         it("matches an identifier whole: `AB-5508` is not returned for `QZ-5508` when the vectors miss it", () => {
@@ -224,9 +250,9 @@ describe("rankMemories", () => {
             const qz = candidate("qz", { ...old, memory: "Ordered part QZ-5508" });
             const searchText = "did I order QZ-5508";
 
-            expect(ids([ab], searchText, [lookup("5508", 0)])).toEqual([]);
-            expect(keywordSignalsFor([ab], searchText, [lookup("5508", 0)]).keywordScores.size).toBe(0);
-            expect(ids([ab, qz], searchText, [lookup("5508", 1)])).toEqual(["qz"]);
+            expect(ids([ab], searchText, [lookup("qz 5508", 0)])).toEqual([]);
+            expect(keywordSignalsFor([ab], searchText, [lookup("qz 5508", 0)]).keywordScores.size).toBe(0);
+            expect(ids([ab, qz], searchText, [lookup("qz 5508", 1)])).toEqual(["qz"]);
         });
 
         it("never counts another bot's rows: a word only they hold is not rare and does not lower this chat's share", () => {
@@ -254,7 +280,7 @@ describe("rankMemories", () => {
 
             expect(searchText.length).toBeGreaterThan(100_000);
             expect(salientTermsOf(searchText).length).toBeLessThanOrEqual(MAX_SCORED_TERMS);
-            expect(ids([part], searchText, [lookup("2291", 1)])).toEqual(["part"]);
+            expect(ids([part], searchText, [lookup("kx 2291", 1)])).toEqual(["part"]);
         });
 
         it("reads a plain number as an ordinary term: it never turns keyword relevance off", () => {
@@ -409,7 +435,7 @@ describe("keyword hits", () => {
         const [code] = keywordLookupTerms("did I order QZ-5508");
         const fetched = [row("ab", "Ordered part AB-5508"), row("apart", "QZ order and 5508 later"), row("qz", "Ordered part QZ-5508")];
 
-        expect(code).toEqual({ code: true, term: "5508", tokens: ["qz", "5508"] });
+        expect(code).toEqual({ code: true, term: "qz 5508", tokens: ["qz", "5508"] });
         expect(keywordLookupOf(code!, fetched, {}, undefined)).toMatchObject({ corpusRows: 1, hits: [{ _id: "qz" }] });
     });
 

@@ -97,9 +97,12 @@ current one, both over this fixture.
 | exact    | 0.000 → 1.000 | 0.000 → 0.982 | 0.600 → 1.000      | 1.000 → 0.048  |               |                   |
 | abstain  |               |               |                    | 1.000 → 1.000  | 0.867 → 0.933 | 1.000 → 1.000     |
 
-With no vector search the keyword-only run reads Recall@8 0.160 → 0.603 and abstain rate 0.433 → 0.767. A number alone
+With no vector search the keyword-only run reads Recall@8 0.160 → 0.603 and abstain rate 0.433 → 0.667. A number alone
 is no identifier, so "is parcel 52690 mine" is answered with the user's own parcel note (ends in 77314) rather than with
-nothing; that one query is the abstain rate's 0.967 → 0.933 (and 0.800 → 0.767 without vectors), and both floors record it. Single NDCG@8
+nothing; that one query is the abstain rate's 0.967 → 0.933 (and 0.800 → 0.767 without vectors), and both floors record it. Without vectors three more fall to 0.667: an
+identifier the memory lacks now weighs in the share instead of zeroing it, so `QZ-5508`, `WTU-40126` and `HIST-318`
+reach the sibling code's row through two or more shared words (part, dishwasher; serial, bike; evening, course, up).
+With vectors all three still abstain. Single NDCG@8
 falls by 0.008 (two queries reorder) because a word the memory never had no longer dilutes the one it does: a row with
 no vector that shares one word of a question whose other words are in no memory scores in full. Its floor stays 0.830,
 within the 0.02 tolerance. Exact NDCG@8 is 0.982 because each term's BM25 factor is capped at 1 in the keyword share,
@@ -114,8 +117,8 @@ What moved them:
   `search_memory_text` FTS5 index (reading 50 rows, keeping 20 whole-token, usable, in-scope ones), so a row older than
   the window that holds the query's code or name becomes a candidate. Relevance is the IDF-weighted share of every salient term
   the memory holds at all, over whole tokens (`time` is not `timer`, which cost two abstain queries with prefix
-  matching). A query whose leading identifier is in no memory (`QZ-5508` when the user has `KX-2291`) has no keyword
-  relevance at all. A row holding the leading term and the rare term (that identifier, or the rarest looked-up word,
+  matching). An identifier the memory lacks (`QZ-5508` when the user has `KX-2291`) counts in the share's denominator at
+  the highest IDF, and a row then needs two of the query's terms (or one of its identifiers) to count by keyword. A row holding the leading term and the rare term (that identifier, or the rarest looked-up word,
   held by at most 2 of the user's rows) counts by keyword even when a full vector cut lacks it. The keyword floor is
   0.15: at 0.2, multi Recall@8 reads 0.867. NDCG@8 of multi moves by 0.001.
 

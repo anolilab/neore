@@ -85,12 +85,13 @@ const isIdentifier = (chunk: string): boolean => {
 };
 
 /**
- * The identifiers of `text`, by each of their tokens with a digit: `5508` → `qz 5508` of `QZ-5508`, `e4012` of `E4012`,
- * `v2` → `v2 3` of `v2.3`, `345` → `12 345` of `12-345`. An identifier is letters then digits, at least 3 of them, or
- * digit groups joined by a separator. A number alone never is one: a year, a count, a price, a decimal or a date
- * (`2026-11-27`); nor a mix that starts with digits, a time, an ordinal or a unit (`5pm`, `21st`, `100km`).
+ * The identifiers of `text`, each once, as the tokens it splits into: `qz 5508` of `QZ-5508`, `e4012` of `E4012`,
+ * `v2 3` of `v2.3`, `12 345` of `12-345`. Two that share a part (`QZ-5508`, `AB-5508`) are two identifiers. An
+ * identifier is letters then digits, at least 3 of them, or digit groups joined by a separator. A number alone never is
+ * one: a year, a count, a price, a decimal or a date (`2026-11-27`); nor a mix that starts with digits, a time, an
+ * ordinal or a unit (`5pm`, `21st`, `100km`).
  */
-const identifiersOf = (text: string): Map<string, string[]> => {
+const identifiersOf = (text: string): string[][] => {
     const identifiers = new Map<string, string[]>();
 
     for (const [chunk] of normalize(text).matchAll(CHUNK_RE)) {
@@ -100,41 +101,45 @@ const identifiersOf = (text: string): Map<string, string[]> => {
 
         const tokens = searchTokensOf(chunk);
 
-        for (const token of tokens) {
-            // A single digit (the `3` of `v2.3`) is too common a token to stand for the identifier.
-            if (token.length > 1 && DIGIT_RE.test(token) && !identifiers.has(token)) {
-                identifiers.set(token, tokens);
-            }
-        }
+        identifiers.set(tokens.join(" "), tokens);
     }
 
-    return identifiers;
+    return [...identifiers.values()];
 };
 
-/** A salient query term: the token it is known by, and the tokens a row must hold, in order and adjacent. */
+/** A salient query term: its key, and the tokens a row must hold. */
 export interface SalientTerm {
-    /** Part of an identifier: `tokens` is the whole identifier, so `AB-5508` does not hold `5508` of `QZ-5508`. */
+    /** An identifier: a row holds it only as a whole run of its own (`AB-5508` and `QZ-5508-9000` do not hold `QZ-5508`). */
     code: boolean;
+    /** The token, or an identifier's tokens joined by spaces (`qz 5508`). */
     term: string;
     tokens: string[];
 }
 
-/** How often `tokens` hold `sequence`, in order and adjacent. */
-export const sequenceCount = (tokens: ReadonlyArray<string>, sequence: ReadonlyArray<string>): number => {
-    let count = 0;
+/** What matching reads of a memory: its tokens, and the tokens of each run of letters and digits joined by separators. */
+export interface TermIndex {
+    runs: string[][];
+    tokens: string[];
+}
 
-    for (let start = 0; start + sequence.length <= tokens.length; start += 1) {
-        if (sequence.every((token, offset) => tokens[start + offset] === token)) {
-            count += 1;
-        }
-    }
-
-    return count;
+export const termIndexOf = (text: string): TermIndex => {
+    return {
+        runs: [...normalize(text).matchAll(CHUNK_RE)].map(([chunk]) => searchTokensOf(chunk)),
+        tokens: searchTokensOf(text),
+    };
 };
 
-/** Whether `tokens` hold `sequence` in order and adjacent. */
-export const holdsSequence = (tokens: ReadonlyArray<string>, sequence: ReadonlyArray<string>): boolean =>
-    sequence.length === 1 ? tokens.includes(sequence[0]!) : sequenceCount(tokens, sequence) > 0;
+/**
+ * How often a memory holds a term: a word as a whole token; an identifier as a whole run, starting and ending where
+ * the identifier does, so `QZ-5508` is in `part QZ-5508.` and not in `QZ-5508-9000` or `AB/QZ-5508`.
+ */
+export const termCount = (index: TermIndex, term: { code: boolean; tokens: ReadonlyArray<string> }): number => {
+    if (!term.code) {
+        return index.tokens.filter((token) => token === term.tokens[0]).length;
+    }
+
+    return index.runs.filter((run) => run.length === term.tokens.length && run.every((token, position) => token === term.tokens[position])).length;
+};
 
 /** Scoring reads at most this much of a search: a pasted document is not a question, and every term costs a pass. */
 export const MAX_SCORED_TEXT_LENGTH = 4000;
@@ -151,20 +156,25 @@ export const MAX_SCORED_TERMS = 32;
 export const salientTermsOf = (searchText: string): SalientTerm[] => {
     const text = searchText.slice(0, MAX_SCORED_TEXT_LENGTH);
     const identifiers = identifiersOf(text);
-    const rank = (term: string): number => {
-        if (identifiers.has(term)) {
-            return 0;
-        }
-
-        return DIGIT_RE.test(term) ? 2 : 1;
-    };
-
-    return extractKeywordTerms(text, Infinity, searchTokensOf)
-        .toSorted((a, b) => rank(a) - rank(b))
-        .slice(0, MAX_SCORED_TERMS)
-        .map((term) => {
-            const tokens = identifiers.get(term);
-
-            return { code: tokens !== undefined, term, tokens: tokens ?? [term] };
+    // The identifier with the longest digit run first, as `extractKeywordTerms` ranks digits; then the earlier one.
+    const longestDigits = (tokens: string[]): number => Math.max(0, ...tokens.filter((token) => DIGIT_RE.test(token)).map((token) => token.length));
+    const codes = identifiers
+        .map((tokens, position) => {
+            return { position, tokens };
+        })
+        .toSorted((a, b) => longestDigits(b.tokens) - longestDigits(a.tokens) || a.position - b.position)
+        .map(({ tokens }) => {
+            return { code: true, term: tokens.join(" "), tokens };
         });
+    // An identifier's tokens are the identifier: its letters (`qz`, `hr`) are no words of their own, or a sibling code
+    // (`HR-7501` for `HR-9934`) would share them.
+    const inCodes = new Set(identifiers.flat());
+    const words = extractKeywordTerms(text, Infinity, searchTokensOf)
+        .filter((term) => !inCodes.has(term))
+        .toSorted((a, b) => Number(DIGIT_RE.test(a)) - Number(DIGIT_RE.test(b)))
+        .map((term) => {
+            return { code: false, term, tokens: [term] };
+        });
+
+    return [...codes, ...words].slice(0, MAX_SCORED_TERMS);
 };

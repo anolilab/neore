@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { salientTermsOf, searchTokensOf } from "./search-terms";
+import { salientTermsOf, searchTokensOf, termCount, termIndexOf } from "./search-terms";
 
 describe(searchTokensOf, () => {
     it("splits Han, kana and Hangul runs into overlapping pairs, as the search index does", () => {
@@ -14,13 +14,32 @@ describe(searchTokensOf, () => {
     });
 });
 
+describe(termCount, () => {
+    const qz = { code: true, tokens: ["qz", "5508"] };
+
+    it("matches an identifier only as a whole run: where it starts and where it ends", () => {
+        expect(termCount(termIndexOf("ordered part QZ-5508."), qz)).toBe(1);
+        expect(termCount(termIndexOf("serial QZ-5508-9000"), qz)).toBe(0);
+        expect(termCount(termIndexOf("AB/QZ-5508"), qz)).toBe(0);
+        // And the other way: a longer identifier is not in a row holding the shorter one.
+        expect(termCount(termIndexOf("ordered part QZ-5508"), { code: true, tokens: ["qz", "5508", "9000"] })).toBe(0);
+    });
+});
+
 describe(salientTermsOf, () => {
+    it("keeps every identifier, two sharing a part included", () => {
+        expect(
+            salientTermsOf("is it QZ-5508 or AB-5508")
+                .filter(({ code }) => code)
+                .map(({ term }) => term),
+        ).toEqual(["qz 5508", "ab 5508"]);
+    });
+
     it("leads with an identifier, then the longest word, and puts a year or a count last", () => {
         expect(salientTermsOf("did I order part QZ-5508 in 2019")).toEqual([
-            { code: true, term: "5508", tokens: ["qz", "5508"] },
+            { code: true, term: "qz 5508", tokens: ["qz", "5508"] },
             { code: false, term: "order", tokens: ["order"] },
             { code: false, term: "part", tokens: ["part"] },
-            { code: false, term: "qz", tokens: ["qz"] },
             { code: false, term: "2019", tokens: ["2019"] },
         ]);
         // A number alone, however long, is an ordinary term.
@@ -47,11 +66,13 @@ describe(salientTermsOf, () => {
     });
 
     it.each([
-        ["serial WTU-38817", "38817"],
-        ["ECON-204 notes", "204"],
+        ["serial WTU-38817", "wtu 38817"],
+        ["ECON-204 notes", "econ 204"],
         ["boiler E4012", "e4012"],
-        ["release v2.3", "v2"],
-        ["ticket 12-345", "345"],
+        ["release v2.3", "v2 3"],
+        ["ticket 12-345", "12 345"],
+        ["my PS5 controller", "ps5"],
+        ["call 555-123-4567", "555 123 4567"],
     ])("reads %s as an identifier", (searchText, term) => {
         expect(salientTermsOf(searchText)[0]).toMatchObject({ code: true, term });
     });

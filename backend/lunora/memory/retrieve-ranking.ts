@@ -6,7 +6,7 @@
 
 import { bm25Idf, bm25TermFactor, MAX_KEYWORD_TERMS, reciprocalRankFusion, scoreKeywordCandidates } from "../knowledge/hybrid";
 import { factDatesOf } from "./dates";
-import { holdsSequence, salientTermsOf, searchTokensOf, sequenceCount } from "./search-terms";
+import { salientTermsOf, searchTokensOf, termCount, termIndexOf } from "./search-terms";
 import type { SalientTerm } from "./search-terms";
 
 /**
@@ -32,7 +32,7 @@ export const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
  * at 0.40, so 0.45 leaves a margin over the noise. The keyword floor (on the IDF-weighted keyword share,
  * `keywordSignalsFor`) applies to a memory with no vector, to one whose vector is new or the search did not fill its
  * cut, to one holding the query's rare term, and to every memory when no vector search ran. 0.15 is the highest that keeps every category of the eval
- * (multi Recall@8 0.867 at 0.2, 0.883 at 0.15); the keyword-only run reads Recall@8 0.603 and abstain rate 0.767 there.
+ * (multi Recall@8 0.867 at 0.2, 0.883 at 0.15); the keyword-only run reads Recall@8 0.603 and abstain rate 0.667 there.
  */
 export const INJECT_MIN_RELEVANCE = 0.45;
 export const INJECT_MIN_KEYWORD_RELEVANCE = 0.15;
@@ -226,7 +226,7 @@ export const keywordLookupOf = <
     today: string | undefined,
 ): KeywordLookup<T> => {
     const held = fetched.filter(
-        (row) => !row.supersededBy && isUsableOn(row, today) && inScope(row, scope) && holdsSequence(searchTokensOf(row.memory), tokens),
+        (row) => !row.supersededBy && isUsableOn(row, today) && inScope(row, scope) && termCount(termIndexOf(row.memory), { code, tokens }) > 0,
     );
 
     return {
@@ -345,8 +345,9 @@ const computeScore = (memory: RankCandidate, semanticScore: number, now: number)
 export const RARE_TERM_MAX_ROWS = 2;
 
 /**
- * The query's rare term: its leading identifier, or else the rarest looked-up term (the earlier on a tie), when that
- * term's lookup read every row holding it and at most `RARE_TERM_MAX_ROWS` usable rows of the user do.
+ * The query's rare term: its first identifier the memory holds, or else the rarest looked-up term (the earlier on a
+ * tie), when that term's lookup read every row holding it and at most `RARE_TERM_MAX_ROWS` usable rows of the chat do.
+ * An identifier no row holds is never one, so a query naming only such codes has no rare-term match.
  */
 const rareTermOf = (terms: SalientTerm[], corpus: ReadonlyMap<string, { complete: boolean; corpusRows: number }>): string | undefined => {
     const rareRows = (term: string): number | undefined => {
@@ -354,10 +355,11 @@ const rareTermOf = (terms: SalientTerm[], corpus: ReadonlyMap<string, { complete
 
         return lookup?.complete === true && lookup.corpusRows > 0 && lookup.corpusRows <= RARE_TERM_MAX_ROWS ? lookup.corpusRows : undefined;
     };
-    const [leading] = terms;
+    const codes = terms.filter(({ code }) => code);
 
-    if (leading?.code === true) {
-        return rareRows(leading.term) === undefined ? undefined : leading.term;
+    // A query naming identifiers looks only at them: the first one the memory holds that rarely, or none at all.
+    if (codes.length > 0) {
+        return codes.find(({ term }) => rareRows(term) !== undefined)?.term;
     }
 
     let rarest: { held: number; term: string } | undefined;
@@ -371,6 +373,29 @@ const rareTermOf = (terms: SalientTerm[], corpus: ReadonlyMap<string, { complete
     }
 
     return rarest?.term;
+};
+
+/** Terms a row must share with a query that names an identifier the memory does not hold. */
+export const MIN_TERMS_BESIDE_ABSENT_CODE = 2;
+
+/**
+ * For a query naming an identifier the memory does not hold, which asks for something else: drops the keyword score of
+ * every row that shares only one of its terms. A row holding one of the query's identifiers answers that one and stays.
+ */
+const dropOneWordMatches = (keywordScores: Map<string, number>, terms: SalientTerm[], termHits: { hits: { id: string }[] }[]): void => {
+    const held = new Map<string, number>();
+
+    for (const [index, { hits }] of termHits.entries()) {
+        for (const hit of hits) {
+            held.set(hit.id, (held.get(hit.id) ?? 0) + (terms[index]!.code ? MIN_TERMS_BESIDE_ABSENT_CODE : 1));
+        }
+    }
+
+    for (const [id, count] of held) {
+        if (count < MIN_TERMS_BESIDE_ABSENT_CODE) {
+            keywordScores.delete(id);
+        }
+    }
 };
 
 /** What the keyword side knows of each candidate. */
@@ -388,11 +413,11 @@ export interface KeywordSignals {
  * - The score is the IDF-weighted share of the terms the memory holds at all (a candidate holds it, or its lookup found
  *   a row in the chat's scopes) that a row holds, IDF over the candidates counted as at least a window of rows. A word
  *   the memory never had does not dilute the one it does, such as an identifier.
- * - When the query's leading term is an identifier no candidate holds (`QZ-5508`), the query asks for something the
- *   memory does not have: no candidate has keyword relevance, whatever common word it shares.
- * - The rare term is that identifier, or else the rarest looked-up term, when its lookup is complete and at most
- *   `RARE_TERM_MAX_ROWS` rows of the user hold it; a word leading term must be in the memory at all. A rare-term match
- *   holds the rare term and the leading term, so a row sharing only one ordinary word with the query is not one.
+ * - An identifier the memory does not hold (`QZ-5508`, `COVID-19`) counts in the denominator at the IDF of a term no row
+ *   holds, the highest: a row that shares only common words with such a query keeps a smaller share, and one sharing
+ *   several of them can still clear the floor.
+ * - The rare term (`rareTermOf`) is never an absent identifier. A rare-term match holds it, and, for a word, the
+ *   leading term too, so a row sharing only one ordinary word with the query is not one.
  */
 export const keywordSignalsFor = (
     candidates: RankCandidate[],
@@ -403,34 +428,46 @@ export const keywordSignalsFor = (
     const rareTermMatches = new Set<string>();
     const terms = salientTermsOf(searchText);
     const rows = candidates.map((m) => {
-        return { id: m._id, tokens: searchTokensOf(m.memory) };
+        return { id: m._id, index: termIndexOf(m.memory) };
     });
-    const termHits = terms.map(({ term, tokens }) => {
-        return { hits: rows.filter((row) => holdsSequence(row.tokens, tokens)), term };
+    const termHits = terms.map((term) => {
+        return { hits: rows.filter((row) => termCount(row.index, term) > 0), term: term.term };
     });
     const [leading] = terms;
-    const leadingHits = termHits[0]?.hits ?? [];
 
-    if (leading === undefined || (leading.code && leadingHits.length === 0)) {
+    if (leading === undefined) {
         return { keywordScores, rareTermMatches };
     }
+
+    const leadingHits = termHits[0]?.hits ?? [];
 
     const corpus = new Map(lookups.map((lookup) => [lookup.term, lookup]));
     const inMemory = (term: string, held: number): boolean => held > 0 || (corpus.get(term)?.corpusRows ?? 0) > 0;
     const corpusSize = Math.max(candidates.length, CANDIDATE_WINDOW_SIZE);
-    const idfs = termHits.map(({ hits, term }) => (inMemory(term, hits.length) ? bm25Idf(hits.length, corpusSize) : 0));
+    const idfs = termHits.map(({ hits, term }, index) => {
+        if (inMemory(term, hits.length)) {
+            return bm25Idf(hits.length, corpusSize);
+        }
+
+        // An identifier nobody holds still weighs in, at the IDF of a term no row holds; an absent word does not.
+        return terms[index]!.code ? bm25Idf(0, corpusSize) : 0;
+    });
     const most = idfs.reduce((sum, idf) => sum + idf, 0);
     const matching = new Set(termHits.flatMap(({ hits }) => hits));
-    const avgLength = Math.max(1, [...matching].reduce((sum, row) => sum + row.tokens.length, 0) / Math.max(1, matching.size));
+    const avgLength = Math.max(1, [...matching].reduce((sum, row) => sum + row.index.tokens.length, 0) / Math.max(1, matching.size));
 
     // Σ idf·min(1, factor) / Σ idf: BM25's term-frequency and length factor, capped at 1 so a short row cannot score
     // above its share; a row holding a term once at average length keeps the term's whole IDF.
     for (const [index, { hits }] of termHits.entries()) {
         for (const hit of hits) {
-            const factor = Math.min(1, bm25TermFactor(sequenceCount(hit.tokens, terms[index]!.tokens), Math.max(1, hit.tokens.length), avgLength));
+            const factor = Math.min(1, bm25TermFactor(termCount(hit.index, terms[index]!), Math.max(1, hit.index.tokens.length), avgLength));
 
             keywordScores.set(hit.id, (keywordScores.get(hit.id) ?? 0) + (idfs[index]! * factor) / most);
         }
+    }
+
+    if (terms.some(({ code, term }, index) => code && !inMemory(term, termHits[index]!.hits.length))) {
+        dropOneWordMatches(keywordScores, terms, termHits);
     }
 
     const rareTerm = leading.code || inMemory(leading.term, leadingHits.length) ? rareTermOf(terms, corpus) : undefined;
@@ -438,7 +475,8 @@ export const keywordSignalsFor = (
     const rareHits = termHits.find(({ term }) => term === rareTerm)?.hits ?? [];
 
     for (const hit of rareHits) {
-        if (leadingIds.has(hit.id)) {
+        // An identifier is distinctive on its own; a rare word needs the query's leading word beside it.
+        if (leading.code || leadingIds.has(hit.id)) {
             rareTermMatches.add(hit.id);
         }
     }
