@@ -116,7 +116,12 @@ export const removeEventWebhookHost = authMutation
         }
 
         // Every row of the host: a merge can leave one host in two rows, and removing only one would leave it approved.
-        const { page } = await context.db.eventWebhookHosts.findMany({ limit: MAX_APPROVED_HOSTS, where: { host, userId: context.user.userId } });
+        // From the primary: a duplicate row a replica has not seen would stay, and the host would still be approved.
+        const { page } = await context.db.eventWebhookHosts.findMany({
+            consistency: "primary",
+            limit: MAX_APPROVED_HOSTS,
+            where: { host, userId: context.user.userId },
+        });
 
         for (const row of page) {
             await context.db.delete("eventWebhookHosts", row._id);
