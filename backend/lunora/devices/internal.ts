@@ -28,7 +28,7 @@ import {
 } from "./lib/constants";
 import { isDeviceInScope, resolveThreadProject } from "./lib/scope";
 import { signDevicePayload, utf8Length } from "./lib/signing";
-import { announceNewDevice, assertRoomForDevice, insertDevice } from "./lib/register";
+import { announceNewDevice, assertRoomForDevice, insertDevice, sendDevicePairedAlert } from "./lib/register";
 import { mergeTaint } from "./lib/taint";
 import { clearMachineFromProjects } from "../projects/machine-location";
 import { noteShardActivity } from "../lib/shard-housekeeping";
@@ -290,6 +290,12 @@ export const expireDeviceCall = internalMutation
 const SWEEP_BATCH = 200;
 
 /**
+ * Owner alerts retry until they are written or there is nothing left to tell: a job whose device is gone finds nothing and ends.
+ * Each alert is its own job, so one that keeps failing waits alone and cannot hold back another device's alert.
+ */
+const ALERT_RETRY = { backoff: "exponential", baseMs: 5000, forever: true, maxMs: 300_000 } as const;
+
+/**
  * Per-shard housekeeping (`lib/shard-housekeeping.ts`): expires open calls a
  * killed run left past their deadline, and prunes audit rows older than 30 days.
  */
@@ -457,6 +463,17 @@ export const registerHeadlessDevice = internalMutation
             userId: args.userId,
         });
 
+        // The owner's alert is queued in this same commit, so the device and its alert cannot part. Nothing is sent from a
+        // floating call after the response, which a Worker may cancel. A retried redemption returns the device made here, and
+        // this job is already queued with it.
+        await runAfterWithRetry(
+            ctx.scheduler,
+            0,
+            internal.devices.internal.announceDeviceAlert,
+            { deviceId: registered.deviceId, userId: args.userId },
+            ALERT_RETRY,
+        );
+
         // Makes the owner's shard eligible for the pending-alert sweep even if it has been dormant for a while. Best-effort.
         await noteShardActivity(ctx, args.userId);
 
@@ -466,10 +483,10 @@ export const registerHeadlessDevice = internalMutation
     });
 
 /**
- * The owner's alert for a machine paired by code, sent by the redemption after `registerHeadlessDevice` has returned the
- * secret (`auth.ts`), so a failure here can never cost the machine it. Idempotent per device, as `announcePairedDevice` is.
+ * The owner's alert for one device that is still pending, run as its own job (`registerHeadlessDevice`, and the sweep below).
+ * Idempotent: an alert already sent, or a device already gone, does nothing.
  */
-export const announceHeadlessDevice = internalMutation
+export const announceDeviceAlert = internalMutation
     .input({ deviceId: v.string().max(MAX_LENGTH.id), userId: v.string().max(MAX_LENGTH.short) })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
@@ -483,10 +500,32 @@ export const announceHeadlessDevice = internalMutation
     });
 
 /**
- * Housekeeping (`lib/shard-housekeeping.ts`): announces each device that has signed in but whose owner has not been told
- * yet, so a pairing whose announcing call never came (a closed tab, a dropped connection) still reaches its owner. A device
- * that never signed in was cancelled on the computer, or never confirmed there: it stays unannounced, whatever its row says.
- * Bounded per pass; a device still pending after a pass is taken by the next.
+ * The alert for a signed-in device that `revokeDevice` is removing. Its row is gone by the time this runs, so the job carries
+ * the name. Queued by `scheduleRemovedDeviceAlert`, which the revoke commits with the deletion.
+ */
+export const sendRemovedDeviceAlert = internalMutation
+    .input({ deviceId: v.string().max(MAX_LENGTH.id), name: v.string().max(MAX_LENGTH.short), userId: v.string().max(MAX_LENGTH.short) })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        await sendDevicePairedAlert(ctx, { _id: args.deviceId, name: args.name, userId: args.userId });
+
+        return null;
+    });
+
+/**
+ * Queues the alert for a signed-in device that is about to be removed. Written in the revoke's own transaction: a revoke
+ * that fails queues nothing, and one that commits always leaves its alert queued. The alert is never written inline, so a
+ * failing notification write cannot keep the device from being removed.
+ */
+export const scheduleRemovedDeviceAlert = async (scheduler: unknown, args: { deviceId: string; name: string; userId: string }): Promise<void> => {
+    await runAfterWithRetry(scheduler, 0, internal.devices.internal.sendRemovedDeviceAlert, args, ALERT_RETRY);
+};
+
+/**
+ * Housekeeping (`lib/shard-housekeeping.ts`): queues the owner's alert for each device that has signed in but whose owner has
+ * not been told yet, so a pairing whose announcing call never came (a closed tab, a dropped connection) still reaches its owner.
+ * A device that never signed in was cancelled on the computer, or never confirmed there: it stays unannounced, whatever its row
+ * says. A device already queued is queued again; its alert's dedupe key keeps it to one notification. Bounded per pass.
  */
 export const sweepPendingDeviceAlerts = internalMutation
     .input({})
@@ -496,7 +535,13 @@ export const sweepPendingDeviceAlerts = internalMutation
         const { page } = await ctx.db.devices.findMany({ limit: SWEEP_BATCH, where: { alertPending: true, lastSeenAt: { gt: 0 } } });
 
         for (const device of page) {
-            await announceNewDevice(ctx, device);
+            await runAfterWithRetry(
+                ctx.scheduler,
+                0,
+                internal.devices.internal.announceDeviceAlert,
+                { deviceId: device._id as string, userId: device.userId },
+                ALERT_RETRY,
+            );
         }
 
         return null;

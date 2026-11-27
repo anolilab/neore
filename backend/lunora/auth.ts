@@ -676,23 +676,9 @@ export const buildAuth = (env: AuthEnv): ReturnType<typeof createAuth> => {
                 precheck: async (userId, codeId) => {
                     await shard.call(internal.devices.internal.checkHeadlessPairing, { codeId, userId }, { shardKey: userId });
                 },
-                register: async ({ codeId, name, platform, userId }) => {
-                    const registered = await shard.call(
-                        internal.devices.internal.registerHeadlessDevice,
-                        { codeId, name, platform, userId },
-                        { shardKey: userId },
-                    );
-
-                    // Not awaited: the secret goes back to the machine now, and a slow alert must not hold it or the spent code.
-                    // The pending-row sweep is the fallback if this call never completes.
-                    void shard
-                        .call(internal.devices.internal.announceHeadlessDevice, { deviceId: registered.deviceId, userId }, { shardKey: userId })
-                        .catch((error: unknown) => {
-                            console.warn("[devices] Failed to announce a machine paired by code:", error);
-                        });
-
-                    return registered;
-                },
+                // The owner's alert is queued by this registration on the same shard, so it needs no call of its own here.
+                register: async ({ codeId, name, platform, userId }) =>
+                    await shard.call(internal.devices.internal.registerHeadlessDevice, { codeId, name, platform, userId }, { shardKey: userId }),
             },
             // Queued, not run here: moving a guest's rows takes a round trip per
             // table and page, too long to hold the sign-up request. The job runs

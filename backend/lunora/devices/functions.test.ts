@@ -1695,11 +1695,13 @@ describe("the new-device alert", () => {
                     await ctx.runMutation(internals.registerHeadlessDevice, { codeId: "code-alert", name: "build-box", platform: "linux", userId: owner }),
             )) as { deviceId: string };
         const announce = async (deviceId: string) =>
-            await harness.run(async (ctx: any) => await ctx.runMutation(internals.announceHeadlessDevice, { deviceId, userId: owner }));
+            await harness.run(async (ctx: any) => await ctx.runMutation(internals.announceDeviceAlert, { deviceId, userId: owner }));
 
         const { deviceId } = await redeem();
 
         expect(await alertsOf(owner)).toHaveLength(0);
+        // The registration queues the alert in its own commit; the redemption does not send it from a call of its own.
+        expect(harness.scheduler.list().filter((job) => job.functionPath?.includes("announceDeviceAlert") === true)).toHaveLength(1);
 
         await announce(deviceId);
         await redeem();
@@ -1716,6 +1718,16 @@ describe("the pending device alert sweep", () => {
         return page as { title: string }[];
     };
     const sweep = async () => await harness.run(async (ctx: any) => await ctx.runMutation(internals.sweepPendingDeviceAlerts, {}));
+    // The harness does not dispatch scheduled jobs: a test runs each queued alert with the job's own args, as the scheduler would.
+    const runQueuedAlerts = async () => {
+        for (const job of harness.scheduler.list()) {
+            if (job.functionPath?.includes("announceDeviceAlert") === true) {
+                await harness.run(async (ctx: any) => await ctx.runMutation(internals.announceDeviceAlert, job.args));
+            } else if (job.functionPath?.includes("sendRemovedDeviceAlert") === true) {
+                await harness.run(async (ctx: any) => await ctx.runMutation(internals.sendRemovedDeviceAlert, job.args));
+            }
+        }
+    };
 
     it("tells the owner of a signed-in pairing whose announcing call never came, and only once", async () => {
         const owner = await insertUser();
@@ -1726,9 +1738,11 @@ describe("the pending device alert sweep", () => {
         expect(await alertsOf(owner)).toHaveLength(0);
 
         await sweep();
+        await runQueuedAlerts();
         expect(await alertsOf(owner)).toHaveLength(1);
 
         await sweep();
+        await runQueuedAlerts();
         await as(owner).mutation(functions.announcePairedDevice as never, { deviceId } as never);
         expect(await alertsOf(owner)).toHaveLength(1);
     });
@@ -1742,6 +1756,31 @@ describe("the pending device alert sweep", () => {
 
         await as(owner).mutation(functions.revokeDevice as never, { deviceId: signedIn.deviceId } as never);
         await as(owner).mutation(functions.revokeDevice as never, { deviceId: cancelled.deviceId } as never);
+        await runQueuedAlerts();
+
+        const alerts = await alertsOf(owner);
+
+        expect(alerts.map((alert) => alert.title)).toEqual(["Laptop"]);
+    });
+
+    it("queues the alert of a signed-in device being removed, with its name, and does not write it inside the revoke", async () => {
+        const owner = await insertUser();
+        const { deviceId } = await register(owner);
+
+        await as(owner).mutation(functions.heartbeatDevice as never, { deviceId } as never);
+        await as(owner).mutation(functions.revokeDevice as never, { deviceId } as never);
+
+        // The device is gone and its alert is not written yet: the revoke only queues it.
+        await expect(as(owner).mutation(functions.heartbeatDevice as never, { deviceId } as never)).resolves.toEqual({ paired: false });
+        expect(await alertsOf(owner)).toHaveLength(0);
+        expect(
+            harness.scheduler
+                .list()
+                .filter((job) => job.functionPath?.includes("sendRemovedDeviceAlert") === true)
+                .map((job) => job.args),
+        ).toEqual([expect.objectContaining({ deviceId, name: "Laptop", userId: owner })]);
+
+        await runQueuedAlerts();
 
         const alerts = await alertsOf(owner);
 
@@ -1773,6 +1812,7 @@ describe("the pending device alert sweep", () => {
         });
 
         await sweep();
+        await runQueuedAlerts();
 
         const alerts = await alertsOf(owner);
 

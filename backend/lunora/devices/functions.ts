@@ -35,7 +35,7 @@ import {
     MAX_MANIFEST_BYTES,
 } from "./lib/constants";
 import { isAppVersion } from "./lib/app-version";
-import { scheduleClearDeviceProjects } from "./internal";
+import { scheduleClearDeviceProjects, scheduleRemovedDeviceAlert } from "./internal";
 import { noteShardActivity } from "../lib/shard-housekeeping";
 import { announceNewDevice, assertRoomForDevice, insertDevice } from "./lib/register";
 import { parseAcpOffers, parseManifestTools } from "./lib/manifest";
@@ -319,11 +319,11 @@ export const revokeDevice = authMutation
             // with the revoke, so a revoke that fails queues nothing and can be retried.
             await scheduleClearDeviceProjects(ctx.scheduler, { machineId: revoked._id, userId });
 
-            // A device that signed in but whose owner was not told yet is announced before it goes: a quick revoke must not hide it.
-            // One that never signed in was cancelled on the computer, and stays silent.
+            // A device that signed in but whose owner was not told yet is still announced: a quick revoke must not hide it. Queued,
+            // not sent here, so a failing notification write cannot keep the device from being removed. One that never signed in
+            // was cancelled on the computer, and stays silent.
             if (revoked.alertPending === true && revoked.lastSeenAt !== undefined) {
-                // Quiet: a failed alert must not keep the device from being removed, and a removed device has nothing left to retry.
-                await announceNewDevice(ctx, revoked, { quiet: true });
+                await scheduleRemovedDeviceAlert(ctx.scheduler, { deviceId: revoked._id as string, name: revoked.name, userId });
             }
 
             await ctx.db.delete("devices", revoked._id);

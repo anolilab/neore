@@ -165,10 +165,9 @@ describe("auth hook shard placement", { timeout: 30_000 }, () => {
         );
 
         expect(response.status).toBe(200);
-        // The check before the code is spent, the registration after it, and the pairing alert, all on the account's shard.
-        // The alert is sent without being awaited, so wait for its call rather than race it.
-        await vi.waitFor(() => expect(names).toHaveLength(3));
-        expect(names).toStrictEqual(["user-a", "user-a", "user-a"]);
+        // The check before the code is spent and the registration after it, both on the account's shard. The owner's alert is
+        // queued by that registration, not a call of its own.
+        expect(names).toStrictEqual(["user-a", "user-a"]);
     });
 
     it("keeps the device-limit marker of a refusal that crosses the shard call", async () => {
