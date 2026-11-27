@@ -87,6 +87,7 @@ export const subscribeOn = async (ctx: Pick<MutationCtx, "db">, input: Subscribe
 
     if (existing && existing.expiresAt > now) {
         await ctx.db.patch("eventWebhookSubscriptions", existing._id, { expiresAt, secretCiphertext: input.secretCiphertext, updatedAt: now });
+
         // A dormant shard is reaped only when the tick reaches it: wake it at this expiry (`lib/shard-housekeeping.ts`).
         if (!(await noteShardDue(ctx, expiresAt + 1, input.userId))) {
             throw new LunoraError("INTERNAL", "The subscription's expiry wake could not be written, so it is not stored; retry the subscribe.");
