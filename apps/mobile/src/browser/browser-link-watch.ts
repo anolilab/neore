@@ -1,7 +1,8 @@
 /**
  * Whether the chat shows its link to the browser screen, outside React so the timing is tested without a screen. It
- * shows while the browser runs; for a reader it goes at the grant's end, and the status is read once at the real end
- * (a renewed grant pushes nothing). Hiding the link never cancels that read: a renewed grant shows it again.
+ * shows while the browser runs, and goes when the browser idles out or a reader's grant ends (neither pushes a new
+ * status); the status is read once just after, and hiding the link never cancels that read: a renewed grant, or a
+ * browser kept alive, shows it again.
  */
 import type { BrowserStatus } from "./browser-api";
 import { browserLinkUntil, GRANT_END_MARGIN_MS } from "./browser-view-state";

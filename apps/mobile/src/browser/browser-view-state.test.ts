@@ -148,9 +148,11 @@ describe(isRateLimited, () => {
 });
 
 describe(browserLinkUntil, () => {
-    it("shows the link while the browser runs, for a reader only until the grant ends, and never otherwise", () => {
-        expect(browserLinkUntil(running(), 5000)).toBe(Infinity);
+    it("shows the link until the browser goes idle, for a reader until the grant ends if sooner, and never otherwise", () => {
+        // `running()`: idle at 500 on the server's clock, read at 100.
+        expect(browserLinkUntil(running(), 5000)).toBe(5400);
         expect(browserLinkUntil(running({ accessUntil: 160, now: 100 }), 5000)).toBe(5060 - GRANT_END_MARGIN_MS);
+        expect(browserLinkUntil(running({ accessUntil: 100_000, now: 100 }), 5000)).toBe(5400);
         expect(browserLinkUntil({ kind: "none", now: 100 } as BrowserStatus, 5000)).toBeUndefined();
     });
 });

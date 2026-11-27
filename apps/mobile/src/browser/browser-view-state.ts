@@ -124,15 +124,16 @@ export const grantEndOnDevice = (status: BrowserStatus | undefined, receivedAt: 
 };
 
 /**
- * Until when the chat shows its link to the browser screen, on this device's clock: while the browser runs, and for a
- * reader only until the grant ends (a grant that runs out pushes no new status). None: no link.
+ * Until when the chat shows its link to the browser screen, on this device's clock: while the browser runs, until it
+ * goes idle (`idleUntil`, after which the server no longer shows it), and for a reader until the grant ends. Neither
+ * end pushes a new status. None: no link.
  */
 export const browserLinkUntil = (status: BrowserStatus, receivedAt: number): number | undefined => {
     if (status.kind !== "running") {
         return undefined;
     }
 
-    return grantEndOnDevice(status, receivedAt) ?? Infinity;
+    return Math.min(receivedAt + (status.idleUntil - status.now), grantEndOnDevice(status, receivedAt) ?? Infinity);
 };
 
 /**

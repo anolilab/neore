@@ -5,7 +5,7 @@ import { watchBrowserLink } from "./browser-link-watch";
 import { GRANT_END_MARGIN_MS } from "./browser-view-state";
 
 const running = (fields: Partial<Extract<BrowserStatus, { kind: "running" }>> = {}): BrowserStatus => {
-    return { browserId: "b-1", canControl: false, currentUrl: "https://example.com", idleUntil: 500, kind: "running", now: 0, ...fields };
+    return { browserId: "b-1", canControl: false, currentUrl: "https://example.com", idleUntil: 1_000_000, kind: "running", now: 0, ...fields };
 };
 
 /** A clock and timers the test moves by hand. */
@@ -62,6 +62,28 @@ describe(watchBrowserLink, () => {
 
         // At the real end the status is read once: the grant was renewed, so the link comes back.
         advanceTo(60_000);
+        expect(read).toHaveBeenCalledTimes(1);
+        await vi.waitFor(() => expect(shown).toStrictEqual([true, false, true]));
+    });
+
+    it("hides the owner's link when the browser goes idle with no new status, and shows it again if it was kept alive", async () => {
+        const { advanceTo, after, now } = timers();
+        const shown: boolean[] = [];
+        const read = vi.fn(async () => running({ idleUntil: 200_000, now: 100_000 }));
+        const link = watchBrowserLink({
+            after,
+            now,
+            onChange: (isShown) => {
+                shown.push(isShown);
+            },
+            read,
+        });
+
+        link.show(running({ idleUntil: 100_000, now: 0 }));
+        advanceTo(100_000);
+        expect(shown).toStrictEqual([true, false]);
+
+        advanceTo(100_000 + GRANT_END_MARGIN_MS);
         expect(read).toHaveBeenCalledTimes(1);
         await vi.waitFor(() => expect(shown).toStrictEqual([true, false, true]));
     });
