@@ -178,7 +178,7 @@ export const createControlSession = ({
 
             if (answer.status === "refused") {
                 // The lease is gone on the server: the phone stops offering what only its holder may do.
-                if (answer.error === NOT_IN_CONTROL && isStillHeld) {
+                if (isStillHeld && answer.error === NOT_IN_CONTROL) {
                     stop(CONTROL_ENDED);
 
                     return CONTROL_ENDED;
@@ -188,7 +188,7 @@ export const createControlSession = ({
             }
 
             // A page that loaded renewed the lease on the server, no earlier than this was sent.
-            if (answer.status === "ok" && isStillHeld) {
+            if (isStillHeld && answer.status === "ok") {
                 endsAt = Math.max(endsAt, sentAt + CONTROL_LEASE_MS);
             }
 
