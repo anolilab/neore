@@ -505,6 +505,8 @@ export const extractMemories = internalAction
         logGate(gate.reason, "extract");
 
         let extractedFacts: z.infer<typeof extractedFactSchema>[] = [];
+        // Asked facts that were nothing but a secret: dropped by the redaction, and refused, as the evidence gate refuses.
+        let secretsAsked = 0;
 
         try {
             const result = await generateText({
@@ -531,9 +533,11 @@ ${args.requested ? REQUESTED_RULE : "Extract NEW facts about the user not alread
 
             if (result.output?.facts) {
                 const redaction = redactMemoryFacts(result.output.facts);
+                const askedCount = (facts: ReadonlyArray<{ asked?: boolean }>) => facts.filter((fact) => fact.asked === true).length;
 
                 logRedaction(ctx.log, "extract", redaction);
                 extractedFacts = redaction.facts;
+                secretsAsked = askedCount(result.output.facts) - askedCount(redaction.facts);
             }
         } catch (error) {
             console.error("[memory/extract] LLM extraction failed:", error);
@@ -568,7 +572,7 @@ ${args.requested ? REQUESTED_RULE : "Extract NEW facts about the user not alread
             return false;
         });
 
-        const refused = dropped.health + dropped.noQuote + dropped.quoteRefused;
+        const refused = secretsAsked + dropped.health + dropped.noQuote + dropped.quoteRefused;
 
         if (refused > 0) {
             ctx.log.event(EVIDENCE_GATE_EVENT, { ...dropped, kept: extractedFacts.length, threadId: args.threadId, userId: args.userId });

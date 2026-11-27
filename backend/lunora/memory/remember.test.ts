@@ -52,6 +52,8 @@ vi.mock("../agent/client/search", () => {
 const USER = "user-a";
 const REPLY = "stream-1";
 const ASK = "Remember this: I'm vegan, please.";
+// Built at run time, so no token-shaped literal sits in the source.
+const TOKEN = ["gh", "p_", "Zq8LmV2xR7tYw4KpN3bC9dF6hJ1sA5gE0uIo"].join("");
 
 type Fact = { asked?: boolean; memory: string; quote: string; sensitive?: boolean; validUntil?: string };
 
@@ -453,6 +455,19 @@ describe(rememberFactFor, () => {
         });
 
         await expect(remember(await setUp({ replies }))).resolves.toMatchObject({ status: "saved" });
+    });
+
+    it("reports an asked fact that was nothing but a secret as refused, and leaves the message to a later call", async () => {
+        answer([{ memory: TOKEN, quote: TOKEN }]);
+
+        const ids = await setUp({ prompt: `Remember my token ${TOKEN}` });
+
+        await expect(remember(ids)).resolves.toStrictEqual({ facts: [], status: "refused" });
+
+        answer([]);
+
+        await expect(remember(ids)).resolves.toMatchObject({ status: "nothing_asked" });
+        expect(await memories()).toHaveLength(0);
     });
 
     it("still extracts the turn when the remember call's model failed", async () => {
