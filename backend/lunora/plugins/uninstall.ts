@@ -299,6 +299,25 @@ export const finishUninstallRows = async (
             ? await readAllPages(async (cursor) => await ctx.db.pluginItems.findMany({ consistency: "primary", cursor, where: { installId } }))
             : [];
 
+    // The owner's group chats, read once for the call: one may have gained a pending skill since begin. A scan that fills its page
+    // cannot prove none does, so every skill is kept then, as at begin.
+    let usedByOthers = new Set<string>();
+    let scanFull = false;
+
+    if (pendingSkills.length > 0) {
+        const threads = await ctx.db
+            .query("threads")
+            .withIndex("by_user_and_updatedAt", (q) => q.eq("userId", install.userId))
+            .take(GROUP_SCAN_LIMIT);
+
+        scanFull = threads.length >= GROUP_SCAN_LIMIT;
+        usedByOthers = new Set(
+            threads.flatMap((thread) =>
+                thread.pluginInstallId === installId ? [] : (thread.groupChat?.participants.map((participant) => participant.skillId) ?? []),
+            ),
+        );
+    }
+
     for (const skillId of pendingSkills) {
         const skill = await ctx.db.skills.findFirst({ consistency: "primary", where: { _id: skillId as Id<"skills"> } });
 
@@ -319,7 +338,7 @@ export const finishUninstallRows = async (
         const link = planned.find((row) => row.entryKey === parseMarker(skill.pluginMarker ?? "")?.entryKey);
         const changed = !link || skillVisibility(skill) !== "private" || (await skillRowHash(skill)) !== link.contentHash;
 
-        if (usedByKept.has(skillId) || changed) {
+        if (usedByKept.has(skillId) || usedByOthers.has(skillId) || scanFull || changed) {
             await ctx.db.patch("skills", skill._id as Id<"skills">, { pluginInstallId: "", pluginMarker: "" });
             result.kept.push(skill.name);
             continue;

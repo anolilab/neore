@@ -27,7 +27,7 @@ describe("actionsFor (the status table)", () => {
         ["updating", false, []],
         ["updating", true, ["repair"]],
         ["uninstalling", false, []],
-        ["uninstalling", true, ["repair", "uninstall"]],
+        ["uninstalling", true, ["uninstall"]],
     ] as const)("%s with lease expired=%s allows %j", (status, expired, allowed) => {
         expect(actionsFor(status, expired)).toEqual(allowed);
     });

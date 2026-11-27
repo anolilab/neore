@@ -652,4 +652,64 @@ describe("uninstall", () => {
 
         await expect(run(async (context) => await finishUninstallRows(context, installId, install.generation))).rejects.toThrow("STALE_LEASE");
     });
+
+    it("keeps a deferred skill that another group chat of the owner gained after begin", async () => {
+        const { installId, skillId } = await installed();
+        const secondSkillId = await run(
+            async (context) =>
+                await context.runMutation(createPluginSkill, {
+                    description: "Critic",
+                    instructions: "Critique.",
+                    isPremium: true,
+                    name: "Critic",
+                    plan: "premium",
+                    pluginInstallId: installId,
+                    pluginMarker: markerFor(installId, "skill:critic"),
+                    slug: "critic",
+                    source: { type: "plugin" as const, version: "1.0.0" },
+                    userId: OWNER,
+                }),
+        );
+
+        await run(
+            async (context) =>
+                await context.runMutation(createPluginGroupChat, {
+                    mode: "round-robin",
+                    model: "claude-haiku-5-5",
+                    plan: "premium",
+                    pluginInstallId: installId,
+                    pluginMarker: markerFor(installId, "group:panel"),
+                    skillIds: [skillId, secondSkillId],
+                    title: "Panel",
+                    userId: OWNER,
+                }),
+        );
+
+        const begun = await run(async (context) => await uninstallRows(context, OWNER, SLUG));
+
+        expect(begun.pendingSkills).toEqual([skillId]);
+
+        // After begin, the owner adds the skill to a group chat of their own.
+        await run(async (context) => {
+            await context.db.insert("threads", {
+                groupChat: {
+                    mode: "round-robin",
+                    participants: [
+                        { addedAt: 1, skillId },
+                        { addedAt: 1, skillId: secondSkillId },
+                    ],
+                },
+                status: "active",
+                title: "My panel",
+                userId: OWNER,
+            });
+        });
+
+        const finished = await run(
+            async (context) => await finishUninstallRows(context, begun.installId, begun.generation, { pendingSkills: begun.pendingSkills }),
+        );
+
+        expect(finished).toMatchObject({ kept: ["Analyst"], removed: 0 });
+        expect(await run(async (context) => await context.db.skills.findFirst({ where: { _id: skillId } }))).toMatchObject({ pluginInstallId: "" });
+    });
 });

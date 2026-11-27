@@ -40,6 +40,8 @@ export interface RepairResult {
     kept: string[];
     linked: number;
     missing: string[];
+    /** More dropped children remain than one call handles: call again before anything is created or the install finished. */
+    moreDropped: boolean;
     status: "installed" | "needs-repair";
 }
 
@@ -126,28 +128,52 @@ const repairStoppedUpdate = async (ctx: MutationCtx, install: Doc<"pluginInstall
         updatedAt: ctx.now,
     });
 
-    return { kept: [], linked, missing: unresolved, status };
+    return { kept: [], linked, missing: unresolved, moreDropped: false, status };
 };
 
 /** Whether repair may start on this install now. An `installing` install is repairable only after its lease expired. */
 export const repairableNow = (install: { leaseUntil?: number; status: string }, now: number): boolean =>
     install.status === "needs-repair" || (install.status === "installing" && (install.leaseUntil === undefined || install.leaseUntil <= now));
 
-/** Links every intent row whose child exists, and returns the install to `installed` once nothing is missing. */
+/** Dropped children handled per call: each costs a patch and a link delete, and a mutation has a statement budget. */
+export const DETACH_PER_CALL = 8;
+
 /**
- * An install kept from an update holds the new file's hash and a target version. A `created` link whose key the new file no
- * longer has is a child the update meant to drop: it is detached as the update would (its marker cleared, a trigger switched
- * off, the child kept), and its link goes. A group chat is left as it is, since update does not detach one in place.
+ * An update kept for repair holds the new file's hash, so a `created` link whose key the file no longer has is a child the
+ * update meant to drop. It is detached as the update would (marker cleared, a trigger switched off, the child kept), and its
+ * link goes. A dropped group chat is detached by nothing in place: its link goes only when its thread is gone or never made, and
+ * stays while the thread exists, as update leaves it. At most {@link DETACH_PER_CALL} children are handled; `more` says some remain.
  */
-const detachDropped = async (ctx: MutationCtx, installId: string, userId: string, rows: Link[], fileKeys: ReadonlySet<string>): Promise<string[]> => {
+const detachDropped = async (
+    ctx: MutationCtx,
+    installId: string,
+    userId: string,
+    rows: Link[],
+    fileKeys: ReadonlySet<string>,
+): Promise<{ kept: string[]; more: boolean }> => {
     const kept: string[] = [];
+    let handled = 0;
 
     for (const row of rows) {
-        if (fileKeys.has(row.entryKey) || row.kind === "group") {
+        if (fileKeys.has(row.entryKey)) {
             continue;
         }
 
         const marker = markerFor(installId, row.entryKey);
+
+        if (row.kind === "group") {
+            const thread = row.state === "created" ? await childIdByMarker(ctx, "group", marker, userId) : undefined;
+
+            if (thread !== undefined) {
+                continue;
+            }
+        }
+
+        if (handled >= DETACH_PER_CALL) {
+            return { kept, more: true };
+        }
+
+        handled += 1;
 
         if (row.state === "created" && row.kind === "skill") {
             const skill = await ctx.db.skills.findFirst({ consistency: "primary", where: { pluginMarker: marker } });
@@ -156,7 +182,7 @@ const detachDropped = async (ctx: MutationCtx, installId: string, userId: string
                 await ctx.db.patch("skills", skill._id as Id<"skills">, { pluginInstallId: "", pluginMarker: "" });
                 kept.push(row.entryKey);
             }
-        } else if (row.state === "created") {
+        } else if (row.state === "created" && row.kind === "trigger") {
             const trigger = await ctx.db
                 .query("triggers")
                 .withIndex("by_plugin_marker", (q) => q.eq("pluginMarker", marker))
@@ -171,9 +197,10 @@ const detachDropped = async (ctx: MutationCtx, installId: string, userId: string
         await ctx.db.delete("pluginItems", row._id as Id<"pluginItems">);
     }
 
-    return kept;
+    return { kept, more: false };
 };
 
+/** Links every intent row whose child exists, and returns the install to `installed` once nothing is missing. */
 export const repairRows = async (ctx: MutationCtx, userId: string, pluginSlug: string, fileKeys?: ReadonlySet<string>): Promise<RepairResult> => {
     // Triggers and group chats live on the owner's shard; anywhere else every child would read as gone and be created again.
     requireOwnerShard(userId, "repair");
@@ -198,10 +225,17 @@ export const repairRows = async (ctx: MutationCtx, userId: string, pluginSlug: s
     const installId = install._id as string;
     const { page: allRows } = await ctx.db.pluginItems.findMany({ consistency: "primary", where: { installId } });
 
-    // Only an install kept from an update, and only with the new file's keys in hand, drops children.
-    const fromUpdate = fileKeys !== undefined && install.targetVersion !== undefined && install.targetVersion !== install.version;
-    const kept = fromUpdate ? await detachDropped(ctx, installId, userId, allRows as Link[], fileKeys) : [];
-    const page = fromUpdate ? allRows.filter((row) => fileKeys.has(row.entryKey) || row.kind === "group") : allRows;
+    // With the file's keys in hand, a link the file no longer has is a dropped child. A plain repair's file holds every key its links
+    // came from, so it drops nothing; an update that kept its version is found the same way. The rest of repair sees only the file's keys.
+    const dropped = fileKeys === undefined ? { kept: [], more: false } : await detachDropped(ctx, installId, userId, allRows as Link[], fileKeys);
+    const { kept } = dropped;
+
+    // More dropped children than one call handles: stop here, within the call's statement budget; the caller calls again.
+    if (dropped.more) {
+        return { kept, linked: 0, missing: [], moreDropped: true, status: "needs-repair" };
+    }
+
+    const page = fileKeys === undefined ? allRows : allRows.filter((row) => fileKeys.has(row.entryKey));
 
     let linked = 0;
     const missing: string[] = [];
@@ -255,7 +289,7 @@ export const repairRows = async (ctx: MutationCtx, userId: string, pluginSlug: s
             version: install.targetVersion ?? install.version,
         });
 
-        return { kept, linked, missing, status: "installed" };
+        return { kept, linked, missing, moreDropped: false, status: "installed" };
     }
 
     if (install.status === "installing") {
@@ -266,5 +300,5 @@ export const repairRows = async (ctx: MutationCtx, userId: string, pluginSlug: s
         });
     }
 
-    return { kept, linked, missing, status: "needs-repair" };
+    return { kept, linked, missing, moreDropped: false, status: "needs-repair" };
 };

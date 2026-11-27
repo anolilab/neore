@@ -94,6 +94,8 @@ export const updateSkillChild = internalMutation
     .output(v.boolean())
     .mutation(async ({ args, ctx }) => {
         await heldInstall(ctx, args.installId as Id<"pluginInstalls">, args.generation);
+        // The rewrite can add a history row; an erasure that began after `beginUpdate` must not find one written behind its sweep.
+        await refuseWhileErasing(ctx, args.userId);
 
         const { page } = await ctx.db.pluginItems.findMany({ consistency: "primary", where: { installId: args.installId } });
         const link = page.find((row) => row.entryKey === args.entryKey && row.kind === "skill");

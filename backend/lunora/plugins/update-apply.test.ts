@@ -107,6 +107,36 @@ describe("applying an update", () => {
         expect(install).toMatchObject({ status: "installed", version: "1.1.0" });
     });
 
+    it("rewrites nothing while the account is being deleted, so no history row is left behind its sweep", async () => {
+        const { installId, skillId } = await installed();
+        const generation = await run(
+            async (context) => await context.runMutation(beginUpdate, { expectedGeneration: 1, installId, targetVersion: "1.1.0", userId: OWNER }),
+        );
+
+        await run(async (context) => await context.db.insert("accountMoves", { createdAt: Date.now(), kind: "erasing", userId: OWNER }));
+
+        await expect(
+            run(
+                async (context) =>
+                    await context.runMutation(updateSkillChild, {
+                        contentHash: await skillRowHash(REVISED),
+                        description: REVISED.description,
+                        entryKey: "skill:analyst",
+                        generation,
+                        installId,
+                        instructions: REVISED.instructions,
+                        name: REVISED.name,
+                        slug: REVISED.slug,
+                        userId: OWNER,
+                    }),
+            ),
+        ).rejects.toThrow("being deleted");
+
+        const skill = await run(async (context) => await context.db.skills.findFirst({ where: { _id: skillId } }));
+
+        expect(skill).not.toMatchObject({ instructions: REVISED.instructions });
+    });
+
     it("records a history revision and advances the version when a plugin update changes the instructions", async () => {
         const { installId, skillId } = await installed();
         const generation = await run(

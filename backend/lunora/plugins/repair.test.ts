@@ -5,7 +5,7 @@ import schema from "../schema";
 import { createPluginSkill } from "../skills/create-skill";
 import { createInstallRow, finishInstall, markNeedsRepair, recordCreated, recordIntent } from "./install-steps";
 import { skillRowHash } from "./entry-hash";
-import { repairRows } from "./repair";
+import { DETACH_PER_CALL, repairRows } from "./repair";
 import { markerFor } from "./logic";
 import { ROOT_SHARD_KEY, runInShard } from "../lib/shard-context";
 
@@ -61,7 +61,7 @@ describe("repair", () => {
 
         const result = await run(async (context) => await repairRows(context, OWNER, SLUG));
 
-        expect(result).toEqual({ kept: [], linked: 1, missing: [], status: "installed" });
+        expect(result).toEqual({ kept: [], linked: 1, missing: [], moreDropped: false, status: "installed" });
 
         const link = await run(async (context) => await context.db.pluginItems.findFirst({ where: { _id: intentId } }));
         const install = await run(async (context) => await context.db.pluginInstalls.findFirst({ where: { _id: installId } }));
@@ -99,7 +99,7 @@ describe("repair", () => {
 
         const result = await run(async (context) => await repairRows(context, OWNER, SLUG));
 
-        expect(result).toEqual({ kept: [], linked: 0, missing: ["skill:ghost"], status: "needs-repair" });
+        expect(result).toEqual({ kept: [], linked: 0, missing: ["skill:ghost"], moreDropped: false, status: "needs-repair" });
     });
 
     it("refuses to repair an install that does not need it", async () => {
@@ -172,7 +172,7 @@ describe("repair", () => {
 
         const result = await run(async (context) => await repairRows(context, OWNER, SLUG));
 
-        expect(result).toEqual({ kept: [], linked: 0, missing: ["skill:ghost"], status: "needs-repair" });
+        expect(result).toEqual({ kept: [], linked: 0, missing: ["skill:ghost"], moreDropped: false, status: "needs-repair" });
         expect(await run(async (context) => await context.db.pluginInstalls.findFirst({ where: { _id: installId } }))).toMatchObject({
             status: "needs-repair",
         });
@@ -193,7 +193,7 @@ describe("repair", () => {
 
         const result = await run(async (context) => await repairRows(context, OWNER, SLUG));
 
-        expect(result).toEqual({ kept: [], linked: 0, missing: ["skill:gone"], status: "needs-repair" });
+        expect(result).toEqual({ kept: [], linked: 0, missing: ["skill:gone"], moreDropped: false, status: "needs-repair" });
 
         const link = await run(async (context) => await context.db.pluginItems.findFirst({ where: { _id: intentId } }));
 
@@ -259,7 +259,7 @@ describe("repair", () => {
 
             const result = await run(async (context) => await repairRows(context, OWNER, SLUG));
 
-            expect(result).toEqual({ kept: [], linked: 1, missing: [], status: "installed" });
+            expect(result).toEqual({ kept: [], linked: 1, missing: [], moreDropped: false, status: "installed" });
 
             const link = await run(async (context) => await context.db.pluginItems.findFirst({ where: { _id: intentId } }));
             const install = await run(async (context) => await context.db.pluginInstalls.findFirst({ where: { _id: installId } }));
@@ -351,7 +351,7 @@ describe("repair", () => {
 
             const result = await run(async (context) => await repairRows(context, OWNER, SLUG));
 
-            expect(result).toEqual({ kept: [], linked: 1, missing: [], status: "installed" });
+            expect(result).toEqual({ kept: [], linked: 1, missing: [], moreDropped: false, status: "installed" });
 
             const link = await run(async (context) => await context.db.pluginItems.findFirst({ where: { _id: intentId } }));
 
@@ -364,6 +364,115 @@ describe("repair", () => {
             await run(async (context) => await context.db.patch("pluginInstalls", installId, { leaseUntil: Date.now() + 60_000 }));
 
             await expect(run(async (context) => await repairRows(context, OWNER, SLUG))).rejects.toThrow("still running");
+        });
+    });
+
+    describe("children the file no longer holds", () => {
+        const install = async () =>
+            await run(async (context) => await context.runMutation(createInstallRow, { contentHash: HASH, pluginSlug: SLUG, userId: OWNER, version: "1.0.0" }));
+
+        const linkedSkill = async (first: { generation: number; installId: string }, key: string) => {
+            const intentId = await run(
+                async (context) =>
+                    await context.runMutation(recordIntent, {
+                        contentHash: HASH,
+                        entryKey: key,
+                        generation: first.generation,
+                        installId: first.installId,
+                        kind: "skill",
+                        userId: OWNER,
+                    }),
+            );
+            const skillId = await run(
+                async (context) =>
+                    await context.runMutation(createPluginSkill, {
+                        description: key,
+                        instructions: key,
+                        isPremium: true,
+                        name: key,
+                        plan: "premium",
+                        pluginInstallId: first.installId,
+                        pluginMarker: markerFor(first.installId, key),
+                        slug: key.replace(":", "-"),
+                        source: { type: "plugin" as const, version: "1.0.0" },
+                        userId: OWNER,
+                    }),
+            );
+
+            await run(
+                async (context) =>
+                    await context.runMutation(recordCreated, { generation: first.generation, installId: first.installId, intentId, itemId: skillId }),
+            );
+
+            return skillId;
+        };
+
+        const linkKeys = async (installId: string) => {
+            const { page } = await run(async (context) => await context.db.pluginItems.findMany({ where: { installId } }));
+
+            return page.map((row: { entryKey: string }) => row.entryKey);
+        };
+
+        it("detaches a dropped child even when the update kept its version", async () => {
+            const first = await install();
+
+            await linkedSkill(first, "skill:keep");
+
+            const droppedId = await linkedSkill(first, "skill:drop");
+
+            await run(async (context) => await context.runMutation(markNeedsRepair, { generation: first.generation, installId: first.installId }));
+
+            const result = await run(async (context) => await repairRows(context, OWNER, SLUG, new Set(["skill:keep"])));
+
+            expect(result).toMatchObject({ kept: ["skill:drop"], moreDropped: false, status: "installed" });
+            expect(await linkKeys(first.installId)).toEqual(["skill:keep"]);
+            expect(await run(async (context) => await context.db.skills.findFirst({ where: { _id: droppedId } }))).toMatchObject({ pluginMarker: "" });
+        });
+
+        it("drops the link of a dropped group chat whose thread is gone, instead of asking for it again", async () => {
+            const first = await install();
+            const intentId = await run(
+                async (context) =>
+                    await context.runMutation(recordIntent, {
+                        contentHash: HASH,
+                        entryKey: "group:old",
+                        generation: first.generation,
+                        installId: first.installId,
+                        kind: "group",
+                        userId: OWNER,
+                    }),
+            );
+
+            await run(
+                async (context) =>
+                    await context.runMutation(recordCreated, { generation: first.generation, installId: first.installId, intentId, itemId: "gone-thread" }),
+            );
+            await run(async (context) => await context.runMutation(markNeedsRepair, { generation: first.generation, installId: first.installId }));
+
+            const result = await run(async (context) => await repairRows(context, OWNER, SLUG, new Set<string>()));
+
+            expect(result).toMatchObject({ missing: [], status: "installed" });
+            expect(await linkKeys(first.installId)).toEqual([]);
+        });
+
+        it("handles a bounded number of dropped children per call and says when more remain", async () => {
+            const first = await install();
+
+            for (let index = 0; index < DETACH_PER_CALL + 2; index += 1) {
+                await linkedSkill(first, `skill:s${String(index)}`);
+            }
+
+            await run(async (context) => await context.runMutation(markNeedsRepair, { generation: first.generation, installId: first.installId }));
+
+            const one = await run(async (context) => await repairRows(context, OWNER, SLUG, new Set<string>()));
+
+            expect(one).toMatchObject({ moreDropped: true, status: "needs-repair" });
+            expect(one.kept).toHaveLength(DETACH_PER_CALL);
+
+            const two = await run(async (context) => await repairRows(context, OWNER, SLUG, new Set<string>()));
+
+            expect(two).toMatchObject({ moreDropped: false, status: "installed" });
+            expect(two.kept).toHaveLength(2);
         });
     });
 });

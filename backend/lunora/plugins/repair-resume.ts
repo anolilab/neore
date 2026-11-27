@@ -44,6 +44,7 @@ export const beginRepair = internalMutation
             kept: v.array(v.string()),
             linked: v.number(),
             missing: v.array(v.object({ entryKey: v.string(), intentId: v.string(), kind: vPluginItemKind })),
+            moreDropped: v.boolean(),
             status: v.union(v.literal("installed"), v.literal("needs-repair")),
             unresolved: v.array(v.string()),
         }),
@@ -77,6 +78,8 @@ export const beginRepairRows = async (
     kept: string[];
     linked: number;
     missing: { entryKey: string; intentId: string; kind: "group" | "skill" | "trigger" }[];
+    /** More dropped children remain: call again before creating anything or finishing. */
+    moreDropped: boolean;
     status: "installed" | "needs-repair";
     /** Children whose pending hash is not settled yet: the install may not finish while any remains. */
     unresolved: string[];
@@ -141,7 +144,7 @@ export const beginRepairRows = async (
         throw new LunoraError("NOT_FOUND", `The plugin "${pluginSlug}" is not installed`);
     }
 
-    if (result.status === "installed" || missing.length === 0) {
+    if (result.status === "installed" || missing.length === 0 || result.moreDropped) {
         return {
             existing,
             generation: current.generation,
@@ -149,6 +152,7 @@ export const beginRepairRows = async (
             kept: result.kept,
             linked: result.linked,
             missing: [],
+            moreDropped: result.moreDropped,
             status: result.status,
             unresolved,
         };
@@ -167,7 +171,7 @@ export const beginRepairRows = async (
         current.status,
     );
 
-    return { existing, generation, installId, kept: result.kept, linked: result.linked, missing, status: "needs-repair", unresolved };
+    return { existing, generation, installId, kept: result.kept, linked: result.linked, missing, moreDropped: false, status: "needs-repair", unresolved };
 };
 
 /** A child repair is about to create is baselined on the plan that creates it, which may differ from the install's (a slug taken since). */
@@ -218,16 +222,25 @@ export const repairPlugin = authAction
                     return { contentHash: await entryHash(entry), entryKey: entry.key, kind: entry.kind };
                 }),
         );
-        const begun = await ctx.runMutation(internal.plugins.repair_resume.beginRepair, {
-            contentHash: hash,
-            entries: planned,
-            fileKeys: entries.map((entry) => entry.key),
-            pluginSlug: args.pluginSlug,
-            userId,
-        });
+        const begin = async () =>
+            await ctx.runMutation(internal.plugins.repair_resume.beginRepair, {
+                contentHash: hash,
+                entries: planned,
+                fileKeys: entries.map((entry) => entry.key),
+                pluginSlug: args.pluginSlug,
+                userId,
+            });
+        let begun = await begin();
+        const kept = [...begun.kept];
+
+        // Dropped children are detached a few per call (a mutation has a statement budget); nothing is created or finished until none remain.
+        while (begun.moreDropped) {
+            begun = await begin();
+            kept.push(...begun.kept);
+        }
 
         if (begun.missing.length === 0) {
-            return { created: [], kept: begun.kept, status: begun.status };
+            return { created: [], kept, status: begun.status };
         }
 
         const missingKeys = new Set(begun.missing.map((entry) => entry.entryKey));
@@ -273,12 +286,12 @@ export const repairPlugin = authAction
             if (begun.unresolved.length > 0) {
                 await ctx.runMutation(internal.plugins.install_steps.markNeedsRepair, { generation: begun.generation, installId: begun.installId });
 
-                return { created: created.map((item) => item.key), kept: begun.kept, status: "needs-repair" };
+                return { created: created.map((item) => item.key), kept, status: "needs-repair" };
             }
 
             await ctx.runMutation(internal.plugins.install_steps.finishInstall, { generation: begun.generation, installId: begun.installId });
 
-            return { created: created.map((item) => item.key), kept: begun.kept, status: "installed" };
+            return { created: created.map((item) => item.key), kept, status: "installed" };
         } catch (error) {
             await ctx.runMutation(internal.plugins.install_steps.markNeedsRepair, { generation: begun.generation, installId: begun.installId });
 

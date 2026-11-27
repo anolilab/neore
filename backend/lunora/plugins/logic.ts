@@ -38,7 +38,8 @@ export const actionsFor = (status: InstallStatus, leaseExpired: boolean): Instal
             return ["repair", "uninstall"];
         }
         case "uninstalling": {
-            return leaseExpired ? ["repair", "uninstall"] : [];
+            // A stopped uninstall is finished by running it again; repair does not take an uninstalling install.
+            return leaseExpired ? ["uninstall"] : [];
         }
         case "updating": {
             return leaseExpired ? ["repair"] : [];
