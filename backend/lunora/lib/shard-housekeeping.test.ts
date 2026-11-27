@@ -597,6 +597,14 @@ describe("a stalled guest merge behind more active shards", () => {
         // A job for the record, and the shard woken for the record's new due time, not left unwoken until its owner is active.
         expect(harness.scheduler.list().filter((job) => job.functionPath?.includes("runMemoryCleanup") === true)).toHaveLength(1);
         expect(await dueOf("user")).toBeGreaterThan(NOW);
+
+        // Once that time comes, the root dispatch sends the tick to the shard whatever its owner's last activity.
+        await harness.run(async (ctx: any) => {
+            const row = await ctx.db.shardActivity.findFirst({ where: { shardKey: "user" } });
+
+            await ctx.db.patch("shardActivity", row._id, { nextDueAt: NOW - 1 });
+        });
+        expect(await dispatchWith(dispatchDueShards)).toContainEqual({ path: "lib_shard_housekeeping:runShardTick", shardKey: "user" });
     });
 
     it("keeps a due time saved while the dispatched tick is being sent, after the dispatch's clear", async () => {
