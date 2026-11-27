@@ -632,8 +632,15 @@ export interface ApiTypes {
             installPlugin: FunctionReference<"action", { contentHash: string; markdown: string }, { installId: string; items: Array<{ id: string; key: string; kind: "skill" | "trigger" | "group"; title: string }> }>;
             previewPlugin: FunctionReference<"action", { markdown: string }, { contentHash: string; items: Array<{ key: string; kind: "skill" | "trigger" | "group"; title: string; warnings: Array<string> }>; name: string; pluginSlug: string; pluginVersion: string }>;
         };
-        repair: {
-            repairPlugin: FunctionReference<"mutation", { pluginSlug: string }, { linked: number; missing: Array<string>; status: "installed" | "needs-repair" }>;
+        repair_resume: {
+            repairPlugin: FunctionReference<"action", { contentHash: string; markdown: string; pluginSlug: string }, { created: Array<string>; status: "installed" | "needs-repair" }>;
+        };
+        uninstall_action: {
+            uninstallPlugin: FunctionReference<"action", { pluginSlug: string }, { kept: Array<string>; removed: number }>;
+        };
+        update: {
+            previewUpdate: FunctionReference<"action", { markdown: string }, { downgrade: boolean; installedVersion: string; plan: Array<{ action: "create" | "delete" | "detach" | "keep-edited" | "report-group" | "same" | "update"; entryKey: string }>; targetVersion: string }>;
+            updatePlugin: FunctionReference<"action", { confirmDowngrade: boolean; contentHash: string; markdown: string }, { applied: Array<string>; skipped: Array<{ action: "create" | "delete" | "detach" | "keep-edited" | "report-group" | "same" | "update"; entryKey: string }>; version: string }>;
         };
     };
     projects: {
@@ -1557,8 +1564,15 @@ export const api: ApiTypes = {
             installPlugin: { __lunoraRef: "plugins_install_action:installPlugin" },
             previewPlugin: { __lunoraRef: "plugins_install_action:previewPlugin" },
         },
-        repair: {
-            repairPlugin: { __lunoraRef: "plugins_repair:repairPlugin" },
+        repair_resume: {
+            repairPlugin: { __lunoraRef: "plugins_repair_resume:repairPlugin" },
+        },
+        uninstall_action: {
+            uninstallPlugin: { __lunoraRef: "plugins_uninstall_action:uninstallPlugin" },
+        },
+        update: {
+            previewUpdate: { __lunoraRef: "plugins_update:previewUpdate" },
+            updatePlugin: { __lunoraRef: "plugins_update:updatePlugin" },
         },
     },
     projects: {

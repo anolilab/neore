@@ -41517,10 +41517,10 @@
         "x-lunora-function-kind": "action"
       }
     },
-    "/_lunora/rpc#plugins_repair:repairPlugin": {
+    "/_lunora/rpc#plugins_repair_resume:repairPlugin": {
       "post": {
-        "description": "Invoke the `mutation` `plugins_repair:repairPlugin` over the Lunora RPC envelope (POST /_lunora/rpc).",
-        "operationId": "plugins_repair:repairPlugin",
+        "description": "Invoke the `action` `plugins_repair_resume:repairPlugin` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "plugins_repair_resume:repairPlugin",
         "requestBody": {
           "content": {
             "application/json": {
@@ -41529,17 +41529,25 @@
                 "properties": {
                   "args": {
                     "properties": {
+                      "contentHash": {
+                        "type": "string"
+                      },
+                      "markdown": {
+                        "type": "string"
+                      },
                       "pluginSlug": {
                         "type": "string"
                       }
                     },
                     "required": [
+                      "contentHash",
+                      "markdown",
                       "pluginSlug"
                     ],
                     "type": "object"
                   },
                   "functionPath": {
-                    "const": "plugins_repair:repairPlugin",
+                    "const": "plugins_repair_resume:repairPlugin",
                     "type": "string"
                   },
                   "shardKey": {
@@ -41562,10 +41570,7 @@
               "application/json": {
                 "schema": {
                   "properties": {
-                    "linked": {
-                      "type": "number"
-                    },
-                    "missing": {
+                    "created": {
                       "items": {
                         "type": "string"
                       },
@@ -41585,8 +41590,7 @@
                     }
                   },
                   "required": [
-                    "linked",
-                    "missing",
+                    "created",
                     "status"
                   ],
                   "type": "object"
@@ -41599,11 +41603,344 @@
             "$ref": "#/components/responses/LunoraError"
           }
         },
-        "summary": "mutation: plugins_repair:repairPlugin",
+        "summary": "action: plugins_repair_resume:repairPlugin",
         "tags": [
           "plugins"
         ],
-        "x-lunora-function-kind": "mutation"
+        "x-lunora-function-kind": "action"
+      }
+    },
+    "/_lunora/rpc#plugins_uninstall_action:uninstallPlugin": {
+      "post": {
+        "description": "Invoke the `action` `plugins_uninstall_action:uninstallPlugin` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "plugins_uninstall_action:uninstallPlugin",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "pluginSlug": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "pluginSlug"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "plugins_uninstall_action:uninstallPlugin",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "kept": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    "removed": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "kept",
+                    "removed"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "action: plugins_uninstall_action:uninstallPlugin",
+        "tags": [
+          "plugins"
+        ],
+        "x-lunora-function-kind": "action"
+      }
+    },
+    "/_lunora/rpc#plugins_update:previewUpdate": {
+      "post": {
+        "description": "Invoke the `action` `plugins_update:previewUpdate` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "plugins_update:previewUpdate",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "markdown": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "markdown"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "plugins_update:previewUpdate",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "downgrade": {
+                      "type": "boolean"
+                    },
+                    "installedVersion": {
+                      "type": "string"
+                    },
+                    "plan": {
+                      "items": {
+                        "properties": {
+                          "action": {
+                            "anyOf": [
+                              {
+                                "const": "create",
+                                "type": "string"
+                              },
+                              {
+                                "const": "delete",
+                                "type": "string"
+                              },
+                              {
+                                "const": "detach",
+                                "type": "string"
+                              },
+                              {
+                                "const": "keep-edited",
+                                "type": "string"
+                              },
+                              {
+                                "const": "report-group",
+                                "type": "string"
+                              },
+                              {
+                                "const": "same",
+                                "type": "string"
+                              },
+                              {
+                                "const": "update",
+                                "type": "string"
+                              }
+                            ]
+                          },
+                          "entryKey": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "action",
+                          "entryKey"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "targetVersion": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "downgrade",
+                    "installedVersion",
+                    "plan",
+                    "targetVersion"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "action: plugins_update:previewUpdate",
+        "tags": [
+          "plugins"
+        ],
+        "x-lunora-function-kind": "action"
+      }
+    },
+    "/_lunora/rpc#plugins_update:updatePlugin": {
+      "post": {
+        "description": "Invoke the `action` `plugins_update:updatePlugin` over the Lunora RPC envelope (POST /_lunora/rpc).",
+        "operationId": "plugins_update:updatePlugin",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "properties": {
+                      "confirmDowngrade": {
+                        "type": "boolean"
+                      },
+                      "contentHash": {
+                        "type": "string"
+                      },
+                      "markdown": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "confirmDowngrade",
+                      "contentHash",
+                      "markdown"
+                    ],
+                    "type": "object"
+                  },
+                  "functionPath": {
+                    "const": "plugins_update:updatePlugin",
+                    "type": "string"
+                  },
+                  "shardKey": {
+                    "description": "Optional shard key; omitted routes to the default shard.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "functionPath"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "applied": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    "skipped": {
+                      "items": {
+                        "properties": {
+                          "action": {
+                            "anyOf": [
+                              {
+                                "const": "create",
+                                "type": "string"
+                              },
+                              {
+                                "const": "delete",
+                                "type": "string"
+                              },
+                              {
+                                "const": "detach",
+                                "type": "string"
+                              },
+                              {
+                                "const": "keep-edited",
+                                "type": "string"
+                              },
+                              {
+                                "const": "report-group",
+                                "type": "string"
+                              },
+                              {
+                                "const": "same",
+                                "type": "string"
+                              },
+                              {
+                                "const": "update",
+                                "type": "string"
+                              }
+                            ]
+                          },
+                          "entryKey": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "action",
+                          "entryKey"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "version": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "applied",
+                    "skipped",
+                    "version"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "default": {
+            "$ref": "#/components/responses/LunoraError"
+          }
+        },
+        "summary": "action: plugins_update:updatePlugin",
+        "tags": [
+          "plugins"
+        ],
+        "x-lunora-function-kind": "action"
       }
     },
     "/_lunora/rpc#projects_functions:addProjectRepo": {

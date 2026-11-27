@@ -35,6 +35,8 @@ export interface PlanEnv {
     now: number;
     /** `undefined` for an account without a skill limit. */
     skillLimit: number | undefined;
+    /** An update's installed skills: the slug each holds, by entry key. That entry may keep the slug; no other entry may take it. */
+    ownSlugByKey?: ReadonlyMap<string, string>;
 }
 
 export const skillLimitFor = (user: { isAdmin?: boolean; plan?: string | null }): number | undefined =>
@@ -81,7 +83,7 @@ export type PlannedCreate = { create: GroupCreate; kind: "group" } | { create: S
 
 /** What the review screen shows for one item. */
 export interface PlanEntry {
-    /** `<kind>:<index>`: how the client names an item in its selection. */
+    /** `<kind>:<declared key>` (or `<kind>:<position>` in a plain bundle): how the client names an item in its selection. */
     key: string;
     kind: BundleItemKind;
     plan?: PlannedCreate;
@@ -123,7 +125,8 @@ export interface PlanView {
     };
 }
 
-export const entryKey = (kind: BundleItemKind, index: number): string => `${kind}:${String(index)}`;
+/** An entry's key: the author's declared key in a plugin file, else the section's position in a plain bundle. */
+export const entryKey = (kind: BundleItemKind, index: number, declaredKey?: string | undefined): string => `${kind}:${declaredKey ?? String(index)}`;
 
 /** A longer value is blocked here, not at import: `createSkill` caps these at `MAX_LENGTH.short` / `MAX_LENGTH.long`. */
 const skillCapProblems = (skill: SkillMarkdownData): string[] => {
@@ -233,6 +236,12 @@ const planTrigger = (trigger: BundleTrigger, env: PlanEnv, problems: string[]): 
 export const planBundle = (bundle: ParsedBundle, selected: ReadonlySet<string> | undefined, env: PlanEnv): PlanEntry[] => {
     const isSelected = (key: string): boolean => selected === undefined || selected.has(key);
     const taken = new Set(env.existingSlugs);
+    // The slugs an entry may take: all taken ones, but not the slug its own installed child holds, which it keeps or gives up.
+    const freeFor = (key: string): Set<string> => {
+        const own = env.ownSlugByKey?.get(key);
+
+        return own === undefined ? taken : new Set([...taken].filter((slug) => slug !== own));
+    };
     const slotsLeft = env.skillLimit === undefined ? Infinity : Math.max(0, env.skillLimit - env.existingSkillCount);
     let slotsUsed = 0;
     const entries: PlanEntry[] = [];
@@ -241,7 +250,7 @@ export const planBundle = (bundle: ParsedBundle, selected: ReadonlySet<string> |
 
     for (const entry of bundle.entries) {
         if (entry.item?.kind === "skill") {
-            skillKeyBySlug.set(entry.item.skill.slug, entryKey("skill", entry.index));
+            skillKeyBySlug.set(entry.item.skill.slug, entryKey("skill", entry.index, entry.declaredKey));
         }
     }
 
@@ -251,7 +260,7 @@ export const planBundle = (bundle: ParsedBundle, selected: ReadonlySet<string> |
             continue;
         }
 
-        const key = entryKey(entry.kind, entry.index);
+        const key = entryKey(entry.kind, entry.index, entry.declaredKey);
         const problems = [...entry.problems];
         const warnings = [...entry.warnings];
 
@@ -278,7 +287,7 @@ export const planBundle = (bundle: ParsedBundle, selected: ReadonlySet<string> |
             let { slug } = planned;
 
             try {
-                slug = pickFreeSlug(planned.slug, taken);
+                slug = pickFreeSlug(planned.slug, freeFor(key));
             } catch (error) {
                 problems.push(messageOf(error));
             }
@@ -334,7 +343,7 @@ export const planBundle = (bundle: ParsedBundle, selected: ReadonlySet<string> |
             continue;
         }
 
-        const key = entryKey(entry.kind, entry.index);
+        const key = entryKey(entry.kind, entry.index, entry.declaredKey);
         const problems = [...entry.problems];
         const warnings = [...entry.warnings];
         const base = { key, kind: entry.kind, requires: [] as string[], warnings };
@@ -441,7 +450,10 @@ export const planBundle = (bundle: ParsedBundle, selected: ReadonlySet<string> |
         entries.push({ ...base, problems: problems.length > 0 ? problems : ["This item could not be read."], title: entry.label, view: {} });
     }
 
-    return entries.toSorted((a, b) => Number(a.key.split(":", 2)[1]) - Number(b.key.split(":", 2)[1]));
+    // The file's order: a declared key is not a number, so the position comes from the bundle, not the key.
+    const position = new Map(bundle.entries.map((entry, at) => [entryKey(entry.kind, entry.index, entry.declaredKey), at] as const));
+
+    return entries.toSorted((a, b) => (position.get(a.key) ?? 0) - (position.get(b.key) ?? 0));
 };
 
 // ─── The import ─────────────────────────────────────────────────────────────
@@ -473,11 +485,14 @@ export interface ImportedItem {
 export class BundleImportError extends Error {
     /** What could not be removed again after the failure. */
     leftBehind: string[];
+    /** Set when the rows created so far are kept on purpose, so a repair can finish the rest (a rate limit). */
+    resumable: boolean;
 
-    constructor(message: string, leftBehind: string[]) {
+    constructor(message: string, leftBehind: string[], resumable = false) {
         super(message);
         this.name = "BundleImportError";
         this.leftBehind = leftBehind;
+        this.resumable = resumable;
     }
 }
 
@@ -547,13 +562,19 @@ const createPlanned = async (entry: PlanEntry, ops: BundleOps, idByKey: Map<stri
  * of them fails. Removal is best effort (each create is its own mutation): an
  * item it cannot remove is named in the error; a skill and a trigger stay switched off, a group chat starts nothing.
  */
-export const runBundleImport = async (entries: ReadonlyArray<PlanEntry>, selected: ReadonlySet<string>, ops: BundleOps): Promise<ImportedItem[]> => {
+export const runBundleImport = async (
+    entries: ReadonlyArray<PlanEntry>,
+    selected: ReadonlySet<string>,
+    ops: BundleOps,
+    options: { keepOnRateLimit?: boolean } = {},
+): Promise<ImportedItem[]> => {
     const created: ImportedItem[] = [];
     const idByKey = new Map<string, string>();
     const order: Record<BundleItemKind, number> = { group: 1, skill: 0, trigger: 2 };
     const todo = entries
         .filter((entry) => entry.plan && selected.has(entry.key))
-        .toSorted((a, b) => order[a.kind] - order[b.kind] || Number(a.key.split(":", 2)[1]) - Number(b.key.split(":", 2)[1]));
+        // `entries` is in the file's order, and the sort is stable: each kind keeps the file's order within it.
+        .toSorted((a, b) => order[a.kind] - order[b.kind]);
 
     const planFor = (key: string): PlannedCreate | undefined => entries.find((entry) => entry.key === key)?.plan;
 
@@ -607,6 +628,11 @@ export const runBundleImport = async (entries: ReadonlyArray<PlanEntry>, selecte
         try {
             created.push(await createPlanned(entry, ops, idByKey));
         } catch (error) {
+            // A rate limit is not a failure of the import: what was created is kept, and a repair resumes the rest.
+            if (options.keepOnRateLimit && error instanceof LunoraError && error.code === "TOO_MANY_REQUESTS") {
+                throw new BundleImportError(`"${entry.title}" hit the rate limit. What was created so far is kept, and repair finishes the rest.`, [], true);
+            }
+
             const { failed, kept } = await rollback();
             const reason = messageOf(error);
             const failedNote = failed.length === 0 ? "" : ` These could not be removed again: ${failed.join(", ")}. Delete them by hand.`;
