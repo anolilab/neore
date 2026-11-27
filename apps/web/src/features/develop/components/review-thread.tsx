@@ -37,17 +37,17 @@ const ReviewThread = ({
     const canToggle = isHostCapabilityAvailable(capabilities, "review.resolveThreads") && (thread.isResolved ? thread.canUnresolve : thread.canResolve);
 
     return (
-        <div className="bg-background text-foreground sticky left-0 my-1 max-w-3xl space-y-2 rounded-md border p-3 font-sans text-sm whitespace-normal">
+        <div className="surface-raised text-foreground sticky left-0 mx-3 my-2 max-w-3xl space-y-2 rounded-xl p-3 font-sans text-sm whitespace-normal">
             {(thread.isResolved || thread.isOutdated) && (
                 <div className="flex gap-2">
                     {thread.isResolved && <Badge variant="secondary">{t`Resolved`}</Badge>}
                     {thread.isOutdated && <Badge variant="outline">{t`Outdated`}</Badge>}
                 </div>
             )}
-            <ul className="space-y-2">
+            <ul className="divide-border/50 divide-y">
                 {thread.comments.map((comment) => (
-                    <li key={comment.id}>
-                        <p className="text-muted-foreground text-xs">
+                    <li className="py-2 first:pt-0 last:pb-0" key={comment.id}>
+                        <p className="text-muted-foreground font-mono text-xs">
                             {comment.url === undefined ? (
                                 `${comment.authorLogin} · ${new Date(comment.createdAt).toLocaleString()}`
                             ) : (
@@ -79,7 +79,9 @@ const ReviewThread = ({
                         }}
                         submitLabel={repliesApart ? t`Send reply now` : t`Reply`}
                     />
-                    {repliesApart && <p className="text-muted-foreground text-xs">{t`A reply is posted straight away, not with the rest of your review.`}</p>}
+                    {repliesApart && (
+                        <p className="text-muted-foreground font-mono text-xs">{t`A reply is posted straight away, not with the rest of your review.`}</p>
+                    )}
                 </div>
             ) : (
                 <div className="flex gap-2">

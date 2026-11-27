@@ -54,7 +54,7 @@ const GuideTab = ({
     const offers = useMemo(() => hostOffersFor(devices.data ?? [], address.repository, now), [address.repository, devices.data, now]);
 
     if (guide.isPending) {
-        return <Skeleton aria-label={t`Loading the guide`} className="h-24 w-full" role="status" />;
+        return <Skeleton aria-label={t`Loading the guide`} className="h-24 w-full rounded-xl" role="status" />;
     }
 
     const chosen: HostOffer | undefined = offers.find((offer) => offerKey(offer) === target);
@@ -150,8 +150,8 @@ const GuideTab = ({
 
     return (
         <div className="space-y-4">
-            <div className="space-y-2">
-                <label className="text-sm" htmlFor={instructionsId}>
+            <div className="surface-raised space-y-3 rounded-xl p-4">
+                <label className="text-sm font-medium" htmlFor={instructionsId}>
                     {t`What should the guide pay attention to?`}
                 </label>
                 <Textarea
@@ -215,20 +215,20 @@ const GuideTab = ({
             {current?.status === "ready" && (
                 <>
                     {stale && (
-                        <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm" role="status">
+                        <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm" role="status">
                             {t`This guide was written for an earlier commit. The ${requestNoun} has changed since: write it again to see the change as it is now.`}
                         </p>
                     )}
                     {current.summary !== "" && <p className="text-sm break-words whitespace-pre-wrap">{current.summary}</p>}
                     {current.leftOut > 0 && (
-                        <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm" role="note">
+                        <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm" role="note">
                             {t`${hostLabel} lists only part of this change; ${current.leftOut} files are not in the guide.`}
                         </p>
                     )}
                     <GuideStops onOpenFile={onOpenFile} stops={current.stops} />
                     {current.proposals.length > 0 && (
                         <section aria-labelledby={`${instructionsId}-suggestions`} className="space-y-2">
-                            <h3 className="text-sm font-medium" id={`${instructionsId}-suggestions`}>
+                            <h3 className="text-[15px] font-semibold" id={`${instructionsId}-suggestions`}>
                                 {t`Suggestions`}
                             </h3>
                             <GuideProposals
