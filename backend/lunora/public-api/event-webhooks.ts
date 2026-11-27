@@ -10,6 +10,7 @@ import { v } from "lunorash/server";
 import type { MutationCtx } from "../_generated/server";
 import { internalMutation } from "../_generated/server";
 import { isHostApproved } from "../auth/event-webhook-hosts";
+import { isErasing } from "../lib/account-moves";
 import { MAX_SUBSCRIPTIONS } from "./events-webhook";
 
 /** Expired rows reclaimed per sweep call. The sweep runs again on the next tick while it reports more. */
@@ -33,6 +34,7 @@ export interface SubscribeWrite {
 
 export type SubscribeOutcome =
     | { cursorSeq: number; expiresAt: number; kind: "granted"; truncated: boolean }
+    | { kind: "account_erasing" }
     | { kind: "host_not_approved" }
     | { kind: "limit" };
 
@@ -43,7 +45,7 @@ export type SubscribeOutcome =
 const vSubscribeWire = v.object({
     cursorSeq: v.number(),
     expiresAt: v.number(),
-    refusal: v.union(v.null(), v.literal("host_not_approved"), v.literal("limit")),
+    refusal: v.union(v.null(), v.literal("account_erasing"), v.literal("host_not_approved"), v.literal("limit")),
     truncated: v.boolean(),
 });
 
@@ -70,6 +72,11 @@ const oldestSeqOf = async (ctx: Pick<MutationCtx, "db">, userId: string): Promis
  * `truncated` is set when the cursor is older than the log keeps (the position then moves to the oldest event still held).
  */
 export const subscribeOn = async (ctx: Pick<MutationCtx, "db">, input: SubscribeWrite, now: number): Promise<SubscribeOutcome> => {
+    // The erasure's final drain of subscriptions runs after its marker is set, so a row written once the marker is there would survive it.
+    if (await isErasing(ctx, input.userId)) {
+        return { kind: "account_erasing" };
+    }
+
     if (!(await isHostApproved(ctx, input.userId, input.host))) {
         return { kind: "host_not_approved" };
     }

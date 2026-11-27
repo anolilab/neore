@@ -5,6 +5,7 @@
 import { lunoraTest } from "@lunora/testing";
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { beginAccountMove } from "../lib/account-moves";
 import schema from "../schema";
 import { reapExpiredOn, type SubscribeWrite, subscribeOn, unsubscribeOn } from "./event-webhooks";
 import { MAX_SUBSCRIPTIONS } from "./events-webhook";
@@ -77,6 +78,14 @@ describe("events/subscribe store", () => {
         await seed([1]);
 
         expect(await subscribe(writeOf())).toStrictEqual({ kind: "host_not_approved" });
+        expect(await rows()).toHaveLength(0);
+    });
+
+    it("refuses a subscription once the account's erasure has begun, and stores nothing", async () => {
+        await approve();
+        await harness.run(async (ctx: any) => await beginAccountMove(ctx, OWNER, "erasing", NOW));
+
+        expect(await subscribe(writeOf())).toStrictEqual({ kind: "account_erasing" });
         expect(await rows()).toHaveLength(0);
     });
 

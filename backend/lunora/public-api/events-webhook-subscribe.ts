@@ -90,6 +90,12 @@ export const subscribeWebhook = async (lunora: HttpActionCtx, identity: ApiKeyId
         });
     }
 
+    if (outcome.refusal === "account_erasing") {
+        throw new EventsWebhookError(FORBIDDEN, "This account is being deleted, so it takes no new webhook subscriptions.", {
+            reason: "account_erasing",
+        });
+    }
+
     if (outcome.refusal === "limit") {
         throw new EventsWebhookError(RESOURCE_EXHAUSTED, "This account has as many webhook subscriptions as it may hold.", {
             limit: "subscriptions",
