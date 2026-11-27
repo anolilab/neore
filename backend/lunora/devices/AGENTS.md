@@ -16,6 +16,11 @@
   that may be lost. Whether a code may still pair lives on the owner's shard
   (`devicePairingRevocations`, written by `revokeDevice`), never on the global
   `deviceCode` row: the two stores do not commit together.
+- **Confirmed = signed in** (the owner's pairing alert). A web-paired device is confirmed by its first signed request
+  (`recordFirstSignedUse`, `lastSeenAt`), a heartbeat or a manifest. A machine paired by code is confirmed when its code is
+  redeemed (`pairedByCode`). A revoke queues the alert of a confirmed, unannounced device; the sweep announces only signed-in
+  ones. A new route that verifies a device's signature, and can run before the device has sent a manifest, must call
+  `recordFirstSignedUse` in its mutation. The result and progress reports do not: a call needs a manifest tool first.
 - **The one call no chat starts** (`global-instructions.ts`): the rule-file editor's "Import from this computer"
   signs `instructions_list` / `instructions_read` for the caller's own desktop (never a server or a machine paired
   by code), with no thread (`deviceCalls.threadId` is optional for it alone). The request names ids from a fixed

@@ -1787,6 +1787,24 @@ describe("the pending device alert sweep", () => {
         expect(alerts.map((alert) => alert.title)).toEqual(["Laptop"]);
     });
 
+    it("tells the owner of a machine paired by code that is revoked before its alert job runs", async () => {
+        const owner = await insertUser();
+        const { deviceId } = (await harness.run(
+            async (ctx: any) =>
+                await ctx.runMutation(internals.registerHeadlessDevice, { codeId: "code-revoked-early", name: "build-box", platform: "linux", userId: owner }),
+        )) as { deviceId: string };
+
+        // No heartbeat: a code-paired machine is confirmed when its code is redeemed, not when it first signs in.
+        await as(owner).mutation(functions.revokeDevice as never, { deviceId } as never);
+
+        expect(await alertsOf(owner)).toHaveLength(0);
+        await runQueuedAlerts();
+
+        const alerts = await alertsOf(owner);
+
+        expect(alerts.map((alert) => alert.title)).toEqual(["build-box"]);
+    });
+
     it("still tells the owner of a signed-in pairing when more cancelled pairings than one sweep reads are waiting", async () => {
         const owner = await insertUser();
 
