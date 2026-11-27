@@ -29,19 +29,36 @@ import { vPluginItemKind } from "./validators";
 const vEntry = v.object({ contentHash: v.string().max(128), entryKey: v.string().max(256), kind: vPluginItemKind });
 
 export const beginRepair = internalMutation
-    .input({ contentHash: v.string().max(128), entries: v.optional(v.array(vEntry)), pluginSlug: v.string().max(64), userId: v.string().max(128) })
+    .input({
+        contentHash: v.string().max(128),
+        entries: v.optional(v.array(vEntry)),
+        fileKeys: v.optional(v.array(v.string().max(256))),
+        pluginSlug: v.string().max(64),
+        userId: v.string().max(128),
+    })
     .output(
         v.object({
             existing: v.array(v.object({ entryKey: v.string(), itemId: v.string() })),
             generation: v.number(),
             installId: v.string(),
+            kept: v.array(v.string()),
             linked: v.number(),
             missing: v.array(v.object({ entryKey: v.string(), intentId: v.string(), kind: vPluginItemKind })),
             status: v.union(v.literal("installed"), v.literal("needs-repair")),
             unresolved: v.array(v.string()),
         }),
     )
-    .mutation(async ({ args, ctx }) => await beginRepairRows(ctx, args.userId, args.pluginSlug, args.contentHash, args.entries));
+    .mutation(
+        async ({ args, ctx }) =>
+            await beginRepairRows(
+                ctx,
+                args.userId,
+                args.pluginSlug,
+                args.contentHash,
+                args.entries,
+                args.fileKeys === undefined ? undefined : new Set(args.fileKeys),
+            ),
+    );
 
 export const beginRepairRows = async (
     ctx: MutationCtx,
@@ -50,10 +67,14 @@ export const beginRepairRows = async (
     contentHash: string,
     /** Every entry the file would create. One with no row yet (an install stopped before it was reached) gets an intent row. */
     entries: { contentHash: string; entryKey: string; kind: "group" | "skill" | "trigger" }[] = [],
+    /** Every key the file holds. With it, an install kept from an update detaches the children the file dropped. */
+    fileKeys?: ReadonlySet<string>,
 ): Promise<{
     existing: { entryKey: string; itemId: string }[];
     generation: number;
     installId: string;
+    /** Children the update dropped, detached and kept as the person's own. */
+    kept: string[];
     linked: number;
     missing: { entryKey: string; intentId: string; kind: "group" | "skill" | "trigger" }[];
     status: "installed" | "needs-repair";
@@ -100,7 +121,7 @@ export const beginRepairRows = async (
         }
     }
 
-    const result = await repairRows(ctx, userId, pluginSlug);
+    const result = await repairRows(ctx, userId, pluginSlug, fileKeys);
     const { page } = await ctx.db.pluginItems.findMany({ consistency: "primary", where: { installId } });
     const existing = page.flatMap((row) =>
         row.state === "created" && row.kind === "skill" && row.itemId ? [{ entryKey: row.entryKey, itemId: row.itemId }] : [],
@@ -112,25 +133,41 @@ export const beginRepairRows = async (
         });
 
     const unresolved = result.missing.filter((key) => missing.every((row) => row.entryKey !== key));
+    // `repairRows` may have moved the generation and status on (an expired install it marked for repair), so the claim below
+    // and the generation returned are read again here, in this same mutation.
+    const current = await ctx.db.pluginInstalls.findFirst({ consistency: "primary", where: { _id: install._id } });
+
+    if (!current) {
+        throw new LunoraError("NOT_FOUND", `The plugin "${pluginSlug}" is not installed`);
+    }
 
     if (result.status === "installed" || missing.length === 0) {
-        return { existing, generation: install.generation, installId, linked: result.linked, missing: [], status: result.status, unresolved };
+        return {
+            existing,
+            generation: current.generation,
+            installId,
+            kept: result.kept,
+            linked: result.linked,
+            missing: [],
+            status: result.status,
+            unresolved,
+        };
     }
 
     // Takeover: the next generation and a fresh lease, so an action started before this one writes nothing more and no other
     // repair or uninstall starts while this one creates children. The action ends it with `finishInstall` or `markNeedsRepair`.
-    const generation = install.generation + 1;
+    const generation = current.generation + 1;
 
     await patchInstallIf(
         ctx,
         install._id as Id<"pluginInstalls">,
-        install.generation,
+        current.generation,
         { generation, leaseUntil: ctx.now + LEASE_MS, status: "installing", updatedAt: ctx.now },
         STALE,
-        install.status,
+        current.status,
     );
 
-    return { existing, generation, installId, linked: result.linked, missing, status: "needs-repair", unresolved };
+    return { existing, generation, installId, kept: result.kept, linked: result.linked, missing, status: "needs-repair", unresolved };
 };
 
 /** A child repair is about to create is baselined on the plan that creates it, which may differ from the install's (a slug taken since). */
@@ -153,6 +190,8 @@ export const repairPlugin = authAction
     .output(
         v.object({
             created: v.array(v.string()),
+            // Children an interrupted update meant to drop: now the person's own, no longer part of the plugin.
+            kept: v.array(v.string()),
             status: v.union(v.literal("installed"), v.literal("needs-repair")),
         }),
     )
@@ -182,12 +221,13 @@ export const repairPlugin = authAction
         const begun = await ctx.runMutation(internal.plugins.repair_resume.beginRepair, {
             contentHash: hash,
             entries: planned,
+            fileKeys: entries.map((entry) => entry.key),
             pluginSlug: args.pluginSlug,
             userId,
         });
 
         if (begun.missing.length === 0) {
-            return { created: [], status: begun.status };
+            return { created: [], kept: begun.kept, status: begun.status };
         }
 
         const missingKeys = new Set(begun.missing.map((entry) => entry.entryKey));
@@ -233,12 +273,12 @@ export const repairPlugin = authAction
             if (begun.unresolved.length > 0) {
                 await ctx.runMutation(internal.plugins.install_steps.markNeedsRepair, { generation: begun.generation, installId: begun.installId });
 
-                return { created: created.map((item) => item.key), status: "needs-repair" };
+                return { created: created.map((item) => item.key), kept: begun.kept, status: "needs-repair" };
             }
 
             await ctx.runMutation(internal.plugins.install_steps.finishInstall, { generation: begun.generation, installId: begun.installId });
 
-            return { created: created.map((item) => item.key), status: "installed" };
+            return { created: created.map((item) => item.key), kept: begun.kept, status: "installed" };
         } catch (error) {
             await ctx.runMutation(internal.plugins.install_steps.markNeedsRepair, { generation: begun.generation, installId: begun.installId });
 

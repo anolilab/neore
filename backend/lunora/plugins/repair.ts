@@ -36,6 +36,8 @@ const childIdByMarker = async (ctx: MutationCtx, kind: ChildKind, marker: string
 };
 
 export interface RepairResult {
+    /** Children an update dropped that stay as the person's own, with the plugin's marker removed. */
+    kept: string[];
     linked: number;
     missing: string[];
     status: "installed" | "needs-repair";
@@ -124,7 +126,7 @@ const repairStoppedUpdate = async (ctx: MutationCtx, install: Doc<"pluginInstall
         updatedAt: ctx.now,
     });
 
-    return { linked, missing: unresolved, status };
+    return { kept: [], linked, missing: unresolved, status };
 };
 
 /** Whether repair may start on this install now. An `installing` install is repairable only after its lease expired. */
@@ -132,7 +134,47 @@ export const repairableNow = (install: { leaseUntil?: number; status: string }, 
     install.status === "needs-repair" || (install.status === "installing" && (install.leaseUntil === undefined || install.leaseUntil <= now));
 
 /** Links every intent row whose child exists, and returns the install to `installed` once nothing is missing. */
-export const repairRows = async (ctx: MutationCtx, userId: string, pluginSlug: string): Promise<RepairResult> => {
+/**
+ * An install kept from an update holds the new file's hash and a target version. A `created` link whose key the new file no
+ * longer has is a child the update meant to drop: it is detached as the update would (its marker cleared, a trigger switched
+ * off, the child kept), and its link goes. A group chat is left as it is, since update does not detach one in place.
+ */
+const detachDropped = async (ctx: MutationCtx, installId: string, userId: string, rows: Link[], fileKeys: ReadonlySet<string>): Promise<string[]> => {
+    const kept: string[] = [];
+
+    for (const row of rows) {
+        if (fileKeys.has(row.entryKey) || row.kind === "group") {
+            continue;
+        }
+
+        const marker = markerFor(installId, row.entryKey);
+
+        if (row.state === "created" && row.kind === "skill") {
+            const skill = await ctx.db.skills.findFirst({ consistency: "primary", where: { pluginMarker: marker } });
+
+            if (skill && skill.userId === userId) {
+                await ctx.db.patch("skills", skill._id as Id<"skills">, { pluginInstallId: "", pluginMarker: "" });
+                kept.push(row.entryKey);
+            }
+        } else if (row.state === "created") {
+            const trigger = await ctx.db
+                .query("triggers")
+                .withIndex("by_plugin_marker", (q) => q.eq("pluginMarker", marker))
+                .first();
+
+            if (trigger && trigger.userId === userId) {
+                await ctx.db.patch("triggers", trigger._id as Id<"triggers">, { enabled: false, pluginInstallId: "", pluginMarker: "" });
+                kept.push(row.entryKey);
+            }
+        }
+
+        await ctx.db.delete("pluginItems", row._id as Id<"pluginItems">);
+    }
+
+    return kept;
+};
+
+export const repairRows = async (ctx: MutationCtx, userId: string, pluginSlug: string, fileKeys?: ReadonlySet<string>): Promise<RepairResult> => {
     // Triggers and group chats live on the owner's shard; anywhere else every child would read as gone and be created again.
     requireOwnerShard(userId, "repair");
 
@@ -154,7 +196,12 @@ export const repairRows = async (ctx: MutationCtx, userId: string, pluginSlug: s
     }
 
     const installId = install._id as string;
-    const { page } = await ctx.db.pluginItems.findMany({ consistency: "primary", where: { installId } });
+    const { page: allRows } = await ctx.db.pluginItems.findMany({ consistency: "primary", where: { installId } });
+
+    // Only an install kept from an update, and only with the new file's keys in hand, drops children.
+    const fromUpdate = fileKeys !== undefined && install.targetVersion !== undefined && install.targetVersion !== install.version;
+    const kept = fromUpdate ? await detachDropped(ctx, installId, userId, allRows as Link[], fileKeys) : [];
+    const page = fromUpdate ? allRows.filter((row) => fileKeys.has(row.entryKey) || row.kind === "group") : allRows;
 
     let linked = 0;
     const missing: string[] = [];
@@ -208,7 +255,7 @@ export const repairRows = async (ctx: MutationCtx, userId: string, pluginSlug: s
             version: install.targetVersion ?? install.version,
         });
 
-        return { linked, missing, status: "installed" };
+        return { kept, linked, missing, status: "installed" };
     }
 
     if (install.status === "installing") {
@@ -219,5 +266,5 @@ export const repairRows = async (ctx: MutationCtx, userId: string, pluginSlug: s
         });
     }
 
-    return { linked, missing, status: "needs-repair" };
+    return { kept, linked, missing, status: "needs-repair" };
 };

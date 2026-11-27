@@ -46,6 +46,7 @@ const MODULES = {
     lib_claim_once: async () => await import("../lib/claim-once"),
     plugins_install_action: async () => await import("./install-action"),
     plugins_install_steps: async () => await import("./install-steps"),
+    plugins_repair_resume: async () => await import("./repair-resume"),
     plugins_update: async () => await import("./update"),
     plugins_update_apply: async () => await import("./update-apply"),
     skills_bundle: async () => await import("../skills/bundle"),
@@ -450,5 +451,22 @@ describe("plugin update action", () => {
 
         // The new child exists, so the old version is not declared complete.
         expect(await installRow()).toMatchObject({ contentHash: next.contentHash, status: "needs-repair", version: "1.0.0" });
+
+        // Repair with the new file detaches the child the update meant to drop, then finishes at the new version.
+        const repaired = await as().action(procedureAt("plugins_repair_resume", "repairPlugin"), {
+            contentHash: next.contentHash,
+            markdown: next.markdown,
+            pluginSlug: SLUG,
+        } as never);
+
+        expect(repaired).toMatchObject({ kept: ["skill:critic"], status: "installed" });
+        expect(await installRow()).toMatchObject({ status: "installed", version: "1.1.0" });
+
+        const { page: critic } = await run(async (context) => await context.db.skills.findMany({ where: { slug: "critic", userId: OWNER } }));
+        const { page: links } = await run(async (context) => await context.db.pluginItems.findMany({ where: { userId: OWNER } }));
+
+        expect(critic).toHaveLength(1);
+        expect(critic[0].pluginMarker).toBeFalsy();
+        expect(links.map((link: { entryKey: string }) => link.entryKey)).not.toContain("skill:critic");
     });
 });

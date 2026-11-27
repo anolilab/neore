@@ -62,6 +62,33 @@ describe("repair: taking over a stopped install", () => {
         ).rejects.toThrow("STALE_LEASE");
     });
 
+    it("takes over an install that crashed mid-install, whose lease ran out, and returns its missing child", async () => {
+        const first = await run(
+            async (context) => await context.runMutation(createInstallRow, { contentHash: HASH, pluginSlug: SLUG, userId: OWNER, version: "1.0.0" }),
+        );
+        const intentId = await run(
+            async (context) =>
+                await context.runMutation(recordIntent, {
+                    contentHash: HASH,
+                    entryKey: "skill:ghost",
+                    generation: first.generation,
+                    installId: first.installId,
+                    kind: "skill",
+                    userId: OWNER,
+                }),
+        );
+
+        // The crash: the install action dies, the row stays `installing`, and its lease runs out.
+        await run(async (context) => await context.db.patch("pluginInstalls", first.installId, { leaseUntil: Date.now() - 1000 }));
+
+        const begun = await run(async (context) => await beginRepairRows(context, OWNER, SLUG, HASH));
+        const install = await run(async (context) => await context.db.pluginInstalls.findFirst({ where: { _id: first.installId } }));
+
+        expect(begun.status).toBe("needs-repair");
+        expect(begun.missing).toEqual([{ entryKey: "skill:ghost", intentId, kind: "skill" }]);
+        expect(install).toMatchObject({ generation: begun.generation, status: "installing" });
+    });
+
     it("finishes with nothing missing when every child exists", async () => {
         const first = await run(
             async (context) => await context.runMutation(createInstallRow, { contentHash: HASH, pluginSlug: SLUG, userId: OWNER, version: "1.0.0" }),
