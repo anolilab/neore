@@ -497,9 +497,10 @@ const HierarchicalThreadList: FC<
     );
 
     // A selection made while searching spans every section; once search closes, the rows the section hides drop out of it, so
-    // bulk delete never takes a thread the list no longer shows. Collapsed groups still count as shown.
+    // bulk delete never takes a thread the list no longer shows. Collapsed groups still count as shown. While searching the list
+    // is the results alone (none while they load), so a selection gathered across searches is left alone until search closes.
     useEffect(() => {
-        if (selectedThreadIds.size === 0) {
+        if (isSearching || !threadsData || selectedThreadIds.size === 0) {
             return;
         }
 
@@ -514,7 +515,7 @@ const HierarchicalThreadList: FC<
         if ([...selectedThreadIds].some((id) => !shown.has(id))) {
             setSelectedThreadIds((previous) => new Set([...previous].filter((id) => shown.has(id))));
         }
-    }, [filteredGroups, selectedThreadIds, setSelectedThreadIds]);
+    }, [filteredGroups, isSearching, selectedThreadIds, setSelectedThreadIds, threadsData]);
 
     // The same groups keep the same list: a new array re-derives every row's inputs (the pull request counts' ids among them) for nothing.
     // Adjusted during render, as `previousInputs` in the list's owner does, so the list and the groups change together.

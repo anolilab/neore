@@ -408,6 +408,22 @@ describe("the sidebar thread list", () => {
         expect([...update(new Set([first, "hidden-thread"]))]).toStrictEqual([first]);
     });
 
+    it("keeps a selection gathered across searches while searching", () => {
+        const setSelectedThreadIds = vi.fn();
+
+        render(
+            <HierarchicalThreadList
+                {...listProps}
+                currentThreadId={first}
+                searchQuery="plan"
+                selectedThreadIds={new Set([first, "hidden-thread"])}
+                setSelectedThreadIds={setSelectedThreadIds}
+            />,
+        );
+
+        expect(setSelectedThreadIds).not.toHaveBeenCalled();
+    });
+
     it("leaves a selection of shown threads as it is", () => {
         const setSelectedThreadIds = vi.fn();
 
