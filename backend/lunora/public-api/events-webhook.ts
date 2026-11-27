@@ -127,6 +127,11 @@ const parseCallbackUrl = (value: unknown): Parsed<CallbackUrl> => {
         return refuse(INVALID_PARAMS, "`delivery.url` must be an absolute https URL.");
     }
 
+    // The stored URL is the canonical one: percent-encoding can grow a short raw value past the limit.
+    if (parsed.href.length > MAX_URL_LENGTH) {
+        return refuse(INVALID_PARAMS, "`delivery.url` must be an https URL.");
+    }
+
     if (parsed.protocol !== "https:") {
         return refuse(INVALID_PARAMS, "`delivery.url` must use https.");
     }

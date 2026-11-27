@@ -174,14 +174,25 @@ export const unsubscribeOn = async (ctx: Pick<MutationCtx, "db">, userId: string
 };
 
 /** Removes up to one batch of expired subscriptions. Each delete is its own call, in order. */
-export const reapExpiredOn = async (ctx: Pick<MutationCtx, "db">, now: number): Promise<{ hasMore: boolean; removed: number }> => {
+export const reapExpiredOn = async (ctx: Pick<MutationCtx, "db">, now: number): Promise<{ hasMore: boolean; nextWakeAt?: number; removed: number }> => {
     const { page } = await ctx.db.eventWebhookSubscriptions.findMany({ limit: REAP_BATCH, where: { expiresAt: { lt: now } } });
 
     for (const row of page) {
         await ctx.db.delete("eventWebhookSubscriptions", row._id);
     }
 
-    return { hasMore: page.length === REAP_BATCH, removed: page.length };
+    // The census keeps only the earliest wake, so the next expiry still to come is returned for the tick to arm (at expiresAt + 1, as
+    // `subscribeOn` arms it). A shard holds at most one account's rows, so the page is the whole of them.
+    const { page: remaining } = await ctx.db.eventWebhookSubscriptions.findMany({ limit: MAX_SUBSCRIPTIONS });
+    let earliest: number | undefined;
+
+    for (const row of remaining) {
+        if (earliest === undefined || row.expiresAt < earliest) {
+            earliest = row.expiresAt;
+        }
+    }
+
+    return { hasMore: page.length === REAP_BATCH, ...(earliest !== undefined && { nextWakeAt: earliest + 1 }), removed: page.length };
 };
 
 export const subscribe = internalMutation
@@ -214,5 +225,5 @@ export const unsubscribe = internalMutation
 
 /** The shard sweep: reclaims expired subscriptions (`lib/shard-housekeeping.ts`). */
 export const reapExpiredEventSubscriptions = internalMutation
-    .output(v.object({ hasMore: v.boolean(), removed: v.number() }))
+    .output(v.object({ hasMore: v.boolean(), nextWakeAt: v.optional(v.number()), removed: v.number() }))
     .mutation(async ({ ctx }) => await reapExpiredOn(ctx, ctx.now));

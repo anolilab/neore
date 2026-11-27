@@ -22,6 +22,7 @@ export type CallbackHostCheck = "private" | "public" | "unresolved";
 interface DnsAnswerBody {
     Answer?: { data?: unknown; type?: unknown }[];
     Status?: unknown;
+    TC?: unknown;
 }
 
 const lookup = async (hostname: string, type: number, fetchFunction: typeof fetch): Promise<string[]> => {
@@ -36,6 +37,11 @@ const lookup = async (hostname: string, type: number, fetchFunction: typeof fetc
 
     if (body.Status !== DNS_STATUS_OK && body.Status !== DNS_STATUS_NXDOMAIN) {
         throw new Error("The lookup failed.");
+    }
+
+    // A truncated answer may leave out the address that is private, so it cannot be classed as public.
+    if (body.TC === true) {
+        throw new Error("The lookup was truncated.");
     }
 
     return (body.Answer ?? []).filter((answer) => answer.type === type && typeof answer.data === "string").map((answer) => answer.data as string);

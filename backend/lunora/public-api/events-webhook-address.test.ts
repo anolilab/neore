@@ -47,6 +47,12 @@ describe("checkCallbackHost", () => {
         }
     });
 
+    it("reports a truncated answer as unresolved, even when the part it gives is public", async () => {
+        const truncated = (async () => Response.json({ Answer: [{ data: "93.184.216.34", type: 1 }], Status: 0, TC: true })) as typeof fetch;
+
+        expect(await checkCallbackHost("hooks.example.com", truncated)).toBe("unresolved");
+    });
+
     it("reports a host with no address, a failed lookup or a lookup that throws as unresolved", async () => {
         expect(await checkCallbackHost("nowhere.example.com", dohWith([]))).toBe("unresolved");
         expect(await checkCallbackHost("hooks.example.com", (async () => new Response("", { status: 500 })) as typeof fetch)).toBe("unresolved");

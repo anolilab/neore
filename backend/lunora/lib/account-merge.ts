@@ -396,6 +396,18 @@ export const listShardRowsPage = internalQuery
             return { continueCursor: result.isDone ? null : (result.continueCursor ?? null), isDone: result.isDone, page: result.page };
         }
 
+        // Only the guest's own approvals: on a store two accounts share, the account's own list sits there too.
+        if (args.table === "eventWebhookHosts") {
+            const result = await ctx.db.eventWebhookHosts.findMany({
+                consistency: "primary",
+                cursor: args.cursor,
+                limit: MERGE_PAGE_SIZE,
+                where: { userId: args.from },
+            });
+
+            return { continueCursor: result.isDone ? null : (result.continueCursor ?? null), isDone: result.isDone, page: result.page };
+        }
+
         const read = async (size: number) => await rawDb(ctx).query(args.table).paginate({ cursor: args.cursor, numItems: size });
         const full = await read(pageSizeFor(args.table));
         const fits = withinClearBytes(full.page).length;

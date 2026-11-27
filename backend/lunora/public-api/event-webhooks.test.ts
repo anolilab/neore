@@ -249,7 +249,8 @@ describe("the expiry sweep", () => {
 
         const outcome = await harness.run(async (ctx: any) => await reapExpiredOn(ctx, NOW + TTL + 1));
 
-        expect(outcome).toStrictEqual({ hasMore: false, removed: 1 });
+        // The live row expires at NOW + TTL / 2 + TTL, so the shard is armed to wake one millisecond after that.
+        expect(outcome).toStrictEqual({ hasMore: false, nextWakeAt: NOW + TTL + TTL / 2 + 1, removed: 1 });
         const remaining = await rows();
 
         expect(remaining.map((row: { keyHash: string }) => row.keyHash)).toStrictEqual(["hash-2"]);

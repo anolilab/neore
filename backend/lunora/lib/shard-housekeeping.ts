@@ -638,8 +638,12 @@ export const runShardTick = internalMutation
         // Expired Events webhook subscriptions (`public-api/event-webhooks.ts`): housekeeping no longer visits a dormant shard, so the
         // tick reaps them here. A page that did not finish, or a failed reap, is armed for now.
         let subscriptionsMore = false;
+        let subscriptionsNextWakeAt: number | undefined;
         const subscriptionsChecked = await bestEffort("reapExpiredEventSubscriptionsOnTick", async () => {
-            ({ hasMore: subscriptionsMore } = await ctx.runMutation(internal.public_api.event_webhooks.reapExpiredEventSubscriptions, {}));
+            ({ hasMore: subscriptionsMore, nextWakeAt: subscriptionsNextWakeAt } = await ctx.runMutation(
+                internal.public_api.event_webhooks.reapExpiredEventSubscriptions,
+                {},
+            ));
         });
 
         const { now } = ctx;
@@ -691,6 +695,7 @@ export const runShardTick = internalMutation
             exportRunRead?.deleteAt,
             mergeCheckAt,
             memoryCleanupAt,
+            subscriptionsNextWakeAt,
             retentionLater,
             ...stuckChecks.map((row) => row?.stuckCheckAt),
         ].filter((at): at is number => at !== undefined);

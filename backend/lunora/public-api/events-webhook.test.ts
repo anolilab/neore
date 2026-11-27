@@ -25,6 +25,8 @@ const secretOf = (bytes: number): string => `whsec_${bytesToBase64(new Uint8Arra
 const VALID_URL = "https://hooks.example.com/neore";
 const ID_SHAPE = /^sub_[\da-f]{16}$/;
 
+const HOST_FOR_LENGTH = "hooks.example.com";
+
 const subscribeWith = (overrides: Record<string, unknown> = {}, delivery: Record<string, unknown> = {}) => {
     return {
         delivery: { mode: "webhook", secret: secretOf(24), url: VALID_URL, ...delivery },
@@ -76,6 +78,14 @@ describe("the TTL grant", () => {
 });
 
 describe("events/subscribe params", () => {
+    it("refuses a URL whose canonical form is over the limit, though its raw form is not", () => {
+        // Each "é" is one character raw and six in the canonical, percent-encoded form.
+        const longPath = `https://${HOST_FOR_LENGTH}/${"é".repeat(340)}`;
+
+        expect(longPath.length).toBeLessThan(2048);
+        expect(parseSubscribeParams(subscribeWith({}, { url: longPath }))).toMatchObject({ ok: false });
+    });
+
     it("reads a valid request: the host, the href, no arguments, the default TTL, no cursor", () => {
         const parsed = parseSubscribeParams(subscribeWith());
 
