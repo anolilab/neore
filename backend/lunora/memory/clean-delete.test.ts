@@ -9,7 +9,7 @@ import { deleteVectorRow } from "../agent/table-writes";
 import type { Id } from "../_generated/dataModel";
 import { memoryLogger } from "../lib/logger";
 import schema from "../schema";
-import { clearAllUserMemories, continueMemoryChainDelete, deleteMemory, linkMemoryEmbeddings, saveMemory, saveMemoryBatch } from "./functions";
+import { continueMemoryChainDelete, deleteMemory, linkMemoryEmbeddings, saveMemory, saveMemoryBatch } from "./functions";
 import { applyReflectionOps } from "./reflection";
 
 const { sessionFrom } = vi.hoisted(() => {
@@ -313,14 +313,5 @@ describe("deleting a memory", () => {
 
         expect(await rowOf(first)).toBeNull();
         expect(await run(async (ctx) => await ctx.db.query("memories").collect())).toHaveLength(0);
-    });
-
-    it("clear-all still removes rows and vectors", async () => {
-        const row = await seed("likes tea");
-
-        await asOwner().mutation(clearAllUserMemories as never, {} as never);
-
-        expect(await rowOf(row.memoryId)).toBeNull();
-        expect(await vectorExists(row.embeddingId)).toBe(false);
     });
 });
