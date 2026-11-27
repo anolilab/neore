@@ -503,6 +503,9 @@ export const RATE_LIMIT_CONFIGS = {
     // not starve the prompt optimizer's `chat/promptImprovement`.
     "skills/builder:free": Ratelimit.tokenBucket(10, MINUTE, 20),
     "skills/builder:premium": Ratelimit.tokenBucket(30, MINUTE, 60),
+    // Installing or updating a plugin: five an hour per person. Repair is not under this limit, so it always makes progress.
+    "plugins/install:free": Ratelimit.fixedWindow(5, HOUR),
+    "plugins/install:premium": Ratelimit.fixedWindow(5, HOUR),
     // Exporting, previewing and importing a team bundle (`skills/bundle.ts`). The creates an import makes are
     // charged to their own families (`skills/create`, `triggers/create`, `chat/create`); this one only bounds the
     // parsing and reading around them.
