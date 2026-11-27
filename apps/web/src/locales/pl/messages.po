@@ -15773,11 +15773,11 @@ msgstr "Nie pamiętasz hasła?"
 msgid "Fork"
 msgstr "Rozwidlij"
 
-#: src/features/chat/host/host-fork.tsx:83
+#: src/features/chat/host/host-fork.tsx:86
 msgid "Fork here"
 msgstr "Rozwidlij tutaj"
 
-#: src/features/chat/host/host-fork.tsx:92
+#: src/features/chat/host/host-fork.tsx:95
 msgid "Fork this chat?"
 msgstr "Rozwidlić ten czat?"
 
@@ -34995,11 +34995,11 @@ msgstr "Tej sugestii nie można już dodać."
 msgid "That suggestion is gone."
 msgstr "Tej sugestii już nie ma."
 
-#: src/features/chat/host/host-fork.tsx:56
+#: src/features/chat/host/host-fork.tsx:59
 msgid "The chat was forked."
 msgstr "Czat został rozwidlony."
 
-#: src/features/chat/host/host-fork.tsx:87
+#: src/features/chat/host/host-fork.tsx:90
 msgid "The fork continues from this conversation in a new chat on the same computer and folder. Both chats work in that folder, so they can change the same files, and a git worktree there is shared too."
 msgstr "Rozwidlenie kontynuuje tę rozmowę w nowym czacie na tym samym komputerze i w tym samym folderze. Oba czaty pracują w tym folderze, więc mogą zmieniać te same pliki, a znajdujący się tam worktree gita również jest współdzielony."
 

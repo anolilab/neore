@@ -49,32 +49,25 @@ vi.mock("sonner", () => {
 vi.mock("@/features/auth/lib/utilities", () => {
     return { getLocalizedError: ({ error }: { error: Error }) => error.message };
 });
+vi.mock("@neore/backend/api", () => {
+    return { api: { acp: { remote: { forkHostThread: "acp.remote.forkHostThread" } } } };
+});
 vi.mock("@/lib/lunora/crpc", () => {
     return {
-        useCRPC: () => {
+        useLunoraActionOptions: () => {
             return {
-                acp: {
-                    remote: {
-                        forkHostThread: {
-                            mutationOptions: () => {
-                                return {
-                                    mutationFn: async (args: unknown) => {
-                                        harness.calls.push(args);
+                mutationFn: async (args: unknown) => {
+                    harness.calls.push(args);
 
-                                        if (harness.hold !== undefined) {
-                                            await harness.hold;
-                                        }
+                    if (harness.hold !== undefined) {
+                        await harness.hold;
+                    }
 
-                                        if (harness.error !== undefined) {
-                                            throw harness.error;
-                                        }
+                    if (harness.error !== undefined) {
+                        throw harness.error;
+                    }
 
-                                        return { started: true, threadId: "thread-fork" };
-                                    },
-                                };
-                            },
-                        },
-                    },
+                    return { started: true, threadId: "thread-fork" };
                 },
             };
         },

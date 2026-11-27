@@ -10,6 +10,7 @@
 import { useLingui } from "@lingui/react/macro";
 import type { CapabilityReportInput } from "@neore/ai/capabilities";
 import { capabilityOf, isAvailable } from "@neore/ai/capabilities";
+import { api } from "@neore/backend/api";
 import { Button } from "@neore/ui/components/button";
 import ConfirmDialog from "@neore/ui/components/confirm-dialog";
 import { useMutation } from "@tanstack/react-query";
@@ -20,11 +21,10 @@ import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { getLocalizedError } from "@/features/auth/lib/utilities";
-import { useCRPC } from "@/lib/lunora/crpc";
+import { useLunoraActionOptions } from "@/lib/lunora/crpc";
 
 const HostFork: FC<{ capabilities: CapabilityReportInput | undefined; disabled?: boolean; threadId: string }> = ({ capabilities, disabled, threadId }) => {
     const { t } = useLingui();
-    const crpc = useCRPC();
     const navigate = useNavigate();
     const [open, setOpen] = useState(false);
     // One id per click, kept while it is retried: a double tap forks once (`clientId`).
@@ -36,7 +36,10 @@ const HostFork: FC<{ capabilities: CapabilityReportInput | undefined; disabled?:
     };
     // The callbacks are the mutation's own, not `mutate`'s: those do not run once this component has unmounted.
     const fork = useMutation({
-        ...crpc.acp.remote.forkHostThread.mutationOptions(),
+        // An action: it starts the session and then copies the chat's settled history into the new one.
+        ...useLunoraActionOptions(api.acp.remote.forkHostThread),
+        networkMode: "always",
+        retry: 0,
         onError: (error) => {
             toast.error(getLocalizedError({ error, t }));
         },

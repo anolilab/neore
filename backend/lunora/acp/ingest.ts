@@ -99,6 +99,19 @@ const openSession = async (ctx: MutationCtx, device: Doc<"devices">, hostSession
     const existing = await ctx.db.acpSessions.findFirst({ where: { deviceId: device._id, hostSessionId } });
 
     if (existing) {
+        // A session started as a fork that the agent did not fork (`fork_unsupported`, `fork_failed`) opened fresh: it holds none of the
+        // source chat's conversation, so the chat is not a branch of it, and the link made when the fork was queued is taken back. Whatever
+        // the session's state now (the chat may have been deleted, which ends it, and restored since), and again for a report sent twice.
+        if (open.fork?.forked === false) {
+            const { page: links } = await ctx.db.threadRelationships.findMany({ where: { threadId: existing.threadId } });
+
+            for (const link of links) {
+                if (link.branchType === "branch") {
+                    await ctx.db.delete("threadRelationships", link._id);
+                }
+            }
+        }
+
         // A thread deleted in the app ends its session: the desktop learns it is over instead of posting into it.
         const thread = await ctx.db.get("threads", existing.threadId as Id<"threads">);
 
@@ -122,18 +135,6 @@ const openSession = async (ctx: MutationCtx, device: Doc<"devices">, hostSession
         // loaded the session counts as one that did not.
         const requestedNativeId = opened ? existing.nativeSessionId : undefined;
         const reattachFailure = requestedNativeId === undefined ? undefined : reattachFailureOf(requestedNativeId, open);
-
-        // A session started as a fork that the agent did not fork (`fork_unsupported`, `fork_failed`) opened fresh: it holds none of the
-        // source chat's conversation, so the chat is not a branch of it, and the link made when the fork was queued is taken back.
-        if (opened && open.fork?.forked === false) {
-            const { page: links } = await ctx.db.threadRelationships.findMany({ where: { threadId: existing.threadId } });
-
-            for (const link of links) {
-                if (link.branchType === "branch") {
-                    await ctx.db.delete("threadRelationships", link._id);
-                }
-            }
-        }
 
         if (reattachFailure !== undefined) {
             await markReattachFailed(ctx, existing.threadId, reattachFailure);

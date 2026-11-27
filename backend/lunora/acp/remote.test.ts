@@ -100,6 +100,11 @@ const { reapExpiredHostStreams } = await import("./lib/reap");
 
 registerModule(registry, "acp_calls", calls);
 registerModule(registry, "acp_ingest", await import("./ingest"));
+registerModule(registry, "acp_remote", remote);
+registerModule(registry, "agent_branches", await import("../agent/branches"));
+registerModule(registry, "agent_messages", await import("../agent/messages"));
+registerModule(registry, "agent_threads", await import("../agent/threads"));
+registerModule(registry, "chat_context_reset", await import("../chat/context-reset"));
 registerModule(registry, "agent_sharing", await import("../agent/sharing"));
 registerModule(registry, "agent_streams", await import("../agent/streams"));
 registerModule(registry, "chat_streaming_persistent_library", await import("../chat/streaming/persistent/library"));
@@ -395,7 +400,7 @@ describe("forkHostThread", () => {
         return { device, threadId: first.threadId };
     };
     const fork = async (threadId: string, clientId = "fork-1", userId = ownerId) =>
-        await as(userId).mutation(remote.forkHostThread as never, { clientId, threadId } as never);
+        await as(userId).action(remote.forkHostThread as never, { clientId, threadId } as never);
 
     it("starts a new chat on the same computer, folder and agent, asking the computer to fork the agent's own session", async () => {
         const { device, threadId } = await started();
@@ -550,6 +555,182 @@ describe("forkHostThread", () => {
         );
 
         expect(await rows("threadRelationships", { threadId: result.threadId })).toHaveLength(links);
+    });
+
+    /** The messages of a chat in reading order: what the person sees, as text. */
+    const textOf = async (threadId: string): Promise<string[]> => {
+        const found = await rows("messages", { threadId });
+
+        return found.toSorted((a, b) => (a.order as number) - (b.order as number)).map((message) => (message.message as { content: string }).content);
+    };
+
+    const say = async (threadId: string, rowsToAdd: [string, string, number][]) => {
+        await run(async (ctx) => {
+            for (const [content, status, order] of rowsToAdd) {
+                await ctx.db.insert("messages", {
+                    message: { content, role: order % 2 === 0 ? "user" : "assistant" },
+                    order,
+                    status,
+                    stepOrder: 0,
+                    threadId,
+                    tool: false,
+                    userId: ownerId,
+                });
+            }
+        });
+    };
+
+    it("copies the source chat's settled messages into the new chat, in order", async () => {
+        const { threadId } = await started();
+
+        await say(threadId, [
+            ["first question", "success", 0],
+            ["first answer", "success", 1],
+            ["second question", "success", 2],
+            ["second answer", "success", 3],
+        ]);
+
+        const result = (await fork(threadId)) as { started: boolean; threadId: string };
+
+        expect(await textOf(result.threadId)).toEqual(["first question", "first answer", "second question", "second answer"]);
+        // The source is as it was.
+        expect(await textOf(threadId)).toEqual(["first question", "first answer", "second question", "second answer"]);
+    });
+
+    it("copies only settled messages when the source is still replying", async () => {
+        const { threadId } = await started();
+
+        await say(threadId, [
+            ["asked", "success", 0],
+            ["answered", "success", 1],
+            ["asked again", "success", 2],
+            ["half an answer", "pending", 3],
+        ]);
+
+        const result = (await fork(threadId)) as { started: boolean; threadId: string };
+        const copied = await textOf(result.threadId);
+
+        expect(copied).not.toContain("half an answer");
+        expect(copied).toEqual(["asked", "answered", "asked again"]);
+    });
+
+    it("refuses a trashed source, and starts nothing", async () => {
+        const { threadId } = await started();
+
+        await say(threadId, [["asked", "success", 0]]);
+        await run(async (ctx) => {
+            await ctx.db.patch("threads", threadId, { deleted: true });
+        });
+        await expect(fork(threadId)).rejects.toThrow("Chat not found");
+        expect(await rows("acpSessions")).toHaveLength(1);
+        expect(await rows("deviceCalls", { toolName: "acp_start" })).toHaveLength(1);
+    });
+
+    it("does not copy the history again for a retry of the same fork", async () => {
+        const { threadId } = await started();
+
+        await say(threadId, [["asked", "success", 0]]);
+
+        const first = (await fork(threadId, "again")) as { threadId: string };
+        const retry = (await fork(threadId, "again")) as { started: boolean; threadId: string };
+
+        expect(retry).toEqual({ started: false, threadId: first.threadId });
+        expect(await textOf(first.threadId)).toEqual(["asked"]);
+    });
+
+    it("carries what the source session was handed over, and nothing when it was handed nothing", async () => {
+        const { threadId } = await started();
+        const [source] = await rows("acpSessions", { threadId });
+
+        const clean = (await fork(threadId, "clean")) as { threadId: string };
+
+        const [cleanSession] = await rows("acpSessions", { threadId: clean.threadId });
+
+        expect(cleanSession?.taintedBy).toBeUndefined();
+
+        await run(async (ctx) => {
+            await ctx.db.patch("acpSessions", source!._id, { taintedBy: ["web", "mcp"] });
+        });
+
+        const warned = (await fork(threadId, "warned")) as { threadId: string };
+
+        const [warnedSession] = await rows("acpSessions", { threadId: warned.threadId });
+        const [sourceSession] = await rows("acpSessions", { threadId });
+
+        expect(warnedSession?.taintedBy).toEqual(["web", "mcp"]);
+        // The source's own is untouched.
+        expect(sourceSession?.taintedBy).toEqual(["web", "mcp"]);
+    });
+
+    it("marks the new chat as the source is marked for a context reset and a handed-over conversation", async () => {
+        const { threadId } = await started();
+
+        await run(async (ctx) => {
+            await ctx.db.patch("threads", threadId, { hasContextReset: true, hasHandoff: true });
+        });
+
+        const result = (await fork(threadId)) as { threadId: string };
+
+        expect(await fieldOf(result.threadId, "hasHandoff")).toBe(true);
+        expect(await fieldOf(result.threadId, "hasContextReset")).toBe(true);
+    });
+
+    it("does not let a start and a fork replay each other's id", async () => {
+        const { device, threadId } = await started();
+        const ordinary = (await as(ownerId).mutation(
+            remote.startHostSession as never,
+            {
+                agentKey: "claude",
+                clientId: `fork:${threadId}:shared`,
+                deviceId: device.deviceId,
+                folderId: "f1",
+            } as never,
+        )) as { started: boolean; threadId: string };
+
+        // A start that happens to carry the id a fork once prefixed itself with is not the fork's.
+        const forked = (await fork(threadId, "shared")) as { started: boolean; threadId: string };
+
+        expect(ordinary.started).toBe(true);
+        expect(forked.started).toBe(true);
+        expect(forked.threadId).not.toBe(ordinary.threadId);
+        expect(await rows("threadRelationships", { threadId: forked.threadId })).toHaveLength(1);
+    });
+
+    it("answers a retry with the fork it made even after the source's session changed", async () => {
+        const { threadId } = await started();
+        const first = (await fork(threadId, "kept")) as { started: boolean; threadId: string };
+        const [source] = await rows("acpSessions", { threadId });
+
+        // The source's agent no longer forks: a new fork would be refused.
+        await run(async (ctx) => {
+            await ctx.db.patch("acpSessions", source!._id, { capabilities: report({ reason: "not_offered", supported: false }) });
+        });
+        await expect(fork(threadId, "new")).rejects.toThrow();
+
+        expect(await fork(threadId, "kept")).toEqual({ started: false, threadId: first.threadId });
+    });
+
+    it("takes the link back for a failed fork reported after the new chat was deleted and restored", async () => {
+        const { device, threadId } = await started();
+        const result = (await fork(threadId)) as { threadId: string };
+        const [opening] = await rows("acpSessions", { threadId: result.threadId });
+
+        await run(async (ctx) => {
+            // Deleting the chat ends its session; restoring it leaves the session ended.
+            await ctx.db.patch("threads", result.threadId, { deleted: true });
+            await ctx.db.patch("acpSessions", opening!._id, { status: "ended" });
+            await ctx.db.patch("threads", result.threadId, { deleted: false });
+        });
+        await run(
+            async (ctx) =>
+                await ctx.runMutation(applyHostEvents, {
+                    deviceId: device.deviceId,
+                    events: [{ ...SESSION_OPEN, fork: { forked: false, reason: "fork_failed" } }],
+                    sessionId: opening?.hostSessionId as string,
+                }),
+        );
+
+        expect(await rows("threadRelationships", { threadId: result.threadId })).toHaveLength(0);
     });
 
     it("answers a chat that is not the caller's as one that does not exist", async () => {

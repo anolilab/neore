@@ -15773,11 +15773,11 @@ msgstr "Esqueceu a senha?"
 msgid "Fork"
 msgstr "Criar cópia"
 
-#: src/features/chat/host/host-fork.tsx:83
+#: src/features/chat/host/host-fork.tsx:86
 msgid "Fork here"
 msgstr "Criar cópia aqui"
 
-#: src/features/chat/host/host-fork.tsx:92
+#: src/features/chat/host/host-fork.tsx:95
 msgid "Fork this chat?"
 msgstr "Criar uma cópia deste chat?"
 
@@ -34995,11 +34995,11 @@ msgstr "Essa sugestão não pode mais ser adicionada."
 msgid "That suggestion is gone."
 msgstr "Essa sugestão não existe mais."
 
-#: src/features/chat/host/host-fork.tsx:56
+#: src/features/chat/host/host-fork.tsx:59
 msgid "The chat was forked."
 msgstr "O chat foi copiado."
 
-#: src/features/chat/host/host-fork.tsx:87
+#: src/features/chat/host/host-fork.tsx:90
 msgid "The fork continues from this conversation in a new chat on the same computer and folder. Both chats work in that folder, so they can change the same files, and a git worktree there is shared too."
 msgstr "A cópia continua esta conversa em um novo chat no mesmo computador e na mesma pasta. Os dois chats trabalham nessa pasta, então podem alterar os mesmos arquivos, e um worktree do git que esteja lá também é compartilhado."
 

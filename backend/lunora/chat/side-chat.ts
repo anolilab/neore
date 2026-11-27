@@ -16,6 +16,7 @@ import { v } from "lunorash/server";
 
 import type { Id } from "../_generated/dataModel";
 import { internal } from "../_generated/internal";
+import type { ActionCtx } from "../_generated/server";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { threadSharedWithOthers } from "../agent/live-grant";
 import { isTeamMember } from "../auth/lib/team-helpers";
@@ -164,6 +165,29 @@ export const refusedOutcome = (log: { event: (name: string, fields: { reason: st
     return { reason, status: "refused" as const };
 };
 
+/**
+ * Removes a thread this action just made, with its link: a failed or refused copy leaves neither behind. The paged delete removes the thread
+ * row last and schedules its own later pages, so it would leave the partial child readable meanwhile; the pages run here, one after another,
+ * until the row is gone, then the usual delete clears what is left (streams, pins, routes).
+ */
+export const discardNewThread = async (ctx: Pick<ActionCtx, "runMutation">, threadId: Id<"threads">): Promise<void> => {
+    await ctx.runMutation(internal.agent.threads.deleteThreadRelationship, { threadId });
+
+    let cursor: string | undefined;
+
+    for (let page = 0; page < MAX_DISCARD_PAGES; page += 1) {
+        const result = await ctx.runMutation(internal.agent.threads._deletePageForThreadId, { cursor, threadId });
+
+        if (result.isDone) {
+            break;
+        }
+
+        cursor = result.cursor ?? undefined;
+    }
+
+    await ctx.runMutation(internal.agent.threads.deleteAllForThreadIdAsync, { threadId });
+};
+
 export const createSideChat = authAction
     .use(rateLimit("chat/create"))
     .input({ threadId: v.string().max(MAX_LENGTH.id) })
@@ -240,26 +264,7 @@ export const createSideChat = authAction
         const newThreadId = created._id as Id<"threads">;
 
         // The child is removed with its link, so a failed or refused copy leaves neither behind.
-        const discard = async (): Promise<void> => {
-            await ctx.runMutation(internal.agent.threads.deleteThreadRelationship, { threadId: newThreadId });
-
-            // The paged delete removes the thread row last and schedules its own later pages, so it would leave the partial
-            // child readable meanwhile. Run the pages here, one after another, until the row is gone, then the usual delete
-            // clears what is left (streams, pins, routes).
-            let cursor: string | undefined;
-
-            for (let page = 0; page < MAX_DISCARD_PAGES; page += 1) {
-                const result = await ctx.runMutation(internal.agent.threads._deletePageForThreadId, { cursor, threadId: newThreadId });
-
-                if (result.isDone) {
-                    break;
-                }
-
-                cursor = result.cursor ?? undefined;
-            }
-
-            await ctx.runMutation(internal.agent.threads.deleteAllForThreadIdAsync, { threadId: newThreadId });
-        };
+        const discard = async (): Promise<void> => await discardNewThread(ctx, newThreadId);
 
         try {
             // The child keeps the parent's bot, so its runs keep the same persona. Its permission mode is copied after the re-read below.

@@ -142,6 +142,14 @@ vi.mock("@/lib/lunora/crpc", async () => {
 
     return {
         useCRPC: () => node([]),
+        // The fork is an action; the composer tests do not run it.
+        useLunoraActionOptions: () => {
+            return {
+                mutationFn: async () => {
+                    return { started: true };
+                },
+            };
+        },
         useLunoraAuth: () => {
             return { isAuthenticated: true };
         },

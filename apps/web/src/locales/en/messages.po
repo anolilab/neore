@@ -15772,11 +15772,11 @@ msgstr "Forgot password?"
 msgid "Fork"
 msgstr "Fork"
 
-#: src/features/chat/host/host-fork.tsx:83
+#: src/features/chat/host/host-fork.tsx:86
 msgid "Fork here"
 msgstr "Fork here"
 
-#: src/features/chat/host/host-fork.tsx:92
+#: src/features/chat/host/host-fork.tsx:95
 msgid "Fork this chat?"
 msgstr "Fork this chat?"
 
@@ -34994,11 +34994,11 @@ msgstr "That suggestion cannot be added any more."
 msgid "That suggestion is gone."
 msgstr "That suggestion is gone."
 
-#: src/features/chat/host/host-fork.tsx:56
+#: src/features/chat/host/host-fork.tsx:59
 msgid "The chat was forked."
 msgstr "The chat was forked."
 
-#: src/features/chat/host/host-fork.tsx:87
+#: src/features/chat/host/host-fork.tsx:90
 msgid "The fork continues from this conversation in a new chat on the same computer and folder. Both chats work in that folder, so they can change the same files, and a git worktree there is shared too."
 msgstr "The fork continues from this conversation in a new chat on the same computer and folder. Both chats work in that folder, so they can change the same files, and a git worktree there is shared too."
 
