@@ -31,6 +31,9 @@ describe(termCount, () => {
         expect(termCount(termIndexOf("serial QZ 5508 9000"), qz)).toBe(0);
         expect(termCount(termIndexOf("serial QZ 5508 B2"), qz)).toBe(0);
         expect(termCount(termIndexOf("part QZ 5508 arrived"), qz)).toBe(1);
+        // A code written right after Chinese or Japanese text is a run of its own, as the index splits it.
+        expect(termCount(termIndexOf("错误代码E4012"), { code: true, tokens: ["e4012"] })).toBe(1);
+        expect(termCount(termIndexOf("部品番号はE4012です"), { code: true, tokens: ["e4012"] })).toBe(1);
         // A run longer than the index keeps has no tokens: two such runs never match.
         expect(termCount(termIndexOf(`B${"7".repeat(300)}`), { code: true, tokens: [] })).toBe(0);
         // And the other way: a longer identifier is not in a row holding the shorter one.
@@ -39,8 +42,13 @@ describe(termCount, () => {
 });
 
 describe(salientTermsOf, () => {
-    it("drops an identifier longer than the index keeps", () => {
+    it("drops an identifier with any part longer than the index keeps", () => {
         expect(salientTermsOf(`code A${"1".repeat(300)}`).some(({ code }) => code)).toBe(false);
+        expect(salientTermsOf(`code A1-${"1".repeat(300)}`).some(({ code }) => code)).toBe(false);
+    });
+
+    it("reads a code written right after Chinese text as the code alone", () => {
+        expect(salientTermsOf("错误代码E4012是什么意思").filter(({ code }) => code)).toEqual([{ code: true, term: "e4012", tokens: ["e4012"] }]);
     });
 
     it("keeps every identifier, two sharing a part included", () => {

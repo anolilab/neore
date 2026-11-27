@@ -91,17 +91,69 @@ const isIdentifier = (chunk: string): boolean => {
  * one: a year, a count, a price, a decimal or a date (`2026-11-27`); nor a mix that starts with digits, a time, an
  * ordinal or a unit (`5pm`, `21st`, `100km`).
  */
+const SEPARATORS = new Set(["#", "-", ".", "/", "_"]);
+
+/**
+ * The runs of letters and digits of normalized text, each with where it starts. A run breaks where the script changes
+ * between Han, kana or Hangul and anything else, as the search index splits them, so `E4012` is a run of its own in
+ * `错误代码E4012` and in `部品番号はE4012です`.
+ */
+const runsOf = function* (normalized: string): Generator<{ index: number; text: string }> {
+    const matches = normalized.matchAll(CHUNK_RE);
+
+    for (const match of matches) {
+        const [chunk] = match;
+        let start = 0;
+        let position = 0;
+        let cjk: boolean | undefined;
+
+        for (const char of chunk) {
+            const isCjk = CJK_RE.test(char);
+
+            if (cjk !== undefined && isCjk !== cjk) {
+                yield* trimmedRun(chunk.slice(start, position), match.index + start);
+                start = position;
+            }
+
+            cjk = isCjk;
+            position += char.length;
+        }
+
+        yield* trimmedRun(chunk.slice(start), match.index + start);
+    }
+};
+
+/** A run without the separators a script break left at its edges (`-E4012` of `代码-E4012`). */
+const trimmedRun = function* (text: string, index: number): Generator<{ index: number; text: string }> {
+    let start = 0;
+    let end = text.length;
+
+    while (start < end && SEPARATORS.has(text[start]!)) {
+        start += 1;
+    }
+
+    while (end > start && SEPARATORS.has(text[end - 1]!)) {
+        end -= 1;
+    }
+
+    if (end > start) {
+        yield { index: index + start, text: text.slice(start, end) };
+    }
+};
+
 const identifiersOf = (text: string): string[][] => {
     const identifiers = new Map<string, string[]>();
 
-    for (const [chunk] of normalize(text).matchAll(CHUNK_RE)) {
-        if (!isIdentifier(chunk)) {
+    const runs = runsOf(normalize(text));
+
+    for (const { text: run } of runs) {
+        // Any part longer than the index keeps (256 characters) is dropped from the tokens: such a run is no identifier.
+        if (!isIdentifier(run) || run.match(TOKEN_RE)!.some((part) => part.length > MAX_TOKEN_LENGTH)) {
             continue;
         }
 
-        const tokens = searchTokensOf(chunk);
+        const tokens = searchTokensOf(run);
 
-        // A run longer than the index keeps (256 characters) has no tokens left, and is no identifier anyone can find.
         if (tokens.length > 0 && !identifiers.has(canonicalOf(tokens))) {
             identifiers.set(canonicalOf(tokens), tokens);
         }
@@ -136,14 +188,16 @@ export const termIndexOf = (text: string): TermIndex => {
     const runs: TermIndex["runs"] = [];
     let end = 0;
 
-    for (const match of normalized.matchAll(CHUNK_RE)) {
-        const canonical = canonicalOf(searchTokensOf(match[0]));
+    const pieces = runsOf(normalized);
+
+    for (const run of pieces) {
+        const canonical = canonicalOf(searchTokensOf(run.text));
 
         if (canonical !== "") {
-            runs.push({ canonical, spaced: runs.length > 0 && WHITESPACE_RE.test(normalized.slice(end, match.index)) });
+            runs.push({ canonical, spaced: runs.length > 0 && WHITESPACE_RE.test(normalized.slice(end, run.index)) });
         }
 
-        end = match.index + match[0].length;
+        end = run.index + run.text.length;
     }
 
     return { runs, tokens: searchTokensOf(text) };

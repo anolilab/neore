@@ -249,6 +249,13 @@ describe("rankMemories", () => {
             }
         });
 
+        it("finds a code a memory writes right after Chinese or Japanese text, past the vectors", () => {
+            const zh = candidate("zh", { ...old, memory: "错误代码E4012" });
+            const ja = candidate("ja", { ...old, memory: "部品番号はE4012です" });
+
+            expect(ids([zh, ja], "what does E4012 mean", [lookup("e4012", 2)]).toSorted((a, b) => a.localeCompare(b))).toEqual(["ja", "zh"]);
+        });
+
         it("reads capitals beside a number in a question as words: `my NYC 2023 trip` finds the trip by its words", () => {
             const trip = candidate("trip", { memory: "NYC trip in March 2023" });
 
