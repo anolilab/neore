@@ -73,7 +73,7 @@ const HeldControls = ({ isBlocked, onOpened, session }: { isBlocked: boolean; on
                 onChangeText={setAddress}
                 onSubmitEditing={() => settleQuietly(open())}
                 placeholder="https://"
-                style={{ borderColor: "#ccc", borderRadius: 8, borderWidth: 1, minHeight: 44, paddingHorizontal: 12 }}
+                style={{ borderColor: "#767676", borderRadius: 8, borderWidth: 1, minHeight: 44, paddingHorizontal: 12 }}
                 value={address}
             />
             <Pressable accessibilityRole="button" accessibilityState={{ disabled: isOff }} disabled={isOff} onPress={() => settleQuietly(open())} style={BUTTON}>

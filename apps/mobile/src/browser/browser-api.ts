@@ -18,7 +18,18 @@ export const watchBrowserStatus = (
     threadId: string,
     onStatus: (status: BrowserStatus) => void,
     onError: (error: { code?: string; message: string }) => void,
-): Unsubscribe => client.subscribe(api.browser.live_view.getThreadBrowser, { threadId: thread(threadId) }, onStatus, { onError });
+): Unsubscribe =>
+    client.subscribe(
+        api.browser.live_view.getThreadBrowser,
+        { threadId: thread(threadId) },
+        // The client passes no value while it reloads its queries for a new sign-in: the last status stands until the next.
+        (status: BrowserStatus | undefined) => {
+            if (status !== undefined) {
+                onStatus(status);
+            }
+        },
+        { onError },
+    );
 
 /** One read of the status, past the live subscription: a renewed grant pushes nothing to it. */
 export const readBrowserStatus = async (client: BrowserClient, threadId: string): Promise<BrowserStatus> =>
