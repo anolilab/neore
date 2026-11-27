@@ -913,9 +913,19 @@ export const runWatchWake = internalAction
         // A turn that ran to its end is recorded durably BEFORE its settlement is tried, so a settlement that keeps failing is settled by a
         // later claim and the model is never asked again for the same occurrence.
         if (delivered) {
-            await retried(async () => {
-                await ctx.runMutation(internal.source_control.pr_watch_wake.completeWatchWake, { ...identity, markers: args.markers, reasons: args.reasons });
-            });
+            try {
+                await retried(async () => {
+                    await ctx.runMutation(internal.source_control.pr_watch_wake.completeWatchWake, {
+                        ...identity,
+                        markers: args.markers,
+                        reasons: args.reasons,
+                    });
+                });
+            } catch (error) {
+                // The checkpoint never landed, but the turn did run to its end: it is still settled as delivered below (counted once, the reasons
+                // cleared). The occurrence already carries its started and model-reached marks, so it cannot be paid for again either way.
+                console.warn("[pr-watch-wake] could not record the completion", { error, linkId: args.linkId });
+            }
         }
 
         // The turn is over and paid for: only this settlement is tried again, never the turn. The queue does not redeliver the job either

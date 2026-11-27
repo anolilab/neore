@@ -1471,6 +1471,39 @@ describe("the window a charge is recorded against", () => {
     });
 });
 
+describe("a completion checkpoint that cannot be written", () => {
+    it("still settles a delivered turn: counted once, the reasons cleared, and no second model run", async () => {
+        const { linkId } = await seed();
+
+        await start(linkId);
+        await harness.action(async (ctx: any) => {
+            const real = ctx.runMutation.bind(ctx);
+
+            ctx.runMutation = async (reference: unknown, args: unknown) => {
+                if (reference === completeWatchWake) {
+                    throw new Error("checkpoint failed");
+                }
+
+                return await real(reference, args);
+            };
+
+            await ctx.runAction(runWatchWake, { ...enqueued[0]!.args, jobId: enqueued[0]!.options.once.jobId });
+        });
+
+        const row = await rowOf(linkId);
+
+        expect(runs).toHaveLength(1);
+        expect(row.watch.wakes).toBe(1);
+        expect(row.watchPending).toEqual([]);
+        expect(row.watchWakeCompleted).toMatchObject({ done: true, modelReached: true });
+        expect(row.watchWakeLeaseUntil).toBe(0);
+
+        // Nothing is owed or left to claim again: a later poll makes no second turn.
+        expect(await start(linkId)).toBe(false);
+        expect(runs).toHaveLength(1);
+    });
+});
+
 describe("a commit that comes back after its wake was delivered", () => {
     it("is delivered again: the settled delivery no longer blocks the same markers, while a failed-after-model one still does", async () => {
         const { linkId } = await seed();

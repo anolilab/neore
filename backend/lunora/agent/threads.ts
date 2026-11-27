@@ -40,7 +40,7 @@ import { clearAwaitingInput, patchThread } from "./table-writes";
 import { deleteMcpEventsOfThread, hasMcpEventsOfThread } from "../public-api/events-log";
 import { runAfterOnShard } from "../lib/shard-scheduler";
 import { deletePullRequestLinksOfThread, setLinksThreadDeleted } from "../source-control/pr-thread-links";
-import { wakeLeaseHeld } from "../source-control/pr-watch-wake-lease";
+import { refuseWhileWaking, wakeLeaseHeld } from "../source-control/pr-watch-wake-lease";
 import { deleteThreadSummaries } from "./thread-summaries";
 import { SEARCH_INTERNAL_FIELDS } from "./thread-search-plan";
 
@@ -796,6 +796,11 @@ export const updateThreadVisibility = internalMutation
         // no token) stays allowed.
         if (isThreadLocked(thread) && (args.isPublic === true || args.publicAccessToken !== undefined)) {
             throw new LunoraError("BAD_REQUEST", "A locked chat cannot be shared. Unlock it first.");
+        }
+
+        // A pull request watch is writing to this chat: it is not made public until it is done (`source-control/pr-watch-wake-lease.ts`).
+        if ((args.isPublic === true || args.publicAccessToken !== undefined) && thread.userId !== undefined) {
+            await refuseWhileWaking(ctx, thread.userId, args.threadId);
         }
 
         // An absent token REMOVES the stored one — making a thread private must

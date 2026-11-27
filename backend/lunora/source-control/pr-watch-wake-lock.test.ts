@@ -139,6 +139,36 @@ const addLinks = async (threadId: string, count: number, from: number, leaseOn?:
     });
 };
 
+describe("making a chat shared while a wake turn holds it", () => {
+    it("refuses a new grant, public visibility and a group chat before writing anything, and allows them once the lease is released", async () => {
+        const { updateThreadVisibility } = await import("../agent/threads");
+        const { insertThreadAccess } = await import("../agent/sharing");
+        const { linkId, threadId } = await seed(Date.now() + 60_000);
+        const grant = async () =>
+            await harness.run(
+                async (ctx: any) =>
+                    await insertThreadAccess(ctx, { grantedBy: OWNER, ownerId: OWNER, permission: "read", threadId: threadId as never, userId: "reader-1" }),
+            );
+        const publish = async () => await harness.run(async (ctx: any) => await ctx.runMutation(updateThreadVisibility, { isPublic: true, threadId }));
+        const message = { message: expect.stringContaining("pull request watch is writing") };
+
+        await expect(grant()).rejects.toMatchObject(message);
+        await expect(publish()).rejects.toMatchObject(message);
+
+        // Nothing was written: no grant row, and the chat is still private.
+        const grants = await harness.run(async (ctx: any) => await ctx.db.query("threadAccess").collect());
+        const thread = await harness.run(async (ctx: any) => await ctx.db.get("threads", threadId));
+
+        expect(grants).toHaveLength(0);
+        expect(thread.isPublic).toBeUndefined();
+
+        await harness.run(async (ctx: any) => {
+            await ctx.db.patch("pullRequestThreads", linkId, { watchWakeLeaseUntil: 0 });
+        });
+        await expect(publish()).resolves.toBeDefined();
+    });
+});
+
 describe("wakeLeaseHeld", () => {
     const held = async (threadId: string, except?: string) =>
         await harness.run(async (ctx: any) => await wakeLeaseHeld(ctx, OWNER, threadId as never, Date.now(), except as never));

@@ -171,7 +171,12 @@ const fakeContext = (): any => {
                 case "source_control_pr_watch_wake_lease:wakeLeaseHeldFor": {
                     const { wakeLeaseHeld } = await import("../source-control/pr-watch-wake-lease");
 
-                    return await run(async (ctx) => await wakeLeaseHeld(ctx, args.userId, args.threadId, Date.now()));
+                    // As the query does: keyed on the thread, under the thread's owner.
+                    return await run(async (ctx) => {
+                        const thread = await ctx.db.get("threads", args.threadId);
+
+                        return await wakeLeaseHeld(ctx, thread.userId, args.threadId, Date.now());
+                    });
                 }
                 default: {
                     return null;
@@ -226,6 +231,28 @@ describe("/chat/start while a pull request watch is waking the chat", () => {
                     watchWakeLeaseUntil: lease,
                 }),
         );
+
+    it("refuses a collaborator's reply too: the lease sits on the thread owner's link, not the replier's", async () => {
+        // The chat belongs to someone else; the signed-in replier is a collaborator, with no link of their own.
+        await run(async (ctx) => {
+            await ctx.db.patch("threads", threadId, { userId: "chat-owner" });
+            await ctx.db.insert("pullRequestThreads", {
+                createdAt: 0,
+                kind: "linked",
+                number: 7,
+                repository: "octo/hello",
+                threadId,
+                title: "pull",
+                url: "https://github.com/octo/hello/pull/7",
+                userId: "chat-owner",
+                watchWakeLeaseUntil: Date.now() + 60_000,
+            });
+        });
+
+        const response = await start({});
+
+        expect([response.status, savedPrompts.length, mutationCalls.length]).toEqual([409, 0, 0]);
+    });
 
     it("refuses the reply with a conflict before anything is written, and lets it through once the lease is released", async () => {
         const linkId = await linkWithLease(Date.now() + 60_000);

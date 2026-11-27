@@ -1018,7 +1018,7 @@ const runChatStartOnShard = async (
     // so no half of a reply is saved. The same held-lease check the lock and the delete use.
     if (
         validThreadId &&
-        (await context.runQuery(internal.source_control.pr_watch_wake_lease.wakeLeaseHeldFor, { threadId: validThreadId as Id<"threads">, userId })) === true
+        (await context.runQuery(internal.source_control.pr_watch_wake_lease.wakeLeaseHeldFor, { threadId: validThreadId as Id<"threads"> })) === true
     ) {
         return Response.json({ code: "PR_WATCH_WAKING", error: "A pull request watch is replying to this chat. Try again in a moment." }, { status: 409 });
     }

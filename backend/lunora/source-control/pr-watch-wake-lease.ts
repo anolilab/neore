@@ -12,7 +12,7 @@
 import type { Id } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
 import { internalQuery } from "../_generated/server";
-import { v } from "lunorash/server";
+import { LunoraError, v } from "lunorash/server";
 
 /**
  * Whether a wake lease is held on a link of the thread at `now`, other than `exceptLinkId`. Only the links whose lease time is later
@@ -35,8 +35,27 @@ export const wakeLeaseHeld = async (
     return live.some((link) => link._id !== exceptLinkId);
 };
 
-/** Whether a wake lease is held on the thread now: asked by a reply before it writes anything, so the reply waits (`chat/http.ts`). */
+/**
+ * Whether a wake lease is held on the thread now: asked by a reply before it writes anything, so the reply waits (`chat/http.ts`). It keys
+ * on the THREAD: the lease sits on the owner's link, so it is looked up under the thread's owner, whoever is replying (a collaborator
+ * included), as the lock and the delete do.
+ */
 export const wakeLeaseHeldFor = internalQuery
-    .input({ threadId: v.id("threads"), userId: v.string() })
+    .input({ threadId: v.id("threads") })
     .output(v.boolean())
-    .query(async ({ args, ctx }) => await wakeLeaseHeld(ctx, args.userId, args.threadId, ctx.now));
+    .query(async ({ args, ctx }) => {
+        const thread = await ctx.db.get("threads", args.threadId);
+
+        return thread?.userId !== undefined && (await wakeLeaseHeld(ctx, thread.userId, args.threadId, ctx.now));
+    });
+
+/**
+ * Refuses, before anything is written, a change that would make a chat shared (a new grant, public visibility, a group chat) while a
+ * wake turn holds it: the wake publishes pull request text in the chat, which a reader added now could see. The same held-lease check the
+ * lock, the delete and the reply use.
+ */
+export const refuseWhileWaking = async (ctx: Pick<QueryCtx, "db"> & { now: number }, userId: string, threadId: Id<"threads">): Promise<void> => {
+    if (await wakeLeaseHeld(ctx, userId, threadId, ctx.now)) {
+        throw new LunoraError("CONFLICT", "A pull request watch is writing to this chat. Try again in a moment.");
+    }
+};
