@@ -8,7 +8,7 @@ import { v } from "lunorash/server";
 
 import type { Doc } from "../_generated/dataModel";
 import { internalMutation, internalQuery } from "../_generated/server";
-import { MAX_SUBSCRIPTIONS } from "./events-webhook";
+import { MAX_LISTED_APPROVED_HOSTS, MAX_SUBSCRIPTIONS } from "./events-webhook";
 
 const BATCH = 200;
 
@@ -169,12 +169,14 @@ export const collectEventWebhooksForExport = internalQuery
     .output(
         v.object({
             hosts: v.array(v.object({ createdAt: v.number(), host: v.string() })),
+            hostsTruncated: v.boolean(),
             subscriptions: v.array(v.object({ argumentsKey: v.string(), createdAt: v.number(), expiresAt: v.number(), name: v.string(), url: v.string() })),
         }),
     )
     .query(async ({ args: { userId }, ctx }) => {
-        // Every row: a merge can grow the list past the list ceiling, and an unbounded read returns all of them (`docs/agents/backend-lunora.md`).
-        const { page: hosts } = await ctx.db.eventWebhookHosts.findMany({ consistency: "primary", where: { userId } });
+        // One row past the ceiling says whether the owner has more; the export names that instead of dropping them without a word.
+        const { page } = await ctx.db.eventWebhookHosts.findMany({ consistency: "primary", limit: MAX_LISTED_APPROVED_HOSTS + 1, where: { userId } });
+        const hosts = page.slice(0, MAX_LISTED_APPROVED_HOSTS);
         const { page: subscriptions } = await ctx.db.eventWebhookSubscriptions.findMany({
             consistency: "primary",
             limit: MAX_SUBSCRIPTIONS,
@@ -185,6 +187,7 @@ export const collectEventWebhooksForExport = internalQuery
             hosts: hosts.map((row) => {
                 return { createdAt: row.createdAt, host: row.host };
             }),
+            hostsTruncated: page.length > MAX_LISTED_APPROVED_HOSTS,
             subscriptions: subscriptions.map((row) => {
                 return { argumentsKey: row.argumentsKey, createdAt: row.createdAt, expiresAt: row.expiresAt, name: row.name, url: row.url };
             }),

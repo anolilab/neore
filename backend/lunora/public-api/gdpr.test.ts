@@ -34,8 +34,33 @@ describe("collectEventWebhooksForExport", () => {
 
             expect(exported).toStrictEqual({
                 hosts: [{ createdAt: 1, host: "hooks.example.com" }],
+                hostsTruncated: false,
                 subscriptions: [{ argumentsKey: "{}", createdAt: 2, expiresAt: 3, name: "run.completed", url: "https://hooks.example.com/neore" }],
             });
+        } finally {
+            harness.close();
+        }
+    });
+});
+
+describe("collectEventWebhooksForExport hosts past the ceiling", () => {
+    it("exports the ceiling's worth of hosts and says so when the owner has more", async () => {
+        const harness = lunoraTest(schemaWithShardedTables([]) as never);
+
+        try {
+            await harness.run(async (context: any) => {
+                for (let index = 0; index < 501; index += 1) {
+                    await context.db.insert("eventWebhookHosts", { createdAt: index, host: `host-${index}.example.com`, userId: "user" });
+                }
+            });
+
+            const exported = (await harness.run(async (context: any) => await context.runQuery(collectEventWebhooksForExport, { userId: "user" }))) as {
+                hosts: unknown[];
+                hostsTruncated: boolean;
+            };
+
+            expect(exported.hosts).toHaveLength(500);
+            expect(exported.hostsTruncated).toBe(true);
         } finally {
             harness.close();
         }
