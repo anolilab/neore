@@ -89,6 +89,32 @@ describe("events/subscribe store", () => {
         expect(await rows()).toHaveLength(0);
     });
 
+    it("reaps the account's expired subscriptions at the cap, so they hold no slot", async () => {
+        await approve();
+        await harness.run(async (ctx: any) => {
+            for (let index = 0; index < MAX_SUBSCRIPTIONS; index += 1) {
+                await ctx.db.insert("eventWebhookSubscriptions", {
+                    argumentsKey: "{}",
+                    createdAt: NOW,
+                    expiresAt: NOW - 1,
+                    id: `old_${index}`,
+                    keyHash: `old-${index}`,
+                    minTimestamp: 0,
+                    name: "run.completed",
+                    principal: "key-1",
+                    scanSeq: 0,
+                    secretCiphertext: "ciphertext",
+                    updatedAt: NOW,
+                    url: `https://${HOST}/${index}`,
+                    userId: OWNER,
+                });
+            }
+        });
+
+        expect(await subscribe(writeOf({ keyHash: "fresh" }))).toMatchObject({ kind: "granted" });
+        expect(await rows()).toHaveLength(1);
+    });
+
     it("refuses a host approved by a different account: the allowlist is per account", async () => {
         await approve("someone-else");
 

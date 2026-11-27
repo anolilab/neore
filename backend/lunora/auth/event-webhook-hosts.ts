@@ -50,6 +50,11 @@ export const addEventWebhookHost = authMutation
     .use(rateLimit("eventWebhookHosts/update"))
     .output(v.object({ host: v.string() }))
     .mutation(async ({ args, ctx: context }) => {
+        // An admin acting as the owner must not change the list that authorizes where events are sent.
+        if (context.user.impersonatedBy) {
+            throw new LunoraError("FORBIDDEN", "Callback hosts cannot be approved while impersonating");
+        }
+
         const host = normalizeApprovedHost(args.host);
 
         if (host === null) {
@@ -83,13 +88,18 @@ export const removeEventWebhookHost = authMutation
     .use(rateLimit("eventWebhookHosts/update"))
     .output(v.object({ removed: v.boolean() }))
     .mutation(async ({ args, ctx: context }) => {
+        if (context.user.impersonatedBy) {
+            throw new LunoraError("FORBIDDEN", "Callback hosts cannot be removed while impersonating");
+        }
+
         const host = normalizeApprovedHost(args.host);
 
         if (host === null) {
             return { removed: false };
         }
 
-        const { page } = await context.db.eventWebhookHosts.findMany({ limit: 1, where: { host, userId: context.user.userId } });
+        // Every row of the host: a merge can leave one host in two rows, and removing only one would leave it approved.
+        const { page } = await context.db.eventWebhookHosts.findMany({ limit: MAX_APPROVED_HOSTS, where: { host, userId: context.user.userId } });
 
         for (const row of page) {
             await context.db.delete("eventWebhookHosts", row._id);

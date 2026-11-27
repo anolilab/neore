@@ -31,6 +31,26 @@ const signedIn = async (harness: ReturnType<typeof lunoraTest>) =>
     })) as { sessionId: string; userId: string };
 
 describe("the owner's approved callback hosts", () => {
+    it("removes a host held in two rows, as a merge can leave one, so it is no longer approved", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            const identity = await signedIn(harness);
+            const as = harness.withIdentity(identity as never);
+
+            await harness.run(async (context: any) => {
+                for (let index = 0; index < 2; index += 1) {
+                    await context.db.insert("eventWebhookHosts", { createdAt: 0, host: "hooks.example.com", userId: identity.userId });
+                }
+            });
+
+            expect(await as.mutation(removeEventWebhookHost as never, { host: "hooks.example.com" } as never)).toStrictEqual({ removed: true });
+            expect(await as.query(listEventWebhookHosts as never, {} as never)).toStrictEqual({ hosts: [] });
+        } finally {
+            harness.close();
+        }
+    });
+
     it("approves a host, lists it, approves it again without a second row, and removes it", async () => {
         const harness = lunoraTest(schema as never);
 

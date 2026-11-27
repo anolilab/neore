@@ -93,7 +93,14 @@ export const subscribeOn = async (ctx: Pick<MutationCtx, "db">, input: Subscribe
     if (!existing) {
         const { page } = await ctx.db.eventWebhookSubscriptions.findMany({ limit: MAX_SUBSCRIPTIONS, where: { userId: input.userId } });
 
-        if (page.length >= MAX_SUBSCRIPTIONS) {
+        // Expired rows hold a slot until the sweep reaps them, so this account's own are reaped here and do not count against the cap.
+        const expired = page.filter((row) => row.expiresAt <= now);
+
+        for (const row of expired) {
+            await ctx.db.delete("eventWebhookSubscriptions", row._id);
+        }
+
+        if (page.length - expired.length >= MAX_SUBSCRIPTIONS) {
             return { kind: "limit" };
         }
     }
