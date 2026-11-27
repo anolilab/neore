@@ -306,16 +306,7 @@ describe("a chapter's style sheets", () => {
 
     it("leaves out whole a sheet that does not fit, and reads no further sheet once one was refused", async () => {
         const big = "a{}".repeat(5_000_000);
-        const read: string[] = [];
-        const original = JSZip.prototype.file;
-
-        vi.spyOn(JSZip.prototype, "file").mockImplementation(function (this: JSZip, ...args: unknown[]) {
-            if (typeof args[0] === "string") {
-                read.push(args[0]);
-            }
-
-            return (original as (...inner: unknown[]) => unknown).apply(this, args) as never;
-        } as never);
+        const fileSpy = vi.spyOn(JSZip.prototype, "file");
 
         const opened = await openEpub(
             await book({
@@ -325,13 +316,15 @@ describe("a chapter's style sheets", () => {
             folder.path,
         );
 
-        read.length = 0;
+        fileSpy.mockClear();
 
         const document = await opened.read("c1");
         const sheets = sheetsOf(parse(document));
 
         // 15 million characters fit; the second would pass the 24 million, so it is left out entire. No sheet after it is opened.
         expect(sheets.map((sheet) => sheet.length)).toEqual(["p{small:1}".length, big.length]);
+        const read = fileSpy.mock.calls.map((call) => String(call[0]));
+
         expect(read.some((path) => path.endsWith("big3.css"))).toBe(false);
         expect(read.some((path) => path.endsWith("after.css"))).toBe(false);
         opened.destroy();
