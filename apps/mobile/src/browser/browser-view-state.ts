@@ -117,6 +117,18 @@ export const grantEndOnDevice = (status: BrowserStatus | undefined, receivedAt: 
 };
 
 /**
+ * Until when the chat shows its link to the browser screen, on this device's clock: while the browser runs, and for a
+ * reader only until the grant ends (a grant that runs out pushes no new status). None: no link.
+ */
+export const browserLinkUntil = (status: BrowserStatus, receivedAt: number): number | undefined => {
+    if (status.kind !== "running") {
+        return undefined;
+    }
+
+    return grantEndOnDevice(status, receivedAt) ?? Infinity;
+};
+
+/**
  * When another person's lease on the browser ends, on this device's clock: a lease that runs out writes nothing, so the
  * screen reads the status again then to show the page. None while no one else holds it.
  */

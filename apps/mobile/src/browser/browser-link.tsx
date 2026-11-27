@@ -5,24 +5,43 @@ import { Text } from "react-native";
 import { getClient } from "@/lib/lunora";
 
 import { watchBrowserStatus } from "./browser-api";
+import { browserLinkUntil } from "./browser-view-state";
 
 /** A link to the chat's browser screen, shown only while the agent's cloud browser runs in the chat. */
 export const BrowserLink = ({ threadId }: { threadId: string }) => {
-    /** The thread whose browser was last seen running: another chat's answer never shows the link here. */
-    const [runningIn, setRunningIn] = useState<string | undefined>(undefined);
+    /**
+     * The thread whose browser was last seen running, and until when the link shows (a reader's grant ends without a new
+     * status): another chat's answer never shows the link here.
+     */
+    const [shown, setShown] = useState<{ threadId: string; until: number } | undefined>(undefined);
 
     useEffect(
         () =>
             watchBrowserStatus(
                 getClient(),
                 threadId,
-                (status) => setRunningIn(status.kind === "running" ? threadId : undefined),
-                () => setRunningIn(undefined),
+                (status) => {
+                    const until = browserLinkUntil(status, Date.now());
+
+                    setShown(until === undefined ? undefined : { threadId, until });
+                },
+                () => setShown(undefined),
             ),
         [threadId],
     );
 
-    if (runningIn !== threadId) {
+    useEffect(() => {
+        if (shown === undefined || shown.until === Infinity) {
+            return undefined;
+        }
+
+        // A newer status clears this timer and sets its own.
+        const timer = setTimeout(() => setShown(undefined), Math.max(0, shown.until - Date.now()));
+
+        return () => clearTimeout(timer);
+    }, [shown]);
+
+    if (shown?.threadId !== threadId) {
         return null;
     }
 

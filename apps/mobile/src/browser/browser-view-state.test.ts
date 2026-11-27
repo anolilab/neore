@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { BrowserStatus } from "./browser-api";
 import {
+    browserLinkUntil,
     CONTROLLED_BY_OTHER,
     frameMessage,
     frameTrigger,
@@ -137,5 +138,13 @@ describe(isRateLimited, () => {
         expect(isRateLimited({ code: "FORBIDDEN" })).toBe(false);
         expect(isRateLimited(new TypeError("Network request failed"))).toBe(false);
         expect(isRateLimited(undefined)).toBe(false);
+    });
+});
+
+describe(browserLinkUntil, () => {
+    it("shows the link while the browser runs, for a reader only until the grant ends, and never otherwise", () => {
+        expect(browserLinkUntil(running(), 5000)).toBe(Infinity);
+        expect(browserLinkUntil(running({ accessUntil: 160, now: 100 }), 5000)).toBe(5060 - GRANT_END_MARGIN_MS);
+        expect(browserLinkUntil({ kind: "none", now: 100 } as BrowserStatus, 5000)).toBeUndefined();
     });
 });
