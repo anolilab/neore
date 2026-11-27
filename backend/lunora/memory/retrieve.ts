@@ -17,7 +17,19 @@ import { validateVectorDimension, type VectorDimension } from "../agent/vector/t
 import { loadModelFilterRules } from "../chat/lib/model-filter-rules";
 import { gatewayFetch } from "../lib/services";
 import { getMemoryEmbeddingModel, MEMORY_EMBEDDING_MODEL_NAME } from "./dedup";
-import { CANDIDATE_WINDOW_SIZE, keywordScoresFor, rankMemories, VECTOR_TOP_K } from "./retrieve-ranking";
+import {
+    CANDIDATE_WINDOW_SIZE,
+    keywordScoresFor,
+    rankMemories,
+    SEARCH_MAX_RESULTS,
+    SEARCH_MIN_KEYWORD_RELEVANCE,
+    SEARCH_MIN_RELEVANCE,
+    SEARCH_THRESHOLD,
+    topScopedHits,
+    VECTOR_FETCH_K,
+    vectorCutIsFull,
+    withVectorHits,
+} from "./retrieve-ranking";
 import type { RankedMemory } from "./retrieve-ranking";
 
 // ============================================================================
@@ -34,8 +46,12 @@ export const retrieveRelevantMemories = internalAction
     .input({
         /** The bot the chat runs as: its memories join the user's own. Unset = the user's own only. */
         botId: v.optional(v.string()),
+        /** Most memories returned for a `search`: up to `SEARCH_MAX_RESULTS`. Unused for injection, which keeps its own cap. */
+        limit: v.optional(v.number()),
         // The user's local day when the caller asked: part of the chat-side cache key, not read by the search.
         localDay: v.optional(v.string()),
+        /** The `search_memory` tool: a lower relevance floor, no score threshold, and `limit` rows instead of the injection cap. */
+        search: v.optional(v.boolean()),
         searchText: v.string(),
         userId: v.string(),
     })
@@ -63,30 +79,35 @@ export const retrieveRelevantMemories = internalAction
         // 2. Fetch the user's active memories still in effect today
         type ActiveMemory = {
             _id: string;
+            botId?: string | null;
             confidence?: number | null;
-            createdAt: number;
+            createdAt?: number;
             embeddingId?: string;
             importance?: number | null;
             lastConfirmedAt: number;
             memory: string;
             pinned?: boolean;
             type: string;
+            validUntil?: string | null;
         };
-        // A fact past its end date in the user's timezone is never injected (`activeOn`).
-        const activeMemories = (await ctx.runQuery(internal.memory.functions.getActiveMemoriesForUser, {
-            activeOn: Date.now(),
-            botId: args.botId,
-            includeUserWide: true,
+        const scope = { botId: args.botId, includeUserWide: true };
+        const now = Date.now();
+        // A fact past its end date in the user's timezone is never injected (`activeOn`). The window is the newest
+        // rows, not the first by type: the vector hits below add the ones it leaves out.
+        const windowMemories = (await ctx.runQuery(internal.memory.functions.getActiveMemoriesForUser, {
+            activeOn: now,
+            ...scope,
             limit: CANDIDATE_WINDOW_SIZE,
+            newestFirst: true,
             userId: args.userId,
         })) as ActiveMemory[];
 
-        if (activeMemories.length === 0) {
-            return [];
-        }
-
-        // 3. Try vector search for semantic similarity
+        // 3. Try vector search for semantic similarity. An empty window does not end it: the window is the newest rows
+        // only, and the hits add the ones it left out (an old fact behind many newer, expired ones).
         const vectorScoreMap = new Map<string, number>(); // memoryId → cosine score
+        let hitMemories: ActiveMemory[] = [];
+        // Whether the search answered with a full in-scope cut: then an old embedded memory it lacks is not relevant.
+        let vectorSearched = false;
 
         try {
             const rules = await loadModelFilterRules(ctx, args.userId);
@@ -113,7 +134,7 @@ export const retrieveRelevantMemories = internalAction
 
                     const vectorResults = await searchVectors(ctx, queryVector, {
                         dimension: dimension as VectorDimension,
-                        limit: VECTOR_TOP_K,
+                        limit: VECTOR_FETCH_K,
                         model: MEMORY_EMBEDDING_MODEL_NAME,
                         searchAllMessagesForUserId: args.userId,
                         table: "memories",
@@ -122,19 +143,25 @@ export const retrieveRelevantMemories = internalAction
                     if (vectorResults.length > 0) {
                         // Bulk-lookup memory records for the vector hits
                         const embeddingIds = vectorResults.map((r) => r._id as string);
+                        // Every scope of the user comes back (the index holds other bots' rows too, and cannot filter
+                        // on them), so more hits than `VECTOR_TOP_K` were asked for and the best in scope are kept.
+                        // An expired or superseded fact is already left out.
                         const matched = (await ctx.runQuery(internal.memory.functions.getMemoriesByEmbeddingIds, {
+                            activeOn: now,
                             embeddingIds,
                             userId: args.userId,
-                        })) as { _id: string; embeddingId: string }[];
-
-                        // Build map: memoryId → cosine score
+                        })) as (ActiveMemory & { embeddingId: string })[];
                         const embeddingScores = new Map(vectorResults.map((r) => [r._id as string, r._score]));
+                        const scopedHits = topScopedHits(matched, scope);
 
-                        for (const mem of matched) {
-                            const score = embeddingScores.get(mem.embeddingId) ?? 0;
-
-                            vectorScoreMap.set(mem._id, score);
+                        // Only now, with every hit resolved, are the scores and hits taken: a lookup that threw above
+                        // leaves them empty and the memories are found by keyword, as with no vector search.
+                        for (const mem of scopedHits) {
+                            vectorScoreMap.set(mem._id, embeddingScores.get(mem.embeddingId) ?? 0);
                         }
+
+                        hitMemories = scopedHits;
+                        vectorSearched = vectorCutIsFull(scopedHits);
                     }
                 }
             }
@@ -143,12 +170,23 @@ export const retrieveRelevantMemories = internalAction
             console.warn("[memory/retrieve] Vector search failed, falling back to keyword scoring:", error);
         }
 
-        // 4. Score each memory (vector hit, else keyword fallback) and keep the ones to inject
+        // 4. The window plus the hits it lacks, each only in scope (a hit on another bot's row is never added).
+        // The hit lookup already left out a fact past its end date, so no day is passed here.
+        const candidates = withVectorHits(windowMemories, hitMemories, scope);
+
+        // 5. Score each memory (vector hit, else keyword fallback) and keep the ones to inject, or for a search the ones to return
         return rankMemories({
-            candidates: activeMemories,
-            keywordScores: keywordScoresFor(activeMemories, args.searchText),
-            now: Date.now(),
+            candidates,
+            keywordScores: keywordScoresFor(candidates, args.searchText),
+            ...(args.search === true && {
+                limit: Math.min(Math.max(Math.trunc(args.limit ?? SEARCH_MAX_RESULTS), 1), SEARCH_MAX_RESULTS),
+                minKeywordRelevance: SEARCH_MIN_KEYWORD_RELEVANCE,
+                minRelevance: SEARCH_MIN_RELEVANCE,
+                threshold: SEARCH_THRESHOLD,
+            }),
+            now,
             vectorScores: vectorScoreMap,
+            vectorSearched,
         });
     });
 

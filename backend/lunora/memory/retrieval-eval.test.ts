@@ -1,7 +1,7 @@
 /**
  * Offline retrieval eval: every labelled query runs through the production candidate window and `rankMemories`, with
  * the embedding model replaced by the fixture's deterministic topic vectors (`__fixtures__/README.md`). The floors
- * below are the baseline; a change to retrieval that lowers one of them has to say why in its own pull request.
+ * below are the current numbers; a change to retrieval that lowers one of them has to say why in its own pull request.
  */
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -9,7 +9,17 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-import { CANDIDATE_WINDOW_SIZE, keywordScoresFor, rankMemories, selectCandidateWindow, VECTOR_TOP_K } from "./retrieve-ranking";
+import {
+    CANDIDATE_WINDOW_SIZE,
+    isUsableOn,
+    keywordScoresFor,
+    rankMemories,
+    selectCandidateWindow,
+    topScopedHits,
+    VECTOR_FETCH_K,
+    vectorCutIsFull,
+    withVectorHits,
+} from "./retrieve-ranking";
 
 const DAY_MS = 86_400_000;
 
@@ -63,14 +73,18 @@ const unitVector = (tags: Tags): number[] => {
 
 const cosine = (a: number[], b: number[]): number => a.reduce((sum, x, i) => sum + x * b[i]!, 0);
 
-/** One query as retrieval runs it: the window, the vector hits (top K over all of the user's vectors), the ranking. */
-const run = (query: FixtureQuery): { ids: string[]; inWindow: Set<string> } => {
+/**
+ * One query as retrieval runs it: the window, the vector hits (top K over all of the user's vectors), the ranking.
+ * Without `vectors` no vector search ran (the model refused, the index failed): the window alone, ranked by keyword.
+ */
+const run = (query: FixtureQuery, vectors = true): { ids: string[]; inWindow: Set<string> } => {
     const persona = fixture.personas.find((p) => p.id === query.persona)!;
     const rows = persona.memories.map((m) => {
         return {
             ...m,
             _creationTime: now - m.createdDays * DAY_MS,
             _id: m.id,
+            embeddingId: m.noVector ? undefined : m.id,
             lastConfirmedAt: now - m.ageDays * DAY_MS,
             memory: m.text,
         };
@@ -85,16 +99,37 @@ const run = (query: FixtureQuery): { ids: string[]; inWindow: Set<string> } => {
             return { cosine: cosine(queryVector, unitVector(m.tags)), id: m.id };
         })
         .toSorted((a, b) => b.cosine - a.cosine || (a.id < b.id ? -1 : 1))
-        .slice(0, VECTOR_TOP_K);
+        .slice(0, vectors ? VECTOR_FETCH_K : 0);
     const superseded = new Set(rows.filter((m) => m.supersededBy).map((m) => m.id));
-    const vectorScores = new Map(hits.filter((h) => !superseded.has(h.id)).map((h) => [h.id, h.cosine]));
+    const scope = { botId: query.asBot, includeUserWide: query.asBot !== undefined };
+    const active = rows.filter((m) => !m.supersededBy);
+    // The lookup drops a superseded row and an expired one (not pinned), then production keeps the best VECTOR_TOP_K hits of the chat's own scopes.
+    const byId = new Map(active.filter((m) => isUsableOn(m, today)).map((m) => [m._id, m]));
+    const scoped = topScopedHits(
+        hits
+            .filter((h) => !superseded.has(h.id) && byId.has(h.id))
+            .map((h) => {
+                return { botId: byId.get(h.id)!.botId, ...h };
+            }),
+        scope,
+    );
+    const vectorScores = new Map(scoped.map((h) => [h.id, h.cosine]));
 
-    const candidates = selectCandidateWindow(
-        rows.filter((m) => !m.supersededBy),
-        { botId: query.asBot, includeUserWide: query.asBot !== undefined, limit: CANDIDATE_WINDOW_SIZE, today },
+    const window = selectCandidateWindow(active, { ...scope, limit: CANDIDATE_WINDOW_SIZE, today });
+    // Production adds the hits the window lacks, read by embedding id and kept only in scope and in effect.
+    const candidates = withVectorHits(
+        window,
+        active.filter((m) => vectorScores.has(m._id)),
+        { ...scope, today },
     );
 
-    const ranked = rankMemories({ candidates, keywordScores: keywordScoresFor(candidates, query.text), now, vectorScores });
+    const ranked = rankMemories({
+        candidates,
+        keywordScores: keywordScoresFor(candidates, query.text),
+        now,
+        vectorScores,
+        vectorSearched: vectorCutIsFull(scoped),
+    });
 
     return { ids: ranked.map((m) => m.memoryId), inWindow: new Set(candidates.map((m) => m._id)) };
 };
@@ -154,8 +189,9 @@ const summary = (totals: Totals) => {
 };
 
 /**
- * Today's numbers, recorded in `__fixtures__/README.md`. A metric may move by `TOLERANCE` before the test fails (the
- * off-topic rate is a ceiling, the rest are floors). Raise a number after a retrieval improvement; lowering one needs a reason.
+ * The numbers measured with the current retrieval, recorded in `__fixtures__/README.md`. A metric may move by `TOLERANCE`
+ * before the test fails (the off-topic rate is a ceiling, the rest are floors). Raise a number after a retrieval
+ * improvement; lowering one needs a reason.
  */
 const TOLERANCE = 0.02;
 
@@ -165,13 +201,13 @@ interface Floor {
     offTopicRate: number;
     recallAt8?: number;
 }
-const BASELINE: Record<"overall" | Category, Floor> & { overall: Required<Floor> & { abstainRate: number } } = {
+const BASELINE: Record<"overall" | Category, Floor> & { overall: Required<Floor> & { abstainPrecision: number; abstainRate: number } } = {
     abstain: { offTopicRate: 1 },
-    multi: { inWindow: 0.833, ndcgAt8: 0.559, offTopicRate: 0.817, recallAt8: 0.733 },
-    overall: { abstainRate: 0, inWindow: 0.638, ndcgAt8: 0.431, offTopicRate: 0.917, recallAt8: 0.6 },
-    single: { inWindow: 0.78, ndcgAt8: 0.543, offTopicRate: 0.907, recallAt8: 0.74 },
-    temporal: { inWindow: 0.033, ndcgAt8: 0.033, offTopicRate: 0.996, recallAt8: 0.033 },
-    update: { inWindow: 0.9, ndcgAt8: 0.554, offTopicRate: 0.887, recallAt8: 0.9 },
+    multi: { inWindow: 1, ndcgAt8: 0.726, offTopicRate: 0.771, recallAt8: 0.883 },
+    overall: { abstainPrecision: 1, abstainRate: 0.9, inWindow: 1, ndcgAt8: 0.771, offTopicRate: 0.853, recallAt8: 0.95 },
+    single: { inWindow: 1, ndcgAt8: 0.83, offTopicRate: 0.88, recallAt8: 0.94 },
+    temporal: { inWindow: 1, ndcgAt8: 0.715, offTopicRate: 0.872, recallAt8: 1 },
+    update: { inWindow: 1, ndcgAt8: 0.776, offTopicRate: 0.873, recallAt8: 1 },
 };
 
 describe("memory retrieval eval", () => {
@@ -263,6 +299,7 @@ describe("memory retrieval eval", () => {
         expect(results.overall!.recallAt8!).toBeGreaterThanOrEqual(all.recallAt8 - TOLERANCE);
         expect(results.overall!.ndcgAt8!).toBeGreaterThanOrEqual(all.ndcgAt8 - TOLERANCE);
         expect(results.overall!.abstainRate!).toBeGreaterThanOrEqual(all.abstainRate - TOLERANCE);
+        expect(results.overall!.abstainPrecision!).toBeGreaterThanOrEqual(all.abstainPrecision - TOLERANCE);
         expect(results.overall!.inWindow!).toBeGreaterThanOrEqual(all.inWindow - TOLERANCE);
         expect(results.overall!.offTopicRate).toBeLessThanOrEqual(all.offTopicRate + TOLERANCE);
 
@@ -277,5 +314,21 @@ describe("memory retrieval eval", () => {
                 expect(got.inWindow!, `${category} expected in window`).toBeGreaterThanOrEqual(floor.inWindow! - TOLERANCE);
             }
         }
+    });
+
+    it("still finds a memory by its words when no vector search ran", () => {
+        const totals = empty();
+
+        for (const query of fixture.queries) {
+            const { ids, inWindow } = run(query, false);
+
+            record(totals, query, ids, inWindow);
+        }
+
+        const { abstainRate, recallAt8 } = summary(totals);
+
+        // Before relevance gated injection: Recall@8 0.165 and an abstain rate of 0. The keyword floor holds the first and moves the second.
+        expect(recallAt8!).toBeGreaterThanOrEqual(0.185 - TOLERANCE);
+        expect(abstainRate!).toBeGreaterThanOrEqual(0.55 - TOLERANCE);
     });
 });

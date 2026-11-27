@@ -39,13 +39,15 @@ const searchMemoryTool = createTool<{ limit?: number; query: string }, { memorie
                 : null;
             // A deleted bot's memories are not searched: the bot must still be the caller's.
             const bot = thread?.botId ? await context.runQuery(internal.bots.functions.getBotForRun, { botId: thread.botId, userId: context.userId }) : null;
-            const memoryArgs = { botId: bot ? thread?.botId : undefined, searchText: query, userId: context.userId };
+            // A search of its own: a lower relevance floor than the injection's and the tool's own `limit`, so it
+            // finds what the 8 injected memories left out.
+            const memoryArgs = { botId: bot ? thread?.botId : undefined, limit, search: true, searchText: query, userId: context.userId };
             const memories = servesUser(context.userId)
                 ? await context.runAction(internal.memory.retrieve.retrieveRelevantMemories, memoryArgs)
                 : await callOnShard(internal.memory.retrieve.retrieveRelevantMemories, memoryArgs, { shardKey: context.userId });
 
             return {
-                memories: memories.slice(0, limit).map((m) => {
+                memories: memories.map((m) => {
                     return {
                         category: m.category,
                         confidence: m.confidence,

@@ -4,8 +4,7 @@
 
 - **User memory** — extraction runs as a background action after each AI
   response; retrieval runs before generation with multi-signal scoring
-  (semantic 0.45 / confidence 0.18 / importance 0.12 / recency 0.25, 30-day
-  half-life; pure in `retrieve-ranking.ts`, measured by the offline `retrieval-eval.test.ts`, floors in `__fixtures__/README.md`). Dedup threshold 0.85; conflicts go through belief revision
+  (semantic 0.65 / confidence 0.12 / importance 0.08 / recency 0.15, 30-day half-life) for a row that first clears a relevance floor (cosine 0.45; keyword overlap 0.2 for a row with no vector hit, unless a decisive vector search lacks it: it ran, its hits resolved and filled the 30 in-scope cut, and the row is embedded and older than 10 minutes, which is no relevance; then score 0.3); `search_memory` has its own (0.35 / 0.15, up to 10 rows). Candidates: the newest 100 usable rows per scope (the read pages past expired rows within one shared 1500-row budget; an empty window still searches vectors) plus in-scope vector hits (`withVectorHits`; 90 asked of the index, the best 30 in scope kept, `topScopedHits`). A hit lookup that throws leaves keyword ranking. Words are tokenised on letters and numbers (`knowledge/hybrid.ts#tokenize`), so `peanuts?` is `peanuts`. Pure in `retrieve-ranking.ts`, measured by `retrieval-eval.test.ts` (`__fixtures__/README.md`). Dedup threshold 0.85; conflicts go through belief revision
   (UPDATE/SUPERSEDE/IGNORE/ADD). **`memoryEnabled` on `userSettings` is OPT-IN —
   absent means off.** `isMemoryEnabled` is the authoritative gate; the settings
   read and the UI fallback must agree with it.
