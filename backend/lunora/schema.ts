@@ -2764,6 +2764,17 @@ export const schema = defineSchema({
         // How the wake turns of this watch are failing (`source-control/pr-watch-wake.ts`): when the last one failed, how many failed in a
         // row (0 after a delivery), when the next try may start, and whether the failure can be cured by trying again. The watch is
         // stopped at the third failure in a row or at a terminal one; the last failure stays as history.
+        // A wake turn that ran to its end, recorded before its settlement is tried (`source-control/pr-watch-wake.ts`): the claim, the delivered
+        // reasons with the occurrence markers they came from, and whether the settlement (the count and the clearing) has been applied. While
+        // it is not, no new claim generates for the same reasons; the next claim settles it instead.
+        watchWakeCompleted: v.optional(
+            v.object({
+                claim: v.number(),
+                done: v.boolean(),
+                markers: v.object({ checks: v.optional(v.string()), conflict: v.optional(v.string()), review: v.optional(v.string()) }),
+                reasons: v.array(v.union(v.literal("checks"), v.literal("conflict"), v.literal("review"))),
+            }),
+        ),
         watchWakeFailure: v.optional(
             v.object({
                 at: v.number(),
@@ -2775,6 +2786,9 @@ export const schema = defineSchema({
         // The lease a wake turn holds while it is delivered (`source-control/pr-watch-wake.ts`): until when no second delivery may start.
         // Released when the delivery ends; a delivery that never ends frees itself when it lapses.
         watchWakeLeaseUntil: v.optional(v.number()),
+        // The limits a wake turn's round was charged to, kept while a refund for it is owed (a turn that failed before reaching the model).
+        // `applied` is set by the refund, so each obligation is paid at most once; the next charge settles an unpaid one first.
+        watchWakeRefund: v.optional(v.object({ applied: v.boolean(), claim: v.number(), keys: v.array(v.string()) })),
     })
         .shardBy("userId")
         .index("by_user_and_repository_number", ["userId", "repository", "number"])

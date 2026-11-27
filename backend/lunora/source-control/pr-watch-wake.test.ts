@@ -10,6 +10,7 @@ import { registeredApi, registerModule } from "../../test/registered-api";
 import { insertThread } from "../agent/table-writes";
 import schema from "../schema";
 import { PR_WATCH_MAX_WAKES, PR_WATCH_WAKE_COOLDOWN_MS } from "./pr-watch-logic";
+import { setPullRequestWatch } from "./pr-watch";
 
 const { enqueued, probe, registry, runs } = vi.hoisted(() => {
     return {
@@ -91,6 +92,7 @@ vi.mock("../chat/lib/headless-run", () => {
 });
 
 const {
+    applyWatchWakeRefund,
     beginWatchWake,
     finishWatchWake,
     isTerminalWakeError,
@@ -718,6 +720,187 @@ describe("a settlement that fails after the turn ran", () => {
         expect(runs).toHaveLength(1);
         expect(row.watch.wakes).toBe(1);
         expect(row.watchPending).toEqual([]);
+    });
+});
+
+describe("a settlement that never lands", () => {
+    /** Runs the job with every call of the named mutation failing. */
+    const runWithBrokenWrite = async (job: { args: Record<string, any>; options: Record<string, any> }, broken: unknown, times = Infinity) => {
+        let left = times;
+
+        return await harness
+            .action(async (ctx: any) => {
+                const real = ctx.runMutation.bind(ctx);
+
+                ctx.runMutation = async (reference: unknown, args: unknown) => {
+                    if (reference === broken && left > 0) {
+                        left -= 1;
+
+                        throw new Error("write failed");
+                    }
+
+                    return await real(reference, args);
+                };
+
+                await ctx.runAction(runWatchWake, { ...job.args, jobId: job.options.once.jobId });
+            })
+            .then(() => "ok")
+            .catch(() => "failed");
+    };
+
+    it("settles a completed turn on the next claim and never generates again for the same reasons", async () => {
+        const { linkId } = await seed();
+
+        await start(linkId);
+        expect(await runWithBrokenWrite(enqueued[0]!, finishWatchWake)).toBe("failed");
+
+        const stuck = await rowOf(linkId);
+
+        expect(runs).toHaveLength(1);
+        expect(stuck.watchWakeCompleted).toMatchObject({ done: false, reasons: ["checks"] });
+        expect(stuck.watchPending).toEqual(["checks"]);
+        expect(stuck.watch.wakes).toBeUndefined();
+
+        // The lease lapses; the next poll's claim settles the completed turn instead of asking the model again.
+        await harness.run(async (ctx: any) => {
+            await ctx.db.patch("pullRequestThreads", linkId, { watchWakeLeaseUntil: Date.now() - 1000 });
+        });
+        expect(await start(linkId)).toBe(false);
+
+        const settled = await rowOf(linkId);
+
+        expect(runs).toHaveLength(1);
+        expect(enqueued).toHaveLength(1);
+        expect(settled.watchWakeCompleted).toMatchObject({ done: true });
+        expect(settled.watchPending).toEqual([]);
+        expect(settled.watch.wakes).toBe(1);
+    });
+});
+
+describe("a refund that fails", () => {
+    it("is retried on its own and applied once", async () => {
+        const { linkId } = await seed();
+
+        await start(linkId);
+        probe.failBeforeModel = true;
+        await harness.action(async (ctx: any) => {
+            const real = ctx.runMutation.bind(ctx);
+            let failures = 1;
+
+            ctx.runMutation = async (reference: unknown, args: unknown) => {
+                if (reference === applyWatchWakeRefund && failures > 0) {
+                    failures -= 1;
+
+                    throw new Error("refund failed");
+                }
+
+                return await real(reference, args);
+            };
+
+            await ctx.runAction(runWatchWake, { ...enqueued[0]!.args, jobId: enqueued[0]!.options.once.jobId });
+        });
+
+        const row = await rowOf(linkId);
+
+        expect(probe.refunds).toBe(1);
+        expect(row.watchWakeRefund).toMatchObject({ applied: true });
+    });
+
+    it("stays owed until the next charge pays it, once, before charging again", async () => {
+        const { linkId } = await seed();
+
+        await start(linkId);
+        probe.failBeforeModel = true;
+        await harness.action(async (ctx: any) => {
+            const real = ctx.runMutation.bind(ctx);
+
+            ctx.runMutation = async (reference: unknown, args: unknown) => {
+                if (reference === applyWatchWakeRefund) {
+                    throw new Error("refund failed");
+                }
+
+                return await real(reference, args);
+            };
+
+            await ctx.runAction(runWatchWake, { ...enqueued[0]!.args, jobId: enqueued[0]!.options.once.jobId });
+        });
+
+        const owed = await rowOf(linkId);
+
+        expect(probe.refunds).toBe(0);
+        expect(owed.watchWakeRefund).toMatchObject({ applied: false, keys: ["chat/dailyText:premium", "tasks/dailyRuns:premium"] });
+
+        // The retry time passes; the next attempt pays the owed refund first, then charges, so no second charge stacks unreconciled.
+        probe.failBeforeModel = false;
+        await harness.run(async (ctx: any) => {
+            await ctx.db.patch("pullRequestThreads", linkId, { watchWakeFailure: { at: 1, attempts: 1, kind: "retryable", retryAt: 0 } });
+        });
+        expect(await start(linkId)).toBe(true);
+        await runJob(enqueued[1]!);
+
+        const row = await rowOf(linkId);
+
+        expect(probe.refunds).toBe(1);
+        expect(probe.charges).toBe(2);
+        expect(row.watchWakeRefund).toMatchObject({ applied: true });
+    });
+});
+
+describe("a restarted watch", () => {
+    it("starts a new failure streak and is not held back by the old retry time", async () => {
+        const { linkId, threadId } = await seed();
+        const failOnce = async () => {
+            const row = await rowOf(linkId);
+
+            await harness.run(async (ctx: any) => {
+                await ctx.db.patch("pullRequestThreads", linkId, {
+                    watchPending: ["checks"],
+                    ...(row.watchWakeFailure !== undefined && { watchWakeFailure: { ...row.watchWakeFailure, retryAt: 0 } }),
+                });
+            });
+            await harness.action(async (ctx: any) => await ctx.runAction(startWatchWake, { linkId, run: row.watchRun, startedAt: row.watch.startedAt }));
+            probe.fail = true;
+            await harness.action(
+                async (ctx: any) => await ctx.runAction(runWatchWake, { ...enqueued.at(-1)!.args, jobId: enqueued.at(-1)!.options.once.jobId }),
+            );
+            probe.fail = false;
+        };
+
+        for (let index = 0; index < PR_WATCH_MAX_WAKE_FAILURES; index += 1) {
+            await failOnce();
+        }
+
+        const stopped = await rowOf(linkId);
+
+        expect(stopped.watchActive).toBe(false);
+        expect(stopped.watchWakeFailure).toMatchObject({ attempts: PR_WATCH_MAX_WAKE_FAILURES });
+
+        await harness.run(
+            async (ctx: any) => await ctx.runMutation(setPullRequestWatch, { number: 7, repository: "octo/hello", threadId, userId: OWNER, watching: true }),
+        );
+
+        const restarted = await rowOf(linkId);
+
+        expect(restarted.watchActive).toBe(true);
+        expect(restarted.watchWakeFailure).toMatchObject({ attempts: 0, retryAt: 0 });
+
+        // The first claim of the new watch is not delayed by the old retry time, and it takes three new failures to stop it again.
+        await harness.run(async (ctx: any) => {
+            await ctx.db.patch("pullRequestThreads", linkId, { watchPending: ["checks"] });
+        });
+
+        for (let index = 0; index < PR_WATCH_MAX_WAKE_FAILURES - 1; index += 1) {
+            await failOnce();
+            const still = await rowOf(linkId);
+
+            expect(still.watchActive).toBe(true);
+        }
+
+        await failOnce();
+
+        const ended = await rowOf(linkId);
+
+        expect(ended.watchActive).toBe(false);
     });
 });
 

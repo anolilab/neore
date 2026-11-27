@@ -40,6 +40,7 @@ import { clearAwaitingInput, patchThread } from "./table-writes";
 import { deleteMcpEventsOfThread, hasMcpEventsOfThread } from "../public-api/events-log";
 import { runAfterOnShard } from "../lib/shard-scheduler";
 import { deletePullRequestLinksOfThread, setLinksThreadDeleted } from "../source-control/pr-thread-links";
+import { heldWakeLeases } from "../source-control/pr-watch-wake-lease";
 import { deleteThreadSummaries } from "./thread-summaries";
 import { SEARCH_INTERNAL_FIELDS } from "./thread-search-plan";
 
@@ -541,6 +542,13 @@ async function deletePageForThreadIdHandler(context: MutationContext, args: Dele
 
         const host = await context.db.get("threads", args.threadId);
 
+        // A pull request watch is waking this chat: the delete waits, as it does for a suggestion (`source-control/pr-watch-wake-lease.ts`).
+        const waking = host?.userId === undefined ? [] : await heldWakeLeases(context, host.userId, args.threadId, context.now);
+
+        if (waking.length > 0) {
+            throw new LunoraError("CONFLICT", "A pull request watch is waking this chat. Try again in a moment.");
+        }
+
         if (host) {
             // The thread is going from here on, whatever page the delete is on: no sub-agent's result posts into it.
             await context.db.patch("threads", args.threadId, { deletingAt: context.now });
@@ -836,6 +844,14 @@ export const softDeleteThread = internalMutation
         const oldThread = await ctx.db.get("threads", args.threadId);
 
         assert(oldThread, `Thread ${args.threadId} not found`);
+
+        // A pull request watch is waking this chat: the trash waits, as it does for a suggestion (`source-control/pr-watch-wake-lease.ts`).
+        const waking = oldThread.userId === undefined ? [] : await heldWakeLeases(ctx, oldThread.userId, args.threadId, ctx.now);
+
+        if (waking.length > 0) {
+            throw new LunoraError("CONFLICT", "A pull request watch is waking this chat. Try again in a moment.");
+        }
+
         await ctx.db.patch("threads", args.threadId, {
             deleted: true,
             deletedAt: ctx.now,

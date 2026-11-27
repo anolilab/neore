@@ -6,6 +6,7 @@
 import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { _deletePageForThreadId, softDeleteThread } from "../agent/threads";
 import { enableThreadLock } from "../agent/thread-lock";
 import { insertThread } from "../agent/table-writes";
 import schema from "../schema";
@@ -94,6 +95,29 @@ describe("locking a chat while a wake turn holds it", () => {
         const { threadId } = await seed(Date.now() - 1000);
 
         await expect(lock(threadId)).resolves.toBeDefined();
+    });
+});
+
+describe("deleting a chat while a wake turn holds it", () => {
+    const trash = async (threadId: string) => await harness.run(async (ctx: any) => await ctx.runMutation(softDeleteThread, { threadId }));
+    const purge = async (threadId: string) => await harness.run(async (ctx: any) => await ctx.runMutation(_deletePageForThreadId, { threadId }));
+
+    it("refuses both delete paths while the lease is held, and proceeds once it lapses", async () => {
+        const { linkId, threadId } = await seed(Date.now() + 60_000);
+
+        await expect(trash(threadId)).rejects.toMatchObject({ message: expect.stringContaining("pull request watch") });
+        await expect(purge(threadId)).rejects.toMatchObject({ message: expect.stringContaining("pull request watch") });
+
+        // Nothing was written: the chat is not marked deleted or deleting.
+        const held = await harness.run(async (ctx: any) => await ctx.db.get("threads", threadId));
+
+        expect(held.deleted).toBeUndefined();
+        expect(held.deletingAt).toBeUndefined();
+
+        await harness.run(async (ctx: any) => {
+            await ctx.db.patch("pullRequestThreads", linkId, { watchWakeLeaseUntil: Date.now() - 1000 });
+        });
+        await expect(trash(threadId)).resolves.toBeDefined();
     });
 });
 

@@ -16,6 +16,7 @@ import type { Doc } from "../_generated/dataModel";
 import { internal } from "../_generated/internal";
 import { internalMutation } from "../_generated/server";
 import { runAfterOnShard } from "../lib/shard-scheduler";
+import { loadEligibleThread } from "../devices/internal";
 import { MAX_LENGTH } from "../lib/validators";
 import { PR_WATCH_MAX_WAKES, storedWatchOf } from "./pr-watch-logic";
 
@@ -33,7 +34,18 @@ export const setPullRequestWatch = internalMutation
         userId: v.string().max(MAX_LENGTH.id),
         watching: v.boolean(),
     })
-    .output(v.object({ status: v.union(v.literal("already"), v.literal("capped"), v.literal("not_linked"), v.literal("ok"), v.literal("too_many")) }))
+    .output(
+        v.object({
+            status: v.union(
+                v.literal("already"),
+                v.literal("capped"),
+                v.literal("not_allowed"),
+                v.literal("not_linked"),
+                v.literal("ok"),
+                v.literal("too_many"),
+            ),
+        }),
+    )
     .mutation(async ({ args, ctx }) => {
         // One exact, bounded read: the newest rows of the person's links of this thread to this pull request. Deleted rows are
         // skipped. Should several live rows match (a run can open a second link), the one holding a running watch wins, so a
@@ -89,6 +101,12 @@ export const setPullRequestWatch = internalMutation
             return { status: "capped" as const };
         }
 
+        // A watch wakes the thread it was started from, so only a chat of the owner's that nobody else reads or writes to may start one: a
+        // shared, public, group or external chat is refused here, with no slot taken and no poll made for a watch that could never be woken.
+        if ((await loadEligibleThread(ctx, link.threadId, args.userId)) === null) {
+            return { status: "not_allowed" as const };
+        }
+
         // The wake count carries over: a restart must not reset the cap that ends a watch which keeps waking.
         const stored = storedWatchOf({ startedAt: ctx.now, ...(link.watch?.wakes !== undefined && { wakes: link.watch.wakes }) });
 
@@ -102,6 +120,8 @@ export const setPullRequestWatch = internalMutation
             watchRun: crypto.randomUUID(),
             // A restarted watch counts its own failures from the first.
             ...(link.watchReadFailure !== undefined && { watchReadFailure: { ...link.watchReadFailure, attempts: 0 } }),
+            // Likewise the wake failures: a restarted watch starts a new streak and is not held back by the old retry time.
+            ...(link.watchWakeFailure !== undefined && { watchWakeFailure: { ...link.watchWakeFailure, attempts: 0, retryAt: 0 } }),
         });
         await runAfterOnShard(ctx.scheduler, 0, internal.source_control.pr_watch_poll.pollWatchLink, { linkId: link._id }, args.userId);
 

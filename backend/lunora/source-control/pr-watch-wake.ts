@@ -31,10 +31,9 @@ import { DEFAULT_CHAT_MODEL } from "@neore/ai/constants";
 import { LunoraError, v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
-import type { Doc } from "../_generated/dataModel";
-import { internalAction, internalMutation, type MutationCtx } from "../_generated/server";
+import type { Doc, Id } from "../_generated/dataModel";
+import { type ActionCtx, internalAction, internalMutation, type MutationCtx } from "../_generated/server";
 import { runHeadlessAgent } from "../chat/lib/headless-run";
-import { loadEligibleThread } from "../devices/internal";
 import { enqueueJob } from "../lib/job-queue";
 import { JOB_LEASE_MS } from "../lib/job-once";
 import { isThreadLocked } from "../lib/thread-lock";
@@ -125,15 +124,38 @@ const currentMarker = (watch: { checksHeadSha?: string; conflictHeadSha?: string
  * streaming (a chat reply holds the thread's run lock). Read at the claim and again by the job right before the turn.
  */
 const wakeableThread = async (ctx: Pick<MutationCtx, "db">, link: Doc<"pullRequestThreads">): Promise<Doc<"threads"> | null> => {
-    const thread = await loadEligibleThread(ctx, link.threadId, link.userId);
+    // The owner's own thread, not locked, not deleted or being deleted. Sharing is decided where a watch starts (`pr-watch.ts`).
+    const thread = await ctx.db.get("threads", link.threadId);
 
-    if (thread === null || isThreadLocked(thread) || thread.deleted === true || thread.deletingAt !== undefined) {
+    if (thread === null || thread.userId !== link.userId || isThreadLocked(thread) || thread.deleted === true || thread.deletingAt !== undefined) {
         return null;
     }
 
     const liveReply = await ctx.db.persistentStreams.findFirst({ where: { status: { in: ["pending", "streaming"] }, threadId: thread._id as string } });
 
     return liveReply === null ? thread : null;
+};
+
+/**
+ * The link's fields after a delivered turn is settled: the wake counted once, the delivered reasons cleared (only those whose
+ * occurrence marker is unchanged since the claim), the lease released, the failure streak reset and the completion marked done.
+ */
+const settledPatch = (
+    link: Doc<"pullRequestThreads">,
+    watch: NonNullable<Doc<"pullRequestThreads">["watch"]>,
+    claim: number,
+    markers: Markers,
+    reasons: ReadonlyArray<WatchWakeReason>,
+    now: number,
+) => {
+    return {
+        watch: { ...watch, lastWakeAt: now, wakes: (watch.wakes ?? 0) + 1 },
+        watchPending: (link.watchPending ?? []).filter((reason) => !reasons.includes(reason) || currentMarker(watch, reason) !== markers[reason]),
+        watchWakeCompleted: { claim, done: true, markers, reasons: [...reasons] },
+        watchWakeLeaseUntil: 0,
+        // A delivery ends the run of failures (the last one stays as history).
+        ...(link.watchWakeFailure !== undefined && { watchWakeFailure: { ...link.watchWakeFailure, attempts: 0, retryAt: 0 } }),
+    };
 };
 
 /**
@@ -156,6 +178,20 @@ export const claimWatchWake = internalMutation
             link.watch.startedAt !== args.startedAt ||
             link.watchRun !== args.run
         ) {
+            return null;
+        }
+
+        if (link.watchWakeLeaseUntil !== undefined && ctx.now < link.watchWakeLeaseUntil) {
+            return null;
+        }
+
+        // A turn that ran to its end but whose settlement never landed is settled now, and nothing is generated for the same reasons: the
+        // model is never asked twice for an occurrence that was delivered.
+        const completed = link.watchWakeCompleted;
+
+        if (completed !== undefined && !completed.done) {
+            await ctx.db.patch("pullRequestThreads", link._id, settledPatch(link, link.watch, completed.claim, completed.markers, completed.reasons, ctx.now));
+
             return null;
         }
 
@@ -312,6 +348,12 @@ export const beginWatchWake = internalMutation
             return await waits();
         }
 
+        // A refund owed for an earlier turn that failed before the model is paid first, so a new charge never stacks on an unreconciled one.
+        if (link.watchWakeRefund !== undefined && !link.watchWakeRefund.applied) {
+            await refundRoundKeys(ctx, link.userId, link.watchWakeRefund.keys);
+            await ctx.db.patch("pullRequestThreads", link._id, { watchWakeRefund: { ...link.watchWakeRefund, applied: true } });
+        }
+
         // The round is charged to the daily limits only now, right before the model is asked: a job that skips the turn above charged nothing.
         const account = await loadTaskAccount(ctx, link.userId);
 
@@ -324,14 +366,50 @@ export const beginWatchWake = internalMutation
     });
 
 /**
- * Gives the round back for a turn that failed before it reached the model (never one that made a model call): one unit to each limit
- * the charge took, as `beginWatchWake` reported them.
+ * Records that a turn failed before it reached the model, so its round is owed back: the exact limits the charge took are kept on the
+ * link (`watchWakeRefund`) until `applyWatchWakeRefund` pays them. Kept apart from the payment so a payment that fails is not forgotten.
  */
-export const refundWatchWakeRound = internalMutation
-    .input({ charged: v.array(v.string()), userId: v.string() })
+export const recordWatchWakeRefund = internalMutation
+    .input({ ...key, charged: v.array(v.string()), claim: v.number() })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
-        await refundRoundKeys(ctx, args.userId, args.charged);
+        const link = await ctx.db.get("pullRequestThreads", args.linkId);
+
+        if (link !== null && link.watchWakeLeaseUntil === args.claim && args.charged.length > 0) {
+            await ctx.db.patch("pullRequestThreads", link._id, { watchWakeRefund: { applied: false, claim: args.claim, keys: args.charged } });
+        }
+
+        return null;
+    });
+
+/** Pays the refund owed on the link, once: the limits it names get one unit back each, then the obligation is marked applied. */
+export const applyWatchWakeRefund = internalMutation
+    .input({ linkId: v.id("pullRequestThreads") })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        const link = await ctx.db.get("pullRequestThreads", args.linkId);
+        const owed = link?.watchWakeRefund;
+
+        if (link !== null && owed !== undefined && !owed.applied) {
+            await refundRoundKeys(ctx, link.userId, owed.keys);
+            await ctx.db.patch("pullRequestThreads", link._id, { watchWakeRefund: { ...owed, applied: true } });
+        }
+
+        return null;
+    });
+
+/** Records that the turn ran to its end, before its settlement is tried: a later claim then settles it instead of generating again. */
+export const completeWatchWake = internalMutation
+    .input({ ...key, claim: v.number(), markers: vMarkers, reasons: v.array(vReason) })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        const link = await ctx.db.get("pullRequestThreads", args.linkId);
+
+        if (link !== null && link.watchWakeLeaseUntil === args.claim) {
+            await ctx.db.patch("pullRequestThreads", link._id, {
+                watchWakeCompleted: { claim: args.claim, done: false, markers: args.markers, reasons: args.reasons },
+            });
+        }
 
         return null;
     });
@@ -389,13 +467,16 @@ export const finishWatchWake = internalMutation
 
         const { watch } = link;
 
-        await ctx.db.patch("pullRequestThreads", link._id, {
-            watch: { ...watch, lastWakeAt: ctx.now, wakes: (watch.wakes ?? 0) + 1 },
-            watchPending: (link.watchPending ?? []).filter((reason) => !args.reasons.includes(reason) || currentMarker(watch, reason) !== args.markers[reason]),
-            watchWakeLeaseUntil: 0,
-            // A delivery ends the run of failures (the last one stays as history).
-            ...(link.watchWakeFailure !== undefined && { watchWakeFailure: { ...link.watchWakeFailure, attempts: 0, retryAt: 0 } }),
-        });
+        // A thread that is gone or being deleted has nothing to wake: the lease is released and nothing more is written.
+        const thread = await ctx.db.get("threads", link.threadId);
+
+        if (thread === null || thread.deleted === true || thread.deletingAt !== undefined) {
+            await ctx.db.patch("pullRequestThreads", link._id, { watchWakeLeaseUntil: 0 });
+
+            return null;
+        }
+
+        await ctx.db.patch("pullRequestThreads", link._id, settledPatch(link, watch, args.claim, args.markers, args.reasons, ctx.now));
 
         return null;
     });
@@ -413,6 +494,42 @@ export const releaseWatchWake = internalMutation
 
         return null;
     });
+
+/** Runs a settlement step, trying again a few times: it is only ever a write, never the model. The last error stands. */
+const retried = async (step: () => Promise<void>): Promise<void> => {
+    for (let attempt = 0; ; attempt += 1) {
+        try {
+            await step();
+
+            return;
+        } catch (error) {
+            if (attempt >= FINISH_RETRIES) {
+                throw error;
+            }
+        }
+    }
+};
+
+/**
+ * A round owed back for a turn that failed before the model: recorded on the link first, then paid, each step tried again on its own. A
+ * payment that never lands stays recorded, and the next charge pays it first (`beginWatchWake`), so the round is refunded once.
+ */
+const owedRefund = async (
+    ctx: Pick<ActionCtx, "runMutation">,
+    identity: { claim: number; linkId: Id<"pullRequestThreads">; run?: string; startedAt: number },
+    charged: string[],
+): Promise<void> => {
+    try {
+        await retried(async () => {
+            await ctx.runMutation(internal.source_control.pr_watch_wake.recordWatchWakeRefund, { ...identity, charged });
+        });
+        await retried(async () => {
+            await ctx.runMutation(internal.source_control.pr_watch_wake.applyWatchWakeRefund, { linkId: identity.linkId });
+        });
+    } catch (error) {
+        console.warn("[pr-watch-wake] could not give the round back", { error, linkId: identity.linkId });
+    }
+};
 
 /** The job: runs the turn in the thread, then counts it. A turn that fails is released uncounted, for a later try. */
 export const runWatchWake = internalAction
@@ -469,34 +586,32 @@ export const runWatchWake = internalAction
             terminal = isTerminalWakeError(error);
 
             if (!reachedModel) {
-                await ctx
-                    .runMutation(internal.source_control.pr_watch_wake.refundWatchWakeRound, { charged, userId: args.userId })
-                    .catch((refundError: unknown) => {
-                        console.warn("[pr-watch-wake] could not give the round back", { linkId: args.linkId, refundError });
-                    });
+                await owedRefund(ctx, identity, charged);
             }
 
             console.warn("[pr-watch-wake] the wake turn failed", { error, linkId: args.linkId, terminal });
         }
 
+        // A turn that ran to its end is recorded durably BEFORE its settlement is tried, so a settlement that keeps failing is settled by a
+        // later claim and the model is never asked again for the same occurrence.
+        if (delivered) {
+            await retried(async () => {
+                await ctx.runMutation(internal.source_control.pr_watch_wake.completeWatchWake, { ...identity, markers: args.markers, reasons: args.reasons });
+            });
+        }
+
         // The turn is over and paid for: only this settlement is tried again, never the turn. The queue does not redeliver the job either
         // (the claim-once wrapper completes its claim when the job ends, even by a throw), so a settlement that keeps failing leaves the
         // lease to lapse rather than running the model a second time for the same occurrence.
-        for (let attempt = 0; ; attempt += 1) {
-            try {
-                await ctx.runMutation(internal.source_control.pr_watch_wake.finishWatchWake, {
-                    ...identity,
-                    delivered,
-                    markers: args.markers,
-                    reasons: args.reasons,
-                    ...(terminal && { terminal }),
-                });
+        await retried(async () => {
+            await ctx.runMutation(internal.source_control.pr_watch_wake.finishWatchWake, {
+                ...identity,
+                delivered,
+                markers: args.markers,
+                reasons: args.reasons,
+                ...(terminal && { terminal }),
+            });
+        });
 
-                return null;
-            } catch (error) {
-                if (attempt >= FINISH_RETRIES) {
-                    throw error;
-                }
-            }
-        }
+        return null;
     });

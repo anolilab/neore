@@ -27,7 +27,12 @@ afterEach(() => {
 });
 
 /** A thread of `userId` with one link to pull request `number`. Returns the thread and the link's row id. */
-const seedLink = async (userId: string, number: number, extra: Record<string, unknown> = {}): Promise<{ linkId: string; threadId: string }> =>
+const seedLink = async (
+    userId: string,
+    number: number,
+    extra: Record<string, unknown> = {},
+    threadExtra: Record<string, unknown> = {},
+): Promise<{ linkId: string; threadId: string }> =>
     await harness.run(async (ctx: any) => {
         const threadId = await insertThread(ctx.db, {
             createdBy: userId,
@@ -37,6 +42,7 @@ const seedLink = async (userId: string, number: number, extra: Record<string, un
             title: `work on ${String(number)}`,
             updatedAt: Date.now(),
             userId,
+            ...threadExtra,
         });
         const linkId = await ctx.db.insert("pullRequestThreads", {
             createdAt: Date.now(),
@@ -75,6 +81,23 @@ describe("setPullRequestWatch", () => {
         expect(watch).toBeDefined();
         expect(watch.stoppedAt).toBeUndefined();
         expect(typeof watch.startedAt).toBe("number");
+    });
+
+    it("refuses to start a watch in a chat that is shared, public, group or external, taking no slot", async () => {
+        for (const patch of [{ isPublic: true }, { externalThreadId: "ext-1" }]) {
+            const { linkId, threadId } = await seedLink(OWNER, 7, {}, patch);
+
+            expect(await call({ number: 7, threadId, userId: OWNER, watching: true })).toStrictEqual({ status: "not_allowed" });
+
+            const row = await harness.run(async (ctx: any) => await ctx.db.get("pullRequestThreads", linkId));
+
+            expect(row.watchActive).toBeUndefined();
+            expect(row.watch).toBeUndefined();
+        }
+
+        const { threadId } = await seedLink(OWNER, 8);
+
+        expect(await call({ number: 8, threadId, userId: OWNER, watching: true })).toStrictEqual({ status: "ok" });
     });
 
     it("schedules the new watch's own first poll", async () => {
