@@ -445,7 +445,8 @@ const failureCause = (error: unknown): { code?: string; name: string } => {
 
 /**
  * The `/memory` reply (`lib/memory-command.ts`): the owner's memory digest, that memory is off, or, when the read
- * fails, that it could not be read. Nothing is read or sent once the reply window closed or the pairing changed.
+ * fails, that it could not be read. Nothing is read or sent once the reply window closed or the pairing changed, and
+ * the pairing is checked again just before the send.
  */
 export const answerMemoryCommand = async (ctx: Pick<ActionCtx, "runQuery">, args: MemoryDigestArgs): Promise<void> => {
     // `args` is the delivery too: the extra ids it carries are not read by the send.
@@ -458,6 +459,11 @@ export const answerMemoryCommand = async (ctx: Pick<ActionCtx, "runQuery">, args
 
         return MEMORY_DIGEST_FAILED_NOTICE;
     });
+
+    // Building the digest takes several reads: the pairing is read again right before the send, by the same rule.
+    if (!(await stillPairedAs(ctx, args))) {
+        return;
+    }
 
     await sendFixedText(ctx, args, args.userId, text);
 };

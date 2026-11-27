@@ -147,8 +147,9 @@ describe("formatMemoryDigest", () => {
                 "4 memories (identity 1, preferences 2, context 1).",
                 "",
                 "📌 Name is Ada — added by you · all chats",
-                "• Likes tea — learned in chat · all chats",
+                // Unscored reads as importance 50, above "Likes tea" at 9.
                 "• Prefers short answers — summarised from earlier memories · bot “Helper”",
+                "• Likes tea — learned in chat · all chats",
                 "",
                 "The full list, with dates: Settings → Personalization → Memory → Download memories.",
             ].join("\n"),
@@ -163,6 +164,37 @@ describe("formatMemoryDigest", () => {
         expect(digest.startsWith("More than 30 memories")).toBe(true);
         expect(digest.endsWith("Download memories.")).toBe(true);
         expect(digest).toContain("…");
+    });
+
+    it("ranks an unscored memory as importance 50", () => {
+        const digest = formatMemoryDigest([row({ importance: 30, lastConfirmedAt: LATE_EVENING + 1, memory: "low" }), row({ memory: "unscored" })], {
+            bots: NO_BOTS,
+            now: NOW,
+            timeZone: "UTC",
+            truncated: false,
+        });
+
+        expect(digest.indexOf("unscored")).toBeLessThan(digest.indexOf("low"));
+    });
+
+    it("cuts a long bot name and still lists the shorter entries on WeChat", () => {
+        const bots = new Map<string, BotLabel>([["long", { kind: "named", name: "B".repeat(500) }]]);
+        const rows = [
+            row({ botId: "long", importance: 90, memory: "first" }),
+            row({ importance: 80, memory: "x".repeat(400) }),
+            row({ importance: 79, memory: "y".repeat(400) }),
+            row({ importance: 70, memory: "short one" }),
+            row({ importance: 60, memory: "short two" }),
+        ];
+        const digest = formatMemoryDigest(rows, { bots, maxChars: 600, now: NOW, timeZone: "UTC", truncated: false });
+
+        expect(digest.length).toBeLessThanOrEqual(600);
+        expect(digest).toContain(`• first — learned in chat · bot “${"B".repeat(39)}…”`);
+        // The first long entry (cut to 200) fits; the second does not fit the room left, and the ones after it still do.
+        expect(digest).toContain("x".repeat(100));
+        expect(digest).not.toContain("y".repeat(100));
+        expect(digest).toContain("• short one");
+        expect(digest).toContain("• short two");
     });
 
     it("fits a smaller platform limit, never past the digest's own", () => {

@@ -33,6 +33,15 @@ export interface InboundMessage {
     timestampMs: number;
 }
 
+/**
+ * The text without a leading bot mention: Slack's `<@U123>` (or `<@U123|name>`) and Discord's `<@123>` / `<@!123>`, so
+ * a command typed after one (`<@U123> /memory`) still matches. Teams' `<at>` and Feishu's `@_user_1` are dropped by
+ * their parsers already.
+ */
+const LEADING_MENTION = /^\s*<@!?[\w.|-]+>\s*/u;
+
+export const withoutLeadingMention = (text: string): string => text.replace(LEADING_MENTION, "");
+
 /** Reply sent for stickers, locations, contacts and the like, which the bot does not read. */
 export const UNSUPPORTED_CONTENT_NOTICE =
     "I can read text, images, documents and voice messages — stickers, locations and similar messages are ignored. Please send your message in one of those forms.";

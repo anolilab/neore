@@ -15,7 +15,8 @@ import { findOrCreateMessengerThread, getConnectionById, pairConnection, saveMes
 import { handleDiscordWebhook, handleSlackWebhook, handleTelegramWebhook, handleWhatsAppWebhook } from "./webhooks";
 
 const rateLimit = vi.hoisted(() => {
-    return { ok: true, operations: [] as string[] };
+    /** `refuse`: operations that answer "over the limit", by prefix. */
+    return { ok: true, operations: [] as string[], refuse: [] as string[] };
 });
 
 vi.mock("../lib/rate-limiter", async (importOriginal) => {
@@ -24,7 +25,7 @@ vi.mock("../lib/rate-limiter", async (importOriginal) => {
         checkRateLimit: async (_context: unknown, operation: string) => {
             rateLimit.operations.push(operation);
 
-            return { ok: rateLimit.ok || !operation.startsWith("messenger/connection") };
+            return { ok: (rateLimit.ok || !operation.startsWith("messenger/connection")) && rateLimit.refuse.every((prefix) => !operation.startsWith(prefix)) };
         },
     };
 });
@@ -88,6 +89,8 @@ const httpContext = (keys: Record<string, string>) => {
         context: context as never,
         /** Model replies scheduled — notices (pairing, private bot) are excluded. */
         replies: () => scheduled.filter((entry) => entry.path === "messenger_respond:generateAndSendResponse").map((entry) => entry.args),
+        /** Every scheduled action. */
+        scheduled: () => scheduled,
         /** Every scheduled action, by path. */
         scheduledPaths: () => scheduled.map((entry) => entry.path),
     };
@@ -131,6 +134,7 @@ beforeEach(() => {
     vi.useFakeTimers({ now: NOW, toFake: ["Date"] });
     rateLimit.ok = true;
     rateLimit.operations = [];
+    rateLimit.refuse = [];
     harness = lunoraTest(schema as never);
 });
 
@@ -269,6 +273,22 @@ describe("Telegram through acceptInbound", () => {
         expect(rateLimit.operations).toContain("messenger/connection:free");
     });
 
+    it("shares the download's limit: past it, /memory gets only the try-later notice", async () => {
+        const connectionId = await connection("telegram", { platformChatId: "77", platformUserId: SENDER });
+        const { context, scheduled } = httpContext(KEYS);
+
+        rateLimit.refuse = ["memory/export"];
+
+        expect(await statusOf(send(context, connectionId, update(1, NOW_SECONDS, "/memory")))).toBe(200);
+        expect(scheduled()).toStrictEqual([
+            expect.objectContaining({
+                args: expect.objectContaining({ text: expect.stringContaining("try again later") }),
+                path: "messenger_respond:sendNotice",
+            }),
+        ]);
+        expect(rateLimit.operations).toContain("memory/export:free");
+    });
+
     it("gives a stranger's /memory only the private-bot notice", async () => {
         const connectionId = await connection("telegram", { platformChatId: "77", platformUserId: "someone-else" });
         const { context, scheduledPaths } = httpContext(KEYS);
@@ -333,6 +353,18 @@ describe("Slack through acceptInbound", () => {
         expect(threads.map((thread: { externalThreadId: string }) => thread.externalThreadId)).toStrictEqual(["slack:C1:1799999000.000001"]);
     });
 
+    it("answers /memory typed after a bot mention in the paired direct message", async () => {
+        const connectionId = await connection("slack", { platformChatId: "D1", platformUserId: SENDER });
+        const { context, scheduledPaths } = httpContext(KEYS);
+        const body = JSON.stringify({
+            event: { channel: "D1", channel_type: "im", text: "<@U0BOT> /memory", ts: `${String(NOW_SECONDS)}.000100`, type: "message", user: SENDER },
+            type: "event_callback",
+        });
+
+        expect(await statusOf(handleSlackWebhook(context, post(body, await signed(body)), connectionId))).toBe(200);
+        expect(scheduledPaths()).toStrictEqual(["messenger_respond:sendMemoryDigest"]);
+    });
+
     it("answers url_verification only when signed, and refuses a request signed outside the window", async () => {
         const connectionId = await connection("slack");
         const { context } = httpContext(KEYS);
@@ -371,6 +403,29 @@ describe("Discord through acceptInbound", () => {
         await handleDiscordWebhook(context, post(message, await signed(pair, message)), connectionId);
 
         expect(replies()).toStrictEqual([expect.objectContaining({ platform: "discord", platformChatId: "D1" })]);
+    });
+
+    it("answers /memory with the digest only in a one-to-one DM, never in a group DM or from the gateway", async () => {
+        const pair = await keyPair();
+        const connectionId = await connection("discord", { platformChatId: "D1", platformUserId: SENDER });
+        const { context, scheduledPaths } = httpContext(await keysFor(pair));
+        const slash = (id: string, channelType: number) =>
+            JSON.stringify({
+                channel: { type: channelType },
+                channel_id: "D1",
+                data: { name: "memory" },
+                id,
+                token: "t",
+                type: 2,
+                user: { id: SENDER, username: "ada" },
+            });
+        const gateway = JSON.stringify({ d: { author: { id: SENDER, username: "ada" }, channel_id: "D1", content: "/memory", id: "m9" }, t: "MESSAGE_CREATE" });
+
+        for (const body of [slash("i1", 1), slash("i2", 3), gateway]) {
+            await handleDiscordWebhook(context, post(body, await signed(pair, body)), connectionId);
+        }
+
+        expect(scheduledPaths()).toStrictEqual(["messenger_respond:sendMemoryDigest", "messenger_respond:sendNotice", "messenger_respond:sendNotice"]);
     });
 
     it("refuses a correctly signed request replayed outside the window", async () => {

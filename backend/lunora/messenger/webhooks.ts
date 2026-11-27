@@ -37,7 +37,7 @@ import { SIGNED_REQUEST_WINDOW_MS } from "../lib/crypto";
 import { httpScheduler } from "../lib/http-scheduler";
 import { checkRateLimit } from "../lib/rate-limiter";
 import { checkSenderPairing } from "./pairing";
-import { isMemoryCommand, MEMORY_COMMAND_OTHER_CHAT_NOTICE } from "./lib/memory-command";
+import { isMemoryCommand, MEMORY_COMMAND_OTHER_CHAT_NOTICE, MEMORY_COMMAND_RATE_LIMITED_NOTICE } from "./lib/memory-command";
 import type { InboundMessage } from "./lib/types";
 import { isFreshInbound, UNSUPPORTED_CONTENT_NOTICE } from "./lib/types";
 import { discordSignedAt, parseDiscordEvent, validateDiscordSignature } from "./platforms/discord";
@@ -125,17 +125,34 @@ const answerMemoryCommand = async (
     connection: Doc<"messengerConnections">,
     message: InboundMessage,
     notice: NonNullable<AcceptOptions["delivery"]> & { inboundAt: number; platform: MessengerPlatform; platformChatId: string },
+    tier: "free" | "premium",
 ): Promise<void> => {
     const scheduler = httpScheduler(context);
+    const sendNotice = async (text: string): Promise<void> => {
+        await scheduler.runAfter(0, internal.messenger.respond.sendNotice, { ...notice, text, userId: connection.userId });
+    };
 
-    await (message.direct === true && message.chatId === connection.platformChatId
-        ? scheduler.runAfter(0, internal.messenger.respond.sendMemoryDigest, {
-              ...notice,
-              connectionId: connection._id,
-              platformUserId: message.senderId,
-              userId: connection.userId,
-          })
-        : scheduler.runAfter(0, internal.messenger.respond.sendNotice, { ...notice, text: MEMORY_COMMAND_OTHER_CHAT_NOTICE, userId: connection.userId }));
+    if (message.direct !== true || message.chatId !== connection.platformChatId) {
+        await sendNotice(MEMORY_COMMAND_OTHER_CHAT_NOTICE);
+
+        return;
+    }
+
+    // The digest reads what the download reads: it draws on the same per-user bucket.
+    const allowed = await checkRateLimit(context, `memory/export:${tier}`, { key: connection.userId, throws: false });
+
+    if (!allowed.ok) {
+        await sendNotice(MEMORY_COMMAND_RATE_LIMITED_NOTICE);
+
+        return;
+    }
+
+    await scheduler.runAfter(0, internal.messenger.respond.sendMemoryDigest, {
+        ...notice,
+        connectionId: connection._id,
+        platformUserId: message.senderId,
+        userId: connection.userId,
+    });
 };
 
 /**
@@ -202,7 +219,13 @@ export const acceptInbound = async (
     }
 
     if (message.kind === "text" && isMemoryCommand(message.text)) {
-        await answerMemoryCommand(context, connection, message, { ...delivery, inboundAt: message.timestampMs, platform, platformChatId: message.chatId });
+        await answerMemoryCommand(
+            context,
+            connection,
+            message,
+            { ...delivery, inboundAt: message.timestampMs, platform, platformChatId: message.chatId },
+            tier,
+        );
 
         return "memory_command";
     }

@@ -53,7 +53,10 @@ const LINE_BREAKS = /[\r\n\u{2028}\u{2029}]+/gu;
 /** One line of text: a memory or a bot name never starts a line (or a heading) of its own. */
 const oneLine = (text: string): string => text.replaceAll(LINE_BREAKS, " ").trim();
 
-const scopeOf = (row: ExportMemoryRow, bots: ReadonlyMap<string, BotLabel>): string => {
+/** One line, cut to `max` characters with an ellipsis. */
+const cutTo = (text: string, max: number): string => (text.length > max ? `${text.slice(0, max - 1)}…` : text);
+
+const scopeOf = (row: ExportMemoryRow, bots: ReadonlyMap<string, BotLabel>, nameMax = Infinity): string => {
     if (row.botId === undefined) {
         return "all chats";
     }
@@ -62,7 +65,7 @@ const scopeOf = (row: ExportMemoryRow, bots: ReadonlyMap<string, BotLabel>): str
 
     switch (label?.kind) {
         case "named": {
-            return `bot “${oneLine(label.name)}”`;
+            return `bot “${cutTo(oneLine(label.name), nameMax)}”`;
         }
         case "shared": {
             return "a shared chat's bot";
@@ -182,14 +185,21 @@ const DIGEST_LINE_MAX = 200;
 export const MEMORY_OFF_DIGEST = "Memory is off for your account, so nothing new is remembered. Turn it on in Settings → Personalization → Memory.";
 const DIGEST_POINTER = "The full list, with dates: Settings → Personalization → Memory → Download memories.";
 
+/** The importance a row with none is read as, as retrieval and reflection read it (`retrieve-ranking.ts`, `reflection.ts`). */
+const UNSCORED_IMPORTANCE = 50;
+/** A bot name in a digest line is cut here, so one long name cannot fill a short message. */
+const DIGEST_BOT_NAME_MAX = 40;
+
 /** Pinned first, then the most important, then the most recently confirmed. */
 const byWeight = (a: ExportMemoryRow, b: ExportMemoryRow): number =>
-    Number(b.pinned) - Number(a.pinned) || (b.importance ?? 0) - (a.importance ?? 0) || b.lastConfirmedAt - a.lastConfirmedAt;
+    Number(b.pinned) - Number(a.pinned) ||
+    (b.importance ?? UNSCORED_IMPORTANCE) - (a.importance ?? UNSCORED_IMPORTANCE) ||
+    b.lastConfirmedAt - a.lastConfirmedAt;
 
 /**
  * The `/memory` reply: counts by type, then up to ten memories (pinned first; an unpinned one past its end date is
  * left out), each with its source and scope as the file labels them, cut to `maxChars` (the platform's message limit, at most {@link MEMORY_DIGEST_MAX_CHARS}). The pointer to the
- * full list always fits: lines are dropped first.
+ * full list always fits: a line that does not fit is skipped and the next tried. A bot name is cut to 40 characters.
  */
 export const formatMemoryDigest = (
     rows: ReadonlyArray<ExportMemoryRow>,
@@ -213,21 +223,20 @@ export const formatMemoryDigest = (
         .map((row) => {
             const text = oneLine(row.memory);
 
-            const shown = text.length > DIGEST_LINE_MAX ? `${text.slice(0, DIGEST_LINE_MAX - 1)}…` : text;
-
-            return `${row.pinned ? "📌" : "•"} ${shown} — ${sourceOf(row)} · ${scopeOf(row, options.bots)}`;
+            return `${row.pinned ? "📌" : "•"} ${cutTo(text, DIGEST_LINE_MAX)} — ${sourceOf(row)} · ${scopeOf(row, options.bots, DIGEST_BOT_NAME_MAX)}`;
         });
     const tail = `\n\n${DIGEST_POINTER}`;
     let body = head;
+    let listed = 0;
 
-    for (const [index, entry] of top.entries()) {
-        const next = `${body}${index === 0 ? "\n\n" : "\n"}${entry}`;
+    // An entry that does not fit the room left is skipped, not the end of the list: a shorter one after it may fit.
+    for (const entry of top) {
+        const next = `${body}${listed === 0 ? "\n\n" : "\n"}${entry}`;
 
-        if (next.length + tail.length > maxChars) {
-            break;
+        if (next.length + tail.length <= maxChars) {
+            body = next;
+            listed += 1;
         }
-
-        body = next;
     }
 
     return `${body}${tail}`;

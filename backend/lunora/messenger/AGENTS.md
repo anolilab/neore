@@ -33,5 +33,6 @@
   **`/memory`** (`lib/memory-command.ts`) is answered after the rate limits with a fixed digest
   (`respond.ts#sendMemoryDigest`, `memory/export-format.ts`): no thread row, no model run, and only in the chat
   the connection was paired in (`platformChatId`) and only when the adapter marks it one-to-one (`InboundMessage.direct`,
-  absent = a group); anywhere else the owner gets a notice, never the digest. The action re-reads the connection and
-  answers nothing if the pairing changed since the command was queued.
+  absent = a group; a Discord gateway message is never one-to-one); anywhere else the owner gets a notice, never the
+  digest. It shares the download's `memory/export` limit. The action re-reads the connection before it reads and again
+  before it sends, and answers nothing if the pairing changed since the command was queued.

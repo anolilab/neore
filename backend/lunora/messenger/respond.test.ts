@@ -27,6 +27,8 @@ const state = vi.hoisted(() => {
         discord: true,
         /** The connection row the digest re-reads; `null` when it is gone. */
         memoryConnection: null as Record<string, unknown> | null,
+        /** Set: the connection row every read after the first one returns. */
+        memoryConnectionAfterFirstRead: undefined as Record<string, unknown> | null | undefined,
         memoryEnabled: true,
         /** Set: the memory page read throws it. */
         memoryReadError: undefined as Error | undefined,
@@ -210,7 +212,14 @@ const ctx = () =>
                     return state.disclosed;
                 }
                 case "messenger_functions:getConnectionById": {
-                    return state.memoryConnection;
+                    const connection = state.memoryConnection;
+
+                    // The first read is the pre-check; from then on the row may have changed meanwhile.
+                    if (state.memoryConnectionAfterFirstRead !== undefined) {
+                        state.memoryConnection = state.memoryConnectionAfterFirstRead;
+                    }
+
+                    return connection;
                 }
                 case "messenger_functions:getReplyToolSetting": {
                     state.settingArgs.push(args);
@@ -248,6 +257,7 @@ beforeEach(() => {
     state.charge = "charged";
     state.disclosed = true;
     state.memoryConnection = { platform: "telegram", platformChatId: "chat-1", platformUserId: "contact-1", status: "active", userId: "owner" };
+    state.memoryConnectionAfterFirstRead = undefined;
     state.memoryEnabled = true;
     state.memoryReadError = undefined;
     state.memoryReads = [];
@@ -495,6 +505,15 @@ describe("/memory answer", () => {
         await answer();
 
         expect(state.memoryReads).toStrictEqual([]);
+        expect(state.sentText).toStrictEqual([]);
+    });
+
+    it("sends nothing when the pairing changed while the digest was built", async () => {
+        state.memoryConnectionAfterFirstRead = { ...state.memoryConnection, platformUserId: "contact-2" };
+
+        await answer();
+
+        expect(state.memoryReads).toStrictEqual(["owner"]);
         expect(state.sentText).toStrictEqual([]);
     });
 

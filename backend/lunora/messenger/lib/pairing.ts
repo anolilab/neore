@@ -11,6 +11,7 @@
  * Pure helpers here; the gate that uses them is `messenger/pairing.ts`.
  */
 import { sha256Hex } from "../../lib/crypto";
+import { withoutLeadingMention } from "./types";
 
 /** How long a pairing code stays valid. */
 export const PAIRING_CODE_TTL_MS = 15 * 60 * 1000;
@@ -32,12 +33,12 @@ export const normalizePairingCode = (code: string): string => code.toUpperCase()
 
 export const hashPairingCode = async (code: string): Promise<string> => await sha256Hex(`messenger-pairing:${normalizePairingCode(code)}`);
 
-/** `/pair K7QM-2XPA`, `pair k7qm2xpa`, or Telegram's `/pair@my_bot K7QM-2XPA`. */
+/** `/pair K7QM-2XPA`, `pair k7qm2xpa`, Telegram's `/pair@my_bot K7QM-2XPA`, or either after a bot mention (`<@U123> /pair …`). */
 const PAIR_COMMAND = /^\s*\/?pair(?:@\S+)?\s+([\w-]{4,32})\s*$/iu;
 
 /** The code in a pairing command, or `null` when the text is not one. */
 export const parsePairCommand = (text: string | undefined): string | null => {
-    const match = text ? PAIR_COMMAND.exec(text) : null;
+    const match = text ? PAIR_COMMAND.exec(withoutLeadingMention(text)) : null;
 
     return match?.[1] ?? null;
 };
