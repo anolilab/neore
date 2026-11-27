@@ -267,7 +267,7 @@ export const collectPullRequestThreadsForExport = internalQuery
                         v.object({
                             at: v.number(),
                             attempts: v.number(),
-                            kind: v.union(v.literal("retryable"), v.literal("terminal")),
+                            kind: v.union(v.literal("retryable"), v.literal("shared"), v.literal("terminal")),
                             retryAt: v.number(),
                         }),
                     ),

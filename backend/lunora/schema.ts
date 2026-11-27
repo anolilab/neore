@@ -2762,7 +2762,7 @@ export const schema = defineSchema({
         // Names one start of the watch: fresh at every start and never the clock, so a poll leased before a stop and restart cannot match the restarted watch (`source-control/pr-watch-poll.ts`).
         watchRun: v.optional(v.string()),
         // How the wake turns of this watch are failing (`source-control/pr-watch-wake.ts`): when the last one failed, how many failed in a
-        // row (0 after a delivery), when the next try may start, and whether the failure can be cured by trying again. The watch is
+        // row (0 after a delivery), when the next try may start, and whether the failure can be cured by trying again ("shared": the chat is no longer the owner's alone, so the watch waits without a failure counted). The watch is
         // stopped at the third failure in a row or at a terminal one; the last failure stays as history.
         // A wake turn that ran to its end, recorded before its settlement is tried (`source-control/pr-watch-wake.ts`): the claim, the delivered
         // reasons with the occurrence markers they came from, and whether the settlement (the count and the clearing) has been applied. While
@@ -2779,7 +2779,7 @@ export const schema = defineSchema({
             v.object({
                 at: v.number(),
                 attempts: v.number(),
-                kind: v.union(v.literal("retryable"), v.literal("terminal")),
+                kind: v.union(v.literal("retryable"), v.literal("shared"), v.literal("terminal")),
                 retryAt: v.number(),
             }),
         ),

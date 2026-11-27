@@ -846,6 +846,68 @@ describe("a refund that fails", () => {
     });
 });
 
+describe("a chat that stops being the owner's alone", () => {
+    const setPublic = async (threadId: string, isPublic: boolean) => {
+        await harness.run(async (ctx: any) => {
+            await ctx.db.patch("threads", threadId, { isPublic });
+        });
+    };
+
+    it("is not woken once shared, keeps the reasons, burns no cooldown or cap, and is woken again when unshared", async () => {
+        const { linkId, threadId } = await seed();
+
+        // Shared after the watch started: the claim refuses, and notes the pause once.
+        await setPublic(threadId, true);
+        expect(await start(linkId)).toBe(false);
+
+        const paused = await rowOf(linkId);
+
+        expect(enqueued).toHaveLength(0);
+        expect(runs).toHaveLength(0);
+        expect(paused.watchWakeFailure).toMatchObject({ attempts: 0, kind: "shared", retryAt: 0 });
+        expect(paused.watchPending).toEqual(["checks"]);
+        expect(paused.watch.wakes).toBeUndefined();
+        expect(paused.watch.lastWakeAt).toBeUndefined();
+        expect(paused.watchActive).toBe(true);
+
+        // Noted once: a later poll does not rewrite it.
+        expect(await start(linkId)).toBe(false);
+
+        const again = await rowOf(linkId);
+
+        expect(again.watchWakeFailure.at).toBe(paused.watchWakeFailure.at);
+
+        // Unshared: the next poll's delivery goes ahead and ends the pause.
+        await setPublic(threadId, false);
+        expect(await start(linkId)).toBe(true);
+        await runJob(enqueued[0]!);
+
+        const resumed = await rowOf(linkId);
+
+        expect(runs).toHaveLength(1);
+        expect(resumed.watch.wakes).toBe(1);
+        expect(resumed.watchPending).toEqual([]);
+        expect(resumed.watchWakeFailure).toMatchObject({ attempts: 0, kind: "retryable" });
+    });
+
+    it("runs no turn for a job whose chat was shared after the claim, releasing the lease and counting nothing", async () => {
+        const { linkId, threadId } = await seed();
+
+        await start(linkId);
+        await setPublic(threadId, true);
+        await runJob(enqueued[0]!);
+
+        const row = await rowOf(linkId);
+
+        expect(runs).toHaveLength(0);
+        expect(probe.charges).toBe(0);
+        expect(row.watchWakeLeaseUntil).toBe(0);
+        expect(row.watchPending).toEqual(["checks"]);
+        expect(row.watch.wakes).toBeUndefined();
+        expect(row.watchWakeFailure).toMatchObject({ attempts: 0, kind: "shared", retryAt: 0 });
+    });
+});
+
 describe("a restarted watch", () => {
     it("starts a new failure streak and is not held back by the old retry time", async () => {
         const { linkId, threadId } = await seed();

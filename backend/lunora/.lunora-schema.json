@@ -25121,6 +25121,13 @@
                   "nullable": false,
                   "optional": false,
                   "unique": false,
+                  "literal": "\"shared\""
+                },
+                {
+                  "kind": "literal",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
                   "literal": "\"terminal\""
                 }
               ]

@@ -36,6 +36,8 @@ import { type ActionCtx, internalAction, internalMutation, type MutationCtx } fr
 import { runHeadlessAgent } from "../chat/lib/headless-run";
 import { enqueueJob } from "../lib/job-queue";
 import { JOB_LEASE_MS } from "../lib/job-once";
+import { threadHasLiveGrant } from "../agent/live-grant";
+import { isDeviceEligibleThread } from "../devices/internal";
 import { isThreadLocked } from "../lib/thread-lock";
 import { chargeRound, loadTaskAccount, refundRoundKeys, roundQuotaKeys, taskAccessProblem } from "../tasks/account";
 import { heldWakeLeases } from "./pr-watch-wake-lease";
@@ -137,6 +139,29 @@ const wakeableThread = async (ctx: Pick<MutationCtx, "db">, link: Doc<"pullReque
 };
 
 /**
+ * Whether the chat is still the owner's alone: not shared, public, a group or an external conversation (the rule a watch is started
+ * under, `pr-watch.ts`). A chat that stopped being so since the watch started must not be sent pull request details others could not
+ * see then, so the turn waits. The pause is noted once on the link (`watchWakeFailure` of kind `shared`, no failure counted, no retry
+ * delay), touches neither the cooldown nor the cap, and ends by itself when the chat is the owner's alone again.
+ */
+const pausedForSharing = async (ctx: Pick<MutationCtx, "db" | "now">, link: Doc<"pullRequestThreads">): Promise<boolean> => {
+    const thread = await ctx.db.get("threads", link.threadId);
+    const ownerOnly = isDeviceEligibleThread(thread, link.userId, thread !== null && (await threadHasLiveGrant(ctx, link.threadId)));
+
+    if (ownerOnly) {
+        return false;
+    }
+
+    if (link.watchWakeFailure?.kind !== "shared") {
+        await ctx.db.patch("pullRequestThreads", link._id, {
+            watchWakeFailure: { at: ctx.now, attempts: link.watchWakeFailure?.attempts ?? 0, kind: "shared", retryAt: 0 },
+        });
+    }
+
+    return true;
+};
+
+/**
  * The link's fields after a delivered turn is settled: the wake counted once, the delivered reasons cleared (only those whose
  * occurrence marker is unchanged since the claim), the lease released, the failure streak reset and the completion marked done.
  */
@@ -154,7 +179,14 @@ const settledPatch = (
         watchWakeCompleted: { claim, done: true, markers, reasons: [...reasons] },
         watchWakeLeaseUntil: 0,
         // A delivery ends the run of failures (the last one stays as history).
-        ...(link.watchWakeFailure !== undefined && { watchWakeFailure: { ...link.watchWakeFailure, attempts: 0, retryAt: 0 } }),
+        ...(link.watchWakeFailure !== undefined && {
+            watchWakeFailure: {
+                ...link.watchWakeFailure,
+                attempts: 0,
+                kind: link.watchWakeFailure.kind === "shared" ? "retryable" : link.watchWakeFailure.kind,
+                retryAt: 0,
+            },
+        }),
     };
 };
 
@@ -216,7 +248,7 @@ export const claimWatchWake = internalMutation
 
         const thread = await wakeableThread(ctx, link);
 
-        if (thread === null) {
+        if (thread === null || (await pausedForSharing(ctx, link))) {
             return null;
         }
 
@@ -346,6 +378,13 @@ export const beginWatchWake = internalMutation
 
         if ((await wakeableThread(ctx, link)) === null) {
             return await waits();
+        }
+
+        // Shared, public, group or external since the watch started: nothing is delivered. The lease is released and nothing is counted.
+        if (await pausedForSharing(ctx, link)) {
+            await ctx.db.patch("pullRequestThreads", link._id, { watchWakeLeaseUntil: 0 });
+
+            return { status: "wait" as const };
         }
 
         // A refund owed for an earlier turn that failed before the model is paid first, so a new charge never stacks on an unreconciled one.
