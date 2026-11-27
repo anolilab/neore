@@ -39,7 +39,7 @@ import {
     promptCharsRead,
     truncateUserMessage,
 } from "./gate";
-import { blankQuotedLines, withoutQuotedLines } from "../chat/lib/attached-text";
+import { withoutQuotedLines } from "../chat/lib/attached-text";
 import { loadModelFilterRules, ModelFilterRulesUnavailableError } from "../chat/lib/model-filter-rules";
 import { lowReasoningUtilityOptions } from "../chat/lib/reasoning-options";
 import { gatewayFetch, type ServiceFetch } from "../lib/services";
@@ -57,7 +57,7 @@ import {
     saveMemoryVectors,
     type SimilarMemoryResult,
 } from "./dedup";
-import { evidenceMatchEnd, type MemoryEvidence, normalisedLength, typedEvidenceQuote } from "./evidence";
+import { evidenceMatchEnd, type MemoryEvidence, typedEvidenceQuote } from "./evidence";
 import { logRedaction, redactMemoryFacts, redactMemoryText, type RedactionCounts } from "./redact";
 import {
     describeFactDates,
@@ -969,68 +969,14 @@ const withoutSentDayLabels = (userMessage: string, steers: ReadonlyArray<SteerOf
 };
 
 /**
- * The steer holding the last word of a quote (`edge: "last"`, which dates it) or its first word (`"first"`, the
- * message it links to): the one whose text, read from the first steer on, first reaches that word. The quoted copy is
- * found once, in the whole steered text the way `factEvidence` finds it (so a quote said twice is held by the copy it
- * shows). A steer sent after its last word never holds it. Blockquoted lines are blanked first, as `factEvidence` leaves
- * them out, so a copy the person quoted from a reply never holds words they typed later. `undefined` when no steer can
- * be matched, so the caller links nothing rather than the wrong message.
- */
-const steerHoldingQuote = (
-    claimed: string | undefined,
-    turn: { steers?: ReadonlyArray<SteerOffset>; userMessage: string },
-    edge: "first" | "last" = "last",
-): SteerOffset | undefined => {
-    const { steers = [] } = turn;
-    const userMessage = blankQuotedLines(turn.userMessage);
-    const start = steers[0]?.from;
-
-    if (start === undefined) {
-        return undefined;
-    }
-
-    const matchEnd = evidenceMatchEnd(claimed, userMessage.slice(start));
-
-    if (matchEnd === undefined || claimed === undefined) {
-        return undefined;
-    }
-
-    // The steer must reach past the quote's first character (`first`), or to its end (`last`).
-    const reach = edge === "first" ? matchEnd - normalisedLength(claimed) + 1 : matchEnd;
-
-    for (const [index, steer] of steers.entries()) {
-        const end = steers[index + 1]?.from;
-
-        // Each steer ends at a blank line, so the text up to it, normalised, is a prefix of the whole.
-        if (end === undefined || normalisedLength(userMessage.slice(start, end - 2)) >= reach) {
-            return steer;
-        }
-    }
-
-    return undefined;
-};
-
-/**
- * When the words a quote holds were sent: the send time of the steer holding its last word, or, when no steer
- * can be matched, the latest steer's.
- */
-const steerSentAt = (claimed: string | undefined, turn: { steers?: ReadonlyArray<SteerOffset>; userMessage: string }): number | undefined => {
-    const { steers = [] } = turn;
-
-    if (steers[0] === undefined) {
-        return undefined;
-    }
-
-    return steerHoldingQuote(claimed, turn)?.at ?? Math.max(...steers.map((steer) => steer.at));
-};
-
-/**
  * A fact's evidence: its quote when that is the user's own typed words (`evidenceQuote`), with the thread
- * and, for a quote from the prompt, the prompt's message. A quote from a message steered in while the reply
- * ran is not in that message, so it links to the thread and, when the steer holding its last word carries the message
- * it was saved in (`steers[].messageId`), to that message. `at` is when the quoted words were sent
- * (`promptAt`, or the steer holding the quoted copy's last word), so a job
- * that finishes late never ranks older words as newer; `fallbackAt` only stands in for a job scheduled without them.
+ * and, for a quote from the prompt, the prompt's message. A quote must sit inside ONE typed segment: the prompt, or a
+ * single typed steer. Text is never joined across a segment boundary or across a steer the owner did not type, so words
+ * the person wrote in separate messages never read as one phrase. A quote from a message steered in while the reply
+ * ran is not in that message, so it links to the thread and, when the steer holding it carries the message it was saved
+ * in (`steers[].messageId`), to that message. `at` is when the quoted words were sent (`promptAt`, or the steer holding
+ * the quote), so a job that finishes late never ranks older words as newer; `fallbackAt` only stands in for a job
+ * scheduled without them.
  */
 export const factEvidence = (
     claimed: string | undefined,
@@ -1051,11 +997,12 @@ export const factEvidence = (
         return undefined;
     }
 
+    const steers = labelledTurn.steers ?? [];
     // Read without the day labels the steers carry: a quote is only ever the person's words.
     // A steer the owner did not type is blanked as well: it can be no quote, and no copy that dates or links one.
     const turn = {
         ...labelledTurn,
-        userMessage: withoutNotTypedSteers(withoutSentDayLabels(labelledTurn.userMessage, labelledTurn.steers ?? []), labelledTurn.steers ?? []),
+        userMessage: withoutNotTypedSteers(withoutSentDayLabels(labelledTurn.userMessage, steers), steers),
     };
 
     const rawPrompt = turn.steeredFrom === undefined ? turn.userMessage : turn.userMessage.slice(0, turn.steeredFrom);
@@ -1065,28 +1012,57 @@ export const factEvidence = (
     const typedRead = typedTurnText(labelledTurn);
     const promptRead = rawPrompt.slice(0, promptCharsRead(typedRead.userMessage, typedRead.steeredFrom));
     const fromPrompt = evidenceMatchEnd(claimed, promptRead) === undefined ? undefined : typedEvidenceQuote(claimed, quotablePrompt, rawPrompt);
-    const steered = turn.steeredFrom === undefined ? undefined : turn.userMessage.slice(turn.steeredFrom);
-    const quote =
-        fromPrompt ??
-        (steered === undefined
-            ? undefined
-            : // A steer's blockquote lines are text the composer quoted from a reply, not the person's words (`typedTextOf`).
-              typedEvidenceQuote(claimed, withoutQuotedLines(steered), steered, turn.userMessage.slice(0, turn.steeredFrom)));
+    const link = (extra: Partial<MemoryEvidence>, quote: string, at: number): MemoryEvidence => {
+        return {
+            at,
+            quote,
+            ...(turn.threadId !== undefined && { threadId: turn.threadId }),
+            ...extra,
+        };
+    };
 
-    if (quote === undefined) {
+    if (fromPrompt !== undefined) {
+        return link(
+            turn.promptMessageId !== undefined && turn.threadId !== undefined ? { messageId: turn.promptMessageId } : {},
+            fromPrompt,
+            turn.promptAt ?? fallbackAt,
+        );
+    }
+
+    if (turn.steeredFrom === undefined) {
         return undefined;
     }
 
-    // Linked to the message the quoted words start in; dated by the one holding their last word (`steerSentAt`).
-    const steerMessageId = fromPrompt === undefined ? steerHoldingQuote(claimed, turn, "first")?.messageId : undefined;
+    const steered = turn.userMessage.slice(turn.steeredFrom);
 
-    return {
-        at: (fromPrompt === undefined ? steerSentAt(claimed, turn) : turn.promptAt) ?? fallbackAt,
-        quote,
-        ...(turn.threadId !== undefined && { threadId: turn.threadId }),
-        ...(fromPrompt !== undefined && turn.promptMessageId !== undefined && turn.threadId !== undefined && { messageId: turn.promptMessageId }),
-        ...(steerMessageId !== undefined && turn.threadId !== undefined && { messageId: steerMessageId }),
-    };
+    // The checks over the whole steered text stand: a copy of the words beside a label in another steer still refuses the
+    // quote. A steer's blockquote lines are text the composer quoted from a reply, not the person's words (`typedTextOf`).
+    if (typedEvidenceQuote(claimed, withoutQuotedLines(steered), steered, turn.userMessage.slice(0, turn.steeredFrom)) === undefined) {
+        return undefined;
+    }
+
+    // Then the quote has to fit inside one typed steer. Steers carry no offsets in a job scheduled without them: the
+    // steered text is one segment then.
+    const segments =
+        steers.length === 0
+            ? [{ from: turn.steeredFrom, text: steered }]
+            : steers.flatMap((steer, index) =>
+                  steer.notTyped === true
+                      ? []
+                      : [{ from: steer.from, steer, text: turn.userMessage.slice(steer.from, steerEnd(turn.userMessage, steers, index)) }],
+              );
+
+    for (const segment of segments) {
+        const quote = typedEvidenceQuote(claimed, withoutQuotedLines(segment.text), segment.text, turn.userMessage.slice(0, segment.from));
+
+        if (quote !== undefined) {
+            const { steer } = segment as { steer?: SteerOffset };
+
+            return link(steer?.messageId !== undefined && turn.threadId !== undefined ? { messageId: steer.messageId } : {}, quote, steer?.at ?? fallbackAt);
+        }
+    }
+
+    return undefined;
 };
 
 // ============================================================================

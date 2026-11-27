@@ -337,12 +337,12 @@ describe(factEvidence, () => {
         expect(factEvidence("I am vegetarian", 999, turn)?.at).toBe(999);
         expect(factEvidence("I am vegetarian", 999, { ...turn, steers })?.at).toBe(200);
         expect(factEvidence("I live in Porto", 999, { ...turn, steers })?.at).toBe(300);
-        // Across two steers: the later one's time.
-        expect(factEvidence("vegetarian and I live", 999, { ...turn, steers })?.at).toBe(300);
+        // Across two steers: never one phrase, so no quote.
+        expect(factEvidence("vegetarian and I live", 999, { ...turn, steers })).toBeUndefined();
     });
 
-    it("dates a quote across steers by the last steer it reaches, not by a steer sent after it", () => {
-        expect.assertions(2);
+    it("dates a quote by the one steer that holds it, and quotes nothing that runs from one steer into the next", () => {
+        expect.assertions(4);
 
         const userMessage = `Plan my week\n\nactually I am vegetarian\n\nand I live in Porto\n\nand I like green tea`;
         const turn = { promptAt: 100, promptMessageId: "m1", quotablePrompt: "Plan my week", steeredFrom: 14, threadId: "t1", userMessage };
@@ -352,8 +352,10 @@ describe(factEvidence, () => {
             { at: 400, from: 61 },
         ];
 
-        expect(factEvidence("vegetarian and I live", 999, { ...turn, steers })?.at).toBe(300);
-        expect(factEvidence("in Porto and I like", 999, { ...turn, steers })?.at).toBe(400);
+        expect(factEvidence("vegetarian and I live", 999, { ...turn, steers })).toBeUndefined();
+        expect(factEvidence("in Porto and I like", 999, { ...turn, steers })).toBeUndefined();
+        expect(factEvidence("I live in Porto", 999, { ...turn, steers })?.at).toBe(300);
+        expect(factEvidence("I like green tea", 999, { ...turn, steers })?.at).toBe(400);
     });
 
     it("quotes nothing from a quoted assistant line in a steer, and quotes the person's own words beside it", () => {
@@ -399,10 +401,10 @@ describe(factEvidence, () => {
         });
     });
 
-    it("links a quote across two steers delivered in one message to that message", () => {
-        expect.assertions(2);
+    it("links a quote to the message of the steer that holds it, and quotes nothing across two steers", () => {
+        expect.assertions(3);
 
-        // Both steers were saved in one message ("s2"); a third, in a later message, is not reached.
+        // Two steers were saved in one message ("s2"); a third, in a later message.
         const userMessage = `Plan my week\n\nactually I am vegetarian\n\nand I live in Porto\n\nand I like green tea`;
         const turn = { promptAt: 100, promptMessageId: "m1", quotablePrompt: "Plan my week", steeredFrom: 14, threadId: "t1", userMessage };
         const steers = [
@@ -411,17 +413,13 @@ describe(factEvidence, () => {
             { at: 400, from: 61, messageId: "s3" },
         ];
 
-        expect(factEvidence("vegetarian and I live", 999, { ...turn, steers })?.messageId).toBe("s2");
-        // Across two messages: the one the quoted words start in, though the later one dates it.
-        expect(factEvidence("in Porto and I like", 999, { ...turn, steers })).toStrictEqual({
-            at: 400,
-            messageId: "s2",
-            quote: "in Porto and I like",
-            threadId: "t1",
-        });
+        expect(factEvidence("I live in Porto", 999, { ...turn, steers })?.messageId).toBe("s2");
+        expect(factEvidence("I like green tea", 999, { ...turn, steers })?.messageId).toBe("s3");
+        // Across steers, in one message or two: the person never wrote it as one phrase.
+        expect(factEvidence("vegetarian and I live", 999, { ...turn, steers })).toBeUndefined();
     });
 
-    it("links a quote that starts in one steered message and ends in the next to the first", () => {
+    it("quotes nothing that starts in one steered message and ends in the next", () => {
         expect.assertions(1);
 
         const userMessage = `Plan my week\n\nactually I am vegetarian\n\nand I live in Porto`;
@@ -431,12 +429,40 @@ describe(factEvidence, () => {
             { at: 300, from: 40, messageId: "s2" },
         ];
 
-        expect(factEvidence("vegetarian and I live", 999, { ...turn, steers })).toStrictEqual({
-            at: 300,
-            messageId: "s1",
-            quote: "vegetarian and I live",
-            threadId: "t1",
-        });
+        expect(factEvidence("vegetarian and I live", 999, { ...turn, steers })).toBeUndefined();
+    });
+
+    it("accepts a quote only inside one typed segment, never across a steer the owner did not type", () => {
+        expect.assertions(5);
+
+        // Typed steer A, a marked steer, typed steer B: the end of A and the start of B were never written together.
+        const a = "I live in Porto";
+        const b = "and I love jazz";
+        const marked = "I own a gold mine";
+        const userMessage = `Plan my week\n\n${a}\n\n${marked}\n\n${b}`;
+        const steers = [
+            { at: 200, from: 14, messageId: "s1" },
+            { at: 300, from: 14 + a.length + 2, messageId: "s2", notTyped: true },
+            { at: 400, from: 14 + a.length + marked.length + 4, messageId: "s3" },
+        ];
+        const turn = { promptAt: 100, quotablePrompt: "Plan my week", steeredFrom: 14, steers, threadId: "t1", userMessage };
+
+        expect(factEvidence("in Porto and I love", 999, turn)).toBeUndefined();
+        expect(factEvidence("Porto and I love jazz", 999, turn)).toBeUndefined();
+        // Joined with no marked steer between them, the same two steers refuse it too.
+        expect(
+            factEvidence("in Porto and I love", 999, {
+                ...turn,
+                steers: [
+                    { at: 200, from: 14, messageId: "s1" },
+                    { at: 400, from: 14 + a.length + 2, messageId: "s3" },
+                ],
+                userMessage: `Plan my week\n\n${a}\n\n${b}`,
+            }),
+        ).toBeUndefined();
+        // A quote inside A, or inside B, is still the person's, dated and linked by its own steer.
+        expect(factEvidence("I live in Porto", 999, turn)).toStrictEqual({ at: 200, messageId: "s1", quote: "I live in Porto", threadId: "t1" });
+        expect(factEvidence("and I love jazz", 999, turn)).toStrictEqual({ at: 400, messageId: "s3", quote: "and I love jazz", threadId: "t1" });
     });
 
     it("quotes no value typed under a quoted credential question, in a steer or in the prompt", () => {
@@ -504,10 +530,10 @@ describe(factEvidence, () => {
         });
     });
 
-    it("dates a quote said twice by the copy it shows, the first one", () => {
+    it("dates a quote by the steer that holds it whole, not by an earlier pair of steers that only run together into it", () => {
         expect.assertions(2);
 
-        // The quote first runs across the first two steers, then appears whole in the third.
+        // The words run across the first two steers (no quote there), then appear whole in the third.
         const userMessage = `Plan my week\n\nI am vegetarian\n\nand I live in Porto\n\nvegetarian and I live in Porto, as I said`;
         const turn = { promptAt: 100, promptMessageId: "m1", quotablePrompt: "Plan my week", steeredFrom: 14, threadId: "t1", userMessage };
         const steers = [
@@ -518,13 +544,13 @@ describe(factEvidence, () => {
         const evidence = factEvidence("vegetarian and I live", 999, { ...turn, steers });
 
         expect(evidence?.quote).toBe("vegetarian and I live");
-        expect(evidence?.at).toBe(300);
+        expect(evidence?.at).toBe(400);
     });
 
-    it("dates the copy it quotes when a later steer makes the match case-exact", () => {
+    it("quotes the first steer that holds the words, in the casing that steer has", () => {
         expect.assertions(2);
 
-        // "İ" lower-cases to two characters, so the whole steered text matches case-exact: the quote is the second copy.
+        // Each steer is read on its own: the first one holds the words, so it quotes and dates them, whatever the later steer's casing.
         const userMessage = `Plan my week\n\nI am VEGETARIAN\n\nvegetarian in İzmir`;
         const turn = { promptAt: 100, promptMessageId: "m1", quotablePrompt: "Plan my week", steeredFrom: 14, threadId: "t1", userMessage };
         const steers = [
@@ -533,8 +559,8 @@ describe(factEvidence, () => {
         ];
         const evidence = factEvidence("vegetarian", 999, { ...turn, steers });
 
-        expect(evidence?.quote).toBe("vegetarian");
-        expect(evidence?.at).toBe(300);
+        expect(evidence?.quote).toBe("VEGETARIAN");
+        expect(evidence?.at).toBe(200);
     });
 });
 
