@@ -18,19 +18,20 @@ interface ScheduleIdeasSwitchProps {
  * still be turned OFF, which erases the suggestions waiting (the backend erases them when memory goes off too, but a
  * switch left on must stay a way out). It is disabled until the settings have loaded.
  *
- * The saved value is the `checked` the switch reports, sent as it is (`mutateAsync`), never rebuilt from the settings
- * cache at a queue's turn (`updateLatest`): a quick off then on would reach the server as two `true` writes, and the
- * erase, which runs on a save of `false`, would never run.
+ * The saved value is the `checked` the switch reports, sent as it is and never rebuilt from the settings cache at a
+ * queue's turn (`updateLatest`): a quick off then on would reach the server as two `true` writes, and the erase, which
+ * runs on a save of `false`, would never run. The writes still leave one at a time, in tap order (`updateExact`), so the
+ * last one to arrive is the last tap.
  */
 const ScheduleIdeasSwitch: FC<ScheduleIdeasSwitchProps> = ({ memoryEnabled }) => {
     const { t } = useLingui();
     const { data: userSettings } = useUserSettings();
-    const { mutateAsync } = useUpdateUserSettings();
+    const { updateExact } = useUpdateUserSettings();
     const enabled = userSettings?.scheduleIdeasEnabled === true;
     const disabled = userSettings === undefined || (!memoryEnabled && !enabled);
 
     const save = (checked: boolean) => {
-        mutateAsync({ scheduleIdeasEnabled: checked })
+        updateExact({ scheduleIdeasEnabled: checked })
             .then(() => {
                 toast.success(checked ? t`Schedule ideas enabled` : t`Schedule ideas disabled`);
 

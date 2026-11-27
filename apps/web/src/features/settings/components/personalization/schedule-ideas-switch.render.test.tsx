@@ -23,7 +23,7 @@ vi.mock("sonner", () => {
     return { toast: { error: vi.fn(), success: vi.fn() } };
 });
 
-// The settings cache: a write is applied at once, as the real hook does, and later reads see it. `mutateAsync` sends the
+// The settings cache: a write is applied at once, as the real hook does, and later reads see it. `updateExact` sends the
 // patch it is given; `updateLatest` sends what the cache holds when its queued turn comes, like the real queue.
 vi.mock("@/features/auth/hooks/use-user-settings", async () => {
     const { useSyncExternalStore } = await import("react");
@@ -39,7 +39,7 @@ vi.mock("@/features/auth/hooks/use-user-settings", async () => {
     return {
         useUpdateUserSettings: () => {
             return {
-                mutateAsync: (patch: { scheduleIdeasEnabled: boolean }) => {
+                updateExact: (patch: { scheduleIdeasEnabled: boolean }) => {
                     apply(patch);
                     store.writes.push(patch.scheduleIdeasEnabled);
 
