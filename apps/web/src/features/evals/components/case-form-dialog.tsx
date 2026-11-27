@@ -63,7 +63,7 @@ const CaseFormBody = ({ editing, knownFileIds, onClose, onSubmit, rag }: Omit<Ca
                 <DialogPanel>
                     <CaseFields rag={rag} setValues={setValues} showErrors={submitted} values={values} />
                 </DialogPanel>
-                <DialogFooter>
+                <DialogFooter className="border-border/50 border-t" variant="bare">
                     <Button onClick={onClose} type="button" variant="outline">
                         {t`Cancel`}
                     </Button>

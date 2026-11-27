@@ -87,7 +87,7 @@ const start = (work: Promise<void>): undefined => {
 };
 
 const ROW_CLASS =
-    "hover:bg-muted focus-visible:ring-ring flex min-h-11 w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-60";
+    "hover:bg-surface-row-hover focus-visible:ring-ring flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-60";
 
 interface AddProjectContentProps extends Omit<AddProjectDialogProps, "open"> {
     /** Reports whether a project is being added; the owner refuses to close the dialog then. */
@@ -672,7 +672,7 @@ const AddProjectContent = ({ onAddingChange, onClose, onCreateNew, pairedHosts, 
                     </>
                 )}
             </DialogPanel>
-            <DialogFooter>
+            <DialogFooter className="border-border/50 border-t" variant="bare">
                 {machine === null ? (
                     <>
                         <Button onClick={onCreateNew} type="button" variant="ghost">

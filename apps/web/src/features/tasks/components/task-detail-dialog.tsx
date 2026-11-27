@@ -85,7 +85,7 @@ const ReviewPanel = ({ task }: { task: BoardTask }) => {
     };
 
     return (
-        <section aria-labelledby={`${noteId}-heading`} className="space-y-3 rounded-lg border border-amber-500/40 bg-amber-500/5 p-3">
+        <section aria-labelledby={`${noteId}-heading`} className="border-warning/40 bg-warning/5 space-y-3 rounded-lg border p-3">
             <h3 className="text-sm font-medium" id={`${noteId}-heading`}>
                 {t`Your review`}
             </h3>

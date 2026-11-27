@@ -150,7 +150,7 @@ const BundleExportDialogBody: FC<Omit<BundleExportDialogProps, "open">> = ({ onC
                     {t`Pick skills, schedules, webhooks and group chats to share as one Markdown file. API keys, webhook secrets, connector tokens and other credentials are never included, and neither are your account or organization ids.`}
                 </DialogDescription>
             </DialogHeader>
-            <DialogPanel className="space-y-5">
+            <DialogPanel className="divide-border/50 divide-y *:py-3 *:first:pt-0 *:last:pb-0">
                 <div className="grid gap-3 sm:grid-cols-2">
                     <div className="space-y-1.5">
                         <Label htmlFor={nameId}>{t`Bundle name`}</Label>
@@ -214,7 +214,7 @@ const BundleExportDialogBody: FC<Omit<BundleExportDialogProps, "open">> = ({ onC
                     </p>
                 )}
             </DialogPanel>
-            <DialogFooter>
+            <DialogFooter className="border-border/50 border-t" variant="bare">
                 <Button onClick={onClose} type="button" variant="outline">
                     {t`Cancel`}
                 </Button>

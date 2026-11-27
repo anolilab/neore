@@ -130,11 +130,11 @@ const VariableFillDialog = ({ existingValues, onCancel, onUse, onUseAnyway, open
 
                 <DialogPanel>
                     {missingRequired.length > 0 && (
-                        <div className="mb-4 flex items-start gap-2 rounded-lg border border-orange-200 bg-orange-50 p-3 dark:border-orange-900/50 dark:bg-orange-900/20">
-                            <AlertTriangle className="mt-0.5 size-4 flex-shrink-0 text-orange-600" />
+                        <div className="border-warning/30 bg-warning/10 mb-4 flex items-start gap-2 rounded-lg border p-3">
+                            <AlertTriangle className="text-warning-foreground mt-0.5 size-4 flex-shrink-0" />
                             <div>
-                                <p className="text-sm font-medium text-orange-800 dark:text-orange-200">{t`Required variables missing`}</p>
-                                <p className="text-xs text-orange-700 dark:text-orange-300">{missingRequired.map((v) => v.name).join(", ")}</p>
+                                <p className="text-warning-foreground text-sm font-medium">{t`Required variables missing`}</p>
+                                <p className="text-warning-foreground text-xs">{missingRequired.map((v) => v.name).join(", ")}</p>
                             </div>
                         </div>
                     )}
@@ -170,7 +170,7 @@ const VariableFillDialog = ({ existingValues, onCancel, onUse, onUseAnyway, open
 
                     {/* Preview */}
                     {allFilled && (
-                        <div className="bg-muted/50 mt-4 rounded-lg border p-3">
+                        <div className="surface-well mt-4 rounded-lg p-3">
                             <p className="mb-1 text-xs font-medium">{t`Preview`}</p>
                             <p className="text-muted-foreground line-clamp-3 text-sm">
                                 {replaceVariables(prompt.content, { ...existingValues, ...values }, { keepUnmatched: true }).slice(0, 200)}
@@ -180,7 +180,7 @@ const VariableFillDialog = ({ existingValues, onCancel, onUse, onUseAnyway, open
                     )}
                 </DialogPanel>
 
-                <DialogFooter className="flex-col gap-2 sm:flex-row">
+                <DialogFooter className="border-border/50 flex-col gap-2 border-t sm:flex-row" variant="bare">
                     <Button className="sm:mr-auto" onClick={onCancel} variant="ghost">
                         {t`Cancel`}
                     </Button>

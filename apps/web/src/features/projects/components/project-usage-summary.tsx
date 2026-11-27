@@ -44,7 +44,7 @@ const ProjectUsageSummary = ({ projectId }: ProjectUsageSummaryProps) => {
     ];
 
     return (
-        <section aria-labelledby={headingId} className="bg-muted/30 space-y-3 rounded-lg border p-4">
+        <section aria-labelledby={headingId} className="border-border/50 space-y-3 border-t pt-5">
             <div className="space-y-1">
                 <h3 className="text-sm font-medium" id={headingId}>
                     {t`Usage`}

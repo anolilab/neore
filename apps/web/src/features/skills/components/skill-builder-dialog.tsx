@@ -202,7 +202,7 @@ const SkillBuilderBody = ({ onClose, onSaved, onUseMarketplaceSkill }: Omit<Skil
                 </DialogDescription>
             </DialogHeader>
             <DialogPanel className="max-h-[65vh] min-h-0 flex-1 overflow-y-auto">
-                <div className="space-y-6">
+                <div className="divide-border/50 divide-y *:py-3 *:first:pt-0 *:last:pb-0">
                     {step.kind !== "review" && (
                         <div className="space-y-2">
                             <Label htmlFor={`${id}-goal`}>{t`What should the agent do?`}</Label>
@@ -315,7 +315,7 @@ const SkillBuilderBody = ({ onClose, onSaved, onUseMarketplaceSkill }: Omit<Skil
                     )}
                 </div>
             </DialogPanel>
-            <DialogFooter className="flex-wrap items-center gap-2">
+            <DialogFooter className="border-border/50 flex-wrap items-center gap-2 border-t" variant="bare">
                 <p aria-live="polite" className={error ? "text-destructive mr-auto text-xs" : "text-muted-foreground mr-auto text-xs"} role="status">
                     {statusText ?? error}
                 </p>

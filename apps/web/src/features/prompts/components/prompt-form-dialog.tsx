@@ -239,8 +239,8 @@ const PromptFormDialogBody = ({ editingPrompt, onClose, onSubmit }: PromptFormDi
                             {editingPrompt ? t`Update your prompt details below.` : t`Create a new prompt to use as a system prompt.`}
                         </DialogDescription>
                     </DialogHeader>
-                    <DialogPanel className="max-h-[60vh] min-h-0 flex-1 overflow-y-scroll">
-                        <div className="space-y-4">
+                    <DialogPanel className="divide-border/50 max-h-[60vh] min-h-0 flex-1 divide-y overflow-y-scroll *:py-3 *:first:pt-0 *:last:pb-0">
+                        <div className="divide-border/50 divide-y *:py-3 *:first:pt-0 *:last:pb-0">
                             <form.AppField name="name">
                                 {(field) => (
                                     <field.FormItem required>
@@ -372,7 +372,7 @@ const PromptFormDialogBody = ({ editingPrompt, onClose, onSubmit }: PromptFormDi
 
                         <div className="space-y-4">
                             {/* Chat Settings Section */}
-                            <div className="space-y-4 rounded-lg border p-4">
+                            <div className="space-y-4">
                                 <div className="space-y-1">
                                     <Label>{t`Chat Settings (Optional)`}</Label>
                                     <p className="text-muted-foreground text-xs">
@@ -444,7 +444,7 @@ const PromptFormDialogBody = ({ editingPrompt, onClose, onSubmit }: PromptFormDi
                                         const effortLabel = effortMessage ? i18n._(effortMessage) : t`Custom`;
 
                                         return (
-                                            <div className="bg-muted rounded-md p-3 text-sm">
+                                            <div className="surface-well rounded-lg p-3 text-sm">
                                                 <p className="font-medium">{t`This prompt will configure:`}</p>
                                                 <ul className="mt-1 list-disc space-y-1 pl-5">
                                                     {model && <li>{t`Model: ${selectedModel?.name || model}`}</li>}
@@ -496,7 +496,7 @@ const PromptFormDialogBody = ({ editingPrompt, onClose, onSubmit }: PromptFormDi
                             }}
                         </form.Subscribe>
                     </DialogPanel>
-                    <DialogFooter>
+                    <DialogFooter className="border-border/50 border-t" variant="bare">
                         <Button onClick={onClose} type="button" variant="outline">
                             {t`Cancel`}
                         </Button>

@@ -216,7 +216,7 @@ const TaskFormDialogBody = ({ defaultGoalId, editingTask, goals, onClose, onSubm
                 }}
             >
                 <DialogPanel className="max-h-[65vh] min-h-0 flex-1 overflow-y-auto">
-                    <div className="space-y-5">
+                    <div className="divide-border/50 divide-y *:py-3 *:first:pt-0 *:last:pb-0">
                         <div className="space-y-2">
                             <Label htmlFor={ids.title}>{t`Title`}</Label>
                             <Input
@@ -631,7 +631,7 @@ const TaskFormDialogBody = ({ defaultGoalId, editingTask, goals, onClose, onSubm
                         </div>
                     </div>
                 </DialogPanel>
-                <DialogFooter>
+                <DialogFooter className="border-border/50 border-t" variant="bare">
                     <Button onClick={onClose} type="button" variant="outline">
                         {t`Cancel`}
                     </Button>
