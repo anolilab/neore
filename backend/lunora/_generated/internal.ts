@@ -442,6 +442,7 @@ export interface InternalApiTypes {
         group: {
             functions: {
                 createImportedGroupChat: FunctionReference<"mutation", { debateRounds?: number; mode: "supervisor" | "round-robin" | "mention-only" | "parallel" | "debate"; model: string; organizationId?: string; skillIds: Array<string>; synthesizerSkillId?: string; title?: string; userId: string }, { threadId: string }>;
+                createPluginGroupChat: FunctionReference<"mutation", { debateRounds?: number; mode: "supervisor" | "round-robin" | "mention-only" | "parallel" | "debate"; model: string; organizationId?: string; plan?: string; pluginInstallId: string; pluginMarker: string; skillIds: Array<string>; synthesizerSkillId?: string; title?: string; userId: string }, { threadId: string }>;
                 getGroupHistory: FunctionReference<"query", { threadId: string; userId: string }, Array<{ agentName?: string; id: string; role: "user" | "assistant"; speakerSkillId?: string; text: string }>>;
                 getGroupRunConfig: FunctionReference<"query", { organizationId?: string; threadId: string; userId: string }, null | { debateRounds?: number; mode: "supervisor" | "round-robin" | "mention-only" | "parallel" | "debate"; participants: Array<{ config?: { additionalTools?: Array<string>; disabledTools?: Array<string>; preferredModel?: string; reasoningEffort?: number; searchMode?: string; voice?: string }; description: string; instructions: string; name: string; skillId: string; slug: string }>; stopRequestedAt?: number; synthesizerSkillId?: string }>;
                 isGroupStopRequested: FunctionReference<"query", { since: number; threadId: string }, boolean>;
@@ -1032,6 +1033,38 @@ export interface InternalApiTypes {
             getPublicPageOwner: FunctionReference<"query", { publicAccessToken: string }, string | null>;
             readPublicPage: FunctionReference<"query", { publicAccessToken: string }, ({ contentJson?: unknown; } & { icon: string | null; title: string; updatedAt: number; }) | null>;
             redeemPageInvite: FunctionReference<"mutation", { token: string; userId: string }, { pageId: Id<"pages"> }>;
+        };
+    };
+    plugins: {
+        export: {
+            pluginForSelection: FunctionReference<"query", { groupChatIds: Array<string>; skillIds: Array<string>; triggerIds: Array<string>; userId: string }, null | { keys: Array<{ id: string; key: string }>; slug: string; version: string }>;
+        };
+        install_steps: {
+            createInstallRow: FunctionReference<"mutation", { contentHash: string; pluginSlug: string; userId: string; version: string }, { generation: number; installId: string }>;
+            deleteInstall: FunctionReference<"mutation", { generation: number; installId: string }, null>;
+            finishInstall: FunctionReference<"mutation", { generation: number; installId: string }, null>;
+            markNeedsRepair: FunctionReference<"mutation", { generation: number; installId: string }, null>;
+            recordCreated: FunctionReference<"mutation", { generation: number; installId: string; intentId: string; itemId: string }, null>;
+            recordIntent: FunctionReference<"mutation", { contentHash: string; entryKey: string; generation: number; installId: string; kind: "skill" | "trigger" | "group"; userId: string }, string>;
+        };
+        repair_resume: {
+            beginRepair: FunctionReference<"mutation", { contentHash: string; pluginSlug: string; userId: string }, { generation: number; installId: string; linked: number; missing: Array<{ entryKey: string; intentId: string; kind: "skill" | "trigger" | "group" }>; status: "installed" | "needs-repair" }>;
+        };
+        uninstall_action: {
+            beginUninstall: FunctionReference<"mutation", { pluginSlug: string; userId: string }, { generation: number; groups: Array<string>; installId: string; kept: Array<string>; removed: number }>;
+            claimGroup: FunctionReference<"mutation", { generation: number; installId: string; threadId: string }, boolean>;
+            finishUninstall: FunctionReference<"mutation", { generation: number; installId: string }, null>;
+        };
+        update: {
+            loadInstalledForUpdate: FunctionReference<"query", { pluginSlug: string; userId: string }, null | { children: Array<{ contentHash: string; currentHash: string; entryKey: string; kind: "skill" | "trigger" | "group" }>; installId: string; ownSlugs: Array<{ entryKey: string; slug: string }>; status: string; version: string }>;
+        };
+        update_apply: {
+            beginUpdate: FunctionReference<"mutation", { installId: string; targetVersion: string; userId: string }, number>;
+            detachChild: FunctionReference<"mutation", { entryKey: string; generation: number; installId: string; userId: string }, null>;
+            finishUpdate: FunctionReference<"mutation", { contentHash: string; generation: number; installId: string; version: string }, null>;
+            removeChild: FunctionReference<"mutation", { entryKey: string; generation: number; installId: string; userId: string }, null>;
+            updateSkillChild: FunctionReference<"mutation", { category?: string; config?: unknown; contentHash: string; description: string; entryKey: string; generation: number; icon?: string; installId: string; instructions: string; name: string; slug: string; tags?: Array<string>; variables?: unknown; version?: string; userId: string }, null>;
+            updateTriggerChild: FunctionReference<"mutation", { contentHash: string; cronExpression?: string; description?: string; entryKey: string; generation: number; inputTemplate?: string; installId: string; model: string; name: string; searchMode?: string; systemPrompt?: string; timezone?: string; userId: string }, null>;
         };
     };
     projects: {
@@ -1766,6 +1799,7 @@ export const internal: InternalApiTypes = {
         group: {
             functions: {
                 createImportedGroupChat: { __lunoraRef: "chat_group_functions:createImportedGroupChat" },
+                createPluginGroupChat: { __lunoraRef: "chat_group_functions:createPluginGroupChat" },
                 getGroupHistory: { __lunoraRef: "chat_group_functions:getGroupHistory" },
                 getGroupRunConfig: { __lunoraRef: "chat_group_functions:getGroupRunConfig" },
                 isGroupStopRequested: { __lunoraRef: "chat_group_functions:isGroupStopRequested" },
@@ -2356,6 +2390,38 @@ export const internal: InternalApiTypes = {
             getPublicPageOwner: { __lunoraRef: "pages_sharing:getPublicPageOwner" },
             readPublicPage: { __lunoraRef: "pages_sharing:readPublicPage" },
             redeemPageInvite: { __lunoraRef: "pages_sharing:redeemPageInvite" },
+        },
+    },
+    plugins: {
+        export: {
+            pluginForSelection: { __lunoraRef: "plugins_export:pluginForSelection" },
+        },
+        install_steps: {
+            createInstallRow: { __lunoraRef: "plugins_install_steps:createInstallRow" },
+            deleteInstall: { __lunoraRef: "plugins_install_steps:deleteInstall" },
+            finishInstall: { __lunoraRef: "plugins_install_steps:finishInstall" },
+            markNeedsRepair: { __lunoraRef: "plugins_install_steps:markNeedsRepair" },
+            recordCreated: { __lunoraRef: "plugins_install_steps:recordCreated" },
+            recordIntent: { __lunoraRef: "plugins_install_steps:recordIntent" },
+        },
+        repair_resume: {
+            beginRepair: { __lunoraRef: "plugins_repair_resume:beginRepair" },
+        },
+        uninstall_action: {
+            beginUninstall: { __lunoraRef: "plugins_uninstall_action:beginUninstall" },
+            claimGroup: { __lunoraRef: "plugins_uninstall_action:claimGroup" },
+            finishUninstall: { __lunoraRef: "plugins_uninstall_action:finishUninstall" },
+        },
+        update: {
+            loadInstalledForUpdate: { __lunoraRef: "plugins_update:loadInstalledForUpdate" },
+        },
+        update_apply: {
+            beginUpdate: { __lunoraRef: "plugins_update_apply:beginUpdate" },
+            detachChild: { __lunoraRef: "plugins_update_apply:detachChild" },
+            finishUpdate: { __lunoraRef: "plugins_update_apply:finishUpdate" },
+            removeChild: { __lunoraRef: "plugins_update_apply:removeChild" },
+            updateSkillChild: { __lunoraRef: "plugins_update_apply:updateSkillChild" },
+            updateTriggerChild: { __lunoraRef: "plugins_update_apply:updateTriggerChild" },
         },
     },
     projects: {
