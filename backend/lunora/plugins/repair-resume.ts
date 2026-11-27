@@ -242,7 +242,6 @@ export const loadOwnSlugs = internalQuery
         const installId = install._id as string;
         const { page } = await ctx.db.pluginItems.findMany({ consistency: "primary", where: { installId } });
         const slugs: { entryKey: string; slug: string }[] = [];
-
         const skills = await pluginSkillsByKey(ctx, installId);
 
         for (const link of page) {
