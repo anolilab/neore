@@ -8,6 +8,7 @@ import { FOLLOWUP_DISPATCH_TTL_MS, FOLLOWUP_PATH_LIMIT, followupModelRows, reply
 import { withoutSearchVectors } from "../agent/thread-search-plan";
 import { callOnShard } from "../lib/cross-shard";
 import { runAfterWithRetry } from "../lib/shard-scheduler";
+import { isSearchIndexBuilding } from "../lib/search-index";
 import { signDocsForDisplay } from "../agent/display-media";
 import {
     DEFAULT_FOLLOWUP_SUGGESTIONS_MODEL,
@@ -3557,9 +3558,6 @@ export const sentPromptOf = (message: TypedPromptRow): { draftFrom: DraftFrom | 
  */
 export const listsSentPrompts = (thread: ThreadDoc | null, userId: string): thread is ThreadDoc =>
     thread !== null && thread.userId === userId && !thread.deleted && thread.deletingAt === undefined && !isThreadLocked(thread) && thread.isTemporary !== true;
-
-/** Lunora's answer for a search index whose backfill has not yet covered the table (`SEARCH_INDEX_BUILDING`, 503). */
-export const isSearchIndexBuilding = (error: unknown): boolean => error instanceof LunoraError && error.code === "SEARCH_INDEX_BUILDING";
 
 /**
  * The caller's own sent prompts that match `searchQuery`, newest first, at most 50. It reads the typed-words index

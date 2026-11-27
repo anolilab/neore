@@ -27,7 +27,7 @@ import { botOwnerRows } from "./bot-owner";
 import { type MemoryEvidence, newestEvidence, vMemoryEvidence } from "./evidence";
 import { logRedaction, redactMemoryText } from "./redact";
 import { DROPPED_DIGEST_SUMMARY, localDayOf } from "./reflection-logic";
-import { byNewest, isUsableOn, mergeScopeWindows, scopesOf } from "./retrieve-ranking";
+import { byNewest, isUsableOn, KEYWORD_LOOKUP_LIMIT, keywordLookupOf, lookupSearchesOf, mergeScopeWindows, scopesOf } from "./retrieve-ranking";
 import { lastConfirmedOf, MEMORY_TYPES, type MemoryType, vMemoryType } from "./taxonomy";
 import { deleteVectorRow, patchMessage } from "../agent/table-writes";
 import { candidatesOnActivePath } from "../agent/branch-rows";
@@ -35,6 +35,8 @@ import { requireOwnedThread, resolveThreadReadAccess } from "../agent/thread-rea
 import { getVectorIdInfo, type VectorTableId, type VectorTableName } from "../agent/vector/tables";
 import { parentKeyOf } from "../lib/rls/scope";
 import { MAX_LENGTH } from "../lib/validators";
+import { MAX_KEYWORD_TERMS } from "../knowledge/hybrid";
+import { isSearchIndexBuilding } from "../lib/search-index";
 import { findLiveGrant } from "../agent/live-grant";
 
 /**
@@ -1852,6 +1854,23 @@ export const getMemoryByEmbeddingId = internalQuery.input({ embeddingId: v.strin
     };
 });
 
+/** What retrieval reads of a stored memory. */
+const retrievalRowOf = (memory: Doc<"memories">) => {
+    return {
+        _creationTime: memory._creationTime,
+        _id: memory._id as string,
+        botId: memory.botId,
+        confidence: memory.confidence,
+        embeddingId: memory.embeddingId,
+        importance: memory.importance,
+        lastConfirmedAt: lastConfirmedOf(memory),
+        memory: memory.memory,
+        pinned: memory.pinned === true,
+        type: memory.type,
+        ...factDatesOf(memory),
+    };
+};
+
 export const getMemoriesByEmbeddingIds = internalQuery
     .input({
         /** As in `getActiveMemoriesForUser`: an unpinned fact past its end date on that day is left out. */
@@ -1878,23 +1897,110 @@ export const getMemoriesByEmbeddingIds = internalQuery
                     return null;
                 }
 
-                return {
-                    _creationTime: memory._creationTime,
-                    _id: memory._id as string,
-                    botId: memory.botId,
-                    confidence: memory.confidence,
-                    embeddingId,
-                    importance: memory.importance,
-                    lastConfirmedAt: lastConfirmedOf(memory),
-                    memory: memory.memory,
-                    pinned: memory.pinned === true,
-                    type: memory.type,
-                    ...factDatesOf(memory),
-                };
+                return { ...retrievalRowOf(memory), embeddingId };
             }),
         );
 
         return settled.filter((r): r is NonNullable<typeof r> => r !== null);
+    });
+
+/**
+ * The keyword leg of retrieval: one search-index lookup per term (at most `MAX_KEYWORD_TERMS`, each reading
+ * `KEYWORD_LOOKUP_LIMIT` rows) over the user's rows. Each keeps whole-token matches only and, as in
+ * `getMemoriesByEmbeddingIds`, leaves out a superseded row and an unpinned fact past its end date, and a row of a scope
+ * the chat does not read, before its cut (`keywordLookupOf`); it also says how many usable rows hold the term.
+ */
+export const searchMemoriesByKeyword = internalQuery
+    .input({
+        activeOn: v.optional(v.number()),
+        botId: v.optional(v.string()),
+        includeUserWide: v.optional(v.boolean()),
+        /** `keywordLookupTerms`: the index is asked for every token of a term, so an identifier is looked up whole. */
+        terms: v.array(v.object({ code: v.boolean(), term: v.string(), tokens: v.array(v.string()) })),
+        timeZone: v.optional(v.string()),
+        userId: v.string(),
+    })
+    .output(
+        v.array(
+            v.object({
+                code: v.boolean(),
+                complete: v.boolean(),
+                corpusRows: v.number(),
+                // `retrievalRowOf`: what ranking reads of a stored memory.
+                hits: v.array(
+                    v.object({
+                        _creationTime: v.number(),
+                        _id: v.string(),
+                        botId: v.optional(v.id("bots")),
+                        confidence: v.optional(v.number()),
+                        embeddingId: v.optional(v.string()),
+                        eventEnd: v.optional(v.string()),
+                        eventStart: v.optional(v.string()),
+                        importance: v.optional(v.number()),
+                        lastConfirmedAt: v.number(),
+                        memory: v.string(),
+                        pinned: v.boolean(),
+                        type: vMemoryType,
+                        validUntil: v.optional(v.string()),
+                    }),
+                ),
+                term: v.string(),
+            }),
+        ),
+    )
+    .query(async ({ args, ctx }) => {
+        const today = args.activeOn === undefined ? undefined : localDayOf(args.activeOn, args.timeZone ?? (await userTimeZone(ctx, args.userId)));
+
+        const settled = await Promise.allSettled(
+            args.terms.slice(0, MAX_KEYWORD_TERMS).map(async (term) => {
+                // One search per spelling; the index ANDs each one's tokens (a prefix match on the last), and
+                // `keywordLookupOf` then wants the whole identifier, however the row writes it.
+                const pages = await Promise.all(
+                    lookupSearchesOf(term).map(
+                        async (search) =>
+                            await ctx.db
+                                .query("memories")
+                                .withSearchIndex("search_memory_text", (q) => q.search("memory", search).eq("userId", args.userId))
+                                .take(KEYWORD_LOOKUP_LIMIT),
+                    ),
+                );
+                const rows = [...new Map(pages.flat().map((row) => [row._id, row])).values()];
+                const complete = pages.every((page) => page.length < KEYWORD_LOOKUP_LIMIT);
+                const lookup = keywordLookupOf(term, rows, { botId: args.botId, includeUserWide: args.includeUserWide }, today, complete);
+
+                return { ...lookup, hits: lookup.hits.map((m) => retrievalRowOf(m)) };
+            }),
+        );
+        const failed = settled.filter((result): result is PromiseRejectedResult => result.status === "rejected");
+        const building = failed.find((result) => isSearchIndexBuilding(result.reason));
+
+        // The index still backfilling refuses every term: the caller reports that state, not a failed lookup.
+        if (building !== undefined) {
+            throw building.reason;
+        }
+
+        if (failed.length > 0) {
+            // One term the index refused loses only that term. The cause is logged, never the term: it is the user's words.
+            const causes = failed.map(({ reason }) => {
+                return {
+                    ...(reason instanceof LunoraError && { code: reason.code }),
+                    message: reason instanceof Error ? reason.message : String(reason),
+                    name: reason instanceof Error ? reason.name : typeof reason,
+                };
+            });
+
+            ctx.log.event("memory.keyword_lookup_failed", { failed: failed.length, terms: settled.length });
+
+            if (failed.length === settled.length) {
+                memoryLogger.error(`Every keyword lookup failed (${String(failed.length)} terms)`, causes);
+            } else {
+                for (const cause of causes) {
+                    memoryLogger.warn("A keyword lookup failed; the other terms still count", cause);
+                }
+            }
+        }
+
+        return settled.flatMap((result) => (result.status === "fulfilled" ? [result.value] : []));
     });
 
 export const getMemoryById = internalQuery.input({ memoryId: v.id("memories") }).query(async ({ args, ctx }) => ctx.db.get("memories", args.memoryId));

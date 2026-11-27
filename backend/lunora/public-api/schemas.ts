@@ -198,6 +198,10 @@ export const zChatRequestSchema = z.object({
         .optional()
         .meta({ description: "A model id from GET /models with `chat: true`. Defaults to the first catalogue text model." }),
     prompt: z.string().min(1).max(100_000),
+    reasoningEffort: z.int().min(0).max(100).optional().meta({
+        description:
+            "How much a reasoning model thinks, 0 to 100 (the app's slider offers 0, 25, 50, 75 and 100). Omit to use the thread's setting. A model that does not reason ignores it.",
+    }),
     stream: z
         .boolean()
         .optional()

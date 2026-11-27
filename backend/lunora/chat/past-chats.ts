@@ -8,8 +8,9 @@ import type { ThreadDoc, TypedPromptRow } from "../agent/validators";
 import { threadSharedWithOthers } from "../agent/live-grant";
 import { isDeviceEligibleThread } from "../devices/internal";
 import { MAX_LENGTH } from "../lib/validators";
+import { isSearchIndexBuilding } from "../lib/search-index";
 import { readMemoryEnabled } from "../memory/functions";
-import { isSearchIndexBuilding, listsSentPrompts, sentPromptOf } from "./functions";
+import { listsSentPrompts, sentPromptOf } from "./functions";
 import { PAST_CHAT_RESULTS_DEFAULT, PAST_CHAT_RESULTS_MAX, pastChatSnippet, pastChatTitle } from "./lib/past-chat-snippet";
 import { capSearchTerms, matchesQueryTerms, queryTerms } from "./lib/search-terms";
 

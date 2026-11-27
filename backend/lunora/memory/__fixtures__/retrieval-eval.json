@@ -1,5 +1,5 @@
 {
-    "meta": { "dimensions": 64, "now": 1795780800000, "today": "2026-11-27" },
+    "meta": { "dimensions": 74, "now": 1795780800000, "today": "2026-11-27" },
     "personas": [
         {
             "botId": "bot-a",
@@ -1993,6 +1993,90 @@
                     "tags": { "1": 1, "25": 0.6, "28": 0.5, "51": 0.3, "59": 0.3 },
                     "text": "Said baking came up again with friends",
                     "type": "activity"
+                },
+                {
+                    "ageDays": 286.4,
+                    "confidence": 67,
+                    "id": "p1-exact-0",
+                    "importance": 70,
+                    "createdDays": 382,
+                    "tags": { "28": 0.5, "42": 0.3, "56": 0.3, "64": 1 },
+                    "text": "Ordered replacement part KX-2291 for the dishwasher",
+                    "type": "context"
+                },
+                {
+                    "ageDays": 381,
+                    "confidence": 82,
+                    "id": "p1-exact-0-shadow",
+                    "importance": 63,
+                    "createdDays": 382,
+                    "tags": { "28": 0.5, "42": 0.3, "56": 0.3, "64": 1 },
+                    "text": "Ordered replacement part KX-2291 for the dishwasher",
+                    "type": "context",
+                    "supersededBy": "p1-exact-0"
+                },
+                {
+                    "ageDays": 238.2,
+                    "confidence": 86,
+                    "id": "p1-exact-1",
+                    "importance": 62,
+                    "createdDays": 387.9,
+                    "tags": { "28": 0.5, "58": 0.3, "61": 0.3, "65": 1 },
+                    "text": "The neighbour's cat is called Pumpernickel",
+                    "type": "context"
+                },
+                {
+                    "ageDays": 386.9,
+                    "confidence": 80,
+                    "id": "p1-exact-1-shadow",
+                    "importance": 61,
+                    "createdDays": 387.9,
+                    "tags": { "28": 0.5, "58": 0.3, "61": 0.3, "65": 1 },
+                    "text": "The neighbour's cat is called Pumpernickel",
+                    "type": "context",
+                    "validUntil": "2026-10-17"
+                },
+                {
+                    "ageDays": 138.4,
+                    "confidence": 71,
+                    "id": "p1-exact-2",
+                    "importance": 70,
+                    "createdDays": 382.5,
+                    "tags": { "28": 0.5, "42": 0.3, "43": 0.3, "66": 1 },
+                    "text": "Bike frame serial number is WTU-38817",
+                    "type": "context"
+                },
+                {
+                    "ageDays": 381.5,
+                    "confidence": 76,
+                    "id": "p1-exact-2-shadow",
+                    "importance": 45,
+                    "createdDays": 382.5,
+                    "tags": { "28": 0.5, "42": 0.3, "43": 0.3, "66": 1 },
+                    "text": "Bike frame serial number is WTU-38817",
+                    "type": "context",
+                    "botId": "bot-b"
+                },
+                {
+                    "ageDays": 222.6,
+                    "confidence": 73,
+                    "id": "p1-exact-3",
+                    "importance": 66,
+                    "createdDays": 406.5,
+                    "tags": { "28": 0.5, "45": 0.3, "61": 0.3, "67": 1 },
+                    "text": "Drinks a smoky lapsang souchong every morning",
+                    "type": "context"
+                },
+                {
+                    "ageDays": 405.5,
+                    "confidence": 72,
+                    "id": "p1-exact-3-shadow",
+                    "importance": 66,
+                    "createdDays": 406.5,
+                    "tags": { "28": 0.5, "45": 0.3, "61": 0.3, "67": 1 },
+                    "text": "Drinks a smoky lapsang souchong every morning",
+                    "type": "context",
+                    "supersededBy": "p1-exact-3"
                 }
             ],
             "userId": "user-p1"
@@ -4162,6 +4246,90 @@
                     "tags": { "14": 1, "25": 0.6, "28": 0.5, "50": 0.3, "53": 0.3 },
                     "text": "Said boardgames came up again with friends",
                     "type": "activity"
+                },
+                {
+                    "ageDays": 148,
+                    "confidence": 75,
+                    "id": "p2-exact-2",
+                    "importance": 59,
+                    "createdDays": 394.9,
+                    "tags": { "28": 0.5, "46": 0.3, "53": 0.3, "66": 1 },
+                    "text": "Bike frame serial number is WTU-38817",
+                    "type": "context"
+                },
+                {
+                    "ageDays": 393.9,
+                    "confidence": 71,
+                    "id": "p2-exact-2-shadow",
+                    "importance": 43,
+                    "createdDays": 394.9,
+                    "tags": { "28": 0.5, "46": 0.3, "53": 0.3, "66": 1 },
+                    "text": "Bike frame serial number is WTU-38817",
+                    "type": "context",
+                    "supersededBy": "p2-exact-2"
+                },
+                {
+                    "ageDays": 181,
+                    "confidence": 66,
+                    "id": "p2-exact-3",
+                    "importance": 64,
+                    "createdDays": 383.9,
+                    "tags": { "28": 0.5, "57": 0.3, "58": 0.3, "67": 1 },
+                    "text": "Drinks a smoky lapsang souchong every morning",
+                    "type": "context"
+                },
+                {
+                    "ageDays": 382.9,
+                    "confidence": 86,
+                    "id": "p2-exact-3-shadow",
+                    "importance": 55,
+                    "createdDays": 383.9,
+                    "tags": { "28": 0.5, "57": 0.3, "58": 0.3, "67": 1 },
+                    "text": "Drinks a smoky lapsang souchong every morning",
+                    "type": "context",
+                    "validUntil": "2026-10-17"
+                },
+                {
+                    "ageDays": 254.5,
+                    "confidence": 77,
+                    "id": "p2-exact-4",
+                    "importance": 69,
+                    "createdDays": 411.9,
+                    "tags": { "28": 0.5, "43": 0.3, "62": 0.3, "68": 1 },
+                    "text": "Accountant is a Ms Thorvaldsen in the old town",
+                    "type": "context"
+                },
+                {
+                    "ageDays": 410.9,
+                    "confidence": 83,
+                    "id": "p2-exact-4-shadow",
+                    "importance": 56,
+                    "createdDays": 411.9,
+                    "tags": { "28": 0.5, "43": 0.3, "62": 0.3, "68": 1 },
+                    "text": "Accountant is a Ms Thorvaldsen in the old town",
+                    "type": "context",
+                    "botId": "bot-b"
+                },
+                {
+                    "ageDays": 128.9,
+                    "confidence": 70,
+                    "id": "p2-exact-5",
+                    "importance": 58,
+                    "createdDays": 380.9,
+                    "tags": { "28": 0.5, "50": 0.3, "62": 0.3, "69": 1 },
+                    "text": "Home router is the HR-7501 model",
+                    "type": "context"
+                },
+                {
+                    "ageDays": 379.9,
+                    "confidence": 86,
+                    "id": "p2-exact-5-shadow",
+                    "importance": 56,
+                    "createdDays": 380.9,
+                    "tags": { "28": 0.5, "50": 0.3, "62": 0.3, "69": 1 },
+                    "text": "Home router is the HR-7501 model",
+                    "type": "context",
+                    "supersededBy": "p2-exact-5"
                 }
             ],
             "userId": "user-p2"
@@ -6592,6 +6760,90 @@
                     "tags": { "11": 1, "25": 0.6, "28": 0.5, "52": 0.3 },
                     "text": "Said aquarium came up again with friends",
                     "type": "activity"
+                },
+                {
+                    "ageDays": 261.3,
+                    "confidence": 74,
+                    "id": "p3-exact-4",
+                    "importance": 63,
+                    "createdDays": 407.5,
+                    "tags": { "28": 0.5, "53": 0.3, "63": 0.3, "68": 1 },
+                    "text": "Accountant is a Ms Thorvaldsen in the old town",
+                    "type": "context"
+                },
+                {
+                    "ageDays": 406.5,
+                    "confidence": 66,
+                    "id": "p3-exact-4-shadow",
+                    "importance": 40,
+                    "createdDays": 407.5,
+                    "tags": { "28": 0.5, "53": 0.3, "63": 0.3, "68": 1 },
+                    "text": "Accountant is a Ms Thorvaldsen in the old town",
+                    "type": "context",
+                    "supersededBy": "p3-exact-4"
+                },
+                {
+                    "ageDays": 114.2,
+                    "confidence": 86,
+                    "id": "p3-exact-5",
+                    "importance": 67,
+                    "createdDays": 389.8,
+                    "tags": { "28": 0.5, "46": 0.3, "55": 0.3, "69": 1 },
+                    "text": "Home router is the HR-7501 model",
+                    "type": "context"
+                },
+                {
+                    "ageDays": 388.8,
+                    "confidence": 83,
+                    "id": "p3-exact-5-shadow",
+                    "importance": 58,
+                    "createdDays": 389.8,
+                    "tags": { "28": 0.5, "46": 0.3, "55": 0.3, "69": 1 },
+                    "text": "Home router is the HR-7501 model",
+                    "type": "context",
+                    "validUntil": "2026-10-17"
+                },
+                {
+                    "ageDays": 281.5,
+                    "confidence": 86,
+                    "id": "p3-exact-6",
+                    "importance": 69,
+                    "createdDays": 381.3,
+                    "tags": { "28": 0.5, "60": 0.3, "70": 1 },
+                    "text": "Book club is reading Quillfeather next",
+                    "type": "context"
+                },
+                {
+                    "ageDays": 380.3,
+                    "confidence": 83,
+                    "id": "p3-exact-6-shadow",
+                    "importance": 67,
+                    "createdDays": 381.3,
+                    "tags": { "28": 0.5, "60": 0.3, "70": 1 },
+                    "text": "Book club is reading Quillfeather next",
+                    "type": "context",
+                    "botId": "bot-b"
+                },
+                {
+                    "ageDays": 224.2,
+                    "confidence": 76,
+                    "id": "p3-exact-7",
+                    "importance": 66,
+                    "createdDays": 394.7,
+                    "tags": { "28": 0.5, "55": 0.3, "61": 0.3, "71": 1 },
+                    "text": "Grandmother grew up in the village of Kleinwaldau",
+                    "type": "context"
+                },
+                {
+                    "ageDays": 393.7,
+                    "confidence": 76,
+                    "id": "p3-exact-7-shadow",
+                    "importance": 60,
+                    "createdDays": 394.7,
+                    "tags": { "28": 0.5, "55": 0.3, "61": 0.3, "71": 1 },
+                    "text": "Grandmother grew up in the village of Kleinwaldau",
+                    "type": "context",
+                    "supersededBy": "p3-exact-7"
                 }
             ],
             "userId": "user-p3"
@@ -9117,6 +9369,90 @@
                     "tags": { "1": 1, "25": 0.6, "28": 0.5, "44": 0.3, "45": 0.3 },
                     "text": "Said baking came up again with friends",
                     "type": "activity"
+                },
+                {
+                    "ageDays": 88.6,
+                    "confidence": 80,
+                    "id": "p4-exact-6",
+                    "importance": 46,
+                    "createdDays": 384.6,
+                    "tags": { "28": 0.5, "46": 0.3, "51": 0.3, "70": 1 },
+                    "text": "Book club is reading Quillfeather next",
+                    "type": "context"
+                },
+                {
+                    "ageDays": 383.6,
+                    "confidence": 81,
+                    "id": "p4-exact-6-shadow",
+                    "importance": 46,
+                    "createdDays": 384.6,
+                    "tags": { "28": 0.5, "46": 0.3, "51": 0.3, "70": 1 },
+                    "text": "Book club is reading Quillfeather next",
+                    "type": "context",
+                    "supersededBy": "p4-exact-6"
+                },
+                {
+                    "ageDays": 131.3,
+                    "confidence": 85,
+                    "id": "p4-exact-7",
+                    "importance": 66,
+                    "createdDays": 384.9,
+                    "tags": { "28": 0.5, "46": 0.3, "58": 0.3, "71": 1 },
+                    "text": "Grandmother grew up in the village of Kleinwaldau",
+                    "type": "context"
+                },
+                {
+                    "ageDays": 383.9,
+                    "confidence": 85,
+                    "id": "p4-exact-7-shadow",
+                    "importance": 60,
+                    "createdDays": 384.9,
+                    "tags": { "28": 0.5, "46": 0.3, "58": 0.3, "71": 1 },
+                    "text": "Grandmother grew up in the village of Kleinwaldau",
+                    "type": "context",
+                    "validUntil": "2026-10-17"
+                },
+                {
+                    "ageDays": 101.8,
+                    "confidence": 84,
+                    "id": "p4-exact-8",
+                    "importance": 64,
+                    "createdDays": 403.6,
+                    "tags": { "28": 0.5, "42": 0.3, "43": 0.3, "72": 1 },
+                    "text": "Signed up for the evening course ECON-204",
+                    "type": "context"
+                },
+                {
+                    "ageDays": 402.6,
+                    "confidence": 87,
+                    "id": "p4-exact-8-shadow",
+                    "importance": 48,
+                    "createdDays": 403.6,
+                    "tags": { "28": 0.5, "42": 0.3, "43": 0.3, "72": 1 },
+                    "text": "Signed up for the evening course ECON-204",
+                    "type": "context",
+                    "botId": "bot-b"
+                },
+                {
+                    "ageDays": 311.2,
+                    "confidence": 68,
+                    "id": "p4-exact-9",
+                    "importance": 69,
+                    "createdDays": 411.5,
+                    "tags": { "28": 0.5, "44": 0.3, "58": 0.3, "73": 1 },
+                    "text": "Parcel tracking number ends in 77314",
+                    "type": "context"
+                },
+                {
+                    "ageDays": 410.5,
+                    "confidence": 86,
+                    "id": "p4-exact-9-shadow",
+                    "importance": 68,
+                    "createdDays": 411.5,
+                    "tags": { "28": 0.5, "44": 0.3, "58": 0.3, "73": 1 },
+                    "text": "Parcel tracking number ends in 77314",
+                    "type": "context",
+                    "supersededBy": "p4-exact-9"
                 }
             ],
             "userId": "user-p4"
@@ -11965,6 +12301,90 @@
                     "tags": { "7": 1, "25": 0.6, "28": 0.5, "48": 0.3, "51": 0.3 },
                     "text": "Said coffee came up again with friends",
                     "type": "activity"
+                },
+                {
+                    "ageDays": 235.4,
+                    "confidence": 83,
+                    "id": "p5-exact-8",
+                    "importance": 66,
+                    "createdDays": 380.8,
+                    "tags": { "28": 0.5, "55": 0.3, "62": 0.3, "72": 1 },
+                    "text": "Signed up for the evening course ECON-204",
+                    "type": "context"
+                },
+                {
+                    "ageDays": 379.8,
+                    "confidence": 78,
+                    "id": "p5-exact-8-shadow",
+                    "importance": 44,
+                    "createdDays": 380.8,
+                    "tags": { "28": 0.5, "55": 0.3, "62": 0.3, "72": 1 },
+                    "text": "Signed up for the evening course ECON-204",
+                    "type": "context",
+                    "supersededBy": "p5-exact-8"
+                },
+                {
+                    "ageDays": 296.7,
+                    "confidence": 73,
+                    "id": "p5-exact-9",
+                    "importance": 59,
+                    "createdDays": 400,
+                    "tags": { "28": 0.5, "49": 0.3, "61": 0.3, "73": 1 },
+                    "text": "Parcel tracking number ends in 77314",
+                    "type": "context"
+                },
+                {
+                    "ageDays": 399,
+                    "confidence": 73,
+                    "id": "p5-exact-9-shadow",
+                    "importance": 60,
+                    "createdDays": 400,
+                    "tags": { "28": 0.5, "49": 0.3, "61": 0.3, "73": 1 },
+                    "text": "Parcel tracking number ends in 77314",
+                    "type": "context",
+                    "validUntil": "2026-10-17"
+                },
+                {
+                    "ageDays": 92.7,
+                    "confidence": 68,
+                    "id": "p5-exact-0",
+                    "importance": 58,
+                    "createdDays": 408.9,
+                    "tags": { "28": 0.5, "49": 0.3, "57": 0.3, "64": 1 },
+                    "text": "Ordered replacement part KX-2291 for the dishwasher",
+                    "type": "context"
+                },
+                {
+                    "ageDays": 407.9,
+                    "confidence": 84,
+                    "id": "p5-exact-0-shadow",
+                    "importance": 65,
+                    "createdDays": 408.9,
+                    "tags": { "28": 0.5, "49": 0.3, "57": 0.3, "64": 1 },
+                    "text": "Ordered replacement part KX-2291 for the dishwasher",
+                    "type": "context",
+                    "botId": "bot-b"
+                },
+                {
+                    "ageDays": 49.6,
+                    "confidence": 74,
+                    "id": "p5-exact-1",
+                    "importance": 48,
+                    "createdDays": 399.6,
+                    "tags": { "28": 0.5, "44": 0.3, "57": 0.3, "65": 1 },
+                    "text": "The neighbour's cat is called Pumpernickel",
+                    "type": "context"
+                },
+                {
+                    "ageDays": 398.6,
+                    "confidence": 66,
+                    "id": "p5-exact-1-shadow",
+                    "importance": 52,
+                    "createdDays": 399.6,
+                    "tags": { "28": 0.5, "44": 0.3, "57": 0.3, "65": 1 },
+                    "text": "The neighbour's cat is called Pumpernickel",
+                    "type": "context",
+                    "supersededBy": "p5-exact-1"
                 }
             ],
             "userId": "user-p5"
@@ -13230,6 +13650,256 @@
             "tags": { "4": 1, "23": 0.6, "28": 0.5, "43": 0.3 },
             "text": "what light and lenses do I like",
             "asBot": "bot-a"
+        },
+        {
+            "category": "exact",
+            "expected": ["p1-exact-0"],
+            "id": "p1-exact-150",
+            "persona": "p1",
+            "tags": { "16": 1, "28": 0.5, "58": 0.3, "59": 0.3 },
+            "text": "did I already order KX-2291",
+            "asBot": "bot-a"
+        },
+        {
+            "category": "exact",
+            "expected": ["p1-exact-1"],
+            "id": "p1-exact-151",
+            "persona": "p1",
+            "tags": { "17": 1, "28": 0.5, "51": 0.3, "59": 0.3 },
+            "text": "who is Pumpernickel"
+        },
+        {
+            "category": "exact",
+            "expected": ["p1-exact-2"],
+            "id": "p1-exact-152",
+            "persona": "p1",
+            "tags": { "18": 1, "28": 0.5, "41": 0.3, "52": 0.3 },
+            "text": "whose bike has serial WTU-38817"
+        },
+        {
+            "category": "exact",
+            "expected": ["p1-exact-3"],
+            "id": "p1-exact-153",
+            "persona": "p1",
+            "tags": { "19": 1, "28": 0.5, "47": 0.3, "62": 0.3 },
+            "text": "do I drink lapsang",
+            "asBot": "bot-a"
+        },
+        {
+            "category": "abstain",
+            "expected": [],
+            "id": "p1-abstain-154",
+            "persona": "p1",
+            "tags": { "16": 1, "28": 0.5, "46": 0.3, "62": 0.3 },
+            "text": "did I order part QZ-5508 for the dishwasher"
+        },
+        {
+            "category": "abstain",
+            "expected": [],
+            "id": "p1-abstain-155",
+            "persona": "p1",
+            "tags": { "17": 1, "28": 0.5, "57": 0.3, "62": 0.3 },
+            "text": "who is Fitzwilliam"
+        },
+        {
+            "category": "exact",
+            "expected": ["p2-exact-2"],
+            "id": "p2-exact-156",
+            "persona": "p2",
+            "tags": { "18": 1, "28": 0.5, "43": 0.3, "46": 0.3 },
+            "text": "whose bike has serial WTU-38817",
+            "asBot": "bot-a"
+        },
+        {
+            "category": "exact",
+            "expected": ["p2-exact-3"],
+            "id": "p2-exact-157",
+            "persona": "p2",
+            "tags": { "19": 1, "28": 0.5, "44": 0.3, "53": 0.3 },
+            "text": "do I drink lapsang"
+        },
+        {
+            "category": "exact",
+            "expected": ["p2-exact-4"],
+            "id": "p2-exact-158",
+            "persona": "p2",
+            "tags": { "20": 1, "28": 0.5, "45": 0.3, "57": 0.3 },
+            "text": "what does Thorvaldsen do for me"
+        },
+        {
+            "category": "exact",
+            "expected": ["p2-exact-5"],
+            "id": "p2-exact-159",
+            "persona": "p2",
+            "tags": { "21": 1, "28": 0.5, "41": 0.3, "48": 0.3 },
+            "text": "which device is the HR-7501",
+            "asBot": "bot-a"
+        },
+        {
+            "category": "abstain",
+            "expected": [],
+            "id": "p2-abstain-160",
+            "persona": "p2",
+            "tags": { "18": 1, "28": 0.5, "41": 0.3 },
+            "text": "is WTU-40126 the serial of my bike"
+        },
+        {
+            "category": "abstain",
+            "expected": [],
+            "id": "p2-abstain-161",
+            "persona": "p2",
+            "tags": { "19": 1, "28": 0.5, "54": 0.3, "55": 0.3 },
+            "text": "is rooibos my favourite"
+        },
+        {
+            "category": "exact",
+            "expected": ["p3-exact-4"],
+            "id": "p3-exact-162",
+            "persona": "p3",
+            "tags": { "20": 1, "28": 0.5, "41": 0.3, "51": 0.3 },
+            "text": "what does Thorvaldsen do for me",
+            "asBot": "bot-a"
+        },
+        {
+            "category": "exact",
+            "expected": ["p3-exact-5"],
+            "id": "p3-exact-163",
+            "persona": "p3",
+            "tags": { "21": 1, "28": 0.5, "54": 0.3, "57": 0.3 },
+            "text": "which device is the HR-7501"
+        },
+        {
+            "category": "exact",
+            "expected": ["p3-exact-6"],
+            "id": "p3-exact-164",
+            "persona": "p3",
+            "tags": { "16": 1, "28": 0.5, "53": 0.3, "61": 0.3 },
+            "text": "have I read Quillfeather"
+        },
+        {
+            "category": "exact",
+            "expected": ["p3-exact-7"],
+            "id": "p3-exact-165",
+            "persona": "p3",
+            "tags": { "17": 1, "28": 0.5, "56": 0.3, "59": 0.3 },
+            "text": "where is Kleinwaldau",
+            "asBot": "bot-a"
+        },
+        {
+            "category": "abstain",
+            "expected": [],
+            "id": "p3-abstain-166",
+            "persona": "p3",
+            "tags": { "20": 1, "28": 0.5, "47": 0.3, "61": 0.3 },
+            "text": "who is Vandersloot"
+        },
+        {
+            "category": "abstain",
+            "expected": [],
+            "id": "p3-abstain-167",
+            "persona": "p3",
+            "tags": { "21": 1, "28": 0.5, "42": 0.3, "55": 0.3 },
+            "text": "is the HR-9934 my router"
+        },
+        {
+            "category": "exact",
+            "expected": ["p4-exact-6"],
+            "id": "p4-exact-168",
+            "persona": "p4",
+            "tags": { "16": 1, "28": 0.5, "55": 0.3, "61": 0.3 },
+            "text": "have I read Quillfeather",
+            "asBot": "bot-a"
+        },
+        {
+            "category": "exact",
+            "expected": ["p4-exact-7"],
+            "id": "p4-exact-169",
+            "persona": "p4",
+            "tags": { "17": 1, "28": 0.5, "50": 0.3, "62": 0.3 },
+            "text": "where is Kleinwaldau"
+        },
+        {
+            "category": "exact",
+            "expected": ["p4-exact-8"],
+            "id": "p4-exact-170",
+            "persona": "p4",
+            "tags": { "18": 1, "28": 0.5, "42": 0.3, "47": 0.3 },
+            "text": "when does ECON-204 meet"
+        },
+        {
+            "category": "exact",
+            "expected": ["p4-exact-9"],
+            "id": "p4-exact-171",
+            "persona": "p4",
+            "tags": { "19": 1, "28": 0.5, "45": 0.3, "59": 0.3 },
+            "text": "which parcel ends in 77314",
+            "asBot": "bot-a"
+        },
+        {
+            "category": "abstain",
+            "expected": [],
+            "id": "p4-abstain-172",
+            "persona": "p4",
+            "tags": { "16": 1, "28": 0.5, "47": 0.3, "55": 0.3 },
+            "text": "who wrote Marrowgate"
+        },
+        {
+            "category": "abstain",
+            "expected": [],
+            "id": "p4-abstain-173",
+            "persona": "p4",
+            "tags": { "17": 1, "28": 0.5, "43": 0.3, "53": 0.3 },
+            "text": "where is Oberhollenbach"
+        },
+        {
+            "category": "exact",
+            "expected": ["p5-exact-8"],
+            "id": "p5-exact-174",
+            "persona": "p5",
+            "tags": { "18": 1, "28": 0.5, "45": 0.3, "46": 0.3 },
+            "text": "when does ECON-204 meet",
+            "asBot": "bot-a"
+        },
+        {
+            "category": "exact",
+            "expected": ["p5-exact-9"],
+            "id": "p5-exact-175",
+            "persona": "p5",
+            "tags": { "19": 1, "28": 0.5, "43": 0.3, "63": 0.3 },
+            "text": "which parcel ends in 77314"
+        },
+        {
+            "category": "exact",
+            "expected": ["p5-exact-0"],
+            "id": "p5-exact-176",
+            "persona": "p5",
+            "tags": { "16": 1, "28": 0.5, "43": 0.3, "46": 0.3 },
+            "text": "did I already order KX-2291"
+        },
+        {
+            "category": "exact",
+            "expected": ["p5-exact-1"],
+            "id": "p5-exact-177",
+            "persona": "p5",
+            "tags": { "17": 1, "28": 0.5, "52": 0.3, "58": 0.3 },
+            "text": "who is Pumpernickel",
+            "asBot": "bot-a"
+        },
+        {
+            "category": "abstain",
+            "expected": [],
+            "id": "p5-abstain-178",
+            "persona": "p5",
+            "tags": { "18": 1, "28": 0.5, "48": 0.3, "63": 0.3 },
+            "text": "did I sign up for the evening course HIST-318"
+        },
+        {
+            "category": "abstain",
+            "expected": [],
+            "id": "p5-abstain-179",
+            "persona": "p5",
+            "tags": { "19": 1, "28": 0.5, "54": 0.3, "61": 0.3 },
+            "text": "is parcel 52690 mine"
         }
     ]
 }
