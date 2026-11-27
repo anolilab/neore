@@ -1024,7 +1024,7 @@ msgstr "{days} Tage"
 msgid "{days}d ago"
 msgstr "vor {days} T."
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:353
+#: src/features/settings/components/personalization/memory-file-import.tsx:360
 msgid "{done} of {total} entries processed"
 msgstr "{done} von {total} Einträgen verarbeitet"
 
@@ -6195,7 +6195,7 @@ msgstr "Deep Work abbrechen"
 msgid "Cancel Export"
 msgstr "Export abbrechen"
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:427
+#: src/features/settings/components/personalization/memory-file-import.tsx:434
 msgid "Cancel import"
 msgstr "Import abbrechen"
 
@@ -6815,11 +6815,11 @@ msgstr "Chinesisch (Traditionell)"
 msgid "Choose .md or .zip"
 msgstr ".md oder .zip auswählen"
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:371
+#: src/features/settings/components/personalization/memory-file-import.tsx:378
 msgid "Choose a .txt file with one memory per line, or a .json file with a list of memories. The file can be up to {maxSize}."
 msgstr "Wähle eine .txt-Datei mit einer Erinnerung pro Zeile oder eine .json-Datei mit einer Liste von Erinnerungen. Die Datei darf bis zu {maxSize} groß sein."
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:249
+#: src/features/settings/components/personalization/memory-file-import.tsx:273
 msgid "Choose a .txt or .json file."
 msgstr "Wähle eine .txt- oder .json-Datei."
 
@@ -9014,7 +9014,7 @@ msgstr "Der Chat konnte nicht angehängt werden"
 msgid "could not be saved"
 msgstr "konnte nicht gespeichert werden"
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:344
+#: src/features/settings/components/personalization/memory-file-import.tsx:351
 msgid "Could not cancel the import."
 msgstr "Der Import konnte nicht abgebrochen werden."
 
@@ -9168,7 +9168,7 @@ msgstr "Der Workflow konnte nicht exportiert werden"
 msgid "Could not generate a draft. Try again."
 msgstr "Es konnte kein Entwurf erstellt werden. Versuche es erneut."
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:309
+#: src/features/settings/components/personalization/memory-file-import.tsx:318
 msgid "Could not import the file."
 msgstr "Die Datei konnte nicht importiert werden."
 
@@ -9334,11 +9334,11 @@ msgstr "Dieser Chat konnte nicht gelesen werden"
 msgid "Could not read that chat. If it is locked, unlock it first."
 msgstr "Dieser Chat konnte nicht gelesen werden. Ist er gesperrt, entsperre ihn zuerst."
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:297
+#: src/features/settings/components/personalization/memory-file-import.tsx:306
 msgid "Could not read the file."
 msgstr "Die Datei konnte nicht gelesen werden."
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:362
+#: src/features/settings/components/personalization/memory-file-import.tsx:369
 msgid "Could not read the import's progress."
 msgstr "Der Fortschritt des Imports konnte nicht gelesen werden."
 
@@ -15171,7 +15171,7 @@ msgstr "Dateigröße überschreitet {maxSize}"
 msgid "File size too large. Maximum 5MB allowed."
 msgstr "Datei zu groß. Maximal 5 MB erlaubt."
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:375
+#: src/features/settings/components/personalization/memory-file-import.tsx:382
 msgid "File to import"
 msgstr "Zu importierende Datei"
 
@@ -18031,7 +18031,7 @@ msgstr "Importiere Unterhaltungen aus ChatGPT, Google Gemini, Claude, einem Neor
 msgid "Import failed"
 msgstr "Import fehlgeschlagen"
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:388
+#: src/features/settings/components/personalization/memory-file-import.tsx:395
 msgid "Import file"
 msgstr "Datei importieren"
 
@@ -18039,7 +18039,7 @@ msgstr "Datei importieren"
 msgid "Import files"
 msgstr "Dateien importieren"
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:413
+#: src/features/settings/components/personalization/memory-file-import.tsx:420
 msgid "Import finished."
 msgstr "Import abgeschlossen."
 
@@ -18053,7 +18053,7 @@ msgstr "Aus Repository importieren"
 msgid "Import from this computer"
 msgstr "Von diesem Computer importieren"
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:368
+#: src/features/settings/components/personalization/memory-file-import.tsx:375
 msgid "Import memories from a file"
 msgstr "Erinnerungen aus einer Datei importieren"
 
@@ -18069,11 +18069,11 @@ msgstr "Notion-Export importieren (.zip)"
 msgid "Import one kind of export at a time."
 msgstr "Importiere jeweils nur eine Art von Export."
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:419
+#: src/features/settings/components/personalization/memory-file-import.tsx:426
 msgid "Import progress"
 msgstr "Importfortschritt"
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:405
+#: src/features/settings/components/personalization/memory-file-import.tsx:412
 msgid "Import result"
 msgstr "Importergebnis"
 
@@ -18123,7 +18123,7 @@ msgstr "{added} Notion-Seite(n) importiert; {skipped} Anhang/Anhänge übersprun
 msgid "Imported {added} Notion page(s)."
 msgstr "{added} Notion-Seite(n) importiert."
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:360
+#: src/features/settings/components/personalization/memory-file-import.tsx:367
 msgid "Imported {imported} · Updated {updated} · Duplicates {duplicates} · Too long {tooLong} · Invalid {invalid}"
 msgstr "Importiert {imported} · Aktualisiert {updated} · Duplikate {duplicates} · Zu lang {tooLong} · Ungültig {invalid}"
 
@@ -18146,7 +18146,7 @@ msgstr "Skill „{0}“ importiert"
 msgid "Importing from {0}..."
 msgstr "Wird aus {0} importiert..."
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:412
+#: src/features/settings/components/personalization/memory-file-import.tsx:419
 msgid "Importing memories…"
 msgstr "Erinnerungen werden importiert…"
 
@@ -21294,11 +21294,11 @@ msgstr "Erinnerungen deaktiviert"
 msgid "Memory enabled"
 msgstr "Erinnerungen aktiviert"
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:210
+#: src/features/settings/components/personalization/memory-file-import.tsx:234
 msgid "Memory import finished"
 msgstr "Erinnerungsimport abgeschlossen"
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:210
+#: src/features/settings/components/personalization/memory-file-import.tsx:234
 msgid "Memory import stopped"
 msgstr "Erinnerungsimport gestoppt"
 
@@ -35209,7 +35209,7 @@ msgstr "Die Erweiterung kann als {0} Chats lesen und senden. Du kannst sie jeder
 msgid "The file is larger than {0} KB, which is more than a bundle can be."
 msgstr "Die Datei ist größer als {0} KB, mehr als ein Bundle sein darf."
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:242
+#: src/features/settings/components/personalization/memory-file-import.tsx:266
 msgid "The file is larger than {maxSize}. Choose a smaller file."
 msgstr "Die Datei ist größer als {maxSize}. Wähle eine kleinere Datei."
 
@@ -35370,7 +35370,7 @@ msgstr "die Host-Software ist veraltet"
 msgid "The icons could not be loaded."
 msgstr "Die Symbole konnten nicht geladen werden."
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:361
+#: src/features/settings/components/personalization/memory-file-import.tsx:368
 msgid "The import stopped before it finished."
 msgstr "Der Import wurde beendet, bevor er fertig war."
 
@@ -37567,7 +37567,7 @@ msgstr "Versuche, deine Suchbegriffe anzupassen."
 #: src/features/projects/components/project-repositories.tsx:297
 #: src/features/projects/components/repo-rule-file-import.tsx:183
 #: src/features/settings/components/chat/default-models-settings.tsx:455
-#: src/features/settings/components/personalization/memory-file-import.tsx:443
+#: src/features/settings/components/personalization/memory-file-import.tsx:445
 #: src/features/tasks/components/task-form-dialog.tsx:459
 #: src/features/vault/components/site-logins.tsx:480
 #: src/features/vault/components/site-logins.tsx:612
@@ -37667,7 +37667,7 @@ msgstr "Auto-Merge ausschalten?"
 msgid "Turn on memory"
 msgstr "Erinnerung einschalten"
 
-#: src/features/settings/components/personalization/memory-file-import.tsx:393
+#: src/features/settings/components/personalization/memory-file-import.tsx:400
 msgid "Turn on memory to import a file."
 msgstr "Aktiviere Erinnerungen, um eine Datei zu importieren."
 

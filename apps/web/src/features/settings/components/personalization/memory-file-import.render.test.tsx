@@ -109,6 +109,8 @@ const makeFile = (name: string, content: string, size?: number): File => {
 
 const COUNTS_RE = /Imported 3 · Updated 1 · Duplicates 2 · Too long 0 · Invalid 4/u;
 const FINAL_RE = /Imported 60 · Updated 5 · Duplicates 20 · Too long 1 · Invalid 14/u;
+/** The page's wait for a started job to show up in the progress query. */
+const JOB_WAIT_MS = 10_000;
 const IMPORTED_60_RE = /Imported 60 /u;
 const LARGER_RE = /larger than 500 KB/u;
 
@@ -154,6 +156,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+    vi.restoreAllMocks();
     harness.cancel.mockReset();
     harness.importFile.mockReset();
     harness.notify.mockReset();
@@ -303,6 +306,9 @@ describe("memory file import", () => {
         await startImportOf(makeFile("export.json", "[]"));
 
         await screen.findByRole("button", { name: "Cancel import" });
+
+        // The live push trails the start's answer: until it lands the page waits, and does not call that an error.
+        expect(screen.queryByRole("alert")).toBeNull();
 
         publish(job({ done: 100, duplicates: 20, imported: 60, invalid: 14, jobId: "job-2", status: "done", tooLong: 1, updated: 5 }));
 
@@ -502,6 +508,20 @@ describe("memory file import", () => {
     it("ends the wait with an error when the progress query never shows the job the start returned", async () => {
         expect.hasAssertions();
 
+        // Only the page's own wait is held back; the polling of `waitFor` keeps its real timers.
+        const realSetTimeout = globalThis.setTimeout;
+        let giveUp: (() => void) | undefined;
+
+        vi.spyOn(globalThis, "setTimeout").mockImplementation(((handler: () => void, delay?: number, ...rest: unknown[]) => {
+            if (delay === JOB_WAIT_MS) {
+                giveUp = handler;
+
+                return 0 as unknown as ReturnType<typeof setTimeout>;
+            }
+
+            return realSetTimeout(handler, delay, ...rest);
+        }) as typeof setTimeout);
+
         harness.progress = job({ done: 100, jobId: "job-0", status: "done" });
         harness.importFile.mockResolvedValue({ jobId: "job-1", queued: true, total: 100 });
         renderImport();
@@ -510,7 +530,15 @@ describe("memory file import", () => {
 
         await startImportOf(makeFile("export.json", "[]"));
 
-        const unconfirmed = await screen.findByRole("alert");
+        await screen.findByRole("button", { name: "Cancel import" });
+
+        expect(screen.queryByRole("alert")).toBeNull();
+
+        act(() => {
+            giveUp?.();
+        });
+
+        const unconfirmed = screen.getByRole("alert");
 
         expect(unconfirmed.textContent).toBe("Could not read the import's progress.");
         expect(screen.queryByText("Importing memories…")).toBeNull();

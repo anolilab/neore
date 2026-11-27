@@ -50,6 +50,9 @@ interface MemoryFileImportProps {
     onImported: () => void;
 }
 
+/** How long a started import's job may take to show up in the progress query before the page says it cannot see it. */
+const JOB_APPEARS_WITHIN_MS = 10_000;
+
 const NO_COUNTS: ImportCounts = { duplicates: 0, imported: 0, invalid: 0, tooLong: 0, updated: 0 };
 
 const isActive = (status: JobStatus): boolean => status === "queued" || status === "running";
@@ -127,6 +130,7 @@ const MemoryFileImport: FC<MemoryFileImportProps> = ({ memoryEnabled, onImported
     const [watched, setWatched] = useState<WatchedJob | undefined>(undefined);
     // The progress query answered after a start without showing the job it returned.
     const [startUnconfirmed, setStartUnconfirmed] = useState(false);
+    const [retries, setRetries] = useState(0);
 
     const maxSize = `${i18n.number(MEMORY_FILE_MAX_BYTES / 1000)} KB`;
 
@@ -188,6 +192,26 @@ const MemoryFileImport: FC<MemoryFileImportProps> = ({ memoryEnabled, onImported
             onImported();
         }
     }, [refreshKey, onImported]);
+
+    // The query shows a start's job through its live push, which can trail the start's answer: wait a while for it, then stop
+    // waiting and say so. `retries` re-arms the wait after "Try again".
+    const waitingForJob = memoryEnabled && watched !== undefined && job === undefined;
+
+    useEffect(() => {
+        if (!waitingForJob) {
+            setStartUnconfirmed(false);
+
+            return undefined;
+        }
+
+        const timer = setTimeout(() => {
+            setStartUnconfirmed(true);
+        }, JOB_APPEARS_WITHIN_MS);
+
+        return () => {
+            clearTimeout(timer);
+        };
+    }, [waitingForJob, retries]);
 
     // The job this page started or saw running: only its end is announced to the shell, never one that was already over.
     const announceable = useRef<Id<"memoryImportJobs"> | undefined>(undefined);
@@ -255,25 +279,9 @@ const MemoryFileImport: FC<MemoryFileImportProps> = ({ memoryEnabled, onImported
         setFile(picked);
     };
 
-    // Asks the progress query for the job a start returned. An answer that still shows no job, or only the one from before the
-    // start, leaves the page waiting on a job it cannot see: that is shown as an error with a retry, never as endless progress.
-    const confirmStart = async (started: WatchedJob) => {
-        setStartUnconfirmed(false);
-
-        const { data } = await refetchProgress();
-
-        if (!data || data.jobId === started.before) {
-            setStartUnconfirmed(true);
-        }
-    };
-
     const retryProgress = () => {
-        if (watched && !job) {
-            void confirmStart(watched);
-
-            return;
-        }
-
+        setStartUnconfirmed(false);
+        setRetries((count) => count + 1);
         void refetchProgress();
     };
 
@@ -314,11 +322,9 @@ const MemoryFileImport: FC<MemoryFileImportProps> = ({ memoryEnabled, onImported
                     setInputKey((key) => key + 1);
 
                     if ("jobId" in response) {
-                        const started: WatchedJob = { before, jobId: response.jobId, seen: false, total: response.total };
-
                         announceable.current = response.jobId;
-                        setWatched(started);
-                        void confirmStart(started);
+                        setWatched({ before, jobId: response.jobId, seen: false, total: response.total });
+                        void refetchProgress();
 
                         return;
                     }
