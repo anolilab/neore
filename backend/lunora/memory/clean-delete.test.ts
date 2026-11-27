@@ -1036,4 +1036,37 @@ describe("erasing an account", () => {
         expect(await cleanups()).toHaveLength(0);
         expect(await vectorExists(old.embeddingId)).toBe(false);
     });
+
+    it("keeps the record of a vector the erasure could not delete, and its job still retries it", async () => {
+        const old = await seed("likes tea");
+        const next = await seed("likes green tea");
+
+        vi.mocked(deleteVectorRow).mockRejectedValueOnce(new Error("vector index unavailable"));
+        await run(async (ctx) => await supersedeMemory(ctx as never, old.memoryId, next.memoryId, Date.now()));
+        await run(
+            async (ctx) =>
+                await ctx.db.insert("gdprRequests", {
+                    requestedAt: 1,
+                    requestType: "deletion",
+                    status: "processing",
+                    userEmail: "a@example.com",
+                    userId: OWNER,
+                }),
+        );
+
+        // The erasure's own vector delete fails too.
+        vi.mocked(deleteVectorRow).mockRejectedValueOnce(new Error("vector index unavailable"));
+
+        const result: any = await run(async (ctx) => await ctx.runMutation(deleteUserMemoryReflectionData, { userId: OWNER }));
+
+        expect(result.hasMore).toBe(false);
+        expect(await vectorExists(old.embeddingId)).toBe(true);
+        expect(await cleanups()).toHaveLength(1);
+
+        // Its job is not stood down by the erasure, and deletes the vector once the index answers.
+        await runCleanup(cleanupJobs().at(-1)?.args);
+
+        expect(await vectorExists(old.embeddingId)).toBe(false);
+        expect(await cleanups()).toHaveLength(0);
+    });
 });

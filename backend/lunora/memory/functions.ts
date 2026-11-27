@@ -730,8 +730,9 @@ export const stepMemoryCleanup = internalMutation
             return { again: false, failed: false, userId: row?.userId ?? "" };
         }
 
-        // An account being erased: the erasure removes its records and the vectors they name (`gdpr.ts`), so no step runs meanwhile.
-        if (await isAccountDeletionUnderway(ctx, row.userId)) {
+        // An account being erased: the erasure removes its walks (`gdpr.ts`), so no walk step runs meanwhile. A vector record still
+        // retries: the erasure keeps one whose vector it could not delete.
+        if (row.kind !== "vector" && (await isAccountDeletionUnderway(ctx, row.userId))) {
             return { again: false, failed: false, userId: row.userId };
         }
 

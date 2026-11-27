@@ -110,15 +110,22 @@ export const deleteUserMemoryReflectionData = internalMutation
             }
         }
 
-        // A recorded vector delete is the only reference left to a vector no memory row points at: erase the vector itself.
+        // A recorded vector delete is the only reference left to a vector no memory row points at: erase the vector itself. A
+        // vector that cannot be erased keeps its record, so its cleanup job retries it: that matters more than the leftover record.
+        const kept = new Set<string>();
+
         for (const row of cleanups) {
-            if (row.kind === "vector" && row.embeddingId) {
-                await eraseEmbeddingRow(ctx, row.embeddingId, `embedding of retired memory ${row.memoryId ?? ""}`);
+            if (
+                row.kind === "vector" &&
+                row.embeddingId &&
+                !(await eraseEmbeddingRow(ctx, row.embeddingId, `embedding of retired memory ${row.memoryId ?? ""}`))
+            ) {
+                kept.add(row._id);
             }
         }
 
         await Promise.all([
-            ...cleanups.map((row) => ctx.db.delete("memoryCleanups", row._id)),
+            ...cleanups.filter((row) => !kept.has(row._id)).map((row) => ctx.db.delete("memoryCleanups", row._id)),
             ...digests.map((row) => ctx.db.delete("memoryDigests", row._id)),
             ...states.map((row) => ctx.db.delete("memoryReflectionState", row._id)),
             ...importJobs.map((row) => ctx.db.delete("memoryImportJobs", row._id)),
@@ -127,6 +134,10 @@ export const deleteUserMemoryReflectionData = internalMutation
 
         return {
             hasMore:
-                cleanups.length >= BATCH || digests.length >= BATCH || states.length >= BATCH || importJobs.length >= BATCH || importBatches.length >= BATCH,
+                (cleanups.length >= BATCH && kept.size < cleanups.length) ||
+                digests.length >= BATCH ||
+                states.length >= BATCH ||
+                importJobs.length >= BATCH ||
+                importBatches.length >= BATCH,
         };
     });
