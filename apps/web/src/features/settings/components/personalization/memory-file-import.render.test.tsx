@@ -28,10 +28,18 @@ const harness = vi.hoisted(() => {
     return {
         cancel: vi.fn(),
         client: undefined as QueryClient | undefined,
+        /** Holds the progress query's answer back until it is resolved. */
+        gate: undefined as Promise<void> | undefined,
         importFile: vi.fn(),
+        notify: vi.fn(),
         progress: null as unknown,
+        progressError: undefined as Error | undefined,
         progressKey: ["memory-import-progress"] as const,
     };
+});
+
+vi.mock("@/lib/native/bridge", () => {
+    return { notifyNative: harness.notify };
 });
 
 vi.mock("@lingui/react/macro", () => {
@@ -58,7 +66,18 @@ vi.mock("@/lib/lunora/crpc", () => {
                         },
                         getMemoryImportProgress: {
                             queryOptions: () => {
-                                return { queryFn: async () => harness.progress, queryKey: harness.progressKey };
+                                return {
+                                    queryFn: async () => {
+                                        await harness.gate;
+
+                                        if (harness.progressError) {
+                                            throw harness.progressError;
+                                        }
+
+                                        return harness.progress;
+                                    },
+                                    queryKey: harness.progressKey,
+                                };
                             },
                         },
                     },
@@ -90,6 +109,7 @@ const makeFile = (name: string, content: string, size?: number): File => {
 
 const COUNTS_RE = /Imported 3 · Updated 1 · Duplicates 2 · Too long 0 · Invalid 4/u;
 const FINAL_RE = /Imported 60 · Updated 5 · Duplicates 20 · Too long 1 · Invalid 14/u;
+const IMPORTED_60_RE = /Imported 60 /u;
 const LARGER_RE = /larger than 500 KB/u;
 
 const onImported = vi.fn();
@@ -106,6 +126,18 @@ const pick = (file: File) => {
     fireEvent.change(screen.getByLabelText("File to import"), { target: { files: [file] } });
 };
 
+/** Picks the file and clicks Import once the page offers it: it does so only after the progress query has answered. */
+const startImportOf = async (file: File) => {
+    pick(file);
+
+    await waitFor(() => {
+        if (screen.getByRole("button", { name: "Import file" }).hasAttribute("disabled")) {
+            throw new Error("The import is not offered yet");
+        }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Import file" }));
+};
+
 /** The server's new answer: a refetch reads it as well as the live push. */
 const publish = (progress: Progress) => {
     harness.progress = progress;
@@ -117,11 +149,14 @@ const publish = (progress: Progress) => {
 beforeEach(() => {
     harness.client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
     harness.progress = null;
+    harness.progressError = undefined;
+    harness.gate = undefined;
 });
 
 afterEach(() => {
     harness.cancel.mockReset();
     harness.importFile.mockReset();
+    harness.notify.mockReset();
     onImported.mockReset();
 });
 
@@ -132,8 +167,7 @@ describe("memory file import", () => {
         harness.importFile.mockResolvedValue({ duplicates: 2, imported: 3, invalid: 4, tooLong: 0, updated: 1 });
         renderImport();
 
-        pick(makeFile("memories.txt", "The user likes tea"));
-        fireEvent.click(screen.getByRole("button", { name: "Import file" }));
+        await startImportOf(makeFile("memories.txt", "The user likes tea"));
 
         await screen.findByText("Import finished.");
 
@@ -152,8 +186,7 @@ describe("memory file import", () => {
         });
         renderImport();
 
-        pick(makeFile("export.json", "[]"));
-        fireEvent.click(screen.getByRole("button", { name: "Import file" }));
+        await startImportOf(makeFile("export.json", "[]"));
 
         await screen.findByText("10 of 100 entries processed");
 
@@ -177,8 +210,7 @@ describe("memory file import", () => {
         harness.importFile.mockRejectedValue(new Error(message));
         renderImport();
 
-        pick(makeFile("secrets.txt", "x"));
-        fireEvent.click(screen.getByRole("button", { name: "Import file" }));
+        await startImportOf(makeFile("secrets.txt", "x"));
 
         const alert = await screen.findByRole("alert");
 
@@ -268,8 +300,7 @@ describe("memory file import", () => {
 
         await waitFor(() => expect(harness.client?.getQueryData(harness.progressKey)).toBeTruthy());
 
-        pick(makeFile("export.json", "[]"));
-        fireEvent.click(screen.getByRole("button", { name: "Import file" }));
+        await startImportOf(makeFile("export.json", "[]"));
 
         await screen.findByRole("button", { name: "Cancel import" });
 
@@ -317,5 +348,177 @@ describe("memory file import", () => {
         expect(screen.queryByText("Import finished.")).toBeNull();
         expect(screen.queryByRole("progressbar")).toBeNull();
         expect(onImported).not.toHaveBeenCalled();
+        expect(harness.notify).not.toHaveBeenCalled();
+    });
+
+    it("shows a failed progress query with a retry, and keeps Cancel for the job it started", async () => {
+        expect.hasAssertions();
+
+        harness.importFile.mockImplementation(async () => {
+            harness.progressError = new Error("Network down");
+
+            return { jobId: "job-1", queued: true, total: 100 };
+        });
+        renderImport();
+
+        await waitFor(() => expect(harness.client?.getQueryData(harness.progressKey)).toBeNull());
+
+        await startImportOf(makeFile("export.json", "[]"));
+
+        const alert = await screen.findByRole("alert");
+
+        expect(alert.textContent).toBe("Network down");
+        expect(screen.queryByText("Importing memories…")).toBeNull();
+        expect(screen.getByRole("button", { name: "Cancel import" })).toBeTruthy();
+
+        harness.progressError = undefined;
+        harness.progress = job({ done: 10, status: "running" });
+        fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+
+        expect(await screen.findByText("10 of 100 entries processed")).toBeTruthy();
+        expect(screen.queryByRole("alert")).toBeNull();
+    });
+
+    it("shows the error when the progress query fails on load, and does not offer an import until it answers", async () => {
+        expect.hasAssertions();
+
+        harness.progressError = new Error("Network down");
+        renderImport();
+
+        const failure = await screen.findByRole("alert");
+
+        expect(failure.textContent).toBe("Network down");
+
+        pick(makeFile("export.json", "[]"));
+
+        expect(screen.getByRole("button", { name: "Import file" }).hasAttribute("disabled")).toBe(true);
+
+        harness.progressError = undefined;
+        fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+
+        await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
+
+        expect(screen.getByRole("button", { name: "Import file" }).hasAttribute("disabled")).toBe(false);
+        expect(screen.queryByText("Importing memories…")).toBeNull();
+    });
+
+    it("tells the shell when an import this page started ends, and when one it found running stops", async () => {
+        expect.hasAssertions();
+
+        harness.importFile.mockImplementation(async () => {
+            harness.progress = job({ done: 10, status: "queued" });
+
+            return { jobId: "job-1", queued: true, total: 100 };
+        });
+
+        const view = renderImport();
+
+        await startImportOf(makeFile("export.json", "[]"));
+        await screen.findByText("10 of 100 entries processed");
+
+        expect(harness.notify).not.toHaveBeenCalled();
+
+        publish(job({ done: 100, imported: 60, status: "done" }));
+        await screen.findByText("Import finished.");
+
+        expect(harness.notify).toHaveBeenCalledOnce();
+
+        view.unmount();
+        harness.notify.mockReset();
+        harness.progress = job({ done: 25, jobId: "job-2", status: "running" });
+        harness.client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
+        renderImport();
+        await screen.findByRole("button", { name: "Cancel import" });
+
+        publish(job({ done: 30, error: "The import was cancelled.", jobId: "job-2", status: "failed" }));
+        await screen.findByRole("alert");
+
+        expect(harness.notify).toHaveBeenCalledOnce();
+        expect(harness.notify.mock.calls[0]?.[0]).toStrictEqual({ title: "Memory import stopped" });
+    });
+
+    it("refreshes again when the final counts are written after the job's status already ended", async () => {
+        expect.hasAssertions();
+
+        harness.progress = job({ done: 25, status: "running" });
+        renderImport();
+        await screen.findByRole("button", { name: "Cancel import" });
+
+        publish(job({ done: 90, imported: 50, status: "done" }));
+        await screen.findByText("Import finished.");
+
+        expect(onImported).toHaveBeenCalledTimes(1);
+
+        publish(job({ done: 100, imported: 60, status: "done" }));
+
+        await waitFor(() => expect(onImported).toHaveBeenCalledTimes(2));
+
+        expect(screen.getByRole("status").textContent).toMatch(IMPORTED_60_RE);
+    });
+
+    it("does not offer an import before the progress query has answered", async () => {
+        expect.hasAssertions();
+
+        let open: () => void = () => undefined;
+
+        // The project's TypeScript lib has no `Promise.withResolvers` yet.
+        // eslint-disable-next-line unicorn/prefer-promise-with-resolvers
+        harness.gate = new Promise<void>((resolve) => {
+            open = resolve;
+        });
+        renderImport();
+
+        pick(makeFile("export.json", "[]"));
+
+        expect(screen.getByRole("button", { name: "Import file" }).hasAttribute("disabled")).toBe(true);
+
+        open();
+
+        await waitFor(() => expect(screen.getByRole("button", { name: "Import file" }).hasAttribute("disabled")).toBe(false));
+    });
+
+    it("follows a job another tab created while its own start was being answered", async () => {
+        expect.hasAssertions();
+
+        harness.progress = job({ done: 100, jobId: "job-0", status: "done" });
+        harness.importFile.mockImplementation(async () => {
+            publish(job({ done: 40, jobId: "job-2", status: "running" }));
+            // Lets the page render the other tab's job before this start is answered.
+            await act(async () => {
+                await Promise.resolve();
+            });
+
+            return { jobId: "job-1", queued: true, total: 100 };
+        });
+        renderImport();
+
+        await waitFor(() => expect(harness.client?.getQueryData(harness.progressKey)).toBeTruthy());
+
+        await startImportOf(makeFile("export.json", "[]"));
+
+        expect(await screen.findByText("40 of 100 entries processed")).toBeTruthy();
+    });
+
+    it("ends the wait with an error when the progress query never shows the job the start returned", async () => {
+        expect.hasAssertions();
+
+        harness.progress = job({ done: 100, jobId: "job-0", status: "done" });
+        harness.importFile.mockResolvedValue({ jobId: "job-1", queued: true, total: 100 });
+        renderImport();
+
+        await waitFor(() => expect(harness.client?.getQueryData(harness.progressKey)).toBeTruthy());
+
+        await startImportOf(makeFile("export.json", "[]"));
+
+        const unconfirmed = await screen.findByRole("alert");
+
+        expect(unconfirmed.textContent).toBe("Could not read the import's progress.");
+        expect(screen.queryByText("Importing memories…")).toBeNull();
+        expect(screen.getByRole("button", { name: "Cancel import" })).toBeTruthy();
+
+        harness.progress = job({ done: 10, jobId: "job-1", status: "running" });
+        fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+
+        expect(await screen.findByText("10 of 100 entries processed")).toBeTruthy();
     });
 });

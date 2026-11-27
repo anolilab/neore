@@ -13,6 +13,7 @@ import type { ChangeEvent, FC } from "react";
 import { useEffect, useId, useRef, useState } from "react";
 
 import { useCRPC, useLunoraActionOptions } from "@/lib/lunora/crpc";
+import { notifyNative } from "@/lib/native/bridge";
 
 interface ImportCounts {
     duplicates: number;
@@ -124,13 +125,24 @@ const MemoryFileImport: FC<MemoryFileImportProps> = ({ memoryEnabled, onImported
     // The background import this page started, or found running. Only its end is shown: the progress query answers with the
     // latest job, which may be one that ended days ago.
     const [watched, setWatched] = useState<WatchedJob | undefined>(undefined);
+    // The progress query answered after a start without showing the job it returned.
+    const [startUnconfirmed, setStartUnconfirmed] = useState(false);
 
     const maxSize = `${i18n.number(MEMORY_FILE_MAX_BYTES / 1000)} KB`;
 
-    const { data: progress, refetch: refetchProgress } = useQuery({
+    const {
+        data: progress,
+        error: progressError,
+        isError: isProgressError,
+        refetch: refetchProgress,
+    } = useQuery({
         ...crpc.memory.import_job.getMemoryImportProgress.queryOptions({}),
         enabled: memoryEnabled,
     });
+
+    // `null` is an answer ("no job yet"); only `undefined` means the query has not answered. An import starts only from an
+    // answered query: the job it finds then is the one "before" this start.
+    const baselineReady = progress !== undefined;
 
     const { isPending: isImporting, mutate: runImport } = useMutation({ ...useLunoraActionOptions(api.memory.import.importMemoryFile) });
     const { isPending: isCancelling, mutate: runCancel } = useMutation({ ...crpc.memory.import_job.cancelMemoryImport.mutationOptions() });
@@ -158,17 +170,46 @@ const MemoryFileImport: FC<MemoryFileImportProps> = ({ memoryEnabled, onImported
     const running = isImporting || isReading || jobRunning;
     const jobEnded = job !== undefined && !isActive(job.status);
     const endedKey = jobEnded ? `${job.jobId}:${job.status}` : undefined;
+    // Also changes when the final counts are written, so `onImported` runs after them and not only at the status change.
+    const refreshKey = jobEnded ? `${endedKey}:${job.done}:${job.imported}:${job.updated}:${job.duplicates}:${job.tooLong}:${job.invalid}` : undefined;
     const errorKey = importError ? `error:${importError}` : undefined;
     const outcomeKey = result ? "result" : (endedKey ?? errorKey);
     const processed = job?.done ?? 0;
     const entries = job?.total ?? watched?.total ?? 0;
     const disabled = !memoryEnabled || running;
+    // The query failed and gave this page nothing to show: no answer at all, or none for the job this page is waiting on.
+    const progressFailed =
+        memoryEnabled &&
+        job === undefined &&
+        ((isProgressError && (watched !== undefined || progress === undefined)) || (startUnconfirmed && watched !== undefined));
 
     useEffect(() => {
-        if (endedKey) {
+        if (refreshKey) {
             onImported();
         }
-    }, [endedKey, onImported]);
+    }, [refreshKey, onImported]);
+
+    // The job this page started or saw running: only its end is announced to the shell, never one that was already over.
+    const announceable = useRef<Id<"memoryImportJobs"> | undefined>(undefined);
+    const jobId = job?.jobId;
+    const jobStatus = job?.status;
+
+    useEffect(() => {
+        if (!jobId || !jobStatus) {
+            return;
+        }
+
+        if (isActive(jobStatus)) {
+            announceable.current = jobId;
+
+            return;
+        }
+
+        if (announceable.current === jobId) {
+            announceable.current = undefined;
+            void notifyNative({ title: jobStatus === "done" ? t`Memory import finished` : t`Memory import stopped` });
+        }
+    }, [jobId, jobStatus, t]);
 
     // The control the person used is disabled or gone once an import ends: the result takes focus then, never from elsewhere.
     useEffect(() => {
@@ -214,16 +255,39 @@ const MemoryFileImport: FC<MemoryFileImportProps> = ({ memoryEnabled, onImported
         setFile(picked);
     };
 
+    // Asks the progress query for the job a start returned. An answer that still shows no job, or only the one from before the
+    // start, leaves the page waiting on a job it cannot see: that is shown as an error with a retry, never as endless progress.
+    const confirmStart = async (started: WatchedJob) => {
+        setStartUnconfirmed(false);
+
+        const { data } = await refetchProgress();
+
+        if (!data || data.jobId === started.before) {
+            setStartUnconfirmed(true);
+        }
+    };
+
+    const retryProgress = () => {
+        if (watched && !job) {
+            void confirmStart(watched);
+
+            return;
+        }
+
+        void refetchProgress();
+    };
+
     const startImport = async () => {
         const format = file ? formatOf(file.name) : undefined;
 
-        if (!file || !format) {
+        if (!file || !format || !baselineReady) {
             return;
         }
 
         setResult(undefined);
         setImportError(undefined);
         setWatched(undefined);
+        setStartUnconfirmed(false);
         setIsReading(true);
 
         const content = await readFileText(file);
@@ -236,6 +300,9 @@ const MemoryFileImport: FC<MemoryFileImportProps> = ({ memoryEnabled, onImported
             return;
         }
 
+        // Read before the request is sent: a job that shows up while it runs is then newer than this start, not "before" it.
+        const before = latestJobId.current;
+
         runImport(
             { content, format },
             {
@@ -247,8 +314,11 @@ const MemoryFileImport: FC<MemoryFileImportProps> = ({ memoryEnabled, onImported
                     setInputKey((key) => key + 1);
 
                     if ("jobId" in response) {
-                        setWatched({ before: latestJobId.current, jobId: response.jobId, seen: false, total: response.total });
-                        void refetchProgress();
+                        const started: WatchedJob = { before, jobId: response.jobId, seen: false, total: response.total };
+
+                        announceable.current = response.jobId;
+                        setWatched(started);
+                        void confirmStart(started);
 
                         return;
                     }
@@ -261,15 +331,15 @@ const MemoryFileImport: FC<MemoryFileImportProps> = ({ memoryEnabled, onImported
     };
 
     const cancelImport = () => {
-        const jobId = job?.jobId ?? watched?.jobId;
+        const targetId = job?.jobId ?? watched?.jobId;
 
-        if (!jobId) {
+        if (!targetId) {
             return;
         }
 
         setImportError(undefined);
         runCancel(
-            { jobId },
+            { jobId: targetId },
             {
                 onError: (error: Error) => {
                     setImportError(error.message || t`Could not cancel the import.`);
@@ -290,7 +360,8 @@ const MemoryFileImport: FC<MemoryFileImportProps> = ({ memoryEnabled, onImported
     const invalid = i18n.number(shownCounts.invalid);
     const countsText = t`Imported ${imported} · Updated ${updated} · Duplicates ${duplicates} · Too long ${tooLong} · Invalid ${invalid}`;
     const jobError = job?.status === "failed" ? (job.error ?? t`The import stopped before it finished.`) : undefined;
-    const alertText = importError ?? jobError;
+    const progressErrorText = progressFailed ? (isProgressError && progressError?.message) || t`Could not read the import's progress.` : undefined;
+    const alertText = importError ?? jobError ?? progressErrorText;
 
     return (
         <div aria-labelledby={`${fileId}-title`} className="space-y-2" role="group">
@@ -314,7 +385,7 @@ const MemoryFileImport: FC<MemoryFileImportProps> = ({ memoryEnabled, onImported
                         type="file"
                     />
                 </div>
-                <Button disabled={disabled || !file} onClick={startImport} ref={importButton} type="button" variant="outline">
+                <Button disabled={disabled || !file || !baselineReady} onClick={startImport} ref={importButton} type="button" variant="outline">
                     {t`Import file`}
                 </Button>
             </div>
@@ -339,7 +410,7 @@ const MemoryFileImport: FC<MemoryFileImportProps> = ({ memoryEnabled, onImported
                 tabIndex={-1}
             >
                 <div className="space-y-1 text-xs" role="status">
-                    {running && <p>{t`Importing memories…`}</p>}
+                    {running && !progressFailed && <p>{t`Importing memories…`}</p>}
                     {finished && <p className="font-medium">{t`Import finished.`}</p>}
                     {(result || jobEnded) && <p>{countsText}</p>}
                 </div>
@@ -362,6 +433,11 @@ const MemoryFileImport: FC<MemoryFileImportProps> = ({ memoryEnabled, onImported
                     <p className="text-destructive text-xs" role="alert">
                         {alertText}
                     </p>
+                )}
+                {progressErrorText && alertText === progressErrorText && (
+                    <Button onClick={retryProgress} size="sm" type="button" variant="outline">
+                        {t`Try again`}
+                    </Button>
                 )}
             </div>
         </div>
