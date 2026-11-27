@@ -67,5 +67,4 @@ export const parseSchedule = (cronExpression: string): ScheduleParts | null => {
     return hour === null ? null : readDays(monthDayField, weekdayField, hour, minute);
 };
 
-/** `HH:MM`, zero-padded. */
 export const formatClock = (hour: number, minute: number): string => `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;

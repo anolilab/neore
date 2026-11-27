@@ -163,7 +163,7 @@ const TaskSuggestions: FC<TaskSuggestionsProps> = ({ fallbackFocus }) => {
                                         onClick={() =>
                                             decide(
                                                 id,
-                                                async () => await dismiss.mutateAsync({ suggestionId: suggestion._id }),
+                                                () => dismiss.mutateAsync({ suggestionId: id }),
                                                 t`Suggestion dismissed: ${title}`,
                                                 t`Failed to dismiss the suggestion`,
                                             )
@@ -178,12 +178,7 @@ const TaskSuggestions: FC<TaskSuggestionsProps> = ({ fallbackFocus }) => {
                                         aria-label={t`Accept "${title}"`}
                                         className="aria-disabled:opacity-50"
                                         onClick={() =>
-                                            decide(
-                                                id,
-                                                async () => await accept.mutateAsync({ suggestionId: suggestion._id }),
-                                                t`Task created: ${title}`,
-                                                t`Failed to create the task`,
-                                            )
+                                            decide(id, () => accept.mutateAsync({ suggestionId: id }), t`Task created: ${title}`, t`Failed to create the task`)
                                         }
                                         size="sm"
                                     >
