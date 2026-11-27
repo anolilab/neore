@@ -243,6 +243,14 @@ describe("candidates", () => {
         expect(warn).toHaveBeenCalledWith(expect.stringContaining("Vector search failed"), expect.anything());
     });
 
+    it("finds an identifier beside a two-letter word: a short term loses nothing", async () => {
+        const part = "ordered replacement part KX-2291 for the dishwasher";
+
+        await seed([{ embeddingId: "emb-part", lastConfirmedAt: 0, memory: part }, ...filler(CANDIDATE_WINDOW_SIZE + 5)]);
+
+        expect(await retrieve({ searchText: "AI KX-2291" })).toEqual([part]);
+    });
+
     it("scores the words of a search past its first 2,000 characters", async () => {
         await seed([{ memory: "descaled the kettle" }]);
 

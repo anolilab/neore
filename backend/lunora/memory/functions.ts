@@ -36,6 +36,7 @@ import { getVectorIdInfo, type VectorTableId, type VectorTableName } from "../ag
 import { parentKeyOf } from "../lib/rls/scope";
 import { MAX_LENGTH } from "../lib/validators";
 import { MAX_KEYWORD_TERMS } from "../knowledge/hybrid";
+import { isSearchIndexBuilding } from "../lib/search-index";
 import { findLiveGrant } from "../agent/live-grant";
 
 /**
@@ -1949,7 +1950,7 @@ export const searchMemoriesByKeyword = internalQuery
     .query(async ({ args, ctx }) => {
         const today = args.activeOn === undefined ? undefined : localDayOf(args.activeOn, args.timeZone ?? (await userTimeZone(ctx, args.userId)));
 
-        return await Promise.all(
+        const settled = await Promise.allSettled(
             args.terms.slice(0, MAX_KEYWORD_TERMS).map(async (term) => {
                 // The index ANDs the tokens (a prefix match on the last); `keywordLookupOf` then wants them adjacent.
                 const search = term.tokens.join(" ");
@@ -1962,6 +1963,20 @@ export const searchMemoriesByKeyword = internalQuery
                 return { ...lookup, hits: lookup.hits.map((m) => retrievalRowOf(m)) };
             }),
         );
+        const failed = settled.filter((result): result is PromiseRejectedResult => result.status === "rejected");
+        const building = failed.find((result) => isSearchIndexBuilding(result.reason));
+
+        // The index still backfilling refuses every term: the caller reports that state, not a failed lookup.
+        if (building !== undefined) {
+            throw building.reason;
+        }
+
+        if (failed.length > 0) {
+            // One term the index refused loses only that term (no query text in the event).
+            ctx.log.event("memory.keyword_lookup_failed", { failed: failed.length, terms: settled.length });
+        }
+
+        return settled.flatMap((result) => (result.status === "fulfilled" ? [result.value] : []));
     });
 
 export const getMemoryById = internalQuery.input({ memoryId: v.id("memories") }).query(async ({ args, ctx }) => ctx.db.get("memories", args.memoryId));

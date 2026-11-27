@@ -3,7 +3,7 @@
  *
  * Fetches relevant user memories before AI response generation.
  * Two searches find candidates beyond the newest rows: the vector index (cosine similarity) and the keyword index
- * (BM25 over one lookup per salient term), fused by rank. Scoring: relevance (cosine, else the BM25 share) +
+ * (BM25 over one lookup per salient term), fused by rank. Scoring: relevance (cosine, else the IDF-weighted keyword share) +
  * confidence + importance + recency decay.
  *
  * Implemented as an internalAction (not internalQuery) because ctx.vectorSearch()

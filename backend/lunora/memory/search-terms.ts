@@ -134,13 +134,21 @@ export const holdsSequence = (tokens: ReadonlyArray<string>, sequence: ReadonlyA
     return false;
 };
 
+/** Scoring reads at most this much of a search: a pasted document is not a question, and every term costs a pass. */
+export const MAX_SCORED_TEXT_LENGTH = 4000;
+
+/** And at most this many distinct salient terms, the most distinctive first. */
+export const MAX_SCORED_TERMS = 32;
+
 /**
- * Every salient term of a query (no stopwords, no single letters), the most distinctive first: identifiers, then words
- * longest first, then numbers and times (`2019`, `5pm`). The first is the query's leading term; the lookups take only the
- * first `MAX_KEYWORD_TERMS`, scoring takes them all.
+ * The salient terms of a query (no stopwords, no single letters, each once), the most distinctive first: identifiers,
+ * then words longest first, then numbers and times (`2019`, `5pm`); at most `MAX_SCORED_TERMS` of the first
+ * `MAX_SCORED_TEXT_LENGTH` characters. The first is the query's leading term; the lookups take only the first
+ * `MAX_KEYWORD_TERMS`, scoring takes them all.
  */
 export const salientTermsOf = (searchText: string): SalientTerm[] => {
-    const identifiers = identifiersOf(searchText);
+    const text = searchText.slice(0, MAX_SCORED_TEXT_LENGTH);
+    const identifiers = identifiersOf(text);
     const rank = (term: string): number => {
         if (identifiers.has(term)) {
             return 0;
@@ -149,8 +157,9 @@ export const salientTermsOf = (searchText: string): SalientTerm[] => {
         return DIGIT_RE.test(term) ? 2 : 1;
     };
 
-    return extractKeywordTerms(searchText, Infinity, searchTokensOf)
+    return extractKeywordTerms(text, Infinity, searchTokensOf)
         .toSorted((a, b) => rank(a) - rank(b))
+        .slice(0, MAX_SCORED_TERMS)
         .map((term) => {
             const tokens = identifiers.get(term);
 

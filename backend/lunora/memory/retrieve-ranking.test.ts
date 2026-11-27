@@ -5,6 +5,7 @@ import {
     KEYWORD_LOOKUP_LIMIT,
     keywordLookupOf,
     keywordLookupTerms,
+    KEYWORD_TOP_K,
     keywordSignalsFor,
     rankMemories,
     SEARCH_MAX_RESULTS,
@@ -18,6 +19,7 @@ import {
     withSearchHits,
 } from "./retrieve-ranking";
 import type { RankCandidate } from "./retrieve-ranking";
+import { MAX_SCORED_TERMS, salientTermsOf } from "./search-terms";
 
 const DAY = 86_400_000;
 const NOW = Date.UTC(2026, 10, 27, 12);
@@ -214,6 +216,29 @@ describe("rankMemories", () => {
             expect(ids([ab, qz], searchText, [lookup("5508", 1)])).toEqual(["qz"]);
         });
 
+        it("never counts another bot's rows: a word only they hold is not rare and does not lower this chat's share", () => {
+            const kite = keywordLookupOf({ term: "kite", tokens: ["kite"] }, [{ _id: "other", botId: "bot-b", memory: "flew a kite" }], {}, undefined);
+            const own = candidate("own", { ...old, memory: "likes Berlin cafes" });
+            // `berlin` is held by two rows of this chat; counting the other bot's row, `kite` (one row) would be rarer.
+            const lookups = [kite, lookup("berlin", 2)];
+            const signals = keywordSignalsFor([own], "kite Berlin", lookups);
+
+            expect(kite).toMatchObject({ corpusRows: 0, hits: [] });
+            expect(signals.keywordScores.get("own")).toBeCloseTo(1, 10);
+            expect(signals.rareTermMatches).toEqual(new Set(["own"]));
+        });
+
+        it("bounds the scoring of a 100 kB search and still finds an identifier near its start", () => {
+            const part = candidate("part", { ...old, memory: "Ordered part KX-2291" });
+            // Distinct words of letters only, so none reads as an identifier.
+            const word = (i: number) => [...i.toString(26)].map((digit) => String.fromCodePoint(97 + Number.parseInt(digit, 26))).join("");
+            const searchText = `did I order KX-2291 ${Array.from({ length: 12_000 }, (_, i) => `filler${word(i)}`).join(" ")}`;
+
+            expect(searchText.length).toBeGreaterThan(100_000);
+            expect(salientTermsOf(searchText).length).toBeLessThanOrEqual(MAX_SCORED_TERMS);
+            expect(ids([part], searchText, [lookup("2291", 1)])).toEqual(["part"]);
+        });
+
         it("reads a plain number as an ordinary term: it never turns keyword relevance off", () => {
             const hotel = candidate("hotel", { lastConfirmedAt: NOW - 30 * DAY, memory: "Liked the hotel by the old harbour" });
             const searchText = "my budget is 15000, which hotel did I like?";
@@ -350,8 +375,8 @@ describe("keyword hits", () => {
         const result = keywordLookupOf(time, fetched, {}, "2026-11-27");
 
         expect(result.hits.map((h) => h._id)).toEqual(["own"]);
-        // Every usable row of the user holding the term, of any scope; fewer rows than a lookup reads, so it is all of them.
-        expect(result).toMatchObject({ complete: true, corpusRows: 2 });
+        // Every usable row of the chat's scopes holding the term, the other bot's not; fewer rows than a lookup reads, so all of them.
+        expect(result).toMatchObject({ complete: true, corpusRows: 1 });
         expect(
             keywordLookupOf(
                 time,
@@ -372,12 +397,26 @@ describe("keyword hits", () => {
 
     it("keeps the best hits by BM25", () => {
         const lookups = [
-            { hits: [row("own", "ordered KX-2291 for the dishwasher"), row("plain", "KX notes")], term: "kx" },
-            { hits: [row("own", "ordered KX-2291 for the dishwasher")], term: "2291" },
+            { complete: true, corpusRows: 30, hits: [row("own", "ordered KX-2291 for the dishwasher"), row("plain", "KX notes")], term: "kx" },
+            { complete: true, corpusRows: 30, hits: [row("own", "ordered KX-2291 for the dishwasher")], term: "2291" },
         ];
 
         expect(topKeywordHits(lookups, 0).map((h) => h._id)).toEqual(["own", "plain"]);
         expect(topKeywordHits(lookups, 0, 1).map((h) => h._id)).toEqual(["own"]);
+    });
+
+    it("keeps a rare term's hits ahead of the cut, so short rows sharing other words cannot push them out", () => {
+        const short = Array.from({ length: 40 }, (_, i) => row(`s${String(i)}`, "replacement dishwasher part"));
+        const long = row("long", "after a long search the replacement dishwasher part QZ-5508 finally arrived by post");
+        const lookups = [
+            { complete: true, corpusRows: 1, hits: [long], term: "5508" },
+            { complete: true, corpusRows: 41, hits: [...short.slice(0, 20), long], term: "dishwasher" },
+            { complete: true, corpusRows: 41, hits: [...short.slice(20), long], term: "replacement" },
+        ];
+        const kept = topKeywordHits(lookups, 0);
+
+        expect(kept).toHaveLength(KEYWORD_TOP_K);
+        expect(kept.map((h) => h._id)).toContain("long");
     });
 
     it("fuses the vector and keyword hits by rank: a row both found leads, each row once", () => {

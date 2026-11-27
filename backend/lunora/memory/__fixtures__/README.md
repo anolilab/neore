@@ -89,12 +89,12 @@ current one, both over this fixture.
 
 | Slice    | Recall@8      | NDCG@8        | Expected in window | Off-topic rate | Abstain rate  | Abstain precision |
 | -------- | ------------- | ------------- | ------------------ | -------------- | ------------- | ----------------- |
-| overall  | 0.823 → 0.957 | 0.668 → 0.799 | 0.947 → 1.000      | 0.853 → 0.836  | 0.867 → 0.933 | 0.605 → 1.000     |
+| overall  | 0.823 → 0.957 | 0.668 → 0.796 | 0.947 → 1.000      | 0.853 → 0.836  | 0.867 → 0.933 | 0.605 → 1.000     |
 | single   | 0.940 → 0.940 | 0.830 → 0.822 | 1.000 → 1.000      | 0.880 → 0.880  |               |                   |
 | multi    | 0.883 → 0.883 | 0.726 → 0.725 | 1.000 → 1.000      | 0.771 → 0.771  |               |                   |
 | temporal | 1.000 → 1.000 | 0.715 → 0.715 | 1.000 → 1.000      | 0.872 → 0.872  |               |                   |
 | update   | 1.000 → 1.000 | 0.776 → 0.776 | 1.000 → 1.000      | 0.873 → 0.873  |               |                   |
-| exact    | 0.000 → 1.000 | 0.000 → 1.000 | 0.600 → 1.000      | 1.000 → 0.048  |               |                   |
+| exact    | 0.000 → 1.000 | 0.000 → 0.982 | 0.600 → 1.000      | 1.000 → 0.048  |               |                   |
 | abstain  |               |               |                    | 1.000 → 1.000  | 0.867 → 0.933 | 1.000 → 1.000     |
 
 With no vector search the keyword-only run reads Recall@8 0.160 → 0.603 and abstain rate 0.433 → 0.767. A number alone
@@ -102,7 +102,9 @@ is no identifier, so "is parcel 52690 mine" is answered with the user's own parc
 nothing; that one query is the abstain rate's 0.967 → 0.933 (and 0.800 → 0.767 without vectors), and both floors record it. Single NDCG@8
 falls by 0.008 (two queries reorder) because a word the memory never had no longer dilutes the one it does: a row with
 no vector that shares one word of a question whose other words are in no memory scores in full. Its floor stays 0.830,
-within the 0.02 tolerance. On the
+within the 0.02 tolerance. Exact NDCG@8 is 0.982 because the keyword share is the IDF share of the terms a row holds,
+with no length factor: for "have I read Quillfeather" a recent row holding only `read` now ranks above the
+Quillfeather row (both injected). On the
 150-query fixture before the `exact` rows, the earlier changes (newest-rows window, relevance gate, weights) took
 overall Recall@8 0.600 → 0.950 and NDCG@8 0.431 → 0.771.
 
@@ -110,7 +112,7 @@ What moved them:
 
 - **Keywords find what vectors miss.** Each of the first six salient query terms is one lookup of the
   `search_memory_text` FTS5 index (reading 50 rows, keeping 20 whole-token, usable, in-scope ones), so a row older than
-  the window that holds the query's code or name becomes a candidate. Relevance is the BM25 share of every salient term
+  the window that holds the query's code or name becomes a candidate. Relevance is the IDF-weighted share of every salient term
   the memory holds at all, over whole tokens (`time` is not `timer`, which cost two abstain queries with prefix
   matching). A query whose leading identifier is in no memory (`QZ-5508` when the user has `KX-2291`) has no keyword
   relevance at all. A row holding the leading term and the rare term (that identifier, or the rarest looked-up word,

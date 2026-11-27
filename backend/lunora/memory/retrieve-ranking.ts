@@ -29,9 +29,9 @@ export const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
  * score of `AUTO_INJECT_THRESHOLD`, which only drops a row that is old, unsure and unimportant at once.
  *
  * Tuned on the retrieval eval (`__fixtures__/README.md`): relevant rows start at cosine 0.86 and unrelated ones end
- * at 0.40, so 0.45 leaves a margin over the noise. The keyword floor (on the BM25 share, `keywordSignalsFor`) applies
- * to a memory with no vector, to one whose vector is new or the search did not fill its cut, to one holding the query's
- * rare term, and to every memory when no vector search ran. 0.15 is the highest that keeps every category of the eval
+ * at 0.40, so 0.45 leaves a margin over the noise. The keyword floor (on the IDF-weighted keyword share,
+ * `keywordSignalsFor`) applies to a memory with no vector, to one whose vector is new or the search did not fill its
+ * cut, to one holding the query's rare term, and to every memory when no vector search ran. 0.15 is the highest that keeps every category of the eval
  * (multi Recall@8 0.867 at 0.2, 0.883 at 0.15); the keyword-only run reads Recall@8 0.603 and abstain rate 0.767 there.
  */
 export const INJECT_MIN_RELEVANCE = 0.45;
@@ -200,11 +200,11 @@ export interface LookupTerm {
     tokens: string[];
 }
 
-/** One term's lookup: the rows it keeps, and how many usable rows of the user hold the term. */
+/** One term's lookup: the rows it keeps, and how many usable rows of the chat's scopes hold the term. */
 export interface KeywordLookup<T> {
-    /** The index had fewer rows than `KEYWORD_LOOKUP_LIMIT` for the term, so `corpusRows` is every usable row holding it. */
+    /** The index had fewer rows than `KEYWORD_LOOKUP_LIMIT` for the term, so `corpusRows` is every row holding it. */
     complete: boolean;
-    /** Usable rows of the user, of any scope, holding the term as a whole token. */
+    /** Usable rows of the chat's scopes holding the term whole; another bot's rows never count. */
     corpusRows: number;
     hits: T[];
     term: string;
@@ -222,19 +222,25 @@ export const keywordLookupOf = <
     scope: MemoryScope,
     today: string | undefined,
 ): KeywordLookup<T> => {
-    const held = fetched.filter((row) => !row.supersededBy && isUsableOn(row, today) && holdsSequence(searchTokensOf(row.memory), tokens));
+    const held = fetched.filter(
+        (row) => !row.supersededBy && isUsableOn(row, today) && inScope(row, scope) && holdsSequence(searchTokensOf(row.memory), tokens),
+    );
 
     return {
         complete: fetched.length < KEYWORD_LOOKUP_LIMIT,
         corpusRows: held.length,
-        hits: held.filter((row) => inScope(row, scope)).slice(0, KEYWORD_HITS_PER_TERM),
+        hits: held.slice(0, KEYWORD_HITS_PER_TERM),
         term,
     };
 };
 
-/** The best `limit` keyword hits, best first by BM25 over whole tokens of what the lookups kept. */
+/**
+ * The best `limit` keyword hits: first every hit of a rare term's lookup (at most `RARE_TERM_MAX_ROWS` rows hold it,
+ * so a long row holding the query's identifier is not cut behind short rows sharing its other words), then the rest
+ * best first by BM25 over whole tokens.
+ */
 export const topKeywordHits = <T extends { _id: string; memory: string }>(
-    lookups: { hits: T[]; term: string }[],
+    lookups: KeywordLookup<T>[],
     corpusSize: number,
     limit: number = KEYWORD_TOP_K,
 ): T[] => {
@@ -247,9 +253,21 @@ export const topKeywordHits = <T extends { _id: string; memory: string }>(
         };
     });
 
-    return scoreKeywordCandidates(termHits, Math.max(corpusSize, CANDIDATE_WINDOW_SIZE), { tokenize: searchTokensOf, wholeTokens: true })
-        .slice(0, limit)
-        .map(({ candidate }) => candidate.row);
+    const rare = lookups.filter(({ complete, corpusRows }) => complete && corpusRows > 0 && corpusRows <= RARE_TERM_MAX_ROWS).flatMap(({ hits }) => hits);
+    const ranked = scoreKeywordCandidates(termHits, Math.max(corpusSize, CANDIDATE_WINDOW_SIZE), { tokenize: searchTokensOf, wholeTokens: true }).map(
+        ({ candidate }) => candidate.row,
+    );
+    const kept = new Map<string, T>();
+
+    for (const row of [...rare, ...ranked]) {
+        if (kept.size >= limit) {
+            break;
+        }
+
+        kept.set(row._id, row);
+    }
+
+    return [...kept.values()];
 };
 
 /** The vector hits and the keyword hits as one list, by Reciprocal Rank Fusion of their ranks; a row is in it once. */
@@ -357,9 +375,9 @@ export interface KeywordSignals {
  * The keyword signals of every candidate, over every salient term of the search (`salientTermsOf`; the lookups take
  * only the first few) matched as whole tokens, as the index splits them.
  *
- * - The score is BM25 over the candidates, counted as at least a window of rows, divided by the sum of IDF over the
- *   terms the memory holds at all (a candidate holds it, or its lookup found a row): the IDF-weighted share of those
- *   terms a row holds. A word the memory never had does not dilute the one it does, such as an identifier.
+ * - The score is the IDF-weighted share of the terms the memory holds at all (a candidate holds it, or its lookup found
+ *   a row in the chat's scopes) that a row holds, IDF over the candidates counted as at least a window of rows. A word
+ *   the memory never had does not dilute the one it does, such as an identifier.
  * - When the query's leading term is an identifier no candidate holds (`QZ-5508`), the query asks for something the
  *   memory does not have: no candidate has keyword relevance, whatever common word it shares.
  * - The rare term is that identifier, or else the rarest looked-up term, when its lookup is complete and at most
@@ -375,7 +393,7 @@ export const keywordSignalsFor = (
     const rareTermMatches = new Set<string>();
     const terms = salientTermsOf(searchText);
     const rows = candidates.map((m) => {
-        return { content: m.memory, id: m._id, tokens: searchTokensOf(m.memory) };
+        return { id: m._id, tokens: searchTokensOf(m.memory) };
     });
     const termHits = terms.map(({ term, tokens }) => {
         return { hits: rows.filter((row) => holdsSequence(row.tokens, tokens)), term };
@@ -390,12 +408,14 @@ export const keywordSignalsFor = (
     const corpus = new Map(lookups.map((lookup) => [lookup.term, lookup]));
     const inMemory = (term: string, held: number): boolean => held > 0 || (corpus.get(term)?.corpusRows ?? 0) > 0;
     const corpusSize = Math.max(candidates.length, CANDIDATE_WINDOW_SIZE);
-    const most = termHits.reduce((sum, { hits, term }) => sum + (inMemory(term, hits.length) ? bm25Idf(hits.length, corpusSize) : 0), 0);
+    const idfs = termHits.map(({ hits, term }) => (inMemory(term, hits.length) ? bm25Idf(hits.length, corpusSize) : 0));
+    const most = idfs.reduce((sum, idf) => sum + idf, 0);
 
-    const scored = scoreKeywordCandidates(termHits, corpusSize, { tokenize: searchTokensOf, wholeTokens: true });
-
-    for (const { candidate, score } of scored) {
-        keywordScores.set(candidate.id, Math.min(score / most, 1));
+    // Numerator and denominator on one scale: the IDF of each held term the row holds, no term-frequency or length factor.
+    for (const [index, { hits }] of termHits.entries()) {
+        for (const hit of hits) {
+            keywordScores.set(hit.id, (keywordScores.get(hit.id) ?? 0) + idfs[index]! / most);
+        }
     }
 
     const rareTerm = leading.code || inMemory(leading.term, leadingHits.length) ? rareTermOf(terms, corpus) : undefined;
