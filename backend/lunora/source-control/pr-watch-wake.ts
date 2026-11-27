@@ -28,6 +28,7 @@
  * Reads and writes of watch state happen on the owner's shard only (`currentUserShard`, `runAfterOnShard`, `enqueueJob`).
  */
 import { DEFAULT_CHAT_MODEL } from "@neore/ai/constants";
+import { MODEL_LOOKUP } from "@neore/ai/models";
 import { LunoraError, v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
@@ -41,6 +42,7 @@ import { isDeviceEligibleThread } from "../devices/internal";
 import { isThreadLocked } from "../lib/thread-lock";
 import { chargeRound, loadTaskAccount, refundRoundKeys, roundQuotaKeys, roundWindowEnds, taskAccessProblem } from "../tasks/account";
 import { wakeLeaseHeld } from "./pr-watch-wake-lease";
+import { isTaskModelAllowed } from "../tasks/logic";
 import { PR_WATCH_MAX_WAKES, PR_WATCH_WAKE_COOLDOWN_MS, type WatchWakeReason } from "./pr-watch-logic";
 
 /**
@@ -72,7 +74,7 @@ const vMarkers = v.object({ checks: v.optional(v.string()), conflict: v.optional
 const vBegin = v.union(
     v.object({ status: v.literal("stale") }),
     v.object({ status: v.literal("wait") }),
-    v.object({ charged: v.array(v.string()), status: v.literal("run") }),
+    v.object({ charged: v.array(v.string()), model: v.string(), status: v.literal("run") }),
 );
 
 const vTurn = v.object({
@@ -178,7 +180,10 @@ const settledPatch = (link: Doc<"pullRequestThreads">, watch: NonNullable<Doc<"p
             watchWakeFailure: {
                 ...link.watchWakeFailure,
                 attempts: 0,
-                kind: link.watchWakeFailure.kind === "shared" ? ("retryable" as const) : link.watchWakeFailure.kind,
+                kind:
+                    link.watchWakeFailure.kind === "shared" || link.watchWakeFailure.kind === "unavailable"
+                        ? ("retryable" as const)
+                        : link.watchWakeFailure.kind,
                 retryAt: 0,
             },
         }),
@@ -430,6 +435,24 @@ export const beginWatchWake = internalMutation
             return { status: "wait" as const };
         }
 
+        // The model is the chat's own NOW, as for a new turn there (the claim's copy may be stale: the owner can have changed it). One that
+        // is no longer available is refused like any other ineligible state: nothing is charged or counted, the lease is released, and the
+        // owner sees it once on `watchWakeFailure`.
+        const wakeThread = await ctx.db.get("threads", link.threadId);
+        const model = wakeThread?.model || DEFAULT_CHAT_MODEL;
+
+        if (!isTaskModelAllowed(model, (id) => MODEL_LOOKUP.get(id))) {
+            if (link.watchWakeFailure?.kind !== "unavailable") {
+                await ctx.db.patch("pullRequestThreads", link._id, {
+                    watchWakeFailure: { at: ctx.now, attempts: link.watchWakeFailure?.attempts ?? 0, kind: "unavailable", retryAt: 0 },
+                });
+            }
+
+            await ctx.db.patch("pullRequestThreads", link._id, { watchWakeLeaseUntil: 0 });
+
+            return { status: "wait" as const };
+        }
+
         // A refund owed for an earlier turn that failed before the model is paid first, so a new charge never stacks on an unreconciled one.
         await payOwedRefund(ctx, link);
 
@@ -459,7 +482,7 @@ export const beginWatchWake = internalMutation
             watchWakeRefund: { applied: false, claim: args.claim, keys: charged, windowEnds },
         });
 
-        return { charged, status: "run" as const };
+        return { charged, model, status: "run" as const };
     });
 
 /** The model was reached: the round stays charged, so the refund owed for it is closed without a payment. Called before the first generation. */
@@ -673,7 +696,7 @@ export const runWatchWake = internalAction
         try {
             await runHeadlessAgent(ctx, {
                 memory: false,
-                model: args.model,
+                model: may.model,
                 // Recorded before the first generation: the round then stays charged, and a failure from here on is never refunded.
                 onGenerationStart: async () => {
                     await ctx.runMutation(internal.source_control.pr_watch_wake.keepWatchWakeCharge, { claim: args.claim, linkId: args.linkId });

@@ -25163,6 +25163,13 @@
                   "optional": false,
                   "unique": false,
                   "literal": "\"terminal\""
+                },
+                {
+                  "kind": "literal",
+                  "nullable": false,
+                  "optional": false,
+                  "unique": false,
+                  "literal": "\"unavailable\""
                 }
               ]
             },

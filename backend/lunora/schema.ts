@@ -2779,13 +2779,13 @@ export const schema = defineSchema({
         ),
         // How the wake turns of this watch are failing (`source-control/pr-watch-wake.ts`): when the last one failed, how many failed in a row
         // (0 after a delivery), when the next try may start, and what kind of failure it was: "retryable", "terminal" (cannot be cured by trying
-        // again), or "shared" (the chat is no longer the owner's alone: the watch waits and no failure is counted). The watch is stopped at the
+        // again), "shared" (the chat is no longer the owner's alone) or "unavailable" (the chat's model is no longer available): the watch waits and no failure is counted. The watch is stopped at the
         // third failure in a row or at a terminal one; the last failure stays as history.
         watchWakeFailure: v.optional(
             v.object({
                 at: v.number(),
                 attempts: v.number(),
-                kind: v.union(v.literal("retryable"), v.literal("shared"), v.literal("terminal")),
+                kind: v.union(v.literal("retryable"), v.literal("shared"), v.literal("terminal"), v.literal("unavailable")),
                 retryAt: v.number(),
             }),
         ),

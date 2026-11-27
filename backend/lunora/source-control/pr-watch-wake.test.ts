@@ -116,6 +116,7 @@ class AgentRunErrorStandIn extends Error {
 }
 
 const OWNER = "user-a";
+const { DEFAULT_CHAT_MODEL: MODEL } = await import("@neore/ai/constants");
 const STARTED_AT = 1000;
 const LEASE = 5000;
 
@@ -153,7 +154,7 @@ const seed = async (extra: Record<string, unknown> = {}, thread: Record<string, 
         const threadId = await insertThread(ctx.db, {
             createdBy: OWNER,
             mode: "text",
-            model: "gpt-4o",
+            model: MODEL,
             status: "active",
             tags: ["chat"],
             title: "work",
@@ -216,7 +217,7 @@ describe("the scheduled step", () => {
         expect(enqueued).toHaveLength(1);
         // A consumer starting the moment the message is sent already finds the committed lease.
         expect(probe.leaseSeenAtEnqueue).toBe(enqueued[0]?.args.claim);
-        expect(enqueued[0]?.args).toMatchObject({ linkId, model: "gpt-4o", reasons: ["checks"], threadId, userId: OWNER });
+        expect(enqueued[0]?.args).toMatchObject({ linkId, model: MODEL, reasons: ["checks"], threadId, userId: OWNER });
         expect(enqueued[0]?.options).toMatchObject({ once: { userId: OWNER }, shardKey: OWNER });
         expect(row.watchWakeLeaseUntil).toBe(enqueued[0]?.args.claim);
         // Nothing is counted or cleared until the turn ran.
@@ -364,7 +365,7 @@ describe("the job", () => {
         const row = await rowOf(linkId);
 
         expect(runs).toHaveLength(1);
-        expect(runs[0]).toMatchObject({ model: "gpt-4o", organizationId: null, origin: "trigger", thread: { threadId }, tools: "headless", userId: OWNER });
+        expect(runs[0]).toMatchObject({ model: MODEL, organizationId: null, origin: "trigger", thread: { threadId }, tools: "headless", userId: OWNER });
         expect(runs[0]?.prompt).toBe(wakePrompt({ number: 7, repository: "octo/hello" }, ["checks"]));
         expect(row.watchPending).toEqual([]);
         expect(row.watch).toMatchObject({ wakes: 1 });
@@ -1012,6 +1013,60 @@ describe("at most one model call per occurrence", () => {
         expect(probe.charges).toBe(2);
         expect(probe.refunds).toBe(1);
         expect(runs).toHaveLength(1);
+    });
+});
+
+describe("the model of the turn", () => {
+    it("is the chat's model when the turn starts, not the copy made at the claim", async () => {
+        const { MODEL_LOOKUP } = await import("@neore/ai/models");
+        const { isTaskModelAllowed } = await import("../tasks/logic");
+        const ids = [...MODEL_LOOKUP.keys()];
+        const other = ids.find((id) => id !== MODEL && isTaskModelAllowed(id, (model) => MODEL_LOOKUP.get(model)));
+        const { linkId, threadId } = await seed();
+
+        await start(linkId);
+        expect(enqueued[0]?.args.model).toBe(MODEL);
+        expect(other).toBeDefined();
+
+        // The owner changes the chat's model after the claim.
+        await harness.run(async (ctx: any) => {
+            await ctx.db.patch("threads", threadId, { model: other });
+        });
+        await runJob(enqueued[0]!);
+
+        expect(runs).toHaveLength(1);
+        expect(runs[0]?.model).toBe(other);
+    });
+
+    it("refuses a model that is no longer available: nothing charged or counted, the lease released, the owner told once", async () => {
+        const { linkId, threadId } = await seed();
+
+        await start(linkId);
+        await harness.run(async (ctx: any) => {
+            await ctx.db.patch("threads", threadId, { model: "retired-model-9000" });
+        });
+        await runJob(enqueued[0]!);
+
+        const row = await rowOf(linkId);
+
+        expect(runs).toHaveLength(0);
+        expect(probe.charges).toBe(0);
+        expect(row.watchWakeLeaseUntil).toBe(0);
+        expect(row.watchPending).toEqual(["checks"]);
+        expect(row.watch.wakes).toBeUndefined();
+        expect(row.watchWakeCompleted).toBeUndefined();
+        expect(row.watchWakeFailure).toMatchObject({ attempts: 0, kind: "unavailable", retryAt: 0 });
+
+        // Noted once: a second refusal does not rewrite it.
+        const noted = row.watchWakeFailure.at;
+
+        expect(await start(linkId)).toBe(true);
+        await runJob(enqueued[1]!);
+
+        const again = await rowOf(linkId);
+
+        expect(again.watchWakeFailure.at).toBe(noted);
+        expect(runs).toHaveLength(0);
     });
 });
 
