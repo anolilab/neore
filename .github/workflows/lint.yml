@@ -72,7 +72,7 @@ jobs:
                   filters: ".github/file-filters.yml"
     format-and-secrets:
         name: "oxfmt and secret scan"
-        runs-on: "ubuntu-latest"
+        runs-on: "ubuntu-24.04"
         timeout-minutes: 20
         permissions:
             contents: "read"
@@ -99,6 +99,15 @@ jobs:
                   node-version: "24.22.1"
                   npm-version: "11"
                   skip-playwright: "true"
+            - name: "Generate the Lunora backend code"
+              env:
+                  NODE_OPTIONS: "--max-old-space-size=4096"
+              run: "pnpm --filter @neore/backend run codegen"
+
+            - name: "Check the schema baseline is committed"
+              env:
+                  NODE_OPTIONS: "--max-old-space-size=4096"
+              run: "pnpm --filter @neore/backend run check:schema-baseline"
 
             - name: "Check formatting"
               shell: "bash"
@@ -122,7 +131,7 @@ jobs:
         name: "oxlint"
         needs: "files-changed"
         if: "github.event_name == 'merge_group' || needs.files-changed.outputs.code == 'true'"
-        runs-on: "ubuntu-latest"
+        runs-on: "ubuntu-24.04"
         timeout-minutes: 30
         permissions:
             contents: "read"
@@ -145,6 +154,10 @@ jobs:
                   node-version: "24.22.1"
                   npm-version: "11"
                   skip-playwright: "true"
+            - name: "Generate the Lunora backend code"
+              env:
+                  NODE_OPTIONS: "--max-old-space-size=4096"
+              run: "pnpm --filter @neore/backend run codegen"
 
             # A rule ESLint turned off for some files but the committed config still
             # enforces would fail here on code ESLint accepts.
@@ -163,7 +176,7 @@ jobs:
         needs: "files-changed"
         # Skipped (reported as success) when the change touches no code, e.g. docs only.
         if: "github.event_name == 'merge_group' || needs.files-changed.outputs.code == 'true'"
-        runs-on: "ubuntu-latest"
+        runs-on: "ubuntu-24.04"
         timeout-minutes: 45
         permissions:
             contents: "read"
@@ -185,6 +198,10 @@ jobs:
                   node-version: "24.22.1"
                   npm-version: "11"
                   skip-playwright: "true"
+            - name: "Generate the Lunora backend code"
+              env:
+                  NODE_OPTIONS: "--max-old-space-size=4096"
+              run: "pnpm --filter @neore/backend run codegen"
 
             # `lint:types` builds the document-parser Worker (worker-build), so the
             # same toolchain the test workflow installs is needed here too.
@@ -230,13 +247,16 @@ jobs:
                   node-version: "24.22.1"
                   npm-version: "11"
                   skip-playwright: "true"
-
             # Typed rules read the packages' emitted declarations. `build:packages` builds the
             # `type:package` projects (`ai`, `service-sdk`), which need neither the Rust toolchain
             # nor libdbus: those stay with the type check, which builds the native module.
             - name: "Build packages"
               shell: "bash"
               run: "pnpm run build:packages"
+            - name: "Generate the Lunora backend code"
+              env:
+                  NODE_OPTIONS: "--max-old-space-size=4096"
+              run: "pnpm --filter @neore/backend run codegen"
 
             - name: "ESLint"
               shell: "bash"
@@ -244,7 +264,7 @@ jobs:
 
     actionlint:
         name: "Actionlint"
-        runs-on: "ubuntu-latest"
+        runs-on: "ubuntu-24.04"
         timeout-minutes: 10
         permissions:
             contents: "read"
@@ -272,7 +292,7 @@ jobs:
         name: "Check Lint"
         needs: ["lint", "files-changed", "format-and-secrets", "oxlint", "types", "eslint", "actionlint"]
         if: "always()"
-        runs-on: "ubuntu-latest"
+        runs-on: "ubuntu-24.04"
         timeout-minutes: 5
         steps:
             - name: "Fail if a dependency failed or was cancelled"

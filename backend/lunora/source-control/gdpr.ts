@@ -205,6 +205,8 @@ export const deleteUserGuides = internalMutation
 /** Links per export step: each row is small, so a page is generous and a long history still takes few steps. */
 const PULL_REQUEST_LINKS_EXPORT_PAGE = 100;
 
+const vWatchWakeReason = v.union(v.literal("checks"), v.literal("conflict"), v.literal("review"));
+
 /**
  * The user's links between threads and the pull requests they work on. `title` is a copy of the thread's title when
  * the link was made (the user's own words, and it outlives a rename or a deletion), so the links travel with the export.
@@ -220,11 +222,47 @@ export const collectPullRequestThreadsForExport = internalQuery
                     createdAt: v.number(),
                     headBranch: v.optional(v.string()),
                     kind: v.union(v.literal("attached"), v.literal("linked"), v.literal("opened")),
+                    mergeAttemptedAt: v.optional(v.number()),
+                    mergedAt: v.optional(v.number()),
+                    mergedBefore: v.optional(v.number()),
+                    mergeRecordedAt: v.optional(v.number()),
+                    mergeSettledAt: v.optional(v.number()),
                     number: v.number(),
                     repository: v.string(),
+                    state: v.optional(v.union(v.literal("open"), v.literal("closed"), v.literal("merged"))),
+                    stateCheckedAt: v.optional(v.number()),
+                    statusReadAt: v.optional(v.number()),
                     threadId: v.string(),
                     title: v.string(),
                     url: v.string(),
+                    watch: v.optional(
+                        v.object({
+                            baselined: v.optional(v.boolean()),
+                            checksHeadSha: v.optional(v.string()),
+                            conflictHeadSha: v.optional(v.string()),
+                            headSha: v.optional(v.string()),
+                            lastWakeAt: v.optional(v.number()),
+                            reviewId: v.optional(v.string()),
+                            startedAt: v.number(),
+                            stoppedAt: v.optional(v.number()),
+                            wakes: v.optional(v.number()),
+                        }),
+                    ),
+                    watchPending: v.optional(v.array(vWatchWakeReason)),
+                    watchReadFailure: v.optional(
+                        v.object({
+                            at: v.number(),
+                            attempts: v.number(),
+                            status: v.union(
+                                v.literal("forbidden"),
+                                v.literal("host_error"),
+                                v.literal("needs_reconnect"),
+                                v.literal("not_connected"),
+                                v.literal("not_found"),
+                                v.literal("rate_limited"),
+                            ),
+                        }),
+                    ),
                 }),
             ),
         }),
@@ -242,9 +280,20 @@ export const collectPullRequestThreadsForExport = internalQuery
                     ...(link.baseBranch !== undefined && { baseBranch: link.baseBranch }),
                     createdAt: link.createdAt,
                     ...(link.headBranch !== undefined && { headBranch: link.headBranch }),
+                    ...(link.mergeAttemptedAt !== undefined && { mergeAttemptedAt: link.mergeAttemptedAt }),
+                    ...(link.mergedAt !== undefined && { mergedAt: link.mergedAt }),
+                    ...(link.mergedBefore !== undefined && { mergedBefore: link.mergedBefore }),
+                    ...(link.mergeRecordedAt !== undefined && { mergeRecordedAt: link.mergeRecordedAt }),
+                    ...(link.mergeSettledAt !== undefined && { mergeSettledAt: link.mergeSettledAt }),
                     kind: link.kind,
                     number: link.number,
                     repository: link.repository,
+                    ...(link.statusReadAt !== undefined && { statusReadAt: link.statusReadAt }),
+                    ...(link.state !== undefined && { state: link.state }),
+                    ...(link.stateCheckedAt !== undefined && { stateCheckedAt: link.stateCheckedAt }),
+                    ...(link.watch !== undefined && { watch: link.watch }),
+                    ...(link.watchPending !== undefined && { watchPending: link.watchPending }),
+                    ...(link.watchReadFailure !== undefined && { watchReadFailure: link.watchReadFailure }),
                     threadId: link.threadId,
                     title: link.title,
                     url: link.url,
@@ -265,5 +314,19 @@ export const deleteUserPullRequestThreads = internalMutation
 
         await Promise.all(links.map((link) => ctx.db.delete("pullRequestThreads", link._id)));
 
-        return { hasMore: links.length >= BATCH };
+        const hasMore = links.length >= BATCH;
+
+        // The scan position goes with the last batch, so no sweep resumes over links that are gone.
+        if (!hasMore) {
+            const scan = await ctx.db
+                .query("pullRequestStateScans")
+                .withIndex("by_userId", (q) => q.eq("userId", userId))
+                .unique();
+
+            if (scan) {
+                await ctx.db.delete("pullRequestStateScans", scan._id);
+            }
+        }
+
+        return { hasMore };
     });

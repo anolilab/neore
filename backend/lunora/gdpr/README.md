@@ -126,16 +126,34 @@ Users can request a complete export of all their personal data in JSON format. T
 1. **Profile Data** - User account information
 2. **Settings** - User preferences and AI settings
 3. **Conversations** - All threads and messages
-4. **Files** - File metadata (actual files stored separately)
+4. **Files** - Vault file and folder metadata, and the chat files of the user (uploads and generated images): the files behind their
+   grants and the files their messages still name, metadata only, the bytes are not exported (`agent/export-pages.ts`, read by
+   `agent/gdpr.ts#collectGrantedChatFileIdsForExport`, the thread and message walk, and `chatFileMetadataForExport`). The section is held
+   to 8 MiB as written; past it the rest are left out and the section says so. Its reads take what the sections before it left of the
+   action's read budget (`chatFilesReadBudget`), and past that the section is cut and flagged too. A chat link alone is not exported: a
+   link outlives the message that named the file
 5. **Prompts** - Saved prompts and history
 6. **Usage History** - AI usage tracking events
+7. **Browser** - Browser sessions (started, status, last page, the extension that drove it), their actions (action, target, time, success),
+   the sites a run asked the user to clear, and paired extensions (`browser/gdpr.ts#collectBrowserForExport`, a
+   page per workflow step, each stored as an object under the run's prefix and read back by `generateExportFile`, so no
+   call carries the whole history past Lunora's 1 MiB dispatch body; the objects are deleted once the export file's step ends,
+   whatever the outcome, before the steps that follow it; no page is stored once the account's deletion has begun, and a page
+   whose write ends after it began is deleted again). The pages sit under `gdpr-exports/browser-<user>/<run>/`, and the run's record (`usageExportRuns`) is written
+   before the first page, so a run killed before its ending is still cleaned up: the usage sweep deletes a dead run's pages
+   with its usage object, and keeps the record until the pages are gone (a deletion that exhausts its retries is tried again a day on), and account erasure deletes the user's whole prefix (`delete-user-browser-export-pages`). Left out: the renderer's connect URL and session id, the in-flight holds, the live-view
+   `control` claim, a typed action's `value` (it can be a password) and an extension's pairing code. A string field
+   over 4 KiB is cut and named in the row's `truncated` (a list keeps every item, the cut ones named: `capabilities[1]`). The
+   section is held to 8 MiB of the file (measured as written, indented) and 256 pages (workflow steps): past either no further
+   page is stored, the rest is left out and the section says `truncated: true`, and the rest of the export is written. The
+   actions are read last, as by far the largest, so a cut drops the newest actions before any session, site or extension is dropped.
 
 **Workflow Steps:**
 
 1. User requests export via `requestDataExport` mutation
 2. Workflow collects data from all tables (parallel queries)
-3. Data is formatted as JSON
-4. JSON is uploaded to R2
+3. `open-export-run` records the run (`usageExportRuns`), then `collect-browser-<n>` stores the browser section a page at a time
+4. Data is formatted as JSON and uploaded to R2; `delete-browser-pages` then deletes the run's browser pages, either way
 5. Signed download URL is generated (7-day expiry)
 6. Email notification sent to user
 
@@ -169,7 +187,8 @@ const { url } = await ctx.runAction(api.gdpr.functions.getExportDownloadUrl, {})
   "conversations": [ ... ],
   "files": { ... },
   "prompts": { ... },
-  "usageHistory": [ ... ]
+  "usageHistory": [ ... ],
+  "browser": { "sessions": [ ... ], "actions": [ ... ], "humanChecks": [ ... ], "extensions": [ ... ] }
 }
 ```
 
@@ -346,14 +365,41 @@ Audit history supports configurable retention via the vacuum feature:
 `gdpr/retention.ts#pruneRetainedActivity` runs in every shard's housekeeping
 sweep (`lib/shard-housekeeping.ts`), a bounded batch per table per run:
 
-| Table          | Kept                                               | Why                                                                           |
-| -------------- | -------------------------------------------------- | ----------------------------------------------------------------------------- |
-| `usageDaily`   | 400 days                                           | The usage page's per-day rollup; a year plus a month of history is enough.    |
-| `subAgentRuns` | 90 days, finished runs only (`succeeded`/`failed`) | The answer was already posted into the parent thread; the row is bookkeeping. |
+| Table                      | Kept                                               | Why                                                                                                                                                                          |
+| -------------------------- | -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `usageDaily`               | 400 days                                           | The usage page's per-day rollup; a year plus a month of history is enough.                                                                                                   |
+| `usageOrganizationReplies` | 400 days, pruned at the next UTC midnight          | Replies recorded under an organization's projects, read by the organization view; the same window as the rollup. Its contributor list drops a user once their rows are gone. |
+| `subAgentRuns`             | 90 days, finished runs only (`succeeded`/`failed`) | The answer was already posted into the parent thread; the row is bookkeeping.                                                                                                |
 
-Both are also in the export (`collectActivityForExport`, with
-`knowledgeCollections`) and deleted with the account in their own batched steps
-(`deleteUserUsageDaily`, `deleteUserSubAgentRuns`).
+Both are also in the export and deleted with the account in their own batched
+steps (`deleteUserUsageDaily`, `deleteUserSubAgentRuns`). A failed delete fails
+its step, so the retry removes what is left. `subAgentRuns` is read with
+`collectActivityForExport`, with `knowledgeCollections`.
+
+`usageOrganizationReplies` is erased with the rest of the usage tables
+(`usage/gdpr.ts#eraseUsageForUser`). The user's entries in
+`usageOrganizationContributors` go only in the batch after their ledger rows are
+all gone: until then the organization view still reads the member, sees the
+erasure underway and withholds their cohort's weeks. Once the entry is gone the
+cohort shows with the members it has (an accepted departure, owner's decision
+of 2026-11-23); a cohort left with fewer than three members is withheld
+(`MIN_MEMBERS_SHORT_COHORT`: with two, a member reading the view subtracts
+their own spend and sees the other's).
+
+`usageDaily` is exported in durable steps (`gdpr/usage-export-steps.ts`): a page
+of 900 rows (`USAGE_EXPORT_PAGE`, below a mutation's write limit), then a recount of the closed days (two days before the user's latest
+row, so a replay gets the same day) and of the backfill row, then the titles of four
+projects at a time until 8 MiB are read, as the last check before the usage action. Once the rows pass the usage share, the export fails before any title is read; the titles and the final file are checked against the share after that. Each step persists its piece (`usageExportPieces`, keyed by run),
+so a retry resumes at the step that did not finish. A recount whose totals differ
+from the pages (a backfill wrote or changed an older row) redoes the pass, up to
+six passes per attempt, three attempts with a one-minute pause between them. A separate usage action (`prepareUsageForExport`) reads the kept pass,
+reads the verified titles and stores the usage JSON; the re-check sweep clears the pass's verified titles and checks each project's ownership and organization membership, each project in its own bounded step, before the final recount. The usage action then re-checks the organization memberships of the named titles from the primary, just before it writes the file, so a membership revoked since the re-check is left out. Ownership is last checked by the re-check sweep: a project transferred after its step, or between the final recount and the file write (separate steps), is still named. Its only size limit is the usage share of the file. A project is named once per pass (`usageExportProjects`), however many rows pages it is on; the file
+action splices it in. The usage object is deleted on every terminal path, before
+the pieces are cleared. The shard housekeeping sweep (`sweepUsageExportPieces`)
+removes a run's pieces and object once they are older than 24 hours and the run's
+request is no longer pending or processing: age alone never proves a run dead, and a
+slow export keeps its pieces.
+Erasure removes the pieces, and deletes each run's usage object inline in the deletion workflow (`purge-user-usage-files`). A failed delete fails that step, so erasure cannot finish while an object remains. A run whose export is still live keeps its record until that export ends: the workflow pauses a minute and purges again; after 120 rounds the purge is forced, removing the object and record while the export is still live.
 
 The rollup's bookkeeping — `usageReplies` (the id of each reply it counted, so
 none counts twice) and `usageBackfill` (the one-shot backfill's position) — is
@@ -379,31 +425,33 @@ GDPR Article 12 requires requests to be fulfilled within 30 days. The cron job:
 
 The following tables contain user personal data and are included in exports/deletions:
 
-| Table               | Location    | Data Type                    |
-| ------------------- | ----------- | ---------------------------- |
-| `user`              | Better Auth | Profile (name, email, image) |
-| `account`           | Better Auth | Auth providers, tokens       |
-| `session`           | Better Auth | Active sessions              |
-| `userSettings`      | `schema.ts` | Preferences, shortcuts       |
-| `aiUserPreferences` | `schema.ts` | AI settings, encrypted keys  |
-| `threads`           | `schema.ts` | Chat conversations           |
-| `messages`          | `schema.ts` | Chat messages                |
-| `files`             | `schema.ts` | Uploaded files               |
-| `folders`           | `schema.ts` | Folder structure             |
-| `prompts`           | `schema.ts` | Saved prompts                |
-| `promptHistory`     | `schema.ts` | Prompt versions              |
-| `threadAccess`      | `schema.ts` | Shared thread permissions    |
-| `threadInvites`     | `schema.ts` | Thread sharing invites       |
+| Table               | Location    | Data Type                                                      |
+| ------------------- | ----------- | -------------------------------------------------------------- |
+| `user`              | Better Auth | Profile (name, email, image)                                   |
+| `account`           | Better Auth | Auth providers, tokens                                         |
+| `session`           | Better Auth | Active sessions                                                |
+| `userSettings`      | `schema.ts` | Preferences, shortcuts                                         |
+| `aiUserPreferences` | `schema.ts` | AI settings, encrypted keys                                    |
+| `threads`           | `schema.ts` | Chat conversations                                             |
+| `messages`          | `schema.ts` | Chat messages                                                  |
+| `files`             | `schema.ts` | Uploaded files                                                 |
+| `chatFileAccess`    | `schema.ts` | Chat files held (uploads, generated images), metadata exported |
+| `folders`           | `schema.ts` | Folder structure                                               |
+| `prompts`           | `schema.ts` | Saved prompts                                                  |
+| `promptHistory`     | `schema.ts` | Prompt versions                                                |
+| `threadAccess`      | `schema.ts` | Shared thread permissions                                      |
+| `threadInvites`     | `schema.ts` | Thread sharing invites                                         |
+| `browser*` tables   | `schema.ts` | Browser sessions and use                                       |
 
 **Not in exports or deletions, by design: `wsTicket`** (raw D1, `lib/ws-ticket.ts`).
 Each row is a live-query socket ticket: a SHA-256 hash, a user id, a session id
-and an expiry 30 seconds after minting. It is deleted when redeemed, and an
+or an app grant's session id, and an expiry 30 seconds after minting. It is deleted when redeemed, and an
 expired one is purged by the next mint or by the Worker's one-minute cron tick
 (`src/server.ts#scheduled`), so no row outlives its minting by more than about
 90 seconds. Account deletion therefore does not visit it: within that window a
 deleted user's rows are gone on their own. Nor can a ticket minted just before
 the deletion be redeemed: `redeemWsTicket` also requires the session it was
-minted under to still exist (any session of the user, for a ticket that names
+minted under to still exist (that exact session or grant; any session of the user, for a ticket that names
 none), and `revokeUserSessions` is the workflow's first step — so from then on
 every outstanding ticket of the user authenticates nothing, even inside its 30s
 (`lib/ws-ticket.test.ts` pins this). A sign-out ends them the same way. It holds
@@ -420,13 +468,13 @@ no content worth exporting.
 
 ### Mutations
 
-- `requestDataExport()` - Request a data export
+- `requestDataExport()` - Request a data export (refused while an admin impersonates the user; the refusal runs before the `gdpr/request` rate limit, so it spends none of the owner's quota)
 - `requestAccountDeletion()` - Request account deletion
 - `cancelStuckExport()` - Cancel a stuck export request
 
 ### Actions
 
-- `getExportDownloadUrl()` - Get signed download URL for completed export
+- `getExportDownloadUrl()` - Get signed download URL for completed export (refused while an admin impersonates the user; the refusal runs before the `gdpr/request` rate limit, so it spends none of the owner's quota)
 
 ### Internal Functions
 

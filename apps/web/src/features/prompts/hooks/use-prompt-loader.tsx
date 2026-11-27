@@ -6,14 +6,15 @@ import { skipToken, useQuery } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 
-import { useAuth } from "@/features/auth/lib/auth-ui-provider";
+import { useAuthActiveOrganization, useAuthSession } from "@/features/auth/hooks/use-auth-session";
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 import { useModelStore } from "@/features/chat/core/stores/model-store";
+import { markComposerDraft, noteSavedPrompt } from "@/features/chat/core/utils/draft-origin";
 import useFeatureFlaggedModels, { useFeatureFlaggedModelsSettled } from "@/hooks/use-feature-flagged-models";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 import validatePromptSettings from "../lib/prompt-validation";
-import { getAutoPopulatedVariables, replaceVariables } from "../lib/prompt-variables";
+import { fillsAnyOf, getAutoPopulatedVariables, organizationValueNames, replaceVariables } from "../lib/prompt-variables";
 
 /**
  * Hook to load a prompt by ID and apply its settings to the chat
@@ -34,9 +35,8 @@ const usePromptLoader = (promptId: string | undefined) => {
     const setPendingSettings = useModelStore((state) => state.setPendingSettings);
 
     // Get current user context for auto-populated variables
-    const { hooks } = useAuth();
-    const { data: sessionData } = hooks.useSession();
-    const { data: activeOrganization } = hooks.useActiveOrganization();
+    const { data: sessionData, isPending: isSessionPending } = useAuthSession();
+    const { data: activeOrganization } = useAuthActiveOrganization();
 
     // Load prompt if promptId is provided
     // `promptId` is the raw `/chat?promptId=…` search param, so the row-id brand has to be applied here.
@@ -50,7 +50,9 @@ const usePromptLoader = (promptId: string | undefined) => {
             return;
         }
 
-        if (!prompt || !modelsSettled || handledPromptId.current === promptId) {
+        // The session too: whose words the prompt holds is told from the viewer's id (`noteSavedPrompt`), and a prompt
+        // handled before it loads would stay marked as someone else's for this visit.
+        if (!prompt || !modelsSettled || isSessionPending || handledPromptId.current === promptId) {
             return;
         }
 
@@ -102,9 +104,16 @@ const usePromptLoader = (promptId: string | undefined) => {
 
         // Set the composer text with the prompt content
         setComposerText(content);
+        noteSavedPrompt(prompt, sessionData?.user?.id, { replaced: true });
+
+        // The active organization's name filled in is not the person's own words; the prompt's own default for it is its author's.
+        if (fillsAnyOf(prompt.content, values, organizationValueNames(undefined, activeOrganization?.name))) {
+            markComposerDraft("organizationValue");
+        }
+
         toast.success(t`Prompt loaded`);
         handledPromptId.current = promptId;
-    }, [promptId, prompt, models, modelsSettled, setComposerText, setSelectedModel, setPendingSettings, sessionData, activeOrganization, t]);
+    }, [promptId, prompt, models, modelsSettled, isSessionPending, setComposerText, setSelectedModel, setPendingSettings, sessionData, activeOrganization, t]);
 };
 
 export default usePromptLoader;

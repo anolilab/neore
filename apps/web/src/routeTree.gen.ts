@@ -16,6 +16,7 @@ import { Route as AuthRouteRouteImport } from './routes/auth/route'
 import { Route as DashboardRouteRouteImport } from './routes/dashboard/route'
 import { Route as DocsRouteRouteImport } from './routes/docs/route'
 import { Route as DownloadRouteImport } from './routes/download'
+import { Route as OfflineShellRouteImport } from './routes/offline-shell'
 import { Route as RobotsDottxtRouteImport } from './routes/robots[.]txt'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as chatWorkflowRouteRouteImport } from './routes/(chat)/workflow/route'
@@ -33,6 +34,7 @@ import { Route as ShortcutVaultRouteImport } from './routes/_shortcut/vault'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as AdminAuditLogRouteImport } from './routes/admin/audit-log'
 import { Route as AdminCleanupRouteImport } from './routes/admin/cleanup'
+import { Route as AdminFeedbackRouteImport } from './routes/admin/feedback'
 import { Route as AdminGatewayRouteImport } from './routes/admin/gateway'
 import { Route as AdminNsfwReviewRouteImport } from './routes/admin/nsfw-review'
 import { Route as AdminUsersRouteImport } from './routes/admin/users'
@@ -131,6 +133,11 @@ const DownloadRoute = DownloadRouteImport.update({
   path: '/download',
   getParentRoute: () => rootRouteImport,
 } as any)
+const OfflineShellRoute = OfflineShellRouteImport.update({
+  id: '/offline-shell',
+  path: '/offline-shell',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RobotsDottxtRoute = RobotsDottxtRouteImport.update({
   id: '/robots.txt',
   path: '/robots.txt',
@@ -214,6 +221,11 @@ const AdminAuditLogRoute = AdminAuditLogRouteImport.update({
 const AdminCleanupRoute = AdminCleanupRouteImport.update({
   id: '/cleanup',
   path: '/cleanup',
+  getParentRoute: () => AdminRouteRoute,
+} as any)
+const AdminFeedbackRoute = AdminFeedbackRouteImport.update({
+  id: '/feedback',
+  path: '/feedback',
   getParentRoute: () => AdminRouteRoute,
 } as any)
 const AdminGatewayRoute = AdminGatewayRouteImport.update({
@@ -564,12 +576,13 @@ const DashboardSettingsConnectorsMessengerRoute =
   } as any)
 
 export interface FileRoutesByFullPath {
+  '/': typeof publicIndexRoute
   '/admin': typeof AdminRouteRouteWithChildren
   '/auth': typeof AuthRouteRouteWithChildren
   '/dashboard': typeof DashboardRouteRouteWithChildren
   '/docs': typeof DocsRouteRouteWithChildren
-  '/': typeof publicIndexRoute
   '/download': typeof DownloadRoute
+  '/offline-shell': typeof OfflineShellRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/workflow': typeof chatWorkflowRouteRouteWithChildren
@@ -585,6 +598,7 @@ export interface FileRoutesByFullPath {
   '/vault': typeof ShortcutVaultRoute
   '/admin/audit-log': typeof AdminAuditLogRoute
   '/admin/cleanup': typeof AdminCleanupRoute
+  '/admin/feedback': typeof AdminFeedbackRoute
   '/admin/gateway': typeof AdminGatewayRouteWithChildren
   '/admin/nsfw-review': typeof AdminNsfwReviewRoute
   '/admin/users': typeof AdminUsersRoute
@@ -652,9 +666,10 @@ export interface FileRoutesByFullPath {
   '/dashboard/settings/connectors/': typeof DashboardSettingsConnectorsIndexRoute
 }
 export interface FileRoutesByTo {
-  '/auth': typeof AuthRouteRouteWithChildren
   '/': typeof publicIndexRoute
+  '/auth': typeof AuthRouteRouteWithChildren
   '/download': typeof DownloadRoute
+  '/offline-shell': typeof OfflineShellRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/datenschutz': typeof publicDatenschutzRoute
@@ -668,6 +683,7 @@ export interface FileRoutesByTo {
   '/vault': typeof ShortcutVaultRoute
   '/admin/audit-log': typeof AdminAuditLogRoute
   '/admin/cleanup': typeof AdminCleanupRoute
+  '/admin/feedback': typeof AdminFeedbackRoute
   '/admin/nsfw-review': typeof AdminNsfwReviewRoute
   '/admin/users': typeof AdminUsersRoute
   '/api/scribe-token': typeof ApiScribeTokenRoute
@@ -742,6 +758,7 @@ export interface FileRoutesById {
   '/docs': typeof DocsRouteRouteWithChildren
   '/_shortcut': typeof ShortcutRouteWithChildren
   '/download': typeof DownloadRoute
+  '/offline-shell': typeof OfflineShellRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/(chat)/workflow': typeof chatWorkflowRouteRouteWithChildren
@@ -757,6 +774,7 @@ export interface FileRoutesById {
   '/_shortcut/vault': typeof ShortcutVaultRoute
   '/admin/audit-log': typeof AdminAuditLogRoute
   '/admin/cleanup': typeof AdminCleanupRoute
+  '/admin/feedback': typeof AdminFeedbackRoute
   '/admin/gateway': typeof AdminGatewayRouteWithChildren
   '/admin/nsfw-review': typeof AdminNsfwReviewRoute
   '/admin/users': typeof AdminUsersRoute
@@ -827,12 +845,13 @@ export interface FileRoutesById {
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
+    | '/'
     | '/admin'
     | '/auth'
     | '/dashboard'
     | '/docs'
-    | '/'
     | '/download'
+    | '/offline-shell'
     | '/robots.txt'
     | '/sitemap.xml'
     | '/workflow'
@@ -848,6 +867,7 @@ export interface FileRouteTypes {
     | '/vault'
     | '/admin/audit-log'
     | '/admin/cleanup'
+    | '/admin/feedback'
     | '/admin/gateway'
     | '/admin/nsfw-review'
     | '/admin/users'
@@ -915,9 +935,10 @@ export interface FileRouteTypes {
     | '/dashboard/settings/connectors/'
   fileRoutesByTo: FileRoutesByTo
   to:
-    | '/auth'
     | '/'
+    | '/auth'
     | '/download'
+    | '/offline-shell'
     | '/robots.txt'
     | '/sitemap.xml'
     | '/datenschutz'
@@ -931,6 +952,7 @@ export interface FileRouteTypes {
     | '/vault'
     | '/admin/audit-log'
     | '/admin/cleanup'
+    | '/admin/feedback'
     | '/admin/nsfw-review'
     | '/admin/users'
     | '/api/scribe-token'
@@ -1004,6 +1026,7 @@ export interface FileRouteTypes {
     | '/docs'
     | '/_shortcut'
     | '/download'
+    | '/offline-shell'
     | '/robots.txt'
     | '/sitemap.xml'
     | '/(chat)/workflow'
@@ -1019,6 +1042,7 @@ export interface FileRouteTypes {
     | '/_shortcut/vault'
     | '/admin/audit-log'
     | '/admin/cleanup'
+    | '/admin/feedback'
     | '/admin/gateway'
     | '/admin/nsfw-review'
     | '/admin/users'
@@ -1095,6 +1119,7 @@ export interface RootRouteChildren {
   DocsRouteRoute: typeof DocsRouteRouteWithChildren
   ShortcutRoute: typeof ShortcutRouteWithChildren
   DownloadRoute: typeof DownloadRoute
+  OfflineShellRoute: typeof OfflineShellRoute
   RobotsDottxtRoute: typeof RobotsDottxtRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   publicDatenschutzRoute: typeof publicDatenschutzRoute
@@ -1119,7 +1144,7 @@ declare module '@tanstack/react-router' {
     '/(chat)': {
       id: '/(chat)'
       path: ''
-      fullPath: ''
+      fullPath: '/'
       preLoaderRoute: typeof chatRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
@@ -1163,6 +1188,13 @@ declare module '@tanstack/react-router' {
       path: '/download'
       fullPath: '/download'
       preLoaderRoute: typeof DownloadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/offline-shell': {
+      id: '/offline-shell'
+      path: '/offline-shell'
+      fullPath: '/offline-shell'
+      preLoaderRoute: typeof OfflineShellRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/robots.txt': {
@@ -1282,6 +1314,13 @@ declare module '@tanstack/react-router' {
       path: '/cleanup'
       fullPath: '/admin/cleanup'
       preLoaderRoute: typeof AdminCleanupRouteImport
+      parentRoute: typeof AdminRouteRoute
+    }
+    '/admin/feedback': {
+      id: '/admin/feedback'
+      path: '/feedback'
+      fullPath: '/admin/feedback'
+      preLoaderRoute: typeof AdminFeedbackRouteImport
       parentRoute: typeof AdminRouteRoute
     }
     '/admin/gateway': {
@@ -1783,6 +1822,7 @@ const AdminGatewayRouteWithChildren = AdminGatewayRoute._addFileChildren(
 interface AdminRouteRouteChildren {
   AdminAuditLogRoute: typeof AdminAuditLogRoute
   AdminCleanupRoute: typeof AdminCleanupRoute
+  AdminFeedbackRoute: typeof AdminFeedbackRoute
   AdminGatewayRoute: typeof AdminGatewayRouteWithChildren
   AdminNsfwReviewRoute: typeof AdminNsfwReviewRoute
   AdminUsersRoute: typeof AdminUsersRoute
@@ -1792,6 +1832,7 @@ interface AdminRouteRouteChildren {
 const AdminRouteRouteChildren: AdminRouteRouteChildren = {
   AdminAuditLogRoute: AdminAuditLogRoute,
   AdminCleanupRoute: AdminCleanupRoute,
+  AdminFeedbackRoute: AdminFeedbackRoute,
   AdminGatewayRoute: AdminGatewayRouteWithChildren,
   AdminNsfwReviewRoute: AdminNsfwReviewRoute,
   AdminUsersRoute: AdminUsersRoute,
@@ -1969,6 +2010,7 @@ const rootRouteChildren: RootRouteChildren = {
   DocsRouteRoute: DocsRouteRouteWithChildren,
   ShortcutRoute: ShortcutRouteWithChildren,
   DownloadRoute: DownloadRoute,
+  OfflineShellRoute: OfflineShellRoute,
   RobotsDottxtRoute: RobotsDottxtRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   publicDatenschutzRoute: publicDatenschutzRoute,

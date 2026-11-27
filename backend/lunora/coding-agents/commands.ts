@@ -230,11 +230,15 @@ export const gitAuthEnv = (githubToken: string | undefined, origin = GITHUB_CRED
     return env;
 };
 
-/** The agent CLI's environment: the user's provider key and nothing of ours. */
+/**
+ * The agent CLI's environment: the user's provider key and nothing of ours. Claude Code also names neore as its
+ * entrypoint, which it sends in its `User-Agent`.
+ */
 export const agentEnv = (agent: CodingAgentId, providerKey: string): Record<string, string> => {
     return {
         CI: "1",
         [CODING_AGENTS[agent].envVar]: providerKey,
+        ...(agent === "claude_code" && { CLAUDE_CODE_ENTRYPOINT: "neore" }),
         DISABLE_AUTOUPDATER: "1",
         DISABLE_TELEMETRY: "1",
         NO_COLOR: "1",
@@ -355,7 +359,18 @@ const INSTALL_TIMEOUT_S = 300;
  * deletes it, and exports it only to `git`, which has exited before the agent
  * starts.
  */
-export const buildRunScript = (input: { agent: CodingAgentId; branch?: string; repo: ParsedRepo; timeoutSeconds: number }): string => {
+export const buildRunScript = (input: {
+    agent: CodingAgentId;
+    branch?: string;
+    repo: ParsedRepo;
+    /**
+     * Leaves the repository's own setup step out of the run (a fix run for that step).
+     * TODO: nothing reads this yet — the `repo-setup` step arrives in a separate change, which must wrap its script
+     * line in `if (!input.skipRepoSetup)`, or a fix run fails at the same step before its agent starts.
+     */
+    skipRepoSetup?: boolean;
+    timeoutSeconds: number;
+}): string => {
     const { label } = CODING_AGENTS[input.agent];
     const agentSeconds = Math.max(60, Math.floor(input.timeoutSeconds));
 

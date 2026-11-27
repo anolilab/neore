@@ -2,7 +2,39 @@ import { describe, expect, it } from "vitest";
 
 import { defaultKeyboardShortcuts } from "@/features/layout/stores/ui-state-store";
 
-import { matchesShortcutQuery, resolveShortcuts, shortcutToKeys } from "./shortcut-sheet";
+import { composerSendRows, matchesShortcutQuery, resolveShortcuts, shortcutToKeys } from "./shortcut-sheet";
+
+describe("composerSendRows", () => {
+    it("enter: Enter sends, Shift+Enter adds a line, Ctrl+Enter sends from any mode", () => {
+        expect(composerSendRows("enter", false)).toEqual([
+            { id: "sendMessage", keys: ["Enter"] },
+            { id: "composerNewline", keys: ["Shift", "Enter"] },
+            { id: "sendAnywhere", keys: ["Ctrl", "Enter"] },
+        ]);
+    });
+
+    it("shiftEnter: Shift+Enter sends, Enter adds a line", () => {
+        expect(composerSendRows("shiftEnter", true)).toEqual([
+            { id: "sendMessage", keys: ["⇧", "Enter"] },
+            { id: "composerNewline", keys: ["Enter"] },
+            { id: "sendAnywhere", keys: ["⌘", "Enter"] },
+        ]);
+    });
+
+    it("modEnter: Ctrl+Enter sends and is the only send chord, Enter adds a line", () => {
+        expect(composerSendRows("modEnter", false)).toEqual([
+            { id: "sendMessage", keys: ["Ctrl", "Enter"] },
+            { id: "composerNewline", keys: ["Enter"] },
+        ]);
+    });
+
+    it("button: only the send chord is listed once, the new line stays Enter", () => {
+        expect(composerSendRows("button", false)).toEqual([
+            { id: "sendMessage", keys: ["Ctrl", "Enter"] },
+            { id: "composerNewline", keys: ["Enter"] },
+        ]);
+    });
+});
 
 describe("shortcutToKeys", () => {
     it("uses symbols on a Mac", () => {
@@ -39,6 +71,13 @@ describe("resolveShortcuts", () => {
         expect(keysOf("newChat")).toEqual(["Alt", "N"]);
         expect(keysOf("findInThread")).toEqual(["Ctrl", "F"]);
         expect(keysOf("focusSearch")).toEqual(["Ctrl", "Shift", "F"]);
+    });
+
+    it("lists the composer's Ctrl+R prompt search with the literal Control key", () => {
+        const keysOf = (isMac: boolean) => resolveShortcuts(defaultKeyboardShortcuts, isMac).find((item) => item.entry.id === "promptSearch")?.keys;
+
+        expect(keysOf(false)).toEqual(["Ctrl", "R"]);
+        expect(keysOf(true)).toEqual(["⌃", "R"]);
     });
 
     it("leaves out actions that are unbound", () => {

@@ -62,6 +62,12 @@ packages: &packages
     - "tools/**"
     - "vis.config.ts"
     - "pnpm-workspace.yaml"
+    # How the unit tests are split across the shards, and the split's own tests.
+    - "scripts/vitest/**"
+    # What backend/deploy-migrations.test.ts pins: the post-deploy migration runner and its step.
+    - "scripts/data-migrations.ts"
+    - "scripts/run-data-migrations.ts"
+    - ".github/workflows/deploy.yml"
     # The jobs themselves: a change to how tests run is tested by running them.
     - ".github/workflows/test.yml"
     - ".github/actions/**"

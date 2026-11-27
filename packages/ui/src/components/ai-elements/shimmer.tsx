@@ -1,60 +1,91 @@
 "use client";
 
 import cn from "@ui/utils/cn";
-import { motion, useReducedMotion } from "motion/react";
 import type { CSSProperties } from "react";
-import { memo, useMemo } from "react";
+import { createElement, memo, useEffect, useState } from "react";
 
 export interface TextShimmerProps {
-    as?: keyof typeof MOTION_ELEMENTS;
+    as?: "div" | "h1" | "h2" | "h3" | "p" | "span";
     children: string;
     className?: string;
+    /** Seconds per sweep. */
     duration?: number;
     spread?: number;
 }
 
 /**
- * The elements the shimmer can render as, each a motion component made ONCE
- * here. `motion.create(as)` in render made a new component type per render, so
- * React remounted the element and restarted the animation every time.
+ * Reports whether `target` is on screen until the returned function stops it. Best-effort: where the observer is
+ * missing, is not a constructor (a test stub), or throws, it reports nothing and the shimmer keeps animating.
  */
-const MOTION_ELEMENTS = {
-    div: motion.div,
-    h1: motion.h1,
-    h2: motion.h2,
-    h3: motion.h3,
-    p: motion.p,
-    span: motion.span,
+const watchOnScreen = (target: Element, onChange: (onScreen: boolean) => void): (() => void) | undefined => {
+    if (typeof IntersectionObserver !== "function") {
+        return undefined;
+    }
+
+    try {
+        const observer = new IntersectionObserver((entries: IntersectionObserverEntry[]) => {
+            const last = entries.at(-1);
+
+            if (last) {
+                onChange(last.isIntersecting);
+            }
+        });
+
+        observer.observe(target);
+
+        return () => {
+            try {
+                observer.disconnect();
+            } catch {
+                // Nothing left to stop.
+            }
+        };
+    } catch {
+        return undefined;
+    }
 };
 
+/**
+ * Text with a highlight sweeping across it. A CSS keyframe (`animate-text-shimmer` in `global.css`) moves the
+ * background in 30 steps per sweep, so no script runs per frame and the text repaints 30 times a cycle, not on every
+ * frame. An endless loop is motion the user cannot pause (WCAG 2.2.2): with reduced motion it does not run, and the
+ * text stays at the sweep's end position. Off-screen it pauses (`data-paused`) where an IntersectionObserver can start.
+ */
 const ShimmerComponent = ({ as = "p", children, className, duration = 2, spread = 2 }: TextShimmerProps) => {
-    const MotionComponent = MOTION_ELEMENTS[as];
-    // An endless loop is motion the user cannot pause (WCAG 2.2.2), and the global CSS rule does not reach Motion.
-    const prefersReducedMotion = useReducedMotion();
+    // A callback ref into state: the effect runs again for a new element (another `as`).
+    const [target, setTarget] = useState<HTMLElement | null>(null);
+    // The element an observer last reported out of view. Kept per element: a replacement (another `as`) is not paused
+    // by its predecessor's report, also when no observer can start for it.
+    const [offScreenElement, setOffScreenElement] = useState<HTMLElement | null>(null);
+    const offScreen = offScreenElement !== null && offScreenElement === target;
 
-    const dynamicSpread = useMemo(() => (children?.length ?? 0) * spread, [children, spread]);
+    useEffect(() => {
+        if (!target) {
+            return undefined;
+        }
 
-    return (
-        <MotionComponent
-            animate={{ backgroundPosition: "0% center" }}
-            aria-live="polite"
-            className={cn(
-                "relative inline-block bg-[length:250%_100%,auto] bg-clip-text text-transparent",
+        return watchOnScreen(target, (onScreen: boolean) => setOffScreenElement(onScreen ? null : target));
+    }, [target]);
+
+    return createElement(
+        as,
+        {
+            "aria-live": "polite",
+            className: cn(
+                "animate-text-shimmer relative inline-block bg-[length:250%_100%,auto] [background-position:0%_center] bg-clip-text text-transparent motion-reduce:animate-none",
                 "[background-repeat:no-repeat,padding-box] [--bg:linear-gradient(90deg,#0000_calc(50%-var(--spread)),var(--color-background),#0000_calc(50%+var(--spread)))]",
                 className,
-            )}
-            initial={{ backgroundPosition: "100% center" }}
-            role={as.startsWith("h") ? undefined : "status"}
-            style={
-                {
-                    "--spread": `${dynamicSpread}px`,
-                    backgroundImage: "var(--bg), linear-gradient(var(--color-muted-foreground), var(--color-muted-foreground))",
-                } as CSSProperties
-            }
-            transition={prefersReducedMotion ? { duration: 0 } : { duration, ease: "linear", repeat: Infinity }}
-        >
-            {children}
-        </MotionComponent>
+            ),
+            "data-paused": offScreen ? "" : undefined,
+            ref: setTarget,
+            role: as.startsWith("h") ? undefined : "status",
+            style: {
+                "--shimmer-duration": `${duration}s`,
+                "--spread": `${children.length * spread}px`,
+                backgroundImage: "var(--bg), linear-gradient(var(--color-muted-foreground), var(--color-muted-foreground))",
+            } as CSSProperties,
+        },
+        children,
     );
 };
 

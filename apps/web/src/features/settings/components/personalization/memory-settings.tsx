@@ -28,6 +28,7 @@ import { trackEvent } from "@/lib/analytics";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 import MemoryDigestCard from "./memory-digest-card";
+import MemoryImportDialog from "./memory-import-dialog";
 import MemoryItem from "./memory-item";
 import type { MemoryType } from "./memory-types";
 import { isMemoryType, MEMORY_TYPES, useMemoryTypeLabels } from "./memory-types";
@@ -79,8 +80,12 @@ const MemorySettings: FC = () => {
 
     // Fetch memories list (skip when memory is disabled to avoid unnecessary API calls)
     const { data: memories, refetch: refetchMemories } = useQuery({
-        ...crpc.memory.functions.listUserMemories.queryOptions({}),
+        // Read by refetches, not a subscription: a shared bot's label comes from the global `botOwners` table, whose writes
+        // on the bot owner's shard never reach a live query (docs/agents/lunora-upstream.md). It is read again whenever the
+        // person comes back to the page, and after each change made here (`refresh`).
+        ...crpc.memory.functions.listUserMemories.queryOptions({}, { live: false }),
         enabled: memoryEnabled,
+        refetchOnWindowFocus: "always",
     });
 
     // Fetch memory stats (skip when memory is disabled)
@@ -133,18 +138,21 @@ const MemorySettings: FC = () => {
         },
     });
 
-    const handleToggleMemory = useCallback(async () => {
-        const isNewValue = !memoryEnabled;
-        const successMessage = isNewValue ? t`Memory enabled` : t`Memory disabled`;
+    const setMemoryEnabled = useCallback(
+        async (enabled: boolean) => {
+            try {
+                await updateSettingsMutation.mutateAsync({ memoryEnabled: enabled });
+                trackEvent("memory_toggled", { enabled });
+                toast.success(enabled ? t`Memory enabled` : t`Memory disabled`);
+            } catch {
+                toast.error(t`Failed to update setting`);
+            }
+        },
+        [updateSettingsMutation, t],
+    );
 
-        try {
-            await updateSettingsMutation.mutateAsync({ memoryEnabled: isNewValue });
-            trackEvent("memory_toggled", { enabled: isNewValue });
-            toast.success(successMessage);
-        } catch {
-            toast.error(t`Failed to update setting`);
-        }
-    }, [memoryEnabled, updateSettingsMutation, t]);
+    const handleToggleMemory = useCallback(async () => setMemoryEnabled(!memoryEnabled), [memoryEnabled, setMemoryEnabled]);
+    const handleEnableMemory = useCallback(async () => setMemoryEnabled(true), [setMemoryEnabled]);
 
     const visible = (memories ?? []).filter((memory) => typeFilter === "all" || memory.type === typeFilter);
     const busy = isDeleting || isUpdating || isPinning;
@@ -164,6 +172,9 @@ const MemorySettings: FC = () => {
                     </label>
                     <Switch checked={memoryEnabled} id="memory-enabled-switch" onCheckedChange={handleToggleMemory} />
                 </div>
+
+                {/* Outside the enabled block: with memory off it offers to turn it on first. */}
+                <MemoryImportDialog memoryEnabled={memoryEnabled} onEnableMemory={handleEnableMemory} onImported={refresh} />
 
                 {memoryEnabled && (
                     <>

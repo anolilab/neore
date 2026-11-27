@@ -20,8 +20,7 @@ import { ArrowDownIcon, CornerLeftUpIcon } from "lucide-react";
 import type { FC } from "react";
 import { useEffect, useMemo, useRef } from "react";
 
-import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
-import { useAuth } from "@/features/auth/lib/auth-ui-provider";
+import { useAuthSession } from "@/features/auth/hooks/use-auth-session";
 import AskAsideShortcutListener from "@/features/chat/aside/ask-aside-shortcut-listener";
 import TooltipIconButton from "@/features/chat/components/tooltip-icon-button";
 import { useChatActions, useChatIsEmpty, useChatIsStreaming, useChatMessages, useChatThread } from "@/features/chat/core/context/chat-context";
@@ -30,8 +29,13 @@ import useComparisonChat from "@/features/chat/core/hooks/use-comparison-chat";
 import type { PendingAttachment } from "@/features/chat/core/stores/chat-ui-store";
 import type { ComposerMode } from "@/features/chat/core/stores/model-store";
 import { useModelStore } from "@/features/chat/core/stores/model-store";
+import type { DraftOrigin } from "@/features/chat/core/utils/draft-origin";
 import ForwardSelectionBar from "@/features/chat/forward/forward-selection-bar";
+import ChatImageGallery from "@/features/chat/image-gallery/chat-image-gallery";
+import { useImageGalleryStore } from "@/features/chat/image-gallery/image-gallery-store";
+import useStoredDrafts, { keepsStoredDraft, storedDraftKnown } from "@/features/chat/split/use-stored-drafts";
 import { hasUnseenReply } from "@/features/chat/thread-list/lib/thread-state-rules";
+import { isThreadLocked } from "@/features/chat/thread-list/thread-lock";
 import WorkerComposer from "@/features/sub-agents/components/worker-composer";
 import WorkerList from "@/features/sub-agents/components/worker-list";
 import WorkerRunLog from "@/features/sub-agents/components/worker-run-log";
@@ -127,12 +131,10 @@ const ScrollToBottomButton: FC<{ canJumpToPrompt: boolean; className?: string; o
 const ThreadContent: FC<ThreadProps> = ({ className, composerActive = true, initialMessage, maxWidth = "65ch", onActivateComposer, splitPane = false }) => {
     const { t } = useLingui();
     const viewportRef = useRef<ThreadViewportRef>(null);
-    const userSettings = useUserSettings();
     const isEmpty = useChatIsEmpty();
-    const { activeStreamId, isStreaming } = useChatIsStreaming();
-    const { isNewThread, thread, threadId } = useChatThread();
-    const { hooks } = useAuth();
-    const { data: sessionData } = hooks.useSession();
+    const { isStreaming } = useChatIsStreaming();
+    const { isNewThread, thread, threadId, threadLoad } = useChatThread();
+    const { data: sessionData, isPending: isSessionPending } = useAuthSession();
     // Only the owner may archive or delete from the keyboard; a shared thread's viewer gets the server's refusal otherwise.
     const isOwner = !!thread?.userId && thread.userId === sessionData?.user?.id;
 
@@ -142,6 +144,16 @@ const ThreadContent: FC<ThreadProps> = ({ className, composerActive = true, init
     const isMultiChatThread = thread?.multiChat === true;
     // A worker takes a turn only through `dispatchToWorker`, so its thread gets its own composer.
     const { isLoading: isWorkerLoading, worker } = useWorker(isNewThread ? undefined : threadId);
+
+    // The draft is kept across a reload for the chat composer below, once the chat is known (a locked one keeps none, a host-run
+    // one has its own composer).
+    useStoredDrafts(
+        isNewThread || !threadId ? "new" : threadId,
+        keepsStoredDraft(composerActive, isNewThread, thread, Boolean(worker) || isWorkerLoading) ? sessionData?.user?.id : undefined,
+        isThreadLocked(thread?.lockedAt),
+        // Until the session, the chat and its worker are known, whether it keeps a stored draft is not: nothing may fill the composer yet.
+        storedDraftKnown({ isNewThread, isSessionPending, isWorkerLoading, threadId, threadLoad }),
+    );
 
     const crpc = useCRPC();
     const afterFirstPaint = useAfterFirstPaint();
@@ -205,12 +217,12 @@ const ThreadContent: FC<ThreadProps> = ({ className, composerActive = true, init
     const { sendToExistingChildren } = useComparisonChat({ jwtToken });
 
     // Submit handler for the comparison parent composer: fans message to all children
-    const handleComparisonParentSubmit = async (text: string, attachments: PendingAttachment[]) => {
+    const handleComparisonParentSubmit = async (text: string, attachments: PendingAttachment[], draftFrom?: DraftOrigin) => {
         const children = comparisonBranches.map((b) => {
             return { model: b.model, threadId: b.threadId };
         });
 
-        await sendToExistingChildren(text, children, attachments);
+        await sendToExistingChildren(text, children, attachments, draftFrom);
     };
 
     // Get mode from thread data (source of truth) or store (for new threads or user changes)
@@ -234,6 +246,14 @@ const ThreadContent: FC<ThreadProps> = ({ className, composerActive = true, init
     };
 
     const composerMode = resolveComposerMode();
+    const setGalleryListShown = useImageGalleryStore((state) => state.setListShown);
+
+    // The image gallery's Go to message needs the message list: image and video mode show their own grid instead.
+    useEffect(() => {
+        if (threadId) {
+            setGalleryListShown(threadId, composerMode === "text");
+        }
+    }, [composerMode, setGalleryListShown, threadId]);
 
     // ─── Comparison parent layout ─────────────────────────────────────────────
     // Each child thread is shown in a scrollable column; a shared composer
@@ -279,8 +299,6 @@ const ThreadContent: FC<ThreadProps> = ({ className, composerActive = true, init
         );
     }
 
-    const isEnableFollowupSuggestions = userSettings?.data?.enableFollowupSuggestions !== false;
-
     // Show message list when we have messages OR when streaming is active.
     // isStreaming covers the brief transition after activeStreamId clears.
     const showMessageList = !isEmpty || isStreaming;
@@ -324,11 +342,9 @@ const ThreadContent: FC<ThreadProps> = ({ className, composerActive = true, init
                         {composerMode === "text" && showMessageList && (
                             <div className="flex w-full flex-1">
                                 <div className="flex min-w-0 flex-1 flex-col">
-                                    <MessageList
-                                        className={isEnableFollowupSuggestions && !activeStreamId ? "pb-[190px]" : "pb-6"}
-                                        editComposerComponent={EditComposer}
-                                        maxWidth={maxWidth}
-                                    />
+                                    {/* Room for the suggestion panel above the composer, so it never covers the end of the newest reply. The panel opens for any
+                                        viewer with a cached suggestion (the owner's setting decides that), so the room does not depend on the viewer's setting. */}
+                                    <MessageList className={isStreaming ? "pb-6" : "pb-[190px]"} editComposerComponent={EditComposer} maxWidth={maxWidth} />
                                     <div className="flex-1" />
                                     {hasWorkers && <WorkerList className="mb-4 w-full" threadId={threadId} />}
                                 </div>
@@ -405,7 +421,9 @@ const ThreadContent: FC<ThreadProps> = ({ className, composerActive = true, init
 
 const Thread: FC<ThreadProps> = (props) => (
     <AtBottomProvider>
-        <ThreadContent {...props} />
+        <ChatImageGallery>
+            <ThreadContent {...props} />
+        </ChatImageGallery>
     </AtBottomProvider>
 );
 

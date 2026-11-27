@@ -5,6 +5,8 @@ import { useThreadPaneState } from "@/features/chat/thread/use-thread-pane-state
 import useAfterFirstPaint from "@/hooks/use-after-first-paint";
 import { useCRPC } from "@/lib/lunora/crpc";
 
+import { isKnownNotWorker } from "./known-not-worker";
+
 /**
  * The worker behind a thread, or `undefined` for any other thread. Waits for first paint and for the
  * relationship read the breadcrumb already makes (same query, so no second subscription), then asks
@@ -15,15 +17,19 @@ import { useCRPC } from "@/lib/lunora/crpc";
 const useWorker = (threadId: string | undefined) => {
     const crpc = useCRPC();
     const afterFirstPaint = useAfterFirstPaint();
-    const { data: paneState } = useThreadPaneState(threadId, { enabled: afterFirstPaint });
-    const relationship = paneState?.relationship;
-    const { data: worker, isPending } = useQuery(
+    const paneQuery = useThreadPaneState(threadId, { enabled: afterFirstPaint });
+    const relationship = paneQuery.data?.relationship;
+    const workerQuery = useQuery(
         crpc.sub_agents.functions.getWorker.queryOptions(
             threadId && relationship?.branchType === "subagent" ? { workerId: threadId as Id<"threads"> } : skipToken,
         ),
     );
 
-    return { isLoading: relationship?.branchType === "subagent" && isPending, worker: worker ?? undefined };
+    return {
+        isLoading: relationship?.branchType === "subagent" && workerQuery.isPending,
+        knownNotWorker: isKnownNotWorker({ data: relationship, isSuccess: paneQuery.isSuccess }, workerQuery),
+        worker: workerQuery.data ?? undefined,
+    };
 };
 
 export default useWorker;

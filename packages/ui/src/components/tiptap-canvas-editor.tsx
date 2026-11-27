@@ -181,6 +181,8 @@ export const TiptapCanvasEditor = ({
             attributes: {
                 "aria-label": t`Document`,
                 class: cn("prose prose-sm dark:prose-invert max-w-none focus:outline-none min-h-[200px] p-4", EDITOR_PLACEHOLDER_CLASSES),
+                // Explicit: the desktop shell turns spellcheck off on <html>; prose editors keep it.
+                spellcheck: "true",
             },
         },
         extensions: extensions ? [...EXTENSIONS, placeholderExtension, ...extensions] : [...EXTENSIONS, placeholderExtension],

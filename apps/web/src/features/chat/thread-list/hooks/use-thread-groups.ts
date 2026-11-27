@@ -11,6 +11,9 @@ import { useCRPC, useLunoraAuth } from "@/lib/lunora/crpc";
 
 import { useDateBoundaries } from "../contexts/date-boundaries-context";
 import { isIdleThread, nextSnoozeWake, partitionDerivedSections } from "../lib/derived-sections";
+import type { NodesById } from "../lib/share-unchanged-nodes";
+import { shareUnchangedNodes } from "../lib/share-unchanged-nodes";
+import { indexRelationships, nodeBranchType } from "../lib/thread-relationships";
 import { selectSelectedTagIds, useThreadListUIStore } from "../stores/thread-list-ui-store";
 import type { BranchNode, GroupType, MinimalThreadRelationship, ThreadGroup } from "../types";
 import { usePersistThreadList, useThreadListPlaceholder } from "./use-thread-list-cache";
@@ -45,6 +48,24 @@ const sortThreadsInGroup = (threads: BranchNode[]): BranchNode[] => {
         return b.createdAt - a.createdAt;
     });
 };
+
+/** The nodes of one build, shared with the build before it, and the build they came from. */
+interface SharedNodes {
+    built: BranchNode[][];
+    byId: NodesById;
+    lists: BranchNode[][];
+}
+
+const NO_NODES: NodesById = new Map();
+
+/** The same nodes, in the same order, in every list. */
+const sameNodeLists = (left: ReadonlyArray<ReadonlyArray<BranchNode>>, right: ReadonlyArray<ReadonlyArray<BranchNode>>): boolean =>
+    left.length === right.length &&
+    left.every((list, index) => {
+        const other = right[index];
+
+        return other !== undefined && list.length === other.length && list.every((node, position) => node === other[position]);
+    });
 
 /** The longest delay setTimeout accepts; a snooze further out simply re-arms when this one fires. */
 const MAX_TIMEOUT_MS = 2_147_483_647;
@@ -110,6 +131,8 @@ const useThreadGroups = (
 
     // Snoozes end on their own (the timer below re-arms per wake); idle rows read the same clock.
     const [now, setNow] = useState(() => Date.now());
+    // The last build's nodes, shared with the one before (see the sharing step below).
+    const [sharedNodes, setSharedNodes] = useState<SharedNodes | null>(null);
 
     // --- Stage 1: Build lookup maps (only recomputes when raw data changes) ---
     const lookupMaps = useMemo(() => {
@@ -136,7 +159,7 @@ const useThreadGroups = (
         const threadMap = new Map<string, any>(allThreadsForMap.map((thread: any) => [thread._id, thread]));
 
         const relationships = effectiveRelationships || [];
-        const relationshipMap = new Map<string, MinimalThreadRelationship>(relationships.map((rel: MinimalThreadRelationship) => [rel.threadId, rel]));
+        const { childrenMap, relationshipMap } = indexRelationships(relationships);
 
         // pinnedThreads returns ThreadDoc objects with _id field, not threadId
         const pinnedThreadsArray = pinnedThreads || [];
@@ -146,22 +169,8 @@ const useThreadGroups = (
         const threadOrdersArray = threadOrders || [];
         const threadOrderMap = new Map<string, number>(threadOrdersArray.map((order: any) => [order._id, order.order]));
 
-        // Find root threads (threads without parent relationships)
+        // Find root threads (threads without parent relationships; a side chat is a child, so it is never one)
         const rootThreads = threadsToUse.filter((thread: any) => !relationshipMap.has(thread._id));
-
-        // Build child map once for O(1) lookups instead of filtering each time
-        const childrenMap = new Map<string, MinimalThreadRelationship[]>();
-
-        for (const rel of relationships) {
-            if (!rel.parentThreadId) {
-                continue;
-            }
-
-            const existing = childrenMap.get(rel.parentThreadId) || [];
-
-            existing.push(rel);
-            childrenMap.set(rel.parentThreadId, existing);
-        }
 
         // Build temporary root threads
         const temporaryRootThreads = temporaryThreadsPage.filter((thread: any) => !relationshipMap.has(thread._id));
@@ -188,7 +197,7 @@ const useThreadGroups = (
     ]);
 
     // --- Stage 2: Build thread hierarchy trees (only recomputes when maps or optimistic state changes) ---
-    const hierarchyData = useMemo(() => {
+    const builtNodes = useMemo(() => {
         if (!lookupMaps) {
             return null;
         }
@@ -211,7 +220,11 @@ const useThreadGroups = (
             // Find direct children using pre-built map
             const childRelationships = childrenMap.get(threadId) || [];
             const children = childRelationships
-                .map((rel: MinimalThreadRelationship) => buildHierarchy(rel.threadId, depth + 1))
+                .map((rel: MinimalThreadRelationship) => {
+                    const child = buildHierarchy(rel.threadId, depth + 1);
+
+                    return child === null ? null : { ...child, branchType: nodeBranchType(rel) };
+                })
                 .filter((node): node is BranchNode => node !== null);
 
             // Apply optimistic state overrides (instant UI updates)
@@ -265,14 +278,50 @@ const useThreadGroups = (
             };
         };
 
-        const allThreadsList = rootThreads
-            .map((thread: any) => buildHierarchy(thread._id))
-            .filter((node: BranchNode | null): node is BranchNode => node !== null);
+        const threads = rootThreads.map((thread: any) => buildHierarchy(thread._id)).filter((node: BranchNode | null): node is BranchNode => node !== null);
 
         // Build temporary threads hierarchy separately
-        const temporaryThreadsList: BranchNode[] = temporaryRootThreads
+        const temporaryNodes: BranchNode[] = temporaryRootThreads
             .map((thread: any) => buildHierarchy(thread._id))
             .filter((node: BranchNode | null): node is BranchNode => node !== null && node.expiresAt !== undefined);
+
+        return [threads, temporaryNodes];
+    }, [lookupMaps, optimisticPins, optimisticStatuses, optimisticDeletions, compositeData?.tags, titleRevision, now, t]);
+
+    // --- Sharing: an unchanged thread gets the node it had, so only the rows whose thread changed re-render ---
+    // Kept in state and adjusted during render, not in a ref: an update made during a render is thrown away with that render, so the
+    // nodes compared against are always those of the last render React kept, and the hook stays compiled. The deep compare runs once
+    // per build: renders that bring no new build reuse it, and so does React's immediate retry after the update below, which finds
+    // the state already holding this build's nodes.
+    const sharedBuild = useMemo(() => {
+        if (builtNodes === null) {
+            return null;
+        }
+
+        if (sharedNodes?.built === builtNodes) {
+            return sharedNodes;
+        }
+
+        const shared = shareUnchangedNodes(sharedNodes?.byId ?? NO_NODES, builtNodes);
+
+        return { built: builtNodes, byId: shared.byId, lists: shared.lists };
+    }, [builtNodes, sharedNodes]);
+    let currentShared = sharedNodes;
+
+    // A build that changed no node keeps the state it has: no update, so a rebuild can never loop through this.
+    if (sharedBuild !== null && sharedBuild !== currentShared && (!currentShared || !sameNodeLists(currentShared.lists, sharedBuild.lists))) {
+        currentShared = sharedBuild;
+        setSharedNodes(sharedBuild);
+    }
+
+    const sharedLists = builtNodes === null ? null : (currentShared?.lists ?? null);
+
+    const hierarchyData = useMemo(() => {
+        if (!sharedLists) {
+            return null;
+        }
+
+        const [allThreadsList = [], temporaryThreadsList = []] = sharedLists;
 
         // Single pass: separate threads by type (more efficient than multiple filters)
         // Apply category + tag filters if selected
@@ -309,7 +358,7 @@ const useThreadGroups = (
             statelessThreads,
             temporaryThreadsList: filteredTemporaryThreadsList,
         };
-    }, [lookupMaps, optimisticPins, optimisticStatuses, optimisticDeletions, selectedCategory, selectedTagIds, compositeData?.tags, titleRevision, now, t]);
+    }, [sharedLists, selectedCategory, selectedTagIds]);
 
     // --- Stage 3: Sort callback for search results (stable reference) ---
     const sortThreadsByPriority = useCallback(

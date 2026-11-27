@@ -15,6 +15,7 @@ import { lazy, Suspense, useCallback, useEffect, useEffectEvent, useMemo, useRef
 
 import { ErrorBoundary } from "@/components/error-boundary";
 import { SettingsSearchField, SettingsSearchResults, useSettingsSearch } from "@/components/settings/settings-search";
+import { useAuthActiveOrganization, useAuthSession } from "@/features/auth/hooks/use-auth-session";
 import useInviteOnly from "@/features/auth/hooks/use-invite-only";
 import { hasNoAccount } from "@/features/auth/lib/account-state";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
@@ -41,6 +42,7 @@ const AppCustomizationSettings = lazy(() => import("@/features/settings/componen
 const AgentSettings = lazy(() => import("@/features/settings/components/chat/agent-settings"));
 const MCPSettings = lazy(() => import("@/features/settings/components/chat/mcp-settings"));
 const ToolPermissionsSettings = lazy(() => import("@/features/settings/components/chat/tool-permissions-settings"));
+const SubAgentRolesSettings = lazy(() => import("@/features/settings/components/chat/sub-agent-roles-settings"));
 const DefaultModelsSettings = lazy(() => import("@/features/settings/components/chat/default-models-settings"));
 const ModelsSettings = lazy(() => import("@/features/settings/components/chat/models-settings"));
 const PrivacySettings = lazy(() => import("@/features/settings/components/privacy/privacy-settings"));
@@ -102,6 +104,7 @@ const preloadTab: Record<string, () => void> = {
     "chat-mcp": () => import("@/features/settings/components/chat/mcp-settings"),
     "chat-models": () => import("@/features/settings/components/chat/models-settings"),
     "chat-tools": () => import("@/features/settings/components/chat/tool-permissions-settings"),
+    "chat-sub-agent-roles": () => import("@/features/settings/components/chat/sub-agent-roles-settings"),
     "chat-personalization": () => import("@/features/settings/components/personalization/personalization-settings"),
     "chat-system-prompts": () => import("@/features/settings/components/chat/system-prompt-preset-settings"),
     privacy: () => import("@/features/settings/components/privacy/privacy-settings"),
@@ -173,11 +176,11 @@ export const SettingsModal: FC = () => {
     const search = useSearch({ strict: false }) as { settings?: boolean; settingsTab?: SettingsTab };
     const queryClient = useQueryClient();
     const crpc = useCRPC();
-    const { apiKey, hooks, organization } = useAuth();
-    const { data: activeOrganization } = hooks.useActiveOrganization();
+    const { apiKey, organization } = useAuth();
+    const { data: activeOrganization } = useAuthActiveOrganization();
     // A guest, or signed out (the chat is reachable signed out under invite-only), locks the account tabs. A session
     // read still pending or failed is unknown, not signed out, so it locks nothing.
-    const isAnonymous = hasNoAccount(hooks.useSession());
+    const isAnonymous = hasNoAccount(useAuthSession());
 
     const { close, isOpen, open } = useModalState("settings");
     // Once opened, stay mounted so the Dialog's Activity component can
@@ -471,6 +474,9 @@ export const SettingsModal: FC = () => {
             case "chat-personalization": {
                 return <PersonalizationSettings />;
             }
+            case "chat-sub-agent-roles": {
+                return <SubAgentRolesSettings />;
+            }
             case "chat-system-prompts": {
                 return <SystemPromptPresetSettings />;
             }
@@ -542,12 +548,12 @@ export const SettingsModal: FC = () => {
                                             const isActive = currentTab === item.tab;
                                             const isLocked = isAnonymous && item.requiresAuth;
 
-                                            let stateClassName = "text-muted-foreground hover:bg-muted hover:text-foreground";
+                                            let stateClassName = "text-muted-foreground web:hover:bg-muted hover:text-foreground";
 
                                             if (isActive) {
                                                 stateClassName = "bg-primary text-primary-foreground";
                                             } else if (isLocked) {
-                                                stateClassName = "text-muted-foreground/40 hover:bg-muted hover:text-muted-foreground";
+                                                stateClassName = "text-muted-foreground/40 web:hover:bg-muted hover:text-muted-foreground";
                                             }
 
                                             return (

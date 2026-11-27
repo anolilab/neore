@@ -95,6 +95,7 @@ const GuideTab = ({
                 host_error: t`${hostLabel} could not be reached. Try again in a moment.`,
                 needs_reconnect: t`Your ${hostLabel} sign-in has expired. Connect it again.`,
                 not_connected: t`${hostLabel} is not connected.`,
+                not_allowed: t`Your organization does not allow agents on your computer.`,
                 not_found: t`It does not exist, or your ${hostLabel} account cannot see it.`,
                 quota: t`Your daily limit for AI requests is used up.`,
                 rate_limited: rateLimited,
@@ -104,6 +105,7 @@ const GuideTab = ({
             const unavailable = {
                 busy: t`That computer is busy. Try again in a moment.`,
                 offline: t`That computer is not online.`,
+                out_of_scope: t`That computer may only be used in some projects, and none of them lists this repository. Add the repository to one of them, or change where the computer is offered in its settings.`,
                 outdated: t`The Neore app on that computer is out of date. Update it, then try again.`,
                 rate_limited: rateLimited,
                 session_ended: t`That agent session has ended.`,

@@ -13,7 +13,7 @@ import { useShallow } from "zustand/react/shallow";
 
 import OrganizationSwitcher from "@/features/auth/components/organization/organization-switcher";
 import TeamSwitcher from "@/features/auth/components/team/team-switcher";
-import { useAuth } from "@/features/auth/lib/auth-ui-provider";
+import { useAuthActiveOrganization, useAuthOrganizationList } from "@/features/auth/hooks/use-auth-session";
 import CreateGroupChatButton from "@/features/chat/group/create-group-chat-button";
 import { useKeyboardShortcuts } from "@/features/layout/hooks/use-ui-state";
 
@@ -27,18 +27,17 @@ interface ThreadListHeaderProps {
 const ThreadListHeader: FC<ThreadListHeaderProps> = memo(({ isSearchLoading = false }) => {
     const { t } = useLingui();
     const navigate = useNavigate();
-    const { hooks } = useAuth();
     const { keyboardShortcuts } = useKeyboardShortcuts();
     const focusSearchShortcut = formatShortcutForDisplay(keyboardShortcuts.focusSearch);
 
-    const { data: organizations } = hooks.useListOrganizations();
-    const { data: activeOrganization } = hooks.useActiveOrganization();
+    const { data: organizations } = useAuthOrganizationList();
+    const { data: activeOrganization } = useAuthActiveOrganization();
     const hasMultipleOrganizations = organizations && organizations.length > 1;
     const hasActiveOrganization = !!activeOrganization;
 
     const {
         enterSelectionMode,
-        openCreateProjectDialog,
+        openAddProjectDialog,
         searchQuery,
         searchType,
         selectedCategory,
@@ -52,7 +51,7 @@ const ThreadListHeader: FC<ThreadListHeaderProps> = memo(({ isSearchLoading = fa
         useShallow((state) => {
             return {
                 enterSelectionMode: state.enterSelectionMode,
-                openCreateProjectDialog: state.openCreateProjectDialog,
+                openAddProjectDialog: state.openAddProjectDialog,
                 searchQuery: state.searchQuery,
                 searchType: state.searchType,
                 selectedCategory: state.selectedCategory,
@@ -124,9 +123,9 @@ const ThreadListHeader: FC<ThreadListHeaderProps> = memo(({ isSearchLoading = fa
                             <TooltipTrigger
                                 render={
                                     <Button
-                                        aria-label={t`Create project`}
+                                        aria-label={t`Add project`}
                                         className="text-brand-black dark:text-brand-white hover:bg-sidebar-accent hover:text-sidebar-accent-foreground h-9 w-9 p-0"
-                                        onClick={openCreateProjectDialog}
+                                        onClick={openAddProjectDialog}
                                         size="sm"
                                         variant="ghost"
                                     >
@@ -134,7 +133,7 @@ const ThreadListHeader: FC<ThreadListHeaderProps> = memo(({ isSearchLoading = fa
                                     </Button>
                                 }
                             />
-                            <TooltipContent>{t`Create project`}</TooltipContent>
+                            <TooltipContent>{t`Add project`}</TooltipContent>
                         </Tooltip>
                     </TooltipProvider>
                     <CreateGroupChatButton className="text-brand-black dark:text-brand-white hover:bg-sidebar-accent hover:text-sidebar-accent-foreground h-9 w-9 p-0" />

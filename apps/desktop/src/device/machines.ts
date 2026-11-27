@@ -1,0 +1,507 @@
+/**
+ * The machines the "Add project" dialog offers: this computer, and the ssh hosts of ~/.ssh/config. The page asks;
+ * a connection, a new folder on a server and a new shared folder each need a native confirmation worded here, so
+ * a page cannot open or change anything on a server by itself. Arguments are validated by the caller (`validate.ts`)
+ * and the machine ids and aliases are checked here against what this process knows.
+ */
+import type { Stats } from "node:fs";
+import { mkdir, opendir, realpath, stat } from "node:fs/promises";
+import path from "node:path";
+
+import type { AddProjectMachine, CreatedMachineFolder, MachineFolderPage, MachineServerSpec, SharedMachineFolder } from "../add-project-machines.types";
+import type { SshHost } from "./ssh-config";
+import type { BrowsePage, CreatedFolder, DeviceStatus, HostView, SettingsView } from "./types";
+import { readMachinePath, readSshAlias } from "./validate";
+
+/** The same page size and scan cap as the host's `browse`. */
+const PAGE_ENTRIES = 2000;
+const MAX_SCAN = 1_000_000;
+/** The most shared folders one server may have. Must match MAX_ROOTS in the host (`packages/device-core`). */
+const MAX_SERVER_ROOTS = 20;
+
+export interface MachineDependencies {
+    /** A native dialog; resolves true only for the person's OK. */
+    confirm: (question: { detail: string; message: string }) => Promise<boolean>;
+    home: () => string;
+    hostBrowse: (deviceId: string, folder: string, after?: string) => Promise<BrowsePage>;
+    hostConnect: (deviceId: string) => Promise<unknown>;
+    hostMakeDir: (deviceId: string, folder: string) => Promise<CreatedFolder>;
+    /** Replaces one server's shared folders. */
+    setRoots: (deviceId: string, roots: string[]) => void;
+    settings: () => SettingsView;
+    sshHosts: () => SshHost[];
+    status: () => DeviceStatus;
+    username: () => string;
+}
+
+export interface AddProjectMachines {
+    browse: (machineId: string, folder: string, after?: string) => Promise<MachineFolderPage>;
+    connect: (sshAlias: string) => Promise<AddProjectMachine>;
+    createFolder: (machineId: string, folder: string) => Promise<CreatedMachineFolder>;
+    list: () => AddProjectMachine[];
+    shareFolder: (machineId: string, folder: string) => Promise<SharedMachineFolder>;
+}
+
+type Machine = { host: HostView; kind: "server" } | { kind: "this-computer" };
+
+const isInside = (folder: string, root: string): boolean => folder === root || folder.startsWith(root.endsWith("/") ? root : `${root}/`);
+
+/** The path a new folder gets once the symlinks in its existing part are followed, so the prompt can name what `mkdir` creates. */
+const resolveNewPath = async (folder: string): Promise<string> => {
+    try {
+        return await realpath(folder);
+    } catch {
+        const parent = path.dirname(folder);
+
+        if (parent === folder) {
+            return folder;
+        }
+
+        return path.join(await resolveNewPath(parent), path.basename(folder));
+    }
+};
+
+const statOrNull = async (file: string): Promise<Stats | null> => {
+    try {
+        return await stat(file);
+    } catch {
+        return null;
+    }
+};
+
+const rootLimit = (): string => `device: this server already has ${MAX_SERVER_ROOTS} shared folders; share a parent folder or remove one in the desktop app.`;
+
+const declined = (): Error => new Error("device: the person declined");
+
+/** The longest name a native pairing accepts (`readHostSpec`); a longer SSH alias is cut for the name only. */
+const MAX_SERVER_NAME = 80;
+/** The address and user names the native pairing accepts (`device-core` `ssh.rs`). A row that needs others is disabled, not offered. */
+const PAIRABLE_ADDRESS = /^[\w.:-]{1,253}$/u;
+const PAIRABLE_USER = /^[\w.-]{1,32}$/u;
+const LEADING_DASH_OR_DOT = /^[-.]/u;
+const NOT_PAIRABLE = "Neore cannot connect to this server: its name, address or user is not one it accepts.";
+
+const pairable = (spec: MachineServerSpec): boolean =>
+    PAIRABLE_ADDRESS.test(spec.address) && PAIRABLE_USER.test(spec.user) && !LEADING_DASH_OR_DOT.test(spec.address) && !LEADING_DASH_OR_DOT.test(spec.user);
+
+/** The longest prefix of `text` that is at most `max` UTF-16 units, cut between code points so no surrogate pair is split. */
+const prefixWithin = (text: string, max: number): string => {
+    let out = "";
+
+    for (const character of text) {
+        if (out.length + character.length > max) {
+            break;
+        }
+
+        out += character;
+    }
+
+    return out;
+};
+
+/** Whether the picker can connect to this alias at all: the same rule the IPC validator applies to it. */
+const aliasUsable = (alias: string): boolean => {
+    try {
+        readSshAlias(alias);
+
+        return true;
+    } catch {
+        return false;
+    }
+};
+
+const requireConnected = (host: HostView): HostView => {
+    if (!host.connected) {
+        throw new Error("device: connect the server first");
+    }
+
+    return host;
+};
+
+const compareNames = (left: string, right: string): number => (left < right ? -1 : Number(left > right));
+
+/** Puts a name into a sorted list at its place and drops the largest when the list grows past `size`. */
+const insertSmallest = (sorted: string[], name: string, size: number): void => {
+    let low = 0;
+    let high = sorted.length;
+
+    while (low < high) {
+        const middle = Math.floor((low + high) / 2);
+
+        if (compareNames(sorted[middle] as string, name) < 0) {
+            low = middle + 1;
+        } else {
+            high = middle;
+        }
+    }
+
+    if (low >= size) {
+        return;
+    }
+
+    sorted.splice(low, 0, name);
+
+    if (sorted.length > size) {
+        sorted.pop();
+    }
+};
+
+/** Directory names of a folder on this computer; a symlink is neither a directory nor a file here, as on a server. */
+/** The real path of a folder, or null when it does not exist or cannot be read. */
+const resolveOrNull = async (folder: string): Promise<string | null> => {
+    try {
+        return await realpath(folder);
+    } catch {
+        return null;
+    }
+};
+
+const browseLocal = async (requested: string, after: string | undefined, approve: (folder: string) => Promise<void>): Promise<MachineFolderPage> => {
+    // Asked before anything is looked up: the prompt names the request as it normalises (no `..`), which is what the person can read.
+    const lexical = readMachinePath(path.resolve(requested), true);
+
+    await approve(lexical);
+
+    const resolved = await resolveOrNull(requested);
+
+    if (resolved === null) {
+        throw new Error("device: that folder was not found");
+    }
+
+    // A symlink or a name that resolves elsewhere: the person is shown the real folder before it is listed. The resolved name is
+    // checked the same way the prompt's name is, since a link target can carry characters that would disguise the prompt.
+    const folder = readMachinePath(resolved, true);
+
+    if (folder !== lexical) {
+        await approve(folder);
+    }
+
+    // Looked up again after the answers: a folder swapped for a link while the prompts were open is not the one approved.
+    if (await resolveOrNull(requested) !== resolved) {
+        throw new Error("device: that folder changed while it was being approved; try again");
+    }
+
+    // Only the page and one more name are kept, so a folder of a million entries costs one page of memory.
+    const kept: string[] = [];
+    let scanned = 0;
+
+    try {
+        const directory = await opendir(folder);
+
+        for await (const entry of directory) {
+            scanned += 1;
+
+            if (scanned > MAX_SCAN) {
+                throw new Error("device: too many entries to browse");
+            }
+
+            if (entry.isDirectory() && (after === undefined || entry.name > after)) {
+                insertSmallest(kept, entry.name, PAGE_ENTRIES + 1);
+            }
+        }
+    } catch (error) {
+        if (error instanceof Error && error.message === "device: too many entries to browse") {
+            throw error;
+        }
+
+        throw new Error("device: that folder cannot be read", { cause: error });
+    }
+
+    const page = kept.slice(0, PAGE_ENTRIES);
+    const parent = path.dirname(folder);
+
+    return {
+        entries: page.map((name) => {
+            return { name };
+        }),
+        host: "This computer",
+        next: kept.length > page.length ? (page.at(-1) ?? null) : null,
+        parent: parent === folder ? null : parent,
+        path: folder,
+    };
+};
+
+export const createAddProjectMachines = (dependencies: MachineDependencies): AddProjectMachines => {
+    let confirming = false;
+
+    /** One native question at a time: a page that asks again while one is open gets nothing. */
+    const ask = async (question: { detail: string; message: string }): Promise<boolean> => {
+        if (confirming) {
+            throw new Error("device: another confirmation is open");
+        }
+
+        confirming = true;
+
+        try {
+            return await dependencies.confirm(question);
+        } finally {
+            confirming = false;
+        }
+    };
+
+    const entryFor = (alias: string): SshHost => {
+        const entry = dependencies.sshHosts().find((candidate) => candidate.alias === alias);
+
+        if (entry === undefined) {
+            throw new Error("device: that host is not in ~/.ssh/config");
+        }
+
+        if (entry.disabledReason !== null) {
+            throw new Error(`device: ${entry.disabledReason}`);
+        }
+
+        return entry;
+    };
+
+    /** The paired server an ssh host stands for: the same address, port, user and key file the transport would use. */
+    const pairedFor = (entry: SshHost): HostView | undefined =>
+        dependencies
+            .settings()
+            .hosts.find(
+                (host) =>
+                    host.address.toLowerCase() === (entry.hostName ?? entry.alias).toLowerCase() &&
+                    host.port === (entry.port ?? 22) &&
+                    host.user === (entry.user ?? dependencies.username()) &&
+                    (host.identityFile ?? null) === entry.identityFile,
+            );
+
+    const machineFor = (machineId: string): Machine => {
+        if (dependencies.status().deviceId === machineId) {
+            return { kind: "this-computer" };
+        }
+
+        const host = dependencies.settings().hosts.find((candidate) => candidate.deviceId === machineId);
+
+        // Only a server the picker lists: some usable ssh host of the config must stand for it.
+        const listed = dependencies.sshHosts().some((entry) => entry.disabledReason === null && pairedFor(entry)?.deviceId === machineId);
+
+        if (host === undefined || !listed) {
+            throw new Error("device: unknown machine");
+        }
+
+        return { host, kind: "server" };
+    };
+
+    /** A server's pairing must be the same one after a confirmation as before it. */
+    const stillPaired = (machineId: string, before: HostView): HostView => {
+        const latest = machineFor(machineId);
+
+        if (latest.kind !== "server" || latest.host.deviceId !== before.deviceId || latest.host.address !== before.address || latest.host.port !== before.port || latest.host.user !== before.user || (latest.host.identityFile ?? null) !== (before.identityFile ?? null)) {
+            throw new Error("device: the server changed while the confirmation was open; try again");
+        }
+
+        return latest.host;
+    };
+
+    /** What pairing an ssh host needs: the same address, port and user the transport would use. */
+    const specFor = (entry: SshHost): MachineServerSpec => {
+        return {
+            address: entry.hostName ?? entry.alias,
+            identityFile: entry.identityFile,
+            name: prefixWithin(entry.alias, MAX_SERVER_NAME),
+            port: entry.port ?? 22,
+            user: entry.user ?? dependencies.username(),
+        };
+    };
+
+    const rowFor = (entry: SshHost): AddProjectMachine => {
+        const base = { kind: "server" as const, name: entry.alias, sshAlias: entry.alias };
+
+        if (entry.disabledReason !== null) {
+            return { ...base, disabledReason: entry.disabledReason, id: null, label: `SSH · ${entry.alias}`, spec: null, status: "disabled" };
+        }
+
+        if (!aliasUsable(entry.alias)) {
+            return { ...base, disabledReason: NOT_PAIRABLE, id: null, label: `SSH · ${entry.alias}`, spec: null, status: "disabled" };
+        }
+
+        const paired = pairedFor(entry);
+        const waiting = `SSH · ${entry.alias} · not connected yet`;
+
+        if (paired === undefined) {
+            const spec = specFor(entry);
+
+            if (!pairable(spec)) {
+                return { ...base, disabledReason: NOT_PAIRABLE, id: null, label: `SSH · ${entry.alias}`, spec: null, status: "disabled" };
+            }
+
+            return { ...base, disabledReason: null, id: null, label: waiting, spec, status: "unpaired" };
+        }
+
+        return paired.connected
+            ? { ...base, disabledReason: null, id: paired.deviceId, label: "Connected", spec: null, status: "connected" }
+            : { ...base, disabledReason: null, id: paired.deviceId, label: waiting, spec: null, status: "not-connected" };
+    };
+
+    const list = (): AddProjectMachine[] => {
+        const own = dependencies.status().deviceId;
+        const computer: AddProjectMachine = {
+            disabledReason: own === null ? "Pair this computer with your account first (Settings → Devices)." : null,
+            id: own,
+            kind: "this-computer",
+            label: "This computer",
+            name: "This computer",
+            spec: null,
+            sshAlias: null,
+            status: own === null ? "disabled" : "this-computer",
+        };
+
+        return [computer, ...dependencies.sshHosts().map((entry) => rowFor(entry))];
+    };
+
+    /** Connects a paired server again, after the person approves it in the desktop window. A server that is not paired yet is paired by the page first, with the shell's prompts. */
+    const connect = async (sshAlias: string): Promise<AddProjectMachine> => {
+        const entry = entryFor(sshAlias);
+        const paired = pairedFor(entry);
+
+        if (paired === undefined) {
+            throw new Error("device: pair this server first");
+        }
+
+        if (!paired.connected) {
+            if (!await ask({ detail: `Server: ${paired.name} (${paired.address})`, message: `Connect to the server “${paired.name}” over SSH?` })) {
+                throw declined();
+            }
+
+            await dependencies.hostConnect(stillPaired(paired.deviceId, paired).deviceId);
+        }
+
+        return rowFor(entry);
+    };
+
+    const browse = async (machineId: string, folder: string, after?: string): Promise<MachineFolderPage> => {
+        const machine = machineFor(machineId);
+
+        if (machine.kind === "this-computer") {
+            const local = folder === "" ? dependencies.home() : folder;
+
+            // Every page asks: a continuation is only a cursor a page can send, so it cannot stand in for the person's yes.
+            return browseLocal(local, after, async (requested) => {
+                if (!await ask({ detail: `Folder: ${JSON.stringify(requested)}`, message: "Look at this folder on this computer?" })) {
+                    throw declined();
+                }
+            });
+        }
+
+        const host = requireConnected(machine.host);
+        const page = await dependencies.hostBrowse(host.deviceId, folder === "" ? (host.roots[0] ?? "/") : folder, after);
+
+        return {
+            entries: page.entries.map((entry) => {
+                return { name: entry.name };
+            }),
+            host: page.host,
+            next: page.next,
+            parent: page.parent,
+            path: page.path,
+        };
+    };
+
+    /** The path a new server folder gets once the symlinks in its existing part are followed: the host resolves the nearest folder that exists. */
+    const resolveServerNewPath = async (deviceId: string, folder: string): Promise<string> => {
+        try {
+            const resolved = await dependencies.hostBrowse(deviceId, folder);
+
+            return resolved.path;
+        } catch (error) {
+            const parent = path.posix.dirname(folder);
+
+            if (parent === folder || !(error instanceof Error) || !error.message.includes("not found")) {
+                throw error;
+            }
+
+            return path.posix.join(await resolveServerNewPath(deviceId, parent), path.posix.basename(folder));
+        }
+    };
+
+    const createFolder = async (machineId: string, folder: string): Promise<CreatedMachineFolder> => {
+        const machine = machineFor(machineId);
+
+        if (machine.kind === "this-computer") {
+            // Asked before the folder is looked up, as for a listing: whether a path exists is something the person sees first.
+            if (!await ask({ detail: `Folder: ${JSON.stringify(folder)}`, message: "Look at this folder on this computer?" })) {
+                throw declined();
+            }
+
+            const existing = await statOrNull(folder);
+
+            if (existing !== null && !existing.isDirectory()) {
+                throw new Error("device: that path is a file");
+            }
+
+            // The prompt names the folder that gets created: a symlink in the path is followed, so the resolved path is shown and created.
+            // A link target can carry characters that would disguise the prompt, so the resolved name is checked as the request is.
+            const target = readMachinePath(existing === null ? await resolveNewPath(folder) : folder, true);
+
+            if (existing === null && !await ask({ detail: `Folder: ${JSON.stringify(target)}`, message: "Create a new folder on this computer?" })) {
+                throw declined();
+            }
+
+            await mkdir(target, { recursive: true });
+
+            return { created: existing === null, path: await realpath(target) };
+        }
+
+        const host = requireConnected(machine.host);
+        // The host follows symlinks when it creates a folder, so the prompt names, and the host makes, the path it resolves to.
+        const target = readMachinePath(await resolveServerNewPath(host.deviceId, folder), false);
+
+        if (!await ask({ detail: `Folder: ${JSON.stringify(target)}`, message: `Create a new folder on the server “${host.name}”?` })) {
+            throw declined();
+        }
+
+        return dependencies.hostMakeDir(requireConnected(stillPaired(machineId, host)).deviceId, target);
+    };
+
+    const shareFolder = async (machineId: string, folder: string): Promise<SharedMachineFolder> => {
+        const machine = machineFor(machineId);
+
+        if (machine.kind === "this-computer") {
+            return { path: folder, shared: false };
+        }
+
+        // The host resolves the folder (symlinks) and says whether it refuses it as a root; what is shown and stored is what it resolved.
+        const resolved = await dependencies.hostBrowse(requireConnected(machine.host).deviceId, folder);
+
+        if (resolved.refusedRoot) {
+            throw new Error("device: that folder is the server's home folder or one above it. Choose a folder inside it.");
+        }
+
+        // The resolved path is what the prompt shows and what is stored, so it gets the same prompt-safety check as the request.
+        const target = readMachinePath(resolved.path, false);
+
+        if (machine.host.roots.some((root) => isInside(target, root))) {
+            throw new Error("device: that folder is already shared");
+        }
+
+        if (machine.host.roots.length >= MAX_SERVER_ROOTS) {
+            throw new Error(rootLimit());
+        }
+
+        if (
+            !await ask({
+                detail: `Folder: ${JSON.stringify(target)}\nIts coding agents and tools can then read and change files in it.`,
+                message: `Share a folder on the server “${machine.host.name}” with Neore?`,
+            })
+        ) {
+            throw declined();
+        }
+
+        // The settings may have changed while the dialog was open.
+        const latest = stillPaired(machineId, machine.host);
+
+        if (latest.roots.some((root) => isInside(target, root))) {
+            throw new Error("device: that folder is already shared");
+        }
+
+        if (latest.roots.length >= MAX_SERVER_ROOTS) {
+            throw new Error(rootLimit());
+        }
+
+        dependencies.setRoots(latest.deviceId, [...latest.roots, target]);
+
+        return { path: target, shared: true };
+    };
+
+    return { browse, connect, createFolder, list, shareFolder };
+};

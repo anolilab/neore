@@ -4,9 +4,9 @@ import { withoutFocusAreaKeys } from "@neore/backend/auth/shortcut";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-import type { AccentId } from "@/features/appearance/lib/accent-presets";
 import type { CodeHighlightThemeId, MermaidThemeId } from "@/features/appearance/lib/code-themes";
 import type { ContrastId, DensityId, MainFontId } from "@/features/appearance/lib/display-preferences";
+import type { AccentChoice, ExplicitAppearance } from "@/features/appearance/lib/native-appearance";
 
 const platformModifier = "ctrl";
 
@@ -29,7 +29,8 @@ export type ModalState = {
 
 /** Accent colour, code-block and diagram themes, UI density and font family — see `features/appearance`. */
 export type AppearanceSettings = {
-    accentColor: AccentId;
+    /** A preset, or `system` (the OS accent; desktop shell only, never synced to `userSettings`). */
+    accentColor: AccentChoice;
     /** Absent means on: long code blocks scroll inside a 24-line cap until expanded. */
     capLongCodeBlocks?: boolean;
     codeHighlightTheme: CodeHighlightThemeId;
@@ -38,8 +39,12 @@ export type AppearanceSettings = {
     /** Absent means `system`: follow the OS `prefers-contrast: more` setting. */
     contrast?: ContrastId;
     density: DensityId;
+    /** Values the user picked (here, or synced from the account); the desktop shell has its own defaults for the rest. */
+    explicit?: ExplicitAppearance;
     mainFont: MainFontId;
     mermaidTheme: MermaidThemeId;
+    /** The account the `synced` marks came from; another one signing in drops them (`AppearanceSync`). */
+    syncedUserId?: string;
 };
 
 export type KeyboardShortcuts = {
@@ -87,11 +92,13 @@ export type UserPreferences = {
     hidePersonalInfo: boolean;
     lastChatId?: string;
     onboardingCompleted: boolean;
-    sendBehavior: "enter" | "shiftEnter" | "button";
+    sendBehavior: "enter" | "shiftEnter" | "modEnter" | "button";
     showTimestamps: boolean;
     soundEffects: boolean;
     /** Opt-in, this browser only: open several chats side by side (`features/chat/split`). */
     splitViewEnabled: boolean;
+    /** This browser only: where a click on a sub-agent opens it, the side panel or the main view (`features/chat/split/chat-open-place`). */
+    subAgentOpenPlace: "main" | "side";
 };
 
 /** What "Reset to Defaults" restores. */
@@ -247,6 +254,7 @@ const defaultUIState = {
         showTimestamps: true,
         soundEffects: false,
         splitViewEnabled: false,
+        subAgentOpenPlace: "side" as const,
     },
     rightSidebarWidth: RIGHT_SIDEBAR_DEFAULT_WIDTH,
     search: { isOpen: false, query: "", recentSearches: [], type: "threads" as const },
@@ -384,8 +392,12 @@ export const useUIStateStore = create<UIStateStore>()(
                 },
                 setAppearance: (appearance: Partial<AppearanceSettings>) => {
                     set((state) => {
+                        // Marks only accumulate, merged with the latest state: two choices before a re-render keep both.
+                        const explicit =
+                            appearance.explicit === undefined ? state.appearance.explicit : { ...state.appearance.explicit, ...appearance.explicit };
+
                         return {
-                            appearance: { ...state.appearance, ...appearance },
+                            appearance: { ...state.appearance, ...appearance, explicit },
                         };
                     });
                 },

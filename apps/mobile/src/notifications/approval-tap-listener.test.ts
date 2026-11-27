@@ -4,6 +4,7 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
+import type { ApprovalAnswer } from "./approval-response";
 import type { TapResponse, TapSource } from "./approval-tap-listener";
 import { attachApprovalTapListener } from "./approval-tap-listener";
 
@@ -33,6 +34,129 @@ const attach = (source: TapSource, answer: (value: unknown) => Promise<void>) =>
     attachApprovalTapListener(source, answer as never, new Set<string>(), new Set<string>());
 
 describe("attachApprovalTapListener", () => {
+    it("lets a replacement listener answer a live tap that an earlier listener skipped while it was in flight", async () => {
+        const answered = new Set<string>();
+        const replayed = new Set<string>();
+        const skipping = vi.fn(async (_value: ApprovalAnswer): Promise<boolean | undefined> => {
+            await new Promise<void>((resolve) => {
+                setTimeout(() => {
+                    resolve();
+                }, 5);
+            });
+
+            return false;
+        });
+        const answerLater = vi.fn(async (_value: ApprovalAnswer) => true as const);
+        const earlier = fakeSource(tap("n1", "approve"));
+        const replacement = fakeSource(null);
+
+        const first = attachApprovalTapListener(earlier, skipping, answered, replayed);
+        const second = attachApprovalTapListener(replacement, answerLater, answered, replayed);
+
+        await second.launched;
+        await replacement.fire(tap("n1", "approve"));
+        await first.launched;
+
+        expect(answerLater).toHaveBeenCalledTimes(1);
+        expect(answered.size).toBe(1);
+    });
+
+    it("leaves a launch response to the next listener when this one was removed while reading it", async () => {
+        const answered = new Set<string>();
+        const replayed = new Set<string>();
+        const answer = vi.fn(async (_value: ApprovalAnswer) => true as const);
+        const slow: TapSource = {
+            addListener: () => {
+                return { remove: () => undefined };
+            },
+            getLast: () =>
+                new Promise<TapResponse>((resolve) => {
+                    setTimeout(() => {
+                        resolve(tap("n1", "approve"));
+                    }, 5);
+                }),
+        };
+
+        const removed = attachApprovalTapListener(slow, answer, answered, replayed);
+
+        removed.remove();
+        await removed.launched;
+
+        expect(answer).not.toHaveBeenCalled();
+        expect(replayed.size).toBe(0);
+
+        const next = attachApprovalTapListener(fakeSource(tap("n1", "approve")), answer, answered, replayed);
+
+        await next.launched;
+
+        expect(answer).toHaveBeenCalledTimes(1);
+    });
+
+    it("logs a failure's code only when it has the shape of a machine code, never a token that a code could carry", async () => {
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+        const failing = vi.fn(async (_value: ApprovalAnswer): Promise<boolean | undefined> => {
+            throw Object.assign(new Error("boom"), { code: "tok_SECRET-1234" });
+        });
+        const source = fakeSource(tap("n1", "approve"));
+
+        const listener = attachApprovalTapListener(source, failing, new Set<string>(), new Set<string>());
+
+        await listener.launched;
+
+        expect(warn).toHaveBeenCalledWith(expect.stringContaining("(unknown)"));
+        expect(JSON.stringify(warn.mock.calls)).not.toContain("SECRET");
+        warn.mockRestore();
+    });
+
+    it("answers an approve on an alert whose earlier default tap was read by another listener", async () => {
+        const answered = new Set<string>();
+        const replayed = new Set<string>();
+        const answer = vi.fn(async (_value: ApprovalAnswer) => true as const);
+
+        const first = attachApprovalTapListener(fakeSource(tap("n1", "default")), answer, answered, replayed);
+
+        await first.launched;
+
+        const later = attachApprovalTapListener(fakeSource(tap("n1", "approve")), answer, answered, replayed);
+
+        await later.launched;
+
+        expect(answer).toHaveBeenCalledTimes(1);
+        expect(answer).toHaveBeenCalledWith({ approvalId: "approval-1", decision: "approve", threadId: "thread-1" });
+    });
+
+    it("does not record a tap as answered when the answer was skipped, so it is read again", async () => {
+        const skipped = vi.fn(async (_value: ApprovalAnswer) => false as const);
+        const answered = new Set<string>();
+        const source = fakeSource(tap("n1", "approve"));
+
+        const listener = attachApprovalTapListener(source, skipped, answered, new Set<string>());
+
+        await listener.launched;
+
+        expect(skipped).toHaveBeenCalledTimes(1);
+        expect(answered.size).toBe(0);
+    });
+
+    it("lets a later listener answer the stored launch tap that an earlier one skipped, reading it itself", async () => {
+        const answered = new Set<string>();
+        const replayed = new Set<string>();
+        const skipped = vi.fn(async (_value: ApprovalAnswer) => false as const);
+        const answerLater = vi.fn(async (_value: ApprovalAnswer) => true as const);
+
+        const first = attachApprovalTapListener(fakeSource(tap("n1", "approve")), skipped, answered, replayed);
+
+        await first.launched;
+
+        const later = attachApprovalTapListener(fakeSource(tap("n1", "approve")), answerLater, answered, replayed);
+
+        await later.launched;
+
+        expect(skipped).toHaveBeenCalledTimes(1);
+        expect(answerLater).toHaveBeenCalledTimes(1);
+        expect(answerLater).toHaveBeenCalledWith({ approvalId: "approval-1", decision: "approve", threadId: "thread-1" });
+    });
+
     it("answers a tap that opened the app from closed, from the launch response", async () => {
         const answer = vi.fn(async () => undefined);
 
@@ -103,23 +227,6 @@ describe("attachApprovalTapListener", () => {
         await source.fire(tap("n3", "approve"));
         await source.fire(tap("n3", "approve"));
         await source.fire(tap("n3", "approve"));
-
-        expect(answer).toHaveBeenCalledTimes(2);
-    });
-
-    it("leaves a skipped tap unanswered, so a later delivery of it is answered and then recorded", async () => {
-        const answered = new Set<string>();
-        const replayed = new Set<string>();
-        const answer = vi
-            .fn<(value: unknown) => Promise<boolean | void>>()
-            .mockResolvedValueOnce(false)
-            .mockResolvedValue(true);
-        const source = fakeSource(null);
-
-        attachApprovalTapListener(source, answer as never, answered, replayed);
-        await source.fire(tap("n5", "approve"));
-        await source.fire(tap("n5", "approve"));
-        await source.fire(tap("n5", "approve"));
 
         expect(answer).toHaveBeenCalledTimes(2);
     });

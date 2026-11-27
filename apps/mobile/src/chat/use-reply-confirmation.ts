@@ -5,6 +5,12 @@ import { CONFIRM_READ_INTERVAL_MS, readAllReplyStates, tallyChecks } from "./rep
 
 interface ReplyConfirmationOptions {
     fetchPage: ConfirmPageFetch;
+
+    /**
+     * The chat is not on screen (another screen over it) or the app is in the background: no check runs, since nobody
+     * sees its result. The checks go on from where they were when it is shown again.
+     */
+    isPaused?: boolean;
     /** A reply's checks ended, whether it settled or was given up: the screen can clear what it was waiting on. */
     onEnded: () => void;
     /** The chat can no longer be read: the screen clears it and forgets its saved copy. */
@@ -16,7 +22,7 @@ interface ReplyConfirmationOptions {
  * The checks after each send. Each send's reply is checked on a timer until its server copy is final. A later send does
  * not end an earlier one's checks. The history is re-read while a reply's checks wait, and again when they settle.
  */
-export const useReplyConfirmation = ({ fetchPage, onEnded, onRefused, threadId }: ReplyConfirmationOptions) => {
+export const useReplyConfirmation = ({ fetchPage, isPaused = false, onEnded, onRefused, threadId }: ReplyConfirmationOptions) => {
     const [confirmations, setConfirmations] = useState<Confirmation[]>([]);
     const [confirmTick, setConfirmTick] = useState(0);
     // Checks made so far for each reply, by message id: kept here so a new send does not restart an earlier reply's count.
@@ -24,7 +30,7 @@ export const useReplyConfirmation = ({ fetchPage, onEnded, onRefused, threadId }
     const isAwaitingReply = confirmations.some((confirmation) => confirmation.threadId === threadId && confirmation.holdsSend);
 
     useEffect(() => {
-        if (threadId === undefined) {
+        if (threadId === undefined || isPaused) {
             return undefined;
         }
 
@@ -91,7 +97,7 @@ export const useReplyConfirmation = ({ fetchPage, onEnded, onRefused, threadId }
             isActive = false;
             clearInterval(timer);
         };
-    }, [confirmations, fetchPage, onEnded, onRefused, threadId]);
+    }, [confirmations, fetchPage, isPaused, onEnded, onRefused, threadId]);
 
     const addConfirmation = useCallback((confirmation: Confirmation) => {
         setConfirmations((current) => [...current, confirmation]);

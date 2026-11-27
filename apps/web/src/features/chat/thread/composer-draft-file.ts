@@ -1,3 +1,5 @@
+import { breaksBefore, onOwnLines } from "./composer-paste/paste-plan";
+
 /** What a text-to-file conversion came back with: the attachment's id, and the reason it failed (absent on success). */
 export interface TextFileResult {
     attachmentId: string;
@@ -85,27 +87,6 @@ export const moveDraftToFile = async ({ attach, clearDraft, discard, getAttachme
     return true;
 };
 
-interface UndoLongPasteOptions {
-    attachmentId: string;
-    getAttachmentIds: () => string[];
-    getDraft: () => string;
-    pastedText: string;
-    removeAttachment: (attachmentId: string) => void;
-    setDraft: (text: string) => void;
-}
-
-/** Puts a pasted text back in the draft and drops its file, unless the file is already gone (sent or removed): then there is nothing to undo. */
-export const undoLongPaste = ({ attachmentId, getAttachmentIds, getDraft, pastedText, removeAttachment, setDraft }: UndoLongPasteOptions): boolean => {
-    if (!getAttachmentIds().includes(attachmentId)) {
-        return false;
-    }
-
-    removeAttachment(attachmentId);
-    setDraft(getDraft() + pastedText);
-
-    return true;
-};
-
 /** `text` spliced into `draft` over the offsets `start` to `end`, as a normal paste would; offsets past the end land at the end. */
 export const insertPastedText = (draft: string, text: string, start: number, end: number): string => {
     const from = Math.min(start, draft.length);
@@ -114,9 +95,64 @@ export const insertPastedText = (draft: string, text: string, start: number, end
     return draft.slice(0, from) + text + draft.slice(to);
 };
 
+/**
+ * `text` after `draft` on a line of its own, `breaks` line breaks after the draft's last text: a paste whose caret was
+ * lost to an edit goes at the end, and neither joins the last word nor, as a block, the last line.
+ */
+export const appendPastedText = (draft: string, text: string, breaks = 1): string => {
+    if (draft === "") {
+        return text;
+    }
+
+    let trailing = 0;
+
+    while (trailing < breaks && draft[draft.length - 1 - trailing] === "\n") {
+        trailing += 1;
+    }
+
+    return draft + "\n".repeat(breaks - trailing) + text;
+};
+
+interface UndoLongPasteOptions {
+    attachmentId: string;
+    /** Whether `pastedText` is converted Markdown: put back, a table, fence or list it opens with goes on a line of its own. */
+    converted?: boolean;
+    getAttachmentIds: () => string[];
+    getDraft: () => string;
+    pastedText: string;
+    removeAttachment: (attachmentId: string) => void;
+    setDraft: (text: string) => void;
+}
+
+/** Puts a pasted text back in the draft and drops its file, unless the file is already gone (sent or removed): then there is nothing to undo. */
+export const undoLongPaste = ({
+    attachmentId,
+    converted = false,
+    getAttachmentIds,
+    getDraft,
+    pastedText,
+    removeAttachment,
+    setDraft,
+}: UndoLongPasteOptions): boolean => {
+    if (!getAttachmentIds().includes(attachmentId)) {
+        return false;
+    }
+
+    removeAttachment(attachmentId);
+    setDraft(converted ? appendPastedText(getDraft(), pastedText, breaksBefore(pastedText)) : getDraft() + pastedText);
+
+    return true;
+};
+
 interface AttachLongPasteOptions {
     attach: (text: string) => Promise<TextFileResult>;
+    /** Whether the composer still takes text (not disabled or locked meanwhile); true when not given. */
+    canInsert?: () => boolean;
+    /** Whether `pastedText` is converted Markdown: put back, its tables, fences and lists then go on lines of their own. */
+    converted?: boolean;
     discard: (attachmentId: string) => void;
+    /** The draft when the paste was made, if that was before this call (a conversion ran in between); `selection` points into it. */
+    draftAtPaste?: string;
     /** Ids of the attachments in the composer right now. */
     getAttachmentIds: () => string[];
     /** The chat the composer belongs to right now; a paste is never written into a different one than it started in. */
@@ -129,20 +165,23 @@ interface AttachLongPasteOptions {
     /** Called instead of `onFailure` when the user left the chat meanwhile: the text went nowhere, the other chat's draft is untouched. */
     onNotInserted: (error: string) => void;
     pastedText: string;
-    /** Where the paste landed in the draft, read before the upload started. */
-    selection: { end: number; start: number };
+    /** Where the paste landed in the draft, read before the upload started, and whether the caret's line has text on either side. */
+    selection: { end: number; lineAfter?: boolean; lineBefore?: boolean; start: number; textAfter?: boolean; textBefore?: boolean };
     setDraft: (text: string) => void;
 }
 
 /**
  * Moves a pasted text (whose default paste was prevented) into a file. When that fails the text goes into the composer at
  * the paste position instead and the failed chip goes, so the paste is never in neither place. If the draft changed during
- * the upload the text is appended, since the saved offsets no longer point at the same characters; if the chat changed,
+ * the upload the text is appended on a line of its own, since the saved offsets no longer point at the same characters; if the chat changed,
  * nothing is written at all.
  */
 export const attachLongPaste = async ({
     attach,
+    canInsert = () => true,
+    converted = false,
     discard,
+    draftAtPaste: givenDraft,
     getAttachmentIds,
     getChatKey,
     getDraft,
@@ -154,7 +193,7 @@ export const attachLongPaste = async ({
     setDraft,
 }: AttachLongPasteOptions): Promise<boolean> => {
     const chatKey = getChatKey();
-    const draftAtPaste = getDraft();
+    const draftAtPaste = givenDraft ?? getDraft();
     const { attachmentId, error } = await attach(pastedText);
 
     if (error === undefined) {
@@ -168,7 +207,8 @@ export const attachLongPaste = async ({
 
     discard(attachmentId);
 
-    if (getChatKey() !== chatKey) {
+    // Another chat open, or the composer locked meanwhile: the text is not written into it.
+    if (getChatKey() !== chatKey || !canInsert()) {
         onNotInserted(error);
 
         return false;
@@ -176,7 +216,15 @@ export const attachLongPaste = async ({
 
     const draft = getDraft();
 
-    setDraft(draft === draftAtPaste ? insertPastedText(draft, pastedText, selection.start, selection.end) : draft + pastedText);
+    // The same line handling as a short paste: at the old caret its neighbours decide, appended the first line does.
+    if (draft === draftAtPaste) {
+        const text = converted ? onOwnLines(pastedText, selection.textBefore ?? false, selection.textAfter ?? false, selection) : pastedText;
+
+        setDraft(insertPastedText(draft, text, selection.start, selection.end));
+    } else {
+        setDraft(appendPastedText(draft, pastedText, converted ? breaksBefore(pastedText) : 1));
+    }
+
     onFailure(error);
 
     return false;

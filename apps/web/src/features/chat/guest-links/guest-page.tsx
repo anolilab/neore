@@ -13,6 +13,7 @@ import { useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } fro
 
 import { useAction } from "@/lib/lunora/crpc";
 
+import { errorCode } from "./error-code";
 import { guestPollInterval } from "./guest-poll";
 import type { PendingPost } from "./guest-token";
 import { forgetGuestToken, guestTokenFor, keepGuestToken, keepPendingPost, readPendingPost, rereadGuestToken } from "./guest-token";
@@ -42,13 +43,6 @@ const LINK_TOKEN_SHAPE = /^[0-9a-f]{64}$/u;
 const SKIP_LINK_ANCHOR = "main-content";
 const readHash = (): string => globalThis.location.hash.slice(1);
 const noHashOnServer = (): undefined => undefined;
-
-/** The backend's error code (`LunoraError#code`), wherever the client put it. */
-const errorCode = (error: unknown): unknown => {
-    const { code, data } = (typeof error === "object" && error !== null ? error : {}) as { code?: unknown; data?: { code?: unknown } };
-
-    return data?.code ?? code;
-};
 
 const GuestLinkPage: FC<{ linkToken: string }> = ({ linkToken }) => {
     const { t } = useLingui();

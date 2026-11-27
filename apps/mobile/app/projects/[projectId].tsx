@@ -2,45 +2,56 @@ import { Link, Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
 import { AccessibilityInfo, FlatList, Pressable, Text } from "react-native";
 
+import { withFinally } from "@/lib/guarded";
 import { getClient } from "@/lib/lunora";
+import { useOffline, useWriteControl } from "@/offline/offline-context";
 import { isWriteBlocked, startProjectThread, writeErrorMessage } from "@/projects/projects-api";
-import { useIsOffline, useProject, useProjectThreads } from "@/projects/use-projects";
+import { useProject, useProjectConfirm, useProjectThreads } from "@/projects/use-projects";
 
 const ProjectScreen = () => {
     const { projectId } = useLocalSearchParams<{ projectId: string }>();
     const router = useRouter();
     const { error: projectError, rows: projectRows } = useProject(projectId);
     const { error: loadError, rows: threads } = useProjectThreads(projectId);
-    const isOffline = useIsOffline();
+    const confirm = useProjectConfirm(projectId, projectRows);
+    const { isOffline } = useOffline();
+    // Off while offline and while the first token mint is out: the write carries the token and would be refused without one.
+    const startControl = useWriteControl("start");
     const [starting, setStarting] = useState(false);
     const [error, setError] = useState<string | null>(null);
     // Read by id: the list is capped at 100 and empty until it answers, and the server prefers the model sent here over the project's own.
     const project = projectRows?.[0];
 
     const startThread = async () => {
-        if (!project || isWriteBlocked({ busy: starting, offline: isOffline })) {
+        if (!project || confirm.gone || isWriteBlocked({ busy: starting, offline: startControl.disabled })) {
             return;
         }
 
         setStarting(true);
         setError(null);
 
-        try {
-            const threadId = await startProjectThread(getClient(), { defaultModel: project.defaultModel, id: projectId });
+        const attempt = async () => {
+            try {
+                const threadId = await startProjectThread(getClient(), { defaultModel: project.defaultModel, id: projectId });
 
-            router.push(`/chat/${threadId}`);
-        } catch (error_: unknown) {
-            const message = writeErrorMessage(error_);
+                router.push(`/chat/${threadId}`);
+            } catch (error_: unknown) {
+                const message = writeErrorMessage(error_);
 
-            setError(message);
-            AccessibilityInfo.announceForAccessibility(message);
-        } finally {
+                setError(message);
+                AccessibilityInfo.announceForAccessibility(message);
+            }
+        };
+
+        // `withFinally`, not `try … finally`: the React Compiler skips a component that holds a `finally`.
+        await withFinally(attempt, () => {
             setStarting(false);
-        }
+        });
     };
 
-    const blocked = isWriteBlocked({ busy: starting, offline: isOffline }) || !project;
-    const shownError = error ?? projectError ?? (projectRows?.length === 0 ? "This project is not available." : undefined) ?? loadError;
+    const blocked = isWriteBlocked({ busy: starting, offline: startControl.disabled }) || !project || confirm.gone;
+    const isUnavailable = confirm.gone || projectRows?.length === 0;
+    const shownError = error ?? projectError ?? confirm.refusal ?? (isUnavailable ? "This project is not available." : undefined) ?? loadError;
 
     return (
         <>
@@ -67,6 +78,7 @@ const ProjectScreen = () => {
                             <Text style={{ fontWeight: "600" }}>{starting ? "Starting..." : "New chat in this project"}</Text>
                         </Pressable>
                         {isOffline ? <Text accessibilityRole="alert" style={{ paddingHorizontal: 16 }}>You are offline. Starting a chat needs a connection.</Text> : null}
+                        {!isOffline && startControl.reason ? <Text accessibilityRole="alert" style={{ paddingHorizontal: 16 }}>{startControl.reason}</Text> : null}
                         {shownError ? <Text accessibilityRole="alert" style={{ color: "#b00020", padding: 16 }}>{shownError}</Text> : null}
                     </>
                 )}

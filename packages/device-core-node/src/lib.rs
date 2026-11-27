@@ -11,17 +11,23 @@
 //! not libuv's four threads, and every promise settles: a panic or join error
 //! rejects it.
 
-use std::sync::Arc;
+use std::collections::HashMap;
+use std::panic::{self, AssertUnwindSafe};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, Condvar, Mutex};
+use std::time::Duration;
 
 use device_core::acp::AcpUpdate;
 use device_core::acp_install::InstallRequest;
 use device_core::acp_install_npm::NpmInstallRequest;
 use device_core::acp_permission::PermissionRequest;
+use device_core::acp_terminal::TerminalRequest;
 use device_core::engine::{HostSpec, SettingsUpdate};
 use device_core::envelope::Signed;
 use device_core::fs::MediaRead;
 use device_core::install::{Bundle, Root};
 use device_core::media::Kind;
+use device_core::shell::{self, Terminal};
 use device_core::{DeviceState, Event};
 use napi::bindgen_prelude::{
     spawn_blocking, Buffer, Env, Error, Function, PromiseRaw, Result, ToNapiValue,
@@ -115,9 +121,156 @@ fn media_result(read: MediaRead) -> AcpMedia {
     }
 }
 
+/// Terminals the computer's coding agents run at once, across every session. The main process caps each session lower.
+const MAX_TERMINALS: usize = 32;
+
+/// The longest a `acpTerminalWait` waits: past the longest a terminal may run, so it always settles with the exit.
+const TERMINAL_WAIT: Duration = Duration::from_secs(11 * 60);
+/// How long quitting waits for the agent's terminals to end once their groups are signalled.
+const STOP_WAIT: Duration = Duration::from_secs(2);
+/// How long quitting waits for the starts still in progress to settle before it ends the terminals without them.
+const START_WAIT: Duration = Duration::from_secs(5);
+
+#[derive(Default)]
+struct Slots {
+    running: HashMap<u64, Arc<Terminal>>,
+    /// Starts that have reserved a place and are still spawning: they count against the cap like a running terminal.
+    starting: usize,
+    /// Set by `close`. No start reserves a place or spawns after it, and `stop` drains once every reserved one has
+    /// settled or [`START_WAIT`] has passed.
+    stopping: bool,
+    /// Set once `stop` has drained: a terminal that settles later is ended by its own start.
+    drained: bool,
+}
+
+/// The terminals coding agents started, by handle, and the starts still spawning.
+#[derive(Default)]
+struct Terminals {
+    slots: Mutex<Slots>,
+    settled: Condvar,
+}
+
+impl Terminals {
+    /// Reserves a place before the spawn: starts that run together count each other, so they cannot all pass the check and
+    /// spawn past the cap.
+    fn reserve(&self) -> std::result::Result<(), String> {
+        let mut slots = self.slots.lock().unwrap();
+
+        if slots.stopping {
+            return Err("the app is shutting down".into());
+        }
+
+        if slots.running.len() + slots.starting >= MAX_TERMINALS {
+            return Err("too many terminals are running".into());
+        }
+
+        slots.starting += 1;
+
+        Ok(())
+    }
+
+    /// Gives up a reservation and keeps what it started, under one lock. A terminal started once shutdown has begun is kept
+    /// too, so `stop` (waiting for this) ends it with the rest, and the start is refused.
+    fn settle(
+        &self,
+        handle: u64,
+        started: std::result::Result<Terminal, String>,
+    ) -> std::result::Result<u64, String> {
+        let mut slots = self.slots.lock().unwrap();
+
+        slots.starting -= 1;
+        self.settled.notify_all();
+
+        let terminal = started?;
+
+        if slots.drained {
+            drop(slots);
+            shell::end_now(std::iter::once(&terminal), STOP_WAIT);
+
+            return Err("the app is shutting down".into());
+        }
+
+        slots.running.insert(handle, Arc::new(terminal));
+
+        if slots.stopping {
+            return Err("the app is shutting down".into());
+        }
+
+        Ok(handle)
+    }
+
+    fn get(&self, handle: u64) -> Option<Arc<Terminal>> {
+        self.slots.lock().unwrap().running.get(&handle).cloned()
+    }
+
+    fn remove(&self, handle: u64) -> Option<Arc<Terminal>> {
+        self.slots.lock().unwrap().running.remove(&handle)
+    }
+
+    /// Reserves a place, runs `run` with every spawn it makes gated on `admit`, and keeps what it started.
+    fn start(
+        self: &Arc<Self>,
+        handle: u64,
+        run: impl FnOnce() -> std::result::Result<Terminal, String>,
+    ) -> std::result::Result<u64, String> {
+        self.reserve()?;
+
+        let gate = Arc::clone(self);
+        // Settled even when the start panics: `stop` waits for every reservation.
+        let started = panic::catch_unwind(AssertUnwindSafe(|| {
+            shell::with_spawn_gate(move || gate.admit(), run)
+        }))
+        .unwrap_or_else(|_| Err("the terminal failed to start".into()));
+
+        self.settle(handle, started)
+    }
+
+    /// Asked under the slots lock right before a start spawns: once `close` has run, a start that reaches its spawn is
+    /// refused, so a start `stop` stopped waiting for never spawns.
+    fn admit(&self) -> std::result::Result<(), String> {
+        if self.slots.lock().unwrap().stopping {
+            return Err("the app is shutting down".into());
+        }
+
+        Ok(())
+    }
+
+    /// Admits no further start.
+    fn close(&self) {
+        self.slots.lock().unwrap().stopping = true;
+    }
+
+    /// Waits up to [`START_WAIT`] for every reserved start to settle, then ends every terminal and waits for them.
+    /// Signalled here, not left to the watchers: quitting exits the process right after this returns. Call after
+    /// `close`.
+    ///
+    /// A start still blocked after the wait (a folder on a hung mount) does not hold quitting up: `stop` returns without
+    /// it, and when it resumes it is refused at its spawn by `admit`, so it starts nothing.
+    fn stop(&self) {
+        let slots = self.slots.lock().unwrap();
+        let (mut slots, _) = self
+            .settled
+            .wait_timeout_while(slots, START_WAIT, |slots| slots.starting > 0)
+            .unwrap();
+
+        slots.drained = true;
+
+        let ended: Vec<Arc<Terminal>> = slots
+            .running
+            .drain()
+            .map(|(_, terminal)| terminal)
+            .collect();
+
+        drop(slots);
+        shell::end_now(ended.iter().map(|terminal| terminal.as_ref()), STOP_WAIT);
+    }
+}
+
 #[napi]
 pub struct DeviceCore {
     state: Arc<DeviceState>,
+    next_terminal: AtomicU64,
+    terminals: Arc<Terminals>,
 }
 
 #[napi]
@@ -160,7 +313,11 @@ impl DeviceCore {
         // Reconnects a server the user connected when its link drops, and reaps what a lost session left running.
         state.supervise();
 
-        Ok(DeviceCore { state })
+        Ok(DeviceCore {
+            next_terminal: AtomicU64::new(1),
+            state,
+            terminals: Arc::default(),
+        })
     }
 
     /// `{ accountLabel, deviceId, platform }` (JSON).
@@ -378,6 +535,41 @@ impl DeviceCore {
             let page = state.host_files_list(&device_id, &path, after.as_deref())?;
 
             serde_json::to_string(&page).map_err(|error| error.to_string())
+        })
+    }
+
+    /// The folders inside an absolute path on a connected server (`{ path, parent, entries, next, host }`, JSON).
+    #[napi]
+    pub fn host_browse<'env>(
+        &self,
+        env: &'env Env,
+        device_id: String,
+        path: String,
+        after: Option<String>,
+    ) -> Result<PromiseRaw<'env, String>> {
+        let state = Arc::clone(&self.state);
+
+        blocking(env, move || {
+            let page = state.host_browse(&device_id, &path, after.as_deref())?;
+
+            serde_json::to_string(&page).map_err(|error| error.to_string())
+        })
+    }
+
+    /// Creates an absolute folder on a connected server (`{ path, created, … }`, JSON).
+    #[napi]
+    pub fn host_make_dir<'env>(
+        &self,
+        env: &'env Env,
+        device_id: String,
+        path: String,
+    ) -> Result<PromiseRaw<'env, String>> {
+        let state = Arc::clone(&self.state);
+
+        blocking(env, move || {
+            let made = state.host_make_dir(&device_id, &path)?;
+
+            serde_json::to_string(&made).map_err(|error| error.to_string())
         })
     }
 
@@ -724,7 +916,7 @@ impl DeviceCore {
         self.state.acp_permission_cancel_session(&session_id);
     }
 
-    /// Checks one relayed coding-agent command (`acp_start`, `acp_send`, `acp_cancel`, `acp_permission_answer`)
+    /// Checks one relayed coding-agent command (`acp_start`, `acp_send`, `acp_cancel`, `acp_permission_answer`, `acp_set_config`)
     /// without acting on it or spending its nonce (JSON `{ callId, expiresAt, command, refusal }`). The main process
     /// writes its receipt, acts on `command`, then asks for the result with `acp_sign`.
     #[napi]
@@ -772,6 +964,77 @@ impl DeviceCore {
             .map_err(Error::from_reason)
     }
 
+    /// Starts a coding agent's terminal, which the person allowed (`terminal/create`; a `TerminalRequest`, JSON), in the
+    /// shell sandbox. Resolves its handle at once; the command runs on. Rejects, with nothing started, for an agent not
+    /// approved for the folder, a working folder outside it, too many terminals, or a computer with no sandbox.
+    #[napi]
+    pub fn acp_terminal_start<'env>(
+        &self,
+        env: &'env Env,
+        request: String,
+    ) -> Result<PromiseRaw<'env, f64>> {
+        let request: TerminalRequest = serde_json::from_str(&request)
+            .map_err(|_| Error::from_reason("invalid terminal request"))?;
+        let state = Arc::clone(&self.state);
+        let terminals = Arc::clone(&self.terminals);
+        let handle = self.next_terminal.fetch_add(1, Ordering::Relaxed);
+
+        blocking(env, move || {
+            terminals
+                .start(handle, || state.acp_terminal_start(&request))
+                .map(|handle| handle as f64)
+        })
+    }
+
+    /// Whether a coding agent's terminal could start in `folder` on this computer (a sandbox that can run it, and the folder
+    /// shared with its tools). The desktop offers `terminal` to an agent only when this is true.
+    #[napi]
+    pub fn acp_terminal_available(&self, folder: String) -> bool {
+        self.state.acp_terminal_available(&folder)
+    }
+
+    /// What a terminal printed so far (its tail) and, once it ended, how (`{ output, truncated, exitStatus }`, JSON).
+    #[napi]
+    pub fn acp_terminal_output(&self, handle: f64) -> Result<String> {
+        to_json(&self.terminal(handle)?.output())
+    }
+
+    /// Resolves how a terminal's command ended (`{ exitCode, signal }`, JSON), once it has.
+    #[napi]
+    pub fn acp_terminal_wait<'env>(
+        &self,
+        env: &'env Env,
+        handle: f64,
+    ) -> Result<PromiseRaw<'env, String>> {
+        let terminal = self.terminal(handle)?;
+
+        blocking(env, move || {
+            let exit = terminal
+                .wait(TERMINAL_WAIT)
+                .ok_or("the terminal did not end")?;
+
+            serde_json::to_string(&exit).map_err(|error| error.to_string())
+        })
+    }
+
+    /// Ends a terminal's command and everything it started. Its output stays readable until it is released.
+    #[napi]
+    pub fn acp_terminal_kill(&self, handle: f64) -> Result<()> {
+        self.terminal(handle)?.kill();
+
+        Ok(())
+    }
+
+    /// Ends a terminal and forgets it. A handle that is already gone is not an error.
+    #[napi]
+    pub fn acp_terminal_release(&self, handle: f64) -> Result<()> {
+        if let Some(terminal) = self.terminals.remove(request_id(handle)?) {
+            terminal.kill();
+        }
+
+        Ok(())
+    }
+
     /// The most recent audit lines, newest first (each a JSON object).
     #[napi]
     pub fn audit_tail(&self) -> Vec<String> {
@@ -791,9 +1054,175 @@ impl DeviceCore {
         })
     }
 
-    /// Stops every local MCP server. Call on quit.
+    /// Stops every local MCP server and every agent's terminal. Call on quit.
     #[napi]
     pub fn stop(&self) {
+        self.terminals.close();
         self.state.stop_servers();
+        self.terminals.stop();
+    }
+}
+
+impl DeviceCore {
+    fn terminal(&self, handle: f64) -> Result<Arc<Terminal>> {
+        self.terminals
+            .get(request_id(handle)?)
+            .ok_or_else(|| Error::from_reason("that terminal is gone"))
+    }
+}
+
+#[cfg(all(test, any(target_os = "linux", target_os = "macos")))]
+mod tests {
+    use std::path::PathBuf;
+    use std::thread;
+
+    use device_core::sandbox::{self, Policy, Support};
+
+    use super::*;
+
+    #[test]
+    fn stop_ends_a_terminal_that_was_still_spawning_when_it_began() {
+        if let Support::Unavailable(reason) = sandbox::support() {
+            eprintln!("skipping: {reason}");
+            return;
+        }
+
+        let dir = std::env::temp_dir().join(format!("neore-node-stop-{}", std::process::id()));
+
+        std::fs::create_dir_all(&dir).unwrap();
+
+        let dir: PathBuf = std::fs::canonicalize(dir).unwrap();
+        let policy = Policy::for_roots(std::slice::from_ref(&dir), None);
+        let terminals = Arc::new(Terminals::default());
+
+        terminals.reserve().unwrap();
+
+        let stopping = Arc::clone(&terminals);
+        let stopper = thread::spawn(move || {
+            stopping.close();
+            stopping.stop();
+        });
+
+        while !terminals.slots.lock().unwrap().stopping {
+            thread::sleep(Duration::from_millis(5));
+        }
+
+        assert!(
+            terminals.reserve().is_err(),
+            "a start was admitted during shutdown"
+        );
+        thread::sleep(Duration::from_millis(100));
+        assert!(
+            !stopper.is_finished(),
+            "stop returned while a start was spawning"
+        );
+
+        let terminal = Terminal::start(
+            "echo $$ > shell.pid; sleep 600",
+            &dir,
+            &policy,
+            &[],
+            1024,
+            Duration::from_secs(600),
+        )
+        .unwrap();
+        let pid = loop {
+            if let Some(pid) = std::fs::read_to_string(dir.join("shell.pid"))
+                .ok()
+                .filter(|text| text.ends_with('\n'))
+            {
+                break pid.trim().to_owned();
+            }
+
+            thread::sleep(Duration::from_millis(10));
+        };
+
+        assert!(terminals.settle(7, Ok(terminal)).is_err());
+        stopper.join().unwrap();
+
+        // Checked at once: the drained terminal is dropped, and a drop alone would end the command only later.
+        let alive = std::process::Command::new("kill")
+            .args(["-0", &pid])
+            .stderr(std::process::Stdio::null())
+            .status()
+            .unwrap()
+            .success();
+
+        let _ = std::fs::remove_dir_all(&dir);
+        assert!(!alive, "the command outlived stop");
+        assert!(terminals.slots.lock().unwrap().running.is_empty());
+    }
+
+    #[test]
+    fn stop_returns_past_a_blocked_start_and_that_start_never_spawns() {
+        if let Support::Unavailable(reason) = sandbox::support() {
+            eprintln!("skipping: {reason}");
+            return;
+        }
+
+        let dir = std::env::temp_dir().join(format!("neore-node-blocked-{}", std::process::id()));
+
+        std::fs::create_dir_all(&dir).unwrap();
+
+        let dir: PathBuf = std::fs::canonicalize(dir).unwrap();
+        let policy = Policy::for_roots(std::slice::from_ref(&dir), None);
+        let terminals = Arc::new(Terminals::default());
+        let (entered, blocked) = std::sync::mpsc::channel::<()>();
+        let (resume, resumed) = std::sync::mpsc::channel::<()>();
+        let (report, reported) = std::sync::mpsc::channel::<std::result::Result<(), String>>();
+        let starting = Arc::clone(&terminals);
+        let folder = dir.clone();
+        let start = thread::spawn(move || {
+            starting.start(7, move || {
+                entered.send(()).unwrap();
+                resumed.recv().unwrap();
+
+                let started = Terminal::start(
+                    "sleep 600",
+                    &folder,
+                    &policy,
+                    &[],
+                    1024,
+                    Duration::from_secs(600),
+                );
+
+                report
+                    .send(started.as_ref().map(|_| ()).map_err(Clone::clone))
+                    .unwrap();
+                started
+            })
+        });
+
+        blocked.recv().unwrap();
+
+        let began = std::time::Instant::now();
+
+        terminals.close();
+        terminals.stop();
+
+        let waited = began.elapsed();
+
+        resume.send(()).unwrap();
+
+        let started = start.join().unwrap();
+        let spawn = reported.recv().unwrap();
+
+        let _ = std::fs::remove_dir_all(&dir);
+        assert!(waited >= START_WAIT, "stop did not wait for the start");
+        assert!(
+            waited < START_WAIT + Duration::from_secs(2),
+            "stop waited past its bound: {waited:?}"
+        );
+        assert_eq!(
+            spawn,
+            Err("the app is shutting down".into()),
+            "the start spawned after stop returned"
+        );
+        assert_eq!(started, Err("the app is shutting down".into()));
+
+        let slots = terminals.slots.lock().unwrap();
+
+        assert_eq!(slots.starting, 0);
+        assert!(slots.running.is_empty());
     }
 }

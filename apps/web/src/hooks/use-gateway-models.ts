@@ -62,3 +62,15 @@ export function useGatewayModels(): GatewayModel[] {
 
 /** Whether the catalog has loaded or failed to: an empty list is then the gateway's answer, not a load still under way. */
 export const useGatewayModelsSettled = (): boolean => !useQuery(gatewayModelsQuery).isPending;
+
+/** Whether the catalog has been read at all: until then (or after a first read that failed) it says nothing about which models exist. */
+export const useGatewayModelsLoaded = (): boolean => useQuery(gatewayModelsQuery).data !== undefined;
+
+/** Reads the catalog again, for a retry after it failed to load. */
+export const useRefetchGatewayModels = (): (() => void) => {
+    const { refetch } = useQuery(gatewayModelsQuery);
+
+    return () => {
+        void refetch();
+    };
+};

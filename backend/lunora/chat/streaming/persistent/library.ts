@@ -13,9 +13,10 @@ import { patchThread } from "../../../agent/table-writes";
 import { internal } from "../../../_generated/internal";
 import type { Doc, Id } from "../../../_generated/dataModel";
 import { internalMutation, internalQuery, type MutationCtx, type QueryCtx } from "../../../_generated/server";
+import { type HostActivity, hostActivityOf } from "../../../acp/lib/activity";
 import { stopHostTurn } from "../../../acp/lib/finish";
 import { enqueueJob } from "../../../lib/job-queue";
-import { endActiveGoals } from "../../goals/rows";
+import { endActiveGoals, endGoalsOfStream } from "../../goals/rows";
 import { patchRow } from "../../../lib/patch";
 import { recordPausedRunUsage } from "../../lib/pause-usage";
 import { planPause, RATE_LIMIT_RESUME_SLACK_MS } from "../../lib/rate-limit-pause";
@@ -24,19 +25,30 @@ import { runStreamingAgentFields } from "../../lib/streaming-run-args";
 import { streamLockedAfterStart } from "../../lib/thread-gate";
 import { type OpenToolProgress, openToolProgress } from "../../lib/mcp-progress";
 import { discardPausedThreadSecrets, discardThreadSecrets, replyKeyOfStream } from "../../lib/secret-requests";
+import { recordRunEnd } from "../../../public-api/events-log";
 import { findPendingRequestOnLatestTurn } from "../../lib/tool-approval-claim";
 import { ASK_USER_TOOL_NAME } from "../../tools/ask-user-constants";
 import { MAX_LENGTH } from "../../../lib/validators";
 import { latestSteerMessageId, latestSteerPendingId, type SteerEntry, withoutQueuedText } from "../../lib/steer-queue";
 import type { StreamStatus } from "./schema";
 import { streamStatusValidator } from "./schema";
+/** Ends only the goals the named streams run (`onlyNamed`), as stopped by the user. */
+const endGoalsOfStreams = async (ctx: MutationCtx, threadId: Id<"threads">, streamIds: Id<"persistentStreams">[]): Promise<boolean> => {
+    let ended = false;
+
+    for (const streamId of streamIds) {
+        ended = (await endGoalsOfStream(ctx, threadId, streamId, "user")) || ended;
+    }
+
+    return ended;
+};
 
 export const STREAM_TTL_MS = 20 * 60 * 1000; // 20 minutes
 const LIVE_STREAM_PAGE = 50;
 
 /** The pending row a run writes into; `createStream` and a goal's next round (`chat/goals/internal.ts`) both start one. */
 export const insertPersistentStream = async (
-    ctx: Pick<MutationCtx, "db" | "now">,
+    ctx: MutationCtx,
     {
         messageId,
         streamingConfig,
@@ -48,8 +60,8 @@ export const insertPersistentStream = async (
         threadId: string;
         userId: string;
     },
-): Promise<Id<"persistentStreams">> =>
-    (await ctx.db.insert("persistentStreams", {
+): Promise<Id<"persistentStreams">> => {
+    const streamId = (await ctx.db.insert("persistentStreams", {
         expiresAt: ctx.now + STREAM_TTL_MS,
         messageId,
         status: "pending",
@@ -57,6 +69,35 @@ export const insertPersistentStream = async (
         threadId,
         userId,
     })) as Id<"persistentStreams">;
+
+    await endSupersededManualWaits(ctx, threadId, streamId);
+
+    return streamId;
+};
+
+/**
+ * A manual wait (`pauseAwaitsPerson`) that the new reply moves the conversation past ends with it. Nothing else does: a manual
+ * wait queues no resume, so the `claimRunResume` supersede check never runs for it, and it would stay live (the thread
+ * running, its notice showing) until it timed out. Read after the new stream is inserted, so the chat is still held running.
+ */
+const endSupersededManualWaits = async (ctx: MutationCtx, threadId: string, newStreamId: Id<"persistentStreams">): Promise<void> => {
+    const live = await liveStreamsOf(ctx, threadId);
+
+    for (const stream of live) {
+        if (stream._id === newStreamId || stream.pauseAwaitsPerson !== true || stream.pause === undefined) {
+            continue;
+        }
+
+        // Read again: ending an earlier wait may have handed its snooze to this one, and the end must use that row.
+        const current = await ctx.db.get("persistentStreams", stream._id);
+
+        if (current === null || current.pause === undefined || !(await isSuperseded(ctx, current, current.pause.from))) {
+            continue;
+        }
+
+        await endPausedRun(ctx, current);
+    }
+};
 
 export const createStream = internalMutation
     .input({
@@ -113,6 +154,11 @@ export const addChunk = internalMutation
         reasoning: v.optional(v.string()),
         /** Steering: the reply continues below a message the user sent into it (`chat/steering.ts`). */
         restart: v.optional(v.boolean()),
+        /**
+         * How the run ended, on the chunk that ends it: the owner's Events log gets one event for the reply (`run:<streamId>`,
+         * `public-api/events-log.ts`), in this mutation, so the event and the end commit together.
+         */
+        runEnd: v.optional(v.union(v.literal("succeeded"), v.literal("failed"))),
         /** The writing run's epoch (`run-epoch.ts`): a chunk from a run a newer one replaced is refused. */
         runEpoch: v.optional(v.number()),
         /** Group chat: this chunk starts a new participant's reply. */
@@ -189,10 +235,17 @@ export const addChunk = internalMutation
 
             await ctx.db.patch("persistentStreams", args.streamId, { status, ...(steers && { steers }) });
         }
+
+        // The run's end: one event per reply, keyed by its stream. A redelivered end finds the event and writes nothing more.
+        if (args.final && args.runEnd !== undefined) {
+            await recordRunEnd(ctx, { outcome: args.runEnd, streamId: args.streamId, threadId: stream.threadId });
+        }
     });
 
 export const setStreamStatus = internalMutation
     .input({
+        /** The writing run's epoch (`run-epoch.ts`): a run a newer one replaced sets nothing, in the same transaction as the check. */
+        runEpoch: v.optional(v.number()),
         status: streamStatusValidator,
         streamId: v.id("persistentStreams"),
     })
@@ -201,6 +254,13 @@ export const setStreamStatus = internalMutation
 
         if (!stream) {
             throw new LunoraError("NOT_FOUND", "Stream not found");
+        }
+
+        assertCurrentRun(stream, args.runEpoch);
+
+        // The same refusal as `addChunk`: a paused stream stays live for its resume, so the run that paused it does not end it here.
+        if (args.runEpoch !== undefined && stream.pause !== undefined) {
+            throw new LunoraError(RUN_REPLACED, "The run is paused or being resumed");
         }
 
         if (stream.status !== "pending" && stream.status !== "streaming") {
@@ -216,6 +276,11 @@ export const setStreamStatus = internalMutation
             status: args.status,
             ...(steers && { steers }),
         });
+
+        // A live stream set to error is a failed run: its final chunk may have been refused, so the end is recorded here.
+        if (args.status === "error") {
+            await recordRunEnd(ctx, { outcome: "failed", streamId: args.streamId, threadId: stream.threadId });
+        }
     });
 
 /** Every live stream of a thread, read in pages (a thread has one or two; the bound is for a runaway one). */
@@ -249,11 +314,20 @@ const liveStreamsOf = async (ctx: MutationCtx, threadId: string): Promise<Doc<"p
  * and the signal its tools get. A tool that ignores that signal still runs to its end, but no further step starts.
  */
 export const stopActiveForThread = internalMutation
-    .input({ messageId: v.optional(v.string().max(MAX_LENGTH.id)), threadId: v.string().max(MAX_LENGTH.id) })
+    .input({
+        messageId: v.optional(v.string().max(MAX_LENGTH.id)),
+        /** With `messageId`: stop that reply only, and nothing when it is no longer live (a sub-agent's own continuation). */
+        onlyNamed: v.optional(v.boolean()),
+        threadId: v.string().max(MAX_LENGTH.id),
+    })
     .output(v.boolean())
     .mutation(async ({ args, ctx }) => {
         // Read the live streams in pages (a thread has one or two; the bound is for a runaway one), then stop them.
         const live = await liveStreamsOf(ctx, args.threadId);
+
+        if (args.onlyNamed === true && live.every((stream) => stream.messageId !== args.messageId)) {
+            return false;
+        }
 
         // A stop that names a prompt ends that prompt's reply only. When no live stream carries the id (a
         // placeholder key, or a reply started from another row), it falls back to the whole thread.
@@ -316,6 +390,16 @@ export const stopActiveForThread = internalMutation
             }
         }
 
+        // The snoozes the stopped waits put on their chats end with the stops. Lifted after every stream above is closed, and
+        // each read fresh, so a snooze handed over earlier in this call is seen; the streams stopped here do not take one over.
+        for (const stream of streams) {
+            const current = await ctx.db.get("persistentStreams", stream._id);
+
+            if (current !== null && current.pause !== undefined) {
+                await liftPauseSnooze(ctx, current, stopping);
+            }
+        }
+
         // The person is stopping a reply that paused on a request (its stream is already closed), whether or not another reply
         // is live: it is abandoned here, and the secret it kept through the pause goes with it. A reply that was live keeps its
         // own (a stopped run drops them when it ends; one still running needs them).
@@ -326,8 +410,16 @@ export const stopActiveForThread = internalMutation
         // A stale id that fell back to the whole thread must not narrow the cleanup to some older reply.
         await discardPausedThreadSecrets(ctx, { keep, messageId: stoppedWholeThread ? undefined : args.messageId, threadId });
 
-        // A goal ends with the stop, whether or not a reply is live: between its rounds there is none to stop.
-        const goalEnded = await endActiveGoals(ctx, args.threadId as Id<"threads">, "user");
+        // A goal ends with the stop, whether or not a reply is live: between its rounds there is none to stop. A stop of one
+        // named stream (`onlyNamed`, a sub-agent's continuation ended by its run) ends only that stream's goal, if any.
+        const goalEnded =
+            args.onlyNamed === true
+                ? await endGoalsOfStreams(
+                      ctx,
+                      threadId,
+                      streams.map((stream) => stream._id),
+                  )
+                : await endActiveGoals(ctx, threadId, "user");
 
         // A stopped coding-agent turn can start the next queued message of a worker in this same transaction
         // (`stopHostTurn` → `finishRun`): its stream is new, so the thread is still running.
@@ -498,6 +590,45 @@ export const getStreamText = internalQuery
     })
     .output(
         v.object({
+            /** A coding agent's running turn only (`acp/lib/activity.ts`): its latest plan and its tool calls. Live only. */
+            hostActivity: v.optional(
+                v.object({
+                    plan: v.optional(
+                        v.array(
+                            v.object({
+                                content: v.string().max(500),
+                                priority: v.union(v.literal("high"), v.literal("medium"), v.literal("low")),
+                                status: v.union(v.literal("pending"), v.literal("in_progress"), v.literal("completed")),
+                            }),
+                        ),
+                    ),
+                    tools: v.array(
+                        v.object({
+                            exit: v.optional(
+                                v.object({
+                                    // Spelled out inline, however deep: codegen reads only an inline validator.
+                                    // eslint-disable-next-line unicorn/max-nested-calls
+                                    code: v.optional(v.number()),
+                                    // eslint-disable-next-line unicorn/max-nested-calls
+                                    signal: v.optional(v.string().max(32)),
+                                }),
+                            ),
+                            id: v.string().max(128),
+                            output: v.optional(v.string().max(2000)),
+                            status: v.union(
+                                v.literal("pending"),
+                                v.literal("in_progress"),
+                                v.literal("completed"),
+                                v.literal("failed"),
+                                v.literal("cancelled"),
+                                v.literal("declined"),
+                            ),
+                            title: v.string().max(500),
+                            toolKind: v.string().max(64),
+                        }),
+                    ),
+                }),
+            ),
             /** A coding agent's turn only (`acp/`). */
             hostState: v.optional(v.union(v.literal("accepted"), v.literal("received"), v.literal("running"), v.literal("ended"))),
             messageId: v.optional(v.string()),
@@ -547,12 +678,23 @@ export const getStreamText = internalQuery
         let reasoning = "";
         let speaker: { name: string; skillId: string } | undefined;
         let toolProgress: OpenToolProgress[] = [];
+        let hostActivity: HostActivity | undefined;
 
         if (stream.status !== "pending") {
-            const { page: allChunks } = await ctx.db.persistentChunks.findMany({
-                orderBy: [{ seq: "asc" }],
-                where: { streamId: args.streamId },
-            });
+            // Every page: a long turn writes more chunks than one page holds, and the activity of its later steps is in them.
+            const allChunks: Doc<"persistentChunks">[] = [];
+            let cursor: string | undefined;
+
+            do {
+                const page = await ctx.db.persistentChunks.findMany({
+                    cursor,
+                    orderBy: [{ seq: "asc" }],
+                    where: { streamId: args.streamId },
+                });
+
+                allChunks.push(...page.page);
+                cursor = page.isDone ? undefined : (page.continueCursor ?? undefined);
+            } while (cursor);
             // In a group turn, earlier participants' replies are already saved
             // messages; only the current speaker's text is still "streaming".
             // Likewise the text before a steered message (`restart`).
@@ -564,6 +706,7 @@ export const getStreamText = internalQuery
             // Only the newest report per call goes out, from the chunks of the current reply; a settled stream runs no call.
             if (stream.status === "streaming") {
                 toolProgress = openToolProgress(chunks);
+                hostActivity = stream.producer === "host" ? hostActivityOf(allChunks) : undefined;
             }
 
             // A steer delivered whose marker is not written yet (the next step never started: a stop or a failure came
@@ -577,6 +720,7 @@ export const getStreamText = internalQuery
         }
 
         return {
+            ...(hostActivity !== undefined && { hostActivity }),
             ...(stream.hostState !== undefined && { hostState: stream.hostState }),
             messageId: stream.messageId,
             reasoning,
@@ -818,6 +962,44 @@ const hasLiveEdit = async (ctx: MutationCtx, threadId: Id<"threads">): Promise<b
     return live.length > 0;
 };
 
+/**
+ * Lifts the snooze a rate-limit pause put on its thread (`pauseRunForRateLimit`). It puts back the value the snooze replaced
+ * (`pauseSnooze.previousUntil`, if still ahead), so an owner's own snooze survives the pause. `leaving` names paused replies
+ * that end in the same call (a Retry now resuming them), so they do not count as still paused.
+ *
+ * While another reply on the chat is still paused, the snooze stays: it passes to that reply (`pauseSnooze`), so the reply
+ * that ends last lifts it. Lifting does nothing once the snooze is no longer the one this pause set. Lifting writes no
+ * choice (`snoozeChosenAt` stays).
+ */
+const liftPauseSnooze = async (ctx: MutationCtx, stream: Doc<"persistentStreams">, leaving: ReadonlySet<string> = new Set()): Promise<void> => {
+    const { pauseSnooze } = stream;
+
+    if (pauseSnooze === undefined) {
+        return;
+    }
+
+    const threadId = stream.threadId as Id<"threads">;
+    const thread = await ctx.db.get("threads", threadId);
+
+    // Only the snooze this record set is the one it may end or hand on. A later snooze (another pause's, or the owner's) is not this reply's.
+    if (thread === null || thread.snoozedUntil !== pauseSnooze.until) {
+        return;
+    }
+
+    const live = await liveStreamsOf(ctx, threadId);
+    const stillPaused = live.find((other) => other._id !== stream._id && other.pause !== undefined && !leaving.has(other._id));
+
+    if (stillPaused !== undefined) {
+        await patchRow(ctx.db, "persistentStreams", stillPaused, { pauseSnooze });
+
+        return;
+    }
+
+    const restore = pauseSnooze.previousUntil !== undefined && pauseSnooze.previousUntil > ctx.now ? pauseSnooze.previousUntil : undefined;
+
+    await patchRow(ctx.db, "threads", thread, { snoozedUntil: restore });
+};
+
 /** Ends a paused run that will not resume: records what it did, closes its stream, and frees the thread unless another reply is live on it. */
 export const endPausedRun = async (ctx: MutationCtx, stream: Doc<"persistentStreams">, options: { holdThread?: boolean } = {}): Promise<void> => {
     await recordPausedRunUsage(ctx, stream);
@@ -825,6 +1007,9 @@ export const endPausedRun = async (ctx: MutationCtx, stream: Doc<"persistentStre
     const steers = withoutQueuedText(stream.steers as SteerEntry[] | undefined);
 
     await patchRow(ctx.db, "persistentStreams", stream, { pausedRun: undefined, status: "done", ...(steers && { steers }) });
+
+    // A stopped wait gives its chat back: the snooze the pause put on it ends with the pause.
+    await liftPauseSnooze(ctx, stream);
 
     const { page } = await ctx.db.persistentStreams.findMany({
         limit: 2,
@@ -854,6 +1039,24 @@ const vPauseOutcome = v.object({
  * `replyRowIds` and `stepsUsed` are what THIS invocation of the run did; they are added to what the earlier ones did
  * (`pausedRun`), so the resume knows how many steps are left and the run can record one reply when it ends.
  */
+/**
+ * Removes the empty placeholder a failed step-cap wrap-up left (`execute.ts`): the agent marks its row failed when its call is
+ * rejected, and the reply would show that error beside its answer. Only the row the wrap-up named goes, and only while it is still
+ * empty. A row of another reply or run is never named here, so it is never removed.
+ */
+export const removeWrapUpPlaceholder = internalMutation
+    .input({ placeholderId: v.string().max(MAX_LENGTH.id), threadId: v.id("threads") })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        const placeholder = await ctx.db.messages.findFirst({ where: { _id: args.placeholderId as Id<"messages">, threadId: args.threadId } });
+
+        if (placeholder && isEmptyPlaceholder(placeholder)) {
+            await removeEmptyPending(ctx, args.threadId, placeholder);
+        }
+
+        return null;
+    });
+
 export const pauseRunForRateLimit = internalMutation
     .input({
         /** The row the rejected step continues from: the last row this run saved, else the prompt. */
@@ -862,11 +1065,15 @@ export const pauseRunForRateLimit = internalMutation
         placeholderId: v.optional(v.string().max(MAX_LENGTH.id)),
         provider: v.optional(v.string().max(MAX_LENGTH.short)),
         replyRowIds: v.array(v.string().max(MAX_LENGTH.id)),
+        /** `false`: the person resumes the run, so no resume is queued (`usage-limit-settings.ts`). Absent: it resumes at `retryAt`. */
+        resumeAfterLimit: v.optional(v.boolean()),
         retryAt: v.optional(v.number()),
         run: v.object({ ...runStreamingAgentFields }),
         /** The pausing run's epoch (`run-epoch.ts`): a run a newer one replaced pauses nothing. */
         runEpoch: v.optional(v.number()),
         skill: v.optional(v.object({ id: v.optional(v.string().max(MAX_LENGTH.id)), name: v.string().max(MAX_LENGTH.short) })),
+        /** `true`: the chat is snoozed until `retryAt`, when the provider reported a reset time (`usage-limit-settings.ts`). */
+        snoozeUntilReset: v.optional(v.boolean()),
         status: v.number(),
         stepsUsed: v.number(),
         streamId: v.id("persistentStreams"),
@@ -923,6 +1130,8 @@ export const pauseRunForRateLimit = internalMutation
             ...((args.skill ?? earlier?.skill) && { skill: args.skill ?? earlier?.skill }),
             ...((args.timeZone ?? earlier?.timeZone) && { timeZone: args.timeZone ?? earlier?.timeZone }),
         };
+        // The person resumes this run themselves (`resumeAfterLimit: false`): the pause is the same, only no resume is queued.
+        const awaitsPerson = args.resumeAfterLimit === false;
         const pause = {
             from: args.from,
             id: `${ctx.now}-${pausedSteps.length}`,
@@ -933,14 +1142,45 @@ export const pauseRunForRateLimit = internalMutation
             status: args.status,
         };
 
-        await ctx.db.patch("persistentStreams", stream._id, {
+        // Snoozed until the reset, only when the provider reported one (a default wait has no reset to snooze to), and only
+        // for the thread's owner's own run: the snooze is the owner's active list. A later snooze the owner chose stays.
+        // The value a shorter snooze replaces is kept on the stream, so lifting this snooze puts back the owner's own.
+        const thread = await ctx.db.get("threads", threadId);
+        const snoozes =
+            args.snoozeUntilReset === true &&
+            args.retryAt !== undefined &&
+            thread !== null &&
+            thread.userId === args.run.userId &&
+            (thread.snoozedUntil ?? 0) < plan.retryAt;
+
+        // When another paused reply set the snooze this one extends, the value to restore is the owner's own, which that reply
+        // recorded. Restoring the other reply's snooze would hide the chat after both have resumed.
+        const current = thread?.snoozedUntil;
+        const liveNow = snoozes && current !== undefined ? await liveStreamsOf(ctx, threadId) : [];
+        const otherOwner = liveNow.find((other) => other._id !== stream._id && other.pauseSnooze?.until === current);
+        const previous = otherOwner === undefined ? current : otherOwner.pauseSnooze?.previousUntil;
+
+        await patchRow(ctx.db, "persistentStreams", stream, {
             expiresAt: Math.max(stream.expiresAt, plan.retryAt + STREAM_TTL_MS),
             pause,
+            pauseAwaitsPerson: awaitsPerson ? true : undefined,
             pausedRun,
             pausedSteps,
+            // The provider gave no reset time: `retryAt` is the default wait, not a reset the person can rely on.
+            pauseResetUnreported: args.retryAt === undefined ? true : undefined,
+            // Not stamped as the owner's choice (`snoozeChosenAt` is left alone), so an owner's own snooze chosen before this
+            // pause and delivered after it still applies.
+            pauseSnooze: thread !== null && snoozes ? { ...(previous !== undefined && { previousUntil: previous }), until: plan.retryAt } : undefined,
         });
-        // A moment after the provider's time, so the resume does not land just before the limit lifts.
-        await enqueueRunResume(pause, plan.retryAt - ctx.now + RATE_LIMIT_RESUME_SLACK_MS);
+
+        if (!awaitsPerson) {
+            // A moment after the provider's time, so the resume does not land just before the limit lifts.
+            await enqueueRunResume(pause, plan.retryAt - ctx.now + RATE_LIMIT_RESUME_SLACK_MS);
+        }
+
+        if (thread !== null && snoozes) {
+            await patchRow(ctx.db, "threads", thread, { snoozedUntil: plan.retryAt });
+        }
 
         return { paused: true, retryAt: plan.retryAt };
     });
@@ -988,12 +1228,18 @@ export const claimRunResume = internalMutation
         // (The watchdog's resume decision already moved the epoch: `inspectRun` fences the run it judged dead.)
         const epoch = stream.pauseCause === "interrupted" ? epochOf(stream) : epochOf(stream) + 1;
 
+        // The reply runs again: a snooze this wait took over from a stopped reply ends with the wait, so the chat is not left hidden.
+        await liftPauseSnooze(ctx, stream, new Set<string>([String(stream._id)]));
+
         // The run is about to write again: it gets a fresh expiry, the pause's (set for the wait) would cut it short.
         await patchRow(ctx.db, "persistentStreams", stream, {
             beatAt: ctx.now,
             expiresAt: ctx.now + STREAM_TTL_MS,
             pause: undefined,
+            pauseAwaitsPerson: undefined,
             pauseCause: undefined,
+            pauseResetUnreported: undefined,
+            pauseSnooze: undefined,
             // This invocation's own claim: the ceiling its beats may extend the expiry to counts from here (`beatExpiry`).
             runClaimedAt: ctx.now,
             runEpoch: epoch,
@@ -1023,14 +1269,23 @@ export const claimRunResume = internalMutation
  * waited the whole pause out gets no such allowance.
  */
 export const retryPausedRunsNow = internalMutation
-    .input({ threadId: v.string().max(MAX_LENGTH.id) })
+    .input({
+        /** Only this paused reply, when the caller means one reply's own wait (a manual Resume); absent: every paused reply of the thread. */
+        streamId: v.optional(v.string().max(MAX_LENGTH.id)),
+        threadId: v.string().max(MAX_LENGTH.id),
+    })
     .output(v.boolean())
     .mutation(async ({ args, ctx }) => {
         const live = await liveStreamsOf(ctx, args.threadId);
+        const resumes: Doc<"persistentStreams">[] = [];
         let resumed = false;
 
         for (const stream of live) {
             const { pause } = stream;
+
+            if (args.streamId !== undefined && String(stream._id) !== args.streamId) {
+                continue;
+            }
 
             // An interrupted run's resume is the watchdog's (`interrupted.ts`): there is no wait to end early.
             if (!pause || stream.pauseCause !== undefined) {
@@ -1039,7 +1294,8 @@ export const retryPausedRunsNow = internalMutation
 
             const early = pause.retryAt > ctx.now;
 
-            if (!early && pause.retryAt > ctx.now - RESUME_OVERDUE_MS) {
+            // A pause the person resumes has no queued resume that could be late: once its reset has passed it is due at once.
+            if (!early && stream.pauseAwaitsPerson !== true && pause.retryAt > ctx.now - RESUME_OVERDUE_MS) {
                 continue;
             }
 
@@ -1047,7 +1303,20 @@ export const retryPausedRunsNow = internalMutation
 
             await ctx.db.patch("persistentStreams", stream._id, { pause: due, ...(early && { earlySteps: [...(stream.earlySteps ?? []), pause.from] }) });
             await enqueueRunResume(due, 0);
+            resumes.push(stream);
             resumed = true;
+        }
+
+        // The snooze the waits put on the chat ends with the waits they end (an early resume runs the reply now). Lifted after the
+        // loop, so a reply resumed in this same call does not count as one still paused.
+        const leaving = new Set<string>(resumes.map((stream) => stream._id));
+
+        // Latest snooze first: lifting a later snooze restores the value it extended, and an earlier reply's snooze can then match it.
+        // In stream order the earlier lift finds nothing to match, and the chat stays snoozed to a reset that no longer holds it.
+        const latestFirst = resumes.toSorted((a, b) => (b.pauseSnooze?.until ?? 0) - (a.pauseSnooze?.until ?? 0));
+
+        for (const stream of latestFirst) {
+            await liftPauseSnooze(ctx, stream, leaving);
         }
 
         return resumed;

@@ -128,6 +128,15 @@ vi.mock("./addon", () => {
 
             return CoreStub;
         },
+        loadToolIdentity: () => (file: string) => `identity of ${file}`,
+    };
+});
+
+vi.mock("./ssh-config", () => {
+    return {
+        readSshConfig: () => [
+            { alias: "build", disabledReason: null, hostName: "build.example.com", identityFile: null, port: null, user: "deploy" },
+        ],
     };
 });
 
@@ -214,6 +223,7 @@ const makeCore = () => {
             JSON.stringify({ args: ["--acp"], command: "/opt/agent", cwd: folder, env: {}, scratch: false, secretNames: [] }),
         ),
         acpInstall: vi.fn((_request: string) => JSON.stringify({ agents: [], consents: [], envNames: [] })),
+        acpInstallNpm: vi.fn(async (_request: string) => JSON.stringify({ agents: [], consents: [], envNames: [] })),
         acpInstallPrune: vi.fn(),
         acpInstallStage: vi.fn(() => mkdtempSync(path.join(fake.userData, "stage-"))),
         acpPermissionAnswer: vi.fn(),
@@ -232,7 +242,7 @@ const makeCore = () => {
         acpSign: vi.fn((_envelope: string, _signature: string, outcome: string) =>
             JSON.stringify({ payload: JSON.stringify({ outcome }), signature: "signed" }),
         ),
-        acpSpawnPlan: vi.fn((): string => {
+        acpSpawnPlanAsync: vi.fn(async (): Promise<string> => {
             throw new Error("that folder is not allowed");
         }),
         acpUpdate: vi.fn(() => JSON.stringify({ agents: [], envNames: [] })),
@@ -248,6 +258,9 @@ const makeCore = () => {
         }),
         hostAgentStop: vi.fn(),
         hostAgentWrite: vi.fn(),
+        hostBrowse: vi.fn(async (_deviceId: string, folder: string, _after?: string) =>
+            JSON.stringify({ entries: [{ name: "app" }], host: "build-box", next: null, parent: "/", path: folder, refusedRoot: false }),
+        ),
         hostConnect: vi.fn(async () => JSON.stringify({ platform: "linux" })),
         hostDisconnect: vi.fn(),
         hostDownload: vi.fn(async (_deviceId: string, _path: string, _destination: string) =>
@@ -258,6 +271,7 @@ const makeCore = () => {
             JSON.stringify({ entries: [], host: "build-box", next: null, path: "/srv/app", truncated: false }),
         ),
         hostForgetKey: vi.fn(),
+        hostMakeDir: vi.fn(async (_deviceId: string, folder: string) => JSON.stringify({ created: true, path: folder })),
         hostPair: vi.fn(async (_spec: string, _deviceId: string, _secret: string) => true),
         hostProbe: vi.fn(async (_spec: string) => JSON.stringify({ platform: "linux", sandboxAvailable: true, sandboxDetail: "Landlock", version: "0.1.0" })),
         hostRemove: vi.fn(),
@@ -352,6 +366,39 @@ describe("relay channels (the site window)", () => {
         expect(core.acpSign).toHaveBeenLastCalledWith(ACP_ENVELOPE, ACP_SIGNATURE, "already_answered");
     });
 
+    it("change an option of a coding agent's session and sign the agent's answer, or the reason it could not be changed", async () => {
+        const { AcpManager } = await import("../acp/manager");
+        const command = { kind: "setConfig", optionId: "model", sessionId: "s1", valueId: "deep" };
+        const change = vi.spyOn(AcpManager.prototype, "setRemoteOption");
+
+        try {
+            core.acpPrepare.mockReturnValue(JSON.stringify({ callId: "c10", command, expiresAt: Date.now() + 60_000, refusal: null }));
+            change.mockResolvedValueOnce(undefined);
+            await invoke(DEVICE_CHANNEL.execute, siteEvent(), { envelope: ACP_ENVELOPE, signature: ACP_SIGNATURE });
+
+            expect(change).toHaveBeenCalledWith("s1", "model", "deep");
+            expect(core.acpSign).toHaveBeenLastCalledWith(ACP_ENVELOPE, ACP_SIGNATURE, "accepted");
+
+            core.acpPrepare.mockReturnValue(JSON.stringify({ callId: "c11", command, expiresAt: Date.now() + 60_000, refusal: null }));
+            change.mockRejectedValueOnce(new Error("the agent does not offer that choice"));
+            await invoke(DEVICE_CHANNEL.execute, siteEvent(), { envelope: ACP_ENVELOPE, signature: ACP_SIGNATURE });
+
+            expect(core.acpSign).toHaveBeenLastCalledWith(ACP_ENVELOPE, ACP_SIGNATURE, "the agent does not offer that choice");
+        } finally {
+            change.mockRestore();
+        }
+    });
+
+    it("refuse an option change for a session that is no longer open, without touching an agent", async () => {
+        core.acpPrepare.mockReturnValue(
+            JSON.stringify({ callId: "c12", command: { kind: "setConfig", sessionId: "gone", valueId: "code" }, expiresAt: Date.now() + 60_000, refusal: null }),
+        );
+        await invoke(DEVICE_CHANNEL.execute, siteEvent(), { envelope: ACP_ENVELOPE, signature: ACP_SIGNATURE });
+
+        expect(core.acpSign).toHaveBeenLastCalledWith(ACP_ENVELOPE, ACP_SIGNATURE, "that session no longer exists");
+        expect(spawnAgent).not.toHaveBeenCalled();
+    });
+
     it("close the device window's prompt list when a remote answer takes a request", () => {
         fake.coreEmit?.(JSON.stringify({ agent: "Claude", tool: "Run tests", type: "acpPermission" }));
         deviceWindow().webContents.send.mockClear();
@@ -381,6 +428,91 @@ describe("relay channels (the site window)", () => {
         expect(() => invoke(LOCAL_CHANNEL.pickFolder, siteEvent())).toThrow("device: not the device window");
         expect(() => invoke(LOCAL_CHANNEL.copyDiagnostics, siteEvent(), "dev_1")).toThrow("device: not the device window");
         expect(core.promptAnswer).not.toHaveBeenCalled();
+    });
+});
+
+describe("add-project machines (the site window)", () => {
+    const PAIRED = {
+        hosts: [{ address: "build.example.com", connected: true, deviceId: "srv-1", name: "build-box", port: 22, roots: ["/srv/app"], user: "deploy" }],
+        paired: true,
+        roots: [],
+    };
+    const call = [DEVICE_CHANNEL.browseMachineFolders, DEVICE_CHANNEL.createMachineFolder, DEVICE_CHANNEL.shareMachineFolder] as const;
+
+    beforeEach(() => {
+        core.settingsGet.mockReturnValue(JSON.stringify(PAIRED));
+        core.status.mockReturnValue(JSON.stringify({ accountLabel: null, deviceId: "desk-1", platform: "macos" }));
+        vi.mocked(dialog.showMessageBox).mockClear();
+    });
+
+    it("refuse every sender but the site", () => {
+        for (const channel of [DEVICE_CHANNEL.listAddProjectMachines, DEVICE_CHANNEL.connectAddProjectMachine, ...call]) {
+            expect(() => invoke(channel, foreignEvent(), {})).toThrow("device: untrusted sender");
+        }
+
+        expect(core.hostMakeDir).not.toHaveBeenCalled();
+        expect(core.hostProbe).not.toHaveBeenCalled();
+    });
+
+    it("are not reachable from the device window's channels", () => {
+        expect(Object.values(LOCAL_CHANNEL)).not.toContain(DEVICE_CHANNEL.createMachineFolder);
+    });
+
+    it("list this computer and the ssh host as the paired server", async () => {
+        const rows = (await invoke(DEVICE_CHANNEL.listAddProjectMachines, siteEvent())) as { id: string | null; status: string }[];
+
+        expect(rows.map((row) => [row.id, row.status])).toEqual([
+            ["desk-1", "this-computer"],
+            ["srv-1", "connected"],
+        ]);
+    });
+
+    it("validate arguments in the main process before anything reaches the core", async () => {
+        await expect(invoke(DEVICE_CHANNEL.createMachineFolder, siteEvent(), { machineId: "srv-1", path: "relative" })).rejects.toThrow("must be absolute");
+        await expect(invoke(DEVICE_CHANNEL.createMachineFolder, siteEvent(), { machineId: "srv-1", path: "/a\0b" })).rejects.toThrow("device: path is invalid");
+        await expect(invoke(DEVICE_CHANNEL.createMachineFolder, siteEvent(), { machineId: "srv-x", path: "/srv/new" })).rejects.toThrow("unknown machine");
+        await expect(invoke(DEVICE_CHANNEL.connectAddProjectMachine, siteEvent(), "not-in-config")).rejects.toThrow("not in ~/.ssh/config");
+        await expect(invoke(DEVICE_CHANNEL.browseMachineFolders, siteEvent(), "nope")).rejects.toThrow("device: request is invalid");
+        expect(core.hostMakeDir).not.toHaveBeenCalled();
+        expect(core.hostProbe).not.toHaveBeenCalled();
+    });
+
+    it("browse a connected server through the host", async () => {
+        const page = await invoke(DEVICE_CHANNEL.browseMachineFolders, siteEvent(), { machineId: "srv-1", path: "/srv" });
+
+        expect(core.hostBrowse).toHaveBeenCalledWith("srv-1", "/srv", undefined);
+        expect(page).toMatchObject({ entries: [{ name: "app" }], path: "/srv" });
+    });
+
+    it("create a folder on a server only after the person confirms, and not when they decline", async () => {
+        await invoke(DEVICE_CHANNEL.createMachineFolder, siteEvent(), { machineId: "srv-1", path: "/srv/new" });
+
+        const [shown] = vi.mocked(dialog.showMessageBox).mock.calls.at(-1)?.slice(-1) as [{ detail: string; message: string }];
+
+        expect(shown.message).toContain("build-box");
+        expect(shown.detail).toContain("/srv/new");
+        expect(core.hostMakeDir).toHaveBeenCalledWith("srv-1", "/srv/new");
+
+        core.hostMakeDir.mockClear();
+        vi.mocked(dialog.showMessageBox).mockResolvedValueOnce({ checkboxChecked: false, response: 0 });
+        await expect(invoke(DEVICE_CHANNEL.createMachineFolder, siteEvent(), { machineId: "srv-1", path: "/srv/other" })).rejects.toThrow("declined");
+        expect(core.hostMakeDir).not.toHaveBeenCalled();
+    });
+
+    it("share a folder only after the person confirms, and not when they decline", async () => {
+        vi.mocked(dialog.showMessageBox).mockResolvedValueOnce({ checkboxChecked: false, response: 0 });
+        await expect(invoke(DEVICE_CHANNEL.shareMachineFolder, siteEvent(), { machineId: "srv-1", path: "/data/p" })).rejects.toThrow("declined");
+        expect(core.settingsUpdate).not.toHaveBeenCalled();
+
+        await invoke(DEVICE_CHANNEL.shareMachineFolder, siteEvent(), { machineId: "srv-1", path: "/data/p" });
+        expect(core.settingsUpdate).toHaveBeenCalledWith(JSON.stringify({ host: { deviceId: "srv-1", roots: ["/srv/app", "/data/p"] } }));
+    });
+
+    it("refuses to connect an ssh host that is not paired yet, and probes nothing", async () => {
+        core.settingsGet.mockReturnValue(JSON.stringify({ hosts: [], paired: true, roots: [] }));
+
+        await expect(invoke(DEVICE_CHANNEL.connectAddProjectMachine, siteEvent(), "build")).rejects.toThrow("pair this server first");
+        expect(core.hostProbe).not.toHaveBeenCalled();
     });
 });
 
@@ -617,20 +749,20 @@ describe("coding agents on a server", () => {
         // Planned by the core for the server (not for this computer), and handed to the server's host.
         await vi.waitFor(() => expect(core.hostAgentStart).toHaveBeenCalledWith("srv-1", 1, "claude", "/srv/app"));
         expect(core.acpHostSpawnPlan).toHaveBeenCalledWith("srv-1", "claude", "/srv/app");
-        expect(core.acpSpawnPlan).not.toHaveBeenCalled();
+        expect(core.acpSpawnPlanAsync).not.toHaveBeenCalled();
         expect(spawnAgent).not.toHaveBeenCalled();
         expect(core.acpSign).toHaveBeenLastCalledWith(ACP_ENVELOPE, ACP_SIGNATURE, "accepted");
     });
 
     it("starts a command for this computer as a process of its own and asks the core for nothing about a server", async () => {
         core.acpPrepare.mockReturnValue(prepared({ deviceId: "desk-1", server: null }));
-        core.acpSpawnPlan.mockImplementation(() => {
+        core.acpSpawnPlanAsync.mockImplementation(() => {
             throw new Error("that folder is not allowed");
         });
 
         await invoke(DEVICE_CHANNEL.execute, siteEvent(), { envelope: ACP_ENVELOPE, signature: ACP_SIGNATURE });
 
-        await vi.waitFor(() => expect(core.acpSpawnPlan).toHaveBeenCalledWith("claude", "/srv/app"));
+        await vi.waitFor(() => expect(core.acpSpawnPlanAsync).toHaveBeenCalledWith("claude", "/srv/app"));
         expect(core.acpHostSpawnPlan).not.toHaveBeenCalled();
         expect(core.hostAgentStart).not.toHaveBeenCalled();
     });
@@ -883,7 +1015,7 @@ describe("coding-agent channels", () => {
         }
 
         expect(core.acpUpdate).not.toHaveBeenCalled();
-        expect(core.acpSpawnPlan).not.toHaveBeenCalled();
+        expect(core.acpSpawnPlanAsync).not.toHaveBeenCalled();
         expect(core.acpPermissionAnswer).not.toHaveBeenCalled();
         expect(core.acpPermissionAnswerBatch).not.toHaveBeenCalled();
         expect(spawnAgent).not.toHaveBeenCalled();
@@ -954,7 +1086,7 @@ describe("coding-agent channels", () => {
         await expect(invoke(LOCAL_CHANNEL.acpStart, localEvent(), "alpha", "/not/allowed")).rejects.toThrow("that folder is not allowed");
         await expect(invoke(LOCAL_CHANNEL.acpProbe, localEvent(), "alpha")).rejects.toThrow("that folder is not allowed");
 
-        expect(core.acpSpawnPlan).toHaveBeenCalledWith("alpha", "/not/allowed");
+        expect(core.acpSpawnPlanAsync).toHaveBeenCalledWith("alpha", "/not/allowed");
         expect(spawnAgent).not.toHaveBeenCalled();
     });
 
@@ -962,14 +1094,14 @@ describe("coding-agent channels", () => {
         await expect(invoke(LOCAL_CHANNEL.acpImportList, localEvent(), "alpha", "/not/allowed")).rejects.toThrow("that folder is not allowed");
         await expect(invoke(LOCAL_CHANNEL.acpImport, localEvent(), "nobody", "/work", "s1")).rejects.toThrow("that agent is not registered");
 
-        expect(core.acpSpawnPlan).toHaveBeenCalledTimes(1);
+        expect(core.acpSpawnPlanAsync).toHaveBeenCalledTimes(1);
         expect(spawnAgent).not.toHaveBeenCalled();
     });
 
     it("check the shape of an import request before it reaches the agent", () => {
         expect(() => invoke(LOCAL_CHANNEL.acpImport, localEvent(), "alpha", "/work", 7)).toThrow("device: saved session is invalid");
         expect(() => invoke(LOCAL_CHANNEL.acpImportList, localEvent(), "alpha", 7)).toThrow("device: folder is invalid");
-        expect(core.acpSpawnPlan).not.toHaveBeenCalled();
+        expect(core.acpSpawnPlanAsync).not.toHaveBeenCalled();
     });
 
     it("report what no agent has said yet as nothing", () => {
@@ -979,7 +1111,7 @@ describe("coding-agent channels", () => {
     it("refuse an unregistered agent before asking for a plan", async () => {
         await expect(invoke(LOCAL_CHANNEL.acpStart, localEvent(), "nobody", "/work")).rejects.toThrow("that agent is not registered");
 
-        expect(core.acpSpawnPlan).not.toHaveBeenCalled();
+        expect(core.acpSpawnPlanAsync).not.toHaveBeenCalled();
     });
 
     it("check the shape of what the window sends before it reaches the core", () => {

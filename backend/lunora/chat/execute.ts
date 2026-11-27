@@ -15,6 +15,7 @@
  * two share lives in `lib/agent-run.ts`.
  */
 import { DEFAULT_CHAT_MODEL } from "@neore/ai/constants";
+import { messageCarriesOutsideAgentText, typedTextOf } from "./lib/attached-text";
 import { estimateTokensFromCharacters, hasActiveFilters, MODEL_LOOKUP, parseCustomModelId } from "@neore/ai/models";
 import { v } from "lunorash/server";
 
@@ -24,7 +25,8 @@ import type { ActionCtx } from "../_generated/server";
 import { internalAction } from "../_generated/server";
 import { autoCompactBeforeReply } from "../agent/thread-compaction";
 import { streamLogger } from "../lib/logger";
-import { COMPLETION_MESSAGE_IDS_MAX } from "../sub-agents/logic";
+import { notTypedMarksOfMessage, statelessPrompt } from "../lib/not-typed-text";
+import { COMPLETION_MESSAGE_IDS_MAX, SUB_AGENT_TOOL_NAME } from "../sub-agents/logic";
 import { findSkillCommand, parseSkillCommand, resolveReasoningEffort, resolveSkillModel } from "../skills/slash-command";
 import { handOffToGoalReview, noteGoalPaused, otherGoalHoldsThread } from "./goals/execute";
 import { GOAL_CONTINUATION_AGENT } from "./goals/shared";
@@ -33,6 +35,7 @@ import {
     afterRun,
     AgentRunError,
     buildRunStreamArgs,
+    continuationFailureMessage,
     createRunSteering,
     discardRunSecrets,
     endStoppedRun,
@@ -40,17 +43,23 @@ import {
     finishRun,
     isAgentRunError,
     loadRunContext,
+    longestContextCharacters,
     mayExtractMemory,
     memoryToCarry,
+    readResumeInterruptedRuns,
     readRunPlan,
-    resolveBackupModelId,
+    readUsageLimitPreferences,
+    resolveBackupModelIds,
     resolveRunModel,
     resumeApprovedRun,
     setDispatchOrigin,
     setResearchDepth,
+    setRunOrganizationId,
+    setRunReplyKey,
     setRunStartedBy,
+    setRunToolSources,
+    setRunTurn,
     setThreadStatus,
-    readResumeInterruptedRuns,
     stampSavedToolCalls,
 } from "./lib/agent-run";
 import { buildAgentTools } from "./lib/agent-tools";
@@ -67,15 +76,20 @@ import { loadModelFilterRules, MODEL_FILTER_RULES_UNAVAILABLE_MESSAGE } from "./
 import { defaultModelUnderRules, readsImagesAndCallsTools } from "../lib/utility-model";
 import { injectsSkillText } from "./lib/low-risk-approval";
 import { closeMCPClientsThenSettle } from "./lib/mcp-tools";
-import { pipeToPersistentChunks, type PipedStream, stopWhenStopped, toolProgressSink } from "./lib/persist-stream";
+import { labelMcpToolCalls } from "./lib/mcp-tool-labels";
+import { isStreamStopped, pipeToPersistentChunks, type PipedStream, STOP_POLL_MS, stopWhenStopped, toolProgressSink } from "./lib/persist-stream";
+import { CAP_WRAP_UP_INSTRUCTION, endedOnStepCap } from "./lib/cap-wrap-up";
+import { collectApprovalRequestIds } from "./lib/tool-approval-claim";
 import { MAX_LENGTH } from "../lib/validators";
 import { resolveAutoModel, shouldRouteAuto } from "./lib/auto-model";
 import classifyQuery from "./lib/query-classifier";
 import detectTaskComplexity, { type TaskAnalysis } from "./lib/task-detector";
-import { getToolsForModelAndMode, type SearchMode } from "./lib/tool-builder";
+import { getToolsForModelAndMode, modelSupportsTools, type SearchMode } from "./lib/tool-builder";
 import { getAgentForUser } from "./lib/thread-helpers";
 import { vToolRunConfig } from "./lib/tool-run-config";
+import { agentPromptKinds, resumedSystemContext } from "./lib/system-context-kinds";
 import { vAskUserAnswers } from "./tools/ask-user-validators";
+import { INSTRUCTION_READ_TOOL, renderInstructionList } from "../projects/rule-files";
 import { pauseOnRateLimit } from "./lib/pause-run";
 import { scheduleRepliesUsage } from "./lib/pause-usage";
 import { runStreamingAgentFields } from "./lib/streaming-run-args";
@@ -85,7 +99,21 @@ export const runStreamingAgent = internalAction
     .input(runStreamingAgentFields)
     .action(
         async ({
-            args: { isAnonymous, messageId, organizationId, origin, resume, skill: goalSkill, streamId, streamingConfig, threadId, userId, userPrompt },
+            args: {
+                impersonated,
+                isAnonymous,
+                messageId,
+                organizationId,
+                origin,
+                resume,
+                skill: goalSkill,
+                streamId,
+                streamingConfig,
+                systemContext: savedSystemContext,
+                threadId,
+                userId,
+                userPrompt,
+            },
             ctx,
         }) => {
             // Everything before the first token is on the user's wait, so the reads
@@ -169,6 +197,10 @@ export const runStreamingAgent = internalAction
             let model = requestedModel;
             // Set once the run has saved rows: a run that fails still leaves the record of the calls the quick check approved.
             let stampSavedCalls: (() => Promise<void>) | undefined;
+            // The rows of the wrap-up written when the reply spent its step cap (`lib/cap-wrap-up.ts`): usage counts them with the reply.
+            let wrapUpRows: typeof priorRows = [];
+            // The wrap-up call once it has started: its own placeholder row and abort hook, settled on every exit (`finally`).
+            let wrapUpCall: { getPendingMessageId: () => string | undefined; settleAbort: () => Promise<void> } | undefined;
             // Aborted when a newer run took the stream (`onReplaced`) or a sidebar stop ends this one.
             const stopping = new AbortController();
             let beat: ReturnType<typeof setInterval> | undefined;
@@ -289,8 +321,10 @@ export const runStreamingAgent = internalAction
                 const runContextPromise = loadRunContext(ctx, {
                     admittedRun: true,
                     customSystemPrompt,
+                    fileIds,
                     promptText: prompt,
                     researchDepth: streamingConfig.researchDepth,
+                    roleCatalog: true,
                     threadId,
                     threadLanguage: thread.language,
                     userId,
@@ -380,9 +414,7 @@ export const runStreamingAgent = internalAction
                                 getAgentForUser(ctx, userId, preRouteModel, thread?.language),
                             ]);
                             const systemCharacters =
-                                (fallbackAgent.options.instructions ?? "").length +
-                                run.contextParts.join("\n\n").length +
-                                (invokedSkill?.instructions.length ?? 0);
+                                (fallbackAgent.options.instructions ?? "").length + longestContextCharacters(run) + (invokedSkill?.instructions.length ?? 0);
 
                             return {
                                 contextTokens: history.contextTokens + Math.ceil(estimateTokensFromCharacters(systemCharacters)),
@@ -494,6 +526,11 @@ export const runStreamingAgent = internalAction
                 // Built-ins + MCP tools, with the user's per-tool permissions applied
                 // (`off` removed, `ask` gated behind a tool-approval request) — and
                 // the run context started above.
+                const projectInstructions = runContextPromise.then((context) => context.projectInstructions);
+
+                // Awaited only by a run that builds tools under no `off` cap; the failure itself surfaces through `runContextPromise`.
+                projectInstructions.catch(() => undefined);
+
                 const [toolResult, runContext] = await Promise.all([
                     allowTools
                         ? buildAgentTools(ctx, {
@@ -502,9 +539,14 @@ export const runStreamingAgent = internalAction
                               autoMediaEnrichment: agentModulePrefs.autoMediaEnrichment,
                               // Interactive: the user's devices, if this thread may reach them.
                               deviceThreadId: threadId,
+                              // Offered as a candidate like any built-in, only to a model that calls tools. A failed context read
+                              // fails the run through `runContextPromise` below, and makes `buildAgentTools` close what it connected.
+                              ...(modelSupportsTools(model) && { instructions: projectInstructions }),
                               mcpProgress: toolProgressSink(ctx, streamId, runEpoch),
                               mcpServerNames: streamingConfig.mcpServerNames,
                               model,
+                              // A thread's stored organization wins; the run's own caps a thread that has none.
+                              organizationId: organizationId ?? null,
                               ...(origin === "outside_agent" && { origin }),
                               searchMode: effectiveSearchMode,
                               skillTools: invokedSkill?.config
@@ -521,6 +563,7 @@ export const runStreamingAgent = internalAction
                               mcpLabels: {},
                               mcpServerNames: [],
                               mcpToolFingerprints: {},
+                              mcpToolOrigins: {},
                               permissionKeys: {},
                               repeatable: [],
                               tools: {},
@@ -530,23 +573,29 @@ export const runStreamingAgent = internalAction
 
                 mcpClients = toolResult.mcpClients;
 
+                // The project's `auto` rule files are listed only while the run still offers `instruction_read` to read them: the
+                // cap, a bot's selection, a skill or the user's permissions may have removed it like any other tool.
+                const instructions = Object.hasOwn(toolResult.tools, INSTRUCTION_READ_TOOL) ? runContext.projectInstructions : [];
                 const tools = toolRuns.wrap(toolResult.tools, new Set(toolResult.repeatable));
-                const { contextParts, prefs, researchDepth: effectiveResearchDepth, threadSettings: appThread } = runContext;
+                const { prefs, researchDepth: effectiveResearchDepth, threadSettings: appThread } = runContext;
+                const contextParts = instructions.length > 0 ? runContext.contextParts : runContext.contextPartsWithoutInstructions;
 
                 setResearchDepth(ctx, effectiveResearchDepth);
                 setDispatchOrigin(ctx, origin ?? "lead");
                 // A write collaborator's turn runs as the collaborator: `startedBy` is what its continuation, run as the owner, still knows.
                 setRunStartedBy(ctx, userId);
+                setRunOrganizationId(ctx, organizationId);
+                setRunReplyKey(ctx, streamId);
 
                 // Build agent
                 const isAutoContinue = streamingConfig.shouldAutoContinue === true;
                 // The step cap is for the whole reply: a run resumed after a pause gets what the earlier steps left.
                 const maxSteps = Math.max(1, getMaxSteps(isAutoContinue) - before.stepsUsed);
 
-                const backupModelId = await resolveBackupModelId(ctx, userId, prefs.backupModel, model, agentModulePrefs.modelFilterRules ?? {});
+                const backupModelIds = await resolveBackupModelIds(ctx, userId, prefs.backupModels, model, agentModulePrefs.modelFilterRules ?? {});
                 const agent = await getAgent(model, {
                     agentMode,
-                    backupModelId,
+                    backupModelIds,
                     customProvider,
                     enabledSkills: skillRun.enabledSkills.length > 0 ? skillRun.enabledSkills : undefined,
                     gateway: gatewayFetch(ctx),
@@ -587,7 +636,7 @@ export const runStreamingAgent = internalAction
 
                 // Reasoning provider options and, for auto-continue, step compression.
                 const streamTextArgs: any = buildRunStreamArgs({
-                    backupModelId,
+                    backupModelIds,
                     hasTools: Object.keys(tools).length > 0,
                     model,
                     reasoningEffort: threadReasoningEffort,
@@ -595,7 +644,8 @@ export const runStreamingAgent = internalAction
                 });
 
                 if (threadStatelessMode) {
-                    streamTextArgs.prompt = prompt;
+                    // It saves its prompt again from this, so the saved prompt's not-typed marks go with it.
+                    streamTextArgs.prompt = statelessPrompt(prompt, notTypedMarksOfMessage(message?.message as Parameters<typeof notTypedMarksOfMessage>[0]));
                 } else {
                     // A resumed run continues from the last row it saved before the pause, so its rows land under that row.
                     streamTextArgs.promptMessageId = resumedFrom ?? messageId;
@@ -603,13 +653,40 @@ export const runStreamingAgent = internalAction
 
                 // Memory, knowledge base, project context and the thread's own
                 // instructions — then a note about attached documents.
-                const additionalParts = [...contextParts];
+                const instructionList = renderInstructionList(instructions);
+                const additionalParts = [...contextParts, ...(instructionList ? [instructionList] : [])];
+
+                if (runContext.roleCatalog && SUB_AGENT_TOOL_NAME in tools) {
+                    additionalParts.push(runContext.roleCatalog);
+                }
 
                 if (fileIds && fileIds.length > 0) {
                     additionalParts.push(
                         `CONTEXT: The user has attached document(s) to this message. Their content has been extracted and included inline. If appropriate, you can offer to create a slide presentation from the document content using the createPresentation tool.`,
                     );
                 }
+
+                // One kind per piece of the final system prompt: the context's, then what `getAgent` and the note above added. A
+                // resume also keeps every kind its first invocation recorded: a source removed meanwhile leaves its kind.
+                const systemContext = resumedSystemContext(
+                    [
+                        ...runContext.systemContext,
+                        ...agentPromptKinds({
+                            enabledSkills: skillRun.enabledSkills.length > 0,
+                            fileNote: Boolean(fileIds && fileIds.length > 0),
+                            hasAgentMode: agentMode.enableDatasource || agentMode.enableKnowledge || agentMode.enablePlanner,
+                            // The search mode picks the tools here; `getAgent` is not given it, so no citation rules are added.
+                            hasSearchMode: false,
+                            skillInstructions: Boolean(invokedSkill?.instructions),
+                            taskPlan: taskAnalysis !== undefined && taskAnalysis.taskType !== "general",
+                        }),
+                    ],
+                    savedSystemContext,
+                    resume !== undefined,
+                );
+
+                setRunTurn(ctx, { impersonated, promptMessageId: messageId, systemContext });
+                setRunToolSources(ctx, toolResult.permissionKeys);
 
                 if (additionalParts.length > 0) {
                     const baseInstructions = agent.options.instructions || "";
@@ -623,6 +700,7 @@ export const runStreamingAgent = internalAction
 
                 // The job's own arguments: what a pause or an interrupted run's resume re-enters the job with.
                 const runArgs = {
+                    ...(impersonated !== undefined && { impersonated }),
                     isAnonymous,
                     messageId,
                     organizationId,
@@ -630,6 +708,7 @@ export const runStreamingAgent = internalAction
                     ...(goalSkill && { skill: goalSkill }),
                     streamId,
                     streamingConfig: routedModel === undefined ? streamingConfig : { ...streamingConfig, model: routedModel },
+                    systemContext,
                     threadId,
                     userId,
                     userPrompt,
@@ -703,6 +782,7 @@ export const runStreamingAgent = internalAction
                 const result = await threadObject.streamText(streamTextArgs, {
                     admittedRun: true,
                     // The step's rows land only while this run holds the stream: `addMessages` checks it in its own transaction.
+                    labelStepContent: (content) => labelMcpToolCalls(content, toolResult.mcpLabels, toolResult.autoApprovals),
                     runHold: { epoch: runEpoch, streamId },
                     statelessMode: threadStatelessMode,
                     takeSteer: steering.takeSteer,
@@ -724,7 +804,12 @@ export const runStreamingAgent = internalAction
                     });
 
                 // A sidebar stop during the run ends it here, with the reply it still owed saved (`endStoppedRun`).
-                const recordRun = async (extra: Pick<Parameters<typeof afterRun>[1], "botId" | "extractMemory" | "firstTokenTime" | "prompt">) => {
+                const recordRun = async (
+                    extra: Pick<
+                        Parameters<typeof afterRun>[1],
+                        "botId" | "extractMemory" | "firstTokenTime" | "prompt" | "promptAt" | "promptMessageId" | "quotablePrompt"
+                    >,
+                ) => {
                     // The rows an earlier invocation of this reply saved (before a pause or a death) were never stamped with their
                     // tool names: this run's labels are the same ones. Idempotent, and never masks how the run ended.
                     if (priorRows.length > 0) {
@@ -742,11 +827,12 @@ export const runStreamingAgent = internalAction
                         knowledgeSources: runContext.knowledgeSources,
                         retrievedMemories: runContext.retrievedMemories,
                         // A run resumed after a pause records the whole reply: its earlier rows come first, so the key is the reply's first row.
-                        savedMessages: [...priorRows, ...(result.savedMessages ?? [])],
+                        savedMessages: [...priorRows, ...(result.savedMessages ?? []), ...wrapUpRows],
                         ...(skill && { skill }),
-                        steeredTexts: steering.steeredTexts(),
+                        steered: steering.steered(),
                         summarizeThread: runContext.prefs.threadSummariesEnabled,
                         threadId,
+                        ...(message && { promptAt: message._creationTime }),
                         ...(runContext.prefs.timezone && { timeZone: runContext.prefs.timezone }),
                         timingStart,
                         userId,
@@ -800,6 +886,7 @@ export const runStreamingAgent = internalAction
                             runEpoch,
                             settle: async () => await result.consumeStream(),
                             streamId,
+                            usageLimit: async () => await readUsageLimitPreferences(userId),
                         }));
 
                     // The steps that finished are not recorded yet: the reply is one reply, recorded when the run ends (or, if
@@ -822,6 +909,100 @@ export const runStreamingAgent = internalAction
                 // reject or stall a run that otherwise finished; a log line must not.
                 ctx.log.event("chat.run_streaming_agent", { autoContinue: isAutoContinue, model });
 
+                // A reply that spent its step cap on a tool step has no answer text: one more call, with tools off, writes the
+                // wrap-up (`lib/cap-wrap-up.ts`). It runs before the stream is finished, so a stop still lands on it. It is
+                // skipped when the run did not end on the cap: a stop, a loop the guard ended, a pause on an approval, a stateless
+                // run (it keeps no row to continue from), or a run a newer one replaced. A failed wrap-up never fails the reply,
+                // which is saved already.
+                const lastSavedRowId = result.savedMessages?.at(-1)?._id;
+
+                if (
+                    !threadStatelessMode &&
+                    lastSavedRowId !== undefined &&
+                    loopGuard.finding === undefined &&
+                    endedOnStepCap({ finishReason: await result.finishReason, maxSteps, stepsRun: stepsFinished.count }) &&
+                    collectApprovalRequestIds(result.savedMessages).length === 0 &&
+                    !replaced &&
+                    !stopping.signal.aborted &&
+                    !(await isStreamStopped(ctx, streamId))
+                ) {
+                    // Nothing else polls this call's stream (there is no pipe), so a sidebar stop is looked for here and aborts the
+                    // call: the stop then ends the run as any other stop does.
+                    const wrapUpStop = new AbortController();
+                    const watchForStop = setInterval(async () => {
+                        if (await isStreamStopped(ctx, streamId)) {
+                            wrapUpStop.abort();
+                        }
+                    }, STOP_POLL_MS);
+
+                    let wrapUpPlaceholderId: string | undefined;
+
+                    try {
+                        // Sized for the call as it is: no tools, so the backup models and compression are chosen for a tool-less call.
+                        const wrapUpArgs: any = buildRunStreamArgs({
+                            backupModelIds,
+                            hasTools: false,
+                            model,
+                            reasoningEffort: threadReasoningEffort,
+                            shouldAutoContinue: isAutoContinue,
+                        });
+                        const wrapUp = await threadObject.streamText(
+                            {
+                                ...wrapUpArgs,
+                                abortSignal: AbortSignal.any([stopping.signal, wrapUpStop.signal]),
+                                promptMessageId: lastSavedRowId,
+                                stopWhen: stopWhenStopped(ctx, streamId, 1),
+                                system: [streamTextArgs.system ?? agent.options.instructions, CAP_WRAP_UP_INSTRUCTION].filter(Boolean).join("\n\n"),
+                                // No tool can be called: the model is told so, and the call offers none.
+                                toolChoice: "none",
+                                tools: {},
+                            },
+                            {
+                                admittedRun: true,
+                                runHold: { epoch: runEpoch, streamId },
+                                statelessMode: false,
+                                takeSteer: steering.takeSteer,
+                            },
+                        );
+
+                        wrapUpCall = wrapUp;
+                        // Read now: the agent clears this id once the call's row is marked failed, so a failed call cannot read it later.
+                        wrapUpPlaceholderId = wrapUp.getPendingMessageId();
+
+                        await wrapUp.consumeStream();
+                        wrapUpRows = wrapUp.savedMessages ?? [];
+                    } catch (error) {
+                        if (wasReplaced(error)) {
+                            onReplaced();
+
+                            return;
+                        }
+
+                        // A stop that aborted the call is the stop's to report, not a failed wrap-up.
+                        if (!wrapUpStop.signal.aborted) {
+                            streamLogger.warn(`[BgAgent] Stream ${streamId}: the step-cap wrap-up failed; the reply stands without it:`, error);
+                        }
+                    } finally {
+                        clearInterval(watchForStop);
+                    }
+
+                    // The call's own row, if it is still an empty placeholder, goes: a call rejected inside the stream (not thrown) is
+                    // marked failed, and its error would otherwise show beside the reply's answer. A successful call filled its row,
+                    // so nothing is removed. Settled first, so the agent has marked the row; best effort, never failing the reply.
+                    await wrapUpCall?.settleAbort().catch(() => undefined);
+
+                    if (wrapUpPlaceholderId !== undefined && !replaced) {
+                        await ctx
+                            .runMutation(internal.chat.streaming.persistent.library.removeWrapUpPlaceholder, {
+                                placeholderId: wrapUpPlaceholderId,
+                                threadId: threadId as Id<"threads">,
+                            })
+                            .catch((cleanupError: unknown) => {
+                                streamLogger.warn(`[BgAgent] Stream ${streamId}: could not remove the wrap-up's own row:`, cleanupError);
+                            });
+                    }
+                }
+
                 // Record the approval snapshot (if the run paused) and flush. The
                 // snapshot is what the continuation rebuilds this exact run from.
                 // A locked chat, a goal round and a guest's note the owner sent on are never mined (`mayExtractMemory`).
@@ -839,13 +1020,18 @@ export const runStreamingAgent = internalAction
                         snapshot: {
                             autoMediaEnrichment: agentModulePrefs.autoMediaEnrichment,
                             ...(origin === "outside_agent" && { dispatchOrigin: origin }),
+                            ...(organizationId && { organizationId }),
+                            ...(impersonated !== undefined && { impersonated }),
                             instructions: streamTextArgs.system ?? agent.options.instructions,
                             mcpServerNames: toolResult.mcpServerNames,
                             mcpToolFingerprints: toolResult.mcpToolFingerprints,
+                            mcpToolOrigins: toolResult.mcpToolOrigins,
                             // A run that pauses extracts at the pause; its continuation extracts only the steers it takes.
                             memory: memoryToCarry({ botId: runContext.botId, extractMemory, prompt }),
                             model,
                             promptMessageId: messageId,
+                            // The project the listed `auto` files came from: the continuation reads that one's, not the thread's then.
+                            ...(instructions.length > 0 && appThread?.projectId && { projectId: appThread.projectId }),
                             reasoningEffort: threadReasoningEffort,
                             // The reply is named by its first stream; every continuation inherits it.
                             replyKey: streamId,
@@ -853,6 +1039,7 @@ export const runStreamingAgent = internalAction
                             searchMode: effectiveSearchMode,
                             shouldAutoContinue: isAutoContinue,
                             startedBy: userId,
+                            systemContext,
                             toolNames: Object.keys(tools),
                             toolPermissionKeys: toolResult.permissionKeys,
                             // A continuation does not reload the context, so the quick check reads this off the snapshot.
@@ -893,6 +1080,15 @@ export const runStreamingAgent = internalAction
                     extractMemory,
                     firstTokenTime,
                     prompt,
+                    // Only the user's own words are quoted: not a prompt an outside agent wrote (its origin, or the mark it was saved with, since a
+                    // regenerate runs with no origin), nor a collaborator's prompt the user regenerated.
+                    ...(origin !== "outside_agent" &&
+                        !messageCarriesOutsideAgentText(message?.message) &&
+                        (message?.userId === undefined || message.userId === userId) && {
+                            ...(message && { promptAt: message._creationTime }),
+                            promptMessageId: messageId,
+                            quotablePrompt: typedTextOf(message?.message),
+                        }),
                 });
 
                 // A run that belongs to a goal is reviewed before the chat settles: the goal keeps the thread running
@@ -904,12 +1100,17 @@ export const runStreamingAgent = internalAction
                     return;
                 }
 
-                void ctx.scheduler.runAfter(0, internal.chat.functions.generateFollowupSuggestionsForThread, {
-                    threadId,
-                    userId,
-                });
-
                 await setThreadStatus(ctx, threadId, "active", { awaitingInput: finished.awaitingInput, replied: !finished.paused });
+
+                // A reply paused on an approval is not finished: its suggestions wait for the reply that finishes after it. Queued after the
+                // status is settled, so the scheduler's latency cannot hold the thread in `running`. A failed hand-off is logged: the reply is saved.
+                if (!finished.paused) {
+                    await ctx.scheduler
+                        .runAfter(0, internal.chat.functions.generateFollowupSuggestionsForThread, { threadId, userId })
+                        .catch((error: unknown) => {
+                            streamLogger.warn(`[AgentRun] Could not queue the follow-up suggestions of ${threadId}:`, error);
+                        });
+                }
 
                 streamLogger.debug(`[BgAgent] Execution complete`, {
                     elapsedMs: Date.now() - startTime,
@@ -958,20 +1159,23 @@ export const runStreamingAgent = internalAction
                 }
             } finally {
                 clearInterval(beat);
+                // The wrap-up call, if one started, is settled too: a replaced or failed wrap-up never outlives the run.
+                await wrapUpCall?.settleAbort().catch(() => undefined);
                 await closeMCPClientsThenSettle(mcpClients, settleAbort);
             }
         },
     );
 
-export type SubAgentEnd = { error: string; kind: "failed" } | { kind: "paused" } | { kind: "succeeded"; messageIds: string[] };
+export type SubAgentEnd = { error: string; kind: "failed" } | { kind: "succeeded"; messageIds: string[] };
 
 /** Delay of a settlement handed to the scheduler after its write in the action failed. */
 const SETTLE_RETRY_DELAY_MS = 30_000;
 
 /**
- * A sub-agent child's continuation hands its end back to the run the snapshot names: paused again, the run waits on
- * the new request; ended, the run ends once, and its answer reaches the parent. Both writes are idempotent, so a failed
- * one is scheduled again: dropped, the run's reaper would fail a child that finished, or close a request that was just made. Returns whether a paused run now waits (a scheduled retry counts as waiting).
+ * A sub-agent child's continuation hands its end back to the run the snapshot names: the run ends once, and its answer
+ * reaches the parent. A pause again is not settled here: `recordPendingToolApprovals` moves the run to waiting where its
+ * requests are recorded, before anyone is told. The write is idempotent, so a failed one is scheduled again: dropped, the
+ * run's reaper would fail a child that finished.
  */
 export const settleSubAgentRun = async (
     ctx: Pick<ActionCtx, "runMutation" | "scheduler">,
@@ -979,54 +1183,42 @@ export const settleSubAgentRun = async (
     end: SubAgentEnd,
     /** The deadline the resume this continuation runs under set (`continuingRun`): every write is bound to it. */
     resumedWith?: number,
-): Promise<boolean> => {
+): Promise<void> => {
     if (runId === undefined) {
-        return false;
+        return;
     }
 
-    // Bound to the resume this continuation runs under, so neither a retried write nor a late one acts on a run that waited
-    // again or was answered since: a pause never re-opens it, an end never ends it.
+    // Bound to the resume this continuation runs under, so neither a retried write nor a late one ends a run that waited
+    // again or was answered since.
     const bound = { ...(resumedWith !== undefined && { resumedWith }), runId };
     const completion = {
         ...(end.kind === "succeeded" && end.messageIds.length > 0 && { messageIds: end.messageIds.slice(-COMPLETION_MESSAGE_IDS_MAX) }),
         outcome: end.kind === "failed" ? { error: end.error.slice(0, MAX_LENGTH.short), kind: "failed" as const } : { kind: "succeeded" as const },
         ...bound,
     };
-    const pauseArgs = bound;
 
     try {
-        if (end.kind === "paused") {
-            return await ctx.runMutation(internal.sub_agents.functions.awaitApproval, pauseArgs);
-        }
-
         await ctx.runMutation(internal.sub_agents.functions.completeResumedRun, completion);
 
-        return false;
+        return;
     } catch (error) {
         streamLogger.error(`[ToolApproval] Could not hand the continuation's end to sub-agent run ${runId}; scheduling it:`, error);
     }
 
     try {
-        if (end.kind === "paused") {
-            await ctx.scheduler.runAfter(SETTLE_RETRY_DELAY_MS, internal.sub_agents.functions.awaitApproval, pauseArgs);
-
-            return true;
-        }
-
         await ctx.scheduler.runAfter(SETTLE_RETRY_DELAY_MS, internal.sub_agents.functions.completeResumedRun, completion);
     } catch (error) {
         streamLogger.error(`[ToolApproval] Could not schedule the end of sub-agent run ${runId}:`, error);
     }
-
-    return false;
 };
 
 /**
  * Resume a run that paused on a tool-approval request, once
  * `respondToToolApproval` has claimed the snapshot and opened `streamId`.
  *
- * A sub-agent child's pause (`config.subAgentRunId`) puts its run back to `running` first and hands the run its end
- * ({@link settleSubAgentRun}), so the answer is posted to the parent once.
+ * A sub-agent child's pause (`config.subAgentRunId`) puts its run back to `running` first. A pause again waits where its
+ * requests are recorded, bound to this resume (`subAgentResumedWith`); any other end is handed to the run
+ * ({@link settleSubAgentRun}; a pause again was settled where its requests were recorded), so the answer is posted to the parent once.
  */
 export const continueAfterToolApproval = internalAction
     .input({
@@ -1084,7 +1276,20 @@ export const continueAfterToolApproval = internalAction
             if (!(await ctx.runQuery(internal.chat.streaming.streamRunThread, { streamId: streamId as Id<"persistentStreams">, userId }))) {
                 streamLogger.warn(`[ToolApproval] Stream ${streamId} belongs to a locked or unreachable chat — not resumed`);
 
-                // The run's end first: a failure closing the stream must not leave the run `running` until its reaper.
+                // The stream closes first, with its error line: ending the run stops a continuation still live
+                // (`finishRun`), which would end it without one. A failure closing it must still end the run, not leave it
+                // `running` until its reaper.
+                try {
+                    await failRun(ctx, {
+                        safeMessage: "This chat can no longer continue the response.",
+                        streamId,
+                        threadId,
+                        threadStatus: "active",
+                    });
+                } catch (error) {
+                    streamLogger.error(`[ToolApproval] Could not close the locked chat's stream ${streamId}:`, error);
+                }
+
                 await settleSubAgentRun(
                     ctx,
                     subAgentRunId,
@@ -1092,12 +1297,6 @@ export const continueAfterToolApproval = internalAction
                     subAgentResume ?? undefined,
                 );
                 settled = true;
-                await failRun(ctx, {
-                    safeMessage: "This chat can no longer continue the response.",
-                    streamId,
-                    threadId,
-                    threadStatus: "active",
-                });
 
                 return;
             }
@@ -1124,18 +1323,23 @@ export const continueAfterToolApproval = internalAction
             const resumed = await resumeApprovedRun(
                 ctx,
                 { answer, answerFileIds, answers, approvalId, approved, config, denyReason, streamId, threadId, userId },
-                { admittedRun: true, steerable: true },
+                { admittedRun: true, steerable: true, ...(typeof subAgentResume === "number" && { subAgentResumedWith: subAgentResume }) },
             );
 
-            let subAgentEnd: SubAgentEnd = { kind: "succeeded", messageIds: resumed.messageIds ?? [] };
+            // A pause again was settled where its requests were recorded (`recordPendingToolApprovals`): the run waits, or was
+            // refused, before anyone is told. Only an end is handed back here.
+            let waiting = false;
 
             if (resumed.paused) {
-                subAgentEnd = { kind: "paused" };
-            } else if (resumed.stopped) {
-                subAgentEnd = { error: "This sub-agent was stopped.", kind: "failed" };
+                waiting = resumed.subAgentWaits ?? false;
+            } else {
+                await settleSubAgentRun(
+                    ctx,
+                    subAgentRunId,
+                    resumed.stopped ? { error: "This sub-agent was stopped.", kind: "failed" } : { kind: "succeeded", messageIds: resumed.messageIds ?? [] },
+                    subAgentResume ?? undefined,
+                );
             }
-
-            const waiting = await settleSubAgentRun(ctx, subAgentRunId, subAgentEnd, subAgentResume ?? undefined);
 
             settled = true;
             // A run that ended while this continuation paused again had its new requests closed: the child does not wait on them.
@@ -1163,12 +1367,26 @@ export const continueAfterToolApproval = internalAction
                 // The stop ended the reply for good, so what it kept through its pause goes with it.
                 await discardRunSecrets(ctx, { streamId, threadId });
             }
+
+            // A reply that finishes after an approval gets its suggestions, as any finished reply does. A continuation that saved only tool
+            // results has no new reply to suggest for, and a sub-agent's child thread does not get any.
+            // The continuation runs as the owner, so the job takes the run's own actor (`config.startedBy`) for the actor gate, billing and the
+            // reply-author check: a collaborator's approved reply is theirs. Owner-started replies keep the owner.
+            if (subAgentRunId === undefined && !resumed.paused && !resumed.stopped && resumed.savedReply === true) {
+                await ctx.scheduler
+                    .runAfter(0, internal.chat.functions.generateFollowupSuggestionsForThread, {
+                        replyUserId: userId,
+                        threadId,
+                        userId: config.startedBy ?? userId,
+                    })
+                    .catch((error: unknown) => {
+                        streamLogger.warn(`[ToolApproval] Could not queue the follow-up suggestions of ${threadId}:`, error);
+                    });
+            }
         } catch (error) {
             streamLogger.error(`[ToolApproval] Continuation failed:`, error);
 
-            const safeMessage = isAgentRunError(error, "stale-approval")
-                ? "This tool request is no longer pending."
-                : "An error occurred while continuing the response. Please try again.";
+            const safeMessage = continuationFailureMessage(error);
 
             // A failure closing the stream must not skip the run's end below.
             try {

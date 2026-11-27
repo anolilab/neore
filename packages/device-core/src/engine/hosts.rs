@@ -1383,7 +1383,7 @@ impl DeviceState {
         let params = json!({ "after": after, "path": path, "roots": host.roots });
         let page = link.list_files(&params, FILES_WAIT);
 
-        self.audit_files(&host, "files_list", path, page.is_ok());
+        self.audit_files(&host, "files_list", path, "window", page.is_ok());
 
         page.map(|mut page| {
             page["host"] = json!(host.name);
@@ -1392,10 +1392,43 @@ impl DeviceState {
         })
     }
 
-    /// Records what the local window did on a server. It decided itself, so the decision is "window".
-    fn audit_files(&self, host: &Host, tool: &str, path: &str, completed: bool) {
+    /// One page of the folders inside an absolute path on a connected server, for the add-project picker. Not
+    /// confined to the server's shared folders, and it lists no files. The caller decides what to do with the
+    /// folder; the desktop asks for the connection and any share before this is reached.
+    pub fn host_browse(
+        &self,
+        device_id: &str,
+        path: &str,
+        after: Option<&str>,
+    ) -> Result<Value, String> {
+        let (host, link) = self.files_link(device_id)?;
+        let params = json!({ "after": after, "path": path });
+        let page = link.browse(&params, FILES_WAIT);
+
+        self.audit_files(&host, "folder_browse", path, "page", page.is_ok());
+
+        page.map(|mut page| {
+            page["host"] = json!(host.name);
+
+            page
+        })
+    }
+
+    /// Creates an absolute folder (and its missing parents) on a connected server. The desktop confirms it first.
+    pub fn host_make_dir(&self, device_id: &str, path: &str) -> Result<Value, String> {
+        let (host, link) = self.files_link(device_id)?;
+        let created = link.make_dir(&json!({ "path": path }), FILES_WAIT);
+
+        self.audit_files(&host, "folder_create", path, "window", created.is_ok());
+
+        created
+    }
+
+    /// Records what was done on a server. `decision` says who decided: "window" when the local window confirmed
+    /// or ran it itself, "page" when the web page asked through the desktop bridge with no native prompt.
+    fn audit_files(&self, host: &Host, tool: &str, path: &str, decision: &str, completed: bool) {
         self.audit(json!({
-            "at": now_ms(), "decision": "window", "host": host.name, "path": path,
+            "at": now_ms(), "decision": decision, "host": host.name, "path": path,
             "status": if completed { "completed" } else { "failed" }, "tool": tool,
         }));
     }
@@ -1415,6 +1448,7 @@ impl DeviceState {
             &host,
             "files_read",
             path,
+            "window",
             remote
                 .as_ref()
                 .is_ok_and(|remote| remote.status == "completed"),
@@ -1488,7 +1522,7 @@ impl DeviceState {
             let _ = stdfs::remove_file(&partial);
         }
 
-        self.audit_files(&host, "files_download", path, result.is_ok());
+        self.audit_files(&host, "files_download", path, "window", result.is_ok());
 
         result.map(|mut summary| {
             summary["host"] = json!(host.name);
@@ -1682,6 +1716,7 @@ mod tests {
     use crate::lifecycle::Phase;
     use crate::ssh::{RemoteOutcome, RemoteSandbox};
     use crate::store::test_keychain;
+    use crate::test_dir::TestDir;
     use std::io::Write;
     use std::sync::atomic::{AtomicBool, AtomicUsize};
     use std::sync::Barrier;
@@ -1867,11 +1902,10 @@ mod tests {
 
     /// A paired desktop and its server, with the server connected over `link`. Their ids are `desk_id(name)` and
     /// `host_id(name)`.
-    fn engine(name: &str, link: &Arc<FakeLink>) -> (DeviceState, PathBuf, Arc<Mutex<Vec<Event>>>) {
+    fn engine(name: &str, link: &Arc<FakeLink>) -> (DeviceState, TestDir, Arc<Mutex<Vec<Event>>>) {
         test_keychain::install();
 
-        let dir = std::env::temp_dir().join(format!("neore-hosts-{name}-{}", std::process::id()));
-        let _ = stdfs::remove_dir_all(&dir);
+        let dir = TestDir::at(&format!("hosts-{name}"));
         stdfs::create_dir_all(&dir).unwrap();
         store::save(
             &dir.join("device.json"),
@@ -3031,7 +3065,7 @@ mod tests {
         name: &str,
         first: &Arc<FakeLink>,
         connector: impl Fn() -> Result<Arc<dyn HostLink>, ConnectError> + Send + Sync + 'static,
-    ) -> (Arc<DeviceState>, PathBuf) {
+    ) -> (Arc<DeviceState>, TestDir) {
         let (mut state, dir, _) = engine(name, first);
 
         state.ssh.connector = Some(Box::new(move |_| connector()));
@@ -3559,7 +3593,7 @@ mod tests {
     #[test]
     fn the_file_tree_asks_the_server_for_a_page_inside_the_folders_set_for_it() {
         let link = FakeLink::new(true);
-        let (state, _, _) = engine("files-list", &link);
+        let (state, _dir, _) = engine("files-list", &link);
         let page = state
             .host_files_list(&host_id("files-list"), "src", Some("m"))
             .unwrap();
@@ -3583,7 +3617,7 @@ mod tests {
     #[test]
     fn a_file_is_read_through_the_same_action_an_agent_would_run() {
         let link = FakeLink::new(true);
-        let (state, _, _) = engine("files-read", &link);
+        let (state, _dir, _) = engine("files-read", &link);
         let read = state
             .host_file_read(&host_id("files-read"), "a.txt")
             .unwrap();

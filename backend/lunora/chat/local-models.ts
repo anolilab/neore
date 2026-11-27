@@ -20,12 +20,15 @@ import { LunoraError, v } from "lunorash/server";
 import { internal } from "../_generated/internal";
 import type { Id } from "../_generated/dataModel";
 import type { MutationCtx as MutationContext } from "../_generated/server";
+import { callerSessionMarks } from "../auth/lib/caller-session";
 import { syncActiveAgent } from "../agent/agent-switch";
 import { getThreadRow } from "../agent/branch-rows";
 import { saveEditedSiblingHandler } from "../agent/branches";
 import { addMessagesHandler } from "../agent/messages";
 import { insertThread, patchThread } from "../agent/table-writes";
 import { authMutation, rateLimit } from "../lib/crpc";
+import { callerRestrictsFull, ownerNewChatMode } from "./lib/new-chat-mode";
+import type { ThreadPermissionMode } from "./lib/thread-permission-mode";
 import { isWorkerThread } from "../sub-agents/functions";
 import { storedRetentionHours } from "../lib/temporary-retention";
 import { MAX_LENGTH } from "../lib/validators";
@@ -43,6 +46,16 @@ import {
     resolveLocalModel,
 } from "./lib/local-turn";
 import { requireOwnedThread } from "../agent/thread-read-access";
+import {
+    type DraftFrom,
+    mergeNotTypedMarks,
+    type NotTypedMarks,
+    notTypedMarksOfDraftFrom,
+    notTypedMarksOfMessage,
+    userTextContent,
+    withNotTypedMarks,
+} from "../lib/not-typed-text";
+import { vDraftFrom } from "../lib/not-typed-text-validator";
 
 /** Regenerate the reply to `messageId` (a prompt), or save an edit of it. Requires `threadId`. */
 export interface LocalTurnBranch {
@@ -52,6 +65,8 @@ export interface LocalTurnBranch {
 
 export interface SaveLocalTurnArgs {
     branch?: LocalTurnBranch;
+    /** The prompt holds a composer draft the owner did not type (`lib/not-typed-text.ts`): it is saved marked. */
+    draftFrom?: DraftFrom;
     error?: string;
     language?: string;
     model: string;
@@ -75,7 +90,13 @@ export interface SaveLocalTurnResult {
 }
 
 /** Exported for the harness test; the procedure below adds auth and the rate limit. */
-export const saveLocalTurnHandler = async (ctx: MutationContext, userId: string, args: SaveLocalTurnArgs): Promise<SaveLocalTurnResult> => {
+export const saveLocalTurnHandler = async (
+    ctx: MutationContext,
+    userId: string,
+    args: SaveLocalTurnArgs,
+    /** What the caller's sign-in marks (`auth/lib/caller-session.ts#callerSessionMarks`): the prompt is saved with them, as `/chat/start` saves theirs. */
+    { newThreadMode, sessionMarks = {} }: { newThreadMode?: ThreadPermissionMode; sessionMarks?: NotTypedMarks } = {},
+): Promise<SaveLocalTurnResult> => {
     // The browser sends what the person typed or said; hidden characters never become a saved turn.
     const prompt = stripHiddenText(args.prompt).text;
 
@@ -137,6 +158,7 @@ export const saveLocalTurnHandler = async (ctx: MutationContext, userId: string,
             lastReplyAt: now,
             mode: "text",
             model: args.model,
+            ...(newThreadMode && { permissionMode: newThreadMode }),
             status: "active",
             tags: ["chat", "local"],
             title: deriveLocalThreadTitle(prompt),
@@ -155,7 +177,8 @@ export const saveLocalTurnHandler = async (ctx: MutationContext, userId: string,
         }
     }
 
-    const userMessage = buildLocalPromptMessage(prompt);
+    const notTyped = mergeNotTypedMarks(sessionMarks, notTypedMarksOfDraftFrom(args.draftFrom));
+    const userMessage = { ...buildLocalPromptMessage(prompt), message: { content: userTextContent(prompt, notTyped), role: "user" as const } };
     const replyMessage = buildLocalReplyMessage({
         error: args.error,
         modelId: resolved.modelId,
@@ -177,7 +200,12 @@ export const saveLocalTurnHandler = async (ctx: MutationContext, userId: string,
         if (args.branch.kind === "edit") {
             // An edit of a guest's note the owner sent on is still the guest's words: it keeps the mark, as `/chat/edit` does.
             const guestNoteId = guestNoteIdOfMessage(target?.message as Parameters<typeof guestNoteIdOfMessage>[0]);
-            const message = guestNoteId === undefined ? userMessage.message : { content: [guestTextPart(prompt, guestNoteId)], role: "user" as const };
+            // So does text the owner did not type (`lib/not-typed-text.ts`).
+            const marks = mergeNotTypedMarks(notTyped, notTypedMarksOfMessage(target?.message as Parameters<typeof notTypedMarksOfMessage>[0]));
+            const message =
+                guestNoteId === undefined
+                    ? { content: userTextContent(prompt, marks), role: "user" as const }
+                    : { content: [withNotTypedMarks(guestTextPart(prompt, guestNoteId), marks)], role: "user" as const };
 
             promptId = await saveEditedSiblingHandler(ctx, { message, originalMessageId: promptId, userId });
         } else {
@@ -215,6 +243,7 @@ export const saveLocalTurn = authMutation
     .input({
         /** Regenerate the reply to a prompt, or save an edit of it, as a sibling branch. */
         branch: v.optional(v.object({ kind: v.union(v.literal("regenerate"), v.literal("edit")), messageId: v.id("messages") })),
+        draftFrom: v.optional(vDraftFrom),
         error: v.optional(v.string().check((value) => value.length <= MAX_LOCAL_ERROR_CHARS * 4, { message: "Error too long" })),
         language: v.optional(v.string().check((value) => value.length <= 20, { message: "Invalid language" })),
         /** `custom:<providerId>/<modelId>` naming the caller's own `local-browser` endpoint. */
@@ -233,7 +262,9 @@ export const saveLocalTurn = authMutation
     })
     .output(v.object({ assistantMessageId: v.string(), threadId: v.string(), userMessageId: v.string() }))
     .mutation(async ({ args, ctx }) => {
-        const result = await saveLocalTurnHandler(ctx, ctx.user.userId, args);
+        // A new thread starts in the owner's default mode (`ownerNewChatMode`); a turn on an existing thread keeps its own.
+        const newThreadMode = args.threadId === undefined ? await ownerNewChatMode(ctx, ctx.user.userId, () => callerRestrictsFull(ctx)) : undefined;
+        const result = await saveLocalTurnHandler(ctx, ctx.user.userId, args, { newThreadMode, sessionMarks: await callerSessionMarks(ctx) });
 
         ctx.log.event("chat.save_local_turn", { branched: args.branch !== undefined, newThread: args.threadId === undefined, outcome: args.outcome });
 

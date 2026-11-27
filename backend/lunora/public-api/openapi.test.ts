@@ -14,6 +14,30 @@ vi.mock("../chat/http", () => {
     return { runChatStart: vi.fn() };
 });
 
+interface JsonSchema {
+    $ref?: string;
+    allOf?: JsonSchema[];
+    anyOf?: JsonSchema[];
+    oneOf?: JsonSchema[];
+    properties?: Record<string, unknown>;
+    required?: string[];
+}
+
+/** The object schemas `schema` stands for, its `$ref`s resolved against the document's components and its unions flattened. */
+const objectSchemas = (schema: unknown): JsonSchema[] => {
+    const node = schema as JsonSchema;
+
+    if (node.$ref) {
+        const name = node.$ref.replace("#/components/schemas/", "");
+
+        return objectSchemas((buildOpenApiDocument() as { components: { schemas: Record<string, unknown> } }).components.schemas[name]);
+    }
+
+    const members = node.anyOf ?? node.oneOf ?? node.allOf;
+
+    return members ? members.flatMap((member) => objectSchemas(member)) : [node];
+};
+
 describe("public API route table", () => {
     it("has unique operation ids and method+path pairs", () => {
         expect(new Set(ROUTES.map((route) => route.operationId)).size).toBe(ROUTES.length);
@@ -103,6 +127,42 @@ describe("OpenAPI document", () => {
         const key = parameters.find((parameter) => parameter.name === "Idempotency-Key");
 
         expect(key?.description).toContain("webhook");
+    });
+
+    it("documents the clientMessageId retry answers on POST /chat", () => {
+        const responses = paths["/chat"]!["post"]!["responses"] as Record<string, { description: string }>;
+
+        expect(responses["409"]!.description).toContain("chat_start_in_progress");
+        expect(responses["422"]!.description).toContain("client_message_id_reused");
+        // A first send is 202; its retry is 200 with `duplicate: true`.
+        expect(Object.keys(responses)).toEqual(expect.arrayContaining(["200", "202"]));
+        expect(responses["200"]!.description).toContain("clientMessageId");
+    });
+
+    it("carries clientMessageId in the POST /chat body, and duplicate with the first send's ids in its 200", () => {
+        const operation = paths["/chat"]!["post"]! as {
+            requestBody: { content: Record<string, { schema: unknown }> };
+            responses: Record<string, { content: Record<string, { schema: unknown }> }>;
+        };
+        const body = objectSchemas(operation.requestBody.content["application/json"]!.schema);
+        const clientMessageId = body.find((schema) => schema.properties?.["clientMessageId"])?.properties?.["clientMessageId"] as
+            | { maxLength?: number; minLength?: number; pattern?: string; type?: string }
+            | undefined;
+
+        expect(clientMessageId).toMatchObject({ maxLength: 128, minLength: 1, type: "string" });
+        expect(clientMessageId?.pattern).toBeDefined();
+        expect(body.every((schema) => !(schema.required ?? []).includes("clientMessageId"))).toBe(true);
+
+        // Both success shapes (streamed and blocking) carry `duplicate` and the first send's ids.
+        const answers = objectSchemas(operation.responses["200"]!.content["application/json"]!.schema);
+
+        expect(answers.length).toBeGreaterThanOrEqual(2);
+
+        for (const answer of answers) {
+            expect(Object.keys(answer.properties ?? {})).toEqual(expect.arrayContaining(["duplicate", "messageId", "threadId"]));
+        }
+
+        expect(answers.some((answer) => answer.properties?.["streamId"] && answer.properties["streamToken"])).toBe(true);
     });
 
     it("documents 409 on the trigger update only among PATCH routes", () => {

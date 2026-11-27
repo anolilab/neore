@@ -23,7 +23,7 @@ jobs:
     release:
         name: "Release"
         if: "github.repository == 'anolilab/neore'"
-        runs-on: "ubuntu-latest"
+        runs-on: "ubuntu-24.04"
         timeout-minutes: 15
         permissions:
             contents: "write" # to push the release tag and the release PR branch
@@ -52,6 +52,10 @@ jobs:
                   enable-nx-cache: "false" # no Nx in this repo: the cache never hits
                   node-version: "24.22.1"
                   cache-prefix: "release"
+            - name: "Generate the Lunora backend code"
+              env:
+                  NODE_OPTIONS: "--max-old-space-size=4096"
+              run: "pnpm --filter @neore/backend run codegen"
 
             # Setup writes files into the checkout (the composite appends to `.npmrc`,
             # postinstall regenerates `worker-configuration.d.ts`). `vis release`

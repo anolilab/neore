@@ -158,6 +158,8 @@ const RenameThreadDialog = ({ onOpenChange, open, restoreFocus, storedTitle, thr
                             }}
                             placeholder={t`New Chat`}
                             ref={titleInput}
+                            // The title is prose: the desktop shell turns spellcheck off page-wide.
+                            spellCheck
                             value={title}
                         />
                         {isBlank && (

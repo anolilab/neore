@@ -5,14 +5,15 @@
  * an organization owner for their active organization (reference =
  * the organization id, one seat per member). `billing/plans.ts` says why.
  *
- * Both go to the Creem ADAPTER (`ctx.payments.adapter`), not the facade's
- * `createCheckout` / `createPortalSession`: the facade authorizes with Lunora's
- * default rule (reference = the caller's own user id, `src/server.ts`), which a
- * Team reference — an organization — never meets. The checks here are the gate
- * instead (`billingOrganizationOf`, `portalCustomerFor`). Creem attaches the
- * checkout to the customer by e-mail, and the webhook stores the customer id
- * (and, for Team, the purchaser) on the user or organization row, which is
- * where the portal reads it.
+ * Checkout goes through the facade (`ctx.payments.createCheckout`), whose
+ * `authorize` admits the caller's own user id and organizations they own
+ * (`src/server.ts`); `billingOrganizationOf` still runs first for its messages.
+ * The facade finds or creates the Creem customer for the reference by the
+ * buyer's e-mail, and the webhook stores the customer id (and, for Team, the
+ * purchaser) on the user or organization row, which is where the portal reads it.
+ *
+ * The portal is the facade's `createPortalSession`, scoped to the one subject and
+ * behind `portalCustomerFor`: only the purchaser opens it.
  */
 import { LunoraError, v } from "lunorash/server";
 
@@ -21,6 +22,7 @@ import { internalQuery } from "../_generated/server";
 import { getOrganization, getUser } from "../auth/lib/better-auth-queries";
 import { CREEM_API_KEY, SITE_URL } from "../env";
 import { authAction, authQuery, rateLimit } from "../lib/crpc";
+import { jobSubject, ownedOrganizationReference } from "./authorize";
 import { billingOrganizationOf, portalCustomerFor, productFor } from "./plans";
 import { checkoutProducts } from "./products";
 
@@ -153,7 +155,11 @@ export const createCheckout = authAction
         }
 
         // The opening seat count; `billing/seats.ts` keeps it in step with membership after.
-        const { url } = await ctx.payments.adapter.createCheckout({
+        // Pro is the caller's own reference, which the default rule admits; Team is scoped to the owned organization.
+        const payments = plan === "pro" ? ctx.payments : ctx.payments.scoped(ownedOrganizationReference(ctx.user));
+        const { url } = await payments.createCheckout({
+            // The facade finds or creates the reference's Creem customer by it; without one Creem refuses the customer.
+            email: ctx.user.email,
             // Read back by the webhook (`subscriptionEventOf`) as the organization's purchaser.
             metadata: { purchaserId: ctx.user.userId },
             mode: "subscription",
@@ -184,11 +190,18 @@ export const openCustomerPortal = authAction
         const id = kind === "user" ? ctx.user.userId : billingOrganizationOf(ctx.user);
         const { creemCustomerId, creemPurchaserId } = await ctx.runQuery(internal.billing.checkout.getBillingSubject, { id, kind });
 
-        const session = await ctx.payments.adapter.createPortalSession({
-            customerId: portalCustomerFor(ctx.user.userId, { creemCustomerId, creemPurchaserId }),
-            referenceId: id,
-            returnUrl: billingPageUrl(),
-        });
+        // The gate: only the purchaser opens the portal, on the customer recorded for the subject.
+        const customerId = portalCustomerFor(ctx.user.userId, { creemCustomerId, creemPurchaserId });
+
+        // The facade opens the portal on the store's customer for the reference, so that must be this one: write it first.
+        // The write refuses a customer another reference owns; then the purchaser manages the subscription in-app.
+        const { seeded } = await ctx.runMutation(internal.billing.customers.seedCustomer, { customerId, referenceId: id });
+
+        if (!seeded) {
+            throw new LunoraError("FORBIDDEN", "This customer is shared with another subscription; manage it in-app");
+        }
+
+        const session = await ctx.payments.scoped(jobSubject(id)).createPortalSession(id, billingPageUrl());
 
         ctx.log.event("billing.open_customer_portal", { subject: kind });
 

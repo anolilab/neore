@@ -12,7 +12,7 @@ import { mkdir } from "node:fs/promises";
 import path from "node:path";
 
 import type { AcpManager } from "./manager";
-import { logout, newSession } from "./protocol";
+import { logout, openNewSession } from "./protocol";
 import { AgentSignedOutError } from "./signed-out";
 
 export type SignInState = "signed_in" | "signed_out" | "unknown";
@@ -60,7 +60,7 @@ export class AgentSignIn {
                 canSignOut = handshake.canLogout;
 
                 try {
-                    await newSession(connection, folder, timeoutMs);
+                    await openNewSession(connection, folder, timeoutMs);
 
                     return this.result(agentKey, "signed_in", canSignOut);
                 } catch (error) {

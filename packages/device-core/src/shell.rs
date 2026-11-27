@@ -4,7 +4,7 @@
 //! (only when the user allowed unsandboxed commands) the approval prompt is the
 //! only control.
 
-use std::io::Read;
+use std::io::{self, Read};
 #[cfg(unix)]
 use std::os::unix::io::AsRawFd;
 use std::path::{Path, PathBuf};
@@ -24,23 +24,51 @@ pub struct ShellOutput {
     pub truncated: bool,
 }
 
+type SpawnGate = Box<dyn Fn() -> Result<(), String>>;
+
+thread_local! {
+    static SPAWN_GATE: std::cell::RefCell<Option<SpawnGate>> = const { std::cell::RefCell::new(None) };
+}
+
+/// Runs `run` with `gate` asked right before every command it spawns on this thread: an error from `gate` refuses that
+/// spawn with the error, and nothing is started.
+pub fn with_spawn_gate<T>(
+    gate: impl Fn() -> Result<(), String> + 'static,
+    run: impl FnOnce() -> T,
+) -> T {
+    struct Restore(Option<SpawnGate>);
+
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            let previous = self.0.take();
+
+            SPAWN_GATE.with(|gate| *gate.borrow_mut() = previous);
+        }
+    }
+
+    let _restore = Restore(SPAWN_GATE.with(|slot| slot.borrow_mut().replace(Box::new(gate))));
+
+    run()
+}
+
 /// How long a finished command may keep its output pipes open (a background child) before we return what we have.
 const READER_GRACE: Duration = Duration::from_millis(500);
 
 /// How long a unix reader waits for output before it checks whether it was told to stop.
 const READER_POLL: Duration = Duration::from_millis(50);
 
-/// Reads a stream to the end (so the child never blocks on a full pipe) and
-/// keeps at most `cap` bytes of it. On unix the read waits in short slices, so
-/// the reader sees `stop` even while a detached child still holds the pipe open.
+/// Reads a stream to the end (so the child never blocks on a full pipe), keeping at most `cap` bytes of it: the head
+/// (`store`) or the tail (`store_tail`). On unix the read waits in short slices, so the reader sees `stop` even while a
+/// detached child still holds the pipe open.
 #[cfg(unix)]
-fn drain(
+fn drain_with(
     mut stream: impl Read + AsRawFd + Send + 'static,
     buffer: Arc<Mutex<(Vec<u8>, bool)>>,
     cap: usize,
     stop: Arc<AtomicBool>,
-) -> thread::JoinHandle<()> {
-    thread::spawn(move || {
+    keep: Keep,
+) -> io::Result<thread::JoinHandle<()>> {
+    thread::Builder::new().spawn(move || {
         let mut chunk = [0u8; 8192];
 
         while !stop.load(Ordering::Relaxed) {
@@ -67,20 +95,21 @@ fn drain(
 
             match stream.read(&mut chunk) {
                 Ok(0) | Err(_) => break,
-                Ok(read) => store(&buffer, &chunk[..read], cap),
+                Ok(read) => keep(&buffer, &chunk[..read], cap),
             }
         }
     })
 }
 
 #[cfg(not(unix))]
-fn drain(
+fn drain_with(
     mut stream: impl Read + Send + 'static,
     buffer: Arc<Mutex<(Vec<u8>, bool)>>,
     cap: usize,
     _stop: Arc<AtomicBool>,
-) -> thread::JoinHandle<()> {
-    thread::spawn(move || {
+    keep: Keep,
+) -> io::Result<thread::JoinHandle<()>> {
+    thread::Builder::new().spawn(move || {
         let mut chunk = [0u8; 8192];
 
         while let Ok(read) = stream.read(&mut chunk) {
@@ -88,10 +117,13 @@ fn drain(
                 break;
             }
 
-            store(&buffer, &chunk[..read], cap);
+            keep(&buffer, &chunk[..read], cap);
         }
     })
 }
+
+/// How a reader keeps what it read in its capped buffer.
+type Keep = fn(&Mutex<(Vec<u8>, bool)>, &[u8], usize);
 
 /// Appends a chunk to the capped buffer, and records when some of it did not fit.
 fn store(buffer: &Mutex<(Vec<u8>, bool)>, chunk: &[u8], cap: usize) {
@@ -104,6 +136,50 @@ fn store(buffer: &Mutex<(Vec<u8>, bool)>, chunk: &[u8], cap: usize) {
 
     let keep = chunk.len().min(room);
     guard.0.extend_from_slice(&chunk[..keep]);
+}
+
+/// Appends a chunk and keeps only the last `cap` bytes, recording when some were dropped from the front.
+fn store_tail(buffer: &Mutex<(Vec<u8>, bool)>, chunk: &[u8], cap: usize) {
+    let mut guard = buffer.lock().unwrap();
+
+    guard.0.extend_from_slice(chunk);
+
+    if guard.0.len() > cap {
+        let cut = guard.0.len() - cap;
+
+        guard.0.drain(..cut);
+        guard.1 = true;
+    }
+}
+
+/// A kept tail as text, at most `cap` bytes long: a character the cut split at the front is dropped, not shown as a
+/// replacement. Invalid bytes decode to U+FFFD, three bytes each, so the decoded text can outgrow `cap`; then its front
+/// is cut at a character boundary. Returns whether anything was cut, beyond the bytes already dropped.
+fn tail_text(bytes: &[u8], truncated: bool, cap: usize) -> (String, bool) {
+    // A cut can split one character, which leaves at most three of its continuation bytes at the front. More than that is output
+    // that never was a character (binary or Latin-1), and it decodes to replacement characters like the rest.
+    let start = if truncated {
+        bytes
+            .iter()
+            .take(3)
+            .take_while(|byte| (**byte & 0xC0) == 0x80)
+            .count()
+    } else {
+        0
+    };
+    let text = String::from_utf8_lossy(&bytes[start..]).into_owned();
+
+    if text.len() <= cap {
+        return (text, false);
+    }
+
+    let mut cut = text.len() - cap;
+
+    while !text.is_char_boundary(cut) {
+        cut += 1;
+    }
+
+    (text[cut..].to_owned(), true)
 }
 
 /// The run's private temp folder (owner-only), removed when the run ends. A
@@ -219,6 +295,20 @@ fn command(line: &str, policy: Option<&Policy>) -> Result<(Command, Guard), Stri
         // Its own process group, so a timeout kills everything it started.
         command.process_group(0);
 
+        // A subreaper keeps what the command double-forks in its tree, for `kill_descendants`, instead of handing it to init.
+        // The attribute survives `exec`.
+        #[cfg(target_os = "linux")]
+        // SAFETY: only `prctl`, which is safe between `fork` and `exec`.
+        unsafe {
+            command.pre_exec(|| {
+                if libc::prctl(libc::PR_SET_CHILD_SUBREAPER, 1, 0, 0, 0) != 0 {
+                    return Err(std::io::Error::last_os_error());
+                }
+
+                Ok(())
+            });
+        }
+
         Ok((command, guard))
     }
 }
@@ -278,6 +368,11 @@ impl Drop for Job {
     }
 }
 
+// SAFETY: the handle names a kernel object, not memory of this thread. The value is moved once, into the thread that
+// waits on the run, and that thread alone closes it, so it is never used from two threads at once.
+#[cfg(windows)]
+unsafe impl Send for Job {}
+
 /// The runs in flight (their process groups), so a host that is told to stop can end them: only the thread that
 /// started a run enforces its timeout, and that thread dies with the host. Once stopping, a run that registers late
 /// is killed on the spot.
@@ -319,18 +414,232 @@ impl Drop for Tracked {
     }
 }
 
-/// Kills the process group `process_group(0)` made for a run. The result is not checked: ESRCH means it ended.
+/// Kills the process group `process_group(0)` made for a run and, on Linux and macOS, every descendant that left it. `pid`
+/// must be unreaped, so it and its group are still the run's. The result is not checked: ESRCH means it ended.
 #[cfg(unix)]
 fn kill_group(pid: u32) {
-    // SAFETY: plain syscall with no memory arguments; the group is one this process made.
+    // SAFETY: plain syscalls with no memory arguments; the group is one this process made.
     unsafe {
+        // Stopped first, so the group forks nothing while its tree is walked.
+        #[cfg(any(target_os = "linux", target_os = "macos"))]
+        libc::kill(-(pid as libc::pid_t), libc::SIGSTOP);
+        #[cfg(any(target_os = "linux", target_os = "macos"))]
+        kill_descendants(pid);
         libc::kill(-(pid as libc::pid_t), libc::SIGKILL);
     }
 }
 
+/// How many times `kill_descendants` walks the tree at most.
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+const DESCENDANT_PASSES: usize = 64;
+
+/// Every descendant of `root` among `processes` (`(pid, parent)` pairs), as `(pid, parent)`, each parent before its
+/// children. A pid is taken once, so a list read while processes come and go cannot make the walk loop.
+#[cfg(any(target_os = "linux", target_os = "macos", all(test, unix)))]
+fn descendants_of(root: u32, processes: &[(u32, u32)]) -> Vec<(u32, u32)> {
+    let mut seen = std::collections::HashSet::from([root]);
+    let mut tree = Vec::new();
+    let mut parent = root;
+    let mut next = 0;
+
+    loop {
+        for &(pid, ppid) in processes {
+            if ppid == parent && seen.insert(pid) {
+                tree.push((pid, parent));
+            }
+        }
+
+        let Some(&(pid, _)) = tree.get(next) else {
+            return tree;
+        };
+
+        next += 1;
+        parent = pid;
+    }
+}
+
+/// Every process as `(pid, parent, alive)`, from `/proc`. A zombie is listed, not alive: it still links its children until
+/// it is reaped.
+#[cfg(target_os = "linux")]
+fn processes() -> Vec<(u32, u32, bool)> {
+    let Ok(entries) = std::fs::read_dir("/proc") else {
+        return Vec::new();
+    };
+
+    entries
+        .filter_map(|entry| entry.ok()?.file_name().to_str()?.parse::<u32>().ok())
+        .filter_map(|pid| {
+            let (parent, alive) = process_parent(pid)?;
+
+            Some((pid, parent, alive))
+        })
+        .collect()
+}
+
+/// A process's parent and whether it is alive, from `/proc/<pid>/stat`. The name in parentheses can hold anything, so the
+/// fields are read after its last `)`.
+#[cfg(target_os = "linux")]
+fn process_parent(pid: u32) -> Option<(u32, bool)> {
+    parent_from_stat(&std::fs::read(format!("/proc/{pid}/stat")).ok()?)
+}
+
+/// The parent and liveness from a `/proc/<pid>/stat` line. The name in parentheses may hold any bytes (a process can name
+/// itself with bytes that are not UTF-8), so the line is cut at its last `)`, and only the fields after it are read.
+#[cfg(target_os = "linux")]
+fn parent_from_stat(stat: &[u8]) -> Option<(u32, bool)> {
+    let close = stat.iter().rposition(|&byte| byte == b')')?;
+    let rest = std::str::from_utf8(stat.get(close + 1..)?).ok()?;
+    let mut fields = rest.split_whitespace();
+    let state = fields.next()?;
+    let parent = fields.next()?.parse().ok()?;
+
+    Some((parent, !matches!(state, "Z" | "X")))
+}
+
+/// Sends `signal` to `pid` if its parent is still `parent`. Through a pidfd where there is one, so the check and the signal name
+/// the same process even if `pid` is reused in between.
+#[cfg(target_os = "linux")]
+fn signal_child_of(pid: u32, parent: u32, signal: libc::c_int) {
+    // SAFETY: plain syscalls with integer arguments and a null `siginfo`; the descriptor is closed once.
+    unsafe {
+        let fd = libc::syscall(libc::SYS_pidfd_open, pid as libc::pid_t, 0) as libc::c_int;
+        let still = process_parent(pid).is_some_and(|(now, _)| now == parent);
+
+        if fd < 0 {
+            if still {
+                libc::kill(pid as libc::pid_t, signal);
+            }
+
+            return;
+        }
+
+        if still {
+            libc::syscall(
+                libc::SYS_pidfd_send_signal,
+                fd,
+                signal,
+                std::ptr::null::<libc::siginfo_t>(),
+                0,
+            );
+        }
+
+        libc::close(fd);
+    }
+}
+
+/// Every process as `(pid, parent, alive)`, from `proc_listallpids`. A zombie is listed, not alive.
+#[cfg(target_os = "macos")]
+fn processes() -> Vec<(u32, u32, bool)> {
+    // SAFETY: a null buffer only asks how many pids there are.
+    let count = unsafe { libc::proc_listallpids(std::ptr::null_mut(), 0) };
+
+    if count <= 0 {
+        return Vec::new();
+    }
+
+    // Room for what starts between the two calls.
+    let mut pids: Vec<libc::pid_t> = vec![0; count as usize + 64];
+    // SAFETY: the buffer and its size in bytes describe `pids`, which outlives the call.
+    let filled = unsafe {
+        libc::proc_listallpids(
+            pids.as_mut_ptr().cast(),
+            (pids.len() * std::mem::size_of::<libc::pid_t>()) as libc::c_int,
+        )
+    };
+
+    pids.truncate(filled.max(0) as usize);
+    pids.into_iter()
+        .filter_map(|pid| {
+            let pid = u32::try_from(pid).ok()?;
+            let (parent, alive) = process_parent(pid)?;
+
+            Some((pid, parent, alive))
+        })
+        .collect()
+}
+
+/// A process's parent and whether it is alive, from `proc_pidinfo`.
+#[cfg(target_os = "macos")]
+fn process_parent(pid: u32) -> Option<(u32, bool)> {
+    let size = std::mem::size_of::<libc::proc_bsdshortinfo>() as libc::c_int;
+    // SAFETY: `info` is a plain out-parameter, zeroed first, and `size` is its size.
+    let mut info: libc::proc_bsdshortinfo = unsafe { std::mem::zeroed() };
+    let read = unsafe {
+        libc::proc_pidinfo(
+            pid as libc::c_int,
+            libc::PROC_PIDT_SHORTBSDINFO,
+            0,
+            std::ptr::addr_of_mut!(info).cast(),
+            size,
+        )
+    };
+
+    (read == size).then_some((info.pbsi_ppid, info.pbsi_status != libc::SZOMB))
+}
+
+/// Sends `signal` to `pid` if its parent is still `parent`. macOS has no pidfd, so the check and the signal name `pid`, not a
+/// process: one that exits and whose pid is taken by a new process of the same parent between the two would be hit.
+/// An accepted risk: the window is two syscalls, and the parent is a stopped process of the run.
+#[cfg(target_os = "macos")]
+fn signal_child_of(pid: u32, parent: u32, signal: libc::c_int) {
+    if process_parent(pid).is_some_and(|(now, _)| now == parent) {
+        // SAFETY: a plain syscall with integer arguments.
+        unsafe {
+            libc::kill(pid as libc::pid_t, signal);
+        }
+    }
+}
+
+/// Kills every live descendant of `root`, which must be unreaped. One that started its own session (`setsid`) left the
+/// process group but not this tree. On Linux the shell is a subreaper, so one whose parent ended is re-parented to the
+/// shell, not to init. macOS has no subreaper: one whose parent ended belongs to launchd and is not reached. Walks again
+/// until a walk finds no one new: a process with SIGKILL pending cannot fork, so what it forked before shows up in the
+/// next walk.
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+fn kill_descendants(root: u32) {
+    let mut signalled = std::collections::HashSet::new();
+
+    for _ in 0..DESCENDANT_PASSES {
+        let processes = processes();
+        let pairs: Vec<(u32, u32)> = processes
+            .iter()
+            .map(|&(pid, parent, _)| (pid, parent))
+            .collect();
+        let dead: std::collections::HashSet<u32> = processes
+            .iter()
+            .filter(|&&(_, _, alive)| !alive)
+            .map(|&(pid, _, _)| pid)
+            .collect();
+        let mut found = false;
+        let tree = descendants_of(root, &pairs);
+
+        // Every process in the tree is stopped before any is killed. Killing a child first lets its parent run on until its own
+        // kill lands, and a parent that does so can still act: a shell whose `sleep` was killed runs its next command. A stopped
+        // process runs nothing, and its parent cannot exit to re-parent it while it is stopped, so the parent check still holds.
+        for &(pid, parent) in &tree {
+            if !dead.contains(&pid) {
+                signal_child_of(pid, parent, libc::SIGSTOP);
+            }
+        }
+
+        // Children before their parents: a parent killed first re-parents its child, and the parent check then refuses it.
+        for (pid, parent) in tree.into_iter().rev() {
+            // By parent too: one re-parented after a walk found it was not signalled, and is tried again under its new parent.
+            if !dead.contains(&pid) && signalled.insert((pid, parent)) {
+                signal_child_of(pid, parent, libc::SIGKILL);
+                found = true;
+            }
+        }
+
+        if !found {
+            return;
+        }
+    }
+}
+
 /// Kills every run in flight, background children included, and every run that starts from now on. For a host that
-/// was told to stop. A descendant that left the run's process group (`setsid`) is out of reach: the group is the
-/// only handle there is without a cgroup.
+/// was told to stop. On Linux and macOS that includes a descendant that left the run's process group (`setsid`) while
+/// the run's shell lives (on macOS, only while its own parent lives too); elsewhere the group is the only handle there is.
 #[cfg(unix)]
 pub fn kill_running() {
     let mut running = RUNNING.lock().unwrap();
@@ -342,16 +651,40 @@ pub fn kill_running() {
     }
 }
 
-fn kill_tree(child: &mut Child) {
+/// Whether the child has exited. On Unix the child is left unreaped (`WNOWAIT`), so its process group id stays reserved until the
+/// caller signals the group and reaps it with `wait`.
+fn has_exited(child: &mut Child) -> std::io::Result<bool> {
     #[cfg(unix)]
     {
-        // A negative pid signals the process group `process_group(0)` made for the run. Signalled directly: an
-        // external `kill` can fail on Linux and leave a background child running, and nothing would notice.
-        // SAFETY: plain syscall with no memory arguments. The result is not checked: ESRCH means the group already ended.
-        unsafe {
-            libc::kill(-(child.id() as libc::pid_t), libc::SIGKILL);
+        // SAFETY: `info` is a plain out-parameter, zeroed first; `WNOWAIT` keeps an exited child a zombie for the caller to reap.
+        let mut info: libc::siginfo_t = unsafe { std::mem::zeroed() };
+        let rc = unsafe {
+            libc::waitid(
+                libc::P_PID,
+                child.id() as libc::id_t,
+                &mut info,
+                libc::WEXITED | libc::WNOHANG | libc::WNOWAIT,
+            )
+        };
+
+        if rc == -1 {
+            return Err(std::io::Error::last_os_error());
         }
+
+        // SAFETY: the call above filled `info`; a zero pid means no state change yet.
+        Ok(unsafe { info.si_pid() } != 0)
     }
+
+    #[cfg(not(unix))]
+    {
+        Ok(child.try_wait()?.is_some())
+    }
+}
+
+fn kill_tree(child: &mut Child) {
+    // Signalled directly: an external `kill` can fail on Linux and leave a background child running, and nothing would notice.
+    #[cfg(unix)]
+    kill_group(child.id());
 
     #[cfg(windows)]
     {
@@ -370,15 +703,29 @@ fn kill_tree(child: &mut Child) {
 /// added on top by `run`.
 const SANDBOX_ENV: &[&str] = &["PATH", "HOME", "LANG", "TERM"];
 
-/// Runs `line` in `cwd`. With a `sandbox` policy it runs confined or not at
-/// all: a sandbox that cannot be set up fails the call.
-pub fn run(
+/// A started command and what must outlive it: its temp folder, the network filter and the sandbox guard. Each is
+/// dropped only after the command (and its process group) has ended.
+struct Spawned {
+    child: Child,
+    /// The network filter of a sandboxed `Dependencies` run; the single place such a program may connect to.
+    proxy: Option<egress::Proxy>,
+    #[cfg(unix)]
+    tracked: Option<Tracked>,
+    #[cfg(windows)]
+    _job: Option<Job>,
+    // Dropped last (fields drop in order): the Landlock ruleset and the temp folder the command may still use.
+    _guard: Guard,
+    _temp: Option<TempDir>,
+}
+
+/// Starts `line` in `cwd` with stdout and stderr piped and stdin closed. With a `sandbox` policy it starts confined or
+/// not at all. `env` is set on top of the allowlist and under the run's own temp, cache and proxy variables, which win.
+fn spawn(
     line: &str,
     cwd: &Path,
-    timeout: Duration,
-    cap: usize,
     sandbox: Option<&Policy>,
-) -> Result<ShellOutput, String> {
+    env: &[(String, String)],
+) -> Result<Spawned, String> {
     let temp = sandbox.map(|_| TempDir::new()).transpose()?;
     // Lives until the run ends. Only a sandboxed `Dependencies` run has one: it is the single place such a
     // program may connect to.
@@ -397,7 +744,7 @@ pub fn run(
         policy
     });
     // Holds the Landlock ruleset open until the child has it; closed with the run.
-    let (mut command, _guard) = command(line, policy.as_ref())?;
+    let (mut command, guard) = command(line, policy.as_ref())?;
 
     if sandbox.is_some() {
         // A sandboxed command gets an allowlist, not the user's environment: no
@@ -410,6 +757,8 @@ pub fn run(
             }
         }
     }
+
+    command.envs(env.iter().map(|(name, value)| (name, value)));
 
     if let Some((temp, sandbox)) = temp.as_ref().zip(sandbox) {
         command
@@ -425,6 +774,8 @@ pub fn run(
         command.envs(egress::proxy_env(proxy.port()));
     }
 
+    SPAWN_GATE.with(|gate| gate.borrow().as_ref().map_or(Ok(()), |gate| gate()))?;
+
     let spawned = command
         .current_dir(cwd)
         .stdin(Stdio::null())
@@ -432,80 +783,144 @@ pub fn run(
         .stderr(Stdio::piped())
         .spawn();
 
-    let mut child = spawned.map_err(|error| match sandbox {
+    let child = spawned.map_err(|error| match sandbox {
         Some(_) => format!("could not start the sandboxed shell: {error}"),
         None => format!("could not start the shell: {error}"),
     })?;
     #[cfg(windows)]
-    let _job = Job::attach(&child);
+    let job = Job::attach(&child);
     #[cfg(unix)]
-    let tracked = Tracked::new(child.id());
+    let tracked = Some(Tracked::new(child.id()));
 
-    let buffer = Arc::new(Mutex::new((Vec::new(), false)));
-    let stop = Arc::new(AtomicBool::new(false));
-    let readers = [
-        drain(
-            child.stdout.take().expect("piped"),
-            buffer.clone(),
-            cap,
-            stop.clone(),
-        ),
-        drain(
-            child.stderr.take().expect("piped"),
-            buffer.clone(),
-            cap,
-            stop.clone(),
-        ),
-    ];
-    let started = Instant::now();
-    let mut timed_out = false;
+    Ok(Spawned {
+        child,
+        proxy,
+        #[cfg(unix)]
+        tracked,
+        #[cfg(windows)]
+        _job: job,
+        _guard: guard,
+        _temp: temp,
+    })
+}
 
-    let status = loop {
-        match child.try_wait() {
-            Ok(Some(status)) => break Some(status),
-            Ok(None) if started.elapsed() >= timeout => {
-                timed_out = true;
-                kill_tree(&mut child);
-                break child.wait().ok();
-            }
-            Ok(None) => thread::sleep(Duration::from_millis(25)),
-            Err(error) => return Err(error.to_string()),
-        }
-    };
-
-    // Whatever the command started and left running dies with it; output it already
-    // wrote stays readable in the pipe.
-    kill_tree(&mut child);
-
-    // The group is gone, so a host that stops now must not signal its number: it may be someone else's by then.
-    #[cfg(unix)]
-    drop(tracked);
-
-    // A background child can inherit stdout and hold the pipe open after the
-    // shell exits, so wait for the readers only up to a deadline. Unfinished
-    // readers are left to end on their own; they write only into the capped buffer.
+/// Waits out the readers of a command that ended: up to [`READER_GRACE`], since a background child can inherit stdout
+/// and hold the pipe open after the shell exits. Readers still open see `stop` within one poll slice and exit.
+fn finish_readers<const N: usize>(readers: [thread::JoinHandle<()>; N], stop: &AtomicBool) {
     let deadline = Instant::now() + READER_GRACE;
 
-    for reader in readers {
+    for reader in &readers {
         while !reader.is_finished() && Instant::now() < deadline {
             thread::sleep(Duration::from_millis(10));
         }
+    }
 
+    stop.store(true, Ordering::Relaxed);
+
+    // A unix reader leaves within one poll slice of `stop`, so joining it cannot wait on a child that holds the pipe. A reader
+    // left running here would append output after the caller had published the command's end.
+    #[cfg(unix)]
+    for reader in readers {
+        let _ = reader.join();
+    }
+
+    #[cfg(not(unix))]
+    for reader in readers {
         if reader.is_finished() {
             let _ = reader.join();
         }
     }
+}
 
-    // Readers still open are held by a detached child. They see this flag within one poll slice and exit,
-    // so repeated calls do not leave threads behind.
-    stop.store(true, Ordering::Relaxed);
+/// Ends a command whose reader or watcher thread could not start, the way an ended one is: its tree is killed, the group
+/// released, the shell reaped and the readers that did start stopped, so nothing is left running.
+fn abandon<const N: usize>(
+    spawned: &mut Spawned,
+    readers: [thread::JoinHandle<()>; N],
+    stop: &AtomicBool,
+) {
+    kill_tree(&mut spawned.child);
+    #[cfg(unix)]
+    drop(spawned.tracked.take());
+    let _ = spawned.child.wait();
+    finish_readers(readers, stop);
+}
+
+/// Starts the readers of a spawned command's stdout and stderr. When one cannot start, the command is ended first.
+fn read_output(
+    spawned: &mut Spawned,
+    buffer: &Arc<Mutex<(Vec<u8>, bool)>>,
+    cap: usize,
+    stop: &Arc<AtomicBool>,
+    keep: Keep,
+) -> Result<[thread::JoinHandle<()>; 2], String> {
+    let stdout = spawned.child.stdout.take().expect("piped");
+    let stdout = match drain_with(stdout, buffer.clone(), cap, stop.clone(), keep) {
+        Ok(reader) => reader,
+        Err(error) => {
+            abandon(spawned, [], stop);
+            return Err(format!("could not start the stdout reader: {error}"));
+        }
+    };
+    let stderr = spawned.child.stderr.take().expect("piped");
+
+    match drain_with(stderr, buffer.clone(), cap, stop.clone(), keep) {
+        Ok(stderr) => Ok([stdout, stderr]),
+        Err(error) => {
+            abandon(spawned, [stdout], stop);
+            Err(format!("could not start the stderr reader: {error}"))
+        }
+    }
+}
+
+/// Runs `line` in `cwd`. With a `sandbox` policy it runs confined or not at
+/// all: a sandbox that cannot be set up fails the call.
+pub fn run(
+    line: &str,
+    cwd: &Path,
+    timeout: Duration,
+    cap: usize,
+    sandbox: Option<&Policy>,
+) -> Result<ShellOutput, String> {
+    let mut spawned = spawn(line, cwd, sandbox, &[])?;
+    let buffer = Arc::new(Mutex::new((Vec::new(), false)));
+    let stop = Arc::new(AtomicBool::new(false));
+    let readers = read_output(&mut spawned, &buffer, cap, &stop, store)?;
+    let started = Instant::now();
+    let mut timed_out = false;
+
+    // The shell is left unreaped until its tree has been killed, so its pid and group id cannot name another process yet.
+    loop {
+        match has_exited(&mut spawned.child) {
+            Ok(true) => break,
+            Ok(false) if started.elapsed() >= timeout => {
+                timed_out = true;
+                break;
+            }
+            Ok(false) => thread::sleep(Duration::from_millis(25)),
+            Err(error) => return Err(error.to_string()),
+        }
+    }
+
+    // Whatever the command started and left running dies with it; output it already
+    // wrote stays readable in the pipe.
+    kill_tree(&mut spawned.child);
+
+    // The group is gone, so a host that stops now must not signal its number: it may be someone else's once reaped.
+    #[cfg(unix)]
+    drop(spawned.tracked.take());
+
+    let status = spawned.child.wait().ok();
+
+    // The readers are joined: once stopped they leave within a poll slice, so nothing is written after the output is read.
+    finish_readers(readers, &stop);
 
     let (bytes, truncated) = std::mem::take(&mut *buffer.lock().unwrap());
     let exit_code = status.and_then(|status| status.code());
     let mut output = String::from_utf8_lossy(&bytes).into_owned();
 
     // A failed run that asked the filter for a host it does not list: say so, or the failure reads as a broken network.
-    if let Some(proxy) = proxy.as_ref().filter(|_| exit_code != Some(0)) {
+    if let Some(proxy) = spawned.proxy.as_ref().filter(|_| exit_code != Some(0)) {
         output.push_str(&proxy.refused_note());
     }
 
@@ -517,9 +932,263 @@ pub fn run(
     })
 }
 
+/// How a terminal's command ended: its exit code, or the signal that ended it.
+#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TerminalExit {
+    pub exit_code: Option<i32>,
+    pub signal: Option<String>,
+}
+
+/// What a terminal printed so far (its tail) and, once it has ended, how.
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TerminalOutput {
+    pub exit_status: Option<TerminalExit>,
+    pub output: String,
+    pub truncated: bool,
+}
+
+struct TerminalState {
+    exit: Option<TerminalExit>,
+    kill: bool,
+    /// The shell's pid, which is also its process group id.
+    #[cfg_attr(not(unix), allow(dead_code))]
+    pid: u32,
+    /// Set just before the watcher reaps the shell. Until then the leader is unreaped, so its group id is still this command's.
+    #[cfg_attr(not(unix), allow(dead_code))]
+    reaped: bool,
+}
+
+struct TerminalShared {
+    buffer: Arc<Mutex<(Vec<u8>, bool)>>,
+    changed: std::sync::Condvar,
+    state: Mutex<TerminalState>,
+}
+
+/// A command started for a coding agent's `terminal/create` (`acp_terminal.rs`): it returns at once and is read
+/// while it runs. It always runs in the sandbox (the type takes a policy, never an absent one), keeps the tail of its
+/// output, and is killed with its whole process group when killed, dropped, past `timeout`, or once its shell ended
+/// (background children die with it, as for `shell_run`). On Linux a descendant that started its own session or group
+/// (`setsid`, or a double fork) is killed with it too while the shell lives. On macOS it is too while the shell and every
+/// process between them live: there is no subreaper, so one whose parent exited belongs to launchd. Once the shell has
+/// exited, such a descendant is no longer in its tree and is not reached; elsewhere it is never reached. One watcher
+/// thread owns the process.
+pub struct Terminal {
+    shared: Arc<TerminalShared>,
+    cap: usize,
+}
+
+#[cfg(unix)]
+fn signal_name(signal: i32) -> String {
+    match signal {
+        libc::SIGHUP => "SIGHUP".into(),
+        libc::SIGINT => "SIGINT".into(),
+        libc::SIGQUIT => "SIGQUIT".into(),
+        libc::SIGABRT => "SIGABRT".into(),
+        libc::SIGKILL => "SIGKILL".into(),
+        libc::SIGSEGV => "SIGSEGV".into(),
+        libc::SIGPIPE => "SIGPIPE".into(),
+        libc::SIGTERM => "SIGTERM".into(),
+        // Names from the libc constants, so each matches its own platform's number (these differ between Linux and macOS).
+        libc::SIGILL => "SIGILL".into(),
+        libc::SIGTRAP => "SIGTRAP".into(),
+        libc::SIGBUS => "SIGBUS".into(),
+        libc::SIGFPE => "SIGFPE".into(),
+        libc::SIGUSR1 => "SIGUSR1".into(),
+        libc::SIGUSR2 => "SIGUSR2".into(),
+        libc::SIGALRM => "SIGALRM".into(),
+        libc::SIGCHLD => "SIGCHLD".into(),
+        libc::SIGCONT => "SIGCONT".into(),
+        libc::SIGSTOP => "SIGSTOP".into(),
+        libc::SIGTSTP => "SIGTSTP".into(),
+        libc::SIGTTIN => "SIGTTIN".into(),
+        libc::SIGTTOU => "SIGTTOU".into(),
+        libc::SIGXCPU => "SIGXCPU".into(),
+        libc::SIGXFSZ => "SIGXFSZ".into(),
+        libc::SIGSYS => "SIGSYS".into(),
+        other => format!("SIG{other}"),
+    }
+}
+
+fn exit_of(status: Option<std::process::ExitStatus>) -> TerminalExit {
+    let Some(status) = status else {
+        return TerminalExit::default();
+    };
+    #[cfg(unix)]
+    let signal = {
+        use std::os::unix::process::ExitStatusExt;
+
+        status.signal().map(signal_name)
+    };
+    #[cfg(not(unix))]
+    let signal = None;
+
+    TerminalExit {
+        exit_code: status.code(),
+        signal,
+    }
+}
+
+impl Terminal {
+    /// Starts `line` in `cwd` inside `sandbox`, keeping the last `cap` bytes of its output. Fails when the sandbox cannot
+    /// be set up: a terminal never runs outside it.
+    pub fn start(
+        line: &str,
+        cwd: &Path,
+        sandbox: &Policy,
+        env: &[(String, String)],
+        cap: usize,
+        timeout: Duration,
+    ) -> Result<Terminal, String> {
+        let mut spawned = spawn(line, cwd, Some(sandbox), env)?;
+        let buffer = Arc::new(Mutex::new((Vec::new(), false)));
+        let stop = Arc::new(AtomicBool::new(false));
+        let readers = read_output(&mut spawned, &buffer, cap, &stop, store_tail)?;
+        let shared = Arc::new(TerminalShared {
+            buffer,
+            changed: std::sync::Condvar::new(),
+            state: Mutex::new(TerminalState {
+                exit: None,
+                kill: false,
+                pid: spawned.child.id(),
+                reaped: false,
+            }),
+        });
+        let watched = Arc::clone(&shared);
+        // Handed over once the watcher runs: a watcher that cannot start leaves the command here, to be ended.
+        let (hand_over, handed) = std::sync::mpsc::sync_channel::<(
+            Spawned,
+            [thread::JoinHandle<()>; 2],
+            Arc<AtomicBool>,
+        )>(1);
+        let watcher = thread::Builder::new().spawn(move || {
+            let Ok((mut spawned, readers, stop)) = handed.recv() else {
+                return;
+            };
+            let started = Instant::now();
+            // The leader is observed, not reaped, until its group has been signalled: an unreaped leader keeps its process group id
+            // reserved, so the group signal cannot reach a process that took that id after the leader was gone.
+            loop {
+                let kill = watched.state.lock().unwrap().kill;
+
+                match has_exited(&mut spawned.child) {
+                    Ok(true) | Err(_) => break,
+                    Ok(false) if kill || started.elapsed() >= timeout => break,
+                    Ok(false) => thread::sleep(Duration::from_millis(25)),
+                }
+            }
+
+            kill_tree(&mut spawned.child);
+            // Reaping returns the group id to the system: from here no signal from `signal_now` or `kill_running` may reach it.
+            #[cfg(unix)]
+            drop(spawned.tracked.take());
+            watched.state.lock().unwrap().reaped = true;
+            let status = spawned.child.wait().ok();
+            finish_readers(readers, &stop);
+
+            let exit = exit_of(status);
+
+            if let Some(proxy) = spawned.proxy.as_ref().filter(|_| exit.exit_code != Some(0)) {
+                store_tail(&watched.buffer, proxy.refused_note().as_bytes(), cap);
+            }
+
+            // The temp folder, the filter and the guard go only now, after the group is gone.
+            drop(spawned);
+            watched.state.lock().unwrap().exit = Some(exit);
+            watched.changed.notify_all();
+        });
+
+        if let Err(error) = watcher {
+            abandon(&mut spawned, readers, &stop);
+            return Err(format!("could not start the terminal watcher: {error}"));
+        }
+
+        if let Err(std::sync::mpsc::SendError((mut spawned, readers, stop))) =
+            hand_over.send((spawned, readers, stop))
+        {
+            abandon(&mut spawned, readers, &stop);
+            return Err("the terminal watcher stopped before it took the command".into());
+        }
+
+        Ok(Terminal { shared, cap })
+    }
+
+    /// The tail of the output so far and, once the command has ended, how it ended.
+    pub fn output(&self) -> TerminalOutput {
+        // Read before the exit, so an ended terminal's output is whole: the watcher sets the exit after its readers.
+        let exit_status = self.shared.state.lock().unwrap().exit.clone();
+        let (bytes, truncated) = self.shared.buffer.lock().unwrap().clone();
+        let (output, cut) = tail_text(&bytes, truncated, self.cap);
+
+        TerminalOutput {
+            exit_status,
+            output,
+            truncated: truncated || cut,
+        }
+    }
+
+    /// Blocks until the command ended, or `limit` passed (`None` then).
+    pub fn wait(&self, limit: Duration) -> Option<TerminalExit> {
+        let state = self.shared.state.lock().unwrap();
+        let (state, _) = self
+            .shared
+            .changed
+            .wait_timeout_while(state, limit, |state| state.exit.is_none())
+            .unwrap();
+
+        state.exit.clone()
+    }
+
+    /// Ends the command and everything it started. Its output stays readable.
+    pub fn kill(&self) {
+        self.shared.state.lock().unwrap().kill = true;
+    }
+
+    /// Ends the command and everything it started, signalled from the calling thread rather than by the watcher, which
+    /// runs again only every 25 ms. The group is signalled only while the shell is unreaped, so its id is still this
+    /// command's. Does not wait for the command to end (see [`end_now`]).
+    pub fn signal_now(&self) {
+        let mut state = self.shared.state.lock().unwrap();
+
+        state.kill = true;
+
+        #[cfg(unix)]
+        if !state.reaped {
+            kill_group(state.pid);
+        }
+    }
+
+    pub fn exited(&self) -> bool {
+        self.shared.state.lock().unwrap().exit.is_some()
+    }
+}
+
+impl Drop for Terminal {
+    fn drop(&mut self) {
+        self.kill();
+    }
+}
+
+/// Ends each of `terminals` now and waits, up to `limit` in all, for them to end. For a host that is stopping: every
+/// group is signalled before any wait, so none depends on a watcher thread that may not run again before the process exits.
+pub fn end_now<'a>(terminals: impl IntoIterator<Item = &'a Terminal>, limit: Duration) {
+    let deadline = Instant::now() + limit;
+    let terminals: Vec<&Terminal> = terminals.into_iter().collect();
+
+    for terminal in &terminals {
+        terminal.signal_now();
+    }
+
+    for terminal in &terminals {
+        terminal.wait(deadline.saturating_duration_since(Instant::now()));
+    }
+}
+
 #[cfg(all(test, unix))]
 mod tests {
     use super::*;
+    use crate::test_dir::TestDir;
 
     #[allow(dead_code)]
     fn tier(network: bool) -> NetworkTier {
@@ -531,11 +1200,23 @@ mod tests {
     }
 
     #[test]
+    fn a_signal_that_ends_a_command_is_named_on_each_platform() {
+        assert_eq!(signal_name(libc::SIGILL), "SIGILL");
+        assert_eq!(signal_name(libc::SIGTRAP), "SIGTRAP");
+        assert_eq!(signal_name(libc::SIGBUS), "SIGBUS");
+        assert_eq!(signal_name(libc::SIGFPE), "SIGFPE");
+        assert_eq!(signal_name(libc::SIGSYS), "SIGSYS");
+        assert_eq!(signal_name(libc::SIGUSR1), "SIGUSR1");
+        // A number nothing names is still shown as a number.
+        assert_eq!(signal_name(1000), "SIG1000");
+    }
+
+    #[test]
     fn a_reader_returns_once_stopped_even_while_its_pipe_stays_open() {
         let (reader, writer) = std::io::pipe().expect("pipe");
         let buffer = Arc::new(Mutex::new((Vec::new(), false)));
         let stop = Arc::new(AtomicBool::new(false));
-        let handle = drain(reader, buffer, 64, stop.clone());
+        let handle = drain_with(reader, buffer, 64, stop.clone(), store).expect("reader");
 
         stop.store(true, Ordering::Relaxed);
 
@@ -642,9 +1323,8 @@ mod tests {
 
     /// A shared folder and a folder next to it, both under a fresh temp dir.
     #[cfg(any(target_os = "linux", target_os = "macos"))]
-    fn folders(name: &str) -> (PathBuf, PathBuf) {
-        let base =
-            std::env::temp_dir().join(format!("neore-sandbox-{name}-{}", std::process::id()));
+    fn folders(name: &str) -> (TestDir, PathBuf, PathBuf) {
+        let base = TestDir::new(&format!("sandbox-{name}"));
         let shared = base.join("shared");
         let outside = base.join("outside");
 
@@ -653,6 +1333,7 @@ mod tests {
         std::fs::write(outside.join("secret.txt"), "TOP-SECRET-CONTENT").unwrap();
 
         (
+            base,
             std::fs::canonicalize(shared).unwrap(),
             std::fs::canonicalize(outside).unwrap(),
         )
@@ -693,7 +1374,7 @@ mod tests {
             return;
         }
 
-        let (shared, outside) = folders("write");
+        let (_base, shared, outside) = folders("write");
         let policy = Policy::for_roots(std::slice::from_ref(&shared), None);
         let result = run(
             &format!(
@@ -733,8 +1414,6 @@ mod tests {
         );
         assert!(shared.join("inside.txt").exists());
         assert!(!outside.join("escaped.txt").exists());
-
-        let _ = std::fs::remove_dir_all(shared.parent().unwrap());
     }
 
     /// The seccomp network filter reaches the real child, and only when the
@@ -747,7 +1426,7 @@ mod tests {
             return;
         }
 
-        let (shared, _outside) = folders("seccomp");
+        let (_base, shared, _outside) = folders("seccomp");
         let filters = |network: bool| {
             let policy = Policy {
                 network: tier(network),
@@ -772,8 +1451,6 @@ mod tests {
         };
 
         assert_eq!(filters(false), filters(true) + 1);
-
-        let _ = std::fs::remove_dir_all(shared.parent().unwrap());
     }
 
     /// A shell that opens a TCP connection to a local listener: refused with
@@ -788,7 +1465,7 @@ mod tests {
             return;
         };
 
-        let (shared, _outside) = folders("connect");
+        let (_base, shared, _outside) = folders("connect");
         let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
         let line = format!(
             "{bash} -c 'exec 3<>/dev/tcp/127.0.0.1/{}' && echo connected || echo refused",
@@ -807,8 +1484,6 @@ mod tests {
 
         assert!(outcome(false).contains("refused"));
         assert!(outcome(true).contains("connected"));
-
-        let _ = std::fs::remove_dir_all(shared.parent().unwrap());
     }
 
     /// A connected socket the parent leaves inheritable is closed in the child,
@@ -824,7 +1499,7 @@ mod tests {
             return;
         };
 
-        let (shared, _outside) = folders("inherited");
+        let (_base, shared, _outside) = folders("inherited");
         let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
         let client = std::net::TcpStream::connect(listener.local_addr().unwrap()).unwrap();
         let fd = client.as_raw_fd();
@@ -852,8 +1527,6 @@ mod tests {
                 "network: {network}"
             );
         }
-
-        let _ = std::fs::remove_dir_all(shared.parent().unwrap());
     }
 
     /// The descriptor sweep must leave the close-on-exec pipe `std` reports an
@@ -865,15 +1538,13 @@ mod tests {
             return;
         }
 
-        let (shared, _outside) = folders("exec-error");
+        let (_base, shared, _outside) = folders("exec-error");
         let policy = Policy::for_roots(std::slice::from_ref(&shared), None);
         let mut command = Command::new("/nonexistent/neore-program");
         let _guard = super::super::sandbox::confine(&mut command, &policy).unwrap();
         let error = command.spawn().unwrap_err();
 
         assert_eq!(error.kind(), std::io::ErrorKind::NotFound);
-
-        let _ = std::fs::remove_dir_all(shared.parent().unwrap());
     }
 
     /// A sandboxed command inherits only the allowlisted environment, so a
@@ -885,7 +1556,7 @@ mod tests {
             return;
         }
 
-        let (shared, _outside) = folders("env");
+        let (_base, shared, _outside) = folders("env");
         let policy = Policy::for_roots(std::slice::from_ref(&shared), None);
 
         std::env::set_var("NEORE_TEST_IPC_SOCKET", "/tmp/not-for-the-sandbox");
@@ -901,8 +1572,6 @@ mod tests {
 
         assert!(result.output.contains("ipc=absent"), "{}", result.output);
         assert!(result.output.contains("path=set"), "{}", result.output);
-
-        let _ = std::fs::remove_dir_all(shared.parent().unwrap());
     }
 
     /// The macOS escape routes are denied inside the sandbox. The control run,
@@ -914,7 +1583,7 @@ mod tests {
             return;
         }
 
-        let (shared, _outside) = folders("exec");
+        let (_base, shared, _outside) = folders("exec");
         let policy = Policy::for_roots(std::slice::from_ref(&shared), None);
         let line = "/usr/bin/osascript -e 'return 1' >/dev/null 2>&1; echo osa=$?; \
                     /usr/bin/open -g -a Finder >/dev/null 2>&1; echo open=$?; \
@@ -927,8 +1596,6 @@ mod tests {
         assert!(!sandboxed.output.contains("osa=0"), "{}", sandboxed.output);
         assert!(!sandboxed.output.contains("open=0"), "{}", sandboxed.output);
         assert!(!sandboxed.output.contains("lctl=0"), "{}", sandboxed.output);
-
-        let _ = std::fs::remove_dir_all(shared.parent().unwrap());
     }
 
     // Only macOS enforces the network setting (see `sandbox.rs`).
@@ -945,7 +1612,7 @@ mod tests {
             "exec 3<>/dev/tcp/127.0.0.1/{} && echo CONNECTED",
             listener.local_addr().unwrap().port()
         );
-        let (shared, _) = folders("network");
+        let (_base, shared, _) = folders("network");
         let blocked = Policy::for_roots(std::slice::from_ref(&shared), None);
         let allowed = Policy {
             network: NetworkTier::On,
@@ -977,7 +1644,7 @@ mod tests {
         }
 
         // Stands in for $HOME: a folder the policy names as home but does not share.
-        let (shared, fake_home) = folders("home");
+        let (_base, shared, fake_home) = folders("home");
         let policy = Policy::for_roots(std::slice::from_ref(&shared), Some(&fake_home));
         let result = run(
             &format!(
@@ -997,8 +1664,6 @@ mod tests {
             "{}",
             result.output
         );
-
-        let _ = std::fs::remove_dir_all(shared.parent().unwrap());
     }
 
     #[test]
@@ -1030,5 +1695,451 @@ mod tests {
         assert!(path.is_dir());
         drop(temp);
         assert!(!path.exists());
+    }
+
+    #[test]
+    fn a_tail_keeps_the_end_and_drops_a_character_split_at_the_front() {
+        let buffer = Mutex::new((Vec::new(), false));
+
+        store_tail(&buffer, "abé".as_bytes(), 3);
+        store_tail(&buffer, b"xy", 3);
+
+        let (bytes, truncated) = buffer.lock().unwrap().clone();
+
+        assert!(truncated);
+        // "é" is two bytes; the cut left only its second, which is not shown.
+        assert_eq!(tail_text(&bytes, truncated, 3), ("xy".to_owned(), false));
+    }
+
+    #[test]
+    fn a_tail_of_invalid_bytes_stays_within_its_cap() {
+        // Each 0xFF decodes to a three-byte replacement, so a 6-byte cap is exceeded by the decoded text unless it is cut.
+        let bytes = [0xFF_u8; 6];
+        let (text, cut) = tail_text(&bytes, false, 6);
+
+        assert!(text.len() <= 6, "{text:?} is {} bytes", text.len());
+        assert!(cut);
+        assert_eq!(text, "\u{FFFD}\u{FFFD}");
+    }
+
+    #[test]
+    fn a_truncated_tail_of_continuation_bytes_is_not_dropped_whole() {
+        // Binary output: a run of bytes that are continuation bytes but no character. Only the three a cut can split are skipped;
+        // the rest decodes to replacement characters instead of vanishing.
+        let bytes = [0x80_u8; 10];
+        let (text, _) = tail_text(&bytes, true, 64);
+
+        assert!(text.contains('\u{FFFD}'), "the output was lost: {text:?}");
+    }
+
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    fn terminal_policy(name: &str) -> Option<(TestDir, Policy, PathBuf, PathBuf)> {
+        if !sandbox_or_skip() {
+            return None;
+        }
+
+        let (base, shared, outside) = folders(name);
+
+        Some((
+            base,
+            Policy::for_roots(std::slice::from_ref(&shared), None),
+            shared,
+            outside,
+        ))
+    }
+
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    #[test]
+    fn a_terminal_output_does_not_change_once_its_end_is_reported() {
+        let Some((_base, policy, shared, _)) = terminal_policy("sealed") else {
+            return;
+        };
+        // A background child keeps the pipe open past the shell's exit and writes once more later. Guard, not a repro: the
+        // group is killed with the shell, so the late line should never be written at all. The late write is checked both in
+        // the output and as a file, because a writer that survives may write where no reader is left to keep it.
+        let terminal = Terminal::start(
+            "echo first; (sleep 1; echo late > late.txt; echo late) & exit 0",
+            &shared,
+            &policy,
+            &[],
+            64 * 1024,
+            Duration::from_secs(20),
+        )
+        .unwrap();
+
+        terminal.wait(Duration::from_secs(20)).expect("ended");
+        let at_end = terminal.output().output;
+
+        std::thread::sleep(Duration::from_millis(1500));
+
+        assert!(at_end.contains("first"));
+        assert!(
+            !at_end.contains("late"),
+            "a background child printed after the end: {at_end}"
+        );
+        assert_eq!(terminal.output().output, at_end);
+        assert!(
+            !shared.join("late.txt").exists(),
+            "a background child wrote a file after the end"
+        );
+    }
+
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    #[test]
+    fn a_terminal_returns_at_once_and_reports_its_output_and_exit_later() {
+        let Some((_base, policy, shared, _)) = terminal_policy("term-exit") else {
+            return;
+        };
+        // The command waits for a gate the test opens after `start` has returned: returning at once is then shown by the command
+        // still running, not by a wall-clock limit that a loaded machine can miss.
+        let terminal = Terminal::start(
+            "until [ -f gate ]; do sleep 0.05; done; echo first; echo second 1>&2; exit 3",
+            &shared,
+            &policy,
+            &[],
+            64 * 1024,
+            Duration::from_secs(30),
+        )
+        .unwrap();
+
+        assert!(terminal.output().exit_status.is_none());
+        std::fs::write(shared.join("gate"), b"").unwrap();
+
+        let exit = terminal.wait(Duration::from_secs(20)).expect("ended");
+        let output = terminal.output();
+
+        assert_eq!(exit.exit_code, Some(3));
+        assert_eq!(output.exit_status, Some(exit));
+        assert!(output.output.contains("first") && output.output.contains("second"));
+        assert!(!output.truncated);
+    }
+
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    #[test]
+    fn a_killed_terminal_ends_with_its_group_and_says_so() {
+        let Some((_base, policy, shared, _)) = terminal_policy("term-kill") else {
+            return;
+        };
+        let terminal = Terminal::start(
+            "sleep 30 & sleep 30",
+            &shared,
+            &policy,
+            &[],
+            1024,
+            Duration::from_secs(60),
+        )
+        .unwrap();
+
+        assert!(terminal.wait(Duration::from_millis(200)).is_none());
+        terminal.kill();
+
+        let exit = terminal.wait(Duration::from_secs(10)).expect("ended");
+
+        assert_eq!(exit.exit_code, None);
+        assert_eq!(exit.signal.as_deref(), Some("SIGKILL"));
+    }
+
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    #[test]
+    fn a_terminal_keeps_the_tail_of_a_long_output_and_stops_at_its_timeout() {
+        let Some((_base, policy, shared, _)) = terminal_policy("term-tail") else {
+            return;
+        };
+        let long = Terminal::start(
+            "yes | head -c 100000; echo END",
+            &shared,
+            &policy,
+            &[],
+            1000,
+            Duration::from_secs(30),
+        )
+        .unwrap();
+
+        long.wait(Duration::from_secs(20)).expect("ended");
+
+        let output = long.output();
+
+        assert!(output.truncated);
+        assert_eq!(output.output.len(), 1000);
+        assert!(output.output.ends_with("END\n"));
+
+        let slow = Terminal::start(
+            "sleep 30",
+            &shared,
+            &policy,
+            &[],
+            1024,
+            Duration::from_millis(300),
+        )
+        .unwrap();
+
+        assert_eq!(
+            slow.wait(Duration::from_secs(10))
+                .and_then(|exit| exit.signal),
+            Some("SIGKILL".to_owned())
+        );
+    }
+
+    /// The pid a background child wrote down, once it has.
+    fn written_pid(file: &Path) -> i32 {
+        let deadline = Instant::now() + Duration::from_secs(10);
+
+        loop {
+            if let Some(pid) = std::fs::read_to_string(file)
+                .ok()
+                .and_then(|text| text.trim().parse().ok())
+            {
+                return pid;
+            }
+
+            assert!(
+                Instant::now() < deadline,
+                "the background child never wrote its pid"
+            );
+            std::thread::sleep(Duration::from_millis(20));
+        }
+    }
+
+    /// Whether `pid` is gone. A child that has exited but is not yet reaped by its parent still exists, so this waits for that too.
+    #[cfg(unix)]
+    fn process_gone(pid: i32) -> bool {
+        let deadline = Instant::now() + Duration::from_secs(10);
+
+        loop {
+            // SAFETY: signal 0 sends nothing; it only asks whether the process exists. Only "no such process" counts as gone: a
+            // process that exists but cannot be signalled (EPERM) is still alive.
+            if unsafe { libc::kill(pid, 0) } != 0
+                && std::io::Error::last_os_error().raw_os_error() == Some(libc::ESRCH)
+            {
+                return true;
+            }
+
+            if Instant::now() >= deadline {
+                return false;
+            }
+            std::thread::sleep(Duration::from_millis(20));
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_killed_terminal_takes_down_a_descendant_that_left_its_group() {
+        let Some((_base, policy, shared, _)) = terminal_policy("setsid") else {
+            return;
+        };
+        // The descendant starts its own session, and the one in the middle exits, so it is neither in the group nor a
+        // child of a process in it.
+        let terminal = Terminal::start(
+            "(setsid sh -c 'echo $$ > child.pid; sleep 2; echo late > late.txt' >/dev/null 2>&1 &); sleep 600",
+            &shared,
+            &policy,
+            &[],
+            1024,
+            Duration::from_secs(600),
+        )
+        .unwrap();
+        let child = written_pid(&shared.join("child.pid"));
+
+        terminal.kill();
+        terminal.wait(Duration::from_secs(10)).expect("ended");
+
+        assert!(
+            process_gone(child),
+            "the detached descendant outlived the terminal"
+        );
+        std::thread::sleep(Duration::from_millis(2500));
+        assert!(
+            !shared.join("late.txt").exists(),
+            "the detached descendant wrote after the kill"
+        );
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_run_past_its_timeout_takes_down_a_descendant_that_left_its_group() {
+        if !sandbox_or_skip() {
+            return;
+        }
+
+        let (_base, shared, _) = folders("setsid-run");
+        let policy = Policy::for_roots(std::slice::from_ref(&shared), None);
+        let output = run(
+            "setsid sh -c 'echo $$ > child.pid; sleep 600' >/dev/null 2>&1 & wait",
+            &shared,
+            Duration::from_millis(500),
+            1024,
+            Some(&policy),
+        )
+        .unwrap();
+
+        assert!(output.timed_out);
+        assert!(
+            process_gone(written_pid(&shared.join("child.pid"))),
+            "the detached descendant outlived the run"
+        );
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_process_named_with_bytes_that_are_not_utf_8_still_has_its_parent_read() {
+        let stat = b"42 (bad\xff\xfename) S 7 42 42 0 -1 0";
+
+        assert_eq!(parent_from_stat(stat), Some((7, true)));
+        assert_eq!(parent_from_stat(b"42 (x) Z 9 1 1"), Some((9, false)));
+    }
+
+    #[test]
+    fn the_descendants_of_a_pid_are_its_whole_subtree_and_nothing_else() {
+        let processes = [
+            (1, 0),
+            (10, 1),
+            (11, 10),
+            (12, 10),
+            (13, 12),
+            (20, 1),
+            (21, 20),
+        ];
+        let mut tree = descendants_of(10, &processes);
+
+        tree.sort_unstable();
+        assert_eq!(tree, [(11, 10), (12, 10), (13, 12)]);
+        assert!(descendants_of(13, &processes).is_empty());
+        assert!(descendants_of(99, &processes).is_empty());
+    }
+
+    #[test]
+    fn the_descendants_walk_ends_on_a_cycle_or_a_repeated_pid() {
+        let cycle = [(2, 3), (3, 2), (4, 3)];
+
+        let mut tree = descendants_of(2, &cycle);
+        tree.sort_unstable();
+        assert_eq!(tree, [(3, 2), (4, 3)]);
+
+        // A pid listed twice, once under each of two parents, as a list read while it was re-parented can show it.
+        let repeated = [(5, 1), (6, 5), (7, 5), (7, 6), (8, 7)];
+        let mut tree = descendants_of(5, &repeated);
+
+        tree.sort_unstable();
+        assert_eq!(tree, [(6, 5), (7, 5), (8, 7)]);
+        assert!(descendants_of(1, &[(1, 1)]).is_empty());
+    }
+
+    /// Runs the rest of a `sh -c` line in a new session. macOS ships no `setsid` command.
+    #[cfg(target_os = "macos")]
+    const SETSID: &str = "perl -MPOSIX -e 'POSIX::setsid(); exec @ARGV' sh -c";
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn a_killed_terminal_takes_down_a_descendant_that_left_its_group() {
+        let Some((_base, policy, shared, _)) = terminal_policy("setsid") else {
+            return;
+        };
+        // The descendant starts its own session from a subshell, so it is not in the group. The subshell stays: macOS has no
+        // subreaper, so one whose parent exited is out of reach.
+        let terminal = Terminal::start(
+            &format!("({SETSID} 'echo $$ > child.pid; sleep 2; echo late > late.txt' >/dev/null 2>&1 & wait) & sleep 600"),
+            &shared,
+            &policy,
+            &[],
+            1024,
+            Duration::from_secs(600),
+        )
+        .unwrap();
+        let child = written_pid(&shared.join("child.pid"));
+
+        terminal.kill();
+        terminal.wait(Duration::from_secs(10)).expect("ended");
+
+        assert!(
+            process_gone(child),
+            "the detached descendant outlived the terminal"
+        );
+        std::thread::sleep(Duration::from_millis(2500));
+        assert!(
+            !shared.join("late.txt").exists(),
+            "the detached descendant wrote after the kill"
+        );
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn a_run_past_its_timeout_takes_down_a_descendant_that_left_its_group() {
+        if !sandbox_or_skip() {
+            return;
+        }
+
+        let (_base, shared, _) = folders("setsid-run");
+        let policy = Policy::for_roots(std::slice::from_ref(&shared), None);
+        let output = run(
+            &format!("{SETSID} 'echo $$ > child.pid; sleep 600' >/dev/null 2>&1 & wait"),
+            &shared,
+            // Long enough for the child to start and write its pid on a slow runner: the timeout must not come first.
+            Duration::from_secs(5),
+            1024,
+            Some(&policy),
+        )
+        .unwrap();
+
+        assert!(output.timed_out);
+        assert!(
+            process_gone(written_pid(&shared.join("child.pid"))),
+            "the detached descendant outlived the run"
+        );
+    }
+
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    #[test]
+    fn ending_terminals_now_takes_down_a_background_child_when_the_call_returns() {
+        let Some((_base, policy, shared, _)) = terminal_policy("end-now") else {
+            return;
+        };
+        // The shell leaves a background child in its group, then waits on a second command, which keeps the terminal running.
+        let terminal = Terminal::start(
+            "sleep 600 & echo $! > child.pid; sleep 600",
+            &shared,
+            &policy,
+            &[],
+            1024,
+            Duration::from_secs(600),
+        )
+        .unwrap();
+        let child = written_pid(&shared.join("child.pid"));
+
+        end_now([&terminal], Duration::from_secs(10));
+
+        assert!(terminal.exited(), "the terminal did not end");
+        assert!(
+            process_gone(child),
+            "the background child outlived the terminal"
+        );
+    }
+
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    #[test]
+    fn a_terminal_writes_only_inside_the_shared_folder_and_sees_the_variables_it_was_given() {
+        let Some((_base, policy, shared, outside)) = terminal_policy("term-write") else {
+            return;
+        };
+        let terminal = Terminal::start(
+            &format!(
+                "echo \"$GREETING\"; echo in > inside.txt; echo out > '{}/escaped.txt' || echo refused",
+                outside.display()
+            ),
+            &shared,
+            &policy,
+            &[("GREETING".to_owned(), "hello".to_owned())],
+            64 * 1024,
+            Duration::from_secs(30),
+        )
+        .unwrap();
+
+        terminal.wait(Duration::from_secs(20)).expect("ended");
+
+        let output = terminal.output().output;
+
+        assert!(output.contains("hello"), "{output}");
+        assert!(output.contains("refused"), "{output}");
+        assert!(shared.join("inside.txt").exists());
+        assert!(!outside.join("escaped.txt").exists());
     }
 }

@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { renderHook } from "@testing-library/react";
+import { useLayoutEffect } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { usePasteGuard } from "./use-paste-guard";
@@ -24,6 +25,27 @@ describe("usePasteGuard", () => {
         rerender({ id: "chat-2" });
 
         expect(result.current.getChatKey()).toBe("chat-2");
+    });
+
+    it("names the new chat already in the commit of a chat change, before passive effects run", () => {
+        const seen: (string | null | undefined)[] = [];
+        const { rerender } = renderHook(
+            ({ id }) => {
+                const guard = usePasteGuard(id);
+
+                // Runs in the same commit, after the guard's own layout effect: a paste resuming here must see the new chat.
+                useLayoutEffect(() => {
+                    seen.push(guard.getChatKey());
+                });
+
+                return guard;
+            },
+            { initialProps: { id: "chat-1" } },
+        );
+
+        rerender({ id: "chat-2" });
+
+        expect(seen.at(-1)).toBe("chat-2");
     });
 
     it("names no chat once the composer unmounted, so a late upload failure writes nowhere", () => {

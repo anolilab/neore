@@ -28,6 +28,7 @@ import type { PendingAttachment } from "../stores/chat-ui-store";
 import { useChatUIStore } from "../stores/chat-ui-store";
 import type { ModelId } from "../stores/model-store";
 import { useModelStore } from "../stores/model-store";
+import type { DraftOrigin } from "../utils/draft-origin";
 import { newChatTemporaryFields } from "../utils/new-chat-temporary";
 
 /** Chat stream endpoint — all requests go through the LLM Gateway */
@@ -61,9 +62,14 @@ interface UseComparisonChatReturn {
     /** Selected models for comparison */
     selectedModels: ModelId[];
     /** Send a message to all selected models (creates new child threads) */
-    sendComparisonMessage: (text: string, models: ModelId[], attachments?: PendingAttachment[]) => Promise<void>;
+    sendComparisonMessage: (text: string, models: ModelId[], attachments?: PendingAttachment[], draftFrom?: DraftOrigin) => Promise<void>;
     /** Send a follow-up message to existing child threads (no thread creation) */
-    sendToExistingChildren: (text: string, children: { model: string; threadId: string }[], attachments?: PendingAttachment[]) => Promise<void>;
+    sendToExistingChildren: (
+        text: string,
+        children: { model: string; threadId: string }[],
+        attachments?: PendingAttachment[],
+        draftFrom?: DraftOrigin,
+    ) => Promise<void>;
     /** Current comparison state */
     state: ComparisonState;
 }
@@ -110,7 +116,7 @@ const useComparisonChat = ({ jwtToken, parentThreadId }: UseComparisonChatOption
      * Send a message to multiple models in parallel
      */
     const sendComparisonMessage = useCallback(
-        async (text: string, models: ModelId[], attachments?: PendingAttachment[]) => {
+        async (text: string, models: ModelId[], attachments?: PendingAttachment[], draftFrom?: DraftOrigin) => {
             if (models.length < 2) {
                 console.error("[useComparisonChat] Not enough models selected");
 
@@ -185,6 +191,7 @@ const useComparisonChat = ({ jwtToken, parentThreadId }: UseComparisonChatOption
                             language: pendingSettings?.language,
                             model,
                             prompt: text,
+                            ...(draftFrom !== undefined && { draftFrom }),
                             reasoningEffort,
                             statelessMode: pendingSettings?.statelessMode,
                             threadId: childThreadId,
@@ -250,7 +257,7 @@ const useComparisonChat = ({ jwtToken, parentThreadId }: UseComparisonChatOption
      * Send a follow-up message to existing child threads (no thread creation, no navigation)
      */
     const sendToExistingChildren = useCallback(
-        async (text: string, children: { model: string; threadId: string }[], attachments?: PendingAttachment[]) => {
+        async (text: string, children: { model: string; threadId: string }[], attachments?: PendingAttachment[], draftFrom?: DraftOrigin) => {
             if (children.length === 0) {
                 return;
             }
@@ -277,6 +284,7 @@ const useComparisonChat = ({ jwtToken, parentThreadId }: UseComparisonChatOption
                                         language: pendingSettings?.language,
                                         model,
                                         prompt: text,
+                                        ...(draftFrom !== undefined && { draftFrom }),
                                         reasoningEffort,
                                         statelessMode: pendingSettings?.statelessMode,
                                         threadId: childThreadId,

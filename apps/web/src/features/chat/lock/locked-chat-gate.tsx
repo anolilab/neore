@@ -4,9 +4,10 @@ import { forgetUnlockProof, isThreadLockedError, onUnlockExpired, useUnlockProof
 import { Button } from "@neore/ui/components/button";
 import { useQuery } from "@tanstack/react-query";
 import type { ReactNode } from "react";
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 import { DEFAULT_MESSAGE_OPTS } from "@/features/chat/core/constants/query-options";
+import { removeStoredDraftsOf } from "@/features/chat/split/composer-drafts";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 import { ThreadLockDialog } from "./thread-lock-dialog";
@@ -63,6 +64,39 @@ export const LockedChatGate = ({ children, lockedExtras, threadId }: { children:
     // with no proof, so it shows again.
     const refused = isThreadLockedError(error);
     const relockedAndPending = proof === undefined && relocked && !isSuccess && !error;
+
+    // Which chat the gate shows now, and whether it still refuses it: read when the storage chunk arrives, after any unmount too.
+    const shown = useRef({ refused, threadId });
+
+    useEffect(() => {
+        shown.current = { refused, threadId };
+    }, [refused, threadId]);
+
+    // The chat's composer never mounts while the gate holds, so its draft stored before the lock is removed from here, even when the
+    // gate unmounted meanwhile (the chat is still locked). Only a chunk that loads after this chat unlocked does nothing: the
+    // unlocked composer may already be storing its draft.
+    useEffect(() => {
+        if (!refused) {
+            return;
+        }
+
+        const stillLocked = (): boolean => shown.current.threadId !== threadId || shown.current.refused;
+
+        void import("@/features/chat/split/stored-drafts")
+            .then(({ lockStoredDraft }: typeof import("@/features/chat/split/stored-drafts")) => {
+                if (stillLocked()) {
+                    lockStoredDraft(threadId);
+                }
+
+                return undefined;
+            })
+            .catch(() => {
+                // The chunk did not load, and the chat's composer stays unmounted while the gate refuses it: remove the draft here.
+                if (stillLocked()) {
+                    removeStoredDraftsOf(threadId);
+                }
+            });
+    }, [refused, threadId]);
 
     if (!refused && !relockedAndPending) {
         // A relocked chat whose read fails for another reason shows that error, not the prompt,

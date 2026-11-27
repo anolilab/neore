@@ -46,10 +46,16 @@ export const resumeClaimedRun = async (ctx: MutationCtx, args: ResumeClaimedRunA
     if (config.subAgentRunId !== undefined) {
         const { resumeRunForAnswer } = await import("../../sub-agents/functions");
 
-        if (!(await resumeRunForAnswer(ctx, config.subAgentRunId))) {
+        if (!(await resumeRunForAnswer(ctx, config.subAgentRunId, approvalId))) {
             throw new LunoraError("CONFLICT", "This sub-agent has already ended");
         }
     }
+
+    // A sub-agent's result held while this thread waited on the request is posted now; it waits out the reply this answer
+    // starts (`postRunResult`). Loaded lazily, as above.
+    const { releaseHeldResults } = await import("../../sub-agents/functions");
+
+    await releaseHeldResults(ctx, threadId);
 
     const streamId = await persistentTextStreaming.createStream(ctx, {
         messageId: approvalId,

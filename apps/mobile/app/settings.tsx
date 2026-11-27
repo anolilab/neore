@@ -5,6 +5,7 @@ import { readReopenLastChat, writeReopenLastChat } from "@/chat/last-thread-stor
 import { loadConfig } from "@/lib/config";
 import { crashReportStore } from "@/lib/crash-report-store";
 import { changeCrashReports, crashReportsOn, UnsavedOptOutError } from "@/lib/crash-reporting";
+import { withFinally } from "@/lib/guarded";
 import { installMarker } from "@/lib/install-marker";
 import { readOnDeviceDictation, writeOnDeviceDictation } from "@/voice/dictation-setting";
 
@@ -126,16 +127,21 @@ const SettingsScreen = () => {
         setIsReopenOn(isOn);
         setIsReopenChanging(true);
 
-        try {
-            await writeReopenLastChat(isOn);
-        } catch (writeError) {
-            console.warn("Could not save the reopen setting.", writeError);
-            setReopenFailure(SETTING_SAVE_FAILED_MESSAGE);
-            // The switch is held while a save runs, so the value before this change is still the one stored.
-            setIsReopenOn(!isOn);
-        } finally {
+        const attempt = async () => {
+            try {
+                await writeReopenLastChat(isOn);
+            } catch (writeError) {
+                console.warn("Could not save the reopen setting.", writeError);
+                setReopenFailure(SETTING_SAVE_FAILED_MESSAGE);
+                // The switch is held while a save runs, so the value before this change is still the one stored.
+                setIsReopenOn(!isOn);
+            }
+        };
+
+        // `withFinally`, not `try … finally`: the React Compiler skips a component that holds a `finally`.
+        await withFinally(attempt, () => {
             setIsReopenChanging(false);
-        }
+        });
     };
 
     // VoiceOver reads neither the live region nor a new alert, so a failure here is announced on iOS.
@@ -150,16 +156,21 @@ const SettingsScreen = () => {
         setIsOnDeviceOn(isOn);
         setIsOnDeviceChanging(true);
 
-        try {
-            await writeOnDeviceDictation(isOn);
-        } catch (writeError) {
-            console.warn("Could not save the on-device transcription setting.", writeError);
-            setOnDeviceFailure(SETTING_SAVE_FAILED_MESSAGE);
-            // The switch is held while a save runs, so the value before this change is still the one stored.
-            setIsOnDeviceOn(!isOn);
-        } finally {
+        const attempt = async () => {
+            try {
+                await writeOnDeviceDictation(isOn);
+            } catch (writeError) {
+                console.warn("Could not save the on-device transcription setting.", writeError);
+                setOnDeviceFailure(SETTING_SAVE_FAILED_MESSAGE);
+                // The switch is held while a save runs, so the value before this change is still the one stored.
+                setIsOnDeviceOn(!isOn);
+            }
+        };
+
+        // `withFinally`, not `try … finally`: the React Compiler skips a component that holds a `finally`.
+        await withFinally(attempt, () => {
             setIsOnDeviceChanging(false);
-        }
+        });
     };
 
     return (

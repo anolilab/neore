@@ -42,10 +42,23 @@ const httpContext = () => {
             throw new Error("no actions here");
         },
         runMutation: async (ref: never, args: never) => await harness.run(async (ctx: any) => await ctx.runMutation(ref, args)),
-        runQuery: async (ref: never, args: never) => await harness.run(async (ctx: any) => await ctx.runQuery(ref, args)),
+        // The caller's sign-in is a valid session in the personal space; every other read goes to the harness.
+        runQuery: async (ref: never, args: never) =>
+            (ref as { __lunoraRef?: string }).__lunoraRef === "auth_session_organization:getSessionOrganizationForCap"
+                ? { organizationId: null }
+                : await harness.run(async (ctx: any) => await ctx.runQuery(ref, args)),
     };
 
-    return { ...runners, auth: { getIdentity: async () => null, userId: "owner" }, forShard: () => runners } as never;
+    return {
+        ...runners,
+        auth: {
+            getIdentity: async () => {
+                return { sessionId: "session-1" };
+            },
+            userId: "owner",
+        },
+        forShard: () => runners,
+    } as never;
 };
 
 const insertThread = async (fields: Record<string, unknown> = {}) =>

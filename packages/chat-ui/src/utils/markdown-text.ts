@@ -118,12 +118,30 @@ const headingText = (line: string): string | undefined => {
 };
 
 /**
+ * The next occurrence of `char` at or after a position, for positions that never move back. Each
+ * search resumes where the last hit lies, so a scan over a whole line costs one pass, not one per bracket.
+ */
+const forwardFinder = (text: string, char: string): ((from: number) => number) => {
+    let found = -2;
+
+    return (from: number): number => {
+        if (found === -2 || (found !== -1 && found < from)) {
+            found = text.indexOf(char, from);
+        }
+
+        return found;
+    };
+};
+
+/**
  * Replaces each inline code span with a marker and records its text. A run of
  * backticks closes only on a run of the same length, as in CommonMark.
  */
 const maskInlineCode = (text: string, codes: string[]): string => {
     let masked = "";
     let index = 0;
+    // One resumable search per run length: an unmatched run costs one pass over the text, not one per run.
+    const closeFor = new Map<number, (from: number) => number>();
 
     while (index < text.length) {
         if (text[index] !== "`") {
@@ -139,7 +157,14 @@ const maskInlineCode = (text: string, codes: string[]): string => {
         }
 
         const run = "`".repeat(ticks);
-        const close = text.indexOf(run, index + ticks);
+        let findClose = closeFor.get(ticks);
+
+        if (!findClose) {
+            findClose = forwardFinder(text, run);
+            closeFor.set(ticks, findClose);
+        }
+
+        const close = findClose(index + ticks);
 
         if (close === -1 || text[close + ticks] === "`") {
             masked += run;
@@ -157,16 +182,19 @@ const maskInlineCode = (text: string, codes: string[]): string => {
 
 /**
  * `[text](url)` → `text`, and `![alt](src)` → `alt`. A scan rather than a regex:
- * a `[^\]]*`-style pattern backtracks badly on a line of unmatched brackets.
+ * a `[^\]]*`-style pattern backtracks badly on a line of unmatched brackets, and the
+ * searches for a closing bracket and parenthesis are linear overall (`forwardFinder`).
  */
 const stripLinks = (text: string): string => {
     let result = "";
     let index = 0;
     let open = text.indexOf("[");
+    const closeAt = forwardFinder(text, "]");
+    const parenAt = forwardFinder(text, ")");
 
     while (open !== -1) {
-        const close = text.indexOf("]", open);
-        const end = close !== -1 && text[close + 1] === "(" ? text.indexOf(")", close + 2) : -1;
+        const close = closeAt(open);
+        const end = close !== -1 && text[close + 1] === "(" ? parenAt(close + 2) : -1;
 
         if (end === -1) {
             open = text.indexOf("[", open + 1);

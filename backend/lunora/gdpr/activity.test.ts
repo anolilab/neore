@@ -73,23 +73,24 @@ describe("account deletion of activity rows", () => {
 });
 
 describe("collectActivityForExport", () => {
-    it("exports the user's usage history, delegations with task and result, and collections — nobody else's", async () => {
+    it("exports the user's delegations with task and result, and collections — nobody else's", async () => {
         await harness.run(async (ctx: any) => {
-            await ctx.db.insert("usageDaily", { ...usageRow(A, "2026-02-01"), projectKey: "p_alpha", skillKey: "__project__" });
-            await ctx.db.insert("usageDaily", usageRow(A, "2026-02-02"));
-            await ctx.db.insert("subAgentRuns", runRow(A, 1, "succeeded"));
+            await ctx.db.insert("subAgentRuns", { ...runRow(A, 1, "succeeded"), role: { instructions: "Check auth.", model: "m", name: "review" } });
             await ctx.db.insert("knowledgeCollections", { createdAt: 0, name: "Handbook", updatedAt: 0, userId: A });
             await ctx.db.insert("knowledgeCollections", { createdAt: 0, name: "Not mine", updatedAt: 0, userId: B });
         });
 
         const exported = (await harness.run(async (ctx: any) => await ctx.runQuery(collectActivityForExport, { userId: A }))) as any;
 
-        // A project row names its project, so it is not read as one more skill, and sits in date order.
-        expect(exported.usageDaily).toEqual([
-            { costMicrodollars: 10, date: "2026-02-01", project: "p_alpha", replies: 1, tokens: 5 },
-            expect.objectContaining({ date: "2026-02-02", tokens: 5 }),
+        expect(exported.usageDaily).toBeUndefined();
+        expect(exported.subAgentRuns).toEqual([
+            expect.objectContaining({
+                result: "answer",
+                role: { instructions: "Check auth.", model: "m", name: "review" },
+                status: "succeeded",
+                task: "task 0",
+            }),
         ]);
-        expect(exported.subAgentRuns).toEqual([expect.objectContaining({ result: "answer", status: "succeeded", task: "task 0" })]);
         expect(exported.knowledgeCollections.map((collection: { name: string }) => collection.name)).toEqual(["Handbook"]);
     });
 });
@@ -109,7 +110,7 @@ describe("pruneRetainedActivity", () => {
 
         const pruned = await harness.run(async (ctx: any) => await ctx.runMutation(pruneRetainedActivity, {}));
 
-        expect(pruned).toEqual({ subAgentRuns: 1, usageDaily: 1 });
+        expect(pruned).toEqual({ organizationReplies: 0, subAgentRuns: 1, usageDaily: 1 });
         expect(await count("usageDaily", A)).toBe(1);
         expect(await count("subAgentRuns", A)).toBe(2);
         expect(RETENTION_BATCH).toBeGreaterThan(0);

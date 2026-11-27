@@ -34,17 +34,18 @@ apps/web/src/features/chat/
 
 ## WHERE TO LOOK
 
-| Task                    | Location                                | Notes                                         |
-| ----------------------- | --------------------------------------- | --------------------------------------------- |
-| Thread management       | core/hooks/use-threads.ts               | Thread CRUD operations                        |
-| AI model integration    | core/hooks/use-current-model.ts         | Model selection and configuration             |
-| Message handling        | lib/agent (`toUIMessages`, re-exported) | Message format conversion                     |
-| Prompt improvement      | prompt-improvement/                     | AI-powered prompt enhancement                 |
-| Thread tagging          | tags/                                   | Thread categorization                         |
-| Chat context            | core/context/chat-context.tsx           | React context for chat state                  |
-| **Pin messages**        | **pins/**                               | **Pin button in message-item.tsx action bar** |
-| **Right sidebar tabs**  | **core/stores/chat-ui-store.ts**        | **`activeRightSidebarTab` state + setter**    |
-| **Right sidebar panel** | **sidebar/thread-sidebar.tsx**          | **Tabs: summary, prompts, variables, pins**   |
+| Task                    | Location                                | Notes                                                         |
+| ----------------------- | --------------------------------------- | ------------------------------------------------------------- |
+| Thread management       | core/hooks/use-threads.ts               | Thread CRUD operations                                        |
+| AI model integration    | core/hooks/use-current-model.ts         | Model selection and configuration                             |
+| Message handling        | lib/agent (`toUIMessages`, re-exported) | Message format conversion                                     |
+| Prompt improvement      | prompt-improvement/                     | AI-powered prompt enhancement                                 |
+| Thread tagging          | tags/                                   | Thread categorization                                         |
+| Chat context            | core/context/chat-context.tsx           | React context for chat state                                  |
+| Pinned goal             | goal/pinned-goal.tsx                    | Owner pin; `send-message.ts` applies it when no goal is armed |
+| **Pin messages**        | **pins/**                               | **Pin button in message-item.tsx action bar**                 |
+| **Right sidebar tabs**  | **core/stores/chat-ui-store.ts**        | **`activeRightSidebarTab` state + setter**                    |
+| **Right sidebar panel** | **sidebar/thread-sidebar.tsx**          | **Tabs: summary, prompts, variables, pins**                   |
 
 ## CONVENTIONS
 
@@ -75,3 +76,12 @@ Tabs: `"summary"` | `"prompts"` | `"variables"` | `"pins"` (and any future tabs 
 - Don't directly mutate UI state - use stores/hooks
 - Don't mix message formats without converters
 - Don't create chat components without proper TypeScript types
+- A click that opens a chat (a sub-agent's link) goes through `useOpenChatClick` (`split/use-open-chat.ts`): it honours the
+  "where a sub-agent or side chat opens" setting and the Ctrl, Cmd and middle-click places. A plain `Link` to `/chat/$threadId` skips both.
+- Don't import `@tiptap/extension-emoji` statically in the composer: its data is ~64 KB gzipped. Load it through
+  `thread/composer-tiptap/emoji-shortcode/emoji-index.ts`, which the composer starts once the list can open.
+- A composer text-input rule must be a plugin registered after `VimMode`, not an editor prop: editor props are asked
+  before plugins, so a props handler runs ahead of vim's normal mode (`composer-tiptap/wrap-selection.ts`).
+- Never send a draft attachment that is not complete. A send pressed during an upload waits (`thread/upload-send-wait.ts`);
+  a failed upload stops it, any edit (removing a file included) ends it with a notice, and a chat or account change, a
+  manual Stop or a manual send that goes out ends it quietly. Keep the pending check in `handleSubmit` when changing it.

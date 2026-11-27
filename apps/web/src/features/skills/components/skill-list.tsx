@@ -1,6 +1,7 @@
 import { useLingui } from "@lingui/react/macro";
 import { api } from "@neore/backend/api";
 import type { Doc, Id } from "@neore/backend/dataModel";
+import type { StoredRow } from "@neore/backend/stored-row";
 import { Button } from "@neore/ui/components/button";
 import ConfirmDialog from "@neore/ui/components/confirm-dialog";
 import { Input } from "@neore/ui/components/input";
@@ -10,7 +11,7 @@ import { FileDown, FileUp, Package, Plus, Search, Wand2 } from "lucide-react";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
-import { useAuth } from "@/features/auth/lib/auth-ui-provider";
+import { useAuthActiveOrganization, useAuthSession } from "@/features/auth/hooks/use-auth-session";
 import useCheckout from "@/features/billing/hooks/use-checkout";
 import { useCRPCClient, useLunoraActionOptions } from "@/lib/lunora/crpc";
 import { createJsZip } from "@/lib/zip";
@@ -26,6 +27,9 @@ import SkillEmptyState from "./skill-empty-state";
 import SkillFormDialog from "./skill-form-dialog";
 import type { ListedSkill } from "./skill-item";
 import SkillItem from "./skill-item";
+
+/** A skill row as the backend sends it: an unset optional column is absent, never `null`. */
+type SavedSkill = StoredRow<Doc<"skills">>;
 
 // Opened on demand; it pulls the SKILL.md parser and, for a .zip, JSZip.
 const SkillImportDialog = lazy(() => import("./skill-import-dialog"));
@@ -46,8 +50,8 @@ const SkillList = ({ reloadKey = 0 }: SkillListProps) => {
     const [searchQuery, setSearchQuery] = useState("");
     const [sortBy, setSortBy] = useState<SortOption>("recent");
     const [isDialogOpen, setIsDialogOpen] = useState(false);
-    const [editingSkill, setEditingSkill] = useState<Doc<"skills"> | null>(null);
-    const [deletingSkill, setDeletingSkill] = useState<Doc<"skills"> | null>(null);
+    const [editingSkill, setEditingSkill] = useState<SavedSkill | null>(null);
+    const [deletingSkill, setDeletingSkill] = useState<SavedSkill | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
     const [busySkillId, setBusySkillId] = useState<string | null>(null);
     // Agent builder: the dialog, the integrations left to set up after a save,
@@ -63,9 +67,8 @@ const SkillList = ({ reloadKey = 0 }: SkillListProps) => {
     const { mutateAsync: exportSkill } = useMutation(useLunoraActionOptions(api.skills.io.exportSkill));
 
     // Auth
-    const { hooks } = useAuth();
-    const { data: sessionData } = hooks.useSession();
-    const { data: activeOrganization } = hooks.useActiveOrganization();
+    const { data: sessionData } = useAuthSession();
+    const { data: activeOrganization } = useAuthActiveOrganization();
     const isLoggedIn = !!sessionData?.user;
     const currentUserId = sessionData?.user?.id;
 
@@ -168,7 +171,7 @@ const SkillList = ({ reloadKey = 0 }: SkillListProps) => {
         [setBuilderSetup, t],
     );
 
-    const handleEditSkill = useCallback((skill: Doc<"skills">) => {
+    const handleEditSkill = useCallback((skill: SavedSkill) => {
         setEditingSkill(skill);
         setIsDialogOpen(true);
     }, []);

@@ -66,7 +66,7 @@ describe("usePendingSend", () => {
         // A second composer mounting later finds nothing.
         renderHook(() => usePendingSend(true, send));
 
-        expect(send).toHaveBeenCalledExactlyOnceWith("hello");
+        expect(send).toHaveBeenCalledExactlyOnceWith({ text: "hello" });
     });
 
     it("sends the text alone, without the guest's attachments and references", () => {
@@ -79,7 +79,7 @@ describe("usePendingSend", () => {
 
         renderHook(() => usePendingSend(true, send));
 
-        expect(send).toHaveBeenCalledExactlyOnceWith("hello");
+        expect(send).toHaveBeenCalledExactlyOnceWith({ text: "hello" });
         expect(useChatUIStore.getState().composerAttachments).toStrictEqual([]);
         expect(useChatUIStore.getState().attachedReferences).toStrictEqual([]);
     });
@@ -107,7 +107,7 @@ describe("usePendingSend", () => {
         harness.token = jwtFor("member");
         rerender();
 
-        expect(send).toHaveBeenCalledExactlyOnceWith("hello");
+        expect(send).toHaveBeenCalledExactlyOnceWith({ text: "hello" });
     });
 
     it("does nothing signed out", () => {
@@ -146,7 +146,7 @@ describe("usePendingSend", () => {
         globalThis.history.replaceState(null, "", "/chat");
         renderHook(() => usePendingSend(true, send));
 
-        expect(send).toHaveBeenCalledExactlyOnceWith("hello");
+        expect(send).toHaveBeenCalledExactlyOnceWith({ text: "hello" });
     });
 
     it("leaves the message for a composer that takes it", () => {
@@ -158,7 +158,7 @@ describe("usePendingSend", () => {
 
         renderHook(() => usePendingSend(true, send));
 
-        expect(send).toHaveBeenCalledExactlyOnceWith("hello");
+        expect(send).toHaveBeenCalledExactlyOnceWith({ text: "hello" });
     });
 });
 

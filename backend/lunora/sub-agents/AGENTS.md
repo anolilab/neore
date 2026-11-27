@@ -47,11 +47,35 @@
   (`settleSubAgentRun`): every write is bound to the resume it runs under (`resumedWith` = that resume's `reapAt`), so a
   further pause waits again and an end finishes the run once (`completeResumedRun`) only while that resume is current;
   a failed write is scheduled again, bound the same way. A continuation that already settled is not ended by a later
-  error.
-- **A one-shot child of the owner's own turn pauses on an `ask` tool** (`pauseForApproval` → `headlessCanAsk`, only
-  when `originOfRun(dispatchedBy) === "lead"`): a chain a trigger, task, messenger reply or outside agent started drops
-  `ask` tools as its parent run does, and so do workers. The run waits and is answered as above; its first pause is bound
-  to "never resumed" (`resumedWith: 0`), so a late write never re-opens an answered run. A nested result waits
-  while its parent's one-shot run goes (running or awaiting), so it never lands after a request; that run's end, waited
-  or not, posts it (`releaseHeldResults`). A pause, first or continued, never overwrites a `"question"` the child thread
-  waits on.
+  error. A resumed run ended from outside (a Stop, the reaper) also stops its live continuation stream at once
+  (`liveContinuationOf`: the stream keyed on the run's `resumedBy` approval id, read exactly; `stopActiveForThread` with
+  `onlyNamed`), so a tool in it gets the abort; only that stream and its goal.
+- **The parent conversation shows a waiting child's requests** (`listSubAgentApprovals`, the card's `SubAgentApprovals`):
+  the parent's owner only (NOT_FOUND otherwise, a locked parent needs its proof), bounded, with a locked child left out
+  (its owner unlocks the child to answer). It admits the parent and every child, so it reads each child's latest turn
+  through a reader keyed on that child (`admittedThreadMessages`): the guarded `ctx.db` would hand it the parent's rows. The card answers through `respondToToolApproval` on the child's thread, so the
+  claim above decides, and it offers no allow for a period.
+- **A one-shot child pauses on an `ask` tool** (`pauseForApproval`), whatever started its chain; an eval's chain and
+  workers drop `ask` tools. A task or trigger has at most one child waiting on its first request (`chainWaitProblem`,
+  `chainPauseProblem`). `recordPendingToolApprovals` moves the run to waiting (`markRunAwaiting`) BEFORE anything is
+  sent, so a refused pause sends nothing. A pause, first or continued, is bound to its resume, so a late write never
+  re-opens an answered run, and never overwrites a `"question"` the child thread waits on. A nested result waits while its
+  parent's one-shot run goes, and that run's end posts it (`releaseHeldResults`). The rules, sources and exceptions:
+  [reference](../../../docs/agents/sub-agents.md).
+- **Lifecycle** ([reference](../../../docs/agents/sub-agents.md)): a send in a child ends its moved-past waits
+  (`afterOwnerMessage`); a hard delete sets `deletingAt` and ends the thread's runs (`endSubAgentRunsOfDeletedThread`).
+- **Roles** (`roles.ts` rules, `role-settings.ts` reads): a model, mode, effort and instructions per kind of delegated
+  work, on `userSettings.subAgentRoles` (`setSubAgentRole`, never `updateUserSettings`), overridden field by field by
+  `projects.subAgentRoles` (`setProjectSubAgentRole`: the owner only, as `updateProject` and the rule files,
+  `projectWithEditableSettings`). A role is on only with a model. `createRun` resolves a named role
+  BEFORE admission charges anything and refuses a role with no model or one `roleModelRefusal` refuses for THIS user
+  (the sub-agent rule, model filters, paid plan or key, their own enabled server-side custom endpoint; saves check the
+  same): never pick another model instead. A worker on a computer skips the model checks: it runs on its coding agent. Only the user's backup model still applies on a gateway failure, as for
+  every run. The run keeps the resolved role on its row (a worker copies its first run's), and `execute.ts` re-checks
+  the model (a worker's thread model too), so a settings change never reaches a running role. A host worker gets the
+  role's instructions ahead of the task (`host-runs.ts`). Instructions from another user's project are labelled as
+  its owner's (`instructionsBy`), never the user's. A role below the lead takes the lead's project
+  (`delegationProjectId`). The lead's catalog (`buildRoleCatalog`: names, scopes,
+  modes, never the instructions) is added only when the run has the delegate tool (`chat/execute.ts`);
+  `loadRunContext` reads it only when asked (`roleCatalog: true`). It leaves out a role `roleModelRefusal` refuses for
+  the running user, since `createRun` would refuse it.

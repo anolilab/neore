@@ -3,6 +3,7 @@
 import type { MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
+import type { Id } from "@neore/backend/dataModel";
 import { Button } from "@neore/ui/components/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@neore/ui/components/responsive-dialog";
 import { code } from "@neore/ui/utils/code-highlighter";
@@ -18,6 +19,8 @@ import { scrollToMessage } from "@/features/chat/thread/message-list";
 import { trackEvent } from "@/lib/analytics";
 import { useCRPC } from "@/lib/lunora/crpc";
 import { showError } from "@/lib/toast";
+
+import PinnedImagePreview from "./pinned-image-preview";
 
 // Only the edit dialog needs the editor, and `reactjs-tiptap-editor` brings
 // KaTeX with it — a static import put both on every chat page.
@@ -55,15 +58,25 @@ interface PinItemProps {
     pin: {
         _id: string;
         createdAt: number;
-        messageId: string;
+        imageIndex?: number;
+        /** The pinned image's storage path, when it has one (`pinned-image-preview.tsx`). */
+        imageKey?: string;
+        /** `"image"` pins one image of the message, at `imageIndex`; absent pins the whole message. `"document"` pins a visual or plan. */
+        kind?: "document" | "image" | "message";
+        /** Absent for a document pin whose document was made without a message. */
+        messageId?: string;
         messageRole: string;
         note?: string;
         selectedText?: string;
+        /** The pin's thread, which its edits route by. */
+        threadId?: string;
     };
 }
 
 const PinItem: FC<PinItemProps> = ({ pin }) => {
     const { i18n, t } = useLingui();
+    // A collaborator's pin is stored on the thread owner's shard: every edit names its thread so the call reaches that shard.
+    const pinThreadId = pin.threadId as Id<"threads"> | undefined;
     const crpc = useCRPC();
     const noteDebounceRef = useRef<ReturnType<typeof setTimeout>>(null);
     const contentRef = useRef<HTMLDivElement>(null);
@@ -122,13 +135,13 @@ const PinItem: FC<PinItemProps> = ({ pin }) => {
         }
 
         noteDebounceRef.current = setTimeout(() => {
-            updateNote({ note: value, pinId: pin._id });
+            updateNote({ note: value, pinId: pin._id, threadId: pinThreadId });
         }, NOTE_DEBOUNCE_MS);
     };
 
     const handleDelete = () =>
         deletePin(
-            { pinId: pin._id },
+            { pinId: pin._id, threadId: pinThreadId },
             {
                 onError: (e) => showError(e as Error),
                 onSuccess: () => trackEvent("message_unpinned", {}),
@@ -148,7 +161,7 @@ const PinItem: FC<PinItemProps> = ({ pin }) => {
         const trimmed = editTextValue.trim();
 
         if (trimmed && trimmed !== pin.selectedText) {
-            updateSelectedText({ pinId: pin._id, selectedText: trimmed }, { onError: (e) => showError(e as Error) });
+            updateSelectedText({ pinId: pin._id, selectedText: trimmed, threadId: pinThreadId }, { onError: (e) => showError(e as Error) });
         }
 
         setIsEditDialogOpen(false);
@@ -157,12 +170,17 @@ const PinItem: FC<PinItemProps> = ({ pin }) => {
     const handleCancelEdit = () => setIsEditDialogOpen(false);
 
     const isUser = pin.messageRole === "user";
+    const { messageId } = pin;
 
     return (
         <>
             <div className="group/pin relative flex overflow-hidden rounded-md border">
                 <div className="flex w-full flex-col px-3 pt-2.5 pb-2">
-                    {!pin.selectedText && (
+                    {pin.kind === "image" && pin.imageIndex !== undefined && messageId !== undefined && (
+                        <PinnedImagePreview alt={pin.selectedText} imageIndex={pin.imageIndex} imageKey={pin.imageKey} messageId={messageId} />
+                    )}
+
+                    {pin.kind !== "image" && !pin.selectedText && (
                         <div className="text-muted-foreground/60 mb-2 flex items-center gap-1.5 text-xs">
                             <PinIcon className="size-3" />
                             <span className="italic">{t`Full message pinned`}</span>
@@ -214,6 +232,7 @@ const PinItem: FC<PinItemProps> = ({ pin }) => {
                         onChange={handleNoteChange}
                         placeholder={t`Add a note…`}
                         rows={1}
+                        spellCheck
                         value={noteValue}
                     />
 
@@ -232,15 +251,17 @@ const PinItem: FC<PinItemProps> = ({ pin }) => {
                         </div>
 
                         <div className="flex items-center gap-0.5">
-                            <button
-                                aria-label={t`Go to message`}
-                                className="text-muted-foreground/50 hover:text-muted-foreground rounded p-0.5 transition-colors"
-                                onClick={() => scrollToMessage(pin.messageId)}
-                                title={t`Go to message`}
-                                type="button"
-                            >
-                                <LocateFixedIcon aria-hidden="true" className="size-4" />
-                            </button>
+                            {messageId !== undefined && (
+                                <button
+                                    aria-label={t`Go to message`}
+                                    className="text-muted-foreground/50 hover:text-muted-foreground rounded p-0.5 transition-colors"
+                                    onClick={() => scrollToMessage(messageId)}
+                                    title={t`Go to message`}
+                                    type="button"
+                                >
+                                    <LocateFixedIcon aria-hidden="true" className="size-4" />
+                                </button>
+                            )}
                             <button
                                 className="text-muted-foreground/50 hover:text-muted-foreground rounded p-0.5 transition-colors"
                                 onClick={handleOpenEditDialog}

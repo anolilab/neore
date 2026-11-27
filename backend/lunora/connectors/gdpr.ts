@@ -5,6 +5,7 @@
  * `revokeUserConnectorGrants` in `gdpr/steps/residual-deletion-steps.ts`.
  */
 import type { MutationCtx } from "../_generated/server";
+import { deleteOneByOne } from "../gdpr/batch";
 
 export const eraseConnectorsForUser = async (ctx: MutationCtx, userId: string): Promise<void> => {
     const userConnectors = await ctx.db
@@ -35,6 +36,9 @@ export const eraseConnectorsForUser = async (ctx: MutationCtx, userId: string): 
         ...userConnectors.map((uc) => ctx.db.delete("userConnectors", uc._id)),
         ...oauthStates.map((os) => ctx.db.delete("oauthStates", os._id)),
         ...mcpServerGrants.map((grant) => ctx.db.delete("mcpServerGrants", grant._id)),
-        ...teammateAccess.map((row) => ctx.db.delete("teammateConnectorAccess", row._id)),
     ]);
+
+    // Audited rows: one at a time. Each delete fires an audit trigger, and a parallel batch of them nests the triggers past the
+    // runtime's limit, which would fail the whole account deletion (`gdpr/batch.ts`).
+    await deleteOneByOne(teammateAccess, (row) => ctx.db.delete("teammateConnectorAccess", row._id));
 };

@@ -140,7 +140,12 @@ describe("DeviceApproval", () => {
         expect(alert.textContent).toBe(
             "This account already has the maximum number of paired devices. Remove one in Settings, then run `neore-host pair` again.",
         );
-        expect(screen.getByRole("heading", { level: 1 }).matches(":focus")).toBe(true);
+        const heading = await screen.findByRole("heading", { level: 1 });
+
+        // The review moves focus in a passive effect, which can land a tick after the alert appears.
+        await vi.waitFor(() => {
+            expect(heading.matches(":focus")).toBe(true);
+        });
     });
 
     it("announces the machine outcome, which tells the person to choose projects", async () => {
@@ -239,7 +244,12 @@ describe("DeviceApproval", () => {
         const alert = await screen.findByRole("alert");
 
         expect(alert.textContent).toContain("different account");
-        expect(screen.getByRole("heading", { level: 1 }).matches(":focus")).toBe(true);
+        const heading = await screen.findByRole("heading", { level: 1 });
+
+        // The review moves focus in a passive effect, which can land a tick after the alert appears.
+        await vi.waitFor(() => {
+            expect(heading.matches(":focus")).toBe(true);
+        });
     });
 
     it("looks again when the answer was already processed, and says so", async () => {
@@ -252,7 +262,10 @@ describe("DeviceApproval", () => {
 
         const heading = await screen.findByRole("heading", { level: 1, name: "Approve a code" });
 
-        expect(heading.matches(":focus")).toBe(true);
+        // Focus moves in an effect, which can land a tick after the heading appears.
+        await vi.waitFor(() => {
+            expect(heading.matches(":focus")).toBe(true);
+        });
         expect(screen.getByRole("status").textContent).toBe("This code has already been answered.");
         expect(paths()).toEqual(["GET /device", "POST /device/approve", "GET /device"]);
     });
@@ -292,6 +305,7 @@ describe("DeviceApproval", () => {
 
         await screen.findByRole("button", { name: "Try again" });
 
+        // The problem message focuses its heading from a ref callback, during the commit that shows it.
         expect(screen.getByRole("heading", { level: 1 }).matches(":focus")).toBe(true);
     });
 

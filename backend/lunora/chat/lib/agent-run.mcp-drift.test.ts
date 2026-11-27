@@ -8,6 +8,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { buildAgentTools } from "./agent-tools";
 import getAgent from "./get-agent";
 import { resumeApprovedRun } from "./agent-run";
+import { mcpToolOrigin } from "./mcp-tool-fingerprint";
 
 vi.mock("./get-agent", () => {
     return { default: vi.fn() };
@@ -17,6 +18,9 @@ vi.mock("./agent-tools", () => {
 });
 
 const TOOL = "mcp_Docs__search";
+
+/** Which server's tool `TOOL` stood for when the run paused. */
+const DOCS_ORIGIN: Record<string, string> = { [TOOL]: "docs" };
 
 /** Thrown by the agent's approve/deny, so the run ends right where this suite looks. */
 const STOP = new Error("stop");
@@ -32,13 +36,14 @@ const agent = {
 };
 
 /** The continuation's rebuilt tools: `fingerprint` absent means the server no longer offers the tool, unless `offered`. */
-const rebuiltWith = (fingerprint: string | undefined, offered = fingerprint !== undefined) => {
+const rebuiltWith = (fingerprint: string | undefined, offered = fingerprint !== undefined, origins: Record<string, string> = offered ? DOCS_ORIGIN : {}) => {
     vi.mocked(buildAgentTools).mockResolvedValue({
         autoApprovals: {},
         mcpClients: [],
         mcpLabels: {},
         mcpServerNames: ["Docs"],
         mcpToolFingerprints: fingerprint === undefined ? {} : { [TOOL]: fingerprint },
+        mcpToolOrigins: origins,
         permissionKeys: {},
         repeatable: [],
         requiresApproval: [],
@@ -46,7 +51,13 @@ const rebuiltWith = (fingerprint: string | undefined, offered = fingerprint !== 
     });
 };
 
-const resume = async (savedFingerprints: Record<string, string> | undefined, decision?: { approved: boolean; denyReason?: string }) => {
+const resume = async (
+    savedFingerprints: Record<string, string> | undefined,
+    decision?: { approved: boolean; denyReason?: string },
+    // `null`: a snapshot written before origins were recorded.
+    savedOrigins: Record<string, string> | null = DOCS_ORIGIN,
+    extra: Record<string, unknown> = {},
+) => {
     const ctx = {
         // Every read answers like the approval lookup: the request is still the open one, for `TOOL`.
         runQuery: vi.fn(async () => {
@@ -57,11 +68,13 @@ const resume = async (savedFingerprints: Record<string, string> | undefined, dec
         autoMediaEnrichment: false,
         mcpServerNames: ["Docs"],
         ...(savedFingerprints && { mcpToolFingerprints: savedFingerprints }),
+        ...(savedOrigins && { mcpToolOrigins: savedOrigins }),
         model: "gpt-4o",
         researchDepth: "balanced",
         searchMode: "chat",
         shouldAutoContinue: false,
         toolNames: [TOOL],
+        ...extra,
     } as never;
 
     return await resumeApprovedRun(ctx as never, {
@@ -79,6 +92,19 @@ describe("an approved MCP call after a pause", () => {
         agent.approveToolCall.mockClear();
         agent.denyToolCall.mockClear();
         vi.mocked(getAgent).mockResolvedValue(agent as never);
+    });
+
+    it("rebuilds the tools under the bot the paused run named, held to the run's owner, else under its thread's", async () => {
+        rebuiltWith("aaa");
+        vi.mocked(buildAgentTools).mockClear();
+
+        await resume({ [TOOL]: "aaa" }, undefined, DOCS_ORIGIN, { botLookup: { botId: "bot-1", threadId: "lead-1" } });
+        await resume({ [TOOL]: "aaa" });
+
+        expect(vi.mocked(buildAgentTools).mock.calls.map(([, options]) => options.botLookup)).toStrictEqual([
+            { botId: "bot-1", ownerId: "owner-1", threadId: "lead-1" },
+            { threadId: "thread-1" },
+        ]);
     });
 
     it("runs as approved when the tool is unchanged", async () => {
@@ -140,15 +166,101 @@ describe("an approved MCP call after a pause", () => {
         );
     });
 
-    it("keeps the earlier check for a snapshot written before fingerprints: a gone tool is a stale approval", async () => {
+    // Not a stale approval: the approval is already claimed, so a refusal would leave the request unanswerable. It is
+    // answered as denied, as a tool the organization's cap removed is.
+    it("answers a call whose tool is gone as denied for a snapshot written before fingerprints", async () => {
         rebuiltWith(undefined);
 
-        const outcome = await resume(undefined);
-
-        expect(outcome).toBeInstanceOf(Error);
-        expect((outcome as Error).message).toContain("no longer available");
+        expect(await resume(undefined, undefined, null)).toBe(STOP);
         expect(agent.approveToolCall).not.toHaveBeenCalled();
-        expect(agent.denyToolCall).not.toHaveBeenCalled();
+        expect(agent.denyToolCall).toHaveBeenCalledWith(
+            expect.anything(),
+            expect.objectContaining({ reason: expect.stringContaining("no longer available") }),
+            expect.anything(),
+            expect.anything(),
+        );
+    });
+
+    // Runtime names are given in listing order: once the servers listed change (a bot's selection, a server switched off), the
+    // approved name can pass to another server's tool. Fingerprinted or not, that tool is not run under the approval.
+    it("is not run when the approved name now stands for another server's tool, even with no fingerprint", async () => {
+        rebuiltWith(undefined, true, { [TOOL]: "other-server" });
+
+        expect(await resume(undefined)).toBe(STOP);
+        expect(agent.approveToolCall).not.toHaveBeenCalled();
+        expect(agent.denyToolCall).toHaveBeenCalledWith(
+            expect.anything(),
+            expect.objectContaining({ reason: expect.stringContaining("another server's tool") }),
+            expect.anything(),
+            expect.anything(),
+        );
+
+        agent.denyToolCall.mockClear();
+        rebuiltWith("aaa", true, { [TOOL]: "other-server" });
+
+        expect(await resume({ [TOOL]: "aaa" })).toBe(STOP);
+        expect(agent.approveToolCall).not.toHaveBeenCalled();
+        expect(agent.denyToolCall).toHaveBeenCalledOnce();
+    });
+
+    // With no fingerprint at the pause (it failed or timed out), the origin alone pins where the call goes.
+    describe("with no fingerprint, under the origin each run computed", () => {
+        const DOCS = { endpoint: "https://docs.example.com/mcp", protocol: "http", serverName: "Docs", toolName: "search" };
+        const NOTION = { ...DOCS, connectorSlug: "notion", endpoint: "https://mcp.notion.example/mcp", serverName: "Notion" };
+        const origins = async (source: Parameters<typeof mcpToolOrigin>[0]) => {
+            return { [TOOL]: await mcpToolOrigin(source) };
+        };
+        const deniedAsReplaced = () => {
+            expect(agent.approveToolCall).not.toHaveBeenCalled();
+            expect(agent.denyToolCall).toHaveBeenCalledWith(
+                expect.anything(),
+                expect.objectContaining({ reason: expect.stringContaining("another server's tool") }),
+                expect.anything(),
+                expect.anything(),
+            );
+        };
+
+        it("runs when the server is the same", async () => {
+            rebuiltWith(undefined, true, await origins(DOCS));
+
+            expect(await resume({}, undefined, await origins({ ...DOCS }))).toBe(STOP);
+            expect(agent.approveToolCall).toHaveBeenCalledOnce();
+        });
+
+        it("is not run when the server's transport changed", async () => {
+            rebuiltWith(undefined, true, await origins({ ...DOCS, protocol: "sse" }));
+
+            expect(await resume({}, undefined, await origins(DOCS))).toBe(STOP);
+            deniedAsReplaced();
+        });
+
+        it("is not run when a connector's endpoint changed", async () => {
+            rebuiltWith(undefined, true, await origins({ ...NOTION, endpoint: "https://elsewhere.example/mcp" }));
+
+            expect(await resume({}, undefined, await origins(NOTION))).toBe(STOP);
+            deniedAsReplaced();
+        });
+
+        // The hash before transport and endpoint joined it: an approval paused under it is asked again, never run, never an error.
+        it("is not run under an origin an earlier version recorded, and the model is told to call again", async () => {
+            const legacy = new TextEncoder().encode(JSON.stringify({ server: { name: "Docs", url: DOCS.endpoint }, tool: "search" }));
+            const legacyHash = [...new Uint8Array(await crypto.subtle.digest("SHA-256", legacy))]
+                .map((byte) => byte.toString(16).padStart(2, "0"))
+                .join("")
+                .slice(0, 32);
+
+            rebuiltWith(undefined, true, await origins(DOCS));
+
+            expect(await resume({}, undefined, { [TOOL]: legacyHash })).toBe(STOP);
+            deniedAsReplaced();
+        });
+    });
+
+    it("runs a snapshot written before origins as before when the tool is unchanged", async () => {
+        rebuiltWith("aaa", true, { [TOOL]: "other-server" });
+
+        expect(await resume({ [TOOL]: "aaa" }, undefined, null)).toBe(STOP);
+        expect(agent.approveToolCall).toHaveBeenCalledOnce();
     });
 
     it("runs a snapshot written before fingerprints as before when the tool is still there", async () => {

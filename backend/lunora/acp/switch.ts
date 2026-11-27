@@ -33,7 +33,7 @@ import { collectHandoffSource, findDividerEntering, findDividerLeaving } from ".
 import { getMaxMessage } from "../agent/messages";
 import { insertAgentSwitchRow, insertContextResetRow, insertThread, insertThreadRelationship, patchAgentSwitchRow, patchThread } from "../agent/table-writes";
 import { resetForTip } from "../agent/context-reset";
-import { CONTEXT_CLEAR_CONFLICT } from "../agent/context-reset-shape";
+import { CONTEXT_CLEAR_CONFLICT, CONTEXT_CLEAR_ORGANIZATION } from "../agent/context-reset-shape";
 import { inheritPasscodeHandler } from "../agent/thread-lock";
 import { requireThreadPermission } from "../agent/thread-read-access";
 import { HOST_HANDOFF_TAINT, threadPathTaint } from "../agent/thread-summary-taint";
@@ -60,11 +60,12 @@ import { loadEligibleThread } from "../devices/internal";
 import { isDeviceInScope, resolveThreadProject } from "../devices/lib/scope";
 import { isDeviceOnline } from "../devices/lib/state";
 import { type DeviceTaintSource, mergeTaint } from "../devices/lib/taint";
-import { claimedAtOf, claimOnce } from "../lib/claim-once";
+import { claimedAtOf, claimOnce, hasClaim } from "../lib/claim-once";
 import { checkRateLimit } from "../lib/rate-limiter";
 import { isThreadLocked } from "../lib/thread-lock";
 import { MAX_LENGTH } from "../lib/validators";
 import { isHostRunThread } from "./lib/host-thread";
+import { hostOrganizationOf, hostOrganizationRefusal, hostOrganizationRefusalCode } from "./lib/organization-cap";
 import { HOST_HANDOFF_MAX_BYTES, pendingHandoffOf } from "./lib/pending-handoff";
 import { savedSessionFor } from "./lib/reattach";
 import { sessionOfThread } from "./lib/sessions";
@@ -110,7 +111,8 @@ const resolveTarget = async (ctx: MutationCtx, args: SwitchArgs, thread: Doc<"th
         return { kind: "model", model: definition.id };
     }
 
-    const device = await ctx.db.devices.findFirst({ where: { _id: target.hostId, userId: args.userId } });
+    // From the primary: the device's pairing and project scope decide the switch, and a replica can still show them as they were.
+    const device = await ctx.db.devices.findFirst({ consistency: "primary", where: { _id: target.hostId, userId: args.userId } });
     const offer = offerOf(device, target.agentKey, target.folderId);
 
     if (!device?.encryptedSecret || device.revokedAt !== undefined || !offer) {
@@ -421,6 +423,8 @@ const answerRepeatedClick = async (
 };
 
 export interface HostSwitchArgs extends SwitchArgs {
+    /** The caller's verified active organization, unset in the personal space. */
+    organizationId?: string;
     unlockProof?: string;
 }
 
@@ -491,6 +495,13 @@ export const commitHostSwitchHandler = async (ctx: MutationCtx, args: HostSwitch
         });
     }
 
+    // A switch to a coding agent starts one on a computer: the organization that caps the chat must allow that.
+    const refused = toHost ? await hostOrganizationRefusal(ctx, hostOrganizationOf(thread, args.organizationId), args.userId) : null;
+
+    if (refused) {
+        throw new LunoraError("FORBIDDEN", refused);
+    }
+
     const target = await resolveTarget(ctx, args, thread, now);
     const to: SwitchAgentRef = target.kind === "host" ? hostRefOf(target.device._id as string, target.offer) : { kind: "model", model: target.model };
 
@@ -528,7 +539,19 @@ export const commitHostSwitchHandler = async (ctx: MutationCtx, args: HostSwitch
     const native = await nativePlanFor(ctx, { current, leaf, target, thread, to });
     const handoff = await handoffFor(ctx, thread, leaf, target, { lenient: native !== undefined });
     const taintedBy = target.kind === "host" ? await takeoverTaint(ctx, { current, fromHost, leaf, thread }) : [];
-    const result = await write(ctx, { clientId: args.clientId, current, handoff, leaf, native, now, taintedBy, target, thread, to, userId: args.userId });
+    const result = await write(ctx, {
+        clientId: args.clientId,
+        current,
+        handoff,
+        leaf,
+        native,
+        now,
+        taintedBy,
+        target,
+        thread,
+        to,
+        userId: args.userId,
+    });
 
     if (!(await claimOnce(ctx, "switch", claimKey, AGENT_SWITCH_CLAIM_TTL_MS, args.userId))) {
         // Another click took it between the check and here: this transaction's writes go with the throw.
@@ -670,6 +693,9 @@ const write = async (ctx: MutationCtx, args: WriteArgs): Promise<SwitchResult> =
                   model: target.offer.agentKey,
                   ...(thread.projectId && { projectId: thread.projectId }),
                   ...(thread.organizationId && { organizationId: thread.organizationId }),
+                  // An unfiled chat keeps the organization that caps it (`capOrganizationId`); a personal one stays capped by the
+                  // space it is used from, so the caller's space is not stamped on it.
+                  ...(!thread.organizationId && thread.capOrganizationId && { capOrganizationId: thread.capOrganizationId }),
                   ...(thread.teamId && { teamId: thread.teamId }),
                   runner: "host",
                   status: "active",
@@ -690,6 +716,8 @@ const write = async (ctx: MutationCtx, args: WriteArgs): Promise<SwitchResult> =
                   model: target.model,
                   ...(thread.projectId && { projectId: thread.projectId }),
                   ...(thread.organizationId && { organizationId: thread.organizationId }),
+                  // An unfiled chat keeps the organization that caps it, so a later switch back to a computer is checked against it.
+                  ...(!thread.organizationId && thread.capOrganizationId && { capOrganizationId: thread.capOrganizationId }),
                   ...(thread.teamId && { teamId: thread.teamId }),
                   status: "active",
                   tags: ["chat"],
@@ -729,7 +757,7 @@ const write = async (ctx: MutationCtx, args: WriteArgs): Promise<SwitchResult> =
  */
 export const clearHostSessionHandler = async (
     ctx: MutationCtx,
-    args: { clientId: string; threadId: Id<"threads">; unlockProof?: string; userId: string },
+    args: { clientId: string; organizationId?: string; threadId: Id<"threads">; unlockProof?: string; userId: string },
 ): Promise<{ messageId: string }> => {
     const now = Date.now();
     const { thread } = await requireThreadPermission(ctx, args.threadId, args.userId, "write", args.unlockProof);
@@ -768,6 +796,20 @@ export const clearHostSessionHandler = async (
     if (current.session?.status === "starting" || current.session?.status === "busy") {
         throw new LunoraError("CONFLICT", "Wait for the agent to be ready before clearing the context", {
             data: { code: CONTEXT_CLEAR_CONFLICT.agentStarting },
+        });
+    }
+
+    // A click already answered stays answered, whatever the cap has become since.
+    if (await hasClaim(ctx, "switch", claimKeyOf(args))) {
+        throw new LunoraError("CONFLICT", "This clear was already made", { data: { code: CONTEXT_CLEAR_CONFLICT.alreadyMade } });
+    }
+
+    // A clear opens a new session on the computer, so it is held to the organization's cap as a start is.
+    const refused = await hostOrganizationRefusalCode(ctx, hostOrganizationOf(thread, args.organizationId), args.userId);
+
+    if (refused) {
+        throw new LunoraError("FORBIDDEN", "Your organization does not allow a new agent session for this chat", {
+            data: { code: CONTEXT_CLEAR_ORGANIZATION[refused] },
         });
     }
 
@@ -841,6 +883,7 @@ export const clearHostSessionHandler = async (
 export const clearHostSession = internalMutation
     .input({
         clientId: v.string().max(MAX_LENGTH.id),
+        organizationId: v.optional(v.string().max(MAX_LENGTH.id)),
         threadId: v.id("threads"),
         unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
         userId: v.string().max(MAX_LENGTH.id),
@@ -857,6 +900,7 @@ export const isHostSwitchSource = internalQuery
 export const commitHostSwitch = internalMutation
     .input({
         clientId: v.string().max(MAX_LENGTH.id),
+        organizationId: v.optional(v.string().max(MAX_LENGTH.id)),
         target: vSwitchTarget,
         threadId: v.id("threads"),
         unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),

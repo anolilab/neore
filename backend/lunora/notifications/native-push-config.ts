@@ -16,3 +16,10 @@ const read = (env: Record<string, unknown>, key: string): string => {
 export const expoAccessToken = (env: Record<string, unknown>): string | undefined => read(env, "EXPO_ACCESS_TOKEN") || undefined;
 
 export const isPhonePushConfigured = (env: Record<string, unknown>): boolean => expoAccessToken(env) !== undefined;
+
+/**
+ * Whether Android phones whose app builds their own alert get the data-only push. A kill switch: set
+ * `ANDROID_DATA_ONLY_PUSH=off` before rolling an Android build back to one without the background task. The server then
+ * sends the notification-style push to every Android phone again, without waiting for each phone to register.
+ */
+export const isAndroidDataOnlyPushOn = (env: Record<string, unknown>): boolean => read(env, "ANDROID_DATA_ONLY_PUSH").toLowerCase() !== "off";

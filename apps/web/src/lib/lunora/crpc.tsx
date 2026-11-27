@@ -30,9 +30,9 @@ import type { ArgsOf, FunctionReference, LunoraClient, ReturnOf } from "@lunora/
 import { lunoraQueryOptions, useLunora } from "@lunora/react";
 import type { ApiTypes } from "@neore/backend/api";
 import { api } from "@neore/backend/api";
-import { getLiveQueryManager, LIVE_ARGS_META_KEY, LIVE_META_KEY, shardOptionsFor, withUnlockProof } from "@neore/client-runtime";
+import { getLiveQueryManager, LIVE_ARGS_META_KEY, LIVE_META_KEY, lunoraMutationKey, shardOptionsFor, withUnlockProof } from "@neore/client-runtime";
 import type { QueryKey, UseMutationOptions } from "@tanstack/react-query";
-import { hashKey, skipToken } from "@tanstack/react-query";
+import { hashKey, onlineManager, skipToken } from "@tanstack/react-query";
 import { useMemo } from "react";
 
 /** A leaf of the `crpc` proxy — what a call site actually invokes. */
@@ -138,9 +138,12 @@ const NEVER_LIVE: ReadonlySet<string> = new Set<ApiPath>([
     "chat_functions:searchThreads",
     "connectors_user_connectors:listConnectorCatalog",
     "evals_functions:compareRuns",
+    // `.global()` rows written from the senders' shards never reach the admin's subscription: refetch instead.
+    "feedback_admin:listFeedback",
     "gdpr_functions:getDataAccessSummary",
     "pages_functions:searchPages",
     "projects_functions:listProjectRepos",
+    "projects_functions:listProjectRuleFiles",
     "skills_marketplace:browseSkills",
     "skills_marketplace:searchSkills",
     "workflow_gallery:browseGallery",
@@ -181,6 +184,25 @@ const resolve = (path: string[]): FunctionReference => {
     return node;
 };
 
+/** Resolves once the browser is back online; at once when it is. */
+const waitForOnline = async (): Promise<void> =>
+    await new Promise<void>((_resolve) => {
+        if (onlineManager.isOnline()) {
+            _resolve();
+
+            return;
+        }
+
+        const unsubscribe = onlineManager.subscribe((online) => {
+            if (!online) {
+                return;
+            }
+
+            unsubscribe();
+            _resolve();
+        });
+    });
+
 // The Proxy is untyped by construction — `CrpcApi` is asserted once, at
 // `useCRPC`. Typing this factory precisely would mean threading the leaf's
 // FunctionReference through a Proxy `get`, which TypeScript cannot express.
@@ -190,8 +212,23 @@ const leaf = (client: LunoraClient, path: string[]): any => {
         // `call.onlineOnly` refuses the write while offline instead of queuing it for the reconnect.
         mutationOptions: (overrides?: object, call?: { onlineOnly?: true }) => {
             return {
-                mutationFn: async (args: Record<string, unknown>) =>
-                    await client.mutation(resolve(path) as never, withUnlockProof(args) as never, { ...shardOptionsFor(args), ...call } as never),
+                mutationFn: async (args: Record<string, unknown>) => {
+                    const reference = resolve(path);
+                    const shard = shardOptionsFor(args);
+
+                    // Before a shard's first connect the client cannot queue a write, so an offline one waits here for
+                    // the network instead of failing (as `@lunora/react`'s `useMutation` does). An online-only write,
+                    // and a sensitive one (which the client never queues), goes on at once to be refused.
+                    const onlineOnly = call?.onlineOnly === true || (reference as { sensitive?: boolean }).sensitive === true;
+
+                    if (!onlineOnly && !client.canQueueOffline(shard.shardKey)) {
+                        await waitForOnline();
+                    }
+
+                    return await client.mutation(reference as never, withUnlockProof(args) as never, { ...shard, ...call } as never);
+                },
+                // The function's dispatch key (`chat_functions:updateThread`), named from the path so a bad one still throws only when called.
+                mutationKey: lunoraMutationKey(`${path.slice(0, -1).join("_")}:${path.at(-1)}`),
                 ...overrides,
             };
         },

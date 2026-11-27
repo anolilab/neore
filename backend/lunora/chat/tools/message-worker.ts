@@ -37,10 +37,13 @@ A worker handles one message at a time, in the order sent: a message sent while 
         }
 
         const sent = await context.runMutation(internal.sub_agents.functions.messageWorker, {
+            ...(context.chainSource !== undefined && { chainSource: context.chainSource }),
             dispatchedBy: context.dispatchOrigin,
             // A headless run cannot be asked to approve: a worker on a computer is out of its reach (checked at admission).
             ...(context.headless && { headless: true }),
             message: input.message,
+            // The run's organization caps the follow-up when neither the worker nor the lead thread has a stored one.
+            ...(context.organizationId && { organizationId: context.organizationId }),
             parentThreadId: context.threadId,
             toolCallId: options.toolCallId,
             userId: context.userId,

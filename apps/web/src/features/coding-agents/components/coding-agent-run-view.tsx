@@ -18,7 +18,7 @@ import { Badge } from "@neore/ui/components/badge";
 import { Button, buttonVariants } from "@neore/ui/components/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@neore/ui/components/collapsible";
 import cn from "@neore/ui/utils/cn";
-import { useMutation } from "@tanstack/react-query";
+import { skipToken, useMutation, useQueries, useQuery } from "@tanstack/react-query";
 import { ChevronRight, CircleStop, ExternalLink, GitPullRequest, Loader2, SquareTerminal } from "lucide-react";
 import type { FC } from "react";
 import { memo, useEffect, useId, useMemo, useRef, useState } from "react";
@@ -28,6 +28,7 @@ import { showError, showSuccess } from "@/lib/toast";
 
 import type { DiffLineKind } from "../lib/diff-lines";
 import { DIFF_PREVIEW_LINES, diffFiles, parseDiff } from "../lib/diff-lines";
+import SetupFixButton from "./setup-fix-dialog";
 
 export type CodingAgentRun = NonNullable<ReturnOf<typeof api.coding_agents.functions.getRun>>;
 
@@ -143,6 +144,21 @@ const CodingAgentRunView: FC<CodingAgentRunViewProps> = ({ className, run }) => 
         }),
     );
     const createPr = useMutation(useLunoraActionOptions(api.coding_agents.execute.createPullRequest));
+    // The "Fix setup" run started from this one, shown under it so the fix is followed where the failure was.
+    const { data: fixRun } = useQuery(crpc.coding_agents.functions.getRun.queryOptions(run.setupFixRunId ? { runId: run.setupFixRunId } : skipToken));
+    // A retry is offered once the linked fix run has ended without finishing; the server checks again when it starts.
+    const fixRunEnded = fixRun?.status === "failed" || fixRun?.status === "cancelled";
+    // Focus returns here when the fix dialog closes: the "Fix setup" button is removed once the fix starts.
+    const sectionRef = useRef<HTMLElement>(null);
+    // Earlier "Fix setup" attempts have ended (a retry starts only after the newest one ended), so each is read rather than kept
+    // live: live subscriptions are capped per socket. A read is refetched on every mount (`staleTime: 0`): the cache would
+    // otherwise show a "running" snapshot from before the attempt ended. The newest attempt is `fixRun`.
+    const earlierIds = run.setupFixRunIds.slice(0, -1);
+    const earlierAttempts = useQueries({
+        queries: earlierIds.map((runId) => {
+            return { ...crpc.coding_agents.functions.getRun.queryOptions({ runId }, { live: false }), staleTime: 0 };
+        }),
+    });
 
     const openPullRequest = () => {
         createPr.mutate(
@@ -169,7 +185,7 @@ const CodingAgentRunView: FC<CodingAgentRunViewProps> = ({ className, run }) => 
     };
 
     return (
-        <section aria-labelledby={headingId} className={cn("my-2 w-full max-w-3xl rounded-lg border p-3", className)}>
+        <section aria-labelledby={headingId} className={cn("my-2 w-full max-w-3xl rounded-lg border p-3", className)} ref={sectionRef} tabIndex={-1}>
             <header className="flex flex-wrap items-center gap-2">
                 <SquareTerminal aria-hidden="true" className="text-muted-foreground size-4 shrink-0" />
                 <h3 className="min-w-0 flex-1 truncate text-sm font-medium" id={headingId}>
@@ -243,6 +259,15 @@ const CodingAgentRunView: FC<CodingAgentRunViewProps> = ({ className, run }) => 
                         {t`Create PR`}
                     </Button>
                 )}
+                {run.setupFix && (
+                    <SetupFixButton
+                        available={run.setupFixAllowed && (run.setupFixRunId === null || fixRunEnded)}
+                        finalFocusRef={sectionRef}
+                        prompt={run.setupFix.prompt}
+                        runId={run._id}
+                        step={run.setupFix.step}
+                    />
+                )}
                 {run.prUrl?.startsWith("https://github.com/") && (
                     <a className={buttonVariants({ size: "sm", variant: "outline" })} href={run.prUrl} rel="noopener noreferrer" target="_blank">
                         <ExternalLink aria-hidden="true" />
@@ -251,6 +276,13 @@ const CodingAgentRunView: FC<CodingAgentRunViewProps> = ({ className, run }) => 
                     </a>
                 )}
             </div>
+
+            {earlierIds.map((runId, index) => {
+                const attempt = earlierAttempts[index]?.data;
+
+                return attempt ? <CodingAgentRunView className="mb-0 max-w-none" key={runId} run={attempt} /> : null;
+            })}
+            {fixRun && <CodingAgentRunView className="mb-0 max-w-none" run={fixRun} />}
         </section>
     );
 };

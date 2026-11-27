@@ -4,10 +4,10 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@neore/ui/components/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@neore/ui/components/card";
 import { AlertTriangle, ArrowLeft, Home, RefreshCw } from "lucide-react";
-import { usePostHog } from "posthog-js/react";
 import type { ErrorInfo, FC, ReactNode } from "react";
 import { useEffect } from "react";
 
+import { captureException } from "@/lib/analytics/posthog-client";
 import { AuthenticationError, ErrorUtilities, NetworkError } from "@/lib/errors";
 
 import { ErrorBoundary } from "../error-boundary";
@@ -151,8 +151,6 @@ const UnauthorizedThreadRedirect: FC = () => {
  * Provides navigation recovery and route-specific error handling.
  */
 const RouteErrorBoundary = ({ children, fallbackRoute = "/", routeName = "page" }: RouteErrorBoundaryProperties) => {
-    const posthog = usePostHog();
-
     const handleError = (error: Error, errorInfo: ErrorInfo) => {
         if (import.meta.env.DEV) {
             // eslint-disable-next-line no-console
@@ -170,20 +168,18 @@ const RouteErrorBoundary = ({ children, fallbackRoute = "/", routeName = "page" 
         }
 
         // Send error report with route context to PostHog
-        if (posthog && typeof posthog.captureException === "function") {
-            posthog.captureException(error, {
-                componentStack: errorInfo.componentStack,
-                errorBoundary: "route",
-                errorType: error.constructor.name,
-                feature: "route",
-                referrer: document.referrer,
-                route: globalThis.location.pathname,
-                routeName,
-                timestamp: new Date().toISOString(),
-                url: globalThis.location.href,
-                userAgent: navigator.userAgent,
-            });
-        }
+        captureException(error, {
+            componentStack: errorInfo.componentStack,
+            errorBoundary: "route",
+            errorType: error.constructor.name,
+            feature: "route",
+            referrer: document.referrer,
+            route: globalThis.location.pathname,
+            routeName,
+            timestamp: new Date().toISOString(),
+            url: globalThis.location.href,
+            userAgent: navigator.userAgent,
+        });
     };
 
     const handleGoBack = () => {
@@ -228,7 +224,7 @@ const RouteErrorBoundary = ({ children, fallbackRoute = "/", routeName = "page" 
     };
 
     return (
-        <ErrorBoundary fallback={renderFallback} onError={handleError} showToast>
+        <ErrorBoundary fallback={renderFallback} isReportedByOnError onError={handleError} showToast>
             {children}
         </ErrorBoundary>
     );

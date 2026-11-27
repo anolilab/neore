@@ -49,11 +49,114 @@
                             }
                         }
                     },
+                    "409": {
+                        "description": "The browser session is signing in with a saved login; nothing was run, and the action can be tried again once that is done",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+                            }
+                        }
+                    },
+                    "410": {
+                        "description": "The browser session was retired for good (a sign-in on it ended without confirming its page clean); nothing was run. Start a new session: call again without `sessionId`",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/SessionRetiredResponse" }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "With the `x-browser-action: not-run` header, nothing was run (the browser session's lock did not answer in time, or the session was refused) and the action can be tried again. Without it, the action's hold could not be confirmed for its whole run, so its result is withheld: the action may have run, so look at the page (a screenshot or an extract on `sessionId`, the browser it kept, when given) before repeating it",
+                        "headers": {
+                            "x-browser-action": {
+                                "description": "`not-run` when the renderer ran nothing for this call",
+                                "schema": { "type": "string", "enum": ["not-run"] }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/ActionWithheldResponse" }
+                            }
+                        }
+                    },
                     "500": {
                         "description": "Internal server error",
                         "content": {
                             "application/json": {
                                 "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/login": {
+            "post": {
+                "operationId": "browserLogin",
+                "summary": "Sign in with a saved login: open the login page and type the username and password in one call",
+                "tags": ["Browser"],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": { "$ref": "#/components/schemas/BrowserLoginRequest" }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Login result; never carries the password",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/BrowserLoginResponse" }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "The browser session is busy with another call, of any isolate; nothing was typed",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/BrowserLoginErrorResponse" }
+                            }
+                        }
+                    },
+                    "410": {
+                        "description": "The browser session was retired for good; nothing was typed. Start a new session: call again without `sessionId`",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/SessionRetiredResponse" }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "The browser session's lock did not answer in time; nothing was typed",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/BrowserLoginErrorResponse" }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/BrowserLoginErrorResponse" }
+                            }
+                        }
+                    },
+                    "504": {
+                        "description": "The browser did not start within the budget; nothing was typed",
+                        "content": {
+                            "application/json": {
+                                "schema": { "$ref": "#/components/schemas/BrowserLoginErrorResponse" }
                             }
                         }
                     }
@@ -82,6 +185,78 @@
     },
     "components": {
         "schemas": {
+            "BrowserLoginRequest": {
+                "type": "object",
+                "required": ["url", "origin", "username", "password"],
+                "properties": {
+                    "budgetMs": {
+                        "type": "integer",
+                        "minimum": 20000,
+                        "maximum": 120000,
+                        "description": "The time the caller gives the whole call, browser setup included; nothing is typed once too little of it is left"
+                    },
+                    "url": { "type": "string", "maxLength": 8192, "description": "The login page; its origin must be exactly `origin`" },
+                    "origin": {
+                        "type": "string",
+                        "maxLength": 2048,
+                        "description": "The exact `https://` origin the login was saved for (scheme, host and port, no path); nothing is typed on any other"
+                    },
+                    "username": { "type": "string", "minLength": 1, "maxLength": 320 },
+                    "password": {
+                        "type": "string",
+                        "minLength": 4,
+                        "maxLength": 1024,
+                        "description": "Typed into a password field only; never returned. A shorter one is refused: it could not be kept out of the results"
+                    },
+                    "sessionId": { "type": "string", "description": "Reconnect to an existing browser session" }
+                }
+            },
+            "BrowserLoginResponse": {
+                "type": "object",
+                "properties": {
+                    "success": { "type": "boolean" },
+                    "sessionId": { "type": "string" },
+                    "url": { "type": "string" },
+                    "title": { "type": "string" },
+                    "submitted": {
+                        "type": "boolean",
+                        "description": "The form's own POST went out to the login's origin with the password. It can be true on a failure (the step after it failed): do not send it again. False when it was not sent"
+                    },
+                    "scriptSignIn": {
+                        "type": "boolean",
+                        "description": "The site signs in from a script that reads the password field, which only ever holds a stand-in: nothing was sent, and trying again cannot help"
+                    },
+                    "sessionClosed": {
+                        "type": "boolean",
+                        "description": "The browser session is gone and no sessionId is returned: the password could not be cleared from the page within the hold, so the page and the session were closed (the close was confirmed), or the session named could not be reconnected"
+                    },
+                    "sessionCloseUnconfirmed": {
+                        "type": "boolean",
+                        "description": "The browser session had to be closed, but its close failed or did not end within the hold: it may still be open and must not be used again. No sessionId is returned"
+                    },
+                    "passwordFieldRemains": {
+                        "type": "boolean",
+                        "description": "A password field is still on the page after sending: the sign-in may have failed"
+                    },
+                    "error": { "type": "string" }
+                }
+            },
+            "BrowserLoginErrorResponse": {
+                "type": "object",
+                "required": ["error", "success"],
+                "properties": {
+                    "success": { "type": "boolean", "enum": [false] },
+                    "error": { "type": "string" },
+                    "sessionClosed": {
+                        "type": "boolean",
+                        "description": "The session named could not be reconnected and is gone; nothing was typed"
+                    },
+                    "sessionId": {
+                        "type": "string",
+                        "description": "The browser session of this call (the one named, when it was reconnected), which holds no password: the sign-in failed before anything was typed"
+                    }
+                }
+            },
             "BrowserActionRequest": {
                 "type": "object",
                 "required": ["action"],
@@ -112,6 +287,23 @@
                         "type": "boolean",
                         "description": "Whether to capture full page screenshot"
                     },
+                    "expectTarget": {
+                        "type": "string",
+                        "description": "Click: the target fingerprint of the element the person was shown; the click is refused when the element differs"
+                    },
+                    "clickMode": {
+                        "type": "string",
+                        "enum": ["page", "pointer", "all"],
+                        "description": "Click, with expectTarget: \"page\" checks and clicks in the page; \"all\" checks, then makes a real click"
+                    },
+                    "strictVisibility": {
+                        "type": "boolean",
+                        "description": "Click: refuse an element that opacity hides too (an approved click, the one a person saw); an ordinary click ignores opacity"
+                    },
+                    "visibleOnly": {
+                        "type": "boolean",
+                        "description": "Extract with a selector: return the rendered text, leaving out hidden descendants"
+                    },
                     "script": {
                         "type": "string",
                         "description": "JavaScript to evaluate (max 5000 chars)"
@@ -132,6 +324,22 @@
                     "screenshot": { "type": "string", "description": "Base64-encoded JPEG" },
                     "screenshotFormat": { "type": "string" },
                     "content": { "type": "string", "description": "Extracted text content" },
+                    "label": { "type": "string", "description": "Accessible name of the extracted control, when it is not its text (visibleOnly reads only)" },
+                    "labelTruncated": { "type": "boolean", "description": "The accessible name was cut short" },
+                    "targetChanged": {
+                        "type": "boolean",
+                        "description": "A click was refused because its target changed since it was checked; nothing was clicked"
+                    },
+                    "target": { "type": "string", "description": "Fingerprint of the extracted element (visibleOnly reads only)" },
+                    "checkout": { "type": "boolean", "description": "The element is on a checkout (visibleOnly reads only)" },
+                    "submitLike": {
+                        "type": "boolean",
+                        "description": "One of the element's name sources is exactly a submit word (visibleOnly reads only)"
+                    },
+                    "subscribeLike": {
+                        "type": "boolean",
+                        "description": "One of the element's name sources is exactly a bare subscription word (visibleOnly reads only)"
+                    },
                     "truncated": { "type": "boolean" },
                     "clickedSelector": { "type": "string" },
                     "typedText": { "type": "string" },
@@ -154,6 +362,27 @@
                 "properties": {
                     "status": { "type": "string" },
                     "service": { "type": "string" }
+                }
+            },
+            "SessionRetiredResponse": {
+                "type": "object",
+                "required": ["code", "error", "success"],
+                "properties": {
+                    "code": { "type": "string", "enum": ["SESSION_RETIRED"] },
+                    "error": { "type": "string" },
+                    "success": { "type": "boolean", "enum": [false] }
+                }
+            },
+            "ActionWithheldResponse": {
+                "type": "object",
+                "required": ["error", "success"],
+                "properties": {
+                    "success": { "type": "boolean", "enum": [false] },
+                    "error": { "type": "string" },
+                    "sessionId": {
+                        "type": "string",
+                        "description": "The browser session the action ran on, kept for the caller; absent when the lost hold closed it"
+                    }
                 }
             },
             "ErrorResponse": {

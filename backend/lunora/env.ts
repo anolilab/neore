@@ -32,11 +32,13 @@ export const CREEM_YEARLY_CHECKOUT = read("CREEM_YEARLY_CHECKOUT");
 export const CREEM_WEBHOOK_SECRET = read("CREEM_WEBHOOK_SECRET");
 /** `true` targets test-api.creem.io (test-mode keys and products). */
 export const CREEM_TEST_MODE = read("CREEM_TEST_MODE");
-/** Comma-separated `chrome-extension://<id>` origins allowed to call auth. Empty = none. */
-export const TRUSTED_EXTENSION_ORIGINS = read("TRUSTED_EXTENSION_ORIGINS");
-/** Comma-separated `identity.launchWebAuthFlow` redirect URIs the extension sign-in may deliver a code to. Empty = the shipped Firefox add-on; `none` = off. */
+/** Comma-separated `identity.launchWebAuthFlow` redirect URIs the extension sign-in may deliver a code to. Empty = the shipped Firefox add-on; `none` = off; list the Chrome build's `https://<id>.chromiumapp.org/` here. */
 export const TRUSTED_EXTENSION_REDIRECT_URIS = read("TRUSTED_EXTENSION_REDIRECT_URIS");
 export const ENCRYPTION_KEY = read("ENCRYPTION_KEY");
+
+/** Watching the agent's cloud browser (`browser/live-view.ts`): the account and a token with Browser Rendering Write. Either empty = off. */
+export const CLOUDFLARE_ACCOUNT_ID = read("CLOUDFLARE_ACCOUNT_ID");
+export const BROWSER_LIVE_VIEW_API_TOKEN = read("BROWSER_LIVE_VIEW_API_TOKEN");
 
 export const GROQ_API_KEY = read("GROQ_API_KEY");
 export const FAL_API_KEY = read("FAL_API_KEY");

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { attachLongPaste, draftFitsAsFile, insertPastedText, moveDraftToFile, pasteHasText, undoLongPaste } from "./composer-draft-file";
+import { appendPastedText, attachLongPaste, draftFitsAsFile, insertPastedText, moveDraftToFile, pasteHasText, undoLongPaste } from "./composer-draft-file";
 
 describe("attachLongPaste", () => {
     const setup = (result: { attachmentId: string; error?: string }, draft = "before after") => {
@@ -80,8 +80,44 @@ describe("attachLongPaste", () => {
         });
 
         expect(await attachLongPaste(options)).toBe(false);
-        expect(state.text).toBe("beforeTYPED afterPASTED");
+        expect(state.text).toBe("beforeTYPED after\nPASTED");
         expect(options.onFailure).toHaveBeenCalledWith("Too big");
+    });
+
+    it("appends the text when the draft changed before the upload started, while the paste was being converted", async () => {
+        const { options, state } = setup({ attachmentId: "a1", error: "Too big" }, "beforeTYPED after");
+
+        expect(await attachLongPaste({ ...options, draftAtPaste: "before after" })).toBe(false);
+        expect(state.text).toBe("beforeTYPED after\nPASTED");
+    });
+
+    it("puts a converted table back on lines of its own, at the paste position or appended, when the upload failed", async () => {
+        const table = "| A |\n| --- |\n| 1 |";
+        const atCaret = setup({ attachmentId: "a1", error: "Too big" });
+
+        expect(
+            await attachLongPaste({
+                ...atCaret.options,
+                converted: true,
+                pastedText: table,
+                selection: { end: 6, start: 6, textAfter: true, textBefore: true },
+            }),
+        ).toBe(false);
+        expect(atCaret.state.text).toBe(`before\n\n${table}\n\n after`);
+
+        const appended = setup({ attachmentId: "a1", error: "Too big" }, "beforeTYPED after");
+
+        expect(await attachLongPaste({ ...appended.options, converted: true, draftAtPaste: "before after", pastedText: table })).toBe(false);
+        expect(appended.state.text).toBe(`beforeTYPED after\n\n${table}`);
+    });
+
+    it("writes nothing into a composer that locked during the upload, and says the text was not inserted", async () => {
+        const { options } = setup({ attachmentId: "a1", error: "Too big" });
+
+        expect(await attachLongPaste({ ...options, canInsert: () => false })).toBe(false);
+        expect(options.setDraft).not.toHaveBeenCalled();
+        expect(options.discard).toHaveBeenCalledWith("a1");
+        expect(options.onNotInserted).toHaveBeenCalledWith("Too big");
     });
 
     it("leaves another chat's draft alone and says the text was not inserted when the chat changed during the upload", async () => {
@@ -100,6 +136,13 @@ describe("attachLongPaste", () => {
         expect(options.discard).toHaveBeenCalledWith("a1");
         expect(options.onNotInserted).toHaveBeenCalledWith("Too big");
         expect(options.onFailure).not.toHaveBeenCalled();
+    });
+
+    it("appends a paste on a line of its own, reusing the line breaks the draft already ends with", () => {
+        expect(appendPastedText("typed", "PASTED")).toBe("typed\nPASTED");
+        expect(appendPastedText("typed\n", "PASTED")).toBe("typed\nPASTED");
+        expect(appendPastedText("typed\n", "| a |", 2)).toBe("typed\n\n| a |");
+        expect(appendPastedText("", "| a |", 2)).toBe("| a |");
     });
 
     it("replaces a selection and clamps an offset past the end", () => {
@@ -205,6 +248,22 @@ describe("draftFitsAsFile", () => {
 });
 
 describe("undoLongPaste", () => {
+    it("puts a converted table back on lines of its own after the draft's last line", () => {
+        const setDraft = vi.fn();
+
+        undoLongPaste({
+            attachmentId: "a1",
+            converted: true,
+            getAttachmentIds: () => ["a1"],
+            getDraft: () => "Before:",
+            pastedText: "| A | B |\n| --- | --- |",
+            removeAttachment: vi.fn(),
+            setDraft,
+        });
+
+        expect(setDraft).toHaveBeenCalledWith("Before:\n\n| A | B |\n| --- | --- |");
+    });
+
     it("puts the text back and drops the file while the file is attached", () => {
         const removeAttachment = vi.fn();
         const setDraft = vi.fn();

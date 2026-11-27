@@ -4,13 +4,15 @@
  * asserting there were none.
  */
 import { existsSync, mkdirSync } from "node:fs";
+import { mkdtemp } from "node:fs/promises";
 import path from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { SleepLock } from "./keep-awake";
 import { AcpManager } from "./manager";
 import { spawnAgent } from "./process";
-import { newSession } from "./protocol";
+import { openNewSession } from "./protocol";
 import { AgentSignedOutError } from "./signed-out";
 import { alive, expectGone, Scratch } from "./testing/harness";
 import type { AcpUpdate, SessionSnapshot, SpawnPlan } from "./types";
@@ -28,7 +30,7 @@ const plans: { env: Record<string, string>; folder: string | null; key: string }
 
 const make = (
     env: Record<string, string> = {},
-    options: { cancelGraceMs?: number; plan?: (key: string, folder: string | null) => SpawnPlan } = {},
+    options: { cancelGraceMs?: number; plan?: (key: string, folder: string | null) => Promise<SpawnPlan> | SpawnPlan } = {},
 ): AcpManager =>
     new AcpManager({
         appVersion: "9.9.9",
@@ -74,6 +76,7 @@ afterEach(() => {
     manager.killAll();
     scratch.dispose();
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
 });
 
 describe("a session", () => {
@@ -320,7 +323,7 @@ describe("a version probe", () => {
         await expect(failure).rejects.toThrow("Sign in with the agent's own login command");
         // Callers tell "not signed in" from other failures by the type, after a session start and after `withAgent`.
         await expect(failure).rejects.toBeInstanceOf(AgentSignedOutError);
-        await expect(target.withAgent("fake", scratch.work, {}, async ({ connection }) => await newSession(connection, scratch.work))).rejects.toBeInstanceOf(
+        await expect(target.withAgent("fake", scratch.work, {}, async ({ connection }) => await openNewSession(connection, scratch.work))).rejects.toBeInstanceOf(
             AgentSignedOutError,
         );
         target.killAll();
@@ -373,6 +376,7 @@ describe("the environment", () => {
     it("is exactly the plan's: nothing is inherited from the app", async () => {
         vi.stubEnv("NEORE_LEAK", "from-the-app");
         vi.stubEnv("ELECTRON_RUN_AS_NODE", "1");
+        vi.stubEnv("SHLVL", "41");
 
         const target = make({ ONLY_FOR_THIS_AGENT: "yes" });
         const id = await start(target);
@@ -380,13 +384,14 @@ describe("the environment", () => {
         target.send(id, "env");
         await idle(id, target);
 
-        // macOS adds this one to every process it starts; it is not the app's.
-        const names = Object.keys(JSON.parse(snapshot(id, target).turns[0].text) as Record<string, string>).filter(
-            (name) => name !== "__CF_USER_TEXT_ENCODING",
-        );
+        const env = JSON.parse(snapshot(id, target).turns[0].text) as Record<string, string>;
+        // macOS adds __CF_USER_TEXT_ENCODING to every process it starts, and bash as the Linux launch `sh` (Arch, Fedora;
+        // not dash) exports its own SHLVL, re-set on `exec`; neither is the app's.
+        const names = Object.keys(env).filter((name) => name !== "__CF_USER_TEXT_ENCODING" && name !== "SHLVL");
 
         expect(new Set(names)).toEqual(new Set(["FAKE_AGENT_LOG", "ONLY_FOR_THIS_AGENT", "PATH"]));
-        vi.unstubAllEnvs();
+        // The shell's own count starts from nothing (0, or 1 for a bash that counts itself); the app's 41 would read 41 or 42.
+        expect(["0", "1"]).toContain(env.SHLVL ?? "0");
         target.killAll();
     });
 });
@@ -463,6 +468,44 @@ describe("an agent that quotes its environment in an error", () => {
         expect(JSON.stringify(target.list())).not.toContain(SENTINEL);
         expect(JSON.stringify(target.list())).toContain("***");
         target.killAll();
+    });
+});
+
+describe("a start the computer's terminal check refuses", () => {
+    it("stops the agent it spawned, and still reports the refusal", async () => {
+        const spawned: { pid: number | undefined }[] = [];
+        const target = new AcpManager({
+            appVersion: "9.9.9",
+            cancelGraceMs: 400,
+            onChange: () => {},
+            plan: (_key, folder) => scratch.plan({}, folder),
+            spawn: (plan, key) => {
+                const child = spawnAgent(plan, key);
+
+                spawned.push(child);
+
+                return child;
+            },
+            startupTimeoutMs: 8000,
+            terminals: {
+                available: () => {
+                    throw new Error("the terminal check failed");
+                },
+                kill: () => {},
+                output: () => {
+                    return { exitStatus: null, output: "", truncated: false };
+                },
+                release: () => {},
+                start: async () => 0,
+                wait: async () => {
+                    return { exitCode: null, signal: null };
+                },
+            } as never,
+        });
+
+        expect(await messageOf(target.startSession("fake", "Fake", scratch.work))).toBe("the terminal check failed");
+        expect(spawned).toHaveLength(1);
+        await expectGone(spawned[0]?.pid ?? -1);
     });
 });
 
@@ -543,5 +586,307 @@ describe("a sign-out of an agent", () => {
         finish.open();
         await hold;
         target.killAll();
+    });
+});
+
+describe("keeping the computer awake during a turn", () => {
+    it("holds a sleep inhibitor from a turn's start to its end, and releases it when the agent is killed", async () => {
+        const live = new Set<number>();
+        let next = 1;
+        const lock = new SleepLock({
+            isStarted: (id) => live.has(id),
+            start: () => {
+                const id = next;
+
+                next += 1;
+                live.add(id);
+
+                return id;
+            },
+            stop: (id) => {
+                live.delete(id);
+            },
+        });
+        const awake = new AcpManager({
+            appVersion: "9.9.9",
+            onChange: () => {},
+            plan: (key, folder) => scratch.plan({}, folder),
+            sleepLock: lock,
+            spawn: spawnAgent,
+            startupTimeoutMs: 8000,
+        });
+
+        try {
+            const id = await awake.startSession("fake", "Fake", scratch.work);
+
+            expect(live.size).toBe(0);
+
+            awake.send(id, "slow");
+            expect(live.size).toBe(1);
+
+            await expect.poll(() => awake.snapshot(id).status, { timeout: 8000 }).toBe("idle");
+            expect(live.size).toBe(0);
+
+            awake.send(id, "hang");
+            expect(live.size).toBe(1);
+
+            awake.killAll();
+            expect(live.size).toBe(0);
+        } finally {
+            awake.killAll();
+        }
+    });
+
+    it("holds the inhibitor for a prompt sent during the pause after a cancel, from the moment it is queued", async () => {
+        const live = new Set<number>();
+        let next = 1;
+        const lock = new SleepLock({
+            isStarted: (id) => live.has(id),
+            start: () => {
+                const id = next;
+
+                next += 1;
+                live.add(id);
+
+                return id;
+            },
+            stop: (id) => {
+                live.delete(id);
+            },
+        });
+        const awake = new AcpManager({
+            appVersion: "9.9.9",
+            onChange: () => {},
+            plan: (key, folder) => scratch.plan({}, folder),
+            sleepLock: lock,
+            spawn: spawnAgent,
+            startupTimeoutMs: 8000,
+        });
+
+        try {
+            const id = await awake.startSession("fake", "Fake", scratch.work);
+
+            awake.send(id, "tool");
+            expect(live.size).toBe(1);
+
+            awake.cancelTurn(id, awake.snapshot(id).turns[0].id);
+            await expect.poll(() => awake.snapshot(id).turns[0]?.stopReason, { timeout: 8000 }).toBe("cancelled");
+            expect(live.size).toBe(0);
+
+            // The session is idle for the pause after the cancel: a prompt sent now waits for it, and holds the lock at once.
+            const queued = awake.send(id, "echo after");
+
+            expect(queued.status).toBe("queued");
+            expect(live.size).toBe(1);
+
+            await expect.poll(() => awake.snapshot(id).status, { timeout: 8000 }).toBe("idle");
+            expect(live.size).toBe(0);
+        } finally {
+            awake.killAll();
+        }
+    });
+});
+
+describe("starts that wait for their plan", () => {
+    it("hold their place, so overlapping starts cannot pass the session limit together", async () => {
+        const target = make({}, { plan: () => new Promise<SpawnPlan>(() => {}) });
+
+        for (let index = 0; index < 8; index += 1) {
+            // eslint-disable-next-line unicorn/prefer-await -- the start never settles in this test; only the limit is under test
+            target.startSession("fake", "Fake", scratch.work).catch(() => {});
+        }
+
+        await expect(target.startSession("fake", "Fake", scratch.work)).rejects.toThrow("at most");
+    });
+
+    it("plan again when approvals were revoked while the plan was being made", async () => {
+        const calls: number[] = [];
+        const bad = { args: [], command: "neore-no-such-agent", cwd: scratch.dir, env: { PATH: "/nonexistent" }, scratch: false, secretNames: [] };
+        const target = make(
+            {},
+            {
+                plan: async () => {
+                    calls.push(calls.length);
+
+                    if (calls.length === 1) {
+                        await target.closeUnapproved({ agents: [], consents: [] });
+                    }
+
+                    return bad;
+                },
+            },
+        );
+
+        await expect(target.startSession("fake", "Fake", scratch.work)).rejects.toThrow(MISSING_COMMAND);
+        expect(calls).toHaveLength(2);
+    });
+
+    it("closes a session whose approval is revoked right after its plan was checked", async () => {
+        let revoking: Promise<void> | undefined;
+        const target = make(
+            {},
+            {
+                plan: async (_key, folder) => {
+                    // Queued before the manager awaits the plan; it queues the revocation, which so runs right after the
+                    // manager's check of this plan, before anything else of the start.
+                    queueMicrotask(() => {
+                        queueMicrotask(() => {
+                            revoking ??= target.closeUnapproved({ agents: [], consents: [] });
+                        });
+                    });
+
+                    return scratch.plan({}, folder);
+                },
+            },
+        );
+        const started = messageOf(target.startSession("fake", "Fake", scratch.work));
+
+        await vi.waitFor(() => expect(revoking).toBeDefined());
+        await revoking;
+        await started;
+
+        // The check passed: the session was started, and the revocation behind it closed it.
+        expect(target.summaries()).toHaveLength(1);
+        expect(target.summaries().every((summary) => summary.status === "ended")).toBe(true);
+    });
+
+    it("starts no probe once the server's removal began while its plan was made", async () => {
+        const target = make(
+            {},
+            {
+                plan: (_key, folder) => {
+                    target.refuse();
+
+                    return scratch.plan({}, folder);
+                },
+            },
+        );
+
+        await expect(target.probe("fake")).rejects.toThrow("being removed");
+    });
+
+    it("removes the scratch folder of a probe plan it drops, on a retry and at the retry limit", async () => {
+        const made: string[] = [];
+        const target = make(
+            {},
+            {
+                plan: async () => {
+                    const cwd = await mkdtemp(path.join(scratch.dir, "probe-"));
+
+                    made.push(cwd);
+                    await target.closeUnapproved({ agents: [], consents: [] });
+
+                    return { args: [], command: "neore-no-such-agent", cwd, env: { PATH: "/nonexistent" }, scratch: true, secretNames: [] };
+                },
+            },
+        );
+
+        await expect(target.startSession("fake", "Fake", scratch.work)).rejects.toThrow("approvals changed");
+        expect(made).toHaveLength(4);
+        expect(made.every((folder) => !existsSync(folder))).toBe(true);
+    });
+
+    it("is not held up by updates of other agents or of this one's unrelated settings during a slow plan", async () => {
+        const calls: number[] = [];
+        const cwd = scratch.dir;
+        const unrelated = { agents: [{ args: [], command: "other", envNames: [], install: null, key: "other", label: "Other" }], consents: [] };
+        const mine = { args: [], command: "fake", envNames: [], install: null, key: "fake", label: "Fake" };
+        const target = make(
+            {},
+            {
+                plan: async () => {
+                    calls.push(calls.length);
+
+                    if (calls.length === 1) {
+                        for (let index = 0; index < 4; index += 1) {
+                            // eslint-disable-next-line no-await-in-loop -- the updates arrive one after another
+                            await target.closeUnapproved({ agents: [...unrelated.agents, { ...mine, envNames: [`V${String(index)}`], label: `Fake ${String(index)}` }], consents: [] });
+                        }
+                    }
+
+                    return { args: [], command: "neore-no-such-agent", cwd, env: { PATH: "/nonexistent" }, scratch: false, secretNames: [] };
+                },
+            },
+        );
+
+        // The agent is known before the slow plan starts.
+        await target.closeUnapproved({ agents: [...unrelated.agents, mine], consents: [] });
+        await expect(target.startSession("fake", "Fake", scratch.work)).rejects.toThrow(MISSING_COMMAND);
+        expect(calls).toHaveLength(1);
+    });
+
+    it("still sees a start in flight after another start of the same agent has finished", async () => {
+        const bad = { args: [], command: "neore-no-such-agent", cwd: scratch.dir, env: { PATH: "/nonexistent" }, scratch: false, secretNames: [] };
+        let released = false;
+        let calls = 0;
+        const target = make(
+            {},
+            {
+                plan: async () => {
+                    calls += 1;
+
+                    // The first start answers at once; the second waits.
+                    if (calls === 2) {
+                        await vi.waitFor(() => expect(released).toBe(true));
+                    }
+
+                    return bad;
+                },
+            },
+        );
+
+        const first = messageOf(target.startSession("fake", "Fake", scratch.work));
+        const second = messageOf(target.startSession("fake", "Fake", scratch.work));
+
+        await first;
+        // The agent is removed while the second start still waits for its plan.
+        await target.closeUnapproved({ agents: [], consents: [] });
+        released = true;
+
+        // Its plan is made again (a third call) rather than used as it came.
+        await second;
+        expect(calls).toBeGreaterThanOrEqual(3);
+    });
+
+    it("makes a plan again when the agent's variables were edited while it was made", async () => {
+        const bad = { args: [], command: "neore-no-such-agent", cwd: scratch.dir, env: { PATH: "/nonexistent" }, scratch: false, secretNames: [] };
+        let calls = 0;
+        const target = make(
+            {},
+            {
+                plan: async () => {
+                    calls += 1;
+
+                    if (calls === 1) {
+                        // A value is replaced (or removed) while the first plan is being made.
+                        target.environmentChanged("fake");
+                    }
+
+                    return bad;
+                },
+            },
+        );
+
+        await expect(target.startSession("fake", "Fake", scratch.work)).rejects.toThrow(MISSING_COMMAND);
+        expect(calls).toBe(2);
+    });
+
+    it("leaves a plan of another agent alone when only this agent's variables changed", async () => {
+        const bad = { args: [], command: "neore-no-such-agent", cwd: scratch.dir, env: { PATH: "/nonexistent" }, scratch: false, secretNames: [] };
+        let calls = 0;
+        const target = make(
+            {},
+            {
+                plan: async () => {
+                    calls += 1;
+                    target.environmentChanged("someone-else");
+
+                    return bad;
+                },
+            },
+        );
+
+        await expect(target.startSession("fake", "Fake", scratch.work)).rejects.toThrow(MISSING_COMMAND);
+        expect(calls).toBe(1);
     });
 });

@@ -4,8 +4,11 @@ import { useMemo } from "react";
 
 import type { ContrastId } from "@/features/appearance/lib/display-preferences";
 import { DEFAULT_CONTRAST, DEFAULT_DENSITY, DEFAULT_MAIN_FONT, isContrastId, isDensityId, isMainFontId } from "@/features/appearance/lib/display-preferences";
+import type { ExplicitAppearance } from "@/features/appearance/lib/native-appearance";
+import { SYSTEM_ACCENT } from "@/features/appearance/lib/native-appearance";
+import { useAuthSession } from "@/features/auth/hooks/use-auth-session";
 import { useUpdateUserSettings, useUserSettings } from "@/features/auth/hooks/use-user-settings";
-import { useAuth } from "@/features/auth/lib/auth-ui-provider";
+import { readChatOpenPlace } from "@/features/chat/split/chat-open-place";
 
 import type { AppearanceSettings, KeyboardShortcuts, LayoutState, SearchState, SidebarStateValue, UserPreferences } from "../stores/ui-state-store";
 import { useUIStateStore } from "../stores/ui-state-store";
@@ -149,17 +152,22 @@ export const useAppearanceSettings = (): AppearanceSettingsHookReturn => {
     const appearance = useUIStateStore((state) => state.appearance);
     const resetAppearance = useUIStateStore((state) => state.resetAppearance);
     const setAppearance = useUIStateStore((state) => state.setAppearance);
-    const { hooks } = useAuth();
-    const { data: sessionData } = hooks.useSession();
+    const { data: sessionData } = useAuthSession();
     const userId = sessionData?.user?.id;
     const updateUserSettingsMutation = useUpdateUserSettings();
 
-    const update = (changes: Partial<AppearanceSettings>) => {
-        setAppearance(changes);
+    const update = (changes: Omit<Partial<AppearanceSettings>, "explicit">, explicit?: keyof ExplicitAppearance) => {
+        // `explicit` is local bookkeeping: it marks a value the user picked, so the desktop shell's defaults step aside.
+        // The store merges the mark into its latest state, so a second choice before a re-render keeps the first one's.
+        setAppearance(explicit === undefined ? changes : { ...changes, explicit: { [explicit]: true } });
 
-        if (userId) {
+        // `system` is a per-device choice the server's validator does not know.
+        const { accentColor, ...synced } = changes;
+        const serverChanges = accentColor === undefined || accentColor === SYSTEM_ACCENT ? synced : { ...synced, accentColor };
+
+        if (userId && Object.keys(serverChanges).length > 0) {
             // Local state already changed; a failed save only loses the cross-device copy.
-            updateUserSettingsMutation.mutate(changes);
+            updateUserSettingsMutation.mutate(serverChanges);
         }
     };
 
@@ -170,13 +178,13 @@ export const useAppearanceSettings = (): AppearanceSettingsHookReturn => {
         density: isDensityId(appearance.density) ? appearance.density : DEFAULT_DENSITY,
         mainFont: isMainFontId(appearance.mainFont) ? appearance.mainFont : DEFAULT_MAIN_FONT,
         resetAppearance,
-        setAccentColor: (accentColor: AppearanceSettings["accentColor"]) => update({ accentColor }),
+        setAccentColor: (accentColor: AppearanceSettings["accentColor"]) => update({ accentColor }, "accentColor"),
         setCapLongCodeBlocks: (capLongCodeBlocks: boolean) => update({ capLongCodeBlocks }),
         setCodeHighlightTheme: (codeHighlightTheme: AppearanceSettings["codeHighlightTheme"]) => update({ codeHighlightTheme }),
         setCodeLineNumbers: (codeLineNumbers: boolean) => update({ codeLineNumbers }),
         setContrast: (contrast: ContrastId) => update({ contrast }),
         setDensity: (density: AppearanceSettings["density"]) => update({ density }),
-        setMainFont: (mainFont: AppearanceSettings["mainFont"]) => update({ mainFont }),
+        setMainFont: (mainFont: AppearanceSettings["mainFont"]) => update({ mainFont }, "mainFont"),
         setMermaidTheme: (mermaidTheme: AppearanceSettings["mermaidTheme"]) => update({ mermaidTheme }),
     };
 };
@@ -253,7 +261,7 @@ export const useLayoutState = (): LayoutStateHookReturn => {
     };
 };
 
-const SEND_BEHAVIORS = new Set<UserPreferences["sendBehavior"]>(["button", "enter", "shiftEnter"]);
+const SEND_BEHAVIORS = new Set<UserPreferences["sendBehavior"]>(["button", "enter", "modEnter", "shiftEnter"]);
 
 const isSendBehavior = (value: unknown): value is UserPreferences["sendBehavior"] => SEND_BEHAVIORS.has(value as UserPreferences["sendBehavior"]);
 
@@ -263,8 +271,7 @@ export const useUserPreferences = (): UserPreferencesHookReturn => {
     const resetUserPreferences = useUIStateStore((state) => state.resetUserPreferences);
     const setUserPreferencesAction = useUIStateStore((state) => state.setUserPreferences);
 
-    const { hooks } = useAuth();
-    const { data: sessionData } = hooks.useSession();
+    const { data: sessionData } = useAuthSession();
     const userId = sessionData?.user?.id;
     const { data: userSettings } = useUserSettings();
     const updateUserSettingsMutation = useUpdateUserSettings();
@@ -286,6 +293,7 @@ export const useUserPreferences = (): UserPreferencesHookReturn => {
             showTimestamps: uiPreferences.showTimestamps,
             soundEffects: uiPreferences.soundEffects,
             splitViewEnabled: uiPreferences.splitViewEnabled === true,
+            subAgentOpenPlace: readChatOpenPlace(uiPreferences.subAgentOpenPlace),
         };
     }, [uiPreferences, userSettings]);
 
@@ -341,6 +349,10 @@ export const useUserPreferences = (): UserPreferencesHookReturn => {
 
             if ("splitViewEnabled" in prefs) {
                 clientSide.splitViewEnabled = prefs.splitViewEnabled;
+            }
+
+            if ("subAgentOpenPlace" in prefs) {
+                clientSide.subAgentOpenPlace = prefs.subAgentOpenPlace;
             }
 
             if ("hidePersonalInfo" in prefs) {

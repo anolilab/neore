@@ -37,8 +37,9 @@ import {
 } from "lucide-react";
 import type { FC, ReactNode } from "react";
 import { memo, useCallback, useState } from "react";
+import { toast } from "sonner";
 
-import { useChatActions, useChatThread } from "@/features/chat/core/context/chat-context";
+import { useChatActions, useChatThreadIdentity } from "@/features/chat/core/context/chat-context";
 import { useThreadManager } from "@/features/chat/core/hooks/use-thread-manager";
 import { isValidThreadId } from "@/features/chat/core/hooks/use-validated-thread";
 import { useChatUIStore, useMessageInteractionState } from "@/features/chat/core/stores/chat-ui-store";
@@ -267,10 +268,9 @@ const MessageTimestamp: FC<{ message: UIMessage }> = ({ message }) => {
  * Uses MessageActions and MessageAction from AI elements
  */
 const DefaultActionBar: FC<ActionBarProps> = memo(({ isCopied, isHovered, isStreaming, message, messageIndex, onCopy, onCopyPlain, onEdit, onReload }) => {
-    const { model: currentModel, threadId } = useChatThread();
+    const { model: currentModel, threadId } = useChatThreadIdentity();
     const models = useFeatureFlaggedModels();
     const crpc = useCRPC();
-    const setActiveRightSidebarTab = useChatUIStore((state) => state.setActiveRightSidebarTab);
     const { createBranch } = useThreadManager(true);
     const [isForkDialogOpen, setIsForkDialogOpen] = useState(false);
     const { mutate: createPin } = useMutation(crpc.chat.pins.functions.createPin.mutationOptions());
@@ -331,8 +331,8 @@ const DefaultActionBar: FC<ActionBarProps> = memo(({ isCopied, isHovered, isStre
             {
                 onError: (error) => showError(error as Error),
                 onSuccess: () => {
-                    trackEvent("message_pinned", { has_note: false });
-                    setActiveRightSidebarTab("pins");
+                    trackEvent("message_pinned", { has_note: false, kind: "message" });
+                    useChatUIStore.getState().setActiveRightSidebarTab("pins");
                 },
             },
         );
@@ -494,9 +494,6 @@ const MessageItem: FC<MessageItemProps> = memo(
         // Actions
         const { copyMessage, reloadMessage } = useChatActions();
 
-        // Edit state - use separate selectors to avoid creating new objects
-        const startEditing = useChatUIStore((state) => state.startEditing);
-
         const messageIsStreaming = isStreaming || message.status === "streaming";
 
         // Handlers
@@ -518,13 +515,23 @@ const MessageItem: FC<MessageItemProps> = memo(
             copyMessage(message.id, "plain");
         }, [copyMessage, message.id]);
 
-        const handleReload = useCallback(() => {
-            reloadMessage(message.id);
-        }, [reloadMessage, message.id]);
+        const { t } = useLingui();
+
+        const handleReload = useCallback(async () => {
+            const started = await reloadMessage(message.id);
+
+            // The prompt is on a page that is not loaded: say so, rather than doing nothing.
+            if (started === false) {
+                toast.error(t`Load the earlier messages, then try again: this reply's prompt is not loaded.`);
+            } else if (started === "model-unavailable") {
+                // A local reply is not sent to another model: the viewer selects the model that wrote it.
+                toast.error(t`Select the model that wrote this reply to continue it.`);
+            }
+        }, [reloadMessage, message.id, t]);
 
         const handleEdit = useCallback(() => {
-            startEditing(message.id, message.role === "user" ? getVisibleUserText(message) : message.text);
-        }, [startEditing, message]);
+            useChatUIStore.getState().startEditing(message.id, message.role === "user" ? getVisibleUserText(message) : message.text);
+        }, [message]);
 
         // Render content
         const content = (
@@ -532,6 +539,13 @@ const MessageItem: FC<MessageItemProps> = memo(
                 {message.role !== "system" && <MessageSelectCheckbox disabled={messageIsStreaming || message.status === "pending"} message={message} />}
                 <MessageContent isStreaming={messageIsStreaming} message={message} />
                 {message.role === "assistant" && message.hostChanges && <HostChangesOfThread changes={message.hostChanges} messageId={message.id} />}
+                {/* A failed last local reply can be asked again: the same prompt, saved as a sibling reply. A gateway failure keeps its own Retry. */}
+                {message.role === "assistant" && message.status === "failed" && isLast && message.localReply === true && (
+                    <Button className="mb-2 min-h-11 gap-1.5" onClick={handleReload} size="default" variant="outline">
+                        <RefreshCwIcon aria-hidden="true" className="size-4" />
+                        <Trans>Continue</Trans>
+                    </Button>
+                )}
             </>
         );
 

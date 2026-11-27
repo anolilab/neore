@@ -13,14 +13,17 @@ import { LunoraError, v } from "lunorash/server";
 
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
-import { internalMutation } from "../_generated/server";
+import { internalMutation, internalQuery } from "../_generated/server";
 import { addMessagesHandler } from "../agent/messages";
 import { insertThread } from "../agent/table-writes";
 import { isValidBranchName } from "../coding-agents/commands";
+import { callerRestrictsFull, ownerNewChatMode } from "../chat/lib/new-chat-mode";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { isThreadLocked, LOCKED_THREAD_TITLE } from "../lib/thread-lock";
 import { MAX_LENGTH } from "../lib/validators";
 import { GITHUB_WEB_ORIGIN, splitGithubRepo } from "./drivers/github";
+import { rereadRelinkedLink, scheduleArchiveAfterClose } from "./pr-state";
+import { MERGE_TIME_PRECISION_MS, noteMergeAttemptRow, pullRequestLinksOf, setThreadMergeOwed, settleMergedLinkRow, someLinkOfThread } from "./pr-thread-links";
 
 /** Threads kept per pull request: a list, not a history. The newest are the ones anyone is working in. */
 export const MAX_THREADS_PER_PULL_REQUEST = 50;
@@ -39,6 +42,7 @@ export const vPullRequestThread = v.object({
     kind: v.union(v.literal("attached"), v.literal("linked"), v.literal("opened")),
     number: v.number(),
     repository: v.string(),
+    statusReadAt: v.optional(v.number()),
     threadId: v.string(),
     title: v.string(),
     url: v.string(),
@@ -67,6 +71,7 @@ export const toOutput = (row: PullRequestThread, thread?: Pick<Doc<"threads">, "
         kind: row.kind,
         number: row.number,
         repository: row.repository,
+        ...(row.statusReadAt !== undefined && { statusReadAt: row.statusReadAt }),
         threadId: row.threadId,
         title: shownTitle(row, thread),
         url: row.url,
@@ -160,6 +165,7 @@ export const startWorkOnPullRequest = authMutation
         }
 
         if (attached) {
+            await rereadRelinkedLink(ctx, attached);
             ctx.log.event("source_control.start_work_on_pull_request", { clearedDeadLinks: deadAttached.length, created: false });
 
             return { created: false, threadId: attached.threadId };
@@ -168,9 +174,12 @@ export const startWorkOnPullRequest = authMutation
         const title = `Work on ${address.repository}#${String(address.number)}`.slice(0, MAX_TITLE_CHARS);
         const url = pullRequestUrl(address.repository, address.number);
         const { now } = ctx;
+        // A new chat starts in the owner's default mode (`ownerNewChatMode`), read before the thread is written.
+        const permissionMode = await ownerNewChatMode(ctx, userId, () => callerRestrictsFull(ctx));
         const threadId = await insertThread(ctx.db, {
             createdBy: userId,
             mode: "text",
+            ...(permissionMode && { permissionMode }),
             status: "active",
             tags: ["chat", "develop"],
             title,
@@ -315,4 +324,246 @@ export const recordOpenedPullRequest = internalMutation
         });
 
         return { created: true, threadId: args.threadId };
+    });
+
+/** A link stamped this recently is not rewritten by a repeat view: it already sits at the back of the rotation. */
+const STATUS_STAMP_WINDOW_MS = 5 * 60 * 1000;
+
+/**
+ * Stamps the links to one pull request as read from the host, now. The chat header reads the least recently read links
+ * first, so every link is reached over the views of its chat. The address is canonical (the caller canonicalizes it).
+ */
+export const recordStatusRead = internalMutation
+    .input({
+        number: v.number(),
+        /** When the host was asked: a link created after it was not part of that read, so it is not stamped. */
+        readStartedAt: v.optional(v.number()),
+        repository: v.string().max(MAX_LENGTH.short),
+        threadId: v.string().max(MAX_LENGTH.id),
+        userId: v.string().max(MAX_LENGTH.id),
+    })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        // Only the viewing chat's own links are stamped, so they are read through that chat's index, paged, and the pull
+        // request's other links are never touched.
+        await someLinkOfThread(ctx, args.userId, args.threadId as Id<"threads">, async (link) => {
+            if (link.repository !== args.repository || link.number !== args.number) {
+                return false;
+            }
+
+            // A row stamped inside the window already sits at the back of the rotation: a repeat view does not rewrite it.
+            const stampedRecently = link.statusReadAt !== undefined && ctx.now - link.statusReadAt < STATUS_STAMP_WINDOW_MS;
+
+            // A link made after the host was asked was not part of its answer, so it is not marked as read.
+            const madeAfterRead = args.readStartedAt !== undefined && link.createdAt > args.readStartedAt;
+
+            if (!stampedRecently && !madeAfterRead) {
+                await ctx.db.patch("pullRequestThreads", link._id, { statusReadAt: ctx.now });
+            }
+
+            return false;
+        });
+
+        return null;
+    });
+
+/**
+ * Notes that an owed link's archive attempt failed before it could answer, so the next read's batch reaches the other owed
+ * chats first. Internal: the caller runs it after the attempt's own transaction rolled back, so only the stamp is written.
+ */
+export const noteMergeAttempt = internalMutation
+    .input({ linkId: v.id("pullRequestThreads") })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        await noteMergeAttemptRow(ctx, args.linkId, ctx.now);
+
+        return null;
+    });
+
+/**
+ * The owner's links to a pull request read merged, when the host says so without a merge time. The state is all it writes: no merge is
+ * recorded, so nothing archives for it. Internal: called by the status read for the owner only.
+ */
+export const noteLinksMerged = internalMutation
+    .input({ number: v.number(), repository: v.string().max(MAX_LENGTH.short), userId: v.string().max(MAX_LENGTH.id) })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        const links = await pullRequestLinksOf(ctx, args.userId, args.repository, args.number);
+
+        for (const link of links) {
+            if (link.state === "merged") {
+                continue;
+            }
+
+            await ctx.db.patch("pullRequestThreads", link._id, { state: "merged" });
+            // A link that just became closed or merged may let an idle chat archive, so its archive job runs now (as recordLinkState does).
+            await scheduleArchiveAfterClose(ctx, link);
+        }
+
+        return null;
+    });
+
+/** Whether the owner's merged-chat archiving is on, so a merge can be ordered against its opt-in: the merge action reads the host's time only then. */
+export const mergedArchiveOn = internalQuery
+    .input({ userId: v.string().max(MAX_LENGTH.id) })
+    .output(v.boolean())
+    .query(async ({ args, ctx }) => {
+        const settings = await ctx.db
+            .query("userSettings")
+            .withIndex("by_userId", (q) => q.eq("userId", args.userId))
+            .unique();
+
+        return settings?.autoArchiveMergedChats === true && settings.autoArchiveMergedChatsSince !== undefined;
+    });
+
+/** A link that still owes an archive attempt for a merge. */
+interface OwedLink {
+    lastAttemptAt: number;
+    linkId: Id<"pullRequestThreads">;
+    threadId: Id<"threads">;
+}
+
+/** Links marked per recording page: each page is one bounded mutation, so a pull request's whole link history is never one transaction. */
+const RECORD_PAGE_LINKS = 100;
+
+const mergeArgsFields = {
+    /** The merge's lower-bound time: the setting's opt-in is compared with it. */
+    mergedAt: v.optional(v.number()),
+    /** The merge's upper-bound time: a link created at or after it was not part of the merge. Absent: `mergedAt` plus a second. */
+    mergedBefore: v.optional(v.number()),
+    /** False when `mergedBefore` is not the host's bound (the host gave no merge time): it orders the links, but it is not stored. */
+    mergedBeforeIsHostBound: v.optional(v.boolean()),
+    number: v.number(),
+    /** When the recording walk first saw the merge. The merge came before that, so this bounds it from above on every page of the walk. */
+    recordedAt: v.optional(v.number()),
+    repository: v.string().max(MAX_LENGTH.short),
+    userId: v.string().max(MAX_LENGTH.id),
+};
+
+/** The merge's times and the owner's setting, read once per recording mutation. */
+interface MergeMark {
+    mergedAt: number;
+    mergedBefore: number;
+    recordedAt: number;
+    settingOn: boolean;
+    since: number | undefined;
+    storeBound: boolean;
+}
+
+const mergeMarkOf = async (
+    ctx: MutationCtx,
+    args: { mergedAt?: number; mergedBefore?: number; mergedBeforeIsHostBound?: boolean; recordedAt?: number; userId: string },
+): Promise<MergeMark> => {
+    const mergedAt = args.mergedAt ?? ctx.now;
+    const mergedBefore = args.mergedBefore ?? mergedAt + MERGE_TIME_PRECISION_MS;
+    const settings = await ctx.db
+        .query("userSettings")
+        .withIndex("by_userId", (q) => q.eq("userId", args.userId))
+        .unique();
+    const since = settings?.autoArchiveMergedChatsSince;
+
+    return {
+        mergedAt,
+        mergedBefore,
+        recordedAt: args.recordedAt ?? ctx.now,
+        // A merge owes an archive only when the setting is on and the merge came after the owner turned it on.
+        settingOn: settings?.autoArchiveMergedChats === true && since !== undefined,
+        since,
+        // The bound is stored only when the host gave the merge time: a bound made from the request time says nothing about when the
+        // merge happened, so the reopen guard must not decline on it.
+        storeBound: args.mergedBeforeIsHostBound !== false,
+    };
+};
+
+/**
+ * Marks one link as merged, once, and settles it when no archive is owed. Returns the link when it still owes an archive attempt.
+ */
+const markLinkMerged = async (ctx: MutationCtx, link: Doc<"pullRequestThreads">, merge: MergeMark): Promise<OwedLink | undefined> => {
+    if (link.mergedAt === undefined) {
+        if (link.createdAt >= merge.mergedBefore) {
+            // Made after the merge, so it owes no archive; the host's merge still holds for its pull request, so its state says merged
+            // and it does not keep another chat open (`pr-state.ts`).
+            if (link.state !== "merged") {
+                await ctx.db.patch("pullRequestThreads", link._id, { state: "merged" });
+            }
+
+            return undefined;
+        }
+
+        await ctx.db.patch("pullRequestThreads", link._id, {
+            mergedAt: merge.mergedAt,
+            mergeRecordedAt: merge.recordedAt,
+            state: "merged",
+            ...(merge.storeBound && { mergedBefore: merge.mergedBefore }),
+        });
+    } else {
+        // A link marked earlier keeps its merge time. A relink may have reset its state to open, but the host's merge still holds.
+        if (link.state !== "merged") {
+            await ctx.db.patch("pullRequestThreads", link._id, { state: "merged" });
+        }
+
+        if (link.mergeSettledAt !== undefined) {
+            return undefined;
+        }
+    }
+
+    // Judged on the link's own merge time, once stored: a later read with a less precise time cannot retract a merge that already
+    // proved it came after the opt-in. With the setting off (or the merge before the opt-in), the link settles here.
+    const eligibleAt = link.mergedAt ?? merge.mergedAt;
+
+    if (!merge.settingOn || merge.since === undefined || eligibleAt < merge.since) {
+        await settleMergedLinkRow(ctx, link._id, ctx.now);
+
+        return undefined;
+    }
+
+    // The chat now owes an archive attempt: flagged before the link is returned, so the sweep reads this chat's links for it.
+    await setThreadMergeOwed(ctx, link.threadId, true);
+
+    return { lastAttemptAt: link.mergeAttemptedAt ?? 0, linkId: link._id, threadId: link.threadId };
+};
+
+/**
+ * Records that a pull request was seen merged, one bounded page of its links per call. Internal: the merge action and the status
+ * read call it page by page, passing the cursor back, and archive the chats each page owes (see `source-control/pr-merged.ts`).
+ * A page's owed links are least recently attempted first; across pages the caller keeps its own order.
+ */
+export const recordPullRequestMergedPage = internalMutation
+    .input({
+        ...mergeArgsFields,
+        cursor: v.optional(v.union(v.string(), v.null())),
+    })
+    .output(
+        v.object({
+            continueCursor: v.union(v.string(), v.null()),
+            isDone: v.boolean(),
+            owed: v.array(v.object({ lastAttemptAt: v.number(), linkId: v.id("pullRequestThreads"), threadId: v.id("threads") })),
+        }),
+    )
+    .mutation(async ({ args, ctx }) => {
+        const merge = await mergeMarkOf(ctx, args);
+        const page = await ctx.db
+            .query("pullRequestThreads")
+            .withIndex("by_user_and_repository_number", (q) => q.eq("userId", args.userId).eq("repository", args.repository).eq("number", args.number))
+            .paginate({ cursor: args.cursor ?? null, numItems: RECORD_PAGE_LINKS });
+        const owed: OwedLink[] = [];
+
+        for (const link of page.page) {
+            const entry = await markLinkMerged(ctx, link, merge);
+
+            if (entry !== undefined) {
+                owed.push(entry);
+            }
+        }
+
+        // Least recently attempted first. The caller orders the owed links of every page together.
+        owed.sort((a, b) => a.lastAttemptAt - b.lastAttemptAt);
+
+        return {
+            continueCursor: page.continueCursor,
+            isDone: page.isDone,
+            owed: owed.map((link) => {
+                return { lastAttemptAt: link.lastAttemptAt, linkId: link.linkId, threadId: link.threadId };
+            }),
+        };
     });

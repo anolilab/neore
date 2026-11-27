@@ -11,6 +11,7 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { registeredApi, registerModule } from "../../test/registered-api";
 
 import schema from "../schema";
+import { markRunAwaiting } from "../sub-agents/functions";
 import { internal } from "../_generated/internal";
 import { continueAfterToolApproval, settleSubAgentRun } from "./execute";
 import { noteGoalPaused } from "./goals/execute";
@@ -240,8 +241,10 @@ describe("a sub-agent child's continuation", () => {
         pausedAgainAt?: number;
         /** The owner was asked a question in the child thread while the continuation ran. */
         questionMeanwhile?: boolean;
-        resumed?: { awaitingInput?: "approval"; paused: boolean; stopped: boolean };
+        resumed?: { awaitingInput?: "approval"; paused: boolean; stopped: boolean; subAgentWaits?: boolean };
         status?: "cancelled";
+        /** Records the run's status at the moment the continuation closes its stream (`failRun`). */
+        watchClose?: boolean;
     }) => {
         const harness = lunoraTest(schema as never);
 
@@ -293,6 +296,18 @@ describe("a sub-agent child's continuation", () => {
                 });
             }
 
+            let statusWhenClosed: string | undefined;
+
+            if (options.watchClose) {
+                vi.mocked(failRun).mockImplementationOnce(async () => {
+                    const row = await harness.run(async (ctx: any) => await ctx.db.get("subAgentRuns", runId));
+
+                    statusWhenClosed = row.status;
+
+                    return { replaced: false };
+                });
+            }
+
             if (options.failAfterSettling) {
                 vi.mocked(noteGoalPaused).mockRejectedValueOnce(new Error("goal write failed"));
             }
@@ -306,13 +321,24 @@ describe("a sub-agent child's continuation", () => {
             } else if (options.resumed) {
                 const { resumed } = options;
 
-                vi.mocked(resumeApprovedRun).mockImplementationOnce(async () => {
+                vi.mocked(resumeApprovedRun).mockImplementationOnce(async (_ctx, _args, runOptions) => {
                     if (options.questionMeanwhile) {
                         await harness.run(async (ctx: any) => await ctx.db.patch("threads", ids.threadId as never, { awaitingInput: "question" }));
                     }
 
                     if (options.newerResume && options.pausedAgainAt !== undefined) {
                         await harness.run(async (ctx: any) => await ctx.db.patch("subAgentRuns", runId, { reapAt: (options.pausedAgainAt ?? 0) + 1 }));
+                    }
+
+                    // A pause again settles where its requests are recorded (`recordPendingToolApprovals`), bound to the resume it
+                    // ran under; the mocked run does that write as the real one would, unless the test names its answer.
+                    if (resumed.paused && resumed.subAgentWaits === undefined) {
+                        const subAgentWaits = await harness.run(
+                            async (ctx: any) =>
+                                await markRunAwaiting(ctx, runId, (runOptions as { subAgentResumedWith?: number } | undefined)?.subAgentResumedWith),
+                        );
+
+                        return { lastMessageId: undefined, ...resumed, subAgentWaits };
                     }
 
                     return { lastMessageId: undefined, ...resumed };
@@ -340,6 +366,7 @@ describe("a sub-agent child's continuation", () => {
                     ...row,
                     childAwaitingInput: child?.awaitingInput,
                     openRequests: approvals.filter((approval: { status: string }) => approval.status === "pending").length,
+                    statusWhenClosed,
                 };
             });
         } finally {
@@ -355,6 +382,10 @@ describe("a sub-agent child's continuation", () => {
         });
     });
 
+    it("closes a locked child's stream before ending its run, so the run's end does not stop it first", async () => {
+        expect(await resumeChild({ lockedAt: Date.now() + 60_000, watchClose: true })).toMatchObject({ status: "failed", statusWhenClosed: "running" });
+    });
+
     it("runs nothing for a run stopped or reaped between the answer and the job's start", async () => {
         expect(await resumeChild({ status: "cancelled" })).toMatchObject({ status: "cancelled" });
         expect(resumeApprovedRun).not.toHaveBeenCalled();
@@ -364,7 +395,19 @@ describe("a sub-agent child's continuation", () => {
         const pausedAgain = { pausedAgainAt: Date.now() + 60 * 60_000, resumed: { paused: true, stopped: false } };
 
         expect(await resumeChild(pausedAgain)).toMatchObject({ status: "awaiting" });
+        // The pause is recorded bound to that resume (`recordPendingToolApprovals` settles it there).
+        expect(vi.mocked(resumeApprovedRun).mock.calls.at(-1)?.[2]).toMatchObject({ subAgentResumedWith: pausedAgain.pausedAgainAt });
         expect(await resumeChild({ ...pausedAgain, newerResume: true })).toMatchObject({ status: "running" });
+    });
+
+    it("takes a pause again as settled where it was recorded, and does not wait when that refused it", async () => {
+        // The run could still wait here: only the recorded answer keeps the continuation from settling it a second time.
+        expect(
+            await resumeChild({
+                pausedAgainAt: Date.now() + 60 * 60_000,
+                resumed: { awaitingInput: "approval", paused: true, stopped: false, subAgentWaits: false },
+            }),
+        ).toMatchObject({ childAwaitingInput: undefined, status: "running" });
     });
 
     it("leaves a run that waits again waiting, with its request open, when a later step of the continuation fails", async () => {
@@ -395,15 +438,10 @@ describe("a sub-agent child's continuation", () => {
         ).toMatchObject({ childAwaitingInput: "question", status: "awaiting" });
     });
 
-    it("hands a pause back to the run's wait, and schedules an end whose write failed", async () => {
+    it("schedules an end whose write failed, bound to the resume it ran under", async () => {
         const runId = "run-1" as never;
         // The deadline the resume this continuation runs under set: every write, and its retry, is bound to it.
         const resumedWith = 42;
-        const paused = { runMutation: vi.fn(async () => true), scheduler: { runAfter: vi.fn(async () => "job") } };
-
-        expect(await settleSubAgentRun(paused as never, runId, { kind: "paused" }, resumedWith)).toBe(true);
-        expect(paused.runMutation).toHaveBeenCalledWith(internal.sub_agents.functions.awaitApproval, { resumedWith, runId });
-
         const failing = {
             runMutation: vi.fn(async () => {
                 throw new Error("write failed");
@@ -412,10 +450,9 @@ describe("a sub-agent child's continuation", () => {
         };
         const completion = { messageIds: ["m1"], outcome: { kind: "succeeded" }, resumedWith, runId };
 
-        expect(await settleSubAgentRun(failing as never, runId, { kind: "succeeded", messageIds: ["m1"] }, resumedWith)).toBe(false);
+        await settleSubAgentRun(failing as never, runId, { kind: "succeeded", messageIds: ["m1"] }, resumedWith);
+
         expect(failing.runMutation).toHaveBeenCalledWith(internal.sub_agents.functions.completeResumedRun, completion);
         expect(failing.scheduler.runAfter).toHaveBeenCalledWith(expect.any(Number), internal.sub_agents.functions.completeResumedRun, completion);
-        expect(await settleSubAgentRun(failing as never, runId, { kind: "paused" }, resumedWith)).toBe(true);
-        expect(failing.scheduler.runAfter).toHaveBeenCalledWith(expect.any(Number), internal.sub_agents.functions.awaitApproval, { resumedWith, runId });
     });
 });

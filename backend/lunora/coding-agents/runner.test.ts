@@ -13,6 +13,7 @@ import {
     PATCH_PATH,
     PR_SCRIPT_PATH,
     PROMPT_PATH,
+    READ_CHUNK_BYTES,
     RUN_SCRIPT_PATH,
 } from "./commands";
 import { expandSecrets } from "./redact";
@@ -25,15 +26,18 @@ import {
     pollRun,
     pullRequestApiFromDriver,
     pullRequestProblem,
+    readSetupLogTail,
     startPullRequest,
     startRun,
 } from "./runner";
-import { fakeKey } from "./test-fixtures";
+import { fakeKey, fakeShapedKey } from "./test-fixtures";
 
 const PROVIDER_KEY = fakeKey("anthropic");
 const GITHUB_TOKEN = fakeKey("github");
 const BASE_SHA = "0123456789abcdef0123456789abcdef01234567";
 const ADAPTER_ERROR = /adapter/u;
+const TAIL_BYTES = /tail -c (\d+)/u;
+const BOUNDED_TAIL = /^tail -c \d+ /u;
 
 interface FakeSandbox extends SandboxHandle {
     calls: { command: string; options: RunCommandOptions }[];
@@ -247,6 +251,66 @@ describe("pollRun", () => {
 
         expect(result.status).toEqual({ exitCode: 0, kind: "agent" });
         expect(result.text).toBe("last words");
+    });
+});
+
+describe("readSetupLogTail", () => {
+    const secrets = expandSecrets([PROVIDER_KEY]);
+    // Setup output longer than two poll chunks, with the failure and a key at its very end.
+    const log = `${"setup output line\n".repeat(Math.ceil((READ_CHUNK_BYTES * 2) / "setup output line\n".length))}npm ERR! missing script ${PROVIDER_KEY}\n`;
+    // What `tail -c N` prints: the last N bytes of the log.
+    const tailOf = (command: string): CommandOutcome => {
+        const bytes = Number(TAIL_BYTES.exec(command)?.[1]);
+
+        return ok(log.slice(-bytes));
+    };
+
+    it("a poll alone stops short of a failure at the end of a long log", async () => {
+        // The poll reads one chunk from its offset, so the failure lies past what it returns.
+        const first = await pollRun(
+            fakeSandbox(() => pollOutput("setup-failed:repo-setup", log.slice(0, READ_CHUNK_BYTES))),
+            {
+                agent: "claude_code",
+                offset: 0,
+                secrets,
+            },
+        );
+
+        expect(first.text).not.toContain("npm ERR!");
+    });
+
+    it("reads the end of the sandbox's own log, redacted", async () => {
+        const tail = await readSetupLogTail(fakeSandbox(tailOf), secrets);
+
+        expect(tail).toContain("npm ERR! missing script [REDACTED]\n");
+        expect(tail).not.toContain(PROVIDER_KEY);
+    });
+
+    it("redacts a key the run was not given, by its shape, when the stored key changed mid-run", async () => {
+        // `secrets` holds only the key now stored; the setup script printed the key the run started with.
+        const oldKey = fakeShapedKey("anthropic-shaped");
+        const tail = await readSetupLogTail(
+            fakeSandbox(() => ok(`npm ERR! using key ${oldKey}\n`)),
+            secrets,
+        );
+
+        expect(tail).toBe("npm ERR! using key [REDACTED]\n");
+    });
+
+    it("rejects a tail that exits nonzero, so the caller keeps the poll's log instead of an empty one", async () => {
+        const failed = (): CommandOutcome => {
+            return { exitCode: 1, stderr: "", stdout: "" };
+        };
+
+        await expect(readSetupLogTail(fakeSandbox(failed), secrets)).rejects.toThrow("exited with 1");
+    });
+
+    it("asks the sandbox for a bounded tail, not the whole log", async () => {
+        const sandbox = fakeSandbox(tailOf);
+
+        await readSetupLogTail(sandbox, secrets);
+
+        expect(sandbox.calls[0]?.command).toMatch(BOUNDED_TAIL);
     });
 });
 

@@ -14,6 +14,7 @@ import type { LanguageModelV3, LanguageModelV3CallOptions } from "@ai-sdk/provid
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { CUSTOM_PROVIDER_FORMATS } from "@neore/ai/gateway";
 import { isVisiblePart } from "@neore/ai/models";
+import type { ModelMessage } from "ai";
 import { z } from "zod";
 
 import type { AppEnv, HonoEnv } from "../../env.js";
@@ -24,6 +25,7 @@ import { deserializeFromWire, serializeForWire } from "../../lib/model-serializa
 import { readRateLimit } from "../../lib/retry-after.js";
 import { internalAuth } from "../../middleware/auth.js";
 import { MODEL_MAP } from "../../models.js";
+import { injectPromptCaching } from "../../providers/adapters/prompt-cache.js";
 import { createProviderModelForEnv, resolveApiKey } from "../../providers/factory.js";
 import { ProviderHealthService } from "../../providers/health.js";
 import type { ModelPricing } from "../../providers/pricing.js";
@@ -224,6 +226,8 @@ modelProxyRouter.openapi(
 
         const usageTracker = new UsageTracker(c.env);
         const usageReporter = new UsageReporter(c.env);
+        // Set once the provider call is started: a cancel before that bills nothing, so only a cancel after it is estimated.
+        let isProviderStarted = false;
 
         let apiKey: string;
 
@@ -246,13 +250,25 @@ modelProxyRouter.openapi(
             // Deserialize call options (restores Uint8Array/URL from tagged JSON)
             const callOptions = deserializeFromWire(body.callOptions) as LanguageModelV3CallOptions;
 
+            // Backend chat calls arrive only here, so the cache breakpoint is placed on the
+            // prompt before the provider sees it. The adapter reads and writes the same message
+            // shape (role, content, providerOptions) that a V3 prompt uses.
+            const cachedPrompt = injectPromptCaching(callOptions.prompt as unknown as ModelMessage[], body.provider).messages;
+            const providerCallOptions: LanguageModelV3CallOptions = {
+                ...callOptions,
+                prompt: cachedPrompt as unknown as LanguageModelV3CallOptions["prompt"],
+            };
+
             if (body.action === "generate") {
                 // ── Non-streaming: doGenerate() ──────────────────────────
                 // Overlaps the model call; a rejection surfaces at the await below.
                 const pricingRead = policy.pricing();
 
                 pricingRead.catch(() => undefined);
-                const result = await model.doGenerate(callOptions);
+                // The caller's cancel (its request's signal) stops the provider call, so an abandoned call is not paid for to the end.
+                // A request already cancelled before this point never reaches the provider, so it is not counted as started.
+                isProviderStarted = !c.req.raw.signal.aborted;
+                const result = await model.doGenerate({ ...providerCallOptions, abortSignal: c.req.raw.signal });
                 const latencyMs = Date.now() - startTime;
 
                 // Extract usage and calculate cost
@@ -261,10 +277,15 @@ modelProxyRouter.openapi(
                 // `outputTokens.total` already includes reasoning (`calculateCost` subtracts it): do not add `reasoning` on top.
                 const completionTokens = usage?.outputTokens?.total ?? 0;
                 const cachedTokens = usage?.inputTokens?.cacheRead ?? 0;
+                const cacheWriteTokens = usage?.inputTokens?.cacheWrite ?? 0;
                 const reasoningTokens = usage?.outputTokens?.reasoning ?? 0;
 
-                const pricing = await pricingRead;
-                const costMicrodollars = pricing ? calculateCost(pricing, { cachedTokens, completionTokens, promptTokens, reasoningTokens }) : 0;
+                // A pricing read that fails after the call succeeded costs nothing here: the provider's usage is still recorded as returned.
+                // Read through the catch path, a failure would record the cancellation estimate instead of this call's actual usage.
+                const pricing = await pricingRead.catch(() => null);
+                const costMicrodollars = pricing
+                    ? calculateCost(pricing, { cachedTokens, cacheWriteTokens, completionTokens, promptTokens, reasoningTokens })
+                    : 0;
 
                 // Non-blocking usage tracking
                 c.executionCtx.waitUntil(
@@ -323,7 +344,7 @@ modelProxyRouter.openapi(
             const pricingRead = policy.pricing();
 
             pricingRead.catch(() => undefined);
-            const streamResult = await model.doStream(callOptions);
+            const streamResult = await model.doStream(providerCallOptions);
             let ttftMs: number | undefined;
             const execContext = c.executionCtx;
 
@@ -351,7 +372,9 @@ modelProxyRouter.openapi(
                         }
                     };
 
-                    let lastUsage: { cachedTokens: number; completionTokens: number; promptTokens: number; reasoningTokens: number } | undefined;
+                    let lastUsage:
+                        | { cachedTokens: number; cacheWriteTokens: number; completionTokens: number; promptTokens: number; reasoningTokens: number }
+                        | undefined;
                     let lastFinishReason: string | undefined;
                     let emittedChars = 0;
                     let reasoningChars = 0;
@@ -384,6 +407,7 @@ modelProxyRouter.openapi(
 
                                     lastUsage = {
                                         cachedTokens: usage?.inputTokens?.cacheRead ?? 0,
+                                        cacheWriteTokens: usage?.inputTokens?.cacheWrite ?? 0,
                                         completionTokens: usage?.outputTokens?.total ?? 0,
                                         promptTokens: usage?.inputTokens?.total ?? 0,
                                         reasoningTokens: usage?.outputTokens?.reasoning ?? 0,
@@ -441,7 +465,7 @@ modelProxyRouter.openapi(
                             lastUsage ??
                             (isEstimated
                                 ? estimateCancelledUsage({ emittedChars, promptChars: countPromptTextChars(callOptions.prompt), reasoningChars })
-                                : { cachedTokens: 0, completionTokens: 0, promptTokens: 0, reasoningTokens: 0 });
+                                : { cachedTokens: 0, cacheWriteTokens: 0, completionTokens: 0, promptTokens: 0, reasoningTokens: 0 });
 
                         const pricing = await pricingRead;
                         const costMicrodollars = pricing ? calculateCost(pricing, tokens) : 0;
@@ -530,7 +554,60 @@ modelProxyRouter.openapi(
                 status: 200,
             });
         } catch (error) {
-            c.executionCtx.waitUntil(policy.recordHealth.failure());
+            // A caller that cancelled ended the call itself: the provider did not fail, so the health tracker is not told it did.
+            if (isProviderStarted && c.req.raw.signal.aborted) {
+                // The provider may already have billed the prompt before the cancel, and no usage came back: record the lower-bound estimate
+                // the stream path records for a cancelled stream, so a cancelled call is not free.
+                const estimate = estimateCancelledUsage({ emittedChars: 0, promptChars: countPromptTextChars(body.callOptions.prompt), reasoningChars: 0 });
+
+                // Registered before the pricing read, so the Worker keeps the settlement alive until it is recorded.
+                c.executionCtx.waitUntil(
+                    (async () => {
+                        const pricing = await policy.pricing().catch(() => null);
+                        const costMicrodollars = pricing ? calculateCost(pricing, estimate) : 0;
+
+                        await Promise.allSettled([
+                            usageTracker.record(
+                                {
+                                    cachedTokens: 0,
+                                    completionTokens: 0,
+                                    costMicrodollars,
+                                    // Marks the row as an estimate, as the stream path does: no cache count came back, so readers leave it out.
+                                    finishReason: "cancelled",
+                                    isStreaming: false,
+                                    latencyMs: Date.now() - startTime,
+                                    modelApiId: body.modelApiId,
+                                    modelId: body.modelId,
+                                    operation: "chat",
+                                    orgId: body.orgId,
+                                    promptTokens: estimate.promptTokens,
+                                    provider: body.provider,
+                                    reasoningTokens: 0,
+                                    requestId: body.requestId,
+                                    source: "internal",
+                                    threadId: body.threadId,
+                                    userId: body.userId,
+                                },
+                                c.var.telemetry,
+                            ),
+                            usageReporter.report({
+                                billingMode,
+                                byokFeeRate,
+                                completionTokens: 0,
+                                costMicrodollars,
+                                modelId: body.modelId,
+                                orgId: body.orgId,
+                                promptTokens: estimate.promptTokens,
+                                requestId: body.requestId,
+                                userId: body.userId,
+                            }),
+                        ]);
+                    })(),
+                );
+            } else if (!c.req.raw.signal.aborted) {
+                // A request the caller already cancelled (before the provider was reached) is not the provider's failure either.
+                c.executionCtx.waitUntil(policy.recordHealth.failure());
+            }
 
             if (error instanceof GatewayError) {
                 return c.json(error.toJSON(), error.statusCode);

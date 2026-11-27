@@ -11,7 +11,7 @@ import { GitBranch, Plus, Trash2 } from "lucide-react";
 import type { FC, KeyboardEvent } from "react";
 import { useEffect, useId, useRef, useState } from "react";
 
-import { useAuth } from "@/features/auth/lib/auth-ui-provider";
+import { useAuthSession } from "@/features/auth/hooks/use-auth-session";
 import { getLocalizedError } from "@/features/auth/lib/utilities";
 import { useCRPC } from "@/lib/lunora/crpc";
 
@@ -132,8 +132,7 @@ const RepoBranchInput: FC<{ name: string; onSave: (branch: string, revision: num
 const ProjectRepositories: FC<{ projectId: string }> = ({ projectId }) => {
     const { t } = useLingui();
     const crpc = useCRPC();
-    const { hooks } = useAuth();
-    const { data: sessionData } = hooks.useSession();
+    const { data: sessionData } = useAuthSession();
     const labelId = useId();
     const urlId = useId();
     const branchId = useId();

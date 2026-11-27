@@ -312,6 +312,24 @@ describe("session_open", () => {
         expect(sessions[0]).toMatchObject({ agentKey: "claude", folderLabel: "neore", status: "idle", threadId });
     });
 
+    it("accepts a session open an older desktop sends with its options, opens the session, and stores none of the options", async () => {
+        const device = await pair(ownerId);
+        const options = {
+            configOptions: [{ category: "model", choices: [{ name: "Deep", value: "deep" }], currentValue: "deep", id: "model", name: "Model" }],
+        };
+        const result = await ingest(device, { events: [SESSION_OPEN, { kind: "session_options", options }] });
+
+        expect(result.status).toBe(200);
+
+        const threadId = result.json.threadId as string;
+        const session = await harness.run(async (ctx: any) => await ctx.db.acpSessions.findFirst({ where: { threadId } }));
+
+        expect(await row(threadId)).toMatchObject({ runner: "host", status: "active", userId: ownerId });
+        expect(session).toMatchObject({ status: "idle", userId: ownerId });
+        expect(session.agentState).toBeUndefined();
+        expect(session.agentOptions).toBeUndefined();
+    });
+
     it("reads back to the owner only", async () => {
         const device = await pair(ownerId);
         const threadId = await openSession(device);
@@ -432,88 +450,6 @@ describe("capability reports", () => {
         await expect(reportOf(threadId)).resolves.toMatchObject({ groups: CHANGED.groups });
         await openWith(device, { ...REPORT, reportedAt: Date.now() + 1000 });
         await expect(reportOf(threadId)).resolves.toMatchObject({ groups: REPORT.groups });
-    });
-
-    it("stores the agent's options with a newer report only, and keeps them when an open's options do not validate", async () => {
-        const device = await pair(ownerId);
-        const mode = (current: string) => {
-            return {
-                configOptions: [
-                    {
-                        category: "mode",
-                        choices: [
-                            { name: "Plan", value: "plan" },
-                            { name: "Build", value: "build" },
-                        ],
-                        currentValue: current,
-                        id: "mode",
-                        name: "Mode",
-                    },
-                ],
-            };
-        };
-        const openWithOptions = async (reportedAt: number, options: unknown) => {
-            const result = await ingest(device, {
-                events: [
-                    { ...SESSION_OPEN, capabilities: { ...REPORT, reportedAt } },
-                    { kind: "session_options", options },
-                ],
-            });
-
-            expect(result.status).toBe(200);
-
-            return result.json.threadId as string;
-        };
-        const optionsOf = async (threadId: string, userId = ownerId) =>
-            ((await as(userId).query(getHostSession as never, { threadId } as never)) as { agentOptions?: unknown } | null)?.agentOptions;
-        const threadId = await openWithOptions(REPORT.reportedAt, mode("build"));
-
-        await expect(optionsOf(threadId)).resolves.toEqual(mode("build"));
-
-        // The agent switched to Plan: the desktop sends the open again with a newer report.
-        await openWithOptions(REPORT.reportedAt + 1, mode("plan"));
-        await expect(optionsOf(threadId)).resolves.toEqual(mode("plan"));
-
-        // A late or replayed open carries an older report and changes nothing.
-        await openWithOptions(REPORT.reportedAt, mode("build"));
-        await expect(optionsOf(threadId)).resolves.toEqual(mode("plan"));
-
-        // Options that do not validate are dropped, never the session's open.
-        await openWithOptions(REPORT.reportedAt + 2, { configOptions: [{ ...mode("x").configOptions[0], id: "i".repeat(200) }] });
-        await expect(optionsOf(threadId)).resolves.toEqual(mode("plan"));
-        await expect(optionsOf(threadId, await insertUser())).resolves.toBeUndefined();
-
-        // A desktop clock ahead of this one: its reports are ordered by the time it gave them, not the capped one, so two
-        // quick changes do not tie and a late older one does not pass a newer one.
-        const ahead = Date.now() + 60_000;
-
-        await openWithOptions(ahead, mode("build"));
-        await openWithOptions(ahead + 1, mode("plan"));
-        await expect(optionsOf(threadId)).resolves.toEqual(mode("plan"));
-        await openWithOptions(ahead, mode("build"));
-        await expect(optionsOf(threadId)).resolves.toEqual(mode("plan"));
-
-        // Nor is the report a late older open carries: it would no longer match the options stored.
-        await ingest(device, {
-            events: [
-                { ...SESSION_OPEN, capabilities: { ...CHANGED, reportedAt: ahead } },
-                { kind: "session_options", options: mode("build") },
-            ],
-        });
-        await expect(reportOf(threadId)).resolves.toMatchObject({ groups: REPORT.groups });
-
-        // Options are a session-level event: never one of a turn, and never anything but the open's follower.
-        await expect(ingest(device, { events: [{ kind: "session_options", options: mode("build") }] })).resolves.toMatchObject({ status: 403 });
-
-        // In a turn post, options are refused whether or not they validate: an invalid one is never quietly left out there.
-        await expect(turn(device, threadId, "t-opts", 0, [START(), { kind: "session_options", options: mode("build") }])).resolves.toMatchObject({
-            status: 403,
-        });
-        await expect(
-            turn(device, threadId, "t-bad", 0, [START(), { kind: "session_options", options: { configOptions: [{ id: 3 }] } }]),
-        ).resolves.toMatchObject({
-            status: 400,
-        });
     });
 
     it("keeps a valid stored report when a later open's report is invalid, and lets the next valid one replace the fallback", async () => {
@@ -1017,6 +953,75 @@ describe("a host turn", () => {
             expect(active).toMatchObject({ hostState: "running", streamId: stream?._id });
             expect(body).toMatchObject({ hostState: "running", reasoning: "hm", status: "streaming", text: "Looking at the code" });
         }
+    });
+
+    it("shows the latest plan and each tool call at its latest report while the turn runs, and keeps neither on the reply", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+        const plan = (status: "completed" | "in_progress") => {
+            return { entries: [{ content: "Read the code", priority: "high", status }], kind: "plan" };
+        };
+        const tool = (status: "completed" | "in_progress") => {
+            return { id: "c1", kind: "tool", status, title: "Run the tests", toolKind: "execute" };
+        };
+
+        await turn(device, threadId, "t1", 0, [START(), plan("in_progress"), tool("in_progress"), TEXT("Working"), plan("completed"), tool("completed")]);
+
+        const stream = await streamFor("t1");
+        const body = (await as(ownerId).query(streaming.getStreamBody as never, { streamId: stream?._id } as never)) as Record<string, any>;
+
+        expect(body.hostActivity).toEqual({
+            plan: [{ content: "Read the code", priority: "high", status: "completed" }],
+            tools: [{ id: "c1", status: "completed", title: "Run the tests", toolKind: "execute" }],
+        });
+
+        await turn(device, threadId, "t1", 6, [{ kind: "turn_end", reason: "finished" }]);
+
+        const after = (await as(ownerId).query(streaming.getStreamBody as never, { streamId: stream?._id } as never)) as Record<string, any>;
+        const saved = ((await messagesOf(threadId)) as Record<string, any>[]).filter((message) => message.message?.role === "assistant");
+
+        expect(after.hostActivity).toBeUndefined();
+        expect(JSON.stringify(saved)).toContain("Working");
+        expect(JSON.stringify(saved)).not.toContain("Read the code");
+        expect(JSON.stringify(saved)).not.toContain("Run the tests");
+    });
+
+    it("shows a call's output and exit from its own event, and refuses an output past its tail or an exit code that is not whole", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+        const call = { id: "c1", kind: "tool", status: "completed", title: "Run", toolKind: "execute" };
+        const printed = { id: "c1", kind: "tool_output" };
+
+        await expect(turn(device, threadId, "t1", 0, [START(), call, { ...printed, output: "x".repeat(2001) }])).resolves.toMatchObject({ status: 400 });
+        await expect(turn(device, threadId, "t1", 0, [START(), call, { ...printed, exit: { code: 1.5 }, output: "" }])).resolves.toMatchObject({ status: 400 });
+        // The `tool` event keeps the shape its stored chunks were written in: output never rides on it.
+        await expect(turn(device, threadId, "t1", 0, [START(), { ...call, output: "x" }])).resolves.toMatchObject({ status: 200 });
+        await expect(
+            turn(device, threadId, "t1", 1, [call, { ...printed, exit: { code: 1, signal: "SIGTERM" }, output: "x".repeat(2000) }]),
+        ).resolves.toMatchObject({ status: 200 });
+
+        const stream = await streamFor("t1");
+        const body = (await as(ownerId).query(streaming.getStreamBody as never, { streamId: stream?._id } as never)) as Record<string, any>;
+
+        expect(body.hostActivity.tools).toEqual([
+            { exit: { code: 1, signal: "SIGTERM" }, id: "c1", output: "x".repeat(2000), status: "completed", title: "Run", toolKind: "execute" },
+        ]);
+    });
+
+    it("refuses a plan past its limits", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+        const entries = Array.from({ length: 51 }, () => {
+            return { content: "x", priority: "low", status: "pending" };
+        });
+
+        await expect(turn(device, threadId, "t1", 0, [START(), { entries, kind: "plan" }])).resolves.toMatchObject({ status: 400 });
+        await expect(
+            turn(device, threadId, "t1", 0, [START(), { entries: [{ content: "x".repeat(501), priority: "low", status: "pending" }], kind: "plan" }]),
+        ).resolves.toMatchObject({ status: 400 });
+        await expect(
+            turn(device, threadId, "t1", 0, [START(), { entries: [{ content: "x", priority: "urgent", status: "pending" }], kind: "plan" }]),
+        ).resolves.toMatchObject({ status: 400 });
     });
 
     it("reads back every host state through the live queries a second client uses", async () => {
@@ -2439,5 +2444,424 @@ describe("files a reply refers to", () => {
 
         expect(sent.status).toBe(400);
         expect(finalize).not.toHaveBeenCalled();
+    });
+});
+
+describe("what the agent reports about itself", () => {
+    const usage = (used: number) => {
+        return { size: 200_000, used };
+    };
+    const report = (device: Paired, at: number, body: Record<string, unknown>, sessionId?: string) =>
+        ingest(device, { events: [{ at, kind: "session_state", ...body }], ...(sessionId !== undefined && { sessionId }) });
+    const rowOf = async (threadId: string) => await harness.run(async (ctx: any) => await ctx.db.acpSessions.findFirst({ where: { threadId } }));
+
+    it("stores the usage the host reports on the session row, and the owner reads it back with the session", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+        const result = await report(device, 1000, { usage: usage(10) });
+
+        expect(result.status).toBe(200);
+        expect(result.json).toEqual({ ended: false, next: 0 });
+        expect(await rowOf(threadId)).toMatchObject({ agentState: { usage: usage(10) }, agentStateAt: 1000 });
+        await expect(as(ownerId).query(getHostSession as never, { threadId } as never)).resolves.toMatchObject({ agentState: { usage: usage(10) } });
+    });
+
+    it("keeps a field a later report leaves out, and replaces one it sends", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+
+        await report(device, 1000, { usage: { cost: { amount: 0.5, currency: "USD" }, size: 200_000, used: 10 } });
+        await report(device, 2000, {});
+        await report(device, 3000, { usage: usage(20) });
+
+        expect(await rowOf(threadId)).toMatchObject({ agentState: { usage: usage(20) }, agentStateAt: 3000 });
+    });
+
+    it("drops a report older than the one applied, so a late post cannot roll the state back", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+
+        await report(device, 3000, { usage: usage(30) });
+        const late = await report(device, 2000, { usage: usage(20) });
+
+        expect(late.status).toBe(200);
+        expect(await rowOf(threadId)).toMatchObject({ agentState: { usage: usage(30) }, agentStateAt: 3000 });
+    });
+
+    it("moves the ordering time on a newer report that repeats the stored usage, so an older report cannot overwrite the newest", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+
+        await report(device, 1000, { usage: usage(10) });
+        await report(device, 3000, { usage: usage(10) });
+        await report(device, 2000, { usage: usage(7) });
+
+        expect(await rowOf(threadId)).toMatchObject({ agentState: { usage: usage(10) }, agentStateAt: 3000 });
+    });
+
+    it("stores a report that arrives after the session closed: the final usage is not lost", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+
+        await report(device, 1000, { usage: usage(10) });
+        await ingest(device, { close: true, events: [] } as Body);
+        const late = await report(device, 2000, { usage: usage(12) });
+
+        expect(late.status).toBe(200);
+        expect(await rowOf(threadId)).toMatchObject({ agentState: { usage: usage(12) }, agentStateAt: 2000, status: "ended" });
+    });
+
+    it("keeps the cost reported before when a later usage report leaves it out", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+        const cost = { amount: 0.4, currency: "USD" };
+
+        await report(device, 1000, { usage: { ...usage(10), cost } });
+        await report(device, 2000, { usage: usage(12) });
+
+        expect(await rowOf(threadId)).toMatchObject({ agentState: { usage: { cost, size: 200_000, used: 12 } } });
+    });
+
+    it("orders a report stamped ahead of the server clock at the server's time, so a current report is still applied", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+
+        await report(device, Number.MAX_SAFE_INTEGER - 1, { usage: usage(10) });
+        const current = await report(device, Date.now(), { usage: usage(11) });
+
+        expect(current.status).toBe(200);
+        const stored = await rowOf(threadId);
+
+        expect(stored?.agentStateAt).toBeLessThanOrEqual(Date.now() + 1000);
+        expect(stored).toMatchObject({ agentState: { usage: usage(11) } });
+    });
+
+    it("keeps the newer report by its sequence number when a clock ahead has capped the time of the older one", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+
+        // The desktop's clock runs ahead: both reports are stamped past the server clock, so both are capped to now. The newer one
+        // (sequence 2) arrives first, and the older one (sequence 1) after it: the older one must not replace it.
+        await report(device, Date.now() + 600_000, { seq: 2, usage: usage(11) });
+        const older = await report(device, Date.now() + 500_000, { seq: 1, usage: usage(10) });
+
+        expect(older.status).toBe(200);
+        expect(await rowOf(threadId)).toMatchObject({ agentState: { usage: usage(11) }, agentStateSeq: 2 });
+    });
+
+    it("keeps the newest sequence when a report repeats the stored values, so a delayed older report cannot overwrite them", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+        const at = Date.now() - 2000;
+
+        await report(device, at, { seq: 1, usage: usage(10) });
+        await report(device, at + 500, { seq: 3, usage: usage(10) });
+
+        // An older report arrives after the repeat: it is older than the newest observation, so it is dropped.
+        await report(device, at + 100, { seq: 2, usage: usage(11) });
+
+        expect(await rowOf(threadId)).toMatchObject({ agentState: { usage: usage(10) }, agentStateSeq: 3 });
+    });
+
+    it("confirms a refused option change once the agent reports the value it asked for, and not a refusal it gave", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+        const option = { category: "model", choices: [{ name: "Deep", value: "deep" }], currentValue: "deep", id: "model", name: "Model" };
+        const refusedBy = async (reason: string) => {
+            const session = await rowOf(threadId);
+
+            await harness.run(async (ctx: any) => {
+                await ctx.db.patch("acpSessions", session._id, {
+                    optionResult: { at: 1, callId: "c1", optionId: "model", outcome: "refused", reason, valueId: "deep" },
+                });
+            });
+        };
+        const resultOf = async () => {
+            const session = await rowOf(threadId);
+
+            return session.optionResult;
+        };
+
+        // A late answer: the desktop had given up on the change, the agent applied it.
+        await refusedBy("the agent did not answer");
+        await report(device, Date.now(), { configOptions: [option], seq: 1 });
+        expect(await resultOf()).toMatchObject({ callId: "c1", outcome: "confirmed", valueId: "deep" });
+        expect(await resultOf()).not.toHaveProperty("reason");
+
+        // A restart before the answer was recorded: the same report settles it.
+        await refusedBy("the app restarted before the agent answered, so the change may or may not have been made");
+        await report(device, Date.now(), { configOptions: [option], seq: 2 });
+        expect(await resultOf()).toMatchObject({ outcome: "confirmed" });
+
+        // A refusal the agent gave is not settled by a report that happens to show the value.
+        await refusedBy("the agent did not accept the change");
+        await report(device, Date.now(), { configOptions: [option], seq: 3 });
+        expect(await resultOf()).toMatchObject({ outcome: "refused" });
+    });
+
+    const commands = (...names: string[]) =>
+        names.map((name) => {
+            return { description: `Does ${name}`, name };
+        });
+
+    it("stores the agent's commands, with an input hint, and the owner reads them back", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+        const list = [{ description: "Review", hint: "a branch", name: "review" }, ...commands("compact")];
+
+        const result = await report(device, 1000, { availableCommands: list });
+
+        expect(result.status).toBe(200);
+        expect(await rowOf(threadId)).toMatchObject({ agentState: { availableCommands: list }, agentStateAt: 1000 });
+        await expect(as(ownerId).query(getHostSession as never, { threadId } as never)).resolves.toMatchObject({ agentState: { availableCommands: list } });
+    });
+
+    it("replaces the commands with a newer list and keeps the usage a later report leaves out", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+
+        await report(device, 1000, { availableCommands: commands("a", "b"), usage: usage(5) });
+        await report(device, 2000, { availableCommands: commands("c") });
+
+        expect(await rowOf(threadId)).toMatchObject({ agentState: { availableCommands: commands("c"), usage: usage(5) }, agentStateAt: 2000 });
+    });
+
+    it("keeps the stored list when the same commands arrive again, and a reordered list replaces it", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+
+        await report(device, 1000, { availableCommands: commands("a", "b") });
+        await report(device, 2000, { availableCommands: commands("a", "b") });
+
+        expect(await rowOf(threadId)).toMatchObject({ agentState: { availableCommands: commands("a", "b") }, agentStateAt: 2000 });
+
+        await report(device, 3000, { availableCommands: commands("b", "a") });
+
+        expect(await rowOf(threadId)).toMatchObject({ agentState: { availableCommands: commands("b", "a") }, agentStateAt: 3000 });
+    });
+
+    it("stores a commands-only report, leaves the usage alone, and advances the watermark", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+
+        await report(device, 1000, { usage: usage(5) });
+        await report(device, 2000, { availableCommands: commands("a") });
+
+        expect(await rowOf(threadId)).toMatchObject({ agentState: { availableCommands: commands("a"), usage: usage(5) }, agentStateAt: 2000 });
+    });
+
+    it("drops an older commands report that arrives after a newer one", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+
+        await report(device, 3000, { availableCommands: commands("new") });
+        const late = await report(device, 2000, { availableCommands: commands("old") });
+
+        expect(late.status).toBe(200);
+        expect(await rowOf(threadId)).toMatchObject({ agentState: { availableCommands: commands("new") }, agentStateAt: 3000 });
+    });
+
+    it("refuses commands past the bounds", async () => {
+        const device = await pair(ownerId);
+
+        await openSession(device);
+
+        const entry = { description: "d", name: "n" };
+
+        for (const bad of [
+            Array.from({ length: 101 }, (_, index) => {
+                return { ...entry, name: `n${index}` };
+            }),
+            [{ ...entry, name: "n".repeat(65) }],
+            [{ ...entry, name: "" }],
+            [{ ...entry, description: "d".repeat(301) }],
+            [{ ...entry, hint: "h".repeat(201) }],
+        ]) {
+            const result = await report(device, 1000, { availableCommands: bad });
+
+            expect(result.status).toBe(400);
+        }
+    });
+
+    it("refuses a report for a session the device does not hold", async () => {
+        const device = await pair(ownerId);
+
+        await openSession(device);
+        const result = await report(device, 1000, { usage: usage(10) }, "no-such-session");
+
+        // Refused as any unknown session is (403): not 401, which counts toward a device's revocation streak.
+        expect(result.status).toBe(403);
+    });
+
+    it("refuses a report with another event beside it", async () => {
+        const device = await pair(ownerId);
+
+        await openSession(device);
+        const result = await ingest(device, { events: [{ at: 1000, kind: "session_state", usage: usage(10) }, SESSION_OPEN] });
+
+        expect(result.status).toBe(403);
+    });
+
+    it("refuses a report sent inside a turn, or beside other events of an import, so it is never stored as a turn chunk", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+        const state = { at: 1000, kind: "session_state", usage: usage(10) };
+
+        const inTurn = await ingest(device, { events: [{ kind: "turn_start", text: "hi" }, state], firstSeq: 0, threadId, turnId: "t9" });
+        const inImport = await ingest(device, { events: [{ kind: "import_end" }, state], firstSeq: 0, threadId, turnId: "t9" });
+
+        expect(inTurn.status).toBe(403);
+        expect(inImport.status).toBe(403);
+        expect(await rowOf(threadId)).not.toHaveProperty("agentStateAt");
+    });
+
+    it("keeps the state in the GDPR export and on every reader of the session row", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+
+        await report(device, 1000, { usage: usage(10) });
+
+        const exported = (await harness.run(async (ctx: any) => await ctx.runQuery(collectAcpSessionsForExport, { userId: ownerId }))) as {
+            sessions: Record<string, unknown>[];
+        };
+
+        expect(exported.sessions.find((session) => session.threadId === threadId)).toMatchObject({ agentState: { usage: usage(10) } });
+        await expect(as(ownerId).query(listHostSessions as never, {} as never)).resolves.toEqual(
+            expect.arrayContaining([expect.objectContaining({ threadId })]),
+        );
+        // A host thread that sent no capability report reads as all unknown, and the state never leaks into it.
+        await expect(as(ownerId).query(getThreadCapabilities as never, { threadId } as never)).resolves.toEqual({ groups: {}, reportedAt: 0, version: 1 });
+        await expect(as(ownerId).query(getHostSession as never, { threadId } as never)).resolves.toMatchObject({ agentState: { usage: usage(10) } });
+    });
+
+    it("refuses a report whose counts are not whole non-negative numbers", async () => {
+        const device = await pair(ownerId);
+
+        await openSession(device);
+
+        for (const bad of [
+            { size: 10, used: 1.5 },
+            { size: 10, used: -1 },
+        ]) {
+            const result = await report(device, 1000, { usage: bad });
+
+            expect(result.status).toBe(400);
+        }
+    });
+});
+
+describe("what the agent reports about its options", () => {
+    const option = (current: string, extra: Record<string, unknown> = {}) => {
+        return {
+            category: "model",
+            choices: [
+                { name: "Fast", value: "fast" },
+                { name: "Deep", value: "deep" },
+            ],
+            currentValue: current,
+            id: "model",
+            name: "Model",
+            ...extra,
+        };
+    };
+    const report = (device: Paired, at: number, body: Record<string, unknown>) => ingest(device, { events: [{ at, kind: "session_state", ...body }] });
+    const rowOf = async (threadId: string) => await harness.run(async (ctx: any) => await ctx.db.acpSessions.findFirst({ where: { threadId } }));
+
+    it("stores the options, the legacy modes and the legacy models, and the owner reads them back", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+        const modes = { available: [{ id: "ask", name: "Ask" }], current: "ask" };
+        const models = { available: [{ id: "m1", name: "M1" }], current: "m1" };
+
+        const posted = await report(device, 1000, { configOptions: [option("fast")], models, modes });
+
+        expect(posted.status).toBe(200);
+        expect(await rowOf(threadId)).toMatchObject({ agentState: { configOptions: [option("fast")], models, modes }, agentStateAt: 1000 });
+        await expect(as(ownerId).query(getHostSession as never, { threadId } as never)).resolves.toMatchObject({
+            agentState: { configOptions: [option("fast")], models, modes },
+        });
+    });
+
+    it("replaces a field it carries and keeps the ones it leaves out", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+
+        await report(device, 1000, { configOptions: [option("fast")], usage: { size: 100, used: 1 } });
+        await report(device, 2000, { configOptions: [option("deep")] });
+
+        expect(await rowOf(threadId)).toMatchObject({ agentState: { configOptions: [option("deep")], usage: { size: 100, used: 1 } }, agentStateAt: 2000 });
+    });
+
+    it("reports the models and the reasoning support of options whatever the case of their categories", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+
+        await report(device, 1000, {
+            configOptions: [
+                { ...option("fast"), category: "Model" },
+                { category: "Thought_Level", choices: [{ name: "Low", value: "low" }], currentValue: "low", id: "effort", name: "Effort" },
+            ],
+        });
+
+        await expect(as(ownerId).query(getThreadCapabilities as never, { threadId } as never)).resolves.toMatchObject({
+            groups: {
+                identity: {
+                    models: [
+                        { id: "fast", name: "Fast" },
+                        { id: "deep", name: "Deep" },
+                    ],
+                    reasoningEffort: { degradation: "none", supported: true },
+                },
+            },
+        });
+    });
+
+    it("writes nothing when the options repeat, whatever order the keys arrive in", async () => {
+        const device = await pair(ownerId);
+        const threadId = await openSession(device);
+        const reordered = {
+            category: "model",
+            choices: [
+                { name: "Fast", value: "fast" },
+                { name: "Deep", value: "deep" },
+            ],
+            currentValue: "fast",
+            id: "model",
+            name: "Model",
+        };
+
+        await report(device, 1000, { configOptions: [option("fast")] });
+        await report(device, 2000, { configOptions: [reordered] });
+
+        // The values are stored, so only the watermark moves.
+        expect(await rowOf(threadId)).toMatchObject({ agentState: { configOptions: [option("fast")] }, agentStateAt: 2000 });
+
+        // A different choice list is a change, even with the same current value.
+        await report(device, 3000, { configOptions: [option("fast", { choices: [{ name: "Fast", value: "fast" }] })] });
+
+        expect(await rowOf(threadId)).toMatchObject({ agentStateAt: 3000 });
+    });
+
+    it("refuses more than 20 options, more than 100 choices and text past the bounds", async () => {
+        const device = await pair(ownerId);
+
+        await openSession(device);
+
+        const many = Array.from({ length: 21 }, (_unused, index) => option("fast", { id: `o${String(index)}` }));
+        const choices = Array.from({ length: 101 }, (_unused, index) => {
+            return { name: "C", value: `c${String(index)}` };
+        });
+
+        for (const body of [
+            { configOptions: many },
+            { configOptions: [option("fast", { choices })] },
+            { configOptions: [option("fast", { id: "x".repeat(129) })] },
+            { configOptions: [option("fast", { name: "x".repeat(201) })] },
+            { modes: { available: [], current: "x".repeat(129) } },
+        ]) {
+            const refused = await report(device, 1000, body);
+
+            expect(refused.status).toBe(400);
+        }
     });
 });

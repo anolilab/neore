@@ -1,8 +1,8 @@
 /** What an agent session reports about its turns, and what the backend is told of them (`ingest.ts`). */
 import type { CapabilityReport } from "@neore/ai/capabilities";
 
-import type { AgentOptions } from "./agent-options";
 import type { ChildEvent } from "./children";
+import type { PlanEntry } from "./plan";
 import type { StopReason } from "./types";
 
 export interface PermissionOption {
@@ -48,6 +48,51 @@ export interface TurnSummary {
     patch?: string | { tooLarge: true };
 }
 
+/** The agent's context use (ACP `usage_update`): tokens in context now, of its window, and a cost when it reported one. */
+export interface AgentUsage {
+    cost?: { amount: number; currency: string };
+    size: number;
+    used: number;
+}
+
+/** One slash command an agent advertised, bounded and scrubbed. */
+export interface AgentCommand {
+    description: string;
+    hint?: string;
+    name: string;
+}
+
+/**
+ * What an agent reports about itself outside a turn. Each field present replaces the stored one; an absent field keeps it
+ * (`applySessionState` in the backend). Sent as a turn-less post, not a turn event.
+ */
+export interface SessionStatePatch {
+    /** The slash commands the agent advertised (ACP `available_commands_update`); the newest list replaces the last. */
+    availableCommands?: AgentCommand[];
+    /** The options the agent offers (model, reasoning effort, mode ...). When present the legacy `modes` and `models` are not sent. */
+    configOptions?: AgentOption[];
+    /** The legacy model state; shown, never changed. */
+    models?: AgentChoiceList;
+    /** The legacy mode state, for an agent that sends no options. */
+    modes?: AgentChoiceList;
+    usage?: AgentUsage;
+}
+
+/** One option of the agent: a list to choose a value from, with the value it has now. At most 100 choices. */
+export interface AgentOption {
+    category?: string;
+    choices: { name: string; value: string }[];
+    currentValue: string;
+    id: string;
+    name: string;
+}
+
+/** The agent's legacy mode or model state: what it offers and which is current. */
+export interface AgentChoiceList {
+    available: { id: string; name: string }[];
+    current: string;
+}
+
 export interface TurnEndEvent {
     error?: string;
     kind: "turn_end";
@@ -55,14 +100,38 @@ export interface TurnEndEvent {
     summary?: TurnSummary;
 }
 
+/** How a terminal's command ended: its exit code, or the signal that ended it. */
+export interface TerminalExit {
+    code?: number;
+    signal?: string;
+}
+
+/** A tool call as the session reports it. */
+export interface ToolReport {
+    exit?: TerminalExit;
+    id: string;
+    kind: string;
+    output?: string;
+    status: string;
+    title: string;
+}
+
+/** The agent's plan for the turn, whole (`plan.ts`): each one replaces the one before. */
+export interface PlanEvent {
+    entries: PlanEntry[];
+    kind: "plan";
+}
+
 export type HostEvent =
     | MediaEvent
+    | PlanEvent
     | PermissionRequestEvent
     | (HostSessionInfo & { kind: "session_open" })
     | TurnEndEvent
     | { kind: "child_end"; spawnId: string; status: "cancelled" | "completed" | "failed"; text?: string }
     | { id: string; kind: "child_tool"; spawnId: string; status: string; title: string; toolKind: string }
     | { field: "reasoning" | "text"; kind: "child_text"; spawnId: string; text: string }
+    | { exit?: TerminalExit; id: string; kind: "tool_output"; output: string }
     | { id: string; kind: "tool"; status: string; title: string; toolKind: string }
     | { kind: "permission_resolved"; outcome: PermissionOutcomeKind; requestId: string }
     | { kind: "reasoning" | "text" | "turn_start"; text: string };
@@ -78,8 +147,6 @@ export interface HostSessionInfo {
     fork?: { forked: boolean; reason?: "fork_failed" | "fork_unsupported" };
     /** The agent's own id for the session, so an import finds it and a later reattach can use it. */
     nativeSessionId?: string;
-    /** The options the agent offers for the session (`agent-options.ts`), already bounded. */
-    options?: AgentOptions;
     /** For a session the backend started with a saved session id (harness switch S4): whether the agent loaded it, and why not. */
     reattach?: { loaded: boolean; reason?: "load_failed" | "load_unsupported" };
 }
@@ -90,14 +157,17 @@ export interface SessionObserver {
     child?: (sessionId: string, turnId: string, spawnId: string, event: ChildEvent) => void;
     permissionRequested: (sessionId: string, turnId: string, request: PermissionRequestEvent) => void;
     permissionResolved: (sessionId: string, turnId: string, requestId: string, outcome: PermissionOutcomeKind) => void;
+    /** The agent's plan for the turn changed; `entries` is the whole list, already scrubbed and cut (`plan.ts`). */
+    plan?: (sessionId: string, turnId: string, entries: PlanEntry[]) => void;
     sessionEnded: (sessionId: string) => void;
     /** `threadId` is known when the backend started the session (`acp_start`); otherwise opening it makes the thread. */
     sessionOpened: (sessionId: string, info: HostSessionInfo, threadId?: string) => void;
-    /** What the session reports changed after it opened (its options, and the report that follows them): the whole info again. */
-    sessionUpdated?: (sessionId: string, info: HostSessionInfo) => void;
+    /** The agent reported something about itself outside a turn (its usage now, or its advertised commands). Coalesced by the poster. */
+    sessionState?: (sessionId: string, patch: SessionStatePatch) => void;
     text: (sessionId: string, turnId: string, delta: string) => void;
     thought: (sessionId: string, turnId: string, delta: string) => void;
-    tool: (sessionId: string, turnId: string, tool: { id: string; kind: string; status: string; title: string }) => void;
+    /** `output` is the tail of what the call printed, masked and cut (`tool-output.ts`); `exit` is set once its terminal has exited. */
+    tool: (sessionId: string, turnId: string, tool: ToolReport) => void;
     turnEnded: (sessionId: string, turnId: string, reason: StopReason | "failed", error?: string, summary?: TurnSummary) => void;
     /** A prompt the backend queued (`acp_send`) is in this computer's hands, running or waiting its turn: the turn is `received`. */
     turnReceived?: (sessionId: string, turnId: string, user: string) => void;
@@ -122,7 +192,6 @@ export const capSessionInfo = (info: HostSessionInfo): HostSessionInfo => {
         folderId: info.folderId.slice(0, 128),
         folderLabel: info.folderLabel.slice(0, 200),
         ...(info.capabilities !== undefined && { capabilities: info.capabilities }),
-        ...(info.options !== undefined && { options: info.options }),
         ...(info.nativeSessionId !== undefined &&
             info.nativeSessionId !== "" &&
             Buffer.byteLength(info.nativeSessionId) <= MAX_NATIVE_ID_BYTES && { nativeSessionId: info.nativeSessionId }),
@@ -152,6 +221,14 @@ export const capPermissionRequest = (request: PermissionRequestEvent): Permissio
 };
 
 export const capRequestId = (requestId: string): string => requestId.slice(0, 128);
+
+/** An exit status the backend takes: a whole exit code, a signal name of at most 32 characters. */
+export const capExit = (exit: TerminalExit): TerminalExit => {
+    return {
+        ...exit.code !== undefined && Number.isSafeInteger(exit.code) && { code: exit.code },
+        ...exit.signal !== undefined && { signal: exit.signal.slice(0, 32) },
+    };
+};
 
 /**
  * What an event adds to the body of a post, in UTF-8 bytes: the payload is JSON inside a JSON string, so quotes

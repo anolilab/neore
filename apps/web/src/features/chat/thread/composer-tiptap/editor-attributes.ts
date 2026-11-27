@@ -7,10 +7,12 @@ interface EditorAttributeOptions {
     invalid?: boolean;
     /** The field's accessible name: a `contenteditable` has no label of its own, and the placeholder is not one. */
     label?: string;
+    /** The `:shortcode` list is open: the editable is then the combobox that owns it. Absent while the list is closed. */
+    popup?: { activeOptionId?: string; listboxId: string };
 }
 
-/** The attributes of the editable element. Rebuilt whenever the description or validity changes. */
-export const composerEditorAttributes = ({ describedBy, invalid = false, label }: EditorAttributeOptions = {}): Record<string, string> => {
+/** The attributes of the editable element. Rebuilt whenever the description, validity or open list changes. */
+export const composerEditorAttributes = ({ describedBy, invalid = false, label, popup }: EditorAttributeOptions = {}): Record<string, string> => {
     const attributes: Record<string, string> = {
         // The editable element is the composer's focus area for F6: the editor itself takes the focus.
         "data-focus-area": "composer",
@@ -18,6 +20,8 @@ export const composerEditorAttributes = ({ describedBy, invalid = false, label }
         // Hebrew or Arabic typed into an LTR app lays out right to left. One direction for the whole message (the
         // first strong character decides), not per paragraph.
         dir: "auto",
+        // Explicit: the desktop shell turns spellcheck off on <html> for its chrome, and prose keeps it.
+        spellcheck: "true",
     };
 
     if (label) {
@@ -31,6 +35,19 @@ export const composerEditorAttributes = ({ describedBy, invalid = false, label }
 
     if (invalid) {
         attributes["aria-invalid"] = "true";
+    }
+
+    if (popup) {
+        // `aria-multiline` belongs to a textbox; a combobox does not take it, so it is dropped while the list is open.
+        delete attributes["aria-multiline"];
+        attributes.role = "combobox";
+        attributes["aria-autocomplete"] = "list";
+        attributes["aria-controls"] = popup.listboxId;
+        attributes["aria-expanded"] = "true";
+
+        if (popup.activeOptionId) {
+            attributes["aria-activedescendant"] = popup.activeOptionId;
+        }
     }
 
     return attributes;

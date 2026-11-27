@@ -61,12 +61,16 @@ cd backend && pnpm codegen     # lunora codegen, then backend/scripts/check-gene
 ## Database access
 
 - `.global()` tables: never `ctx.db.query(t).withIndex(...)`; use `ctx.db.<table>.findFirst/findMany` (`lib/global-table-reader.test.ts`).
+- A metered `.global()` read is charged the whole row: `select` lowers what it returns, never what it costs against the read budget (`projects/project-row.ts#projectRowsReadBytes`).
 - `findMany` without `limit` returns every row and always a `QueryPage` (`.page`); test past 25 rows before claiming read completeness. `findUnique` throws `NOT_UNIQUE`, takes no `limit`/`cursor`.
 - Index `.eq()` takes `null`, never `undefined` (`args.x ?? null`).
 - Never pass `undefined` (or `null` for a `v.optional` column) to `ctx.db.patch`: use `lib/patch.ts` (`patchRow`/`patchById`, `withoutUndefined`).
+- Since codegen 443 (lunora#1668, closed), `Doc_*` types an optional `.global()` column as absent, so `lib/stored-row.ts` (`storedRow`/`storedRows`/`storedPage`) is a no-op on those reads. Existing call sites stay until a follow-up removes them. Filter an optional column for "not set" with `{ isNull: true }`, not `null`. Clients name such a row `StoredRow<Doc<…>>` (`@neore/backend/stored-row`).
 - `.global()` D1 tables are created lazily: exercise the route before checking `sqlite_master`; drop the `globalSchemaMarker` row if you drop a table by hand.
 - `lunora build` gates schema drift against `backend/lunora/.lunora-schema.json`: commit it with schema changes; with data at rest, widen → migrate → narrow.
+- `defineMigration` never reaches a `.global()` table (it runs in the shard DOs): backfill D1 through an admin route the deploy calls (`docs/agents/build-and-deploy.md`).
 - Delete rows of `AUDIT_TABLES` one at a time, never `Promise.all` (`deleteParentsWithChildren` in `gdpr/batch.ts`).
+- A Worker's D1 statement budget counts only `.global()` statements, audit `documentHistory` inserts included; shard-local tables (`idempotencyClaims` too) are the shard's SQLite, bounded by its transaction limits (50,000 written rows), not by D1's.
 - A cache write (`actionCache`) must never fail the caller.
 
 ## Sharding and concurrency

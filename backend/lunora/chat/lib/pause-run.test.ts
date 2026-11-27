@@ -29,9 +29,12 @@ describe("pauseOnRateLimit", () => {
         expect(runMutation).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ from: "row-2", replyRowIds: ["row-1", "row-2"], stepsUsed: 2 }));
     });
 
-    it("asks for nothing when the error is not a rate limit", async () => {
+    it("asks for nothing, and reads no settings, when the error is not a rate limit", async () => {
         const runMutation = vi.fn();
         const progress = vi.fn();
+        const usageLimit = vi.fn(async () => {
+            return { resumeAfterLimit: false, snoozeUntilReset: true };
+        });
 
         const paused = await pauseOnRateLimit({ runMutation } as never, {
             error: new Error("boom"),
@@ -40,10 +43,12 @@ describe("pauseOnRateLimit", () => {
             run,
             settle: async () => undefined,
             streamId: "s1",
+            usageLimit,
         });
 
         expect(paused).toBe(false);
         expect(runMutation).not.toHaveBeenCalled();
         expect(progress).not.toHaveBeenCalled();
+        expect(usageLimit).not.toHaveBeenCalled();
     });
 });

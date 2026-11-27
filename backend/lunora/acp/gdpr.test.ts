@@ -32,7 +32,7 @@ const insertDevice = async (userId: string) =>
         async (ctx: any) => await ctx.db.insert("devices", { createdAt: 0, encryptedSecret: "x", name: "Laptop", platform: "linux", userId }),
     )) as string;
 
-const insertSession = async (userId: string, deviceId: string, index: number, fields: Record<string, unknown> = {}) =>
+const insertSession = async (userId: string, deviceId: string, index: number) =>
     await harness.run(async (ctx: any) => {
         const threadId = await ctx.db.insert("threads", { runner: "host", status: "active", title: `T${String(index)}`, userId });
 
@@ -48,7 +48,6 @@ const insertSession = async (userId: string, deviceId: string, index: number, fi
             threadId,
             updatedAt: index,
             userId,
-            ...fields,
         });
 
         return threadId as string;
@@ -106,6 +105,237 @@ const collectAll = async (userId: string) => {
 };
 
 describe("the export of coding-agent sessions and events", () => {
+    it("cuts a page by bytes when the sessions carry heavy agent state, and loses none of them", async () => {
+        const device = await insertDevice(A);
+        // Multi-byte names: three bytes a character, so the byte budget is what cuts the pages.
+        const choices = Array.from({ length: 100 }, (_unused, index) => {
+            return { name: `choice ${String(index)} ${"漢".repeat(40)}`, value: `v${String(index)}` };
+        });
+        const agentState = { configOptions: [{ category: "model", choices, currentValue: "v0", id: "model", name: "Model" }] };
+
+        for (let index = 0; index < 100; index += 1) {
+            const threadId = await insertSession(A, device, index);
+
+            await harness.run(async (ctx: any) => {
+                const row = await ctx.db.acpSessions.findFirst({ where: { threadId } });
+
+                await ctx.db.patch("acpSessions", row._id, { agentState });
+            });
+        }
+
+        const pages = await collectAll(A);
+        const sessions = pages.flatMap((page) => page.sessions);
+
+        expect(pages.length).toBeGreaterThan(1);
+        expect(sessions).toHaveLength(100);
+        expect(new Set(sessions.map((session) => session.threadId)).size).toBe(100);
+
+        // Each page holds the budget plus at most one more row, so no page nears the step's limit.
+        for (const page of pages) {
+            expect(new TextEncoder().encode(JSON.stringify(page.sessions)).length).toBeLessThan(400_000 + 20_000);
+        }
+    });
+
+    it("keeps every session exactly once when one a page already exported is deleted before the next page", async () => {
+        const device = await insertDevice(A);
+        const choices = Array.from({ length: 100 }, (_unused, index) => {
+            return { name: `choice ${String(index)} ${"漢".repeat(40)}`, value: `v${String(index)}` };
+        });
+        const agentState = { configOptions: [{ category: "model", choices, currentValue: "v0", id: "model", name: "Model" }] };
+        const threads: string[] = [];
+
+        for (let index = 0; index < 100; index += 1) {
+            const threadId = await insertSession(A, device, index);
+
+            threads.push(threadId);
+            await harness.run(async (ctx: any) => {
+                const row = await ctx.db.acpSessions.findFirst({ where: { threadId } });
+
+                await ctx.db.patch("acpSessions", row._id, { agentState });
+            });
+        }
+
+        const first = await collectPage(A);
+        const sessions = [...first.sessions];
+
+        expect(first.next).toBeDefined();
+
+        // A session the first page already exported goes away while the export is still paging.
+        await harness.run(async (ctx: any) => {
+            const row = await ctx.db.acpSessions.findFirst({ where: { threadId: threads[0] } });
+
+            await ctx.db.delete("acpSessions", row._id);
+        });
+
+        for (let cursor = first.next; cursor !== undefined;) {
+            const page: Page = await collectPage(A, cursor);
+
+            sessions.push(...page.sessions);
+            cursor = page.next;
+        }
+
+        const exported = sessions.map((session) => session.threadId);
+
+        expect(new Set(exported).size).toBe(exported.length);
+        expect(exported).toEqual(expect.arrayContaining(threads.slice(1)));
+    });
+
+    it("resumes after the session a page ends on when that session is deleted, and skips none of the rest", async () => {
+        const device = await insertDevice(A);
+        // Twenty options with long names and values: a row is about 10 KB, so a page is cut by bytes before its row limit.
+        const configOptions = Array.from({ length: 20 }, (_unused, index) => {
+            return {
+                category: "model",
+                choices: [{ name: "n", value: "v" }],
+                currentValue: "v".repeat(120),
+                id: `opt${String(index)}`.padEnd(120, "i"),
+                name: "n".repeat(200),
+            };
+        });
+        const threads: string[] = [];
+
+        for (let index = 0; index < 100; index += 1) {
+            const threadId = await insertSession(A, device, index);
+
+            threads.push(threadId);
+            await harness.run(async (ctx: any) => {
+                const row = await ctx.db.acpSessions.findFirst({ where: { threadId } });
+
+                await ctx.db.patch("acpSessions", row._id, { agentState: { configOptions } });
+            });
+        }
+
+        const first = await collectPage(A);
+        const sessions = [...first.sessions];
+
+        // The page was cut by bytes, so the next page resumes inside it: after its last session.
+        expect(first.sessions.length).toBeLessThan(50);
+        expect(first.next).toBeDefined();
+
+        const anchor = first.sessions.at(-1)?.threadId as string;
+
+        // The session the next page resumes after goes away while the export is still paging.
+        await harness.run(async (ctx: any) => {
+            const row = await ctx.db.acpSessions.findFirst({ where: { threadId: anchor } });
+
+            await ctx.db.delete("acpSessions", row._id);
+        });
+
+        for (let cursor = first.next; cursor !== undefined;) {
+            const page: Page = await collectPage(A, cursor);
+
+            sessions.push(...page.sessions);
+            cursor = page.next;
+        }
+
+        // Every session is exported once: the deleted one was exported already, and none that is left is skipped.
+        const exported = sessions.map((session) => session.threadId);
+
+        expect(exported).toHaveLength(100);
+        expect(new Set(exported)).toEqual(new Set(threads));
+    });
+
+    it("exports a legacy mode and model state's current value, without the choices it offered", async () => {
+        const device = await insertDevice(A);
+        const threadId = await insertSession(A, device, 0);
+
+        await harness.run(async (ctx: any) => {
+            const row = await ctx.db.acpSessions.findFirst({ where: { threadId } });
+
+            await ctx.db.patch("acpSessions", row._id, {
+                agentState: {
+                    models: { available: [{ id: "m1", name: "M1" }], current: "m1" },
+                    modes: {
+                        available: [
+                            { id: "ask", name: "Ask" },
+                            { id: "code", name: "Code" },
+                        ],
+                        current: "code",
+                    },
+                },
+            });
+        });
+
+        const pages = await collectAll(A);
+        const [first] = pages.flatMap((page) => page.sessions);
+
+        // The mode the session ran in is kept; its list of modes, like a list of models, is not exported.
+        expect(first?.agentState).toEqual({ models: { current: "m1" }, modes: { current: "code" } });
+    });
+
+    it("exports the agent's usage and each option's current value, without the choices it offered", async () => {
+        const device = await insertDevice(A);
+        const threadId = await insertSession(A, device, 0);
+
+        await harness.run(async (ctx: any) => {
+            const row = await ctx.db.acpSessions.findFirst({ where: { threadId } });
+
+            await ctx.db.patch("acpSessions", row._id, {
+                agentState: {
+                    configOptions: [
+                        {
+                            category: "model",
+                            choices: [
+                                { name: "Deep", value: "deep" },
+                                { name: "Fast", value: "fast" },
+                            ],
+                            currentValue: "deep",
+                            id: "model",
+                            name: "Model",
+                        },
+                    ],
+                    models: { available: [{ id: "m1", name: "M1" }], current: "m1" },
+                    usage: { size: 200_000, used: 12_345 },
+                },
+            });
+        });
+
+        const pages = await collectAll(A);
+        const [first] = pages.flatMap((page) => page.sessions);
+
+        expect(first).toMatchObject({
+            agentState: {
+                configOptions: [{ category: "model", currentValue: "deep", id: "model", name: "Model" }],
+                usage: { size: 200_000, used: 12_345 },
+            },
+        });
+        // The legacy model's current value is kept; its list of models is not.
+        expect(first?.agentState?.models).toEqual({ current: "m1" });
+        expect(JSON.stringify(first)).not.toContain("Fast");
+    });
+
+    it("includes the last option change the person made on a session", async () => {
+        const device = await insertDevice(A);
+        const threadId = await insertSession(A, device, 0);
+
+        await harness.run(async (ctx: any) => {
+            const row = await ctx.db.acpSessions.findFirst({ where: { threadId } });
+
+            await ctx.db.patch("acpSessions", row._id, { optionResult: { at: 5, callId: "c1", optionId: "model", outcome: "confirmed", valueId: "deep" } });
+        });
+
+        const pages = await collectAll(A);
+        const [first] = pages.flatMap((page) => page.sessions);
+
+        expect(first).toMatchObject({ optionResult: { outcome: "confirmed", valueId: "deep" } });
+    });
+
+    it("includes the agent's usage report with the time it was observed, which dates its values", async () => {
+        const device = await insertDevice(A);
+        const threadId = await insertSession(A, device, 0);
+
+        await harness.run(async (ctx: any) => {
+            const row = await ctx.db.acpSessions.findFirst({ where: { threadId } });
+
+            await ctx.db.patch("acpSessions", row._id, { agentState: { usage: { size: 200_000, used: 12_345 } }, agentStateAt: 1_700_000_000_000 });
+        });
+
+        const pages = await collectAll(A);
+        const [first] = pages.flatMap((page) => page.sessions);
+
+        expect(first).toMatchObject({ agentState: { usage: { size: 200_000, used: 12_345 } }, agentStateAt: 1_700_000_000_000 });
+    });
+
     it("is complete past one page of sessions, and carries no other user's", async () => {
         const device = await insertDevice(A);
         const other = await insertDevice(B);
@@ -124,31 +354,6 @@ describe("the export of coding-agent sessions and events", () => {
         expect(new Set(sessions.map((session) => session.threadId)).size).toBe(1100);
         expect(sessions[0]).not.toHaveProperty("deviceId");
         expect(sessions[0]).not.toHaveProperty("folderId");
-    });
-
-    it("carries the value each of the agent's options had, not the agent's lists of choices", async () => {
-        const device = await insertDevice(A);
-        const choices = [
-            { name: "Plan", value: "plan" },
-            { name: "Build", value: "build" },
-        ];
-
-        await insertSession(A, device, 0, {
-            agentOptions: { configOptions: [{ category: "mode", choices, currentValue: "plan", id: "mode", name: "Mode" }] },
-            capabilities: { groups: { identity: { models: [{ id: "m", name: "M" }] } }, reportedAt: 1, version: 1 },
-        });
-        await insertSession(A, device, 1, { agentOptions: { modes: { available: choices, current: "build" } } });
-
-        const pages = await collectAll(A);
-        const sessions = pages.flatMap((page) => page.sessions);
-
-        // The agent's list of models is its offer, not the person's data: it is left out of the export.
-        expect(sessions.some((session) => JSON.stringify(session).includes('"models"'))).toBe(false);
-        // The rows come back in no set order.
-        expect(sessions.map((session) => session.agentOptions)).toHaveLength(2);
-        expect(sessions.map((session) => session.agentOptions)).toEqual(
-            expect.arrayContaining([[{ id: "mode", name: "Mode", value: "plan" }], [{ id: "mode", name: "Mode", value: "build" }]]),
-        );
     });
 
     it("pages a user's tool and permission events across streams, each exactly once and in order", async () => {
@@ -259,6 +464,29 @@ describe("the export of coding-agent sessions and events", () => {
         const pages = await collectAll(A);
 
         expect(pages.flatMap((page) => [...page.sessions, ...page.events])).toEqual([]);
+    });
+
+    it("exports a session's usage without the command list the agent advertised", async () => {
+        const device = await insertDevice(A);
+        const threadId = await insertSession(A, device, 0);
+
+        await harness.run(async (ctx: any) => {
+            const row = await ctx.db.acpSessions.findFirst({ where: { threadId } });
+
+            await ctx.db.patch("acpSessions", row._id, {
+                agentState: {
+                    availableCommands: [{ description: "Review the change", name: "review" }],
+                    usage: { size: 200_000, used: 12_000 },
+                },
+            });
+        });
+
+        const page = await collectPage(A);
+        const exported = page.sessions.find((session) => session.threadId === threadId);
+
+        expect(exported?.agentState).toBeDefined();
+        expect(exported?.agentState).not.toHaveProperty("availableCommands");
+        expect(exported?.agentState?.usage).toEqual({ size: 200_000, used: 12_000 });
     });
 });
 

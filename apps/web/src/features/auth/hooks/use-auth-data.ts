@@ -112,6 +112,12 @@ const useAuthData = <T>({
 
     useEffect(() => {
         if (!sessionData) {
+            // Still loading, or a subtree hydrating (`useSession` reads as pending until then): nothing was lost yet, and the
+            // shared entry other subscribers show must stay.
+            if (sessionPending) {
+                return;
+            }
+
             // Clear cache when session is lost
             authDataCache.setRefetching(stableCacheKey, false);
             authDataCache.clear(stableCacheKey);
@@ -147,7 +153,7 @@ const useAuthData = <T>({
 
         // Update the previous user ID
         previousUserId.current = currentUserId;
-    }, [sessionData, sessionData?.user?.id, stableCacheKey, cacheEntry, staleTime]);
+    }, [sessionData, sessionData?.user?.id, sessionPending, stableCacheKey, cacheEntry, staleTime]);
 
     // Determine if we're in a pending state
     // We're only pending if:

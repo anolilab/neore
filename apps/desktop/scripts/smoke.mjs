@@ -17,6 +17,7 @@ const fail = (message) => {
 };
 
 const bundles = [
+    "boot.cjs",
     "main.cjs",
     "preload.cjs",
     "quick-composer/preload.cjs",

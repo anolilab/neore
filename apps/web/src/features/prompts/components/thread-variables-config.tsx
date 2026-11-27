@@ -13,6 +13,7 @@ import { Braces, HelpCircle, Loader2, Plus, Save, X } from "lucide-react";
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
 
+import ChangedByAdminMark from "@/features/admin/components/changed-by-admin-mark";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 import type { PromptVariable } from "../lib/prompt-variables";
@@ -46,15 +47,27 @@ const ThreadVariablesConfig = ({ threadId }: ThreadVariablesConfigProps) => {
 
     // Mutations
     const { mutateAsync: setThreadVariables } = useMutation(crpc.prompts.functions.setThreadVariables.mutationOptions());
+    const { mutateAsync: keepVariableValue } = useMutation(crpc.prompts.functions.keepVariableValue.mutationOptions());
+    // The stored values, which a keep sends (the server refuses one changed since), and the names of those an admin wrote
+    // while acting as the owner: read off the stored row, never the edited copy. A keep waits while this field shows an
+    // unsaved edit or a save is in flight, so it never carries a value other than the one on screen.
+    const storedValues = new Map((threadVariables?.variables ?? []).map((entry) => [entry.name, entry.value]));
+    const impersonatedNames = new Set(threadVariables && "variablesByImpersonator" in threadVariables ? threadVariables.variablesByImpersonator : undefined);
 
     // Sync local state with query results (filter out system-managed variables).
     // Adjusted during render rather than in an effect, so the list never paints
     // once with the previous thread's variables.
     const [syncedVariables, setSyncedVariables] = useState<typeof threadVariables | undefined>(undefined);
 
+    // The same chat's row with the values already synced changed only its marks ("Keep as mine"): unsaved edits here stay.
+    const sameValues =
+        threadVariables?.threadId === syncedVariables?.threadId && JSON.stringify(threadVariables?.variables) === JSON.stringify(syncedVariables?.variables);
+
     if (threadVariables?.variables && threadVariables !== syncedVariables) {
         setSyncedVariables(threadVariables);
+    }
 
+    if (threadVariables?.variables && threadVariables !== syncedVariables && !sameValues) {
         const { variables } = threadVariables;
 
         setLocalVariables(
@@ -233,6 +246,21 @@ const ThreadVariablesConfig = ({ threadId }: ThreadVariablesConfigProps) => {
                                         <X aria-hidden="true" className="size-3" />
                                     </Button>
                                 </div>
+                                {impersonatedNames.has(variable.name) && (
+                                    <ChangedByAdminMark
+                                        disabled={isSaving}
+                                        fieldLabel={variable.name}
+                                        onKeep={async () =>
+                                            await keepVariableValue({
+                                                name: variable.name,
+                                                scope: "thread",
+                                                threadId: threadId as Id<"threads">,
+                                                value: storedValues.get(variable.name) ?? "",
+                                            })
+                                        }
+                                        unsavedEdit={variable.value !== storedValues.get(variable.name)}
+                                    />
+                                )}
                                 <Input
                                     id={`var-${index}`}
                                     onChange={(e) => handleVariableChange(index, e.target.value)}

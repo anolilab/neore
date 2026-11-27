@@ -1,5 +1,5 @@
-//! Commands the backend sends to a coding agent on this computer: `acp_start`, `acp_send`, `acp_cancel` and
-//! `acp_permission_answer` (acp-agent-host.md §4.1).
+//! Commands the backend sends to a coding agent on this computer: `acp_start`, `acp_send`, `acp_cancel`,
+//! `acp_permission_answer` and `acp_set_config` (acp-agent-host.md §4.1).
 //!
 //! They are signed device calls like any other, but they are not device tools: nothing runs here. Rust checks the
 //! signature, the device and the expiry, decides whether the command may be carried out at all (a start needs an
@@ -32,10 +32,11 @@ const TEXT_MAX: usize = 32 * 1024;
 /// `acp_start` offers at most this many pairs in the manifest.
 pub const MAX_OFFERS: usize = 50;
 
-const TOOLS: [&str; 4] = [
+const TOOLS: [&str; 5] = [
     "acp_cancel",
     "acp_permission_answer",
     "acp_send",
+    "acp_set_config",
     "acp_start",
 ];
 
@@ -69,6 +70,14 @@ pub enum AcpCommand {
         session_id: String,
         text: String,
         turn_id: String,
+    },
+    /// Changes one of the agent's options, or (with no `option_id`) a mode of its legacy mode state. The value is
+    /// checked against what the agent itself offered by whoever acts on this; nothing here says what is offered.
+    SetConfig {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        option_id: Option<String>,
+        session_id: String,
+        value_id: String,
     },
     Start {
         agent_key: String,
@@ -285,6 +294,24 @@ impl DeviceState {
                     _ => refusal("a send names a session and a turn and carries a prompt"),
                 }
             }
+            "acp_set_config" => {
+                let option_id = match input.get("optionId") {
+                    None | Some(Value::Null) => None,
+                    Some(_) => match id_of(input, "optionId") {
+                        Some(id) => Some(id),
+                        None => return refusal("a change names its option by a valid id"),
+                    },
+                };
+
+                match (id_of(input, "sessionId"), id_of(input, "valueId")) {
+                    (Some(session_id), Some(value_id)) => Ok(AcpCommand::SetConfig {
+                        option_id,
+                        session_id,
+                        value_id,
+                    }),
+                    _ => refusal("a change names a session and a value"),
+                }
+            }
             _ => self.acp_start_command(input, host),
         }
     }
@@ -388,7 +415,7 @@ impl DeviceState {
 
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
+    use crate::test_dir::TestDir;
     use std::sync::{Arc, Mutex};
 
     use super::*;
@@ -402,11 +429,9 @@ mod tests {
 
     type Events = Arc<Mutex<Vec<Event>>>;
 
-    fn state(name: &str) -> (DeviceState, PathBuf, Events) {
+    fn state(name: &str) -> (DeviceState, TestDir, Events) {
         crate::store::test_keychain::install();
-        let dir =
-            std::env::temp_dir().join(format!("neore-acp-call-{name}-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&dir);
+        let dir = TestDir::at(&format!("acp-call-{name}"));
         std::fs::create_dir_all(&dir).unwrap();
         store::save(
             &dir.join("device.json"),
@@ -470,7 +495,7 @@ mod tests {
 
     #[test]
     fn a_valid_signature_for_an_unapproved_pair_is_refused() {
-        let (state, dir, _) = state("unapproved");
+        let (state, _dir, _) = state("unapproved");
 
         for input in [
             start_input("claude", "someone-elses-folder"),
@@ -494,13 +519,11 @@ mod tests {
             assert_eq!(result["status"], "failed");
             assert_eq!(result["error"], "refused: not approved on this computer");
         }
-
-        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
     fn an_approved_pair_yields_a_start_with_the_path_from_the_approval() {
-        let (state, dir, _) = state("approved");
+        let (state, _dir, _) = state("approved");
         let prepared = state
             .acp_prepare(&call("acp_start", start_input("claude", "f1")))
             .unwrap();
@@ -520,13 +543,11 @@ mod tests {
             })
         );
         assert_eq!(prepared.call_id, "c1");
-
-        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
     fn a_start_may_name_a_saved_session_but_only_a_valid_one() {
-        let (state, dir, _) = state("native");
+        let (state, _dir, _) = state("native");
         let mut input = start_input("claude", "f1");
 
         input["nativeSessionId"] = json!("sess_1");
@@ -573,13 +594,11 @@ mod tests {
         let prepared = state.acp_prepare(&call("acp_start", input)).unwrap();
 
         assert!(prepared.command.is_none());
-
-        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
     fn a_start_may_name_a_session_to_fork_but_not_with_one_to_load() {
-        let (state, dir, _) = state("fork");
+        let (state, _dir, _) = state("fork");
         let mut input = start_input("claude", "f1");
 
         input["forkSessionId"] = json!("sess_1");
@@ -627,13 +646,11 @@ mod tests {
             .unwrap()
             .command
             .is_none());
-
-        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
     fn a_start_cannot_carry_its_own_path() {
-        let (state, dir, _) = state("no-path");
+        let (state, _dir, _) = state("no-path");
         let mut input = start_input("claude", "f1");
 
         input["folderPath"] = json!("/etc");
@@ -644,13 +661,11 @@ mod tests {
             prepared.command,
             Some(AcpCommand::Start { ref folder_path, .. }) if folder_path == "/home/me/neore"
         ));
-
-        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
     fn a_redelivered_call_prepares_again_because_no_nonce_is_spent() {
-        let (state, dir, _) = state("redelivery");
+        let (state, _dir, _) = state("redelivery");
         let signed = call(
             "acp_send",
             json!({ "sessionId": "s1", "turnId": "u1", "text": "hi" }),
@@ -662,13 +677,11 @@ mod tests {
             result_of(&state.acp_sign(&signed, "accepted").unwrap())["status"],
             "completed"
         );
-
-        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
     fn commands_name_what_they_act_on_or_are_refused() {
-        let (state, dir, _) = state("malformed");
+        let (state, _dir, _) = state("malformed");
 
         for (tool, input) in [
             ("acp_cancel", json!({ "sessionId": "s1" })),
@@ -682,19 +695,93 @@ mod tests {
                 json!({ "sessionId": "s1", "requestId": "r1" }),
             ),
             ("acp_start", json!({ "sessionId": "s1" })),
+            ("acp_set_config", json!({ "sessionId": "s1" })),
+            ("acp_set_config", json!({ "valueId": "v1" })),
+            (
+                "acp_set_config",
+                json!({ "sessionId": "s1", "valueId": "" }),
+            ),
+            (
+                "acp_set_config",
+                json!({ "sessionId": "s1", "valueId": "v".repeat(ID_MAX + 1) }),
+            ),
+            (
+                "acp_set_config",
+                json!({ "sessionId": "s1", "valueId": "v1", "optionId": 7 }),
+            ),
+            (
+                "acp_set_config",
+                json!({ "sessionId": "s1", "valueId": "v1", "optionId": "o".repeat(ID_MAX + 1) }),
+            ),
         ] {
             let prepared = state.acp_prepare(&call(tool, input)).unwrap();
 
             assert!(prepared.command.is_none(), "{tool}");
             assert!(prepared.refusal.is_some(), "{tool}");
         }
+    }
 
-        let _ = std::fs::remove_dir_all(&dir);
+    #[test]
+    fn an_option_change_names_a_session_a_value_and_optionally_an_option() {
+        let (state, _dir, _) = state("set-config");
+
+        for (input, option) in [
+            (
+                json!({ "sessionId": "s1", "valueId": "deep", "optionId": "model" }),
+                Some("model"),
+            ),
+            (json!({ "sessionId": "s1", "valueId": "code" }), None),
+            (
+                json!({ "sessionId": "s1", "valueId": "code", "optionId": null }),
+                None,
+            ),
+        ] {
+            let prepared = state.acp_prepare(&call("acp_set_config", input)).unwrap();
+
+            assert_eq!(
+                prepared.command,
+                Some(AcpCommand::SetConfig {
+                    option_id: option.map(str::to_owned),
+                    session_id: "s1".into(),
+                    value_id: if option.is_some() { "deep" } else { "code" }.into(),
+                })
+            );
+            assert!(prepared.refusal.is_none());
+        }
+
+        // Signed like any command: the result is `accepted` and the call can be redelivered under the same envelope.
+        let signed = call(
+            "acp_set_config",
+            json!({ "sessionId": "s1", "valueId": "deep", "optionId": "model" }),
+        );
+
+        assert!(state.acp_prepare(&signed).is_ok());
+        assert_eq!(
+            result_of(&state.acp_sign(&signed, "accepted").unwrap())["status"],
+            "completed"
+        );
+        assert_eq!(
+            result_of(
+                &state
+                    .acp_sign(&signed, "the agent does not offer that choice")
+                    .unwrap()
+            )["status"],
+            "failed"
+        );
+
+        // A forged signature is no command at all.
+        let mut forged = call(
+            "acp_set_config",
+            json!({ "sessionId": "s1", "valueId": "deep" }),
+        );
+
+        forged.signature = "0".repeat(64);
+        assert!(state.acp_prepare(&forged).is_err());
     }
 
     #[test]
     fn a_cancel_keeps_the_queue_only_when_it_says_so() {
-        let (state, dir, _) = state("keep-queue");
+        let (state, _dir, _) = state("keep-queue");
 
         for (input, keep) in [
             (json!({ "sessionId": "s1", "turnId": "u1" }), false),
@@ -722,13 +809,11 @@ mod tests {
                 })
             );
         }
-
-        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
     fn a_device_tool_or_a_call_for_another_device_is_not_a_command() {
-        let (state, dir, _) = state("not-a-command");
+        let (state, _dir, _) = state("not-a-command");
 
         assert!(state.acp_prepare(&call("fs_read", json!({}))).is_err());
 
@@ -751,13 +836,11 @@ mod tests {
                 json!({ "sessionId": "s1", "turnId": "u1" })
             ))
             .is_err());
-
-        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
     fn an_unsigned_or_expired_command_is_refused() {
-        let (state, dir, _) = state("expired");
+        let (state, _dir, _) = state("expired");
         let mut forged = call("acp_cancel", json!({ "sessionId": "s1", "turnId": "u1" }));
 
         forged.signature = "0".repeat(64);
@@ -774,13 +857,11 @@ mod tests {
         );
 
         assert!(state.acp_prepare(&expired).is_err());
-
-        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
     fn the_manifest_offers_labels_and_ids_never_a_path() {
-        let (state, dir, _) = state("offers");
+        let (state, _dir, _) = state("offers");
         let offers = state.acp_offers();
 
         assert_eq!(
@@ -790,15 +871,13 @@ mod tests {
             })]
         );
         assert!(!serde_json::to_string(&offers).unwrap().contains("/home/me"));
-
-        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
     fn a_remote_answer_closes_the_local_prompt_and_a_second_one_is_already_answered() {
         use crate::acp_permission::{OfferedOption, PermissionRequest, ALREADY_ANSWERED};
 
-        let (state, dir, events) = state("remote-answer");
+        let (state, _dir, events) = state("remote-answer");
         let state = Arc::new(state);
         let waiting = Arc::clone(&state);
         let handle = std::thread::spawn(move || {
@@ -808,6 +887,7 @@ mod tests {
                 details: "{}".into(),
                 details_complete: true,
                 folder: "neore".into(),
+                local_only: false,
                 options: vec![OfferedOption {
                     kind: "allow_once".into(),
                     name: "Yes".into(),
@@ -816,6 +896,7 @@ mod tests {
                 request_id: "r1".into(),
                 session_id: "s1".into(),
                 target: None,
+                terminal: false,
                 tool: "Run tests".into(),
                 tool_kind: "execute".into(),
             })
@@ -846,7 +927,5 @@ mod tests {
                 .unwrap_err(),
             ALREADY_ANSWERED
         );
-
-        let _ = std::fs::remove_dir_all(&dir);
     }
 }

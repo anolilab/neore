@@ -135,7 +135,16 @@ export const retryDelayMs = (policy: SessionReadRetryPolicy, retry: number, serv
     return Math.min(serverAskMs ?? backoff, policy.maxDelayMs);
 };
 
+/**
+ * The browser says it has no network. Nothing a retry could reach, so a failed read stops at once
+ * instead of holding the first paint for the whole backoff; the session is re-read once it is back
+ * (`lib/auth/client.ts`). Never true where `navigator.onLine` does not exist (the server, React Native).
+ */
+const isBrowserOffline = (): boolean => (globalThis as { navigator?: { onLine?: boolean } }).navigator?.onLine === false;
+
 export interface ReadWithRetryOptions {
+    /** Whether the device is known to be offline; a network failure then ends the retries. */
+    isOffline?: () => boolean;
     policy: SessionReadRetryPolicy;
     /** The caller's abort: stops the retries, rejecting with its reason. */
     signal?: AbortSignal | null;
@@ -149,7 +158,10 @@ export interface ReadWithRetryOptions {
  * 401). Rejects with `SessionReadFailedError` when every attempt failed — the
  * caller decides what a failure means, but it is never an empty session.
  */
-export const readWithRetry = async (read: () => Promise<Response>, { policy, signal, sleep = defaultSleep }: ReadWithRetryOptions): Promise<Response> => {
+export const readWithRetry = async (
+    read: () => Promise<Response>,
+    { isOffline = isBrowserOffline, policy, signal, sleep = defaultSleep }: ReadWithRetryOptions,
+): Promise<Response> => {
     let lastFailure: SessionReadFailedError | undefined;
 
     for (let attempt = 0; attempt < policy.attempts; attempt += 1) {
@@ -177,6 +189,10 @@ export const readWithRetry = async (read: () => Promise<Response>, { policy, sig
             }
 
             lastFailure = new SessionReadFailedError(undefined, error);
+
+            if (isOffline()) {
+                throw lastFailure;
+            }
         }
 
         if (attempt < policy.attempts - 1) {
@@ -479,6 +495,54 @@ const errorStatus = (error: unknown): number | undefined => {
     const status = (error as { status?: unknown } | null | undefined)?.status;
 
     return typeof status === "number" ? status : undefined;
+};
+
+/** Whether the atom has no read in flight. */
+const isSettled = ({ error, isPending, isRefetching }: ReturnType<SessionAtomLike["get"]>): boolean => !isRefetching && !(isPending && !error);
+
+/**
+ * Re-read the session now if better-auth's atom holds a FAILED read (a 401 is an
+ * answer and is left alone), for a connection that has just come back. A read
+ * still in flight, which may have started while offline, is waited for first,
+ * and re-read once it settles if it failed: re-reading at once would join the
+ * same shared read and fail with it. Resolves once the re-read (if any) has
+ * settled, or at once when `signal` aborts.
+ */
+export const rereadFailedSessionRead = async (atom: SessionAtomLike, signal?: AbortSignal): Promise<void> => {
+    const settled = new Promise<void>((resolve) => {
+        if (isSettled(atom.get())) {
+            resolve();
+
+            return;
+        }
+
+        const stop = () => {
+            unlisten();
+            signal?.removeEventListener("abort", stop);
+            resolve();
+        };
+        const unlisten = atom.listen(() => {
+            if (isSettled(atom.get())) {
+                stop();
+            }
+        });
+
+        signal?.addEventListener("abort", stop, { once: true });
+    });
+
+    await settled;
+
+    const { error, refetch } = atom.get();
+
+    if (signal?.aborted || !error || errorStatus(error) === 401 || !refetch) {
+        return;
+    }
+
+    try {
+        await refetch();
+    } catch {
+        // The atom holds the failure; `keepRetryingFailedSessionReads` takes it from there.
+    }
 };
 
 /**

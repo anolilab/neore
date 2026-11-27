@@ -453,6 +453,7 @@ pub fn reap(_dir: &Path, _ids: &[String], _own: Option<&str>) -> Reaped {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_dir::TestDir;
 
     #[cfg(unix)]
     #[test]
@@ -480,12 +481,8 @@ mod tests {
         assert_eq!(split_ps_args("sleep 5"), ["sleep", "5"]);
     }
 
-    fn dir(name: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("neore-launch-{name}-{}", std::process::id()));
-
-        let _ = fs::remove_dir_all(&dir);
-
-        dir
+    fn dir(name: &str) -> TestDir {
+        TestDir::at(&format!("launch-{name}"))
     }
 
     const A: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";

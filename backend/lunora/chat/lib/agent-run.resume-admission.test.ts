@@ -7,11 +7,14 @@ import { describe, expect, it, vi } from "vitest";
 import z from "zod/v4";
 
 import { internal } from "../../_generated/internal";
+import { LEFT_ORGANIZATION_MESSAGE } from "../../auth/lib/organization-policy";
 import { createTool } from "../../agent/client/create-tool";
 
 import { buildAgentTools } from "./agent-tools";
 import getAgent from "./get-agent";
 import { resumeApprovedRun } from "./agent-run";
+import { createAnsweredAskUserTool } from "../tools/ask-user";
+import { createAnsweredRequestSecretTool } from "../tools/request-secret";
 
 // The rebuilt tools and the agent are not what this checks: the run stops at the approval lookup.
 vi.mock("./get-agent", () => {
@@ -21,6 +24,22 @@ vi.mock("./agent-tools", () => {
     return {
         buildAgentTools: vi.fn(async () => {
             return { mcpClients: [], mcpLabels: {}, mcpServerNames: [], permissionKeys: {}, tools: {} };
+        }),
+    };
+});
+
+// Each answered tool is a marker, so a test can tell it reached the agent the continuation runs.
+vi.mock("../tools/ask-user", () => {
+    return {
+        createAnsweredAskUserTool: vi.fn(() => {
+            return { answered: "askUser" };
+        }),
+    };
+});
+vi.mock("../tools/request-secret", () => {
+    return {
+        createAnsweredRequestSecretTool: vi.fn(() => {
+            return { answered: "requestSecret" };
         }),
     };
 });
@@ -74,6 +93,42 @@ describe(resumeApprovedRun, () => {
             ctx,
             expect.objectContaining({ headless: true, headlessApproved: ["delegateToSubAgent"], headlessCanAsk: true }),
         );
+    });
+});
+
+describe("a sub-agent child's continuation after its owner left the organization", () => {
+    it("is refused before any tool is rebuilt, as a new run would be", async () => {
+        vi.mocked(buildAgentTools).mockClear();
+
+        const runQuery = vi.fn(async (reference: unknown) => (reference === internal.auth.organization_policy.isOrganizationMemberQuery ? false : null));
+        const failure = await resumeApprovedRun({ runQuery } as never, {
+            approvalId: "approval-1",
+            approved: true,
+            config: { ...(CONFIG as object), organizationId: "org-left", subAgentRunId: "run-1" } as never,
+            streamId: "stream-1",
+            threadId: "thread-1",
+            userId: "owner-1",
+        }).catch((error: unknown) => error);
+
+        expect(failure).toMatchObject({ kind: "left-organization", message: LEFT_ORGANIZATION_MESSAGE });
+        expect(buildAgentTools).not.toHaveBeenCalled();
+    });
+
+    it("still resumes for a member, rebuilding its tools", async () => {
+        vi.mocked(buildAgentTools).mockClear();
+
+        const runQuery = vi.fn(async (reference: unknown) => (reference === internal.auth.organization_policy.isOrganizationMemberQuery ? true : null));
+
+        await resumeApprovedRun({ runQuery } as never, {
+            approvalId: "approval-1",
+            approved: true,
+            config: { ...(CONFIG as object), organizationId: "org-a", subAgentRunId: "run-1" } as never,
+            streamId: "stream-1",
+            threadId: "thread-1",
+            userId: "owner-1",
+        }).catch(() => undefined);
+
+        expect(buildAgentTools).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ organizationId: "org-a" }));
     });
 });
 
@@ -189,6 +244,72 @@ describe("a headless pause's continuation", () => {
             expect.anything(),
             expect.objectContaining({ contextOptions: { fromOrder: 4 } }),
         );
+    });
+});
+
+describe("an answer whose tool left the rebuilt set", () => {
+    let approveToolCall: ReturnType<typeof vi.fn>;
+    let denyToolCall: ReturnType<typeof vi.fn>;
+
+    /**
+     * Resumes an approved `toolName` against an empty rebuilt set, which is what an `off` cap gives, and returns the tools
+     * the continuation's agent was built with. The agent here is a stub, so the run stops right after it is built; what
+     * matters is that the agent received the answered tool, and that the resume was not refused before it.
+     */
+    const toolsOfResumedAgent = async (toolName: string, extra: Record<string, unknown>): Promise<Record<string, unknown>> => {
+        const resumeCtx = {
+            runQuery: vi.fn(async () => {
+                return { toolName };
+            }),
+        };
+
+        // Both continuations stop the run once called: which one is called is what an answer decides.
+        approveToolCall = vi.fn(async () => {
+            throw new Error("stop after approve");
+        });
+        denyToolCall = vi.fn(async () => {
+            throw new Error("stop after deny");
+        });
+        vi.mocked(getAgent).mockClear();
+        vi.mocked(getAgent).mockResolvedValue({ approveToolCall, denyToolCall, options: {} } as never);
+
+        const failure = await resumeApprovedRun(resumeCtx as never, {
+            approvalId: "approval-1",
+            approved: true,
+            config: CONFIG,
+            streamId: "stream-1",
+            threadId: "thread-1",
+            userId: "owner-1",
+            ...extra,
+        })
+            .then(() => undefined)
+            .catch((error: unknown) => error);
+
+        // A refusal before the agent (a stale or unanswerable approval) would leave the answer unused.
+        expect(failure).not.toMatchObject({ kind: "stale-approval" });
+        expect(getAgent).toHaveBeenCalledTimes(1);
+
+        const [, options] = vi.mocked(getAgent).mock.calls[0] as unknown as [string, { tools: Record<string, unknown> }];
+
+        return options.tools;
+    };
+
+    it("runs the person's answer to a question as the call's result, rather than recording a denial", async () => {
+        const tools = await toolsOfResumedAgent("askUser", { answer: "Blue" });
+
+        expect(createAnsweredAskUserTool).toHaveBeenLastCalledWith("Blue", [], []);
+        expect(tools).toStrictEqual({ askUser: { answered: "askUser" } });
+        expect(approveToolCall).toHaveBeenCalledTimes(1);
+        expect(denyToolCall).not.toHaveBeenCalled();
+    });
+
+    it("runs the reference to a requested secret as the call's result, rather than recording a denial", async () => {
+        const tools = await toolsOfResumedAgent("requestSecret", { answer: "secret-ref-1" });
+
+        expect(createAnsweredRequestSecretTool).toHaveBeenLastCalledWith("secret-ref-1");
+        expect(tools).toStrictEqual({ requestSecret: { answered: "requestSecret" } });
+        expect(approveToolCall).toHaveBeenCalledTimes(1);
+        expect(denyToolCall).not.toHaveBeenCalled();
     });
 });
 

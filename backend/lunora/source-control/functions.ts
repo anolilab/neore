@@ -57,7 +57,19 @@ const vDetail = v.object({
     deletions: v.number(),
     draft: v.boolean(),
     headBranch: v.string(),
+    headInBaseRepository: v.boolean(),
     headSha: v.string(),
+    mergeState: v.optional(
+        v.union(
+            v.literal("behind"),
+            v.literal("blocked"),
+            v.literal("clean"),
+            v.literal("conflicting"),
+            v.literal("draft"),
+            v.literal("unknown"),
+            v.literal("unstable"),
+        ),
+    ),
     number: v.number(),
     repository: v.string(),
     state: v.union(v.literal("closed"), v.literal("merged"), v.literal("open")),
@@ -173,6 +185,27 @@ export const getPullRequest = authAction
         });
 
         ctx.log.event("source_control.get_pull_request", { status: outcome.status });
+
+        return outcome;
+    });
+
+/**
+ * How far the head commit `headSha` is behind (and ahead of) the base branch `baseBranch`, from the host comparing the two.
+ * The answer names the branch and commit it compared, so the page uses it only for the revision it shows.
+ */
+export const getBranchComparison = authAction
+    .use(rateLimit("sourceControl/read"))
+    .input({ ...vRef, baseBranch: v.string().max(MAX_LENGTH.short), headSha: v.string().max(MAX_LENGTH.short) })
+    .output(v.union(v.object({ aheadBy: v.number(), baseBranch: v.string(), behindBy: v.number(), headSha: v.string(), status: v.literal("ok") }), vFailed))
+    .action(async ({ args, ctx }) => {
+        const token = await resolveGithubToken(ctx, ctx.user.userId);
+        const outcome = await readFromHost(DEVELOP_DRIVER, token, async (request) => {
+            const comparison = await DEVELOP_DRIVER.compareWithBase(request, args, args.baseBranch, args.headSha);
+
+            return { ...comparison, baseBranch: args.baseBranch, headSha: args.headSha };
+        });
+
+        ctx.log.event("source_control.get_branch_comparison", { status: outcome.status });
 
         return outcome;
     });

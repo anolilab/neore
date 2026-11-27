@@ -7,11 +7,15 @@ export type AuthStatus = "loading" | "signed-in" | "signed-out";
 export interface AuthValue {
     /** Whether a JWT is held. A cold start with no network is signed in (the stored user is known) but holds none, so it reads nothing from the server. */
     hasToken: boolean;
+    /** Signed in from the stored user while the first token mint is still out: not yet confirmed, and not offline either. */
+    isConfirming: boolean;
     /** Mints a new JWT now instead of at the next retry. Resolves when that attempt has ended, whether or not it got one. */
     retryToken: () => Promise<void>;
     signIn: () => Promise<void>;
     signOut: () => Promise<void>;
     status: AuthStatus;
+    /** Moves each time a JWT is minted, so a read that failed on a lapsed token can run again once a new one is held. */
+    tokenSerial: number;
     user: GrantUser | null;
 }
 

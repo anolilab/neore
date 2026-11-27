@@ -24,16 +24,19 @@
  * - **A turn cut off by a restart** is recorded on disk while it runs. On the next start each such turn is ended
  * with the reason `interrupted`, at the `seq` the backend says is next.
  */
+import { createHash } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import type { ChildEvent } from "./children";
-import type { HostEvent, HostSessionInfo, PermissionOutcomeKind, PermissionRequestEvent, PostResult, SessionObserver, TurnSummary } from "./host-events";
-import { capPermissionRequest, capPrompt, capRequestId, capSessionInfo, childHostEvents, endReasonOf } from "./host-events";
+import type { AgentUsage, HostEvent, HostSessionInfo, PermissionOutcomeKind, PermissionRequestEvent, PostResult, SessionObserver, SessionStatePatch, ToolReport, TurnSummary } from "./host-events";
+import { capExit, capPermissionRequest, capPrompt, capRequestId, capSessionInfo, childHostEvents, endReasonOf } from "./host-events";
 import type { ImportIo } from "./import-post";
 import type { MediaOptions } from "./media";
 import { collectMedia, imageReferences } from "./media";
+import type { PlanEntry } from "./plan";
 import { SessionLink } from "./session-link";
+import { MAX_TOOL_OUTPUT_CHARS } from "./tool-output";
 import type { ChannelHost } from "./turn-channel";
 import { TurnChannel } from "./turn-channel";
 import type { StopReason } from "./types";
@@ -45,6 +48,64 @@ const REQUEST_TIMEOUT_MS = 20_000;
 /** The most of a turn's text kept for its references; a reply is capped at the same length on the backend. */
 const MAX_TURN_TEXT_CHARS = 256_000;
 const REFUSED_STATUSES = new Set([400, 403, 413]);
+
+/** Agent state is coalesced to one post per session per this many ms; a failed post waits this long before its retry. */
+const STATE_DEBOUNCE_MS = 2000;
+const STATE_RETRY_MS = 30_000;
+
+/** A report is posted this many times at most while nothing newer replaces it; then it is dropped (the agent's next report carries the value again). */
+export const MAX_STATE_ATTEMPTS = 10;
+
+/**
+ * A report waiting to be posted. `at` is when the agent's value was observed, not when it is sent: a value sent again
+ * after a newer one was posted carries its old `at`, and the backend drops it.
+ */
+interface PendingState extends SessionStatePatch {
+    at: number;
+    /** The report's place in this session's observation order (`stateSeq`): the backend keeps the newest one, whatever the clocks say. */
+    seq: number;
+}
+
+/**
+ * The report to keep after a send failed: a field observed later wins, whichever send it went out with. Two sends can be in
+ * flight at once, so the one that failed may be the older value; it must not replace the newer one. "Later" is the
+ * sequence number, not the clock: the clock can move back, and a report observed later can carry an earlier time.
+ */
+export const newerPending = (failed: PendingState, waiting: PendingState | undefined): PendingState => {
+    if (waiting === undefined) {
+        return failed;
+    }
+
+    const [older, newer] = waiting.seq < failed.seq ? [waiting, failed] : [failed, waiting];
+    const usage = mergeUsage(older.usage, newer.usage);
+
+    return { ...older, ...newer, ...usage !== undefined && { usage }, at: newer.at, seq: Math.max(older.seq, newer.seq) };
+};
+
+/** A usage report's counts are the newer ones; the cost is the newer one when it has one, otherwise the older one (a running total). */
+const mergeUsage = (older: AgentUsage | undefined, newer: AgentUsage | undefined): AgentUsage | undefined => {
+    if (newer === undefined) {
+        return older;
+    }
+
+    const cost = newer.cost ?? older?.cost;
+
+    return { size: newer.size, used: newer.used, ...cost !== undefined && { cost } };
+};
+
+/**
+ * The fields a report sends only on change: the agent's options, its legacy states and its command list. A dropped report hands these
+ * on to the session's next report, so the agent's one-time list is not lost with the usage.
+ */
+const changeOnlyFieldsOf = (state: SessionStatePatch): SessionStatePatch => {
+    return {
+        ...state.availableCommands !== undefined && { availableCommands: state.availableCommands },
+        ...state.configOptions !== undefined && { configOptions: state.configOptions },
+        ...state.models !== undefined && { models: state.models },
+        ...state.modes !== undefined && { modes: state.modes },
+    };
+};
+
 /** A run of 401s this long and this many is a device the backend no longer knows, not a clock blip. */
 const REVOKED_AFTER_MS = 60_000;
 const REVOKED_AFTER_ATTEMPTS = 5;
@@ -82,6 +143,31 @@ export interface RunningTurn {
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
 
+/** The field texts of a report, for the fields it carries: a report whose texts a session already has is not posted again. */
+const valuesOf = (report: PendingState): Map<string, string> => {
+    const values = new Map<string, string>();
+
+    for (const key of ["availableCommands", "configOptions", "models", "modes", "usage"] as const) {
+        if (report[key] !== undefined) {
+            values.set(key, JSON.stringify(report[key]));
+        }
+    }
+
+    return values;
+};
+
+/**
+ * A call id the backend accepts (at most 128 bytes). A longer id is cut and followed by a hash of the whole, so two ids that share a
+ * prefix stay two calls. The cut is at 24 characters, so the result stays under the byte limit for any characters.
+ */
+const boundedCallId = (id: string): string => {
+    if (Buffer.byteLength(id) <= 128) {
+        return id;
+    }
+
+    return `${id.slice(0, 24)}#${createHash("sha256").update(id).digest("hex").slice(0, 32)}`;
+};
+
 export class HostPoster implements SessionObserver {
     private readonly channelHost: ChannelHost;
 
@@ -94,6 +180,50 @@ export class HostPoster implements SessionObserver {
     private readonly infos = new Map<string, HostSessionInfo>();
 
     private readonly sessions = new Map<string, SessionLink>();
+
+    /** The agent's own reports not yet posted, by session: the newest value of each field (`sessionState`). */
+    private readonly pendingState = new Map<string, PendingState>();
+
+    private stateTimer: ReturnType<typeof setTimeout> | undefined;
+
+    /** Sessions the desktop has ended: a report still waiting for a thread that will never come is dropped. */
+    private readonly endedSessions = new Set<string>();
+
+    /** When the pending timer fires: a sooner report moves it earlier, a later one leaves it. */
+    private stateDueAt: number | undefined;
+
+    /** The state post on its way, per session: at most one per session, so a session's reports stay in order. */
+    private readonly stateInFlight = new Map<string, Promise<void>>();
+
+    /** When a session's failed report may be retried: its own backoff, unaffected by other sessions' reports. */
+    private readonly stateRetryAt = new Map<string, number>();
+
+    /** Failed posts of a session's current report, reset by a fresh report or a success (`MAX_STATE_ATTEMPTS`). */
+    private readonly stateAttempts = new Map<string, number>();
+
+    /**
+     * The newest sequence number handed out per session. Kept for the life of the process, not forgotten with the post bookkeeping:
+     * a report after the session ended must still count above the ones before it, or the backend would drop it as older.
+     */
+    private readonly stateSeq = new Map<string, number>();
+
+    /** Where this process's sequence numbers start: the clock when it first numbers a report (`nextStateSeq`). */
+    private stateSeqBase: number | undefined;
+
+    /** When a session last posted its report: its next one waits out `STATE_DEBOUNCE_MS` from it, whichever pass runs. */
+    private readonly stateSentAt = new Map<string, number>();
+
+    /** The values last posted for a session, one JSON text per field: a report whose values are these again is not posted. */
+    private readonly sentValues = new Map<string, Map<string, string>>();
+
+    /** What each running turn's calls last posted as their output (`tool_output`), by turn and call id. */
+    private readonly postedOutput = new Map<string, string>();
+
+    /** The change-only fields (options, legacy states, command list) of a report that was dropped: the next report carries them. */
+    private readonly heldOptions = new Map<string, SessionStatePatch>();
+
+    /** Sessions whose option fields the backend refused once and that are waiting on the next report: a second refusal is not held again. */
+    private readonly optionsRefused = new Set<string>();
 
     /** The text of each running turn, kept for the references its reply makes (capped). */
     private readonly texts = new Map<string, string>();
@@ -115,6 +245,13 @@ export class HostPoster implements SessionObserver {
             finished: (channel) => {
                 this.channels.delete(channel.turnId);
                 this.texts.delete(channel.turnId);
+
+                for (const key of this.postedOutput.keys()) {
+                    if (key.startsWith(`${channel.turnId}\u{0}`)) {
+                        this.postedOutput.delete(key);
+                    }
+                }
+
                 this.persist();
                 this.closeWhenDrained(channel.sessionId);
             },
@@ -134,13 +271,18 @@ export class HostPoster implements SessionObserver {
         const link = new SessionLink(sessionId, capSessionInfo(info), {
             bound: (id, thread) => this.bindThread(id, thread),
             deviceId: () => this.options.deviceId(),
+            flushReport: async (id) => await this.flushReport(id),
             now: () => this.now(),
             random: () => this.random(),
-            released: (id) => this.releaseChannels(id),
+            released: (id) => this.releaseSession(id),
             request: async (payload) => await this.request(payload),
         });
 
         this.sessions.set(sessionId, link);
+
+        if (this.pendingState.has(sessionId)) {
+            this.scheduleState(STATE_DEBOUNCE_MS);
+        }
 
         if (this.options.deviceId() === undefined) {
             // Not paired: the session stays on this computer.
@@ -154,10 +296,23 @@ export class HostPoster implements SessionObserver {
         link.open();
     }
 
-    /** The session's options changed: the backend is told with the session's open, sent again. */
-    public sessionUpdated(sessionId: string, info: HostSessionInfo): void {
-        this.infos.set(sessionId, info);
-        this.sessions.get(sessionId)?.update(capSessionInfo(info));
+    /**
+     * What the agent reported about itself. The newest value of each field is kept until the next post, so a burst of
+     * usage updates (one per model step) costs one post, not one each.
+     */
+    public sessionState(sessionId: string, patch: SessionStatePatch): void {
+        const pending = this.pendingState.get(sessionId);
+        // A usage report inside the same window that leaves the cost out keeps the cost before it: the agent's cost is cumulative.
+        const usage = patch.usage === undefined ? pending?.usage : { ...pending?.usage, ...patch.usage };
+        // Options held by a dropped report go out with this one; a newer options report in the patch replaces them.
+        const held = this.heldOptions.get(sessionId);
+
+        this.heldOptions.delete(sessionId);
+        this.pendingState.set(sessionId, { ...held, ...pending, ...patch, ...usage !== undefined && { usage }, at: this.now(), seq: this.nextStateSeq(sessionId) });
+        // A fresh report is the newest value, so it does not wait out its own session's backoff: the next flush sends it.
+        this.stateRetryAt.delete(sessionId);
+        this.stateAttempts.delete(sessionId);
+        this.scheduleState(STATE_DEBOUNCE_MS);
     }
 
     /** This computer was paired: the sessions that stayed local while it was not now open on the backend. */
@@ -165,12 +320,23 @@ export class HostPoster implements SessionObserver {
         for (const link of this.sessions.values()) {
             link.paired();
         }
+
+        // Reports held for sessions that were opened while unpaired go out once their threads are bound.
+        if (this.pendingState.size > 0) {
+            this.scheduleState(STATE_DEBOUNCE_MS);
+        }
     }
 
     public sessionEnded(sessionId: string): void {
+        this.endedSessions.add(sessionId);
         this.sessions.get(sessionId)?.close();
         this.closing.add(sessionId);
         this.closeWhenDrained(sessionId);
+
+        // A report still waiting for its thread is dropped by the next flush: run that now, not with the next report.
+        if (this.pendingState.has(sessionId)) {
+            this.scheduleState(STATE_DEBOUNCE_MS);
+        }
     }
 
     public turnReceived(sessionId: string, turnId: string, user: string): void {
@@ -243,16 +409,53 @@ export class HostPoster implements SessionObserver {
         this.channels.get(turnId)?.append("reasoning", delta);
     }
 
-    public tool(_sessionId: string, turnId: string, tool: { id: string; kind: string; status: string; title: string }): void {
-        this.channels
-            .get(turnId)
-            ?.enqueue({ id: tool.id.slice(0, 128), kind: "tool", status: tool.status, title: tool.title.slice(0, 500), toolKind: tool.kind.slice(0, 64) });
+    /**
+     * A call's state, and, in a `tool_output` event of its own, what it printed and how its terminal ended, posted only
+     * when that changed: a status update does not resend the output, and the `tool` event keeps its stored shape.
+     */
+    public tool(_sessionId: string, turnId: string, tool: ToolReport): void {
+        const channel = this.channels.get(turnId);
+
+        if (channel === undefined) {
+            return;
+        }
+
+        const id = boundedCallId(tool.id);
+
+        channel.enqueue({ id, kind: "tool", status: tool.status, title: tool.title.slice(0, 500), toolKind: tool.kind.slice(0, 64) });
+
+        if (tool.output === undefined && tool.exit === undefined) {
+            return;
+        }
+
+        const printed = {
+            id,
+            kind: "tool_output" as const,
+            output: (tool.output ?? "").slice(-MAX_TOOL_OUTPUT_CHARS),
+            ...tool.exit !== undefined && { exit: capExit(tool.exit) },
+        };
+        const key = `${turnId}\u{0}${id}`;
+        const signature = JSON.stringify(printed);
+
+        // An empty output with nothing posted before it and no exit has nothing to clear.
+        if (printed.output === "" && !this.postedOutput.has(key) && tool.exit === undefined) {
+            return;
+        }
+
+        // Recorded only once the channel takes it: a dropped output (its queue over the cap) is sent again by the next report.
+        if (this.postedOutput.get(key) !== signature && channel.enqueue(printed)) {
+            this.postedOutput.set(key, signature);
+        }
     }
 
     public child(_sessionId: string, turnId: string, spawnId: string, event: ChildEvent): void {
         for (const posted of childHostEvents(spawnId, event)) {
             this.channels.get(turnId)?.enqueue(posted);
         }
+    }
+
+    public plan(_sessionId: string, turnId: string, entries: PlanEntry[]): void {
+        this.channels.get(turnId)?.enqueue({ entries, kind: "plan" });
     }
 
     public permissionRequested(_sessionId: string, turnId: string, request: PermissionRequestEvent): void {
@@ -319,7 +522,7 @@ export class HostPoster implements SessionObserver {
      * message the replay took up again). Call once after the core is up, with what `readLeftovers` returned.
      */
     public async recover(leftovers?: RunningTurn[]): Promise<void> {
-        const left = leftovers ?? (await this.readLeftovers());
+        const left = leftovers ?? await this.readLeftovers();
 
         for (const turn of left) {
             if (this.channels.has(turn.turnId)) {
@@ -337,6 +540,8 @@ export class HostPoster implements SessionObserver {
 
     /** Stops every timer. Output not yet sent is lost, as the process is going away; the next start ends those turns as interrupted. */
     public stop(): void {
+        clearTimeout(this.stateTimer);
+        this.stateTimer = undefined;
         this.stopped = true;
 
         for (const channel of this.channels.values()) {
@@ -387,8 +592,8 @@ export class HostPoster implements SessionObserver {
                     {
                         ...media,
                         deviceId: this.options.deviceId,
-                        ...(this.options.fetch && { fetch: this.options.fetch }),
-                        ...(this.options.log && { log: this.options.log }),
+                        ...this.options.fetch && { fetch: this.options.fetch },
+                        ...this.options.log && { log: this.options.log },
                         now: () => this.now(),
                     },
                     info.agentKey,
@@ -416,6 +621,64 @@ export class HostPoster implements SessionObserver {
         }
     }
 
+    /** A session that stays local: its waiting turns end, and a report held for it is dropped by the flush this schedules. */
+    private releaseSession(sessionId: string): void {
+        this.releaseChannels(sessionId);
+
+        if (this.pendingState.has(sessionId)) {
+            this.scheduleState(STATE_DEBOUNCE_MS);
+        }
+    }
+
+    /**
+     * Posts the report held for a session now, and resolves once that post has settled. A post already on its way for the
+     * session goes first. A single failed attempt is not waited on: the report is kept for its retry and the caller goes on.
+     */
+    private async flushReport(sessionId: string): Promise<void> {
+        for (let sending = this.stateInFlight.get(sessionId); sending !== undefined; sending = this.stateInFlight.get(sessionId)) {
+            // eslint-disable-next-line no-await-in-loop -- one session's posts go one after another
+            await sending;
+        }
+
+        const pending = this.pendingState.get(sessionId);
+        const deviceId = this.options.deviceId();
+        const threadId = this.sessions.get(sessionId)?.threadId;
+
+        // Not bound to a thread (still opening, or local): nothing is posted here. A local session's report is dropped by the flush.
+        if (typeof threadId !== "string" || pending === undefined || deviceId === undefined || this.stopped) {
+            return;
+        }
+
+        // A failed post waits out its own backoff, as the timed flush does: the close does not repost it at once. The timed flush sends it.
+        const retryAt = this.stateRetryAt.get(sessionId);
+
+        if (retryAt !== undefined && retryAt > this.now()) {
+            return;
+        }
+
+        await this.postReport(sessionId, pending, deviceId);
+    }
+
+    /** Takes a session's pending report and posts it, unless it repeats the values already posted. */
+    private async postReport(sessionId: string, pending: PendingState, deviceId: string): Promise<void> {
+        this.pendingState.delete(sessionId);
+
+        // Posted: an id is kept only while a report of its ended session is held back, and this one is no longer held. A session
+        // still closing keeps its id until it drains (`closeWhenDrained`).
+        if (!this.closing.has(sessionId)) {
+            this.endedSessions.delete(sessionId);
+        }
+
+        // A report repeating the values already posted is not sent: the backend would only rewrite the row to record the same.
+        if (this.repeatsSent(sessionId, pending)) {
+            this.forgetStateOf(sessionId);
+
+            return;
+        }
+
+        await this.sendState(sessionId, pending, deviceId);
+    }
+
     /**
      * Tells the backend a local session is over, once its last turn has been delivered: the backend refuses turn
      * posts into an ended session, so closing first would lose the final reply.
@@ -432,7 +695,104 @@ export class HostPoster implements SessionObserver {
         }
 
         this.closing.delete(sessionId);
+
+        // An ended session's id is needed only while a report of it may still be held back.
+        if (!this.pendingState.has(sessionId)) {
+            this.endedSessions.delete(sessionId);
+        }
+
         this.sessions.get(sessionId)?.announceClose();
+        this.forgetStateOf(sessionId);
+    }
+
+    /**
+     * The next sequence number of a session's reports, in the order they are observed. The numbers of a process start from the
+     * clock, not from 1: a desktop restarted with a session the backend already holds numbers above the reports the earlier
+     * process sent, which the backend keeps (it drops a report at or below the newest one it has).
+     */
+    private nextStateSeq(sessionId: string): number {
+        this.stateSeqBase ??= this.now();
+
+        const next = Math.max(this.stateSeq.get(sessionId) ?? 0, this.stateSeqBase) + 1;
+
+        this.stateSeq.set(sessionId, next);
+
+        return next;
+    }
+
+    /** Whether every field the report carries is already posted as it is for this session. */
+    private repeatsSent(sessionId: string, report: PendingState): boolean {
+        const sent = this.sentValues.get(sessionId);
+        const values = valuesOf(report);
+
+        return sent !== undefined && values.size > 0 && [...values].every(([key, value]) => sent.get(key) === value);
+    }
+
+    /**
+     * Records the values a post carried as the ones the backend now holds for this session. Only an accepted post stores them: a
+     * refused one leaves them unrecorded, so a later report repeating them is sent.
+     */
+    private rememberSent(sessionId: string, report: PendingState, result: PostResult): void {
+        if (result.kind !== "ok") {
+            return;
+        }
+
+        const sent = this.sentValues.get(sessionId) ?? new Map<string, string>();
+
+        for (const [key, value] of valuesOf(report)) {
+            sent.set(key, value);
+        }
+
+        this.sentValues.set(sessionId, sent);
+    }
+
+    /**
+     * Forgets a session's post bookkeeping once the session has ended and nothing of it is pending or in flight. Without this,
+     * the per-session maps keep every session that ever posted a report for the life of the process.
+     */
+    private forgetStateOf(sessionId: string): void {
+        if (this.pendingState.has(sessionId) || this.stateInFlight.has(sessionId) || this.sessions.get(sessionId)?.isClosed !== true) {
+            return;
+        }
+
+        this.sentValues.delete(sessionId);
+        this.stateSentAt.delete(sessionId);
+        this.stateAttempts.delete(sessionId);
+        this.stateRetryAt.delete(sessionId);
+        this.heldOptions.delete(sessionId);
+        this.optionsRefused.delete(sessionId);
+    }
+
+    /**
+     * What an accepted or refused post leaves of its option fields. The agent sends options only on change, so when the backend refuses
+     * a post carrying them, the usage that follows would leave it without them: they are kept for the next report. Options refused a
+     * second time are not kept again, so a persistent refusal cannot hold back the usage after them.
+     */
+    private settleOptionsOf(sessionId: string, result: PostResult, sent: PendingState): void {
+        const options = changeOnlyFieldsOf(sent);
+
+        if (result.kind !== "refused" || Object.keys(options).length === 0) {
+            this.optionsRefused.delete(sessionId);
+
+            return;
+        }
+
+        if (this.optionsRefused.has(sessionId)) {
+            this.optionsRefused.delete(sessionId);
+
+            return;
+        }
+
+        this.optionsRefused.add(sessionId);
+
+        // A newer report already waiting carries the options under its own, which take precedence.
+        const waiting = this.pendingState.get(sessionId);
+
+        if (waiting === undefined) {
+            this.heldOptions.set(sessionId, options);
+        } else {
+            this.pendingState.set(sessionId, { ...options, ...waiting });
+        }
     }
 
     private bindThread(sessionId: string, threadId: string): void {
@@ -442,7 +802,195 @@ export class HostPoster implements SessionObserver {
             }
         }
 
+        // A state report that waited for the thread goes out now.
+        if (this.pendingState.has(sessionId)) {
+            this.scheduleState(STATE_DEBOUNCE_MS);
+        }
+
         this.persist();
+    }
+
+    /**
+     * One timer for both delays: a sooner report moves it earlier, so a retry's long backoff never holds back a fresh
+     * report, and a later one never pushes a pending flush out. Nothing is scheduled once the poster is stopped.
+     */
+    private scheduleState(ms: number): void {
+        const dueAt = this.now() + ms;
+
+        if (this.stopped || (this.stateTimer !== undefined && this.stateDueAt !== undefined && this.stateDueAt <= dueAt)) {
+            return;
+        }
+
+        clearTimeout(this.stateTimer);
+        this.stateDueAt = dueAt;
+        this.stateTimer = setTimeout(async () => {
+            this.stateTimer = undefined;
+            this.stateDueAt = undefined;
+            await this.runStateFlush();
+        }, ms);
+    }
+
+    /**
+     * Runs one pass when the timer comes due. There is no pass lock: each session's post is guarded by `stateInFlight`, so one
+     * session's stalled request never holds back another session's report.
+     */
+    private async runStateFlush(): Promise<void> {
+        await this.flushState();
+    }
+
+    /**
+     * One signed `session_state` post per session with a pending report. The payload is built here, at send time, so a
+     * retry carries a fresh `issuedAt` (an old one fails the backend's freshness check after an outage). A session with
+     * no thread yet keeps its report; a local-only session drops it.
+     */
+    private async flushState(): Promise<void> {
+        if (this.stopped) {
+            return;
+        }
+
+        const deviceId = this.options.deviceId();
+        // A snapshot: a send below writes its entry back, and this pass must not reach that entry again.
+        const snapshot = new Map(this.pendingState);
+        const sends: Promise<void>[] = [];
+        let nextDueAt: number | undefined;
+
+        for (const sessionId of snapshot.keys()) {
+            const pending = this.pendingState.get(sessionId);
+
+            if (pending === undefined || this.stopped || this.stateInFlight.has(sessionId)) {
+                continue;
+            }
+
+            const link = this.sessions.get(sessionId);
+
+            // Not posted now: a session not yet bound to its thread, or one held while unpaired. The report waits, and pairing
+            // or the thread's binding flushes it.
+            // A session that ended without ever reaching the backend has nothing to deliver its report to. One whose open is still in
+            // flight keeps it: the open answers, the thread binds, and the report goes out before the close.
+            // An ended session that never got a link (its start failed before the open) or whose link never bound a thread has no
+            // thread to deliver to: its report is dropped here, and its ended mark with it.
+            if ((link === undefined || link.threadId === null) && this.endedSessions.has(sessionId)) {
+                this.pendingState.delete(sessionId);
+                this.endedSessions.delete(sessionId);
+
+                continue;
+            }
+
+            if (deviceId === undefined || link?.threadId === undefined || link.threadId === null) {
+                continue;
+            }
+
+            // A session whose report failed waits out its own backoff, and its posts are two seconds apart, whichever pass runs.
+            const heldUntil = this.stateHeldUntil(sessionId);
+
+            if (heldUntil !== undefined) {
+                nextDueAt = Math.min(nextDueAt ?? heldUntil, heldUntil);
+
+                continue;
+            }
+
+            // Sessions are independent: one slow post does not hold up another session's report. Each is signed when it is sent.
+            sends.push(this.postReport(sessionId, pending, deviceId));
+        }
+
+        if (nextDueAt !== undefined) {
+            this.scheduleState(nextDueAt - this.now());
+        }
+
+        await Promise.all(sends);
+    }
+
+    /**
+     * When a session's next report may go: the end of its failed post's backoff, else two seconds after its last post. Undefined
+     * when it may go now. The window counts forward only, so a clock that moved back does not hold the report until it catches up.
+     */
+    private stateHeldUntil(sessionId: string): number | undefined {
+        const retryAt = this.stateRetryAt.get(sessionId);
+
+        if (retryAt !== undefined && retryAt > this.now()) {
+            return retryAt;
+        }
+
+        const sentAt = this.stateSentAt.get(sessionId);
+        const eligibleAt = (sentAt ?? 0) + STATE_DEBOUNCE_MS;
+
+        return sentAt !== undefined && sentAt <= this.now() && eligibleAt > this.now() ? eligibleAt : undefined;
+    }
+
+    /** Sends one session's report. It is in flight until it has settled: a held report (`flushReport`) waits for it. */
+    private async sendState(sessionId: string, pending: PendingState, deviceId: string): Promise<void> {
+        let settled = () => {};
+
+        // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- the supported Node range starts before it exists
+        this.stateInFlight.set(sessionId, new Promise<void>((resolve) => {
+            settled = resolve;
+        }));
+
+        try {
+            await this.postState(sessionId, pending, deviceId);
+        } finally {
+            this.stateInFlight.delete(sessionId);
+            settled();
+
+            // A report that arrived while this post was on its way is sent by the next flush of this session, unless it is backing off.
+            if (this.pendingState.has(sessionId) && !this.stateRetryAt.has(sessionId)) {
+                this.scheduleState(STATE_DEBOUNCE_MS);
+            }
+
+            this.forgetStateOf(sessionId);
+        }
+    }
+
+    /** Posts one session's report. A failed post keeps what is newer than this send, and waits out its own backoff. */
+    private async postState(sessionId: string, pending: PendingState, deviceId: string): Promise<void> {
+        this.stateSentAt.set(sessionId, this.now());
+
+        const now = this.now();
+        const { at, seq, ...fields } = pending;
+        const payload = JSON.stringify({ deviceId, events: [{ ...fields, at, kind: "session_state", seq }], issuedAt: now, kind: "turn", sessionId, v: 1 });
+        let result: PostResult;
+
+        try {
+            result = await this.request(payload);
+        } catch {
+            result = { kind: "retry" };
+        }
+
+        if (result.kind === "retry") {
+            const waiting = this.pendingState.get(sessionId);
+            const attempts = (this.stateAttempts.get(sessionId) ?? 0) + 1;
+
+            if (waiting === undefined && attempts >= MAX_STATE_ATTEMPTS) {
+                // Nothing newer replaces it, and it has failed this many times: its usage is dropped, not written back (the agent's
+                // next report carries the usage again). The options and the command list are sent only on change, so they are held
+                // for the next report.
+                this.pendingState.delete(sessionId);
+                this.stateAttempts.delete(sessionId);
+                this.stateRetryAt.delete(sessionId);
+
+                const changeOnly = changeOnlyFieldsOf(pending);
+
+                if (Object.keys(changeOnly).length > 0) {
+                    this.heldOptions.set(sessionId, changeOnly);
+                }
+            } else {
+                this.pendingState.set(sessionId, newerPending(pending, waiting));
+                this.stateAttempts.set(sessionId, attempts);
+
+                // A fresh report that arrived meanwhile is not held behind this failure: the finally block sends it at its
+                // debounce. Only a failed report with nothing newer waiting backs off.
+                if (waiting === undefined) {
+                    this.stateRetryAt.set(sessionId, this.now() + STATE_RETRY_MS);
+                    this.scheduleState(STATE_RETRY_MS);
+                }
+            }
+        } else {
+            this.stateRetryAt.delete(sessionId);
+            this.stateAttempts.delete(sessionId);
+
+            this.rememberSent(sessionId, pending, result);
+            this.settleOptionsOf(sessionId, result, pending);
+        }
     }
 
     private async sendTurn(channel: TurnChannel, firstSeq: number, events: HostEvent[]): Promise<PostResult> {
@@ -504,8 +1052,8 @@ export class HostPoster implements SessionObserver {
                 ended: fields.ended === true,
                 kind: "ok",
                 next: fields.next,
-                ...(typeof fields.existing === "boolean" && { existing: fields.existing }),
-                ...(typeof fields.threadId === "string" && { threadId: fields.threadId }),
+                ...typeof fields.existing === "boolean" && { existing: fields.existing },
+                ...typeof fields.threadId === "string" && { threadId: fields.threadId },
             };
         }
 
@@ -519,8 +1067,8 @@ export class HostPoster implements SessionObserver {
         const now = this.now();
         // Retries come at most ~50 s apart (a request timeout plus the longest backoff), so a longer gap (the computer
         // slept, the network was down, a close gave up) ends the streak: only 401s that keep arriving count.
-        const streak =
-            this.unauthorized === undefined || now - this.unauthorized.last > REVOKED_AFTER_MS
+        const streak
+            = this.unauthorized === undefined || now - this.unauthorized.last > REVOKED_AFTER_MS
                 ? { count: 1, last: now, reported: false, since: now }
                 : { ...this.unauthorized, count: this.unauthorized.count + 1, last: now };
 

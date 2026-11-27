@@ -79,6 +79,10 @@ pub struct AcpInstall {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub index_integrity: Option<String>,
     pub publisher: String,
+    /// The names of the variables the registry set at this install. A reinstall drops those the registry no longer
+    /// sets and keeps the agent's other variables (the person's own).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub registry_env: Vec<String>,
     /// SHA-256 of the archive that was verified, lowercase hex.
     pub sha256: String,
     /// The archive's URL, as the registry gave it.
@@ -107,6 +111,23 @@ fn keeps_program_pin(before: &AcpAgent, command: &str, args: &[String]) -> bool 
 /// `NODE_*` setting (`NODE_OPTIONS` with `--require` or `--import`, `NODE_PATH`).
 fn changes_node(name: &str) -> bool {
     changes_program(name) || name.to_ascii_uppercase().starts_with("NODE_")
+}
+
+/// A variable of `agent_key` the person set is theirs from now on, even under a name the registry set at install: a
+/// reinstall that no longer sets it keeps their value. A global variable is not in any agent's own set.
+fn disown_registry_var(settings: &mut crate::store::Settings, agent_key: Option<&str>, name: &str) {
+    let Some(key) = agent_key else {
+        return;
+    };
+
+    if let Some(pin) = settings
+        .acp_agents
+        .iter_mut()
+        .find(|agent| agent.key == key)
+        .and_then(|agent| agent.install.as_mut())
+    {
+        pin.registry_env.retain(|owned| owned != name);
+    }
 }
 
 /// Drops the pin of the npm agents a changed variable reaches (`agent_key`, or all of them for a global one): they
@@ -281,8 +302,8 @@ fn probe_folder() -> Result<PathBuf, String> {
     static COUNTER: AtomicU64 = AtomicU64::new(0);
 
     let folder = std::env::temp_dir().join(format!(
-        "neore-acp-probe-{}-{}-{}",
-        std::process::id(),
+        "{}{}-{}",
+        probe_prefix(),
         now_ms(),
         COUNTER.fetch_add(1, Ordering::Relaxed)
     ));
@@ -292,8 +313,51 @@ fn probe_folder() -> Result<PathBuf, String> {
     std::os::unix::fs::DirBuilderExt::mode(&mut builder, 0o700);
 
     builder.create(&folder).map_err(|error| error.to_string())?;
+    #[cfg(test)]
+    created_probes().insert(folder.clone());
 
     Ok(folder)
+}
+
+/// Every probe folder [`probe_folder`] made in this test process, by the exact path it returned.
+#[cfg(test)]
+fn created_probes() -> std::sync::MutexGuard<'static, BTreeSet<PathBuf>> {
+    static CREATED: std::sync::Mutex<BTreeSet<PathBuf>> = std::sync::Mutex::new(BTreeSet::new());
+
+    CREATED
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
+/// The start of every probe folder's name this process makes.
+fn probe_prefix() -> String {
+    format!("neore-acp-probe-{}-", std::process::id())
+}
+
+/// The probe folder `plan` names, for a test to remove, only when it is provably one this process made: the plan is
+/// a probe, its path is one [`probe_folder`] returned and is still a folder, not a link, and its real path (the temp
+/// folder may sit behind a link) is directly in the real temp folder with this process's probe prefix. Anything else
+/// is left alone, so a plan that wrongly names a real folder fails its test without deleting that folder.
+#[cfg(test)]
+pub(crate) fn probe_scratch(plan: &SpawnPlan) -> Option<crate::test_dir::TestDir> {
+    let path = Path::new(&plan.cwd);
+
+    if !plan.scratch
+        || !created_probes().contains(path)
+        || !fs::symlink_metadata(path).is_ok_and(|meta| meta.is_dir())
+    {
+        return None;
+    }
+
+    let real = fs::canonicalize(&plan.cwd).ok()?;
+    let temp = fs::canonicalize(std::env::temp_dir()).ok()?;
+    let named = real
+        .file_name()
+        .and_then(|name| name.to_str())
+        .is_some_and(|name| name.starts_with(&probe_prefix()));
+
+    (named && real.parent() == Some(temp.as_path()) && real.is_dir())
+        .then(|| crate::test_dir::TestDir::adopt(real))
 }
 
 /// Names of variables that decide which code a program runs besides the ones it names: where it is found, its
@@ -330,14 +394,42 @@ pub(crate) fn changes_program(name: &str) -> bool {
             .any(|prefix| upper.starts_with(prefix))
 }
 
+/// The keys Claude Code is registered under: the ACP registry's id, the plain name, and what the "Add agent" forms
+/// make of the label "Claude Code".
+const CLAUDE_AGENT_KEYS: [&str; 3] = ["claude-acp", "claude", "claude-code"];
+/// The Claude Code ACP adapter's programs and packages, current and earlier, for an agent added under another key.
+const CLAUDE_ADAPTERS: [&str; 2] = ["claude-agent-acp", "claude-code-acp"];
+
+/// Whether `agent` runs Claude Code: by its key, or by an adapter named in its command or arguments. A false match
+/// costs nothing, since another program ignores the variable.
+pub(crate) fn runs_claude_code(agent: &AcpAgent) -> bool {
+    let names_adapter = |text: &str| {
+        let lower = text.to_ascii_lowercase();
+
+        CLAUDE_ADAPTERS
+            .iter()
+            .any(|adapter| lower.contains(adapter))
+    };
+
+    CLAUDE_AGENT_KEYS.contains(&agent.key.as_str())
+        || names_adapter(&agent.command)
+        || agent.args.iter().any(|arg| names_adapter(arg))
+}
+
 /// The full environment of one agent: built, then the global variables, then the agent's own.
 /// Every user variable is validated again here, so a hand-edited `device.json` cannot slip a reserved name in.
+/// Claude Code is also told it runs under Neore (its `User-Agent` says so), unless the person set the name.
 pub fn agent_env(
+    claude_code: bool,
     built: BTreeMap<String, String>,
     global: &EnvVars,
     agent: &EnvVars,
 ) -> Result<EnvVars, String> {
     let mut env = built;
+
+    if claude_code {
+        env.insert("CLAUDE_CODE_ENTRYPOINT".to_owned(), "neore".to_owned());
+    }
 
     for layer in [global, agent] {
         for (name, value) in &layer.0 {
@@ -542,7 +634,11 @@ impl DeviceState {
                     let moved = changes_program(&name) && changed;
                     let node = changes_node(&name) && changed;
 
-                    scope.0.insert(name, value);
+                    scope.0.insert(name.clone(), value);
+
+                    if changed {
+                        disown_registry_var(settings, agent_key.as_deref(), &name);
+                    }
 
                     if moved {
                         drop_path_consents(settings, agent_key.as_deref());
@@ -652,6 +748,7 @@ impl DeviceState {
             None => probe_folder()?,
         };
         let env = agent_env(
+            runs_claude_code(agent),
             built_env(app_vars(std::env::vars_os())),
             &settings.acp_env,
             &agent.env,
@@ -778,10 +875,10 @@ impl DeviceState {
 mod tests {
     use super::*;
     use crate::store::Settings;
+    use crate::test_dir::TestDir;
 
-    fn state(name: &str) -> (DeviceState, PathBuf) {
-        let dir = std::env::temp_dir().join(format!("neore-acp-{name}-{}", std::process::id()));
-        let _ = fs::remove_dir_all(&dir);
+    fn state(name: &str) -> (DeviceState, TestDir) {
+        let dir = TestDir::at(&format!("acp-{name}"));
         fs::create_dir_all(&dir).unwrap();
 
         (DeviceState::new(&dir, Box::new(|_| {})), dir)
@@ -879,7 +976,7 @@ mod tests {
 
     #[test]
     fn a_refused_variable_is_not_stored_and_its_error_has_no_value() {
-        let (state, dir) = state("refuse");
+        let (state, _dir) = state("refuse");
 
         save(&state, "alpha");
         let error =
@@ -890,13 +987,11 @@ mod tests {
         assert!(!error.contains("super-secret-value"));
         assert!(state.acp_view().env_names.is_empty());
         assert!(state.acp_view().agents[0].env_names.is_empty());
-
-        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]
     fn a_variable_reaches_its_agent_and_no_other() {
-        let (state, dir) = state("scope");
+        let (state, _dir) = state("scope");
 
         save(&state, "alpha");
         save(&state, "beta");
@@ -908,17 +1003,13 @@ mod tests {
             state.acp_spawn_plan("alpha", None).unwrap(),
             state.acp_spawn_plan("beta", None).unwrap(),
         );
+        let _probes = (probe_scratch(&alpha_plan), probe_scratch(&beta_plan));
         let (alpha, beta) = (alpha_plan.env.0.clone(), beta_plan.env.0.clone());
-
-        let _ = fs::remove_dir_all(&alpha_plan.cwd);
-        let _ = fs::remove_dir_all(&beta_plan.cwd);
 
         assert_eq!(alpha.get("ONLY_ALPHA").map(String::as_str), Some("a1"));
         assert_eq!(alpha.get("FOR_ALL").map(String::as_str), Some("g1"));
         assert!(!beta.contains_key("ONLY_ALPHA"));
         assert_eq!(beta.get("FOR_ALL").map(String::as_str), Some("b-wins"));
-
-        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]
@@ -935,9 +1026,9 @@ mod tests {
         assert!(!view.contains("sentinel-value"));
         assert!(!format!("{:?}", state.settings()).contains("sentinel-value"));
         let plan = state.acp_spawn_plan("alpha", None).unwrap();
+        let _probe = probe_scratch(&plan);
 
         assert!(!format!("{plan:?}").contains("sentinel-value"));
-        let _ = fs::remove_dir_all(&plan.cwd);
 
         // The values are stored (owner-only, in device.json) so the next start still has them.
         let stored = crate::store::load(&dir.join("device.json"));
@@ -952,8 +1043,6 @@ mod tests {
 
         let audit = fs::read_to_string(dir.join("device-audit.jsonl")).unwrap_or_default();
         assert!(!audit.contains("sentinel-value"));
-
-        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]
@@ -965,7 +1054,119 @@ mod tests {
             .0
             .insert("ELECTRON_RUN_AS_NODE".into(), "1".into());
 
-        assert!(agent_env(BTreeMap::new(), &stored.acp_env, &EnvVars::default()).is_err());
+        assert!(agent_env(false, BTreeMap::new(), &stored.acp_env, &EnvVars::default()).is_err());
+    }
+
+    #[test]
+    fn claude_code_is_told_it_runs_under_neore_unless_the_person_says_otherwise() {
+        let none = EnvVars::default();
+        let entrypoint = |claude_code: bool, global: &EnvVars, agent: &EnvVars| {
+            agent_env(claude_code, BTreeMap::new(), global, agent)
+                .unwrap()
+                .0
+                .get("CLAUDE_CODE_ENTRYPOINT")
+                .cloned()
+        };
+        let own = EnvVars(BTreeMap::from([(
+            "CLAUDE_CODE_ENTRYPOINT".to_owned(),
+            "mine".to_owned(),
+        )]));
+
+        assert_eq!(entrypoint(true, &none, &none).as_deref(), Some("neore"));
+        assert_eq!(entrypoint(false, &none, &none), None);
+        assert_eq!(entrypoint(true, &own, &none).as_deref(), Some("mine"));
+        assert_eq!(entrypoint(true, &none, &own).as_deref(), Some("mine"));
+    }
+
+    #[test]
+    fn claude_code_is_known_by_its_key_or_by_its_adapter() {
+        let agent = |key: &str, command: &str, args: &[&str]| AcpAgent {
+            args: args.iter().map(|arg| (*arg).to_owned()).collect(),
+            command: command.to_owned(),
+            env: EnvVars::default(),
+            install: None,
+            key: key.to_owned(),
+            label: key.to_owned(),
+        };
+
+        for key in ["claude-acp", "claude", "claude-code"] {
+            assert!(runs_claude_code(&agent(key, "/bin/x", &[])), "{key}");
+        }
+
+        // Added by hand under another name: the adapter's program, or the package it is run from.
+        assert!(runs_claude_code(&agent(
+            "mine",
+            "/usr/local/bin/claude-agent-acp",
+            &[]
+        )));
+        assert!(runs_claude_code(&agent(
+            "mine",
+            "npx",
+            &["-y", "@zed-industries/claude-code-acp"]
+        )));
+        assert!(!runs_claude_code(&agent("codex-acp", "codex-acp", &[])));
+        assert!(!runs_claude_code(&agent(
+            "gemini",
+            "gemini",
+            &["--experimental-acp"]
+        )));
+    }
+
+    #[test]
+    fn a_test_removes_only_a_probe_folder_it_can_prove_is_one() {
+        let (_state, dir) = state("probe-scratch");
+        let plan = |cwd: &Path, scratch: bool| SpawnPlan {
+            args: Vec::new(),
+            command: String::new(),
+            cwd: cwd.to_string_lossy().into_owned(),
+            env: EnvVars::default(),
+            scratch,
+            secret_names: Vec::new(),
+        };
+        let probe = TestDir::adopt(probe_folder().unwrap());
+        let escape = probe.join("..").join(dir.file_name().unwrap());
+
+        assert!(
+            probe_scratch(&plan(&dir, true)).is_none(),
+            "not probe-named"
+        );
+        assert!(
+            probe_scratch(&plan(&escape, true)).is_none(),
+            "`..` out of a probe"
+        );
+        assert!(
+            probe_scratch(&plan(&probe, false)).is_none(),
+            "not a probe plan"
+        );
+
+        #[cfg(unix)]
+        {
+            let link = TestDir::adopt(std::env::temp_dir().join(format!("{}link", probe_prefix())));
+
+            std::os::unix::fs::symlink(&*dir, &link).unwrap();
+            assert!(
+                probe_scratch(&plan(&link, true)).is_none(),
+                "a probe-named link"
+            );
+        }
+
+        #[cfg(unix)]
+        {
+            let other = TestDir::adopt(probe_folder().unwrap());
+            let swapped = TestDir::adopt(probe_folder().unwrap());
+
+            fs::remove_dir(&swapped).unwrap();
+            std::os::unix::fs::symlink(&*other, &swapped).unwrap();
+            assert!(
+                probe_scratch(&plan(&swapped, true)).is_none(),
+                "a link to another probe folder"
+            );
+            assert!(other.is_dir(), "the other probe folder stays");
+        }
+
+        assert!(dir.is_dir() && probe.is_dir(), "nothing was removed");
+        drop(probe_scratch(&plan(&probe, true)).unwrap());
+        assert!(!probe.exists(), "a real probe folder is removed");
     }
 
     #[test]
@@ -979,13 +1180,12 @@ mod tests {
 
         let probe = state.acp_spawn_plan("alpha", None).unwrap();
         let again = state.acp_spawn_plan("alpha", None).unwrap();
+        let _probes = (probe_scratch(&probe), probe_scratch(&again));
         assert!(probe.scratch && !probe.cwd.starts_with(dir.to_str().unwrap()));
         assert!(Path::new(&probe.cwd).starts_with(std::env::temp_dir()));
         assert!(fs::read_dir(&probe.cwd).unwrap().next().is_none());
         assert_ne!(probe.cwd, again.cwd, "each probe has a folder of its own");
         assert!(!dir.join("acp-probe").exists());
-        let _ = fs::remove_dir_all(&probe.cwd);
-        let _ = fs::remove_dir_all(&again.cwd);
 
         let session = state
             .acp_spawn_plan("alpha", Some(work.to_str().unwrap()))
@@ -1002,25 +1202,21 @@ mod tests {
             .acp_spawn_plan("alpha", Some("/nonexistent/neore"))
             .is_err());
         assert!(state.acp_spawn_plan("nobody", None).is_err());
-
-        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]
     fn only_the_variables_the_user_set_are_named_as_secrets() {
-        let (state, dir) = state("secrets");
+        let (state, _dir) = state("secrets");
 
         save(&state, "alpha");
         set_env(&state, Some("alpha"), "API_KEY", "k-1234").unwrap();
         set_env(&state, None, "HTTPS_PROXY", "http://proxy").unwrap();
 
         let plan = state.acp_spawn_plan("alpha", None).unwrap();
+        let _probe = probe_scratch(&plan);
 
         assert_eq!(plan.secret_names, vec!["API_KEY", "HTTPS_PROXY"]);
         assert!(plan.env.0.contains_key("API_KEY"));
-
-        let _ = fs::remove_dir_all(&plan.cwd);
-        let _ = fs::remove_dir_all(&dir);
     }
 
     #[cfg(unix)]
@@ -1114,13 +1310,11 @@ mod tests {
                 "{name} keeps an approval"
             );
         }
-
-        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]
     fn agents_are_validated_and_removal_takes_the_variables_along() {
-        let (state, dir) = state("agents");
+        let (state, _dir) = state("agents");
 
         assert!(state
             .acp_update(update(
@@ -1147,8 +1341,6 @@ mod tests {
             .unwrap();
         assert!(state.acp_view().agents.is_empty());
         assert!(set_env(&state, Some("alpha"), "K", "v").is_err());
-
-        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]
@@ -1175,8 +1367,6 @@ mod tests {
         assert!(ask("beta", &one).is_err());
         // A path that does not exist is refused too.
         assert!(ask("alpha", &dir.join("missing")).is_err());
-
-        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]
@@ -1210,8 +1400,6 @@ mod tests {
             state.acp_read_media("alpha", one.to_str().unwrap(), "../two/chart.png"),
             MediaRead::Refused
         ));
-
-        let _ = fs::remove_dir_all(&dir);
     }
 
     #[cfg(unix)]
@@ -1239,8 +1427,6 @@ mod tests {
             state.acp_read_media("alpha", one.to_str().unwrap(), "chart.png"),
             MediaRead::Refused
         ));
-
-        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]
@@ -1275,8 +1461,6 @@ mod tests {
         assert!(restarted
             .acp_spawn_plan("alpha", Some(work.to_str().unwrap()))
             .is_err());
-
-        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]
@@ -1307,8 +1491,6 @@ mod tests {
             .acp_update(update(r#"{"op":"removeAgent","key":"alpha"}"#))
             .unwrap();
         assert!(state.acp_view().consents.is_empty());
-
-        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]
@@ -1335,8 +1517,6 @@ mod tests {
                 "{folder}"
             );
         }
-
-        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]
@@ -1351,6 +1531,7 @@ mod tests {
             details: "{}".into(),
             details_complete: true,
             folder: "/work".into(),
+            local_only: false,
             request_id: "r1".into(),
             options: vec![
                 OfferedOption {
@@ -1371,6 +1552,7 @@ mod tests {
             ],
             session_id: "s1".into(),
             target: Some("/work/x".into()),
+            terminal: false,
             tool: "Run curl".into(),
             tool_kind: "execute".into(),
         };
@@ -1398,7 +1580,5 @@ mod tests {
 
         assert!(audit.contains("acp: Run curl") && audit.contains("deny"));
         assert!(!audit.contains("sentinel-token"));
-
-        let _ = fs::remove_dir_all(&dir);
     }
 }

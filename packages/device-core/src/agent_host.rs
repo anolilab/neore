@@ -42,7 +42,7 @@ use crate::outbox::Outbox;
 pub const MAX_AGENTS: usize = 8;
 const MAX_ARGS: usize = 50;
 const MAX_ARG_BYTES: usize = 1000;
-const MAX_ENV_VARS: usize = 100;
+pub(crate) const MAX_ENV_VARS: usize = 100;
 /// Bytes of an agent's output per chunk frame.
 const CHUNK_BYTES: usize = 32 * 1024;
 /// How long a polite stop waits before the group is killed.
@@ -162,7 +162,8 @@ pub struct AgentParams {
     pub command: String,
     /// Absolute, on this machine, inside one of `roots`.
     pub cwd: String,
-    /// The variables the person set (global, then the agent's own): applied on top of the built environment.
+    /// The variables the person set (global, then the agent's own), and Claude Code's entrypoint name: applied on top
+    /// of the built environment.
     #[serde(default)]
     pub env: BTreeMap<String, String>,
     /// The shared folders for this server.
@@ -589,6 +590,7 @@ fn signal_group(pid: u32, signal: libc::c_int) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_dir::TestDir;
 
     fn vars(list: &[(&str, &str)]) -> impl Iterator<Item = (String, String)> {
         list.iter()
@@ -647,7 +649,7 @@ mod tests {
 
     #[test]
     fn a_folder_outside_the_shared_ones_is_refused() {
-        let root = std::env::temp_dir().join(format!("neore-agent-host-{}", std::process::id()));
+        let root = TestDir::at("agent-host");
 
         std::fs::create_dir_all(root.join("inside")).unwrap();
 
@@ -663,8 +665,6 @@ mod tests {
         assert!(working_folder(&params(&root.join("inside").to_string_lossy())).is_ok());
         assert!(working_folder(&params("/")).is_err());
         assert!(working_folder(&params("relative")).is_err());
-
-        let _ = std::fs::remove_dir_all(&root);
     }
 
     #[test]
@@ -709,15 +709,14 @@ mod tests {
     }
 
     #[cfg(unix)]
-    fn scratch_roots(name: &str) -> (PathBuf, PathBuf) {
-        let base = std::env::temp_dir().join(format!("neore-agent-{name}-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&base);
+    fn scratch_roots(name: &str) -> (TestDir, PathBuf, PathBuf) {
+        let base = TestDir::at(&format!("agent-{name}"));
         let (root, outside) = (base.join("shared"), base.join("private"));
 
         std::fs::create_dir_all(root.join("inside")).unwrap();
         std::fs::create_dir_all(&outside).unwrap();
 
-        (root, outside)
+        (base, root, outside)
     }
 
     #[cfg(unix)]
@@ -734,7 +733,7 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn a_dot_dot_path_and_a_symlink_out_of_the_shared_folder_are_refused_on_the_host() {
-        let (root, outside) = scratch_roots("escape");
+        let (_base, root, outside) = scratch_roots("escape");
 
         // `..` that climbs out.
         let climbing = root.join("inside").join("..").join("..").join("private");
@@ -752,8 +751,6 @@ mod tests {
         assert!(working_folder(&params_in(&root, &root.with_file_name("shared-sibling"))).is_err());
         // The folder itself still works.
         assert!(working_folder(&params_in(&root, &root.join("inside"))).is_ok());
-
-        let _ = std::fs::remove_dir_all(root.parent().unwrap());
     }
 
     #[cfg(unix)]
@@ -797,7 +794,7 @@ mod tests {
     /// Runs `script` as the agent in a scratch folder and returns what it wrote to the file `out`.
     #[cfg(unix)]
     fn agent_output(name: &str, script: &str) -> String {
-        let (root, _outside) = scratch_roots(name);
+        let (_base, root, _outside) = scratch_roots(name);
         let mut params = params_in(&root, &root.join("inside"));
 
         params.command = "/bin/sh".into();
@@ -816,8 +813,6 @@ mod tests {
         writer.join().unwrap();
 
         let written = std::fs::read_to_string(root.join("inside").join("out")).unwrap();
-
-        let _ = std::fs::remove_dir_all(root.parent().unwrap());
 
         written.trim().to_owned()
     }
@@ -932,7 +927,7 @@ mod tests {
         };
         let python = String::from_utf8_lossy(&python.stdout).trim().to_owned();
 
-        let (root, _outside) = scratch_roots("leak");
+        let (_base, root, _outside) = scratch_roots("leak");
         let mut params = params_in(&root, &root.join("inside"));
 
         params.command = "/bin/sh".into();
@@ -964,6 +959,5 @@ mod tests {
         assert!(started.elapsed() < Duration::from_secs(5));
         outbox.close();
         writer.join().unwrap();
-        let _ = std::fs::remove_dir_all(root.parent().unwrap());
     }
 }

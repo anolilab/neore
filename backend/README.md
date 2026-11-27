@@ -16,7 +16,7 @@ Private (`@neore/backend`, FSL-1.1-ALv2). The deploy is Alchemy's
 | `lunora/`              | The application: `schema.ts`, `auth.ts`, `http.ts`, `crons.ts`, `queues.ts`, `workflows.ts` and one folder per feature                    |
 | `lunora/<feature>/`    | A feature module. Each holds a `module.ts` (`defineModule({ description, tables })`) naming the tables it owns                            |
 | `lunora/lib/`          | Shared helpers (shard context, job queue, services, claim-once, crypto, RLS in `lib/rls/`). Not a module                                  |
-| `lunora/_generated/`   | Codegen output, committed. **Not hand-edited**                                                                                            |
+| `lunora/_generated/`   | Codegen output, not committed (gitignored; `pnpm run codegen:backend` writes it). **Not hand-edited**                                     |
 | `src/`                 | The Worker entry (`server.ts`) and what must run before the generated app: shard routing, JWKS cache, queue-stage stripping, PostHog sink |
 | `lunora.config.ts`     | Project config, read statically by codegen: the service bindings (`ctx.services.<key>`) and reviewed advisories                           |
 | `wrangler.jsonc`       | Bindings; Lunora writes the `services[]` entries (the gateway's is hand-written)                                                          |
@@ -36,6 +36,8 @@ modules such as `./agent/ui-messages`, `./document-limits`,
 (`@/lib/lunora/crpc`), not by importing handlers.
 
 ## Codegen
+
+A fresh clone has no `_generated/`. Run `pnpm run codegen:backend` before typecheck, dev, or build; `apps/web` runs it itself on `dev` and `build`.
 
 ```bash
 cd backend && pnpm codegen      # lunora codegen, then scripts/check-generated.mjs

@@ -5,13 +5,10 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@neore/ui/components/tooltip";
 import { ChevronDown, ChevronRight, Folder, GripVertical, Loader2, MoreVertical, Pin } from "lucide-react";
 import type { FC } from "react";
-import { lazy, Suspense } from "react";
 
-import IconPlaceholder from "./icon-placeholder";
+import ProjectIcon from "./project-icon";
 import type { ThreadGroup } from "./types";
 import { getGroupType, isGroupFullySelected } from "./utilities";
-
-const ProjectIcon = lazy(() => import("./project-icon"));
 
 interface GroupHeaderProperties {
     dragListeners?: any;
@@ -59,11 +56,7 @@ const GroupHeader: FC<GroupHeaderProperties> = ({
             return <Folder className="size-3" />;
         }
 
-        return (
-            <Suspense fallback={<IconPlaceholder />}>
-                <ProjectIcon color={group.projectColor || "#6b7280"} name={group.projectIcon} />
-            </Suspense>
-        );
+        return <ProjectIcon color={group.projectColor || "#6b7280"} name={group.projectIcon} />;
     };
 
     return (

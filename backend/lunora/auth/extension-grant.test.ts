@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { ExtensionGrantStore, ExtensionGrantUser } from "./extension-grant";
+import { MOBILE_REDIRECT_URI, NATIVE_REDIRECT_URI } from "../lib/extension-origins";
 import { authorizeExtension, CODE_TTL_MS, exchangeExtensionCode, mintExtensionAccessToken, pkceChallenge, revokeExtensionSession } from "./extension-grant";
 
 const REDIRECT_URI = `https://${"a1".repeat(20)}.extensions.allizom.org/`;
@@ -20,7 +21,7 @@ const USER: ExtensionGrantUser = { email: "ada@example.test", id: "user-1", imag
  */
 const createStore = (users: ExtensionGrantUser[] = [USER]) => {
     const codes = new Map<string, { expiresAt: Date; value: string }>();
-    const sessions = new Map<string, { expiresAt: Date; id: string; userId: string }>();
+    const sessions = new Map<string, { clientGrant?: string; expiresAt: Date; id: string; userId: string }>();
     const signed: Record<string, unknown>[] = [];
     let sessionCount = 0;
 
@@ -32,12 +33,12 @@ const createStore = (users: ExtensionGrantUser[] = [USER]) => {
 
             return row;
         },
-        createSession: async (userId) => {
+        createSession: async (userId, meta) => {
             sessionCount += 1;
 
             const session = { expiresAt: new Date(Date.now() + 7 * 86_400_000), token: `session-${sessionCount}` };
 
-            sessions.set(session.token, { expiresAt: session.expiresAt, id: `sid-${String(sessionCount)}`, userId });
+            sessions.set(session.token, { clientGrant: meta.clientGrant, expiresAt: session.expiresAt, id: `sid-${String(sessionCount)}`, userId });
 
             return session;
         },
@@ -75,6 +76,7 @@ const authorize = async (store: ExtensionGrantStore, overrides: Partial<Paramete
     await authorizeExtension(store, {
         codeChallenge: await pkceChallenge(VERIFIER),
         redirectUri: REDIRECT_URI,
+        session: {},
         trustedRedirectUris: [REDIRECT_URI],
         userId: USER.id,
         ...overrides,
@@ -119,6 +121,27 @@ describe("authorizeExtension", () => {
     });
 });
 
+describe("authorizeExtension while an admin is impersonating the user", () => {
+    it("issues no code, so no app session can follow", async () => {
+        const { codes, sessions, store } = createStore();
+
+        await expect(authorize(store, { session: { impersonating: true } })).rejects.toMatchObject({
+            code: "access_denied",
+            message: expect.stringContaining("while impersonating"),
+            name: "ExtensionGrantError",
+        });
+        expect(codes.size).toBe(0);
+        expect(sessions.size).toBe(0);
+    });
+
+    it("refuses a sign-in whose session could not be read (an app's grant, or a session gone)", async () => {
+        const { codes, store } = createStore();
+
+        await expect(authorize(store, { session: null })).rejects.toMatchObject({ code: "unauthorized", name: "ExtensionGrantError" });
+        expect(codes.size).toBe(0);
+    });
+});
+
 describe("exchangeExtensionCode", () => {
     it("issues a session for the approving user", async () => {
         const { sessions, store } = createStore();
@@ -127,6 +150,18 @@ describe("exchangeExtensionCode", () => {
 
         expect(result.user).toEqual({ email: USER.email, id: USER.id, image: null, name: USER.name });
         expect(sessions.get(result.token)?.userId).toBe(USER.id);
+    });
+
+    it.each([
+        [REDIRECT_URI, "extension"],
+        [MOBILE_REDIRECT_URI, "mobile"],
+        [NATIVE_REDIRECT_URI, "desktop"],
+    ])("records on the session which app the code for %s was issued for", async (redirectUri, clientGrant) => {
+        const { sessions, store } = createStore();
+        const { code } = await authorize(store, { redirectUri, trustedRedirectUris: [redirectUri] });
+        const result = await exchangeExtensionCode(store, { code, codeVerifier: VERIFIER, redirectUri });
+
+        expect(sessions.get(result.token)?.clientGrant).toBe(clientGrant);
     });
 
     it("is single use: a replayed code fails even with the right verifier", async () => {

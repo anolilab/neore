@@ -127,6 +127,17 @@ describe("prompt queue persistence", () => {
         expect(editQueuedPrompt(tried, "a", "go further", "b").items[0]).toStrictEqual({ attachments: [], id: "b", text: "go further" });
     });
 
+    it("keeps a queued draft's not-typed mark across a reload and an edit, and reads an unknown one as marked", () => {
+        const marked: PromptQueueState<never> = { items: [{ attachments: [], draftFrom: "sharedPrompt", id: "a", text: "go" }], paused: false };
+
+        expect(restorePromptQueue(serializePromptQueue(marked))?.items[0]?.draftFrom).toBe("sharedPrompt");
+        expect(editQueuedPrompt(marked, "a", "go further", "b").items[0]?.draftFrom).toBe("sharedPrompt");
+        expect(restorePromptQueue(JSON.stringify({ format: 2, items: [{ draftFrom: "elsewhere", id: "a", text: "go" }] }))?.items[0]?.draftFrom).toBe(
+            "promptLink",
+        );
+        expect(restorePromptQueue(JSON.stringify({ format: 2, items: [{ id: "a", text: "go" }] }))?.items[0]).not.toHaveProperty("draftFrom");
+    });
+
     it("leaves out a prompt with no text and no kept attachment, and stores nothing for an empty queue", () => {
         expect(serializePromptQueue({ items: [{ attachments: ["file"], id: "a", text: "  " }], paused: false })).toBeUndefined();
         expect(serializePromptQueue(EMPTY_PROMPT_QUEUE)).toBeUndefined();

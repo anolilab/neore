@@ -26,7 +26,10 @@ export const GUEST_MESSAGE_MAX_CHARS = 2000;
 /** Messages waiting for the owner, per link. A guest who reaches it is refused until the owner acts. */
 export const GUEST_MAX_HELD_PER_LINK = 20;
 
-/** Rows (held and sent) one link keeps; the held cap above leaves room for the owner's sent ones. */
+/**
+ * Rows (held and sent) one link keeps; the held cap above leaves room for the owner's sent ones. Never above
+ * {@link GUEST_MESSAGE_REMOVAL_PAGE}: a revoke checks the waiting notes and removes the whole link in one transaction.
+ */
 export const GUEST_MAX_ROWS_PER_LINK = 100;
 
 /** The most links of one thread a removal reads: a thread has one live link at a time, and lapsed ones go with the sweep. */

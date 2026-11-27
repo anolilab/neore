@@ -108,8 +108,9 @@ const REQUEST_ID_SHAPE = /^[A-Za-z0-9-]{8,64}$/u;
 
 const tooLong = (token: string): boolean => token.length === 0 || token.length > GUEST_TOKEN_MAX_LENGTH;
 
-/** Whether a note on a live link of the thread still waits for the owner. A lapsed link's notes are hidden and do not count. */
-const hasWaitingNotes = async (context: MutationCtx, threadId: Id<"threads">): Promise<boolean> => {
+/** The notes on the thread's live links that still wait for the owner. A lapsed link's notes are hidden and do not count. */
+const waitingNotes = async (context: MutationCtx, threadId: Id<"threads">): Promise<Id<"threadGuestMessages">[]> => {
+    const waiting: Id<"threadGuestMessages">[] = [];
     const links = await context.db
         .query("threadGuestLinks")
         .withIndex("by_thread_expiresAt", (q) => q.eq("threadId", threadId).gt("expiresAt", context.now))
@@ -121,25 +122,39 @@ const hasWaitingNotes = async (context: MutationCtx, threadId: Id<"threads">): P
             .withIndex("by_link", (q) => q.eq("linkId", link._id))
             .take(GUEST_MAX_ROWS_PER_LINK);
 
-        if (notes.some((note) => note.status === "held")) {
-            return true;
-        }
+        waiting.push(...notes.filter((note) => note.status === "held").map((note) => note._id));
     }
 
-    return false;
+    return waiting;
+};
+
+const hasWaitingNotes = async (context: MutationCtx, threadId: Id<"threads">): Promise<boolean> => {
+    const waiting = await waitingNotes(context, threadId);
+
+    return waiting.length > 0;
 };
 
 // ---------------------------------------------------------------------------
 // The owner
 // ---------------------------------------------------------------------------
 
+/** The pattern of `setThreadPermissionMode` and `registerDevice`: an admin acting as the owner hands out, withdraws, sends or dismisses nothing on their guest link. */
+const refuseImpersonation = (impersonatedBy: string | null | undefined): void => {
+    if (impersonatedBy) {
+        throw new LunoraError("FORBIDDEN", "Guest links cannot be changed while impersonating");
+    }
+};
+
 /** Makes the thread's guest link (replacing any earlier one). The token comes back once; only its hash is kept. */
 export const createGuestLink = authMutation
     .use(rateLimit("sharing/create"))
     .input({ discardWaiting: v.optional(v.boolean()), threadId: v.id("threads") })
-    .output(v.object({ expiresAt: v.number(), linkToken: v.string() }))
+    .output(v.object({ expiresAt: v.number(), id: v.string(), linkToken: v.string() }))
     .mutation(async ({ args: { discardWaiting, threadId }, ctx: context }) => {
-        const { userId } = context.user;
+        const { impersonatedBy, userId } = context.user;
+
+        refuseImpersonation(impersonatedBy);
+
         // The owner alone, and never a locked chat: this takes no unlock proof, and a link into a locked chat would be a way around the lock.
         const thread = await requireOwnedThread(context, threadId, userId);
 
@@ -186,7 +201,8 @@ export const createGuestLink = authMutation
         const linkHash = await hashGuestToken(linkToken);
         const expiresAt = context.now + GUEST_LINK_TTL_MS;
 
-        await context.db.insert("threadGuestLinks", { createdAt: context.now, expiresAt, linkHash, threadId, userId });
+        const linkId = await context.db.insert("threadGuestLinks", { createdAt: context.now, expiresAt, linkHash, threadId, userId });
+
         await setShardRoute(context, "guest-link", linkHash, userId);
         // The replaced links' routes go in a job that runs only once this write commits.
         await scheduleGuestLinkRouteDrop(context, replacedHashes);
@@ -194,16 +210,50 @@ export const createGuestLink = authMutation
         await noteShardActivity(context, userId);
         context.log.event("chat.create_guest_link", { created: true });
 
-        return { expiresAt, linkToken };
+        // The id (never secret) lets the owner's panel tell this link from a later one made in the same millisecond.
+        return { expiresAt, id: linkId as string, linkToken };
     });
 
-/** Withdraws the guest link and everything guests left on it. Works on a locked chat, so the owner can always withdraw. */
+/**
+ * Withdraws the guest link and everything guests left on it. Works on a locked chat, so the owner can always withdraw. The
+ * owner names the waiting notes they agreed to delete (`confirmedNotes`, none by default): a note they did not see (left
+ * since, even in place of one sent meanwhile) is never deleted, the revoke is refused with the count now waiting instead.
+ * The owner also names the link they meant (`linkId`): when another tab has replaced it, the live link is not that one
+ * and the revoke is refused as an ended link, so a confirmation never takes a link the owner did not see. The reads and
+ * the delete are one transaction.
+ */
 export const revokeGuestLink = authMutation
     .use(rateLimit("sharing/update"))
-    .input({ threadId: v.id("threads") })
+    .input({
+        confirmedNotes: v.optional(v.array(v.id("threadGuestMessages")).max(GUEST_MAX_HELD_PER_LINK)),
+        linkId: v.id("threadGuestLinks"),
+        threadId: v.id("threads"),
+    })
     .output(v.null())
-    .mutation(async ({ args: { threadId }, ctx: context }) => {
+    .mutation(async ({ args: { confirmedNotes = [], linkId, threadId }, ctx: context }) => {
+        refuseImpersonation(context.user.impersonatedBy);
         await requireOwnedThreadIgnoringLock(context, threadId, context.user.userId);
+
+        // Only compared with the owner's own thread's live link: an id from elsewhere never matches and grants nothing.
+        const live = await context.db
+            .query("threadGuestLinks")
+            .withIndex("by_thread_expiresAt", (q) => q.eq("threadId", threadId).gt("expiresAt", context.now))
+            .first();
+
+        if (live && live._id !== linkId) {
+            throw new LunoraError("NOT_FOUND", "That guest link has ended.", { data: { code: "GUEST_LINK_ENDED" } });
+        }
+
+        // Only compared with the owner's own thread's notes: an id from another thread matches nothing and grants nothing.
+        const confirmed = new Set<string>(confirmedNotes);
+        const waiting = await waitingNotes(context, threadId);
+
+        if (waiting.some((noteId) => !confirmed.has(noteId))) {
+            throw new LunoraError("BAD_REQUEST", "Guest messages are waiting that were not confirmed.", {
+                data: { code: "GUEST_NOTES_WAITING", waiting: waiting.length },
+            });
+        }
+
         await withdrawGuestLinksForThread(context, threadId);
         context.log.event("chat.revoke_guest_link", { revoked: true });
 
@@ -215,7 +265,7 @@ export const getGuestLink = authQuery
     .input({ threadId: v.id("threads"), unlockProof: v.optional(v.string().max(MAX_LENGTH.short)) })
     .output(
         v.object({
-            link: v.union(v.object({ bound: v.boolean(), expiresAt: v.number() }), v.null()),
+            link: v.union(v.object({ bound: v.boolean(), expiresAt: v.number(), id: v.string() }), v.null()),
             messages: v.array(v.object({ createdAt: v.number(), id: v.string(), status: vGuestMessageStatus, text: v.string() })),
         }),
     )
@@ -237,7 +287,7 @@ export const getGuestLink = authQuery
             .take(GUEST_MAX_ROWS_PER_LINK);
 
         return {
-            link: { bound: link.guestHash !== undefined, expiresAt: link.expiresAt },
+            link: { bound: link.guestHash !== undefined, expiresAt: link.expiresAt, id: link._id as string },
             messages: rows.map((row) => {
                 return { createdAt: row.createdAt, id: row._id as string, status: row.status, text: row.text };
             }),
@@ -362,6 +412,8 @@ export const sendHeldGuestMessage = authMutation
     .input(vReviewArgs)
     .output(v.union(v.object({ status: v.literal("ready"), text: v.string(), threadId: v.string() }), v.object({ status: v.literal("sent") })))
     .mutation(async ({ args: { messageId, unlockProof }, ctx: context }) => {
+        refuseImpersonation(context.user.impersonatedBy);
+
         const row = await reviewedAfterSettle(context, context.user.userId, messageId, unlockProof);
 
         if (row.status === "sent") {
@@ -379,6 +431,8 @@ export const dismissHeldGuestMessage = authMutation
     .input(vReviewArgs)
     .output(v.object({ status: v.union(v.literal("dismissed"), v.literal("sent")) }))
     .mutation(async ({ args: { messageId, unlockProof }, ctx: context }) => {
+        refuseImpersonation(context.user.impersonatedBy);
+
         const row = await reviewedAfterSettle(context, context.user.userId, messageId, unlockProof);
 
         if (row.status === "sent") {
@@ -604,6 +658,33 @@ export const recordGuestNoteSent = internalMutation
     .output(v.boolean())
     .mutation(async ({ args, ctx }) => {
         if (!(await recordClaimResult(ctx, GUEST_SEND_SCOPE, args.messageId, args.claimedAt, args.savedMessageId))) {
+            return false;
+        }
+
+        await ctx.db.patch("threadGuestMessages", args.messageId, { status: "sent" });
+
+        return true;
+    });
+
+/**
+ * A `/chat/start` send that saved the note as `savedMessageId` and died before its record: its resend (`chat/start-claim.ts`,
+ * whose fingerprint binds the note to the claim, so the saved message is this note's) marks the note sent on whatever guest
+ * send still holds it, without saving it again. A note already sent is left as it is.
+ */
+export const recordResumedGuestNoteSent = internalMutation
+    .input({ messageId: v.id("threadGuestMessages"), savedMessageId: v.string().max(MAX_LENGTH.id), userId: v.string().max(MAX_LENGTH.id) })
+    .output(v.boolean())
+    .mutation(async ({ args, ctx }) => {
+        const row = await ctx.db.get("threadGuestMessages", args.messageId);
+
+        if (row?.userId !== args.userId || row.status !== "held") {
+            return false;
+        }
+
+        const send = await claimRow(ctx, GUEST_SEND_SCOPE, args.messageId);
+        const claimedAt = send?.claimedAt ?? (await claimFence(ctx, GUEST_SEND_SCOPE, args.messageId, { ttlMs: GUEST_SEND_CLAIM_TTL_MS, userId: args.userId }));
+
+        if (claimedAt === null || !(await recordClaimResult(ctx, GUEST_SEND_SCOPE, args.messageId, claimedAt, args.savedMessageId))) {
             return false;
         }
 

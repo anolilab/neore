@@ -1,5 +1,6 @@
 import { api } from "@neore/backend/api";
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { onlineManager } from "@tanstack/react-query";
 import { expect, userEvent, waitFor } from "storybook/test";
 
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
@@ -207,7 +208,7 @@ export const ReadOnlyShare: Story = {
     },
 };
 
-/** The connection to the backend dropped: the banner above the composer. */
+/** The connection to the backend dropped: the banner at the top of the app. */
 export const Reconnecting: Story = {
     play: async ({ canvas }) => {
         const banner = await canvas.findByText("Reconnecting to the server…", undefined, STATE_WAIT);
@@ -220,16 +221,33 @@ export const Reconnecting: Story = {
 };
 
 export const Offline: Story = {
+    // The event below also takes Query's page-wide `onlineManager` offline, which no later `online` event reaches once this
+    // story's client has unmounted: put it back when the story ends.
+    beforeEach: () => () => {
+        onlineManager.setOnline(true);
+    },
     play: async ({ canvas }) => {
         // The "offline" view comes from the browser's offline event, not the live status: fire it once the page has mounted.
         await canvas.findByRole("textbox", { name: "Message" }, PAGE_WAIT);
         globalThis.dispatchEvent(new Event("offline"));
-        const banner = await canvas.findByText("You are offline.", undefined, STATE_WAIT);
+        const banner = await canvas.findByText("Offline – reconnecting…", undefined, STATE_WAIT);
 
         await expect(banner).toBeInTheDocument();
         await bannerShown(banner);
     },
     parameters: { connection: "offline" },
+};
+
+/**
+ * The story after `Offline` starts online: Query's `onlineManager` is one per page, so an `offline` event left standing pauses
+ * every later story's queries and mutations in the same iframe (the Storybook UI keeps one for the whole session).
+ */
+export const OnlineAfterOffline: Story = {
+    play: async ({ canvas }) => {
+        await expect(onlineManager.isOnline()).toBe(true);
+        await settle(canvas);
+        await expect(canvas.queryByText("Offline – reconnecting…")).not.toBeInTheDocument();
+    },
 };
 
 /** A fresh chat, before the first message. */
@@ -314,7 +332,14 @@ export const JumpToLastMessage: Story = {
             return centre >= box.top && centre <= box.bottom;
         };
 
-        // Scrolled up past the question, the way a long run of replies leaves it. The control shows only away from the bottom.
+        // The thread first scrolls itself to the bottom, a frame after its messages are ready (`thread-viewport.tsx`). Scrolling up
+        // before that lands would be undone by it, and the control, shown only away from the bottom, would never appear. The
+        // viewport starts at the top and nothing else moves it first.
+        await waitFor(() => {
+            expect(scroller.scrollTop).toBeGreaterThan(0);
+        }, STATE_WAIT);
+
+        // Scrolled up past the question, the way a long run of replies leaves it.
         scroller.scrollTop = 0;
         await waitFor(() => {
             expect(isCentred()).toBe(false);

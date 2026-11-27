@@ -23,6 +23,8 @@ export interface ExpoMessage {
     categoryId?: string;
     /** Opaque ids only. */
     data: Record<string, string>;
+    /** iOS: the Notification Service Extension may rewrite the alert before it shows. */
+    mutableContent?: boolean;
     priority: "high" | "normal";
     sound?: "default";
     title?: string;

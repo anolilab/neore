@@ -27,12 +27,14 @@ import type { Id } from "../_generated/dataModel";
 import { internal } from "../_generated/internal";
 import { internalAction } from "../_generated/server";
 import { runHeadlessAgent } from "../chat/lib/headless-run";
+import { isAgentRunError } from "../chat/lib/agent-run";
 import { RUN_BEAT_MS } from "../chat/lib/interrupted-run";
 import { toUserFacingError } from "../chat/lib/user-facing-error";
 import { isTaskModelAllowed } from "../tasks/logic";
 import {
     buildSubAgentPrompt,
     canNest,
+    chainPausesForApproval,
     MESSAGE_WORKER_TOOL_NAME,
     originOfRun,
     resolveSubAgentModel,
@@ -40,12 +42,10 @@ import {
     SUB_AGENT_TOOL_NAME,
     WORKER_SYSTEM,
 } from "./logic";
+import { isRoleModelAllowed, roleSystemText } from "./roles";
 
 /** A failure this run raised itself, whose message is written for the user. */
 class SubAgentRunError extends Error {}
-
-/** Delay of a first wait handed to the scheduler after its write in the action failed. */
-const AWAIT_RETRY_DELAY_MS = 30_000;
 
 export const runSubAgent = internalAction.input({ runId: v.id("subAgentRuns") }).action(async ({ args: { runId }, ctx }) => {
     const claim = await ctx.runMutation(internal.sub_agents.functions.claimRun, { runId });
@@ -88,13 +88,28 @@ export const runSubAgent = internalAction.input({ runId: v.id("subAgentRuns") })
 
         const skill = skillRun?.invocation ? { config: skillRun.invocation.config, instructions: skillRun.invocation.instructions } : undefined;
         const worker = claim.mode === "worker" && claim.childThreadId !== undefined ? claim.childThreadId : undefined;
-        // A worker keeps its own model: the thread's, not the lead's and not a skill's.
-        const model = resolveSubAgentModel({
-            defaultModel: DEFAULT_CHAT_MODEL,
-            isAllowed: (id) => isTaskModelAllowed(id, (lookupId) => MODEL_LOOKUP.get(lookupId)),
-            parentModel: worker ? claim.model : claim.parentModel,
-            preferredModel: worker ? undefined : skill?.config?.preferredModel,
-        });
+        const { role } = claim;
+        // A role's run is on its model (a worker's: its thread's, which starts as the role's) or does not run: no other
+        // model stands in for it quietly.
+        const roleModel = role && (worker ? (claim.model ?? role.model) : role.model);
+
+        if (role && roleModel && !isRoleModelAllowed(roleModel)) {
+            throw new SubAgentRunError(
+                worker
+                    ? `This worker's model (${roleModel}) can no longer run sub-agents. Pick another one in the worker's model picker, or start a new worker.`
+                    : `The ${role.name} role's model (${roleModel}) can no longer run sub-agents. Pick another one in Settings → Sub-agent roles.`,
+            );
+        }
+
+        // A worker keeps its own model: the thread's, not the lead's and not a skill's. A role's model wins over a skill's.
+        const model =
+            roleModel ||
+            resolveSubAgentModel({
+                defaultModel: DEFAULT_CHAT_MODEL,
+                isAllowed: (id) => isTaskModelAllowed(id, (lookupId) => MODEL_LOOKUP.get(lookupId)),
+                parentModel: worker ? claim.model : claim.parentModel,
+                preferredModel: worker ? undefined : skill?.config?.preferredModel,
+            });
         // An account deletion may have started since the claim; a thread created now would land behind the
         // step that erased the threads, and a worker's thread is about to be written to.
         const assertCanRun = async () => {
@@ -113,15 +128,19 @@ export const runSubAgent = internalAction.input({ runId: v.id("subAgentRuns") })
         }
 
         const { paused, text } = await runHeadlessAgent(ctx, {
+            organizationId: claim.organizationId ?? null,
             // The parent's `delegateToSubAgent` call only ran past its permission
             // check (approved, or set to `auto`), so that consent carries into
             // this child and nesting stays reachable. At the depth cap the
             // grant is withheld, and the tools with it (`withheldTools` below).
             ...(canNest(claim.depth) && { approvedTools: [SUB_AGENT_TOOL_NAME, MESSAGE_WORKER_TOOL_NAME] }),
             beforeThread: assertCanRun,
+            ...(claim.chainSource !== undefined && { chainSource: claim.chainSource }),
             keepThreadStatus: worker !== undefined,
             memory: false,
             model,
+            // A bot's chain runs under the bot's mode where it asks more; a worker reads it through its own thread.
+            modeThreadId: claim.parentThreadId,
             onThread: async (childThreadId) => {
                 const linked = await ctx.runMutation(internal.sub_agents.functions.attachChildThread, { childThreadId, runId });
 
@@ -137,12 +156,13 @@ export const runSubAgent = internalAction.input({ runId: v.id("subAgentRuns") })
             },
             // A nested dispatch carries what reached this run, so an unattended chain is not read as the lead's own.
             origin: originOfRun(claim.dispatchedBy),
-            // A one-shot child of the owner's own turn keeps the tools its owner set to `ask` and pauses on them; the owner
-            // answers on the child's thread. A worker's are removed, as before, and so are those of a chain a trigger, a
-            // task, a messenger reply or an outside agent started: nobody of that chain is there to answer, as for its
-            // parent run. The depth cap limits delegation only: a child there keeps its other `ask` tools, but the dispatch
-            // tools are withheld rather than left to ask for a nesting that would be refused.
-            ...(claim.mode !== "worker" && originOfRun(claim.dispatchedBy) === "lead" && { pauseForApproval: { subAgentRunId: runId } }),
+            // A one-shot child keeps the tools its owner set to `ask` and pauses on them, whether the owner's turn, a task or a
+            // trigger started its chain: the pause notifies the owner (`recordPendingToolApprovals`), who answers on the child's
+            // thread. A worker's are removed, as before, and so are those of an eval's chain, which measures a headless answer
+            // (`chainPausesForApproval`). The depth
+            // cap limits delegation only: a child there keeps its other `ask` tools, but the dispatch tools are withheld
+            // rather than left to ask for a nesting that would be refused.
+            ...(claim.mode !== "worker" && chainPausesForApproval(claim.chainSource) && { pauseForApproval: { subAgentRunId: runId } }),
             ...(!canNest(claim.depth) && { withheldTools: [SUB_AGENT_TOOL_NAME, MESSAGE_WORKER_TOOL_NAME] }),
             personalization: "full",
             // A message the user typed into the worker's thread is the prompt as written.
@@ -154,9 +174,10 @@ export const runSubAgent = internalAction.input({ runId: v.id("subAgentRuns") })
 
                     return false;
                 }),
+            ...(role?.reasoningEffort !== undefined && { reasoningEffort: role.reasoningEffort }),
             skill,
             skipUnread: true,
-            system: worker ? WORKER_SYSTEM : SUB_AGENT_SYSTEM,
+            system: [worker ? WORKER_SYSTEM : SUB_AGENT_SYSTEM, ...(role ? [roleSystemText(role)] : [])].join("\n\n"),
             thread: worker ? { threadId: worker } : { tags: ["sub-agent"], title: `Sub-agent: ${claim.task}`.split("\n", 1)[0]!.slice(0, 120) },
             toolAllowlist: claim.toolAllowlist,
             tools: "headless",
@@ -167,17 +188,9 @@ export const runSubAgent = internalAction.input({ runId: v.id("subAgentRuns") })
             userId,
         });
 
-        // Stopped on an approval request: the run waits, and the answer's continuation ends it (`chat/execute.ts`). Bound to
-        // the first pause (0: never resumed), so a write landing after the owner already answered does not wait again.
+        // Stopped on an approval request: recording it moved the run to `awaiting` before the owner was told, or ended it refused
+        // (`recordPendingToolApprovals`). Either way the run is settled; the answer's continuation ends a waiting one (`chat/execute.ts`).
         if (paused) {
-            try {
-                await ctx.runMutation(internal.sub_agents.functions.awaitApproval, { resumedWith: 0, runId });
-            } catch (error) {
-                // The requests are recorded: the wait is scheduled again, bound the same way, rather than failing the run.
-                console.error(`[SubAgent] Run ${runId}: could not record its wait; scheduling it:`, error);
-                await ctx.scheduler.runAfter(AWAIT_RETRY_DELAY_MS, internal.sub_agents.functions.awaitApproval, { resumedWith: 0, runId });
-            }
-
             return;
         }
 
@@ -185,7 +198,11 @@ export const runSubAgent = internalAction.input({ runId: v.id("subAgentRuns") })
     } catch (error) {
         console.error(`[SubAgent] Run ${runId} failed:`, error);
 
-        const message = error instanceof SubAgentRunError ? error.message : toUserFacingError(error, { customEndpoint: false });
+        // The owner left the run's organization: our own wording, safe to show, and it says what to do.
+        const message =
+            error instanceof SubAgentRunError || isAgentRunError(error, "left-organization")
+                ? error.message
+                : toUserFacingError(error, { customEndpoint: false });
 
         await ctx.runMutation(internal.sub_agents.functions.completeRun, { outcome: { error: message, kind: "failed" }, runId });
     } finally {

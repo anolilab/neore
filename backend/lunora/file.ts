@@ -7,7 +7,7 @@
  *    `lib/chat-upload-staging.ts`) and refuses a declared type off the
  *    allowlist or a declared size over its kind's limit.
  * 2. {@link finalizeChatUpload} reads what actually arrived, checks its real
- *    size, type and leading bytes, and stores it content-addressed through
+ *    size, type and leading bytes, and stores it under its own key through
  *    `storeFile` (dedupe into `chatFiles`, a `chatFileAccess` grant for the
  *    caller), then deletes the staging object. It returns the `chatFiles` id
  *    that `/chat/start`'s `fileIds` and extraction already take.
@@ -135,6 +135,7 @@ export const getChatFileImageUrl = authQuery
             return null;
         }
 
+        // lunora-advisor-exempt storage_key_from_user_args -- the key is the stored `storageId` of a file the caller holds a `chatFileAccess` grant on (read by `ctx.user.userId` above), never request input
         return await ctx.storage.getSignedUrl(file.storageId, { expiresInSeconds: displayUrlExpiresInSeconds() });
     });
 

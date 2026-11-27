@@ -280,12 +280,19 @@ export const LockedThreadSidebar: FC = () => {
     const { t } = useLingui();
 
     return (
-        <Sidebar className="py-1 [&>div]:rounded-l-xl" collapsible="offcanvas" data-focus-area="panel" name="right" side="right" variant="inset">
+        <Sidebar
+            className="py-1 [&>div]:rounded-l-xl"
+            collapsible="offcanvas"
+            data-focus-area="panel"
+            name="right"
+            rail={<SidebarRail name="right" side="right" />}
+            side="right"
+            variant="inset"
+        >
             <SidebarResizeHandle />
             <SidebarContent className="items-center justify-center p-4 text-center">
                 <p className="text-brand-black/60 dark:text-brand-white/60 text-sm">{t`This chat is locked. Unlock it to see its details.`}</p>
             </SidebarContent>
-            <SidebarRail name="right" side="right" />
         </Sidebar>
     );
 };
@@ -299,11 +306,20 @@ const ThreadSidebar: FC<ThreadSidebarProps> = ({ threadId }) => {
 
     const { thread } = useModelCombobox({ threadId });
     const isTextModel = !thread?.model || (modelsMap.get(thread.model)?.mode ?? "text") === "text";
-    // The Ask and Pins tabs exist for text models only: a thread switched to another model falls back to the summary tab.
-    const activeRightSidebarTab = !isTextModel && (storedRightSidebarTab === ASIDE_TAB || storedRightSidebarTab === "pins") ? "summary" : storedRightSidebarTab;
+    // The Ask tab exists for text models only: a thread switched to another model falls back to the summary tab. Pins stay,
+    // since an image chat's replies are what people pin there.
+    const activeRightSidebarTab = !isTextModel && storedRightSidebarTab === ASIDE_TAB ? "summary" : storedRightSidebarTab;
 
     return (
-        <Sidebar className="py-1 [&>div]:rounded-l-xl" collapsible="offcanvas" data-focus-area="panel" name="right" side="right" variant="inset">
+        <Sidebar
+            className="py-1 [&>div]:rounded-l-xl"
+            collapsible="offcanvas"
+            data-focus-area="panel"
+            name="right"
+            rail={<SidebarRail name="right" side="right" />}
+            side="right"
+            variant="inset"
+        >
             <SidebarResizeHandle />
             <SidebarContent className="overflow-hidden">
                 <Tabs className="flex min-h-0 flex-1 flex-col" onValueChange={setActiveRightSidebarTab} value={activeRightSidebarTab}>
@@ -339,15 +355,13 @@ const ThreadSidebar: FC<ThreadSidebarProps> = ({ threadId }) => {
                                     {t`Ask`}
                                 </TabsTrigger>
                             )}
-                            {isTextModel && (
-                                <TabsTrigger
-                                    className="text-brand-black/70 dark:text-brand-white/70 hover:text-brand-black hover:dark:text-brand-white data-active:text-brand-black data-active:dark:text-brand-white"
-                                    value="pins"
-                                >
-                                    <PinIcon className="mr-1.5 size-3.5" />
-                                    {t`Pins`}
-                                </TabsTrigger>
-                            )}
+                            <TabsTrigger
+                                className="text-brand-black/70 dark:text-brand-white/70 hover:text-brand-black hover:dark:text-brand-white data-active:text-brand-black data-active:dark:text-brand-white"
+                                value="pins"
+                            >
+                                <PinIcon className="mr-1.5 size-3.5" />
+                                {t`Pins`}
+                            </TabsTrigger>
                         </TabsList>
                     </div>
                     {/* Relative wrapper gives all tabs the same absolute bounds */}
@@ -380,17 +394,14 @@ const ThreadSidebar: FC<ThreadSidebarProps> = ({ threadId }) => {
                                 </TabsContent>
                             </Activity>
                         )}
-                        {isTextModel && (
-                            <Activity mode={activeRightSidebarTab === "pins" ? "visible" : "hidden"}>
-                                <TabsContent className="absolute inset-0 overflow-y-auto" value="pins">
-                                    <PinsSidebarTab threadId={threadId} />
-                                </TabsContent>
-                            </Activity>
-                        )}
+                        <Activity mode={activeRightSidebarTab === "pins" ? "visible" : "hidden"}>
+                            <TabsContent className="absolute inset-0 overflow-y-auto" value="pins">
+                                <PinsSidebarTab threadId={threadId} />
+                            </TabsContent>
+                        </Activity>
                     </div>
                 </Tabs>
             </SidebarContent>
-            <SidebarRail name="right" side="right" />
         </Sidebar>
     );
 };

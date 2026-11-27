@@ -14,9 +14,11 @@ import ThreadShortcutsListener from "./thread-shortcuts-listener";
 
 const state = vi.hoisted(() => {
     return {
+        confirmBeforeDelete: true,
         handleDeleteThread: vi.fn(),
         handlerThreadId: undefined as string | undefined,
         optimistic: new Map<string, string>(),
+        impersonating: false,
         threadId: "t1" as string | undefined,
         updateThread: vi.fn(),
     };
@@ -33,6 +35,10 @@ vi.mock("@lingui/react/macro", () => {
             };
         },
     };
+});
+
+vi.mock("@/features/admin/hooks/use-is-impersonating", () => {
+    return { useImpersonating: () => state.impersonating };
 });
 
 vi.mock("@tanstack/react-router", () => {
@@ -62,7 +68,12 @@ vi.mock("@/features/chat/thread-list/hooks/use-thread-handlers", () => {
         default: (_setLoadingStates: unknown, threadId?: string) => {
             state.handlerThreadId = threadId;
 
-            return { handleDeleteThread: state.handleDeleteThread, updateThread: state.updateThread };
+            return {
+                confirmBeforeDelete: state.confirmBeforeDelete,
+                confirmDialog: null,
+                handleDeleteThread: state.handleDeleteThread,
+                updateThread: state.updateThread,
+            };
         },
     };
 });
@@ -109,7 +120,9 @@ describe("thread shortcuts", () => {
         state.updateThread.mockReset();
         state.optimistic = new Map();
         state.threadId = "t1";
+        state.impersonating = false;
         state.handlerThreadId = undefined;
+        state.confirmBeforeDelete = true;
     });
 
     it("the archive shortcut archives the open thread on the global model when the thread has none", () => {
@@ -157,6 +170,16 @@ describe("thread shortcuts", () => {
         expect(state.handleDeleteThread).toHaveBeenCalledWith("t1");
     });
 
+    it("with the setting off, the delete shortcut deletes at once and opens no dialog", () => {
+        state.confirmBeforeDelete = false;
+        render(listener());
+
+        pressDelete();
+
+        expect(state.handleDeleteThread).toHaveBeenCalledWith("t1");
+        expect(screen.queryByRole("button", { name: "Confirm delete" })).toBeNull();
+    });
+
     it("deletes the thread the dialog was opened for, even if the route moved to another thread meanwhile", () => {
         const view = render(listener());
 
@@ -176,6 +199,18 @@ describe("thread shortcuts", () => {
 
     it("does nothing for a thread the person does not own, as a shared thread's viewer", () => {
         render(listener({ isOwner: false, status: "active" }));
+
+        pressArchive();
+        pressDelete();
+
+        expect(state.updateThread).not.toHaveBeenCalled();
+        expect(screen.queryByRole("button", { name: "Confirm delete" })).toBeNull();
+    });
+
+    it("does nothing for an admin impersonating the owner, as the server refuses both", () => {
+        state.impersonating = true;
+
+        render(listener({ isOwner: true, status: "active" }));
 
         pressArchive();
         pressDelete();

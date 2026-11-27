@@ -18,6 +18,7 @@ import { ensureSlugUnique, validateSlug, vSkillConfigInput } from "./validators"
 import { insertSkill, skillCreateFields } from "./create-skill";
 import { scheduleObjectDeletion } from "../lib/storage-cleanup";
 import { assertJsonWithinLimit, MAX_LENGTH, vJsonValue } from "../lib/validators";
+import { type StoredRow, storedRow, storedRows } from "../lib/stored-row";
 
 /**
  * Throws NOT_FOUND — not FORBIDDEN — for a skill the caller may not read, so a
@@ -49,7 +50,7 @@ export const getSkillsByUserInternal = internalQuery
     .query(async ({ args: { maxSkills, userId }, ctx: context }) => {
         const { page: skills } = await context.db.skills.findMany({ limit: maxSkills, where: { userId } });
 
-        return skills;
+        return storedRows(skills);
     });
 
 export const getUserSkillsStateInternal = internalQuery
@@ -73,7 +74,7 @@ export const getSkillsByOrganizationInternal = internalQuery
     .query(async ({ args: { maxSkills, organizationId }, ctx: context }) => {
         const { page: skills } = await context.db.skills.findMany({ limit: maxSkills, where: { organizationId } });
 
-        return skills;
+        return storedRows(skills);
     });
 
 export const getSkillsByIdsInternal = internalQuery
@@ -83,7 +84,7 @@ export const getSkillsByIdsInternal = internalQuery
     .query(async ({ args: { skillIds }, ctx: context }) => {
         const skills = await Promise.all(skillIds.map((skillId) => context.db.skills.findFirst({ where: { _id: skillId } })));
 
-        return skills.filter((skill): skill is Doc<"skills"> => skill !== null);
+        return storedRows(skills.filter((skill): skill is Doc<"skills"> => skill !== null));
     });
 
 export const calculateSkills = internalAction
@@ -184,7 +185,7 @@ export const getSkills = authAction
         category: v.optional(v.string().max(MAX_LENGTH.short)),
         sortBy: v.optional(v.union(v.literal("recent"), v.literal("mostUsed"), v.literal("alphabetical"))),
     })
-    .action(async ({ args: { category, sortBy = "recent" }, ctx }): Promise<Doc<"skills">[]> => {
+    .action(async ({ args: { category, sortBy = "recent" }, ctx }): Promise<StoredRow<Doc<"skills">>[]> => {
         const { userId } = ctx.user;
 
         // Handle anonymous users - return empty array if no userId
@@ -205,7 +206,7 @@ export const getSkills = authAction
                 sortBy?: "alphabetical" | "mostUsed" | "recent";
                 userId: string;
             },
-            Doc<"skills">[]
+            StoredRow<Doc<"skills">>[]
         >(undefined, {
             action: internal.skills.functions.calculateSkills,
             name: SKILLS_CACHE_NAME,
@@ -240,14 +241,18 @@ export const getSkill = authQuery
             args: { skillId },
             ctx,
         }): Promise<
-            | (Doc<"skills"> & { enabled?: boolean; isOwner: true; stats?: Doc<"skillStats"> })
-            | (Omit<Doc<"skills">, "organizationId" | "source" | "userId"> & { enabled?: boolean; isOwner: false; stats?: Doc<"skillStats"> })
+            | (StoredRow<Doc<"skills">> & { enabled?: boolean; isOwner: true; stats?: StoredRow<Doc<"skillStats">> })
+            | (Omit<StoredRow<Doc<"skills">>, "organizationId" | "source" | "userId"> & {
+                  enabled?: boolean;
+                  isOwner: false;
+                  stats?: StoredRow<Doc<"skillStats">>;
+              })
             | null
         > => {
             const { userId } = ctx.user;
             const organizationId = ctx.user.activeOrganization?.id;
 
-            const skill = await ctx.db.skills.findFirst({ where: { _id: skillId as Id<"skills"> } });
+            const skill = storedRow(await ctx.db.skills.findFirst({ where: { _id: skillId as Id<"skills"> } }));
 
             if (!skill) {
                 return null;
@@ -263,7 +268,7 @@ export const getSkill = authQuery
                     .query("userSkills")
                     .withIndex("by_user_and_skill", (query) => query.eq("userId", userId).eq("skillId", skillId))
                     .first(),
-                ctx.db.skillStats.findFirst({ where: { skillId } }),
+                ctx.db.skillStats.findFirst({ where: { skillId } }).then(storedRow),
             ]);
 
             // A reader who is not the owner (a public or org-shared skill) gets the

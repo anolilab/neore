@@ -37,6 +37,9 @@ const REDACTED_FIELDS = new Set([
     "kvTokenKey",
     "mcpSecretHeaders",
     "oauthClient",
+    // `userSettings.projectRunnerDefaults`: up to 200 machine-written runner ids, rewritten when a host thread opens, so copying
+    // it into both sides of each snapshot would make every settings change's row tens of KB. The export reads it from the live row.
+    "projectRunnerDefaults",
     "publicAccessToken",
     "totpSecret",
     "verificationToken",
@@ -174,6 +177,7 @@ export const AUDIT_TABLES: Record<string, Attribution> = {
     prompts: { organizationId: (d) => asString(d["organizationId"]), userId: (d) => asString(d["userId"]) },
     session: { userId: (d) => asString(d["userId"]) },
     team: { organizationId: (d) => asString(d["organizationId"]) },
+    teammateConnectorAccess: { userId: (d) => asString(d["userId"]) },
     teamMember: { userId: (d) => asString(d["userId"]) },
     teamSettings: { organizationId: (d) => asString(d["organizationId"]) },
     twoFactor: { userId: (d) => asString(d["userId"]) },

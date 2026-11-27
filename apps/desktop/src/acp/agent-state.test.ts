@@ -1,0 +1,199 @@
+import { describe, expect, it, vi } from "vitest";
+
+import { availableCommandsOf, usageOf } from "./agent-state";
+
+const plain = (text: string): string => text;
+
+describe("usageOf", () => {
+    it("reads the context use and window of a usage update", () => {
+        expect(usageOf({ sessionUpdate: "usage_update", size: 200_000, used: 12_345 }, plain)).toEqual({ size: 200_000, used: 12_345 });
+    });
+
+    it("keeps a cost the agent reported, and only that", () => {
+        expect(usageOf({ cost: { amount: 0.42, currency: "USD" }, size: 1000, used: 10 }, plain)).toEqual({
+            cost: { amount: 0.42, currency: "USD" },
+            size: 1000,
+            used: 10,
+        });
+        expect(usageOf({ cost: null, size: 1000, used: 10 }, plain)).toEqual({ size: 1000, used: 10 });
+    });
+
+    it.each([
+        ["a missing used", { size: 1000 }],
+        ["a missing size", { used: 10 }],
+        ["a fraction", { size: 1000.5, used: 10 }],
+        ["a negative count", { size: 1000, used: -1 }],
+        ["a text count", { size: "1000", used: 10 }],
+        ["an unsafe integer", { size: Number.MAX_SAFE_INTEGER + 2, used: 10 }],
+    ])("refuses %s", (_name, update) => {
+        expect(usageOf({ sessionUpdate: "usage_update", ...update }, plain)).toBeUndefined();
+    });
+
+    it("drops a cost that is not a finite non-negative amount with a currency, and keeps the usage", () => {
+        for (const cost of [{ amount: -1, currency: "USD" }, { amount: NaN, currency: "USD" }, { amount: 1 }, { amount: 1, currency: "" }, "1 USD"]) {
+            expect(usageOf({ cost, size: 1000, used: 10 }, plain)).toEqual({ size: 1000, used: 10 });
+        }
+    });
+
+    it("cuts a currency code longer than the backend takes", () => {
+        const usage = usageOf({ cost: { amount: 1, currency: "USDTOOLONGCODE" }, size: 1, used: 0 }, plain);
+
+        expect(usage?.cost?.currency).toBe("USDTOOLO");
+    });
+
+    it("leaves the cost out, rather than relabel it, when the scrub changes the currency code", () => {
+        // A four-letter code that matches a configured secret is scrubbed to a marker: the amount would then carry a false currency.
+        const scrub = (text: string) => text.replaceAll("USDC", "***");
+
+        expect(usageOf({ cost: { amount: 2, currency: "USDC" }, size: 10, used: 1 }, scrub)).toEqual({ size: 10, used: 1 });
+    });
+});
+
+describe("availableCommandsOf", () => {
+    it("does not offer a name with a hidden character, which the prompt cleaning would change", () => {
+        const hidden = { description: "Hidden", name: "re\u{200B}view" };
+        const visible = { description: "Visible", name: "review" };
+
+        expect(availableCommandsOf({ availableCommands: [hidden, visible] }, plain)?.map((command) => command.name)).toEqual(["review"]);
+    });
+
+    it("reads no more than 1000 entries, valid or not, so a long list of malformed ones stays bounded", () => {
+        const malformed: Record<string, string>[] = [];
+        const blanks: Record<string, string>[] = [];
+        const valid = { description: "Late", name: "late" };
+
+        for (let index = 0; index < 5000; index += 1) {
+            malformed.push({ description: "x" });
+        }
+
+        for (let index = 0; index < 1000; index += 1) {
+            blanks.push({});
+        }
+
+        expect(availableCommandsOf({ availableCommands: [...malformed, valid] }, plain)).toEqual([]);
+        expect(availableCommandsOf({ availableCommands: [...blanks, valid] }, plain)).toEqual([]);
+    });
+
+    it("drops a name longer than 64 characters rather than cutting it, and keeps two long names apart", () => {
+        const long = "x".repeat(64);
+
+        expect(availableCommandsOf({ availableCommands: [{ name: `${long}-a` }, { name: `${long}-b` }, { name: "short" }] }, plain)).toEqual([
+            { description: "", name: "short" },
+        ]);
+    });
+
+    it("drops a name the scrub would change, since the person would see a different command", () => {
+        const scrub = (text: string) => text.replaceAll("SECRET", "");
+
+        expect(availableCommandsOf({ availableCommands: [{ name: "run-SECRET" }, { name: "run" }] }, scrub)).toEqual([{ description: "", name: "run" }]);
+    });
+
+    it("drops a name with a space or a line break: a command is one token in the draft", () => {
+        expect(availableCommandsOf({ availableCommands: [{ name: "foo\nbar" }, { name: "two words" }, { name: "single" }] }, plain)).toEqual([
+            { description: "", name: "single" },
+        ]);
+    });
+
+    it("leaves a description longer than 4096 characters out, without scrubbing it, and keeps the command", () => {
+        const long = "x".repeat(4097);
+        const scrubbed = vi.fn(plain);
+
+        expect(availableCommandsOf({ availableCommands: [{ description: long, input: { hint: long }, name: "long" }, { name: "short" }] }, scrubbed)).toEqual([
+            { description: "", name: "long" },
+            { description: "", name: "short" },
+        ]);
+        expect(scrubbed).not.toHaveBeenCalledWith(long);
+    });
+
+    it("drops an entry whose name is longer than 4096 characters, since a cut name would name another command", () => {
+        expect(availableCommandsOf({ availableCommands: [{ name: "n".repeat(4097) }, { name: "short" }] }, plain)).toEqual([
+            { description: "", name: "short" },
+        ]);
+    });
+
+    it("reads the commands with their description and input hint", () => {
+        const update = {
+            availableCommands: [
+                { description: "Compact the context", name: "compact" },
+                { description: "Review changes", input: { hint: "a branch" }, name: "review" },
+            ],
+            sessionUpdate: "available_commands_update",
+        };
+
+        expect(availableCommandsOf(update, plain)).toEqual([
+            { description: "Compact the context", name: "compact" },
+            { description: "Review changes", hint: "a branch", name: "review" },
+        ]);
+    });
+
+    it("answers undefined when the list is not an array, and an empty list for an empty one", () => {
+        expect(availableCommandsOf({ availableCommands: "x" }, plain)).toBeUndefined();
+        expect(availableCommandsOf({}, plain)).toBeUndefined();
+        expect(availableCommandsOf({ availableCommands: [] }, plain)).toEqual([]);
+    });
+
+    it("skips entries without a usable name", () => {
+        expect(availableCommandsOf({ availableCommands: [null, 3, { name: "" }, { description: "x" }, { name: "ok" }] }, plain)).toEqual([
+            { description: "", name: "ok" },
+        ]);
+    });
+
+    it("cuts the list and each text to its bound", () => {
+        const many = Array.from({ length: 150 }, (_, index) => {
+            return { name: `c${index}` };
+        });
+
+        expect(availableCommandsOf({ availableCommands: many }, plain)).toHaveLength(100);
+
+        const [long] =
+            availableCommandsOf({ availableCommands: [{ description: "d".repeat(500), input: { hint: "h".repeat(500) }, name: "n".repeat(64) }] }, plain) ?? [];
+
+        expect(long?.name).toHaveLength(64);
+        expect(long?.description).toHaveLength(300);
+        expect(long?.hint).toHaveLength(200);
+    });
+
+    it("cuts the list to the longest prefix whose JSON fits 64 KiB, so a post with the options stays under the ingest cap", () => {
+        // Each description is 300 euro signs: 900 bytes of JSON apiece, so 100 of them are about 90 KiB, over the budget.
+        const euros = "€".repeat(300);
+        const many = Array.from({ length: 100 }, (_, index) => {
+            return { description: euros, name: `c${index}` };
+        });
+        const commands = availableCommandsOf({ availableCommands: many }, plain) ?? [];
+        // The size of the first `count` entries as the post sends them: a prefix fits when its JSON does.
+        const fits = (count: number): boolean => new TextEncoder().encode(JSON.stringify(many.slice(0, count))).length <= 64 * 1024;
+
+        expect(commands.length).toBeGreaterThan(1);
+        expect(commands.length).toBeLessThan(100);
+        // The JSON grows with each entry, so this is the longest prefix that fits: one more would be over the budget.
+        expect(fits(commands.length)).toBe(true);
+        expect(fits(commands.length + 1)).toBe(false);
+        // The prefix is kept in the agent's order.
+        expect(commands.map((command) => command.name)).toEqual(many.slice(0, commands.length).map((command) => command.name));
+    });
+
+    it("keeps every command of a list that fits the 64 KiB budget", () => {
+        // 50 entries of 300 euro signs are about 47 KiB of JSON: all of them fit, so none is cut.
+        const many = Array.from({ length: 50 }, (_, index) => {
+            return { description: "€".repeat(300), name: `c${index}` };
+        });
+
+        expect(availableCommandsOf({ availableCommands: many }, plain)?.map((command) => command.name)).toEqual(many.map((command) => command.name));
+    });
+
+    it("scrubs every description and hint, and drops a command whose name the scrub would change", () => {
+        const scrub = (text: string) => text.replaceAll("SECRET", "***");
+
+        expect(
+            availableCommandsOf(
+                {
+                    availableCommands: [
+                        { description: "uses SECRET", input: { hint: "SECRET" }, name: "SECRETcmd" },
+                        { description: "uses SECRET", name: "ok" },
+                    ],
+                },
+                scrub,
+            ),
+        ).toEqual([{ description: "uses ***", name: "ok" }]);
+    });
+});

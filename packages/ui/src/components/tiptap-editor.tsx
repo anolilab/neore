@@ -127,6 +127,8 @@ export const TiptapEditor = ({
             attributes: {
                 "aria-label": placeholder ?? t`Start writing...`,
                 class: cn("prose prose-sm dark:prose-invert max-w-none focus:outline-none min-h-[100px] p-3", EDITOR_PLACEHOLDER_CLASSES, editorClassName),
+                // Explicit: the desktop shell turns spellcheck off on <html>; prose editors keep it.
+                spellcheck: "true",
             },
         },
         extensions,

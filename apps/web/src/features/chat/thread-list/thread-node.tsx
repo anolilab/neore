@@ -46,23 +46,29 @@ import type { FC } from "react";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import DeleteConfirmationDialog from "@/components/delete-confirmation-dialog";
+import { useImpersonating } from "@/features/admin/hooks/use-is-impersonating";
 import { DEFAULT_PAGINATION_OPTS } from "@/features/chat/core/constants/query-options";
 import { usePromptQueueStore } from "@/features/chat/core/stores/prompt-queue-store";
 import type { ThreadLockMode } from "@/features/chat/lock/thread-lock-dialog";
 import { ThreadLockDialog } from "@/features/chat/lock/thread-lock-dialog";
+import type { PaneOpenResult } from "@/features/chat/split/split-layout-store";
 import { openThreadInSplitView, useSplitLayoutStore } from "@/features/chat/split/split-layout-store";
 import { useChatHasDraft } from "@/features/chat/split/use-chat-has-draft";
 import { THREAD_CATEGORY_LABELS } from "@/features/chat/tags/thread-categories";
 import ThreadTagChips from "@/features/chat/tags/thread-tag-chips";
 import ThreadTagsMenu from "@/features/chat/tags/thread-tags-menu";
 import { usePullRequestCount } from "@/features/develop/components/pull-request-counts";
+import { focusThreadSearchToggle } from "@/features/keyboard/lib/thread-search-target";
 import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
 import { useHasOpened } from "@/hooks/use-has-opened";
+import { LOAD_MARKS, useLoadMarkWhenVisible } from "@/lib/analytics/load-marks";
 import { createLunoraQueryOptions, useCRPC, useLunora } from "@/lib/lunora/crpc";
 import { openThreadWindow, supportsThreadWindows } from "@/lib/native/bridge";
 import { showError, showWarning } from "@/lib/toast";
 
+import { useIsKeyboardSelected } from "./contexts/keyboard-selection-context";
 import useCanHover from "./hooks/use-can-hover";
+import { useConfirmBeforeDelete } from "./hooks/use-confirm-before-delete";
 import { useThreadStateActions } from "./hooks/use-thread-state-actions";
 import { releaseBlinkWindow } from "./lib/needs-you-blink";
 import { hasUnreadReply, isSnoozed } from "./lib/thread-state-rules";
@@ -74,7 +80,7 @@ import ThreadOptionsMenu from "./thread-options-menu";
 import ThreadStatusIcon, { NEEDS_YOU_TEXT_CLASS } from "./thread-status-icon";
 import type { BranchNode, LoadingStates } from "./types";
 
-// Lazy: its project icons pull `lucide-react/dynamic`'s import map of every icon (~190KB).
+// Lazy: a dialog opened on demand.
 const MoveToProjectDialog = lazy(() => import("@/features/projects/components/move-to-project-dialog"));
 
 /** Colour, icon and display name of the badge for threads that came in through a messenger. */
@@ -99,6 +105,9 @@ const renderMessengerBadgeIcon = (source: string) => {
 
 const CHAT_THREAD_PATH_RE = new RegExp(`^/chat/(${LUNORA_ID_SOURCE})$`);
 
+/** Child rows take no part in the list's keyboard reset; one function for all of them keeps their props unchanged. */
+const ignoreMouseEnter = (): void => {};
+
 /** Escaped Tailwind `group/action-item` class selector, hoisted so the render body stays compilable. */
 const ACTION_ITEM_SELECTOR = String.raw`.group\/action-item`;
 
@@ -120,7 +129,6 @@ const getArchiveTooltip = (isArchiving: boolean, status: string | undefined): Me
 };
 
 const ThreadNodeChildren: FC<{
-    currentThreadId: string | undefined;
     expandedThreads: Set<string>;
     handleCreateBranch: (threadId: string) => void;
     handleDeleteThread: (threadId: string) => void;
@@ -129,18 +137,13 @@ const ThreadNodeChildren: FC<{
     handlePinThread: (threadId: string) => void;
     handleThreadToggle: (threadId: string, index: number, isShiftClick: boolean) => void;
     handleUnpinThread: (threadId: string) => void;
-    isKeyboardNavigating: boolean;
     isSelectionMode: boolean;
-    keyboardThreadId?: string;
     loadingStates: LoadingStates;
     nodes: BranchNode[];
-    searchQuery: string;
     selectedThreadIds: Set<string>;
-    selectedThreadIndex: number;
     toggleExpanded: (threadId: string) => void;
     updateThread: (threadId: string, model: string, status: "archived" | "active") => void;
 }> = ({
-    currentThreadId,
     expandedThreads,
     handleCreateBranch,
     handleDeleteThread,
@@ -149,21 +152,16 @@ const ThreadNodeChildren: FC<{
     handlePinThread,
     handleThreadToggle,
     handleUnpinThread,
-    isKeyboardNavigating,
     isSelectionMode,
-    keyboardThreadId,
     loadingStates,
     nodes: children,
-    searchQuery,
     selectedThreadIds,
-    selectedThreadIndex,
     toggleExpanded,
     updateThread,
 }) => (
     <div className="relative">
         {children.map((child, childIndex) => (
             <SortableThreadItem
-                currentThreadId={currentThreadId}
                 expandedThreads={expandedThreads}
                 handleCreateBranch={handleCreateBranch}
                 handleDeleteThread={handleDeleteThread}
@@ -173,17 +171,12 @@ const ThreadNodeChildren: FC<{
                 handleThreadToggle={handleThreadToggle}
                 handleUnpinThread={handleUnpinThread}
                 index={childIndex}
-                isKeyboardNavigating={isKeyboardNavigating}
-                isKeyboardSelected={child.threadId === keyboardThreadId}
                 isSelected={selectedThreadIds.has(child.threadId)}
                 isSelectionMode={isSelectionMode}
                 key={child.threadId}
-                keyboardThreadId={keyboardThreadId}
                 loadingStates={loadingStates}
                 node={child}
-                searchQuery={searchQuery}
                 selectedThreadIds={selectedThreadIds}
-                selectedThreadIndex={selectedThreadIndex}
                 toggleExpanded={toggleExpanded}
                 updateThread={updateThread}
             />
@@ -192,7 +185,6 @@ const ThreadNodeChildren: FC<{
 );
 
 interface ThreadNodeProperties {
-    currentThreadId: string | undefined;
     dragAttributes?: ReturnType<typeof useSortable>["attributes"];
     dragListeners?: ReturnType<typeof useSortable>["listeners"];
     expandedThreads: Set<string>;
@@ -203,20 +195,16 @@ interface ThreadNodeProperties {
     handleThreadToggle: (threadId: string, index: number, isShiftClick: boolean) => void;
     handleUnpinThread: (threadId: string) => void;
     index?: number;
-    isKeyboardSelected?: boolean;
     isSelected: boolean;
     isSelectionMode: boolean;
-    keyboardThreadId?: string;
     loadingStates: LoadingStates;
     node: BranchNode;
-    searchQuery: string;
     selectedThreadIds: Set<string>;
     toggleExpanded: (threadId: string) => void;
     updateThread: (threadId: string, model: string, status: "archived" | "active") => void;
 }
 
 const ThreadNode: FC<ThreadNodeProperties> = ({
-    currentThreadId,
     dragAttributes,
     dragListeners,
     expandedThreads,
@@ -227,13 +215,10 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
     handleThreadToggle,
     handleUnpinThread,
     index,
-    isKeyboardSelected,
     isSelected,
     isSelectionMode,
-    keyboardThreadId,
     loadingStates,
     node,
-    searchQuery,
     selectedThreadIds,
     toggleExpanded,
     updateThread,
@@ -241,8 +226,16 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
     const { i18n, t } = useLingui();
     const crpc = useCRPC();
     const lunoraClient = useLunora();
+
+    // The first row on screen is when the sidebar list became visible (real-user load timing, `lib/analytics/load-marks.ts`);
+    // a row mounted in a collapsed sidebar does not count.
+    const rowRef = useRef<HTMLDivElement>(null);
+
+    useLoadMarkWhenVisible(LOAD_MARKS.sidebarListVisible, rowRef);
     const router = useRouter();
-    const location = useLocation();
+    // Boolean selectors: a thread switch re-renders the row it leaves and the row it opens, not every row.
+    const isActive = useLocation({ select: (location) => location.pathname.match(CHAT_THREAD_PATH_RE)?.[1] === node.threadId });
+    const isKeyboardSelected = useIsKeyboardSelected(node.threadId);
     const queryClient = useQueryClient();
     const { mutateAsync: convertToPermanent } = useMutation(crpc.chat.functions.convertTemporaryToPermanent.mutationOptions());
     const { isPending: isStopping, mutate: stopThreadStream } = useMutation(crpc.chat.functions.abortThreadStream.mutationOptions());
@@ -251,7 +244,10 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
     // Mounted on first open only: rendered closed in every row, the lazy dialog loaded on first paint.
     const hasOpenedMoveToProject = useHasOpened(showMoveToProjectDialog);
     const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+    const confirmBeforeDelete = useConfirmBeforeDelete();
     const [lockMode, setLockMode] = useState<ThreadLockMode | null>(null);
+    // An admin acting as the owner may not lock, archive or delete: the server refuses each, as each withdraws the guest link.
+    const isImpersonating = useImpersonating();
     // "Lock now" makes the server refuse the old proof (epoch rotated): forget it here too, and refetch so the locked gate shows at once.
     const { mutate: lockNow } = useMutation(
         crpc.agent.thread_lock.lockThread.mutationOptions({
@@ -284,7 +280,6 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
     const canHover = useCanHover();
     const isTransitioningRef = useRef(false);
 
-    const urlThreadId = location.pathname.match(CHAT_THREAD_PATH_RE)?.[1];
     const splitViewEnabled = useUIStateStore((state) => state.preferences.splitViewEnabled === true);
     // A boolean selector, so a row re-renders only when its own chat enters or leaves the panes.
     const isOpenInSplit = useSplitLayoutStore((state) => splitViewEnabled && state.layout.panes.includes(node.threadId));
@@ -293,7 +288,14 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
     // On a page with no chat open there is no split view to add a pane to: the chat opens as the page's own, then.
     const handleOpenInSplitView = useCallback(() => {
         const open = async () => {
-            const result = await openThreadInSplitView(node.threadId);
+            let result: PaneOpenResult | undefined;
+
+            try {
+                result = await openThreadInSplitView(node.threadId);
+            } catch {
+                // The saved layout could not be read: the chat opens in the main view below.
+                result = undefined;
+            }
 
             if (result === "full") {
                 showWarning(t`Split view is full. Close a chat first.`);
@@ -301,18 +303,14 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                 return;
             }
 
-            if (urlThreadId === undefined) {
+            // Read at the click, not subscribed to: only this handler needs to know whether a chat is open.
+            if (result === undefined || !CHAT_THREAD_PATH_RE.test(router.state.location.pathname)) {
                 await router.navigate({ params: { threadId: node.threadId }, search: {}, to: "/chat/$threadId" });
             }
         };
 
         void open();
-    }, [node.threadId, router, t, urlThreadId]);
-    const isOnDefaultRoute = location.pathname === "/chat" || location.pathname === "/chat/";
-
-    const isActive = isOnDefaultRoute
-        ? false // Never active on default route
-        : urlThreadId === node.threadId || (urlThreadId === undefined && currentThreadId === node.threadId && currentThreadId !== "default");
+    }, [node.threadId, router, t]);
     const hasChildren = node?.children?.length > 0;
     const isComparisonParent = hasChildren && node.children?.some((child: any) => child.branchType === "comparison");
     const isExpanded = expandedThreads.has(node.threadId);
@@ -449,7 +447,7 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
     const containerClassName = useMemo(
         () =>
             cn(
-                "cursor-pointer hover:bg-white/10 focus-visible:bg-white/10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+                "cursor-pointer web:hover:bg-white/10 focus-visible:bg-white/10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
                 isActive && "bg-white/20",
                 isKeyboardSelected && "bg-white/10 ring-2 ring-white/50",
                 isSelectionMode && isSelected && "bg-white/15",
@@ -497,10 +495,6 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                 }
 
                 if (isActive) {
-                    return;
-                }
-
-                if (urlThreadId === node.threadId || currentThreadId === node.threadId) {
                     return;
                 }
 
@@ -858,54 +852,60 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                     />
                 )}
 
-                <DropdownMenu>
-                    <Tooltip>
-                        <TooltipTrigger
-                            render={
-                                <DropdownMenuTrigger
-                                    render={
-                                        <Button
-                                            aria-label={named(isLocked ? t`Chat lock: locked` : t`Chat lock`)}
-                                            className="hover:text-primary-text h-6 w-6 p-0"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
+                {(!isImpersonating || (isLocked && !isUnlocked)) && (
+                    <DropdownMenu>
+                        <Tooltip>
+                            <TooltipTrigger
+                                render={
+                                    <DropdownMenuTrigger
+                                        render={
+                                            <Button
+                                                aria-label={named(isLocked ? t`Chat lock: locked` : t`Chat lock`)}
+                                                className="hover:text-primary-text h-6 w-6 p-0"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                }}
+                                                size="icon-sm"
+                                                variant="ghost"
+                                            >
+                                                <Lock aria-hidden="true" className="h-3 w-3" />
+                                            </Button>
+                                        }
+                                    />
+                                }
+                            />
+                            <TooltipContent>{t`Chat lock`}</TooltipContent>
+                        </Tooltip>
+                        <DropdownMenuContent
+                            onClick={(e) => {
+                                e.stopPropagation();
+                            }}
+                        >
+                            {isLocked ? (
+                                <>
+                                    {isUnlocked && !isImpersonating && (
+                                        <DropdownMenuItem
+                                            onClick={() => {
+                                                lockNow({ threadId: node.threadId as Id<"threads"> });
                                             }}
-                                            size="icon-sm"
-                                            variant="ghost"
                                         >
-                                            <Lock aria-hidden="true" className="h-3 w-3" />
-                                        </Button>
-                                    }
-                                />
-                            }
-                        />
-                        <TooltipContent>{t`Chat lock`}</TooltipContent>
-                    </Tooltip>
-                    <DropdownMenuContent
-                        onClick={(e) => {
-                            e.stopPropagation();
-                        }}
-                    >
-                        {isLocked ? (
-                            <>
-                                {isUnlocked && (
-                                    <DropdownMenuItem
-                                        onClick={() => {
-                                            lockNow({ threadId: node.threadId as Id<"threads"> });
-                                        }}
-                                    >
-                                        {t`Lock now`}
-                                    </DropdownMenuItem>
-                                )}
-                                {!isUnlocked && <DropdownMenuItem onClick={() => setLockMode("unlock")}>{t`Unlock chat`}</DropdownMenuItem>}
-                                <DropdownMenuItem onClick={() => setLockMode("change")}>{t`Change passcode`}</DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => setLockMode("remove")}>{t`Remove passcode`}</DropdownMenuItem>
-                            </>
-                        ) : (
-                            <DropdownMenuItem onClick={() => setLockMode("set")}>{t`Lock chat`}</DropdownMenuItem>
-                        )}
-                    </DropdownMenuContent>
-                </DropdownMenu>
+                                            {t`Lock now`}
+                                        </DropdownMenuItem>
+                                    )}
+                                    {!isUnlocked && <DropdownMenuItem onClick={() => setLockMode("unlock")}>{t`Unlock chat`}</DropdownMenuItem>}
+                                    {!isImpersonating && (
+                                        <>
+                                            <DropdownMenuItem onClick={() => setLockMode("change")}>{t`Change passcode`}</DropdownMenuItem>
+                                            <DropdownMenuItem onClick={() => setLockMode("remove")}>{t`Remove passcode`}</DropdownMenuItem>
+                                        </>
+                                    )}
+                                </>
+                            ) : (
+                                !isImpersonating && <DropdownMenuItem onClick={() => setLockMode("set")}>{t`Lock chat`}</DropdownMenuItem>
+                            )}
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                )}
                 {/* Only roots are sorted into the Snoozed section, so a child has no snooze to set. */}
                 {isRootThread && (node.lastReplyAt !== undefined || snoozedUntil !== undefined) && (
                     <DropdownMenu
@@ -1006,41 +1006,43 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                     </DropdownMenuContent>
                 </DropdownMenu>
 
-                <Tooltip>
-                    <TooltipTrigger
-                        render={
-                            <Button
-                                aria-label={named(i18n._(getArchiveTooltip(isArchiving, node.status)))}
-                                className="hover:text-primary-text h-6 w-6 p-0"
-                                disabled={isArchiving}
-                                onClick={(e) => {
-                                    e.stopPropagation();
+                {!isImpersonating && (
+                    <Tooltip>
+                        <TooltipTrigger
+                            render={
+                                <Button
+                                    aria-label={named(i18n._(getArchiveTooltip(isArchiving, node.status)))}
+                                    className="hover:text-primary-text h-6 w-6 p-0"
+                                    disabled={isArchiving}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
 
-                                    if (isArchiving) {
-                                        return;
-                                    }
+                                        if (isArchiving) {
+                                            return;
+                                        }
 
-                                    const model = node.model || "gemini-1.5-flash"; // Default model
+                                        const model = node.model || "gemini-1.5-flash"; // Default model
 
-                                    if (node.status === "archived") {
-                                        updateThread(node.threadId, model, "active");
-                                    } else {
-                                        updateThread(node.threadId, model, "archived");
-                                    }
-                                }}
-                                size="icon-sm"
-                                variant="ghost"
-                            >
-                                {isArchiving ? (
-                                    <Loader2 aria-hidden="true" className="h-3 w-3 animate-spin" />
-                                ) : (
-                                    <ArchiveIcon aria-hidden="true" className="h-3 w-3" />
-                                )}
-                            </Button>
-                        }
-                    />
-                    <TooltipContent>{i18n._(getArchiveTooltip(isArchiving, node.status))} </TooltipContent>
-                </Tooltip>
+                                        if (node.status === "archived") {
+                                            updateThread(node.threadId, model, "active");
+                                        } else {
+                                            updateThread(node.threadId, model, "archived");
+                                        }
+                                    }}
+                                    size="icon-sm"
+                                    variant="ghost"
+                                >
+                                    {isArchiving ? (
+                                        <Loader2 aria-hidden="true" className="h-3 w-3 animate-spin" />
+                                    ) : (
+                                        <ArchiveIcon aria-hidden="true" className="h-3 w-3" />
+                                    )}
+                                </Button>
+                            }
+                        />
+                        <TooltipContent>{i18n._(getArchiveTooltip(isArchiving, node.status))} </TooltipContent>
+                    </Tooltip>
+                )}
 
                 {isTemporary && (
                     <Tooltip>
@@ -1082,45 +1084,60 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                     </Tooltip>
                 )}
 
-                <Tooltip>
-                    <TooltipTrigger
-                        render={
-                            <Button
-                                aria-label={named(isDeleting ? t`Deleting...` : t`Delete thread`)}
-                                className="hover:text-destructive h-6 w-6 p-0"
-                                disabled={isDeleting}
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    setShowDeleteDialog(true);
-                                }}
-                                size="icon-sm"
-                                variant="ghost"
-                            >
-                                {isDeleting ? (
-                                    <Loader2 aria-hidden="true" className="h-3 w-3 animate-spin" />
-                                ) : (
-                                    <TrashIcon aria-hidden="true" className="h-3 w-3" />
-                                )}
-                            </Button>
-                        }
-                    />
-                    <TooltipContent>{isDeleting ? t`Deleting...` : t`Delete thread`}</TooltipContent>
-                </Tooltip>
-                <DeleteConfirmationDialog
-                    description={t`Are you sure you want to delete this thread? This action cannot be undone and will permanently remove all messages in this conversation.`}
-                    isDeleting={isDeleting}
-                    onConfirm={() => {
-                        if (isDeleting) {
-                            return; // Prevent multiple clicks
-                        }
+                {!isImpersonating && (
+                    <>
+                        <Tooltip>
+                            <TooltipTrigger
+                                render={
+                                    <Button
+                                        aria-label={named(isDeleting ? t`Deleting...` : t`Delete thread`)}
+                                        className="hover:text-destructive h-6 w-6 p-0"
+                                        disabled={isDeleting}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
 
-                        handleDeleteThread(node.threadId);
-                        setShowDeleteDialog(false);
-                    }}
-                    onOpenChange={setShowDeleteDialog}
-                    open={showDeleteDialog}
-                    title={t`Delete Thread`}
-                />
+                                            if (confirmBeforeDelete) {
+                                                setShowDeleteDialog(true);
+
+                                                return;
+                                            }
+
+                                            // The row leaves at once and takes this button with it, so focus goes to the search toggle first, which stays.
+                                            focusThreadSearchToggle();
+                                            handleDeleteThread(node.threadId);
+                                        }}
+                                        size="icon-sm"
+                                        variant="ghost"
+                                    >
+                                        {isDeleting ? (
+                                            <Loader2 aria-hidden="true" className="h-3 w-3 animate-spin" />
+                                        ) : (
+                                            <TrashIcon aria-hidden="true" className="h-3 w-3" />
+                                        )}
+                                    </Button>
+                                }
+                            />
+                            <TooltipContent>{isDeleting ? t`Deleting...` : t`Delete thread`}</TooltipContent>
+                        </Tooltip>
+                        <DeleteConfirmationDialog
+                            description={t`Are you sure you want to delete this thread? This action cannot be undone and will permanently remove all messages in this conversation.`}
+                            isDeleting={isDeleting}
+                            onConfirm={() => {
+                                if (isDeleting) {
+                                    return; // Prevent multiple clicks
+                                }
+
+                                handleDeleteThread(node.threadId);
+                                setShowDeleteDialog(false);
+                                // The dialog returns focus to the button that opened it on close, and that button leaves with the row: the toggle gets focus after the return.
+                                globalThis.setTimeout(focusThreadSearchToggle, 0);
+                            }}
+                            onOpenChange={setShowDeleteDialog}
+                            open={showDeleteDialog}
+                            title={t`Delete Thread`}
+                        />
+                    </>
+                )}
                 {lockMode !== null && (
                     <ThreadLockDialog
                         mode={lockMode}
@@ -1155,7 +1172,7 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                     <span className="sr-only">{t`Unread`}</span>
                 </>
             )}
-            {searchQuery.trim() && node.relevantMessages && node.relevantMessages.length > 0 && (
+            {node.relevantMessages && node.relevantMessages.length > 0 && (
                 <div className="bg-primary/10 text-primary-text shrink-0 rounded-full px-1.5 py-0.5 text-xs">
                     <Plural one="# match" other="# matches" value={node.relevantMessages.length} />
                 </div>
@@ -1177,6 +1194,7 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                             handleThreadToggle(node.threadId, index, e.shiftKey);
                         }
                     }}
+                    ref={rowRef}
                     role="presentation"
                 >
                     {content}
@@ -1209,10 +1227,6 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                                 return;
                             }
 
-                            if (urlThreadId === node.threadId || currentThreadId === node.threadId) {
-                                return;
-                            }
-
                             if (isTransitioningRef.current) {
                                 return;
                             }
@@ -1230,14 +1244,16 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                         }
                     }}
                     onMouseEnter={handleMouseEnter}
+                    ref={rowRef}
                     role="presentation"
                 >
                     {content}
                 </div>
             )}
 
-            {searchQuery.trim() && !isSelectionMode && node.relevantMessages && node.relevantMessages.length > 0 && (
-                <MessageSearchMatches matches={node.relevantMessages} searchQuery={searchQuery} threadId={node.threadId} />
+            {/* Only a message search's results carry matches. */}
+            {!isSelectionMode && node.relevantMessages && node.relevantMessages.length > 0 && (
+                <MessageSearchMatches matches={node.relevantMessages} threadId={node.threadId} />
             )}
 
             {hasOpenedMoveToProject && (
@@ -1253,23 +1269,18 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
 
             {hasChildren && isExpanded && (
                 <ThreadNodeChildren
-                    currentThreadId={currentThreadId}
                     expandedThreads={expandedThreads}
                     handleCreateBranch={handleCreateBranch}
                     handleDeleteThread={handleDeleteThread}
                     handleDownloadThread={handleDownloadThread}
-                    handleMouseEnter={() => {}}
+                    handleMouseEnter={ignoreMouseEnter}
                     handlePinThread={handlePinThread}
                     handleThreadToggle={handleThreadToggle}
                     handleUnpinThread={handleUnpinThread}
-                    isKeyboardNavigating={false}
                     isSelectionMode={isSelectionMode}
-                    keyboardThreadId={keyboardThreadId}
                     loadingStates={loadingStates}
                     nodes={node.children}
-                    searchQuery={searchQuery}
                     selectedThreadIds={selectedThreadIds}
-                    selectedThreadIndex={-1}
                     toggleExpanded={toggleExpanded}
                     updateThread={updateThread}
                 />

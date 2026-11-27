@@ -1,6 +1,6 @@
 /**
  * The coding-agent commands the BACKEND creates (acp-agent-host.md §4.1): `acp_start`, `acp_send`,
- * `acp_cancel` and `acp_permission_answer`. `createDeviceCall` is for device tools: it refuses anything the
+ * `acp_cancel`, `acp_permission_answer` and `acp_set_config`. `createDeviceCall` is for device tools: it refuses anything the
  * manifest does not list. These calls are signed like any other (the desktop's Rust core verifies them), but have
  * their own open-call budget and claim window (`lib/constants.ts`), a claim that is a lease, and a prompt that is
  * cleared once the call ends (`acp/lib/calls.ts`).
@@ -18,18 +18,28 @@ import {
     MAX_DEVICE_INPUT_BYTES,
     MAX_OPEN_ACP_CALLS_PER_DEVICE,
     MAX_OPEN_ACP_CANCELS_PER_DEVICE,
+    MAX_OPEN_ACP_SET_CONFIGS_PER_DEVICE,
 } from "./constants";
 import { signDevicePayload, utf8Length } from "./signing";
 import { countOpenCalls, isAcpTool, isDeviceOnline, isDeviceOutdated } from "./state";
 import type { DeviceTaintSource } from "./taint";
 import { mergeTaint } from "./taint";
 
-export type AcpCallKind = "acp_cancel" | "acp_permission_answer" | "acp_send" | "acp_start";
+export type AcpCallKind = "acp_cancel" | "acp_permission_answer" | "acp_send" | "acp_set_config" | "acp_start";
 
 export type AcpCallResult = { callId: string } | { error: "busy" | "ineligible" | "input_too_large" | "offline" | "outdated" };
 
 /** Slack past a window, so the check that enforces it runs after the window rather than a tick before. */
 const CHECK_SLACK_MS = 1000;
+
+/** How many open calls of this kind's budget the device may hold: Stop and an option change have budgets of their own. */
+const openBudgetOf = (kind: AcpCallKind): number => {
+    if (kind === "acp_cancel") {
+        return MAX_OPEN_ACP_CANCELS_PER_DEVICE;
+    }
+
+    return kind === "acp_set_config" ? MAX_OPEN_ACP_SET_CONFIGS_PER_DEVICE : MAX_OPEN_ACP_CALLS_PER_DEVICE;
+};
 
 export const createAcpCall = async (
     ctx: Pick<MutationCtx, "db" | "scheduler">,
@@ -69,23 +79,26 @@ export const createAcpCall = async (
     }
 
     // A pending call past its claim window can no longer be claimed (it expires on its own): it must not block a cancel.
-    // Stop has a budget of its own: three answers waiting to be delivered must not be able to swallow it.
+    // Stop and an option change have budgets of their own, so three answers waiting to be delivered cannot swallow either.
+    const limit = openBudgetOf(kind);
+    const budgetOf = (name: string): string => (name === "acp_cancel" || name === "acp_set_config" ? name : "other");
     const open = await countOpenCalls(
         ctx,
         deviceId,
         (call) =>
             isAcpTool(call.toolName) &&
             !(call.status === "pending" && now - call.createdAt > ACP_CLAIM_WINDOW_MS) &&
-            (call.toolName === "acp_cancel") === (kind === "acp_cancel"),
-        MAX_OPEN_ACP_CALLS_PER_DEVICE,
+            budgetOf(call.toolName) === budgetOf(kind),
+        limit,
     );
 
-    if (open >= (kind === "acp_cancel" ? MAX_OPEN_ACP_CANCELS_PER_DEVICE : MAX_OPEN_ACP_CALLS_PER_DEVICE)) {
+    if (open >= limit) {
         return { error: "busy" };
     }
 
     const thread = await ctx.db.threads.findFirst({ where: { _id: threadId } });
     const deadline = now + DEVICE_CALL_DEADLINE_MS;
+    // lunora-advisor-exempt owner_field_from_args_not_auth -- a helper, not a procedure: the call is written only for a device `userId` owns (the read above), so the row's owner is the device's
     const callId = await ctx.db.insert("deviceCalls", {
         createdAt: now,
         deadline,

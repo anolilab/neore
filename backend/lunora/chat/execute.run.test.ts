@@ -15,7 +15,8 @@
  */
 import { lunoraTest } from "@lunora/testing";
 import { enabledModelOf, MODEL_REGISTRY } from "@neore/ai/models";
-import { MockLanguageModelV3 } from "ai/test";
+import { jsonSchema } from "ai";
+import { MockLanguageModelV3, simulateReadableStream } from "ai/test";
 import { v } from "lunorash/server";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -23,7 +24,8 @@ import { registeredApi, registerModule } from "../../test/registered-api";
 import { jobsQueueMessages } from "../../test/stubs/cloudflare-workers";
 import { internalQuery } from "../_generated/server";
 import schema from "../schema";
-import { scriptedModel, textStep } from "./group/test-models";
+import { scriptedModel, textStep, toolCallStep } from "./group/test-models";
+import { CAP_WRAP_UP_INSTRUCTION } from "./lib/cap-wrap-up";
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -33,15 +35,27 @@ const { autoState, groupState, modelState, prefsState, registry, skillState, too
         autoState: { plans: [] as unknown[], requests: 0 },
         /** What `getGroupRunConfig` answers, and how often it was asked. */
         groupState: { calls: 0, config: null as unknown },
-        /** The model `getAgent` hands out; `builtAgents` counts the runs that got as far as generating. */
-        modelState: { builtAgents: 0, model: undefined as unknown },
+        /** The model `getAgent` hands out; `builtAgents` counts the runs that got as far as generating, `tools` names the last one's tools. */
+        modelState: { builtAgents: 0, model: undefined as unknown, tools: [] as string[] },
         /** Whether the agent-module preference read reports a failure. */
         prefsState: { readFailed: false },
         registry: new Map<string, unknown>(),
         /** What `resolveSkillsForRun` is asked, and its answer. */
         skillState: { answer: undefined as unknown, calls: [] as { skillSlug?: string }[] },
         /** Whether the model may use tools, and the options `buildAgentTools` was last given. */
-        toolsState: { allowTools: false, options: undefined as { untrustedContext?: Promise<boolean> | boolean } | undefined },
+        /**
+         * Whether the model may use tools, and the options `buildAgentTools` was last given.
+         * `removesInstructionRead`: the tools' own gates (the cap, a bot's selection, the permissions) removed it.
+         */
+        toolsState: {
+            allowTools: false,
+            /** The action ctx the tools were built with: the tools get it as their `ToolCtx`. */
+            ctx: undefined as { runTurn?: unknown } | undefined,
+            options: undefined as { untrustedContext?: Promise<boolean> | boolean } | undefined,
+            removesInstructionRead: false,
+            /** When set, the tools the run is given, in place of the rule-file tool. */
+            tools: undefined as Record<string, unknown> | undefined,
+        },
     };
 });
 
@@ -65,17 +79,24 @@ vi.mock("../usage/schedule", async (importOriginal) => {
 });
 
 vi.mock("./lib/agent-run", async (importOriginal) => {
+    const actual = await importOriginal<typeof import("./lib/agent-run")>();
+
     return {
-        ...(await importOriginal<typeof import("./lib/agent-run")>()),
+        ...actual,
+        // Passed through; watched for the snapshot a pause would record.
+        finishRun: vi.fn(actual.finishRun),
         loadRunContext: vi.fn(async () => {
             return {
                 botId: undefined,
                 contextParts: [],
+                contextPartsWithoutInstructions: [],
                 knowledgeSources: [],
                 memoryEnabled: false,
                 prefs: { language: undefined, location: undefined, personalization: undefined, timezone: "Europe/Berlin" },
+                projectInstructions: [],
                 researchDepth: "balanced",
                 retrievedMemories: [],
+                systemContext: ["instructions"],
                 threadSettings: null,
                 untrustedContext: false,
                 userProviderKeys: undefined,
@@ -109,11 +130,20 @@ vi.mock("./lib/auto-model", async (importOriginal) => {
 vi.mock("./lib/agent-tools", async (importOriginal) => {
     return {
         ...(await importOriginal<typeof import("./lib/agent-tools")>()),
-        buildAgentTools: vi.fn(async (_ctx: unknown, options: { untrustedContext?: Promise<boolean> | boolean }) => {
-            toolsState.options = options;
+        buildAgentTools: vi.fn(
+            async (ctx: { runTurn?: unknown }, options: { instructions?: Promise<ReadonlyArray<unknown>>; untrustedContext?: Promise<boolean> | boolean }) => {
+                toolsState.ctx = ctx;
+                toolsState.options = options;
 
-            return { autoApprovals: {}, mcpClients: [], mcpLabels: {}, mcpServerNames: [], permissionKeys: {}, tools: {} };
-        }),
+                // Offered as a candidate, kept unless the gates remove it (`agent-tools.bot-selection.test.ts`).
+                const listed = (await options.instructions) ?? [];
+                const tools =
+                    toolsState.tools ??
+                    (listed.length > 0 && !toolsState.removesInstructionRead ? { instruction_read: { description: "read", inputSchema: {} } } : {});
+
+                return { autoApprovals: {}, mcpClients: [], mcpLabels: {}, mcpServerNames: [], permissionKeys: {}, repeatable: [], tools };
+            },
+        ),
     };
 });
 
@@ -123,8 +153,9 @@ vi.mock("./group/run", async (importOriginal) => {
 
 vi.mock("./lib/get-agent", () => {
     return {
-        default: async (model: string, options: { maxSteps?: number }) => {
+        default: async (model: string, options: { maxSteps?: number; tools?: Record<string, unknown> }) => {
             modelState.builtAgents += 1;
+            modelState.tools = Object.keys(options.tools ?? {});
 
             // Imported at call time: the agent client and `agent/messages` import each other.
             const { Agent } = await import("../agent/client");
@@ -135,6 +166,9 @@ vi.mock("./lib/get-agent", () => {
                 languageModel: modelState.model as never,
                 maxSteps: options.maxSteps ?? 5,
                 name: model,
+                // Offered to the model only by a suite that sets `toolsState.tools` (the step-cap suite's probe): the placeholder
+                // `instruction_read` has no schema a model can take, so the other suites keep their agent tool-less.
+                tools: toolsState.tools === undefined ? undefined : (options.tools as never),
             });
         },
     };
@@ -143,6 +177,8 @@ vi.mock("./lib/get-agent", () => {
 const { scheduleReplyUsage } = await import("../usage/schedule");
 const { runGroupTurn } = await import("./group/run");
 const { runStreamingAgent } = await import("./execute");
+const { finishRun, loadRunContext } = await import("./lib/agent-run");
+const { stopActiveForThread } = await import("./streaming/persistent/library");
 
 type Harness = ReturnType<typeof lunoraTest>;
 
@@ -222,7 +258,10 @@ beforeEach(async () => {
     skillState.calls = [];
     skillState.answer = { enabledSkills: [], invocation: null };
     toolsState.allowTools = false;
+    toolsState.tools = undefined;
+    toolsState.ctx = undefined;
     toolsState.options = undefined;
+    toolsState.removesInstructionRead = false;
 
     harness = lunoraTest(schema as never);
 
@@ -255,7 +294,9 @@ afterEach(() => {
     harness.close();
 });
 
-const run = async (extra: { model?: string; organizationId?: string; skill?: { rawArgs: string; slug: string }; userPrompt?: string } = {}) => {
+const run = async (
+    extra: { impersonated?: boolean; model?: string; organizationId?: string; skill?: { rawArgs: string; slug: string }; userPrompt?: string } = {},
+) => {
     const { model = "test-model", ...rest } = extra;
 
     return await harness.action(
@@ -316,6 +357,267 @@ describe("runStreamingAgent: a successful turn", () => {
         expect(usageArgs).toMatchObject({ date: expect.stringMatching(ISO_DATE), replyKey: expect.any(String), tokens: 8, userId: OWNER });
         // A plain turn has no invoked skill, so the usage page files it under the assistant.
         expect(usageArgs).not.toHaveProperty("skillName");
+    });
+});
+
+describe("runStreamingAgent: the turn its tools see", () => {
+    it.each([false, true])(
+        "hands the tools the turn as /chat/start recorded it (impersonated: %s), its prompt and its system prompt's kinds",
+        async (impersonated) => {
+            toolsState.allowTools = true;
+
+            await run({ impersonated });
+
+            expect(toolsState.ctx?.runTurn).toStrictEqual({
+                impersonated,
+                promptMessageId: ids.messageId,
+                systemContext: expect.arrayContaining(["instructions"]),
+            });
+        },
+    );
+
+    it("hands them no turn when the job does not say whether an admin sent it, which refuses a saved login", async () => {
+        toolsState.allowTools = true;
+
+        await run();
+
+        expect(toolsState.ctx).toBeDefined();
+        expect(toolsState.ctx?.runTurn).toBeUndefined();
+    });
+});
+
+describe("runStreamingAgent: a project's rule files read when needed", () => {
+    const instructions = [{ content: "Run the script.", description: "How to deploy", id: "d", title: "Deploy" }];
+
+    /** The run's context with the project's `auto` files, as `loadRunContext` reads them. */
+    const withInstructions = (threadSettings: { projectId: string } | null = null) => {
+        vi.mocked(loadRunContext).mockResolvedValueOnce({
+            botId: undefined,
+            contextParts: ["PROJECT CONTEXT:\nBe brief."],
+            // Chosen without the list's cost: a later file the list left no room for.
+            contextPartsWithoutInstructions: ["PROJECT CONTEXT:\nBe brief.\n\nAlso this."],
+            knowledgeSources: [],
+            memoryEnabled: false,
+            prefs: { language: undefined, location: undefined, personalization: undefined, timezone: "Europe/Berlin" },
+            projectInstructions: instructions,
+            researchDepth: "balanced",
+            retrievedMemories: [],
+            systemContext: ["instructions"],
+            threadSettings,
+            untrustedContext: true,
+            userProviderKeys: undefined,
+        } as never);
+    };
+
+    /** The tools the run's agent was built with, and the system prompt the model was called with. */
+    const firstCall = () => {
+        const [call] = (modelState.model as MockLanguageModelV3).doStreamCalls;
+        const system = call?.prompt.find((message) => message.role === "system");
+
+        return { system: typeof system?.content === "string" ? system.content : "", tools: modelState.tools };
+    };
+
+    it("lists them after the project's context and offers instruction_read over them", async () => {
+        toolsState.allowTools = true;
+        withInstructions();
+
+        await run();
+
+        const { system, tools } = firstCall();
+
+        expect(tools).toContain("instruction_read");
+        expect(system).toContain("PROJECT CONTEXT:\nBe brief.\n\nInstruction files you can read with the instruction_read tool");
+        expect(system).toContain("- Deploy (id: d): How to deploy");
+        expect(system).not.toContain("Run the script.");
+    });
+
+    it("names the project they came from in the snapshot a pause records, so its continuation reads that one's", async () => {
+        toolsState.allowTools = true;
+        withInstructions({ projectId: "project-a" });
+
+        await run();
+
+        expect(vi.mocked(finishRun).mock.calls.at(-1)?.[1].snapshot).toMatchObject({ projectId: "project-a" });
+    });
+
+    it("neither lists them nor gives up their room once the tools' own gates removed instruction_read", async () => {
+        toolsState.allowTools = true;
+        toolsState.removesInstructionRead = true;
+        withInstructions();
+
+        await run();
+
+        const { system, tools } = firstCall();
+
+        expect(tools).not.toContain("instruction_read");
+        expect(system).not.toContain("instruction_read");
+        expect(system).toContain("PROJECT CONTEXT:\nBe brief.\n\nAlso this.");
+    });
+
+    it("neither lists nor offers them to a model that takes no tools", async () => {
+        withInstructions();
+
+        await run();
+
+        const { system, tools } = firstCall();
+
+        expect(tools).not.toContain("instruction_read");
+        expect(system).not.toContain("instruction_read");
+    });
+});
+
+describe("runStreamingAgent: a reply that spends its step cap", () => {
+    // The default cap for a run that is not auto-continuing: five steps. Five tool steps reach it, so the next model call is the wrap-up.
+    const CAP = 5;
+    const probeSteps = (count: number) => Array.from({ length: count }, (_, index) => toolCallStep("probe", `c${index + 1}`));
+    const modelCalls = () => (modelState.model as MockLanguageModelV3).doStreamCalls;
+    const offeredTools = (call: { tools?: unknown[] }) => call.tools ?? [];
+
+    let probeRuns = 0;
+
+    beforeEach(() => {
+        probeRuns = 0;
+        toolsState.allowTools = true;
+        // Each run answers something new: three identical calls in a row are a loop to the repeated-call guard, which would end the run first.
+        toolsState.tools = {
+            probe: {
+                description: "probe",
+                execute: async () => {
+                    probeRuns += 1;
+
+                    return `probed ${probeRuns}`;
+                },
+                inputSchema: jsonSchema({ properties: {}, type: "object" }),
+            },
+        };
+    });
+
+    it("makes exactly one wrap-up call, with no tools offered, and saves its text under the reply", async () => {
+        modelState.model = scriptedModel([...probeSteps(CAP), textStep("Wrap-up: probed five times, nothing left.")]);
+
+        await run();
+
+        const calls = modelCalls();
+
+        // The five tool steps each offered the tool; the sixth call is the wrap-up and offers none.
+        expect(calls).toHaveLength(CAP + 1);
+        expect(calls.slice(0, CAP).every((call) => offeredTools(call).length === 1)).toBe(true);
+        expect(offeredTools(calls[CAP]!)).toHaveLength(0);
+        expect(JSON.stringify(calls[CAP]!.prompt)).toContain(CAP_WRAP_UP_INSTRUCTION);
+
+        const state = await readState();
+
+        expect(JSON.stringify(state.replies)).toContain("Wrap-up: probed five times");
+        expect(state.streamStatus).toBe("done");
+        expect(state.threadStatus).toBe("active");
+    });
+
+    it("makes no wrap-up call when the person stopped the reply on its cap", async () => {
+        let calls = 0;
+
+        modelState.model = scriptedModel([...probeSteps(CAP), textStep("Wrap-up that must not run.")], async () => {
+            calls += 1;
+
+            // Stop lands while the cap's last tool step is being generated.
+            if (calls === CAP) {
+                await harness.run(async (ctx: any) => await ctx.runMutation(stopActiveForThread, { threadId: ids.threadId }));
+            }
+        });
+
+        await run();
+
+        // Every call that ran offered the tool: none was the tool-less wrap-up.
+        expect(modelCalls().every((call) => offeredTools(call).length > 0)).toBe(true);
+        const state = await readState();
+
+        expect(JSON.stringify(state.replies)).not.toContain("Wrap-up that must not run");
+    });
+
+    it("aborts a wrap-up that a stop reaches while it generates, and saves none of its text", async () => {
+        const steps = probeSteps(CAP);
+        let calls = 0;
+
+        modelState.model = new MockLanguageModelV3({
+            doStream: async ({ abortSignal }) => {
+                calls += 1;
+
+                if (calls <= CAP) {
+                    return { stream: simulateReadableStream({ chunkDelayInMs: null, chunks: steps[calls - 1]!, initialDelayInMs: null }) };
+                }
+
+                // The wrap-up: a stop lands while it generates, and its text waits for the abort that the stop causes.
+                await harness.run(async (ctx: any) => await ctx.runMutation(stopActiveForThread, { threadId: ids.threadId }));
+
+                return {
+                    stream: new ReadableStream({
+                        start(controller) {
+                            controller.enqueue({ type: "stream-start", warnings: [] });
+                            controller.enqueue({ id: "t", type: "text-start" });
+                            controller.enqueue({ delta: "Wrap-up a stop must end.", id: "t", type: "text-delta" });
+                            abortSignal?.addEventListener("abort", () => {
+                                controller.error(new Error("aborted"));
+                            });
+                        },
+                    }) as never,
+                };
+            },
+        });
+
+        await run();
+
+        const state = await readState();
+
+        expect(calls).toBe(CAP + 1);
+        expect(JSON.stringify(state.replies)).not.toContain("Wrap-up a stop must end");
+        expect(state.streamStatus).toBe("done");
+    }, 20_000);
+
+    it("leaves no failed row of its own when the wrap-up call is rejected, and the reply stands", async () => {
+        const steps = probeSteps(CAP);
+        let calls = 0;
+
+        modelState.model = new MockLanguageModelV3({
+            doStream: async () => {
+                calls += 1;
+
+                if (calls <= CAP) {
+                    return { stream: simulateReadableStream({ chunkDelayInMs: null, chunks: steps[calls - 1]!, initialDelayInMs: null }) };
+                }
+
+                throw new Error("provider rejected the tool-less call");
+            },
+        });
+
+        await run();
+
+        const state = await readState();
+
+        expect(calls).toBe(CAP + 1);
+        expect(state.replies.filter((row: { status?: string }) => row.status === "failed")).toHaveLength(0);
+        expect(state.streamStatus).toBe("done");
+        expect(state.threadStatus).toBe("active");
+    });
+
+    it("makes no wrap-up call when the reply finishes in text before the cap", async () => {
+        modelState.model = scriptedModel([probeSteps(1)[0]!, textStep("Done, after one probe.")]);
+
+        await run();
+
+        const calls = modelCalls();
+
+        // Exactly the calls the loop itself makes: the tool step, then the text answer. No extra call.
+        expect(calls).toHaveLength(2);
+        expect(calls.every((call) => offeredTools(call).length > 0)).toBe(true);
+
+        const state = await readState();
+
+        expect(JSON.stringify(state.replies)).toContain("Done, after one probe.");
+    });
+
+    it("makes no wrap-up call for a reply that answers in text at once", async () => {
+        await run();
+
+        expect(modelCalls()).toHaveLength(1);
     });
 });
 

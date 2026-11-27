@@ -25,7 +25,18 @@ import { RATE_LIMIT_RESUME_SLACK_MS } from "./lib/rate-limit-pause";
 const { enqueued, modelState, registry } = vi.hoisted(() => {
     return {
         enqueued: [] as { args: Record<string, unknown>; delayMs: number | undefined }[],
-        modelState: { builtAgents: 0, groupConfig: null as unknown, model: undefined as unknown, withTools: false },
+        modelState: {
+            builtAgents: 0,
+            groupConfig: null as unknown,
+            model: undefined as unknown,
+            /** The tool context the run built its tools with, which it sets its turn on (`setRunTurn`). */
+            toolCtx: undefined as { runTurn?: { systemContext?: ReadonlyArray<string> } } | undefined,
+            /** The person's usage-limit settings, as the prefs read answers them (absent = the defaults). */
+            usagePrefs: {} as { resumeAfterUsageLimit?: boolean; snoozeUntilUsageLimitReset?: boolean },
+            /** The person's settings cannot be read: the shard read fails. */
+            usagePrefsFail: false,
+            withTools: false,
+        },
         registry: new Map<string, unknown>(),
     };
 });
@@ -48,6 +59,20 @@ vi.mock("../lib/crpc-auth-helpers", async (importOriginal) => {
 
 vi.mock("../lib/rate-limiter", async (importOriginal) => {
     return { ...(await importOriginal<typeof import("../lib/rate-limiter")>()), rateLimitGuard: async () => undefined };
+});
+
+// The person's own shard answers their preferences. The harness is one database, so the read is faked; resumable runs stay off here.
+vi.mock("../lib/cross-shard", async (importOriginal) => {
+    return {
+        ...(await importOriginal<typeof import("../lib/cross-shard")>()),
+        callOnShard: vi.fn(async () => {
+            if (modelState.usagePrefsFail) {
+                throw new Error("shard unreachable");
+            }
+
+            return { memoryEnabled: false, resumeInterruptedRuns: false, threadSummariesEnabled: false, ...modelState.usagePrefs };
+        }),
+    };
 });
 
 vi.mock("../lib/job-queue", () => {
@@ -80,11 +105,14 @@ vi.mock("./lib/agent-run", async (importOriginal) => {
             return {
                 botId: undefined,
                 contextParts: [],
+                contextPartsWithoutInstructions: [],
                 knowledgeSources: [],
                 memoryEnabled: false,
                 prefs: { language: undefined, location: undefined, personalization: undefined, timezone: "Europe/Berlin" },
+                projectInstructions: [],
                 researchDepth: "balanced",
                 retrievedMemories: [],
+                systemContext: ["instructions"],
                 threadSettings: null,
                 userProviderKeys: undefined,
             };
@@ -97,7 +125,9 @@ vi.mock("./lib/agent-run", async (importOriginal) => {
 
 vi.mock("./lib/agent-tools", () => {
     return {
-        buildAgentTools: vi.fn(async () => {
+        buildAgentTools: vi.fn(async (ctx: { runTurn?: { systemContext?: ReadonlyArray<string> } }) => {
+            modelState.toolCtx = ctx;
+
             return {
                 mcpClients: [],
                 mcpLabels: {},
@@ -133,6 +163,7 @@ vi.mock("./lib/get-agent", () => {
 });
 
 const { scheduleReplyUsage } = await import("../usage/schedule");
+const { loadRunContext } = await import("./lib/agent-run");
 const { runStreamingAgent } = await import("./execute");
 const { pauseRunForRateLimit, retryPausedRunsNow, stopActiveForThread } = await import("./streaming/persistent/library");
 
@@ -220,6 +251,8 @@ beforeEach(async () => {
     modelState.builtAgents = 0;
     modelState.withTools = false;
     modelState.groupConfig = null;
+    modelState.usagePrefs = {};
+    modelState.usagePrefsFail = false;
     vi.mocked(runGroupTurn).mockClear();
     modelState.model = scriptedModel([textStep("Hello there.")]);
 
@@ -254,7 +287,7 @@ afterEach(() => {
     harness.close();
 });
 
-const run = async (extra: { resume?: string; skill?: { rawArgs: string; slug: string } } = {}) =>
+const run = async (extra: { impersonated?: boolean; resume?: string; skill?: { rawArgs: string; slug: string }; systemContext?: string[] } = {}) =>
     await harness.action(
         async (ctx: any) =>
             await ctx.runAction(runStreamingAgent, {
@@ -270,6 +303,8 @@ const run = async (extra: { resume?: string; skill?: { rawArgs: string; slug: st
 interface RunState {
     chunkText: string;
     pause: { from: string; id: string; provider?: string; reason: string; retryAt: number; status: number } | undefined;
+    /** Whether the person resumes the paused run (no resume is queued for it). */
+    pauseAwaitsPerson: true | undefined;
     pausedSteps: string[] | undefined;
     rows: { id: string; order: number; parent: string | undefined; role: string; status: string; stepOrder: number }[];
     steers: { id: string; status: string; text?: string }[] | undefined;
@@ -293,6 +328,7 @@ const readState = async (): Promise<RunState> =>
         return {
             chunkText: chunks.map((chunk: { text: string }) => chunk.text).join(""),
             pause: stream?.pause,
+            pauseAwaitsPerson: stream?.pauseAwaitsPerson,
             pausedSteps: stream?.pausedSteps,
             rows: rows.map((row: any) => {
                 return {
@@ -431,13 +467,35 @@ describe("a provider rate limit on the first model call", () => {
         expect(scheduleReplyUsage).toHaveBeenCalledOnce();
     });
 
-    it("keeps a goal round's skill on the resume it queues", async () => {
+    it("keeps a goal round's skill, and who sent the turn, on the resume it queues", async () => {
         modelState.model = planned([rateLimited()]);
 
-        await run({ skill: { rawArgs: "the thread", slug: "summarise" } });
+        await run({ impersonated: true, skill: { rawArgs: "the thread", slug: "summarise" } });
 
         expect(enqueued).toHaveLength(1);
-        expect(enqueued[0]!.args).toMatchObject({ skill: { rawArgs: "the thread", slug: "summarise" } });
+        // The resume re-enters with these arguments: without `impersonated` it would read as not known.
+        expect(enqueued[0]!.args).toMatchObject({ impersonated: true, skill: { rawArgs: "the thread", slug: "summarise" } });
+    });
+
+    it("resumes with every system-prompt kind the first run had, though its source is gone by then", async () => {
+        modelState.model = planned([rateLimited(), textStep("Hello there.")]);
+        modelState.withTools = true;
+        // The first run had memories in its system prompt; the owner turns them off before the resume.
+        vi.mocked(loadRunContext).mockImplementationOnce(async (...args) => {
+            const context = await vi.mocked(loadRunContext).getMockImplementation()!(...args);
+
+            return { ...context, systemContext: ["instructions", "memories"] };
+        });
+
+        await run({ impersonated: false });
+
+        expect(enqueued[0]!.args).toMatchObject({ systemContext: ["instructions", "memories"] });
+
+        const { pause } = await readState();
+
+        await run({ impersonated: false, resume: pause!.id, systemContext: enqueued[0]!.args.systemContext as string[] });
+
+        expect(modelState.toolCtx?.runTurn?.systemContext).toStrictEqual(["instructions", "memories"]);
     });
 
     it("ignores a redelivery of the original job while the run is paused", async () => {
@@ -1224,5 +1282,640 @@ describe("how the model fails", () => {
 
         expect(wrapped.lastError).toBeDefined();
         expect(paused.pause).toMatchObject({ provider: "anthropic", status: 429 });
+    });
+});
+
+describe("the usage-limit settings of a rate-limited run", () => {
+    /** The thread's snooze, as the owner's active list reads it. */
+    const snoozedUntil = async (): Promise<number | undefined> =>
+        await harness.run(async (ctx: any) => {
+            const thread = await ctx.db.get("threads", ids.threadId as never);
+
+            return thread?.snoozedUntil;
+        });
+
+    it("resumes by itself and leaves the chat alone when both settings are absent", async () => {
+        modelState.model = planned([rateLimited()]);
+
+        await run();
+
+        const { pause, pauseAwaitsPerson } = await readState();
+
+        expect(pause).toBeDefined();
+        expect(pauseAwaitsPerson).toBeUndefined();
+        expect(enqueued).toHaveLength(1);
+        expect(await snoozedUntil()).toBeUndefined();
+    });
+
+    it("with resuming after a limit off, queues no resume: the run waits, and the chat shows it waiting for the person", async () => {
+        modelState.usagePrefs = { resumeAfterUsageLimit: false };
+        modelState.model = planned([rateLimited(), textStep("Hello there.")]);
+
+        await run();
+
+        const { pause, pauseAwaitsPerson, streamStatus, threadStatus } = await readState();
+
+        // Still live and paused, with the same reset time the pause always has.
+        expect(["pending", "streaming"]).toContain(streamStatus);
+        expect(threadStatus).toBe("running");
+        expect(pauseAwaitsPerson).toBe(true);
+        expect(pause).toMatchObject({ reason: "rate_limit", status: 429 });
+        expect(enqueued).toHaveLength(0);
+
+        const { getActiveStreamForThread } = await import("./streaming");
+        const active = (await harness
+            .withIdentity({ userId: OWNER } as never)
+            .query(getActiveStreamForThread as never, { threadId: ids.threadId } as never)) as { pause: object };
+
+        expect(active.pause).toMatchObject({ awaitsPerson: true, reason: "rate_limit" });
+    });
+
+    it("with resuming after a limit off, Retry now resumes the run at once after its reset, though no resume was queued", async () => {
+        modelState.usagePrefs = { resumeAfterUsageLimit: false };
+        modelState.model = planned([rateLimited(), textStep("Hello there.")]);
+
+        await run();
+
+        // The reset has passed by five seconds: an automatic resume would still be given its overdue grace.
+        await harness.run(async (ctx: any) => {
+            const stream = await ctx.db.get("persistentStreams", ids.streamId as never);
+
+            await ctx.db.patch("persistentStreams", ids.streamId as never, { pause: { ...stream.pause, retryAt: Date.now() - 5000 } });
+        });
+
+        const resumed = await harness.run(async (ctx: any) => await ctx.runMutation(retryPausedRunsNow, { threadId: ids.threadId }));
+        const { pause } = await readState();
+
+        expect(resumed).toBe(true);
+        expect(enqueued).toHaveLength(1);
+        expect(enqueued[0]!.delayMs).toBe(0);
+
+        await run({ resume: pause!.id });
+
+        const state = await readState();
+
+        expect(state.streamStatus).toBe("done");
+        expect(state.rows.filter((row) => row.role === "assistant")).toHaveLength(1);
+    });
+
+    it("with snoozing on and the provider's reset time given, the chat is snoozed until that reset, and still resumes by itself", async () => {
+        modelState.usagePrefs = { snoozeUntilUsageLimitReset: true };
+        modelState.model = planned([rateLimited()]);
+
+        await run();
+
+        const { pause } = await readState();
+
+        expect(await snoozedUntil()).toBe(pause!.retryAt);
+        expect(enqueued).toHaveLength(1);
+        expect(enqueued[0]!.delayMs).toBeGreaterThan(RETRY_IN_MS);
+    });
+
+    it("with snoozing on and no reset time from the provider, the chat is not snoozed, and the default wait still resumes it", async () => {
+        modelState.usagePrefs = { snoozeUntilUsageLimitReset: true };
+        // A 429 with no retry time: `rateLimited(undefined)` would take the parameter's default, so the error is built without one.
+        modelState.model = planned([
+            Object.assign(new Error("Gateway model proxy failed (502): rate limited"), {
+                rateLimit: { provider: "anthropic", status: 429 },
+                statusCode: 502,
+            }),
+        ]);
+
+        await run();
+
+        const { pause } = await readState();
+
+        expect(pause).toBeDefined();
+        expect(await snoozedUntil()).toBeUndefined();
+        // The default wait (30 s) and the resume slack, not the reset the other tests give.
+        expect(enqueued[0]!.delayMs).toBeGreaterThan(25_000);
+        expect(enqueued[0]!.delayMs).toBeLessThan(35_000);
+    });
+
+    it("with both settings on, the chat is snoozed to the reset and the run waits for the person", async () => {
+        modelState.usagePrefs = { resumeAfterUsageLimit: false, snoozeUntilUsageLimitReset: true };
+        modelState.model = planned([rateLimited()]);
+
+        await run();
+
+        const { pause, pauseAwaitsPerson } = await readState();
+
+        expect(pauseAwaitsPerson).toBe(true);
+        expect(await snoozedUntil()).toBe(pause!.retryAt);
+        expect(enqueued).toHaveLength(0);
+    });
+
+    it("never shortens a snooze the owner chose for a later time", async () => {
+        const later = Date.now() + 2 * 60 * 60 * 1000;
+
+        await harness.run(async (ctx: any) => await ctx.db.patch("threads", ids.threadId as never, { snoozeChosenAt: Date.now() - 1000, snoozedUntil: later }));
+
+        modelState.usagePrefs = { snoozeUntilUsageLimitReset: true };
+        modelState.model = planned([rateLimited()]);
+
+        await run();
+
+        expect(await snoozedUntil()).toBe(later);
+    });
+
+    it("does not stamp the owner's choice order on the snooze it puts on the chat", async () => {
+        modelState.usagePrefs = { snoozeUntilUsageLimitReset: true };
+        modelState.model = planned([rateLimited()]);
+
+        await run();
+
+        const thread = await harness.run(async (ctx: any) => await ctx.db.get("threads", ids.threadId as never));
+
+        expect(thread.snoozedUntil).toBeDefined();
+        expect(thread.snoozeChosenAt).toBeUndefined();
+    });
+
+    it("an early Retry now lifts the snooze the pause put on the chat", async () => {
+        modelState.usagePrefs = { snoozeUntilUsageLimitReset: true };
+        modelState.model = planned([rateLimited(), textStep("Hello there.")]);
+
+        await run();
+
+        expect(await snoozedUntil()).toBeDefined();
+
+        const resumed = await harness.run(async (ctx: any) => await ctx.runMutation(retryPausedRunsNow, { threadId: ids.threadId }));
+
+        expect(resumed).toBe(true);
+        expect(await snoozedUntil()).toBeUndefined();
+    });
+
+    it("Stop lifts the snooze the pause put on the chat", async () => {
+        modelState.usagePrefs = { snoozeUntilUsageLimitReset: true };
+        modelState.model = planned([rateLimited()]);
+
+        await run();
+
+        expect(await snoozedUntil()).toBeDefined();
+
+        await harness.run(async (ctx: any) => await ctx.runMutation(stopActiveForThread, { threadId: ids.threadId }));
+
+        expect(await snoozedUntil()).toBeUndefined();
+    });
+
+    it("an early Retry now keeps a snooze the owner chose for another time", async () => {
+        const later = Date.now() + 2 * 60 * 60 * 1000;
+
+        await harness.run(async (ctx: any) => await ctx.db.patch("threads", ids.threadId as never, { snoozeChosenAt: Date.now() - 1000, snoozedUntil: later }));
+
+        modelState.usagePrefs = { snoozeUntilUsageLimitReset: true };
+        modelState.model = planned([rateLimited(), textStep("Hello there.")]);
+
+        await run();
+        await harness.run(async (ctx: any) => await ctx.runMutation(retryPausedRunsNow, { threadId: ids.threadId }));
+
+        expect(await snoozedUntil()).toBe(later);
+    });
+
+    it("tells the chat when the provider gave no reset time, and only then", async () => {
+        const { getActiveStreamForThread } = await import("./streaming");
+        const activePause = async () =>
+            (await harness.withIdentity({ userId: OWNER } as never).query(getActiveStreamForThread as never, { threadId: ids.threadId } as never)) as {
+                pause: object;
+            };
+
+        modelState.model = planned([
+            Object.assign(new Error("Gateway model proxy failed (502): rate limited"), {
+                rateLimit: { provider: "anthropic", status: 429 },
+                statusCode: 502,
+            }),
+        ]);
+
+        await run();
+
+        expect(await activePause()).toMatchObject({ pause: { resetUnreported: true } });
+    });
+
+    it("does not call the wait an unreported reset when the provider gave one", async () => {
+        const { getActiveStreamForThread } = await import("./streaming");
+
+        modelState.model = planned([rateLimited()]);
+
+        await run();
+
+        const active = (await harness
+            .withIdentity({ userId: OWNER } as never)
+            .query(getActiveStreamForThread as never, { threadId: ids.threadId } as never)) as { pause: object };
+
+        expect(active.pause).not.toHaveProperty("resetUnreported");
+    });
+
+    it("an early Retry now gives back the owner's own snooze, which was shorter than the reset", async () => {
+        const ownerUntil = Date.now() + 10_000;
+
+        await harness.run(async (ctx: any) => await ctx.db.patch("threads", ids.threadId as never, { snoozedUntil: ownerUntil }));
+
+        modelState.usagePrefs = { snoozeUntilUsageLimitReset: true };
+        modelState.model = planned([rateLimited(), textStep("Hello there.")]);
+
+        await run();
+
+        // The pause extended the snooze to the reset; the owner's own is what an early Retry now gives back.
+        expect(await snoozedUntil()).not.toBe(ownerUntil);
+
+        await harness.run(async (ctx: any) => await ctx.runMutation(retryPausedRunsNow, { threadId: ids.threadId }));
+
+        expect(await snoozedUntil()).toBe(ownerUntil);
+    });
+
+    /** A second paused reply on the same chat, waiting for the same reset (the reply `messageId` "other-message"). */
+    const addSecondPausedReply = async (retryAt: number) =>
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("persistentStreams", {
+                    expiresAt: Date.now() + 60_000,
+                    messageId: "other-message",
+                    pause: {
+                        from: ids.messageId,
+                        id: "other-pause",
+                        reason: "rate_limit",
+                        retryAt,
+                        run: {
+                            messageId: "other-message",
+                            streamId: "other-stream",
+                            streamingConfig: { contentType: "text", model: "test-model" },
+                            threadId: ids.threadId,
+                            userId: OWNER,
+                        },
+                        status: 429,
+                    },
+                    status: "pending",
+                    streamingConfig: { contentType: "text", model: "test-model" },
+                    threadId: ids.threadId,
+                    userId: OWNER,
+                }),
+        );
+
+    it("a Retry now that resumes both paused replies of a chat leaves the chat visible", async () => {
+        modelState.usagePrefs = { snoozeUntilUsageLimitReset: true };
+        modelState.model = planned([rateLimited(), textStep("Hello there.")]);
+
+        await run();
+
+        const { pause } = await readState();
+
+        await addSecondPausedReply(pause!.retryAt);
+
+        const resumed = await harness.run(async (ctx: any) => await ctx.runMutation(retryPausedRunsNow, { threadId: ids.threadId }));
+
+        expect(resumed).toBe(true);
+        expect(await snoozedUntil()).toBeUndefined();
+    });
+
+    it("stopping the reply that set the snooze hands it to the other paused reply, which lifts it when it ends", async () => {
+        modelState.usagePrefs = { snoozeUntilUsageLimitReset: true };
+        modelState.model = planned([rateLimited()]);
+
+        await run();
+
+        const { pause } = await readState();
+
+        await addSecondPausedReply(pause!.retryAt);
+        await harness.run(
+            async (ctx: any) => await ctx.runMutation(stopActiveForThread, { messageId: ids.messageId, onlyNamed: true, threadId: ids.threadId }),
+        );
+
+        expect(await snoozedUntil()).toBeDefined();
+
+        await harness.run(
+            async (ctx: any) => await ctx.runMutation(stopActiveForThread, { messageId: "other-message", onlyNamed: true, threadId: ids.threadId }),
+        );
+
+        expect(await snoozedUntil()).toBeUndefined();
+    });
+
+    /** A second reply on the chat, live and not yet paused, paused through the pause mutation: its reset is `minutes` away. */
+    const pauseSecondReply = async (minutes: number, resumeAfterLimit?: boolean) => {
+        const streamId = await harness.run(
+            async (ctx: any) =>
+                await ctx.db.insert("persistentStreams", {
+                    expiresAt: Date.now() + 60_000,
+                    messageId: "other-message",
+                    status: "pending",
+                    streamingConfig: { contentType: "text", model: "test-model" },
+                    threadId: ids.threadId,
+                    userId: OWNER,
+                }),
+        );
+
+        return await harness.run(
+            async (ctx: any) =>
+                await ctx.runMutation(pauseRunForRateLimit, {
+                    from: ids.messageId,
+                    replyRowIds: [],
+                    retryAt: Date.now() + minutes * 60_000,
+                    run: {
+                        messageId: "other-message",
+                        streamId: String(streamId),
+                        streamingConfig: { contentType: "text", model: "test-model" },
+                        threadId: ids.threadId,
+                        userId: OWNER,
+                    },
+                    ...(resumeAfterLimit !== undefined && { resumeAfterLimit }),
+                    snoozeUntilReset: true,
+                    status: 429,
+                    stepsUsed: 0,
+                    streamId,
+                }),
+        );
+    };
+
+    it("stopping the first reply leaves a snooze a later pause extended to its own reset, and that reply lifts it", async () => {
+        modelState.usagePrefs = { snoozeUntilUsageLimitReset: true };
+        modelState.model = planned([rateLimited()]);
+
+        await run();
+
+        const first = await readState();
+
+        // The second reply extends the snooze to its later reset.
+        expect(await pauseSecondReply(5)).toMatchObject({ paused: true });
+
+        const later = await snoozedUntil();
+
+        expect(later).toBeGreaterThan(first.pause!.retryAt);
+
+        await harness.run(
+            async (ctx: any) => await ctx.runMutation(stopActiveForThread, { messageId: ids.messageId, onlyNamed: true, threadId: ids.threadId }),
+        );
+
+        // The first reply's snooze is no longer the chat's: stopping it must not hand its snooze on or change the chat's.
+        expect(await snoozedUntil()).toBe(later);
+
+        await harness.run(
+            async (ctx: any) => await ctx.runMutation(stopActiveForThread, { messageId: "other-message", onlyNamed: true, threadId: ids.threadId }),
+        );
+
+        expect(await snoozedUntil()).toBeUndefined();
+    });
+
+    it("stopping the earlier of two paused replies leaves the later reply's own snooze marker alone, and stopping the later one clears the chat", async () => {
+        modelState.usagePrefs = { snoozeUntilUsageLimitReset: true };
+        modelState.model = planned([rateLimited()]);
+
+        await run();
+
+        await readState();
+
+        expect(await pauseSecondReply(5)).toMatchObject({ paused: true });
+
+        const later = await snoozedUntil();
+        const laterMarker = async () =>
+            await harness.run(async (ctx: any) => {
+                const row = await ctx.db.persistentStreams.findFirst({ where: { messageId: "other-message" } });
+
+                return row.pauseSnooze;
+            });
+        const markerBefore = await laterMarker();
+
+        expect(markerBefore?.until).toBe(later);
+
+        await harness.run(
+            async (ctx: any) => await ctx.runMutation(stopActiveForThread, { messageId: ids.messageId, onlyNamed: true, threadId: ids.threadId }),
+        );
+
+        expect(await snoozedUntil()).toBe(later);
+        expect(await laterMarker()).toEqual(markerBefore);
+
+        await harness.run(
+            async (ctx: any) => await ctx.runMutation(stopActiveForThread, { messageId: "other-message", onlyNamed: true, threadId: ids.threadId }),
+        );
+
+        expect(await snoozedUntil()).toBeUndefined();
+    });
+
+    it("stopping the reply that set the snooze, with a second paused reply that has an earlier reset, then stopping that one, leaves the chat visible", async () => {
+        modelState.usagePrefs = { snoozeUntilUsageLimitReset: true };
+        modelState.model = planned([rateLimited()]);
+
+        await run();
+
+        const first = await readState();
+
+        // The second reply's reset is earlier, so it extends nothing and stores no snooze record of its own.
+        expect(await pauseSecondReply(0.5)).toMatchObject({ paused: true });
+        expect(await snoozedUntil()).toBe(first.pause!.retryAt);
+
+        await harness.run(
+            async (ctx: any) => await ctx.runMutation(stopActiveForThread, { messageId: ids.messageId, onlyNamed: true, threadId: ids.threadId }),
+        );
+
+        // The record hands on to the paused reply, which now holds the snooze for the first reply's reset.
+        expect(await snoozedUntil()).toBe(first.pause!.retryAt);
+
+        await harness.run(
+            async (ctx: any) => await ctx.runMutation(stopActiveForThread, { messageId: "other-message", onlyNamed: true, threadId: ids.threadId }),
+        );
+
+        expect(await snoozedUntil()).toBeUndefined();
+    });
+
+    it("a Retry now that resumes both replies, where the later pause extended the snooze, leaves the chat visible", async () => {
+        modelState.usagePrefs = { snoozeUntilUsageLimitReset: true };
+        modelState.model = planned([rateLimited(), textStep("Hello there.")]);
+
+        await run();
+
+        expect(await pauseSecondReply(5)).toMatchObject({ paused: true });
+
+        const resumed = await harness.run(async (ctx: any) => await ctx.runMutation(retryPausedRunsNow, { threadId: ids.threadId }));
+
+        expect(resumed).toBe(true);
+        expect(await snoozedUntil()).toBeUndefined();
+    });
+
+    it("a Retry now over two paused replies whose restore chain names the earlier reset still leaves the chat visible", async () => {
+        modelState.usagePrefs = { snoozeUntilUsageLimitReset: true };
+        modelState.model = planned([rateLimited()]);
+
+        await run();
+
+        const first = await readState();
+
+        expect(await pauseSecondReply(5)).toMatchObject({ paused: true });
+
+        // The later reply's restore value is the earlier reply's reset (the state the review describes). Lifting in stream order would
+        // then restore that earlier reset after the earlier reply's lift had found nothing to match, leaving the chat snoozed.
+        await harness.run(async (ctx: any) => {
+            const later = await ctx.db.persistentStreams.findFirst({ where: { messageId: "other-message" } });
+
+            await ctx.db.patch("persistentStreams", later._id, {
+                pauseSnooze: { previousUntil: first.pause!.retryAt, until: later.pauseSnooze.until },
+            });
+        });
+
+        await harness.run(async (ctx: any) => await ctx.runMutation(retryPausedRunsNow, { threadId: ids.threadId }));
+
+        expect(await snoozedUntil()).toBeUndefined();
+    });
+
+    it("stopping the whole chat with two paused replies in one call leaves it visible", async () => {
+        modelState.usagePrefs = { snoozeUntilUsageLimitReset: true };
+        modelState.model = planned([rateLimited()]);
+
+        await run();
+
+        expect(await pauseSecondReply(5)).toMatchObject({ paused: true });
+
+        await harness.run(async (ctx: any) => await ctx.runMutation(stopActiveForThread, { threadId: ids.threadId }));
+
+        expect(await snoozedUntil()).toBeUndefined();
+    });
+
+    it("stopping the reply that holds the snooze hands it on, and the last paused reply lifts it", async () => {
+        modelState.usagePrefs = { snoozeUntilUsageLimitReset: true };
+        modelState.model = planned([rateLimited()]);
+
+        await run();
+
+        expect(await pauseSecondReply(5)).toMatchObject({ paused: true });
+
+        // The later reply holds the chat's snooze; stopping it leaves the first, still paused, to hold it.
+        await harness.run(
+            async (ctx: any) => await ctx.runMutation(stopActiveForThread, { messageId: "other-message", onlyNamed: true, threadId: ids.threadId }),
+        );
+
+        expect(await snoozedUntil()).toBeDefined();
+
+        await harness.run(
+            async (ctx: any) => await ctx.runMutation(stopActiveForThread, { messageId: ids.messageId, onlyNamed: true, threadId: ids.threadId }),
+        );
+
+        expect(await snoozedUntil()).toBeUndefined();
+    });
+
+    it("a manual Resume that names its reply resumes that reply only, not the chat's other waits", async () => {
+        modelState.model = planned([rateLimited(), rateLimited(), textStep("Hello there.")]);
+
+        await run();
+
+        await pauseSecondReply(5);
+
+        const before = enqueued.length;
+        const resumed = await harness.run(async (ctx: any) => await ctx.runMutation(retryPausedRunsNow, { streamId: ids.streamId, threadId: ids.threadId }));
+
+        expect(resumed).toBe(true);
+        expect(enqueued).toHaveLength(before + 1);
+        expect(enqueued[before]!.args).toMatchObject({ streamId: ids.streamId });
+    });
+
+    it("the reply that took over a stopped reply's snooze lifts it when it resumes by itself", async () => {
+        const { claimRunResume } = await import("./streaming/persistent/library");
+
+        // The first reply holds the chat's snooze; the second, with an earlier reset, holds none of its own.
+        modelState.model = planned([rateLimited()]);
+
+        await run();
+
+        await pauseSecondReply(0.5);
+        await harness.run(
+            async (ctx: any) => await ctx.runMutation(stopActiveForThread, { messageId: ids.messageId, onlyNamed: true, threadId: ids.threadId }),
+        );
+
+        expect(await snoozedUntil()).toBeDefined();
+
+        const waiting = await harness.run(async (ctx: any) => {
+            const streams = await ctx.db.query("persistentStreams").collect();
+
+            return streams.find((stream: any) => stream.messageId === "other-message");
+        });
+
+        const claim = await harness.run(async (ctx: any) => await ctx.runMutation(claimRunResume, { pauseId: waiting.pause.id, streamId: waiting._id }));
+
+        expect(claim).not.toBeNull();
+        expect(await snoozedUntil()).toBeUndefined();
+    });
+
+    it("a new reply on the chat ends the manual wait it moves past, instead of leaving it waiting", async () => {
+        const { createStream } = await import("./streaming/persistent/library");
+
+        modelState.usagePrefs = { resumeAfterUsageLimit: false };
+        modelState.model = planned([rateLimited()]);
+
+        await run();
+
+        const waiting = await readState();
+
+        expect(waiting.pauseAwaitsPerson).toBe(true);
+
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.runMutation(createStream, {
+                    messageId: ids.messageId,
+                    streamingConfig: { contentType: "text", model: "test-model" },
+                    threadId: ids.threadId,
+                    userId: OWNER,
+                }),
+        );
+
+        const after = await readState();
+
+        expect(after.streamStatus).toBe("done");
+    });
+
+    it("a Retry now that resumes both replies, when the earlier-created reply holds the later reset, leaves the chat visible", async () => {
+        // The first reply, created first, holds the snooze to its later reset; the second, with an earlier reset, holds none.
+        modelState.usagePrefs = { snoozeUntilUsageLimitReset: true };
+        modelState.model = planned([rateLimited(5 * 60_000)]);
+
+        await run();
+
+        await pauseSecondReply(0.5);
+
+        const resumed = await harness.run(async (ctx: any) => await ctx.runMutation(retryPausedRunsNow, { threadId: ids.threadId }));
+
+        expect(resumed).toBe(true);
+        expect(await snoozedUntil()).toBeUndefined();
+    });
+
+    it("a failed settings read resumes a rate-limited reply as an absent setting does, with no snooze", async () => {
+        modelState.usagePrefsFail = true;
+        modelState.model = planned([rateLimited()]);
+
+        await run();
+
+        const state = await readState();
+
+        expect(state.pauseAwaitsPerson).toBeUndefined();
+        expect(enqueued).toHaveLength(1);
+        expect(await snoozedUntil()).toBeUndefined();
+    });
+
+    it("a new reply ends every manual wait it moves past, including one that took over a snooze", async () => {
+        const { createStream } = await import("./streaming/persistent/library");
+
+        // Both replies wait for the person. The first holds the chat's snooze; the second, with an earlier reset, takes it over when the first ends.
+        modelState.usagePrefs = { resumeAfterUsageLimit: false, snoozeUntilUsageLimitReset: true };
+        modelState.model = planned([rateLimited()]);
+
+        await run();
+        await pauseSecondReply(0.5, false);
+
+        await harness.run(
+            async (ctx: any) =>
+                await ctx.runMutation(createStream, {
+                    messageId: ids.messageId,
+                    streamingConfig: { contentType: "text", model: "test-model" },
+                    threadId: ids.threadId,
+                    userId: OWNER,
+                }),
+        );
+
+        const first = await readState();
+
+        expect(first.streamStatus).toBe("done");
+        expect(await snoozedUntil()).toBeUndefined();
+
+        const second = await harness.run(async (ctx: any) => {
+            const streams = await ctx.db.query("persistentStreams").collect();
+
+            return streams.find((stream: any) => stream.messageId === "other-message");
+        });
+
+        expect(second.status).toBe("done");
     });
 });

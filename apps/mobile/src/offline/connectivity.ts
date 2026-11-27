@@ -12,12 +12,14 @@ export interface Connectivity {
     socket: ConnectionStatus | undefined;
     /** Signed in, but no token could be minted (the server was not reached on a cold start). */
     tokenMissing: boolean;
+    /** Signed in from the stored user while the first mint is still out: not offline, but nothing to write with yet. */
+    tokenPending: boolean;
 }
 
-export const INITIAL_CONNECTIVITY: Connectivity = { network: undefined, recovering: false, requestFailed: false, socket: undefined, tokenMissing: false };
+export const INITIAL_CONNECTIVITY: Connectivity = { network: undefined, recovering: false, requestFailed: false, socket: undefined, tokenMissing: false, tokenPending: false };
 
 export type ConnectivityEvent
-    = { network: boolean; type: "network" } | { socket: ConnectionStatus; type: "socket" } | { type: "request-failed" } | { type: "request-succeeded" } | { missing: boolean; type: "token" };
+    = { network: boolean; type: "network" } | { socket: ConnectionStatus; type: "socket" } | { type: "request-failed" } | { type: "request-succeeded" } | { missing: boolean; pending: boolean; type: "token" };
 
 /** Offline means no connection, the live socket down, a read that failed on the network, or no token for a signed-in launch. An idle socket is not down: nothing may have asked for one. */
 export const isOffline = (state: Connectivity): boolean => state.network === false || state.socket === "offline" || state.requestFailed || state.tokenMissing;
@@ -47,7 +49,7 @@ export const reduceConnectivity = (state: Connectivity, event: ConnectivityEvent
             return { ...state, socket: event.socket };
         }
         case "token": {
-            return { ...state, tokenMissing: event.missing };
+            return { ...state, tokenMissing: event.missing, tokenPending: event.pending };
         }
         default: {
             return state;
@@ -55,8 +57,8 @@ export const reduceConnectivity = (state: Connectivity, event: ConnectivityEvent
     }
 };
 
-/** Writes need a connection that has answered: online, and not still confirming one that just returned. */
-export const canWrite = (state: Connectivity): boolean => !isOffline(state) && !state.recovering;
+/** Writes need a connection that has answered and a token: online, not still confirming one that just returned, no mint still out. */
+export const canWrite = (state: Connectivity): boolean => !isOffline(state) && !state.recovering && !state.tokenPending;
 
 /**
  * Whether the device has a network. `isInternetReachable` is left out on purpose: on Android it reads false until its

@@ -1,7 +1,7 @@
 import useIsHydrated from "@neore/ui/hooks/use-hydrated";
 
+import { useAuthSession } from "@/features/auth/hooks/use-auth-session";
 import useSignInMethods from "@/features/auth/hooks/use-sign-in-methods";
-import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import { INVITE_TOKEN_PARAM, readInviteToken } from "@/features/auth/lib/invite-token";
 
 /**
@@ -41,8 +41,7 @@ const useInviteOnly = (): {
     signUpHref: string;
 } => {
     const { inviteOnly } = useSignInMethods();
-    const { hooks } = useAuth();
-    const { data: sessionData, error: sessionError, isPending: isSessionPending } = hooks.useSession();
+    const { data: sessionData, error: sessionError, isPending: isSessionPending } = useAuthSession();
     const isHydrated = useIsHydrated();
     const inviteToken = isHydrated ? readInviteToken() : undefined;
     const hasInvitation = inviteToken !== undefined;

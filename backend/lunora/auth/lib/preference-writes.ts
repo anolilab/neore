@@ -23,6 +23,7 @@ export type AiUserPreferencesPatch = Partial<
     Pick<
         Doc<"aiUserPreferences">,
         | "autoApproveLowRisk"
+        | "browserClickMode"
         | "browserSettings"
         | "codingAgentCommitIdentity"
         | "customAIProviders"
@@ -36,7 +37,19 @@ export type AiUserPreferencesPatch = Partial<
 >;
 
 /** The `userSettings` columns other modules set. */
-export type UserSettingsPatch = Partial<Pick<Doc<"userSettings">, "dailyBriefEnabled" | "setupStepsSkipped" | "taskEmailEnabled">>;
+export type UserSettingsPatch = Partial<
+    Pick<
+        Doc<"userSettings">,
+        | "chatFailedToastEnabled"
+        | "chatFinishedToastEnabled"
+        | "chatInputToastEnabled"
+        | "dailyBriefEnabled"
+        | "dailyBriefOfferDismissedAt"
+        | "projectRunnerDefaults"
+        | "setupStepsSkipped"
+        | "taskEmailEnabled"
+    >
+>;
 
 /**
  * Refuse a write to a setting the caller's organization locks. `organizationId`

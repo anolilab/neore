@@ -20,6 +20,5 @@ export interface TerminalWindowApi {
 
 declare global {
     // The preload exposes this on the page's global object; the terminal page reads it from there.
-    // eslint-disable-next-line vars-on-top -- declare global takes var, not let or const
     var neoreTerminal: TerminalWindowApi;
 }

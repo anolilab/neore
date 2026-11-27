@@ -2,7 +2,7 @@
 
 import type { FC } from "react";
 
-import { useAuth } from "@/features/auth/lib/auth-ui-provider";
+import { useAuthSession } from "@/features/auth/hooks/use-auth-session";
 import { useChatThread } from "@/features/chat/core/context/chat-context";
 import type { UIMessage } from "@/lib/agent";
 
@@ -15,8 +15,7 @@ import HostChanges from "./host-changes";
  */
 const HostChangesOfThread: FC<{ changes: NonNullable<UIMessage["hostChanges"]>; messageId: string }> = ({ changes, messageId }) => {
     const { thread, threadId } = useChatThread();
-    const { hooks } = useAuth();
-    const { data: sessionData } = hooks.useSession();
+    const { data: sessionData } = useAuthSession();
     // A public viewer's thread copy has no `userId`, so it never matches.
     const isOwner = !!thread?.userId && thread.userId === sessionData?.user?.id;
 

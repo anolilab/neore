@@ -15,17 +15,20 @@ import {
 } from "@neore/ui/components/responsive-dropdown-menu";
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@neore/ui/components/sidebar";
 import { Link } from "@tanstack/react-router";
-import { Check, ChevronsUpDown, Globe, LogIn, LogOut, PlusCircleIcon, Sparkles, UserRound } from "lucide-react";
+import { Check, ChevronsUpDown, Globe, LogIn, LogOut, MessageSquareText, PlusCircleIcon, Sparkles, UserRound } from "lucide-react";
 import type { FC } from "react";
-import { Fragment, useCallback, useMemo, useState } from "react";
+import { Fragment, lazy, Suspense, useCallback, useMemo, useState } from "react";
 
 import UserView from "@/features/auth/components/user-view";
 import { useListDeviceSessions } from "@/features/auth/hooks/device-session-management";
 import { useSession } from "@/features/auth/hooks/session-user-management";
 import useIsAnonymous from "@/features/auth/hooks/use-is-anonymous";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
+import { clearLastAccountHint } from "@/features/auth/lib/last-account-hint";
 import { getLocalizedError } from "@/features/auth/lib/utilities";
 import useCheckout from "@/features/billing/hooks/use-checkout";
+import { clearPromptQueues } from "@/features/chat/core/stores/prompt-queue-session";
+import { dropStoredDrafts } from "@/features/chat/split/composer-drafts";
 import { clearThreadListCache, releaseThreadListWrites } from "@/features/chat/thread-list/lib/thread-list-cache";
 import { useUserPreferences } from "@/features/layout/hooks/use-ui-state";
 import { useReleasePushOnSignOut } from "@/features/notifications/hooks/use-release-push-on-sign-out";
@@ -34,6 +37,9 @@ import { resetAnalyticsIdentity } from "@/lib/analytics";
 import type { AuthClient } from "@/lib/auth/client";
 import { DEFAULT_LOCALE, deLocalizeUrl, dynamicActivate, locales as appLocales, shouldIgnorePath } from "@/lib/intl/client";
 import { setNativeBadge } from "@/lib/native/bridge";
+
+// Loaded on first open: the dialog pulls in the uploader and the image downscaler.
+const SendFeedbackDialog = lazy(() => import("@/features/feedback/components/send-feedback-dialog"));
 
 const LOCALE_DISPLAY_NAMES: Record<string, string> = {
     de: "Deutsch",
@@ -132,8 +138,16 @@ const NavUser: FC<NavUserProperties> = ({ trigger }) => {
     const releasePush = useReleasePushOnSignOut();
     const { isPending: checkoutPending, startCheckout } = useCheckout();
     const [activeSessionPending, setActiveSessionPending] = useState(false);
+    const [feedbackOpen, setFeedbackOpen] = useState(false);
+    // Mounted from the first open on, so a close keeps the draft (text, kind, images) for the next open.
+    const [feedbackMounted, setFeedbackMounted] = useState(false);
 
     const isPending = sessionPending || activeSessionPending;
+
+    const openFeedback = () => {
+        setFeedbackMounted(true);
+        setFeedbackOpen(true);
+    };
 
     const switchAccount = useCallback(
         async (sessionToken: string) => {
@@ -256,6 +270,10 @@ const NavUser: FC<NavUserProperties> = ({ trigger }) => {
                     <Sparkles />
                     {t`Upgrade to Pro`}
                 </DropdownMenuItem>
+                <DropdownMenuItem onClick={openFeedback}>
+                    <MessageSquareText />
+                    {t`Send feedback`}
+                </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             {user && multiSession ? (
@@ -276,6 +294,9 @@ const NavUser: FC<NavUserProperties> = ({ trigger }) => {
                 onClick={async () => {
                     // Before the request, and it holds writes until the page reloads or the next sign-in: the sidebar stays mounted meanwhile.
                     clearThreadListCache();
+                    // Read before the session ends; when it cannot tell whose drafts they are, every account's go.
+                    const departing = user?.id;
+
                     // Push first, while the session still authenticates the server call.
                     await releasePush();
                     await authClient.signOut({
@@ -294,6 +315,11 @@ const NavUser: FC<NavUserProperties> = ({ trigger }) => {
                                 });
                             },
                             onSuccess: async () => {
+                                // Only once the session ended (a failed sign-out keeps them and their saving), and before the reload,
+                                // which comes before the handler that drops them would run.
+                                clearLastAccountHint();
+                                clearPromptQueues();
+                                dropStoredDrafts(departing);
                                 resetAnalyticsIdentity();
                                 // Only after the session ends: a failed sign-out keeps the badge.
                                 await setNativeBadge(0);
@@ -312,10 +338,17 @@ const NavUser: FC<NavUserProperties> = ({ trigger }) => {
     // When a custom trigger is provided, render without SidebarMenu context
     if (trigger) {
         return (
-            <DropdownMenu>
-                <DropdownMenuTrigger render={trigger} />
-                {menuContent}
-            </DropdownMenu>
+            <>
+                <DropdownMenu>
+                    <DropdownMenuTrigger render={trigger} />
+                    {menuContent}
+                </DropdownMenu>
+                {feedbackMounted ? (
+                    <Suspense fallback={null}>
+                        <SendFeedbackDialog key={user?.id} onOpenChange={setFeedbackOpen} open={feedbackOpen} />
+                    </Suspense>
+                ) : null}
+            </>
         );
     }
 
@@ -327,7 +360,7 @@ const NavUser: FC<NavUserProperties> = ({ trigger }) => {
                         className="text-brand-black dark:text-brand-white"
                         render={
                             isAnonymous ? (
-                                <SidebarMenuButton className="hover:bg-sidebar-accent data-[popup-open]:bg-sidebar-accent" name="login" size="lg">
+                                <SidebarMenuButton className="web:hover:bg-sidebar-accent data-[popup-open]:bg-sidebar-accent" name="login" size="lg">
                                     <UserRound className="size-5 shrink-0" />
                                     <div className="grid flex-1 text-left text-sm leading-tight">
                                         <span className="truncate font-medium">{t`Guest`}</span>
@@ -335,7 +368,7 @@ const NavUser: FC<NavUserProperties> = ({ trigger }) => {
                                     <ChevronsUpDown className="text-brand-black/60 dark:text-brand-white/50 ml-auto size-4" />
                                 </SidebarMenuButton>
                             ) : (
-                                <SidebarMenuButton className="hover:bg-sidebar-accent data-[popup-open]:bg-sidebar-accent" name="login" size="lg">
+                                <SidebarMenuButton className="web:hover:bg-sidebar-accent data-[popup-open]:bg-sidebar-accent" name="login" size="lg">
                                     <div className="grid flex-1 text-left text-sm leading-tight">
                                         <span className="truncate font-medium">{hidePersonalInfo ? t`User` : user?.name || t`User`}</span>
                                         <span className="text-brand-black/60 dark:text-brand-white/60 truncate text-xs">
@@ -349,6 +382,11 @@ const NavUser: FC<NavUserProperties> = ({ trigger }) => {
                     />
                     {menuContent}
                 </DropdownMenu>
+                {feedbackMounted ? (
+                    <Suspense fallback={null}>
+                        <SendFeedbackDialog key={user?.id} onOpenChange={setFeedbackOpen} open={feedbackOpen} />
+                    </Suspense>
+                ) : null}
             </SidebarMenuItem>
         </SidebarMenu>
     );

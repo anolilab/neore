@@ -162,6 +162,7 @@ const withServerUrl = async (ctx: Pick<MutationCtx, "db">, ownerId: string, use:
 export const claimSecretAnswer = async (
     ctx: Pick<MutationCtx, "db">,
     args: {
+        answeredByImpersonator: boolean;
         approvalId: string;
         callerId: string;
         /** The server address the card displayed; a header save without it, or with one the saved server no longer has, is refused. */
@@ -172,8 +173,9 @@ export const claimSecretAnswer = async (
         unlockProof?: string | null;
     },
 ): Promise<SecretClaim> => {
-    const { approvalId, callerId, expectedUrl, now, reply, threadId, unlockProof } = args;
+    const { answeredByImpersonator, approvalId, callerId, expectedUrl, now, reply, threadId, unlockProof } = args;
     const claim = await claimToolApproval(ctx, {
+        answeredByImpersonator,
         approvalId,
         callerId,
         decision: reply.kind === "save" ? "approve" : "deny",

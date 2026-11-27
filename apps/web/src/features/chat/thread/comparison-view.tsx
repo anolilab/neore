@@ -17,6 +17,7 @@
 import { useLingui } from "@lingui/react/macro";
 import { api } from "@neore/backend/api";
 import type { Id } from "@neore/backend/dataModel";
+import { ImageOpenContext } from "@neore/chat-ui/chat/image-open-context";
 import { ProviderIcon } from "@neore/ui/components/ai-elements/provider-icon";
 import { Button } from "@neore/ui/components/button";
 import cn from "@neore/ui/utils/cn";
@@ -27,7 +28,8 @@ import type { FC } from "react";
 import { use, useMemo } from "react";
 
 import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
-import { ChatThreadContext } from "@/features/chat/core/context/chat-context-hooks";
+import { BrowserLiveViewHereContext } from "@/features/chat/browser-live-view/control-request";
+import { ChatThreadContext, ChatThreadIdentityContext } from "@/features/chat/core/context/chat-context-hooks";
 import type { ThreadData } from "@/features/chat/core/context/chat-context-types";
 import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
 import type { UIMessage } from "@/lib/agent";
@@ -170,7 +172,14 @@ const ModelColumn: FC<{
                         {assistant && (
                             <div className="prose prose-sm dark:prose-invert max-w-none px-6 py-4">
                                 <ChatThreadContext value={columnThreadContext}>
-                                    <MessageContent message={assistant} />
+                                    <ChatThreadIdentityContext value={columnThreadContext}>
+                                        {/* No live view card in a column: a "Needs you" card points to the model's own chat. The page's gallery holds its own chat's images, not the column's: here they stay plain. */}
+                                        <BrowserLiveViewHereContext value={false}>
+                                            <ImageOpenContext value={null}>
+                                                <MessageContent message={assistant} pinImages={false} />
+                                            </ImageOpenContext>
+                                        </BrowserLiveViewHereContext>
+                                    </ChatThreadIdentityContext>
                                 </ChatThreadContext>
                             </div>
                         )}

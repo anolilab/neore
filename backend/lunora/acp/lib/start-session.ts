@@ -27,6 +27,7 @@ export const openHostSession = async (
     const { device, hostSessionId, nativeSessionId, offer, threadId, userId } = args;
     const taintedBy = mergeTaint(args.taintedBy);
 
+    // lunora-advisor-exempt owner_field_from_args_not_auth -- a helper, not a procedure: `userId` is the owner each caller checked the device and thread against (`startHostSessionFor` takes `ctx.user.userId`)
     await ctx.db.insert("acpSessions", {
         agentKey: offer.agentKey,
         agentLabel: offer.agentLabel,

@@ -6,7 +6,7 @@ import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { cascadeDeleteUser } from "../auth/hooks";
-import { reassignGlobalRows } from "../lib/account-merge";
+import { acquireMergeLease, reassignGlobalRows } from "../lib/account-merge";
 import schema from "../schema";
 import { isUniqueViolation } from "../lib/error-helpers";
 import { getNativePushConfig, registerPushDevice, unregisterPushDevice } from "./native-push";
@@ -106,8 +106,8 @@ describe("phone push tokens", () => {
         expect(row).not.toHaveProperty("language");
     });
 
-    it("puts the previous account's language back with its phone when a registration is refused after its write", async () => {
-        await call(registerPushDevice, OTHER, { language: "en-GB", platform: "ios", token: PHONE });
+    it("puts the previous account's language and build flag back with its phone when a registration is refused after its write", async () => {
+        await call(registerPushDevice, OTHER, { buildsAlert: true, language: "en-GB", platform: "android", token: PHONE });
 
         // USER's session ends while its registration is on its way: the first check passes, the second does not.
         const live = sessions[USER]!;
@@ -136,11 +136,11 @@ describe("phone push tokens", () => {
                         userId: USER,
                     },
                 },
-                { language: "de-AT", platform: "ios", token: PHONE },
+                { buildsAlert: false, language: "de-AT", platform: "android", token: PHONE },
             );
         });
 
-        expect(await devicesOf(OTHER)).toMatchObject([{ language: "en-GB", token: PHONE }]);
+        expect(await devicesOf(OTHER)).toMatchObject([{ buildsAlert: true, language: "en-GB", token: PHONE }]);
     });
 
     it("refuses a language that is not a language tag", async () => {
@@ -274,15 +274,23 @@ describe("phone push tokens", () => {
     });
 
     it("drops a guest's phones on an account merge instead of moving them, through the module's own writes", async () => {
-        await call(registerPushDevice, USER, { platform: "ios", token: PHONE });
-        await call(registerPushDevice, OTHER, { platform: "android", token: SECOND_PHONE });
+        // A merge moves rows only into a real account, so the guest folds into one with a `user` row.
+        const account = (await harness.run(
+            async (ctx: any) => await ctx.db.insert("user", { createdAt: 0, email: "account@example.com", emailVerified: true, name: "account", updatedAt: 0 }),
+        )) as string;
 
-        // USER is the guest folding into OTHER: its phone registers again under OTHER's own sign-in.
-        await call(reassignGlobalRows, null, { from: USER, to: OTHER });
+        sessions[account] = await startSession(account);
+        await call(registerPushDevice, USER, { platform: "ios", token: PHONE });
+        await call(registerPushDevice, account, { platform: "android", token: SECOND_PHONE });
+
+        // USER is the guest folding into the account: its phone registers again under the account's own sign-in.
+        const { generation } = await call<{ generation: number }>(acquireMergeLease, null, { from: USER, to: account });
+
+        await call(reassignGlobalRows, null, { from: USER, generation, to: account });
 
         const stored = await harness.run(async (ctx: any) => await ctx.db.pushDevices.findMany({ where: {} }));
 
-        expect(stored.page.map((row: { token: string; userId: string }) => [row.token, row.userId])).toStrictEqual([[SECOND_PHONE, OTHER]]);
+        expect(stored.page.map((row: { token: string; userId: string }) => [row.token, row.userId])).toStrictEqual([[SECOND_PHONE, account]]);
     });
 
     it("drops a deleted guest's phones with the rest of its account (inactive-guest cleanup and the merge's last step)", async () => {

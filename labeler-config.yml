@@ -10,6 +10,9 @@
 "package: device-core-node":
     - changed-files:
           - any-glob-to-any-file: "packages/device-core-node/**/*"
+"package: html-to-markdown":
+    - changed-files:
+          - any-glob-to-any-file: "packages/html-to-markdown/**/*"
 "package: service-sdk":
     - changed-files:
           - any-glob-to-any-file: "packages/service-sdk/**/*"

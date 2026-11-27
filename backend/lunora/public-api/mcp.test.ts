@@ -470,9 +470,9 @@ describe("MCP write tools", () => {
 
         expect(Object.keys(byName)).toEqual(["create_thread", "send_message"]);
         expect(byName["create_thread"].required).toEqual(["prompt"]);
-        expect(Object.keys(byName["create_thread"].properties)).toEqual(["model", "prompt", "idempotencyKey"]);
+        expect(Object.keys(byName["create_thread"].properties)).toEqual(["clientMessageId", "model", "prompt", "idempotencyKey"]);
         expect(byName["send_message"].required).toEqual(["prompt", "threadId"]);
-        expect(Object.keys(byName["send_message"].properties)).toEqual(["model", "prompt", "threadId", "idempotencyKey"]);
+        expect(Object.keys(byName["send_message"].properties)).toEqual(["clientMessageId", "model", "prompt", "threadId", "idempotencyKey"]);
         expect(byName["send_message"].additionalProperties).toBe(false);
     });
 
@@ -681,6 +681,20 @@ describe("MCP write tools", () => {
 
         expect(replayed.headers.get("Idempotent-Replayed")).toBe("true");
         expect(chatStart).toHaveBeenCalledOnce();
+    });
+
+    it("answers a blocking retry of a send (same clientMessageId) with 200 and duplicate, as the streaming one does", async () => {
+        chatStart.mockImplementation(async () => Response.json({ ...started, duplicate: true }));
+
+        const harness = setup({ scopes: WRITE_SCOPES });
+        const response = await harness.request("/chat", {
+            body: JSON.stringify({ clientMessageId: "send-1", prompt: "hello", stream: false, threadId: "t1" }),
+            headers: { "Content-Type": "application/json" },
+            method: "POST",
+        });
+
+        expect(response.status).toBe(200);
+        expect(await response.json()).toMatchObject({ duplicate: true });
     });
 
     it("rejects an idempotencyKey the header would reject", async () => {

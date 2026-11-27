@@ -19,6 +19,7 @@ import { activeGoalsOf } from "../../goals/rows";
 import { runAfterWithRetry } from "../../../lib/shard-scheduler";
 import { interruptionMessage, planInterruption, RUN_STALE_MS, RUN_WATCH_MS, RUN_WATCH_RETRY, type SavedRow, settleSavedRows } from "../../lib/interrupted-run";
 import { recordPausedRunUsage } from "../../lib/pause-usage";
+import { recordRunEnd } from "../../../public-api/events-log";
 import { assertCurrentRun, assertRunHeld, epochOf, RUN_REPLACED } from "../../lib/run-epoch";
 import type { SteerEntry } from "../../lib/steer-queue";
 import { runStreamingAgentFields } from "../../lib/streaming-run-args";
@@ -246,8 +247,13 @@ const vVerdict = v.union(
         kind: v.literal("finished"),
         labels: v.optional(v.record(v.string(), v.object({ serverName: v.string(), toolName: v.string() }))),
         messageId: v.string(),
+        origin: v.optional(v.union(v.literal("lead"), v.literal("outside_agent"))),
         replyRowIds: v.array(v.string()),
         skill: v.optional(v.object({ id: v.optional(v.string()), name: v.string() })),
+        /** The steer rows delivered into the reply, in order: their text is what a memory quoting a steer reads. */
+        steerRowIds: v.optional(v.array(v.string())),
+        /** Each delivered steer with when it was sent and its text length, in order: how a recovered reply splits its rows. */
+        steers: v.optional(v.array(v.object({ messageId: v.string(), sentAt: v.optional(v.number()), textLength: v.optional(v.number()) }))),
         threadId: v.string(),
         timeZone: v.optional(v.string()),
         userId: v.string(),
@@ -356,17 +362,44 @@ export const inspectRun = internalMutation
 
             await endPausedRun(ctx, { ...stream, pausedRun }, { holdThread: finishedGoals.length > 0 });
 
+            // The saved answer is the reply's end, so the Events log records it as a finished run, as the run's own end would.
+            await recordRunEnd(ctx, { outcome: "succeeded", streamId: stream._id, threadId: stream.threadId });
+
             if (ownGoal) {
                 await enqueueJob(internal.chat.goals.execute.reviewGoalRound, { goalId: ownGoal._id, round: ownGoal.round + 1 });
             }
+
+            // Delivered steers keep their row (the text lives there; the entry no longer carries it).
+            const steerRowIds = [
+                ...new Set(
+                    ((stream.steers as SteerEntry[] | undefined) ?? []).flatMap((entry) =>
+                        entry.status === "delivered" && entry.messageId !== undefined ? [entry.messageId] : [],
+                    ),
+                ),
+            ];
+
+            const steers = ((stream.steers as SteerEntry[] | undefined) ?? []).flatMap((entry) =>
+                entry.status === "delivered" && entry.messageId !== undefined
+                    ? [
+                          {
+                              messageId: entry.messageId,
+                              ...(entry.sentAt !== undefined && { sentAt: entry.sentAt }),
+                              ...(entry.textLength !== undefined && { textLength: entry.textLength }),
+                          },
+                      ]
+                    : [],
+            );
 
             return {
                 goal: finishedGoals.length > 0,
                 kind: "finished" as const,
                 ...(stream.toolLabels && { labels: stream.toolLabels }),
                 messageId: stream.messageId,
+                ...(stream.runArgs.origin && { origin: stream.runArgs.origin }),
                 replyRowIds: pausedRun.replyRowIds,
                 ...(pausedRun.skill && { skill: pausedRun.skill }),
+                ...(steerRowIds.length > 0 && { steerRowIds }),
+                ...(steers.length > 0 && { steers }),
                 threadId: stream.threadId,
                 ...(pausedRun.timeZone && { timeZone: pausedRun.timeZone }),
                 userId: stream.userId,

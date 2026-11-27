@@ -30,6 +30,8 @@ describe(clearRefusalOf, () => {
         [{ code: "CONFLICT", data: { code: "CONTEXT_CLEAR_ALREADY_MADE" } }, "already_made"],
         [{ code: "CONFLICT", data: { code: "CONTEXT_CLEAR_REPLY_RUNNING" } }, "busy"],
         [{ code: "CONFLICT", data: { code: "CONTEXT_CLEAR_SUMMARISING" } }, "summarising"],
+        [{ code: "FORBIDDEN", data: { code: "CONTEXT_CLEAR_NOT_ALLOWED" } }, "not_allowed"],
+        [{ code: "FORBIDDEN", data: { code: "CONTEXT_CLEAR_LEFT_ORGANIZATION" } }, "left_organization"],
         [new Error("offline"), "failed"],
         [undefined, "failed"],
     ])("reads %o as %s", (error, refusal) => {

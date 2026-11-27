@@ -3,7 +3,12 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { usePromptQueueStore } from "@/features/chat/core/stores/prompt-queue-store";
+import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
+import type { QueuedChatPrompt } from "@/features/chat/core/stores/prompt-queue-store";
+import { clearPromptQueues, usePromptQueueStore } from "@/features/chat/core/stores/prompt-queue-store";
+import { useQueueEditStore } from "@/features/chat/core/stores/queue-edit-store";
+import { EMPTY_PROMPT_QUEUE, serializePromptQueue } from "@/features/chat/core/utils/prompt-queue";
+import { clearSendStarting, isSendStarting, markSendStarting } from "@/features/chat/core/utils/send-in-flight";
 
 import ComposerPromptQueue from "./composer-prompt-queue";
 
@@ -30,6 +35,7 @@ vi.mock("@dnd-kit/core", async (importOriginal) => {
 
 const chat = vi.hoisted(() => {
     return {
+        authenticated: true,
         error: undefined as Error | undefined,
         isStreaming: false,
         // A mode save as the query cache sees it now; `saving` is the flag the last render read.
@@ -37,6 +43,7 @@ const chat = vi.hoisted(() => {
         saving: false,
         sendMessage: vi.fn(),
         threadId: "thread-1",
+        view: "online" as "offline" | "online" | "reconnecting",
     };
 });
 const withdrawSteer = vi.hoisted(() => vi.fn());
@@ -79,14 +86,22 @@ vi.mock("@/lib/lunora/crpc", () => {
     };
 
     return {
+        useLunoraAuth: () => {
+            return { isAuthenticated: chat.authenticated };
+        },
         useCRPC: () => {
             return { chat: { steering: { withdrawSteer: options() }, streaming: { getActiveStreamForThread: options() } } };
         },
     };
 });
-vi.mock("@/lib/toast", () => {
-    return { showError: vi.fn() };
+vi.mock("@/features/connection/hooks/use-connection", () => {
+    return { useConnectionView: () => chat.view };
 });
+const toast = vi.hoisted(() => {
+    return { showError: vi.fn(), showInfo: vi.fn() };
+});
+
+vi.mock("@/lib/toast", () => toast);
 vi.mock("@/features/chat/core/context/chat-context", () => {
     return {
         useChatActions: () => {
@@ -125,15 +140,180 @@ describe("composer prompt queue", () => {
                 return { disconnect: vi.fn(), observe: vi.fn(), unobserve: vi.fn() };
             }),
         );
+        chat.authenticated = true;
+        chat.threadId = "thread-1";
+        sessionStorage.clear();
         chat.error = new Error("the reply failed");
         chat.isStreaming = false;
         chat.liveSaving = false;
         chat.saving = false;
         chat.sendMessage.mockReset();
+        chat.view = "online";
         withdrawSteer.mockReset();
-        usePromptQueueStore.setState({ queues: {} });
+        toast.showInfo.mockReset();
+        usePromptQueueStore.setState({ offlineHolds: {}, queues: {} });
+        useQueueEditStore.setState({ editing: {}, failedSave: {}, held: {} });
+
+        // A test that failed midway can leave a send marked as starting in the thread.
+        while (isSendStarting(chat.threadId)) {
+            clearSendStarting(chat.threadId);
+        }
+
         // Marks the thread as hydrated, so the (empty) stored queue is not read over ours.
         usePromptQueueStore.getState().hydrate(chat.threadId);
+    });
+
+    it("restores a stored queue only once Lunora confirms the session, never in the optimistic layout before it", () => {
+        chat.authenticated = false;
+        chat.threadId = "thread-stored";
+        sessionStorage.setItem(
+            "neore:prompt-queue:thread-stored",
+            serializePromptQueue({ ...EMPTY_PROMPT_QUEUE, items: [{ attachments: [], id: "q1", text: "an ended session's prompt" }] }) ?? "",
+        );
+
+        const { rerender } = render(<ComposerPromptQueue />);
+
+        expect(screen.queryByText("an ended session's prompt")).toBeNull();
+
+        chat.authenticated = true;
+        rerender(<ComposerPromptQueue />);
+
+        expect(screen.getByText("an ended session's prompt")).toBeTruthy();
+    });
+
+    it("holds a queued prompt while another send in the thread has begun, and sends it once that send ends without a reply", async () => {
+        chat.error = undefined;
+        markSendStarting(chat.threadId);
+
+        try {
+            render(<ComposerPromptQueue />);
+            // A prompt queued now would go at once, the thread being idle.
+            act(() => {
+                usePromptQueueStore.getState().enqueue(chat.threadId, { attachments: [], text: "queued" });
+            });
+            await nextFrame();
+            await nextFrame();
+
+            expect(chat.sendMessage).not.toHaveBeenCalled();
+        } finally {
+            // The send that held it ends, refused before any reply streamed: no streaming -> idle transition follows.
+            act(() => {
+                clearSendStarting(chat.threadId);
+            });
+        }
+
+        await nextFrame();
+        await nextFrame();
+
+        expect(chat.sendMessage).toHaveBeenCalledWith("queued", [], { draftFrom: undefined });
+    });
+
+    it("sends a queued draft with its own not-typed mark, and leaves the next draft's mark in the composer", async () => {
+        chat.error = undefined;
+        useChatUIStore.getState().setComposerText("my next draft");
+        useChatUIStore.getState().setComposerDraftFrom("promptLink");
+        // The real send clears the composer before its first await.
+        chat.sendMessage.mockImplementationOnce(() => {
+            useChatUIStore.getState().clearComposer();
+        });
+
+        try {
+            render(<ComposerPromptQueue />);
+            act(() => {
+                usePromptQueueStore.getState().enqueue(chat.threadId, { attachments: [], draftFrom: "sharedPrompt", text: "queued" });
+            });
+
+            await waitFor(() => expect(chat.sendMessage).toHaveBeenCalledWith("queued", [], { draftFrom: "sharedPrompt" }));
+            expect(useChatUIStore.getState()).toMatchObject({ composerDraftFrom: "promptLink", composerText: "my next draft" });
+        } finally {
+            useChatUIStore.getState().clearComposer();
+        }
+    });
+
+    it("leaves an old queue put when another thread's send ends", async () => {
+        chat.error = undefined;
+        // Queued before this thread showed: coming back to it never sends by surprise.
+        usePromptQueueStore.getState().enqueue(chat.threadId, { attachments: [], text: "queued" });
+        render(<ComposerPromptQueue />);
+
+        markSendStarting("another-thread");
+        act(() => {
+            clearSendStarting("another-thread");
+        });
+        await nextFrame();
+        await nextFrame();
+
+        expect(chat.sendMessage).not.toHaveBeenCalled();
+    });
+
+    it("leaves an old queue put when a send of its own thread ends that it never waited for", async () => {
+        chat.error = undefined;
+        usePromptQueueStore.getState().enqueue(chat.threadId, { attachments: [], text: "queued" });
+        render(<ComposerPromptQueue />);
+
+        markSendStarting(chat.threadId);
+        act(() => {
+            clearSendStarting(chat.threadId);
+        });
+        await nextFrame();
+        await nextFrame();
+
+        expect(chat.sendMessage).not.toHaveBeenCalled();
+    });
+
+    it("pauses the queue behind a composer send refused for banned words, though its brief reply state ends cleanly", async () => {
+        chat.error = undefined;
+        markSendStarting(chat.threadId);
+        // The send began its reply state before the gateway answered.
+        chat.isStreaming = true;
+
+        const view = render(<ComposerPromptQueue />);
+
+        // Queued behind it while it is out.
+        act(() => {
+            usePromptQueueStore.getState().enqueue(chat.threadId, { attachments: [], text: "queued" });
+        });
+        // Refused: the text goes back to the composer, and the reply state ends without an error.
+        act(() => {
+            clearSendStarting(chat.threadId, { refused: true });
+        });
+        chat.isStreaming = false;
+        view.rerender(<ComposerPromptQueue />);
+        await nextFrame();
+        await nextFrame();
+
+        expect(chat.sendMessage).not.toHaveBeenCalled();
+        expect(usePromptQueueStore.getState().queues[chat.threadId]?.paused).toBe(true);
+    });
+
+    it("pauses the queue when its own first prompt is refused for banned words, so the second does not go at once", async () => {
+        chat.error = undefined;
+        // The queue's send begins its reply state, then is refused.
+        chat.sendMessage.mockImplementation(() => {
+            markSendStarting(chat.threadId);
+            chat.isStreaming = true;
+        });
+        usePromptQueueStore.getState().enqueue(chat.threadId, { attachments: [], text: "first" });
+
+        const view = render(<ComposerPromptQueue />);
+
+        act(() => {
+            usePromptQueueStore.getState().enqueue(chat.threadId, { attachments: [], text: "second" });
+        });
+        await waitFor(() => expect(chat.sendMessage).toHaveBeenCalledTimes(1));
+        view.rerender(<ComposerPromptQueue />);
+        await nextFrame();
+
+        act(() => {
+            clearSendStarting(chat.threadId, { refused: true });
+        });
+        chat.isStreaming = false;
+        view.rerender(<ComposerPromptQueue />);
+        await nextFrame();
+        await nextFrame();
+
+        expect(chat.sendMessage).toHaveBeenCalledTimes(1);
+        expect(usePromptQueueStore.getState().queues[chat.threadId]?.paused).toBe(true);
     });
 
     it("holds a queued prompt while the thread's mode is saving, and sends it once the save has ended", async () => {
@@ -153,6 +333,215 @@ describe("composer prompt queue", () => {
         view.rerender(<ComposerPromptQueue />);
 
         await waitFor(() => expect(chat.sendMessage).toHaveBeenCalledTimes(1));
+    });
+
+    it("holds a queued prompt while the browser is offline, and sends it once the network is back", async () => {
+        chat.error = undefined;
+        chat.isStreaming = true;
+        chat.view = "offline";
+        usePromptQueueStore.getState().enqueue(chat.threadId, { attachments: [], text: "queued" });
+
+        const view = render(<ComposerPromptQueue />);
+
+        chat.isStreaming = false;
+        view.rerender(<ComposerPromptQueue />);
+        await act(async () => {
+            await Promise.resolve();
+        });
+        expect(chat.sendMessage).not.toHaveBeenCalled();
+
+        // Only the live socket is down: messages go over HTTP, so the held prompt goes.
+        chat.view = "reconnecting";
+        view.rerender(<ComposerPromptQueue />);
+
+        await waitFor(() => expect(chat.sendMessage).toHaveBeenCalledWith("queued", [], { draftFrom: undefined }));
+    });
+
+    it("sends a Send next clicked offline once the network is back, though a steer withdrawal still held the queue then", async () => {
+        chat.error = undefined;
+
+        let finish: (value: { outcome: "withdrawn" }) => void = () => {};
+
+        // The lib target has no `Promise.withResolvers` yet.
+        // eslint-disable-next-line unicorn/prefer-promise-with-resolvers
+        const promise = new Promise<{ outcome: "withdrawn" }>((resolve: (value: PromiseLike<{ outcome: "withdrawn" }> | { outcome: "withdrawn" }) => void) => {
+            finish = resolve;
+        });
+
+        withdrawSteer.mockReturnValue(promise);
+
+        const view = render(<ComposerPromptQueue />);
+
+        await act(async () => {
+            const { enqueue } = usePromptQueueStore.getState();
+
+            enqueue(chat.threadId, { attachments: [], steer: { id: "steer-1", streamId: "stream-1" }, text: "steered" });
+            enqueue(chat.threadId, { attachments: [], text: "queued" });
+        });
+        expect(withdrawSteer).toHaveBeenCalledTimes(1);
+
+        chat.view = "offline";
+        view.rerender(<ComposerPromptQueue />);
+        fireEvent.click(screen.getByRole("button", { name: "Send next" }));
+        expect(toast.showInfo).toHaveBeenCalledWith(expect.stringContaining("You are offline"), { id: "composer-offline-send" });
+
+        // Back online while the withdrawal still holds the queue: the held send waits for it, it is not dropped.
+        chat.view = "online";
+        view.rerender(<ComposerPromptQueue />);
+
+        await act(async () => {
+            finish({ outcome: "withdrawn" });
+        });
+
+        // The withdrawn steer goes; the held Send next waits for its reply, so two turns never run at once.
+        await waitFor(() => expect(chat.sendMessage).toHaveBeenCalledTimes(1));
+        expect(chat.sendMessage).toHaveBeenLastCalledWith("steered", [], { draftFrom: undefined });
+
+        chat.isStreaming = true;
+        view.rerender(<ComposerPromptQueue />);
+        expect(chat.sendMessage).toHaveBeenCalledTimes(1);
+
+        chat.isStreaming = false;
+        view.rerender(<ComposerPromptQueue />);
+
+        await waitFor(() => expect(chat.sendMessage).toHaveBeenCalledTimes(2));
+        expect(chat.sendMessage).toHaveBeenLastCalledWith("queued", [], { draftFrom: undefined });
+    });
+
+    it("keeps a prompt when the network goes during its steer withdrawal, and sends it once it is back", async () => {
+        chat.error = undefined;
+
+        let finish: (value: { outcome: "withdrawn" }) => void = () => {};
+
+        // The lib target has no `Promise.withResolvers` yet.
+        // eslint-disable-next-line unicorn/prefer-promise-with-resolvers
+        const promise = new Promise<{ outcome: "withdrawn" }>((resolve: (value: PromiseLike<{ outcome: "withdrawn" }> | { outcome: "withdrawn" }) => void) => {
+            finish = resolve;
+        });
+
+        withdrawSteer.mockReturnValue(promise);
+
+        const view = render(<ComposerPromptQueue />);
+
+        await act(async () => {
+            usePromptQueueStore.getState().enqueue(chat.threadId, { attachments: [], steer: { id: "steer-1", streamId: "stream-1" }, text: "steered" });
+        });
+
+        chat.view = "offline";
+        view.rerender(<ComposerPromptQueue />);
+
+        await act(async () => {
+            finish({ outcome: "withdrawn" });
+        });
+
+        expect(chat.sendMessage).not.toHaveBeenCalled();
+        expect(usePromptQueueStore.getState().queues[chat.threadId]?.items.map((item: QueuedChatPrompt) => item.text)).toStrictEqual(["steered"]);
+
+        chat.view = "online";
+        view.rerender(<ComposerPromptQueue />);
+
+        await waitFor(() => expect(chat.sendMessage).toHaveBeenCalledWith("steered", [], { draftFrom: undefined }));
+    });
+
+    it("keeps a Send next asked for offline while a reply streams on reconnect, and sends it when that reply ends, even in an error", async () => {
+        chat.error = undefined;
+        chat.view = "offline";
+        usePromptQueueStore.getState().enqueue(chat.threadId, { attachments: [], text: "queued" });
+
+        const view = render(<ComposerPromptQueue />);
+
+        fireEvent.click(screen.getByRole("button", { name: "Send next" }));
+
+        // A reply is streaming when the network comes back: the request is kept for its end, not dropped.
+        chat.isStreaming = true;
+        view.rerender(<ComposerPromptQueue />);
+        chat.view = "online";
+        view.rerender(<ComposerPromptQueue />);
+        await act(async () => {
+            await Promise.resolve();
+        });
+        expect(chat.sendMessage).not.toHaveBeenCalled();
+
+        chat.error = new Error("the reply failed");
+        chat.isStreaming = false;
+        view.rerender(<ComposerPromptQueue />);
+
+        await waitFor(() => expect(chat.sendMessage).toHaveBeenCalledWith("queued", [], { draftFrom: undefined }));
+    });
+
+    it("does not send a held Send next into a queue paused since, when the reply ends", async () => {
+        chat.error = undefined;
+        chat.view = "offline";
+        usePromptQueueStore.getState().enqueue(chat.threadId, { attachments: [], text: "queued" });
+
+        const view = render(<ComposerPromptQueue />);
+
+        fireEvent.click(screen.getByRole("button", { name: "Send next" }));
+        chat.isStreaming = true;
+        view.rerender(<ComposerPromptQueue />);
+        chat.view = "online";
+        view.rerender(<ComposerPromptQueue />);
+
+        await act(async () => {
+            usePromptQueueStore.getState().setPaused(chat.threadId, true);
+        });
+
+        chat.isStreaming = false;
+        view.rerender(<ComposerPromptQueue />);
+        await act(async () => {
+            await Promise.resolve();
+        });
+
+        expect(chat.sendMessage).not.toHaveBeenCalled();
+    });
+
+    it("sends a prompt held offline when its thread's composer mounts again online", async () => {
+        chat.error = undefined;
+        chat.view = "offline";
+        usePromptQueueStore.getState().enqueue(chat.threadId, { attachments: [], text: "queued" });
+
+        const view = render(<ComposerPromptQueue />);
+
+        fireEvent.click(screen.getByRole("button", { name: "Send next" }));
+        view.unmount();
+        expect(chat.sendMessage).not.toHaveBeenCalled();
+
+        chat.view = "online";
+        render(<ComposerPromptQueue />);
+
+        await waitFor(() => expect(chat.sendMessage).toHaveBeenCalledWith("queued", [], { draftFrom: undefined }));
+    });
+
+    it("keeps a prompt when the queue is paused (Stop) while its steer withdrawal settles", async () => {
+        chat.error = undefined;
+
+        let finish: (value: { outcome: "withdrawn" }) => void = () => {};
+
+        // The lib target has no `Promise.withResolvers` yet.
+        // eslint-disable-next-line unicorn/prefer-promise-with-resolvers
+        const promise = new Promise<{ outcome: "withdrawn" }>((resolve) => {
+            finish = resolve;
+        });
+
+        withdrawSteer.mockReturnValue(promise);
+        render(<ComposerPromptQueue />);
+
+        await act(async () => {
+            usePromptQueueStore.getState().enqueue(chat.threadId, { attachments: [], steer: { id: "steer-1", streamId: "stream-1" }, text: "steered" });
+        });
+        expect(withdrawSteer).toHaveBeenCalledTimes(1);
+
+        // Stop pauses the queue while the withdrawal is still out.
+        act(() => {
+            usePromptQueueStore.getState().setPaused(chat.threadId, true);
+        });
+
+        await act(async () => {
+            finish({ outcome: "withdrawn" });
+        });
+        await nextFrame();
+
+        expect(chat.sendMessage).not.toHaveBeenCalled();
     });
 
     it("holds a prompt when a mode save begins after the last render, while a steer withdrawal settles", async () => {
@@ -192,7 +581,7 @@ describe("composer prompt queue", () => {
         chat.saving = false;
         view.rerender(<ComposerPromptQueue />);
 
-        await waitFor(() => expect(chat.sendMessage).toHaveBeenCalledWith("steered", []));
+        await waitFor(() => expect(chat.sendMessage).toHaveBeenCalledWith("steered", [], { draftFrom: undefined }));
     });
 
     it("sends on Send next clicked while a chip removal settles, though the reply ended in an error", async () => {
@@ -223,7 +612,7 @@ describe("composer prompt queue", () => {
         });
 
         expect(chat.sendMessage).toHaveBeenCalledTimes(1);
-        expect(chat.sendMessage).toHaveBeenCalledWith("queued", []);
+        expect(chat.sendMessage).toHaveBeenCalledWith("queued", [], { draftFrom: undefined });
     });
 
     it("does not repeat a move's announcement in a later queue of the same thread", async () => {
@@ -320,7 +709,485 @@ describe("composer prompt queue", () => {
         expect(order()).toEqual(["three", "one", "two"]);
 
         fireEvent.click(screen.getByRole("button", { name: "Send next" }));
-        await vi.waitFor(() => expect(chat.sendMessage).toHaveBeenCalledWith("three", []));
+        await vi.waitFor(() => expect(chat.sendMessage).toHaveBeenCalledWith("three", [], { draftFrom: undefined }));
+    });
+
+    it("edits a queued message in place, keeps its place, and leaves it unchanged on Escape or an empty text", () => {
+        const { enqueue, setPaused } = usePromptQueueStore.getState();
+
+        for (const text of ["one", "two", "three"]) {
+            enqueue(chat.threadId, { attachments: [], text });
+        }
+
+        setPaused(chat.threadId, true);
+        render(<ComposerPromptQueue />);
+
+        const texts = () => usePromptQueueStore.getState().queues[chat.threadId]?.items.map((item) => item.text);
+
+        fireEvent.click(screen.getByLabelText("Edit queued message 2"));
+        fireEvent.change(screen.getByLabelText("Edit queued message 2"), { target: { value: "two, edited" } });
+        fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+        expect(texts()).toEqual(["one", "two, edited", "three"]);
+
+        fireEvent.click(screen.getByLabelText("Edit queued message 1"));
+        fireEvent.change(screen.getByLabelText("Edit queued message 1"), { target: { value: "dropped" } });
+        fireEvent.keyDown(screen.getByLabelText("Edit queued message 1"), { key: "Escape" });
+
+        expect(texts()).toEqual(["one", "two, edited", "three"]);
+
+        fireEvent.click(screen.getByLabelText("Edit queued message 3"));
+        fireEvent.change(screen.getByLabelText("Edit queued message 3"), { target: { value: " ".repeat(3) } });
+
+        expect((screen.getByRole("button", { name: "Save" }) as HTMLButtonElement).disabled).toBe(true);
+
+        fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+        expect(texts()).toEqual(["one", "two, edited", "three"]);
+    });
+
+    it("returns focus to the message's Edit button when its editor closes, on Escape and after a save", () => {
+        const { enqueue, setPaused } = usePromptQueueStore.getState();
+
+        for (const text of ["one", "two"]) {
+            enqueue(chat.threadId, { attachments: [], text });
+        }
+
+        setPaused(chat.threadId, true);
+        render(<ComposerPromptQueue />);
+
+        fireEvent.click(screen.getByLabelText("Edit queued message 1"));
+        fireEvent.keyDown(screen.getByLabelText("Edit queued message 1"), { key: "Escape" });
+
+        // Focus placement (document.activeElement) is what this test asserts.
+        // eslint-disable-next-line testing-library/no-node-access
+        expect(document.activeElement).toBe(screen.getByLabelText("Edit queued message 1"));
+
+        fireEvent.click(screen.getByLabelText("Edit queued message 2"));
+        fireEvent.change(screen.getByLabelText("Edit queued message 2"), { target: { value: "two, changed" } });
+        fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+        // eslint-disable-next-line testing-library/no-node-access
+        expect(document.activeElement).toBe(screen.getByLabelText("Edit queued message 2"));
+    });
+
+    it("refuses to save a draft that is only hidden characters, and keeps the old text", () => {
+        const { enqueue, setPaused } = usePromptQueueStore.getState();
+
+        enqueue(chat.threadId, { attachments: [], text: "kept" });
+        setPaused(chat.threadId, true);
+        render(<ComposerPromptQueue />);
+
+        fireEvent.click(screen.getByLabelText("Edit queued message 1"));
+        fireEvent.change(screen.getByLabelText("Edit queued message 1"), { target: { value: "​" } });
+
+        expect((screen.getByRole("button", { name: "Save" }) as HTMLButtonElement).disabled).toBe(true);
+
+        // The keyboard save is refused the same way: the editor stays open, and the queued text is kept.
+        fireEvent.keyDown(screen.getByLabelText("Edit queued message 1"), { ctrlKey: true, key: "Enter" });
+
+        expect(screen.getByLabelText("Edit queued message 1")).toBeTruthy();
+        expect(usePromptQueueStore.getState().queues[chat.threadId]?.items.map((item) => item.text)).toEqual(["kept"]);
+    });
+
+    it("holds the head's send while its text is open, and sends the edited text once the edit closes", async () => {
+        const { enqueue, setPaused } = usePromptQueueStore.getState();
+
+        enqueue(chat.threadId, { attachments: [], text: "one" });
+        setPaused(chat.threadId, true);
+        render(<ComposerPromptQueue />);
+
+        fireEvent.click(screen.getByLabelText("Edit queued message 1"));
+        fireEvent.change(screen.getByLabelText("Edit queued message 1"), { target: { value: "one, fixed" } });
+
+        expect((screen.getByRole("button", { name: "Send next" }) as HTMLButtonElement).disabled).toBe(true);
+
+        fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+        expect(usePromptQueueStore.getState().queues[chat.threadId]?.items.map((item) => item.text)).toEqual(["one, fixed"]);
+
+        fireEvent.click(screen.getByRole("button", { name: "Send next" }));
+        await vi.waitFor(() => expect(chat.sendMessage).toHaveBeenCalledWith("one, fixed", [], { draftFrom: undefined }));
+    });
+
+    it("keeps an unsaved draft when its chip remounts", () => {
+        const { enqueue, setPaused } = usePromptQueueStore.getState();
+
+        enqueue(chat.threadId, { attachments: [], text: "draft me" });
+        setPaused(chat.threadId, true);
+
+        const { unmount } = render(<ComposerPromptQueue />);
+
+        fireEvent.click(screen.getByLabelText("Edit queued message 1"));
+        fireEvent.change(screen.getByLabelText("Edit queued message 1"), { target: { value: "typed, not saved" } });
+        unmount();
+
+        render(<ComposerPromptQueue />);
+
+        expect((screen.getByLabelText("Edit queued message 1") as HTMLTextAreaElement).value).toBe("typed, not saved");
+    });
+
+    it("keeps one open editor per thread: another message's Edit waits, and the open draft is not replaced", () => {
+        const { enqueue, setPaused } = usePromptQueueStore.getState();
+
+        for (const text of ["one", "two"]) {
+            enqueue(chat.threadId, { attachments: [], text });
+        }
+
+        setPaused(chat.threadId, true);
+        render(<ComposerPromptQueue />);
+
+        fireEvent.click(screen.getByLabelText("Edit queued message 1"));
+        fireEvent.change(screen.getByLabelText("Edit queued message 1"), { target: { value: "one, typed" } });
+
+        expect((screen.getByLabelText("Edit queued message 2") as HTMLButtonElement).disabled).toBe(true);
+
+        // The store itself refuses a second editor, whatever the caller.
+        useQueueEditStore.getState().start(chat.threadId, "some-other-id", "replacement");
+
+        expect((screen.getByLabelText("Edit queued message 1") as HTMLTextAreaElement).value).toBe("one, typed");
+    });
+
+    it("does not send another thread's head when the chat switches while this thread's head is being edited", async () => {
+        chat.error = undefined;
+
+        const { enqueue, setPaused } = usePromptQueueStore.getState();
+
+        enqueue("thread-1", { attachments: [], text: "one" });
+        setPaused("thread-1", true);
+        enqueue("thread-2", { attachments: [], text: "other thread's head" });
+
+        chat.threadId = "thread-1";
+
+        const { rerender } = render(<ComposerPromptQueue />);
+
+        fireEvent.click(screen.getByLabelText("Edit queued message 1"));
+
+        chat.threadId = "thread-2";
+        rerender(<ComposerPromptQueue />);
+
+        await act(async () => {
+            await Promise.resolve();
+        });
+
+        expect(chat.sendMessage).not.toHaveBeenCalled();
+    });
+
+    it("drops an open editor with the queues when the session ends, so the thread's next message can be edited", () => {
+        const { enqueue, setPaused } = usePromptQueueStore.getState();
+
+        enqueue(chat.threadId, { attachments: [], text: "one" });
+        setPaused(chat.threadId, true);
+
+        const { rerender } = render(<ComposerPromptQueue />);
+
+        fireEvent.click(screen.getByLabelText("Edit queued message 1"));
+
+        clearPromptQueues();
+
+        enqueue(chat.threadId, { attachments: [], text: "fresh" });
+        setPaused(chat.threadId, true);
+        rerender(<ComposerPromptQueue />);
+
+        expect((screen.getByLabelText("Edit queued message 1") as HTMLButtonElement).disabled).toBe(false);
+    });
+
+    it("saving an edit does not count as a new arrival: an idle, unpaused queue left unsent stays unsent", async () => {
+        chat.error = undefined;
+
+        const { enqueue } = usePromptQueueStore.getState();
+
+        // Queued before the chip mounts: the queue is idle and unpaused, and nothing in it has arrived since the mount.
+        enqueue(chat.threadId, { attachments: [], text: "one" });
+        enqueue(chat.threadId, { attachments: [], text: "two" });
+        render(<ComposerPromptQueue />);
+
+        fireEvent.click(screen.getByLabelText("Edit queued message 2"));
+        fireEvent.change(screen.getByLabelText("Edit queued message 2"), { target: { value: "two, edited" } });
+        fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+        await act(async () => {
+            await Promise.resolve();
+        });
+
+        expect(chat.sendMessage).not.toHaveBeenCalled();
+    });
+
+    it("sends nothing when an edit of a paused head is cancelled", async () => {
+        const { enqueue, setPaused } = usePromptQueueStore.getState();
+
+        enqueue(chat.threadId, { attachments: [], text: "one" });
+        setPaused(chat.threadId, true);
+        render(<ComposerPromptQueue />);
+
+        fireEvent.click(screen.getByLabelText("Edit queued message 1"));
+        fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+        await act(async () => {
+            await Promise.resolve();
+        });
+
+        expect(chat.sendMessage).not.toHaveBeenCalled();
+    });
+
+    it("busy send retry: a send requested during a busy send runs once, when the busy send sent nothing", async () => {
+        chat.error = undefined;
+
+        let finish: (value: { outcome: "withdrawn" }) => void = () => {};
+
+        // The lib target has no `Promise.withResolvers` yet.
+        // eslint-disable-next-line unicorn/prefer-promise-with-resolvers
+        const promise = new Promise<{ outcome: "withdrawn" }>((resolve: (value: PromiseLike<{ outcome: "withdrawn" }> | { outcome: "withdrawn" }) => void) => {
+            finish = resolve;
+        });
+
+        withdrawSteer.mockReturnValue(promise);
+
+        const view = render(<ComposerPromptQueue />);
+
+        // The arrival starts a send, which waits on the steer withdrawal: that call holds the flag.
+        await act(async () => {
+            usePromptQueueStore.getState().enqueue(chat.threadId, { attachments: [], steer: { id: "steer-1", streamId: "stream-1" }, text: "steered" });
+        });
+
+        // The reply fails meanwhile, so the arrival's call may not send; Send next asks for one during that call.
+        chat.error = new Error("the reply failed");
+        view.rerender(<ComposerPromptQueue />);
+        fireEvent.click(screen.getByRole("button", { name: "Send next" }));
+
+        await act(async () => {
+            finish({ outcome: "withdrawn" });
+        });
+
+        // Send next is explicit: it goes despite the error, once.
+        await waitFor(() => expect(chat.sendMessage).toHaveBeenCalledTimes(1));
+        expect(chat.sendMessage).toHaveBeenCalledWith("steered", [], { draftFrom: undefined });
+    });
+
+    it("busy send retry: a send requested during a busy send is dropped when the busy send sends, so nothing goes twice", async () => {
+        chat.error = undefined;
+
+        let finish: (value: { outcome: "withdrawn" }) => void = () => {};
+
+        // The lib target has no `Promise.withResolvers` yet.
+        // eslint-disable-next-line unicorn/prefer-promise-with-resolvers
+        const promise = new Promise<{ outcome: "withdrawn" }>((resolve: (value: PromiseLike<{ outcome: "withdrawn" }> | { outcome: "withdrawn" }) => void) => {
+            finish = resolve;
+        });
+
+        withdrawSteer.mockReturnValue(promise);
+
+        render(<ComposerPromptQueue />);
+
+        await act(async () => {
+            usePromptQueueStore.getState().enqueue(chat.threadId, { attachments: [], steer: { id: "steer-1", streamId: "stream-1" }, text: "steered" });
+        });
+
+        fireEvent.click(screen.getByRole("button", { name: "Send next" }));
+
+        await act(async () => {
+            finish({ outcome: "withdrawn" });
+        });
+
+        await act(async () => {
+            await Promise.resolve();
+        });
+
+        expect(chat.sendMessage).toHaveBeenCalledTimes(1);
+    });
+
+    it("sends a send held for a chat when the user comes back to it while it is idle", async () => {
+        chat.error = undefined;
+        chat.threadId = "thread-1";
+
+        usePromptQueueStore.getState().enqueue("thread-2", { attachments: [], text: "held for two" });
+
+        useQueueEditStore.getState().holdSend("thread-2", false);
+
+        const view = render(<ComposerPromptQueue />);
+
+        chat.threadId = "thread-2";
+        view.rerender(<ComposerPromptQueue />);
+
+        await waitFor(() => expect(chat.sendMessage).toHaveBeenCalledWith("held for two", [], { draftFrom: undefined }));
+    });
+
+    it("moving another message ahead of an open head edit does not release the edit's held send", async () => {
+        chat.error = undefined;
+
+        const { enqueue } = usePromptQueueStore.getState();
+
+        // Queued before the chip mounts: idle and unpaused, nothing has arrived since the mount.
+        enqueue(chat.threadId, { attachments: [], text: "one" });
+        enqueue(chat.threadId, { attachments: [], text: "two" });
+        const headId = usePromptQueueStore.getState().queues[chat.threadId]?.items[0]?.id;
+
+        render(<ComposerPromptQueue />);
+
+        fireEvent.click(screen.getByLabelText("Edit queued message 1"));
+        useQueueEditStore.getState().holdSend(chat.threadId, false, headId);
+
+        // "two" moves ahead of the edited head: the head changes, but the edit is still open.
+        fireEvent.click(screen.getByLabelText("Move queued message 2 up"));
+
+        await act(async () => {
+            await Promise.resolve();
+        });
+
+        expect(chat.sendMessage).not.toHaveBeenCalled();
+        expect(screen.getByLabelText("Edit queued message 2")).toBeTruthy();
+    });
+
+    it("a chat that mounts idle sends the send held for it, so a remount after its reply ended is not stalled", async () => {
+        chat.error = undefined;
+        chat.threadId = "thread-2";
+
+        usePromptQueueStore.getState().enqueue("thread-2", { attachments: [], text: "held on remount" });
+        useQueueEditStore.getState().holdSend("thread-2", false);
+
+        render(<ComposerPromptQueue />);
+
+        await waitFor(() => expect(chat.sendMessage).toHaveBeenCalledWith("held on remount", [], { draftFrom: undefined }));
+    });
+
+    it("an explicit held send does not clear a pause a failed permission-mode save set", async () => {
+        const { enqueue, setPaused } = usePromptQueueStore.getState();
+
+        enqueue(chat.threadId, { attachments: [], text: "one" });
+        setPaused(chat.threadId, true);
+        useQueueEditStore.getState().markFailedSave(chat.threadId, true);
+        render(<ComposerPromptQueue />);
+
+        fireEvent.click(screen.getByLabelText("Edit queued message 1"));
+        useQueueEditStore.getState().holdSend(chat.threadId, true);
+        fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+        await act(async () => {
+            await Promise.resolve();
+        });
+
+        expect(chat.sendMessage).not.toHaveBeenCalled();
+        expect(usePromptQueueStore.getState().queues[chat.threadId]?.paused).toBe(true);
+    });
+
+    it("an explicit held send does not lift a Stop's pause when no chat error is set", async () => {
+        chat.error = undefined;
+
+        const { enqueue, setPaused } = usePromptQueueStore.getState();
+
+        enqueue(chat.threadId, { attachments: [], text: "one" });
+        setPaused(chat.threadId, true);
+        render(<ComposerPromptQueue />);
+
+        fireEvent.click(screen.getByLabelText("Edit queued message 1"));
+        useQueueEditStore.getState().holdSend(chat.threadId, true);
+        fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+        await act(async () => {
+            await Promise.resolve();
+        });
+
+        expect(chat.sendMessage).not.toHaveBeenCalled();
+        expect(usePromptQueueStore.getState().queues[chat.threadId]?.paused).toBe(true);
+    });
+
+    it("a reply that ends in an error sends an explicit held send, reading the queue's live pause", async () => {
+        chat.error = undefined;
+        chat.isStreaming = true;
+
+        usePromptQueueStore.getState().enqueue(chat.threadId, { attachments: [], text: "held through the error" });
+        useQueueEditStore.getState().holdSend(chat.threadId, true);
+
+        const view = render(<ComposerPromptQueue />);
+
+        // The reply fails and ends: the queue may be paused in the same commit, so the release must not use the render's value.
+        chat.error = new Error("the reply failed");
+        chat.isStreaming = false;
+        view.rerender(<ComposerPromptQueue />);
+
+        await waitFor(() => expect(chat.sendMessage).toHaveBeenCalledWith("held through the error", [], { draftFrom: undefined }));
+    });
+
+    it("an explicit held send does not lift a manual Stop's pause, even with a chat error set", async () => {
+        chat.error = new Error("the reply failed");
+
+        const { enqueue, setPaused } = usePromptQueueStore.getState();
+
+        enqueue(chat.threadId, { attachments: [], text: "one" });
+        // A manual Stop pauses without the error's mark.
+        setPaused(chat.threadId, true);
+        render(<ComposerPromptQueue />);
+
+        fireEvent.click(screen.getByLabelText("Edit queued message 1"));
+        useQueueEditStore.getState().holdSend(chat.threadId, true);
+        fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+        await act(async () => {
+            await Promise.resolve();
+        });
+
+        expect(chat.sendMessage).not.toHaveBeenCalled();
+        expect(usePromptQueueStore.getState().queues[chat.threadId]?.paused).toBe(true);
+    });
+
+    it("Send next replaces a hold the queue left, so a later error cannot send it unasked", async () => {
+        const { enqueue, setPaused } = usePromptQueueStore.getState();
+
+        enqueue(chat.threadId, { attachments: [], text: "one" });
+        setPaused(chat.threadId, true);
+        useQueueEditStore.getState().holdSend(chat.threadId, true);
+        render(<ComposerPromptQueue />);
+
+        fireEvent.click(screen.getByRole("button", { name: "Send next" }));
+
+        await waitFor(() => expect(chat.sendMessage).toHaveBeenCalledWith("one", [], { draftFrom: undefined }));
+        expect(useQueueEditStore.getState().held[chat.threadId]).toBeUndefined();
+    });
+
+    it("a hold for an edited message moves to the message's new id on save, so its send fulfils it", async () => {
+        const { enqueue, setPaused } = usePromptQueueStore.getState();
+
+        enqueue(chat.threadId, { attachments: [], text: "one" });
+        setPaused(chat.threadId, true);
+        render(<ComposerPromptQueue />);
+
+        const oldId = usePromptQueueStore.getState().queues[chat.threadId]?.items[0]?.id;
+
+        fireEvent.click(screen.getByLabelText("Edit queued message 1"));
+        useQueueEditStore.getState().holdSend(chat.threadId, true, oldId);
+        fireEvent.change(screen.getByLabelText("Edit queued message 1"), { target: { value: "one, edited" } });
+        fireEvent.click(screen.getByRole("button", { name: "Save" }));
+        fireEvent.click(screen.getByRole("button", { name: "Send next" }));
+
+        await waitFor(() => expect(chat.sendMessage).toHaveBeenCalledWith("one, edited", [], { draftFrom: undefined }));
+        expect(useQueueEditStore.getState().held[chat.threadId]).toBeUndefined();
+    });
+
+    it("closing an edit after another message moved ahead of it sends nothing: the hold names the edited message", async () => {
+        chat.error = undefined;
+
+        const { enqueue } = usePromptQueueStore.getState();
+
+        // Queued before the chip mounts: idle and unpaused, nothing has arrived since the mount.
+        enqueue(chat.threadId, { attachments: [], text: "one" });
+        enqueue(chat.threadId, { attachments: [], text: "two" });
+        const headId = usePromptQueueStore.getState().queues[chat.threadId]?.items[0]?.id;
+
+        render(<ComposerPromptQueue />);
+
+        fireEvent.click(screen.getByLabelText("Edit queued message 1"));
+        useQueueEditStore.getState().holdSend(chat.threadId, true, headId);
+
+        // "two" moves ahead of the edited "one", then the edit is cancelled.
+        fireEvent.click(screen.getByLabelText("Move queued message 2 up"));
+        fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+        await act(async () => {
+            await Promise.resolve();
+        });
+
+        expect(chat.sendMessage).not.toHaveBeenCalled();
+        expect(useQueueEditStore.getState().held[chat.threadId]?.id).toBe(headId);
     });
 
     it("moves a dropped message to where it lands in the queue", async () => {
@@ -383,7 +1250,7 @@ describe("composer prompt queue", () => {
         view.rerender(<ComposerPromptQueue />);
 
         // The queue moves on once the save has ended, which is what the waiting text promised.
-        await vi.waitFor(() => expect(chat.sendMessage).toHaveBeenCalledWith("queued", []));
+        await vi.waitFor(() => expect(chat.sendMessage).toHaveBeenCalledWith("queued", [], { draftFrom: undefined }));
     });
 
     it("does not promise a send after the save when the queue is held", () => {

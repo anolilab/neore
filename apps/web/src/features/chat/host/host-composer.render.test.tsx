@@ -3,11 +3,13 @@
  * permission buttons send only an option the agent offered (allow once, decline), by the ids the backend gave.
  */
 
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { onlineManager, QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { toast } from "sonner";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { prefillComposer } from "@/features/chat/thread/composer-prefill";
 import { focusNextArea } from "@/features/keyboard/lib/focus-areas";
 
 const NAME_0 = /^(Send|Queue)$/;
@@ -35,11 +37,17 @@ const harness = vi.hoisted(() => {
     };
 });
 
+vi.mock("@lingui/core/macro", () => {
+    return {
+        plural: (count: number, forms: { one: string; other: string }) => (count === 1 ? forms.one : forms.other),
+    };
+});
+
 vi.mock("@lingui/react/macro", () => {
     return {
         Trans: ({ children }: { children: unknown }) => children,
         useLingui: () => {
-            return { t: (strings: TemplateStringsArray, ...values: unknown[]) => String.raw({ raw: strings }, ...values) };
+            return { i18n: { locale: "en" }, t: (strings: TemplateStringsArray, ...values: unknown[]) => String.raw({ raw: strings }, ...values) };
         },
     };
 });
@@ -132,7 +140,12 @@ vi.mock("@/lib/lunora/crpc", async () => {
             },
         );
 
-    return { useCRPC: () => node([]) };
+    return {
+        useCRPC: () => node([]),
+        useLunoraAuth: () => {
+            return { isAuthenticated: true };
+        },
+    };
 });
 
 const { default: HostComposer } = await import("./host-composer");
@@ -142,6 +155,10 @@ const ALWAYS = /always/iu;
 const EDIT_BUTTON = /Edit queued message \d/u;
 const SEND_OR_QUEUE = /^(Send|Queue)$/u;
 const CUT = /too long to show whole/u;
+const STILL_SHOWS_FAST = /The agent confirmed Deep, but Model still shows Fast/u;
+/** The page's catch-up wait for a confirmed value to show, in `host-options.tsx` (`CATCH_UP_MS`). */
+const CATCH_UP_MS = 15_000;
+const WAITING_FOR_CATCH_UP = /Waiting for Model to show Deep/u;
 
 const OPTIONS = [
     { kind: "allow_once", name: "Allow", optionId: "r1-allow" },
@@ -157,6 +174,36 @@ const mount = (data: Record<string, unknown>) => {
             <HostComposer threadId="thread-1" />
         </QueryClientProvider>,
     );
+};
+
+// The text is on screen for the person: it is in the document, no ancestor hides it with `hidden` or `aria-hidden`, and neither the text
+// nor an ancestor is hidden by a style (`display: none`, `visibility: hidden` or zero opacity) jsdom computes. A class from a stylesheet
+// the tests do not load is not seen here.
+/** Whether jsdom computes the element to be hidden: `display: none`, `visibility: hidden` or an opacity of zero. */
+const isHiddenByStyle = (element: HTMLElement): boolean => {
+    const style = globalThis.getComputedStyle(element);
+
+    return style.display === "none" || style.visibility === "hidden" || (style.opacity !== "" && Number(style.opacity) === 0);
+};
+
+/** The element and its ancestors, nearest first: the chain a hidden ancestor is found on. */
+const chainOf = (element: HTMLElement): HTMLElement[] => {
+    const chain: HTMLElement[] = [];
+
+    // eslint-disable-next-line testing-library/no-node-access -- walks the ancestor chain for the computed style, which no query does
+    for (let node: HTMLElement | null = element; node !== null; node = node.parentElement) {
+        chain.push(node);
+    }
+
+    return chain;
+};
+
+const expectShown = (element: HTMLElement) => {
+    expect(element.isConnected).toBe(true);
+    // The ancestor check needs the node itself: no query finds a hidden ancestor.
+    // eslint-disable-next-line testing-library/no-node-access -- checks the hiding attributes of the ancestors, which no query does
+    expect(element.closest("[hidden], [aria-hidden='true']")).toBeNull();
+    expect(chainOf(element).find((node) => isHiddenByStyle(node))).toBeUndefined();
 };
 
 const sendCalls = () => harness.calls.filter(([name]: [string, unknown]) => name === "send");
@@ -186,6 +233,7 @@ const endTurn = async (lastEndReason = "finished") => {
     harness.data = {
         ...harness.data,
         "acp.functions.getHostSession": {
+            _id: "session-1",
             lastEndedReason: lastEndReason,
             lastEndReason,
             lastEndStreamId: running?.streamId ?? `ended-${harness.calls.length}-${Math.random().toString(36).slice(2)}`,
@@ -203,7 +251,7 @@ const session = (fields: Record<string, unknown> = {}) => {
             ? { lastEndedReason: fields.lastEndReason, lastEndStreamId: "stream-before" }
             : {};
 
-    return { "acp.functions.getHostSession": { status: "idle", ...ended, ...fields } };
+    return { "acp.functions.getHostSession": { _id: "session-1", status: "idle", ...ended, ...fields } };
 };
 
 beforeEach(() => {
@@ -223,10 +271,10 @@ afterEach(() => {
     harness.data = {};
 });
 
-const CHOICES = [
-    { name: "Plan", value: "plan" },
-    { name: "Build", value: "build" },
-];
+/** Picks a value of a native select the way the person does, through user-event. */
+const pickOption = async (user: ReturnType<typeof userEvent.setup>, select: HTMLSelectElement, value: string): Promise<void> => {
+    await user.selectOptions(select as unknown as Element, value);
+};
 
 describe("the coding-agent composer", () => {
     it("is a focus area for F6, as the cloud composer is, so F6 reaches it", async () => {
@@ -247,28 +295,6 @@ describe("the coding-agent composer", () => {
         expect(focusNextArea(1)).toBe(true);
         // eslint-disable-next-line testing-library/no-node-access -- focus placement is what this asserts
         expect(document.activeElement).toBe(box);
-    });
-
-    it.each([
-        [
-            "its options, with the name of each current value",
-            { configOptions: [{ category: "mode", choices: CHOICES, currentValue: "plan", id: "mode", name: "Mode" }] },
-            "Mode: Plan",
-        ],
-        ["its legacy mode list", { modes: { available: CHOICES, current: "build" } }, "Mode: Build"],
-    ])("shows %s as the agent reported them", async (_name, agentOptions, shown) => {
-        mount(session({ agentOptions }));
-
-        const list = await screen.findByRole("list", { name: "Agent options" });
-
-        expect(list.textContent).toBe(shown);
-    });
-
-    it("shows no options for an agent that reported none", async () => {
-        mount(session());
-        await screen.findByLabelText("Message to the coding agent");
-
-        expect(screen.queryByRole("list", { name: "Agent options" })).toBeNull();
     });
 
     it("sends the message under one request id and clears the box", async () => {
@@ -430,6 +456,56 @@ describe("the coding-agent composer", () => {
         expect(box.value).toBe("ab");
         await waitFor(() => expect(box.selectionStart).toBe(2));
         expect(toast.info).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ id: "host-composer-hidden-text" }));
+    });
+
+    it("takes a fix prompt for its thread after the draft, cleaned and unsent, and leaves another thread's", async () => {
+        mount(session());
+
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+
+        fireEvent.change(box, { target: { value: "my notes" } });
+        act(() => {
+            prefillComposer("thread-2", "not this one");
+            prefillComposer("thread-1", "Fix checks on octo/hello#7\u{202E}");
+        });
+
+        await waitFor(() => expect(box.value).toBe("my notes\nFix checks on octo/hello#7"));
+        expect(sendCalls()).toEqual([]);
+    });
+
+    it.each([
+        { during: undefined, name: "the sent message goes and the prompt stays" },
+        { during: "rewritten while it went out", name: "an edited sent message goes too" },
+    ])("takes a fix prompt clicked while a send is pending: $name", async ({ during }) => {
+        let open: () => void = () => undefined;
+
+        harness.gate = new Promise<void>((resolve) => {
+            open = () => {
+                resolve();
+            };
+        });
+        mount(session());
+
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+
+        fireEvent.change(box, { target: { value: "first message" } });
+        fireEvent.click(screen.getByRole("button", { name: "Send" }));
+        await waitFor(() => expect(harness.calls).toHaveLength(1));
+
+        if (during !== undefined) {
+            fireEvent.change(box, { target: { value: during } });
+        }
+
+        act(() => {
+            prefillComposer("thread-1", "Fix checks on octo/hello#7");
+        });
+        await waitFor(() => expect(box.value).toBe(`${during ?? "first message"}\nFix checks on octo/hello#7`));
+        open();
+        harness.gate = undefined;
+
+        // The message went out once; the box keeps only the prompt, so the next Send cannot post it again.
+        await waitFor(() => expect(box.value).toBe("Fix checks on octo/hello#7"));
+        expect(sendCalls().map(([, args]: [string, unknown]) => (args as { text: string }).text)).toEqual(["first message"]);
     });
 
     it("does not send an empty message", async () => {
@@ -729,7 +805,13 @@ describe("the coding-agent composer", () => {
         // The turn fails while the stop is still in flight, and only then does the stop answer that no turn was live.
         harness.data = {
             ...harness.data,
-            "acp.functions.getHostSession": { lastEndReason: "failed", lastEndedReason: "failed", lastEndStreamId: "stream-1", status: "idle" },
+            "acp.functions.getHostSession": {
+                _id: "session-1",
+                lastEndReason: "failed",
+                lastEndedReason: "failed",
+                lastEndStreamId: "stream-1",
+                status: "idle",
+            },
             "chat.streaming.getActiveStreamForThread": null,
         };
         await harness.client?.invalidateQueries();
@@ -1038,7 +1120,7 @@ describe("the coding-agent composer", () => {
 
         harness.gate = promise;
         harness.hold = ["acp.functions.getHostSession", "chat.streaming.getActiveStreamForThread"];
-        mount({ "acp.functions.getHostSession": { status: "idle" }, "chat.streaming.getActiveStreamForThread": null });
+        mount({ "acp.functions.getHostSession": { _id: "session-1", status: "idle" }, "chat.streaming.getActiveStreamForThread": null });
 
         expect(await screen.findByText("waiting")).toBeTruthy();
         expect(sendCalls()).toHaveLength(0);
@@ -1220,11 +1302,7 @@ describe("the coding-agent composer", () => {
         // The failed turn ended and a replacement turn is running: the session's last reason is the replacement's, not the failure.
         harness.data = {
             ...harness.data,
-            "acp.functions.getHostSession": {
-                lastEndedReason: "failed",
-                lastEndStreamId: "stream-9",
-                status: "busy",
-            },
+            "acp.functions.getHostSession": { _id: "session-1", lastEndedReason: "failed", lastEndStreamId: "stream-9", status: "busy" },
             "chat.streaming.getActiveStreamForThread": { streamId: "stream-2" },
         };
         await harness.client?.invalidateQueries();
@@ -1336,7 +1414,7 @@ describe("the coding-agent composer", () => {
         harness.gate = promise;
         harness.hold = ["acp.functions.getHostSession"];
         mount({
-            "acp.functions.getHostSession": { lastEndReason: "failed", status: "starting" },
+            "acp.functions.getHostSession": { _id: "session-1", lastEndReason: "failed", status: "starting" },
             "chat.streaming.getActiveStreamForThread": null,
         });
 
@@ -1345,7 +1423,7 @@ describe("the coding-agent composer", () => {
         release();
         await waitFor(() => expect(usePromptQueueStore.getState().queues["thread-1"]?.items).toHaveLength(1));
 
-        harness.data = { ...harness.data, "acp.functions.getHostSession": { lastEndReason: "failed", status: "idle" } };
+        harness.data = { ...harness.data, "acp.functions.getHostSession": { _id: "session-1", lastEndReason: "failed", status: "idle" } };
         await harness.client?.invalidateQueries();
 
         await waitFor(() => expect(sendCalls()).toHaveLength(1));
@@ -1456,7 +1534,13 @@ describe("the coding-agent composer", () => {
         // The turn started and failed without the composer ever seeing it running: only the end stream changed.
         harness.data = {
             ...harness.data,
-            "acp.functions.getHostSession": { lastEndReason: "failed", lastEndedReason: "failed", lastEndStreamId: "stream-1", status: "idle" },
+            "acp.functions.getHostSession": {
+                _id: "session-1",
+                lastEndReason: "failed",
+                lastEndedReason: "failed",
+                lastEndStreamId: "stream-1",
+                status: "idle",
+            },
             "chat.streaming.getActiveStreamForThread": null,
         };
         await harness.client?.invalidateQueries();
@@ -1695,7 +1779,7 @@ describe("the coding-agent composer", () => {
         // A newer turn starts first; the session reports no reason while it runs.
         harness.data = {
             ...harness.data,
-            "acp.functions.getHostSession": { status: "busy" },
+            "acp.functions.getHostSession": { _id: "session-1", status: "busy" },
             "chat.streaming.getActiveStreamForThread": { streamId: "stream-2" },
         };
         await harness.client?.invalidateQueries();
@@ -1724,7 +1808,13 @@ describe("the coding-agent composer", () => {
         // The stream clears and the session reports this composer's own stop, with its new end stream, in one update.
         harness.data = {
             ...harness.data,
-            "acp.functions.getHostSession": { lastEndedReason: "stopped", lastEndReason: "stopped", lastEndStreamId: "stream-1", status: "idle" },
+            "acp.functions.getHostSession": {
+                _id: "session-1",
+                lastEndedReason: "stopped",
+                lastEndReason: "stopped",
+                lastEndStreamId: "stream-1",
+                status: "idle",
+            },
             "chat.streaming.getActiveStreamForThread": null,
         };
         await harness.client?.invalidateQueries();
@@ -1786,7 +1876,13 @@ describe("the coding-agent composer", () => {
             harness.onSend = undefined;
             harness.data = {
                 ...harness.data,
-                "acp.functions.getHostSession": { lastEndedReason: "stopped", lastEndReason: "stopped", lastEndStreamId: "stream-2", status: "idle" },
+                "acp.functions.getHostSession": {
+                    _id: "session-1",
+                    lastEndedReason: "stopped",
+                    lastEndReason: "stopped",
+                    lastEndStreamId: "stream-2",
+                    status: "idle",
+                },
             };
         };
         await endTurn("stopped");
@@ -1811,7 +1907,7 @@ describe("the coding-agent composer", () => {
         expect(await screen.findByText("next turn")).toBeTruthy();
 
         // Mid-turn the session moves on and reports no reason, so the reason the turn started under is stale.
-        harness.data = { ...harness.data, "acp.functions.getHostSession": { status: "idle" } };
+        harness.data = { ...harness.data, "acp.functions.getHostSession": { _id: "session-1", status: "idle" } };
         await harness.client?.invalidateQueries();
         // Let React render the session's new state before the turn ends, so the intermediate reason is seen.
         await new Promise((resolve) => {
@@ -1885,7 +1981,13 @@ describe("the coding-agent composer", () => {
         // The session reports stream-1's end; the stream read lags and still names it.
         harness.data = {
             ...harness.data,
-            "acp.functions.getHostSession": { lastEndedReason: "finished", lastEndReason: "finished", lastEndStreamId: "stream-1", status: "idle" },
+            "acp.functions.getHostSession": {
+                _id: "session-1",
+                lastEndedReason: "finished",
+                lastEndReason: "finished",
+                lastEndStreamId: "stream-1",
+                status: "idle",
+            },
         };
         await harness.client?.invalidateQueries({ queryKey: ["acp.functions.getHostSession"] });
 
@@ -1971,6 +2073,44 @@ describe("a permission request from the agent", () => {
         expect(screen.getByRole("button", { name: "Decline" })).toBeTruthy();
     });
 
+    it("shows a terminal command with its folder, and offers allow once and decline for it", async () => {
+        mount({
+            ...withRequest(),
+            "acp.remote.getHostPendingPermissions": [
+                {
+                    command: "npm test",
+                    folder: "neore",
+                    options: [
+                        { kind: "allow_once", name: "Allow once", optionId: "allow" },
+                        { kind: "reject_once", name: "Decline", optionId: "decline" },
+                    ],
+                    requestId: "r1",
+                    tool: "Run a command in a terminal",
+                },
+            ],
+        });
+
+        expect(await screen.findByText("Run a command in a terminal")).toBeTruthy();
+        expect(screen.getByText("npm test")).toBeTruthy();
+        expect(screen.getByText("In neore")).toBeTruthy();
+        fireEvent.click(screen.getByRole("button", { name: "Allow once" }));
+
+        await waitFor(() =>
+            expect(harness.calls).toContainEqual(["acp.remote.answerHostPermission", { optionId: "allow", requestId: "r1", threadId: "thread-1" }]),
+        );
+    });
+
+    it("offers only a decline for another request the computer allows alone", async () => {
+        mount({
+            ...withRequest(),
+            "acp.remote.getHostPendingPermissions": [{ command: "rm -rf build", options: [OPTIONS[1]], requestId: "r1", tool: "Run a command" }],
+        });
+
+        expect(await screen.findByText("rm -rf build")).toBeTruthy();
+        expect(screen.queryByRole("button", { name: "Allow once" })).toBeNull();
+        expect(screen.getByRole("button", { name: "Decline" })).toBeTruthy();
+    });
+
     it("answers with the agent's own option id for that request", async () => {
         mount(withRequest());
 
@@ -1989,5 +2129,823 @@ describe("a permission request from the agent", () => {
         await waitFor(() =>
             expect(harness.calls).toContainEqual(["acp.remote.answerHostPermission", { optionId: "r1-reject", requestId: "r1", threadId: "thread-1" }]),
         );
+    });
+});
+
+const WINDOW_TEXT = /\/200K/u;
+const METER_NAME = /12K\/200K tokens used/u;
+
+describe("what the agent reports about itself", () => {
+    it("shows the context the agent reported, against its window", async () => {
+        mount(session({ agentState: { usage: { size: 200_000, used: 12_345 } } }));
+
+        expect(await screen.findByText("12K/200K")).toBeTruthy();
+    });
+
+    it("shows no meter until the agent has reported its usage", async () => {
+        mount(session());
+
+        await screen.findByLabelText("Message to the coding agent");
+        expect(screen.queryByText(WINDOW_TEXT)).toBeNull();
+    });
+
+    it("shows a reported cost whose currency code is not valid, as the bare number, in the meter's tooltip", async () => {
+        mount(session({ agentState: { usage: { cost: { amount: 0.5, currency: "not money!" }, size: 200_000, used: 12_345 } } }));
+
+        // The tooltip positions itself with ResizeObserver, which the shared stub (a function, not a class) cannot be constructed as.
+        // The stub only has to be constructible; its methods do nothing and need no receiver.
+        /* eslint-disable class-methods-use-this */
+        vi.stubGlobal(
+            "ResizeObserver",
+            class {
+                disconnect() {}
+
+                observe() {}
+
+                unobserve() {}
+            },
+        );
+        /* eslint-enable class-methods-use-this */
+
+        try {
+            const meter = await screen.findByRole("button", { name: METER_NAME });
+
+            fireEvent.focus(meter);
+
+            expect(await screen.findByText("Cost reported by the agent: 0.5 not money!")).toBeTruthy();
+        } finally {
+            vi.unstubAllGlobals();
+        }
+    });
+});
+
+describe("the agent's slash commands", () => {
+    beforeEach(() => {
+        harness.calls = [];
+        harness.sendResults = [];
+        // The popup brings its active command into view; jsdom has no layout, so the call is recorded instead.
+        Object.defineProperty(Element.prototype, "scrollIntoView", { configurable: true, value: vi.fn(), writable: true });
+    });
+
+    const COMMANDS = [
+        { description: "Compact the context", name: "compact" },
+        { description: "Review the changes", hint: "a branch", name: "review" },
+        { description: "Resume a session", name: "resume" },
+    ];
+    const withCommands = () => session({ agentLabel: "Example agent", agentState: { availableCommands: COMMANDS } });
+    // The draft is typed in the focused box: the menu opens only while the box has focus.
+    const typeInto = (box: HTMLTextAreaElement, value: string) => {
+        fireEvent.focus(box);
+        fireEvent.change(box, { target: { selectionStart: value.length, value } });
+    };
+
+    it("opens on a slash, names the agent as the source of each command, and filters by prefix", async () => {
+        mount(withCommands());
+
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+
+        expect(screen.queryByRole("listbox")).toBeNull();
+        typeInto(box, "/");
+
+        expect(await screen.findByRole("listbox", { name: "Commands from Example agent" })).toBeTruthy();
+        // The suggestions are filtered from what was typed, so assistive technology is told the box autocompletes into a list.
+        expect(box.getAttribute("aria-autocomplete")).toBe("list");
+        expect(screen.getAllByRole("option")).toHaveLength(3);
+        expect(screen.getAllByText("Example agent")).toHaveLength(3);
+
+        typeInto(box, "/re");
+
+        const options = screen.getAllByRole("option");
+
+        expect(options.map((option) => option.textContent)).toEqual([expect.stringContaining("/review"), expect.stringContaining("/resume")]);
+        expect(box.getAttribute("aria-activedescendant")).toBe(options[0]?.id);
+    });
+
+    it("moves with the arrows and inserts the chosen command with Enter, which does not send", async () => {
+        mount(withCommands());
+
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+
+        typeInto(box, "/re");
+        fireEvent.keyDown(box, { key: "ArrowDown" });
+        expect(box.getAttribute("aria-activedescendant")).toBe(screen.getAllByRole("option")[1]?.id);
+        fireEvent.keyDown(box, { key: "Enter" });
+
+        await waitFor(() => expect(box.value).toBe("/resume "));
+        expect(screen.queryByRole("listbox")).toBeNull();
+        expect(harness.calls).toEqual([]);
+    });
+
+    it("leaves Shift+Arrow to the textarea, which extends the selection, while the menu is open", async () => {
+        mount(withCommands());
+
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+
+        typeInto(box, "first line\n/re");
+        const active = box.getAttribute("aria-activedescendant");
+
+        // fireEvent returns false when the handler prevented the default action: the arrows must not be taken by the menu.
+        expect(fireEvent.keyDown(box, { key: "ArrowUp", shiftKey: true })).toBe(true);
+        expect(fireEvent.keyDown(box, { key: "ArrowDown", shiftKey: true })).toBe(true);
+        expect(box.getAttribute("aria-activedescendant")).toBe(active);
+        expect(screen.getAllByRole("option")).toHaveLength(2);
+    });
+
+    it("picks with Tab too, after text and a space", async () => {
+        mount(withCommands());
+
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+
+        typeInto(box, "please /com");
+        fireEvent.keyDown(box, { key: "Tab" });
+
+        await waitFor(() => expect(box.value).toBe("please /compact "));
+    });
+
+    it("inserts a command picked with the mouse or a tap, which keeps the textarea focused", async () => {
+        mount(withCommands());
+
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+
+        typeInto(box, "/re");
+        fireEvent.click(screen.getAllByRole("option")[1]!);
+
+        await waitFor(() => expect(box.value).toBe("/resume "));
+        expect(harness.calls).toEqual([]);
+    });
+
+    it("inserts a command on a click alone, as assistive technology sends it, with no mouse-down before it", async () => {
+        mount(withCommands());
+
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+
+        typeInto(box, "/re");
+        fireEvent.click(screen.getAllByRole("option")[1]!);
+
+        await waitFor(() => expect(box.value).toBe("/resume "));
+        expect(harness.calls).toEqual([]);
+    });
+
+    it("does not pick a command for Alt+Enter, which keeps its usual meaning", async () => {
+        mount(withCommands());
+
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+
+        typeInto(box, "/re");
+        fireEvent.keyDown(box, { altKey: true, key: "Enter" });
+
+        expect(box.value).not.toBe("/resume ");
+    });
+
+    it("brings the active command into view as the arrows move it", async () => {
+        const scroll = vi.fn();
+
+        Object.defineProperty(Element.prototype, "scrollIntoView", { configurable: true, value: scroll, writable: true });
+        mount(withCommands());
+
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+
+        typeInto(box, "/re");
+        fireEvent.keyDown(box, { key: "ArrowDown" });
+
+        expect(scroll.mock.contexts.at(-1)).toBe(screen.getAllByRole("option")[1]);
+    });
+
+    it("sends with Ctrl+Enter while the menu is open, rather than picking the active command", async () => {
+        mount(withCommands());
+
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+
+        typeInto(box, "/re");
+        fireEvent.keyDown(box, { ctrlKey: true, key: "Enter" });
+
+        await waitFor(() => expect(harness.calls).toHaveLength(1));
+        expect(harness.calls[0]).toEqual(["send", { requestId: expect.any(String), text: "/re", threadId: "thread-1" }]);
+    });
+
+    it("dismisses the menu for one slash query only: a second query in the same draft opens it again", async () => {
+        mount(withCommands());
+
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+
+        typeInto(box, "/re then /");
+        expect(await screen.findByRole("listbox")).toBeTruthy();
+        fireEvent.keyDown(box, { key: "Escape" });
+        expect(screen.queryByRole("listbox")).toBeNull();
+
+        // The caret moves to the first query, which is not the one dismissed.
+        box.setSelectionRange(3, 3);
+        fireEvent.keyUp(box);
+
+        expect(await screen.findByRole("listbox")).toBeTruthy();
+    });
+
+    it("follows the end of a forward selection, where the caret sits, not its start", async () => {
+        mount(withCommands());
+
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+
+        typeInto(box, "/re and /res");
+        // Selected forward from the first query into the second: the caret is at the end, in the second query.
+        box.setSelectionRange(3, 12, "forward");
+        fireEvent.keyUp(box);
+
+        expect(screen.getAllByRole("option").map((option) => option.textContent)).toEqual([expect.stringContaining("/resume")]);
+        fireEvent.click(screen.getAllByRole("option")[0]!);
+
+        await waitFor(() => expect(box.value).toBe("/re and /resume "));
+    });
+
+    it("closes the menu when the session has ended, since the input is disabled", async () => {
+        mount(session({ agentLabel: "Example agent", agentState: { availableCommands: COMMANDS }, status: "ended" }));
+
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+
+        typeInto(box, "/re");
+
+        expect(box.disabled).toBe(true);
+        expect(screen.queryByRole("listbox")).toBeNull();
+    });
+
+    it("refuses a pick that would make the draft too long to send, and keeps the draft", async () => {
+        mount(withCommands());
+
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+        // Filled to the limit: picking "resume" grows "/re" into "/resume " and takes the draft past it.
+        const draft = `${"x".repeat(30_000 - 4)} /re`; // 30,000 is the send limit the mock above sets.
+
+        typeInto(box, draft);
+        fireEvent.click(screen.getAllByRole("option")[1]!);
+
+        expect(box.value).toBe(draft);
+        expect(harness.calls).toEqual([]);
+    });
+
+    it("starts at the first command of a new query when the caret moves into another slash, rather than keeping the highlight", async () => {
+        mount(withCommands());
+
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+
+        // The highlight is on the second command of the whole list (review), then the caret moves into the `/re` before it.
+        typeInto(box, "/re and /");
+        fireEvent.keyDown(box, { key: "ArrowDown" });
+        expect(box.getAttribute("aria-activedescendant")).toBe(screen.getAllByRole("option")[1]?.id);
+
+        box.setSelectionRange(3, 3);
+        fireEvent.keyUp(box);
+
+        // The list is now the two commands of `/re`: Enter picks its first, review, not the second one the highlight used to name.
+        expect(screen.getAllByRole("option").map((option) => option.textContent)).toEqual([
+            expect.stringContaining("/review"),
+            expect.stringContaining("/resume"),
+        ]);
+        fireEvent.keyDown(box, { key: "Enter" });
+
+        await waitFor(() => expect(box.value).toBe("/review and /"));
+    });
+
+    it("places the caret after a command that is already typed, when picking it changes no text", async () => {
+        mount(withCommands());
+
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+
+        typeInto(box, "/review and");
+        box.setSelectionRange(3, 3);
+        fireEvent.keyUp(box);
+        fireEvent.click(screen.getAllByRole("option")[0]!);
+
+        await waitFor(() => expect(box.selectionStart).toBe(8));
+        expect(box.value).toBe("/review and");
+    });
+
+    it("closes the menu when the draft loses focus, and opens it again when the box is focused", async () => {
+        mount(withCommands());
+
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+
+        typeInto(box, "/re");
+        expect(await screen.findByRole("listbox")).toBeTruthy();
+
+        // Clicking the thread or another control takes the focus: the list must not stay drawn over the composer.
+        fireEvent.blur(box);
+        expect(screen.queryByRole("listbox")).toBeNull();
+
+        fireEvent.focus(box);
+        expect(await screen.findByRole("listbox")).toBeTruthy();
+    });
+
+    it("closes on Escape and reopens when the text changes", async () => {
+        mount(withCommands());
+
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+
+        typeInto(box, "/");
+        await screen.findByRole("listbox");
+        fireEvent.keyDown(box, { key: "Escape" });
+        expect(screen.queryByRole("listbox")).toBeNull();
+
+        typeInto(box, "/c");
+        expect(await screen.findByRole("listbox")).toBeTruthy();
+    });
+
+    it("shows no menu when the agent advertised no commands, and Enter still sends", async () => {
+        mount(session());
+
+        const box = (await screen.findByLabelText("Message to the coding agent")) as HTMLTextAreaElement;
+
+        typeInto(box, "/compact");
+        expect(screen.queryByRole("listbox")).toBeNull();
+        fireEvent.keyDown(box, { key: "Enter" });
+
+        await waitFor(() => expect(harness.calls).toHaveLength(1));
+        expect(harness.calls[0]).toEqual(["send", expect.objectContaining({ text: "/compact" })]);
+    });
+});
+
+describe("what counts as shown on screen", () => {
+    it.each([
+        ["an ancestor with display none", { display: "none" }],
+        ["an ancestor with visibility hidden", { visibility: "hidden" }],
+        ["an ancestor with zero opacity", { opacity: "0" }],
+    ])("does not count a message inside %s as shown", (_name, style) => {
+        const hidden = document.createElement("div");
+        const message = document.createElement("span");
+
+        Object.assign(hidden.style, style);
+        message.textContent = "The agent confirmed: Model is now Deep.";
+        hidden.appendChild(message);
+        document.body.appendChild(hidden);
+
+        try {
+            expect(() => expectShown(message)).toThrow();
+        } finally {
+            hidden.remove();
+        }
+    });
+
+    it("counts a message shown in the document as shown", () => {
+        const message = document.createElement("span");
+
+        message.textContent = "Shown";
+        document.body.appendChild(message);
+
+        try {
+            expect(() => expectShown(message)).not.toThrow();
+        } finally {
+            message.remove();
+        }
+    });
+});
+
+const WAITING_STATUS = /^Waiting/u;
+
+describe("the options the agent offers", () => {
+    const MODEL = {
+        category: "model",
+        choices: [
+            { name: "Fast", value: "fast" },
+            { name: "Deep", value: "deep" },
+        ],
+        currentValue: "fast",
+        id: "model",
+        name: "Model",
+    };
+    const EFFORT = {
+        category: "thought_level",
+        choices: [
+            { name: "Low", value: "low" },
+            { name: "High", value: "high" },
+        ],
+        currentValue: "high",
+        id: "effort",
+        name: "Reasoning effort",
+    };
+
+    const mountWith = (fields: Record<string, unknown>, result?: unknown) => {
+        const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+        harness.data = { ...session(fields), ...(result !== undefined && { "acp.remote.setHostOption:result": result }) };
+        render(
+            <QueryClientProvider client={client}>
+                <HostComposer threadId="thread-1" />
+            </QueryClientProvider>,
+        );
+
+        return client;
+    };
+
+    const mutations = () => harness.calls.filter(([name]) => name === "acp.remote.setHostOption");
+
+    it("shows each option with its current value under a name, and nothing when the agent reported none", async () => {
+        mountWith({ agentState: { configOptions: [MODEL, EFFORT] } });
+
+        expect(((await screen.findByLabelText("Model")) as unknown as HTMLSelectElement).value).toBe("fast");
+        expect((screen.getByLabelText("Reasoning effort") as unknown as HTMLSelectElement).value).toBe("high");
+        expect(screen.getByRole("list", { name: "Agent options" })).toBeTruthy();
+    });
+
+    it("shows a mode option read-only whatever the case of its category, since the computer refuses to change it", async () => {
+        const MODE = {
+            category: "Mode",
+            choices: [
+                { name: "Ask", value: "ask" },
+                { name: "Code", value: "code" },
+            ],
+            currentValue: "ask",
+            id: "mode",
+            name: "Mode",
+        };
+
+        mountWith({ agentState: { configOptions: [MODE] } });
+
+        await screen.findByRole("list", { name: "Agent options" });
+        expect(screen.queryByLabelText("Mode")).toBeNull();
+        expect(screen.getByText("Ask")).toBeTruthy();
+    });
+
+    it("keeps the answer to this page's change when another client's result replaces the session's one, and does not wait again", async () => {
+        const client = mountWith({ _id: "session-1", agentState: { configOptions: [MODEL] } }, { callId: "call-1", sent: true });
+        const model = (await screen.findByLabelText("Model")) as unknown as HTMLSelectElement;
+
+        const user = userEvent.setup();
+
+        await pickOption(user, model, "deep");
+        await waitFor(() => expect(mutations()).toHaveLength(1));
+
+        const key = ["acp.functions.getHostSession", { threadId: "thread-1" }];
+
+        client.setQueryData(key, {
+            _id: "session-1",
+            agentState: { configOptions: [{ ...MODEL, currentValue: "deep" }] },
+            optionResult: { callId: "call-1", optionId: "model", outcome: "confirmed", valueId: "deep" },
+            status: "idle",
+        });
+        await screen.findByText("The agent confirmed: Model is now Deep.");
+
+        // Another client then changes the option: the session's one result is theirs now, and this page's answer must stand.
+        client.setQueryData(key, {
+            _id: "session-1",
+            agentState: { configOptions: [{ ...MODEL, currentValue: "fast" }] },
+            optionResult: { callId: "call-2", optionId: "model", outcome: "refused", reason: "the agent did not accept the change", valueId: "fast" },
+            status: "idle",
+        });
+
+        await waitFor(() => expect((screen.getByLabelText("Model") as unknown as HTMLSelectElement).disabled).toBe(false));
+        expect(screen.queryByText(WAITING_STATUS)).toBeNull();
+    });
+
+    it("reports a change the agent applied after the backend expired its call as answered late, not as refused", async () => {
+        const client = mountWith({ _id: "session-1", agentState: { configOptions: [MODEL] } }, { callId: "call-1", sent: true });
+        const model = (await screen.findByLabelText("Model")) as unknown as HTMLSelectElement;
+
+        const user = userEvent.setup();
+
+        await pickOption(user, model, "deep");
+        await waitFor(() => expect(mutations()).toHaveLength(1));
+
+        client.setQueryData(["acp.functions.getHostSession", { threadId: "thread-1" }], {
+            _id: "session-1",
+            agentState: { configOptions: [{ ...MODEL, currentValue: "deep" }] },
+            optionResult: { callId: "call-1", optionId: "model", outcome: "refused", reason: "The host did not answer.", valueId: "deep" },
+            status: "idle",
+        });
+
+        expect(await screen.findByText("The agent answered late: Model is now Deep.")).toBeTruthy();
+    });
+
+    it("names the option in its refusal, and while it waits, when the agent has removed the option since the change", async () => {
+        const client = mountWith({ _id: "session-1", agentState: { configOptions: [MODEL] } }, { callId: "call-1", sent: true });
+        const model = (await screen.findByLabelText("Model")) as unknown as HTMLSelectElement;
+
+        const user = userEvent.setup();
+
+        await pickOption(user, model, "deep");
+        await waitFor(() => expect(mutations()).toHaveLength(1));
+
+        // Still waiting for its answer when the agent's list loses the option.
+        client.setQueryData(["acp.functions.getHostSession", { threadId: "thread-1" }], {
+            _id: "session-1",
+            agentState: { configOptions: [] },
+            status: "idle",
+        });
+        expect(await screen.findByText("Waiting for the agent to change Model to Deep.")).toBeTruthy();
+
+        client.setQueryData(["acp.functions.getHostSession", { threadId: "thread-1" }], {
+            _id: "session-1",
+            agentState: { configOptions: [] },
+            optionResult: { callId: "call-1", optionId: "model", outcome: "refused", reason: "the agent did not accept the change", valueId: "deep" },
+            status: "idle",
+        });
+        expect(await screen.findByText("The agent did not change Model: the agent did not accept the change")).toBeTruthy();
+    });
+
+    it("says what the agent confirmed when the option it changed is no longer among its options", async () => {
+        const client = mountWith({ _id: "session-1", agentState: { configOptions: [MODEL] } }, { callId: "call-1", sent: true });
+        const model = (await screen.findByLabelText("Model")) as unknown as HTMLSelectElement;
+
+        const user = userEvent.setup();
+
+        await pickOption(user, model, "deep");
+        await waitFor(() => expect(mutations()).toHaveLength(1));
+
+        // The agent's list no longer has the model, and the session holds its confirmed answer for that change.
+        client.setQueryData(["acp.functions.getHostSession", { threadId: "thread-1" }], {
+            _id: "session-1",
+            agentState: { configOptions: [] },
+            optionResult: { callId: "call-1", optionId: "model", outcome: "confirmed", valueId: "deep" },
+            status: "idle",
+        });
+
+        expect(await screen.findByText("The agent confirmed: Model is now Deep, but no longer lists Model.")).toBeTruthy();
+    });
+
+    it("gives a new session in the thread its own options, not the change still waiting on the old session", async () => {
+        const client = mountWith({ _id: "session-1", agentState: { configOptions: [MODEL] } }, { callId: "call-1", sent: true });
+        const model = (await screen.findByLabelText("Model")) as unknown as HTMLSelectElement;
+
+        const user = userEvent.setup();
+
+        await pickOption(user, model, "deep");
+        await waitFor(() => expect(model.disabled).toBe(true));
+
+        // The thread's newest session is another one: the old session's answer never comes, so its wait must not carry over.
+        client.setQueryData(["acp.functions.getHostSession", { threadId: "thread-1" }], {
+            _id: "session-2",
+            agentState: { configOptions: [MODEL] },
+            status: "idle",
+        });
+
+        await waitFor(() => expect((screen.getByLabelText("Model") as unknown as HTMLSelectElement).disabled).toBe(false));
+    });
+
+    it("hands a change to the client while the browser is offline, so the client can queue it", async () => {
+        mountWith({ agentState: { configOptions: [MODEL, EFFORT] } }, { callId: "call-1", sent: true });
+
+        const model = (await screen.findByLabelText("Model")) as unknown as HTMLSelectElement;
+
+        onlineManager.setOnline(false);
+
+        try {
+            const user = userEvent.setup();
+
+            await pickOption(user, model, "deep");
+
+            // The mutation is not paused by the offline state: the client receives it, and queues it.
+            await waitFor(() => expect(mutations()).toHaveLength(1));
+        } finally {
+            onlineManager.setOnline(true);
+        }
+    });
+
+    it("does not fall back to the legacy model once the agent has reported options and cleared them", async () => {
+        // The legacy model is what the agent reported before its options changed: it is stored until the agent sends another, so the
+        // composer must not show it as the current model.
+        const client = mountWith({ agentState: { configOptions: [], models: { available: [{ id: "m1", name: "M1" }], current: "m1" } } });
+
+        // The session is read asynchronously: the assertions below run only once it has loaded, so they are not vacuous.
+        await waitFor(() => expect(client.getQueryState(["acp.functions.getHostSession", { threadId: "thread-1" }])?.status).toBe("success"));
+        await screen.findByLabelText("Message to the coding agent");
+        expect(screen.queryByRole("list", { name: "Agent options" })).toBeNull();
+        expect(screen.queryByText("M1")).toBeNull();
+    });
+
+    it("renders no options row for an agent that reported none", async () => {
+        mountWith({});
+
+        await screen.findByLabelText("Message to the coding agent");
+        expect(screen.queryByRole("list", { name: "Agent options" })).toBeNull();
+    });
+
+    it("queues the chosen value for the option and keeps every control off until the agent has answered", async () => {
+        mountWith({ agentState: { configOptions: [MODEL, EFFORT] } }, { callId: "call-1", sent: true });
+
+        const model = (await screen.findByLabelText("Model")) as unknown as HTMLSelectElement;
+
+        const user = userEvent.setup();
+
+        await pickOption(user, model, "deep");
+
+        await waitFor(() => expect(mutations()).toHaveLength(1));
+        expect(mutations()[0]?.[1]).toEqual({ optionId: "model", sessionId: "session-1", threadId: "thread-1", valueId: "deep" });
+        await waitFor(() => expect(model.disabled).toBe(true));
+        expect((screen.getByLabelText("Reasoning effort") as unknown as HTMLSelectElement).disabled).toBe(true);
+        expectShown(screen.getByText("Waiting for the agent to change Model to Deep."));
+    });
+
+    it("says in words that the agent confirmed the change, and frees the controls", async () => {
+        const client = mountWith({ agentState: { configOptions: [MODEL] } }, { callId: "call-1", sent: true });
+        const model = (await screen.findByLabelText("Model")) as unknown as HTMLSelectElement;
+
+        const user = userEvent.setup();
+
+        await pickOption(user, model, "deep");
+        await waitFor(() => expect(model.disabled).toBe(true));
+
+        harness.data = {
+            ...harness.data,
+            "acp.functions.getHostSession": {
+                _id: "session-1",
+                agentState: { configOptions: [{ ...MODEL, currentValue: "deep" }] },
+                optionResult: { callId: "call-1", optionId: "model", outcome: "confirmed", valueId: "deep" },
+                status: "idle",
+            },
+        };
+        await client.invalidateQueries();
+
+        expectShown(await screen.findByText("The agent confirmed: Model is now Deep."));
+        expect(model.disabled).toBe(false);
+        expect(model.value).toBe("deep");
+    });
+
+    it("does not say confirmed over the old value: it waits for the option to show the new one", async () => {
+        const client = mountWith({ agentState: { configOptions: [MODEL] } }, { callId: "call-1", sent: true });
+        const model = (await screen.findByLabelText("Model")) as unknown as HTMLSelectElement;
+
+        const user = userEvent.setup();
+
+        await pickOption(user, model, "deep");
+        await waitFor(() => expect(model.disabled).toBe(true));
+
+        // The agent's answer is in, but the options it changed have not arrived yet.
+        harness.data = {
+            ...harness.data,
+            "acp.functions.getHostSession": {
+                _id: "session-1",
+                agentState: { configOptions: [MODEL] },
+                optionResult: { callId: "call-1", optionId: "model", outcome: "confirmed", valueId: "deep" },
+                status: "idle",
+            },
+        };
+        await client.invalidateQueries();
+
+        expectShown(await screen.findByText("The agent confirmed. Waiting for Model to show Deep."));
+        expect(screen.queryByText("The agent confirmed: Model is now Deep.")).toBeNull();
+        expect(model.disabled).toBe(true);
+
+        harness.data = {
+            ...harness.data,
+            "acp.functions.getHostSession": {
+                _id: "session-1",
+                agentState: { configOptions: [{ ...MODEL, currentValue: "deep" }] },
+                optionResult: { callId: "call-1", optionId: "model", outcome: "confirmed", valueId: "deep" },
+                status: "idle",
+            },
+        };
+        await client.invalidateQueries();
+
+        expectShown(await screen.findByText("The agent confirmed: Model is now Deep."));
+        expect(model.disabled).toBe(false);
+    });
+
+    it("says the agent answered late when its answer comes after the wait, and the option shows the value it gave", async () => {
+        const client = mountWith({ agentState: { configOptions: [MODEL] } }, { callId: "call-1", sent: true });
+        const model = (await screen.findByLabelText("Model")) as unknown as HTMLSelectElement;
+
+        const user = userEvent.setup();
+
+        await pickOption(user, model, "deep");
+        await waitFor(() => expect(model.disabled).toBe(true));
+
+        // The page's call failed at the agent's timeout, and the agent's late answer has since changed the option.
+        harness.data = {
+            ...harness.data,
+            "acp.functions.getHostSession": {
+                _id: "session-1",
+                agentState: { configOptions: [{ ...MODEL, currentValue: "deep" }] },
+                optionResult: { callId: "call-1", optionId: "model", outcome: "refused", reason: "the agent did not answer", valueId: "deep" },
+                status: "idle",
+            },
+        };
+        await client.invalidateQueries();
+
+        expectShown(await screen.findByText("The agent answered late: Model is now Deep."));
+        expect(screen.queryByText("The agent did not change Model: the agent did not answer")).toBeNull();
+    }, 30_000);
+
+    it("says the option has not caught up when the agent confirmed a value it still does not show, and then frees the control", async () => {
+        const client = mountWith({ agentState: { configOptions: [MODEL] } }, { callId: "call-1", sent: true });
+        const model = (await screen.findByLabelText("Model")) as unknown as HTMLSelectElement;
+
+        const user = userEvent.setup();
+
+        await pickOption(user, model, "deep");
+        await waitFor(() => expect(model.disabled).toBe(true));
+
+        // The page's wait for the value to show is a timer of CATCH_UP_MS: the clock is driven past it, not waited out.
+        vi.useFakeTimers({ shouldAdvanceTime: true, toFake: ["setTimeout", "clearTimeout"] });
+
+        try {
+            // The agent confirmed the value, but the options it reports keep the old one past the page's wait.
+            harness.data = {
+                ...harness.data,
+                "acp.functions.getHostSession": {
+                    _id: "session-1",
+                    agentState: { configOptions: [MODEL] },
+                    optionResult: { callId: "call-1", optionId: "model", outcome: "confirmed", valueId: "deep" },
+                    status: "idle",
+                },
+            };
+            await client.invalidateQueries();
+            expectShown(await screen.findByText(WAITING_FOR_CATCH_UP));
+
+            // Flush the effect that starts the wait, then drive the clock past it.
+            await act(async () => {
+                await vi.advanceTimersByTimeAsync(0);
+            });
+            await act(async () => {
+                await vi.advanceTimersByTimeAsync(CATCH_UP_MS);
+            });
+        } finally {
+            vi.useRealTimers();
+        }
+
+        expectShown(await screen.findByText(STILL_SHOWS_FAST));
+        expect(screen.queryByText("The agent confirmed: Model is now Deep.")).toBeNull();
+        expect(model.disabled).toBe(false);
+    });
+
+    it("says why the agent refused, and leaves the value as it was", async () => {
+        const client = mountWith({ agentState: { configOptions: [MODEL] } }, { callId: "call-1", sent: true });
+        const model = (await screen.findByLabelText("Model")) as unknown as HTMLSelectElement;
+
+        const user = userEvent.setup();
+
+        await pickOption(user, model, "deep");
+        await waitFor(() => expect(model.disabled).toBe(true));
+
+        harness.data = {
+            ...harness.data,
+            "acp.functions.getHostSession": {
+                _id: "session-1",
+                agentState: { configOptions: [MODEL] },
+                optionResult: { callId: "call-1", optionId: "model", outcome: "refused", reason: "the agent did not accept the change", valueId: "deep" },
+                status: "idle",
+            },
+        };
+        await client.invalidateQueries();
+
+        expectShown(await screen.findByText("The agent did not change Model: the agent did not accept the change"));
+        expect(model.disabled).toBe(false);
+        expect(model.value).toBe("fast");
+    });
+
+    it("tells the person when the change was not sent, with the reason, and frees the control", async () => {
+        mountWith({ agentState: { configOptions: [MODEL] } }, { reason: "offline", sent: false });
+
+        const model = (await screen.findByLabelText("Model")) as unknown as HTMLSelectElement;
+
+        const user = userEvent.setup();
+
+        await pickOption(user, model, "deep");
+
+        expect(await screen.findByText("Your computer is offline. Open Neore on it and try again.")).toBeTruthy();
+        expect(model.disabled).toBe(false);
+    });
+
+    it("shows the legacy model and mode states without a way to change them: a mode is changed on the computer", async () => {
+        mountWith({
+            agentState: {
+                modes: {
+                    available: [
+                        { id: "ask", name: "Ask" },
+                        { id: "code", name: "Code" },
+                    ],
+                    current: "ask",
+                },
+                models: { available: [{ id: "m1", name: "M1" }], current: "m1" },
+            },
+        });
+
+        expect(await screen.findByText("M1")).toBeTruthy();
+        expect(screen.queryByLabelText("Model")).toBeNull();
+        expect(screen.queryByLabelText("Mode")).toBeNull();
+        expect(screen.getByText("Ask")).toBeTruthy();
+        expect(mutations()).toHaveLength(0);
+    });
+
+    it("shows a mode option read-only whatever the case of its category, since the computer refuses that change", async () => {
+        const MODE = {
+            category: "Mode",
+            choices: [
+                { name: "Ask", value: "ask" },
+                { name: "Code", value: "code" },
+            ],
+            currentValue: "ask",
+            id: "mode",
+            name: "Mode",
+        };
+
+        mountWith({ agentState: { configOptions: [MODE, MODEL] } });
+
+        expect(await screen.findByLabelText("Model")).toBeTruthy();
+        expect(screen.queryByLabelText("Mode")).toBeNull();
+        expect(screen.getByText("Ask", { selector: "span" })).toBeTruthy();
+        expect(mutations()).toHaveLength(0);
+    });
+
+    it("keeps the controls off once the session has ended", async () => {
+        mountWith({ agentState: { configOptions: [MODEL] }, status: "ended" });
+
+        expect(((await screen.findByLabelText("Model")) as unknown as HTMLSelectElement).disabled).toBe(true);
     });
 });

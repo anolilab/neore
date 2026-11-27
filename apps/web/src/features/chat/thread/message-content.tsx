@@ -20,6 +20,7 @@ import { lazy, memo, Suspense, useCallback, useMemo } from "react";
 
 import useMCPToolMeta from "@/features/chat/core/hooks/use-mcp-tool-meta";
 import LinkPreviewSlot from "@/features/chat/link-preview/link-preview-slot";
+import PinnableImage from "@/features/chat/pins/pinnable-image";
 import ToolAutoApproval from "@/features/chat/thread/tool-auto-approval";
 import TOOL_WIDGETS from "@/features/chat/thread/widgets";
 import KnowledgeSourceGroup from "@/features/knowledge/components/knowledge-source-group";
@@ -42,6 +43,7 @@ const LazySubAgentToolView = lazy(() => import("@/features/sub-agents/components
 const LazySandboxFiles = lazy(() => import("@/features/chat/thread/sandbox-files"));
 const LazyCodingAgentToolView = lazy(() => import("@/features/coding-agents/components/coding-agent-tool-view"));
 const LazyDeviceToolCall = lazy(() => import("@/features/devices/components/device-tool-call"));
+const LazyBrowserHumanCheck = lazy(() => import("@/features/chat/browser-live-view/browser-human-check"));
 const LazyPresentationArtifact = lazy(() =>
     import("@/features/slides").then((m) => {
         return { default: m.PresentationArtifact };
@@ -49,7 +51,7 @@ const LazyPresentationArtifact = lazy(() =>
 );
 
 // Suspense-wrapped adapters so chat-ui's MessageContent doesn't need to know about lazy loading
-const DocumentArtifact: FC<{ documentId: string; kind: string; title: string; version: number }> = ({ kind, ...props }) => (
+const DocumentArtifact: FC<{ documentId: string; kind: string; threadId?: string; title: string; version: number }> = ({ kind, ...props }) => (
     <Suspense fallback={null}>
         <LazyDocumentArtifact kind={kind as "code" | "design" | "image" | "sheet" | "text"} {...props} />
     </Suspense>
@@ -109,6 +111,13 @@ const DeviceToolCall: FC<{ part: ToolPart }> = (props) => (
     </Suspense>
 );
 
+// The agent's browser reached a page only a person can clear: the "Needs you" card, with its live browser status.
+const BrowserHumanCheck: FC<{ part: ToolPart }> = (props) => (
+    <Suspense fallback={null}>
+        <LazyBrowserHumanCheck {...props} />
+    </Suspense>
+);
+
 const SandboxFiles: FC<SandboxOutputs> = (props) => (
     <Suspense fallback={null}>
         <LazySandboxFiles {...props} />
@@ -134,12 +143,18 @@ interface MessageContentProps {
     className?: string;
     isStreaming?: boolean;
     message: UIMessage;
+
+    /**
+     * Whether an image of the reply can be pinned (default: yes). Off where a pin would not land in this chat's pins: a
+     * reply still streaming has no saved id yet, and a comparison column is another thread.
+     */
+    pinImages?: boolean;
 }
 
 // Memoized, with a `components` object that only changes with the MCP tool
 // metadata: chat-ui's MessageContent is memoized too, and a fresh object per
 // render would re-render every message's content for nothing.
-const MessageContent: FC<MessageContentProps> = memo(({ className, isStreaming, message }) => {
+const MessageContent: FC<MessageContentProps> = memo(({ className, isStreaming, message, pinImages = true }) => {
     const { t } = useLingui();
     const toolMeta = useMCPToolMeta(message.parts.some((part: UIMessage["parts"][number]) => resolveMcpToolName(part) !== null));
     // Stable per locale, so the memoized chat-ui renderer is not re-rendered for it.
@@ -166,8 +181,10 @@ const MessageContent: FC<MessageContentProps> = memo(({ className, isStreaming, 
     );
     const components = useMemo(() => {
         return {
+            BrowserHumanCheck,
             DeviceToolCall,
             DocumentArtifact,
+            ...(pinImages && { Image: PinnableImage }),
             McpApp,
             PresentationArtifact,
             SandboxFiles,
@@ -178,7 +195,7 @@ const MessageContent: FC<MessageContentProps> = memo(({ className, isStreaming, 
             toolViews: TOOL_VIEWS,
             toolWidgets: TOOL_WIDGETS,
         };
-    }, [toolMeta]);
+    }, [pinImages, toolMeta]);
 
     return (
         <FetchableOriginsProvider origins={FETCHABLE_ORIGINS}>

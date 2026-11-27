@@ -37,7 +37,7 @@ const settled = async <T>(read: () => Promise<T>): Promise<T | typeof FAILED> =>
 /**
  * The user's model filters (`{}` when they set none), for a run to read once and hand to both the gateway models
  * (`getAgent({ modelFilterRules })`, which is where `requireZDR` / `denyDataCollection` reach the provider routing)
- * and `resolveBackupModelId`. Every run path loads them here, so the chosen model and its backup are routed alike.
+ * and `resolveBackupModelIds`. Every run path loads them here, so the chosen model and its backups are routed alike.
  * Background model calls (`getUtilityModel`) read them the same way, and the returned rules also carry whether the
  * user's plan opens paid-plan models, which `pickUtilityModelId` applies to its candidates.
  *
@@ -114,21 +114,23 @@ export const mergeModelFilterRules = (payer: ModelFilterRules, other: ModelFilte
 
 /**
  * The rules for a call that carries the thread owner's content AND the caller's own input: both users' filters
- * apply, so the model is one each of them allows. The caller's plan grades the paid-plan rule, as they pay. For the
+ * apply, so the model is one each of them allows. The paying user's plan grades the paid-plan rule: the caller's by
+ * default, or `planUserId` when someone else pays (the owner, for a collaborator who turned suggestions off). For the
  * owner's own call it is just their rules.
  */
 export const loadSharedModelFilterRules = async (
     ctx: Pick<ActionCtx, "runQuery">,
     callerId: string,
     ownerId: string | undefined,
+    planUserId: string = callerId,
 ): Promise<ModelFilterRules> => {
-    const caller = await loadModelFilterRules(ctx, callerId);
+    const caller = await loadModelFilterRules(ctx, callerId, planUserId);
 
     if (!ownerId || ownerId === callerId) {
         return caller;
     }
 
-    return mergeModelFilterRules(caller, await loadModelFilterRules(ctx, ownerId, callerId));
+    return mergeModelFilterRules(caller, await loadModelFilterRules(ctx, ownerId, planUserId));
 };
 
 /**

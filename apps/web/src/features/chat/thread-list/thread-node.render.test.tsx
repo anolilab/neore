@@ -2,8 +2,9 @@
 
 /** The row's hover actions are icon-only buttons; each needs an accessible name of its own. */
 // eslint-disable-next-line testing-library/no-manual-cleanup -- vitest runs without globals, so nothing else cleans up between tests
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { useState } from "react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { clearComposerDrafts, saveComposerDraft } from "@/features/chat/split/composer-drafts";
 import { useSplitLayoutStore } from "@/features/chat/split/split-layout-store";
@@ -15,6 +16,15 @@ const navigate = vi.hoisted(() => vi.fn());
 
 const linkedPullRequests = vi.hoisted(() => {
     return { count: 0 };
+});
+
+// The options menu reads the follow state; these tests are about the row, not the follow items.
+vi.mock("../follows/use-thread-follow", () => {
+    return {
+        useThreadFollow: () => {
+            return { error: null, isPending: false, setState: () => {}, state: undefined };
+        },
+    };
 });
 
 vi.mock("@lingui/core/macro", () => {
@@ -34,7 +44,7 @@ vi.mock("@lingui/react/macro", () => {
 });
 
 vi.mock("@neore/backend/api", () => {
-    return { api: { chat: { functions: { regenerateThreadTitle: {}, updateThread: {} } } } };
+    return { api: { chat: { functions: { regenerateThreadTitle: {}, updateThread: {} }, side_chat: { createSideChat: {} } } } };
 });
 
 vi.mock("@/features/develop/components/pull-request-counts", () => {
@@ -58,11 +68,14 @@ vi.mock("@tanstack/react-router", () => {
     return {
         // The thread title is a router link (#548); it renders as a plain anchor here.
         Link: ({ children, to }: { children: unknown; to: string }) => <a href={to}>{children as never}</a>,
-        useLocation: () => {
-            return { pathname: "/chat" };
+        useLocation: (options?: { select?: (location: { pathname: string }) => unknown }) => {
+            const location = { pathname: "/chat" };
+
+            return options?.select ? options.select(location) : location;
         },
+        useNavigate: () => navigate,
         useRouter: () => {
-            return { navigate, preloadRoute: async () => {} };
+            return { navigate, preloadRoute: async () => {}, state: { location: { pathname: "/chat" } } };
         },
     };
 });
@@ -113,8 +126,26 @@ vi.mock("@/hooks/use-has-opened", () => {
     return { useHasOpened: () => false };
 });
 
+const userSettings = vi.hoisted(() => {
+    return { value: undefined as Record<string, boolean> | undefined };
+});
+
+vi.mock("./hooks/use-confirm-before-delete", () => {
+    return {
+        useConfirmBeforeDelete: () => userSettings.value?.confirmBeforeDeleteChat !== false,
+    };
+});
+
+// Shows its confirm button only while open, as the real dialog is shown only when a delete asks first.
 vi.mock("@/components/delete-confirmation-dialog", () => {
-    return { default: () => null };
+    return {
+        default: ({ onConfirm, open }: { onConfirm: () => void; open: boolean }) =>
+            open ? (
+                <button onClick={onConfirm} type="button">
+                    Confirm delete
+                </button>
+            ) : null,
+    };
 });
 
 vi.mock("@/features/chat/core/stores/prompt-queue-store", () => {
@@ -155,6 +186,15 @@ vi.mock("./sortable-thread-item", () => {
     return { default: vi.fn(() => null) };
 });
 
+/** Set while a test acts as an admin impersonating the signed-in user. */
+const impersonation = vi.hoisted(() => {
+    return { active: false };
+});
+
+vi.mock("@/features/admin/hooks/use-is-impersonating", () => {
+    return { useImpersonating: () => impersonation.active };
+});
+
 /** The thread whose options menu the list has open, as the context-menu key sets it. */
 const uiState = vi.hoisted(() => {
     return { optionsMenuThreadId: null as string | null };
@@ -169,7 +209,7 @@ vi.mock("./stores/thread-list-ui-store", () => {
 });
 
 const { default: ThreadNode } = await import("./thread-node");
-const { default: SortableThreadItem } = await import("./sortable-thread-item");
+const { KeyboardSelectionProvider } = await import("./contexts/keyboard-selection-context");
 
 const SNOOZE_BUTTON = /^Snooze thread/u;
 const TOUCH_CLASSES = /pointer-coarse|hover:none/u;
@@ -177,7 +217,6 @@ const TOUCH_CLASSES = /pointer-coarse|hover:none/u;
 const child = { branchPoint: 0, branchType: "branch", children: [], createdAt: 0, depth: 1, status: "idle", threadId: "c1", title: "Child" };
 
 const baseProps = {
-    currentThreadId: undefined,
     expandedThreads: new Set<string>(),
     handleCreateBranch: () => {},
     handleDeleteThread: () => {},
@@ -212,6 +251,76 @@ const baseProps = {
     updateThread: () => {},
 };
 
+/** The thread list beside the row, which takes the row away when it is deleted, as the optimistic deletion does. */
+const RowHost = () => {
+    const [deleted, setDeleted] = useState(false);
+
+    return (
+        <>
+            <button data-search-toggle="" type="button">
+                Search threads
+            </button>
+            {!deleted && <ThreadNode {...baseProps} handleDeleteThread={() => setDeleted(true)} />}
+        </>
+    );
+};
+
+describe("ThreadNode delete confirmation", () => {
+    beforeEach(() => {
+        userSettings.value = undefined;
+    });
+
+    it("asks first by default, and deletes only once the dialog is confirmed", () => {
+        const handleDeleteThread = vi.fn();
+
+        render(<ThreadNode {...baseProps} handleDeleteThread={handleDeleteThread} />);
+
+        fireEvent.click(screen.getByRole("button", { name: "Delete thread: Quarterly plan" }));
+
+        expect(handleDeleteThread).not.toHaveBeenCalled();
+
+        fireEvent.click(screen.getByRole("button", { name: "Confirm delete" }));
+
+        expect(handleDeleteThread).toHaveBeenCalledWith("t1");
+    });
+
+    it("deletes at once, with no dialog, when the setting is saved as off", () => {
+        userSettings.value = { confirmBeforeDeleteChat: false };
+        const handleDeleteThread = vi.fn();
+
+        render(<ThreadNode {...baseProps} handleDeleteThread={handleDeleteThread} />);
+
+        fireEvent.click(screen.getByRole("button", { name: "Delete thread: Quarterly plan" }));
+
+        expect(handleDeleteThread).toHaveBeenCalledWith("t1");
+        expect(screen.queryByRole("button", { name: "Confirm delete" })).toBeNull();
+    });
+
+    it("moves focus to the search toggle when a delete at once takes the focused row away", () => {
+        userSettings.value = { confirmBeforeDeleteChat: false };
+
+        render(<RowHost />);
+
+        const deleteButton = screen.getByRole("button", { name: "Delete thread: Quarterly plan" });
+
+        deleteButton.focus();
+        fireEvent.click(deleteButton);
+
+        // eslint-disable-next-line testing-library/no-node-access -- focus placement (document.activeElement) is what this test asserts
+        expect(document.activeElement).toBe(screen.getByRole("button", { name: "Search threads" }));
+    });
+
+    it("moves focus to the search toggle after a confirmed delete, since the row's button that opened the dialog leaves", async () => {
+        render(<RowHost />);
+
+        fireEvent.click(screen.getByRole("button", { name: "Delete thread: Quarterly plan" }));
+        fireEvent.click(screen.getByRole("button", { name: "Confirm delete" }));
+
+        // eslint-disable-next-line testing-library/no-node-access -- focus placement (document.activeElement) is what this test asserts
+        await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("button", { name: "Search threads" })));
+    });
+});
+
 describe("ThreadNode", () => {
     it("shows the linked pull request count with an accessible label, and none for a thread with no link", () => {
         linkedPullRequests.count = 2;
@@ -242,6 +351,26 @@ describe("ThreadNode", () => {
         expect(screen.getByRole("button", { name: `${action}: Quarterly plan` })).toBeTruthy();
     });
 
+    it("hides archive, delete and the lock menu from an admin impersonating the owner, as the server refuses them", () => {
+        impersonation.active = true;
+        render(<ThreadNode {...baseProps} />);
+        impersonation.active = false;
+
+        for (const action of ["Archive thread", "Delete thread", "Chat lock"]) {
+            expect(screen.queryByRole("button", { name: `${action}: Quarterly plan` })).toBeNull();
+        }
+
+        expect(screen.getByRole("button", { name: "Download thread: Quarterly plan" })).toBeTruthy();
+    });
+
+    it("keeps the lock menu for an admin impersonating the owner of a locked chat, so they can still unlock it to read", () => {
+        impersonation.active = true;
+        render(<ThreadNode {...baseProps} node={{ ...baseProps.node, lockedAt: 1 }} />);
+        impersonation.active = false;
+
+        expect(screen.getByRole("button", { name: "Chat lock: locked: Locked chat" })).toBeTruthy();
+    });
+
     it("offers a snooze on a root thread that has a reply, and none on a child", () => {
         const replied = { ...baseProps.node, lastReplyAt: 1 };
         const { rerender } = render(<ThreadNode {...baseProps} node={replied} />);
@@ -253,19 +382,24 @@ describe("ThreadNode", () => {
         expect(screen.queryByRole("button", { name: SNOOZE_BUTTON })).toBeNull();
     });
 
-    it("marks the keyboard-selected child inside an expanded group, and no other row", () => {
-        // The child rows are stubbed here: the test checks the selection each one is given.
-        vi.mocked(SortableThreadItem).mockImplementation((props) => (
-            <div data-selected={String(props.isKeyboardSelected)} data-testid={`row-${props.node.threadId}`} />
-        ));
+    it("marks itself when the list's arrow keys select it, and not when they select another row", () => {
+        const { container, rerender } = render(
+            <KeyboardSelectionProvider threadId="t1">
+                <ThreadNode {...baseProps} />
+            </KeyboardSelectionProvider>,
+        );
 
-        try {
-            render(<ThreadNode {...baseProps} expandedThreads={new Set(["t1"])} keyboardThreadId="c1" />);
+        // eslint-disable-next-line testing-library/no-container, testing-library/no-node-access -- the highlight is only a class
+        expect(container.querySelector(`[data-thread-id="t1"]`)?.className).toContain("ring-white/50");
 
-            expect(screen.getByTestId("row-c1").dataset.selected).toBe("true");
-        } finally {
-            vi.mocked(SortableThreadItem).mockImplementation(() => null);
-        }
+        rerender(
+            <KeyboardSelectionProvider threadId="c1">
+                <ThreadNode {...baseProps} />
+            </KeyboardSelectionProvider>,
+        );
+
+        // eslint-disable-next-line testing-library/no-container, testing-library/no-node-access -- the highlight is only a class
+        expect(container.querySelector(`[data-thread-id="t1"]`)?.className).not.toContain("ring-white/50");
     });
 
     describe("when its chat is a split view pane", () => {

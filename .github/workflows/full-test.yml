@@ -51,7 +51,6 @@ jobs:
                   node-version: "24.22.1"
                   npm-version: "11"
                   skip-playwright: "true"
-
             # services/document-parser is a Rust Worker: its tests need rustc +
             # wasm32 + worker-build, built once up front as `test.yml` does.
             - name: "Setup Rust Worker toolchain"
@@ -64,11 +63,34 @@ jobs:
             - name: "Build packages"
               shell: "bash"
               run: "pnpm run build:packages"
+            - name: "Generate the Lunora backend code"
+              env:
+                  NODE_OPTIONS: "--max-old-space-size=4096"
+              run: "pnpm --filter @neore/backend run codegen"
 
             # Not the `affected` variant: this measures the whole tree.
+            # The last recorded timings, so the new record averages with them rather than with the committed seed.
+            - name: "Restore the test timings"
+              uses: "actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9" # v6.1.0
+              with:
+                  path: "scripts/vitest/timings"
+                  key: "test-timings-${{ github.sha }}"
+                  restore-keys: "test-timings-"
+
+            # Also records how long each test file took, for the shards in `test.yml` (`scripts/vitest/time-sharding.ts`).
             - name: "Run all tests with coverage"
               shell: "bash"
-              run: "pnpm exec vis run test:coverage"
+              env:
+                  VITEST_RECORD_TIMINGS: "1"
+              # Past the task cache: a cached pass would record nothing, and the save below would store old timings anew.
+              run: 'pnpm exec vis run test:coverage --skip-cache ":test:coverage"'
+
+            # Saved from main, whose caches every pull request can restore. A run whose tests failed saves nothing.
+            - name: "Save the test timings"
+              uses: "actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9" # v6.1.0
+              with:
+                  path: "scripts/vitest/timings"
+                  key: "test-timings-${{ github.run_id }}-${{ github.run_attempt }}"
 
             # The one project with a `test` target and no `test:coverage`.
             - name: "Run the Rust Worker tests"
@@ -112,6 +134,10 @@ jobs:
                   node-version: "24.22.1"
                   npm-version: "11"
                   skip-playwright: "true"
+            - name: "Generate the Lunora backend code"
+              env:
+                  NODE_OPTIONS: "--max-old-space-size=4096"
+              run: "pnpm --filter @neore/backend run codegen"
 
             - name: "Resolve the Playwright version"
               id: "playwright"

@@ -43,12 +43,19 @@ const resume = async (
     steered = true,
     steps: unknown[] = [],
     failPreferences = false,
+    /** A sub-agent continuation's resume (`continuingRun`), handed to the pause it records. */
+    subAgentResumedWith?: number,
 ) => {
     const runAfter = vi.fn(async () => "job");
     let preferenceReads = 0;
-    const runMutation = vi.fn(async (ref: unknown) =>
-        ref === internal.chat.steering.deliverSteers && steered ? { messageId: "steer-1", text: "actually, vegetarian" } : null,
-    );
+    const runMutation = vi.fn(async (ref: unknown) => {
+        if (ref === internal.chat.steering.deliverSteers && steered) {
+            return { messageId: "steer-1", parts: [{ sentAt: 1, text: "actually, vegetarian" }], text: "actually, vegetarian" };
+        }
+
+        // A recorded pause whose sub-agent run was refused: it does not wait.
+        return ref === internal.chat.tool_permissions.recordPendingToolApprovals ? false : null;
+    });
     const runQuery = vi.fn(async (ref: unknown) => {
         if (ref === internal.chat.tool_permissions.getPendingToolApproval) {
             return { toolName: null };
@@ -93,7 +100,7 @@ const resume = async (
     const outcome = await resumeApprovedRun(
         ctx as never,
         { approvalId: "approval-1", approved: true, config, streamId: "stream-1", threadId: "thread-1", userId: "owner-1" },
-        { steerable: true },
+        { steerable: true, ...(subAgentResumedWith !== undefined && { subAgentResumedWith }) },
     );
 
     const jobs = (ref: unknown) => runAfter.mock.calls.filter((call) => (call as unknown[])[1] === ref).map((call) => (call as unknown[])[2]);
@@ -107,8 +114,10 @@ const pauseRun = (runAfter: ReturnType<typeof vi.fn>) =>
         extractMemory: true,
         firstTokenTime: undefined,
         prompt: "Plan my dinner",
+        // Sent the same day as the steer, so it carries no day label.
+        promptAt: 0,
         savedMessages: [{ _id: "r0", message: { content: "Let me check.", role: "assistant" }, order: 1, stepOrder: 1 }] as never,
-        steeredTexts: ["no nuts"],
+        steered: [{ sentAt: 1, text: "no nuts" }],
         summarizeThread: false,
         threadId: "thread-1",
         timingStart: Date.now(),
@@ -158,8 +167,17 @@ describe("a tool-approval continuation", () => {
         const extractions = jobs(internal.memory.extract.extractMemories);
 
         expect(extractions).toHaveLength(1);
-        expect(extractions[0]).toMatchObject({ assistantResponse: "Here is a plan.", botId: "bot-1", userMessage: "actually, vegetarian" });
-        expect(extractions[0]).not.toHaveProperty("steeredFrom");
+        expect(extractions[0]).toMatchObject({
+            assistantResponse: "Here is a plan.",
+            botId: "bot-1",
+            // Relative dates read against when the first steer was sent, not when the continuation ran.
+            messageAt: 1,
+            // The steer is the whole text, so it starts at 0 and links to its message: a quote from it can be dated and linked.
+            quotablePrompt: "",
+            steeredFrom: 0,
+            steers: [{ at: 1, from: 0, messageId: "steer-1" }],
+            userMessage: "actually, vegetarian",
+        });
     });
 
     it("extracts the exchange once in all: the prompt and the earlier steer at the pause, the later steer after it", async () => {
@@ -203,15 +221,19 @@ describe("a tool-approval continuation", () => {
     it("runs a sub-agent child headless and hands its next approval what is left of its budget; an interactive one neither", async () => {
         const recordedConfig = (runMutation: ReturnType<typeof vi.fn>) =>
             (runMutation.mock.calls.find((call) => (call as unknown[])[0] === internal.chat.tool_permissions.recordPendingToolApprovals) as unknown[])[1];
-        const child = await resume({ ...BASE_CONFIG, stepsLeft: 3, subAgentRunId: "run-1" } as ToolRunConfig, [pausedAgain], true, true, [{}]);
+        const child = await resume({ ...BASE_CONFIG, stepsLeft: 3, subAgentRunId: "run-1" } as ToolRunConfig, [pausedAgain], true, true, [{}], false, 42);
 
         expect(child.ctx.headless).toBe(true);
-        expect(recordedConfig(child.runMutation)).toMatchObject({ config: { stepsLeft: 2 } });
+        // The pause is bound to the resume the continuation runs under, and the run's answer (refused here) comes back.
+        expect(recordedConfig(child.runMutation)).toMatchObject({ config: { stepsLeft: 2 }, subAgentResumedWith: 42 });
+        expect(child.outcome).toMatchObject({ paused: true, subAgentWaits: false });
 
         const chat = await resume(BASE_CONFIG, [pausedAgain], true, true, [{}]);
 
         expect(chat.ctx.headless).toBeUndefined();
         expect((recordedConfig(chat.runMutation) as { config: object }).config).not.toHaveProperty("stepsLeft");
+        expect(recordedConfig(chat.runMutation)).not.toHaveProperty("subAgentResumedWith");
+        expect(chat.outcome).not.toHaveProperty("subAgentWaits");
     });
 
     it("records no pause for a request a sub-agent child's continuation saved on its last step, which no step is left to answer", async () => {
@@ -228,7 +250,11 @@ describe("a tool-approval continuation", () => {
     });
 
     it("hands the next approval the permission keys and fingerprints of the tools IT offered, not the first run's", async () => {
-        const rebuilt = { mcpToolFingerprints: { mcp_docs__search: "new" }, permissionKeys: { mcp_docs__search: "mcp:docs (work):search" } };
+        const rebuilt = {
+            mcpToolFingerprints: { mcp_docs__search: "new" },
+            mcpToolOrigins: { mcp_docs__search: "docs-work" },
+            permissionKeys: { mcp_docs__search: "mcp:docs (work):search" },
+        };
 
         vi.mocked(buildAgentTools).mockImplementationOnce(async () => {
             return { autoApprovals: {}, mcpClients: [], mcpLabels: {}, mcpServerNames: [], repeatable: [], requiresApproval: [], tools: {}, ...rebuilt };
@@ -241,7 +267,7 @@ describe("a tool-approval continuation", () => {
         const recorded = runMutation.mock.calls.find((call) => (call as unknown[])[0] === internal.chat.tool_permissions.recordPendingToolApprovals);
 
         expect((recorded as unknown[] | undefined)?.[1]).toMatchObject({
-            config: { mcpToolFingerprints: rebuilt.mcpToolFingerprints, toolPermissionKeys: rebuilt.permissionKeys },
+            config: { mcpToolFingerprints: rebuilt.mcpToolFingerprints, mcpToolOrigins: rebuilt.mcpToolOrigins, toolPermissionKeys: rebuilt.permissionKeys },
         });
     });
 });

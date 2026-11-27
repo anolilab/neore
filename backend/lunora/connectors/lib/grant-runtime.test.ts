@@ -285,4 +285,19 @@ describe("withMcpServerGrants", () => {
         await withMcpServerGrants(ctx, "alice", [saved("Linear", "https://mcp.linear.app/mcp")], { fetchImpl: vi.fn<OAuthFetch>(), pruneOrphans: true });
         expect(deleted).toStrictEqual(["Removed"]);
     });
+
+    it("never refreshes or marks the grant of a server it is told not to keep, and still prunes by the full list", async () => {
+        const expiring = { ...(await serverGrant("Linear", "https://mcp.linear.app/mcp")), tokenExpiresAt: Date.now() - 1000 };
+        const { ctx, deleted } = grantsCtx([expiring, await serverGrant("Removed", "https://gone.example.com/mcp")]);
+        const fetchImpl = vi.fn<OAuthFetch>();
+        const linear = saved("Linear", "https://mcp.linear.app/mcp");
+
+        const [kept] = await withMcpServerGrants(ctx, "alice", [linear], { fetchImpl, keep: () => false, pruneOrphans: true });
+
+        expect(kept).toStrictEqual(linear);
+        expect(fetchImpl).not.toHaveBeenCalled();
+        // Only the orphan's delete: no status mark for the expired grant of the server not kept.
+        expect(ctx.runMutation).toHaveBeenCalledTimes(1);
+        expect(deleted).toStrictEqual(["Removed"]);
+    });
 });

@@ -42,9 +42,14 @@ describe(toggleAskUserChoice, () => {
 });
 
 describe(isAskUserQuestionAnswered, () => {
-    it("needs a pick or a non-blank note", () => {
-        expect(isAskUserQuestionAnswered({ note: " ", selected: [] })).toBe(false);
-        expect(isAskUserQuestionAnswered({ note: "x", selected: [] })).toBe(true);
-        expect(isAskUserQuestionAnswered({ note: "", selected: ["A"] })).toBe(true);
+    it("needs a pick or a non-blank note on a single-choice question", () => {
+        expect(isAskUserQuestionAnswered({ note: " ", selected: [] }, false)).toBe(false);
+        expect(isAskUserQuestionAnswered({ note: "x", selected: [] }, false)).toBe(true);
+        expect(isAskUserQuestionAnswered({ note: "", selected: ["A"] }, false)).toBe(true);
+    });
+
+    it("counts a multi-select question as answered with nothing picked", () => {
+        expect(isAskUserQuestionAnswered({ note: "", selected: [] }, true)).toBe(true);
+        expect(isAskUserQuestionAnswered({ note: "  ", selected: [] }, true)).toBe(true);
     });
 });

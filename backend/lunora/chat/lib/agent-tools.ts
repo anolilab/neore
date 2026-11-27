@@ -11,25 +11,35 @@ import type { MCPClient } from "@ai-sdk/mcp";
 import type { LanguageModel, ToolSet } from "ai";
 
 import { internal } from "../../_generated/internal";
+import { applyBotToolSelection } from "../../bots/tool-selection";
+import type { RunToolSelection } from "../../bots/run-tool-selection";
+import { NO_TOOLS_RUN_SELECTION } from "../../bots/run-tool-selection";
+import { connectorServerKey, deviceServerKey, selectionMayKeepDevices, selectionMayKeepServer, selectionServerKey } from "../../bots/tool-selectors";
 import type { Id } from "../../_generated/dataModel";
 import type { ActionCtx } from "../../_generated/server";
 import { levelOfConnection, toolOfferedAt } from "../../connectors/access-levels";
 import { getConnectorMcpServers, withMcpServerGrants } from "../../connectors/lib/grant-runtime";
 import { toolsLogger } from "../../lib/logger";
+import { withoutUndefined } from "../../lib/patch";
 import type { DeviceToolsResult } from "./device-tools";
 import { buildDeviceTools } from "./device-tools";
 import type { AutoApprovals } from "./low-risk-approval";
 import { createRunLowRiskCheck } from "./low-risk-check";
 import type { McpToolLabels } from "./mcp-tool-labels";
 import type { MCPServerConfig } from "./mcp-tools";
-import { getMCPTools } from "./mcp-tools";
+import { mcpToolOrigin } from "./mcp-tool-fingerprint";
+import { closeMCPClients, getMCPTools } from "./mcp-tools";
 import { isSafeToRepeat } from "./repeatable-tools";
 import { connectorTrustId, mcpTrustId } from "./low-risk-trust";
 import type { ToolProgressSink } from "./mcp-progress";
+import type { ThreadPermissionMode } from "./thread-permission-mode";
 import type { SearchMode } from "./tool-builder";
 import { ToolName } from "../tools";
+import { instructionReadTool } from "../tools/instruction-read";
 import { admittedKnowledgeSearchTool } from "../tools/knowledge-search";
+import { INSTRUCTION_READ_TOOL, type RunInstruction } from "../../projects/rule-files";
 import { getToolsForModelAndMode, listBuiltInTools, PULL_REQUEST_TOOLS } from "./tool-builder";
+import { readRunPermissionCap } from "./run-permission-cap";
 import type { ToolDescriptor, ToolPermissionOverrides } from "./tool-permissions";
 import type { RunOrigin } from "./tool-run-config";
 import { applyToolPermissions, toolPermissionKey } from "./tool-permissions";
@@ -48,6 +58,12 @@ export interface BuildAgentToolsOptions {
     admittedRun?: boolean;
     autoMediaEnrichment?: boolean;
     /**
+     * Where the bot whose tool selection narrows these tools is found (`bots/tool-selection.ts`): the bot a run names, or the
+     * thread it runs for (a sub-agent child's chain leads to its lead's bot). Omitted, `threadId`, else `permissionModeThreadId`.
+     * `ownerId` (a continuation): a named bot that is gone or not that user's gives no tools.
+     */
+    botLookup?: { botId?: string; ownerId?: string; threadId?: string };
+    /**
      * The thread an INTERACTIVE run is in: offers the user's online devices'
      * tools (`device-tools.ts`), when that thread may reach them at all (the
      * user owns it alone). Ignored when `headless` — nobody is at the device.
@@ -62,11 +78,24 @@ export interface BuildAgentToolsOptions {
     headlessApproved?: ReadonlyArray<string>;
     /** Headless only: keep `ask` tools for a run that pauses for its owner's answer (`ToolPermissionOptions.headlessCanAsk`). */
     headlessCanAsk?: boolean;
+    /**
+     * The project's `auto` rule files the run lists: offers `instruction_read` over them as one more built-in candidate, so the
+     * organization's cap, a skill's disabled tools, a bot's selection and the user's permissions remove it like any other.
+     * Omitted or empty, no such tool; a snapshot rebuild that names the tool keeps it over an empty list, so a file removed since
+     * is answered as not found. The caller lists the files only when the result still has the tool. A promise, because the
+     * files come with the run's context, which loads while the tools are built.
+     */
+    instructions?: Promise<ReadonlyArray<RunInstruction>> | ReadonlyArray<RunInstruction>;
     /** Interactive runs: where a long MCP call's progress is shown. Omitted, none is relayed. */
     mcpProgress?: ToolProgressSink;
     /** Restrict MCP servers to these names; empty/undefined means every enabled server. */
     mcpServerNames?: string[];
     model: LanguageModel | string;
+    /**
+     * The organization the run was started from, whose policy caps its tools (`org-policy.md` §6a). A thread's stored
+     * organization takes precedence over it when a `threadId` is given. `null` is the personal space (no policy).
+     */
+    organizationId: string | null;
     /** Who started the run, when not the person at the app: an API key's run gets no device tools and no `auto` tool. */
     origin?: RunOrigin;
     /**
@@ -99,6 +128,8 @@ export interface BuildAgentToolsOptions {
      * `ask` tool pauses for a person.
      */
     threadId?: string;
+    /** Headless only: the mode of the bot the run belongs to, applied only where it asks more (`ToolPermissionOptions.unattendedMode`). */
+    unattendedMode?: ThreadPermissionMode;
     /**
      * Resolves to whether the run's prompt carries knowledge, memory or project context (`RunContext.untrustedContext`).
      * The quick check never runs after any of them; omitted, that is unknown and counts as present. A promise, because
@@ -119,6 +150,8 @@ export interface BuildAgentToolsResult {
     mcpServerNames: string[];
     /** Runtime name -> fingerprint, for every MCP tool in `tools` (`mcp-tool-fingerprint.ts`). Recorded in approval snapshots. */
     mcpToolFingerprints: Record<string, string>;
+    /** Runtime name -> origin, for every MCP tool in `tools` (`mcpToolOrigin`). Recorded in approval snapshots. */
+    mcpToolOrigins: Record<string, string>;
     /**
      * Runtime tool name -> stable permission key, for every tool in `tools`.
      * Recorded in approval snapshots so "Always allow" writes the right key
@@ -132,17 +165,39 @@ export interface BuildAgentToolsResult {
     tools: ToolSet;
 }
 
+/** The selection of the bot a run belongs to. Fails closed: one that cannot be read gives no tools, never more than the bot chose. */
+const readBotToolSelection = async (
+    ctx: ActionCtx,
+    lookup: NonNullable<BuildAgentToolsOptions["botLookup"]>,
+    userId: string,
+): Promise<RunToolSelection | null> => {
+    if (lookup.botId === undefined && lookup.threadId === undefined) {
+        return null;
+    }
+
+    try {
+        return await ctx.runQuery(internal.bots.functions.getBotToolSelectionForRun, withoutUndefined(lookup));
+    } catch (error: unknown) {
+        toolsLogger.warn("[TOOLS] Bot tool selection unavailable, offering no tools:", error, { ...lookup, userId });
+
+        return NO_TOOLS_RUN_SELECTION;
+    }
+};
+
 export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOptions): Promise<BuildAgentToolsResult> => {
     const {
         admittedRun,
         autoMediaEnrichment,
+        botLookup = { threadId: options.threadId ?? options.permissionModeThreadId },
         deviceThreadId,
         headless,
         headlessApproved,
         headlessCanAsk,
+        instructions,
         mcpProgress,
         mcpServerNames,
         model,
+        organizationId,
         origin,
         permissionModeThreadId,
         permissionModeUserId,
@@ -150,6 +205,7 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
         skillTools,
         snapshot,
         threadId,
+        unattendedMode,
         untrustedContext = true,
         userId,
     } = options;
@@ -164,13 +220,46 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
     // keeps the ones its run had, and each tool checks the thread again when it runs).
     const baseExtraBuiltIns = snapshot ? snapshot.toolNames : (skillTools?.additionalTools ?? []).filter((name) => !PULL_REQUEST_TOOLS.includes(name));
     const linkThreadId = threadId ?? deviceThreadId;
-    const [allMcpServers, overrides, timedGrants, quickCheckOn, connectorServers, pullRequestTools, threadMode] = await Promise.all([
+
+    // The cap is read beside the reads that do not depend on it. Under `off` every tool is removed, so no quick-check, MCP,
+    // connector or pull request work (token refresh included) starts. A failed read caps at `ask` (`org-policy.md` §6a).
+    const preferences = Promise.all([
         ctx.runQuery(internal.auth.functions.getMCPServersQuery, { userId }),
         ctx.runQuery(internal.chat.tool_permissions.getToolPermissionsQuery, { userId }),
         // A run nobody is at inherits no time-boxed allow, so it does not even read them.
         headless ? {} : ctx.runQuery(internal.chat.tool_permissions.getToolPermissionGrantsQuery, { userId }),
+    ]);
+
+    // Handled here so a failed preference read is not reported as unhandled when an `off` run never awaits it.
+    preferences.catch(() => undefined);
+
+    const permissionCap = await readRunPermissionCap(ctx, { organizationId, threadId });
+
+    // Decided before the preferences are awaited: a failed preference read cannot take down a run that offers no tools.
+    // A headless run below `auto` that cannot pause offers none either: the cap holds every tool at `ask` or `off`, and
+    // with nobody to answer, each `ask` is removed (`resolveToolPermission`). One that pauses keeps its `ask` tools.
+    if (permissionCap === "off" || (headless && !headlessCanAsk && permissionCap !== "auto")) {
+        return {
+            autoApprovals: {},
+            mcpClients: [],
+            mcpLabels: {},
+            mcpServerNames: [],
+            mcpToolFingerprints: {},
+            mcpToolOrigins: {},
+            permissionKeys: {},
+            repeatable: [],
+            requiresApproval: [],
+            tools: {},
+        };
+    }
+
+    const [allMcpServers, overrides, timedGrants] = await preferences;
+
+    const selectionRead = readBotToolSelection(ctx, botLookup, userId);
+    const [quickCheckOn, connectorServers, pullRequestTools, threadMode, runToolSelection] = await Promise.all([
         // Nobody answers in a headless run, and an outside agent's calls stay `ask` because only the app approves them.
-        headless || origin === "outside_agent" || threadId === undefined
+        // Under a cap below `auto` the quick check is off anyway, so its eligibility and trusted servers are not read.
+        headless || origin === "outside_agent" || threadId === undefined || permissionCap !== "auto"
             ? false
             : // A failed read turns the quick check off; it must not take the run down.
               ctx
@@ -180,12 +269,23 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
 
                       return false;
                   }),
-        // A broken connector must never take the run down with it.
-        getConnectorMcpServers(ctx, userId).catch((error: unknown) => {
-            toolsLogger.warn("[TOOLS] Connector servers unavailable:", error);
+        // A broken connector must never take the run down with it. A connector the bot could keep no tool of is not set up at
+        // all: no token is obtained or refreshed for it, and a failed refresh is not recorded against its grant.
+        selectionRead
+            .then(async (read) => {
+                const picked = read?.selection;
 
-            return [];
-        }),
+                return await getConnectorMcpServers(
+                    ctx,
+                    userId,
+                    picked ? (slug: string) => selectionMayKeepServer(picked, connectorServerKey(slug)) : undefined,
+                );
+            })
+            .catch((error: unknown) => {
+                toolsLogger.warn("[TOOLS] Connector servers unavailable:", error);
+
+                return [];
+            }),
         // The pull request tools join only a thread with a linked pull request; a snapshot rebuild already names them.
         snapshot || linkThreadId === undefined
             ? []
@@ -211,21 +311,33 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
 
                       return "supervised" as const;
                   }),
+        selectionRead,
     ]);
 
+    const botToolSelection = runToolSelection?.selection ?? null;
     const extraBuiltIns = [...baseExtraBuiltIns, ...pullRequestTools].filter((name) => availableBuiltIns.has(name));
     const builtInTools = withAdmittedBuiltIns(
         getToolsForModelAndMode(model, searchMode, extraBuiltIns.length > 0 ? { additionalTools: extraBuiltIns } : undefined, { autoMediaEnrichment }),
         admittedRun,
     );
 
-    // Bearer tokens for servers the user signed in to. The FULL list, so a grant
-    // whose server was removed is recognised as orphaned and revoked.
-    const servers = await withMcpServerGrants(ctx, userId, allMcpServers as MCPServerConfig[], { pruneOrphans: true }).catch((error: unknown) => {
-        toolsLogger.warn("[TOOLS] MCP server sign-ins unavailable:", error);
+    const savedUrls = (allMcpServers as MCPServerConfig[]).map((server) => server.url);
+    // `savedUrls` are the RUNNING user's; in a collaborator's run the owner's saved keys tell what an exclusion still names.
+    const selectionOwner = { runs: runToolSelection?.ownerId === userId, serverKeys: runToolSelection?.ownerServerKeys ?? [] };
+    // A server none of whose tools the bot could keep is not connected to: nothing is listed only to be dropped below. Judged by
+    // the key its tools are matched by below, so a server that keeps none of them (`""`) is not connected to either.
+    const botMayKeep = (server: MCPServerConfig): boolean =>
+        !botToolSelection || selectionMayKeepServer(botToolSelection, selectionServerKey(botToolSelection, server, savedUrls, selectionOwner));
 
-        return allMcpServers as MCPServerConfig[];
-    });
+    // Bearer tokens for servers the user signed in to. The FULL list, so a grant whose server was removed is recognised as
+    // orphaned and revoked; a server the bot keeps nothing of gets no token, so its grant is never refreshed or marked.
+    const servers = await withMcpServerGrants(ctx, userId, allMcpServers as MCPServerConfig[], { keep: botMayKeep, pruneOrphans: true }).catch(
+        (error: unknown) => {
+            toolsLogger.warn("[TOOLS] MCP server sign-ins unavailable:", error);
+
+            return allMcpServers as MCPServerConfig[];
+        },
+    );
     let selectedServers = servers.filter((s) => s.enabled);
 
     if (snapshot) {
@@ -238,13 +350,15 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
     // resumed run derives the same runtime names). The composer's server pick
     // does not narrow them — their per-tool permissions do — but a snapshot does.
     selectedServers = [...selectedServers, ...(snapshot ? connectorServers.filter((s) => snapshot.mcpServerNames.includes(s.name)) : connectorServers)];
+    selectedServers = selectedServers.filter((server) => botMayKeep(server));
 
     const noDevices: DeviceToolsResult = { descriptors: new Map(), tools: {} };
     const [mcpResult, deviceResult] = await Promise.all([
         // An outside agent's (public API) event mapping drops progress chunks, so its runs write none.
         getMCPTools(selectedServers, { progress: origin === "outside_agent" ? undefined : mcpProgress }),
         // A device problem must never take the run down with it.
-        deviceThreadId === undefined || headless || origin === "outside_agent"
+        // Below `auto` every device tool is removed by the cap, so the device round-trip is skipped.
+        deviceThreadId === undefined || headless || origin === "outside_agent" || permissionCap !== "auto" || !selectionMayKeepDevices(botToolSelection)
             ? noDevices
             : buildDeviceTools(ctx, { threadId: deviceThreadId, userId }).catch((error: unknown) => {
                   toolsLogger.warn("[TOOLS] Device tools unavailable:", error);
@@ -253,7 +367,19 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
               }),
     ]);
 
-    let candidates: ToolSet = { ...builtInTools, ...mcpResult.tools, ...deviceResult.tools };
+    // The servers are connected by now: a failed read of the files closes them before it fails the run.
+    const listed = await Promise.resolve(instructions).catch(async (error: unknown) => {
+        await closeMCPClients(mcpResult.clients);
+
+        throw error;
+    });
+    let candidates: ToolSet = {
+        ...builtInTools,
+        ...mcpResult.tools,
+        ...deviceResult.tools,
+        // Last, so no server's tool of the same name takes its place.
+        ...(listed && (listed.length > 0 || snapshot) && { [INSTRUCTION_READ_TOOL]: instructionReadTool(listed) }),
+    };
 
     if (snapshot) {
         const allowed = new Set(snapshot.toolNames);
@@ -267,6 +393,33 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
 
         candidates = Object.fromEntries(Object.entries(candidates).filter(([name]) => !disabled.has(name)));
     }
+
+    // The project's instruction files are the run's context, not a capability a bot picks: an `allow` list naming other tools
+    // keeps them. An `exclude` naming `instruction_read` removes them (`bots/functions.ts` accepts the name), and so does an
+    // empty `allow` list, no tools at all, which a selection that could not be read is too.
+    const instructionRead: ToolSet =
+        Object.hasOwn(candidates, INSTRUCTION_READ_TOOL) &&
+        botToolSelection?.allow?.length !== 0 &&
+        !(botToolSelection?.exclude ?? []).includes(INSTRUCTION_READ_TOOL)
+            ? { [INSTRUCTION_READ_TOOL]: candidates[INSTRUCTION_READ_TOOL]! }
+            : {};
+
+    // The bot's own pick, by built-in name or `<server key>:tool` (`bots/tool-selectors.ts`: a server's stable key, so a rename
+    // keeps its selectors matching); it only removes, so every rule below still applies.
+    candidates = applyBotToolSelection(candidates, botToolSelection, (name) => {
+        const mcp = mcpResult.descriptors.get(name);
+
+        if (mcp) {
+            // A server whose key cannot stand for it alone keeps none of its tools (`""`), as one that cannot be told from an excluded one.
+            return { server: selectionServerKey(botToolSelection, mcp, savedUrls, selectionOwner), tool: mcp.toolName };
+        }
+
+        const device = deviceResult.descriptors.get(name);
+
+        return device && { server: deviceServerKey(device.deviceId) ?? "", tool: device.toolName };
+    });
+
+    candidates = { ...candidates, ...instructionRead };
 
     // A teammate's access per connection (`connectors/access.ts`). A write tool its level does not allow is not offered to the
     // model at all, and a connection set to none offers nothing. Fails closed: when the settings cannot be read, no connector
@@ -352,10 +505,12 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
         ...(origin === "outside_agent" && { apiKeyOrigin: true }),
         headless,
         ...(headlessApproved && { headlessApproved: new Set(headlessApproved) }),
+        permissionCap,
         ...(quickCheck && { lowRiskCheck: quickCheck.check }),
         ...(trusted && { lowRiskTrusted: trusted }),
         ...(headlessCanAsk && { headlessCanAsk: true }),
         ...(threadMode && { threadMode }),
+        ...(unattendedMode && { unattendedMode }),
         timedGrants,
     });
 
@@ -386,12 +541,24 @@ export const buildAgentTools = async (ctx: ActionCtx, options: BuildAgentToolsOp
         }
     }
 
+    // Kept beside the fingerprints: a name given in listing order can pass to another server's tool between a pause and its continuation.
+    const mcpToolOrigins = Object.fromEntries(
+        await Promise.all(
+            Object.keys(tools).flatMap((name) => {
+                const mcp = mcpResult.descriptors.get(name);
+
+                return mcp ? [mcpToolOrigin(mcp).then((hash) => [name, hash] as const)] : [];
+            }),
+        ),
+    );
+
     return {
         autoApprovals: quickCheck?.approvals ?? {},
         mcpClients: mcpResult.clients,
         mcpLabels,
         mcpServerNames: selectedServers.map((s) => s.name),
         mcpToolFingerprints,
+        mcpToolOrigins,
         permissionKeys,
         repeatable: Object.keys(tools).filter((name) => isSafeToRepeat(name, describe(name))),
         requiresApproval,

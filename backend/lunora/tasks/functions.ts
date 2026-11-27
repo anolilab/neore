@@ -15,6 +15,7 @@ import { LunoraError, v } from "lunorash/server";
 
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
+import { getMemberByOrganizationAndUser } from "../auth/lib/better-auth-queries";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { patchById, patchRow } from "../lib/patch";
 import { noteShardDue } from "../lib/shard-housekeeping";
@@ -41,6 +42,7 @@ import {
     TASK_EFFORT_MAX,
     TASK_INSTRUCTIONS_MAX,
     TASK_NOTE_MAX,
+    TASK_SCHEDULE_MAX,
     TASK_TITLE_MAX,
     validateParent,
 } from "./logic";
@@ -161,10 +163,16 @@ const requireOwnedGoal = async (ctx: QueryCtx, goalId: Id<"goals">, userId: stri
     return goal;
 };
 
-/** Trims, and turns an empty optional into `undefined` so it clears the column. */
+/**
+ * The one way task text is cleaned before it is checked or stored: hidden characters (tag block, bidi controls, zero
+ * width) can carry instructions nobody reads, or split a secret so a filter misses it, so they are removed first.
+ * Task writes and the suggestion filter both use it, so a suggestion is checked in the form it will be accepted in.
+ */
+export const normalizeTaskText = (value: string): string => stripHiddenText(value).text.trim();
+
+/** Normalises, and turns an empty optional into `undefined` so it clears the column. */
 const optionalText = (value: string | undefined, max: number, label: string): string | undefined => {
-    // Hidden characters (tag block, bidi controls) can carry instructions nobody reads; a task never stores them.
-    const trimmed = value === undefined ? undefined : stripHiddenText(value).text.trim();
+    const trimmed = value === undefined ? undefined : normalizeTaskText(value);
 
     if (!trimmed) {
         return undefined;
@@ -206,7 +214,7 @@ const requireUsableSkill = async (ctx: QueryCtx, skillId: Id<"skills">, subject:
     }
 };
 
-interface TaskDefinitionInput {
+export interface TaskDefinitionInput {
     codingAgent?: { agent: "claude_code" | "codex"; branch?: string; openPr?: boolean; repoUrl: string };
     cronExpression?: string;
     dependsOn: Id<"tasks">[];
@@ -270,7 +278,7 @@ const resolveDefinition = async (
     tasks: ReadonlyArray<Doc<"tasks">>,
     taskId?: Id<"tasks">,
 ) => {
-    const cronExpression = optionalText(input.cronExpression, 100, "Schedule");
+    const cronExpression = optionalText(input.cronExpression, TASK_SCHEDULE_MAX, "Schedule");
 
     if (cronExpression && !isValidCronExpression(cronExpression)) {
         throw new LunoraError("BAD_REQUEST", 'Schedule must be a 5-field cron expression (UTC), e.g. "0 9 * * 1"');
@@ -408,6 +416,42 @@ const resolveDefinition = async (
         successCriteria,
         title,
     };
+};
+
+/**
+ * The one way a task is created: `createTask` and accepting a suggestion (`tasks/suggestions.ts`) both come here, so
+ * the account, count, definition and schedule rules cannot differ between them.
+ */
+export const insertTask = async (
+    ctx: MutationCtx,
+    { now, organizationId, userId }: { now: number; organizationId?: string; userId: string },
+    input: TaskDefinitionInput,
+): Promise<{ recurring: boolean; taskId: Id<"tasks"> }> => {
+    await requireTaskAccount(ctx, userId);
+
+    const tasks = await loadUserTasks(ctx, userId);
+
+    if (tasks.length >= MAX_TASKS_PER_USER) {
+        throw new LunoraError("BAD_REQUEST", `You can have at most ${String(MAX_TASKS_PER_USER)} tasks`);
+    }
+
+    const definition = await resolveDefinition(ctx, { organizationId, userId }, input, tasks);
+    const taskId = await ctx.db.insert("tasks", {
+        ...definition,
+        attemptCount: 0,
+        createdAt: now,
+        nextRunAt: definition.cronExpression ? nextRecurrenceAt(definition.cronExpression, now) : undefined,
+        status: "todo",
+        updatedAt: now,
+        userId,
+    });
+
+    if (definition.cronExpression) {
+        // The root tick only visits shards with timed work due (`lib/shard-housekeeping.ts`).
+        await noteShardDue(ctx, nextRecurrenceAt(definition.cronExpression, now), userId);
+    }
+
+    return { recurring: Boolean(definition.cronExpression), taskId };
 };
 
 // ─── Queries ─────────────────────────────────────────────────────────────────
@@ -637,34 +681,9 @@ export const createTask = authMutation
     })
     .output(v.object({ taskId: v.id("tasks") }))
     .mutation(async ({ args, ctx }) => {
-        const { userId } = ctx.user;
+        const { recurring, taskId } = await insertTask(ctx, { now: ctx.now, organizationId: ctx.user.activeOrganization?.id, userId: ctx.user.userId }, args);
 
-        await requireTaskAccount(ctx, userId);
-
-        const tasks = await loadUserTasks(ctx, userId);
-
-        if (tasks.length >= MAX_TASKS_PER_USER) {
-            throw new LunoraError("BAD_REQUEST", `You can have at most ${String(MAX_TASKS_PER_USER)} tasks`);
-        }
-
-        const definition = await resolveDefinition(ctx, { organizationId: ctx.user.activeOrganization?.id, userId }, args, tasks);
-        const { now } = ctx;
-        const taskId = await ctx.db.insert("tasks", {
-            ...definition,
-            attemptCount: 0,
-            createdAt: now,
-            nextRunAt: definition.cronExpression ? nextRecurrenceAt(definition.cronExpression, now) : undefined,
-            status: "todo",
-            updatedAt: now,
-            userId,
-        });
-
-        if (definition.cronExpression) {
-            // The root tick only visits shards with timed work due (`lib/shard-housekeeping.ts`).
-            await noteShardDue(ctx, nextRecurrenceAt(definition.cronExpression, now), userId);
-        }
-
-        ctx.log.event("tasks.create_task", { recurring: Boolean(definition.cronExpression), taskId });
+        ctx.log.event("tasks.create_task", { recurring, taskId });
 
         return { taskId };
     });
@@ -699,7 +718,11 @@ export const updateTask = authMutation
         }
 
         const tasks = await loadUserTasks(ctx, userId);
-        const definition = await resolveDefinition(ctx, { organizationId: ctx.user.activeOrganization?.id, userId }, args, tasks, args.taskId);
+        // The task keeps the organization it was created under, so an edit from another space cannot move its skill scope or
+        // its cap. A skill is authorized against that organization only while the editor is still a member, as a run checks it.
+        const membership = task.organizationId ? await getMemberByOrganizationAndUser(ctx, task.organizationId, userId, "primary") : null;
+        const skillOrganizationId = membership ? (task.organizationId ?? undefined) : undefined;
+        const definition = await resolveDefinition(ctx, { organizationId: skillOrganizationId, userId }, args, tasks, args.taskId);
         const { now } = ctx;
         let nextRunAt: number | undefined;
 
@@ -722,7 +745,7 @@ export const updateTask = authMutation
             maxRepairRounds: definition.maxRepairRounds,
             model: definition.model,
             nextRunAt,
-            organizationId: definition.organizationId,
+            organizationId: task.organizationId ?? undefined,
             parentTaskId: definition.parentTaskId,
             projectId: definition.projectId,
             reasoningEffort: definition.reasoningEffort,

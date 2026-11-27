@@ -16,6 +16,8 @@ import { throwThreadLocked } from "../../lib/thread-lock";
 import { deliveredSteerIds, type SteerEntry } from "../lib/steer-queue";
 import { discardPausedThreadSecrets } from "../lib/secret-requests";
 import { lockedAfterCreation, streamLockedAfterStart } from "../lib/thread-gate";
+import { recordStartStream, vStartClaim } from "../start-claim";
+import { insertPersistentStream } from "./persistent/library";
 
 /**
  * Persistent Text Streaming Helper
@@ -52,6 +54,42 @@ export const persistentTextStreaming = new PersistentTextStreaming({
  * Query to get stream body - required by useStream hook on client
  */
 const vStreamBody = v.object({
+    /** A coding agent's running turn only: its latest plan and its tool calls (`acp/lib/activity.ts`). Never for a public viewer. */
+    hostActivity: v.optional(
+        v.object({
+            plan: v.optional(
+                v.array(
+                    v.object({
+                        content: v.string().max(500),
+                        priority: v.union(v.literal("high"), v.literal("medium"), v.literal("low")),
+                        status: v.union(v.literal("pending"), v.literal("in_progress"), v.literal("completed")),
+                    }),
+                ),
+            ),
+            tools: v.array(
+                v.object({
+                    exit: v.optional(
+                        v.object({
+                            code: v.optional(v.number()),
+                            signal: v.optional(v.string().max(32)),
+                        }),
+                    ),
+                    id: v.string().max(128),
+                    output: v.optional(v.string().max(2000)),
+                    status: v.union(
+                        v.literal("pending"),
+                        v.literal("in_progress"),
+                        v.literal("completed"),
+                        v.literal("failed"),
+                        v.literal("cancelled"),
+                        v.literal("declined"),
+                    ),
+                    title: v.string().max(500),
+                    toolKind: v.string().max(64),
+                }),
+            ),
+        }),
+    ),
     /** A coding agent's turn only (`acp/`): "Sending" until `received`, "Working" from `running`. */
     hostState: v.optional(vHostState),
     reasoning: v.string(),
@@ -118,14 +156,25 @@ export const getStreamBody = optionalAuthQuery
 
         const body = await persistentTextStreaming.getStreamBody(ctx, input.streamId as StreamId);
 
+        // What a coding agent runs and prints is its owner's: a viewer the thread is shared with sees the reply, not the activity.
         if (access.kind === "full") {
-            return body;
+            if (access.thread.userId === ctx.user?.userId) {
+                return body;
+            }
+
+            const shared = { ...body };
+
+            delete shared.hostActivity;
+
+            return shared;
         }
 
         // Like the reasoning, which tool is running (and what it says) is not part of what a public thread shows.
         const visible = { ...body, reasoning: "" };
 
         delete visible.toolProgress;
+        // What a coding agent runs and prints is its owner's: a public viewer sees the reply's text only.
+        delete visible.hostActivity;
 
         return visible;
     });
@@ -135,6 +184,8 @@ export const createStreamWithMessage = internalMutation
         /** The goal this message started: `startGoal` already ended the thread's others, so nothing ends here. */
         goalId: v.optional(v.id("threadGoals")),
         messageId: v.string(),
+        /** A send with a `clientMessageId` (`chat/start-claim.ts`): the stream is recorded on its claim in this transaction. */
+        startClaim: v.optional(vStartClaim),
         streamingConfig: vStreamingConfig,
         threadId: v.string(),
         userId: v.string(),
@@ -143,22 +194,34 @@ export const createStreamWithMessage = internalMutation
     // inferring the brand into `api.ts`, where it landed as a bare name with no
     // import.
     .output(v.string())
-    .mutation(async ({ args: { goalId, messageId, streamingConfig, threadId, userId }, ctx: context }) => {
+    .mutation(async ({ args: { goalId, messageId, startClaim, streamingConfig, threadId, userId }, ctx: context }) => {
         // A new message in a thread ends the goal it was working toward (a goal's own rounds never come through here).
         // A goal-starting message skips it: `startGoal` ended the others with its insert, and a late stream must not end a later goal.
         if (!goalId) {
-            await endActiveGoals(context, threadId as Id<"threads">, "superseded");
+            // A send under a claim may be a resumed one, whose prompt was saved before its sender died: it ends the goals of
+            // prompts saved before its own, even one that started later, and never the goal of a later prompt. The claim is
+            // checked below, in this transaction.
+            const prompt = startClaim ? await context.db.get("messages", messageId as Id<"messages">) : null;
+
+            await endActiveGoals(context, threadId as Id<"threads">, "superseded", prompt ? { before: prompt } : {});
         }
 
         // A reply paused on a request that this message moves the conversation past is abandoned: drop what it kept through the pause.
         await discardPausedThreadSecrets(context, { threadId: threadId as Id<"threads"> });
 
-        const streamId = await persistentTextStreaming.createStream(context, {
+        // Inserted here, not through `persistentTextStreaming.createStream`: that is a nested mutation, which commits on its
+        // own, so a refused claim below would leave its stream behind.
+        const streamId = await insertPersistentStream(context, {
             messageId,
             streamingConfig,
             threadId,
             userId,
         });
+
+        if (startClaim) {
+            // Throws when another try holds the send, which rolls this stream back.
+            await recordStartStream(context, startClaim, streamId);
+        }
 
         // The thread shows as running from the moment its stream exists. This
         // was a scheduled `updateThread` that `/chat/start` awaited after
@@ -190,8 +253,12 @@ export const createStreamWithMessage = internalMutation
  */
 /** What the chat shows of a paused run: who limited it and when it resumes. The job's own arguments stay on the row. */
 const vRunPause = v.object({
+    /** The person resumes the run: it does not resume by itself at `retryAt` (`usage-limit-settings.ts`). */
+    awaitsPerson: v.optional(v.boolean()),
     provider: v.optional(v.string()),
     reason: v.literal("rate_limit"),
+    /** The provider gave no reset time: `retryAt` is the default wait, so the chat must not describe it as a reset. */
+    resetUnreported: v.optional(v.boolean()),
     retryAt: v.number(),
     status: v.number(),
 });
@@ -251,6 +318,8 @@ export const getActiveStreamForThread = optionalAuthQuery
             ...(stream.pause &&
                 stream.pauseCause === undefined && {
                     pause: {
+                        ...(stream.pauseAwaitsPerson === true && { awaitsPerson: true }),
+                        ...(stream.pauseResetUnreported === true && { resetUnreported: true }),
                         ...(stream.pause.provider !== undefined && { provider: stream.pause.provider }),
                         reason: stream.pause.reason,
                         retryAt: stream.pause.retryAt,

@@ -20,4 +20,13 @@ describe("getLocaleFromRequest", () => {
         expect(result.locale).toBe("de");
         expect(result.headers).toBeUndefined();
     });
+
+    // The kept shell serves every window; the client switches to the window's locale after hydrating in this one.
+    it("renders the offline shell in the default locale, whatever the request asks for, and sets no cookie", () => {
+        const shell = (path: string, headers: Record<string, string>) => getLocaleFromRequest(new Request(`https://neore.example${path}`, { headers }));
+
+        expect(shell("/offline-shell", { "accept-language": "de-DE,de;q=0.9" })).toStrictEqual({ locale: "en" });
+        expect(shell("/offline-shell", { cookie: "locale=fr" })).toStrictEqual({ locale: "en" });
+        expect(shell("/offline-shell?locale=ja", {})).toStrictEqual({ locale: "en" });
+    });
 });

@@ -14,6 +14,7 @@ import { useId } from "react";
 import { useIsImpersonating } from "@/features/admin/hooks/use-admin";
 import { useChatIsRunning, useChatThread } from "@/features/chat/core/context/chat-context";
 import { usePromptQueueStore } from "@/features/chat/core/stores/prompt-queue-store";
+import { useQueueEditStore } from "@/features/chat/core/stores/queue-edit-store";
 import { useCRPC } from "@/lib/lunora/crpc";
 import { showError } from "@/lib/toast";
 
@@ -157,6 +158,8 @@ const ComposerThreadPermissionMode: FC = () => {
 
             if (!isComparisonRefusal(error) && (usePromptQueueStore.getState().queues[saved]?.items.length ?? 0) > 0) {
                 usePromptQueueStore.getState().setPaused(saved, true);
+                // The pause is the failed save's: an explicit held send does not clear it (see the queue's release checks).
+                useQueueEditStore.getState().markFailedSave(saved, true);
             }
         },
     });

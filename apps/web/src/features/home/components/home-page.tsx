@@ -4,18 +4,20 @@ import { useLingui } from "@lingui/react/macro";
 import { Badge } from "@neore/ui/components/badge";
 import { Button } from "@neore/ui/components/button";
 import { Textarea } from "@neore/ui/components/textarea";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { ArrowUp, Bot, ListChecks, MessageSquare, ShieldQuestion, Sparkles, Workflow } from "lucide-react";
 import type { FC, FormEvent, ReactNode } from "react";
 import { useId, useState } from "react";
-import { toast } from "sonner";
 
-import { LANDING_MESSAGE_KEY } from "@/features/marketing/stores/landing-store";
+import { useAuthSession } from "@/features/auth/hooks/use-auth-session";
+import { handOffLandingMessage } from "@/features/marketing/stores/landing-store";
 import NotificationList from "@/features/notifications/components/notification-list";
 import useNotificationInbox from "@/features/notifications/hooks/use-notification-inbox";
 import { formatRelativeTime } from "@/features/notifications/lib/relative-time";
 import { useCRPC } from "@/lib/lunora/crpc";
+
+import DailyBriefOffer from "./daily-brief-offer";
 
 const Section: FC<{ action?: ReactNode; children: ReactNode; count?: number; icon: ReactNode; title: string }> = ({ action, children, count, icon, title }) => {
     const headingId = useId();
@@ -50,7 +52,7 @@ const Row: FC<{ children: ReactNode; meta?: ReactNode; to: string }> = ({ childr
 
 const Empty: FC<{ children: ReactNode }> = ({ children }) => <p className="text-muted-foreground px-4 py-2 text-sm">{children}</p>;
 
-/** Starts a chat through the same hand-off the landing page and onboarding use (`LANDING_MESSAGE_KEY`). */
+/** Starts a chat through the same hand-off the landing page and onboarding use (`handOffLandingMessage`). */
 const HomeComposer: FC = () => {
     const { t } = useLingui();
     const navigate = useNavigate();
@@ -67,7 +69,7 @@ const HomeComposer: FC = () => {
         }
 
         try {
-            sessionStorage.setItem(LANDING_MESSAGE_KEY, text);
+            handOffLandingMessage(text);
         } catch {
             // No sessionStorage: the chat opens empty rather than failing.
         }
@@ -114,9 +116,9 @@ const HomePage: FC = () => {
         return status === "awaiting" ? t`Waiting for your approval` : t`Running`;
     };
     const crpc = useCRPC();
+    const { data: session } = useAuthSession();
     const { data: overview, isError, isFetching, isLoading, refetch } = useQuery(crpc.home.overview.getHomeOverview.queryOptions({}));
     const { markRead } = useNotificationInbox({ enabled: false });
-    const enableBrief = useMutation(crpc.notifications.daily_brief.setDailyBriefEnabled.mutationOptions());
     const ago = (timestamp: number) => formatRelativeTime(timestamp, i18n.locale);
 
     const needsYouCount = (overview?.approvals.length ?? 0) + (overview?.reviews.length ?? 0);
@@ -153,6 +155,10 @@ const HomePage: FC = () => {
                     </Button>
                 </div>
             )}
+
+            {/* An account switch happens in place: a fresh card, so one account's answer never shows on another's home, and
+                no offer until the overview is the signed-in account's (signing in another account keeps the last one's cached). */}
+            {overview && overview.userId === session?.user.id && <DailyBriefOffer key={session.user.id} offered={overview.dailyBriefOffer} />}
 
             {overview && (
                 <div className="grid gap-4 md:grid-cols-2">
@@ -229,27 +235,6 @@ const HomePage: FC = () => {
                                 }
                             }}
                         />
-                        {!overview.dailyBriefEnabled && (
-                            <div className="flex items-center justify-between gap-3 border-t px-4 pt-3 text-sm">
-                                <span className="text-muted-foreground">{t`Get a short summary here every morning.`}</span>
-                                <Button
-                                    disabled={enableBrief.isPending}
-                                    onClick={() =>
-                                        enableBrief.mutate(
-                                            { enabled: true },
-                                            {
-                                                onError: () => toast.error(t`Could not turn on the Daily Brief.`),
-                                                onSuccess: () => toast.success(t`Daily Brief turned on`),
-                                            },
-                                        )
-                                    }
-                                    size="sm"
-                                    variant="outline"
-                                >
-                                    {t`Turn on Daily Brief`}
-                                </Button>
-                            </div>
-                        )}
                     </Section>
 
                     <Section

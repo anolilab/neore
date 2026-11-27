@@ -8,7 +8,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MAX_LENGTH } from "../lib/validators";
 import schema from "../schema";
 import { connectorTrustId, MAX_TRUSTED_SERVERS, mcpTrustId } from "./lib/low-risk-trust";
-import { MAX_TOOL_GRANTS } from "./lib/tool-permission-grants";
+import { isGrantableKey, MAX_TOOL_GRANTS } from "./lib/tool-permission-grants";
+import { ALWAYS_ALLOW_REFUSED_BUILTINS } from "./lib/tool-permissions";
+import { ToolName } from "./tools";
 import {
     consumeLowRiskCheck,
     getLowRiskApprovalContext,
@@ -179,6 +181,87 @@ describe("recordApprovalPreference", () => {
         await record("hour", KEY);
 
         expect(await grantsOf()).toStrictEqual({ [KEY]: NOW + 3_600_000 });
+    });
+});
+
+describe("Always allow on a tool that spends money or sends out as the person", () => {
+    const PAID_KEYS = [...ALWAYS_ALLOW_REFUSED_BUILTINS].map((name) => `builtin:${name}`);
+    // Person-only tools (merge, saved-login sign-in) never take a timed grant; the refusal above covers them.
+    const GRANTABLE_PAID_KEYS = PAID_KEYS.filter((key) => isGrantableKey(key));
+    const TODAY_END = Date.UTC(2026, 9, 31, 0, 0);
+
+    const overridesOf = async (): Promise<Record<string, string> | undefined> => {
+        const row = await stored();
+
+        return row?.toolPermissions;
+    };
+
+    it("names only real built-in tools, so a rename cannot quietly drop one from the list", () => {
+        const builtins = new Set<string>(Object.values(ToolName));
+
+        for (const name of ALWAYS_ALLOW_REFUSED_BUILTINS) {
+            expect(builtins.has(name)).toBe(true);
+        }
+    });
+
+    it.each(PAID_KEYS)("refuses Always for %s and stores no auto", async (key) => {
+        await expect(record("always", key)).rejects.toMatchObject({ code: "BAD_REQUEST" });
+
+        expect(await stored()).toBeNull();
+    });
+
+    it.each(GRANTABLE_PAID_KEYS)("still stores an hour allow for %s, without an override", async (key) => {
+        await record("hour", key);
+
+        expect(await grantsOf()).toStrictEqual({ [key]: NOW + 3_600_000 });
+        expect(await overridesOf()).toBeUndefined();
+    });
+
+    it.each(GRANTABLE_PAID_KEYS)("still stores a today allow for %s, without an override", async (key) => {
+        await record("today", key);
+
+        expect(await grantsOf()).toStrictEqual({ [key]: TODAY_END });
+        expect(await overridesOf()).toBeUndefined();
+    });
+
+    it.each(["builtin:mergePullRequest", "builtin:signInWithSavedLogin"])("refuses a timed allow for %s, which needs a person", async (key) => {
+        await expect(record("hour", key)).rejects.toMatchObject({ code: "BAD_REQUEST" });
+        await expect(record("today", key)).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    });
+
+    it("offers only a single approval for a person-only tool, and offers a period for the rest", async () => {
+        const personMessage = await record("always", "builtin:mergePullRequest")
+            .then(() => "")
+            .catch((error: unknown) => (error as Error).message);
+        const periodMessage = await record("always", "builtin:imageGeneration")
+            .then(() => "")
+            .catch((error: unknown) => (error as Error).message);
+
+        expect(personMessage).toContain("approve this call");
+        expect(personMessage).not.toContain("hour");
+        expect(periodMessage).toContain("an hour or today");
+    });
+
+    it("leaves a running hour allow as it was when Always is refused", async () => {
+        const key = "builtin:imageGeneration";
+
+        await record("hour", key);
+        await expect(record("always", key)).rejects.toMatchObject({ code: "BAD_REQUEST" });
+
+        expect(await grantsOf()).toStrictEqual({ [key]: NOW + 3_600_000 });
+        expect(await overridesOf()).toBeUndefined();
+    });
+
+    it("still grants Always for a free built-in", async () => {
+        await record("always", "builtin:weather");
+
+        expect(await overridesOf()).toStrictEqual({ "builtin:weather": "auto" });
+    });
+
+    it("refuses only the built-in itself: an MCP tool with the same name is still grantable", async () => {
+        await record("always", "mcp:Images:imageGeneration");
+
+        expect(await overridesOf()).toStrictEqual({ "mcp:Images:imageGeneration": "auto" });
     });
 });
 

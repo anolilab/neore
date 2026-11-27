@@ -1,0 +1,303 @@
+"use client";
+
+import { useLingui } from "@lingui/react/macro";
+import { Button } from "@neore/ui/components/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@neore/ui/components/tooltip";
+import type { ReactNode, RefObject } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
+
+import { subscribeTurnEnded, turnEndedGeneration } from "@/features/chat/core/utils/turn-ended";
+import { prefillComposer, useComposerTakesPrefill } from "@/features/chat/thread/composer-prefill";
+import { focusIsLost, useReportFocusLoss } from "@/lib/focus-loss";
+
+import { catchUpPrompt, catchUpRunId, hostOfPullRequestUrl, isPlainBranchName, isPlainRepo } from "../lib/catch-up-prompt";
+import { useBranchComparison, usePullRequest } from "../lib/use-develop";
+
+/**
+ * What a control last heard, per thread and pull request, kept while it is not mounted (a split pane without focus unmounts it,
+ * its chat goes on): the count of the thread's ended turns it had heard, and whether a turn's end reads again.
+ */
+const heard = new Map<string, { generation: number; rereads: boolean }>();
+
+/** Whether a turn of `threadId` ended while no control for `key` was mounted; a first mount has missed nothing. */
+const missedTurn = (key: string, threadId: string): boolean => {
+    const last = heard.get(key);
+
+    return last !== undefined && turnEndedGeneration(threadId) > last.generation;
+};
+
+/** The shown control; it reports when a read removes it while it holds focus, which the browser would drop to the page. */
+const Shown = ({ children, onFocusLost }: { children: ReactNode; onFocusLost: () => void }) => {
+    const ref = useRef<HTMLSpanElement>(null);
+
+    useReportFocusLoss(onFocusLost, ref);
+
+    return (
+        <span className="inline-flex items-center gap-1 text-xs" ref={ref}>
+            {children}
+        </span>
+    );
+};
+
+/**
+ * Shows "Behind <base>" and a Catch up button beside an open linked pull request whose branch is behind its base. The button puts a
+ * rebase prompt in this thread's composer and sends nothing. Behind is the host's COMPARISON of the head commit with the base
+ * branch (`behindBy > 0`), not its mergeability: that says `behind` only where branch protection asks for an up-to-date branch, so a
+ * blocked, unstable or clean pull request may be behind too. The comparison is read only for an open, non-draft pull request
+ * whose read answered, is keyed by its base branch and head commit, and counts only when it names that same branch and commit:
+ * a push or a retarget reads again. Shows nothing while either read has no answer, on a failure (a failed refresh too: a cached
+ * "behind" is not known to hold), or once the pull request is merged or closed. A background refresh that has not failed keeps
+ * it, so it does not flicker. While it shows, or while a failed read hides it after the host said behind, the end of an agent turn in this thread reads the pull request and the comparison
+ * again: that turn may have pushed the caught-up branch. The end comes from the chat's own stream state (`turn-ended.ts`), not
+ * from the header's read of the thread, so a turn that ends before that read answers still counts. A turn that ends while a read
+ * is in flight (a first read too) owes one more read after it settles, and nothing shows until that answers. A pull request whose branch names or repository are not plain enough to put in a command never shows, and
+ * so never reads again at a turn's end.
+ * Whether the prompt pushes is the host's word on the head's repository, never a guess from names or commits: a fork's branch
+ * is not pushed. When it goes away holding focus, focus moves to `returnFocusTo` (the pull request's link).
+ */
+const CatchUpControl = ({
+    link,
+    returnFocusTo,
+    threadId,
+}: {
+    link: { number: number; repository: string };
+    returnFocusTo?: RefObject<HTMLElement | null>;
+    threadId: string;
+}) => {
+    const { t } = useLingui();
+    // One run per mounted control: a second click makes the same prompt, and the composer adds the same text only once.
+    // A retry of the same run still goes ahead: the fork's local branch takes the next free number instead of stopping.
+    const [run] = useState(catchUpRunId);
+    const key = `${threadId} ${link.repository}#${String(link.number)}`;
+    // A turn ended while this was not mounted: the cached reads predate it, so nothing shows until they are read again.
+    const [stale, setStale] = useState(() => missedTurn(key, threadId));
+    const address = { number: link.number, repository: link.repository };
+    const pull = usePullRequest(address);
+    const detail = pull.data?.status === "ok" ? pull.data.detail : undefined;
+    const open = detail?.state === "open" && !detail.draft;
+    const comparison = useBranchComparison(address, open ? { baseBranch: detail.baseBranch, headSha: detail.headSha } : undefined);
+    const compared = comparison.data?.status === "ok" ? comparison.data : undefined;
+    const comparisonAnswered =
+        open && !comparison.isError && compared !== undefined && compared.baseBranch === detail.baseBranch && compared.headSha === detail.headSha;
+    const behind = comparisonAnswered && compared.behindBy > 0;
+    // Only names plain enough for a command make a prompt; a pull request whose names are not shows nothing, behind or not.
+    const host = open ? hostOfPullRequestUrl(detail.url) : undefined;
+    const promptable =
+        open && host !== undefined && isPlainBranchName(detail.baseBranch) && isPlainBranchName(detail.headBranch) && isPlainRepo(link.repository);
+    const shows = behind && promptable && !pull.isError;
+    const settled = !pull.isError && detail !== undefined && (!open || !promptable || (comparisonAnswered && !behind));
+    // A read in flight (a first read too) may have started before a turn that ends now: its answer may be the state from before it.
+    const pending = pull.isFetching || (open && comparison.isFetching);
+    // Whether the control could show once the reads answer: unknown before the pull request's read answers.
+    const couldShow = detail === undefined || (open && promptable);
+    // The turn ends heard while a read was pending, not yet followed by a read that started after them. Until that read
+    // answers nothing shows: the pending read's "behind" may be from before the turn.
+    // An answer that rules the control out (closed, merged, a draft, names no prompt is made for) owes nothing: a hidden control
+    // reads nothing.
+    const [owed, setOwed] = useState(0);
+    const owing = owed > 0 && couldShow;
+    const owedReading = useRef(false);
+    // Whether the read for turns that ended while this was not mounted is in flight.
+    const missedTurnsReading = useRef(false);
+    const latestTurn = useEffectEvent((): number => turnEndedGeneration(threadId));
+
+    // Whether a turn's end reads again (`heard`, so a remount knows it too): set by a read that confirmed behind for names that make
+    // a prompt (so the control shows), cleared only by one that confirmed the pull request closed, merged, a draft, caught up or
+    // named so that no prompt is made. A failed read hides the control but leaves this as
+    // it was, so the next turn's end reads again and the control comes back once the host answers behind.
+    useEffect(() => {
+        // While a missed turn's read, or one a turn's end owes, has not answered, the cached reads say nothing new.
+        if (stale || owing) {
+            return;
+        }
+
+        const generation = heard.get(key)?.generation ?? turnEndedGeneration(threadId);
+
+        if (shows) {
+            heard.set(key, { generation, rereads: true });
+        } else if (settled || !heard.has(key)) {
+            heard.set(key, { generation, rereads: false });
+        }
+    });
+
+    const readAgain = useEffectEvent(async (): Promise<void> => {
+        // The revision the comparison is keyed on; none while the pull request's read has no answer.
+        const revision = open ? { baseBranch: detail.baseBranch, headSha: detail.headSha } : undefined;
+
+        // The pull request first: a turn that pushed or retargeted it gives the comparison a new key, which its query reads by
+        // itself. Only the same base and head keep the old key, and the base branch may have moved, so only then is it read again,
+        // and only while the pull request is still open and not a draft: a hidden control reads nothing.
+        const result = await pull.refetch();
+        const next = !result.isError && result.data?.status === "ok" ? result.data.detail : undefined;
+        const stillOpen = next?.state === "open" && !next.draft;
+
+        if (revision !== undefined && stillOpen && next.baseBranch === revision.baseBranch && next.headSha === revision.headSha) {
+            await comparison.refetch();
+        }
+    });
+
+    /**
+     * Notes every ended turn of the thread as heard. A turn that ends while a read is pending (or before the first answer) of a
+     * control that could show owes one more read of each, made once the pending one settles, and hides the control until then:
+     * that read may answer with the state from before the turn, a shown control's background refresh too. Otherwise it reads
+     * again when the last read said behind (or a failed read hid it after that), or when a missed turn finds a cached "behind".
+     * Returns that read, or nothing when there is none. While the missed turns' read is in flight, a turn's end starts no read of
+     * its own: that read goes on until one started after the latest turn's end has settled (`forMissedTurns` marks its own calls).
+     */
+    const hear = useEffectEvent((forMissedTurns = false): Promise<void> | undefined => {
+        const rereads = heard.get(key)?.rereads === true;
+
+        heard.set(key, { generation: turnEndedGeneration(threadId), rereads });
+
+        if (missedTurnsReading.current && !forMissedTurns) {
+            return undefined;
+        }
+
+        if (couldShow && pending) {
+            setOwed((count: number) => count + 1);
+
+            return undefined;
+        }
+
+        if ((rereads || (stale && shows)) && pull.data !== undefined) {
+            return readAgain();
+        }
+
+        return undefined;
+    });
+    const lostFocus = useRef(false);
+
+    useEffect(() => {
+        if (!lostFocus.current) {
+            return;
+        }
+
+        lostFocus.current = false;
+
+        if (focusIsLost()) {
+            returnFocusTo?.current?.focus();
+        }
+    });
+
+    // A turn that ended may have pushed the rebased branch (or merged or closed the pull request): one read, while it shows or
+    // while a failed read hides a pull request last known to be behind. One read too for the turns that ended while this was
+    // not mounted; until it answers the cached "behind" is not shown. A turn that ends during that read is read for again, and the
+    // control stays hidden until a read started after the latest turn's end has settled: an earlier read's "behind" predates it.
+    useEffect(() => {
+        if (!stale) {
+            return;
+        }
+
+        const settle = async (): Promise<void> => {
+            missedTurnsReading.current = true;
+
+            // The count of ended turns the last settled read started after.
+            let answeredFor = -1;
+
+            while (answeredFor < latestTurn()) {
+                answeredFor = latestTurn();
+                await hear(true);
+            }
+
+            missedTurnsReading.current = false;
+            setStale(false);
+        };
+
+        void settle();
+    }, [stale]);
+
+    // The read a turn's end owes, once no read is in flight: the pull request, then the comparison for the same revision (a new
+    // revision's key reads by itself). A turn that ends during it owes another.
+    const pullFetching = pull.isFetching;
+    const comparisonFetching = comparison.isFetching;
+
+    useEffect(() => {
+        if (!owing || owedReading.current || pullFetching || comparisonFetching) {
+            return;
+        }
+
+        owedReading.current = true;
+
+        const settle = async (): Promise<void> => {
+            await readAgain();
+            owedReading.current = false;
+            setOwed((count: number) => count - owed);
+        };
+
+        void settle();
+    }, [owing, owed, pullFetching, comparisonFetching]);
+
+    useEffect(
+        () =>
+            subscribeTurnEnded(threadId, () => {
+                void hear();
+            }),
+        [key, threadId],
+    );
+
+    if (stale || owing || !shows || host === undefined) {
+        return null;
+    }
+
+    const base = detail.baseBranch;
+    const head = detail.headBranch;
+
+    const pullRequest = `${link.repository}#${String(link.number)}`;
+    const label = t`Catch up ${pullRequest} with ${base}`;
+    // Strictly `true`: a detail from before the host reported it reads as a fork, which is never pushed to.
+    const sameRepo = detail.headInBaseRepository === true;
+
+    return (
+        <Shown
+            onFocusLost={() => {
+                lostFocus.current = true;
+            }}
+        >
+            <span className="text-muted-foreground">{t`Behind ${base}`}</span>
+            <Tooltip>
+                {/* A `render` element replaces the trigger, and TooltipTrigger does not forward its children into it: the label goes in the button. */}
+                <TooltipTrigger
+                    render={
+                        <Button
+                            aria-label={label}
+                            onClick={() =>
+                                prefillComposer(
+                                    threadId,
+                                    catchUpPrompt({
+                                        baseBranch: base,
+                                        headBranch: head,
+                                        headInBaseRepository: sameRepo,
+                                        host,
+                                        ...address,
+                                        run,
+                                    }),
+                                )
+                            }
+                            size="sm"
+                            variant="outline"
+                        >
+                            {t`Catch up`}
+                        </Button>
+                    }
+                />
+                <TooltipContent side="bottom">
+                    {sameRepo
+                        ? t`Puts a prompt in the composer to rebase this branch on ${base}, resolve conflicts, and check the build and tests. It pushes only when a signed-in gh confirms the pull request is still open on that base. Nothing is sent.`
+                        : t`Puts a prompt in the composer to rebase this fork's branch on ${base} in a local copy, resolve conflicts, and check the build and tests. It is not pushed. Nothing is sent.`}
+                </TooltipContent>
+            </Tooltip>
+        </Shown>
+    );
+};
+
+type CatchUpProps = Parameters<typeof CatchUpControl>[0];
+
+/**
+ * Mounts the control, and with it its host reads, only where the thread has a composer on the page that takes the prompt
+ * (`useComposerPrefill`): a split pane without focus, or a thread whose composer is not shown, reads nothing. A turn that ends
+ * meanwhile is not lost: the remount sees it (`turnEndedGeneration`) and reads again before it shows a cached "behind".
+ */
+const ThreadPullRequestCatchUp = ({ link, returnFocusTo, threadId }: CatchUpProps) =>
+    useComposerTakesPrefill(threadId) ? <CatchUpControl link={link} returnFocusTo={returnFocusTo} threadId={threadId} /> : null;
+
+export default ThreadPullRequestCatchUp;

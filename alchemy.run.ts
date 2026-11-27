@@ -76,6 +76,11 @@ const REQUIRED_DEPLOY_ENV = [
     // answers 403 DISPATCH_UNAUTHENTICATED to both, so no scheduled or queued
     // job would ever run on a Worker that deployed green.
     "LUNORA_ADMIN_TOKEN",
+    // Signs the host's calls to the shard registry. Unset, the registry refuses to
+    // register a shard (RELAY_MISCONFIGURED), so every cross-shard fan-out (data
+    // migrations, the account-deletion workflow) misses shards on a Worker that
+    // deployed green.
+    "LUNORA_RELAY_SECRET",
     "R2_ENDPOINT",
     "SITE_URL",
     // Signs `ctx.storage` download URLs (uploads go through the TUS route,
@@ -179,6 +184,7 @@ const customDomain = (origin: string, name: (typeof REQUIRED_DEPLOY_ENV)[number]
  */
 const PLAIN_ENV_KEYS = new Set([
     "AMADEUS_CLIENT_ID",
+    "ANDROID_DATA_ONLY_PUSH",
     "APP_NAME",
     "AUTH_GITHUB_CLIENT_ID",
     "BROWSERBASE_PROJECT_ID",
@@ -436,8 +442,16 @@ const GatewayCacheKv = Cloudflare.KV.Namespace("llm-gateway-cache", { title: sta
 // @neore/backend codegen`). Table DDL needs no step: the runtime applies root and
 // `.shardBy()` tables from the schema, and `.global()` tables are created on first
 // access. The schema-drift gate runs in `pnpm build` (`lunora build`), before this
-// deploy. Only a data backfill (`defineMigration`) needs `lunora migrate up --prod
-// --yes --url <worker>` after the deploy; none exists yet.
+// deploy. A data backfill (`defineMigration`) is a `lunora migrate up <id>` call against the
+// new Worker, which this deploy does not make: `deploy.yml` runs every migration declared in
+// `backend/lunora/migrations.ts` right after its smoke test, in declaration order
+// (`scripts/run-data-migrations.ts`), so a new one needs no workflow edit. Order matters for
+// the agent-options backfills: `drop-agent-option-fields`, then
+// `session-options-to-session-state`. Without those runs, stored sessions keep the removed
+// `agentOptions` fields and stored chunks keep the removed `session_options` event. Without
+// `backfill-message-typed-text`, the composer's prompt search (Ctrl+R) finds only prompts
+// sent after the deploy. A deploy outside that workflow runs them by hand:
+// `LUNORA_ADMIN_TOKEN=… lunora migrate up <id> --prod --yes --url <worker>`.
 const BackendDatabase = Cloudflare.D1.Database("neore-backend-db", { jurisdiction: dataJurisdiction, name: named("neore-backend") });
 
 const BackendFiles = Cloudflare.R2.Bucket("neore-backend-files", {
@@ -475,6 +489,11 @@ const embeddingIndexes = EMBEDDING_DIMENSIONS.map((dimensions) => ({
 // these two keys (`agent/vector/index.ts#searchVectors`); without the indexes
 // every filtered query matches nothing.
 const EMBEDDING_METADATA_PROPERTIES = ["model_table_threadId", "model_table_userId"] as const;
+
+// Thread title and summary vectors (bge-m3, 1024 wide only) also carry whether their thread is archived
+// (`agent/thread-vector-archived.ts`), so a meaning search can filter archived threads before its top-K cut.
+// The housekeeping sweep rewrites older vectors once, after this index exists.
+const THREAD_VECTOR_METADATA = { dimensions: 1024, indexType: "boolean", propertyName: "archived" } as const;
 
 /**
  * The backend's jobs queue and its DLQ (`backend/lunora/queues.ts`).
@@ -616,11 +635,16 @@ export const NsfwChecker = Cloudflare.Worker("nsfw-checker", {
 // Uses CF Browser Rendering binding for serverless headless Chrome.
 // PRIVATE, like the document parser: reached only through `SERVICE_BROWSER_RENDERER`.
 export const BrowserRenderer = Cloudflare.Worker("browser-renderer", {
-    build: WORKER_BUILD,
+    // No kept names: a function handed to `page.evaluate` runs in the page as its source text, where the `__name(…)`
+    // helper a kept name is wrapped in does not exist.
+    build: { ...WORKER_BUILD, output: { ...WORKER_BUILD.output, keepNames: false } },
     compatibility: { date: "2025-09-15", flags: ["nodejs_compat"] },
     env: {
         BROWSER: Cloudflare.Browser(),
         NODE_ENV: stage === "production" ? "production" : "development",
+        // The hold on each browser session every isolate sees (`src/session-lock.ts`); created SQLite-backed, as
+        // `wrangler.jsonc`'s migration declares it.
+        SESSION_LOCK: Cloudflare.DurableObject("SessionLock"),
     },
     main: "./services/browser-renderer/src/index.ts",
     name: named("browser-renderer"),
@@ -822,7 +846,8 @@ export default Alchemy.Stack(
             // Production only, for the same reason as the backend's crons.
             // `global_fetch_strictly_public`: the gateway calls the backend by its public URL,
             // which on workers.dev is another Worker of this account (see `Website`).
-            compatibility: { date: COMPATIBILITY_DATE, flags: ["nodejs_compat_v2", "global_fetch_strictly_public"] },
+            // `enable_request_signal`: the request's signal aborts when the caller disconnects, so a cancelled model call stops at the provider.
+            compatibility: { date: COMPATIBILITY_DATE, flags: ["nodejs_compat_v2", "global_fetch_strictly_public", "enable_request_signal"] },
             crons: stage === "production" ? [...GATEWAY_CRONS] : [],
             domain: customDomain(requireEnv("LLM_GATEWAY_URL"), "LLM_GATEWAY_URL"),
             env: llmGatewayEnv(website.url),
@@ -906,6 +931,14 @@ export default Alchemy.Stack(
                     propertyName,
                 });
             }
+
+            if (dimensions === THREAD_VECTOR_METADATA.dimensions) {
+                yield* Cloudflare.Vectorize.MetadataIndex(`neore-embeddings-${dimensions}-${THREAD_VECTOR_METADATA.propertyName}`, {
+                    indexName: vectorIndex.indexName,
+                    indexType: THREAD_VECTOR_METADATA.indexType,
+                    propertyName: THREAD_VECTOR_METADATA.propertyName,
+                });
+            }
         }
 
         const backend = yield* Cloudflare.Worker("neore-backend", {
@@ -941,6 +974,7 @@ export default Alchemy.Stack(
                 QUEUE_JOBS: BackendJobs,
                 QUEUE_JOBS_DEAD_LETTERS: BackendJobsDlq,
                 LUNORA_ADMIN_TOKEN: secret(requireEnv("LUNORA_ADMIN_TOKEN")),
+                LUNORA_RELAY_SECRET: secret(requireEnv("LUNORA_RELAY_SECRET")),
                 NODE_ENV: stage === "production" ? "production" : "development",
 
                 // Signing, encryption and the outbound services the backend cannot boot

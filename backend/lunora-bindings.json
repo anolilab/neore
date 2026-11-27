@@ -1,6 +1,10 @@
 {
   "bindings": [
     {
+      "binding": "ASSETS",
+      "type": "assets"
+    },
+    {
       "binding": "DB",
       "resource": "neore-backend",
       "resourceId": "00000000-0000-0000-0000-000000000000",

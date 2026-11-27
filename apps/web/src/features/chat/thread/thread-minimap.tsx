@@ -2,8 +2,8 @@
 
 /**
  * Outline rail beside the message list: one button per user prompt in the active
- * branch. Clicking one goes through `scrollToMessage`, so a prompt in the
- * virtualized head or not loaded yet is still reached by the list's own jump logic.
+ * branch. Clicking one goes through `scrollToMessage`, so a prompt not loaded yet
+ * is still reached by the list's own jump logic.
  */
 
 import { useLingui } from "@lingui/react/macro";

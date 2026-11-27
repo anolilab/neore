@@ -10,6 +10,7 @@ import type { MutationCtx, QueryCtx } from "../../../_generated/server";
 import { patchThread } from "../../../agent/table-writes";
 import { patchRow, withoutUndefined } from "../../../lib/patch";
 import { noteShardDue } from "../../../lib/shard-housekeeping";
+import { recordRunEnd } from "../../../public-api/events-log";
 
 type HostState = NonNullable<Doc<"persistentStreams">["hostState"]>;
 type EndReason = NonNullable<Doc<"persistentStreams">["hostEndReason"]>;
@@ -165,12 +166,25 @@ export const releaseThread = async (
 };
 
 /**
+ * The run end a host turn records: `succeeded` for a finished turn, `failed` for an error, timeout or revocation, and none
+ * (`undefined`) for a stop, which writes no run event anywhere.
+ */
+const hostRunOutcome = (end: { reason: EndReason; status: "done" | "error" | "timeout" }): "succeeded" | "failed" | undefined => {
+    // A stop, from either side: the person's, or the computer cancelling the turn it was running.
+    if (end.reason === "stopped" || end.reason === "cancelled") {
+        return undefined;
+    }
+
+    return end.reason === "finished" && end.status === "done" ? "succeeded" : "failed";
+};
+
+/**
  * Ends a host stream in one write: its status, `hostState: ended` and why. Every terminal path goes through
  * here (the host's `turn_end`, the reaper, a revoked device, Stop), so none can leave a stream that reads as
  * live to one client and ended to another. Returns false when the stream was already over.
  */
 export const endHostStream = async (
-    ctx: Pick<MutationCtx, "db">,
+    ctx: Pick<MutationCtx, "db" | "scheduler">,
     stream: Stream,
     end: { reason: EndReason; status: "done" | "error" | "timeout" },
     now: number,
@@ -187,6 +201,14 @@ export const endHostStream = async (
     });
     // A stop or a finished turn keeps a snooze; an error or a timeout wakes the thread, as a failed run does.
     await releaseThread(ctx, stream.threadId as Id<"threads">, now, { failed: end.status !== "done" });
+
+    // The turn's end in the Events log, as a cloud reply's is. A stop records none, as there too.
+    const outcome = hostRunOutcome(end);
+
+    if (outcome !== undefined) {
+        // The scheduler goes along, so a failed wake for the event's expiry is retried (`wakeForExpiry`, `public-api/events-log.ts`).
+        await recordRunEnd({ db: ctx.db, now, scheduler: ctx.scheduler }, { outcome, streamId: stream._id, threadId: stream.threadId });
+    }
 
     return true;
 };

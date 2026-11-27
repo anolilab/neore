@@ -17,17 +17,28 @@ const state = vi.hoisted(() => {
         acceptedToken: "fresh",
         access: [] as { connectorSlug: string; level: string }[],
         accessFails: false,
+        /** Whether one of the caller's bots has a tool selection (`bots_functions:hasBotWithToolSelection`); `"fail"` throws. */
+        botWithSelection: false as "fail" | boolean,
+        cap: "auto" as "auto" | "ask" | "off",
         config: null as MCPServerConfig | null,
         connects: 0,
         crossed: [] as string[],
         overrides: {} as Record<string, string>,
+        /** The caller's own saved servers (`bots_functions:getSavedMcpServerUrls`); `"fail"` throws. */
+        savedServers: [] as "fail" | { name: string; url: string }[],
         seenTokens: [] as string[],
         shard: "alice",
-        thread: { allowed: true, mode: null } as {
+        thread: { allowed: true, mode: null, organizationId: null } as {
             allowed: boolean;
             connectorAccess?: { connectorSlug: string; level: string }[];
             mode: string | null;
+            organizationId?: string | null;
+            /** The selection of the chat's bot and the bot's owner, read with the thread on its own shard. */
+            toolSelection?: { ownerId: string; ownerServerKeys: string[]; selection: { allow?: string[]; exclude: string[] } } | null;
         },
+        /** The cap of the organization the chat is filed in (its policy); read only for a chat that names one. */
+        threadCap: "auto" as "auto" | "ask" | "off",
+        unresolved: undefined as "session" | "unavailable" | undefined,
     };
 });
 
@@ -35,6 +46,15 @@ vi.mock("../../auth/lib/helper", () => {
     return {
         getCurrentUserInternal: async () => {
             return { _id: "alice" };
+        },
+    };
+});
+
+vi.mock("./run-permission-cap", async (importOriginal) => {
+    return {
+        ...(await importOriginal<typeof import("./run-permission-cap")>()),
+        readRequestPermissionCap: async () => {
+            return { cap: state.cap, ...(state.unresolved && { unresolved: state.unresolved }) };
         },
     };
 });
@@ -48,7 +68,7 @@ vi.mock("../../lib/cross-shard", () => {
         callOnShard: async (_ref: unknown, _args: unknown, options: { shardKey: string }) => {
             state.crossed.push(options.shardKey);
 
-            return { connectorAccess: [], ...state.thread };
+            return { connectorAccess: [], organizationId: null, ...state.thread };
         },
     };
 });
@@ -64,6 +84,8 @@ vi.mock("../../lib/rate-limiter", () => {
 vi.mock("../../connectors/lib/user-mcp-servers", () => {
     return {
         findUserMcpServer: async (_ctx: unknown, userId: string, name: string) => (userId === "alice" && state.config?.name === name ? state.config : null),
+        findUserMcpServerIdentity: async (_ctx: unknown, userId: string, name: string) =>
+            userId === "alice" && state.config?.name === name ? { connectorSlug: state.config.connectorSlug, name: state.config.name } : null,
     };
 });
 
@@ -124,10 +146,32 @@ vi.mock("@modelcontextprotocol/sdk/client/index.js", () => {
     };
 });
 
+// No session: the caller is in the personal space, which the proxy caps at auto.
 const context = {
+    auth: { getIdentity: async () => null },
     runQuery: async (ref: { __lunoraRef?: string }, args?: { connectorSlug?: string }) => {
         if (ref.__lunoraRef === "chat_tool_permissions:getThreadPermissionModeForApp") {
             return { connectorAccess: [], ...state.thread };
+        }
+
+        if (ref.__lunoraRef === "auth_organization_policy:getPermissionCapQuery") {
+            return state.threadCap;
+        }
+
+        if (ref.__lunoraRef === "bots_functions:getSavedMcpServerUrls") {
+            if (state.savedServers === "fail") {
+                throw new Error("preferences unavailable");
+            }
+
+            return state.savedServers.map((server) => server.url);
+        }
+
+        if (ref.__lunoraRef === "bots_functions:hasBotWithToolSelection") {
+            if (state.botWithSelection === "fail") {
+                throw new Error("bots unavailable");
+            }
+
+            return state.botWithSelection;
         }
 
         if (ref.__lunoraRef === "connectors_access:listUserConnectorAccessForSlug") {
@@ -174,15 +218,20 @@ const oauthConfig = (refreshTo: string | null) => {
 
 beforeEach(() => {
     state.acceptedToken = "fresh";
+    state.cap = "auto";
+    state.unresolved = undefined;
     state.config = null;
     state.connects = 0;
     state.crossed = [];
     state.overrides = {};
     state.shard = "alice";
-    state.thread = { allowed: true, mode: null };
+    state.thread = { allowed: true, mode: null, organizationId: null };
+    state.threadCap = "auto";
     state.seenTokens = [];
     state.access = [];
     state.accessFails = false;
+    state.botWithSelection = false;
+    state.savedServers = [];
 });
 
 describe("MCP Apps proxy with an OAuth grant", () => {
@@ -231,6 +280,112 @@ describe("MCP Apps proxy with an OAuth grant", () => {
         await expect(response.json()).resolves.toMatchObject({ error: expect.stringContaining("needs your approval") });
     });
 
+    it("says the organization's policy limits a tool its cap lowered, since changing the member's own setting would not help", async () => {
+        oauthConfig("fresh");
+        state.cap = "ask";
+        state.overrides = { "connector:notion:create_page": "auto" };
+
+        const response = await callMCPToolFromAppHttpAction(context, post({ arguments: {}, serverName: "Notion", toolName: "create_page" }));
+
+        expect(response.status).toBe(403);
+        await expect(response.json()).resolves.toMatchObject({ error: expect.stringContaining("organization's tool policy") });
+    });
+
+    it("names the organization's policy, not the member's setting, for a tool already at ask under an ask cap", async () => {
+        oauthConfig("fresh");
+        state.cap = "ask";
+
+        // Unannotated, so the member's own mode is the default `ask`; setting it to "Allow" would be held at `ask` by the cap.
+        const unannotated = await callMCPToolFromAppHttpAction(context, post({ arguments: {}, serverName: "Notion", toolName: "create_page" }));
+
+        state.overrides = { "connector:notion:create_page": "ask" };
+
+        const overridden = await callMCPToolFromAppHttpAction(context, post({ arguments: {}, serverName: "Notion", toolName: "create_page" }));
+
+        for (const response of [unannotated, overridden]) {
+            expect(response.status).toBe(403);
+            await expect(response.json()).resolves.toMatchObject({ error: expect.stringContaining("organization's tool policy") });
+        }
+    });
+
+    it("still names the member's own setting for a tool they switched off under an ask cap", async () => {
+        oauthConfig("fresh");
+        state.cap = "ask";
+        state.overrides = { "connector:notion:create_page": "off" };
+
+        const response = await callMCPToolFromAppHttpAction(context, post({ arguments: {}, serverName: "Notion", toolName: "create_page" }));
+
+        expect(response.status).toBe(403);
+        await expect(response.json()).resolves.toMatchObject({ error: expect.stringContaining("turned off in your tool permissions") });
+    });
+
+    it("refuses every call under an off cap without contacting the server or refreshing its token", async () => {
+        const oauth = oauthConfig("fresh");
+
+        state.cap = "off";
+
+        // No override: without the early refusal this call would connect to read the tool's annotations.
+        const response = await callMCPToolFromAppHttpAction(context, post({ arguments: {}, serverName: "Notion", toolName: "search" }));
+
+        expect(response.status).toBe(403);
+        await expect(response.json()).resolves.toMatchObject({ error: expect.stringContaining("organization's tool policy") });
+        expect(state.connects).toBe(0);
+        expect(oauth.refresh).not.toHaveBeenCalled();
+    });
+
+    it("refuses every call under an ask cap without contacting the server or refreshing its token", async () => {
+        const oauth = oauthConfig("fresh");
+
+        state.cap = "ask";
+
+        // A read-only tool with no override would reach `auto` without the cap, so without the early refusal this call
+        // would connect to read its annotations.
+        const response = await callMCPToolFromAppHttpAction(context, post({ arguments: {}, serverName: "Notion", toolName: "search" }));
+
+        expect(response.status).toBe(403);
+        await expect(response.json()).resolves.toMatchObject({ error: expect.stringContaining("organization's tool policy") });
+        expect(state.connects).toBe(0);
+        expect(oauth.refresh).not.toHaveBeenCalled();
+    });
+
+    it("asks the caller to sign in again when their session cannot be confirmed, not blaming an organization's policy", async () => {
+        const oauth = oauthConfig("fresh");
+
+        state.cap = "ask";
+        state.unresolved = "session";
+
+        const response = await callMCPToolFromAppHttpAction(context, post({ arguments: {}, serverName: "Notion", toolName: "search" }));
+        const { error } = (await response.json()) as { error: string };
+
+        expect(response.status).toBe(403);
+        expect(error).toContain("Sign in again");
+        expect(error).not.toContain("organization");
+        expect(state.connects).toBe(0);
+        expect(oauth.refresh).not.toHaveBeenCalled();
+    });
+
+    it("asks the caller to retry when their tool permissions could not be read", async () => {
+        oauthConfig("fresh");
+        state.cap = "ask";
+        state.unresolved = "unavailable";
+
+        const response = await callMCPToolFromAppHttpAction(context, post({ arguments: {}, serverName: "Notion", toolName: "search" }));
+        const { error } = (await response.json()) as { error: string };
+
+        expect(response.status).toBe(403);
+        expect(error).toContain("Try again in a moment");
+        expect(error).not.toContain("organization");
+    });
+
+    it("answers not found for an unknown server under a cap, as it does without one", async () => {
+        oauthConfig("fresh");
+        state.cap = "ask";
+
+        const response = await callMCPToolFromAppHttpAction(context, post({ arguments: {}, serverName: "Elsewhere", toolName: "search" }));
+
+        expect(response.status).toBe(404);
+    });
+
     it("refuses a tool the user set to ask before connecting, and runs one they allowed", async () => {
         oauthConfig("fresh");
         state.overrides = { "connector:notion:create_page": "auto", "connector:notion:search": "ask" };
@@ -274,7 +429,7 @@ describe("MCP Apps proxy with an OAuth grant", () => {
     it("refuses a collaborator the owner's shard does not admit", async () => {
         oauthConfig("fresh");
         state.shard = "owner";
-        state.thread = { allowed: false, mode: null };
+        state.thread = { allowed: false, mode: null, organizationId: null };
 
         const response = await callMCPToolFromAppHttpAction(context, post({ arguments: {}, serverName: "Notion", toolName: "search" }));
 
@@ -306,6 +461,33 @@ describe("MCP Apps proxy with an OAuth grant", () => {
         expect(JSON.stringify(await response.json())).toContain("needs your approval");
     });
 
+    it("caps a call by the organization of the chat it is shown in, even when the caller's own space would allow it", async () => {
+        const oauth = oauthConfig("fresh");
+
+        // The caller has switched to the personal space (`auto`), but the chat is filed in an organization capped at `ask`.
+        state.thread = { allowed: true, mode: null, organizationId: "org-thread" };
+        state.threadCap = "ask";
+        state.overrides = { "connector:notion:search": "auto" };
+
+        const response = await callMCPToolFromAppHttpAction(context, post({ arguments: {}, serverName: "Notion", toolName: "search" }));
+
+        expect(response.status).toBe(403);
+        await expect(response.json()).resolves.toMatchObject({ error: expect.stringContaining("organization's tool policy") });
+        expect(state.connects).toBe(0);
+        expect(oauth.refresh).not.toHaveBeenCalled();
+    });
+
+    it("keeps the session's cap when it is the stricter one, for a chat in the personal space", async () => {
+        oauthConfig("fresh");
+        state.cap = "ask";
+        state.overrides = { "connector:notion:search": "auto" };
+
+        const response = await callMCPToolFromAppHttpAction(context, post({ arguments: {}, serverName: "Notion", toolName: "search" }));
+
+        expect(response.status).toBe(403);
+        expect(state.connects).toBe(0);
+    });
+
     it("runs a read-only tool that names no thread, as the default does, and still refuses one that would ask", async () => {
         // The older clients: a call with no thread must not lose the read-only tools they always ran.
         oauthConfig("fresh");
@@ -321,7 +503,7 @@ describe("MCP Apps proxy with an OAuth grant", () => {
         // The route runs on the caller's shard (`onCallerShard`), which is the owner's shard for the owner's own thread: no cross-shard call.
         oauthConfig("fresh");
         state.shard = "alice";
-        state.thread = { allowed: true, mode: "auto" };
+        state.thread = { allowed: true, mode: "auto", organizationId: null };
 
         const response = await callMCPToolFromAppHttpAction(context, post({ arguments: {}, serverName: "Notion", toolName: "search" }));
 
@@ -331,7 +513,7 @@ describe("MCP Apps proxy with an OAuth grant", () => {
 
     it("refuses a thread the caller cannot reach", async () => {
         oauthConfig("fresh");
-        state.thread = { allowed: false, mode: null };
+        state.thread = { allowed: false, mode: null, organizationId: null };
 
         const response = await callMCPToolFromAppHttpAction(context, post({ arguments: {}, serverName: "Notion", toolName: "search" }));
 
@@ -340,7 +522,7 @@ describe("MCP Apps proxy with an OAuth grant", () => {
 
     it("applies a supervised thread's mode: a server's read-only hint no longer runs unasked, a tool the user allowed still does", async () => {
         oauthConfig("fresh");
-        state.thread = { allowed: true, mode: "supervised" };
+        state.thread = { allowed: true, mode: "supervised", organizationId: null };
         state.overrides = { "connector:notion:create_page": "auto" };
 
         const lookup = await callMCPToolFromAppHttpAction(context, post({ arguments: {}, serverName: "Notion", toolName: "search" }));
@@ -359,6 +541,140 @@ describe("MCP Apps proxy with an OAuth grant", () => {
 
         expect(response.status).toBe(403);
         expect(state.connects).toBe(0);
+    });
+
+    it("runs an app's call only for a tool the chat's bot keeps, by the connector's key, before connecting", async () => {
+        oauthConfig("fresh");
+        state.overrides = { "connector:notion:create_page": "auto" };
+        state.thread = {
+            allowed: true,
+            mode: null,
+            organizationId: null,
+            toolSelection: { ownerId: "alice", ownerServerKeys: [], selection: { allow: ["connector=notion:*"], exclude: ["connector=notion:create_page"] } },
+        };
+
+        const kept = await callMCPToolFromAppHttpAction(context, post({ arguments: {}, serverName: "Notion", toolName: "search" }));
+        const connectsBefore = state.connects;
+        const excluded = await callMCPToolFromAppHttpAction(context, post({ arguments: {}, serverName: "Notion", toolName: "create_page" }));
+
+        expect(kept.status).toBe(200);
+        expect(excluded.status).toBe(403);
+        expect(state.connects).toBe(connectsBefore);
+    });
+
+    it("holds a collaborator's app call in the owner's bot chat to the bot's selection, read on the owner's shard", async () => {
+        oauthConfig("fresh");
+        state.overrides = { "connector:notion:create_page": "auto" };
+        state.shard = "bob";
+        state.thread = {
+            allowed: true,
+            mode: null,
+            organizationId: null,
+            toolSelection: { ownerId: "bob", ownerServerKeys: [], selection: { exclude: ["connector=notion:create_page"] } },
+        };
+
+        const excluded = await callMCPToolFromAppHttpAction(context, post({ arguments: {}, serverName: "Notion", toolName: "create_page" }));
+
+        expect(excluded.status).toBe(403);
+        expect(state.crossed).toStrictEqual(["bob"]);
+    });
+
+    it("strips a user server's tools for an owner's edited exclusion in the owner's call, and in a collaborator's only for a server the owner also saved", async () => {
+        const url = "https://docs.example/mcp";
+        const statusOf = async (toolName: string): Promise<number> => {
+            const response = await callMCPToolFromAppHttpAction(context, post({ arguments: {}, serverName: "Docs", toolName }));
+
+            return response.status;
+        };
+
+        state.config = { enabled: true, headers: [{ key: "Authorization", value: "Bearer fresh" }], name: "Docs", protocol: "http", url };
+        state.overrides = { "mcp:Docs:search": "auto" };
+        state.savedServers = [{ name: "Docs", url }];
+
+        const edited = { exclude: ["mcp=https%3A%2F%2Fdocs.example%2Fold:*"] };
+
+        // The bot is someone else's: its owner's edited address says nothing about the caller's own server.
+        state.thread = { allowed: true, mode: null, organizationId: null, toolSelection: { ownerId: "bob", ownerServerKeys: [], selection: edited } };
+
+        expect(await statusOf("search")).toBe(200);
+
+        // The owner saved the caller's address too: it may be the server they excluded and then moved.
+        state.thread = {
+            allowed: true,
+            mode: null,
+            organizationId: null,
+            toolSelection: { ownerId: "bob", ownerServerKeys: ["mcp=https%3A%2F%2Fdocs.example%2Fmcp"], selection: edited },
+        };
+
+        expect(await statusOf("search")).toBe(403);
+
+        // The caller owns the bot: which of their servers the exclusion meant cannot be told, so none is trusted.
+        state.thread = { allowed: true, mode: null, organizationId: null, toolSelection: { ownerId: "alice", ownerServerKeys: [], selection: edited } };
+
+        expect(await statusOf("search")).toBe(403);
+
+        // An exact key still names the collaborator's server.
+        state.thread = {
+            allowed: true,
+            mode: null,
+            organizationId: null,
+            toolSelection: { ownerId: "bob", ownerServerKeys: [], selection: { exclude: ["mcp=https%3A%2F%2Fdocs.example%2Fmcp:search"] } },
+        };
+
+        expect(await statusOf("search")).toBe(403);
+    });
+
+    it("refuses an allowed server's call when the caller's saved servers cannot be read, rather than reading them as none", async () => {
+        const url = "https://docs.example/mcp";
+        const allowed = { allow: ["mcp=https%3A%2F%2Fdocs.example%2Fmcp:*"], exclude: [] };
+
+        state.config = { enabled: true, headers: [{ key: "Authorization", value: "Bearer fresh" }], name: "Docs", protocol: "http", url };
+        state.overrides = { "mcp:Docs:search": "auto" };
+        state.thread = { allowed: true, mode: null, organizationId: null, toolSelection: { ownerId: "alice", ownerServerKeys: [], selection: allowed } };
+        state.savedServers = [{ name: "Docs", url }];
+
+        const statusOf = async (): Promise<number> => {
+            const response = await callMCPToolFromAppHttpAction(context, post({ arguments: {}, serverName: "Docs", toolName: "search" }));
+
+            return response.status;
+        };
+
+        expect(await statusOf()).toBe(200);
+
+        // Another saved server at the address: the allowed key would admit both.
+        state.savedServers = [
+            { name: "Docs", url },
+            { name: "Docs (work)", url },
+        ];
+
+        expect(await statusOf()).toBe(403);
+
+        // A lookup that failed is not an exclusion: still not run, but said to be a check to retry.
+        state.savedServers = "fail";
+
+        expect(await statusOf()).toBe(503);
+    });
+
+    it("refuses a call that names no chat when any of the caller's bots has a selection, or when that cannot be read", async () => {
+        oauthConfig("fresh");
+
+        const allowed = await callMCPToolFromAppHttpAction(context, bare("search"));
+
+        expect(allowed.status).toBe(200);
+
+        state.botWithSelection = true;
+
+        const refused = await callMCPToolFromAppHttpAction(context, bare("search"));
+
+        expect(refused.status).toBe(403);
+        expect(await refused.json()).toStrictEqual({ error: expect.stringContaining("needs the chat") });
+
+        state.botWithSelection = "fail";
+
+        const unreadable = await callMCPToolFromAppHttpAction(context, bare("search"));
+
+        expect(unreadable.status).toBe(503);
+        expect(await unreadable.json()).toStrictEqual({ error: expect.stringContaining("could not be checked") });
     });
 
     it("offers a read-only connection only the tools the server marks read only, even one the user allowed to write", async () => {
@@ -434,7 +750,7 @@ describe("MCP Apps proxy with an OAuth grant", () => {
 
     it("keeps a tool that needs approval refused under full access: an iframe is not the model's turn", async () => {
         oauthConfig("fresh");
-        state.thread = { allowed: true, mode: "full" };
+        state.thread = { allowed: true, mode: "full", organizationId: null };
 
         // Unannotated: the default is `ask`, which `full` would lift to `auto` for the model's own calls.
         const response = await callMCPToolFromAppHttpAction(context, post({ arguments: {}, serverName: "Notion", toolName: "create_page" }));

@@ -80,6 +80,7 @@ const reply = async (answer: string | null, options: { approvalId?: string; call
     await harness.run(
         async (ctx: any) =>
             await claimAskUserAnswer(ctx, {
+                answeredByImpersonator: false,
                 approvalId: options.approvalId ?? "ask-1",
                 callerId: options.callerId ?? OWNER,
                 reply: answer === null ? { kind: "dismiss" } : { answer, kind: "answer" },
@@ -192,7 +193,14 @@ describe("resumed askUser", () => {
 
 const claimReply = async (askReply: AskUserReply) =>
     await harness.run(
-        async (ctx: any) => await claimAskUserAnswer(ctx, { approvalId: "ask-1", callerId: OWNER, reply: askReply, threadId: threadId as never }),
+        async (ctx: any) =>
+            await claimAskUserAnswer(ctx, {
+                answeredByImpersonator: false,
+                approvalId: "ask-1",
+                callerId: OWNER,
+                reply: askReply,
+                threadId: threadId as never,
+            }),
     );
 
 describe("askUser input", () => {
@@ -263,9 +271,29 @@ describe("multi-question askUser", () => {
         await refuse([{ selected: ["Blue"] }]);
         await refuse([{ selected: ["Green"] }, { selected: ["Gloss"] }]);
         await refuse([{ selected: ["Red", "Blue"] }, { selected: ["Gloss"] }]);
-        await refuse([{ selected: ["Blue"] }, { note: "  ", selected: [] }]);
         await refuse([{ selected: ["Blue", "Blue"] }, { selected: ["Gloss"] }]);
         expect(await statuses()).toStrictEqual(["pending"]);
+    });
+
+    it("refuses an empty single-choice question, even when the other one is multi-select", async () => {
+        const refuse = async (answers: { note?: string; selected: string[] }[]) => await expect(claimReply({ answers, kind: "answers" })).rejects.toThrow();
+
+        await refuse([{ note: "  ", selected: [] }, { selected: ["Gloss"] }]);
+        await refuse([{ selected: [] }, { selected: [] }]);
+        expect(await statuses()).toStrictEqual(["pending"]);
+    });
+
+    it("accepts a multi-select question with nothing picked, and carries it to the model as an empty list", async () => {
+        const claim = await claimReply({ answers: [{ selected: ["Red"] }, { selected: [] }], kind: "answers" });
+
+        expect(claim).toMatchObject({
+            answers: [
+                { question: "Which colour?", selected: ["Red"] },
+                { question: "Which finishes?", selected: [] },
+            ],
+            kind: "claimed",
+        });
+        expect(await statuses()).toStrictEqual(["approved"]);
     });
 
     it("takes a list only: a text answer is refused, a dismissal closes the whole card", async () => {

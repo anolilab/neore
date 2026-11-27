@@ -63,6 +63,7 @@ interface ComposerInputAreaProps {
 
     /** Show compact version */
     compact?: boolean;
+
     /** The chat being typed into; the @ popup does not offer it as a reference */
     currentThreadId?: string;
     /** Custom variables for {{variable}} autocomplete */
@@ -78,16 +79,25 @@ interface ComposerInputAreaProps {
 
     /** Whether the draft has a finished upload; with one, an empty text can still be sent. */
     hasCompletedAttachments?: boolean;
+
     /** Hidden characters taken out of the draft; shown as a notice */
     hiddenRemoved?: number;
     /** Whether a recalled prompt is showing, see `ComposerTiptapEditor` */
     isHistoryRecalled?: () => boolean;
+    /** A send was pressed while uploads run and waits for them: the send button shows the pending state */
+    isSendWaiting?: boolean;
     /** Whether streaming is active (shows stop button) */
     isStreaming?: boolean;
-    /** Whether file uploads are in progress (disables send with upload tooltip) */
+    /** Whether file uploads are in progress (the send stays enabled and goes out once they finish) */
     isUploading?: boolean;
     /** Max rows for editor */
     maxRows?: number;
+    /** The suggestion is held back while the composer holds attachments; see the editor. */
+    nextPromptHeld?: boolean;
+    /** The chat the suggestion belongs to: the same text in another chat is placed again. */
+    nextPromptScope?: string | null;
+    /** The suggested next prompt after a reply, as ghost text; `null` or omit for none. See `ComposerTiptapEditor`. */
+    nextPromptSuggestion?: string | null;
     /** Called when attachment button is clicked */
     onAddAttachment?: () => void;
     /** Moves an over-the-cap draft into a text attachment; the length notice offers it. Leave out where it would not fit. */
@@ -104,10 +114,15 @@ interface ComposerInputAreaProps {
     onHistoryNavigate?: (direction: PromptHistoryDirection) => string | null;
     /** Called on paste */
     onPaste?: (event: React.ClipboardEvent) => void;
+    /** Ctrl+R prompt search, see `ComposerTiptapEditor` */
+    onPromptSearch?: () => boolean;
+    /** The queue button's own action: it queues even where Enter would steer (`onSubmit` is the send). */
+    onQueue?: () => void;
     /** Called when a chat is selected from the @ popup, to attach its text */
     onSelectChat?: (chat: ChatReference) => void;
     /** Called when "Upload new file" is selected from the @ popup */
     onSelectFileUpload?: () => void;
+
     /** Called when a vault file is selected from the @ popup */
     onSelectVaultFile?: (file: VaultFileRef) => void;
 
@@ -144,6 +159,7 @@ const ComposerInputArea = ({
     onAttachDraftAsFile,
     beforeInput,
     canQueueWhileStreaming = false,
+    onQueue,
     compact = false,
     customVariables,
     disabled = false,
@@ -151,6 +167,7 @@ const ComposerInputArea = ({
     hiddenRemoved = 0,
     hasCompletedAttachments = false,
     isStreaming = false,
+    isSendWaiting = false,
     isUploading = false,
     maxRows = 5,
     onAddAttachment,
@@ -160,6 +177,7 @@ const ComposerInputArea = ({
     onChange,
     onDraw,
     onHistoryNavigate,
+    onPromptSearch,
     isHistoryRecalled,
     onPaste,
     onSelectChat,
@@ -167,6 +185,9 @@ const ComposerInputArea = ({
     onSelectVaultFile,
     onSteer,
     onSubmit,
+    nextPromptScope,
+    nextPromptHeld,
+    nextPromptSuggestion,
     placeholder,
     ref,
     requestCompletion,
@@ -196,6 +217,11 @@ const ComposerInputArea = ({
     const isEmpty = !value.trim();
     // A draft with only a finished attachment is sendable, so it needs the send control as much as typed text does.
     const canSend = !isEmpty || hasCompletedAttachments;
+    // A send pressed during an upload waits for it, and the button says so until the send goes out.
+    // The send keeps its name while uploads run. The tooltip says what the press does, and the status region announces a wait.
+    const uploadTooltip = isSendWaiting ? t`Sending once uploads finish…` : t`Send when uploads finish`;
+    // While a reply streams the queue button is the visible control, so it shows that a send now waits, as the send button does.
+    const queueUploadTooltip = isSendWaiting ? t`Sending once uploads finish…` : t`Waiting for uploads to complete…`;
     // Over the cap the handlers refuse to send; the buttons say so instead of doing nothing.
     const isOverCap = value.length > MAX_PROMPT_CHARS;
     const lengthNoticeId = useId();
@@ -300,10 +326,14 @@ const ComposerInputArea = ({
                         isHistoryRecalled={isHistoryRecalled}
                         isStreaming={isStreaming}
                         maxRows={maxRows}
+                        nextPromptHeld={nextPromptHeld}
+                        nextPromptScope={nextPromptScope}
+                        nextPromptSuggestion={nextPromptSuggestion}
                         onCancel={onCancel}
                         onChange={onChange}
                         onHistoryNavigate={onHistoryNavigate}
                         onPaste={onPaste}
+                        onPromptSearch={onPromptSearch}
                         onSelectChat={onSelectChat}
                         onSelectFileUpload={onSelectFileUpload}
                         onSelectVaultFile={onSelectVaultFile}
@@ -371,7 +401,7 @@ const ComposerInputArea = ({
                                                 compact && "my-1.5 size-[30px]",
                                             )}
                                             disabled={disabled || isUploading || isOverCap}
-                                            onClick={onSubmit}
+                                            onClick={onQueue ?? onSubmit}
                                             type="button"
                                         >
                                             {isUploading ? (
@@ -383,7 +413,7 @@ const ComposerInputArea = ({
                                     }
                                 />
                                 <TooltipContent side="bottom">
-                                    {isUploading ? t`Waiting for uploads to complete…` : t`Queue message — sends when the current reply finishes`}
+                                    {isUploading ? queueUploadTooltip : t`Queue message — sends when the current reply finishes`}
                                 </TooltipContent>
                             </Tooltip>
                         )}
@@ -418,21 +448,21 @@ const ComposerInputArea = ({
                                     render={
                                         <button
                                             aria-describedby={overCapDescription}
-                                            aria-label={isUploading ? t`Waiting for uploads to complete…` : t`Send message`}
+                                            aria-label={t`Send message`}
                                             className={clsx(
                                                 buttonVariants({ size: "icon", variant: "default" }),
                                                 "my-2 size-[34px]",
                                                 compact && "my-1.5 size-[30px]",
                                             )}
-                                            disabled={disabled || isUploading || isOverCap}
+                                            disabled={disabled || isOverCap}
                                             onClick={onSubmit}
                                             type="button"
                                         >
-                                            {isUploading ? <Loader2Icon className="size-4 animate-spin" /> : <SendIcon className="size-4" />}
+                                            {isSendWaiting ? <Loader2Icon className="size-4 animate-spin" /> : <SendIcon className="size-4" />}
                                         </button>
                                     }
                                 />
-                                <TooltipContent side="bottom">{isUploading ? t`Waiting for uploads to complete…` : sendTooltip}</TooltipContent>
+                                <TooltipContent side="bottom">{isUploading ? uploadTooltip : sendTooltip}</TooltipContent>
                             </Tooltip>
                         )}
                     </>
@@ -445,6 +475,10 @@ const ComposerInputArea = ({
             {/* Always mounted so a screen reader announces the change when it appears */}
             <div aria-live="polite" className="text-muted-foreground px-3 text-xs" role="status">
                 {hiddenNotice}
+            </div>
+            {/* A send that starts waiting for uploads is announced here; the send button keeps its name */}
+            <div aria-live="polite" className="sr-only">
+                {isSendWaiting ? t`Sending once uploads finish…` : null}
             </div>
             <ComposerLengthNotice chars={value.length} id={lengthNoticeId} onAttachAsFile={onAttachDraftAsFile} tooLongForFile={tooLongForFile} />
         </>

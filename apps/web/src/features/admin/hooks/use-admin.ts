@@ -4,14 +4,16 @@
  * Hooks for admin operations using Lunora queries and mutations.
  * Provides type-safe access to admin functions with TanStack Query integration.
  */
+import type { ReturnOf } from "@lunora/react";
 import { api } from "@neore/backend/api";
 import type { Id } from "@neore/backend/dataModel";
 import { skipToken, useMutation, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
-import useAfterFirstPaint from "@/hooks/use-after-first-paint";
-import { useAction, useCRPC, useLunoraActionOptions, useLunoraAuth } from "@/lib/lunora/crpc";
+import { useAction, useCRPC, useLunoraActionOptions } from "@/lib/lunora/crpc";
 import { referenceNow } from "@/lib/reference-time";
+
+export { useIsImpersonating } from "./use-is-impersonating";
 
 /**
  * Check if current user is an admin.
@@ -168,27 +170,6 @@ export const useRevokeAllUserSessions = () => {
 // =============================================================================
 
 /**
- * Check if current session is impersonated.
- *
- * The banner that consumes this is mounted app-wide, including on the signed-out
- * landing page, and the procedure requires a session — so without the gate every
- * first paint fired a request that could only ever come back 401.
- */
-export const useIsImpersonating = () => {
-    const crpc = useCRPC();
-    // Gated on the RPC client's auth state rather than better-auth's session:
-    // the two are not the same instant. The session cookie lands first and the
-    // bearer token the client sends is fetched after, so gating on the session
-    // still fires this while the client is anonymous — a 401, every load.
-    const { isAuthenticated } = useLunoraAuth();
-    // A banner for a rare admin session; it can appear a moment after first paint.
-    const afterFirstPaint = useAfterFirstPaint();
-    const options = crpc.auth.admin.isImpersonating.queryOptions({});
-
-    return useQuery({ ...options, queryFn: isAuthenticated && afterFirstPaint ? options.queryFn : skipToken });
-};
-
-/**
  * Log impersonation start mutation.
  */
 export const useLogImpersonationStart = () => {
@@ -313,5 +294,67 @@ export const useGatewayAnalytics = (period: "24h" | "7d" = "24h") => {
         refetchInterval: 60_000,
         retry: 1,
         staleTime: 30_000,
+    });
+};
+
+/** The query key every page of the shard footprint census shares, followed by that page's cursor. */
+export const SHARD_FOOTPRINT_QUERY_KEY = ["admin", "shardFootprint"] as const;
+
+/**
+ * The provider prompt-cache readings for the last `days`: prompt tokens and the share each provider served from its
+ * own cache, by hour and by model. Fetched on a visit only; the readings change by the hour.
+ */
+export const useProviderCacheReadings = (days: 1 | 7 | 30) => {
+    const fetchReadings = useAction(api.admin.gateway_analytics.getProviderCacheReadingsForAdmin);
+
+    return useQuery({
+        queryFn: () => fetchReadings({ days }),
+        queryKey: ["admin", "providerCacheReadings", days],
+        refetchOnWindowFocus: false,
+        retry: 1,
+        staleTime: 5 * 60_000,
+    });
+};
+
+/**
+ * One page of the shard footprint census (`getShardFootprint`): totals for the shards on that page.
+ * Pass the previous page's `continueCursor` to measure the next shards.
+ */
+export const useShardFootprint = (cursor?: string) => {
+    const measure = useAction(api.admin.cleanup.getShardFootprint);
+
+    return useQuery({
+        queryFn: () => measure(cursor === undefined ? {} : { cursor }),
+        queryKey: [...SHARD_FOOTPRINT_QUERY_KEY, cursor ?? null],
+        refetchOnReconnect: false,
+        refetchOnWindowFocus: false,
+        retry: 1,
+        // Stale at once: a new dashboard visit measures again rather than showing an earlier visit's totals.
+        // Focus and reconnect refetches stay off (above), so a visit is the only thing that re-runs the scan.
+        staleTime: 0,
+    });
+};
+
+// =============================================================================
+// Feedback
+// =============================================================================
+
+export type AdminFeedbackPage = ReturnOf<typeof api.feedback.admin.listFeedback>;
+export type AdminFeedbackItem = AdminFeedbackPage["page"][number];
+export type FeedbackKind = AdminFeedbackItem["kind"];
+
+/**
+ * How often an open feedback page reads again. The list is not live (`NEVER_LIVE` in `crpc.tsx`), so this is what
+ * brings in rows sent since, and it renews the signed image URLs long before their 12 hours run out.
+ */
+export const ADMIN_FEEDBACK_REFETCH_INTERVAL_MS = 5 * 60_000;
+
+/** One page of the feedback users sent, newest first; `cursor` is the previous page's `continueCursor`. */
+export const useAdminFeedback = (options: { cursor: string | null; kind?: FeedbackKind; limit: number }) => {
+    const crpc = useCRPC();
+
+    return useQuery({
+        ...crpc.feedback.admin.listFeedback.queryOptions({ cursor: options.cursor, kind: options.kind, limit: options.limit }),
+        refetchInterval: ADMIN_FEEDBACK_REFETCH_INTERVAL_MS,
     });
 };

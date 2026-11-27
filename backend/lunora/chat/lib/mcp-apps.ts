@@ -3,8 +3,10 @@ import type { HttpActionCtx } from "lunorash/server";
 
 import { internal } from "../../_generated/internal";
 import { getCurrentUserInternal } from "../../auth/lib/helper";
+import type { RunToolSelection } from "../../bots/run-tool-selection";
+import { selectionKeeps, selectionServerKey } from "../../bots/tool-selectors";
 import { type ConnectorAccessLevel, levelOfConnection, strictestLevel, toolOfferedAt } from "../../connectors/access-levels";
-import { findUserMcpServer } from "../../connectors/lib/user-mcp-servers";
+import { findUserMcpServer, findUserMcpServerIdentity } from "../../connectors/lib/user-mcp-servers";
 import { callOnShard } from "../../lib/cross-shard";
 import { toolsLogger } from "../../lib/logger";
 import { checkRateLimit } from "../../lib/rate-limiter";
@@ -15,7 +17,9 @@ import type { MCPServerConfig } from "./mcp-tools";
 import { headersToRecord } from "./mcp-tools";
 import type { ThreadPermissionMode } from "./thread-permission-mode";
 import type { ToolAnnotationHints, ToolDescriptor, ToolPermissionMode, ToolPermissionOverrides } from "./tool-permissions";
-import { isToolPermissionMode, resolveToolPermission, toolPermissionKey } from "./tool-permissions";
+import { clampToolPermission, isToolPermissionMode, resolveToolPermission, toolPermissionKey } from "./tool-permissions";
+import type { RequestPermissionCap } from "./run-permission-cap";
+import { readPermissionCap, readRequestPermissionCap } from "./run-permission-cap";
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -83,7 +87,7 @@ const readToolAnnotations = async (client: SDKClient, toolName: string): Promise
  * server's annotations do, which needs a `tools/list` on the call's own
  * connection; a tool the server does not list resolves as unannotated, `ask`.
  */
-const descriptorFor = (config: MCPServerConfig, toolName: string): ToolDescriptor =>
+const descriptorFor = (config: Pick<MCPServerConfig, "connectorSlug" | "name">, toolName: string): ToolDescriptor =>
     config.connectorSlug
         ? { key: toolPermissionKey("connector", toolName, config.connectorSlug), source: "connector" }
         : { key: toolPermissionKey("mcp", toolName, config.name), source: "mcp" };
@@ -95,10 +99,16 @@ const descriptorFor = (config: MCPServerConfig, toolName: string): ToolDescripto
  * `full` is not passed on. It turns `ask` defaults into `auto`, which is the model's turn to take; an app iframe is not a turn, and
  * the proxy cannot ask anyone, so a tool that needs approval stays refused here under `full` too.
  */
-/** What an app call reads from its thread: the mode it runs under, and the teammate's connection levels (`connectors/access.ts`). */
+/**
+ * What an app call reads from its thread: the mode it runs under, the teammate's connection levels (`connectors/access.ts`),
+ * and the organization whose cap holds it.
+ */
 interface ThreadAppAccess {
     connectorAccess: { connectorSlug: string; level: ConnectorAccessLevel }[];
     mode: ThreadPermissionMode | undefined;
+    organizationId: string | null;
+    /** The selection of the bot the chat runs as (`bots/tool-selectors.ts`) and the bot's owner, read on the thread's own shard. */
+    toolSelection: RunToolSelection | null;
 }
 
 const threadModeFor = async (context: HttpActionCtx, userId: string, threadId: string): Promise<ThreadAppAccess | "denied"> => {
@@ -122,7 +132,55 @@ const threadModeFor = async (context: HttpActionCtx, userId: string, threadId: s
         return "denied";
     }
 
-    return { connectorAccess: found.connectorAccess, mode: found.mode === "full" ? undefined : (found.mode ?? undefined) };
+    return {
+        connectorAccess: found.connectorAccess,
+        mode: found.mode === "full" ? undefined : (found.mode ?? undefined),
+        organizationId: found.organizationId,
+        toolSelection: found.toolSelection,
+    };
+};
+
+/**
+ * Whether the bot an app call runs under keeps the tool (`bots/tool-selectors.ts`). The chat's bot when the call names the chat.
+ * A call that names none (a client from before the chat was sent) cannot tell which bot it is under, so it is refused when
+ * any of the caller's bots has a selection. A failed read refuses it too, as `unavailable`: the call is not run, but the
+ * reason is a lookup to retry, not an excluded tool. Never more tools than the bot chose.
+ */
+const botKeepsAppTool = async (
+    context: HttpActionCtx,
+    userId: string,
+    thread: ThreadAppAccess | undefined,
+    serverConfig: Pick<MCPServerConfig, "connectorSlug" | "url">,
+    toolName: string,
+): Promise<"kept" | "refused" | "unavailable"> => {
+    const verdict = (keeps: boolean): "kept" | "refused" => (keeps ? "kept" : "refused");
+
+    try {
+        if (!thread) {
+            return verdict(!(await context.runQuery(internal.bots.functions.hasBotWithToolSelection, { userId })));
+        }
+
+        if (!thread.toolSelection) {
+            return "kept";
+        }
+
+        // The caller's saved servers tell whether the key stands for this server alone, as in the run (`selectionServerKey`); for
+        // a collaborator, an owner's edited address strips only a server the owner also saved.
+        // Read so that a failure throws (and denies): an empty list would read as no duplicate address.
+        const savedUrls = await context.runQuery(internal.bots.functions.getSavedMcpServerUrls, { userId });
+        const { ownerId, ownerServerKeys, selection } = thread.toolSelection;
+
+        return verdict(
+            selectionKeeps(selection, toolName, {
+                server: selectionServerKey(selection, serverConfig, savedUrls, { runs: ownerId === userId, serverKeys: ownerServerKeys }),
+                tool: toolName,
+            }),
+        );
+    } catch (error: unknown) {
+        toolsLogger.warn("[MCP] Bot tool selection lookup failed for an app call; denied:", error, { userId });
+
+        return "unavailable";
+    }
 };
 
 /**
@@ -154,11 +212,17 @@ const annotatedToolMode = async (
     client: SDKClient,
     descriptor: ToolDescriptor,
     toolName: string,
+    permissionCap: ToolPermissionMode,
     threadMode: ThreadPermissionMode | undefined,
-): Promise<ToolPermissionMode> => {
+): Promise<{ member: ToolPermissionMode; mode: ToolPermissionMode }> => {
     const annotations = await readToolAnnotations(client, toolName);
+    const described = { ...descriptor, ...(annotations && { annotations }) };
 
-    return resolveToolPermission({ ...descriptor, ...(annotations && { annotations }) }, undefined, { threadMode });
+    // The member's own choice (their tool permissions under the thread's mode), and the mode the organization's cap leaves of it.
+    return {
+        member: resolveToolPermission(described, undefined, { threadMode }),
+        mode: resolveToolPermission(described, undefined, { permissionCap, threadMode }),
+    };
 };
 
 /**
@@ -166,7 +230,17 @@ const annotatedToolMode = async (
  * approval is a pause in the model's run (`needsApproval`), and an iframe's call
  * has no run to pause and no one to ask — running it would be auto-approval.
  */
-const refusalFor = (mode: ToolPermissionMode, toolName: string): string | null => {
+const refusalFor = (
+    mode: ToolPermissionMode,
+    toolName: string,
+    { member, permissionCap }: { member: ToolPermissionMode; permissionCap: ToolPermissionMode },
+): string | null => {
+    // The organization's policy is the reason when changing the member's own setting would change nothing: the cap
+    // lowered the mode, the cap is `off`, or the tool is at `ask` under a cap that would hold "Allow" at `ask` anyway.
+    if (member !== mode || (permissionCap !== "auto" && (permissionCap === "off" || mode === "ask"))) {
+        return `Tool "${toolName}" is limited by your organization's tool policy, so an MCP App cannot run it`;
+    }
+
     if (mode === "off") {
         return `Tool "${toolName}" is turned off in your tool permissions`;
     }
@@ -176,6 +250,12 @@ const refusalFor = (mode: ToolPermissionMode, toolName: string): string | null =
     }
 
     return null;
+};
+
+/** Why an app call is refused when the caller's space could not be told (`RequestPermissionCap.unresolved`). */
+const UNRESOLVED_SPACE_REFUSALS: Record<NonNullable<RequestPermissionCap["unresolved"]>, (toolName: string) => string> = {
+    session: (toolName) => `Your sign-in could not be confirmed, so an MCP App cannot run tool "${toolName}". Sign in again, then retry`,
+    unavailable: (toolName) => `Your tool permissions could not be checked just now, so an MCP App cannot run tool "${toolName}". Try again in a moment`,
 };
 
 const CONNECT_TIMEOUT_MS = 10_000;
@@ -366,6 +446,42 @@ export const callMCPToolFromAppHttpAction = async (context: HttpActionCtx, reque
         return Response.json({ error: "Missing serverName or toolName" }, { status: 400 });
     }
 
+    // Both are read before the server is resolved: an app call runs only at `auto`, so under any lower cap every call is
+    // refused, and no credential is refreshed and no server is contacted for it. The chat the app is shown in gives its mode
+    // and the organization it is filed or was started in; the session gives the space the caller is in. A call that names
+    // no chat (a client from before the chat was sent) is capped by the session alone, as before, so it keeps working unless
+    // one of the caller's bots has a tool selection (`botKeepsAppTool`).
+    const [thread, { cap: requestCap, unresolved }] = await Promise.all([
+        threadId ? threadModeFor(context, user._id, threadId) : undefined,
+        readRequestPermissionCap(context, user._id),
+    ]);
+
+    if (thread === "denied") {
+        return Response.json({ error: "This chat is not available to you" }, { status: 403 });
+    }
+
+    // The caller's space could not be told, so no organization's policy is the reason: say what would get the call through.
+    if (unresolved) {
+        return Response.json({ error: UNRESOLVED_SPACE_REFUSALS[unresolved](toolName) }, { status: 403 });
+    }
+
+    // The stricter of the chat's organization's cap and the session's holds, so switching spaces cannot lift a chat's cap.
+    const permissionCap = thread ? clampToolPermission(requestCap, await readPermissionCap(context, thread.organizationId)) : requestCap;
+
+    if (permissionCap !== "auto") {
+        const identity = await findUserMcpServerIdentity(context, user._id, serverName);
+
+        if (!identity) {
+            return Response.json({ error: `MCP server "${serverName}" not found` }, { status: 404 });
+        }
+
+        const capOverrides = (await context.runQuery(internal.chat.tool_permissions.getToolPermissionsQuery, { userId: user._id })) as ToolPermissionOverrides;
+        // Only a tool the member switched off is refused for their own setting; any other mode is held below `auto` by the cap.
+        const member = capOverrides[descriptorFor(identity, toolName).key] === "off" ? "off" : permissionCap;
+
+        return Response.json({ error: refusalFor(clampToolPermission(member, permissionCap), toolName, { member, permissionCap }) }, { status: 403 });
+    }
+
     const serverConfig = await findServerConfig(context, user._id, serverName);
 
     if (!serverConfig) {
@@ -374,13 +490,7 @@ export const callMCPToolFromAppHttpAction = async (context: HttpActionCtx, reque
 
     // The app's call runs under the thread's mode, as the model's calls do: the proxy is no way around a supervised thread. A call
     // that names no thread (a client built before the thread was sent) has no thread mode, so it gets the default: a read-only tool
-    // runs, and one that would ask is refused, since no person is there to answer it. Rejecting it would break every such client.
-    const thread = threadId ? await threadModeFor(context, user._id, threadId) : undefined;
-
-    if (thread === "denied") {
-        return Response.json({ error: "This chat is not available to you" }, { status: 403 });
-    }
-
+    // runs, and one that would ask is refused, since no person is there to answer it.
     const threadMode = thread?.mode;
 
     // The teammate's access to this connection. `none` runs nothing; `read_only` runs only what the server marks read only, checked
@@ -391,10 +501,29 @@ export const callMCPToolFromAppHttpAction = async (context: HttpActionCtx, reque
         return Response.json({ error: `Your teammate's access to ${serverConfig.name} is set to none` }, { status: 403 });
     }
 
+    // The bot the chat runs as narrows what its apps may call, as it narrows the model's tools.
+    const botVerdict = await botKeepsAppTool(context, user._id, thread, serverConfig, toolName);
+
+    if (botVerdict === "unavailable") {
+        return Response.json({ error: `The bot's tools could not be checked for "${toolName}". Try again in a moment.` }, { status: 503 });
+    }
+
+    if (botVerdict === "refused") {
+        return Response.json(
+            {
+                error: thread
+                    ? `Tool "${toolName}" is not among this bot's tools`
+                    : `Tool "${toolName}" needs the chat it was opened in: update the app and try again`,
+            },
+            { status: 403 },
+        );
+    }
+
     const overrides = (await context.runQuery(internal.chat.tool_permissions.getToolPermissionsQuery, { userId: user._id })) as ToolPermissionOverrides;
     const descriptor = descriptorFor(serverConfig, toolName);
-    const chosen = isToolPermissionMode(overrides[descriptor.key]) ? resolveToolPermission(descriptor, overrides, { threadMode }) : undefined;
-    const refusedUpFront = chosen && refusalFor(chosen, toolName);
+    const chosen = isToolPermissionMode(overrides[descriptor.key]) ? resolveToolPermission(descriptor, overrides, { permissionCap, threadMode }) : undefined;
+    const memberChosen = chosen === undefined ? undefined : resolveToolPermission(descriptor, overrides, { threadMode });
+    const refusedUpFront = chosen && memberChosen && refusalFor(chosen, toolName, { member: memberChosen, permissionCap });
 
     if (refusedUpFront) {
         return Response.json({ error: refusedUpFront }, { status: 403 });
@@ -406,7 +535,8 @@ export const callMCPToolFromAppHttpAction = async (context: HttpActionCtx, reque
                 return { refused: `Tool "${toolName}" can change data, and your teammate's access to ${serverConfig.name} is read only` };
             }
 
-            const refused = chosen ? null : refusalFor(await annotatedToolMode(client, descriptor, toolName, threadMode), toolName);
+            const annotated = chosen ? undefined : await annotatedToolMode(client, descriptor, toolName, permissionCap, threadMode);
+            const refused = annotated ? refusalFor(annotated.mode, toolName, { member: annotated.member, permissionCap }) : null;
 
             if (refused) {
                 return { refused };

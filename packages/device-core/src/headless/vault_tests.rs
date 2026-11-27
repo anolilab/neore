@@ -1,18 +1,18 @@
 use super::*;
-use crate::acp_install::commit_tests::Scratch;
+use crate::test_dir::TestDir;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
 /// A keychain in memory, or one that refuses everything (a server with no Secret Service).
 #[derive(Default)]
-struct FakeKeychain {
-    entries: Rc<RefCell<HashMap<String, String>>>,
-    broken: bool,
+pub(in crate::headless) struct FakeKeychain {
+    pub(in crate::headless) entries: Rc<RefCell<HashMap<String, String>>>,
+    pub(in crate::headless) broken: bool,
     /// Deleting fails (a locked secret service) while reading and writing work.
-    stuck_delete: bool,
+    pub(in crate::headless) stuck_delete: bool,
     /// Runs at the start of every `set`, to look at (or change) the world at the moment the secret is stored.
-    on_set: Option<Box<dyn Fn()>>,
+    pub(in crate::headless) on_set: Option<Box<dyn Fn()>>,
 }
 
 impl Keychain for FakeKeychain {
@@ -52,13 +52,8 @@ impl Keychain for FakeKeychain {
 }
 
 /// A path under the system temp folder that is removed, with whatever is in it, when the test ends.
-fn scratch(label: &str) -> Scratch {
-    let dir = std::env::temp_dir().join(format!("neore-host-vault-{label}-{}", std::process::id()));
-
-    let _ = fs::remove_dir_all(&dir);
-    let _ = fs::remove_file(&dir);
-
-    Scratch(dir)
+pub(in crate::headless) fn scratch(label: &str) -> TestDir {
+    TestDir::at(&format!("host-vault-{label}"))
 }
 
 const SECRET: &str = concat!(

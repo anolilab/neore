@@ -4,7 +4,7 @@
  * delivers a real host's. What is checked is the plan's S7 line: a turn on a server streams into the thread through this
  * computer's ingest, signed as that server, and quitting stops the agent.
  */
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { declineGate } from "./permission";
 import type { AgentProcess } from "./process";
@@ -29,6 +29,8 @@ let stopped: number[];
 let posts: { post: Post; signature: string; url: string }[];
 let signed: string[];
 let children: Map<number, AgentProcess>;
+/** Every `ServerAgents` a test set up, so the teardown can wait for what each still writes into the scratch folder. */
+let created: ServerAgents[];
 let records: ServerRecord[] | undefined;
 /** Set once the core has dropped a server: its secret is gone, so nothing can be signed for it any more. */
 let secretGone: boolean;
@@ -126,6 +128,8 @@ const setup = (): { remote: RemoteAgents; servers: ServerAgents } => {
         userData: scratch.dir,
     });
 
+    created.push(servers);
+
     return { remote, servers };
 };
 
@@ -136,16 +140,29 @@ beforeEach(() => {
     posts = [];
     signed = [];
     children = new Map();
+    created = [];
     records = undefined;
     secretGone = false;
 });
 
-afterEach(() => {
-    for (const child of children.values()) {
-        child.killNow();
-    }
+afterEach(async () => {
+    try {
+        for (const child of children.values()) {
+            child.killNow();
+        }
 
-    scratch.dispose();
+        await Promise.all(Array.from(children.values(), async (child) => await child.exited));
+
+        // Each server's running turns are written to a file under the scratch folder, and a write recreates the folder.
+        // `stop()` cancels the state flushes still queued; the writes already under way are awaited before the removal.
+        for (const servers of created) {
+            servers.stop();
+        }
+
+        await Promise.all(created.map(async (servers) => await servers.persisted()));
+    } finally {
+        scratch.dispose();
+    }
 });
 
 describe("coding agents on a server", () => {
@@ -275,5 +292,86 @@ describe("coding agents on a server", () => {
         expect(runtime.acp.summaries()[0]?.status).toBe("ended");
         // The runtime is gone with the server: a later command cannot conjure it again.
         expect(() => servers.get("someone-else")).toThrow("not paired");
+    });
+
+    it("refuses a turn on a server while its removal is under way, so no session outlives the runtime it is dropped with", async () => {
+        const { servers } = setup();
+        const runtime = servers.get(SERVER);
+        const sessionId = await runtime.acp.startSession("fake", "Fake on build-box", scratch.work, { sessionId: "session-5", threadId: "thread-5" });
+
+        runtime.acp.send(sessionId, "tool", "turn-5");
+        await expect.poll(() => posts.some(({ post }) => post.turnId === "turn-5"), { timeout: 8000 }).toBe(true);
+
+        const removal = servers.remove(SERVER);
+
+        // Checked before the removal's first wait has finished: the runtime is still in the map, but no command may reach it.
+        expect(() => servers.get(SERVER)).toThrow("being removed");
+        await removal;
+        secretGone = true;
+
+        expect(runtime.acp.summaries()[0]?.status).toBe("ended");
+    });
+
+    it("refuses a start on a removed server's manager, so a start that held the runtime cannot spawn after the removal", async () => {
+        const { servers } = setup();
+        const runtime = servers.get(SERVER);
+
+        await servers.remove(SERVER);
+        secretGone = true;
+
+        await expect(runtime.acp.startSession("fake", "Fake on build-box", scratch.work, { sessionId: "session-6", threadId: "thread-6" })).rejects.toThrow(
+            "being removed",
+        );
+    });
+
+    it("keeps the runtime of a removal that fails, and lets the server start turns again", async () => {
+        const { servers } = setup();
+        const runtime = servers.get(SERVER);
+
+        vi.spyOn(runtime.acp, "closeUnapproved").mockRejectedValueOnce(new Error("close failed"));
+
+        await expect(servers.remove(SERVER)).rejects.toThrow("close failed");
+
+        // Same runtime, same poster and turn file; a start is accepted again.
+        expect(servers.get(SERVER)).toBe(runtime);
+        await runtime.acp.startSession("fake", "Fake on build-box", scratch.work, { sessionId: "session-9", threadId: "thread-9" });
+        servers.killAll();
+    });
+
+    it("joins an overlapping removal of the same server, so one removal runs and its live turn ends once", async () => {
+        const { servers } = setup();
+        const runtime = servers.get(SERVER);
+        const sessionId = await runtime.acp.startSession("fake", "Fake on build-box", scratch.work, { sessionId: "session-7", threadId: "thread-7" });
+
+        runtime.acp.send(sessionId, "tool", "turn-7");
+        await expect.poll(() => posts.some(({ post }) => post.turnId === "turn-7"), { timeout: 8000 }).toBe(true);
+
+        const first = servers.remove(SERVER);
+        const second = servers.remove(SERVER);
+
+        expect(second).toBe(first);
+
+        await Promise.all([first, second]);
+        secretGone = true;
+
+        const ended = posts.filter(({ post }) => post.turnId === "turn-7").flatMap(({ post }) => post.events).filter((event) => event.kind === "turn_end");
+
+        expect(ended).toHaveLength(1);
+        expect(runtime.acp.summaries()[0]?.status).toBe("ended");
+    });
+
+    it("hands a held turn's end the poster of a server being removed, and the server's own poster otherwise", async () => {
+        const { servers } = setup();
+        const runtime = servers.get(SERVER);
+        const removal = servers.remove(SERVER);
+
+        expect(servers.posterForEnd(SERVER)).toBe(runtime.poster);
+        expect(() => servers.posterForEnd("someone-else")).toThrow("not paired");
+
+        await removal;
+        secretGone = true;
+
+        // Once the removal is over, the server is paired again only as a runtime that a later command builds.
+        expect(servers.posterForEnd(SERVER)).not.toBe(runtime.poster);
     });
 });

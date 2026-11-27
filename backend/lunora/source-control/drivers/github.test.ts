@@ -45,14 +45,14 @@ const fakeHost = (routes: Record<string, (query: Record<string, number | string>
 const pullBody = (overrides: Record<string, unknown> = {}) => {
     return {
         additions: 10,
-        base: { ref: "main" },
+        base: { ref: "main", repo: { id: 1 } },
         body: "Fixes the thing",
         changed_files: 3,
         commits: 2,
         created_at: "2026-10-01T10:00:00Z",
         deletions: 4,
         draft: false,
-        head: { ref: "fix/thing", sha: SHA },
+        head: { ref: "fix/thing", repo: { id: 1 }, sha: SHA },
         html_url: "https://github.com/octo/hello/pull/7",
         merged: false,
         number: 7,
@@ -189,11 +189,24 @@ describe("github driver: a pull request", () => {
             changedFiles: 3,
             commitCount: 2,
             headBranch: "fix/thing",
+            headInBaseRepository: true,
             headSha: SHA,
             repository: "octo/hello",
             state: "open",
             url: "https://github.com/octo/hello/pull/7",
         });
+    });
+
+    it.each([
+        ["a fork, even on the same branch name and commit", { ref: "fix/thing", repo: { id: 2 }, sha: SHA }, { ref: "main", repo: { id: 1 } }],
+        ["a deleted fork", { ref: "fix/thing", repo: null, sha: SHA }, { ref: "main", repo: { id: 1 } }],
+        ["a pull request whose base repository the host did not name", { ref: "fix/thing", repo: { id: 1 }, sha: SHA }, { ref: "main" }],
+        ["a deleted fork whose base repository the host did not name either", { ref: "fix/thing", repo: null, sha: SHA }, { ref: "main" }],
+    ])("reads the head of %s as outside the base repository", async (_case, head, base) => {
+        const { request } = fakeHost({ "/repos/octo/hello/pulls/7": () => pullBody({ base, head }) });
+        const detail = await githubDriver.getPullRequest(request, REF);
+
+        expect(detail.headInBaseRepository).toBe(false);
     });
 
     it.each([
@@ -206,6 +219,18 @@ describe("github driver: a pull request", () => {
         const detail = await githubDriver.getPullRequest(request, REF);
 
         expect(detail.state).toBe(state);
+    });
+
+    it.each([
+        ["dirty", "conflicting"],
+        ["clean", "clean"],
+        [undefined, "unknown"],
+    ])("reads the merge state %s from the same answer as %s", async (mergeable_state, mergeState) => {
+        const { request } = fakeHost({ "/repos/octo/hello/pulls/7": () => pullBody({ mergeable_state }) });
+
+        const detail = await githubDriver.getPullRequest(request, REF);
+
+        expect(detail.mergeState).toBe(mergeState);
     });
 
     it("keeps no link that is not a GitHub address", async () => {
@@ -562,5 +587,67 @@ describe("github driver: bounds", () => {
 
         expect(calls.filter((call) => call.path === "/user")).toHaveLength(1);
         expect(calls.filter((call) => call.path === "/search/issues")).toHaveLength(2);
+    });
+});
+
+describe("github driver: comparing a head with its base", () => {
+    const COMPARE = `/repos/octo/hello/compare/main...${SHA}`;
+
+    it.each([
+        [0, false],
+        [3, true],
+    ])("reads behind_by %d from the host's comparison of the base branch with the head commit", async (behindBy, behind) => {
+        const { calls, request } = fakeHost({
+            [COMPARE]: () => {
+                return { ahead_by: 2, behind_by: behindBy, status: behind ? "diverged" : "ahead" };
+            },
+        });
+        const comparison = await githubDriver.compareWithBase(request, REF, "main", SHA);
+
+        expect(comparison).toEqual({ aheadBy: 2, behindBy });
+        expect(comparison.behindBy > 0).toBe(behind);
+        // Only the counts are read: the second page of one commit, which carries no changed files.
+        expect(calls).toEqual([{ path: COMPARE, query: { page: 2, per_page: 1 } }]);
+    });
+
+    it("reads the counts from a page past the commits, which lists no commits and no changed files", async () => {
+        // The host's shape for a page past the first: the counts, an empty commit list, no `files`.
+        const { request } = fakeHost({
+            [COMPARE]: (query) => (query.page === 2 ? { ahead_by: 1, behind_by: 7, commits: [], status: "diverged", total_commits: 1 } : { files: [] }),
+        });
+
+        await expect(githubDriver.compareWithBase(request, REF, "main", SHA)).resolves.toEqual({ aheadBy: 1, behindBy: 7 });
+    });
+
+    it("compares a fork's head by its commit in the base repository, never by the fork's branch name", async () => {
+        const { calls, request } = fakeHost({
+            [COMPARE]: () => {
+                return { ahead_by: 1, behind_by: 4 };
+            },
+        });
+
+        await expect(githubDriver.compareWithBase(request, REF, "main", SHA)).resolves.toEqual({ aheadBy: 1, behindBy: 4 });
+        expect(calls.map((call) => call.path)).toEqual([COMPARE]);
+    });
+
+    it("encodes each part of a base branch with slashes", async () => {
+        const path = `/repos/octo/hello/compare/release/2%2B1...${SHA}`;
+        const { request } = fakeHost({
+            [path]: () => {
+                return { ahead_by: 0, behind_by: 1 };
+            },
+        });
+
+        await expect(githubDriver.compareWithBase(request, REF, "release/2+1", SHA)).resolves.toEqual({ aheadBy: 0, behindBy: 1 });
+    });
+
+    it.each([
+        ["a head that is not a commit id", "main", "feat/x"],
+        ["a base that could leave its path", "../main", SHA],
+    ])("asks nothing for %s", async (_case, base, head) => {
+        const { calls, request } = fakeHost({});
+
+        await expect(githubDriver.compareWithBase(request, REF, base, head)).rejects.toBeInstanceOf(HostApiError);
+        expect(calls).toEqual([]);
     });
 });

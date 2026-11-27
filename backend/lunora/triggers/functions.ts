@@ -45,6 +45,8 @@ import { deleteShardRoute, setShardRoute } from "../lib/shard-routes";
 import { noteShardActivity, noteShardDue } from "../lib/shard-housekeeping";
 import { notifyQuietly } from "../notifications/notify";
 import { MAX_LENGTH } from "../lib/validators";
+import { getMemberByOrganizationAndUser } from "../auth/lib/better-auth-queries";
+import { LEFT_ORGANIZATION_MESSAGE } from "../auth/lib/organization-policy";
 import { chargeRound, DAILY_LIMIT_MESSAGE, loadTaskAccount, taskAccessProblem } from "../tasks/account";
 import { isTaskModelAllowed } from "../tasks/logic";
 import { advanceStreak, modelUnavailableMessage, pausedNoticeBody, runOutcome } from "./failure-streak";
@@ -443,6 +445,8 @@ const vTriggerCreateArgs = v.object({ ...triggerCreateFields });
 
 /** The owner a trigger row is created for. The caller stamps it from its own identity, never from request input. */
 export interface TriggerOwner {
+    /** The creator's verified active organization, which caps the runs' tools. Absent means the personal space. */
+    organizationId?: string;
     userId: string;
 }
 
@@ -514,6 +518,8 @@ export const insertTrigger = async (
         inputTemplate,
         model: args.model,
         name: args.name,
+        // Triggers created before this column was written have none and run in the personal space.
+        organizationId: owner.organizationId,
         quietWhenEmpty: args.quietWhenEmpty === true ? true : undefined,
         searchMode: args.searchMode,
         systemPrompt: cleanPromptField(args.systemPrompt, "The system prompt"),
@@ -552,7 +558,10 @@ export const createTrigger = authMutation
     .use(rateLimit("triggers/create"))
     .input({ ...triggerCreateFields })
     .output(v.object({ triggerId: v.string(), webhookSecret: v.optional(v.string()) }))
-    .mutation(async ({ args, ctx: context }) => await insertTrigger(context, { userId: context.user.userId }, args));
+    .mutation(
+        async ({ args, ctx: context }) =>
+            await insertTrigger(context, { organizationId: context.user.activeOrganization?.id, userId: context.user.userId }, args),
+    );
 
 /**
  * Creates a trigger for a plugin install. Called from an action. A trigger with the same marker is returned as it is, so a
@@ -1351,6 +1360,12 @@ export const admitTriggerRun = internalMutation
             return await refused(problem ?? "Your account no longer exists.");
         }
 
+        // An owner who left the trigger's organization cannot run it (`runHeadlessAgent` refuses too): refused before the
+        // charge, as tasks, evals and sub-agents are, and the caller pauses the trigger at once (`isLeftOrganizationRefusal`).
+        if (trigger.organizationId && !(await getMemberByOrganizationAndUser(ctx, trigger.organizationId, trigger.userId, "primary"))) {
+            return await refused(LEFT_ORGANIZATION_MESSAGE);
+        }
+
         const { DEFAULT_CHAT_MODEL } = await import("@neore/ai/constants");
         // The model the run uses (`execute.ts`): a bot's current model first, so the check and the run agree.
         const bot = trigger.botId ? await ctx.db.get("bots", trigger.botId) : null;
@@ -1522,12 +1537,14 @@ export const pruneExpiredRunPrompts = internalMutation
  * Closes an execution and tells the owner. A run is counted toward the trigger's failure
  * streak once, on the `running` to settled transition of its own execution row: a
  * redelivered call finds it already settled. `userFixable` marks a failure only the owner
- * can cure; any other failure leaves the streak where it was.
+ * can cure, and `permanent` one no later run can cure, which pauses the trigger at once;
+ * any other failure leaves the streak where it was.
  */
 export const updateExecution = internalMutation
     .input({
         error: v.optional(v.string()),
         executionId: v.id("triggerExecutions"),
+        permanent: v.optional(v.boolean()),
         // The prompt the run was given, for the run log. Written only by the settle that changes the row.
         prompt: v.optional(v.string().max(MAX_LENGTH.long)),
         status: v.string(),
@@ -1535,7 +1552,7 @@ export const updateExecution = internalMutation
         userFixable: v.optional(v.boolean()),
     })
     .output(v.null())
-    .mutation(async ({ args: { error, executionId, prompt, status, threadId, userFixable }, ctx }) => {
+    .mutation(async ({ args: { error, executionId, permanent, prompt, status, threadId, userFixable }, ctx }) => {
         const execution = await ctx.db.get("triggerExecutions", executionId);
 
         if (!execution) {
@@ -1572,14 +1589,23 @@ export const updateExecution = internalMutation
             return null;
         }
 
-        // The streak moves on the first settlement only; `pausedTrigger` remembers it so a redelivery can say the same thing.
+        // The streak moves on the first settlement only; `pausedTrigger` and `pausedPermanently` remember it, so a redelivery
+        // (which may not repeat `permanent`) says the same thing.
         let paused = execution.pausedTrigger === true;
+        let pausedPermanently = execution.pausedPermanently === true;
 
         if (settling) {
-            paused = await settleFailureStreak(ctx, trigger, execution.startedAt, runOutcome(settled.status, userFixable));
+            paused = await settleFailureStreak(ctx, trigger, execution.startedAt, runOutcome(settled.status, userFixable, permanent));
+            pausedPermanently = paused && permanent === true;
 
             if (paused) {
-                await ctx.db.patch("triggerExecutions", executionId, { pausedTrigger: true });
+                await ctx.db.patch("triggerExecutions", executionId, { pausedTrigger: true, ...(pausedPermanently && { pausedPermanently: true }) });
+            }
+
+            // A permanent pause names its cause on the trigger in this same write, so the trigger list cannot show the pause
+            // without it, whatever happens to the caller's later bookkeeping.
+            if (pausedPermanently && settled.error) {
+                await ctx.db.patch("triggers", trigger._id, { lastError: settled.error });
             }
         }
 
@@ -1599,7 +1625,7 @@ export const updateExecution = internalMutation
             title: trigger.name,
             type: "trigger",
             userId: trigger.userId,
-            ...(paused ? { body: pausedNoticeBody(settled.error) } : settled.error && { body: settled.error }),
+            ...(paused ? { body: pausedNoticeBody(settled.error, pausedPermanently) } : settled.error && { body: settled.error }),
         });
 
         return null;

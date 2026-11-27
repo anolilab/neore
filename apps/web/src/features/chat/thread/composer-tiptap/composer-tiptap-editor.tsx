@@ -19,27 +19,35 @@
 import { useLingui } from "@lingui/react/macro";
 import type { Editor } from "@tiptap/core";
 import PlaceholderExtension from "@tiptap/extension-placeholder";
+import type { EditorState } from "@tiptap/pm/state";
 import { Selection } from "@tiptap/pm/state";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKitExtension from "@tiptap/starter-kit";
 import clsx from "clsx";
-import { useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
 import useFavoriteModels from "@/features/chat/core/hooks/use-favorite-models";
+import { composerDraftFrom, markComposerDraft } from "@/features/chat/core/utils/draft-origin";
 import type { PromptHistoryDirection } from "@/features/chat/core/utils/prompt-history";
 import type { PromptVariable } from "@/features/prompts/lib/prompt-variables";
 import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
+import { LOAD_MARKS, useLoadMark } from "@/lib/analytics/load-marks";
 
 import type { ChatReference } from "../chat-reference";
 import { cleanEditorText } from "./clean-editor-text";
+import { readComposerText } from "./composer-text";
 import { composerEditorAttributes } from "./editor-attributes";
+import EmojiShortcodePopup from "./emoji-shortcode-popup";
 import type { BannedWordMatch } from "./extensions/banned-word-decoration";
 import BannedWordDecoration from "./extensions/banned-word-decoration";
+import type { EmojiShortcodeMatch } from "./extensions/emoji-shortcode";
+import EmojiShortcode from "./extensions/emoji-shortcode";
 import type { FileMentionMatch } from "./extensions/file-mention";
 import FileMention from "./extensions/file-mention";
-import GhostCompletion from "./extensions/ghost-completion";
+import GhostCompletion, { getGhostCompletion } from "./extensions/ghost-completion";
 import PromptHistoryKeys from "./extensions/prompt-history-keys";
+import PromptSearchKey from "./extensions/prompt-search-key";
 import QuoteChip, { refreshQuoteChipLabels } from "./extensions/quote-chip";
 import type { SlashCommandMatch } from "./extensions/slash-command";
 import SlashCommand from "./extensions/slash-command";
@@ -51,10 +59,14 @@ import type { VaultFileRef } from "./file-mention-popup";
 import FileMentionPopup from "./file-mention-popup";
 import type { GhostController, GhostEligibility, GhostRequest } from "./ghost-completion-controller";
 import { createGhostController, shouldAnnounceGhost } from "./ghost-completion-controller";
+import { appendPlainText, composerCoreExtensionOptions, pastePlainText } from "./paste-plain-text";
 import { plainTextToHtml } from "./plain-text";
 import SlashCommandPopup from "./slash-command-popup";
+import { useEmojiShortcode } from "./use-emoji-shortcode";
+import useMentionPrefetch from "./use-mention-prefetch";
 import VariableAutocompletePopup from "./variable-autocomplete-popup";
 import type { VimMode as VimModeName } from "./vim-keys";
+import { WrapSelection } from "./wrap-selection";
 
 // ============================================================================
 // Types
@@ -82,6 +94,21 @@ export interface ComposerTiptapEditorProps {
     /** Max height in rows (approximate) */
     maxRows?: number;
 
+    /**
+     * The suggestion is held back while the composer holds attachments: it is hidden now, and its record is kept, so a prompt the
+     * person dismissed stays dismissed when the attachments go.
+     */
+    nextPromptHeld?: boolean;
+
+    /** The chat the suggestion belongs to: the same text in another chat is placed again. */
+    nextPromptScope?: string | null;
+
+    /**
+     * The suggested next prompt after a reply, shown as ghost text in an empty composer: Tab inserts it, Escape or typing
+     * dismisses it. Set once per reply; `null` clears it.
+     */
+    nextPromptSuggestion?: string | null;
+
     /** Called when cancel/stop is clicked */
     onCancel?: () => void;
 
@@ -93,8 +120,15 @@ export interface ComposerTiptapEditorProps {
      * Escape). Returns the text to show, or `null` to let the key through.
      */
     onHistoryNavigate?: (direction: PromptHistoryDirection) => string | null;
+
     /** Called on paste (for file and long text handling) */
     onPaste?: (e: React.ClipboardEvent) => void;
+
+    /**
+     * Ctrl+R: opens the search over the person's sent prompts. Returns `true` when it opened, so the key is taken; omit it
+     * (or return `false`) and Ctrl+R stays the browser's reload.
+     */
+    onPromptSearch?: () => boolean;
     /** Called when a chat is selected from the @ popup, to attach its text */
     onSelectChat?: (chat: ChatReference) => void;
     /** Called when "Upload new file" is selected from the @ popup */
@@ -103,6 +137,7 @@ export interface ComposerTiptapEditorProps {
     onSelectVaultFile?: (file: VaultFileRef) => void;
     /** Called on submit (Enter without Shift) */
     onSubmit: () => void;
+
     /** Placeholder text */
     placeholder?: string;
 
@@ -123,9 +158,15 @@ export interface ComposerTiptapEditorProps {
 }
 
 export interface ComposerTiptapEditorRef {
+    /** `text` typed at the document's end, the blocks before it untouched; false when the editor cannot take it. */
+    appendText: (text: string) => boolean;
     blur: () => void;
     focus: () => void;
     getEditor: () => Editor | null;
+    /** Whether `event` is a paste made with Ctrl/Cmd+Shift+V, which keeps the text exactly as copied. */
+    isPlainPaste: (event: { timeStamp: number }) => boolean;
+    /** Inserts `text` over the selection (of `at` when given) as one undoable paste, a paragraph per line; false without an editor or when the text changed since `at`. */
+    pasteText: (text: string, at?: EditorState) => boolean;
 }
 
 // ============================================================================
@@ -135,6 +176,9 @@ export interface ComposerTiptapEditorRef {
 
 const EMPTY_BANNED_MATCHES: BannedWordMatch[] = [];
 const EMPTY_VARIABLES: PromptVariable[] = [];
+
+/** A paste this soon after Ctrl/Cmd+Shift+V came from it: the paste event itself does not say. */
+const PLAIN_PASTE_WINDOW_MS = 1000;
 
 /** How long the "suggestion available" announcement stays in the live region. */
 const ANNOUNCEMENT_CLEAR_MS = 4000;
@@ -146,7 +190,7 @@ const editorGhostState = (editor: Editor, focused: boolean): Pick<GhostEligibili
     return {
         caretAtEnd: selection.empty && selection.head === Selection.atEnd(doc).from,
         focused,
-        text: editor.getText({ blockSeparator: "\n" }),
+        text: readComposerText(editor),
     };
 };
 
@@ -167,6 +211,7 @@ const ComposerTiptapEditor = ({
     onCancel,
     onChange,
     onHistoryNavigate,
+    onPromptSearch,
     isHistoryRecalled,
     onPaste,
     onSelectChat,
@@ -174,6 +219,9 @@ const ComposerTiptapEditor = ({
     onSelectVaultFile,
     onSubmit,
     placeholder: placeholderProp,
+    nextPromptScope = null,
+    nextPromptHeld = false,
+    nextPromptSuggestion = null,
     ref,
     requestCompletion,
     suggestions = true,
@@ -188,8 +236,11 @@ const ComposerTiptapEditor = ({
 
     // Popup state
     const [slashMatchState, setSlashMatch] = useState<SlashCommandMatch | null>(null);
+    // Whether the slash menu shows: a slash with nothing to list shows nothing, so it must not hold the emoji list back.
+    const [slashOpen, setSlashOpen] = useState(false);
     const [fileMentionMatchState, setFileMentionMatch] = useState<FileMentionMatch | null>(null);
     const [variableMatchState, setVariableMatch] = useState<VariableAutocompleteMatch | null>(null);
+    const [emojiMatchState, setEmojiMatch] = useState<EmojiShortcodeMatch | null>(null);
     // With suggestions off nothing opens, so Enter still sends "/like this".
     const slashMatch = suggestions ? slashMatchState : null;
     const fileMentionMatch = suggestions ? fileMentionMatchState : null;
@@ -259,15 +310,36 @@ const ComposerTiptapEditor = ({
         historyRecalledRef.current = isHistoryRecalled;
     }, [isVimEnabled, isHistoryRecalled]);
 
+    const plainPasteKeyAt = useRef(-Infinity);
+
+    // The key handlers the extensions call. Tiptap's `extension.options` is a getter that returns a fresh object, and
+    // shortcuts read the options captured when the editor was built, so a handler assigned onto it later is lost; the
+    // extensions read this ref at key time instead. No popup check here: an open popup (one with items) takes Enter, the
+    // arrows and Escape on `window` in the capture phase, and a match without items must still let Enter send.
+    const keyHandlersRef = useRef({ isStreaming, onCancel, onHistoryNavigate, onPromptSearch, onSubmit });
+
+    useLayoutEffect(() => {
+        keyHandlersRef.current = { isStreaming, onCancel, onHistoryNavigate, onPromptSearch, onSubmit };
+    }, [isStreaming, onCancel, onHistoryNavigate, onPromptSearch, onSubmit]);
+
     // Create editor
     const editor = useEditor({
         autofocus: autoFocus ? "end" : false,
+        coreExtensionOptions: composerCoreExtensionOptions,
         editable: !disabled,
         editorProps: {
             attributes: composerEditorAttributes({ describedBy, invalid, label: t`Message` }),
             // The composer's paste handler runs first (capture phase) and prevents a paste it turns into a file; the editor
             // then leaves that paste alone, so a long text is never both attached and inserted.
             handlePaste: (_view, event) => event.defaultPrevented,
+            handleKeyDown: (_view, event) => {
+                // `code` is the physical key: on a Cyrillic or Greek layout `key` is not "v" for the same shortcut.
+                if (event.shiftKey && (event.ctrlKey || event.metaKey) && (event.code === "KeyV" || event.key.toLowerCase() === "v")) {
+                    plainPasteKeyAt.current = event.timeStamp;
+                }
+
+                return false;
+            },
         },
         extensions: [
             StarterKitExtension.configure({
@@ -292,14 +364,31 @@ const ComposerTiptapEditor = ({
                 placeholder: () => placeholderRef.current ?? "",
             }),
             // Before SubmitOnEnter: Escape restores a recalled prompt's draft first.
-            PromptHistoryKeys,
-            SubmitOnEnter.configure({
-                isStreaming: () => isStreaming,
-                onCancel,
-                onSubmit: () => {
-                    // Initial handler - will be kept in sync via useEffect
-                    onSubmit();
+            // eslint-disable-next-line react-hooks/refs -- tiptap calls these options from editor events, never during render
+            PromptHistoryKeys.configure({
+                onNavigate: (direction: PromptHistoryDirection) => keyHandlersRef.current.onHistoryNavigate?.(direction) ?? null,
+            }),
+            // eslint-disable-next-line react-hooks/refs -- tiptap calls these options from editor events, never during render
+            PromptSearchKey.configure({
+                onOpen: () => {
+                    const opened = keyHandlersRef.current.onPromptSearch?.() ?? false;
+
+                    // An open suggestion list takes the arrows, Enter and Escape on `window`; it closes so the search gets them.
+                    if (opened) {
+                        setSlashMatch(null);
+                        setFileMentionMatch(null);
+                        setVariableMatch(null);
+                    }
+
+                    return opened;
                 },
+            }),
+            // eslint-disable-next-line react-hooks/refs -- tiptap calls these options from editor events, never during render
+            SubmitOnEnter.configure({
+                // Escape cancels only with a cancel handler to call; otherwise it falls through.
+                isStreaming: () => keyHandlersRef.current.isStreaming && keyHandlersRef.current.onCancel !== undefined,
+                onCancel: () => keyHandlersRef.current.onCancel?.(),
+                onSubmit: () => keyHandlersRef.current.onSubmit(),
             }),
             BannedWordDecoration,
             QuoteChip.configure({
@@ -319,20 +408,26 @@ const ComposerTiptapEditor = ({
             VariableAutocomplete.configure({
                 onStateChange: handleVariableStateChange,
             }),
+            EmojiShortcode.configure({
+                onStateChange: setEmojiMatch,
+            }),
             // Inert until `requestCompletion` is set: it only draws what it is handed.
-            GhostCompletion,
+            // An accepted completion is the model's text: the draft is marked like a clicked suggestion, unless it already holds a mark.
+            GhostCompletion.configure({ onAccept: () => composerDraftFrom() ?? markComposerDraft("suggestion") }),
             // eslint-disable-next-line react-hooks/refs -- tiptap calls these options from editor events, never during render
             VimMode.configure({
                 isEnabled: () => vimEnabledRef.current,
                 isHistoryRecalled: () => historyRecalledRef.current?.() ?? false,
                 onModeChange: setVimMode,
             }),
+            // After VimMode: vim's normal mode takes typed text, and that must win over a wrap (`wrap-selection.ts`).
+            WrapSelection,
         ],
         immediatelyRender: false,
         onUpdate: ({ editor: ed }) => {
             isInternalUpdate.current = true;
             // Reads the raw text (the store counts what it removes), then cleans the document itself.
-            const text = ed.getText({ blockSeparator: "\n" });
+            const text = readComposerText(ed);
 
             cleanEditorText(ed);
             onChange(text);
@@ -342,6 +437,12 @@ const ComposerTiptapEditor = ({
             });
         },
     });
+
+    // The "@" and "/" menus' data, loaded on the first edit that leaves text in the composer, so they open with it.
+    const suggestionsWarm = useMentionPrefetch(editor, suggestions);
+
+    // Real-user load timing: the composer counts as visible once its editor exists (`lib/analytics/load-marks.ts`).
+    useLoadMark(LOAD_MARKS.composerVisible, editor !== null);
 
     // Sync placeholder ref + trigger a decoration re-render (with a brief fade) when placeholder changes.
     useEffect(() => {
@@ -381,6 +482,16 @@ const ComposerTiptapEditor = ({
             blur: () => editor?.commands.blur(),
             focus: () => editor?.commands.focus(),
             getEditor: () => editor,
+            // One shortcut, one paste: a normal paste right after it keeps its formatting.
+            isPlainPaste: (event: { timeStamp: number }) => {
+                const plain = event.timeStamp - plainPasteKeyAt.current < PLAIN_PASTE_WINDOW_MS;
+
+                plainPasteKeyAt.current = -Infinity;
+
+                return plain;
+            },
+            appendText: (text: string) => (editor && !editor.isDestroyed ? appendPlainText(editor, text) : false),
+            pasteText: (text: string, at?: EditorState) => (editor && !editor.isDestroyed ? pastePlainText(editor, text, at) : false),
         };
     }, [editor]);
 
@@ -390,7 +501,7 @@ const ComposerTiptapEditor = ({
             return;
         }
 
-        const currentText = editor.getText({ blockSeparator: "\n" });
+        const currentText = readComposerText(editor);
 
         if (currentText !== value) {
             // Convert plain text to paragraphs
@@ -410,15 +521,6 @@ const ComposerTiptapEditor = ({
             editor.setEditable(!disabled);
         }
     }, [disabled, editor]);
-
-    // The editor reads its attributes once, at creation: push a changed description or validity to the live element.
-    useEffect(() => {
-        if (editor && !editor.isDestroyed) {
-            editor.setOptions({
-                editorProps: { ...editor.options.editorProps, attributes: composerEditorAttributes({ describedBy, invalid, label: t`Message` }) },
-            });
-        }
-    }, [editor, describedBy, invalid, t]);
 
     // Turning Vim on or off while the editor is open: the caret class and the mode label follow at once, not at the next keystroke.
     useEffect(() => {
@@ -449,39 +551,126 @@ const ComposerTiptapEditor = ({
         editor.commands.setBannedWordMatches(bannedWordMatches);
     }, [bannedWordMatches, editor]);
 
-    // Update submit/cancel handlers - guard against submitting when a popup is open
-    useEffect(() => {
-        if (!editor) {
-            return;
-        }
-
-        for (const extension of editor.extensionManager.extensions) {
-            if (extension.name === "promptHistoryKeys") {
-                // eslint-disable-next-line react-hooks/immutability -- tiptap reads extension options at event time; reassigning them is its documented way to swap a handler without recreating the editor
-                extension.options.onNavigate = (direction: PromptHistoryDirection) => {
-                    if (slashMatch || fileMentionMatch || variableMatch || !onHistoryNavigate) {
-                        return null;
-                    }
-
-                    return onHistoryNavigate(direction);
-                };
+    // Replace for slash commands, file mentions, variables and emoji shortcodes
+    const handleReplace = useCallback(
+        (from: number, to: number, replacement: string) => {
+            if (!editor) {
+                return;
             }
 
-            if (extension.name !== "submitOnEnter") {
-                continue;
+            editor.chain().focus().deleteRange({ from, to }).insertContent(replacement).run();
+        },
+        [editor],
+    );
+
+    // Focus decides whether the `:shortcode` list is the composer's: keys typed in another field are not its to take. Read
+    // from the editor rather than tracked by an effect, so the state is right when the editor autofocuses on mount.
+    const subscribeEmojiFocus = useCallback(
+        (notify: () => void): (() => void) => {
+            if (!editor) {
+                return () => {};
             }
 
-            extension.options.onSubmit = () => {
-                if (slashMatch || fileMentionMatch || variableMatch) {
-                    return;
-                }
+            editor.on("focus", notify);
+            editor.on("blur", notify);
 
-                onSubmit();
+            return () => {
+                editor.off("focus", notify);
+                editor.off("blur", notify);
             };
-            extension.options.onCancel = onCancel;
-            extension.options.isStreaming = () => isStreaming;
+        },
+        [editor],
+    );
+    const emojiEditorFocused = useSyncExternalStore(
+        subscribeEmojiFocus,
+        () => editor?.isFocused ?? false,
+        () => false,
+    );
+
+    // The `:shortcode` list. It waits while another popup is open, since each takes the keys while it shows, while the
+    // composer is disabled, and in Vim normal mode, where Enter and Escape are the Vim keys.
+    const emoji = useEmojiShortcode({
+        enabled: suggestions && !disabled && vimMode !== "normal" && !slashOpen && !fileMentionMatch && !variableMatch,
+        focused: emojiEditorFocused,
+        match: emojiMatchState,
+        onReplace: handleReplace,
+    });
+    const emojiOpen = emoji.open;
+    const emojiListboxId = emoji.listboxId;
+    const emojiActiveOptionId = emoji.activeOptionId;
+
+    // The list is fixed to the composer's box as measured when it opened: re-measure while it is open, so scrolling or
+    // resizing does not leave it behind.
+    useEffect(() => {
+        if (!emojiOpen) {
+            return undefined;
         }
-    }, [onSubmit, onCancel, onHistoryNavigate, isStreaming, slashMatch, fileMentionMatch, variableMatch, editor]);
+
+        let frame: number | undefined;
+
+        // At most one measurement a frame, and none of the state update when the box has not moved: a scroll of the message
+        // list must not re-render the whole composer.
+        const remeasure = () => {
+            frame = undefined;
+
+            const container = editorContainerRef.current;
+
+            if (!container) {
+                return;
+            }
+
+            const rect = container.getBoundingClientRect();
+
+            setEditorRect((previous) => {
+                const moved =
+                    !previous || previous.left !== rect.left || previous.top !== rect.top || previous.width !== rect.width || previous.height !== rect.height;
+
+                return moved ? rect : previous;
+            });
+        };
+        const schedule = () => {
+            frame ??= requestAnimationFrame(remeasure);
+        };
+
+        // Measured as the list opens too: it may reopen after the composer moved while the list was closed.
+        schedule();
+        globalThis.addEventListener("scroll", schedule, { capture: true, passive: true });
+        globalThis.addEventListener("resize", schedule);
+
+        // A long shortcode that wraps grows the composer upward, with no scroll or resize: its own size change re-measures it.
+        const observer = new ResizeObserver(schedule);
+
+        if (editorContainerRef.current) {
+            observer.observe(editorContainerRef.current);
+        }
+
+        return () => {
+            if (frame !== undefined) {
+                cancelAnimationFrame(frame);
+            }
+
+            observer.disconnect();
+            globalThis.removeEventListener("scroll", schedule, { capture: true });
+            globalThis.removeEventListener("resize", schedule);
+        };
+    }, [emojiOpen]);
+
+    // The editor reads its attributes once, at creation: push a changed description, validity or open list to the live element.
+    useEffect(() => {
+        if (editor && !editor.isDestroyed) {
+            editor.setOptions({
+                editorProps: {
+                    ...editor.options.editorProps,
+                    attributes: composerEditorAttributes({
+                        describedBy,
+                        invalid,
+                        label: t`Message`,
+                        popup: emojiOpen ? { activeOptionId: emojiActiveOptionId, listboxId: emojiListboxId } : undefined,
+                    }),
+                },
+            });
+        }
+    }, [editor, describedBy, invalid, t, emojiOpen, emojiActiveOptionId, emojiListboxId]);
 
     // ---- Ghost-text autocomplete -------------------------------------------
     const [ghostAnnouncement, setGhostAnnouncement] = useState("");
@@ -489,13 +678,99 @@ const ComposerTiptapEditor = ({
     const ghostPropsRef = useRef({ disabled, isStreaming, popupOpen: false });
     const requestCompletionRef = useRef(requestCompletion);
     const lastAnnouncedAtRef = useRef<number | null>(null);
+    // The prompt last placed, by chat and text: the same text for another chat is said again.
+    // `dismissed` is set only when the person removes the prompt (typing or Escape): a pause hides it without dismissing it.
+    const lastPlacedPromptRef = useRef<{ dismissed: boolean; scope: string | null; text: string } | null>(null);
     const hasCompletionSource = Boolean(requestCompletion);
-    const isPopupOpen = Boolean(slashMatch || fileMentionMatch || variableMatch);
+    // A shortcode being typed counts as a popup, open or not yet, so the ghost does not finish it while it is typed. A bare
+    // colon, or the colon that closes a finished `:dog:`, has an empty query and is not typing one.
+    const emojiTyping = suggestions && emojiMatchState !== null && emojiMatchState.query !== "";
+    const isPopupOpen = Boolean(slashMatch || fileMentionMatch || variableMatch || emojiOpen || emojiTyping);
     const ghostAnnouncementText = t`Suggestion available, press Right Arrow to accept`;
 
     useEffect(() => {
         requestCompletionRef.current = requestCompletion;
     }, [requestCompletion]);
+
+    // The suggested next prompt is its own ghost source: the as-you-type controller clears what it does not own (on focus,
+    // for instance). It is placed when the suggestion arrives, once: typing dismisses it, and clearing the draft does not
+    // bring it back, because this runs only when the suggestion changes.
+    const promptAnnouncementText = nextPromptSuggestion ? t`Suggested next prompt: ${nextPromptSuggestion}. Press Tab to insert.` : "";
+
+    useEffect(() => {
+        if (!editor || editor.isDestroyed) {
+            return undefined;
+        }
+
+        // A disabled composer holds no prompt, because Tab would otherwise insert it into a draft that cannot be edited.
+        if (!nextPromptSuggestion || disabled || nextPromptHeld || readComposerText(editor) !== "") {
+            editor.commands.setSuggestedPrompt(null);
+            // The cleanup below cancels this suggestion's clear timer, so its line is cleared here instead of being left in the live region.
+            // A completion's announcement is kept: the as-you-type completion it describes is still on screen.
+            setGhostAnnouncement((current) => (current === ghostAnnouncementText ? current : ""));
+
+            // A reply without a suggestion starts over. A pause or a draft does not: a prompt dismissed in this reply stays dismissed.
+            if (!nextPromptSuggestion) {
+                lastPlacedPromptRef.current = null;
+            }
+
+            return undefined;
+        }
+
+        // Placed once per reply: a dismissal (typing or Escape) is not undone by a pause or a cleared draft.
+        if (
+            lastPlacedPromptRef.current?.dismissed &&
+            lastPlacedPromptRef.current.scope === nextPromptScope &&
+            lastPlacedPromptRef.current.text === nextPromptSuggestion
+        ) {
+            return undefined;
+        }
+
+        editor.commands.setSuggestedPrompt(nextPromptSuggestion);
+
+        // The same text for another chat is already what the live region holds, so it would not be said again: it is cleared, and said
+        // in a later task.
+        const sameTextForAnotherChat = lastPlacedPromptRef.current?.text === nextPromptSuggestion && lastPlacedPromptRef.current.scope !== nextPromptScope;
+
+        lastPlacedPromptRef.current = { dismissed: false, scope: nextPromptScope, text: nextPromptSuggestion };
+
+        let restoreAnnouncement: ReturnType<typeof setTimeout> | undefined;
+
+        if (sameTextForAnotherChat) {
+            setGhostAnnouncement("");
+            restoreAnnouncement = setTimeout(setGhostAnnouncement, 0, promptAnnouncementText);
+        } else {
+            setGhostAnnouncement(promptAnnouncementText);
+        }
+
+        const clearAnnouncement = setTimeout(setGhostAnnouncement, ANNOUNCEMENT_CLEAR_MS, "");
+
+        // Typing or Escape removes the prompt, and its line goes with it rather than when the timer runs out. The placement above
+        // is not seen: this listener is added after it.
+        const onTransaction = () => {
+            if (getGhostCompletion(editor.state)?.kind === "prompt") {
+                return;
+            }
+
+            // The person removed it (typing or Escape): it is dismissed for this reply, so a pause does not bring it back.
+            if (lastPlacedPromptRef.current) {
+                lastPlacedPromptRef.current.dismissed = true;
+            }
+
+            editor.off("transaction", onTransaction);
+            clearTimeout(clearAnnouncement);
+            clearTimeout(restoreAnnouncement);
+            setGhostAnnouncement("");
+        };
+
+        editor.on("transaction", onTransaction);
+
+        return () => {
+            editor.off("transaction", onTransaction);
+            clearTimeout(clearAnnouncement);
+            clearTimeout(restoreAnnouncement);
+        };
+    }, [disabled, editor, ghostAnnouncementText, nextPromptHeld, nextPromptScope, nextPromptSuggestion, promptAnnouncementText]);
 
     useEffect(() => {
         if (!editor || !hasCompletionSource) {
@@ -505,7 +780,7 @@ const ComposerTiptapEditor = ({
         let clearAnnouncement: ReturnType<typeof setTimeout> | undefined;
 
         const controller = createGhostController({
-            getText: () => editor.getText({ blockSeparator: "\n" }),
+            getText: () => readComposerText(editor),
             onSuggestion: (suggestion) => {
                 if (editor.isDestroyed) {
                     return;
@@ -562,18 +837,6 @@ const ComposerTiptapEditor = ({
         }
     }, [disabled, isStreaming, isPopupOpen, editor]);
 
-    // Handle replace for slash commands, file mentions, and variables
-    const handleReplace = useCallback(
-        (from: number, to: number, replacement: string) => {
-            if (!editor) {
-                return;
-            }
-
-            editor.chain().focus().deleteRange({ from, to }).insertContent(replacement).run();
-        },
-        [editor],
-    );
-
     // The editor's text now, for a `/clear` that finished while the person may have kept typing. A destroyed editor (the
     // chat changed) reads as empty, which no command matches.
     const readDraft = useCallback(() => (editor && !editor.isDestroyed ? editor.getText() : ""), [editor]);
@@ -621,8 +884,8 @@ const ComposerTiptapEditor = ({
                 </span>
             )}
 
-            {/* The ghost itself is aria-hidden; this says once in a while that Right Arrow would accept one. */}
-            {hasCompletionSource && (
+            {/* The ghost itself is aria-hidden; this says once in a while that a ghost is there to accept. */}
+            {(hasCompletionSource || Boolean(nextPromptSuggestion)) && (
                 <span aria-live="polite" className="sr-only" role="status">
                     {ghostAnnouncement}
                 </span>
@@ -636,8 +899,10 @@ const ComposerTiptapEditor = ({
                 match={slashMatch}
                 models={models}
                 onDismiss={handleDismissSlash}
+                onOpenChange={setSlashOpen}
                 onReplace={handleReplace}
                 readDraft={readDraft}
+                warm={suggestionsWarm}
             />
 
             {/* File mention popup */}
@@ -659,6 +924,22 @@ const ComposerTiptapEditor = ({
                 match={variableMatch}
                 onDismiss={handleDismissVariable}
                 onReplace={handleReplace}
+            />
+
+            {/* Emoji shortcode list. The announcement is always mounted, so a screen reader hears each count change. */}
+            {suggestions && (
+                <span aria-live="polite" className="sr-only" role="status">
+                    {emoji.announcement}
+                </span>
+            )}
+            <EmojiShortcodePopup
+                editorRect={editorRect}
+                listboxId={emoji.listboxId}
+                onHighlight={emoji.highlight}
+                onSelect={emoji.select}
+                open={emoji.open}
+                selected={emoji.selected}
+                suggestions={emoji.suggestions}
             />
         </div>
     );

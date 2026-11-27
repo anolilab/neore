@@ -137,6 +137,31 @@ describe("chatFileThreads is written by the message writers", () => {
 
         await expect(linksOf({ threadId: copy })).resolves.toMatchObject([{ fileId, threadId: copy, userId: OWNER }]);
     });
+
+    it("a fork of two messages sharing one file adds exactly two references", async () => {
+        await send(OWNER, threadId, [fileId]);
+        await send(OWNER, threadId, [fileId]);
+
+        const refcountOf = async (): Promise<number> => {
+            const file = await run(async (ctx) => await ctx.db.get("chatFiles", fileId));
+
+            return file.refcount;
+        };
+        const before = await refcountOf();
+        const copy = await newThread(OWNER);
+
+        await run(
+            async (ctx) =>
+                await ctx.runMutation(cloneMessageBatch, {
+                    paginationOpts: { cursor: null, numItems: 100 },
+                    sourceThreadId: threadId,
+                    statuses: ["success"],
+                    targetThreadId: copy,
+                }),
+        );
+
+        expect(await refcountOf()).toBe(before + 2);
+    });
 });
 
 describe("a permanent delete of a chat with many linked files", () => {

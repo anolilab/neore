@@ -171,12 +171,15 @@ const OWNER_TABLES = [
     "aiUserPreferences",
     "bots",
     "browserExtensions",
+    "browserHumanChecks",
     "browserSessions",
     "chatImportJobs",
     "codingAgentRuns",
     "dailyBriefState",
     "deviceCalls",
     "deviceCode",
+    "mcpEventWatermarks",
+    "mcpEvents",
     "devicePairingRevocations",
     "devices",
     "documentVersions",
@@ -191,6 +194,7 @@ const OWNER_TABLES = [
     "evalDatasets",
     "evalResults",
     "evalRuns",
+    "feedback",
     "folders",
     "gatewayNotifications",
     "gatewayUsageDeductions",
@@ -203,6 +207,8 @@ const OWNER_TABLES = [
     "mcpServerGrants",
     "memories",
     "memoryDigests",
+    "memoryImportBatches",
+    "memoryImportJobs",
     "memoryReflectionState",
     "messengerConnections",
     "notifications",
@@ -217,14 +223,18 @@ const OWNER_TABLES = [
     "pullRequestThreads",
     "requestedSecrets",
     "reviewDrafts",
+    "runWebhooks",
     "sandboxSessions",
+    "savedSiteLogins",
     "session",
     "skillInvocations",
     "subAgentRuns",
     "systemPromptPresets",
     "taskRuns",
+    "taskSuggestions",
     "tasks",
     "temporaryThreads",
+    "threadFollows",
     "threadGoals",
     "teammateConnectorAccess",
     "threadGuestLinks",
@@ -239,6 +249,10 @@ const OWNER_TABLES = [
     "twoFactor",
     "usageBackfill",
     "usageDaily",
+    "usageExportPieces",
+    "usageExportProjects",
+    "usageExportRuns",
+    "usageOrganizationReplies",
     "usageReplies",
     "userConnectors",
     "userSettings",
@@ -376,6 +390,15 @@ const RULES: Record<string, TableRules> = {
         },
         update: (scope, row) => threadLevelAtLeast(scope, row.threadId, "admin"),
     },
+    // A grantee's own grant revisions; written only by the internal grant mutations.
+    threadAccessRevisions: {
+        delete: () => false,
+        insert: () => false,
+        read: (_scope, userId) => {
+            return { userId };
+        },
+        update: () => false,
+    },
     // A condensed copy of the thread's content: readable by whoever reads the thread. Written only by internal functions.
     threadContextSummaries: threadScoped({ hasUserId: true }),
     // No `userId`: the pending tokens are the owner's and admin grantees' alone.
@@ -418,11 +441,19 @@ const RULES: Record<string, TableRules> = {
  * fails when a schema table is in neither this list nor {@link POLICIES}.
  */
 export const UNPOLICED_TABLES: Record<string, string> = {
+    accountMoves:
+        "the erasure and guest-merge markers: written by those workflows before an account's pins move, read by pin writers through the primary; no client reads them",
     actionCache: "server-side cache of computed values; no user column",
     apikey: "better-auth's own table, reached through its adapter and `verifyApiKey`",
     auditLog: "admin-only audit trail (`admin*` procedures)",
+    billingErasures: "erased billing references; written by the deletion step and read by the webhook, system only",
+    botOwners:
+        "bot creator record, global: written by `createBot`, erased with its owner; read by the memory list (`listUserMemories` through `memory/bot-owner.ts`), which returns only whether a bot is someone else's and whether it was deleted, never the owner id",
     browserActions: "no owner column; read only after the parent browser session's owner check",
     changelogCache: "public changelog cache",
+    chatFileMetadata:
+        "the export view of a shared `chatFiles` row (name, type, hash, stored-at), written and erased with that row; read only by the GDPR export, which reads it for files the user holds a grant for or names in a message",
+    chatFileObjectDeletes: "a chat-file storage object no row names, to be deleted; no user column, written and read only by the file store and its deletes",
     chatFiles: "content-addressed and SHARED (same bytes, one row) — no owner; access is the `chatFileAccess` grant",
     chatFileThreads:
         "derived index of which of the owner's chats hold a chat file; read only as a yes/no by the lock gate, never returned, written by `changeMessageFiles` and the chat-file backfill (`agent/file-link-backfill.ts`), and deleted directly by `deleteChatFileLinksForThread` (permanent thread delete) and `eraseChatFileThreadsForUser` (account erasure)",
@@ -439,23 +470,35 @@ export const UNPOLICED_TABLES: Record<string, string> = {
     nodeExecutions: "no owner column; internal only",
     organization: "better-auth organizations; org-scoped",
     organizationPolicies: "an organization's policy document; the owner writes and any member reads, both decided by the caller's active-organization role",
-    payment_customers: "`@lunora/payment` store (Creem customers); read and written only through `ctx.payments` on `__root__`",
+    payment_customers:
+        "`@lunora/payment` store (Creem customers); read through `ctx.payments`, written only through the store and `billing/customers.ts` `seedCustomer`, on `__root__`",
     payment_events: "`@lunora/payment` webhook claim log; system only",
+    payment_referenceRevisions: "`@lunora/payment` per-reference grant counter; unused (`singleSubscriptionPerReference` is off), system only",
     payment_sessions: "`@lunora/payment` store (Creem checkouts); system only",
     payment_subscriptions: "`@lunora/payment` store (Creem subscriptions); system only — the tier lands on `user` / `organization`",
     payment_usageEvents: "`@lunora/payment` usage metering; unused (Creem has none), system only",
     persistentChunks: "no owner column; read through HTTP actions keyed by a verified stream token",
+    pinWriteLeases:
+        "the in-flight pin-write lease of an account: renewed by pin writers before their move check, read by the move that waits for them; no client reads it",
     playgroundApiKeys: "internal only",
     presentationSlides: "no owner column; every access follows the parent presentation's owner check",
     projectKnowledge: "link rows with no owner column; every access follows the project's owner check",
     projectRepositories:
         "access is decided by the row's project, never its own `userId`/`organizationId` copies: `readableProject`/`editableProject` in `projects/functions.ts` (read: the owner or a current member of the project's organization; change: the owner, or any current member when the project has no owner)",
+    projectRuleFiles:
+        "one row per project; its `userId` copies the project's owner (re-stamped on account merge) for erasure only (`eraseProjectRuleFilesForUser`), and every access follows the project's check (`readableProject`, `projectWithEditableSettings` in `projects/functions.ts`)",
     promptHistory: "`userId` is the EDITOR of an org-shared prompt; read under the prompt's rule",
+    pullRequestStateScans:
+        "the housekeeping sweep's scan position over the owner's pull-request links; written and read only by `dispatchLinkedPullRequestChecks` on the owner's shard, erased with the links (`source-control/gdpr.ts`); no client reads it",
     rateLimit: "better-auth rate limiter",
     rateLimits: "rate-limit counters written by every procedure's rate-limit middleware",
     sandboxActions: "no owner column; internal only",
     shardActivity: "per-shard housekeeping bookkeeping; system only",
+    shardPinFences:
+        "an erasure's fence on one owner shard: read by the pin write in its own transaction and written only by the erasure's sweep; no client reads it",
     shardRoutes: "key → owner-shard lookup (a share token, a webhook id), read before any identity; holds no user content",
+    sharedPinRoutes:
+        "a collaborator's pin routes: written by the pin writers on the owner's shard, read only by the owner-side export (internal); no client reads it",
     signUpInvitation: "invite-only registration; admin and seed route only",
     skillFiles: "internal only",
     skillHistory: "`userId` is the EDITOR (an org admin edits another member's skill); read under the skill's rule",
@@ -466,7 +509,13 @@ export const UNPOLICED_TABLES: Record<string, string> = {
     teamMember: "better-auth team membership; org-scoped",
     teamSettings: "org-scoped settings, checked by org role",
     threadKnowledge: "link rows with no owner column; every access follows a thread access check",
+    threadPurgeMarks:
+        "a chat deleted for good, with no user column: written by its grant purge and read through the primary by the internal grant writers (`agent/grant-revision.ts#markThreadPurged`); no client reads it",
     triggerExecutions: "no owner column; every access follows the parent trigger's owner check",
+    usageOrganizationCohortSlots:
+        "global booking slots per organization; written by the contributor booking and read by the organization usage view, both through systemDb",
+    usageOrganizationContributors:
+        "global list of the organization view's contributors; read only by the admin-checked organization query (through systemDb), written by the contributor's own reply and erased with the account",
     verification: "better-auth verification tokens",
 };
 

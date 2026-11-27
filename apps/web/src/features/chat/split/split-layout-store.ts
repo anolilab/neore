@@ -1,7 +1,8 @@
 "use client";
 
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import type { StateStorage } from "zustand/middleware";
+import { createJSONStorage, persist } from "zustand/middleware";
 
 import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
 
@@ -14,6 +15,38 @@ type SplitLayoutState = {
     /** Each pane's header title, reported by the pane once its chat has loaded. Not saved: a reload reads them again. */
     setTitle: (threadId: string, title: string) => void;
     titles: Record<string, string>;
+};
+
+/**
+ * Whether the saved layout has been read in this page. Until it has, the store holds an empty layout, and a write would replace the
+ * saved panes with it when the read fails (zustand swallows a failed read: its `onRehydrateStorage` callback is the only signal).
+ */
+const savedLayout = { read: false };
+
+const guardedLocalStorage: StateStorage = {
+    // A value that does not parse is treated as no saved layout. Otherwise it would fail every read, and the write guard would then block
+    // every save for good.
+    getItem: (name) => {
+        const raw = localStorage.getItem(name);
+
+        if (raw === null) {
+            return null;
+        }
+
+        try {
+            JSON.parse(raw);
+
+            return raw;
+        } catch {
+            return null;
+        }
+    },
+    removeItem: (name) => localStorage.removeItem(name),
+    setItem: (name, value) => {
+        if (savedLayout.read) {
+            localStorage.setItem(name, value);
+        }
+    },
 };
 
 /**
@@ -45,6 +78,10 @@ export const useSplitLayoutStore = create<SplitLayoutState>()(
                 return { ...current, layout: parseSplitLayout((persisted as { layout?: unknown } | undefined)?.layout) };
             },
             name: "chat-split-layout",
+            onRehydrateStorage: () => (_state, error) => {
+                savedLayout.read = error === undefined;
+            },
+            storage: createJSONStorage(() => guardedLocalStorage),
             partialize: (state) => {
                 return { layout: state.layout };
             },
@@ -66,11 +103,32 @@ export const hydrateSplitLayout = (): Promise<void> => {
         return Promise.resolve();
     }
 
-    hydration.pending ??= Promise.resolve(useSplitLayoutStore.persist.rehydrate()).finally(() => {
+    const read = async (): Promise<void> => {
+        await useSplitLayoutStore.persist.rehydrate();
+
+        // zustand resolves a read that failed too: only a store that has hydrated holds the saved layout.
+        if (!useSplitLayoutStore.persist.hasHydrated()) {
+            throw new Error("The saved split layout could not be read.");
+        }
+    };
+
+    hydration.pending ??= read().finally(() => {
         hydration.pending = undefined;
     });
 
     return hydration.pending;
+};
+
+/**
+ * The saved layout for the split view's own start. A layout that cannot be read starts empty instead of holding the view back: the
+ * route's chat still shows. The chat-opening paths use `hydrateSplitLayout` directly, so they can fall back on a failed read.
+ */
+export const readSavedLayoutOrEmpty = async (): Promise<void> => {
+    try {
+        await hydrateSplitLayout();
+    } catch {
+        // The saved layout stays empty; a later read may still succeed.
+    }
 };
 
 /** Whether the chat reads: a missing chat answers null or fails, and either way it is not a survivor. */
@@ -95,7 +153,12 @@ export const survivingPaneAfterDelete = async (
         return undefined;
     }
 
-    await hydrateSplitLayout();
+    try {
+        await hydrateSplitLayout();
+    } catch {
+        // An unreadable layout has no pane to move to: the caller goes to the chat list instead.
+        return undefined;
+    }
 
     const deleted = new Set(deletedIds);
     const candidates = useSplitLayoutStore.getState().layout.panes.filter((id) => !deleted.has(id));
@@ -108,20 +171,50 @@ export const survivingPaneAfterDelete = async (
 /** Whether the address names one of these chats: a delete that has moved the route on must not move it again. */
 export const routeIsOn = (threadIds: ReadonlyArray<string>): boolean => globalThis.location.pathname.split("/").some((part) => threadIds.includes(part));
 
-/**
- * Opens a chat as a new pane. `"focused"` when it was already open, `"full"` when every pane is taken (nothing changes).
- * Loads the saved layout first, so a click before the split view has mounted does not lose the panes saved earlier.
- */
-export const openThreadInSplitView = async (threadId: string): Promise<"focused" | "full" | "opened"> => {
+/** What opening a chat as a pane did: it was already open, it opened, every pane is taken, or a later click has overtaken this one. */
+export type PaneOpenResult = "focused" | "full" | "opened" | "superseded";
+
+/** Dispatches one open action once the saved layout is in. */
+const openPane = async (threadId: string, type: "open" | "openBeside", after: string | undefined, isCurrent: () => boolean): Promise<PaneOpenResult> => {
     await hydrateSplitLayout();
+
+    // A click a later one has overtaken changes nothing: the later click's pane is the one wanted.
+    if (!isCurrent()) {
+        return "superseded";
+    }
 
     const wasOpen = useSplitLayoutStore.getState().layout.panes.includes(threadId);
 
-    useSplitLayoutStore.getState().dispatch({ threadId, type: "open" });
+    useSplitLayoutStore.getState().dispatch(type === "open" ? { threadId, type } : { after, threadId, type });
 
     if (wasOpen) {
         return "focused";
     }
 
     return useSplitLayoutStore.getState().layout.panes.includes(threadId) ? "opened" : "full";
+};
+
+/**
+ * Opens a chat as a new pane at the end. `"focused"` when it was already open, `"full"` when every pane is taken (nothing changes).
+ * Loads the saved layout first, so a click before the split view has mounted does not lose the panes saved earlier.
+ */
+export const openThreadInSplitView = (threadId: string): Promise<PaneOpenResult> => openPane(threadId, "open", undefined, () => true);
+
+/**
+ * Opens a chat as a pane right after `afterThreadId`'s pane, or after the focused one when that chat has no pane: the side panel a
+ * sub-agent link opens. Same results as `openThreadInSplitView`.
+ */
+export const openThreadBesideFocusedPane = (threadId: string, afterThreadId?: string, isCurrent: () => boolean = () => true): Promise<PaneOpenResult> =>
+    openPane(threadId, "openBeside", afterThreadId, isCurrent);
+
+/**
+ * Shows a chat in the main view while the split view is on: focuses its pane, or puts it in place of the focused pane, as a route
+ * change does. A route that already names the chat does not change, so the main view needs this to move focus to it.
+ */
+export const showThreadInSplitView = async (threadId: string, isCurrent: () => boolean = () => true): Promise<void> => {
+    await hydrateSplitLayout();
+
+    if (isCurrent()) {
+        useSplitLayoutStore.getState().dispatch({ threadId, type: "show" });
+    }
 };

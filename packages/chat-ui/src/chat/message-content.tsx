@@ -14,13 +14,16 @@ import { useLingui } from "@lingui/react/macro";
 import { Reasoning, ReasoningContent, ReasoningTrigger } from "@neore/ui/components/ai-elements/reasoning";
 import { Source, Sources, SourcesContent, SourcesTrigger } from "@neore/ui/components/ai-elements/sources";
 import AnimatedTiles from "@neore/ui/components/animated-tiles";
+import CachedMarkdownBlock from "@neore/ui/components/cached-markdown-block";
 import { chatMarkdownComponents, hostMarkdownComponents } from "@neore/ui/components/chat-markdown-components";
 import type { FileRendererType } from "@neore/ui/components/file-renderers/file-type-utilities";
 import { getFileRendererType } from "@neore/ui/components/file-renderers/file-type-utilities";
 import { useFocusableCodeBlocks } from "@neore/ui/hooks/use-focusable-code-blocks";
 import useStreamdownAppearance from "@neore/ui/hooks/use-streamdown-appearance";
-import useStreamdownPlugins from "@neore/ui/hooks/use-streamdown-plugins";
-import { AlertCircle, ChevronDown, ChevronRight, FileIcon, Globe, Loader2, Play, Presentation, Terminal } from "lucide-react";
+import useStreamdownPlugins, { streamdownRehypePlugins } from "@neore/ui/hooks/use-streamdown-plugins";
+import { MarkdownBlockCacheContext } from "@neore/ui/utils/markdown-block-cache";
+import { safeImageDownloadUrl, saveOnClick } from "@neore/ui/utils/save-from-url";
+import { AlertCircle, ChevronDown, ChevronRight, Download, FileIcon, Globe, Loader2, Play, Presentation, Terminal } from "lucide-react";
 import type { ComponentType, FC, ReactNode } from "react";
 import { lazy, memo, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Streamdown } from "streamdown";
@@ -32,10 +35,13 @@ import { createCitationMarker, safeHttpUrl } from "../utils/citation-marker";
 import cn from "../utils/cn";
 import { resolveDeviceToolName } from "../utils/device-tool-name";
 import { isHostRunText } from "../utils/host-run-text";
+import { imageOrdinals } from "../utils/image-ordinals";
 import { mcpToolMetaKey, resolveMcpToolName } from "../utils/mcp-tool-name";
 import { getPageContextInfo } from "../utils/page-context";
 import { SANDBOX_FILE_TOOL_TYPES, sandboxOutputsOf } from "../utils/sandbox-files";
+import { browserImageKey, codeImageKey } from "../utils/thread-images";
 import { toolImageSource } from "../utils/tool-image-source";
+import { GalleryImage } from "./gallery-image";
 import PageContextChip from "./page-context-chip";
 import PdfPart from "./pdf-part";
 import ToolGroup from "./tool-group";
@@ -72,20 +78,52 @@ const IMAGE_GENERATING_MARKER = "__IMAGE_GENERATING__";
 const VIDEO_GENERATING_MARKER = "__VIDEO_GENERATING__";
 const AUDIO_GENERATING_MARKER = "__AUDIO_GENERATING__";
 
+/**
+ * The error kinds older builds saved for a local reply in place of a sentence (`unreachable`, `stream`). Matched exactly: a server
+ * message that merely looks like a code is shown as written.
+ */
+const LEGACY_LOCAL_ERROR_CODES: ReadonlySet<string> = new Set([
+    "aborted",
+    "cors",
+    "http",
+    "mixed-content",
+    "not-found",
+    "permission-denied",
+    "stream",
+    "timeout",
+    "unknown",
+    "unreachable",
+]);
+
+/** Where an image sits in its message, so an `Image` override can act on that one image (pin it, open it). */
+export interface ImagePlace {
+    /** The image's place among the message's images (`utils/image-ordinals.ts`), which a reply edit leaves as it is. */
+    imageIndex?: number;
+    messageId?: string;
+    /** The role of the message the image is in (`"user"`, `"assistant"`). */
+    messageRole?: string;
+}
+
+/** What the `Image` renderer is given: the image, and where it sits (absent when a caller renders one on its own). */
+export type ImageRendererProps = ImagePlace & { part: ImagePart };
+
 interface MessageContentProps {
     /** The accessible name of the inline `[n]` citation marker for source `n` — pass a translated one. Keep it stable (module scope or memoized). */
     citationLabel?: (index: number) => string;
     className?: string;
     components?: {
+        /** Rendered in place of a browser call's result whose page needs a person, and the person was asked (`humanCheck.status: "asked"`). */
+        BrowserHumanCheck?: FC<{ part: ToolPart }>;
+
         /**
          * Rendered for every call of a tool that runs on the user's own computer
          * (`utils/device-tool-name.ts`), in every state after approval — its
          * progress (approval prompt on the device, running) lives outside the message.
          */
         DeviceToolCall?: FC<{ part: ToolPart }>;
-        DocumentArtifact?: FC<{ documentId: string; kind: string; title: string; version: number }>;
+        DocumentArtifact?: FC<{ documentId: string; kind: string; threadId?: string; title: string; version: number }>;
         File?: FC<{ part: FilePart }>;
-        Image?: FC<{ part: ImagePart }>;
+        Image?: FC<ImageRendererProps>;
         McpApp?: FC<{ part: ToolPart; resourceUri: string; serverName: string; toolName: string }>;
         PresentationArtifact?: FC<{ presentationId: string; slideCount: number; styleName?: string; title: string }>;
         Reasoning?: FC<{ isStreaming?: boolean; literalImages?: boolean; text: string }>;
@@ -130,20 +168,25 @@ const DefaultText: FC<{ isAnimating: boolean; literalImages?: boolean; text: str
 
     // `codeBlockMaxHeight="none"`: the 24-line cap is per block (`chatMarkdownComponents`), not Streamdown's global 400px.
     // `contents` keeps the wrapper out of the layout.
+    // A finished reply's parsed blocks are cached across mounts (`CachedMarkdownBlock`); a streaming one is not.
     return (
         <div className="contents" ref={rootRef}>
-            <Streamdown
-                className="streamdown-animate"
-                codeBlockMaxHeight="none"
-                components={literalImages ? hostMarkdownComponents : chatMarkdownComponents}
-                isAnimating={isAnimating}
-                lineNumbers={codeLineNumbers}
-                mermaid={mermaid}
-                plugins={plugins}
-                shikiTheme={shikiTheme}
-            >
-                {text}
-            </Streamdown>
+            <MarkdownBlockCacheContext value={!isAnimating}>
+                <Streamdown
+                    BlockComponent={CachedMarkdownBlock}
+                    className="streamdown-animate"
+                    codeBlockMaxHeight="none"
+                    components={literalImages ? hostMarkdownComponents : chatMarkdownComponents}
+                    isAnimating={isAnimating}
+                    lineNumbers={codeLineNumbers}
+                    mermaid={mermaid}
+                    plugins={plugins}
+                    rehypePlugins={streamdownRehypePlugins(text)}
+                    shikiTheme={shikiTheme}
+                >
+                    {text}
+                </Streamdown>
+            </MarkdownBlockCacheContext>
         </div>
     );
 });
@@ -347,13 +390,27 @@ const FileLoadingFallback: FC<{ name?: string }> = memo(({ name }) => {
 FileLoadingFallback.displayName = "FileLoadingFallback";
 
 /** One file part: an image, or the preview its type maps to (`FILE_RENDERERS`), falling back to the download card. */
-const FilePartView: FC<{ generationPrompt?: string; Image: FC<{ part: ImagePart }>; part: FilePart }> = ({ generationPrompt, Image, part }) => {
+const FilePartView: FC<ImagePlace & { generationPrompt?: string; Image: FC<ImageRendererProps>; part: FilePart }> = ({
+    generationPrompt,
+    Image,
+    imageIndex,
+    messageId,
+    messageRole,
+    part,
+}) => {
     const { filename, mediaType, nsfwStatus } = part;
     const fileUrl = part.url || part.data;
     const type = fileUrl ? getFileRendererType(mediaType, filename) : "generic";
 
     if (type === "image") {
-        return <Image part={{ filename, image: fileUrl ?? "", nsfwStatus, prompt: generationPrompt, type: "image" }} />;
+        return (
+            <Image
+                imageIndex={imageIndex}
+                messageId={messageId}
+                messageRole={messageRole}
+                part={{ filename, image: fileUrl ?? "", nsfwStatus, prompt: generationPrompt, type: "image" }}
+            />
+        );
     }
 
     const Renderer = FILE_RENDERERS[type];
@@ -407,9 +464,9 @@ const NsfwBlockedPlaceholder: FC<{ nsfwStatus: string }> = memo(({ nsfwStatus })
 NsfwBlockedPlaceholder.displayName = "NsfwBlockedPlaceholder";
 
 /**
- * Default Image renderer
+ * Default Image renderer. Exported so an `Image` override can wrap it rather than copy it.
  */
-const DefaultImage: FC<{ part: ImagePart }> = memo(({ part }) => {
+export const DefaultImage: FC<ImageRendererProps> = memo(({ part }) => {
     const { t } = useLingui();
 
     // Show placeholder for blocked or checking images
@@ -417,8 +474,11 @@ const DefaultImage: FC<{ part: ImagePart }> = memo(({ part }) => {
         return <NsfwBlockedPlaceholder nsfwStatus={part.nsfwStatus} />;
     }
 
+    // Only a link to a value safe to open on its own: a modified click skips the save helper's check.
+    const downloadUrl = safeImageDownloadUrl(part.image);
+
     return (
-        <div className="mb-4">
+        <div className="group/image relative mb-4 w-fit max-w-full">
             <img
                 alt={part.prompt || part.filename || t`Image`}
                 className="max-h-[400px] max-w-full rounded-lg object-contain"
@@ -426,6 +486,21 @@ const DefaultImage: FC<{ part: ImagePart }> = memo(({ part }) => {
                 loading="lazy"
                 src={part.image}
             />
+            {/* Top left, so an override's own button (a pin) can take the top right. Always shown where nothing can hover. */}
+            {downloadUrl && (
+                <a
+                    aria-label={part.filename ? t`Download ${part.filename}` : t`Download image`}
+                    className="bg-background/80 hover:bg-background absolute top-2 left-2 inline-flex size-8 items-center justify-center rounded-md border opacity-0 shadow-sm backdrop-blur-sm transition-opacity group-focus-within/image:opacity-100 group-hover/image:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
+                    download={part.filename ?? ""}
+                    href={downloadUrl}
+                    onClick={saveOnClick(downloadUrl, part.filename, "image")}
+                    rel="noopener noreferrer"
+                    target="_blank"
+                    title={t`Download image`}
+                >
+                    <Download aria-hidden="true" className="size-4" />
+                </a>
+            )}
             {part.prompt && (
                 <p className="text-muted-foreground mt-1.5 line-clamp-2 text-xs italic" title={part.prompt}>
                     {part.prompt}
@@ -520,7 +595,7 @@ interface CodeExecutionOutput {
     unsavedMedia?: number;
 }
 
-const CodeExecutionResultView: FC<{ part: ToolPart }> = memo(({ part }) => {
+const CodeExecutionResultView: FC<{ messageId: string; part: ToolPart }> = memo(({ messageId, part }) => {
     const { t } = useLingui();
     const [isCodeExpanded, setIsCodeExpanded] = useState(false);
     const isLoading = part.state === "input-streaming" || part.state === "input-available";
@@ -592,7 +667,12 @@ const CodeExecutionResultView: FC<{ part: ToolPart }> = memo(({ part }) => {
 
                             return source === undefined ? null : (
                                 <div className="flex justify-center border-b border-gray-100 p-3 last:border-b-0 dark:border-gray-800" key={resultKey}>
-                                    <img alt={t`Code output`} className="max-w-full rounded" src={source} />
+                                    <GalleryImage
+                                        alt={t`Code output`}
+                                        className="max-w-full rounded"
+                                        imageKey={codeImageKey(messageId, part.toolCallId, index)}
+                                        src={source}
+                                    />
                                 </div>
                             );
                         }
@@ -654,7 +734,7 @@ const DOCUMENT_ARTIFACT_TOOLS = new Set(["tool-createDocument", "tool-deepResear
 /** Tools that render their own card or ask the person something; never folded into a summary. */
 const UNFOLDABLE_TOOLS = new Set(["tool-askUser", "tool-browser", "tool-codeExecution", "tool-createPresentation", "tool-updateSlide"]);
 
-const BrowserToolResultView: FC<{ part: ToolPart }> = memo(({ part }) => {
+const BrowserToolResultView: FC<{ messageId: string; part: ToolPart }> = memo(({ messageId, part }) => {
     const { t } = useLingui();
     const isLoading = part.state === "input-streaming" || part.state === "input-available";
     const isError = part.state === "output-error";
@@ -718,7 +798,13 @@ const BrowserToolResultView: FC<{ part: ToolPart }> = memo(({ part }) => {
                     )}
                 </div>
                 {/* Screenshot */}
-                <img alt={output.title || t`Browser screenshot`} className="w-full" src={screenshotSource} />
+                <GalleryImage
+                    alt={output.title || t`Browser screenshot`}
+                    buttonClassName="block w-full"
+                    className="w-full"
+                    imageKey={browserImageKey(messageId, part.toolCallId)}
+                    src={screenshotSource}
+                />
             </div>
         );
     }
@@ -779,6 +865,7 @@ const MessageContent: FC<MessageContentProps> = memo(({ citationLabel, className
     const isStreaming = isStreamingProp ?? false;
     const { t } = useLingui();
     const {
+        BrowserHumanCheck,
         DeviceToolCall,
         DocumentArtifact,
         Image = DefaultImage,
@@ -851,6 +938,9 @@ const MessageContent: FC<MessageContentProps> = memo(({ citationLabel, className
 
     let openGroup: { end: number; group: ToolGroupSegment; mark: number } | undefined;
 
+    // Each image's place among the message's images, so an `Image` override can name it (an image pin).
+    const ordinals = imageOrdinals(message.parts);
+
     for (let i = 0; i < message.parts.length; i += 1) {
         const part = message.parts[i] as MessagePart;
         const key = `${message.id}-part-${i}`;
@@ -865,7 +955,17 @@ const MessageContent: FC<MessageContentProps> = memo(({ citationLabel, className
                 const filePart = part as FilePart;
                 const fileUrl = filePart.url || filePart.data;
 
-                renderedParts.push(<FilePartView generationPrompt={generationPrompt} Image={Image} key={key} part={filePart} />);
+                renderedParts.push(
+                    <FilePartView
+                        generationPrompt={generationPrompt}
+                        Image={Image}
+                        imageIndex={ordinals.get(i)}
+                        key={key}
+                        messageId={message.id}
+                        messageRole={message.role}
+                        part={filePart}
+                    />,
+                );
 
                 // Art. 50(4): assistant output is labelled where it is shown, not only on hover.
                 if (message.role === "assistant" && fileUrl) {
@@ -878,7 +978,15 @@ const MessageContent: FC<MessageContentProps> = memo(({ citationLabel, className
             case "image": {
                 const imagePart = part as unknown as ImagePart;
 
-                renderedParts.push(<Image key={key} part={generationPrompt ? { ...imagePart, prompt: generationPrompt } : imagePart} />);
+                renderedParts.push(
+                    <Image
+                        imageIndex={ordinals.get(i)}
+                        key={key}
+                        messageId={message.id}
+                        messageRole={message.role}
+                        part={generationPrompt ? { ...imagePart, prompt: generationPrompt } : imagePart}
+                    />,
+                );
 
                 if (message.role === "assistant") {
                     renderedParts.push(<AiGeneratedLabel key={`${key}-ai-label`} />);
@@ -999,7 +1107,7 @@ const MessageContent: FC<MessageContentProps> = memo(({ citationLabel, className
                             : null;
 
                     if (part.type === "tool-codeExecution") {
-                        renderedParts.push(<CodeExecutionResultView key={key} part={toolPart} />);
+                        renderedParts.push(<CodeExecutionResultView key={key} messageId={message.id} part={toolPart} />);
 
                         if (sandboxOutputs && SandboxFiles) {
                             renderedParts.push(<SandboxFiles key={`${key}-files`} {...sandboxOutputs} />);
@@ -1010,7 +1118,15 @@ const MessageContent: FC<MessageContentProps> = memo(({ citationLabel, className
 
                     // Special rendering for browser tool — show live status or screenshot result
                     if (part.type === "tool-browser") {
-                        renderedParts.push(<BrowserToolResultView key={key} part={toolPart} />);
+                        const asked = (toolPart.output as { humanCheck?: { status?: string } } | undefined)?.humanCheck?.status === "asked";
+
+                        renderedParts.push(
+                            BrowserHumanCheck && asked ? (
+                                <BrowserHumanCheck key={key} part={toolPart} />
+                            ) : (
+                                <BrowserToolResultView key={key} messageId={message.id} part={toolPart} />
+                            ),
+                        );
                         break;
                     }
 
@@ -1021,7 +1137,7 @@ const MessageContent: FC<MessageContentProps> = memo(({ citationLabel, className
                         typeof toolPart.output === "object" &&
                         toolPart.state === "output-available"
                     ) {
-                        const output = toolPart.output as { documentId?: string; kind?: string; title?: string; version?: number };
+                        const output = toolPart.output as { documentId?: string; kind?: string; threadId?: string; title?: string; version?: number };
 
                         if (output.documentId && output.title && output.kind && DocumentArtifact) {
                             renderedParts.push(
@@ -1029,6 +1145,7 @@ const MessageContent: FC<MessageContentProps> = memo(({ citationLabel, className
                                     documentId={output.documentId}
                                     key={key}
                                     kind={output.kind}
+                                    threadId={output.threadId}
                                     title={output.title}
                                     version={output.version ?? 1}
                                 />,
@@ -1143,27 +1260,36 @@ const MessageContent: FC<MessageContentProps> = memo(({ citationLabel, className
         renderedParts.unshift(<SourceGroup key={`${message.id}-sources`} sources={sourceParts} />);
     }
 
-    // If no parts rendered, show placeholder for streaming or error for failed
-    if (renderedParts.length === 0) {
-        if (isAnimating) {
-            renderedParts.push(
-                <span className="text-muted-foreground animate-pulse" key="loading">
-                    {t`Thinking...`}
-                </span>,
-            );
-        } else if (message.status === "failed") {
-            const errorMessage = message.error || t`An error occurred while generating the response.`;
+    // A placeholder while nothing has rendered yet
+    if (renderedParts.length === 0 && isAnimating) {
+        renderedParts.push(
+            <span className="text-muted-foreground animate-pulse" key="loading">
+                {t`Thinking...`}
+            </span>,
+        );
+    }
 
-            renderedParts.push(
-                <div
-                    className="mb-2 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-950/50 dark:text-red-300"
-                    key="error"
-                >
-                    <AlertCircle className="mt-0.5 size-4 shrink-0" />
-                    <span>{errorMessage}</span>
-                </div>,
-            );
-        }
+    // A failed reply with text shows its cause beside the partial reply, but only for a local reply: a gateway failure already
+    // shows its error in the chat banner, so repeating it in the thread would show it twice.
+    const isLocalReply = message.localReply === true;
+
+    if (message.status === "failed" && !isAnimating && (renderedParts.length === 0 || isLocalReply)) {
+        // An error that is only an old kind code (`unreachable`) is what older builds saved for a local reply: never show the code.
+        // A gateway failure keeps the error it saved, as before.
+        const errorMessage =
+            message.error && !(isLocalReply && LEGACY_LOCAL_ERROR_CODES.has(message.error))
+                ? message.error
+                : t`An error occurred while generating the response.`;
+
+        renderedParts.push(
+            <div
+                className="mb-2 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-950/50 dark:text-red-300"
+                key="error"
+            >
+                <AlertCircle className="mt-0.5 size-4 shrink-0" />
+                <span>{errorMessage}</span>
+            </div>,
+        );
     }
 
     const containerRef = useRef<HTMLDivElement>(null);

@@ -6,10 +6,15 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Tooltip, TooltipContent, TooltipTrigger } from "@neore/ui/components/tooltip";
 import cn from "@neore/ui/utils/cn";
 import { useMutation } from "@tanstack/react-query";
+import { useRouter } from "@tanstack/react-router";
 import { MoreHorizontal } from "lucide-react";
+import { useRef } from "react";
 
 import { useLunoraActionOptions } from "@/lib/lunora/crpc";
 import { showError, showSuccess } from "@/lib/toast";
+
+import { useThreadFollow } from "../follows/use-thread-follow";
+import { useOpenChatClick } from "../split/use-open-chat";
 
 interface ThreadOptionsMenuProps {
     /** Where this copy of the menu shows: `className` for the wrapper, which is `display: contents` while it shows. */
@@ -37,11 +42,84 @@ const ThreadOptionsMenu = ({ className, isHostRun, isLocked, label, onOpenChange
         networkMode: "always",
         retry: 0,
     });
+    // The follow state is read only while the menu is open, so a list of rows opens no subscription per thread.
+    const openChat = useOpenChatClick();
+    const router = useRouter();
+    // Set before the action runs, cleared when it settles: a click made in between would start a second side chat.
+    const isStartingRef = useRef(false);
+    const { isPending: isStartingSideChat, mutateAsync: startSideChat } = useMutation({
+        ...useLunoraActionOptions(api.chat.side_chat.createSideChat),
+        networkMode: "always",
+        retry: 0,
+    });
+    const follow = useThreadFollow(threadId, { enabled: open && !isLocked });
 
     // A locked row keeps only the split-view item: the server refuses its rename and its regenerate.
     if (isLocked && !onOpenInSplitView) {
         return null;
     }
+
+    const sideChatRefusal = (reason: string): string => {
+        switch (reason) {
+            case "archived": {
+                return t`An archived chat cannot start a side chat.`;
+            }
+            case "custom_endpoint": {
+                return t`A chat on a custom endpoint cannot start a side chat.`;
+            }
+            case "empty": {
+                return t`Send a message and wait for the reply before starting a side chat.`;
+            }
+            case "group_or_shared":
+            case "shared":
+            case "shared_or_temporary": {
+                return t`A shared or temporary chat cannot start a side chat.`;
+            }
+            case "host_run": {
+                return t`A chat that runs on your computer cannot start a side chat.`;
+            }
+            case "locked": {
+                return t`Unlock this chat to start a side chat.`;
+            }
+            default: {
+                return t`This chat cannot start a side chat.`;
+            }
+        }
+    };
+
+    // The click is copied now: the event is spent when the action answers. The click and the saved setting pick where the chat opens.
+    const startFrom = (event: { button: number; ctrlKey: boolean; detail: number; metaKey: boolean }) => {
+        if (isStartingRef.current) {
+            return;
+        }
+
+        isStartingRef.current = true;
+
+        // Where the person is now: a reply that comes after they have gone elsewhere must not pull them into the new chat.
+        const startedAt = router.state.location.pathname;
+
+        const click = { button: event.button, ctrlKey: event.ctrlKey, detail: event.detail, metaKey: event.metaKey };
+
+        // Awaited here, not in a callback of the menu: the menu closes on the click and may be gone before the answer comes.
+        void (async () => {
+            try {
+                const result = await startSideChat({ threadId });
+
+                if (result.status !== "ok") {
+                    showError(sideChatRefusal(result.reason));
+                } else if (router.state.location.pathname === startedAt) {
+                    openChat(result.threadId, click, threadId);
+                }
+            } catch (error) {
+                console.error("Failed to start a side chat:", error);
+                showError(error instanceof Error ? error : new Error(String(error)));
+            } finally {
+                isStartingRef.current = false;
+            }
+        })();
+    };
+
+    const showFollowChoices = !isLocked && follow.error === null && follow.state !== undefined;
 
     // The menu's items are portaled; a click in them bubbles through React to the row, which must not open.
     return (
@@ -89,6 +167,40 @@ const ThreadOptionsMenu = ({ className, isHostRun, isLocked, label, onOpenChange
                             }
                         >
                             {t`Regenerate title`}
+                        </DropdownMenuItem>
+                    )}
+                    {!isHostRun && !isLocked && (
+                        <DropdownMenuItem
+                            disabled={isStartingSideChat}
+                            onAuxClick={(event) => {
+                                if (event.button !== 1) {
+                                    return;
+                                }
+
+                                event.preventDefault();
+                                startFrom(event);
+                            }}
+                            onClick={startFrom}
+                        >
+                            {t`Side chat`}
+                        </DropdownMenuItem>
+                    )}
+                    {!isLocked && follow.error !== null && <DropdownMenuItem disabled>{t`Couldn't load follow state`}</DropdownMenuItem>}
+                    {/* Disabled while a change is in flight: a second choice made then could reach the server first. None while the
+                        lookup fails: a cached state may predate the last change. */}
+                    {showFollowChoices && follow.state !== "on" && (
+                        <DropdownMenuItem disabled={follow.isPending} onClick={() => follow.setState("on")}>
+                            {t`Follow thread`}
+                        </DropdownMenuItem>
+                    )}
+                    {showFollowChoices && follow.state !== "off" && (
+                        <DropdownMenuItem disabled={follow.isPending} onClick={() => follow.setState("off")}>
+                            {t`Unfollow thread`}
+                        </DropdownMenuItem>
+                    )}
+                    {showFollowChoices && follow.state !== "muted" && (
+                        <DropdownMenuItem disabled={follow.isPending} onClick={() => follow.setState("muted")}>
+                            {t`Mute thread`}
                         </DropdownMenuItem>
                     )}
                 </DropdownMenuContent>

@@ -14,6 +14,7 @@ import { useValidatedThread } from "@/features/chat/core/hooks/use-validated-thr
 import { beginTitleSave, queueTitleWrite, settleTitleSave, titleOnScreen, useTitleSaveRevision } from "@/features/chat/core/lib/thread-title-saves";
 import { useThreadActions } from "@/features/chat/core/stores/thread-store-hooks";
 import GroupParticipantBar from "@/features/chat/group/group-participant-bar";
+import ThreadImagesButton from "@/features/chat/image-gallery/thread-images-button";
 import ThreadShareButton from "@/features/chat/sharing/thread-share-button";
 import ThreadPullRequests from "@/features/develop/components/thread-pull-requests";
 import SiteHeader from "@/features/layout/components/site-header";
@@ -135,6 +136,7 @@ const ChatSiteHeader: FC<{ threadId?: string }> = ({ threadId }) => {
             anonymousUserBanner={<AnonymousUserBanner />}
             menu={
                 <>
+                    <ThreadImagesButton threadId={actualThreadId} />
                     <KBAttachmentButton threadId={actualThreadId} />
                     <ThreadDownloadButton model={model} threadId={actualThreadId} />
                     <ThreadShareButton threadId={actualThreadId} />
@@ -162,6 +164,8 @@ const ChatSiteHeader: FC<{ threadId?: string }> = ({ threadId }) => {
                             className="focus-visible:ring-ring/50 h-7 min-w-[200px] border-none bg-transparent py-0 text-lg leading-tight font-bold shadow-none focus:outline-none focus-visible:ring-1"
                         />
                     )}
+                    // The title is prose: the desktop shell turns spellcheck off page-wide.
+                    spellCheck
                     value={isValid ? currentTitle : undefined}
                 />
                 {statelessMode && (

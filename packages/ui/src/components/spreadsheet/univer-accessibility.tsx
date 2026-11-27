@@ -64,23 +64,32 @@ const repairControls = (root: HTMLElement): void => {
     for (const region of root.querySelectorAll<HTMLElement>('section[aria-live="polite"][aria-label^="Notifications"]')) {
         region.removeAttribute("aria-label");
     }
+};
 
-    // Univer's render canvases use a positive tabindex to order focus. Keyboard focus follows the document order instead.
+// Univer creates every render canvas (the sheet's, and one per doc editor) with tabIndex = 1 to order focus. Keyboard
+// focus follows the document order instead.
+const repairCanvasTabIndex = (root: HTMLElement): void => {
     for (const canvas of root.querySelectorAll<HTMLCanvasElement>('canvas[tabindex]:not([tabindex="0"]):not([tabindex="-1"])')) {
         canvas.setAttribute("tabindex", "0");
     }
 };
 
 /**
- * Repairs `root` now, and again after each batch of changes inside it. Repairs are coalesced into one per frame, because
- * Univer re-renders its toolbar as the selection moves. Returns the function that stops watching.
+ * Repairs `root` now, and again after each batch of changes inside it. The controls' repairs are coalesced into one per
+ * frame, because Univer re-renders its toolbar as the selection moves; the canvases' tabindex is reset at once. Returns the
+ * function that stops watching.
  */
 export const observeUniverAccessibility = (root: HTMLElement): (() => void) => {
     repairControls(root);
+    repairCanvasTabIndex(root);
 
     let frame: number | null = null;
 
     const observer = new MutationObserver(() => {
+        // Not deferred to the frame: a canvas inserted with tabindex="1" is reset in the same task, so nothing that runs
+        // in a later task (axe, a focus change) ever sees it. A frame can be late or, in a hidden iframe, never come.
+        repairCanvasTabIndex(root);
+
         if (frame !== null) {
             return;
         }
@@ -103,7 +112,8 @@ export const observeUniverAccessibility = (root: HTMLElement): (() => void) => {
         target.click();
     };
 
-    observer.observe(root, { childList: true, subtree: true });
+    // `tabindex` too: Univer can set a canvas's positive tabindex after inserting it, which adds no node.
+    observer.observe(root, { attributeFilter: ["tabindex"], attributes: true, childList: true, subtree: true });
     root.addEventListener("keydown", onKeyDown);
 
     return () => {

@@ -19,6 +19,7 @@ import type { CommonVariableCategoryKey, PromptVariable, VariableItem } from "@/
 import { COMMON_VARIABLE_CATEGORIES, formatVariable, getAllFilteredVariables } from "@/features/prompts/lib/prompt-variables";
 
 import type { VariableAutocompleteMatch } from "./extensions/variable-autocomplete";
+import { POPUP_ENTER_MOTION, POPUP_ROW_MOTION } from "./popup-motion";
 
 // ============================================================================
 // Types
@@ -221,7 +222,7 @@ const VariableAutocompletePopup: FC<VariableAutocompletePopupProps> = ({
                     "border-border dark:border-white/10",
                     "shadow-md dark:shadow-xl dark:shadow-black/50",
                     "ring-foreground/10 ring-1 dark:ring-white/10",
-                    "animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-2",
+                    POPUP_ENTER_MOTION,
                 )}
                 style={{ width: MENU_WIDTH }}
             >
@@ -242,7 +243,7 @@ const VariableAutocompletePopup: FC<VariableAutocompletePopupProps> = ({
                                 <CommandGroupLabel>{t`Prompt Variables`}</CommandGroupLabel>
                                 {customGroup.map((variable, i) => (
                                     <CommandItem
-                                        className={clsx("transition-colors", getItemIndex("custom", i) === selectedIndex && "bg-accent text-accent-foreground")}
+                                        className={clsx(POPUP_ROW_MOTION, getItemIndex("custom", i) === selectedIndex && "bg-accent text-accent-foreground")}
                                         key={variable.name}
                                         onClick={(e) => {
                                             e.preventDefault();
@@ -271,7 +272,7 @@ const VariableAutocompletePopup: FC<VariableAutocompletePopupProps> = ({
                                     {category.variables.map((variable, i) => (
                                         <CommandItem
                                             className={clsx(
-                                                "transition-colors",
+                                                POPUP_ROW_MOTION,
                                                 getItemIndex(category.key, i) === selectedIndex && "bg-accent text-accent-foreground",
                                             )}
                                             key={variable.name}

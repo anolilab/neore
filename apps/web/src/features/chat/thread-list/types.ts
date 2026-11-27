@@ -80,6 +80,8 @@ export interface HierarchicalThreadListProperties {
     collapsedGroups: Set<GroupType>;
     collapsedProjects: Set<string>;
     expandedThreads: Set<string>;
+    /** The asked search failed: the list says so instead of showing every thread. */
+    isSearchError?: boolean;
     isSearchLoading: boolean;
     isSelectionMode: boolean;
     lastSelectedIndex: number;
@@ -101,4 +103,4 @@ export interface HierarchicalThreadListProperties {
 }
 
 // Define a minimal type for threadRelationships to avoid deep type recursion
-export type MinimalThreadRelationship = { parentThreadId?: string; threadId: string };
+export type MinimalThreadRelationship = { branchType?: string; parentThreadId?: string; threadId: string };

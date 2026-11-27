@@ -1,3 +1,4 @@
+import type { Middleware } from "lunorash/server";
 import { LunoraError } from "lunorash/server";
 import { v } from "lunorash/server";
 
@@ -12,8 +13,27 @@ import { assertAccountDeletionAllowed } from "./deletion-guard";
 import { withoutUndefined } from "../lib/patch";
 import { systemDb } from "../lib/rls/scope";
 import { noteShardActivity } from "../lib/shard-housekeeping";
+import { scheduleObjectDeletion } from "../lib/storage-cleanup";
 import { withDependency } from "../lib/dependency";
 import { signedReadUrl } from "../lib/storage-read";
+
+/**
+ * An admin acting as the owner starts and downloads no export: it holds the owner's whole account, device-call output
+ * and instruction files included. The status stays readable, as the API key list does, since it carries no content or
+ * link; cancelling stays open too, as it only withdraws an export.
+ *
+ * It sits before `rateLimit("gdpr/request")`: a refused call must not spend the owner's quota, and an action's charge
+ * commits in its own mutation, so the owner would otherwise meet TOO_MANY_REQUESTS after three refused attempts.
+ */
+const refuseImpersonation =
+    <C extends { user: { impersonatedBy?: string | null } }>(refused: string): Middleware<C, C> =>
+    ({ ctx, next }) => {
+        if (ctx.user.impersonatedBy) {
+            throw new LunoraError("FORBIDDEN", `${refused} while impersonating`);
+        }
+
+        return next();
+    };
 
 export const getExportStatus = authQuery.query(async ({ ctx }) => {
     const { userId } = ctx.user;
@@ -241,51 +261,54 @@ export const getGdprStatus = authQuery
         };
     });
 
-export const requestDataExport = authMutation.use(rateLimit("gdpr/request")).mutation(async ({ ctx }) => {
-    const { userId } = ctx.user;
-    const userEmail = ctx.user.email || "";
+export const requestDataExport = authMutation
+    .use(refuseImpersonation("A data export cannot be requested"))
+    .use(rateLimit("gdpr/request"))
+    .mutation(async ({ ctx }) => {
+        const { userId } = ctx.user;
+        const userEmail = ctx.user.email || "";
 
-    const existingRequest = await ctx.db
-        .query("gdprRequests")
-        .withIndex("by_user_and_type", (q) => q.eq("userId", userId).eq("requestType", "export"))
-        .order("desc")
-        .first();
+        const existingRequest = await ctx.db
+            .query("gdprRequests")
+            .withIndex("by_user_and_type", (q) => q.eq("userId", userId).eq("requestType", "export"))
+            .order("desc")
+            .first();
 
-    if (existingRequest && (existingRequest.status === "pending" || existingRequest.status === "processing")) {
-        throw new LunoraError("TOO_MANY_REQUESTS", "An export is already in progress");
-    }
+        if (existingRequest && (existingRequest.status === "pending" || existingRequest.status === "processing")) {
+            throw new LunoraError("TOO_MANY_REQUESTS", "An export is already in progress");
+        }
 
-    // Create request record
-    const requestId = await ctx.db.insert("gdprRequests", {
-        requestedAt: ctx.now,
-        requestType: "export",
-        status: "pending",
-        userEmail,
-        userId,
+        // Create request record
+        const requestId = await ctx.db.insert("gdprRequests", {
+            requestedAt: ctx.now,
+            requestType: "export",
+            status: "pending",
+            userEmail,
+            userId,
+        });
+
+        // Its expiry and timeout are swept on this shard (`lib/shard-housekeeping.ts`).
+        await noteShardActivity(ctx, userId);
+
+        ctx.scheduler.runAfter(0, internal.gdpr.workflow_actions.startExportWorkflow, {
+            requestId,
+            userEmail,
+            userId,
+        });
+
+        // Log audit (lightweight operation)
+        await ctx.db.insert("gdprAuditLog", {
+            action: "export_requested",
+            details: JSON.stringify({ requestId }),
+            performedBy: userId,
+            timestamp: ctx.now,
+            userId,
+        });
+
+        ctx.log.event("gdpr.request_data_export", { requestType: "export" });
+
+        return { requestId };
     });
-
-    // Its expiry and timeout are swept on this shard (`lib/shard-housekeeping.ts`).
-    await noteShardActivity(ctx, userId);
-
-    ctx.scheduler.runAfter(0, internal.gdpr.workflow_actions.startExportWorkflow, {
-        requestId,
-        userEmail,
-        userId,
-    });
-
-    // Log audit (lightweight operation)
-    await ctx.db.insert("gdprAuditLog", {
-        action: "export_requested",
-        details: JSON.stringify({ requestId }),
-        performedBy: userId,
-        timestamp: ctx.now,
-        userId,
-    });
-
-    ctx.log.event("gdpr.request_data_export", { requestType: "export" });
-
-    return { requestId };
-});
 
 export const requestAccountDeletion = authMutation.use(rateLimit("gdpr/request")).mutation(async ({ ctx }) => {
     const { userId } = ctx.user;
@@ -336,6 +359,7 @@ export const requestAccountDeletion = authMutation.use(rateLimit("gdpr/request")
 });
 
 export const getExportDownloadUrl = authAction
+    .use(refuseImpersonation("A data export cannot be downloaded"))
     .use(rateLimit("gdpr/request"))
     .output(v.object({ expiresAt: v.union(v.number(), v.null()), url: v.string() }))
     .action(async ({ ctx }) => {
@@ -459,13 +483,21 @@ export const updateRequestProgress = internalMutation
     .output(v.boolean())
     .mutation(async ({ args, ctx: context }) => {
         const { fromStatus, requestId, ...updates } = args;
+        const current = await context.db.get("gdprRequests", requestId);
 
-        if (fromStatus !== undefined) {
-            const current = await context.db.get("gdprRequests", requestId);
+        // A completed export is final: a replayed progress write must not move it back, or its download is refused while it reads processing.
+        if (current?.requestType === "export" && current.status === "completed" && updates.status !== "completed") {
+            return false;
+        }
 
-            if (current === null || !fromStatus.includes(current.status)) {
-                return false;
+        if (fromStatus !== undefined && (current === null || !fromStatus.includes(current.status))) {
+            // A refused write that names a stored file would orphan it once the request is cancelled or failed, so that file is deleted. A
+            // completed request holds its file: a refused write there names the file it keeps, and nothing is deleted.
+            if (updates.storageId !== undefined && current?.status !== "completed") {
+                await scheduleObjectDeletion(context, [updates.storageId]);
             }
+
+            return false;
         }
 
         const patch: Partial<Doc<"gdprRequests">> = {};
@@ -494,7 +526,8 @@ export const updateRequestProgress = internalMutation
             patch.errorMessage = updates.errorMessage;
         }
 
-        if (updates.status === "completed") {
+        // A replayed completion keeps the time the export first completed: its download window starts there.
+        if (updates.status === "completed" && current?.status !== "completed") {
             patch.completedAt = context.now;
             patch.expiresAt = context.now + EXPORT_EXPIRY_MS;
         }

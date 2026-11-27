@@ -1,5 +1,6 @@
 import type { Doc, MutationCtx as MutationContext, QueryCtx as QueryContext } from "../../_generated/server";
 import { withoutUndefined } from "../../lib/patch";
+import { storedRow, storedRows, type StoredRow } from "../../lib/stored-row";
 
 // Better Auth's tables (organization, member, invitation, user) ARE part of the
 // Lunora schema, so these wrappers are plain typed reads — they exist to keep the
@@ -10,44 +11,55 @@ type AuthContext = MutationContext | QueryContext;
 /**
  * Typed wrapper for querying Better Auth organization table.
  */
-export const getOrganization = async (context: AuthContext, organizationId: string): Promise<Doc<"organization"> | null> =>
-    context.db.organization.findFirst({ where: { _id: context.db.asId("organization", organizationId) } });
+export const getOrganization = async (context: AuthContext, organizationId: string): Promise<StoredRow<Doc<"organization">> | null> =>
+    storedRow(await context.db.organization.findFirst({ where: { _id: context.db.asId("organization", organizationId) } }));
 
 /**
  * Typed wrapper for querying Better Auth organization by slug.
  */
-export const getOrganizationBySlug = async (context: AuthContext, slug: string): Promise<Doc<"organization"> | null> =>
-    context.db.organization.findFirst({ where: { slug } });
+export const getOrganizationBySlug = async (context: AuthContext, slug: string): Promise<StoredRow<Doc<"organization">> | null> =>
+    storedRow(await context.db.organization.findFirst({ where: { slug } }));
 
 /**
  * Typed wrapper for querying Better Auth members.
  */
-export const getMembersByOrganization = async (context: AuthContext, organizationId: string, limit?: number): Promise<Doc<"member">[]> =>
-    await context.db.member.findMany({ limit, where: { organizationId } }).then((result) => result.page);
+export const getMembersByOrganization = async (context: AuthContext, organizationId: string, limit?: number): Promise<StoredRow<Doc<"member">>[]> =>
+    await context.db.member.findMany({ limit, where: { organizationId } }).then((result) => storedRows(result.page));
 
 /**
- * Typed wrapper for querying Better Auth member by organization and user.
+ * Typed wrapper for querying Better Auth member by organization and user. A check that enforces a removal passes
+ * `"primary"`: `member` is a global table, and a regional replica can still hold a membership that was just revoked.
  */
-export const getMemberByOrganizationAndUser = async (context: AuthContext, organizationId: string, userId: string): Promise<Doc<"member"> | null> =>
-    context.db.member.findFirst({ where: { organizationId, userId } });
+export const getMemberByOrganizationAndUser = async (
+    context: AuthContext,
+    organizationId: string,
+    userId: string,
+    consistency?: "primary",
+): Promise<StoredRow<Doc<"member">> | null> =>
+    storedRow(await context.db.member.findFirst({ ...(consistency && { consistency }), where: { organizationId, userId } }));
 
 /**
  * Typed wrapper for querying Better Auth members by userId.
  */
-export const getMembersByUserId = async (context: AuthContext, userId: string): Promise<Doc<"member">[]> =>
-    await context.db.member.findMany({ where: { userId } }).then((result) => result.page);
+export const getMembersByUserId = async (context: AuthContext, userId: string): Promise<StoredRow<Doc<"member">>[]> =>
+    await context.db.member.findMany({ where: { userId } }).then((result) => storedRows(result.page));
 
 /**
  * Typed wrapper for querying Better Auth members by role.
  */
-export const getMembersByOrganizationAndRole = async (context: AuthContext, organizationId: string, role: string, limit?: number): Promise<Doc<"member">[]> =>
-    await context.db.member.findMany({ limit, where: { organizationId, role } }).then((result) => result.page);
+export const getMembersByOrganizationAndRole = async (
+    context: AuthContext,
+    organizationId: string,
+    role: string,
+    limit?: number,
+): Promise<StoredRow<Doc<"member">>[]> =>
+    await context.db.member.findMany({ limit, where: { organizationId, role } }).then((result) => storedRows(result.page));
 
 /**
  * Typed wrapper for querying Better Auth invitation.
  */
-export const getInvitation = async (context: AuthContext, invitationId: string): Promise<Doc<"invitation"> | null> =>
-    context.db.invitation.findFirst({ where: { _id: context.db.asId("invitation", invitationId) } });
+export const getInvitation = async (context: AuthContext, invitationId: string): Promise<StoredRow<Doc<"invitation">> | null> =>
+    storedRow(await context.db.invitation.findFirst({ where: { _id: context.db.asId("invitation", invitationId) } }));
 
 /**
  * Typed wrapper for querying Better Auth invitations by organization and status.
@@ -57,7 +69,8 @@ export const getInvitationsByOrganizationAndStatus = async (
     organizationId: string,
     status: "pending" | "accepted" | "rejected" | "canceled",
     limit?: number,
-): Promise<Doc<"invitation">[]> => await context.db.invitation.findMany({ limit, where: { organizationId, status } }).then((result) => result.page);
+): Promise<StoredRow<Doc<"invitation">>[]> =>
+    await context.db.invitation.findMany({ limit, where: { organizationId, status } }).then((result) => storedRows(result.page));
 
 /**
  * Typed wrapper for querying Better Auth invitations by email, organization, and status.
@@ -68,7 +81,8 @@ export const getInvitationsByEmailOrganizationAndStatus = async (
     organizationId: string,
     status: "pending" | "accepted" | "rejected" | "canceled",
     limit?: number,
-): Promise<Doc<"invitation">[]> => await context.db.invitation.findMany({ limit, where: { email, organizationId, status } }).then((result) => result.page);
+): Promise<StoredRow<Doc<"invitation">>[]> =>
+    await context.db.invitation.findMany({ limit, where: { email, organizationId, status } }).then((result) => storedRows(result.page));
 
 /**
  * Typed wrapper for querying Better Auth user.
@@ -79,8 +93,8 @@ export const getInvitationsByEmailOrganizationAndStatus = async (
  * type only because `organization.ts` still reads `inviter.username` — that read
  * is dead and should be deleted, at which point this intersection goes with it.
  */
-export const getUser = async (context: AuthContext, userId: string): Promise<(Doc<"user"> & { username?: string | null }) | null> =>
-    context.db.user.findFirst({ where: { _id: context.db.asId("user", userId) } });
+export const getUser = async (context: Pick<AuthContext, "db">, userId: string): Promise<(StoredRow<Doc<"user">> & { username?: string | null }) | null> =>
+    storedRow(await context.db.user.findFirst({ where: { _id: context.db.asId("user", userId) } }));
 
 /**
  * Typed wrapper for patching Better Auth organization.

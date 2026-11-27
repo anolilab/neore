@@ -24,8 +24,11 @@ import type { Message, MessageDoc } from "../validators";
 import { type ToolCtx as ToolContext, wrapTools } from "./create-tool";
 import type { Agent } from "./index";
 import saveInputMessages from "./save-input-messages";
+import { applyStepLabels } from "./step-labels";
+import { inlineToolResultImages, isLocalOrigin } from "./files";
 import { embedMessages, fetchContextWithPrompt } from "./search";
-import type { ActionCtx as ActionContext, AgentComponent, Config, Options } from "./types";
+import { withApprovedToolModelOutputs } from "./tool-approval";
+import type { ActionCtx as ActionContext, AgentComponent, Config, Options, TakeSteer } from "./types";
 
 const startGeneration = async <T, Tools extends ToolSet = ToolSet, CustomContext extends object = object>(
     context_: ActionContext & CustomContext,
@@ -125,7 +128,7 @@ const startGeneration = async <T, Tools extends ToolSet = ToolSet, CustomContext
     settleAbort: () => Promise<void>;
     stepOrder: number;
     /** Steering: delivers a queued message at a step boundary, after which saves follow it. */
-    takeSteer: () => Promise<{ messageId: string; text: string } | null>;
+    takeSteer: () => ReturnType<TakeSteer>;
     updateModel: (model: ModelOrMetadata | undefined) => void;
     userId: string | undefined;
 }> => {
@@ -146,6 +149,11 @@ const startGeneration = async <T, Tools extends ToolSet = ToolSet, CustomContext
         threadId,
         userId,
     });
+
+    const model = args.model ?? options.languageModel;
+
+    assert(model, "model is required");
+    let activeModel: ModelOrMetadata = model;
 
     const saveMessages = options.storageOptions?.saveMessages ?? "promptAndOutput";
     // When forceNewOrder is true, skip creating a pendingMessage because it would
@@ -186,11 +194,6 @@ const startGeneration = async <T, Tools extends ToolSet = ToolSet, CustomContext
     }
 
     let pendingMessageId = pendingMessage?._id;
-
-    const model = args.model ?? options.languageModel;
-
-    assert(model, "model is required");
-    let activeModel: ModelOrMetadata = model;
 
     const fail = async (reason: string) => {
         if (!pendingMessageId) {
@@ -244,16 +247,43 @@ const startGeneration = async <T, Tools extends ToolSet = ToolSet, CustomContext
         threadId,
         userId,
     } satisfies ToolContext;
-    const tools = wrapTools(toolContext, args.tools) as Tools;
-    // Late compression: prevent context-exceeded errors by compressing messages
-    // that are close to the model's context window limit before sending to LLM.
-    // A call that may fall back must fit the smaller of the two models' windows.
-    const fallback = model instanceof FallbackLanguageModel ? model : undefined;
-    const modelId = fallback ? fallback.primaryModelId : getModelName(model);
-    // A backup that would be skipped for this call (tools, images or documents it cannot take) does not size this prompt.
-    const hasTools = Object.keys(args.tools ?? {}).length > 0;
-    const sizedForBackup = fallback?.canServe({ hasTools, messages: context.messages }) ? fallback.backupModelId : undefined;
-    const messages = applyLateCompression(context.messages, modelId, sizedForBackup);
+    // The pending row is saved and the caller gets `fail` only once this returns: a failure on the way there fails the row here,
+    // or it would stay pending with no reply and no error.
+    const { messages, tools } = await (async () => {
+        const wrapped = wrapTools(toolContext, args.tools) as Tools;
+        // Late compression: prevent context-exceeded errors by compressing messages
+        // that are close to the model's context window limit before sending to LLM.
+        // A call that may fall back must fit the smallest window among the models that could take it.
+        const fallback = model instanceof FallbackLanguageModel ? model : undefined;
+        const modelId = fallback ? fallback.primaryModelId : getModelName(model);
+        // An approved call's saved result reaches the model as its tool's view, as a step's own result does.
+        const approvedMessages = context.approvedToolCallIds
+            ? await withApprovedToolModelOutputs(context.messages, wrapped, context.approvedToolCallIds, options.builtInToolFormatter)
+            : undefined;
+        // In local dev a view's signed screenshot URL points at localhost, which no provider can reach: its bytes are inlined, as
+        // `fetchContextWithPrompt` inlines the messages' own files.
+        const modelMessages =
+            approvedMessages !== undefined && isLocalOrigin(process.env.PUBLIC_ORIGIN)
+                ? await inlineToolResultImages(approvedMessages)
+                : (approvedMessages ?? context.messages);
+        // A backup that would be skipped for this call (tools, images or documents it cannot take, including an approved
+        // result's screenshot) does not size this prompt.
+        const hasTools = Object.keys(args.tools ?? {}).length > 0;
+        const sizedForBackups = fallback?.backupsServing({ hasTools, messages: modelMessages });
+
+        return { messages: applyLateCompression(modelMessages, modelId, sizedForBackups), tools: wrapped };
+    })().catch(async (error: unknown) => {
+        await fail(error instanceof Error ? error.message : String(error)).catch((failError: unknown) => {
+            console.error("[startGeneration] prepare.fail_pending_message", {
+                error: failError instanceof Error ? { message: failError.message, name: failError.name } : String(failError),
+                messageId: pendingMessageId,
+                operation: "agent.messages.finalizeMessage",
+                threadId,
+            });
+        });
+
+        throw error;
+    });
 
     // The notes on the thread's older turns ride in the system prompt: they are reference material, not a turn.
     const system = [(args as { system?: string }).system, context.threadNotes].filter(Boolean).join("\n\n");
@@ -292,6 +322,23 @@ const startGeneration = async <T, Tools extends ToolSet = ToolSet, CustomContext
                 "object" in toSave
                     ? await serializeObjectResult(context_, toSave.object, activeModel)
                     : await serializeNewMessagesInStep(context_, toSave.step, activeModel, mediaOwner);
+
+            // The run labels its MCP calls as they are written, so a live step reads as the saved one does.
+            const labelContent = options.labelStepContent;
+
+            if (labelContent) {
+                serialized.messages = applyStepLabels(serialized.messages, labelContent);
+            }
+
+            // Each row names the run that wrote it, so the reader can tell one reply's rows from another's.
+            const replyId = options.runHold?.streamId;
+
+            if (replyId) {
+                serialized.messages = serialized.messages.map((row) => {
+                    return { ...row, replyId };
+                });
+            }
+
             const embeddings = await embedMessages(
                 context_,
                 { threadId, ...options, userId },

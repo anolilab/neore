@@ -15,7 +15,7 @@ import { omit } from "../lib/collections";
  *
  * NOTE: fileIds reference 'chatFiles' table (renamed from 'files')
  */
-import { assert } from "../lib/error-helpers";
+import { assert, throwThreadNotFound } from "../lib/error-helpers";
 import { MAX_LENGTH, paginationOptionsValidator } from "../lib/validators";
 import { throwThreadLocked, isThreadLocked } from "../lib/thread-lock";
 import { systemDb } from "../lib/rls/scope";
@@ -23,7 +23,7 @@ import { mergedStream, stream } from "../lib/streams";
 // Not through the `./client` barrel: it re-exports this module, so importing
 // it here is a cycle, and whichever side loads first sees the other's
 // validators as `undefined` at `.output(v.from(...))`.
-import { DEFAULT_MESSAGE_RANGE, DEFAULT_RECENT_MESSAGES, extractText, isTool, sorted } from "./shared";
+import { DEFAULT_MESSAGE_RANGE, DEFAULT_RECENT_MESSAGES, extractText, isTool, sorted, typedTextColumn } from "./shared";
 import {
     type Message,
     type MessageDoc,
@@ -33,6 +33,8 @@ import {
     vMessageEmbeddingsWithDimension,
     vMessageStatus,
     vMessageWithMetadataInternal,
+    type TypedPromptRow,
+    vTypedPromptRow,
     vPaginationResult,
 } from "./validators";
 import { agentSwitchOf, withoutSwitchIds } from "./agent-switch-logic";
@@ -49,11 +51,35 @@ import { patchRow, withoutUndefined } from "../lib/patch";
 import { admittedThreadDb } from "./admitted-thread-db";
 import { ownedChatFileIdsIn } from "../lib/storage-ownership";
 
-const publicMessage = (message: Doc<"messages">): MessageDoc =>
+/**
+ * A row as message reads and streams return it: without the server-only columns (`SERVER_ONLY_MESSAGE_COLUMNS`), so the
+ * prompt search's `typedText` never reaches a client beside `text`.
+ */
+export const publicMessage = (message: Doc<"messages">): MessageDoc => {
+    // eslint-disable-next-line sonarjs/no-unused-vars -- the rest pattern is the point of this line
+    const { typedText: _typedText, ...visible } = message;
+
     // Optional fields are never null at runtime (only undefined),
     // but the column builders generate null|T types in TypeScript.
     // Safe cast: runtime values are always T | undefined, never null.
-    message as unknown as MessageDoc;
+    return visible as unknown as MessageDoc;
+};
+
+/** A row as the prompt search reads it (`vTypedPromptRow`): only what `sentPromptOf` decides with. */
+const typedPromptRowOf = (message: Doc<"messages">): TypedPromptRow =>
+    withoutUndefined({
+        _creationTime: message._creationTime,
+        _id: message._id,
+        agentName: message.agentName ?? undefined,
+        createdAt: message.createdAt ?? undefined,
+        message: (message.message ?? undefined) as TypedPromptRow["message"],
+        order: message.order,
+        stepOrder: message.stepOrder,
+        threadId: message.threadId,
+        tool: message.tool,
+        typedText: message.typedText ?? undefined,
+        userId: message.userId ?? undefined,
+    }) as TypedPromptRow;
 
 export const deleteMessage = async (context: MutationContext, messageDocument: Doc<"messages">) => {
     await context.db.delete("messages", messageDocument._id);
@@ -305,14 +331,16 @@ export async function addMessagesHandler(context: MutationContext, args: InferAr
             });
         }
 
+        const text = hideFromUserIdSearch ? undefined : extractText(message.message);
         const messageDocument = {
             ...rest,
             ...message,
             embeddingId,
             error: isFail ? error : message.error,
             status: isFail ? "failed" : (message.status ?? "success"),
-            text: hideFromUserIdSearch ? undefined : extractText(message.message),
+            text,
             tool: isTool(message.message),
+            typedText: typedTextColumn(message.message, text),
             userId,
             // Not `satisfies Omit<WithoutSystemFields<Doc<"messages">>, …>`.
             //
@@ -349,6 +377,8 @@ export async function addMessagesHandler(context: MutationContext, args: InferAr
             await patchRow(context.db, "messages", pendingMessage, {
                 ...withoutUndefined({ ...messageDocument, order: pendingMessage.order, stepOrder: pendingMessage.stepOrder }),
                 ...(pendingMessage.embeddingId !== undefined && { embeddingId: messageDocument.embeddingId }),
+                // So are typed words: a pending row's must not stay searchable once its saved content has none.
+                ...(pendingMessage.typedText !== undefined && { typedText: messageDocument.typedText }),
             });
             // The row AS PATCHED: callers read the saved content back (the
             // approval requests a paused run records, the text memory
@@ -597,6 +627,12 @@ export const updateMessage = internalMutation
             patch.message = args.patch.message;
             patch.tool = isTool(args.patch.message);
             patch.text = extractText(args.patch.message);
+            const typedText = typedTextColumn(args.patch.message, patch.text);
+
+            // Removed when nothing is typed any more (`patchRow` drops an unset field), so an edit leaves no old words searchable.
+            if (typedText !== undefined || message.typedText !== undefined) {
+                patch.typedText = typedText;
+            }
         }
 
         if (args.patch.status === "failed") {
@@ -644,6 +680,8 @@ export const cloneMessageBatch = internalMutation
         excludeToolMessages: v.optional(v.boolean()),
         insertAtOrder: v.optional(v.number()),
         paginationOpts: paginationOptionsValidator,
+        // Set by a caller that must not copy from a trashed chat (`createSideChat`), checked in every batch.
+        refuseTrashedSource: v.optional(v.boolean()),
         sourceThreadId: v.id("threads"),
         statuses: v.optional(v.array(vMessageStatus)),
         targetThreadId: v.id("threads"),
@@ -659,6 +697,13 @@ export const cloneMessageBatch = internalMutation
         // NEW thread and gets no lock of its own.
         if (await isLockedWithoutProof(ctx, args.sourceThreadId, args.unlockProof)) {
             throwThreadLocked();
+        }
+
+        // A source that starts deletion mid-copy fails the copy (and a trashed one, for a caller that asks: `refuseTrashedSource`), so the caller removes the half-copied fork.
+        const source = await ctx.db.get("threads", args.sourceThreadId);
+
+        if (source === null || source.deletingAt !== undefined || (args.refuseTrashedSource === true && source.deleted === true)) {
+            throwThreadNotFound();
         }
 
         const orderOffset = args.insertAtOrder ?? 0;
@@ -710,6 +755,10 @@ export const cloneMessageBatch = internalMutation
                       ["order", "stepOrder"],
                   ).collect();
 
+        // Each file's count is read, then written back one higher: two copied messages sharing a file would both read the
+        // same count and lose an increment, so the file links of a batch are taken one after another.
+        let fileLinks: Promise<void> = Promise.resolve();
+
         await Promise.all(
             result.page
                 .filter((m) => !activePath || activePath.has(m._id))
@@ -717,7 +766,10 @@ export const cloneMessageBatch = internalMutation
                 .filter((m) => existing.every((existingMessage) => !(existingMessage.order === m.order && existingMessage.stepOrder === m.stepOrder)))
                 .map(async (m) => {
                     if (m.fileIds) {
-                        await changeMessageFiles(ctx, args.targetThreadId, [], m.fileIds);
+                        const { fileIds } = m;
+
+                        fileLinks = fileLinks.then(async () => await changeMessageFiles(ctx, args.targetThreadId, [], fileIds));
+                        await fileLinks;
                     }
 
                     let embeddingId: VectorTableId | undefined;
@@ -770,6 +822,7 @@ export const cloneThread = internalAction
         excludeToolMessages: v.optional(v.boolean()),
         insertAtOrder: v.optional(v.number()),
         limit: v.optional(v.number()),
+        refuseTrashedSource: v.optional(v.boolean()),
         sourceThreadId: v.id("threads"),
         statuses: v.optional(v.array(vMessageStatus)),
         targetThreadId: v.id("threads"),
@@ -1292,6 +1345,38 @@ export const textSearch = internalQuery
                 .filter((m) => !targetMessage || m.order < targetMessage.order || (m.order === targetMessage.order && m.stepOrder < targetMessage.stepOrder))
                 .map((item) => publicMessage(item)),
         };
+    });
+
+/**
+ * The caller's typed prompts that match `text`, from `typed_text_search`: only the words a person typed into a user row
+ * (`typedText`), never an attachment, a quote, a reply or a tool row. Locked threads are dropped (no proof is passed).
+ * `filled` says the index had at least `limit` hits, so a match past them may be missing.
+ */
+export const typedTextSearch = internalQuery
+    .input({ limit: v.number(), text: v.string().max(MAX_LENGTH.long), userId: v.string().max(MAX_LENGTH.short) })
+    .output(v.object({ filled: v.boolean(), messages: v.from(v.array(vTypedPromptRow)) }))
+    .query(async ({ args, ctx }) => {
+        const messages = await ctx.db
+            .query("messages")
+            .withSearchIndex("typed_text_search", (q) => q.search("typedText", args.text).eq("userId", args.userId))
+            .take(args.limit);
+        const visible = await withoutLockedThreads(ctx, messages, {});
+
+        return { filled: messages.length >= args.limit, messages: visible.map((item) => typedPromptRowOf(item)) };
+    });
+
+/**
+ * One message as the prompt search reads it (`vTypedPromptRow`), or `null` when there is none. Raw like
+ * `getMessagesByIdsUnfiltered`: the caller (`chat/functions.ts#currentSentPrompt`) checks the owner and the thread's lock
+ * itself. Internal only.
+ */
+export const typedPromptRow = internalQuery
+    .input({ messageId: v.id("messages") })
+    .output(v.from(v.union(v.null(), vTypedPromptRow)))
+    .query(async ({ args, ctx }) => {
+        const message = await ctx.db.get("messages", args.messageId);
+
+        return message ? typedPromptRowOf(message) : null;
     });
 
 export const getMessageSearchFields = internalQuery

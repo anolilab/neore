@@ -22,12 +22,13 @@ import type { ReactNode } from "react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 
+import { useImpersonating } from "@/features/admin/hooks/use-is-impersonating";
+import { useAuthSession } from "@/features/auth/hooks/use-auth-session";
 import useInviteOnly from "@/features/auth/hooks/use-invite-only";
 import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
-import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import { openLoginPrompt } from "@/features/auth/stores/login-prompt-store";
-import { holdForSignIn } from "@/features/chat/core/hooks/use-pending-send";
 import useLocalModelTurn from "@/features/local-models/hooks/use-local-model-turn";
+import useChatRunToasts, { LOCAL_BROWSER_REPLY_RUN, THREAD_REPLY_RUN } from "@/features/notifications/hooks/use-chat-run-toasts";
 import type { UIMessage } from "@/lib/agent";
 import { trackEvent } from "@/lib/analytics";
 import type { AppError } from "@/lib/errors";
@@ -42,10 +43,11 @@ import type { ModelId } from "../stores/model-store";
 import { useModelStore } from "../stores/model-store";
 import { mapNavigatorLanguage } from "../utils/language-utilities";
 import { createReadinessGate } from "../utils/readiness-gate";
+import { markTurnEnded } from "../utils/turn-ended";
 import { runEditMessage, runReloadMessage } from "./branch-actions";
 import type { ChangedSettings, StreamingMessage } from "./chat-action-shared";
 import { stopTarget, toAppError } from "./chat-action-shared";
-import { ChatActionsContext, ChatMessagesContext, ChatStreamingContext, ChatThreadContext } from "./chat-context-hooks";
+import ChatContextProviders from "./chat-context-providers";
 import type {
     ChatActionsContextValue,
     ChatMessagesContextValue,
@@ -58,16 +60,20 @@ import type {
 import type { GatewayInfo } from "./chat-gateway";
 import { NO_GATEWAY_INFO, pendingGatewayInfo } from "./chat-gateway";
 import { kickOffMediaGeneration } from "./media-kickoff";
-import { runSendMessage } from "./send-message";
+import type { SendMessageOptions, SendOutcome } from "./send-message";
+import { holdSendForSignIn, runSendMessage } from "./send-message";
 import { registerThreadErrorSink, takeUndeliveredThreadError } from "./thread-error-sinks";
+import { threadLoadOf } from "./thread-load";
 
 // The context objects, hooks and value types live in sibling files; importers keep this path.
 export {
     ChatActionsContext,
     ChatContext,
+    ChatIsEmptyContext,
     ChatMessagesContext,
     ChatStreamingContext,
     ChatThreadContext,
+    ChatThreadIdentityContext,
     useChat,
     useChatActions,
     useChatError,
@@ -77,6 +83,7 @@ export {
     useChatLunora,
     useChatMessages,
     useChatThread,
+    useChatThreadIdentity,
 } from "./chat-context-hooks";
 export type {
     ChatActionsContextValue,
@@ -84,6 +91,7 @@ export type {
     ChatMessagesContextValue,
     ChatStreamingContextValue,
     ChatThreadContextValue,
+    ChatThreadIdentity,
 } from "./chat-context-types";
 
 interface ChatProviderProps {
@@ -165,8 +173,7 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
         return registerThreadErrorSink(threadId, handleError);
     }, [threadId, handleError]);
 
-    const { hooks } = useAuth();
-    const { data: sessionData, refetch: refetchSession } = hooks.useSession();
+    const { data: sessionData, refetch: refetchSession } = useAuthSession();
     const isAuthenticated = !!sessionData?.user;
 
     // A send that lands before the session query resolves WAITS on this rather
@@ -320,7 +327,11 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
         previousThreadIdRef.current = threadId;
     }, [threadId, initialThread, modelStore, splitPane]);
 
-    const { data: threadData } = useQuery({
+    const {
+        data: threadData,
+        isError: threadReadFailed,
+        isPending: threadReadPending,
+    } = useQuery({
         // `threadId` is the `/chat/$threadId` route param handed to `ChatProvider`, so
         // it is a plain string that always names an existing thread.
         ...crpc.chat.functions.getThread.queryOptions(threadId ? { threadId: threadId as Id<"threads"> } : skipToken),
@@ -348,6 +359,8 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
     // The live row wins once there is one: it is seeded from `initialThread`, so it equals it until a switch or an
     // edit moves the thread, and the loader's snapshot would otherwise keep showing the creation model after one.
     const thread: ThreadData | null = (threadData as ThreadData | null) ?? (initialThread && initialThread._id === threadId ? initialThread : null) ?? null;
+    // `thread` is null both while it loads and once its read failed: what waits on the thread tells them apart by this.
+    const threadLoad = threadLoadOf(threadId, thread !== null, { isError: threadReadFailed, isPending: threadReadPending });
 
     // Backup sync: when Lunora query resolves with fresh data, update store
     // Only if user hasn't explicitly changed model/mode for this thread
@@ -654,6 +667,33 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
         Boolean(threadId) &&
         (streamingMessageId !== null || Boolean(activeStreamId) || isRegenerating || (isLocalStreaming && localStreamingThreadId === threadId));
 
+    // Tells the page when a turn of THIS thread ended (`turn-ended.ts`): a control there whose own read of the thread has not
+    // answered yet still hears a turn that started and ended before it. Only a change within one thread counts, and only an
+    // actual stream: the optimistic `isRegenerating` is left out, so a send or regeneration that fails before the gateway
+    // starts one ends no turn (nothing ran that could have pushed a branch).
+    const isThreadStreamRunning =
+        Boolean(threadId) && (streamingMessageId !== null || Boolean(activeStreamId) || (isLocalStreaming && localStreamingThreadId === threadId));
+    const streamedRef = useRef<{ streaming: boolean; threadId: string | undefined }>({ streaming: false, threadId: undefined });
+
+    useEffect(() => {
+        const previous = streamedRef.current;
+
+        streamedRef.current = { streaming: isThreadStreamRunning, threadId };
+
+        if (threadId && previous.threadId === threadId && previous.streaming && !isThreadStreamRunning) {
+            markTurnEnded(threadId);
+        }
+    }, [isThreadStreamRunning, threadId]);
+
+    // In-app toasts for a run that failed, finished, or waits for the person (each gated by its setting). A run is a gateway
+    // stream, a browser-local reply, or a reply still streaming in the thread: an edit or a regenerate shows its reply before
+    // its stream id is known.
+    const localRunId = isLocalStreaming && localStreamingThreadId === threadId ? LOCAL_BROWSER_REPLY_RUN : null;
+    // A local reply in a chat without a thread yet has no thread id to be streaming in, so its marker is taken on its own.
+    const runId = activeStreamId ?? localRunId ?? (isThreadStreaming ? THREAD_REPLY_RUN : null);
+
+    useChatRunToasts({ activeStreamId: runId, error, messages, messagesReady: isMessagesReady, settings: userSettings, threadId });
+
     const { mutateAsync: abortStreamMutation } = useMutation(crpc.chat.functions.abortStreamByMessageId.mutationOptions());
     const { mutateAsync: abortThreadStreamMutation } = useMutation(crpc.chat.functions.abortThreadStream.mutationOptions());
     const streamingMessageRef = useRef<StreamingMessage | null>(null);
@@ -675,18 +715,18 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
     // regenerate) asks them to sign in instead. A send keeps its draft and is held for after sign-in. Here rather than
     // in the composer, which the landing page also renders over a provider that sends nothing.
     const { mustSignIn } = useInviteOnly();
+    // An admin acting as the owner: the owner's pinned goal is not applied to their sends (`pinnedGoalAllowed`).
+    const impersonating = useImpersonating();
 
     const sendMessage = useCallback(
-        async (text: string, attachments?: PendingAttachment[]) => {
+        async (text: string, attachments?: PendingAttachment[], options?: SendMessageOptions): Promise<SendOutcome> => {
             if (mustSignIn) {
-                useChatUIStore.getState().setComposerText(text);
-                useChatUIStore.getState().setIsSubmitting(false);
-                holdForSignIn(text);
+                holdSendForSignIn(text, options);
 
-                return;
+                return { refused: false, signIn: true, started: false };
             }
 
-            await runSendMessage(
+            return await runSendMessage(
                 {
                     authGate,
                     authHeader,
@@ -698,10 +738,12 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
                     isMountedRef,
                     kickOffMedia,
                     localTarget,
+                    lunora,
                     messagesRef,
                     model,
                     navigate,
                     newChatsTemporary,
+                    pinnedGoalAllowed: !impersonating,
                     queryClient,
                     refetchSession,
                     sendLocalTurn,
@@ -714,6 +756,15 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
                     streamingMessageRef,
                     texts: {
                         bannedContent: () => t`Your message contains inappropriate content that cannot be sent.`,
+                        guestLinkEnded: () => t`That guest link has ended.`,
+                        guestNoteAlreadySent: () => t`That message was already sent.`,
+                        guestNoteAsGoal: () => t`A guest's message cannot be sent as a goal.`,
+                        guestNoteBeingSent: () => t`That message is being sent.`,
+                        guestNoteNeedsTextModel: () => t`Switch to a text model to send this message.`,
+                        guestNoteNotLocal: () => t`A guest's message is sent through a hosted model only. Pick one and send it again.`,
+                        guestNoteNotSendable: () => t`This message cannot be sent in this chat.`,
+                        guestNoteSessionNotReady: () =>
+                            t`We could not confirm your session in time. The guest's message was not sent; send it again from the Guests tab.`,
                         localTextOnly: () => t`Local models are text only. Remove the attachments to send.`,
                         sessionNotReady: () =>
                             t`We could not confirm your session in time. Your message is still in the composer. Please try sending it again.`,
@@ -724,14 +775,17 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
                 },
                 text,
                 attachments,
+                options,
             );
         },
         [
+            impersonating,
             mustSignIn,
             authGate,
             threadId,
             model,
             authHeader,
+            lunora,
             navigate,
             queryClient,
             refetchSession,
@@ -800,10 +854,10 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
             if (mustSignIn) {
                 openLoginPrompt();
 
-                return;
+                return undefined;
             }
 
-            await runReloadMessage(
+            return runReloadMessage(
                 {
                     authHeader,
                     defaultLanguage,
@@ -912,8 +966,10 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
         const lastAssistantMessage = messagesRef.current.findLast((m) => m.role === "assistant");
 
         if (lastAssistantMessage) {
-            await reloadMessage(lastAssistantMessage.id);
+            return reloadMessage(lastAssistantMessage.id);
         }
+
+        return undefined;
     }, [reloadMessage]);
 
     // Derived isEmpty boolean — only changes when empty↔non-empty transitions,
@@ -928,8 +984,9 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
             model,
             thread,
             threadId,
+            threadLoad,
         };
-    }, [threadId, thread, isNewThread, model]);
+    }, [threadId, thread, threadLoad, isNewThread, model]);
 
     const messagesContextValue = useMemo((): ChatMessagesContextValue => {
         return {
@@ -973,12 +1030,8 @@ export const ChatProvider = ({ children, initialThread, jwtToken, model: modelPr
     }, [sendMessage, cancelStream, reloadMessage, editMessage, copyMessage, clearError, regenerate, error, lunora, jwtToken]);
 
     return (
-        <ChatThreadContext value={threadContextValue}>
-            <ChatMessagesContext value={messagesContextValue}>
-                <ChatStreamingContext value={streamingContextValue}>
-                    <ChatActionsContext value={actionsContextValue}>{children}</ChatActionsContext>
-                </ChatStreamingContext>
-            </ChatMessagesContext>
-        </ChatThreadContext>
+        <ChatContextProviders actions={actionsContextValue} messages={messagesContextValue} streaming={streamingContextValue} thread={threadContextValue}>
+            {children}
+        </ChatContextProviders>
     );
 };

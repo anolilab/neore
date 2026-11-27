@@ -24,9 +24,15 @@ import { v } from "lunorash/server";
 import type { Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { internalMutation } from "../_generated/server";
+import { guestHoldsGrantRows } from "../agent/grant-revision";
+import { guestHasFollowRows } from "../chat/follows/follow-writes";
+import { guestHasPinRoutes } from "../chat/pins/pin-route-writes";
 import { ADMIN } from "../env";
+import { dropMergeGeneration, dropPinsLeft, firstTableWithGuestRows, mergeGenerationCurrent, onGuestShard } from "../lib/account-merge";
+import { patchBetterAuthRow } from "../lib/better-auth-dates";
+import { authLogger } from "../lib/logger";
 import { noteShardActivity } from "../lib/shard-housekeeping";
-import { deleteShardRoutesOf } from "../lib/shard-routes";
+import { deleteShardRoute, deleteShardRoutesOf } from "../lib/shard-routes";
 import { dropPushDevicesOf } from "../notifications/push-device-writes";
 
 /** Emails in the `ADMIN` allowlist, trimmed and lowercased. */
@@ -82,7 +88,7 @@ export const promoteVerifiedAdmin = internalMutation.input({ userId: v.id("user"
     }
 
     if (adminEmails().includes(user.email.toLowerCase())) {
-        await ctx.db.patch("user", args.userId, { role: "admin" });
+        await patchBetterAuthRow(ctx.db, "user", user, { role: "admin" });
     }
 });
 
@@ -161,26 +167,92 @@ const cascadeDelete = async (ctx: MutationCtx, user: Id<"user">): Promise<void> 
 /**
  * Delete a guest whose rows have been moved to the account it converted to, the way the anonymous plugin deletes it
  * when the conversion completes in the guest's own browser. The last step of `lib/account-merge.ts#runGuestMerge`,
- * run on the guest's shard. Only ever an anonymous user: a missing or real one is left alone, so a second run (queue
- * redelivery) or a wrong id does nothing.
+ * run on the guest's shard. Never a real account: one is left alone. A guest whose `user` row is already gone (the
+ * anonymous plugin deletes it in the sign-up request that queues the merge) is ended all the same once its shard is
+ * empty, its generation and pins-left signal dropped; a second run then finds nothing left to drop. A guest still named by a thread follow (one written after the merge read its
+ * last page) is kept and `followsRemain` is set, and one still named by a shared pin route (a pin made after the merge's
+ * pin step) is kept with `pinsRemain`, and one whose shard still holds a row (written to a table after the merge cleared
+ * it) with `rowsRemain` naming the first such table, so the merge moves the row first and tries again. A grant or grant revision still naming the guest (one
+ * written after the merge's `global` step) keeps it with `grantsRemain`, and the merge runs that step again. A merge run whose
+ * lease generation is no longer the newest this shard has seen deletes nothing (`fenced`). On a shard that is not the
+ * guest's own (development's `SHARD_ROUTING=off` runs every user on `__root__`), the merge moved none of its rows, so the
+ * guest is kept with them (`sharedShard`). Once the guest is ended, its `merged-guest` mark goes too, so no route names
+ * it after the merge; a grant written under the guest from then on finds no account and is refused.
  */
 export const deleteMergedGuest = internalMutation
-    .input({ userId: v.string() })
-    .output(v.object({ deleted: v.boolean() }))
+    .input({ generation: v.number(), sharedStore: v.optional(v.boolean()), userId: v.string() })
+    .output(
+        v.object({
+            deleted: v.boolean(),
+            fenced: v.optional(v.boolean()),
+            followsRemain: v.optional(v.boolean()),
+            grantsRemain: v.optional(v.boolean()),
+            pinsRemain: v.optional(v.boolean()),
+            rowsRemain: v.optional(v.string()),
+            sharedShard: v.optional(v.boolean()),
+        }),
+    )
     .mutation(async ({ args, ctx }) => {
-        const user = (await ctx.db.user.findFirst({ where: { _id: ctx.db.asId("user", args.userId) } })) as {
+        const guestId = ctx.db.asId("user", args.userId);
+
+        // Before the generation: a merge on a shared store writes none (`noteMergeGeneration`), and must hear why it stops.
+        if (!onGuestShard(guestId)) {
+            authLogger.warn(`[auth] kept guest ${guestId}: its shard serves other users too, so the merge moved none of its rows`);
+
+            return { deleted: false, sharedShard: true };
+        }
+
+        if (!(await mergeGenerationCurrent(ctx.db, args.userId, args.generation))) {
+            return { deleted: false, fenced: true };
+        }
+
+        // Primary: a replica that has not seen the guest yet would pass as its deletion, and the guest would stay.
+        const user = (await ctx.db.user.findFirst({ consistency: "primary", where: { _id: guestId } })) as {
             _id: Id<"user">;
             isAnonymous?: boolean | null;
         } | null;
 
-        if (user?.isAnonymous !== true) {
+        // A real account is never deleted here. A missing row is the anonymous plugin's deletion at sign-up: the merge
+        // still empties the guest's shard, and this step still ends it, so no row and no generation is left behind.
+        if (user !== null && user.isAnonymous !== true) {
             return { deleted: false };
         }
 
-        await cascadeDelete(ctx, user._id);
-        await ctx.db.delete("user", user._id);
+        if (await guestHasFollowRows(ctx.db, guestId)) {
+            return { deleted: false, followsRemain: true };
+        }
 
-        return { deleted: true };
+        // A pin the guest made on another owner's thread after the merge's pin step: its route still names the guest.
+        if (await guestHasPinRoutes(ctx.db, guestId)) {
+            return { deleted: false, pinsRemain: true };
+        }
+
+        // A grant or a count still under the guest: the merge's `global` step moves it first.
+        if (await guestHoldsGrantRows(ctx, guestId)) {
+            return { deleted: false, grantsRemain: true };
+        }
+
+        const rowsRemain = await firstTableWithGuestRows(ctx, guestId, args.sharedStore === true);
+
+        if (rowsRemain !== null) {
+            return { deleted: false, rowsRemain };
+        }
+
+        await cascadeDelete(ctx, guestId);
+        // Its `global` step dropped this already; a guest gone takes its shard's pins-left signal with it in any case.
+        await dropPinsLeft(ctx.db, guestId);
+        // Never lapses while the merge is unfinished; with the guest gone, nothing is left for it to fence.
+        await dropMergeGeneration(ctx.db, guestId);
+
+        if (user !== null) {
+            await ctx.db.delete("user", user._id);
+        }
+
+        // The mark goes last, once the guest is ended: a grant written under the guest from here on finds no account and
+        // is refused (`agent/sharing.ts#insertThreadAccess`), as it found the mark until now.
+        await deleteShardRoute(ctx, "merged-guest", args.userId);
+
+        return { deleted: user !== null };
     });
 
 /**

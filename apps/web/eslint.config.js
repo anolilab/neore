@@ -625,12 +625,13 @@ export default createConfig(
             "sonarjs/redundant-type-aliases": "off",
 
             /**
-             * Nine findings, one cause: `const { hooks } = useAuth();
-             * hooks.useSession()` — dynamically dispatched hooks. `hooks` is
-             * composed at runtime in `auth-ui-provider-tanstack.tsx` and is the
-             * auth feature's deliberate injection seam. Clearing this means
-             * deleting the override point and importing concrete hooks, which
-             * is an architectural decision rather than a lint fix.
+             * Its findings were `const { hooks } = useAuth(); hooks.useSession()`
+             * — dynamically dispatched hooks, `hooks` being the auth feature's
+             * injection seam (`auth-ui-provider-tanstack.tsx`). Components now
+             * call `useAuthSession` & co. (`features/auth/hooks/use-auth-session.ts`),
+             * which keep that seam in one place, and
+             * `scripts/react-compiler-bailouts.test.ts` fails when a chat
+             * component is skipped by the compiler again.
              */
             "react-compiler/react-compiler": "off",
 

@@ -108,3 +108,16 @@ describe("runEvalCase when the model filter rules cannot be read", () => {
         expect(result).not.toContain("judge model could not be reached");
     });
 });
+
+const EVAL_SOURCE = /^eval:/u;
+
+describe("an eval case's agent run", () => {
+    it("names the eval as its chain's source, so a sub-agent it starts refuses an `ask` tool instead of waiting", async () => {
+        runHeadlessAgent.mockResolvedValue({ text: "x marks the spot", threadId: "t1", totalTokens: 10 });
+        const runId = await seed(false);
+
+        await harness.action(async (ctx: any) => await ctx.runAction(runEvalCase, { index: 0, runId }));
+
+        expect(runHeadlessAgent).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ chainSource: expect.stringMatching(EVAL_SOURCE) }));
+    });
+});

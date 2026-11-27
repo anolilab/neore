@@ -87,3 +87,14 @@
   exactly that one (`model: "auto"` and `/internal/route` are for other callers). The cost-notice
   threshold is `PROMPT_CACHE_COLD_START_TOKENS` (`@neore/ai/models`), shared with the gateway's
   downgrade policy.
+
+- **Grant revisions** (`agent/grant-revision.ts`) — each grant write advances a per-thread-and-grantee count
+  (`threadAccessRevisions`) that outlives the row; non-owner answers carry it, web cards drop older ones. A guest merge
+  marks, folds, unmarks; a write racing the purge takes itself back; a stamped row grants nothing (`live-grant.ts`).
+- **Typed words column** (`messages.typedText`) — `text` stays as sent; `typedText` is only what the person typed
+  (`typedTextColumn`), indexed by `typed_text_search`. Every writer of a user row's `text` sets it beside it
+  (`addMessagesHandler`, `updateMessage`, `table-writes.ts`); server-only, stripped by `publicMessage`. Detail:
+  `docs/agents/backend-lunora.md#agent-columns`.
+- **Archived flag on thread vectors** (`agent/thread-vector-archived.ts`) — title/summary vectors carry `archived`
+  (`embeddings-1024` metadata) so a meaning search filters before its top-K cut; set at insert, corrected in
+  `commitThreadSearch`, moved by the threads update trigger, backfilled once per shard. Detail: backend-lunora.md.

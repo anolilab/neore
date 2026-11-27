@@ -1,28 +1,27 @@
 import { api } from "@neore/backend/api";
 import type { Id } from "@neore/backend/dataModel";
-import { addPushTokenListener } from "expo-notifications";
-import { useEffect } from "react";
+import { addPushTokenListener, DEFAULT_ACTION_IDENTIFIER, useLastNotificationResponse } from "expo-notifications";
+import { useRouter, useSegments } from "expo-router";
+import { useEffect, useRef } from "react";
 import { AppState } from "react-native";
 
 import { useAuth } from "../auth/auth-state";
+import { canClaimLaunchReopen } from "../chat/launch-reopen";
 import { getClient } from "../lib/lunora";
 import { listenForApprovalTaps } from "./approval-actions";
-import { backendPushServer, configurePhoneNotifications, deviceLocale, devicePushPlatform, pushRegistrations } from "./phone-push";
-import { createForegroundGate, createPromptOffer, createTokenChangeFilter, registerPhoneForPush } from "./push-registration";
-
-/**
- * Runs the notification setup, the approval category included, before a registration. Push is best-effort: a failed step is logged
- * and retried by the next attempt (a message, the app coming back to the front, a token rotation), but it never stops the
- * registration, so the phone keeps its token and its ordinary alerts even while the approve and deny actions are missing.
- */
-const setUp = async (): Promise<void> => {
-    try {
-        await configurePhoneNotifications();
-    } catch (error) {
-        // eslint-disable-next-line no-console -- no logger in the app; a failed setup must not be silent
-        console.warn("Could not set up notifications.", error);
-    }
-};
+import { canNavigateToTap, holdTapRoute, takeTapRoute } from "./pending-tap";
+import {
+    backendPushServer,
+    configurePhoneNotifications,
+    devicePushPlatform,
+    dismissAccountNotifications,
+    noteSignedInAccount,
+    pushRegistrations,
+    syncApprovalActions,
+    syncExtensionAddress,
+} from "./phone-push";
+import { deviceLocale } from "./push-channel";
+import { createAccountChecks, createForegroundGate, createPromptOffer, createTokenChangeFilter, pushIdsFromNotification, registerPhoneForPush, routeForPush } from "./push-registration";
 
 /** `didRun`: no error (offline, no answer). `isRegistered`: the server now holds the token for this account. */
 interface RegisterResult {
@@ -59,8 +58,13 @@ const promptOffer = createPromptOffer();
 /** The signed-in account's registrations carry `isCurrent`; false while nobody is, or once its sign-out began. */
 const signedIn: { account?: { isCurrent: boolean } } = {};
 
+/** Set when the signed-in account's sign-out begins, cleared when it finishes (the status goes signed-out): a tap in between waits for the next sign-in. */
+const signOutState = { isBegun: false };
+
 /** Sign-out has begun: no prompt and no registration, offered or in the background, for the account that is leaving. */
 export const endPhonePushForAccount = (): void => {
+    signOutState.isBegun = true;
+
     if (signedIn.account) {
         signedIn.account.isCurrent = false;
     }
@@ -71,6 +75,101 @@ export const endPhonePushForAccount = (): void => {
 
 /** Coming back to the front often (closing the notification shade, the permission prompt) registers at most this often. */
 export const FOREGROUND_REGISTER_INTERVAL_MS = 60_000;
+
+const setup = { inFlight: undefined as Promise<boolean> | undefined };
+
+/** Registers the approval actions in the current language, unless they already are; a failure is logged and reported as `false`. */
+const syncActionsNow = async (): Promise<boolean> => {
+    try {
+        await syncApprovalActions();
+
+        return true;
+    } catch (error: unknown) {
+        // eslint-disable-next-line no-console -- no logger in the app; a failed setup must not be silent
+        console.warn("Could not set up notifications.", error);
+
+        return false;
+    }
+};
+
+const attemptSetUp = async (): Promise<boolean> => {
+    try {
+        await configurePhoneNotifications();
+        await syncExtensionAddress();
+
+        return true;
+    } catch (error: unknown) {
+        // eslint-disable-next-line no-console -- no logger in the app; a failed setup must not be silent
+        console.warn("Could not set up notifications.", error);
+
+        return false;
+    }
+};
+
+/**
+ * The setup the approve and deny actions need. Concurrent callers share one attempt. A failed attempt is not remembered as done: the next
+ * call tries again. `configurePhoneNotifications` runs once it has worked, so a retry after that costs nothing.
+ */
+const setUpNotifications = async (): Promise<boolean> => {
+    setup.inFlight ??= attemptSetUp();
+
+    const attempt = setup.inFlight;
+
+    try {
+        const isSetUp = await attempt;
+
+        if (!isSetUp) {
+            return false;
+        }
+
+        // The actions are checked against the current language, and registered again when it changed, before any registration
+        // proceeds. This is the only place the sync runs, so it runs once per setup.
+        return await syncActionsNow();
+    } finally {
+        if (setup.inFlight === attempt) {
+            setup.inFlight = undefined;
+        }
+    }
+};
+
+/** How long an account check may hold up the checks and registrations queued after it. */
+const ACCOUNT_CHECK_TIMEOUT_MS = 5000;
+
+// eslint-disable-next-line no-console -- no logger in the app; a check that did not finish must not be silent
+const accountChecks = createAccountChecks(ACCOUNT_CHECK_TIMEOUT_MS, console.warn);
+
+/**
+ * Another person signed in on this phone, now or before a relaunch: the alerts still on it are the previous account's,
+ * and are removed. A check for an account that has already left does nothing. A phone that stays with one account keeps
+ * its alerts. Every registration waits for the checks queued before it (`registerAfterSetUp`), so the new account's own
+ * alerts cannot be removed after they arrive.
+ */
+const checkAccount = (userId: string, isCurrent: () => boolean): void => {
+    accountChecks.run(async (isLive) => {
+        const isOwner = () => isCurrent() && isLive();
+
+        if (!isOwner()) {
+            return;
+        }
+
+        try {
+            await noteSignedInAccount(userId, dismissAccountNotifications, isOwner);
+        } catch (error) {
+            // eslint-disable-next-line no-console -- no logger in the app; alerts that could not be removed must not be silent
+            console.warn("Could not remove the previous account's notifications.", error);
+        }
+    });
+};
+
+/** A registration that waits for the setup first: it does not register a phone whose alerts would lack their actions. */
+const registerAfterSetUp = async (isPrompt: boolean, isCurrent: () => boolean): Promise<Awaited<ReturnType<typeof register>>> => {
+    // A setup that failed does not stop the registration: without one the phone gets no alerts at all, where an alert without its
+    // buttons still opens the app. The setup is tried again at the next registration.
+    await accountChecks.settled();
+    await setUpNotifications();
+
+    return await register(isPrompt, isCurrent);
+};
 
 /**
  * The moment to ask: `userId` just sent a message, so a reply, a question or an approval may come while the app is in
@@ -84,10 +183,7 @@ export const offerPhonePush = async (userId: string): Promise<void> => {
     }
 
     const { account } = signedIn;
-
-    await setUp();
-
-    const { didRun } = await register(true, () => account?.isCurrent === true);
+    const { didRun } = await registerAfterSetUp(true, () => account?.isCurrent === true);
 
     if (!didRun) {
         promptOffer.release(userId);
@@ -101,12 +197,46 @@ export const offerPhonePush = async (userId: string): Promise<void> => {
  */
 export const usePhonePush = (): void => {
     const { hasToken, status, user } = useAuth();
+    const router = useRouter();
+    const response = useLastNotificationResponse();
+    const isOnSignIn = useSegments()[0] === "sign-in";
+    const handled = useRef<string | undefined>(undefined);
     const userId = status === "signed-in" && hasToken ? user?.id : undefined;
 
-    // The setup, the approval category included, runs before any registration: an alert that arrives as the phone registers
-    // must already carry its approve and deny actions.
+    // A tapped notification opens its chat (the chat list when it names none). An approval alert's body opens its chat too;
+    // its approve and deny buttons answer it (`approval-tap-listener`), and a tap is never an answer.
     useEffect(() => {
-        setUp();
+        // A sign-out ends with the status going signed-out: from then on a tap belongs to the next sign-in, not the one that left.
+        if (status === "signed-out") {
+            signOutState.isBegun = false;
+        }
+
+        // A tap during a sign-out waits for the next sign-in instead of navigating to the account that is leaving.
+        const isSigningOut = signOutState.isBegun;
+
+        if (response?.actionIdentifier === DEFAULT_ACTION_IDENTIFIER && handled.current !== response.notification.request.identifier) {
+            const { request } = response.notification;
+
+            handled.current = request.identifier;
+            // A launch from a notification opens its chat, not the one the launch would reopen.
+            canClaimLaunchReopen();
+            holdTapRoute(routeForPush(pushIdsFromNotification(request)), { whileSignedOut: status !== "signed-in" || isSigningOut });
+        }
+
+        // Still signing in (or on the sign-in screen): the sign-in gate goes there instead of the chat list.
+        if (!isSigningOut && canNavigateToTap({ isOnSignIn, status })) {
+            const route = takeTapRoute();
+
+            if (route !== undefined) {
+                router.push(route);
+            }
+        }
+    }, [isOnSignIn, response, router, status]);
+
+    // Set up early, so an alert that arrives as the phone registers already carries its approve and deny actions. Every
+    // registration tries the same setup first (`registerAfterSetUp`).
+    useEffect(() => {
+        setUpNotifications();
     }, []);
 
     useEffect(() => {
@@ -115,8 +245,8 @@ export const usePhonePush = (): void => {
         }
 
         // A tap on an approval alert answers it as the signed-in account, through the procedure the chat's own card uses.
-        // Offline it is refused, never queued (`onlineOnly`). Once that account's sign-out has begun, no tap is answered.
-        // Returns `false` when sign-out began first: that tap is not answered, so it is not recorded and a new tap can answer it.
+        // Offline it is refused, never queued (`onlineOnly`). Once that account's sign-out has begun, no tap is answered: the
+        // answer reports that it was skipped, so the tap is not recorded as answered and can be read again.
         const subscription = listenForApprovalTaps(async (answer) => {
             if (signedIn.account?.isCurrent !== true) {
                 return false;
@@ -147,15 +277,15 @@ export const usePhonePush = (): void => {
         const foreground = createForegroundGate(FOREGROUND_REGISTER_INTERVAL_MS);
         const isRotation = createTokenChangeFilter();
         const registerSilently = async (): Promise<boolean> => {
-            await setUp();
-
-            const { isRegistered } = await register(false, isCurrent);
+            const { isRegistered } = await registerAfterSetUp(false, isCurrent);
 
             return isRegistered;
         };
 
         // A new sign-in reopens the gate the last sign-out closed and is offered the prompt again. Its registration
         // counts toward the foreground spacing.
+        checkAccount(userId, isCurrent);
+
         pushRegistrations.open();
         signedIn.account = account;
         promptOffer.begin(userId);
@@ -170,6 +300,8 @@ export const usePhonePush = (): void => {
             if (state !== "active") {
                 return;
             }
+
+            setUpNotifications();
 
             foreground.run(registerSilently);
         });

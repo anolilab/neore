@@ -9,13 +9,12 @@
 import { useLingui } from "@lingui/react/macro";
 import type { FC } from "react";
 
-import { useAuth } from "@/features/auth/lib/auth-ui-provider";
+import { useAuthSession } from "@/features/auth/hooks/use-auth-session";
 import { useUserPreferences } from "@/features/layout/hooks/use-ui-state";
 
 const ThreadWelcome: FC = () => {
     const { t } = useLingui();
-    const { hooks } = useAuth();
-    const { data: sessionData } = hooks.useSession();
+    const { data: sessionData } = useAuthSession();
     const { hidePersonalInfo } = useUserPreferences();
 
     const getWelcomeMessage = () => {

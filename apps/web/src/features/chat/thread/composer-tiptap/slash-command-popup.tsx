@@ -9,6 +9,7 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import type { GatewayModel } from "@neore/ai/models";
 import { api } from "@neore/backend/api";
 import type { Doc } from "@neore/backend/dataModel";
+import type { StoredRow } from "@neore/backend/stored-row";
 import { ProviderIcon } from "@neore/ui/components/ai-elements/provider-icon";
 import { Command, CommandEmpty, CommandGroup, CommandGroupLabel, CommandItem, CommandList } from "@neore/ui/components/command";
 import { useMutation } from "@tanstack/react-query";
@@ -19,14 +20,21 @@ import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } fro
 import { createPortal } from "react-dom";
 
 import { useModelPickerPopupActions } from "@/components/model-picker/model-picker-popup-store";
-import { useAuth } from "@/features/auth/lib/auth-ui-provider";
+import { useAuthSession } from "@/features/auth/hooks/use-auth-session";
 import useCompactThread from "@/features/chat/compaction/use-compact-thread";
 import useClearContext from "@/features/chat/context-reset/use-clear-context";
 import { useModelStore } from "@/features/chat/core/stores/model-store";
+import { noteSavedPrompt } from "@/features/chat/core/utils/draft-origin";
 import { useLunoraActionOptions } from "@/lib/lunora/crpc";
 
 import type { ComposerSlashState, SlashCommandMatch } from "./extensions/slash-command";
 import { clearedCommandRange, isBareCommand, isPrefixOfCommand } from "./extensions/slash-command";
+import { POPUP_ENTER_MOTION, POPUP_ROW_MOTION } from "./popup-motion";
+
+/** A prompt row as the backend sends it: an unset optional column is absent, never `null`. */
+type SavedPrompt = StoredRow<Doc<"prompts">>;
+/** A skill row as the backend sends it: an unset optional column is absent, never `null`. */
+type SavedSkill = StoredRow<Doc<"skills">>;
 
 ("use client");
 
@@ -46,10 +54,14 @@ interface SlashCommandPopupProps {
     models: GatewayModel[];
     /** Called to dismiss the popup (e.g., after selecting a model) */
     onDismiss: () => void;
+    /** Reports whether the menu is showing. A slash with nothing to list shows none, so the composer may open another list. */
+    onOpenChange?: (open: boolean) => void;
     /** Called to replace the slash text range in the editor */
     onReplace: (from: number, to: number, replacement: string) => void;
     /** The editor's whole text now; a `/clear` that finished reads it, so an edit the menu has not seen yet is not cut. */
     readDraft: () => string;
+    /** The person has typed in the composer (`use-mention-prefetch.ts`): load the prompts and skills now, so "/prompt" and "/skill" open with them. */
+    warm?: boolean;
 }
 
 // `/model` stays first: the list is not filtered for a partial command, so Enter on a bare `/` picks the first entry,
@@ -94,7 +106,7 @@ const filterModels = (models: GatewayModel[], query: string, favoriteModelIds: s
     return filtered.slice(0, 10);
 };
 
-const filterPrompts = (prompts: Doc<"prompts">[], query: string): Doc<"prompts">[] => {
+const filterPrompts = (prompts: SavedPrompt[], query: string): SavedPrompt[] => {
     if (!query) {
         return prompts.slice(0, 10);
     }
@@ -112,7 +124,7 @@ const filterPrompts = (prompts: Doc<"prompts">[], query: string): Doc<"prompts">
         .slice(0, 10);
 };
 
-const filterSkills = (skills: Doc<"skills">[], query: string): Doc<"skills">[] => {
+const filterSkills = (skills: SavedSkill[], query: string): SavedSkill[] => {
     if (!query) {
         return skills.slice(0, 10);
     }
@@ -134,7 +146,18 @@ const filterSkills = (skills: Doc<"skills">[], query: string): Doc<"skills">[] =
 // Main Component
 // ============================================================================
 
-const SlashCommandPopup: FC<SlashCommandPopupProps> = ({ currentThreadId, editorRect, favoriteModelIds, match, models, onDismiss, onReplace, readDraft }) => {
+const SlashCommandPopup: FC<SlashCommandPopupProps> = ({
+    currentThreadId,
+    editorRect,
+    favoriteModelIds,
+    match,
+    models,
+    onDismiss,
+    onOpenChange,
+    onReplace,
+    readDraft,
+    warm = false,
+}) => {
     const { i18n } = useLingui();
     const selectedModel = useModelStore((state) => state.selectedModel);
     const setSelectedModelStore = useModelStore((state) => state.setSelectedModel);
@@ -142,51 +165,89 @@ const SlashCommandPopup: FC<SlashCommandPopupProps> = ({ currentThreadId, editor
     const { compact } = useCompactThread(currentThreadId);
     const { clear } = useClearContext(currentThreadId);
 
-    const { hooks } = useAuth();
-    const { data: sessionData } = hooks.useSession();
+    const { data: sessionData } = useAuthSession();
     const user = sessionData?.user;
     const isProUser = (user as { plan?: string; role?: string } | undefined)?.plan === "premium" || user?.role === "admin";
 
-    // Fetch prompts and skills
-    const { mutateAsync: getPrompts } = useMutation(useLunoraActionOptions(api.prompts.functions.getPrompts));
-    const { mutateAsync: getSkills } = useMutation(useLunoraActionOptions(api.skills.functions.getSkills));
-    const [prompts, setPrompts] = useState<Doc<"prompts">[]>([]);
-    const [skills, setSkills] = useState<Doc<"skills">[]>([]);
+    // Fetch prompts and skills. Offline they fail at once, as Lunora's own `useAction` does, instead of waiting paused for the
+    // network (TanStack's default for a mutation): a failed load is tried again when the menu next opens.
+    const { mutateAsync: getPrompts } = useMutation({ ...useLunoraActionOptions(api.prompts.functions.getPrompts), networkMode: "always" });
+    const { mutateAsync: getSkills } = useMutation({ ...useLunoraActionOptions(api.skills.functions.getSkills), networkMode: "always" });
+    const [prompts, setPrompts] = useState<SavedPrompt[]>([]);
+    const [skills, setSkills] = useState<SavedSkill[]>([]);
+    // Both follow the session's active organization, so a switch drops what was loaded for the previous one.
+    const organizationId = sessionData?.session.activeOrganizationId ?? null;
+    const loadedRef = useRef({ organizationId, prompts: false, skills: false });
+    const [loadOrganizationId, setLoadOrganizationId] = useState(organizationId);
 
-    // Loaded once, on the first "/" — not on mount: the editor mounts this popup
-    // permanently, and two actions on every first paint of /chat queued on the
-    // one `__root__` shard (see `e2e/first-paint.e2e.test.ts`).
-    const hasMatch = match !== null;
-    const [shouldLoad, setShouldLoad] = useState(false);
+    // Loaded when the composer is warm (`use-mention-prefetch.ts`) or on the first "/" — not on mount: the editor mounts
+    // this popup permanently, and two actions on every first paint of /chat queued on the one `__root__` shard (see
+    // `e2e/first-paint.e2e.test.ts`). What failed is tried again once, when "/" opens or its submenu changes, never in a loop.
+    const menuKey = match === null ? null : (match.command ?? "");
+    const [load, setLoad] = useState<"done" | "failed" | "idle" | "pending">("idle");
+    const [loadMenuKey, setLoadMenuKey] = useState(menuKey);
 
-    if (hasMatch && !shouldLoad) {
-        setShouldLoad(true);
+    if (loadMenuKey !== menuKey) {
+        setLoadMenuKey(menuKey);
+    }
+
+    if (loadOrganizationId !== organizationId) {
+        setLoadOrganizationId(organizationId);
+        setPrompts([]);
+        setSkills([]);
+        setLoad("idle");
+    }
+
+    if ((load === "idle" && (menuKey !== null || warm)) || (load === "failed" && menuKey !== null && menuKey !== loadMenuKey)) {
+        setLoad("pending");
     }
 
     useEffect(() => {
-        if (!shouldLoad) {
+        if (load !== "pending") {
             return undefined;
         }
 
         let isCancelled = false;
 
-        Promise.all([getPrompts({}), getSkills({ sortBy: "recent" })])
-            .then(([p, s]) => {
-                if (isCancelled) {
-                    return undefined;
-                }
+        if (loadedRef.current.organizationId !== organizationId) {
+            loadedRef.current = { organizationId, prompts: false, skills: false };
+        }
 
-                setPrompts(p as Doc<"prompts">[]);
-                setSkills(s as Doc<"skills">[]);
+        const loaded = loadedRef.current;
+        // Each list is shown as soon as its own request answers: a slow one never holds back the other's menu.
+        const promptsLoad = loaded.prompts
+            ? undefined
+            : getPrompts({}).then((result) => {
+                  if (!isCancelled) {
+                      loaded.prompts = true;
+                      setPrompts(result as SavedPrompt[]);
+                  }
 
-                return undefined;
-            })
-            .catch(() => {});
+                  return undefined;
+              });
+        const skillsLoad = loaded.skills
+            ? undefined
+            : getSkills({ sortBy: "recent" }).then((result) => {
+                  if (!isCancelled) {
+                      loaded.skills = true;
+                      setSkills(result as SavedSkill[]);
+                  }
+
+                  return undefined;
+              });
+
+        void Promise.allSettled([promptsLoad, skillsLoad]).then(() => {
+            if (!isCancelled) {
+                setLoad(loaded.prompts && loaded.skills ? "done" : "failed");
+            }
+
+            return undefined;
+        });
 
         return () => {
             isCancelled = true;
         };
-    }, [getPrompts, getSkills, shouldLoad]);
+    }, [getPrompts, getSkills, load, organizationId]);
 
     const [selectedIndex, setSelectedIndex] = useState(0);
     const commandListRef = useRef<HTMLDivElement | null>(null);
@@ -231,6 +292,10 @@ const SlashCommandPopup: FC<SlashCommandPopupProps> = ({ currentThreadId, editor
 
     const itemCount = items.length;
     const isOpen = match !== null && itemCount > 0;
+
+    useEffect(() => {
+        onOpenChange?.(isOpen);
+    }, [isOpen, onOpenChange]);
 
     // Reset the highlight when the item list changes. Adjusted during render
     // rather than through an effect so the popup never paints one frame with a
@@ -331,19 +396,21 @@ const SlashCommandPopup: FC<SlashCommandPopupProps> = ({ currentThreadId, editor
     );
 
     const handleSelectPrompt = useCallback(
-        (prompt: Doc<"prompts">) => {
+        (prompt: SavedPrompt) => {
             if (!match) {
                 return;
             }
 
             onReplace(match.from, match.to, prompt.content);
+            // Into the draft's other text, which keeps its own mark.
+            noteSavedPrompt(prompt, user?.id, { replaced: false });
             onDismiss();
         },
-        [match, onReplace, onDismiss],
+        [match, onReplace, onDismiss, user?.id],
     );
 
     const handleSelectSkill = useCallback(
-        (skill: Doc<"skills">) => {
+        (skill: SavedSkill) => {
             if (!match) {
                 return;
             }
@@ -374,11 +441,11 @@ const SlashCommandPopup: FC<SlashCommandPopupProps> = ({ currentThreadId, editor
                 break;
             }
             case "prompts": {
-                handleSelectPrompt(selected as Doc<"prompts">);
+                handleSelectPrompt(selected as SavedPrompt);
                 break;
             }
             case "skills": {
-                handleSelectSkill(selected as Doc<"skills">);
+                handleSelectSkill(selected as SavedSkill);
                 break;
             }
             default: {
@@ -446,11 +513,11 @@ const SlashCommandPopup: FC<SlashCommandPopupProps> = ({ currentThreadId, editor
         }
 
         if (type === "prompts") {
-            return (selected as Doc<"prompts">)._id;
+            return (selected as SavedPrompt)._id;
         }
 
         if (type === "skills") {
-            return (selected as Doc<"skills">)._id;
+            return (selected as SavedSkill)._id;
         }
 
         return undefined;
@@ -473,7 +540,7 @@ const SlashCommandPopup: FC<SlashCommandPopupProps> = ({ currentThreadId, editor
                     "border-border dark:border-white/10",
                     "shadow-md dark:shadow-xl dark:shadow-black/50",
                     "ring-foreground/10 ring-1 dark:ring-white/10",
-                    "animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-2",
+                    POPUP_ENTER_MOTION,
                 )}
                 style={{ width: MENU_WIDTH }}
             >
@@ -487,7 +554,7 @@ const SlashCommandPopup: FC<SlashCommandPopupProps> = ({ currentThreadId, editor
                                     </CommandGroupLabel>
                                     {(items as ReadonlyArray<(typeof COMMANDS)[number]>).map((command, index) => (
                                         <CommandItem
-                                            className={clsx("transition-colors", index === selectedIndex && "bg-accent text-accent-foreground")}
+                                            className={clsx(POPUP_ROW_MOTION, index === selectedIndex && "bg-accent text-accent-foreground")}
                                             key={command.id}
                                             onClick={(e) => {
                                                 e.preventDefault();
@@ -513,7 +580,7 @@ const SlashCommandPopup: FC<SlashCommandPopupProps> = ({ currentThreadId, editor
                                         return (
                                             <CommandItem
                                                 className={clsx(
-                                                    "transition-colors",
+                                                    POPUP_ROW_MOTION,
                                                     index === selectedIndex && "bg-accent text-accent-foreground",
                                                     !isSelectable && "cursor-not-allowed opacity-50",
                                                 )}
@@ -549,9 +616,9 @@ const SlashCommandPopup: FC<SlashCommandPopupProps> = ({ currentThreadId, editor
                                     <CommandGroupLabel>
                                         <Trans>Insert Prompt</Trans>
                                     </CommandGroupLabel>
-                                    {(items as Doc<"prompts">[]).map((prompt, index) => (
+                                    {(items as SavedPrompt[]).map((prompt, index) => (
                                         <CommandItem
-                                            className={clsx("transition-colors", index === selectedIndex && "bg-accent text-accent-foreground")}
+                                            className={clsx(POPUP_ROW_MOTION, index === selectedIndex && "bg-accent text-accent-foreground")}
                                             key={prompt._id}
                                             onClick={(e) => {
                                                 e.preventDefault();
@@ -582,9 +649,9 @@ const SlashCommandPopup: FC<SlashCommandPopupProps> = ({ currentThreadId, editor
                                     <CommandGroupLabel>
                                         <Trans>Invoke Skill</Trans>
                                     </CommandGroupLabel>
-                                    {(items as Doc<"skills">[]).map((skill, index) => (
+                                    {(items as SavedSkill[]).map((skill, index) => (
                                         <CommandItem
-                                            className={clsx("transition-colors", index === selectedIndex && "bg-accent text-accent-foreground")}
+                                            className={clsx(POPUP_ROW_MOTION, index === selectedIndex && "bg-accent text-accent-foreground")}
                                             key={skill._id}
                                             onClick={(e) => {
                                                 e.preventDefault();

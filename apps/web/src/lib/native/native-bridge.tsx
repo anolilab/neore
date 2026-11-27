@@ -1,14 +1,17 @@
 import { useLingui } from "@lingui/react/macro";
 import { useNavigate, useRouter } from "@tanstack/react-router";
 import type { JSX } from "react";
-import { lazy, Suspense, useCallback, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
+import { SIGNED_OUT } from "@/features/chat/core/utils/signed-out";
+import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
 import useAfterFirstPaint from "@/hooks/use-after-first-paint";
 import { trackEvent } from "@/lib/analytics";
 
-import { completeNativeSignIn, getNativeDeviceStatus, onNativeCompose, onNativeDraft, onNativeFiles, onNativeSignIn } from "./bridge";
+import { getNativeDeviceStatus } from "./device-bridge";
+import { completeNativeSignIn, onNativeCompose, onNativeDraft, onNativeFiles, onNativeMenuCommand, onNativeSignIn } from "./shell-inbox";
 
 /** Only the desktop shell ever loads it. */
 const DeviceRelay = lazy(async () => await import("@/features/devices/components/device-relay"));
@@ -25,10 +28,20 @@ const requestSend = async (text: string): Promise<void> => {
 };
 
 /** Lazy, like `requestSend`: the new-thread composer takes the files and attaches them (`composer-submit.ts`). */
-const requestAttach = async (files: File[]): Promise<void> => {
+
+/**
+ * Queues a dock drop for the new-chat composer. Returns the number of files of an earlier drop it replaced (another
+ * account's), or `"switched"` when the account changed while the composer code loaded: the switch has let go of drops
+ * for the account before already, so these are not queued either.
+ */
+const requestAttach = async (files: File[], accountId: string | undefined, currentAccount: () => string | undefined): Promise<number | "switched"> => {
     const { requestComposerAttach } = await import("@/features/chat/core/utils/composer-submit");
 
-    requestComposerAttach({ files });
+    if (accountId !== undefined && currentAccount() !== accountId) {
+        return "switched";
+    }
+
+    return requestComposerAttach({ accountId, files });
 };
 
 /**
@@ -38,6 +51,8 @@ const requestAttach = async (files: File[]): Promise<void> => {
  *   as a new chat; files dropped on the dock icon are attached to a new chat;
  * - a system-browser sign-in the shell received is exchanged for a session
  *   cookie on this origin, then the page reloads signed in;
+ * - the application menu's New Chat opens the new-chat route (as the `newChat`
+ *   shortcut does) and Settings opens the settings modal (as the sidebar's cog does);
  * - on desktop, for a signed-in account and after first paint, the device
  *   relay runs (`features/devices`): agent calls to this computer go to the
  *   shell, which asks the user in its own window.
@@ -47,7 +62,31 @@ const NativeBridge = (): JSX.Element | null => {
     const navigate = useNavigate();
     const router = useRouter();
     const { authClient } = useAuth();
-    const { data: session } = authClient.useSession();
+    const { data: session, isPending: sessionPending } = authClient.useSession();
+    // The account a dock drop is for: undefined only while the session loads (the composer that opens takes it), and
+    // signed out once it has loaded with no user. Read from a ref when a drop starts to be taken from the shell, so a
+    // session that resolves never re-subscribes the listener mid-drain, and a switch during it never re-tags the files.
+    const sessionUserId = session?.user?.id ?? (sessionPending ? undefined : SIGNED_OUT);
+    const sessionUserIdRef = useRef(sessionUserId);
+
+    useEffect(() => {
+        sessionUserIdRef.current = sessionUserId;
+    }, [sessionUserId]);
+
+    // Read by the dock listener from a ref, so a locale change never re-subscribes it mid-drain either.
+    const discardedMessage = t`The files arrived while the account changed, so they were not attached. Drop them again.`;
+    const discardedMessageRef = useRef(discardedMessage);
+
+    useEffect(() => {
+        discardedMessageRef.current = discardedMessage;
+    }, [discardedMessage]);
+
+    const replacedMessage = t`Files dropped earlier for another account were not attached. Drop them again.`;
+    const replacedMessageRef = useRef(replacedMessage);
+
+    useEffect(() => {
+        replacedMessageRef.current = replacedMessage;
+    }, [replacedMessage]);
     const afterFirstPaint = useAfterFirstPaint();
     const [hasDeviceTools, setHasDeviceTools] = useState(false);
 
@@ -81,7 +120,7 @@ const NativeBridge = (): JSX.Element | null => {
                     // Into the composer, not sent: a link cannot send a message the user did not submit.
                     const { requestComposerRestore } = await import("@/features/chat/core/utils/composer-restore");
 
-                    requestComposerRestore({ append: true, files: [], text });
+                    requestComposerRestore({ append: true, draftFrom: "shellLink", files: [], text });
                     await openNewChat();
                 })();
             }),
@@ -90,13 +129,45 @@ const NativeBridge = (): JSX.Element | null => {
 
     useEffect(
         () =>
-            onNativeFiles((files) => {
-                void (async () => {
-                    await requestAttach(files);
-                    await openNewChat();
-                })();
-            }),
+            onNativeFiles(
+                (files, accountId) => {
+                    void (async () => {
+                        const queued = await requestAttach(files, accountId, () => sessionUserIdRef.current);
+
+                        if (queued === "switched") {
+                            toast.error(discardedMessageRef.current);
+
+                            return;
+                        }
+
+                        if (queued > 0) {
+                            toast.error(replacedMessageRef.current);
+                        }
+
+                        await openNewChat();
+                    })();
+                },
+                () => sessionUserIdRef.current,
+                () => {
+                    toast.error(discardedMessageRef.current);
+                },
+            ),
         [openNewChat],
+    );
+
+    useEffect(
+        () =>
+            onNativeMenuCommand((command) => {
+                if (command === "settings") {
+                    // The modal `useModalState("settings")` opens, as the sidebar's cog does.
+                    useUIStateStore.getState().openModal("settings");
+
+                    return;
+                }
+
+                void navigate({ search: {}, to: "/chat" });
+            }),
+        [navigate],
     );
 
     useEffect(
@@ -104,7 +175,8 @@ const NativeBridge = (): JSX.Element | null => {
             onNativeSignIn((signIn) => {
                 void (async () => {
                     if (await completeNativeSignIn(signIn)) {
-                        // Sent before the reload; analytics may not flush on unload, so this one can be lost.
+                        // Survives the full load: a loaded PostHog sends its batch on `pagehide`; before it has loaded the
+                        // event waits in sessionStorage and the next page sends it (`queueEvent`).
                         trackEvent("desktop_signed_in", {});
                         // A full load: SSR, the RPC token and every cached query
                         // must all start from the new session.

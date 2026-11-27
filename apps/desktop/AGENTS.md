@@ -29,9 +29,13 @@
 - **Registry installs** (`apps/desktop/src/acp/{registry,install}.ts`, `device-core/src/acp_install.rs`):
   the desktop reads the ACP registry (`cdn.agentclientprotocol.com/registry/v1/latest/registry.json`) only when
   the local window searches. A `binary` download is installable only with a published `sha256`, which the schema
-  makes OPTIONAL (`npx`/`uvx` entries never have one), so those are listed and refused. The window names an id and
+  makes OPTIONAL (`npx`/`uvx` entries never have one). The window names an id and
   version; the main process takes archive, checksum and command from its own snapshot and words the native
   consent itself. Rust hashes, unpacks (no links, no `..`) and records the pin; there is no update path, by design.
+  **npm (`npx`) entries** install pinned to the exact registry version, with the package index's integrity read BEFORE
+  the consent and shown as the index's word (trust on first use). The core hashes the installed folder and re-hashes
+  it before EVERY start; it refuses on a mismatch, so do not add a start path that skips `acp_spawn_plan`. Detail
+  (trash, locks, what the check does not cover): `packages/device-core/README.md`.
 
 - **Desktop dictation** (`apps/desktop/src/dictation/`, desktop-dictation.md S2) is off until the settings
   switch turns it on (`DEFAULT_SETTINGS.enabled: false`); off, no shortcut is registered.
@@ -56,3 +60,26 @@
   opened in ONE stable folder per agent under `<userData>/acp-sign-in/`: some agents keep a record per folder, so a fresh
   folder per check would add one each time. Sign-out is the agent's own `logout`, after its open sessions end. Never
   sign a real account in or out in a test: Claude keeps its credential in the macOS Keychain, so an empty HOME isolates nothing.
+
+- **Offline cold start** is the SITE's service worker, not the shell: `apps/web/public/offline-shell-sw.js` keeps
+  `/offline-shell` (root route only, rendered for nobody: the root `beforeLoad` never reads the session on that path,
+  `apps/web/src/lib/root-before-load.ts`) per build revision, revalidated every 30 min of online use, and answers an
+  Electron GET navigation the network FAILED with it (a 5xx is passed through), else `offline.html`: never an older
+  revision's shell, whose precached chunks are gone. Only `activate` prunes other revisions. The cached response keeps
+  its own CSP header, whose nonce matches its HTML. It only helps after one online run, and only for route chunks that
+  run loaded (`bundle-assets`). Detection is `Electron/` in the worker's user agent: keep the default user agent. The recovery page stays for a first run.
+
+- **Keep-awake during host turns** (`acp/keep-awake.ts`): one `powerSaveBlocker` (`prevent-app-suspension`: the system stays
+  awake, the display may sleep) is held while any host session of this app is `busy`, on this computer and on every SSH
+  server. Each `AcpManager` reports through the one `SleepLock` from its session change callback (not the debounced timer)
+  and in `killAll`; a blocker that throws is logged and never fails a turn.
+
+- **Window look** (`appearance.ts`, `app-menu.ts`, `menu-delivery.ts`; the event order is in their headers): site windows
+  start hidden. Never a bare `show()` on an unrevealed window (`maximize()` shows one on Windows and Linux): reveal through
+  `bringForward`, which applies the saved maximized state. A window closed before its reveal stays hidden until
+  `bringForward`. An unrequested reveal (main window at launch) uses `showInactive`; a window the user opened is shown with
+  `focusOnReveal`. A failed load reveals at the recovery page's `did-finish-load` (`ready-to-show` fires once).
+  Vibrancy needs a fully transparent `backgroundColor`. The live accent event is `accent-color-changed` on Windows and
+  Linux; macOS needs `subscribeNotification("AppleColorPreferencesChangedNotification")`. The pre-paint fill follows
+  `<userData>/appearance.json`. Menu commands wait for the page's `menu-commands-ready` (per document); 2 s after a load
+  without it, New Chat opens a NEW site window and the rest is dropped. ⌘N is `registerAccelerator: false`: the site binds it.

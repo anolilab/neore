@@ -1,6 +1,7 @@
 import { MAX_THREAD_TITLE_INSTRUCTIONS_LENGTH } from "@neore/ai/constants";
 import { v } from "lunorash/server";
 
+import { MAX_BACKUP_MODELS } from "../chat/lib/backup-model";
 import { MAX_SEARCH_DOMAIN_BLOCKLIST } from "../chat/tools/search-domains";
 import { MAX_LENGTH } from "../lib/validators";
 import { MAX_MODEL_NICKNAME_LENGTH, MAX_MODEL_NICKNAMES } from "./lib/model-nicknames";
@@ -30,6 +31,8 @@ export const userSettingsFieldsWithoutUserId = {
             message: "Auto-archive must be off or 7 to 365 days",
         }),
     ),
+    // Archive a chat when a pull request it is linked to merges (`agent/auto-archive.ts#archiveMergedThread`). Absent = off.
+    autoArchiveMergedChats: v.optional(v.boolean()),
     // Compact a thread's model context before a reply once it fills this percentage of the model's window (`agent/thread-compaction.ts`). 0 or absent = off.
     autoCompactThreshold: v.optional(
         v.number().check((value) => value === 0 || (Number.isSafeInteger(value) && value >= 50 && value <= 95), {
@@ -37,9 +40,26 @@ export const userSettingsFieldsWithoutUserId = {
         }),
     ),
     autoReadReplies: v.optional(v.boolean()), // Speak every finished assistant reply aloud. OPT-IN: absent means off.
-    backupModel: v.optional(v.string().max(MAX_LENGTH.short)), // Model a reply is retried on once when the chosen model fails with an infrastructure error. "" or absent = none. Checked against the registry in `settingsUpsert`.
+    backupModel: v.optional(v.string().max(MAX_LENGTH.short)), // The single backup model saved before `backupModels`; a write of it alone also sets `backupModels`. "" clears it.
+    // Models a reply is retried on, in order, when the chosen model fails with an infrastructure error. Empty = none. Checked against the registry in `settingsUpsert`.
+    backupModels: v.optional(
+        v.array(v.string().max(MAX_LENGTH.short)).check((value) => value.length <= MAX_BACKUP_MODELS, {
+            message: `At most ${MAX_BACKUP_MODELS} backup models`,
+        }),
+    ),
+    // The list a `backupModels` write was built on. The write is refused (CONFLICT) when the stored list is no longer this
+    // one, so an edit made on a stale copy (another tab) never overwrites a newer list. Never stored.
+    backupModelsBase: v.optional(
+        v.array(v.string().max(MAX_LENGTH.short)).check((value) => value.length <= MAX_BACKUP_MODELS, {
+            message: `At most ${MAX_BACKUP_MODELS} backup models`,
+        }),
+    ),
     // Appearance: cap long chat code blocks at 24 lines with an expand toggle. Absent means ON.
     capLongCodeBlocks: v.optional(v.boolean()),
+    // In-app toasts for chat events (`features/notifications/lib/chat-toasts.ts`). Absent means ON.
+    chatFailedToastEnabled: v.optional(v.boolean()),
+    chatFinishedToastEnabled: v.optional(v.boolean()),
+    chatInputToastEnabled: v.optional(v.boolean()),
     codeFont: v.optional(v.union(v.literal("fira-code"), v.literal("mono"), v.literal("consolas"), v.literal("jetbrains"), v.literal("source-code-pro"))),
     // Appearance: Shiki theme pair for code blocks (`apps/web/src/features/appearance/lib/code-themes.ts`).
     codeHighlightTheme: v.optional(
@@ -57,20 +77,29 @@ export const userSettingsFieldsWithoutUserId = {
     codeLineNumbers: v.optional(v.boolean()),
     composerAutocompleteEnabled: v.optional(v.boolean()), // Ghost-text completions in the chat composer. OPT-IN: absent means off.
     composerVimMode: v.optional(v.boolean()), // Vim keys (normal/insert mode) in the chat composer. OPT-IN: absent means off.
+    confirmBeforeArchiveChat: v.optional(v.boolean()), // Ask before a chat is archived (list, shortcut, palette). OPT-IN: absent means off.
+    confirmBeforeDeleteChat: v.optional(v.boolean()), // Ask before a chat is deleted. Absent means on.
+    confirmBeforeUnpinChat: v.optional(v.boolean()), // Ask before a pinned chat is unpinned. OPT-IN: absent means off.
     // Appearance: "high" forces the high-contrast tokens, "standard" forces them off, "system" (absent) follows `prefers-contrast: more`.
     contrast: v.optional(v.union(v.literal("system"), v.literal("standard"), v.literal("high"))),
     customInstructions: v.optional(v.string().max(MAX_LENGTH.document)), // Custom instructions for how AI should respond (max 3000 chars)
     dailyBriefEnabled: v.optional(v.boolean()), // Opt-in morning summary notification. OPT-IN: absent means off.
+    // The permission mode a new chat starts with (`chat/lib/thread-permission-mode.ts`, `newChatPermissionMode`). Absent = auto.
+    defaultPermissionMode: v.optional(v.union(v.literal("supervised"), v.literal("auto"), v.literal("full"))),
     // Appearance: UI spacing preset (`apps/web/src/features/appearance/lib/display-preferences.ts`). Absent = comfortable.
     density: v.optional(v.union(v.literal("compact"), v.literal("comfortable"), v.literal("spacious"))),
     dictationLanguage: v.optional(v.string().max(MAX_LENGTH.short)), // Default dictation language for new threads (BCP 47 code, e.g., "en-US", "es-ES")
     disableExternalLinkWarning: v.optional(v.boolean()),
     enableFollowupSuggestions: v.optional(v.boolean()), // Enable/disable follow-up suggestions after assistant messages
     favoriteModels: v.optional(v.array(v.string().max(MAX_LENGTH.short))),
+    // A message sent while a reply streams joins that reply at its next step, instead of queueing behind it. Absent means queue.
+    followUpSteer: v.optional(v.boolean()),
     hidePersonalInfo: v.optional(v.boolean()),
     hostFollowUpSteer: v.optional(v.boolean()), // A message sent during a coding agent's turn interrupts it and goes next. Absent means queue.
     id: v.optional(v.string().max(MAX_LENGTH.id)),
     isAdvancedUser: v.optional(v.boolean()),
+    // Keep an idle chat out of auto-archive while it has a linked pull request that is open. Absent = on (`agent/auto-archive.ts`).
+    keepOpenPullRequestChats: v.optional(v.boolean()),
     keyboardShortcuts: v.optional(
         v.object({
             archiveThread: v.optional(v.string().max(MAX_LENGTH.short)),
@@ -118,14 +147,17 @@ export const userSettingsFieldsWithoutUserId = {
     nickname: v.optional(v.string().max(MAX_LENGTH.short)), // User's preferred name for the AI to call them (max 50 chars)
     onboardingCompleted: v.optional(v.boolean()),
     profession: v.optional(v.string().max(MAX_LENGTH.short)), // User's profession (e.g., "Product Designer", "Software Developer") (max 100 chars)
+    resumeAfterUsageLimit: v.optional(v.boolean()), // A reply paused by a provider's usage limit resumes when the limit resets. Absent means on (`chat/lib/usage-limit-settings.ts`).
     resumeInterruptedRuns: v.optional(v.boolean()), // A run whose worker died resumes from its last saved row (max 3 times). Absent means on.
     resumeLastChat: v.optional(v.boolean()), // Open /chat on the most recent thread instead of a blank one. OPT-IN: absent means off.
+    scheduleIdeasEnabled: v.optional(v.boolean()), // Suggest scheduled tasks drawn from the user's own messages, to accept or dismiss. OPT-IN: absent means off.
     searchDomainBlocklist: v.optional(
         v.array(v.string().max(MAX_LENGTH.short)).check((value) => value.length <= MAX_SEARCH_DOMAIN_BLOCKLIST, {
             message: "Too many blocked domains",
         }),
     ), // Hostnames the web search tool never returns (subdomains too). Normalised server-side in `settingsUpsert`.
-    sendBehavior: v.optional(v.union(v.literal("enter"), v.literal("shiftEnter"), v.literal("button"))),
+    sendBehavior: v.optional(v.union(v.literal("enter"), v.literal("shiftEnter"), v.literal("modEnter"), v.literal("button"))),
+    snoozeUntilUsageLimitReset: v.optional(v.boolean()), // A chat whose reply is paused by a usage limit is snoozed until the reset. OPT-IN: absent means off.
     taskEmailEnabled: v.optional(v.boolean()), // Opt-in email when a task or trigger run finishes with a result. OPT-IN: absent means off.
     temporaryChatRetentionHours: v.optional(v.number()), // Default: 24 hours
     threadSummariesEnabled: v.optional(v.boolean()), // Summarise a long thread's older turns while it sits idle. OPT-IN: absent means off.

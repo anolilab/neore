@@ -644,6 +644,118 @@ describe("reading past the first page", () => {
         expect(reviews.items[0]?.body).toBe("r220");
         expect(reviews.items.at(-1)?.body).toBe("r101");
     });
+
+    describe("a full read for a watch (readAll)", () => {
+        const at = (id: number, seconds: number) => {
+            return {
+                body: `r${String(id)}`,
+                id,
+                state: "COMMENTED",
+                submitted_at: new Date(Date.UTC(2026, 0, 1, 0, 0, seconds)).toISOString(),
+                user: { login: "x" },
+            };
+        };
+        const pageOf = (from: number, count: number, submittedAt = (id: number) => id) =>
+            Array.from({ length: count }, (_, index) => at(from + index, submittedAt(from + index)));
+        const linkTo = (last: number) =>
+            `<https://api.github.com/repositories/1/pulls/7/reviews?page=2&per_page=100>; rel="next", <https://api.github.com/repositories/1/pulls/7/reviews?page=${String(last)}&per_page=100>; rel="last"`;
+        const counted = (pages: { body: unknown; link?: string }[]) => {
+            const requests: number[] = [];
+            const request: HostRequest = async (_path, options: HostRequestOptions = {}) => {
+                const page = Number(options.query?.page ?? 1);
+
+                requests.push(page);
+
+                return Response.json(pages[page - 1]?.body, { headers: page === 1 && pages[0]?.link !== undefined ? { link: pages[0].link } : {} });
+            };
+
+            return { request, requests };
+        };
+
+        it("makes exactly one request for a PR with less than a page of reviews", async () => {
+            const { request, requests } = counted([{ body: pageOf(1, 30) }]);
+            const reviews = await githubDriver.listReviews(request, REF, { readAll: true });
+
+            expect(requests).toEqual([1]);
+            expect(reviews.items).toHaveLength(30);
+        });
+
+        it("reads every page when the list fits under the bound, so a review created early and submitted late is listed first", async () => {
+            // Review 40 sits on page 1 (created early) but was submitted after everything else.
+            const pages = [{ body: pageOf(1, 100, (id) => (id === 40 ? 9999 : id)), link: linkTo(3) }, { body: pageOf(101, 100) }, { body: pageOf(201, 20) }];
+            const { request, requests } = counted(pages);
+            const reviews = await githubDriver.listReviews(request, REF, { readAll: true, seenId: "150" });
+
+            expect(requests).toEqual([1, 2, 3]);
+            expect(reviews.total).toBe(220);
+            expect(reviews.items[0]?.id).toBe("40");
+        });
+
+        it("keeps the first page it read when it falls back, so the newest reviews of page 1 are not dropped", async () => {
+            const last = 12;
+            const pages = Array.from({ length: last }, (_, index) => {
+                // Review 55 on page 1 was submitted after everything else.
+                return { body: pageOf(index * 100 + 1, 100, (id) => (id === 55 ? 99_999 : id)), ...(index === 0 && { link: linkTo(last) }) };
+            });
+            const { request, requests } = counted(pages);
+            const reviews = await githubDriver.listReviews(request, REF, { readAll: true });
+
+            expect(requests).toEqual([1, last]);
+            expect(reviews.items[0]?.id).toBe("55");
+            expect(new Set(reviews.items.map((item) => item.id)).size).toBe(reviews.items.length);
+        });
+
+        it("falls back to the newest pages without an error when there are more pages than the bound", async () => {
+            const last = 12;
+            const pages = Array.from({ length: last }, (_, index) => {
+                return { body: pageOf(index * 100 + 1, 100), ...(index === 0 && { link: linkTo(last) }) };
+            });
+            const { request, requests } = counted(pages);
+            const reviews = await githubDriver.listReviews(request, REF, { readAll: true, seenId: "50" });
+
+            // Never the whole list: the first page, the last, the one before, then back to the seen one within the usual budget.
+            expect(requests.length).toBeLessThanOrEqual(5);
+            expect(requests).toContain(last);
+            expect(reviews.total).toBe(1200);
+            expect(reviews.items[0]?.id).toBe("1200");
+        });
+    });
+
+    it("goes back through earlier pages until the seen review is listed, within a bound", async () => {
+        const page = (from: number, count: number) =>
+            Array.from({ length: count }, (_, index) => {
+                const id = from + index;
+
+                return {
+                    body: `r${String(id)}`,
+                    id,
+                    state: "COMMENTED",
+                    submitted_at: new Date(Date.UTC(2026, 0, 1, 0, 0, id)).toISOString(),
+                    user: { login: "x" },
+                };
+            });
+        const link = `<https://api.github.com/repositories/1/pulls/7/reviews?page=2&per_page=100>; rel="next", <https://api.github.com/repositories/1/pulls/7/reviews?page=5&per_page=100>; rel="last"`;
+        // Reads in order: the first page, the last, the one before it, then one earlier page at a time.
+        const request = () =>
+            paged({
+                [`${REPO}/pulls/7/reviews`]: [
+                    { body: page(1, 100), link },
+                    { body: page(401, 20) },
+                    { body: page(301, 100) },
+                    { body: page(201, 100) },
+                    { body: page(101, 100) },
+                ],
+            });
+
+        const found = await githubDriver.listReviews(request(), REF, { seenId: "250" });
+        const without = await githubDriver.listReviews(request(), REF);
+        const absent = await githubDriver.listReviews(request(), REF, { seenId: "9999" });
+
+        expect(found.items.some((item) => item.id === "250")).toBe(true);
+        expect(without.items.some((item) => item.id === "250")).toBe(false);
+        // Never found: the read stops at the bound (5 pages in all, the first included), not at the end of the list.
+        expect(absent.items.some((item) => item.id === "101")).toBe(true);
+    });
 });
 
 describe("the review count", () => {
@@ -657,6 +769,38 @@ describe("the review count", () => {
         const reviews = await githubDriver.listReviews(request, REF);
 
         expect(reviews).toMatchObject({ items: [{ body: "seen" }], total: 1 });
+    });
+
+    it("puts the later of two reviews sent in the same second first, and keeps the reviewer's standing", async () => {
+        const at = "2026-01-01T00:00:00Z";
+        const request: HostRequest = async () =>
+            Response.json([
+                { author_association: "MEMBER", body: "fine", id: 10, state: "APPROVED", submitted_at: at, user: { login: "ann" } },
+                { author_association: "MEMBER", body: "on second thought", id: 11, state: "CHANGES_REQUESTED", submitted_at: at, user: { login: "ann" } },
+            ]);
+
+        const reviews = await githubDriver.listReviews(request, REF);
+
+        expect(reviews.items.map((review) => [review.body, review.authorAssociation])).toStrictEqual([
+            ["on second thought", "MEMBER"],
+            ["fine", "MEMBER"],
+        ]);
+    });
+
+    it("hands over the reviewer's id, and no name for a deleted account", async () => {
+        const at = "2026-01-01T00:00:00Z";
+        const request: HostRequest = async () =>
+            Response.json([
+                { body: "a", id: 10, state: "APPROVED", submitted_at: at, user: { id: 42, login: "ann" } },
+                { body: "b", id: 11, state: "CHANGES_REQUESTED", submitted_at: at, user: null },
+            ]);
+
+        const reviews = await githubDriver.listReviews(request, REF);
+
+        expect(reviews.items.map((review) => [review.authorId, review.authorLogin])).toStrictEqual([
+            [undefined, ""],
+            ["42", "ann"],
+        ]);
     });
 });
 

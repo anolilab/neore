@@ -648,11 +648,18 @@ const buildHandoff = async (
  * The action's body, with the summary call passed in so a test can drive it without the gateway. Plans,
  * builds the handoff (the summary first, fenced but not yet charged), then commits in one mutation.
  */
-export const runAgentSwitch = async (ctx: SwitchRunner, args: SwitchArgs & { mode?: RequestedMode }, summarise: Summarise): Promise<SwitchResult> => {
+export const runAgentSwitch = async (
+    ctx: SwitchRunner,
+    args: SwitchArgs & { mode?: RequestedMode },
+    summarise: Summarise,
+    /** The caller's verified active organization: a switch to a coding agent is held to the cap of the chat's organization, else this one. */
+    organizationId?: string,
+): Promise<SwitchResult> => {
     // To or from a coding agent: no summary and no charge, and a different runner means a new thread (acp/switch.ts).
     if (args.target.kind === "host" || (await ctx.runQuery(internal.acp.switch.isHostSwitchSource, { threadId: args.threadId }))) {
         return (await ctx.runMutation(internal.acp.switch.commitHostSwitch, {
             clientId: args.clientId,
+            organizationId,
             target: args.target,
             threadId: args.threadId,
             unlockProof: args.unlockProof,
@@ -717,7 +724,12 @@ export const switchThreadAgent = authAction
             runQuery: async (reference, runArgs) => await ctx.runQuery(reference as never, runArgs as never),
         };
 
-        const result = await runAgentSwitch(runner, { ...args, userId }, summariseWith(ctx, { threadId: args.threadId, userId }));
+        const result = await runAgentSwitch(
+            runner,
+            { ...args, userId },
+            summariseWith(ctx, { threadId: args.threadId, userId }),
+            ctx.user.activeOrganization?.id,
+        );
 
         ctx.log.event("chat.switch_thread_agent", { forked: result.forkedThreadId !== undefined, switched: result.switched, targetKind: args.target.kind });
 

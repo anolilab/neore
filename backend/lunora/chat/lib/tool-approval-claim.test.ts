@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { loadHomeOverview } from "../../home/overview";
 import schema from "../../schema";
-import { recordPendingToolApprovals } from "../tool-permissions";
+import { MAX_APPROVAL_ID_LENGTH, recordPendingToolApprovals } from "../tool-permissions";
 import { claimToolApproval, collectApprovalRequestIds } from "./tool-approval-claim";
 import { PENDING_APPROVAL_TTL_MS } from "./tool-approval-cleanup";
 
@@ -46,8 +46,10 @@ let threadId: string;
 const insertMessage = async (order: number, message: unknown, tool = false) =>
     await harness.run(async (ctx: any) => await ctx.db.insert("messages", { message, order, status: "success", stepOrder: 0, threadId, tool, userId: OWNER }));
 
-const claim = async (callerId: string, decision: "always" | "approve" | "deny" = "approve", approvalId = APPROVAL_ID) =>
-    await harness.run(async (ctx: any) => await claimToolApproval(ctx, { approvalId, callerId, decision, threadId: threadId as never }));
+const claim = async (callerId: string, decision: "always" | "approve" | "deny" = "approve", approvalId = APPROVAL_ID, answeredByImpersonator = false) =>
+    await harness.run(
+        async (ctx: any) => await claimToolApproval(ctx, { answeredByImpersonator, approvalId, callerId, decision, threadId: threadId as never }),
+    );
 
 const runStatus = async () =>
     await harness.run(async (ctx: any) => {
@@ -85,6 +87,12 @@ describe("claimToolApproval", () => {
 
         expect(result).toMatchObject({ config: CONFIG, kind: "claimed", ownerId: OWNER, toolName: "mcp_Files__delete" });
         expect(await runStatus()).toStrictEqual(["approved"]);
+    });
+
+    it("marks the continuation's turn impersonated when an admin acting as the owner answers, so it unlocks no saved login", async () => {
+        const result = await claim(OWNER, "approve", APPROVAL_ID, true);
+
+        expect(result).toMatchObject({ config: { ...CONFIG, impersonated: true }, kind: "claimed" });
     });
 
     it("records a denial as denied", async () => {
@@ -185,7 +193,14 @@ describe("claimToolApproval", () => {
 
         await expect(
             harness.run(
-                async (ctx: any) => await claimToolApproval(ctx, { approvalId: APPROVAL_ID, callerId: OWNER, decision: "approve", threadId: otherThread }),
+                async (ctx: any) =>
+                    await claimToolApproval(ctx, {
+                        answeredByImpersonator: false,
+                        approvalId: APPROVAL_ID,
+                        callerId: OWNER,
+                        decision: "approve",
+                        threadId: otherThread,
+                    }),
             ),
         ).rejects.toThrow("can no longer be resumed");
     });
@@ -221,6 +236,29 @@ describe("a collaborator's paused turn", () => {
 
         expect(home.approvals.map((approval: { approvalId: string }) => approval.approvalId)).toContain("approval-2");
         await expect(claim(OWNER, "approve", "approval-2")).resolves.toMatchObject({ kind: "claimed", ownerId: OWNER });
+    });
+});
+
+describe("the Events log's record of a pause", () => {
+    it("keeps an id an answer accepts as an event, and records none for one past the answer's limit", async () => {
+        const longId = "a".repeat(MAX_APPROVAL_ID_LENGTH + 1);
+        const shortId = "a".repeat(MAX_APPROVAL_ID_LENGTH);
+
+        await insertMessage(2, { content: "tidy up", role: "user" });
+        await insertMessage(3, assistantWithRequest(shortId), true);
+        await insertMessage(4, { content: "again", role: "user" });
+        await insertMessage(5, assistantWithRequest(longId), true);
+
+        const count = async (approvalIds: string[]) => {
+            await harness.run(async (ctx: any) => await ctx.runMutation(recordPendingToolApprovals, { approvalIds, config: CONFIG, threadId, userId: OWNER }));
+
+            const events = await harness.run(async (ctx: any) => await ctx.db.query("mcpEvents").collect());
+
+            return events.length;
+        };
+
+        expect(await count([shortId])).toBe(1);
+        expect(await count([longId])).toBe(1);
     });
 });
 
@@ -276,6 +314,49 @@ describe("what a pause notifies as", () => {
 
         expect(rows.map((row) => row.type).toSorted((a, b) => a.localeCompare(b))).toStrictEqual(["ask_user", "secret_request", "tool_approval"]);
         expect(rows.find((row) => row.type === "secret_request")?.dedupeKey).toBe("secret_request:secret-1");
+    });
+
+    it("names the task that started a waiting sub-agent's chain, and nothing for the owner's own chat", async () => {
+        const subAgentRun = async (fields: Record<string, unknown>) =>
+            await harness.run(
+                async (ctx: any) =>
+                    await ctx.db.insert("subAgentRuns", {
+                        childThreadId: threadId,
+                        createdAt: 0,
+                        depth: 1,
+                        parentThreadId: "lead",
+                        status: "running",
+                        task: "Tidy up",
+                        updatedAt: 0,
+                        userId: OWNER,
+                        ...fields,
+                    }),
+            );
+        const fromTask = await subAgentRun({ chainSource: "task:t1", dispatchedBy: "trigger" });
+        const fromChat = await subAgentRun({ dispatchedBy: "lead" });
+
+        // Each run's request is on the child's latest turn, so the run waits and its owner is told.
+        await insertMessage(2, { content: [...assistantWithRequest("task-1").content, ...assistantWithRequest("chat-1").content], role: "assistant" }, true);
+
+        for (const [approvalId, subAgentRunId] of [
+            ["task-1", fromTask],
+            ["chat-1", fromChat],
+        ]) {
+            await harness.run(
+                async (ctx: any) =>
+                    await ctx.runMutation(recordPendingToolApprovals, {
+                        approvalIds: [approvalId],
+                        config: { ...CONFIG, subAgentRunId },
+                        threadId,
+                        userId: OWNER,
+                    }),
+            );
+        }
+
+        const rows = (await notifications()) as { body?: string; dedupeKey: string }[];
+
+        expect(rows.find((row) => row.dedupeKey === "tool_approval:task-1")?.body).toBe("A sub-agent started by a task is waiting for you.");
+        expect(rows.find((row) => row.dedupeKey === "tool_approval:chat-1")).not.toHaveProperty("body");
     });
 
     it("words the push for a secret request, and sends it urgently like the other things a run waits on", async () => {

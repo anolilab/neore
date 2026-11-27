@@ -1,26 +1,40 @@
 use super::*;
+use crate::test_dir::TestDir;
+use pretty_assertions::assert_eq;
 use serde_json::json;
 use std::collections::BTreeMap;
 use std::io::Write;
 use std::path::PathBuf;
 
 use crate::acp::EnvVars;
-use crate::acp_install::commit_tests::Scratch;
 use crate::acp_install::sweep_trash;
 
 const PACKAGE: &str = "fixture-agent";
 const PROGRAM: &str = "console.log('hello');\n";
 
 /// The state over a fresh folder under the system temp folder.
-fn state(name: &str) -> (DeviceState, Scratch) {
+fn state(name: &str) -> (DeviceState, TestDir) {
     crate::store::test_keychain::install();
 
-    let dir = std::env::temp_dir().join(format!("neore-acp-npm-{name}-{}", std::process::id()));
-
-    let _ = fs::remove_dir_all(&dir);
+    let dir = TestDir::at(&format!("acp-npm-{name}"));
     fs::create_dir_all(&dir).unwrap();
 
-    (DeviceState::new(&dir, Box::new(|_| {})), Scratch(dir))
+    (DeviceState::new(&dir, Box::new(|_| {})), dir)
+}
+
+/// A probe's plan with the scratch folder it made already removed, as the desktop removes it after the probe.
+fn probe(state: &DeviceState) -> Result<crate::acp::SpawnPlan, String> {
+    without_scratch(state.acp_spawn_plan("fixture", None))
+}
+
+fn without_scratch(
+    plan: Result<crate::acp::SpawnPlan, String>,
+) -> Result<crate::acp::SpawnPlan, String> {
+    if let Ok(plan) = &plan {
+        drop(crate::acp::probe_scratch(plan));
+    }
+
+    plan
 }
 
 /// A stand-in `node`: a file at an absolute path, which is all the start-up check looks at.
@@ -32,8 +46,20 @@ fn fake_node(dir: &Path) -> PathBuf {
     node
 }
 
+/// The installed 1.0.0 folder of `fixture` (named by its version and tree hash), or where a seed writes it first.
 fn installed(dir: &Path) -> PathBuf {
-    dir.join("acp-agents/fixture/1.0.0")
+    let key_dir = dir.join("acp-agents/fixture");
+
+    fs::read_dir(&key_dir)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .map(|entry| entry.path())
+        .find(|path| {
+            path.file_name()
+                .is_some_and(|name| name.to_string_lossy().starts_with("npm-1.0.0-"))
+        })
+        .unwrap_or_else(|| key_dir.join("1.0.0"))
 }
 
 fn script(dir: &Path) -> PathBuf {
@@ -43,14 +69,23 @@ fn script(dir: &Path) -> PathBuf {
         .join("cli.js")
 }
 
-/// What an npm install leaves behind: the files under `acp-agents/fixture/1.0.0` and an agent recorded to run
-/// `node <program>`, pinned with the hash of that folder. Returns the agent as recorded.
+/// What an npm install leaves behind: the files under `acp-agents/fixture/npm-1.0.0-<tree hash prefix>` and an agent
+/// recorded to run `node <program>`, pinned with the hash of that folder. Returns the agent as recorded.
 fn seed_install(state: &DeviceState, dir: &Path, node: &Path) -> AcpAgent {
+    let written = script(dir);
+
+    fs::create_dir_all(written.parent().unwrap()).unwrap();
+    fs::write(&written, PROGRAM).unwrap();
+
+    let tree = tree_hash(&installed(dir)).unwrap();
+
+    fs::rename(
+        installed(dir),
+        dir.join(format!("acp-agents/fixture/npm-1.0.0-{}", &tree[..16])),
+    )
+    .unwrap();
+
     let program = script(dir);
-
-    fs::create_dir_all(program.parent().unwrap()).unwrap();
-    fs::write(&program, PROGRAM).unwrap();
-
     let agent = AcpAgent {
         args: vec![program.to_string_lossy().into_owned(), "--acp".into()],
         command: node.to_string_lossy().into_owned(),
@@ -58,9 +93,10 @@ fn seed_install(state: &DeviceState, dir: &Path, node: &Path) -> AcpAgent {
         install: Some(AcpInstall {
             index_integrity: Some("sha512-index".into()),
             publisher: "Example Inc.".into(),
+            registry_env: Vec::new(),
             sha256: "0".repeat(64),
             source: "https://registry.npmjs.org/fixture-agent/-/fixture-agent-1.0.0.tgz".into(),
-            tree_sha256: Some(tree_hash(&installed(dir)).unwrap()),
+            tree_sha256: Some(tree),
             version: "1.0.0".into(),
         }),
         key: "fixture".into(),
@@ -215,12 +251,12 @@ fn a_changed_added_or_removed_file_refuses_the_start_and_says_so() {
     seed_install(&state, &dir, &node);
 
     let program = script(&dir);
-    let untouched = state.acp_spawn_plan("fixture", None).unwrap();
+    let untouched = probe(&state).unwrap();
 
     assert_eq!(Path::new(&untouched.command), node);
 
     fs::write(&program, "console.log('changed');\n").unwrap();
-    let changed = state.acp_spawn_plan("fixture", None).unwrap_err();
+    let changed = probe(&state).unwrap_err();
     assert!(
         changed.contains("no longer matches the files recorded"),
         "{changed}"
@@ -228,18 +264,18 @@ fn a_changed_added_or_removed_file_refuses_the_start_and_says_so() {
 
     fs::write(&program, PROGRAM).unwrap();
     assert!(
-        state.acp_spawn_plan("fixture", None).is_ok(),
+        probe(&state).is_ok(),
         "restoring the bytes restores the start"
     );
 
     let extra = program.with_file_name("extra.js");
 
     fs::write(&extra, "x").unwrap();
-    assert!(state.acp_spawn_plan("fixture", None).is_err());
+    assert!(probe(&state).is_err());
     fs::remove_file(&extra).unwrap();
 
     fs::remove_file(&program).unwrap();
-    assert!(state.acp_spawn_plan("fixture", None).is_err());
+    assert!(probe(&state).is_err());
 }
 
 #[test]
@@ -252,7 +288,7 @@ fn an_executable_bit_changes_the_hash() {
     seed_install(&state, &dir, &node);
     fs::set_permissions(script(&dir), fs::Permissions::from_mode(0o755)).unwrap();
 
-    assert!(state.acp_spawn_plan("fixture", None).is_err());
+    assert!(probe(&state).is_err());
 }
 
 #[test]
@@ -263,7 +299,7 @@ fn a_missing_install_folder_refuses_the_start() {
     seed_install(&state, &dir, &node);
     fs::remove_dir_all(installed(&dir)).unwrap();
 
-    assert!(state.acp_spawn_plan("fixture", None).is_err());
+    assert!(probe(&state).is_err());
 }
 
 #[test]
@@ -281,7 +317,7 @@ fn an_agent_without_a_recorded_tree_is_not_checked() {
         .unwrap();
     fs::write(script(&dir), "changed").unwrap();
 
-    assert!(state.acp_spawn_plan("fixture", None).is_ok());
+    assert!(probe(&state).is_ok());
 }
 
 #[test]
@@ -290,10 +326,10 @@ fn a_node_that_is_gone_stops_the_start_with_a_message_that_names_it() {
     let node = fake_node(&dir);
 
     seed_install(&state, &dir, &node);
-    assert!(state.acp_spawn_plan("fixture", None).is_ok());
+    assert!(probe(&state).is_ok());
     fs::remove_file(&node).unwrap();
 
-    let error = state.acp_spawn_plan("fixture", None).unwrap_err();
+    let error = probe(&state).unwrap_err();
 
     assert!(
         error.contains("which is gone")
@@ -316,7 +352,7 @@ fn a_node_modules_folder_planted_next_to_the_install_refuses_the_start() {
     let node = fake_node(&dir);
 
     seed_install(&state, &dir, &node);
-    assert!(state.acp_spawn_plan("fixture", None).is_ok());
+    assert!(probe(&state).is_ok());
 
     for planted in [
         dir.join("acp-agents/fixture/node_modules"),
@@ -325,17 +361,14 @@ fn a_node_modules_folder_planted_next_to_the_install_refuses_the_start() {
     ] {
         fs::create_dir_all(&planted).unwrap();
 
-        let error = state.acp_spawn_plan("fixture", None).unwrap_err();
+        let error = probe(&state).unwrap_err();
 
         assert!(
             error.contains("node_modules folder next to its install"),
             "{error}"
         );
         fs::remove_dir_all(&planted).unwrap();
-        assert!(
-            state.acp_spawn_plan("fixture", None).is_ok(),
-            "removing it allows the start"
-        );
+        assert!(probe(&state).is_ok(), "removing it allows the start");
     }
 }
 
@@ -413,9 +446,9 @@ fn editing_the_arguments_after_the_program_keeps_the_pin_and_the_check() {
 
     assert!(edited.agents[0].install.is_some());
     assert!(Path::new(&program).is_file());
-    assert!(state.acp_spawn_plan("fixture", None).is_ok());
+    assert!(probe(&state).is_ok());
     fs::write(&program, "changed").unwrap();
-    assert!(state.acp_spawn_plan("fixture", None).is_err());
+    assert!(probe(&state).is_err());
     fs::write(&program, PROGRAM).unwrap();
 
     // The program itself is replaced: no longer the install, and its files go with it, as for a binary.
@@ -490,7 +523,7 @@ fn a_hash_that_cannot_be_computed_is_refused_with_its_own_reason() {
     seed_install(&state, &dir, &node);
     std::os::unix::fs::symlink("/etc/hosts", script(&dir).with_file_name("out")).unwrap();
 
-    let error = state.acp_spawn_plan("fixture", None).unwrap_err();
+    let error = probe(&state).unwrap_err();
 
     assert!(error.contains("could not be checked"), "{error}");
     assert!(error.contains("outside the package"), "{error}");
@@ -571,6 +604,7 @@ fn removing_a_node_variable_drops_the_pin_too() {
                 settings.acp_agents[0].install = Some(AcpInstall {
                     index_integrity: Some("sha512-index".into()),
                     publisher: "Example Inc.".into(),
+                    registry_env: Vec::new(),
                     sha256: "0".repeat(64),
                     source: "https://registry.npmjs.org/x".into(),
                     tree_sha256: Some(tree_hash(&installed(&dir)).unwrap()),
@@ -924,7 +958,7 @@ fn a_node_reached_through_a_link_with_another_name_installs() {
         link,
         "the recorded command is the link, by its own name"
     );
-    assert!(state.acp_spawn_plan("fixture", None).is_ok());
+    assert!(probe(&state).is_ok());
 }
 
 #[test]
@@ -2185,7 +2219,7 @@ fn no_lifecycle_script_runs_during_an_install() {
         !marker.exists(),
         "a lifecycle script ran during the install"
     );
-    assert!(state.acp_spawn_plan("fixture", None).is_ok());
+    assert!(probe(&state).is_ok());
 }
 
 #[test]
@@ -2314,7 +2348,7 @@ fn plan_with_a_change_during_the_hash(
         change(state);
         go_tx.send(()).unwrap();
 
-        plan.join().unwrap()
+        without_scratch(plan.join().unwrap())
     });
 
     crate::acp_install::tests_hook::clear_after_hash();
@@ -2414,4 +2448,230 @@ fn a_plan_is_built_from_the_settings_as_they_are_after_the_check_not_before() {
         .unwrap_err();
 
     assert!(error.contains("is not approved for that folder"), "{error}");
+}
+
+#[test]
+fn a_reinstall_with_other_bytes_leaves_the_files_a_plan_verified_in_place() {
+    let (state, scratch) = state("plan-reinstall");
+    let dir = scratch.to_path_buf();
+    let (node, npm, _) = fake_tools(&dir);
+    let first = tarball(&manifest(), &[]);
+
+    state
+        .acp_install_npm(request(&state, &node, &npm, &first, integrity(&first)))
+        .unwrap();
+
+    let plan = probe(&state).unwrap();
+    let verified = installed(&dir);
+    let verified_hash = tree_hash(&verified).unwrap();
+
+    // The same version republished with other bytes, installed after the plan was made and before it is spawned.
+    let second = tarball(&manifest(), &[("extra.js", "console.log('new');\n")]);
+
+    state
+        .acp_install_npm(request(&state, &node, &npm, &second, integrity(&second)))
+        .unwrap();
+
+    let program = Path::new(&plan.args[0]);
+
+    assert!(
+        program.starts_with(&verified),
+        "the plan runs from the folder it verified"
+    );
+    assert!(program.is_file(), "which is still there until a prune");
+    assert_eq!(
+        tree_hash(&verified).unwrap(),
+        verified_hash,
+        "with the files it verified"
+    );
+
+    let pin = state.acp_view().agents[0].install.clone().unwrap();
+    let current = dir
+        .join("acp-agents/fixture")
+        .join(crate::acp_install::install_dir_name(&pin));
+
+    assert_ne!(
+        current, verified,
+        "the new bytes went to a folder of their own"
+    );
+    assert!(probe(&state).is_ok());
+
+    state.acp_install_prune("fixture");
+
+    let gone = (0..100).any(|_| {
+        if verified.exists() {
+            std::thread::sleep(Duration::from_millis(20));
+        }
+
+        !verified.exists()
+    });
+
+    assert!(gone, "the prune takes the old folder");
+    assert!(current.exists(), "and keeps the pinned one");
+}
+
+#[test]
+fn npm_is_told_to_fetch_nothing_from_git() {
+    let (state, dir) = state("allow-git");
+    let (node, npm, log) = fake_tools(&dir);
+    let bytes = tarball(&manifest(), &[]);
+
+    state
+        .acp_install_npm(request(&state, &node, &npm, &bytes, integrity(&bytes)))
+        .unwrap();
+
+    assert!(fs::read_to_string(&log)
+        .unwrap()
+        .split_whitespace()
+        .any(|arg| arg == "--allow-git=none"));
+}
+
+/// Installs `bytes` as the registry entry would with `env` as its variables.
+fn install_with_env(
+    state: &DeviceState,
+    node: &Path,
+    npm: &Path,
+    bytes: &[u8],
+    env: &[(&str, &str)],
+) {
+    let mut request = request(state, node, npm, bytes, integrity(bytes));
+
+    request.env = env
+        .iter()
+        .map(|(name, value)| ((*name).to_owned(), (*value).to_owned()))
+        .collect();
+    state.acp_install_npm(request).unwrap();
+}
+
+#[test]
+fn a_reinstall_drops_the_variables_the_registry_no_longer_sets_and_keeps_the_persons_own() {
+    let (state, dir) = state("registry-env");
+    let (node, npm, _) = fake_tools(&dir);
+    let bytes = tarball(&manifest(), &[]);
+    let install = |env: &[(&str, &str)]| install_with_env(&state, &node, &npm, &bytes, env);
+    let env = || -> Vec<(String, String)> {
+        state.settings().acp_agents[0]
+            .env
+            .0
+            .iter()
+            .map(|(name, value)| (name.clone(), value.clone()))
+            .collect()
+    };
+
+    install(&[("FIXTURE_MODE", "legacy"), ("FIXTURE_LEVEL", "1")]);
+    state
+        .acp_update(
+            serde_json::from_value(json!({
+                "op": "setEnv", "agentKey": "fixture", "name": "MY_TOKEN", "value": "mine",
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+
+    install(&[("FIXTURE_LEVEL", "2")]);
+
+    assert_eq!(
+        env(),
+        vec![
+            ("FIXTURE_LEVEL".to_owned(), "2".to_owned()),
+            ("MY_TOKEN".to_owned(), "mine".to_owned()),
+        ]
+    );
+}
+
+#[test]
+fn an_install_in_the_older_version_named_folder_still_starts_and_is_kept_by_a_prune() {
+    let (state, dir) = state("legacy-folder");
+    let node = fake_node(&dir);
+    let agent = seed_install(&state, &dir, &node);
+    let current = installed(&dir);
+    let legacy = dir.join("acp-agents/fixture/1.0.0");
+    let program = Path::new(&agent.args[0]);
+
+    // As an install recorded before the folder carried its tree hash: the same files, by the version alone.
+    fs::rename(&current, &legacy).unwrap();
+    state
+        .change_settings(|settings| {
+            settings.acp_agents[0].args[0] = legacy
+                .join(program.strip_prefix(&current).unwrap())
+                .to_string_lossy()
+                .into_owned();
+
+            Ok(())
+        })
+        .unwrap();
+
+    assert!(probe(&state).is_ok());
+
+    // A prune moves what it drops into the trash at once, so a folder still here was kept.
+    state.acp_install_prune("fixture");
+
+    assert!(
+        legacy.exists(),
+        "the folder the program is in is the one kept"
+    );
+    assert!(probe(&state).is_ok());
+}
+
+#[test]
+fn a_registry_variable_the_person_changed_is_theirs_and_a_reinstall_keeps_it() {
+    let (state, dir) = state("registry-env-override");
+    let (node, npm, _) = fake_tools(&dir);
+    let bytes = tarball(&manifest(), &[]);
+    let install = |env: &[(&str, &str)]| install_with_env(&state, &node, &npm, &bytes, env);
+
+    install(&[("FIXTURE_MODE", "legacy")]);
+    state
+        .acp_update(
+            serde_json::from_value(json!({
+                "op": "setEnv", "agentKey": "fixture", "name": "FIXTURE_MODE", "value": "mine",
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+
+    install(&[]);
+
+    assert_eq!(
+        state.settings().acp_agents[0].env.0.get("FIXTURE_MODE"),
+        Some(&"mine".to_owned())
+    );
+}
+
+#[test]
+fn the_installed_folder_is_the_programs_the_command_for_a_binary_and_the_first_argument_for_npm() {
+    let (state, dir) = state("installed-folder");
+    let key_dir = dir.join("acp-agents/fixture");
+    let in_key = |path: &str| key_dir.join(path).to_string_lossy().into_owned();
+    let pin = |tree: Option<&str>| AcpInstall {
+        index_integrity: None,
+        publisher: "Example Inc.".into(),
+        registry_env: Vec::new(),
+        sha256: "0".repeat(64),
+        source: "https://example.com/agent.tgz".into(),
+        tree_sha256: tree.map(str::to_owned),
+        version: "1.0.0".into(),
+    };
+    let agent = AcpAgent {
+        // An argument that also points into the agent's folder, but not at its program.
+        args: vec![in_key("shared/config.json")],
+        command: in_key("1.0.0/bin/agent"),
+        env: EnvVars(BTreeMap::new()),
+        install: None,
+        key: "fixture".into(),
+        label: "Fixture".into(),
+    };
+
+    assert_eq!(state.installed_dir_name(&agent, &pin(None)), "1.0.0");
+
+    let npm = AcpAgent {
+        args: vec![in_key("1.0.0/node_modules/fixture-agent/cli.js")],
+        command: "/usr/bin/node".into(),
+        ..agent
+    };
+
+    assert_eq!(
+        state.installed_dir_name(&npm, &pin(Some(&"a".repeat(64)))),
+        "1.0.0"
+    );
 }

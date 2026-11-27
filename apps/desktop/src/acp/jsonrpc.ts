@@ -17,8 +17,6 @@ export interface RpcHandlers {
 }
 
 interface Pending {
-    /** Called as the answer is read, before anything read after it: a promise's callbacks run only after the whole read is handled. */
-    answered?: () => void;
     reject: (error: Error) => void;
     resolve: (value: unknown) => void;
 }
@@ -27,7 +25,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> => typeof va
 
 /** A write to a dead child's stdin fails with EPIPE: the agent exited before it read its input. */
 const exitedBeforeInput = (error: Error): Error =>
-    (error as NodeJS.ErrnoException).code === "EPIPE" ? new Error("the agent exited before reading its input") : error;
+    (error as NodeJS.ErrnoException).code === "EPIPE" ? new Error("the agent exited before reading its input", { cause: error }) : error;
 
 export class JsonRpcConnection {
     private readonly pending = new Map<number, Pending>();
@@ -59,7 +57,7 @@ export class JsonRpcConnection {
         output.on("error", (error) => this.close(exitedBeforeInput(error)));
     }
 
-    public request<Result = unknown>(method: string, params: unknown, answered?: () => void): Promise<Result> {
+    public request<Result = unknown>(method: string, params: unknown): Promise<Result> {
         if (this.closed !== undefined) {
             return Promise.reject(this.closed);
         }
@@ -69,7 +67,7 @@ export class JsonRpcConnection {
         this.nextId += 1;
 
         return new Promise<Result>((resolve, reject) => {
-            this.pending.set(id, { answered, reject, resolve: (value) => resolve(value as Result) });
+            this.pending.set(id, { reject, resolve: (value) => resolve(value as Result) });
             this.write({ id, jsonrpc: "2.0", method, params });
         });
     }
@@ -159,7 +157,6 @@ export class JsonRpcConnection {
         }
 
         this.pending.delete(id);
-        waiter.answered?.();
 
         if (isRecord(message.error)) {
             const { code, message: text } = message.error;

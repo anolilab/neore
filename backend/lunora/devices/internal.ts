@@ -5,11 +5,12 @@
  */
 import { LunoraError, v } from "lunorash/server";
 
-import type { Doc } from "../_generated/dataModel";
+import type { Doc, Id } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { ACP_CLEARED } from "../acp/lib/constants";
 import { HOST_DID_NOT_ANSWER, onAcpCallEnded } from "../acp/lib/calls";
+import { internal } from "../_generated/internal";
 import { isAccountDeletionUnderway } from "../gdpr/deletion-guard";
 import { threadHandoffTaint, threadSummaryTaint } from "../agent/thread-summary-taint";
 import { decryptKey } from "../lib/encryption";
@@ -18,6 +19,7 @@ import { MAX_LENGTH } from "../lib/validators";
 import {
     DEVICE_CALL_DEADLINE_MS,
     DEVICE_CALL_RETENTION_MS,
+    isGlobalInstructionsTool,
     MAX_DEVICE_INPUT_BYTES,
     MAX_DEVICES_PER_USER,
     MAX_OPEN_CALLS_PER_DEVICE,
@@ -28,8 +30,11 @@ import { isDeviceInScope, resolveThreadProject } from "./lib/scope";
 import { signDevicePayload, utf8Length } from "./lib/signing";
 import { assertRoomForDevice, insertDevice } from "./lib/register";
 import { mergeTaint } from "./lib/taint";
+import { clearMachineFromProjects } from "../projects/machine-location";
+import { runAfterWithRetry } from "../lib/shard-scheduler";
 import { countOpenCalls, isAcpTool, isDeviceOnline, isDeviceOutdated, isTerminalCallStatus, OPEN_CALL_STATUSES } from "./lib/state";
 import { vDeviceCallStatus, vDeviceManifestTool, vDevicePlatform, vDeviceTaintSource } from "./validators";
+import { threadHasLiveGrant } from "../agent/live-grant";
 
 type ThreadRow = Pick<Doc<"threads">, "deleted" | "externalThreadId" | "groupChat" | "isPublic" | "userId">;
 
@@ -50,9 +55,8 @@ export const isDeviceEligibleThread = (thread: ThreadRow | null, userId: string,
 /** The thread when {@link isDeviceEligibleThread} admits it for this user (a grant is looked up here), else null. */
 export const loadEligibleThread = async (ctx: Pick<QueryCtx, "db">, threadId: Doc<"threads">["_id"], userId: string): Promise<Doc<"threads"> | null> => {
     const thread = await ctx.db.get("threads", threadId);
-    const grant = await ctx.db.threadAccess.findFirst({ where: { threadId } });
 
-    return isDeviceEligibleThread(thread, userId, grant !== null) ? thread : null;
+    return isDeviceEligibleThread(thread, userId, await threadHasLiveGrant(ctx, threadId)) ? thread : null;
 };
 
 /**
@@ -136,6 +140,11 @@ export const createDeviceCall = internalMutation
     .output(vCreateResult)
     .mutation(async ({ args, ctx }) => {
         const { deviceId, threadId, toolName, userId } = args;
+
+        // Started only from project settings (`global-instructions.ts`), whose prompt says the agent did not ask: a chat never signs one.
+        if (isGlobalInstructionsTool(toolName)) {
+            return { error: "ineligible" as const };
+        }
 
         if (utf8Length(args.input) > MAX_DEVICE_INPUT_BYTES) {
             return { error: "input_too_large" as const };
@@ -353,6 +362,30 @@ const assertAccountMayPair = async (ctx: QueryCtx, userId: string): Promise<void
         throw new LunoraError("FORBIDDEN", "This account is being deleted");
     }
 };
+
+/** Cleanup retries until it succeeds: a dead-lettered run would leave its projects pointing at a deleted device, with nothing left to queue it again. */
+const CLEAR_PROJECTS_RETRY = { forever: true } as const;
+
+/** Queues a `clearDeviceProjects` run for the machine, retried forever. Shared by the revoke and by a run that cleared a full batch. */
+export const scheduleClearDeviceProjects = async (scheduler: unknown, args: { machineId: Id<"devices">; userId: string }): Promise<void> => {
+    await runAfterWithRetry(scheduler, 0, internal.devices.internal.clearDeviceProjects, args, CLEAR_PROJECTS_RETRY);
+};
+
+/**
+ * Clears a revoked device's machine and folder from the owner's projects (scheduled by `revokeDevice`): one batch per
+ * run, and a run that cleared a full batch schedules the next. Needs no device row, which the revoke has already
+ * deleted. Running it again, or a second run for the same machine, is harmless: a run finds fewer rows or none.
+ */
+export const clearDeviceProjects = internalMutation
+    .input({ machineId: v.id("devices"), userId: v.string() })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        if (await clearMachineFromProjects(ctx, args.userId, args.machineId)) {
+            await scheduleClearDeviceProjects(ctx.scheduler, args);
+        }
+
+        return null;
+    });
 
 /**
  * Before a pairing code is spent (`auth/cli-device-auth.ts`, `POST /device/host`): refuses an account that could not

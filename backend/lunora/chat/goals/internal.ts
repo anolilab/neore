@@ -19,7 +19,7 @@
 import { v } from "lunorash/server";
 
 import type { Doc, Id } from "../../_generated/dataModel";
-import type { MutationCtx, QueryCtx } from "../../_generated/server";
+import type { MutationCtx } from "../../_generated/server";
 import { internalMutation, internalQuery } from "../../_generated/server";
 import { candidatesOnActivePath } from "../../agent/branch-rows";
 import { isThreadLocked } from "../../lib/thread-lock";
@@ -32,6 +32,7 @@ import { withoutUndefined } from "../../lib/patch";
 import { MAX_LENGTH } from "../../lib/validators";
 import { chargeRound, loadTaskAccount, taskAccessProblem } from "../../tasks/account";
 import { insertPersistentStream } from "../streaming/persistent/library";
+import { recordStartGoal, recordStartRefused, startedGoalOf, vStartClaim } from "../start-claim";
 import {
     buildGoalContinuationPrompt,
     buildGoalTranscript,
@@ -41,7 +42,7 @@ import {
     GOAL_TEXT_MAX,
     type GoalStopReason,
 } from "./logic";
-import { activeGoalsOf, endActiveGoals, giveThreadBack, hasLiveStream, stopGoalRow } from "./rows";
+import { activeGoalsOf, endActiveGoals, endGoalsOfStream, giveThreadBack, hasLiveStream, runPromptId, stopGoalRow } from "./rows";
 import { GOAL_CONTINUATION_AGENT } from "./shared";
 import { vGoalRunConfig, vGoalStopReason } from "./validators";
 
@@ -49,27 +50,6 @@ import { vGoalRunConfig, vGoalStopReason } from "./validators";
 const ROUND_ROWS_SCAN = 200;
 
 const ANONYMOUS_GOALS_MESSAGE = "Goals need an account. Sign up to run until a goal is met.";
-
-/** The prompt row a run answers: named directly, or read off the run's stream. */
-const runPromptId = async (ctx: Pick<QueryCtx, "db">, run: { messageId?: string; streamId?: Id<"persistentStreams"> }): Promise<string | undefined> => {
-    if (run.messageId !== undefined || run.streamId === undefined) {
-        return run.messageId;
-    }
-
-    const stream = await ctx.db.get("persistentStreams", run.streamId);
-
-    if (!stream) {
-        return undefined;
-    }
-
-    // An approval continuation's stream is keyed on the approval id; the paused run's prompt is in its snapshot.
-    const approval = await ctx.db
-        .query("toolApprovalRuns")
-        .withIndex("by_approvalId", (q) => q.eq("approvalId", stream.messageId))
-        .first();
-
-    return approval?.config.promptMessageId ?? stream.messageId;
-};
 
 /**
  * Ends the thread's active goals. Given a run (`streamId`), only the goal whose current round that run answers:
@@ -83,15 +63,7 @@ export const endGoalsForThread = internalMutation
             return await endActiveGoals(ctx, args.threadId, args.reason);
         }
 
-        const promptId = await runPromptId(ctx, { streamId: args.streamId });
-        const goals = await activeGoalsOf(ctx, args.threadId);
-        const own = goals.filter((goal) => promptId !== undefined && goal.promptMessageId === promptId);
-
-        for (const goal of own) {
-            await stopGoalRow(ctx, goal, args.reason);
-        }
-
-        return own.length > 0;
+        return await endGoalsOfStream(ctx, args.threadId, args.streamId, args.reason);
     });
 
 /**
@@ -115,39 +87,72 @@ export const startGoal = internalMutation
         maxRounds: v.optional(v.number()),
         organizationId: v.optional(v.string().max(MAX_LENGTH.id)),
         promptMessageId: v.string().max(MAX_LENGTH.id),
+        /** A send with a `clientMessageId` (`chat/start-claim.ts`): a sender whose send was taken over starts nothing. */
+        startClaim: v.optional(vStartClaim),
         text: v.string().max(GOAL_TEXT_MAX),
         threadId: v.id("threads"),
         userId: v.string().max(MAX_LENGTH.id),
     })
-    .output(v.union(v.object({ goalId: v.id("threadGoals"), ok: v.literal(true) }), v.object({ error: v.string(), ok: v.literal(false) })))
+    // No `goalId` when a resumed send's goal is outrun by a later prompt's: the send's prompt is answered as an ordinary turn.
+    .output(v.union(v.object({ goalId: v.optional(v.id("threadGoals")), ok: v.literal(true) }), v.object({ error: v.string(), ok: v.literal(false) })))
     .mutation(async ({ args, ctx }) => {
+        if (args.startClaim) {
+            // Throws before the supersede below: a dead sender must not end the goal its retry started.
+            const started = await startedGoalOf(ctx, args.startClaim);
+
+            // A resumed send whose first try started its goal before its stream failed: that goal goes on.
+            if (started !== undefined) {
+                return { goalId: started, ok: true as const };
+            }
+        }
+
+        // A refused goal is a saved send's answer: recorded on its claim in this transaction, so a resend gets the same refusal
+        // and the saved prompt is never resumed into a run.
+        const refuse = async (error: string) => {
+            if (args.startClaim) {
+                await recordStartRefused(ctx, args.startClaim, error);
+            }
+
+            return { error, ok: false as const };
+        };
         const text = args.text.trim();
 
         if (text.length === 0) {
-            return { error: "Say what the goal is.", ok: false as const };
+            return await refuse("Say what the goal is.");
         }
 
         const account = await loadTaskAccount(ctx, args.userId);
 
         if (account?.isAnonymous) {
-            return { error: ANONYMOUS_GOALS_MESSAGE, ok: false as const };
+            return await refuse(ANONYMOUS_GOALS_MESSAGE);
         }
 
         const problem = taskAccessProblem(account);
 
         if (problem) {
-            return { error: problem, ok: false as const };
+            return await refuse(problem);
         }
 
         const thread = await ctx.db.get("threads", args.threadId);
 
         // A goal keeps a chat running on the owner's budget: only the owner starts one.
         if (!thread || thread.userId !== args.userId) {
-            return { error: "A goal can only be set in your own chat.", ok: false as const };
+            return await refuse("A goal can only be set in your own chat.");
         }
 
         // A goal replaces the thread's previous one here, with the insert: the later of two concurrent starts is the one left active.
-        await endActiveGoals(ctx, args.threadId, "superseded");
+        // A send under a claim may be a resumed one: it replaces only the goals of prompts saved before its own
+        // (`comparePromptPositions`). A goal a later prompt started stays, and this one is not started: the later prompt
+        // moved the conversation past it, and a thread runs one goal at a time.
+        const prompt = args.startClaim ? await ctx.db.get("messages", args.promptMessageId as Id<"messages">) : null;
+
+        await endActiveGoals(ctx, args.threadId, "superseded", prompt ? { before: prompt } : {});
+
+        const outrun = prompt === null ? [] : await activeGoalsOf(ctx, args.threadId);
+
+        if (outrun.length > 0) {
+            return { ok: true as const };
+        }
 
         const { now } = ctx;
         const goalId = await ctx.db.insert("threadGoals", {
@@ -167,6 +172,10 @@ export const startGoal = internalMutation
             userId: args.userId,
             verdicts: [],
         });
+
+        if (args.startClaim) {
+            await recordStartGoal(ctx, args.startClaim, goalId);
+        }
 
         return { goalId, ok: true as const };
     });

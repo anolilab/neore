@@ -47,10 +47,10 @@ describe(queueOrganizationBillingCancel, () => {
     });
 
     it("queues the cancel on __root__, keyed by the organization as the payment reference", async () => {
-        await queueOrganizationBillingCancel("org_1");
+        await queueOrganizationBillingCancel("org_1", true);
 
         expect(jobsQueueMessages).toStrictEqual([
-            { body: { args: { referenceId: "org_1" }, functionPath: "billing_gdpr:cancelBilling", shardKey: "__root__" } },
+            { body: { args: { erase: true, referenceId: "org_1" }, functionPath: "billing_gdpr:cancelBilling", shardKey: "__root__" } },
         ]);
     });
 });

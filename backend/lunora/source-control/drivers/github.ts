@@ -10,13 +10,14 @@ import z from "zod/v4";
 import type { HostCapabilityReport } from "../capabilities";
 import { excerptLog, excerptRead, isLogAddress, readTail } from "../check-log";
 import { requirementOf } from "../checks-logic";
-import type { CreatePullRequestInput, CreatedPullRequest, HostDriver } from "../driver";
+import type { CreatePullRequestInput, CreatedPullRequest, HostDriver, ListReviewsOptions } from "../driver";
 import { graphqlRequest } from "../graphql";
 import { FETCH_TIMEOUT_LONG_MS, FETCH_TIMEOUT_MS, fetchWithDeadline } from "../../lib/fetch-timeout";
 import { HostApiError } from "../origin-fetch";
 import type { HostRequest } from "../origin-fetch";
 import { discard, parse, readJson } from "../response";
 import type {
+    BranchComparison,
     CheckLog,
     CheckRun,
     CheckState,
@@ -225,7 +226,7 @@ const logins = new WeakMap<HostRequest, Promise<string>>();
  * The signed-in login, read once per requester (one per action), since `@me` is not
  * documented for the REST search. A failed read is not kept, so a retry asks again.
  */
-const signedInLogin = (request: HostRequest): Promise<string> => {
+export const signedInLogin = (request: HostRequest): Promise<string> => {
     const known = logins.get(request);
 
     if (known) {
@@ -342,22 +343,36 @@ const pollReviewRequests = async (request: HostRequest, repo: string, known: { e
 
 const pullSchema = z.object({
     additions: z.number(),
-    base: z.object({ ref: z.string() }),
+    base: z.object({ ref: z.string(), repo: z.object({ id: z.number() }).optional() }),
     body: z.string().nullable(),
     changed_files: z.number(),
     commits: z.number(),
     created_at: z.string(),
     deletions: z.number(),
     draft: z.boolean().optional(),
-    head: z.object({ ref: z.string(), sha: z.string() }),
+    // `repo` is null once a fork is deleted.
+    head: z.object({ ref: z.string(), repo: z.object({ id: z.number() }).nullable().optional(), sha: z.string() }),
     html_url: z.string(),
+    mergeable_state: z.string().optional(),
     merged: z.boolean().optional(),
+    merged_at: z.string().nullable().optional(),
     number: z.int(),
     state: z.string(),
     title: z.string(),
     updated_at: z.string(),
     user: z.object({ login: z.string() }).nullable(),
 });
+
+/** The host's `mergeable_state`, as ours; a state it has not worked out yet reads `unknown`. */
+const MERGE_STATES: Record<string, MergeState> = {
+    behind: "behind",
+    blocked: "blocked",
+    clean: "clean",
+    dirty: "conflicting",
+    draft: "draft",
+    has_hooks: "clean",
+    unstable: "unstable",
+};
 
 const pullState = (pull: { merged?: boolean; state: string }): PullRequestDetail["state"] => {
     if (pull.merged === true) {
@@ -383,13 +398,19 @@ const getPullRequest = async (request: HostRequest, ref: PullRequestRef): Promis
         deletions: pull.deletions,
         draft: pull.draft === true,
         headBranch: pull.head.ref,
+        // By the repositories' ids, which survive a rename: a fork may have a branch of the same name and the same commit. Either
+        // id missing reads as a fork, which is never pushed to.
+        headInBaseRepository: pull.head.repo?.id !== undefined && pull.head.repo.id === pull.base.repo?.id,
         headSha: pull.head.sha,
+        mergeState: MERGE_STATES[pull.mergeable_state ?? ""] ?? "unknown",
         number: pull.number,
         repository: ref.repository,
         state: pullState(pull),
         title: pull.title,
         updatedAt: toMs(pull.updated_at),
         url: webUrl(pull.html_url) ?? `${GITHUB_WEB_ORIGIN}/${ref.repository}/pull/${ref.number}`,
+        // A timestamp GitHub sent that does not parse is no merge time at all, never the epoch.
+        ...(pull.merged_at && Number.isFinite(Date.parse(pull.merged_at)) && { mergedAt: toMs(pull.merged_at) }),
     };
 };
 
@@ -537,7 +558,7 @@ const THREADS_QUERY = `query ($owner: String!, $name: String!, $number: Int!, $a
         pageInfo { endCursor hasNextPage }
         nodes {
           id isResolved isOutdated path line startLine diffSide viewerCanResolve viewerCanUnresolve
-          comments(first: ${THREAD_COMMENTS}) { totalCount pageInfo { endCursor hasNextPage } nodes { fullDatabaseId author { login } body createdAt } }
+          comments(first: ${THREAD_COMMENTS}) { totalCount pageInfo { endCursor hasNextPage } nodes { fullDatabaseId url author { login } body createdAt } }
         }
       }
     }
@@ -548,7 +569,7 @@ const THREADS_QUERY = `query ($owner: String!, $name: String!, $number: Int!, $a
 const COMMENTS_QUERY = `query ($id: ID!, $after: String) {
   node(id: $id) {
     ... on PullRequestReviewThread {
-      comments(first: ${COMMENT_PAGE_SIZE}, after: $after) { pageInfo { endCursor hasNextPage } nodes { fullDatabaseId author { login } body createdAt } }
+      comments(first: ${COMMENT_PAGE_SIZE}, after: $after) { pageInfo { endCursor hasNextPage } nodes { fullDatabaseId url author { login } body createdAt } }
     }
   }
 }`;
@@ -562,6 +583,7 @@ const threadCommentSchema = z.object({
     body: z.string(),
     createdAt: z.string(),
     fullDatabaseId: z.union([z.string(), z.number()]),
+    url: z.string().nullable().optional(),
 });
 
 const threadSchema = z.object({
@@ -591,6 +613,7 @@ const commentsOf = (nodes: unknown[]): ThreadComment[] =>
     nodes.flatMap((node) => {
         const comment = threadCommentSchema.safeParse(node);
         const id = comment.success ? String(comment.data.fullDatabaseId) : "";
+        const url = comment.success ? webUrl(comment.data.url) : null;
 
         return comment.success && COMMENT_ID.test(id)
             ? [
@@ -599,6 +622,7 @@ const commentsOf = (nodes: unknown[]): ThreadComment[] =>
                       body: comment.data.body.slice(0, COMMENT_MAX_CHARS),
                       createdAt: toMs(comment.data.createdAt),
                       id,
+                      ...(url !== null && { url }),
                   },
               ]
             : [];
@@ -690,14 +714,24 @@ const replyToThread = async (request: HostRequest, ref: PullRequestRef, commentI
 };
 
 const REVIEW_PAGE_SIZE = 100;
+/** Pages a read for a seen review goes back through before giving up (`listReviews`), the pages already read included. */
+const REVIEW_SEEN_MAX_PAGES = 5;
+/**
+ * Pages a full read of reviews (`readAll`, the watch poll's) goes through: 1000 reviews. Reviews are paged in creation order but the
+ * ones a watch needs are those submitted after the seen one, which can sit on any page (a review is created before it is
+ * submitted), so the poll reads them all; this bound caps the cost of that. A PR with more pages falls back to the newest pages and
+ * the seen-review lookup, in the same page budget as before (`REVIEW_SEEN_MAX_PAGES`).
+ */
+const REVIEW_ALL_MAX_PAGES = 10;
 const REVIEW_BODY_MAX_CHARS = 20_000;
 
 const submittedReviewSchema = z.object({
+    author_association: z.string().optional(),
     body: z.string().nullable().optional(),
     id: z.number(),
     state: z.string(),
     submitted_at: z.string().nullable().optional(),
-    user: z.object({ login: z.string() }).nullable().optional(),
+    user: z.object({ id: z.number().optional(), login: z.string() }).nullable().optional(),
 });
 
 const REVIEW_STATES: Record<string, ReviewState> = {
@@ -729,9 +763,10 @@ export const lastPageOf = (link: string | null): number | undefined => {
 
 /**
  * The newest reviews, newest first, and how many there are in all. The host lists reviews oldest first, so past one
- * page the last page is read too, with the one before it when the last is short.
+ * page the last page is read too, with the one before it when the last is short. With `seenId`, earlier pages are read
+ * too until that review is listed (at most {@link REVIEW_SEEN_MAX_PAGES} pages in all), so a watch can tell what came after it.
  */
-const listReviews = async (request: HostRequest, ref: PullRequestRef): Promise<{ items: PullRequestReview[]; total: number }> => {
+const listReviews = async (request: HostRequest, ref: PullRequestRef, options?: ListReviewsOptions): Promise<{ items: PullRequestReview[]; total: number }> => {
     const path = `${repoPath(ref)}/pulls/${ref.number}/reviews`;
     const readPage = async (page: number): Promise<{ last: number | undefined; values: unknown[] }> => {
         const response = await request(path, { query: { page, per_page: REVIEW_PAGE_SIZE } });
@@ -742,19 +777,76 @@ const listReviews = async (request: HostRequest, ref: PullRequestRef): Promise<{
     const first = await readPage(1);
     let { values } = first;
     let total = first.values.length;
+    let earliest = 1;
+    let pagesRead = 1;
 
-    if (first.last !== undefined && first.last > 1) {
+    if (options?.readAll === true && first.last !== undefined && first.last > 1 && first.last <= REVIEW_ALL_MAX_PAGES) {
+        // The whole list fits under the bound: every page, in order, so the decision sees all of it. One request when there is one page.
+        for (let page = 2; page <= first.last; page += 1) {
+            const next = await readPage(page);
+
+            values = [...values, ...next.values];
+        }
+
+        total = values.length;
+    } else if (first.last !== undefined && first.last > 1) {
         const last = await readPage(first.last);
 
         values = last.values;
+        earliest = first.last;
+        pagesRead += 1;
         total = (first.last - 1) * REVIEW_PAGE_SIZE + last.values.length;
 
         if (last.values.length < REVIEW_PAGE_SIZE) {
             const before = first.last > 2 ? await readPage(first.last - 1) : first;
 
             values = [...before.values, ...last.values];
+
+            if (first.last > 2) {
+                earliest = first.last - 1;
+                pagesRead += 1;
+            } else {
+                earliest = 1;
+            }
         }
     }
+
+    // A full read that is over the bound keeps the first page it already read beside the trailing pages (no extra request). Pages can
+    // overlap once the seen-review lookup walks back to it, so a review is kept once.
+    if (options?.readAll === true && earliest > 1) {
+        values = [...first.values, ...values];
+    }
+
+    const listsSeen = (): boolean =>
+        values.some((value) => typeof value === "object" && value !== null && "id" in value && String(value.id) === options?.seenId);
+
+    // The seen review is older than the pages read: go back a page at a time, within the bound. Past it the caller treats it as gone.
+    while (options?.seenId !== undefined && earliest > 1 && pagesRead < REVIEW_SEEN_MAX_PAGES && !listsSeen()) {
+        earliest -= 1;
+        pagesRead += 1;
+        const older = await readPage(earliest);
+
+        values = [...older.values, ...values];
+    }
+
+    // A page read twice (the first page, once the walk back reaches it) lists its reviews twice: keep each once.
+    const seenIds = new Set<string>();
+
+    values = values.filter((value) => {
+        const id = typeof value === "object" && value !== null && "id" in value ? String(value.id) : undefined;
+
+        if (id === undefined) {
+            return true;
+        }
+
+        if (seenIds.has(id)) {
+            return false;
+        }
+
+        seenIds.add(id);
+
+        return true;
+    });
 
     const items = values.flatMap((value): PullRequestReview[] => {
         const review = submittedReviewSchema.safeParse(value);
@@ -767,6 +859,8 @@ const listReviews = async (request: HostRequest, ref: PullRequestRef): Promise<{
 
         return [
             {
+                ...(review.data.author_association !== undefined && { authorAssociation: review.data.author_association }),
+                ...(review.data.user?.id !== undefined && { authorId: String(review.data.user.id) }),
                 authorLogin: review.data.user?.login ?? "",
                 body: (review.data.body ?? "").slice(0, REVIEW_BODY_MAX_CHARS),
                 id: String(review.data.id),
@@ -781,7 +875,10 @@ const listReviews = async (request: HostRequest, ref: PullRequestRef): Promise<{
     // anyone sees, so they leave the count. Pages not read may hold more of them: the count is then an upper bound.
     const dropped = values.length - items.length;
 
-    return { items: items.toSorted((left, right) => right.submittedAt - left.submittedAt), total: Math.max(items.length, total - dropped) };
+    // Two reviews submitted in the same second keep the host's order reversed (the later id first), so the newer verdict leads.
+    const newestFirst = items.toSorted((left, right) => right.submittedAt - left.submittedAt || Number(right.id) - Number(left.id));
+
+    return { items: newestFirst, total: Math.max(items.length, total - dropped) };
 };
 
 const RESOLVE_MUTATION = `mutation ($threadId: ID!) { resolveReviewThread(input: { threadId: $threadId }) { thread { id isResolved } } }`;
@@ -877,6 +974,16 @@ const setViewed = async (request: HostRequest, ref: PullRequestRef, path: string
         { path, pullRequestId },
         z.object({ [viewed ? "markFileAsViewed" : "unmarkFileAsViewed"]: z.object({}).passthrough() }),
     );
+};
+
+/** One review by id: when it was submitted. A 404 (a deleted review) rejects like any other read; the caller tells it from a failure by its status. */
+const reviewSubmittedAt = async (request: HostRequest, ref: PullRequestRef, reviewId: string): Promise<number> => {
+    const review = parse(
+        z.object({ submitted_at: z.string().nullable().optional() }),
+        await readJson(await request(`${repoPath(ref)}/pulls/${ref.number}/reviews/${encodeURIComponent(reviewId)}`)),
+    );
+
+    return toMs(review.submitted_at);
 };
 
 const reviewSchema = z.object({ html_url: z.string().optional(), id: z.number(), state: z.string() });
@@ -984,6 +1091,29 @@ const branchPath = (branch: string): string | undefined => {
         // A lone surrogate cannot be encoded.
         return undefined;
     }
+};
+
+const comparisonSchema = z.object({ ahead_by: z.int().nonnegative(), behind_by: z.int().nonnegative() });
+
+/**
+ * `GET /repos/{o}/{r}/compare/{base}...{sha}`: the head by its commit, which the host finds in a fork too (a fork shares the
+ * base repository's network). Only the counts are read, and the host sends them on every page but lists the changed files
+ * (patches included, up to 300) only on the first, so the second page of one commit is asked for: a large diff is
+ * never downloaded and cannot outgrow the response cap.
+ */
+const compareWithBase = async (request: HostRequest, ref: PullRequestRef, baseBranch: string, headSha: string): Promise<BranchComparison> => {
+    const base = branchPath(baseBranch);
+
+    if (base === undefined || !SHA.test(headSha)) {
+        throw new HostApiError("Not a branch and commit to compare", 404);
+    }
+
+    const comparison = parse(
+        comparisonSchema,
+        await readJson(await request(`${repoPath(ref)}/compare/${base}...${headSha}`, { query: { page: 2, per_page: 1 } })),
+    );
+
+    return { aheadBy: comparison.ahead_by, behindBy: comparison.behind_by };
 };
 
 const createdPullRequestSchema = z.object({ html_url: z.string().nullable().optional(), number: z.int().positive() });
@@ -1471,16 +1601,6 @@ const mergeabilitySchema = z.object({
     mergeable_state: z.string().optional(),
 });
 
-const MERGE_STATES: Record<string, MergeState> = {
-    behind: "behind",
-    blocked: "blocked",
-    clean: "clean",
-    dirty: "conflicting",
-    draft: "draft",
-    has_hooks: "clean",
-    unstable: "unstable",
-};
-
 const getMergeStatus = async (request: HostRequest, ref: PullRequestRef): Promise<MergeStatus> => {
     const repo = repoPath(ref);
     const settings = parse(mergeSettingsSchema, await readJson(await request(repo)));
@@ -1724,6 +1844,7 @@ const revertPullRequest = async (request: HostRequest, ref: PullRequestRef, reve
 
 export const githubDriver: HostDriver = {
     apiOrigin: GITHUB_API_ORIGIN,
+    compareWithBase,
     createPullRequest,
     editPullRequest,
     findOpenPullRequest,
@@ -1750,6 +1871,7 @@ export const githubDriver: HostDriver = {
     rerunGroupOf,
     rerunnableOfGroup,
     revertPullRequest,
+    reviewSubmittedAt,
     setAutoMerge,
     setThreadResolved,
     setViewed,

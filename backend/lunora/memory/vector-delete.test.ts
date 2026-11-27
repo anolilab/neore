@@ -11,7 +11,8 @@ import { memoryLogger } from "../lib/logger";
 import schema from "../schema";
 import { deleteVectorRow } from "../agent/table-writes";
 import { getVectorIdInfo } from "../agent/vector/tables";
-import { clearAllUserMemories, deleteMemory, retryMemoryVectorDelete } from "./functions";
+import { runAfterOnShard } from "../lib/shard-scheduler";
+import { clearAllUserMemories, deleteMemory, linkMemoryEmbeddings, retryMemoryVectorDelete, updateMemoryInternal } from "./functions";
 
 const { sessionFrom } = vi.hoisted(() => {
     return {
@@ -42,6 +43,12 @@ vi.mock("../agent/table-writes", async (importOriginal) => {
     const original = await importOriginal<typeof import("../agent/table-writes")>();
 
     return { ...original, deleteVectorRow: vi.fn(original.deleteVectorRow) };
+});
+
+vi.mock("../lib/shard-scheduler", async (importOriginal) => {
+    const original = await importOriginal<typeof import("../lib/shard-scheduler")>();
+
+    return { ...original, runAfterOnShard: vi.fn(original.runAfterOnShard) };
 });
 
 vi.mock("../agent/vector/tables", async (importOriginal) => {
@@ -162,5 +169,95 @@ describe("memory vector deletion", () => {
         expect(memoryLogger.error).not.toHaveBeenCalled();
         expect(deleteVectorRow).not.toHaveBeenCalled();
         expect(jobs()).toHaveLength(0);
+    });
+});
+
+describe("re-embedding a reworded memory", () => {
+    // `restoreAllMocks` leaves a `vi.fn`'s own implementation: drop what earlier tests stubbed.
+    beforeEach(() => {
+        vi.mocked(getVectorIdInfo).mockReset();
+        vi.mocked(deleteVectorRow).mockReset();
+    });
+
+    const insertVector = async (): Promise<Id<"embeddings_768">> =>
+        await run(
+            async (ctx) =>
+                await ctx.db.insert("embeddings_768", {
+                    model: "m",
+                    table: "memories",
+                    userId: OWNER,
+                    vector: Array.from({ length: 768 }, (_, index) => index / 768),
+                }),
+        );
+    const rowEmbedding = async (): Promise<string | undefined> =>
+        await run(async (ctx) => {
+            const row = await ctx.db.get("memories", memoryId);
+
+            return row?.embeddingId as string | undefined;
+        });
+    const vectorExists = async (id: Id<"embeddings_768">): Promise<boolean> => (await run(async (ctx) => await ctx.db.get("embeddings_768", id))) !== null;
+
+    it("schedules the re-embed on the owner's shard", async () => {
+        await run(async (ctx) => await ctx.runMutation(updateMemoryInternal as never, { memory: "likes green tea", memoryId } as never));
+
+        expect(runAfterOnShard).toHaveBeenCalledWith(expect.anything(), 0, expect.anything(), { memoryId, userId: OWNER }, OWNER);
+    });
+
+    it("keeps the newer wording's vector when two re-embeds finish in reverse order", async () => {
+        // The job for "likes tea" embedded before the row was reworded; the job for the new wording finishes first.
+        const forOldWording = await insertVector();
+        const forNewWording = await insertVector();
+
+        await run(async (ctx) => await ctx.db.patch("memories", memoryId, { memory: "likes green tea" }));
+
+        const link = async (vector: Id<"embeddings_768">, text: string): Promise<void> => {
+            await run(
+                async (ctx) =>
+                    await ctx.runMutation(linkMemoryEmbeddings as never, { links: [{ embeddingId: vector, memoryId, text }], userId: OWNER } as never),
+            );
+        };
+
+        await link(forNewWording, "likes green tea");
+        await link(forOldWording, "likes tea");
+
+        expect(await rowEmbedding()).toBe(forNewWording);
+        // The original vector and the late job's vector are both gone; only the one for the row's text is left.
+        expect(await vectorExists(embeddingId)).toBe(false);
+        expect(await vectorExists(forOldWording)).toBe(false);
+        expect(await vectorExists(forNewWording)).toBe(true);
+    });
+
+    it("deletes the new vector when its row is gone", async () => {
+        const late = await insertVector();
+
+        await run(async (ctx) => await ctx.db.delete("memories", memoryId));
+
+        await run(
+            async (ctx) =>
+                await ctx.runMutation(linkMemoryEmbeddings as never, { links: [{ embeddingId: late, memoryId, text: "likes tea" }], userId: OWNER } as never),
+        );
+
+        expect(await vectorExists(late)).toBe(false);
+    });
+
+    it("drops the old vector with the rewording, before the re-embed runs", async () => {
+        await run(async (ctx) => await ctx.runMutation(updateMemoryInternal as never, { memory: "likes green tea", memoryId } as never));
+
+        expect(await rowEmbedding()).toBeUndefined();
+        expect(await vectorExists(embeddingId)).toBe(false);
+
+        // A metadata update keeps the vector, which still matches the wording.
+        const fresh = await insertVector();
+
+        await run(
+            async (ctx) =>
+                await ctx.runMutation(
+                    linkMemoryEmbeddings as never,
+                    { links: [{ embeddingId: fresh, memoryId, text: "likes green tea" }], userId: OWNER } as never,
+                ),
+        );
+        await run(async (ctx) => await ctx.runMutation(updateMemoryInternal as never, { confidence: 90, memoryId } as never));
+
+        expect(await rowEmbedding()).toBe(fresh);
     });
 });

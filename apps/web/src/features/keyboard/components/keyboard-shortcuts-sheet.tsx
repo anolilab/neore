@@ -8,9 +8,10 @@ import { useEffect, useId, useState } from "react";
 
 import { useThreadListUIStore } from "@/features/chat/thread-list/stores/thread-list-ui-store";
 import type { KeyboardShortcuts } from "@/features/layout/stores/ui-state-store";
+import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
 
-import type { ShortcutGroupId } from "../lib/shortcut-sheet";
-import { matchesShortcutQuery, resolveShortcuts, SHORTCUT_GROUP_ORDER } from "../lib/shortcut-sheet";
+import type { ComposerSendRowId, ShortcutGroupId } from "../lib/shortcut-sheet";
+import { composerSendRows, matchesShortcutQuery, resolveShortcuts, SHORTCUT_GROUP_ORDER } from "../lib/shortcut-sheet";
 
 const isEditableTarget = (target: EventTarget | null): boolean =>
     target instanceof HTMLElement &&
@@ -54,6 +55,7 @@ const KeyboardShortcutsSheet = ({ shortcuts }: { shortcuts: Partial<KeyboardShor
     const open = useThreadListUIStore((state) => state.showKeyboardHelp);
     const setOpen = useThreadListUIStore((state) => state.setShowKeyboardHelp);
     const [query, setQuery] = useState("");
+    const sendBehavior = useUIStateStore((state) => state.preferences.sendBehavior);
     const searchId = useId();
 
     useQuestionMarkToggle();
@@ -73,7 +75,7 @@ const KeyboardShortcutsSheet = ({ shortcuts }: { shortcuts: Partial<KeyboardShor
         commandPalette: t`Open command palette`,
         copyLastCodeBlock: t`Copy last code block`,
         decreaseEffort: t`Lower reasoning effort`,
-        deleteThread: t`Delete open thread (asks first)`,
+        deleteThread: t`Delete open thread`,
         escape: t`Cancel or close`,
         findInThread: t`Find in thread`,
         firstItem: t`Go to first item`,
@@ -92,19 +94,29 @@ const KeyboardShortcutsSheet = ({ shortcuts }: { shortcuts: Partial<KeyboardShor
         nextItem: t`Next item`,
         openModelPicker: t`Open model picker`,
         prevItem: t`Previous item`,
+        promptSearch: t`Search sent prompts (in the composer)`,
         sidebarLeft: t`Toggle left sidebar`,
         sidebarRight: t`Toggle right sidebar`,
     };
 
-    const resolved = resolveShortcuts(shortcuts, isMac);
+    const sendLabels: Record<ComposerSendRowId, string> = {
+        composerNewline: t`New line in message`,
+        sendAnywhere: t`Send from any mode`,
+        sendMessage: t`Send message`,
+    };
+
+    const resolved = resolveShortcuts(shortcuts, isMac).map((item) => {
+        return { group: item.entry.group, id: item.entry.id, keys: item.keys, label: labels[item.entry.id] ?? item.entry.id };
+    });
+    // The send chords follow the user's send setting, so they are built here rather than from the stored bindings.
+    const sendRows = composerSendRows(sendBehavior, isMac).map((row) => {
+        return { group: "composer" as const, id: row.id, keys: row.keys, label: sendLabels[row.id] };
+    });
     const sections = SHORTCUT_GROUP_ORDER.map((group) => {
         return {
             group,
-            rows: resolved
-                .filter((item) => item.entry.group === group)
-                .map((item) => {
-                    return { id: item.entry.id, keys: item.keys, label: labels[item.entry.id] ?? item.entry.id };
-                })
+            rows: [...resolved, ...sendRows]
+                .filter((row) => row.group === group && row.keys.length > 0)
                 .filter((row) => matchesShortcutQuery(query, row.label, groupLabels[group], row.keys)),
         };
     }).filter((section) => section.rows.length > 0);

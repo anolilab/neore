@@ -15,10 +15,11 @@ import { internalAction, internalMutation, internalQuery } from "../_generated/s
 import type { ExpoMessage, ExpoOutcome } from "./expo-push";
 import { getExpoReceipts, isDeviceGone, sendExpoMessages } from "./expo-push";
 import type { PhonePlatform } from "./native-push-config";
-import { expoAccessToken } from "./native-push-config";
+import { expoAccessToken, isAndroidDataOnlyPushOn } from "./native-push-config";
 import { MAX_PUSH_DEVICES_PER_USER } from "./push-device-writes";
 import { threadIdOfLink } from "./locked-link";
 import { approvalToolFallback, PHONE_PLACEHOLDER_TITLE, phonePlaceholderBody, pushUrgency } from "./push-text";
+import { storedPage } from "../lib/stored-row";
 
 const vPlatform = v.union(v.literal("android"), v.literal("ios"));
 
@@ -50,23 +51,38 @@ export const listPushDevicesForUser = internalQuery
         v.object({
             ended: v.array(v.object({ id: v.id("pushDevices"), lastSeenAt: v.number(), sessionId: v.string() })),
             live: v.array(
-                v.object({ id: v.id("pushDevices"), language: v.optional(v.string()), platform: vPlatform, sessionId: v.string(), token: v.string() }),
+                v.object({
+                    buildsAlert: v.optional(v.boolean()),
+                    id: v.id("pushDevices"),
+                    language: v.optional(v.string()),
+                    platform: vPlatform,
+                    sessionId: v.string(),
+                    token: v.string(),
+                }),
             ),
         }),
     )
     .query(async ({ args, ctx }) => {
         // The newest phones, at most the cap (the trim on registration keeps it there).
-        const { page } = await ctx.db.pushDevices.findMany({
-            consistency: "primary",
-            limit: MAX_PUSH_DEVICES_PER_USER,
-            orderBy: [{ lastSeenAt: "desc" }],
-            where: { userId: args.userId },
-        });
+        const { page } = storedPage(
+            await ctx.db.pushDevices.findMany({
+                consistency: "primary",
+                limit: MAX_PUSH_DEVICES_PER_USER,
+                orderBy: [{ lastSeenAt: "desc" }],
+                where: { userId: args.userId },
+            }),
+        );
 
         const now = Date.now();
         const ended: { id: (typeof page)[number]["_id"]; lastSeenAt: number; sessionId: string }[] = [];
-        const live: { id: (typeof page)[number]["_id"]; language?: string; platform: (typeof page)[number]["platform"]; sessionId: string; token: string }[] =
-            [];
+        const live: {
+            buildsAlert?: boolean;
+            id: (typeof page)[number]["_id"];
+            language?: string;
+            platform: (typeof page)[number]["platform"];
+            sessionId: string;
+            token: string;
+        }[] = [];
 
         for (const row of page) {
             const session = await ctx.db.session.findFirst({ consistency: "primary", where: { _id: row.sessionId as Id<"session"> } });
@@ -77,6 +93,7 @@ export const listPushDevicesForUser = internalQuery
                     platform: row.platform,
                     sessionId: row.sessionId,
                     token: row.token,
+                    ...(row.buildsAlert !== undefined && { buildsAlert: row.buildsAlert }),
                     ...(row.language !== undefined && { language: row.language }),
                 });
             } else {
@@ -128,11 +145,15 @@ export interface PhonePushMessage {
 }
 
 /**
- * The message for one phone: the same generic alert on both platforms, in the phone's language. Nothing about the
- * notification itself leaves us, only its ids in `data`. A tool approval is the one exception: its alert names the tool
- * and the teammate, and carries the approval's id for the phone's approve and deny actions.
+ * The message for one phone: the generic alert in the phone's language, except that an Android phone whose app builds its
+ * own alert (`buildsAlert`) gets ids only. Nothing about the notification itself leaves us, only its ids in `data`. A tool
+ * approval is the one exception: its alert names the tool and the teammate, and carries the approval's id for the phone's
+ * approve and deny actions.
  */
-export const phoneMessage = (device: { language?: string; platform: PhonePlatform; token: string }, message: PhonePushMessage): ExpoMessage => {
+export const phoneMessage = (
+    device: { buildsAlert?: boolean; language?: string; platform: PhonePlatform; token: string },
+    message: PhonePushMessage,
+): ExpoMessage => {
     const data = {
         notificationId: message.notificationId,
         ...(message.threadId !== undefined && { threadId: message.threadId }),
@@ -153,11 +174,18 @@ export const phoneMessage = (device: { language?: string; platform: PhonePlatfor
         };
     }
 
+    // Android's app builds the alert itself (its background task), so the message carries only ids: no title, body or sound.
+    // A notification-style one would show the placeholder on its own, and the task would show a second alert.
+    if (device.platform === "android" && device.buildsAlert) {
+        return { data, priority: message.urgency, to: device.token, ttl: PUSH_TTL_SECONDS };
+    }
+
     return {
         body: phonePlaceholderBody(device.language),
         data,
         priority: message.urgency,
         sound: "default",
+        ...(device.platform === "ios" && { mutableContent: true }),
         title: PHONE_PLACEHOLDER_TITLE,
         to: device.token,
         ttl: PUSH_TTL_SECONDS,
@@ -197,11 +225,12 @@ export const deliverToPhones = async (ctx: ActionCtx, userId: string, message: P
 
     let outcomes: ExpoOutcome[];
     const sentAt = Date.now();
+    const dataOnly = isAndroidDataOnlyPushOn(process.env);
 
     try {
         outcomes = await sendExpoMessages(
             accessToken,
-            devices.map((device) => phoneMessage(device, message)),
+            devices.map((device) => phoneMessage({ ...device, buildsAlert: device.buildsAlert && dataOnly }, message)),
         );
     } catch (error) {
         console.warn("[notifications] Phone push send failed:", error);
@@ -287,8 +316,13 @@ export const sendPhonePush = internalAction
                 return null;
             }
 
-            // A sub-agent's approval is answerable only once its run waits on it: until then the actionable alert is held and
-            // sent by a later attempt. After the last attempt the owner still gets the generic alert, which names nothing.
+            // A sub-agent's approval is answerable only while its run waits on it. A first push cannot find the run still working on
+            // its own request: the notification is written in the transaction that moves the run to `awaiting`
+            // (`recordPendingToolApprovals`). But once the owner answers one request of a pause, the run is `running` again
+            // while its siblings stay pending on the latest turn, and an answer to them is refused (`SUB_AGENT_STILL_WORKING`). A
+            // push read then (the four-hour reminder, `lib/approval-reminder.ts`, or a late first push) would name a sibling whose
+            // Approve fails, so its actionable alert is held for a later attempt: the run waits again (answerable) or ends (its
+            // requests close, no push). After the last attempt the owner still gets the generic alert, which names nothing.
             const working = await ctx.runQuery(internal.notifications.phone_content.subAgentStillWorking, {
                 approvalId: notification.approvalId,
             });

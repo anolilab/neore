@@ -13,6 +13,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
+import { markComposerDraft } from "@/features/chat/core/utils/draft-origin";
 import useOptimizerStyleLabels from "@/features/chat/prompt-improvement/hooks/use-optimizer-style-labels";
 import usePromptImprovement from "@/features/chat/prompt-improvement/hooks/use-prompt-improvement";
 import usePromptImprovementStore from "@/features/chat/prompt-improvement/stores/prompt-improvement-store";
@@ -26,7 +27,6 @@ const PromptImprovementPanel: FC<PromptImprovementPanelProps> = ({ className }) 
     const { i18n, t } = useLingui();
     const styleLabels = useOptimizerStyleLabels();
 
-    const composerText = useChatUIStore((state) => state.composerText);
     const setComposerText = useChatUIStore((state) => state.setComposerText);
 
     const {
@@ -80,6 +80,9 @@ const PromptImprovementPanel: FC<PromptImprovementPanelProps> = ({ className }) 
             };
         }),
     );
+
+    // The draft only while the panel is open: the panel is always mounted, and a closed one must not re-render per keystroke.
+    const composerText = useChatUIStore((state) => (isOpen ? state.composerText : ""));
 
     const currentImprovedPrompt = improvedPrompts[currentPromptIndex] || "";
     const canGoPrevious = currentPromptIndex > 0;
@@ -146,6 +149,8 @@ const PromptImprovementPanel: FC<PromptImprovementPanelProps> = ({ className }) 
         }
 
         setComposerText(currentImprovedPrompt);
+        // The model rewrote it: sent, it is not the person's own words (`draft-origin.ts`).
+        markComposerDraft("improvedPrompt");
         dismiss();
     }, [setComposerText, currentImprovedPrompt, dismiss]);
 
@@ -328,7 +333,7 @@ const PromptImprovementPanel: FC<PromptImprovementPanelProps> = ({ className }) 
                                             {t`Apply`}
                                         </Button>
                                     )}
-                                    <Button className="text-black" disabled={isImproving || !currentPrompt.trim()} onClick={handleImprove}>
+                                    <Button disabled={isImproving || !currentPrompt.trim()} onClick={handleImprove}>
                                         {isImproving ? (
                                             <>
                                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />

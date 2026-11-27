@@ -32,12 +32,17 @@ import type { ModelMessage } from "ai";
 import { generateText, Output } from "ai";
 import z from "zod/v4";
 
+import { LunoraError } from "lunorash/server";
+
 import { internal } from "../../_generated/internal";
 import type { Id } from "../../_generated/dataModel";
 import type { ActionCtx } from "../../_generated/server";
 import type { ResearchDepth } from "../../agent/client/create-tool";
+import { MAX_ATTACHED_FILES } from "../../agent/file-attach-claim";
+import { callOnShard } from "../../lib/cross-shard";
 import { streamLogger } from "../../lib/logger";
 import { gatewayFetch, type ServiceFetch } from "../../lib/services";
+import { onUserShard } from "../lib/daily-limit";
 import { defaultModelUnderRules, getUtilityModel, readsImagesAndCallsTools } from "../../lib/utility-model";
 import { resolveReasoningEffort, resolveSkillModel } from "../../skills/slash-command";
 import type { AwaitingInput, RunContext } from "../lib/agent-run";
@@ -46,7 +51,7 @@ import {
     AgentRunError,
     buildRunStreamArgs,
     loadModelFilterRules,
-    resolveBackupModelId,
+    resolveBackupModelIds,
     endStoppedRun,
     finishRun,
     loadRunContext,
@@ -54,6 +59,8 @@ import {
     resumeApprovedRun,
     discardRunSecrets,
     setDispatchOrigin,
+    setRunOrganizationId,
+    setRunReplyKey,
     setRunStartedBy,
     setResearchDepth,
     setThreadStatus,
@@ -154,12 +161,16 @@ interface TurnContext {
     baseModel: string;
     /** Memory, knowledge base, project and thread instructions — appended to each speaker's system prompt. */
     extraContext: string[];
+    /** The files the user message attaches, kept in a pause's snapshot so the turn's later speakers get the same project rules. */
+    fileIds: string[] | undefined;
     isAnonymous: boolean;
     mcpServerNames: string[] | undefined;
     organizationId: string | undefined;
     /** What started the turn, for a speaker's dispatch to a worker to carry. */
     origin: DispatchOrigin;
     participants: GroupParticipantRun[];
+    /** The group thread's stored organization, else the run's, which caps each speaker's tools. */
+    permissionOrganizationId: string | null;
     prefs: RunContext["prefs"];
     /** The user message the turn answers. */
     promptMessageId: string;
@@ -278,6 +289,8 @@ const runSpeaker = async (
                   mcpProgress: toolProgressSink(ctx, turn.streamId),
                   mcpServerNames: turn.mcpServerNames,
                   model,
+                  // No threadId here: the group thread's stored organization, else the run's, caps the speaker's tools.
+                  organizationId: turn.permissionOrganizationId,
                   ...(turn.origin === "outside_agent" && { origin: turn.origin }),
                   // The group thread's mode governs every speaker's tools; a speaker has no thread of its own.
                   permissionModeThreadId: turn.threadId,
@@ -288,17 +301,20 @@ const runSpeaker = async (
                   skillTools: speaker.config ? { additionalTools: speaker.config.additionalTools, disabledTools: speaker.config.disabledTools } : undefined,
                   userId: turn.userId,
               })
-            : { mcpClients: [], mcpLabels: {}, mcpServerNames: [], mcpToolFingerprints: {}, permissionKeys: {}, repeatable: [], tools: {} };
+            : { mcpClients: [], mcpLabels: {}, mcpServerNames: [], mcpToolFingerprints: {}, mcpToolOrigins: {}, permissionKeys: {}, repeatable: [], tools: {} };
 
         mcpClients = toolResult.mcpClients;
 
         setResearchDepth(ctx, turn.researchDepth);
         setDispatchOrigin(ctx, turn.origin);
         setRunStartedBy(ctx, turn.startedBy);
+        // Per reply, not per group thread: a site's check is asked about once in this reply, and again in the next.
+        setRunReplyKey(ctx, turn.replyKey);
+        setRunOrganizationId(ctx, turn.permissionOrganizationId);
 
-        const backupModelId = await resolveBackupModelId(ctx, turn.userId, turn.prefs.backupModel, model, modelFilterRules);
+        const backupModelIds = await resolveBackupModelIds(ctx, turn.userId, turn.prefs.backupModels, model, modelFilterRules);
         const agent = await getAgent(model, {
-            backupModelId,
+            backupModelIds,
             customProvider,
             gateway: gatewayFetch(ctx),
             language: turn.prefs.language,
@@ -351,7 +367,7 @@ const runSpeaker = async (
         });
         const streamTextArgs: Record<string, unknown> = {
             ...buildRunStreamArgs({
-                backupModelId,
+                backupModelIds,
                 hasTools: Object.keys(toolResult.tools).length > 0,
                 model,
                 reasoningEffort,
@@ -460,6 +476,7 @@ const runSpeaker = async (
             instructions: system,
             mcpServerNames: toolResult.mcpServerNames,
             mcpToolFingerprints: toolResult.mcpToolFingerprints,
+            mcpToolOrigins: toolResult.mcpToolOrigins,
             model,
             reasoningEffort,
             replyKey: turn.replyKey,
@@ -513,6 +530,8 @@ const groupSnapshot = (turn: TurnContext, skillId: string, position: QueuePositi
 
     return {
         baseModel: turn.baseModel,
+        // Within the snapshot's cap, as `loadRunContext` reads them.
+        ...(turn.fileIds && turn.fileIds.length > 0 && { fileIds: turn.fileIds.slice(0, MAX_ATTACHED_FILES) }),
         isAnonymous: turn.isAnonymous,
         ...(turn.organizationId && { organizationId: turn.organizationId }),
         queue: remaining.kind === "speakers" ? remaining.queue : remaining.steps.map((step) => step.skillId),
@@ -556,6 +575,19 @@ const shiftQueue = (queue: TurnQueue): { next: { skillId: string; step?: GroupSt
 const isQueueEmpty = (queue: TurnQueue): boolean => (queue.kind === "steps" ? queue.steps : queue.queue).length === 0;
 
 /**
+ * Takes the daily Text unit for a speaker after the first. `/chat/start` charged the turn's first reply; each further one is a
+ * full agent run of its own. The unit is taken on the paying user's own shard: this turn runs on the thread owner's, so a charge
+ * made here would draw on the owner's counter for the member.
+ */
+const takeFurtherSpeakerUnit = async (ctx: ActionCtx, turn: TurnContext): Promise<boolean> => {
+    const chargeArgs = { kind: "Text" as const, organizationId: turn.organizationId, userId: turn.userId };
+
+    return onUserShard(turn.userId)
+        ? await ctx.runMutation(internal.chat.daily_charge.chargeDailyUnit, chargeArgs)
+        : await callOnShard(internal.chat.daily_charge.chargeDailyUnit, chargeArgs, { shardKey: turn.userId });
+};
+
+/**
  * Run `queue` in order until it is empty, the per-turn cap is reached, the
  * user pressed stop, or a speaker paused for an approval. Closes the stream
  * unless a pause already did.
@@ -568,6 +600,9 @@ const runQueue = async (
     const spoken = [...start.spokenSkillIds];
     let queue = boundedQueue(start.plan, spoken);
     let continueFrom = start.continueFromMessageId;
+    // The end the closing chunk records: none for a stop (a stopped run writes no event). A quota that ends the turn after a reply was
+    // delivered still succeeds: that reply went out, and the stream closes as done.
+    let runEnd: "succeeded" | "failed" | undefined = "succeeded";
 
     while (!isQueueEmpty(queue)) {
         const { next, rest } = shiftQueue(queue);
@@ -585,15 +620,12 @@ const runQueue = async (
             spoken.length > 0 &&
             (await ctx.runQuery(internal.chat.group.functions.isGroupStopRequested, { since: turn.turnStartedAt, threadId: turn.threadId }))
         ) {
+            runEnd = undefined;
+
             break;
         }
 
-        // `/chat/start` charged the turn's first reply; each further one is a
-        // full agent run of its own and costs one more unit of the daily quota.
-        if (
-            spoken.length > 0 &&
-            !(await ctx.runMutation(internal.chat.daily_charge.chargeDailyUnit, { kind: "Text", organizationId: turn.organizationId, userId: turn.userId }))
-        ) {
+        if (spoken.length > 0 && !(await takeFurtherSpeakerUnit(ctx, turn))) {
             streamLogger.debug("[GroupChat] Daily limit reached; ending the turn early", { spoken: spoken.length, threadId: turn.threadId });
 
             break;
@@ -630,11 +662,9 @@ const runQueue = async (
         continueFrom = lastMessageId ?? continueFrom;
     }
 
-    await ctx.runMutation(internal.chat.streaming.persistent.library.addChunk, {
-        final: true,
-        streamId: turn.streamId as Id<"persistentStreams">,
-        text: "",
-    });
+    // Every way past the speaker loop that is not a pause lands here and closes the stream. The end it records is `runEnd`: a stop
+    // records none, and the rest (a quota refusal after a delivered reply, and the repeated-call guard's stop included) succeed.
+    await closeGroupTurnStream(ctx, turn, runEnd);
 
     await setThreadStatus(ctx, turn.threadId, "active", { replied: true });
     // The turn is over for good (a pause or a stop returned before this): its saved references go with it.
@@ -650,6 +680,8 @@ const loadTurnContext = async (
         baseModel: string;
         config: GroupRunConfig;
         customSystemPrompt?: string;
+        /** The files the user's message attaches: the project's rule files applied by pattern match their names. */
+        fileIds?: string[];
         isAnonymous: boolean;
         mcpServerNames?: string[];
         messageReasoningEffort?: number;
@@ -674,25 +706,36 @@ const loadTurnContext = async (
         ctx.runQuery(internal.auth.functions.getAgentModulePreferencesQuery, { userId }),
         ctx.runQuery(internal.agent.threads.getThreadInternal, { threadId: threadId as Id<"threads"> }),
     ]);
+
+    // Refused before any tool is built: without the thread there is no stored organization to cap the speaker's tools by.
+    if (!thread) {
+        throw new LunoraError("NOT_FOUND", "The group thread no longer exists.");
+    }
+
     const runContext = await loadRunContext(ctx, {
         admittedRun: true,
         customSystemPrompt: args.customSystemPrompt,
+        fileIds: args.fileIds,
         promptText: args.promptText,
         researchDepth: args.researchDepth,
         threadId,
-        threadLanguage: thread?.language,
+        threadLanguage: thread.language,
         userId,
     });
 
     return {
         agentPrefs,
         baseModel: args.baseModel,
-        extraContext: runContext.contextParts,
+        // A group turn lists no `auto` files, so the list's cost never takes room from its project text.
+        extraContext: runContext.contextPartsWithoutInstructions,
+        fileIds: args.fileIds,
         isAnonymous: args.isAnonymous,
         mcpServerNames: args.mcpServerNames,
         organizationId: args.organizationId,
         origin: args.origin,
         participants: args.config.participants,
+        // As `readRunPermissionCap` does: the thread's organization, then the one a temporary chat was started in, then the run's.
+        permissionOrganizationId: thread.organizationId ?? thread.capOrganizationId ?? args.organizationId ?? null,
         prefs: runContext.prefs,
         promptMessageId: args.promptMessageId,
         promptMessages: undefined,
@@ -708,6 +751,23 @@ const loadTurnContext = async (
         userId,
         userProviderKeys: runContext.userProviderKeys,
     };
+};
+
+/**
+ * The chunk that closes a group turn's stream. `runEnd` is the end it records in the Events log; `undefined` records none, which
+ * is what a stop does. A paused turn returns before this is called, so it writes nothing.
+ */
+export const closeGroupTurnStream = async (
+    ctx: Pick<ActionCtx, "runMutation">,
+    turn: Pick<TurnContext, "streamId">,
+    runEnd: "succeeded" | "failed" | undefined,
+): Promise<void> => {
+    await ctx.runMutation(internal.chat.streaming.persistent.library.addChunk, {
+        final: true,
+        ...(runEnd !== undefined && { runEnd }),
+        streamId: turn.streamId as Id<"persistentStreams">,
+        text: "",
+    });
 };
 
 /**
@@ -731,6 +791,7 @@ export const runGroupTurn = async (ctx: ActionCtx, input: GroupTurnInput, config
         baseModel: streamingConfig.model,
         config,
         customSystemPrompt: streamingConfig.customSystemPrompt,
+        fileIds: message?.fileIds,
         isAnonymous: input.isAnonymous,
         mcpServerNames: streamingConfig.mcpServerNames,
         messageReasoningEffort: streamingConfig.reasoningEffort,
@@ -890,6 +951,7 @@ export const continueGroupAfterToolApproval = async (
     const turn = await loadTurnContext(ctx, {
         baseModel: group.baseModel,
         config: groupConfig,
+        fileIds: group.fileIds,
         isAnonymous: group.isAnonymous,
         mcpServerNames: config.mcpServerNames,
         organizationId: group.organizationId,

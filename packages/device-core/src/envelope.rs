@@ -81,6 +81,10 @@ pub struct CallEnvelope {
     pub nonce: String,
     #[serde(default)]
     pub tainted_by: Vec<String>,
+    /// The chat the call came from. Every chat call names one; the only calls without one are the global instruction
+    /// files, started from a project's settings (`backend/lunora/devices/global-instructions.ts`).
+    #[serde(default)]
+    pub thread_id: Option<String>,
     #[serde(default)]
     pub thread_title: String,
     pub tool: String,
@@ -97,6 +101,9 @@ pub const MAX_ENVELOPE_AHEAD_MS: u64 = 15 * 60 * 1000;
 pub struct NonceSet {
     entries: HashMap<String, u64>,
     path: Option<PathBuf>,
+    /// Also sync the folder after each save. Only the strict set does: a desktop keeps its history as before, without
+    /// a folder sync per call or a refusal on a file system that will not sync a folder.
+    sync_folder: bool,
 }
 
 impl NonceSet {
@@ -109,7 +116,23 @@ impl NonceSet {
         NonceSet {
             entries,
             path: Some(path.to_owned()),
+            sync_folder: false,
         }
+    }
+
+    /// [`persisted`](Self::persisted) for a caller that must not run on a lost history: a stored file that cannot be
+    /// read or parsed is an error.
+    pub fn persisted_strict(path: &Path, now: u64) -> Result<Self, String> {
+        let mut entries = store::load_nonces_strict(path)?;
+
+        entries.retain(|_, expiry| *expiry > now);
+
+        // A power loss that brought back the previous history would make an accepted call replayable.
+        Ok(NonceSet {
+            entries,
+            path: Some(path.to_owned()),
+            sync_folder: true,
+        })
     }
 
     /// `false` when the nonce was already used (a replay), or when it cannot be
@@ -124,7 +147,15 @@ impl NonceSet {
         self.entries.insert(nonce.to_owned(), expires_at);
 
         if let Some(path) = &self.path {
-            if store::save_nonces(path, &self.entries).is_err() {
+            let saved = store::save_nonces(path, &self.entries).and_then(|()| {
+                if self.sync_folder {
+                    store::sync_folder_of(path)
+                } else {
+                    Ok(())
+                }
+            });
+
+            if saved.is_err() {
                 self.entries.remove(nonce);
 
                 return false;
@@ -220,6 +251,7 @@ pub fn sign_value(secret: &str, domain: Domain, value: &Value) -> Signed {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_dir::TestDir;
     use serde_json::json;
     use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -314,11 +346,11 @@ mod tests {
         assert!(verify_call(SECRET, "dev1", &signed, 2_000, &mut nonces).is_err());
     }
 
-    fn nonce_file(name: &str) -> PathBuf {
-        let dir =
-            std::env::temp_dir().join(format!("neore-device-nonces-{name}-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&dir);
-        dir.join("device-nonces.json")
+    fn nonce_file(name: &str) -> (TestDir, PathBuf) {
+        let dir = TestDir::at(&format!("device-nonces-{name}"));
+        let path = dir.join("device-nonces.json");
+
+        (dir, path)
     }
 
     static NEXT_NONCE: AtomicU64 = AtomicU64::new(0);
@@ -333,7 +365,7 @@ mod tests {
 
     #[test]
     fn a_stored_nonce_is_still_refused_after_a_restart() {
-        let path = nonce_file("reload");
+        let (_dir, path) = nonce_file("reload");
         let first = fresh_nonce();
         let second = fresh_nonce();
         let mut before = NonceSet::persisted(&path, 1_000);
@@ -343,13 +375,11 @@ mod tests {
         let mut after = NonceSet::persisted(&path, 2_000);
         assert!(!after.insert(&first, 10_000, 2_000));
         assert!(after.insert(&second, 10_000, 2_000));
-
-        let _ = std::fs::remove_dir_all(path.parent().unwrap());
     }
 
     #[test]
     fn an_expired_nonce_is_pruned_on_load() {
-        let path = nonce_file("prune");
+        let (_dir, path) = nonce_file("prune");
         let old = fresh_nonce();
         let mut before = NonceSet::persisted(&path, 1_000);
 
@@ -357,8 +387,6 @@ mod tests {
 
         let mut after = NonceSet::persisted(&path, 6_000);
         assert!(after.insert(&old, 20_000, 6_000));
-
-        let _ = std::fs::remove_dir_all(path.parent().unwrap());
     }
 
     #[test]

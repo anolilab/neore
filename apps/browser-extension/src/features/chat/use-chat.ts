@@ -89,7 +89,18 @@ export function useChat(threadId: string | null, onThreadCreated: (threadId: str
         }
     }, [isStreaming, live, persisted]);
 
-    useEffect(() => () => abortRef.current?.abort(), []);
+    // A send still waiting on `POST /v1/chat` when the chat closes must not report
+    // its thread to the next chat or start a stream nobody aborts.
+    const mountedRef = useRef(true);
+
+    useEffect(() => {
+        mountedRef.current = true;
+
+        return () => {
+            mountedRef.current = false;
+            abortRef.current?.abort();
+        };
+    }, []);
 
     const start = useCallback(async (body: StartBody, retry = true): Promise<StartResponse> => {
         const token = await getAccessToken();
@@ -145,6 +156,10 @@ export function useChat(threadId: string | null, onThreadCreated: (threadId: str
                 setIsSending(false);
 
                 return false;
+            }
+
+            if (!mountedRef.current) {
+                return true;
             }
 
             setIsSending(false);

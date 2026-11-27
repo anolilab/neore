@@ -26,7 +26,7 @@ import { useDropzone } from "react-dropzone";
 import { toast } from "sonner";
 
 import SettingsCard from "@/components/settings/settings-card";
-import { useAuth } from "@/features/auth/lib/auth-ui-provider";
+import { useAuthActiveOrganization } from "@/features/auth/hooks/use-auth-session";
 import type { CollectionScope, CollectionView } from "@/features/knowledge/components/collection-picker";
 import { CollectionPicker, MoveToCollection } from "@/features/knowledge/components/collection-picker";
 import KnowledgeImportActions from "@/features/knowledge/components/knowledge-import-actions";
@@ -66,9 +66,8 @@ type FileRow = Partial<Pick<KnowledgeFile, "collectionId" | "error" | "summary">
 const KnowledgeBaseSettings: FC = () => {
     const { t } = useLingui();
     const crpc = useCRPC();
-    const { hooks } = useAuth();
     // Sharing a collection goes to the ACTIVE organization, the one the server proves.
-    const { data: activeOrganization } = hooks.useActiveOrganization();
+    const { data: activeOrganization } = useAuthActiveOrganization();
     const organizationName = activeOrganization?.name;
     const [isUploading, setIsUploading] = useState(false);
     const [isRemovingAll, setIsRemovingAll] = useState(false);

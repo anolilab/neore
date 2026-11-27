@@ -11,7 +11,6 @@ import type { PeriodicJob } from "./lib/cron-schedule";
 import { dueJobs } from "./lib/cron-schedule";
 import { HISTORY_PAGE } from "./lib/document-history";
 import { cronsLogger } from "./lib/logger";
-import { scheduleObjectDeletion } from "./lib/storage-cleanup";
 
 export const crons = cronJobs();
 
@@ -43,13 +42,15 @@ export const deleteUnusedFiles = internalMutation
             cronsLogger.debug(`Deleting ${toDelete.length} files...`);
         }
 
-        await scheduleObjectDeletion(
-            context,
-            toDelete.map((f) => f.storageId as string),
-        );
+        // The objects go after the rows, through the deletes `deleteFiles` records and schedules.
         await context.runMutation(internal.agent.files.deleteFiles, {
             fileIds: toDelete.map((f) => f._id),
         });
+
+        if (arguments_.cursor === undefined) {
+            // Its own invocation: object deletes that did not finish, and uploads no row took, are deleted again (`retryObjectDeletes`).
+            await context.scheduler.runAfter(0, internal.agent.files.retryObjectDeletes, {});
+        }
 
         if (!files.isDone) {
             cronsLogger.debug(`Deleted ${toDelete.length} files but not done yet, continuing...`);
@@ -255,8 +256,23 @@ export const PERIODIC_JOBS: ReadonlyArray<CronJob & PeriodicJob> = [
         ref: internal.crons.deleteExpiredTemporaryChats,
         schedule: { everyMinutes: 60, kind: "interval" },
     },
+    // Rate-limit rows past every window: our limits (`lib/rate-limit-sweep.ts`) and better-auth's (`auth/rate-limit-sweep.ts`).
+    { name: "sweepExpiredRateLimits", ref: internal.lib.rate_limit_sweep.sweepExpiredRateLimits, schedule: { everyMinutes: 60, kind: "interval" } },
+    // Dormant shards, which housekeeping no longer visits, still get the `rateLimits` sweep (`lib/shard-housekeeping.ts`).
+    {
+        name: "dispatchDormantRateLimitSweeps",
+        ref: internal.lib.shard_housekeeping.dispatchDormantRateLimitSweeps,
+        schedule: { hourUTC: 5, kind: "daily", minuteUTC: 0 },
+    },
+    { name: "sweepExpiredAuthRateLimits", ref: internal.auth.rate_limit_sweep.sweepExpiredAuthRateLimits, schedule: { everyMinutes: 60, kind: "interval" } },
     // Claim-once rows past their TTL (`lib/claim-once.ts`).
     { name: "purgeIdempotencyClaims", ref: internal.lib.claim_once.purgeExpiredClaims, schedule: { everyMinutes: 60, kind: "interval" } },
+    // Rule files a failed project delete left marked (`projects/gdpr.ts`).
+    {
+        name: "sweepUnfinishedRuleFileErasures",
+        ref: internal.projects.gdpr.sweepUnfinishedRuleFileErasures,
+        schedule: { hourUTC: 4, kind: "daily", minuteUTC: 45 },
+    },
     // 0 */6 * * *
     {
         name: "cleanupExpiredExports",

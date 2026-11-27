@@ -1,91 +1,182 @@
 /**
- * The options an agent offers for its session (its model, reasoning effort, mode ...), read from what it sends: the
- * answer to `session/new` or `session/load`, and the `config_option_update` and `current_mode_update` updates. Pure: a
- * malformed value is dropped, never sent.
+ * Reads the options an agent offers (its model, reasoning effort, mode ...) from what it sends: the answers to
+ * `session/new` and `session/load`, `config_option_update`, `current_mode_update`, and the answer to a change.
+ * Pure: a malformed value is dropped, never sent. The agent's `configOptions` take precedence over its legacy `modes`
+ * and `models` states, which stand in only when it sends no options.
  *
- * Only list options are kept (`type: "select"`; a boolean option has no list to choose from). The agent's `configOptions`
- * take precedence over its legacy `modes` state, which stands in only for an agent that sends no options. Bounds match
- * the backend's (`backend/lunora/acp/validators.ts#vAgentOptions`). Every text goes through the caller's `scrub` (the
- * agent's environment values are removed there); an id the scrub would change is dropped, since it would no longer name
- * the agent's own choice.
+ * Bounds match the backend's (`backend/lunora/acp/validators.ts`): at most 20 options with at most 100 choices each,
+ * ids up to 128 bytes of UTF-8, names up to 200 characters. Every text goes through the caller's `scrub` (the agent's environment
+ * values are removed there); an id or value the scrub would change is dropped, since it would no longer name the
+ * agent's own choice.
  */
-export const MAX_OPTIONS = 10;
-export const MAX_CHOICES = 64;
-/** The computer's core counts an id in UTF-8 bytes: a longer one would be refused there, after the change is sent. */
+import type { AgentChoiceList, AgentOption, SessionStatePatch } from "./host-events";
+
+export const MAX_OPTIONS = 20;
+export const MAX_CHOICES = 100;
+/** The computer's own check counts an id in UTF-8 bytes, so the bound is bytes: a longer id is refused there, after the change is sent. */
 const MAX_ID_BYTES = 128;
-const MAX_NAME_CHARS = 120;
+const MAX_NAME_CHARS = 200;
 const MAX_CATEGORY_CHARS = 64;
 
 /**
- * What the options may take as JSON: counts alone do not bound bytes. The post that carries them (the backend refuses one over
- * 256 KiB, and a refused open leaves the session local) encodes them a second time, which at most doubles them, and the
- * capability report repeats the model choices: at most four times this, well under the cap.
+ * The most JSON one part of the report may take. The backend refuses a `session_state` post over 256 KiB (`MAX_INGEST_BYTES`),
+ * and a refused post drops its usage with it. Counts do not bound that alone: a name of 200 characters can be 800 bytes.
  */
-const MAX_OPTIONS_BYTES = 32 * 1024;
+const OPTIONS_BYTE_BUDGET = 64 * 1024;
+const LEGACY_LIST_BYTE_BUDGET = 32 * 1024;
 
-export interface AgentChoice {
-    name: string;
-    value: string;
-}
+const bytesOf = (value: unknown): number => new TextEncoder().encode(JSON.stringify(value)).length;
 
-/** One list option of the agent, with the value it has now. */
-export interface AgentOption {
-    /** The agent's own grouping (`model`, `thought_level`, `mode` ...), when it gave one. */
-    category?: string;
-    choices: AgentChoice[];
-    currentValue: string;
-    id: string;
-    name: string;
-}
+/** The longest prefix of `items` whose JSON array fits in `budget` bytes. */
+export const fitPrefix = <T>(items: ReadonlyArray<T>, budget: number): T[] => {
+    const kept: T[] = [];
+    let used = 2; // the brackets
 
-/** What the agent offers: its options, or (for an agent that sends none) its legacy mode list. */
-export interface AgentOptions {
-    configOptions?: AgentOption[];
-    modes?: { available: AgentChoice[]; current: string };
-}
+    for (const item of items) {
+        const size = bytesOf(item) + 1; // with its comma
+
+        if (used + size > budget) {
+            break;
+        }
+
+        kept.push(item);
+        used += size;
+    }
+
+    return kept;
+};
+
+/**
+ * The entries a bounded read keeps: the first `MAX_CHOICES`, with `later` (the first current entry after them, if any) in the last place
+ * when the current one is not among them. The same list `fitKeeping` cuts from the whole input.
+ */
+const withCurrentLast = <T>(kept: T[], later: T | undefined, isCurrent: (item: T) => boolean): T[] => {
+    if (later === undefined || kept.some((item) => isCurrent(item))) {
+        return kept;
+    }
+
+    return [...kept.slice(0, MAX_CHOICES - 1), later];
+};
+
+/**
+ * The longest prefix of `items` within `limit` entries and `budget` bytes, with the entry `isCurrent` names kept in it. When the cut
+ * would drop it, it takes the place of the last entry kept, so the list still names the agent's current choice.
+ */
+const fitKeeping = <T>(items: ReadonlyArray<T>, isCurrent: (item: T) => boolean, limit: number, budget: number): T[] => {
+    const kept = fitPrefix(items.slice(0, limit), budget);
+    const current = items.find((item) => isCurrent(item));
+
+    if (current === undefined || kept.includes(current)) {
+        return kept;
+    }
+
+    const reserve = bytesOf(current) + 1;
+
+    // The current entry alone does not fit: the list is cut without it.
+    if (2 + reserve > budget) {
+        return kept;
+    }
+
+    return [...fitPrefix(items.filter((item) => item !== current).slice(0, limit - 1), budget - reserve), current];
+};
+
+/** The option with as many of its choices as fit in `budget` bytes, its current one among them; `undefined` when the option without them does not fit. */
+const fitOption = (option: AgentOption, budget: number): AgentOption | undefined => {
+    const bare = bytesOf({ ...option, choices: [] });
+
+    if (bare > budget) {
+        return undefined;
+    }
+
+    return { ...option, choices: fitKeeping(option.choices, (choice) => choice.value === option.currentValue, MAX_CHOICES, budget - bare) };
+};
 
 type Scrub = (text: string) => string;
 
+/** What the agent reported, before the precedence between options and legacy states is applied. */
+export interface RawOptions {
+    configOptions?: AgentOption[];
+    models?: AgentChoiceList;
+    modes?: AgentChoiceList;
+}
+
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
 
-const bytesOf = (value: unknown): number => Buffer.byteLength(JSON.stringify(value));
-
 /** An id the agent chose, kept only whole: empty, too long or changed by the scrub reads as no id. */
-const idOf = (value: unknown, scrub: Scrub): string | undefined =>
-    typeof value === "string" && value !== "" && Buffer.byteLength(value) <= MAX_ID_BYTES && scrub(value) === value ? value : undefined;
+export const idOf = (value: unknown, scrub: Scrub): string | undefined => {
+    if (typeof value !== "string" || value === "" || new TextEncoder().encode(value).length > MAX_ID_BYTES) {
+        return undefined;
+    }
+
+    return scrub(value) === value ? value : undefined;
+};
 
 const nameOf = (value: unknown, fallback: string, scrub: Scrub): string => {
     const name = typeof value === "string" ? scrub(value).slice(0, MAX_NAME_CHARS) : "";
 
-    // The fallback is the id, which may be longer than a name is allowed to be.
-    return (name === "" ? fallback : name).slice(0, MAX_NAME_CHARS);
+    return name === "" ? fallback : name;
 };
 
-/** A list of `{ [idKey], name }` entries, groups (`{ options: [...] }`) flattened, duplicates and bad ids dropped. */
-const choicesOf = (entries: unknown, idKey: string, scrub: Scrub): AgentChoice[] => {
-    const choices: AgentChoice[] = [];
-    const flat = (Array.isArray(entries) ? (entries as unknown[]) : []).flatMap((entry) =>
-        isRecord(entry) && Array.isArray(entry.options) ? (entry.options as unknown[]) : [entry],
-    );
+/** The choices of a list option, groups flattened into one list, cut to the bound with the `current` one kept among them. */
+const choicesOf = (options: unknown, scrub: Scrub, current: string): AgentOption["choices"] => {
+    const choices: AgentOption["choices"] = [];
+    const values = new Set<string>();
+    // The first current choice that comes after the first `MAX_CHOICES`: the only entry past the bound that is still read.
+    let later: AgentOption["choices"][number] | undefined;
 
-    for (const entry of flat) {
-        const value = isRecord(entry) ? idOf(entry[idKey], scrub) : undefined;
+    const add = (entry: unknown): void => {
+        if (!isRecord(entry)) {
+            return;
+        }
 
-        if (value !== undefined && choices.length < MAX_CHOICES && choices.every((choice) => choice.value !== value)) {
-            choices.push({ name: nameOf((entry as Record<string, unknown>).name, value, scrub), value });
+        if (choices.length >= MAX_CHOICES) {
+            // A raw match is checked before anything else is read from the entry, so the rest of a long list costs one comparison each.
+            if (later === undefined && entry.value === current) {
+                const value = idOf(entry.value, scrub);
+
+                if (value === current) {
+                    later = { name: nameOf(entry.name, value, scrub), value };
+                }
+            }
+
+            return;
+        }
+
+        const value = idOf(entry.value, scrub);
+
+        if (value !== undefined && !values.has(value)) {
+            values.add(value);
+            choices.push({ name: nameOf(entry.name, value, scrub), value });
+        }
+    };
+
+    const entries: unknown[] = Array.isArray(options) ? (options as unknown[]) : [];
+
+    for (const entry of entries) {
+        if (isRecord(entry) && Array.isArray(entry.options)) {
+            for (const inner of entry.options as unknown[]) {
+                add(inner);
+            }
+        } else {
+            add(entry);
         }
     }
 
-    return choices;
+    return withCurrentLast(choices, later, (choice) => choice.value === current);
 };
 
+/**
+ * One option, if it is a list the person can choose from. A boolean option, one with no usable id or current value, and one
+ * with no list of choices, is left out; an empty current value is kept. An entry left out does not hide the legacy mode list.
+ */
 const optionOf = (entry: unknown, scrub: Scrub): AgentOption | undefined => {
-    if (!isRecord(entry) || entry.type !== "select" || !Array.isArray(entry.options)) {
+    if (!isRecord(entry) || (entry.type !== undefined && entry.type !== "select") || !Array.isArray(entry.options)) {
         return undefined;
     }
 
     const id = idOf(entry.id, scrub);
-    const currentValue = idOf(entry.currentValue, scrub);
+    // An empty current value is no selection, which the backend accepts: the option keeps its choices. Any other value is read as an id.
+    const currentValue = entry.currentValue === "" ? "" : idOf(entry.currentValue, scrub);
 
     if (id === undefined || currentValue === undefined) {
         return undefined;
@@ -93,126 +184,182 @@ const optionOf = (entry: unknown, scrub: Scrub): AgentOption | undefined => {
 
     const category = typeof entry.category === "string" ? scrub(entry.category).slice(0, MAX_CATEGORY_CHARS) : "";
 
-    return { choices: choicesOf(entry.options, "value", scrub), currentValue, id, name: nameOf(entry.name, id, scrub), ...(category !== "" && { category }) };
+    return {
+        choices: choicesOf(entry.options, scrub, currentValue),
+        currentValue,
+        id,
+        name: nameOf(entry.name, id, scrub),
+        ...category !== "" && { category },
+    };
 };
 
-/** `configOptions` of an answer or an update; `undefined` when it is not a list, or a nonempty list with nothing usable in it. */
+/** `configOptions` of an answer or an update; `undefined` when it is not a list. */
 export const configOptionsOf = (value: unknown, scrub: Scrub): AgentOption[] | undefined => {
     if (!Array.isArray(value)) {
         return undefined;
     }
 
     const options: AgentOption[] = [];
-    let used = 2;
+    let used = 2; // the brackets of the list
 
     for (const entry of value as unknown[]) {
         const option = optionOf(entry, scrub);
 
-        if (option === undefined || options.some((other) => other.id === option.id)) {
+        if (option !== undefined && options.length < MAX_OPTIONS && options.every((other) => other.id !== option.id)) {
+            const fitted = fitOption(option, OPTIONS_BYTE_BUDGET - used);
+
+            if (fitted === undefined) {
+                break;
+            }
+
+            options.push(fitted);
+            used += bytesOf(fitted) + 1;
+        }
+    }
+
+    // A nonempty list with no usable entry is malformed, not a list that clears the choices: it is ignored, and the choices offered
+    // before stay. Only an explicitly empty list means the agent offers none.
+    if (options.length === 0 && value.length > 0) {
+        return undefined;
+    }
+
+    return options;
+};
+
+/**
+ * A model that comes past the bound, if it is the current one. A raw match is checked before anything else is read from the entry (see `choicesOf`).
+ */
+const currentModelOf = (entry: Record<string, unknown>, idKey: string, current: string, scrub: Scrub): AgentChoiceList["available"][number] | undefined => {
+    if (entry[idKey] !== current) {
+        return undefined;
+    }
+
+    const id = idOf(entry[idKey], scrub);
+
+    return id === current ? { id, name: nameOf(entry.name, id, scrub) } : undefined;
+};
+
+/**
+ * The models a legacy list keeps: the first `MAX_CHOICES` distinct ones, and the first current one after them (see `choicesOf`), within
+ * the byte budget. A long list costs no more than its kept size.
+ */
+const legacyEntriesOf = (entries: unknown[], idKey: string, current: string, scrub: Scrub): AgentChoiceList["available"] => {
+    const available: AgentChoiceList["available"] = [];
+    const ids = new Set<string>();
+    let later: AgentChoiceList["available"][number] | undefined;
+
+    for (const entry of entries) {
+        if (!isRecord(entry)) {
             continue;
         }
 
-        used += bytesOf(option) + 1;
+        if (available.length < MAX_CHOICES) {
+            const id = idOf(entry[idKey], scrub);
 
-        if (options.length >= MAX_OPTIONS || used > MAX_OPTIONS_BYTES) {
-            break;
+            if (id !== undefined && !ids.has(id)) {
+                ids.add(id);
+                available.push({ id, name: nameOf(entry.name, id, scrub) });
+            }
+        } else if (later === undefined) {
+            later = currentModelOf(entry, idKey, current, scrub);
         }
-
-        options.push(option);
     }
 
-    // Only an explicitly empty list says the agent offers none; one with nothing usable is malformed and changes nothing.
-    return options.length === 0 && value.length > 0 ? undefined : options;
+    const isCurrent = (entry: AgentChoiceList["available"][number]): boolean => entry.id === current;
+
+    return fitKeeping(withCurrentLast(available, later, isCurrent), isCurrent, MAX_CHOICES, LEGACY_LIST_BYTE_BUDGET);
 };
 
-/** What a `session/new` or `session/load` answer says about options. */
-export const optionsOf = (answer: unknown, scrub: Scrub): AgentOptions => {
+const listOf = (state: unknown, currentKey: string, listKey: string, idKey: string, scrub: Scrub): AgentChoiceList | undefined => {
+    if (!isRecord(state)) {
+        return undefined;
+    }
+
+    const current = idOf(state[currentKey], scrub);
+    const entries = state[listKey];
+
+    if (current === undefined || !Array.isArray(entries)) {
+        return undefined;
+    }
+
+    return { available: legacyEntriesOf(entries as unknown[], idKey, current, scrub), current };
+};
+
+/** What a `session/new` or `session/load` answer says about options, in the agent's own shape. */
+export const optionsOf = (answer: unknown, scrub: Scrub): RawOptions => {
     if (!isRecord(answer)) {
         return {};
     }
 
     const configOptions = configOptionsOf(answer.configOptions, scrub);
+    const modes = listOf(answer.modes, "currentModeId", "availableModes", "id", scrub);
+    const models = listOf(answer.models, "currentModelId", "availableModels", "modelId", scrub);
 
-    // A list the agent sent, even an empty one, is what it offers: its legacy modes are then ignored.
-    if (configOptions !== undefined) {
-        return { configOptions };
-    }
-
-    const modes = isRecord(answer.modes) ? answer.modes : undefined;
-    const current = idOf(modes?.currentModeId, scrub);
-    const available = choicesOf(modes?.availableModes, "id", scrub);
-
-    return current !== undefined && available.length > 0 ? { modes: { available, current } } : {};
+    return { ...configOptions !== undefined && { configOptions }, ...modes !== undefined && { modes }, ...models !== undefined && { models } };
 };
 
-/**
- * A `session/update` that changes the options, applied; `undefined` for any other update or one that changes nothing.
- * `config_option_update` replaces the options whole; `current_mode_update` moves the legacy mode and a `mode` option.
- */
-export const applyOptionsUpdate = (options: AgentOptions, update: Record<string, unknown>, scrub: Scrub): AgentOptions | undefined => {
-    if (update.sessionUpdate === "config_option_update") {
-        const configOptions = configOptionsOf(update.configOptions, scrub);
-
-        // The options replace everything offered before, legacy modes included. The same list again changes nothing: `optionOf`
-        // builds every option with the same key order, so equal lists serialise alike.
-        if (configOptions === undefined || (options.modes === undefined && JSON.stringify(configOptions) === JSON.stringify(options.configOptions))) {
-            return undefined;
-        }
-
-        return { configOptions };
+/** The state to send and to offer: the agent's options, or its legacy states when it sent no options. */
+export const resolveOptions = (raw: RawOptions): SessionStatePatch => {
+    if (raw.configOptions !== undefined && raw.configOptions.length > 0) {
+        return { configOptions: raw.configOptions };
     }
 
-    if (update.sessionUpdate !== "current_mode_update") {
-        return undefined;
-    }
-
-    const id = idOf(update.currentModeId, scrub);
-
-    if (id === undefined) {
-        return undefined;
-    }
-
-    const moves = (option: AgentOption): boolean =>
-        option.category === "mode" && option.currentValue !== id && option.choices.some((choice) => choice.value === id);
-    const movesLegacy = options.modes !== undefined && options.modes.current !== id && options.modes.available.some((mode) => mode.value === id);
-
-    // An unknown mode, or the one already current, changes nothing: no report is sent for it.
-    if (!movesLegacy && options.configOptions?.some((option) => moves(option)) !== true) {
-        return undefined;
-    }
-
+    // An empty list is the agent saying it has no options now: it is sent, so the options stored before are replaced.
     return {
-        ...(options.configOptions !== undefined && {
-            configOptions: options.configOptions.map((option) => (moves(option) ? { ...option, currentValue: id } : option)),
-        }),
-        ...(options.modes !== undefined && {
-            modes: { ...options.modes, current: movesLegacy ? id : options.modes.current },
-        }),
+        ...raw.configOptions !== undefined && { configOptions: raw.configOptions },
+        ...raw.modes !== undefined && { modes: raw.modes },
+        // The legacy model is not refreshed by an option's change, so once the agent has reported options it is not sent again: after
+        // the options clear, it would name the model the agent had before it changed one.
+        ...raw.configOptions === undefined && raw.models !== undefined && { models: raw.models },
     };
 };
 
-/** The most mode changes one session keeps while its id is not known yet. */
-const MAX_EARLY_MODE_CHANGES = 16;
-
 /**
- * One session's option updates that came before its id was known, with `update` added, kept so that applying them in order
- * gives what applying every update would: an option list that parses replaces everything before it (one that does not would
- * change nothing, so it changes nothing here either); a mode change only moves the mode, so of each mode id only its last
- * change is kept, in the order of those last changes, after the newest list.
+ * `current_mode_update`: the mode the agent is in now. The legacy state, and the mode option when the agent has one, follow. An id that
+ * changes neither (the current mode again, or one the agent does not list) returns the same object, so a caller can tell nothing moved.
  */
-export const keepEarlyUpdate = (kept: Record<string, unknown>[], update: Record<string, unknown>, scrub: Scrub): Record<string, unknown>[] => {
-    if (update.sessionUpdate === "config_option_update") {
-        return configOptionsOf(update.configOptions, scrub) === undefined ? kept : [update];
-    }
-
-    const id = update.sessionUpdate === "current_mode_update" ? idOf(update.currentModeId, scrub) : undefined;
+export const withCurrentMode = (raw: RawOptions, modeId: unknown, scrub: Scrub): RawOptions => {
+    const id = idOf(modeId, scrub);
 
     if (id === undefined) {
-        return kept;
+        return raw;
     }
 
-    const list = kept.filter((early) => early.sessionUpdate === "config_option_update");
-    const modes = kept.filter((early) => early.sessionUpdate === "current_mode_update" && early.currentModeId !== id);
+    const legacyMoves = raw.modes !== undefined && raw.modes.current !== id && raw.modes.available.some((mode) => mode.id === id);
+    const optionMoves = (raw.configOptions ?? []).some(
+        (option) => option.category?.toLowerCase() === "mode" && option.currentValue !== id && option.choices.some((choice) => choice.value === id),
+    );
 
-    return [...list, ...[...modes, update].slice(-MAX_EARLY_MODE_CHANGES)];
+    if (!legacyMoves && !optionMoves) {
+        return raw;
+    }
+
+    return {
+        ...raw,
+        ...raw.modes !== undefined && legacyMoves && { modes: { ...raw.modes, current: id } },
+        ...raw.configOptions !== undefined && {
+            configOptions: raw.configOptions.map((option) =>
+                option.category?.toLowerCase() === "mode" && option.choices.some((choice) => choice.value === id) ? { ...option, currentValue: id } : option,
+            ),
+        },
+    };
+};
+
+/** Replaces the value of one option; the rest stay. */
+export const withOptionValue = (raw: RawOptions, optionId: string, value: string): RawOptions => {
+    return {
+        ...raw,
+        ...raw.configOptions !== undefined && {
+            configOptions: raw.configOptions.map((option) => option.id === optionId ? { ...option, currentValue: value } : option),
+        },
+    };
+};
+
+/** Whether the agent offered this value: of an option, or (with no `optionId`) a mode of the legacy state, which counts only when it sent no options. */
+export const isOffered = (raw: RawOptions, optionId: string | undefined, value: string): boolean => {
+    if (optionId !== undefined) {
+        return raw.configOptions?.find((option) => option.id === optionId)?.choices.some((choice) => choice.value === value) === true;
+    }
+
+    return (raw.configOptions?.length ?? 0) === 0 && raw.modes?.available.some((mode) => mode.id === value) === true;
 };

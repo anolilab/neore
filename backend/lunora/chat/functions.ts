@@ -3,6 +3,11 @@ import { isHostRunThread, refuseHostThread } from "../acp/lib/host-thread";
 import { rowsAfterContextReset } from "../agent/context-reset";
 import { type AgentRef, vAgentRef } from "../agent/agent-switch-validators";
 import { withoutSwitchIds } from "../agent/agent-switch-logic";
+import { MAX_ATTACHED_FILES } from "../agent/file-attach-claim";
+import { FOLLOWUP_DISPATCH_TTL_MS, FOLLOWUP_PATH_LIMIT, followupModelRows, replyAnchorRow, withDeadline } from "../agent/followup-suggestions";
+import { withoutSearchVectors } from "../agent/thread-search-plan";
+import { callOnShard } from "../lib/cross-shard";
+import { runAfterWithRetry } from "../lib/shard-scheduler";
 import { signDocsForDisplay } from "../agent/display-media";
 import {
     DEFAULT_FOLLOWUP_SUGGESTIONS_MODEL,
@@ -28,7 +33,6 @@ import {
     type SystemOptimizerStyle,
     type UserOptimizerStyle,
 } from "@neore/ai/prompts/optimizer";
-import { stripHiddenText } from "@neore/ai/utils";
 import type { LanguageModel, ModelMessage, SpeechModel } from "ai";
 import { experimental_generateSpeech, generateImage as aiGenerateImage, generateText, Output, wrapLanguageModel } from "ai";
 import type { PaginationResult } from "lunorash/server";
@@ -59,11 +63,18 @@ import {
     resolveThreadReadAccess,
     type ThreadPermission,
 } from "../agent/thread-read-access";
-import { publicThread, threadForViewer } from "../agent/threads";
+import { insertTemporaryThread, publicThread, threadForViewer } from "../agent/threads";
+import { insertThread, patchThread } from "../agent/table-writes";
+import { withoutUndefined } from "../lib/patch";
 import { isThreadLocked, throwThreadLocked } from "../lib/thread-lock";
+import { GOAL_CONTINUATION_AGENT } from "./goals/shared";
 import { readChildThreads } from "./lib/child-threads";
+import { capSearchTerms, matchesQueryTerms, queryTerms } from "./lib/search-terms";
+import { callerRestrictsFull, ownerNewChatMode } from "./lib/new-chat-mode";
 import { lockedAfterCreation, threadGateOutcome, threadRowForList, throwUnlessGranted, type ThreadGateOutcome } from "./lib/thread-gate";
-import { vMessageDoc, vThreadDoc, vThreadDocFields as vThreadDocumentFields } from "../agent/validators";
+import { type TypedPromptRow, vMessageDoc, vThreadDoc, vThreadDocFields as vThreadDocumentFields } from "../agent/validators";
+import { type DraftFrom, draftFromOfMarks, notTypedMarksOfMessage, statelessPrompt } from "../lib/not-typed-text";
+import { vDraftFrom, vNotTypedMarks } from "../lib/not-typed-text-validator";
 import { paginatedOf } from "../lib/output-validators";
 import { getAuthUserIdentity } from "../auth";
 import { readableProject } from "../projects/functions";
@@ -90,7 +101,7 @@ import { TEXT_TO_VIDEO_PROVIDERS } from "./lib/video-providers";
 import { gatewayFetch, NO_SERVICE_FETCH, type ServiceFetch } from "../lib/services";
 import { assertPaidModel, requireEnabledModel } from "./lib/enabled-model";
 import getAgent from "./lib/get-agent";
-import { holdTtlFrom } from "../lib/claim-once";
+import { claimFence, claimRow, holdTtlFrom, recordClaimResult } from "../lib/claim-once";
 import { sha256Hex } from "../lib/crypto";
 import { capTitlePrompt } from "./lib/first-user-prompt";
 import { getMessageFileIds, loadNsfwStatuses, redactUIMessagesForPublicViewer } from "./lib/public-thread";
@@ -106,6 +117,9 @@ import {
     falVideoOptionInput,
 } from "./lib/fal-reference-mapping";
 import { getAgentForUser } from "./lib/thread-helpers";
+import { assertStartClaimHeld, recordStartSaved, vStartClaim } from "./start-claim";
+import { savePromptInTransaction } from "./lib/save-prompt";
+import { type ReferenceClaim, referenceBytesForProvider, referencesStillHeld, releaseReferenceClaims } from "./reference-recheck";
 import { FETCH_TIMEOUT_LONG_MS, fetchOk, fetchWithDeadline } from "../lib/fetch-timeout";
 import { systemDb } from "../lib/rls/scope";
 import { deleteThreadShardRoutes } from "../lib/shard-routes";
@@ -170,6 +184,7 @@ const generateFollowupSuggestionsInternal = async (
     language?: string,
     timezone?: string,
     location?: string,
+    timeoutMs = FOLLOWUP_DISPATCH_TTL_MS / 2,
 ): Promise<{
     suggestions: string[];
 }> => {
@@ -191,17 +206,21 @@ const generateFollowupSuggestionsInternal = async (
         model: model as LanguageModelV3,
     });
 
-    const result = await generateText({
-        model: wrappedModel,
-        output: Output.object({
-            schema: z
-                .object({
-                    suggestions: z.array(z.string()).max(MAX_SUGGESTION_COUNT),
-                })
-                .strict(),
+    // The call is cut off before the dispatch claim lapses, so a lock that waited for it cannot commit while the request is still live (`agent/thread-lock.ts`).
+    const result = await withDeadline(timeoutMs, (abortSignal) =>
+        generateText({
+            abortSignal,
+            model: wrappedModel,
+            output: Output.object({
+                schema: z
+                    .object({
+                        suggestions: z.array(z.string()).max(MAX_SUGGESTION_COUNT),
+                    })
+                    .strict(),
+            }),
+            prompt,
         }),
-        prompt,
-    });
+    );
 
     // Handle case where model doesn't generate valid output
     if (!result.output) {
@@ -559,10 +578,30 @@ export const createThread = authMutation
                 }
             }
 
+            // The mode is read before the thread exists, so a failed read writes nothing. A bot's own mode wins; a bot with none starts in
+            // the owner's default, as any new chat does. An admin acting as the owner, or any grant, never takes `full` from the bot or the
+            // default. A grant is the browser extension, the desktop app or the phone app, so a Full bot started from one of those apps
+            // takes the owner's default instead, and keeps `full` only in the web app. The session is read only where it can change the
+            // mode: a bot's `full`, or the owner's `full` default.
+            const restrictsFull = () => callerRestrictsFull(context);
+            const botMode = bot?.permissionMode && !(bot.permissionMode === "full" && (await restrictsFull())) ? bot.permissionMode : undefined;
+            const startMode = botMode ?? (await ownerNewChatMode(context, userId, restrictsFull));
+
             const { threadId } = await agent.createThread(context, {
                 title: threadTitle,
                 userId,
             });
+
+            if (startMode) {
+                try {
+                    await context.runMutation(internal.chat.thread_state.copyThreadPermissionMode, { mode: startMode, threadId });
+                } catch (error) {
+                    // Nothing else is written yet. Without this the chat would stay as an empty chat the user never asked for (as a branch does).
+                    await context.runMutation(internal.agent.threads.deleteAllForThreadIdAsync, { threadId: threadId as Id<"threads"> });
+
+                    throw error;
+                }
+            }
 
             await context.runMutation(internal.agent.threads.updateThread, {
                 patch: {
@@ -600,6 +639,8 @@ export const createThread = authMutation
                 const expiresAt = context.now + retentionHoursToUse! * 60 * 60 * 1000;
 
                 await context.runMutation(internal.agent.threads.createTemporaryThread, {
+                    // Not filed under it, but capped by it (`threads.capOrganizationId`).
+                    ...(organizationId && { capOrganizationId: organizationId }),
                     expiresAt,
                     retentionHours: retentionHoursToUse!,
                     threadId: threadId as Id<"threads">,
@@ -640,13 +681,24 @@ export const createThreadWithInitialMessage = internalMutation
         customSystemPrompt: v.optional(v.string()),
         enabledFeatures: v.optional(v.array(v.string())),
         fileIds: v.optional(v.array(v.string())),
+        /** An admin acting as the owner, or a session `/chat/start` saw impersonating: the owner's default never gives such a chat `full`. */
+        impersonated: v.optional(v.boolean()),
         language: v.optional(v.string()),
         messageContent: v.array(v.record(v.string(), v.any())),
         mode: v.optional(v.union(v.literal("text"), v.literal("image"), v.literal("video"))),
         model: v.string(),
+        /**
+         * The caller's verified active organization (`/chat/start` reads it from the session). Written with the insert, so a
+         * chat started in an organization is never left without it and later capped by a broader space.
+         */
+        organizationId: v.optional(v.string().max(MAX_LENGTH.id)),
+        /** The composer chip's project, filed with the thread from its first run. A project the caller cannot read is refused. */
+        projectId: v.optional(v.string().max(MAX_LENGTH.id)),
         reasoningEffort: v.optional(v.number()),
         /** Hours until expiry when `temporary`; the client sends a preset from the temporary-chat control. */
         retentionHours: v.optional(v.number().check((value) => value >= 1 && value <= 168, { message: "Invalid retention" })),
+        /** A send with a `clientMessageId` (`chat/start-claim.ts`): checked before anything is written, its ids recorded with the save. */
+        startClaim: v.optional(vStartClaim),
         statelessMode: v.optional(v.boolean()),
         temporary: v.optional(v.boolean()),
         /** A title known up front (a media prompt's); otherwise the default, replaced by `createTitleChat`. */
@@ -660,12 +712,16 @@ export const createThreadWithInitialMessage = internalMutation
                 customSystemPrompt,
                 enabledFeatures,
                 fileIds,
+                impersonated,
                 language,
                 messageContent,
                 mode,
                 model,
+                organizationId,
+                projectId,
                 reasoningEffort,
                 retentionHours,
+                startClaim,
                 statelessMode,
                 temporary,
                 title,
@@ -673,30 +729,43 @@ export const createThreadWithInitialMessage = internalMutation
             },
             ctx: context,
         }) => {
-            const agent = await getAgentForUser(context, userId, model);
+            if (startClaim) {
+                await assertStartClaimHeld(context, startClaim);
+            }
 
-            // Create thread with minimal required fields
-            const { threadId } = await agent.createThread(context, {
+            // The pick is filed only when the caller may file threads in it: the owner rule of `moveThreadToProject`, read on the
+            // primary so a revoked project is not admitted from a lagging replica. Another pick is left out rather than refused,
+            // so a stale chip never blocks the send.
+            let filedProjectId: Id<"projects"> | undefined;
+
+            if (projectId && !temporary) {
+                const project = await readableProject(context, projectId as Id<"projects">, userId, { primary: true });
+
+                if (project && (!project.userId || project.userId === userId)) {
+                    filedProjectId = projectId as Id<"projects">;
+                }
+            }
+
+            // Every write below is in THIS transaction, with no nested mutation (each would commit on its own): a send with
+            // a `clientMessageId` must leave either the thread, its prompt and the claim's record, or none of them.
+            // The owner's default mode for a new chat, read here and written with the insert: the claim's invariant allows no nested
+            // mutation, so the default cannot be copied on afterwards.
+            const startMode = await ownerNewChatMode(context, userId, async () => impersonated === true);
+
+            const threadId = await insertThread(context.db, {
+                ...withoutUndefined({ customSystemPrompt, enabledFeatures, language, mode, reasoningEffort, statelessMode }),
+                ...(autoModel === true && { autoModel }),
+                ...(startMode && { permissionMode: startMode }),
+                createdAt: context.now,
+                model,
+                // A temporary chat stays untagged, as `createThread` leaves it.
+                ...(organizationId && !temporary && { organizationId }),
+                ...(filedProjectId && { projectId: filedProjectId }),
+                status: "running", // Running from the start: no separate status write
+                tags: ["chat"],
                 title: title ?? DEFAULT_THREAD_TITLE,
+                updatedAt: context.now,
                 userId,
-            });
-
-            // Batch all settings + status update in one mutation (much faster than separate calls)
-            await context.runMutation(internal.agent.threads.updateThread, {
-                patch: {
-                    ...(autoModel === true && { autoModel }),
-                    customSystemPrompt,
-                    enabledFeatures,
-                    language,
-                    mode,
-                    model,
-                    reasoningEffort,
-                    statelessMode,
-                    status: "running", // Set running status immediately - no separate mutation needed
-                    tags: ["chat"],
-                    updatedAt: context.now,
-                },
-                threadId: threadId as Id<"threads">,
             });
 
             // A composer chat created as temporary gets the same record as the temporary-chat control writes.
@@ -707,31 +776,28 @@ export const createThreadWithInitialMessage = internalMutation
                     .unique();
                 const hours = retentionHours ?? storedRetentionHours(userSettings?.temporaryChatRetentionHours);
 
-                await context.runMutation(internal.agent.threads.createTemporaryThread, {
+                await insertTemporaryThread(context, {
+                    // Not filed under it, but capped by it (`threads.capOrganizationId`).
+                    ...(organizationId && { capOrganizationId: organizationId }),
                     expiresAt: context.now + hours * 60 * 60 * 1000,
                     retentionHours: hours,
-                    threadId: threadId as Id<"threads">,
+                    threadId,
                 });
             }
 
-            // Save user message
-            const messageMetadata = fileIds && fileIds.length > 0 ? { fileIds } : {};
-            const result = await agent.saveMessage(context, {
-                message: {
-                    // Wire boundary: `messageContent` is declared as untyped records
-                    // (`v.array(v.record(v.string(), v.any()))`) because the caller sends
-                    // AI SDK content parts the validator cannot express.
-                    content: messageContent as unknown as Extract<ModelMessage, { role: "user" }>["content"],
-                    role: "user",
-                },
+            const messageId = await savePromptInTransaction(context, {
+                // Wire boundary: `messageContent` is declared as untyped records, the AI SDK content parts the validator cannot express.
+                content: messageContent as unknown as Parameters<typeof savePromptInTransaction>[1]["content"],
+                ...(fileIds && fileIds.length > 0 && { fileIds }),
+                model,
                 threadId,
-                ...(Object.keys(messageMetadata).length > 0 && { metadata: messageMetadata }),
             });
 
-            return {
-                messageId: result.messageId,
-                threadId,
-            };
+            if (startClaim) {
+                await recordStartSaved(context, startClaim, { messageId, model, newThread: true, threadId });
+            }
+
+            return { messageId, threadId };
         },
     );
 
@@ -743,7 +809,7 @@ export const createThreadWithInitialMessage = internalMutation
 export const gateThreadActionHandler = async (
     context: Pick<QueryContext, "db">,
     args: { level: ThreadPermission; threadId: Id<"threads">; unlockProof?: string | null; userId: string },
-): Promise<{ activeAgent?: AgentRef; botId?: Id<"bots">; hostRun?: boolean; isWorker?: boolean; outcome: ThreadGateOutcome }> => {
+): Promise<{ activeAgent?: AgentRef; botId?: Id<"bots">; hostRun?: boolean; isWorker?: boolean; outcome: ThreadGateOutcome; ownerId?: string }> => {
     const outcome = await threadGateOutcome(context, args);
 
     if (outcome !== "ok") {
@@ -761,6 +827,7 @@ export const gateThreadActionHandler = async (
         botId: thread?.botId,
         ...(args.level === "write" && { isWorker: await isWorkerThread(context, args.threadId) }),
         outcome,
+        ...(thread && { ownerId: thread.userId }),
         ...(isHostRunThread(thread) && { hostRun: true }),
     };
 };
@@ -779,6 +846,7 @@ export const gateThreadAction = internalQuery
             hostRun: v.optional(v.boolean()),
             isWorker: v.optional(v.boolean()),
             outcome: v.union(v.literal("denied"), v.literal("locked"), v.literal("ok")),
+            ownerId: v.optional(v.string()),
         }),
     )
     .query(async ({ args, ctx: context }) => await gateThreadActionHandler(context, args));
@@ -1088,64 +1156,6 @@ export const getToolOutput = liteAuthQuery
             raw !== null && typeof raw === "object" && typeof (raw as { type?: unknown }).type === "string" ? (raw as { value?: unknown }).value : raw;
 
         return { output };
-    });
-
-/**
- * Output cap for `continueThread`, which streams a reply into an existing thread.
- * Generation bills per output token, so this bounds one reply the way
- * `pages/agent.ts` caps its own generation.
- */
-const CONTINUE_THREAD_MAX_OUTPUT_TOKENS = 16_000;
-
-export const continueThread = authAction
-    .use(rateLimit("chat/stream"))
-    .input({
-        model: v.string().max(MAX_LENGTH.short),
-        prompt: v.string().max(MAX_LENGTH.text),
-        threadId: v.id("threads"),
-        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
-    })
-    // The handler returns a `Response`, whose inferred type drags DOM WebSocket
-    // types into `_generated/` (which then fails to compile). Codegen renders a
-    // `v.any()` output from the handler's return type, hence `Promise<unknown>`.
-    .output(v.any())
-    .action(async ({ args: { model, prompt, threadId, unlockProof }, ctx: context }): Promise<unknown> => {
-        const { userId } = context.user;
-
-        const cleanPrompt = stripHiddenText(prompt).text;
-
-        if (cleanPrompt.trim() === "") {
-            throw new LunoraError("BAD_REQUEST", "The prompt is empty after removing hidden characters");
-        }
-
-        const gateResult = await context.runQuery(internal.chat.functions.gateThreadAction, { level: "write", threadId, unlockProof, userId });
-
-        throwUnlessGranted(gateResult.outcome, "Write access denied to this thread");
-
-        if (gateResult.isWorker) {
-            throw new LunoraError("BAD_REQUEST", "This is a worker's thread. Message the worker from its thread instead.");
-        }
-
-        // A cloud model must never answer in a thread the desktop owns: `runChatStart` refuses it the same way.
-        if (gateResult.hostRun) {
-            throw new LunoraError("CONFLICT", "This thread runs on a paired computer. Send the message from the desktop app.");
-        }
-
-        const threadData = await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: threadId as Id<"threads"> });
-        const threadLanguage = threadData?.language;
-
-        const agent = await getAgentForUser(context, userId, model, threadLanguage);
-
-        const { thread } = await agent.continueThread(context, {
-            threadId,
-            userId,
-        });
-
-        const result = await thread.streamText({ maxOutputTokens: CONTINUE_THREAD_MAX_OUTPUT_TOKENS, prompt: cleanPrompt });
-
-        context.log.event("chat.continue_thread", { model });
-
-        return result.toUIMessageStreamResponse();
     });
 
 export const getThreads = authQuery
@@ -1463,6 +1473,17 @@ export const updateThreadModel = internalMutation
         },
     );
 
+/**
+ * The pattern of `setThreadPermissionMode` and the guest-link writes: an admin acting as the owner archives, restores, trashes
+ * or deletes no chat. Each of those also withdraws the chat's guest link and held notes. Undoing one is refused too: it is a write
+ * to the owner's chats all the same.
+ */
+const refuseImpersonation = (impersonatedBy: string | null | undefined, refused: string): void => {
+    if (impersonatedBy) {
+        throw new LunoraError("FORBIDDEN", `${refused} while impersonating`);
+    }
+};
+
 export const updateThread = authAction
     .use(rateLimit("chat/update"))
     .input({
@@ -1498,7 +1519,11 @@ export const updateThread = authAction
             },
             ctx: context,
         }) => {
-            const { userId } = context.user;
+            const { impersonatedBy, userId } = context.user;
+
+            if (status !== undefined) {
+                refuseImpersonation(impersonatedBy, status === "archived" ? "A chat cannot be archived" : "A chat cannot be unarchived");
+            }
 
             const gateResult = await context.runQuery(internal.chat.functions.gateThreadAction, { level: "admin", threadId, unlockProof, userId });
 
@@ -1515,12 +1540,15 @@ export const updateThread = authAction
 
             const threadLanguage = threadData?.language;
 
+            // An archive or restore sends whichever model the caller has open, often another thread's (the palette's rows, a
+            // shortcut), so with a status the argument is no pick and the thread keeps its own model.
+            const pickedModel = status === undefined ? model : undefined;
             // Use provided model or fall back to thread's existing model
-            const effectiveModel = (threadData?.activeAgent ? undefined : model) ?? threadData?.model;
+            const effectiveModel = (threadData?.activeAgent ? undefined : pickedModel) ?? threadData?.model;
 
             // Only a change that reads or writes the model needs one: a thread whose model was never set can still be renamed,
             // archived or restored.
-            const modelChange = [autoModel, customSystemPrompt, enabledFeatures, model, order, reasoningEffort, statelessMode].some(
+            const modelChange = [autoModel, customSystemPrompt, enabledFeatures, pickedModel, order, reasoningEffort, statelessMode].some(
                 (value) => value !== undefined,
             );
 
@@ -1556,8 +1584,7 @@ export const updateThread = authAction
             // Auto stands for no switch: a switched thread keeps the agent its path derives, and a host thread has no cloud
             // model to route. A concrete model that differs from the stored one is a pick, and a pick ends Auto unless the
             // caller says otherwise.
-            // A status change (archive, restore) sends whatever model the caller has open, which is not a pick.
-            const pickEndsAuto = status === undefined && model !== undefined && model !== threadData?.model;
+            const pickEndsAuto = pickedModel !== undefined && pickedModel !== threadData?.model;
             const pickFallback = pickEndsAuto ? false : undefined;
             const stays = !(threadData?.activeAgent || threadData?.runner === "host");
             const autoModelForWrite = stays ? (autoModel ?? pickFallback) : undefined;
@@ -1610,7 +1637,8 @@ export const updateThread = authAction
             }
 
             context.log.event("chat.update_thread", {
-                modelChanged: model !== undefined && !threadData?.activeAgent,
+                // The model actually applied: an archive or restore carries the caller's open model but keeps the thread's own.
+                modelChanged: pickedModel !== undefined && !threadData?.activeAgent && pickedModel !== threadData?.model,
                 statusChanged: status ?? null,
                 summaryChanged: summary !== undefined,
                 titleChanged: title !== undefined,
@@ -2333,74 +2361,233 @@ export const refusedBeforeDispatch = async (context: ActionContext, threadId: st
     return !thread || isThreadLocked(thread) || thread.deletedAt !== undefined;
 };
 
-export const createCategoryChat = internalAction.input({ prompt: v.string(), threadId: v.string() }).action(async ({ args: arguments_, ctx: context }) => {
-    // As in `createTitleChat`: a thread that is gone is skipped, not retried.
-    const threadData = await context.runQuery(internal.agent.threads.getThreadInternal, {
-        threadId: arguments_.threadId as Id<"threads">,
+/** The claim that lets one category job per prompt call the model (`lib/claim-once.ts`). */
+export const CATEGORY_CLAIM_SCOPE = "thread-category";
+
+/** A day: keeps the answer for every resend of the prompt's send; a thread with its category set is skipped before the claim anyway. */
+const CATEGORY_CLAIM_TTL_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * How long a delivery holds the claim before it has an answer: well past a model call. After it, a later delivery takes
+ * the claim over and calls the model, so a delivery that died never strands the category. An answered claim is never
+ * taken over. Shorter than the scheduler's retry window, so a retried in-flight delivery reaches the takeover.
+ */
+export const CATEGORY_LEASE_MS = 5 * 60 * 1000;
+
+/**
+ * Takes the prompt's category claim, or says why not: `answered` when an earlier delivery's call answered (the category
+ * is kept on the claim, `recordCategoryAnswer`), so this delivery writes it without a call; `in-flight` while an earlier
+ * delivery holds the claim within its lease with no answer yet. An unanswered claim past its lease is taken over.
+ */
+export const admitCategoryRun = internalMutation
+    .input({ key: v.string().max(MAX_LENGTH.short), userId: v.string().max(MAX_LENGTH.id) })
+    .output(
+        v.union(
+            v.object({ claimedAt: v.number(), outcome: v.literal("admitted") }),
+            v.object({ category: v.string(), claimedAt: v.number(), outcome: v.literal("answered") }),
+            v.object({ outcome: v.literal("in-flight") }),
+        ),
+    )
+    .mutation(async ({ args: { key, userId }, ctx }) => {
+        const existing = await claimRow(ctx, CATEGORY_CLAIM_SCOPE, key);
+
+        if (existing) {
+            if (existing.result !== undefined) {
+                return {
+                    category: (JSON.parse(existing.result) as { category: string }).category,
+                    claimedAt: existing.claimedAt,
+                    outcome: "answered" as const,
+                };
+            }
+
+            if (ctx.now - existing.claimedAt < CATEGORY_LEASE_MS) {
+                return { outcome: "in-flight" as const };
+            }
+
+            // Abandoned before an answer: its delivery died or stopped. Taken over; its late record finds the claim moved.
+            await ctx.db.delete("idempotencyClaims", existing._id);
+        }
+
+        const claimedAt = await claimFence(ctx, CATEGORY_CLAIM_SCOPE, key, { ttlMs: CATEGORY_CLAIM_TTL_MS, userId });
+
+        return claimedAt === null ? { outcome: "in-flight" as const } : { claimedAt, outcome: "admitted" as const };
     });
 
-    if (!threadData) {
-        console.warn(`[createCategoryChat] thread ${arguments_.threadId} not found; skipping`);
-
-        return;
-    }
-
-    if (isThreadLocked(threadData)) {
-        return;
-    }
-
-    // As for the title: the user's model filters decide the model, and a thread stays uncategorised when they allow none.
-    const background = await resolveBackgroundModel(context, threadData.userId, DEFAULT_TITLE_GENERATION_MODEL);
-
-    if (!background) {
-        context.log.event("chat.thread_category", { skipped: "no-allowed-model" });
-
-        return;
-    }
-
-    const { billedUserId, model, modelFilterRules } = background;
-    const agent = await getAgent(model, { gateway: gatewayFetch(context), modelFilterRules, userId: billedUserId });
-
-    const { thread } = await agent.continueThread(context, {
-        threadId: arguments_.threadId,
-    });
-
-    const metadata = await thread.getMetadata();
-
-    // Don't re-categorize if already set
-    if (metadata.category) {
-        return;
-    }
-
-    // Read again right before the call: the lock checked above ran before the model setup.
-    if (await refusedBeforeDispatch(context, arguments_.threadId)) {
-        context.log.event("chat.thread_category", { skipped: "refused-before-dispatch" });
-
-        return;
-    }
-
-    const categoryList = THREAD_CATEGORIES.join(", ");
-    const textResult = await thread.generateText(
-        {
-            prompt: `Classify this user message into exactly ONE category. Reply with ONLY the category name, nothing else.\n\nCategories: ${categoryList}\n\nUser message: "${arguments_.prompt}"\n\nCategory:`,
-        },
-        {
-            storageOptions: {
-                saveMessages: "none",
-            },
-        },
+/** Keeps the model's category on the prompt's claim, so a delivery after a failed write writes it without a second call. `false` when the claim moved. */
+export const recordCategoryAnswer = internalMutation
+    .input({ category: v.string().max(MAX_LENGTH.short), claimedAt: v.number(), key: v.string().max(MAX_LENGTH.short) })
+    .output(v.boolean())
+    .mutation(
+        async ({ args: { category, claimedAt, key }, ctx }) => await recordClaimResult(ctx, CATEGORY_CLAIM_SCOPE, key, claimedAt, JSON.stringify({ category })),
     );
 
-    // Parse and validate the category
-    const rawCategory = textResult.text.trim().toLowerCase();
-    const category = (THREAD_CATEGORIES as ReadonlyArray<string>).includes(rawCategory) ? rawCategory : "general";
+/** A thread that may not be categorised now: gone, locked or deleted. */
+const categoryRefused = (thread: (Parameters<typeof isThreadLocked>[0] & { deletedAt?: number }) | null): boolean =>
+    !thread || isThreadLocked(thread) || thread.deletedAt !== undefined;
 
-    await thread.updateMetadata({
-        category,
+/**
+ * Writes a category in one transaction with everything that may forbid it: the thread exists, is not locked or deleted and
+ * has no category yet, and the delivery's claim still holds the key (`claimedAt`). A lock or a delete during the model call,
+ * or a takeover of a delivery that outlasted its lease, writes nothing. Not `updateThread`, whose other callers keep their rules.
+ */
+export const writeThreadCategory = internalMutation
+    .input({ category: v.string().max(MAX_LENGTH.short), claimedAt: v.number(), key: v.string().max(MAX_LENGTH.short), threadId: v.id("threads") })
+    .output(v.union(v.literal("written"), v.literal("refused"), v.literal("moved")))
+    .mutation(async ({ args: { category, claimedAt, key, threadId }, ctx }) => {
+        const thread = await ctx.db.get("threads", threadId);
+
+        if (categoryRefused(thread) || thread?.category) {
+            return "refused" as const;
+        }
+
+        const claim = await claimRow(ctx, CATEGORY_CLAIM_SCOPE, key);
+
+        if (claim?.claimedAt !== claimedAt) {
+            return "moved" as const;
+        }
+
+        await patchThread(ctx.db, threadId, { category });
+
+        return "written" as const;
     });
 
-    context.log.event("chat.thread_category", { category, inputTokens: textResult.usage.inputTokens, model, outputTokens: textResult.usage.outputTokens });
-});
+/**
+ * Sets a new chat's category from its first prompt. One paid call per prompt, under the prompt's `thread-category`
+ * claim: a recorded answer is written before any model is resolved, so it lands whatever the model filters say by then;
+ * a delivery that finds another's unanswered claim within its lease fails, and the scheduler's retry comes back to it
+ * (finding the category written, the answer recorded, or the lease over and the claim to take over).
+ */
+export const createCategoryChat = internalAction
+    .input({
+        prompt: v.string(),
+        /** The prompt the category is generated from: the claim's key, so a resend's second job never calls the model again. */
+        promptId: v.optional(v.string().max(MAX_LENGTH.id)),
+        threadId: v.string(),
+    })
+    .action(async ({ args: arguments_, ctx: context }) => {
+        const threadId = arguments_.threadId as Id<"threads">;
+        const readThread = async () => await context.runQuery(internal.agent.threads.getThreadInternal, { threadId });
+        // Fenced, and checked against a lock or delete in the same transaction (`writeThreadCategory`).
+        const writeCategory = async (category: string, claimedAt: number): Promise<"moved" | "refused" | "written"> =>
+            await context.runMutation(internal.chat.functions.writeThreadCategory, { category, claimedAt, key: claimKey, threadId });
+        const claimKey = `${arguments_.threadId}:${arguments_.promptId ?? "thread"}`;
+        // As in `createTitleChat`: a thread that is gone is skipped, not retried.
+        const threadData = await readThread();
+
+        if (!threadData) {
+            console.warn(`[createCategoryChat] thread ${arguments_.threadId} not found; skipping`);
+
+            return;
+        }
+
+        // Don't re-categorize if already set; nothing is written into a locked or deleted chat.
+        if (categoryRefused(threadData) || threadData.category) {
+            return;
+        }
+
+        const admission = await context.runMutation(internal.chat.functions.admitCategoryRun, { key: claimKey, userId: threadData.userId });
+
+        if (admission.outcome === "answered") {
+            // An earlier delivery's answer: written with no model, whatever the filters allow by now.
+            const written = await writeCategory(admission.category, admission.claimedAt);
+
+            context.log.event("chat.thread_category", { category: admission.category, resumed: true, written });
+
+            return;
+        }
+
+        if (admission.outcome === "in-flight") {
+            // Not done: failed, so the scheduler's retry comes back once the other delivery answered, or its lease is over.
+            throw new LunoraError("CONFLICT", "This chat's category is being generated by another delivery.");
+        }
+
+        const { claimedAt } = admission;
+        // Until the model answers, a failure gives the claim back: nothing was paid for, and a later delivery may call.
+        const release = async (): Promise<void> => {
+            await context
+                .runMutation(internal.lib.claim_once.releaseKey, { claimedAt, key: claimKey, scope: CATEGORY_CLAIM_SCOPE })
+                .catch((releaseError: unknown) => {
+                    console.error("[createCategoryChat] Could not release the category claim:", releaseError);
+                });
+        };
+        let answer: { category: string; inputTokens: number | undefined; model: string; outputTokens: number | undefined } | undefined;
+
+        try {
+            // As for the title: the user's model filters decide the model, and a thread stays uncategorised when they allow none.
+            const background = await resolveBackgroundModel(context, threadData.userId, DEFAULT_TITLE_GENERATION_MODEL);
+
+            if (!background) {
+                context.log.event("chat.thread_category", { skipped: "no-allowed-model" });
+                await release();
+
+                return;
+            }
+
+            const { billedUserId, model, modelFilterRules } = background;
+            const agent = await getAgent(model, { gateway: gatewayFetch(context), modelFilterRules, userId: billedUserId });
+            const { thread } = await agent.continueThread(context, { threadId: arguments_.threadId });
+
+            // Read again right before the call: the lock checked above ran before the model setup.
+            if (categoryRefused(await readThread())) {
+                context.log.event("chat.thread_category", { skipped: "refused-before-dispatch" });
+                await release();
+
+                return;
+            }
+
+            const categoryList = THREAD_CATEGORIES.join(", ");
+            const textResult = await thread.generateText(
+                {
+                    prompt: `Classify this user message into exactly ONE category. Reply with ONLY the category name, nothing else.\n\nCategories: ${categoryList}\n\nUser message: "${arguments_.prompt}"\n\nCategory:`,
+                },
+                {
+                    storageOptions: {
+                        saveMessages: "none",
+                    },
+                },
+            );
+            const rawCategory = textResult.text.trim().toLowerCase();
+
+            answer = {
+                category: (THREAD_CATEGORIES as ReadonlyArray<string>).includes(rawCategory) ? rawCategory : "general",
+                inputTokens: textResult.usage.inputTokens,
+                model,
+                outputTokens: textResult.usage.outputTokens,
+            };
+        } catch (error) {
+            await release();
+
+            throw error;
+        }
+
+        // Kept before the write, so a failed write is retried from it with no second call. A record that threw (transient)
+        // leaves the claim unanswered: the write below still lands, and if it fails too, the lease lets a later delivery redo it.
+        const recorded = await context
+            .runMutation(internal.chat.functions.recordCategoryAnswer, { category: answer.category, claimedAt, key: claimKey })
+            .catch((error: unknown) => {
+                console.error("[createCategoryChat] Could not keep the category answer:", error);
+
+                return undefined;
+            });
+
+        // The claim moved: this delivery outlasted its lease and another took over. Its answer, not this one, is the chat's.
+        if (recorded === false) {
+            context.log.event("chat.thread_category", { skipped: "claim-moved" });
+
+            return;
+        }
+
+        const written = await writeCategory(answer.category, claimedAt);
+
+        context.log.event("chat.thread_category", {
+            category: answer.category,
+            ...(recorded === undefined && { unrecorded: true }),
+            inputTokens: answer.inputTokens,
+            model: answer.model,
+            outputTokens: answer.outputTokens,
+            written,
+        });
+    });
 
 export const createSummarizeChat = internalAction.input({ threadId: v.string(), userId: v.string() }).action(async ({ args: arguments_, ctx: context }) => {
     const threadData = await context.runQuery(internal.agent.threads.getThreadInternal, {
@@ -2549,7 +2736,7 @@ export const generateSummary = authAction
 export const createThreadRelationship = internalMutation
     .input({
         branchPoint: v.optional(v.number()),
-        branchType: v.optional(v.union(v.literal("branch"), v.literal("continuation"), v.literal("comparison"))),
+        branchType: v.optional(v.union(v.literal("branch"), v.literal("continuation"), v.literal("comparison"), v.literal("side"))),
         parentThreadId: v.string(),
         threadId: v.string(),
     })
@@ -2619,7 +2806,9 @@ export const getChildThreads = authQuery
             v.object({
                 ...vThreadDocumentFields,
                 branchPoint: v.optional(v.number()),
-                branchType: v.optional(v.union(v.literal("branch"), v.literal("continuation"), v.literal("comparison"), v.literal("subagent"))),
+                branchType: v.optional(
+                    v.union(v.literal("branch"), v.literal("continuation"), v.literal("comparison"), v.literal("side"), v.literal("subagent")),
+                ),
                 createdAt: v.number(),
             }),
         ),
@@ -2646,6 +2835,8 @@ export const deleteThread = authMutation
     })
     .output(v.object({ isDone: v.boolean() }))
     .mutation(async ({ args: { threadId }, ctx: context }) => {
+        refuseImpersonation(context.user.impersonatedBy, "A chat cannot be deleted");
+
         const { userId } = context.user;
 
         // Get thread data before deletion for audit history
@@ -2661,9 +2852,15 @@ export const deleteThread = authMutation
             throw new LunoraError("FORBIDDEN", "Cannot delete another user's thread");
         }
 
-        await context.runMutation(internal.chat.functions.deleteThreadRelationship, { threadId });
+        // A suggestion for this chat is being sent to a model: the delete waits for it, as a lock does (`agent/thread-lock.ts`).
+        if (await context.runQuery(internal.agent.followup_suggestions.followupInFlight, { threadId })) {
+            throw new LunoraError("CONFLICT", "A suggestion is being generated for this chat. Try again in a moment.");
+        }
 
+        // The delete first: a refused delete (a suggestion in flight) must leave the chat's branch link in place.
         const result = await context.runMutation(internal.agent.threads.deleteAllForThreadIdAsync, { threadId: threadId as Id<"threads"> });
+
+        await context.runMutation(internal.chat.functions.deleteThreadRelationship, { threadId });
 
         // Record audit history for thread deletion
         if (threadBeforeDelete) {
@@ -2693,6 +2890,8 @@ export const deleteThreads = authMutation
     })
     .output(v.object({ deletedCount: v.number(), success: v.boolean() }))
     .mutation(async ({ args: { threadIds }, ctx: context }) => {
+        refuseImpersonation(context.user.impersonatedBy, "Chats cannot be deleted");
+
         if (threadIds.length === 0) {
             return { deletedCount: 0, success: true };
         }
@@ -2717,11 +2916,20 @@ export const deleteThreads = authMutation
                     return null;
                 }
 
+                // A suggestion for this chat is being sent to a model: the chat is left out of this batch, as a single delete waits for it
+                // (`deleteThread`). The rest of the batch is deleted and the count says so.
+                if (await context.runQuery(internal.agent.followup_suggestions.followupInFlight, { threadId })) {
+                    chatLogger.debug(`[deleteThreads] Left out, a suggestion is being generated: ${threadId}`);
+
+                    return null;
+                }
+
                 try {
                     // Run all operations in parallel for this thread
+                    // The delete first, then its link and audit: a refused delete leaves the branch link in place.
+                    await context.runMutation(internal.agent.threads.deleteAllForThreadIdAsync, { threadId: threadId as Id<"threads"> });
                     await Promise.all([
                         context.runMutation(internal.chat.functions.deleteThreadRelationship, { threadId }),
-                        context.runMutation(internal.agent.threads.deleteAllForThreadIdAsync, { threadId: threadId as Id<"threads"> }),
                         context.runMutation(internal.lib.document_history.recordHistory, {
                             attribution: { action: "delete", source: "manual" },
                             doc: null,
@@ -3288,6 +3496,277 @@ export const searchMessages = authQuery
         };
     });
 
+/** A prompt the person sent, as the composer's Ctrl+R search lists it (`composer-prompt-search.tsx`). */
+const vSentPrompt = v.object({
+    createdAt: v.optional(v.number()),
+    /** The prompt's not-typed mark, so a pick goes out marked again, as an ArrowUp recall does. */
+    draftFrom: v.optional(vDraftFrom),
+    messageId: v.id("messages"),
+    text: v.string(),
+    threadId: v.string(),
+    threadTitle: v.string(),
+});
+
+/**
+ * Index hits read before the thread filter and the newest-first sort, against the transaction's 32 MiB read budget. The
+ * index holds only typed words (`typedText`), so replies and attachments never take a window; the first pass reads the
+ * smaller one and widens once, only when fewer than a full list of prompts survived every filter (a row read again is
+ * charged once). The index ranks by score, so a common word lists the newest prompts of its best hits, and `truncated`
+ * says so. A hit past the wider window is not searched.
+ */
+const SENT_PROMPT_WINDOW = 100;
+const SENT_PROMPT_WINDOW_MAX = 400;
+const SENT_PROMPT_LIMIT = 50;
+/** Thread lookups that run at once inside one search. */
+const SENT_PROMPT_LOOKUP_BATCH = 16;
+/** Parent links followed from a thread to the chat it was first branched from; a deeper chain stops there. */
+const SENT_PROMPT_LINEAGE_DEPTH = 8;
+
+/**
+ * `threadRelationships` reads one search may make to tell branch copies apart, across both windows. Past it a thread counts
+ * as its own family: a copy may list twice, but no prompt is dropped.
+ */
+export const SENT_PROMPT_LINEAGE_READS = 64;
+
+/**
+ * One saved row as a sent prompt: a user row someone typed, with its `typedText` (the indexed words, so what lists is
+ * what matched) and its not-typed mark. `undefined` for a reply, a goal continuation round (typed by nobody), and a row
+ * with no typed words: an attached document alone, a quote, the app's placeholder, a guest's note or an outside agent's
+ * text sent on. `typedText` (`typedTextOf`) leaves those parts out of a row that has typed parts beside them, so only the
+ * person's own words list, and a row of nothing but such parts has no `typedText`.
+ */
+const sentPromptOf = (message: TypedPromptRow): { draftFrom: DraftFrom | undefined; typed: string } | undefined => {
+    const stored = message.message as { content?: unknown; role?: string } | undefined;
+    const typed = message.typedText;
+
+    if (typed === undefined || message.tool || stored?.role !== "user" || message.agentName === GOAL_CONTINUATION_AGENT) {
+        return undefined;
+    }
+
+    return { draftFrom: draftFromOfMarks(notTypedMarksOfMessage(stored)), typed };
+};
+
+/**
+ * Whether the search may list a thread's prompts: the caller's own chat, not trashed, deleted for good (`deletingAt`,
+ * erased in batches after the delete), locked or temporary. The same rule as the thread search (`isSearchEligible`).
+ */
+const listsSentPrompts = (thread: ThreadDoc | null, userId: string): thread is ThreadDoc =>
+    thread !== null && thread.userId === userId && !thread.deleted && thread.deletingAt === undefined && !isThreadLocked(thread) && thread.isTemporary !== true;
+
+/** Lunora's answer for a search index whose backfill has not yet covered the table (`SEARCH_INDEX_BUILDING`, 503). */
+export const isSearchIndexBuilding = (error: unknown): boolean => error instanceof LunoraError && error.code === "SEARCH_INDEX_BUILDING";
+
+/**
+ * The caller's own sent prompts that match `searchQuery`, newest first, at most 50. It reads the typed-words index
+ * (`typed_text_search`, `typedText`: what the person typed, no attached document or page, no quoted line and no app
+ * placeholder) through `typedTextSearch`, which drops every locked thread (no proof is passed), so a locked chat's prompt
+ * never lists. Whole words, and the last word also as the start of a longer one (`dep` finds `deploy`), as the index
+ * matches. Trashed threads, chats deleted for good, temporary chats, other people's threads and goal continuation rounds (typed by nobody) are
+ * dropped too. A guest's note or an outside agent's text sent on never lists: `typedText` leaves those parts out, so a
+ * message holding them beside typed words lists and matches by the typed words alone. A branch copies its rows, so the same prompt
+ * in chats of one branch family (`threadRelationships`) lists once; the same words sent in unrelated chats list once per
+ * chat. A query longer than the search reads is cut to its first characters and words, not refused. `truncated` says a
+ * matching prompt may be missing: the index window was full, or more prompts matched than the list holds. `preparing`
+ * says the index is still being built after a deploy (`isSearchIndexBuilding`), so nothing was searched yet.
+ */
+export const searchSentPrompts = authQuery
+    .input({ searchQuery: v.string().max(MAX_LENGTH.long) })
+    .output(v.object({ preparing: v.optional(v.literal(true)), prompts: v.array(vSentPrompt), truncated: v.boolean() }))
+    .query(async ({ args: { searchQuery }, ctx: context }) => {
+        const { userId } = context.user;
+        const text = capSearchTerms(searchQuery.trim().slice(0, MAX_LENGTH.short).trim());
+        const terms = queryTerms(text);
+
+        if (terms.length === 0) {
+            context.log.event("chat.search_sent_prompts", { listed: 0, truncated: false, widened: false });
+
+            return { prompts: [], truncated: false };
+        }
+
+        // The index already holds only typed words; this keeps a hit only when they match as the query reads them.
+        const typedHits = (hits: ReadonlyArray<TypedPromptRow>) =>
+            hits.flatMap((message) => {
+                const prompt = sentPromptOf(message);
+
+                return prompt !== undefined && matchesQueryTerms(prompt.typed, terms) ? [{ ...prompt, message }] : [];
+            });
+        // Kept across both windows, so widening looks up only the threads the first window did not reach.
+        const threads = new Map<string, ThreadDoc | null>();
+        const roots = new Map<string, string>();
+        let lineageReads = 0;
+
+        // The chat a thread was first branched from (itself when it is no branch). A sub-agent's chat copies no prompts, so its
+        // link is not followed. Read only for a prompt the list may show whose words and send time another thread shares,
+        // and at most `SENT_PROMPT_LINEAGE_READS` times per search.
+        const lineageRoot = async (threadId: string): Promise<string> => {
+            const walked: string[] = [];
+            let current = threadId;
+
+            for (let step = 0; step < SENT_PROMPT_LINEAGE_DEPTH; step += 1) {
+                const known = roots.get(current);
+
+                if (known !== undefined) {
+                    current = known;
+                    break;
+                }
+
+                if (lineageReads >= SENT_PROMPT_LINEAGE_READS) {
+                    // Not cached: the walk stopped for the budget, not at a root.
+                    return threadId;
+                }
+
+                walked.push(current);
+                lineageReads += 1;
+
+                const [link] = await context.db
+                    .query("threadRelationships")
+                    .withIndex("by_thread", (q) => q.eq("threadId", current as Id<"threads">))
+                    .take(1);
+
+                // A side chat is its own chat: its prompts are not a copy of the parent's family to deduplicate against.
+                if (!link || link.branchType === "subagent" || link.branchType === "side" || (link.userId ?? userId) !== userId) {
+                    break;
+                }
+
+                current = link.parentThreadId;
+            }
+
+            for (const id of walked) {
+                roots.set(id, current);
+            }
+
+            return current;
+        };
+
+        // Every prompt one index window gives, after all the filters below.
+        const collect = async (limit: number) => {
+            const { filled, messages } = await context.runQuery(internal.agent.messages.typedTextSearch, { limit, text, userId });
+            const sent = typedHits(messages);
+            const unseen = [...new Set(sent.map(({ message }) => message.threadId))].filter((threadId) => !threads.has(threadId));
+
+            // Each lookup is a nested query and Lunora caps how many run at once, so they go in small batches. A failed lookup
+            // is not caught: a missing thread already reads as null, and swallowing an error would drop its prompts unseen.
+            for (let start = 0; start < unseen.length; start += SENT_PROMPT_LOOKUP_BATCH) {
+                const batch = unseen.slice(start, start + SENT_PROMPT_LOOKUP_BATCH);
+                const found = await Promise.all(
+                    batch.map((threadId) => context.runQuery(internal.agent.threads.getThreadInternal, { threadId: threadId as Id<"threads"> })),
+                );
+
+                for (const [offset, threadId] of batch.entries()) {
+                    threads.set(threadId, found[offset] ?? null);
+                }
+            }
+
+            const sentAt = (message: TypedPromptRow): number => message.createdAt ?? message._creationTime;
+            const copyKey = (message: TypedPromptRow, typed: string) => `${String(sentAt(message))}\u{0}${typed}`;
+            const listed = sent
+                .filter(({ message }) => listsSentPrompts(threads.get(message.threadId) ?? null, userId))
+                .toSorted(
+                    (a, b) =>
+                        sentAt(b.message) - sentAt(a.message) ||
+                        b.message._creationTime - a.message._creationTime ||
+                        a.message.threadId.localeCompare(b.message.threadId) ||
+                        b.message.order - a.message.order ||
+                        b.message.stepOrder - a.message.stepOrder ||
+                        String(a.message._id).localeCompare(String(b.message._id)),
+                );
+            // A branch copies its rows with the same text and send time: only a thread whose prompt shares its key is walked.
+            const threadsByKey = new Map<string, Set<string>>();
+
+            for (const { message, typed } of listed) {
+                const key = copyKey(message, typed);
+                const group = threadsByKey.get(key) ?? new Set<string>();
+
+                group.add(message.threadId);
+                threadsByKey.set(key, group);
+            }
+
+            // One prompt per branch family, listed from its newest copy. Newest first, and only until one past the list's
+            // limit is known, so no lineage is read for a prompt the list would not show.
+            const seen = new Set<string>();
+            const distinct: typeof listed = [];
+
+            for (const entry of listed) {
+                if (distinct.length > SENT_PROMPT_LIMIT) {
+                    break;
+                }
+
+                const key = copyKey(entry.message, entry.typed);
+                const family = (threadsByKey.get(key)?.size ?? 0) > 1 ? await lineageRoot(entry.message.threadId) : entry.message.threadId;
+                const familyKey = `${family}\u{0}${key}`;
+
+                if (!seen.has(familyKey)) {
+                    seen.add(familyKey);
+                    distinct.push(entry);
+                }
+            }
+
+            const prompts = distinct.slice(0, SENT_PROMPT_LIMIT).map(({ draftFrom, message, typed }) => {
+                return {
+                    createdAt: message.createdAt,
+                    ...(draftFrom !== undefined && { draftFrom }),
+                    messageId: message._id as Id<"messages">,
+                    text: typed,
+                    threadId: message.threadId,
+                    threadTitle: threads.get(message.threadId)?.title ?? DEFAULT_THREAD_TITLE,
+                };
+            });
+
+            return { cut: distinct.length > SENT_PROMPT_LIMIT, filled, prompts };
+        };
+
+        try {
+            let { cut, filled, prompts } = await collect(SENT_PROMPT_WINDOW);
+            const widened = filled && prompts.length < SENT_PROMPT_LIMIT;
+
+            // Branch copies and trashed or temporary chats can take the first window; a common word whose first window already
+            // gave a full list stops there.
+            if (widened) {
+                ({ cut, filled, prompts } = await collect(SENT_PROMPT_WINDOW_MAX));
+            }
+
+            context.log.event("chat.search_sent_prompts", { listed: prompts.length, truncated: filled || cut, widened });
+
+            return { prompts, truncated: filled || cut };
+        } catch (error) {
+            // After a deploy that adds `typed_text_search`, Lunora refuses the index until its backfill covers the existing
+            // messages. That is "not ready yet", not a failure and not "no match": the composer says so and the person retries.
+            if (isSearchIndexBuilding(error)) {
+                context.log.event("chat.search_sent_prompts", { listed: 0, preparing: true, truncated: false, widened: false });
+
+                return { preparing: true as const, prompts: [], truncated: false };
+            }
+
+            throw error;
+        }
+    });
+
+/**
+ * A prompt the search listed, as it reads now: its typed words (`typedText`, kept current by an edit) and its not-typed
+ * mark, as {@link searchSentPrompts} would list them, or `null` when it may no longer go in the draft: not the caller's
+ * own sent prompt, no typed words left, or a chat that is trashed, deleted for good, locked or temporary. The composer puts this in the
+ * draft, never the list's copy, which an edit since the search may have changed. It reads that one prompt rather than
+ * running the search again: a prompt pushed past the search's 50 by newer matches is still available.
+ */
+export const currentSentPrompt = authQuery
+    .input({ messageId: v.id("messages") })
+    .output(v.union(v.object({ draftFrom: v.optional(vDraftFrom), text: v.string() }), v.null()))
+    .query(async ({ args: { messageId }, ctx: context }) => {
+        const { userId } = context.user;
+        const message = await context.runQuery(internal.agent.messages.typedPromptRow, { messageId });
+        // No `typedText` is a row the typed-words index does not hold (`sentPromptOf`), so the search never lists it.
+        const prompt = message && message.userId === userId ? sentPromptOf(message) : undefined;
+        const thread =
+            message && prompt !== undefined
+                ? await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: message.threadId as Id<"threads"> })
+                : null;
+        const available = prompt !== undefined && listsSentPrompts(thread, userId);
+
+        context.log.event("chat.current_sent_prompt", { available });
+
+        return available ? { ...(prompt.draftFrom !== undefined && { draftFrom: prompt.draftFrom }), text: prompt.typed } : null;
+    });
+
 /**
  * Shared rate-limit check used by all prompt-optimizer actions.
  * Reuses the existing `chat/promptImprovement` family so the per-user budget
@@ -3514,8 +3993,9 @@ export const getFullThreadForExport = authQuery
             ? await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: threadRelationship.parentThreadId as Id<"threads"> })
             : null;
 
-        // A locked parent is not exported: the proof covers this thread only.
-        if (threadRelationship && parentThread?.userId === userId && !isThreadLocked(parentThread)) {
+        // A locked parent is not exported: the proof covers this thread only. A side chat already holds its own copy of the
+        // parent's settled history (`side-chat.ts`), so its parent is not prefixed again.
+        if (threadRelationship && threadRelationship.branchType !== "side" && parentThread?.userId === userId && !isThreadLocked(parentThread)) {
             const parentMessages = await agent.listMessages(context, {
                 paginationOpts: { cursor: null, numItems: 10_000 },
                 threadId: threadRelationship.parentThreadId,
@@ -3551,7 +4031,8 @@ export const getFullThreadForExport = authQuery
             allMessages = messages.page;
         }
 
-        return { messages: allMessages, thread };
+        // Derived data is not exported: the palette-search vector ids (`agent/thread-search.ts`) are rebuilt from the text.
+        return { messages: allMessages, thread: withoutSearchVectors(thread) };
     });
 
 export const branchThread = authAction
@@ -3592,11 +4073,14 @@ export const branchThread = authAction
             throw new LunoraError("CONFLICT", "This thread runs on a paired computer, so it cannot be branched.");
         }
 
-        const { language, model, organizationId } = parentThread;
+        const { language, model } = parentThread;
 
         if (!model) {
             throw new LunoraError("BAD_REQUEST", "Parent thread is missing model");
         }
+
+        // A branch is a lasting chat: one taken from a temporary chat started in an organization is placed as saving it would be.
+        const placement = await context.runQuery(internal.agent.threads.lastingChatPlacement, { threadId: threadId as Id<"threads"> });
 
         // Resolved along the ACTIVE path: a branched thread also stores
         // off-path siblings, which a raw row index would count.
@@ -3614,8 +4098,8 @@ export const branchThread = authAction
         // Create the new thread
         const newThread = await context.runMutation(internal.agent.threads.createThread, {
             language,
+            ...placement,
             model,
-            organizationId,
             title: branchName || "",
             userId,
         });
@@ -3734,6 +4218,8 @@ export const softDeleteThread = authMutation
         threadId: v.id("threads"),
     })
     .mutation(async ({ args: { threadId }, ctx: context }) => {
+        refuseImpersonation(context.user.impersonatedBy, "A chat cannot be moved to the trash");
+
         const { userId } = context.user;
         const thread = await context.runQuery(internal.agent.threads.getThreadInternal, {
             threadId: threadId as Id<"threads">,
@@ -3741,6 +4227,11 @@ export const softDeleteThread = authMutation
 
         if (!thread || thread.userId !== userId) {
             throwForbidden("Not allowed");
+        }
+
+        // A suggestion for this chat is being sent to a model: the delete waits for it, as a lock does (`agent/thread-lock.ts`).
+        if (await context.runQuery(internal.agent.followup_suggestions.followupInFlight, { threadId })) {
+            throw new LunoraError("CONFLICT", "A suggestion is being generated for this chat. Try again in a moment.");
         }
 
         await context.runMutation(internal.agent.threads.softDeleteThread, {
@@ -3774,8 +4265,9 @@ export const hardDeleteThread = internalMutation
         // Get thread data before deletion for audit history
         const threadBeforeDelete = await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: threadId as Id<"threads"> });
 
-        await context.runMutation(internal.chat.functions.deleteThreadRelationship, { threadId });
+        // The thread's pins and the collaborator routes that name it go with the chain, one batch per pass (`agent/threads.ts`).
         await context.runMutation(internal.agent.threads.deleteAllForThreadIdAsync, { threadId: threadId as Id<"threads"> });
+        await context.runMutation(internal.chat.functions.deleteThreadRelationship, { threadId });
         await context.runMutation(internal.acp.functions.deleteSessionsOfThread, { threadId });
 
         // Record audit history for hard delete
@@ -3797,12 +4289,14 @@ export const hardDeleteThread = internalMutation
         return null;
     });
 
-export const undoDeleteThread = authMutation
+export const undoDeleteThread = authAction
     .use(rateLimit("chat/update"))
     .input({
         threadId: v.id("threads"),
     })
-    .mutation(async ({ args: { threadId }, ctx: context }) => {
+    .action(async ({ args: { threadId }, ctx: context }) => {
+        refuseImpersonation(context.user.impersonatedBy, "A chat cannot be restored from the trash");
+
         const { userId } = context.user;
         const thread = await context.runQuery(internal.agent.threads.getThreadInternal, {
             threadId: threadId as Id<"threads">,
@@ -3812,27 +4306,32 @@ export const undoDeleteThread = authMutation
             throwForbidden("Not allowed");
         }
 
-        await context.runMutation(internal.agent.threads.restoreThread, {
+        // The trashed chat's leftover events go first, one batch per `runMutation`. This is an action, so each call is its own
+        // transaction and the batches do not share a budget. Restore then refuses while any events remain (`agent/threads.ts`).
+        while (!(await context.runMutation(internal.public_api.events.drainTrashedThreadEvents, { threadId, userId }))) {
+            // Each call removes up to one batch; the loop ends once none are left.
+        }
+
+        const restore = await context.runMutation(internal.agent.threads.restoreThread, {
             threadId: threadId as Id<"threads">,
         });
 
-        // Record audit history for restore
-        const restoredThread = await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: threadId as Id<"threads"> });
-
-        if (restoredThread) {
+        // Only the call that changed the chat from trashed to live records the restore: an overlapping undo finds it live already. The
+        // history's old state is the row that call read, not this action's earlier snapshot.
+        if (restore.restored) {
             await context.runMutation(internal.lib.document_history.recordHistory, {
                 attribution: { action: "update", metadata: { restored: true }, source: "manual" },
-                doc: restoredThread,
+                doc: restore.thread,
                 documentId: threadId,
                 isDeleted: false,
-                oldDoc: thread,
-                organizationId: restoredThread.organizationId ?? undefined,
+                oldDoc: restore.before,
+                organizationId: restore.thread.organizationId ?? undefined,
                 tableName: "threads",
                 userId,
             });
         }
 
-        context.log.event("chat.undo_delete_thread", { restored: true });
+        context.log.event("chat.undo_delete_thread", { restored: restore.restored });
     });
 
 // Tag functions removed — replaced by auto-categorization.
@@ -3882,7 +4381,7 @@ export const getBrowserSession = authQuery
  * Returns the most recent actions (up to 50).
  */
 // Projection of `browserActions` rows: `success` is stored as a number and
-// surfaced as a boolean, and the session/user columns are deliberately dropped.
+// surfaced as a boolean, and the session column is deliberately dropped.
 export const getBrowserActions = authQuery
     .input({
         sessionId: v.string().max(MAX_LENGTH.id),
@@ -3898,7 +4397,10 @@ export const getBrowserActions = authQuery
                     v.literal("type"),
                     v.literal("extract"),
                     v.literal("scroll"),
+                    v.literal("login"),
                 ),
+                /** A person in control of the browser did this: the owner, or someone they shared the chat with; absent: the agent. */
+                actor: v.optional(v.union(v.literal("collaborator"), v.literal("owner"))),
                 durationMs: v.optional(v.number()),
                 errorMessage: v.optional(v.string()),
                 success: v.boolean(),
@@ -3927,6 +4429,7 @@ export const getBrowserActions = authQuery
             return {
                 _id: a._id,
                 action: a.action,
+                actor: a.actor,
                 durationMs: a.durationMs,
                 errorMessage: a.errorMessage,
                 success: a.success === 1,
@@ -3991,6 +4494,32 @@ export const updateBrowserSettings = authMutation
             blocklistCount: browserSettings.domainBlocklist?.length ?? 0,
             enabledSet: browserSettings.enabled !== undefined,
         });
+    });
+
+/**
+ * How the agent's browser clicks: "page" (the default), "pointer" (real clicks for ordinary targets), or "all" (real clicks after
+ * a check). Server-written, like the commit identity: the setter is the only writer of `browserClickMode`.
+ */
+export const setBrowserClickMode = authMutation
+    .use(rateLimit("chat/update"))
+    .input({ mode: v.union(v.literal("page"), v.literal("pointer"), v.literal("all")) })
+    .output(v.null())
+    .mutation(async ({ args: { mode }, ctx: context }) => {
+        // A real-click mode lets a page change an ordinary button into a purchase unseen: an admin acting as the user may not turn it on.
+        // Going back to "page" only adds protection, so it stays allowed.
+        if (mode !== "page") {
+            refuseImpersonation(context.user.impersonatedBy, "The browser click mode cannot be made real while impersonating");
+        }
+
+        const prefs = await context.db
+            .query("aiUserPreferences")
+            .withIndex("by_userId", (q) => q.eq("userId", context.user.userId))
+            .first();
+
+        await saveAiUserPreferences(context.db, prefs, context.user.userId, { browserClickMode: mode }, context.user.activeOrganization?.id ?? null);
+        context.log.event("chat.set_browser_click_mode", { mode });
+
+        return null;
     });
 
 /**
@@ -4329,16 +4858,29 @@ export const getMessageRateLimit = optionalAuthQuery
  */
 export const getCachedFollowupSuggestions = authQuery
     .input({
+        // The reply on screen: its own row is read, so a branch the person switched back to still shows its suggestions.
+        lastMessageId: v.optional(v.string().max(MAX_LENGTH.id)),
         threadId: v.id("threads"),
         unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
     })
     .output(v.object({ lastMessageId: v.optional(v.string()), suggestions: v.array(v.string()) }))
-    .query(async ({ args: { threadId, unlockProof }, ctx: context }) => {
+    .query(async ({ args: { lastMessageId, threadId, unlockProof }, ctx: context }) => {
         const { userId } = context.user;
 
         throwUnlessGranted(await threadGateOutcome(context, { level: "read", threadId, unlockProof, userId }), "Access denied to this thread");
 
+        // The owner's setting governs a shared thread: suggestions made while it was on are not shown once it is turned off.
+        const thread = await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: threadId as Id<"threads"> });
+        const ownerGate = thread?.userId
+            ? await context.runQuery(internal.agent.followup_suggestions.getFollowupSuggestionGate, { userId: thread.userId })
+            : null;
+
+        if (!ownerGate?.enabled) {
+            return { suggestions: [] };
+        }
+
         const cached = await context.runQuery(internal.agent.followup_suggestions.getCachedFollowupSuggestions, {
+            lastMessageId,
             threadId,
         });
 
@@ -4353,105 +4895,198 @@ export const getCachedFollowupSuggestions = authQuery
     });
 
 /**
- * Action to generate follow-up suggestions for a thread.
- * Can be called from the frontend to get suggestions after a message.
+ * The generator is the only thing that pays for a follow-up suggestion: the run that finished a reply schedules it once, and the
+ * composer reads the cache (`getCachedFollowupSuggestions`) live. There is no client-triggered generation to race it.
  */
-export const getFollowupSuggestions = authAction
-    // An LLM call per invocation; it had no limit at all.
-    .use(rateLimit("chat/followups"))
+/** Pages of messages read for one reply's turn, so a very long tool turn cannot make the job read without end. */
+const MAX_TURN_PAGES = 20;
+
+/** The model call's deadline is the claim's life left at its start, measured from when the claim was taken. */
+const modelBudgetMs = (claimedAt: number): number => claimedAt + FOLLOWUP_DISPATCH_TTL_MS / 2 - Date.now();
+
+/** A call with less budget than this cannot finish, so it is not started. */
+const MIN_MODEL_BUDGET_MS = 10 * 1000;
+
+/** The rows on a branched thread's active path, newest first: the rows the composer shows (see `activePathIds`). */
+const readFollowupPath = async (context: Pick<ActionContext, "runQuery">, threadId: string, leafId: string) => {
+    const messageIds = await context.runQuery(internal.agent.followup_suggestions.activePathIds, { leafId, threadId });
+
+    if (messageIds.length === 0) {
+        return [];
+    }
+
+    const rows = await context.runQuery(internal.agent.messages.getMessagesByIdsUnfiltered, { messageIds: messageIds as Id<"messages">[] });
+
+    return rows.filter((row): row is NonNullable<typeof row> => row !== null);
+};
+
+/**
+ * The cache write's retry policy: unbounded, with backoff capped at five minutes, so a reply never loses its suggestion to a run of
+ * failed writes. Each write is idempotent (a refused write returns quietly, and the unit is taken only when the write landed).
+ */
+const FOLLOWUP_CACHE_RETRY = { backoff: "exponential", baseMs: 5000, forever: true, maxMs: 300_000 } as const;
+
+/**
+ * The write of a reply's suggestions, and its Text unit, when the job's first write failed. A write that throws is retried with
+ * {@link FOLLOWUP_CACHE_RETRY}. The unit is taken only when the write landed: a refused write (a newer reply) takes none.
+ * No model call is made here.
+ */
+export const retryFollowupCache = internalAction
     .input({
-        threadId: v.id("threads"),
-        unlockProof: v.optional(v.string().max(MAX_LENGTH.short)),
+        chargedUserId: v.string().max(MAX_LENGTH.id),
+        claimedAt: v.number(),
+        lastMessageId: v.string().max(MAX_LENGTH.id),
+        leafId: v.optional(v.string().max(MAX_LENGTH.id)),
+        newestId: v.optional(v.string().max(MAX_LENGTH.id)),
+        order: v.number(),
+        organizationId: v.optional(v.string().max(MAX_LENGTH.id)),
+        pathIds: v.optional(v.array(v.string().max(MAX_LENGTH.id))),
+        replyAt: v.number(),
+        requestId: v.string().max(MAX_LENGTH.long),
+        resetOrder: v.optional(v.number()),
+        shown: v.optional(v.object({ leafId: v.optional(v.string()), newestId: v.string(), resetOrder: v.optional(v.number()) })),
+        suggestions: v.array(v.string().max(MAX_LENGTH.long)),
+        threadId: v.string().max(MAX_LENGTH.id),
     })
-    .output(v.object({ suggestions: v.array(v.string()) }))
-    .action(async ({ args: { threadId, unlockProof }, ctx: context }) => {
-        const { userId } = context.user;
+    .action(async ({ args, ctx }) => {
+        const { chargedUserId, claimedAt, leafId, newestId, organizationId, requestId, resetOrder, ...write } = args;
 
-        const gateResult = await context.runQuery(internal.chat.functions.gateThreadAction, { level: "read", threadId, unlockProof, userId });
-
-        throwUnlessGranted(gateResult.outcome, "Access denied to this thread");
-
-        // The suggestions come from a cloud model, which a host-run thread's messages must never reach. The
-        // client asks after every reply, so this answers with none instead of an error.
-        if (gateResult.hostRun) {
-            return { suggestions: [] };
-        }
-
-        const threadData = await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: threadId as Id<"threads"> });
-
-        const threadLanguage = threadData?.language;
-
-        const { language: userLanguage, location, timezone } = await context.runQuery(internal.auth.functions.getUserPreferencesQuery, { userId });
-        const language = threadLanguage || userLanguage;
-
-        // The messages are the thread owner's, so the owner's filters pick the model, not the (possibly collaborating) caller's.
-        const background = await resolveBackgroundModel(context, threadData?.userId ?? userId, DEFAULT_FOLLOWUP_SUGGESTIONS_MODEL as string, userId, true);
-
-        // The model filters allow no background model: no suggestions, as for a host-run thread.
-        if (!background) {
-            return { suggestions: [] };
-        }
-
-        const agent = await getAgentForUser(context, userId, background.model, language, background.modelFilterRules, background.billedUserId);
-
-        const messagesResult = await agent.listMessages(context, {
-            paginationOpts: { cursor: null, numItems: 10 },
-            threadId,
-            // The gate above admitted this proof: without it a locked chat has no turns to suggest from.
-            unlockProof,
+        // The reply's claim is renewed before each attempt, so no second model call can start while this write is still outstanding.
+        // If the claim is no longer this run's (it lapsed and another run took the reply), this write is dropped: the newer run owns it.
+        const stillOurs = await ctx.runMutation(internal.agent.followup_suggestions.holdFollowupClaim, {
+            claimedAt,
+            lastMessageId: write.lastMessageId,
+            threadId: write.threadId,
+            userId: chargedUserId,
         });
 
-        // A context reset (`/clear`) ends the context follow-ups are made from: rows before it are not read.
-        const contextReset = await context.runQuery(internal.agent.context_reset_read.getContextReset, { threadId: threadId as Id<"threads"> });
-        const filteredMessageDocuments = rowsAfterContextReset(messagesResult.page || [], contextReset).filter((messageDocument) => {
-            const role = messageDocument.message?.role;
+        if (!stillOurs) {
+            return;
+        }
 
-            return role === "user" || role === "assistant";
-        });
+        // A suggestion is written only while its reply is still the one the composer shows: a `/clear` since the job began, a branch
+        // switch, or a deletion drops it (the claim goes, and no unit is taken). A clear always lands, so it is never dropped.
+        if (write.suggestions.length > 0) {
+            const [thread, reset, shownNewest] = await Promise.all([
+                ctx.runQuery(internal.agent.threads.getThreadInternal, { threadId: write.threadId as Id<"threads"> }),
+                ctx.runQuery(internal.agent.context_reset_read.getContextReset, { threadId: write.threadId as Id<"threads"> }),
+                // The newest row the composer shows, not just the leaf: a newer message in a thread without a leaf supersedes the reply too.
+                ctx.runQuery(internal.agent.followup_suggestions.newestShownRowId, { leafId, threadId: write.threadId }),
+            ]);
+            const fresh =
+                thread !== null &&
+                thread !== undefined &&
+                !thread.deletedAt &&
+                thread.deletingAt === undefined &&
+                (thread.activeLeafMessageId ?? undefined) === leafId &&
+                reset?.order === resetOrder &&
+                shownNewest === newestId;
 
-        // Messages are returned in descending order (newest first), so the first element is the latest
-        const lastMessageId = filteredMessageDocuments.length > 0 ? (filteredMessageDocuments[0]?._id ?? null) : null;
+            if (!fresh) {
+                chatLogger.debug(`[retryFollowupCache] The reply is no longer the one shown, dropping its suggestions: ${write.threadId}`);
+                await ctx.runMutation(internal.agent.followup_suggestions.releaseFollowupSuggestions, {
+                    claimedAt,
+                    lastMessageId: write.lastMessageId,
+                    threadId: write.threadId,
+                    userId: chargedUserId,
+                });
 
-        if (lastMessageId) {
-            const cached = await context.runQuery(internal.agent.followup_suggestions.getCachedFollowupSuggestions, {
-                threadId,
-            });
-
-            if (cached && cached.lastMessageId === lastMessageId) {
-                context.log.event("chat.get_followup_suggestions", { cacheHit: true, suggestionCount: cached.suggestions.length });
-
-                return {
-                    suggestions: cached.suggestions,
-                };
+                return;
             }
         }
 
-        const modelMessages = docsToModelMessages(filteredMessageDocuments);
+        const written = await ctx.runMutation(internal.agent.followup_suggestions.cacheFollowupSuggestions, write);
 
-        const output = await generateFollowupSuggestionsInternal(modelMessages, agent.options.languageModel as LanguageModel, language, timezone, location);
-
-        if (lastMessageId) {
-            await context.runMutation(internal.agent.followup_suggestions.cacheFollowupSuggestions, {
-                lastMessageId,
-                suggestions: output.suggestions,
-                threadId,
+        // Refused (a newer reply's suggestions are stored): the renewed claim goes, as the generator's does, so a later run is not blocked.
+        // A write that threw keeps its claim instead, for the scheduled retry.
+        if (!written) {
+            await ctx.runMutation(internal.agent.followup_suggestions.releaseFollowupSuggestions, {
+                claimedAt,
+                lastMessageId: write.lastMessageId,
+                threadId: write.threadId,
+                userId: chargedUserId,
             });
+
+            return;
         }
 
-        context.log.event("chat.get_followup_suggestions", { cacheHit: false, suggestionCount: output.suggestions.length });
+        // A clear takes no unit: it lands, and the reply's claim is given back so a later run may ask again.
+        if (write.suggestions.length === 0) {
+            await ctx.runMutation(internal.agent.followup_suggestions.releaseFollowupSuggestions, {
+                claimedAt,
+                lastMessageId: write.lastMessageId,
+                threadId: write.threadId,
+                userId: chargedUserId,
+            });
 
-        return {
-            suggestions: output.suggestions,
-        };
+            return;
+        }
+
+        // The unit is taken on the charged user's own shard, where their message quota lives (`/chat/start` charges there too).
+        let charged = false;
+
+        try {
+            charged = await callOnShard(
+                internal.chat.daily_charge.chargeDailyUnit,
+                { kind: "Suggestion", organizationId, requestId, userId: chargedUserId },
+                { shardKey: chargedUserId },
+            );
+        } catch (chargeError) {
+            chatLogger.error(`[retryFollowupCache] The Text unit could not be taken: ${write.threadId}`, chargeError);
+        }
+
+        if (charged) {
+            const mark = { lastMessageId: write.lastMessageId, threadId: write.threadId };
+
+            try {
+                await ctx.runMutation(internal.agent.followup_suggestions.markFollowupCharged, mark);
+            } catch (markError) {
+                // Idempotent: the scheduler retries the mark, so the paid suggestion is shown without another unit or model call.
+                chatLogger.error(`[retryFollowupCache] The charged mark failed, retrying it: ${write.threadId}`, markError);
+                await runAfterWithRetry(ctx.scheduler, 0, internal.agent.followup_suggestions.markFollowupCharged, mark, FOLLOWUP_CACHE_RETRY);
+            }
+        }
+
+        // No unit, no suggestion: the written suggestions are cleared for this reply (the clear is retried by the scheduler if it cannot land).
+        if (!charged) {
+            await ctx.runMutation(internal.agent.followup_suggestions.cacheFollowupSuggestions, { ...write, suggestions: [] });
+            await ctx.runMutation(internal.agent.followup_suggestions.releaseFollowupSuggestions, {
+                claimedAt,
+                lastMessageId: write.lastMessageId,
+                threadId: write.threadId,
+                userId: chargedUserId,
+            });
+        }
     });
 
 export const generateFollowupSuggestionsForThread = internalAction
     .input({
+        // The author the newest reply's row carries, when it is not `userId`: an approved reply's final row is saved by the owner's
+        // continuation even when a collaborator started the run. Unset: `userId` wrote it.
+        replyUserId: v.optional(v.string().max(MAX_LENGTH.id)),
+        // The run's own actor: the actor gate, billing and the model's filters.
         threadId: v.string(),
         userId: v.string(),
     })
-    .action(async ({ args: { threadId, userId }, ctx: context }) => {
+    .action(async ({ args: { replyUserId, threadId, userId }, ctx: context }) => {
         chatLogger.debug(`[generateFollowupSuggestionsForThread] Starting`, { threadId, userId });
+
+        // The reply's paid claim, once taken. A failure before its cache lands gives the claim back (see the catch).
+        let paid: { cached: boolean; claimedAt: number; lastMessageId: string } | null = null;
+
+        // Gives the reply's paid claim back, at most once per run: a run that cached, or that already gave it back, does not again.
+        const giveBackPaidClaim = async (): Promise<void> => {
+            if (paid === null || paid.cached) {
+                return;
+            }
+
+            const { claimedAt, lastMessageId } = paid;
+
+            // Cleared only once the release has landed: a release that throws leaves `paid` set, so the caller's cleanup can try again.
+            // The release is fenced by `claimedAt`, so a repeat cannot free a claim a later run has taken.
+            await context.runMutation(internal.agent.followup_suggestions.releaseFollowupSuggestions, { claimedAt, lastMessageId, threadId, userId });
+            paid = null;
+        };
 
         try {
             const threadData = await context.runQuery(internal.agent.threads.getThreadInternal, {
@@ -4464,8 +5099,29 @@ export const generateFollowupSuggestionsForThread = internalAction
                 return;
             }
 
-            // Follow-ups are generated from the messages, so a locked chat gets none.
-            if (isThreadLocked(threadData)) {
+            // Follow-ups are generated from the messages, so a locked chat gets none. A host-run thread's messages must never
+            // reach a cloud model, and a guest or a user who turned the setting off costs no call.
+            if (isThreadLocked(threadData) || isHostRunThread(threadData)) {
+                return;
+            }
+
+            // Media threads keep their prompts out of the chat, so there is no next prompt to suggest and nothing to charge for one.
+            if (threadData.mode !== undefined && threadData.mode !== "text") {
+                return;
+            }
+
+            // The owner's setting decides whether the owner's thread gets a suggestion; the run's own guest status decides whether this run pays.
+            const ownerUserId = threadData.userId;
+
+            if (!ownerUserId) {
+                return;
+            }
+
+            const ownerGate = await context.runQuery(internal.agent.followup_suggestions.getFollowupSuggestionGate, { userId: ownerUserId });
+            // The actor's own setting lives on the actor's shard (a row lives on its owner's shard), not on the thread's: read it there.
+            const actorGate = await callOnShard(internal.agent.followup_suggestions.getFollowupSuggestionGate, { userId }, { shardKey: userId });
+
+            if (!ownerGate.enabled || actorGate.guest) {
                 return;
             }
 
@@ -4477,7 +5133,16 @@ export const generateFollowupSuggestionsForThread = internalAction
             const language = threadLanguage || userLanguage;
 
             // Scheduled by whoever finished a run, which on a shared thread need not be the owner whose messages these are.
-            const background = await resolveBackgroundModel(context, threadData.userId, DEFAULT_FOLLOWUP_SUGGESTIONS_MODEL as string, userId, true);
+            // The paid fallback, if any, is metered to the paying user: the collaborator who keeps suggestions on, else the owner. Passing
+            // the collaborator when they opted out would bill their plan for a call the owner's quota is charged for.
+            // The prompt carries the collaborator's messages whoever pays, so their own model filters apply to the model too (with the owner's).
+            const background = await resolveBackgroundModel(
+                context,
+                ownerUserId,
+                DEFAULT_FOLLOWUP_SUGGESTIONS_MODEL as string,
+                actorGate.enabled ? userId : ownerUserId,
+                userId,
+            );
 
             if (!background) {
                 return;
@@ -4485,10 +5150,22 @@ export const generateFollowupSuggestionsForThread = internalAction
 
             const agent = await getAgentForUser(context, userId, background.model, language, background.modelFilterRules, background.billedUserId);
 
-            const messagesResult = await agent.listMessages(context, {
-                paginationOpts: { cursor: null, numItems: 10 },
-                threadId,
-            });
+            // A branched thread (a regenerate or an edit) is read along its active path: the rows the composer shows, newest first. A
+            // plain thread reads its raw rows, which are one branch. Either way the turn below is keyed on the reply the composer shows.
+            const messagesResult = (
+                threadData.activeLeafMessageId
+                    ? await (async () => {
+                          // A path read at its cap is not the whole path: the turn may run past it, so it is not complete.
+                          const page = await readFollowupPath(context, threadId, threadData.activeLeafMessageId as string);
+
+                          // The reader fetches one row past the cap: a path of exactly the cap is whole, and only a longer one is not read to its end.
+                          return { continueCursor: null, isDone: page.length <= FOLLOWUP_PATH_LIMIT, page: page.slice(0, FOLLOWUP_PATH_LIMIT) };
+                      })()
+                    : await agent.listMessages(context, {
+                          paginationOpts: { cursor: null, numItems: 10 },
+                          threadId,
+                      })
+            ) as Awaited<ReturnType<typeof agent.listMessages>>;
 
             // A context reset (`/clear`) ends the context follow-ups are made from: rows before it are not read.
             const contextReset = await context.runQuery(internal.agent.context_reset_read.getContextReset, { threadId: threadId as Id<"threads"> });
@@ -4498,14 +5175,76 @@ export const generateFollowupSuggestionsForThread = internalAction
                 return role === "user" || role === "assistant";
             });
 
-            // Messages are returned in descending order (newest first), so the first element is the latest
-            const lastMessageId = filteredMessageDocuments.length > 0 ? (filteredMessageDocuments[0]?._id ?? null) : null;
+            // Messages are returned in descending order (newest first), so the first element is the latest.
+            const newest = filteredMessageDocuments[0];
 
-            if (!lastMessageId) {
+            if (!newest) {
                 chatLogger.warn(`[generateFollowupSuggestionsForThread] No messages found for thread: ${threadId}`);
 
                 return;
             }
+
+            // Only the reply that is still the newest message gets suggestions. A newer user message has its own run, which schedules its own.
+            if (newest.message?.role !== "assistant") {
+                chatLogger.debug(`[generateFollowupSuggestionsForThread] Newest message is not a reply, skipping: ${threadId}`);
+
+                return;
+            }
+
+            // In a shared thread the newest reply may be another member's: that member's own run pays for it, so this run must not
+            // charge the member who scheduled it. Rows that hide their user id are not compared.
+            if (newest.userId !== undefined && newest.userId !== (replyUserId ?? userId)) {
+                chatLogger.debug(`[generateFollowupSuggestionsForThread] The newest reply is another member's, skipping: ${threadId}`);
+
+                return;
+            }
+
+            // The composer keys a reply by the first row of its last group (ui-messages closes a group at a user or system row), so cache under that id.
+            // A long tool turn can run past one page, so the turn's pages are read until the rows of an older turn appear.
+            const turnRows: (typeof newest)[] = [];
+            let turnPage = messagesResult;
+            let turnComplete = false;
+
+            for (let pages = 0; pages < MAX_TURN_PAGES; pages += 1) {
+                let reachedOlderTurn = false;
+
+                const pageRows = turnPage.page || [];
+
+                for (const messageDocument of pageRows) {
+                    if (messageDocument.order < newest.order) {
+                        reachedOlderTurn = true;
+
+                        break;
+                    }
+
+                    turnRows.push(messageDocument);
+                }
+
+                if (reachedOlderTurn || turnPage.isDone) {
+                    turnComplete = true;
+
+                    break;
+                }
+
+                if (!turnPage.continueCursor || pages === MAX_TURN_PAGES - 1) {
+                    break;
+                }
+
+                turnPage = await agent.listMessages(context, {
+                    paginationOpts: { cursor: turnPage.continueCursor, numItems: 10 },
+                    threadId,
+                });
+            }
+
+            // A turn longer than the pages read has no known first row, so the reply the composer shows cannot be keyed. Nothing is paid.
+            if (!turnComplete) {
+                chatLogger.debug(`[generateFollowupSuggestionsForThread] The turn is longer than the rows read, not suggesting: ${threadId}`);
+
+                return;
+            }
+
+            const firstRow = replyAnchorRow(turnRows, newest);
+            const lastMessageId = firstRow._id;
 
             chatLogger.debug(`[generateFollowupSuggestionsForThread] Last message found`, {
                 lastMessageId,
@@ -4515,35 +5254,349 @@ export const generateFollowupSuggestionsForThread = internalAction
 
             // Check cache first
             const cached = await context.runQuery(internal.agent.followup_suggestions.getCachedFollowupSuggestions, {
+                lastMessageId,
                 threadId,
             });
 
-            if (cached && cached.lastMessageId === lastMessageId) {
+            // A cleared row (its unit was refused, or the charge failed) is not a cache hit: the reply may be asked again.
+            if (cached && cached.lastMessageId === lastMessageId && cached.suggestions.length > 0) {
                 chatLogger.debug(`[generateFollowupSuggestionsForThread] Already cached for this message`, { lastMessageId, threadId });
 
                 return;
             }
 
-            chatLogger.debug(`[generateFollowupSuggestionsForThread] Generating new suggestions`, {
-                cachedMessageId: cached?.lastMessageId,
-                hasCached: !!cached,
-                threadId,
-            });
+            // The reply is still the newest of the thread. A newer message has its own run, which pays for its own reply. Checked before
+            // the claim, so a superseded reply never takes its paid claim.
+            const isStillNewest = async (): Promise<boolean> => {
+                // A `/clear` since the job began ends the context this reply belongs to: its prompt is no longer shown, so nothing is paid for it.
+                const currentReset = await context.runQuery(internal.agent.context_reset_read.getContextReset, { threadId: threadId as Id<"threads"> });
 
-            const modelMessages = docsToModelMessages(filteredMessageDocuments);
+                if (currentReset?.order !== contextReset?.order) {
+                    return false;
+                }
 
-            const output = await generateFollowupSuggestionsInternal(modelMessages, agent.options.languageModel as LanguageModel, language, timezone, location);
+                // An edit or regenerate that switched the branch since the job began supersedes this reply: its leaf moved, so the reply
+                // the composer shows is another one. The leaf is read now, not the one captured when the job started.
+                const currentThread = await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: threadId as Id<"threads"> });
 
-            // Cache the suggestions
-            await context.runMutation(internal.agent.followup_suggestions.cacheFollowupSuggestions, {
+                if (currentThread?.activeLeafMessageId !== threadData.activeLeafMessageId) {
+                    return false;
+                }
+
+                // A branched thread's newest reply is on its active path: a row on another branch, stored later, does not supersede it.
+                const listing = threadData.activeLeafMessageId
+                    ? undefined
+                    : await agent.listMessages(context, { paginationOpts: { cursor: null, numItems: 10 }, threadId });
+                const rows = threadData.activeLeafMessageId ? await readFollowupPath(context, threadId, threadData.activeLeafMessageId) : (listing?.page ?? []);
+                // Filtered by the reset read just now, which equals the one read at the start (the check above returns otherwise).
+                // System rows are skipped on purpose: an agent-switch divider does not hide the reply the composer shows.
+                const latest = rowsAfterContextReset(rows, currentReset).find((messageDocument) => {
+                    const role = messageDocument.message?.role;
+
+                    return role === "user" || role === "assistant";
+                });
+
+                return latest?._id === newest._id;
+            };
+
+            if (!(await isStillNewest())) {
+                chatLogger.debug(`[generateFollowupSuggestionsForThread] A newer message arrived before the claim, not suggesting: ${threadId}`);
+
+                return;
+            }
+
+            // One paid call per reply: a second run of this reply, or one on a thread locked since the check above, stops here.
+            const admittedAt = await context.runMutation(internal.agent.followup_suggestions.admitFollowupSuggestions, {
                 lastMessageId,
-                suggestions: output.suggestions,
                 threadId,
+                userId,
             });
 
-            chatLogger.info(`[generateFollowupSuggestionsForThread] Generated ${output.suggestions.length} suggestions for thread: ${threadId}`);
+            if (admittedAt === null) {
+                return;
+            }
+
+            paid = { cached: false, claimedAt: admittedAt, lastMessageId };
+
+            // The chat's dispatch claim is taken after the lock check and held until this request settles, so a lock waits for it.
+            const dispatchedAt = await context.runMutation(internal.agent.followup_suggestions.beginFollowupDispatch, { requestId: lastMessageId, threadId });
+
+            if (dispatchedAt === null) {
+                // The chat was locked since admission: nothing was sent, so the reply's claim is given back.
+                await giveBackPaidClaim();
+
+                return;
+            }
+
+            try {
+                // A newer message landed since the check above: nothing is paid for this reply.
+                if (!(await isStillNewest())) {
+                    await giveBackPaidClaim();
+
+                    return;
+                }
+
+                chatLogger.debug(`[generateFollowupSuggestionsForThread] Generating new suggestions`, {
+                    cachedMessageId: cached?.lastMessageId,
+                    hasCached: !!cached,
+                    threadId,
+                });
+
+                // The charge and the freshness read took part of the claim's life: a call that cannot finish inside what is left is not started.
+                if (modelBudgetMs(dispatchedAt) < MIN_MODEL_BUDGET_MS) {
+                    chatLogger.debug(`[generateFollowupSuggestionsForThread] The claim is too close to lapsing to call the model: ${threadId}`);
+                    await giveBackPaidClaim();
+
+                    return;
+                }
+
+                // The unit the reply would be charged to, found before the model is called: a spent quota does not buy a model call.
+                const chargedUserId = actorGate.enabled ? (background.billedUserId ?? userId) : ownerUserId;
+                // Keys the reply's one Text unit: a retry of a reply already charged finds the unit taken, and is not refused for it.
+                const replyChargeKey = `followup:${threadId}:${lastMessageId}`;
+
+                if (
+                    !(await callOnShard(
+                        internal.chat.daily_charge.dailyUnitAvailable,
+                        {
+                            kind: "Suggestion",
+                            organizationId: threadData.organizationId ?? undefined,
+                            requestId: replyChargeKey,
+                            userId: chargedUserId,
+                        },
+                        { shardKey: chargedUserId },
+                    ))
+                ) {
+                    await giveBackPaidClaim();
+
+                    return;
+                }
+
+                // The model reads the reply's whole turn, its user prompt included, however many pages it spans; the first page's older rows follow.
+                // The rows come newest first, and the model reads a conversation in order: they are reversed here.
+                const modelRows = followupModelRows(
+                    rowsAfterContextReset(turnRows, contextReset).filter(
+                        (messageDocument) => messageDocument.message?.role === "user" || messageDocument.message?.role === "assistant",
+                    ),
+                    filteredMessageDocuments,
+                ).toReversed();
+                // A reply a local browser model wrote stays on the device: it is left out of the history a cloud model is sent.
+                const localRowIds = new Set(
+                    await context.runQuery(internal.agent.followup_suggestions.localBrowserRowIds, {
+                        messageIds: modelRows.map((row) => row._id),
+                        userId: ownerUserId,
+                    }),
+                );
+
+                // A reply the local browser model wrote stays on the device: no cloud model is called for it, and nothing is charged for it.
+                if (localRowIds.has(newest._id)) {
+                    chatLogger.debug(`[generateFollowupSuggestionsForThread] The newest reply is local, not suggesting: ${threadId}`);
+                    await giveBackPaidClaim();
+
+                    return;
+                }
+
+                // A local reply's prompt was on the device too: the user rows of its turn are left out with it.
+                const localTurns = new Set(modelRows.filter((row) => localRowIds.has(row._id)).map((row) => row.order));
+                const modelMessages = docsToModelMessages(
+                    modelRows.filter((row) => !localRowIds.has(row._id) && !(row.message?.role === "user" && localTurns.has(row.order))),
+                );
+
+                // The messages above were read before this point. A thread deleted, or marked for deletion, since then is not sent to a model.
+                // Narrows the window to this read; the delete actions refuse while a suggestion is in flight (`followupInFlight`).
+                const liveThread = await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: threadId as Id<"threads"> });
+
+                if (!liveThread || liveThread.deletedAt !== undefined || liveThread.deletingAt !== undefined) {
+                    await giveBackPaidClaim();
+
+                    return;
+                }
+
+                // A collaborator whose access was removed, or has expired, since the job read the thread is not sent to a model under it.
+                // The lookup returns expired grants too, so a grant counts only while it has not expired.
+                const grant =
+                    userId === ownerUserId
+                        ? undefined
+                        : await context.runQuery(internal.agent.sharing.getThreadAccess, { threadId: threadId as Id<"threads">, userId });
+
+                if (userId !== ownerUserId && (!grant || (grant.expiresAt !== undefined && grant.expiresAt <= Date.now()))) {
+                    chatLogger.debug(`[generateFollowupSuggestionsForThread] The actor's access was removed, not sending: ${threadId}`);
+                    await giveBackPaidClaim();
+
+                    return;
+                }
+
+                const output = await generateFollowupSuggestionsInternal(
+                    modelMessages,
+                    agent.options.languageModel as LanguageModel,
+                    language,
+                    timezone,
+                    location,
+                    modelBudgetMs(dispatchedAt),
+                );
+
+                // A newer message may have landed while the model worked. Its own run suggests for it, so this one must not overwrite that.
+                if (!(await isStillNewest())) {
+                    chatLogger.debug(`[generateFollowupSuggestionsForThread] A newer message arrived, not caching: ${threadId}`);
+                    await giveBackPaidClaim();
+
+                    return;
+                }
+
+                // A blank suggestion shows nothing, so it is neither counted, charged nor cached.
+                const suggestions = output.suggestions.map((suggestion) => suggestion.trim()).filter((suggestion) => suggestion.length > 0);
+
+                // A reply the model gave no usable suggestion for is not paid for: there is nothing to show, so the claim is given back.
+                if (suggestions.length === 0) {
+                    await giveBackPaidClaim();
+
+                    return;
+                }
+
+                // The mutation refuses an older turn, and an older sibling of the same turn, than the reply already cached. The newest-reply
+                // check above is not part of that write, so a reply overtaken in between can still be written; the unit is taken after it.
+                const cacheWrite = {
+                    lastMessageId,
+                    order: newest.order,
+                    // On a branched thread the rows read are the active path: only a stored reply on it can refuse this write.
+                    ...(threadData.activeLeafMessageId && { pathIds: (messagesResult.page || []).map((row) => row._id) }),
+                    replyAt: newest.createdAt ?? newest._creationTime,
+                    // The newest row the job saw, on the leaf it saw: the cache write checks both in its own transaction.
+                    shown: { leafId: threadData.activeLeafMessageId ?? undefined, newestId: newest._id, resetOrder: contextReset?.order },
+                    suggestions,
+                    threadId,
+                };
+
+                let written: boolean;
+
+                try {
+                    written = await context.runMutation(internal.agent.followup_suggestions.cacheFollowupSuggestions, cacheWrite);
+                } catch (cacheError) {
+                    // The suggestions are in hand: the scheduler writes them and takes the unit, with no model call and no second charge.
+                    // The claim stays held for that, so a run does not call the model again for this reply meanwhile.
+                    chatLogger.error(`[generateFollowupSuggestionsForThread] Cache write failed, retrying it: ${threadId}`, cacheError);
+                    await runAfterWithRetry(
+                        context.scheduler,
+                        0,
+                        internal.chat.functions.retryFollowupCache,
+                        {
+                            ...cacheWrite,
+                            // A collaborator who turned suggestions off pays for none: the owner, whose thread this is, is charged instead.
+                            chargedUserId,
+                            claimedAt: paid.claimedAt,
+                            // The reply as it was when the suggestions were made: a retry that finds it changed drops its write.
+                            leafId: threadData.activeLeafMessageId ?? undefined,
+                            newestId: newest._id,
+                            organizationId: threadData.organizationId ?? undefined,
+                            requestId: replyChargeKey,
+                            resetOrder: contextReset?.order,
+                        },
+                        FOLLOWUP_CACHE_RETRY,
+                    );
+                    paid.cached = true;
+
+                    return;
+                }
+
+                // Refused: a newer reply's suggestions are stored, or the thread is gone. Nothing is written and no unit is taken.
+                if (!written) {
+                    chatLogger.debug(`[generateFollowupSuggestionsForThread] The cache refused this reply, not charging: ${threadId}`);
+                    await giveBackPaidClaim();
+
+                    return;
+                }
+
+                // Written, and the claim is kept whatever the charge does. The Text unit is taken now; it is keyed per reply, so a retry is
+                // not charged twice. A refused charge clears the written suggestions (below), so nothing shows without its unit.
+                paid.cached = true;
+
+                // Taken on the charged user's shard (see `retryFollowupCache`); a collaborator's unit is their own, not the owner's bucket there.
+                // A throw counts as refused: the suggestions written above must not stay shown for a unit that was never taken.
+                let charged = false;
+
+                try {
+                    charged = await callOnShard(
+                        internal.chat.daily_charge.chargeDailyUnit,
+                        {
+                            kind: "Suggestion",
+                            organizationId: threadData.organizationId ?? undefined,
+                            requestId: replyChargeKey,
+                            // A collaborator who turned suggestions off pays for none: the owner, whose thread this is, is charged instead.
+                            userId: chargedUserId,
+                        },
+                        { shardKey: chargedUserId },
+                    );
+                } catch (chargeError) {
+                    chatLogger.error(`[generateFollowupSuggestionsForThread] The Text unit could not be taken: ${threadId}`, chargeError);
+                }
+
+                if (charged) {
+                    // The unit is taken, so the suggestions become readable. Until this lands they stay hidden: a run that finds them
+                    // uncharged takes the same unit again, which is a no-op, and marks them.
+                    // A mark that fails is retried by the scheduler (it is idempotent): a paid suggestion must not stay hidden for the claim's hour.
+                    try {
+                        await context.runMutation(internal.agent.followup_suggestions.markFollowupCharged, { lastMessageId, threadId });
+                    } catch (markError) {
+                        chatLogger.error(`[generateFollowupSuggestionsForThread] The charged mark failed, retrying it: ${threadId}`, markError);
+                        await runAfterWithRetry(
+                            context.scheduler,
+                            0,
+                            internal.agent.followup_suggestions.markFollowupCharged,
+                            { lastMessageId, threadId },
+                            FOLLOWUP_CACHE_RETRY,
+                        );
+                    }
+
+                    chatLogger.info(`[generateFollowupSuggestionsForThread] Stored ${suggestions.length} suggestions for thread: ${threadId}`);
+                } else {
+                    // No unit, no suggestion: the write is cleared for this reply (an empty write under the same guard), so nothing is shown
+                    // that was not paid for. Once the clear lands the claim is given back, so a later run may ask again; the availability
+                    // check before the model call keeps a spent quota from costing a call. A clear that cannot land is retried by the scheduler.
+                    chatLogger.warn(`[generateFollowupSuggestionsForThread] The Text unit was refused; clearing the suggestions: ${threadId}`);
+
+                    try {
+                        await context.runMutation(internal.agent.followup_suggestions.cacheFollowupSuggestions, { ...cacheWrite, suggestions: [] });
+                        paid.cached = false;
+                        await giveBackPaidClaim();
+                    } catch (clearError) {
+                        chatLogger.error(`[generateFollowupSuggestionsForThread] The clear could not land, retrying it: ${threadId}`, clearError);
+                        await runAfterWithRetry(
+                            context.scheduler,
+                            0,
+                            internal.chat.functions.retryFollowupCache,
+                            {
+                                ...cacheWrite,
+                                chargedUserId,
+                                claimedAt: paid.claimedAt,
+                                leafId: threadData.activeLeafMessageId ?? undefined,
+                                newestId: newest._id,
+                                organizationId: threadData.organizationId ?? undefined,
+                                requestId: replyChargeKey,
+                                resetOrder: contextReset?.order,
+                                suggestions: [],
+                            },
+                            FOLLOWUP_CACHE_RETRY,
+                        );
+                    }
+                }
+            } finally {
+                // The request has settled, so the chat may be locked again.
+                await context.runMutation(internal.agent.followup_suggestions.endFollowupDispatch, {
+                    claimedAt: dispatchedAt,
+                    requestId: lastMessageId,
+                    threadId,
+                });
+            }
         } catch (error) {
             chatLogger.error(`[generateFollowupSuggestionsForThread] Error generating suggestions:`, error);
+
+            // A paid reply whose cache never landed gives its claim back, so a later run can finish it. The charge is keyed per reply,
+            // so that run is not charged twice.
+            try {
+                await giveBackPaidClaim();
+            } catch (releaseError) {
+                chatLogger.error(`[generateFollowupSuggestionsForThread] Could not give the reply's claim back:`, releaseError);
+            }
         }
     });
 
@@ -4551,10 +5604,14 @@ export const streamAsync = internalAction
     .input({
         customSystemPrompt: v.optional(v.string()),
         enabledFeatures: v.optional(v.array(v.string())),
+        /** The files the edited message attaches: the project's rule files applied by pattern match their names. */
+        fileIds: v.optional(v.array(v.id("chatFiles")).max(MAX_ATTACHED_FILES)),
         /** Set by `runJobOnce` when `/chat/edit` enqueues this; nothing reads it. */
         jobId: v.optional(v.string()),
         messageId: v.string(),
         model: v.string(),
+        /** The edited prompt's not-typed marks (`lib/not-typed-text.ts`): a stateless reply saves its prompt again, marked. */
+        notTyped: v.optional(vNotTypedMarks),
         parentId: v.optional(v.string()),
         prompt: v.optional(v.string()),
         reasoningEffort: v.optional(v.number()),
@@ -4572,7 +5629,7 @@ export const streamAsync = internalAction
             timestamp: streamAsyncStartTime,
         });
 
-        const { customSystemPrompt, messageId, model, prompt, reasoningEffort, statelessMode, threadId } = args;
+        const { customSystemPrompt, messageId, model, notTyped, prompt, reasoningEffort, statelessMode, threadId } = args;
 
         // Get thread to find userId
         const thread = await context.runQuery(internal.agent.threads.getThreadInternal, { threadId: threadId as Id<"threads"> });
@@ -4616,11 +5673,14 @@ export const streamAsync = internalAction
 
         if (appThread?.projectId) {
             // The access `createThread` applied (owner or organization member), not the owner-only read.
-            projectContext =
-                (await context.runQuery(internal.projects.functions.getProjectContextForRun, {
-                    projectId: appThread.projectId as Id<"projects">,
-                    userId,
-                })) ?? undefined;
+            // This run has no tools, so the `auto` files are neither listed nor read.
+            const project = await context.runQuery(internal.projects.functions.getProjectContextForRun, {
+                ...(args.fileIds && args.fileIds.length > 0 && { fileIds: args.fileIds }),
+                projectId: appThread.projectId as Id<"projects">,
+                userId,
+            });
+
+            projectContext = project?.textWithoutInstructions ?? project?.text ?? undefined;
         }
 
         // Get model definition
@@ -4646,7 +5706,7 @@ export const streamAsync = internalAction
         const streamTextArgs: any = Object.keys(providerOptions).length > 0 ? { providerOptions } : {};
 
         if (threadStatelessMode) {
-            streamTextArgs.prompt = prompt;
+            streamTextArgs.prompt = statelessPrompt(prompt ?? "", notTyped ?? {});
         } else {
             streamTextArgs.promptMessageId = messageId;
         }
@@ -4694,6 +5754,13 @@ export const streamAsync = internalAction
 
         // Consume the stream to ensure it completes
         await result.consumeStream();
+
+        // The edit's reply gets its follow-up suggestions here, as any finished reply does: the composer offers the next prompt for it.
+        // The job's own claim and charge are per reply, so a second schedule for the same reply does no second work.
+        // A failed hand-off is logged, not thrown: the edit is saved and its job is already complete, so the job must not fail for it.
+        await context.scheduler.runAfter(0, internal.chat.functions.generateFollowupSuggestionsForThread, { threadId, userId }).catch((error: unknown) => {
+            streamLogger.warn(`[StreamAsync] Could not queue the follow-up suggestions of ${threadId}:`, error);
+        });
 
         context.log.event("chat.stream_async", { model, statelessMode: threadStatelessMode ?? false });
 
@@ -4846,6 +5913,10 @@ export const generateImage = internalAction
         prompt: v.string(),
         /** The prompt this is a reply to. Set by `/chat/media`, so a regenerate becomes a sibling reply (`agent/branch-tree.ts`). */
         promptMessageId: v.optional(v.id("messages")),
+        /** When the request's references were checked (`/chat/media`): a lock or grant change after it refuses the job. */
+        referenceCheckedAt: v.optional(v.number()),
+        /** The picker's id for each reference image, paired by position (`chat/reference-recheck.ts`). */
+        referenceIds: v.optional(v.array(v.string())),
         referenceImages: v.optional(v.array(v.string())),
         seed: v.optional(v.number()),
         threadId: v.string(),
@@ -4875,6 +5946,8 @@ export const generateImage = internalAction
                 numImages: numberImages = 1,
                 prompt,
                 promptMessageId,
+                referenceCheckedAt,
+                referenceIds,
                 referenceImages,
                 seed,
                 threadId,
@@ -4935,7 +6008,38 @@ export const generateImage = internalAction
                 threadId,
             });
 
+            // The attach claims the recheck takes on the chats' owner shards; released once the provider has the references (`finally`).
+            const referenceClaims: ReferenceClaim[] = [];
+            const referenceRequestId = crypto.randomUUID();
+
             try {
+                // Checked again here, after the queue delivered the job: a lock or grant change since the request must not reach the
+                // provider. Only a job that carries reference ids is checked: `/chat/media` sends them with its references and refuses
+                // references without them, while the image tool and the workflows pass their own URLs, which are not picker rows.
+                // What the provider receives: the URLs as sent, or for a checked job the bytes of each file, read after the holds are renewed
+                // (`referenceBytesForProvider`), so no signed URL reaches the provider.
+                let providerReferences = referenceImages;
+
+                if (referenceIds !== undefined) {
+                    const storageKeys =
+                        referenceImages !== undefined && referenceCheckedAt !== undefined
+                            ? await referencesStillHeld(context, {
+                                  claims: referenceClaims,
+                                  referenceIds,
+                                  referenceImages,
+                                  requestedAt: referenceCheckedAt,
+                                  requestId: referenceRequestId,
+                                  userId,
+                              })
+                            : null;
+
+                    if (storageKeys === null || referenceImages === undefined) {
+                        throw new LunoraError("NOT_FOUND", "File not found");
+                    }
+
+                    providerReferences = await referenceBytesForProvider(context.storage, referenceImages, storageKeys);
+                }
+
                 let images: { mimeType?: string; uint8Array: Uint8Array }[] = [];
                 let warnings: any[] | undefined;
                 let providerMetadata: any;
@@ -4945,7 +6049,7 @@ export const generateImage = internalAction
                 // that take refs as inline image content parts, not as provider-
                 // level `image_url`/`image_urls`, so spreading FAL fields there is
                 // a no-op at best and a foot-gun at worst.
-                const referenceImageInput = buildFalReferenceImageInput(modelDefinition, referenceImages);
+                const referenceImageInput = buildFalReferenceImageInput(modelDefinition, providerReferences);
 
                 if (provider === "openrouter") {
                     const baseProviderOptions = {};
@@ -5125,6 +6229,8 @@ export const generateImage = internalAction
 
                 chatLogger.error("[cvx][image_generation] Error generating image:", error);
                 throw new LunoraError("BAD_REQUEST", `Failed to generate image: ${error instanceof Error ? error.message : "Unknown error"}`);
+            } finally {
+                await releaseReferenceClaims(referenceClaims, referenceRequestId);
             }
         },
     );

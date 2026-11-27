@@ -1,0 +1,165 @@
+# @neore/html-to-markdown
+
+HTML to Markdown, forked from [turndown](https://github.com/mixmark-io/turndown) 7.2.5 (MIT, Dom Christie and
+contributors). The fork starts at upstream commit `b86e2b18539fa4922acf7001902255e2ce5bf0b9`. See [NOTICE](./NOTICE)
+for the attributions and [LICENSE](./LICENSE) for the upstream MIT text.
+
+```ts
+import TurndownService from "@neore/html-to-markdown";
+
+const markdown = new TurndownService().turndown("<p>Hello <strong>world</strong></p>");
+// "Hello **world**"
+```
+
+Options and extension points (`addRule`, `use`) are the same as upstream's, with four API differences:
+
+- `TurndownService` must be constructed with `new` (upstream also allowed a call without it).
+- `escape` is an instance property, so overriding `TurndownService.prototype.escape` has no effect.
+- Only own rules of `options.rules` are read, not inherited ones (upstream read inherited enumerable keys too).
+- Built-in rules no longer win over `keep` and `remove`, so `keep("p")` on `<p>Hello world</p>` gives `<p>Hello world</p>`,
+  where upstream gives `Hello world`, and `remove("i")` drops an `<i>` and its content. The order is: the blank rule,
+  rules added with `addRule` (newest first), then `keep`, then `remove`, then the built-in rules. A blank element goes to
+  the blank rule first, even past `addRule` and `keep`, so `keep(["p"])` on `<p></p>a` gives `a`. An `addRule` rule still
+  comes before `keep`, and a tag in both `keep` and `remove` is kept. `remove` does not convert the removed element's
+  children. `keep` does, so a custom `keepReplacement` receives the converted content. The default `keepReplacement`
+  ignores its content, so the children of a kept element are not converted either. With the default, a referenced link
+  inside a kept element leaves no orphan `[1]: x` definition. A custom `keepReplacement` that ignores `content` still
+  converts the children, so `<span><a href="x">l</a></span>` with `linkStyle: "referenced"` and
+  `keepReplacement: (c, n) => n.outerHTML` gives `<span><a href="x">l</a></span>\n\n[1]: x`.
+
+Keeping or removing a structural tag drops its Markdown. The tag is output as HTML, or removed, so no list markers or
+code fences are left:
+
+```ts
+const service = new TurndownService();
+
+service.keep(["li"]);
+service.turndown("<ul><li>a</li><li>b</li></ul>"); // "<li>a</li>\n\n<li>b</li>"
+
+const pre = new TurndownService();
+
+pre.keep(["pre"]);
+pre.turndown("<pre><code>x</code></pre>"); // "<pre><code>x</code></pre>", raw HTML, not a code block
+```
+
+## GitHub Flavored Markdown
+
+`gfm` is a plugin for tables, strikethrough and task list items:
+
+```ts
+import TurndownService, { gfm } from "@neore/html-to-markdown";
+
+new TurndownService().use(gfm).turndown("<table><tr><th>a</th></tr><tr><td><s>1</s></td></tr></table>");
+// "| a |\n| --- |\n| ~~1~~ |"
+```
+
+- A table's first row is its header. A cell that spans columns or rows leaves empty cells, so the cells after it stay
+  under their own headers. A cell spans down to the end of its row group at most. A caption goes above the table.
+- A cell is one line: a line break is a space, a list is its items joined by `; `, a heading is strong text, and every
+  pipe is escaped, inside code too. A table nested in a cell is the text of its cells.
+- A table whose spans would fill more than 100,000 cells is written as its cells' text, a line per row.
+- `<del>`, `<s>` and `<strike>` are `~~text~~`. A checkbox is `[x] ` or `[ ] `.
+- An element that a `remove` filter matches is left out, even where a gfm rule would write it.
+- The table is laid out from the text gfm's own rules keep for each cell and caption. A rule added after `gfm` for
+  `td`, `th` or `caption` takes those elements from it, and the table does not write what that rule returns: its output
+  reaches the row mixed with the other cells', with no place in the grid.
+
+## Paste preset
+
+`paste` is a preset for HTML pasted into a chat composer, with the options it is written for:
+
+```ts
+import TurndownService, { paste, PASTE_OPTIONS } from "@neore/html-to-markdown";
+
+new TurndownService(PASTE_OPTIONS).use(paste).turndown(html);
+```
+
+- It uses the `gfm` plugin, and `PASTE_OPTIONS` turns `safeLinks` on.
+- What the page does not show is left out: an element with `hidden`, `aria-hidden="true"`, an `sr-only` or
+  `visually-hidden` class, or a style whose last valid `display` is `none`, `visibility` is `hidden` or `collapse`, or
+  `content-visibility` is `hidden` (an earlier `!important` declaration wins, and comments are skipped). A closed
+  `<details>` is written as its summary alone, and a `<dialog>` that is not open is left out. So are scripts, styles, media, buttons, selects, text areas, embedded documents and
+  `<svg>`. A checkbox is a task box (`[x] ` or `[ ] `), from the `gfm` rules. The checks apply to the elements inside
+  what is converted, as all rules do: pass the HTML as a string, or a container, not a hidden element itself.
+- An image is written as text only when it draws an emoji (its alt text) or a formula (an image with a `math` class,
+  as inline math). Any other image is dropped: a pasted picture arrives as a file, if at all.
+- A formula with a TeX annotation is written as inline math; without one, its visible text stays.
+- The forms are the ones people type: `- ` and `1. ` with one space, a plain newline for a line break, fenced code,
+  `#` headings, `*` emphasis and `---` rules. A nested item is indented to its parent's text. Blank lines in a list
+  item or a quote end in no spaces (`>` alone in a quote), and a repeated `<br>` keeps its blank line.
+- A `<div>` that holds only inline content is a line: a run of them is not parted by blank lines, and one that holds
+  only a `<br>` is a blank line.
+- Inline code keeps the spaces it holds, at its ends too. Raised and lowered text (`<sup>`, `<sub>`) is written in
+  Unicode's raised and lowered characters when each of its characters has one (`E=mc²`, `H₂O`), and as written
+  otherwise (`12th`).
+- Items are numbered as HTML numbers them, from the list's `start` or an item's `value`. Markdown numbers only in
+  digits and from 0 up, so a lettered or roman list (`type="a"`, `"i"`) and a number below 0 are written as text after
+  a bullet: `- b. item`, `- -1. item`.
+- Google Docs writes a nested item as an item of the same list with a deeper `aria-level`; Word writes a list as
+  paragraphs with `mso-list` styles and hides the marker. Both are written as nested lists, each depth numbered on its
+  own, and a copy that starts at a nested item starts at the left edge. Word's numbers (up to nine digits) are kept,
+  other marker text (`a.`, `1.1.`, `(iv)`) is written after a bullet, and two Word lists side by side stay apart. A list placed straight in a list goes under the item
+  before it, and text placed straight in a list is an item of its own.
+- `<b>` or `<strong>` set back to normal weight is not bold: Google Docs wraps a whole copy in one.
+- Bold, italics and strikethrough set by a style (`font-weight`, `font-style`, `text-decoration`) are written as
+  Markdown on a span, a paragraph, a list item or a table cell, not on a heading. Text set back to normal weight
+  inside bold stays out of the bold: `<b>a <span style="font-weight:normal">b</span> c</b>` is `**a** b **c**`. A
+  block holding a list, a table or a code block keeps no formatting of its own, which could not span them.
+- Formatting on part of a ZWJ emoji sequence (`<b>👩</b>‍👩`) is left off, so the joiner stays beside its emoji.
+- Every `<pre>` is fenced, with or without a `<code>` in it, its text read as the page shows it (a line per `<br>` and
+  per line element, hidden text left out). The language comes from a `language-`, `lang-` or `highlight-` class on
+  the code, the block, or the two elements around it, as GitHub writes it. The fence is longer than any backtick run
+  in the code.
+- Pasted HTML nested more than 500 elements deep (a table and its cell are one level), or so deep around many lines
+  that re-indenting quotes and list items or rebuilding formatting line by line would take more than a budget of work,
+  throws a `RangeError`: paste the plain text instead.
+- The output starts at its first content: blank text before it, such as the spaces in a pasted `<head>`, is left out.
+
+The preset marks the normal-weight runs with the control characters U+0001 and U+0002 while it converts, so it takes
+them out of the input and the output.
+
+The rest of the composer's paste behaviour (sub- and superscripts, work budgets) follows in the next parts.
+
+## Rule lookup
+
+A rule's filter and replacement get a `RuleLookup`. Besides `ruleFor`, `hasRuleFor` and `isRemoved`, it has
+`ruleAfter(rule, node)`: the rule the node would get if `rule` did not match it. A rule that adds to what another rule
+writes, such as the paste preset's formatting set by style, formats the content and passes it on to that rule.
+
+## Status
+
+This is the first step of the fork: a behaviour-preserving TypeScript port, except for `keep` and `remove` on built-in
+tags (see the API differences). Its output matches upstream 7.2.5 on:
+
+- the 147 upstream golden cases, with their per-case options (`test/golden.test.ts`);
+- the upstream API tests, ported (`test/turndown.test.ts`) and the edge-whitespace internals (`test/edge-whitespace.test.ts`);
+- 1,500 seeded random documents in CI (`test/differential.test.ts`). Before the pull request was opened, the same
+  generator also ran 40,000 documents across five seeds, with no differences.
+
+The port also replaces four regular expressions that backtrack super-linearly with linear code: the edge-whitespace
+split, the code-span padding check, the attribute line-break collapse and the trailing-whitespace trim. The
+differential test covers each of them.
+
+## Known limits (fixed in later steps)
+
+- Runtimes without `DOMParser`, such as Node and Workers, have no default parser: tests and the bench pass
+  `@mixmark-io/domino` to `setHTMLParser`. Domino is dropped when the converter moves onto an internal tree.
+- Node's DOM is still mutated during conversion (upstream's design).
+- Reference-style links keep their state on a shared rule object, as upstream does.
+- `<style>`, `<script>`, `<noscript>`, `<template>` and `<title>` emit nothing (a divergence from upstream). Unsafe link
+  destinations are kept unless the `safeLinks` option is on (off by default, as upstream). `display:none` content is not
+  removed.
+
+## Roadmap
+
+1. This port (behaviour-identical), with goldens, a differential test and benchmarks.
+2. An internal tree built from the DOM, DOMParser on the main thread, parse5 only for Node and offline use, domino removed.
+3. Upstream fixes and the known issues above (per-line escaping, `<br>` handling, list `start`/`value`, hidden content,
+   safe hrefs).
+4. GFM: tables, strikethrough and task lists (the `gfm` plugin), then a paste preset (`paste`) with the rules the composer needs.
+5. Use in the composer's paste path, loaded lazily.
+
+## Scripts
+
+- `pnpm test`: unit, golden and differential tests.
+- `pnpm test:bench`: this port against upstream 7.2.5 on the paste fixtures, a 5 MB document and adversarial inputs.

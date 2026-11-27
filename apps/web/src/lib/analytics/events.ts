@@ -118,6 +118,8 @@ export interface MessengerDisconnectedProperties {
 // ── Pins ────────────────────────────────────────────────────────────────────
 export interface MessagePinnedProperties {
     has_note: boolean;
+    /** What was pinned; absent on events sent before image pins existed, which were all message pins. */
+    kind?: "image" | "message";
 }
 
 // ── Chat Import ─────────────────────────────────────────────────────────────
@@ -144,6 +146,24 @@ export interface OnboardingStepCompletedProperties {
 
 export interface OnboardingSkippedProperties {
     at_step: string;
+}
+
+// ── Performance ─────────────────────────────────────────────────────────────
+/** Milliseconds from navigation start, per page load (`load-timing/report-load-timing.ts`). Absent when not measured. */
+export interface PageLoadTimingProperties {
+    /** The composer first painted, before any user input. */
+    composer_visible_ms?: number;
+    fcp_ms?: number;
+    /** Interaction to Next Paint, the slowest interaction's latency, not a time from navigation start. */
+    inp_ms?: number;
+    lcp_ms?: number;
+    /** web-vitals' navigation type: navigate, reload, back-forward, back-forward-cache, prerender, restore. */
+    navigation_type?: string;
+    /** A known route's first path segment only (`chat`, `dashboard`; `other` for any other), never an id. */
+    route_section: string;
+    /** The sidebar thread list first painted rows, before any user input. */
+    sidebar_list_visible_ms?: number;
+    ttfb_ms?: number;
 }
 
 // ── Event map ───────────────────────────────────────────────────────────────
@@ -176,6 +196,7 @@ export interface AnalyticsEventMap {
     onboarding_skipped: OnboardingSkippedProperties;
     onboarding_started: Record<string, never>;
     onboarding_step_completed: OnboardingStepCompletedProperties;
+    page_load_timing: PageLoadTimingProperties;
     settings_changed: SettingsChangedProperties;
     signed_in: SignedInProperties;
     signed_out: Record<string, never>;

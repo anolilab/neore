@@ -1,0 +1,16 @@
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - `__dirname` (vitest.config.ts:8:26). Use `import.meta.dirname` instead
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+ RUN  v5.1.0 /private/tmp/claude-501/-Users-danielbannert--t3-worktrees-neore-add-project-machine-picker/2bc5412d-68f1-4a18-af42-31dbd5ae5923/scratchpad/wt-merge/apps/web
+
+
+ Test Files  13 passed (13)
+      Tests  119 passed (119)
+   Start at  10:01:54
+   Duration  3.89s (environment 72%, import 12%, tests 11%, transform 4%, setup 1%)
+
+Environment  jsdom was created 13 times · 20.06s total, 72% of tracked time
+             create it once per worker with pool: 'vmThreads' (keeps per-file isolation) or isolate: false (shares it across files)
+             learn more: https://vitest.dev/guide/improving-performance#test-environments
+

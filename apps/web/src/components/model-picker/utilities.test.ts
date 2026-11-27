@@ -11,6 +11,7 @@ import {
     filterModelsByBlockedCreators,
     filterModelsByQuery,
     formatPricePerMillion,
+    formatTokenCount,
     getCreatorSlug,
     getModelLabel,
     getModelSearchText,
@@ -229,5 +230,14 @@ describe(adjacentFavorite, () => {
         expect(adjacentFavorite(visible, "a", -1)).toBeUndefined();
         expect(adjacentFavorite(visible, "c", 1)).toBeUndefined();
         expect(adjacentFavorite(visible, "x", 1)).toBeUndefined();
+    });
+});
+
+describe("formatTokenCount", () => {
+    it("keeps a period for the default, and uses the locale's decimal mark when one is given", () => {
+        expect(formatTokenCount(1_500_000)).toBe("1.5M");
+        expect(formatTokenCount(12_345)).toBe("12K");
+        expect(formatTokenCount(1_500_000, "de")).toBe("1,5M");
+        expect(formatTokenCount(12_345, "de")).toBe("12K");
     });
 });

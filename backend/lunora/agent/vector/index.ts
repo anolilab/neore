@@ -6,6 +6,7 @@ import { LunoraError, v } from "lunorash/server";
 
 import type { Id } from "../../_generated/dataModel";
 import { type ActionCtx as ActionContext, internalMutation, internalQuery, type MutationCtx as MutationContext } from "../../_generated/server";
+import { encodeVector } from "../../embed";
 import { mergedStream, stream } from "../../lib/streams";
 import { deleteVectorRow } from "../table-writes";
 import {
@@ -106,6 +107,7 @@ export const insertBatch = internalMutation
         // userId, vector }` was rejected as an unknown property.
         vectors: v.array(
             v.object({
+                archived: v.optional(v.boolean()),
                 messageId: v.optional(v.id("messages")),
                 model: v.string(),
                 table: v.string(),
@@ -138,6 +140,7 @@ export const insertVector = async (context: MutationContext, dimension: VectorDi
         ...innerV,
         model_table_threadId: innerV.threadId ? vectorFilterKey(innerV.model, innerV.table, innerV.threadId) : undefined,
         model_table_userId: innerV.userId ? vectorFilterKey(innerV.model, innerV.table, innerV.userId) : undefined,
+        vectorText: encodeVector(innerV.vector),
     });
 
 export const searchVectors = async (
@@ -197,7 +200,11 @@ export const updateBatch = internalMutation
                     throw new LunoraError("BAD_REQUEST", `Cannot update ${embedding.id}: a ${embedding.vector.length}-dimension vector does not fit ${table}`);
                 }
 
-                await ctx.db.patch(table, embedding.id as Id<VectorTableName>, { model: embedding.model, vector: embedding.vector });
+                await ctx.db.patch(table, embedding.id as Id<VectorTableName>, {
+                    model: embedding.model,
+                    vector: embedding.vector,
+                    vectorText: encodeVector(embedding.vector),
+                });
             }),
         );
 

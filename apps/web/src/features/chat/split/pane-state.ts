@@ -1,4 +1,5 @@
 import { stripHiddenText } from "@neore/ai/utils";
+import type { DraftFrom } from "@neore/backend/not-typed-text";
 
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 import type { ComposerMode, PendingSettings } from "@/features/chat/core/stores/model-store";
@@ -7,6 +8,7 @@ import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
 
 import type { ComposerDraft } from "./composer-drafts";
 import {
+    handOverDraftOwnership,
     hasDraftContent,
     peekComposerDraft,
     peekParkedModelState,
@@ -58,12 +60,20 @@ export const isOwnerLive = (ownerId: string | undefined): boolean => {
     return layout.panes[layout.focus] === ownerId;
 };
 
-type ComposerContent = Pick<ComposerDraft, "attachedReferences" | "composerAttachments" | "composerText">;
+type ComposerContent = Pick<ComposerDraft, "attachedReferences" | "composerAttachments" | "composerDraftFrom" | "composerText">;
 
-/** Hands a failed send's text back to the chat that sent it: its live composer when it is focused, else its parked draft. */
-export const restoreTextFor = (ownerId: string | undefined, text: string): void => {
+/**
+ * Hands a failed send's text back to the chat that sent it: its live composer when it is focused, else its parked draft. The
+ * send's not-typed mark (`draftFrom`) comes back with it.
+ */
+export const restoreTextFor = (ownerId: string | undefined, text: string, draftFrom?: DraftFrom): void => {
     if (ownerId === undefined || isOwnerLive(ownerId)) {
         useChatUIStore.getState().setComposerText(text);
+
+        // After the text, which replaced the draft, so the mark is the sent text's: an empty draft holds none.
+        if (useChatUIStore.getState().composerText !== "") {
+            useChatUIStore.getState().setComposerDraftFrom(draftFrom);
+        }
 
         return;
     }
@@ -74,7 +84,7 @@ export const restoreTextFor = (ownerId: string | undefined, text: string): void 
         return;
     }
 
-    saveComposerDraft(ownerId, { ...parked, composerText: stripHiddenText(text).text });
+    saveComposerDraft(ownerId, { ...parked, composerDraftFrom: draftFrom, composerText: stripHiddenText(text).text });
 };
 
 /** Puts a failed send back, unless the owner started a new draft meanwhile: its live one when focused, else its parked one. */
@@ -99,6 +109,7 @@ const parkLiveComposer = (threadId: string): void => {
     saveComposerDraft(threadId, {
         attachedReferences: ui.attachedReferences,
         composerAttachments: ui.composerAttachments,
+        composerDraftFrom: ui.composerDraftFrom,
         composerText: ui.composerText,
     });
     ui.clearComposer();
@@ -112,6 +123,8 @@ export const restoreLiveComposerFor = (threadId: string): void => {
         return;
     }
 
+    // An empty composer is this chat's from here on, whichever composer it was before: what comes back is not carried from there.
+    handOverDraftOwnership(threadId);
     ui.restoreComposer(takeComposerDraftState(threadId));
 };
 
@@ -245,6 +258,9 @@ export const leaveSplitView = (focusedThreadId: string | undefined, routeThreadI
     }
 
     if (isPreferenceOff && routeThreadId !== undefined) {
+        // Stored now, while the composer is empty and still the focused pane's: once the routed chat's draft is back in it, it is
+        // that chat's, not text carried from the focused pane.
+        handOverDraftOwnership(routeThreadId);
         restoreLiveComposerFor(routeThreadId);
 
         // Restored here, not when the single chat's provider loads: the model choices are back before its composer is first shown.
@@ -270,6 +286,8 @@ export const watchPaneFocus = (): (() => void) =>
             focusEpoch.count += 1;
             parkModelState(before);
             parkLiveComposer(before);
+            // Stored now, while the composer is empty: once the incoming pane's draft is back in it, it is that pane's.
+            handOverDraftOwnership(after);
             // The outgoing chat's comparison is not the incoming one's: its own parent turns comparison back on when it has focus.
             useModelStore.setState({ comparisonMode: false, selectedModelsForComparison: [] });
         }

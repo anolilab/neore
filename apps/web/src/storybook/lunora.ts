@@ -66,10 +66,10 @@ export const lunora = <F extends FunctionReference>(reference: F, value: Resolve
 };
 
 /** A procedure that fails with a Lunora error envelope (`code` as `LunoraError#code`). */
-export const lunoraError = (reference: FunctionReference, code: string, message = code, status = 400): LunoraFixture => {
+export const lunoraError = (reference: FunctionReference, code: string, message = code, status = 400, data?: Record<string, string>): LunoraFixture => {
     return {
         answer: async () => {
-            return { body: { error: { code, message } }, status };
+            return { body: { error: { code, message, ...(data && { data }) } }, status };
         },
         functionPath: pathOf(reference),
     };

@@ -49,6 +49,7 @@ import {
     eraseChatFileAccessForUser,
     eraseChatFileThreadsForUser,
     eraseStreamingMessagesForUser,
+    eraseGrantRevisionsForUser,
     eraseThreadSummariesForUser,
     eraseWorkflowExecutionsForProject,
     eraseWorkflowExecutionsForUser,
@@ -57,9 +58,11 @@ import { eraseSubAgentRunsForUser } from "../../sub-agents/gdpr";
 import { eraseSystemPromptPresetsForUser } from "../../system-prompts/gdpr";
 import { eraseWorkflowVersionsAndPresenceForProject, eraseWorkflowVersionsAndPresenceForUser } from "../../workflow/gdpr";
 import { eraseSkillRatingRows } from "../../skills/gdpr";
+import { purgeObject } from "../../usage/gdpr";
 import { eraseKnowledgeForUser, eraseProjectKnowledgeForProject } from "../../knowledge/gdpr";
 import { eraseProjectRepositories, eraseProjectRepositoriesForUser } from "../../projects/gdpr";
 import { eraseBotsForUser } from "../../bots/gdpr";
+import { eraseFeedbackForUser } from "../../feedback/gdpr";
 import { eraseTriggersForUser } from "../../triggers/gdpr";
 import { eraseSandboxSessionsForUser } from "../../sandbox/gdpr";
 import { eraseMessengerConnectionsForUser } from "../../messenger/gdpr";
@@ -207,6 +210,16 @@ export const killUserSandboxes = internalAction
 
 // --- Batched deletions -------------------------------------------------------
 
+/** One erasure batch: whether more remains, and where the run scan continues. */
+const vUsageErasure = v.object({ hasMore: v.boolean(), runCursor: v.union(v.string(), v.null()) });
+
+/**
+ * Pages of a user's keyed runs one purge call reads before it returns its cursor. A page is ten runs, and each keyed run costs about
+ * three subrequests (a storage lookup, a delete and a record call), so two pages can reach roughly 60 subrequests in one call. That is
+ * over the 50-subrequest cap the Free plan allows, and fits the paid plan's. The workflow calls again while a cursor comes back.
+ */
+const PURGE_PAGES_PER_CALL = 2;
+
 /**
  * The usage page's per-day rollup (`usage/activity.ts`): one row per skill per
  * day, so an active year is hundreds of them — plus its bookkeeping, the keys
@@ -214,9 +227,64 @@ export const killUserSandboxes = internalAction
  * (`usageBackfill`), which a step still running finds gone and stops.
  */
 export const deleteUserUsageDaily = internalMutation
-    .input({ userId: v.string() })
-    .output(vBatchResult)
-    .mutation(async ({ args: { userId }, ctx: context }): Promise<BatchResult> => await eraseUsageForUser(context, userId));
+    .input({ runCursor: v.optional(v.union(v.string(), v.null())), userId: v.string() })
+    .output(vUsageErasure)
+    .mutation(async ({ args: { runCursor, userId }, ctx: context }) => await eraseUsageForUser(context, userId, runCursor));
+
+/**
+ * Deletes the stored usage JSON of the user's export runs, and releases the record of each run whose export has ended, a bounded part
+ * of the runs at a time: `cursor` continues the scan from the previous call. A run whose export is still live keeps its record, so its
+ * write cannot land after the record is gone: `waiting` tells the workflow to purge again once that export has ended. `force` deletes the
+ * stored object of a live run too, once the workflow's wait is over, but keeps its record, so the sweep finds whatever the export stores
+ * later. A failed delete throws, so the workflow retries the step.
+ */
+export const purgeUserUsageFiles = internalAction
+    .input({ cursor: v.optional(v.union(v.string(), v.null())), force: v.optional(v.boolean()), userId: v.string() })
+    .output(v.object({ cursor: v.union(v.string(), v.null()), waiting: v.boolean() }))
+    .action(async ({ args: { cursor: start, force, userId }, ctx: context }) => {
+        let waiting = false;
+        let cursor = start ?? null;
+
+        for (let pages = 0; pages < PURGE_PAGES_PER_CALL; pages += 1) {
+            const page = await context.runQuery(internal.usage.gdpr.keyedUsageRuns, { cursor, userId });
+
+            for (const run of page.keyed) {
+                if (run.live && force !== true) {
+                    waiting = true;
+                    continue;
+                }
+
+                // Forced past the wait while the export is still live. Any object it has stored goes now, but the run's record stays: the
+                // export can still store one, and releasing the record would hide it from the sweep. The sweep checks the run a minute on and
+                // purges whatever it finds once the export has ended.
+                if (run.live) {
+                    // Logged so an operator can tell a deletion that finished past a live export from a normal one.
+                    gdprLogger.warn("Account deletion finished past a live usage export; its record is kept for the sweep");
+
+                    if (run.key !== undefined && (await context.storage.getMetadata(run.key))) {
+                        await context.storage.delete(run.key);
+                    }
+
+                    await context.runMutation(internal.usage.gdpr.rearmLiveUsageRun, { runId: run.runId, userId });
+                    continue;
+                }
+
+                if (run.key === undefined) {
+                    continue;
+                }
+
+                await purgeObject(context.storage, run.key, async () => await context.runMutation(internal.usage.gdpr.releaseUsageKey, { runId: run.runId }));
+            }
+
+            cursor = page.cursor;
+
+            if (cursor === null) {
+                break;
+            }
+        }
+
+        return { cursor, waiting };
+    });
 
 /**
  * Sub-agent runs (`sub-agents/gdpr.ts`). A run still in flight finds its row
@@ -250,6 +318,12 @@ export const deleteUserThreadSummaries = internalMutation
     .input({ userId: v.string() })
     .output(vBatchResult)
     .mutation(async ({ args: { userId }, ctx: context }): Promise<BatchResult> => await eraseThreadSummariesForUser(context, userId));
+
+/** The revisions of grants the user held or gave, which outlive the grants (`agent/gdpr.ts`). */
+export const deleteUserGrantRevisions = internalMutation
+    .input({ userId: v.string() })
+    .output(vBatchResult)
+    .mutation(async ({ args: { userId }, ctx: context }): Promise<BatchResult> => await eraseGrantRevisionsForUser(context, userId));
 
 /** Streaming-message rows outlive their thread when a stream is abandoned (`agent/gdpr.ts`). */
 export const deleteUserStreamingMessages = internalMutation
@@ -295,6 +369,8 @@ export const deleteUserIntegrations = internalMutation
         const fileLinks = await eraseChatFileThreadsForUser(context, userId);
         const triggers = await eraseTriggersForUser(context, userId);
         const bots = await eraseBotsForUser(context, userId);
+        // The feedback the user sent, with its images (`feedback/gdpr.ts`).
+        const feedback = await eraseFeedbackForUser(context, userId);
         const sessions = await eraseSandboxSessionsForUser(context, userId);
 
         return {
@@ -307,6 +383,7 @@ export const deleteUserIntegrations = internalMutation
                 fileLinks.hasMore ||
                 triggers.hasMore ||
                 bots.hasMore ||
+                feedback.hasMore ||
                 sessions.hasMore,
         };
     });
@@ -315,9 +392,9 @@ export const deleteUserIntegrations = internalMutation
  * Workflow-builder data. By `userId` for what the user did anywhere, and by
  * project for everything attached to projects the user owns — including other
  * people's presence rows, which point at a project that is about to vanish.
- * Runs BEFORE `deleteUserProjects`, which only removes the project rows.
- * Executions and project knowledge are erased by their owners
- * (`agent/gdpr.ts`, `knowledge/gdpr.ts`).
+ * Runs BEFORE `deleteUserProjects`, which removes the project rows and then their rule files.
+ * Executions, project knowledge and repositories are erased by their owners
+ * (`agent/gdpr.ts`, `knowledge/gdpr.ts`, `projects/gdpr.ts`).
  */
 export const deleteUserWorkflowData = internalMutation
     .input({ userId: v.string() })
@@ -331,7 +408,9 @@ export const deleteUserWorkflowData = internalMutation
 
         hasMore ||= userVersions.hasMore;
 
-        // Repository rows by owner: also one whose project is already gone (a project delete that failed part way).
+        // Repository rows by owner: also one whose project is already gone (a project delete that failed part way). Not
+        // the rule files: `deleteUserProjects` erases them once the projects are gone, so a deletion stopped between the
+        // two steps leaves no live project without its rules.
         const ownRepositories = await eraseProjectRepositoriesForUser(context, userId);
 
         hasMore ||= ownRepositories.hasMore;
@@ -410,7 +489,7 @@ export const deleteUserIdentity = internalMutation
                 const remainingMembers = await context.db.member.count({ organizationId });
                 const action = teamBillingOnAccountDeletion({ isPurchaser: purchasedIds.has(organizationId), remainingMembers });
 
-                await (action === "cancel" ? queueOrganizationBillingCancel(organizationId) : queueSeatSync(organizationId));
+                await (action === "cancel" ? queueOrganizationBillingCancel(organizationId, false) : queueSeatSync(organizationId));
             }),
         );
 

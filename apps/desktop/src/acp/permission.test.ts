@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { PermissionRequest } from "./permission";
-import { coreGate, declineGate, describePermission } from "./permission";
+import { coreGate, declineGate, describePermission, remoteOptions } from "./permission";
 
 const OPTIONS = [
     { kind: "allow_once", name: "Allow", optionId: "allow" },
@@ -45,6 +45,27 @@ describe("describing a request", () => {
 
         expect(big.detailsComplete).toBe(false);
         expect(describePermission(request({ content: [{ path: "/work/a", type: "diff" }], title: "Edit" })).detailsComplete).toBe(true);
+    });
+});
+
+describe("what another device is offered", () => {
+    const kinds = (extra: Partial<PermissionRequest>) =>
+        remoteOptions(describePermission({ ...request({ rawInput: { command: "npm test" }, title: "Run" }), ...extra })).map((option) => option.kind);
+
+    it("is allow once and decline for a terminal, with its command and working folder, and never an always option", () => {
+        const described = describePermission({
+            ...request({ kind: "execute", rawInput: { command: "npm test", cwd: "/work/app" }, title: "Run" }),
+            localOnly: true,
+            terminal: true,
+        });
+
+        expect(remoteOptions(described).map((option) => option.kind)).toEqual(["allow_once", "reject_once"]);
+        expect(described).toMatchObject({ command: "npm test", folder: "/work", target: "/work/app" });
+    });
+
+    it("is the decline alone for any other local-only request, and keeps the usual options for the rest", () => {
+        expect(kinds({ localOnly: true })).toEqual(["reject_once"]);
+        expect(kinds({})).toEqual(["allow_once", "reject_once"]);
     });
 });
 

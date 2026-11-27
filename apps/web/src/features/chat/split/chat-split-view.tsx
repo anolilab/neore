@@ -6,7 +6,7 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@neore/ui/
 import cn from "@neore/ui/utils/cn";
 import { CrosshairIcon, XIcon } from "lucide-react";
 import type { FC } from "react";
-import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import TooltipIconButton from "@/features/chat/components/tooltip-icon-button";
@@ -19,34 +19,16 @@ import Thread from "@/features/chat/thread/thread";
 import { useThreadPaneState } from "@/features/chat/thread/use-thread-pane-state";
 
 import { setSplitViewMounted } from "./composer-drafts";
+import { useIsDesktop } from "./desktop-layout";
+import { COMPOSER_INPUT, focusComposerWhenMounted, useComposerFocusRequest } from "./focus-composer";
 import { leaveSplitView, restoreLiveComposerFor, syncFocusedModel, watchPaneFocus } from "./pane-state";
+import { useFocusFollowsPaneSwitch } from "./pane-switch-focus";
 import { MIN_PANE_PX } from "./split-layout";
-import { hydrateSplitLayout, useSplitLayoutStore } from "./split-layout-store";
+import { readSavedLayoutOrEmpty, useSplitLayoutStore } from "./split-layout-store";
 import { useChatHasDraft } from "./use-chat-has-draft";
 
-/** Below this the split is off and one chat shows (the app's `md` breakpoint). */
-const DESKTOP_QUERY = "(min-width: 768px)";
 /** The space between two panes: the resize handle itself, so there is no line between them. */
 const GAP_PX = 8;
-/** How many frames to wait for the composer's editor (it loads lazily) before giving up on moving focus into it. */
-const FOCUS_FRAMES = 60;
-/** The composer's input: the chat editor, or a worker's textarea (which has no textbox role). */
-const COMPOSER_INPUT = '[role="textbox"], textarea[data-focus-area="composer"]';
-
-const subscribeDesktop = (notify: () => void): (() => void) => {
-    const media = globalThis.matchMedia(DESKTOP_QUERY);
-
-    media.addEventListener("change", notify);
-
-    return () => media.removeEventListener("change", notify);
-};
-
-const useIsDesktop = (): boolean =>
-    useSyncExternalStore(
-        subscribeDesktop,
-        () => globalThis.matchMedia(DESKTOP_QUERY).matches,
-        () => true,
-    );
 
 /**
  * Makes the focused pane's chat the one the global model state describes. Every pane's provider loads its chat's model into
@@ -153,29 +135,15 @@ const Pane: FC<PaneProps> = ({
             return undefined;
         }
 
-        let frame = 0;
-        let frames = 0;
-        const focusEditor = () => {
-            const editor = paneRef.current?.querySelector<HTMLElement>(COMPOSER_INPUT);
-
-            if (editor) {
-                editor.focus();
+        return focusComposerWhenMounted(paneRef, (focused) => {
+            if (focused) {
                 focusComposerRef.current = false;
-
-                return;
             }
-
-            frames += 1;
-
-            if (frames < FOCUS_FRAMES) {
-                frame = requestAnimationFrame(focusEditor);
-            }
-        };
-
-        focusEditor();
-
-        return () => cancelAnimationFrame(frame);
+        });
     }, [isFocused]);
+
+    // A keyboard activation of a link that opened this pane asks for its composer: the request is consumed by this hook.
+    useComposerFocusRequest(paneRef, threadId, isFocused);
 
     const activate = () => {
         focusComposerRef.current = true;
@@ -210,6 +178,7 @@ const Pane: FC<PaneProps> = ({
                     "flex h-9 shrink-0 items-center gap-1 px-3 pointer-coarse:h-11",
                     isFocused ? "text-foreground dark:bg-muted" : "bg-muted/60 text-muted-foreground dark:bg-transparent",
                 )}
+                data-chrome=""
             >
                 {hasDraft && <span aria-hidden="true" className="border-muted-foreground size-2 shrink-0 rounded-full border-[1.5px] border-dashed" />}
                 <h2 className="min-w-0 flex-1 truncate text-sm font-medium" id={headingId}>
@@ -336,7 +305,7 @@ const ChatSplitView: FC<ChatSplitViewProps> = ({ headerSlot = null, initialMessa
     useEffect(() => {
         let cancelled = false;
         const start = async () => {
-            await hydrateSplitLayout();
+            await readSavedLayoutOrEmpty();
 
             if (cancelled) {
                 return;
@@ -360,6 +329,23 @@ const ChatSplitView: FC<ChatSplitViewProps> = ({ headerSlot = null, initialMessa
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
+    // A saved layout read after the view started without it (a retry, once storage recovers) replaces the layout: the route's chat
+    // is shown again. Changes made while the saved layout was unreadable are not kept: nothing is saved until it has been read.
+    useEffect(
+        () =>
+            useSplitLayoutStore.persist.onFinishHydration(() => {
+                // The saved panes are checked as the initial load checks them: an invalid ID would otherwise occupy a slot.
+                dispatch({ isValid: (id) => isLunoraId(id), type: "prune" });
+
+                const route = routeRef.current;
+
+                if (route !== undefined) {
+                    dispatch({ threadId: route, type: "show" });
+                }
+            }),
+        [dispatch],
+    );
+
     useEffect(() => {
         if (!ready || lastRouteThreadId.current === routeThreadId) {
             return;
@@ -373,6 +359,9 @@ const ChatSplitView: FC<ChatSplitViewProps> = ({ headerSlot = null, initialMessa
     }, [dispatch, ready, routeThreadId]);
 
     const focusedThreadId = layout.panes[layout.focus];
+
+    // The old pane's header and composer go away with the switch; focus they held follows to the new pane.
+    useFocusFollowsPaneSwitch(containerRef, focusedThreadId);
 
     useEffect(() => {
         focusedRef.current = focusedThreadId;

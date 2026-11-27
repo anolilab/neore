@@ -42,13 +42,14 @@ import { bodyHash } from "../plugins/logic";
 import { BUNDLE_LIMITS, buildBundleMarkdown, groupItemOf, parseBundleMarkdown, skillItemOf, triggerItemOf } from "./bundle-format";
 import type { PlanEntry, PlanEnv } from "./bundle-plan";
 import { assertSelectionImportable, BundleImportError, mayRetryImport, planBundle, runBundleImport, skillLimitFor } from "./bundle-plan";
-import { isSelectableTextModel } from "./builder-logic";
+import { isSelectableTextModel } from "@neore/ai/models";
 import { getToolRegistry } from "./jit-tool-loader";
 import { deleteTriggerRows } from "../triggers/functions";
 import { deleteSkillRows } from "./functions";
 import { canReadSkill } from "./access";
 import { toSkillSlug } from "./markdown";
 import { pickFreeSlug } from "./slug";
+import { storedRow } from "../lib/stored-row";
 
 /** The newest chats scanned for group chats: `threads` has no index on `groupChat`. */
 const GROUP_SCAN_LIMIT = 300;
@@ -331,7 +332,7 @@ export const loadBundleSources = internalQuery
         const notFound = (): never => {
             throw new LunoraError("NOT_FOUND", "One of the items to export was not found");
         };
-        const skills = await Promise.all(args.skillIds.map(async (skillId) => await ctx.db.skills.findFirst({ where: { _id: skillId } })));
+        const skills = await Promise.all(args.skillIds.map(async (skillId) => storedRow(await ctx.db.skills.findFirst({ where: { _id: skillId } }))));
         const triggers = await Promise.all(args.triggerIds.map(async (triggerId) => await ctx.db.get("triggers", triggerId)));
         const threads = await Promise.all(args.groupChatIds.map(async (threadId) => await ctx.db.get("threads", threadId)));
 

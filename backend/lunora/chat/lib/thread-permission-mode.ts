@@ -28,4 +28,21 @@ export const isThreadPermissionMode = (value: unknown): value is ThreadPermissio
  * the model chose to a third party. `supervised` leaves these at their own mode. An allowlist: a built-in not named
  * here asks. A search, a lookup, or a memory query that reaches a provider (even one of the app's own, billed per request) asks.
  */
-export const BUILTIN_TOOLS_READ_ONLY: ReadonlySet<string> = new Set(["dateTime", "listLanguages"]);
+export const BUILTIN_TOOLS_READ_ONLY: ReadonlySet<string> = new Set(["dateTime", "instruction_read", "listLanguages"]);
+
+/**
+ * The mode a new chat is created with, from the owner's default (`userSettings.defaultPermissionMode`). `undefined` stores nothing,
+ * so the chat runs under the defaults exactly as a chat without a stored mode does: that is what an absent setting and `auto` both
+ * mean. `full` is not given to an admin acting as the owner, as a bot's `full` is not (`chat/functions.ts`).
+ */
+export const newChatPermissionMode = (defaultMode: ThreadPermissionMode | undefined, impersonated: boolean): ThreadPermissionMode | undefined => {
+    if (defaultMode === undefined || defaultMode === DEFAULT_THREAD_PERMISSION_MODE) {
+        return undefined;
+    }
+
+    if (defaultMode === "full" && impersonated) {
+        return undefined;
+    }
+
+    return defaultMode;
+};

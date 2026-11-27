@@ -70,6 +70,16 @@ describe("messageWorker", () => {
         await tool.execute({ message: "go", worker: "w1" }, { toolCallId: "c1" });
         expect(runMutation).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ headless: true }));
     });
+
+    it("hands the run's chain source to the mutation, so what the worker delegates counts toward its task", async () => {
+        const runMutation = vi.fn(async () => {
+            return { runId: "r1", state: "queued", workerId: "w1" };
+        });
+        const tool = withContext(messageWorkerTool, { chainSource: "task:task-1", dispatchOrigin: "lead", runMutation, threadId: "t1", userId: "u1" });
+
+        await tool.execute({ message: "go", worker: "w1" }, { toolCallId: "c1" });
+        expect(runMutation).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ chainSource: "task:task-1" }));
+    });
 });
 
 describe("delegateToSubAgent", () => {
@@ -106,5 +116,22 @@ describe("delegateToSubAgent", () => {
 
         await tool.execute({ host, name: "Coder", persistent: true, task: "x" }, { toolCallId: "c1" });
         expect(runMutation).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ headless: true, host }));
+    });
+
+    it("hands the run's chain source to the mutation, so the child counts toward its task's one waiting child", async () => {
+        const runMutation = vi.fn(async () => {
+            return { runId: "r1" };
+        });
+        const tool = withContext(delegateToSubAgentTool, {
+            agent: { options: { tools: { a: {} } } },
+            chainSource: "task:task-1",
+            dispatchOrigin: "lead",
+            runMutation,
+            threadId: "t1",
+            userId: "u1",
+        });
+
+        await tool.execute({ task: "x" }, { toolCallId: "c1" });
+        expect(runMutation).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ chainSource: "task:task-1" }));
     });
 });

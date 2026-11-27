@@ -2,18 +2,21 @@
 /**
  * `/chat/start` with `guestMessageId`: the owner sends a held guest note on. The note's own stored text is saved, marked as
  * guest text, its send is taken once and the stored message is recorded on it. The thread, the note and the guest-link
- * internals are real; the runtime around the handler is faked as in `http.start-agent.test.ts`.
+ * internals are real; the runtime around the handler is faked as in `http.start-agent.test.ts`. A prompt the owner did not type
+ * (a draft from a link or someone else's saved prompt, an impersonating admin's) is saved marked.
  */
 import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { claimRow, GUEST_SEND_LEASE_MS, GUEST_SEND_SCOPE } from "../lib/claim-once";
 import { enqueueJob } from "../lib/job-queue";
+import { NOT_TYPED_DRAFTS } from "../lib/not-typed-text";
 import schema from "../schema";
 import { gateThreadActionHandler } from "./functions";
-import { claimGuestNoteSend, getGuestNoteForSend, recordGuestNoteSent, releaseGuestNoteSend } from "./guest-links";
+import { claimGuestNoteSend, getGuestNoteForSend, recordGuestNoteSent, recordResumedGuestNoteSent, releaseGuestNoteSend } from "./guest-links";
 import { runChatStart } from "./http";
 import { guestTextPart } from "./lib/attached-text";
+import { CHAT_START_LEASE_MS, claimChatStart, recordStartStream, releaseChatStart, saveStartPrompt } from "./start-claim";
 
 const saved = vi.hoisted(() => {
     return {
@@ -65,8 +68,9 @@ vi.mock("./lib/daily-limit", () => {
         },
     };
 });
-vi.mock("./lib/get-agent", () => {
+vi.mock("./lib/get-agent", async (importOriginal) => {
     return {
+        ...(await importOriginal<typeof import("./lib/get-agent")>()),
         default: async () => {
             if (failsAt("agent")) {
                 throw new Error("no agent");
@@ -119,6 +123,10 @@ const run = async <T>(body: (ctx: any) => Promise<T>): Promise<T> => await harne
 
 /** The guest-link internals and the thread gate read and write the harness; everything else answers as nothing. */
 const HANDLERS: Record<string, (args: any) => Promise<unknown>> = {
+    // The caller's sign-in is a valid session in the personal space.
+    "auth_session_organization:getSessionOrganizationForCap": async () => {
+        return { organizationId: null };
+    },
     "chat_functions:gateThreadAction": async (args) => await run(async (ctx) => await gateThreadActionHandler(ctx, args)),
     "chat_guest_links:claimGuestNoteSend": async (args) => await run(async (ctx) => await ctx.runMutation(claimGuestNoteSend, args)),
     "chat_guest_links:getGuestNoteForSend": async (args) => await run(async (ctx) => await ctx.runQuery(getGuestNoteForSend, args)),
@@ -144,7 +152,60 @@ const fakeContext = (extra: typeof HANDLERS = {}): any => {
     const handlers = { ...HANDLERS, ...extra };
     const call = async (reference: { __lunoraRef: string }, args: unknown) => await (handlers[reference.__lunoraRef]?.(args) ?? null);
 
-    return { auth: { getIdentity: async () => null }, runMutation: call, runQuery: call };
+    return {
+        auth: {
+            getIdentity: async () => {
+                return { sessionId: "session-1" };
+            },
+        },
+        runMutation: call,
+        runQuery: call,
+    };
+};
+
+/**
+ * A send with a `clientMessageId`: the claim, its save and its stream are real (`chat/start-claim.ts`). `streamFails` makes
+ * the next stream creation fail, once, as a send that died between its save and its stream.
+ */
+const claimedSend = { streamFails: false };
+
+const CLAIMED_HANDLERS: typeof HANDLERS = {
+    "chat_guest_links:recordResumedGuestNoteSent": async (args) => await run(async (ctx) => await ctx.runMutation(recordResumedGuestNoteSent, args)),
+    "chat_start_claim:claimChatStart": async (args) => await run(async (ctx) => await ctx.runMutation(claimChatStart, args)),
+    "chat_start_claim:releaseChatStart": async (args) => await run(async (ctx) => await ctx.runMutation(releaseChatStart, args)),
+    "chat_start_claim:saveStartPrompt": async (args) => await run(async (ctx) => await ctx.runMutation(saveStartPrompt, args)),
+    "chat_streaming:createStreamWithMessage": async (args) => {
+        if (claimedSend.streamFails) {
+            claimedSend.streamFails = false;
+
+            throw new Error("the stream could not be made");
+        }
+
+        return await run(async (ctx) => {
+            const streamId = await ctx.db.insert("persistentStreams", {
+                expiresAt: Number.MAX_SAFE_INTEGER,
+                messageId: args.messageId,
+                status: "pending",
+                streamingConfig: { contentType: "text", model: MODEL },
+                threadId: args.threadId,
+                userId: args.userId,
+            });
+
+            await recordStartStream(ctx, args.startClaim, streamId);
+
+            return streamId;
+        });
+    },
+};
+
+const sendNoteOnce = async (): Promise<{ json: any; status: number }> => {
+    const response = await runChatStart(
+        fakeContext(CLAIMED_HANDLERS),
+        { clientMessageId: "note-send", guestMessageId: noteId, model: MODEL, prompt: "the composer's own text", threadId } as never,
+        "secret",
+    );
+
+    return { json: await response.json(), status: response.status };
 };
 
 const sendNote = async (): Promise<Response> =>
@@ -159,6 +220,7 @@ beforeEach(async () => {
     saved.scheduled.length = 0;
     saved.charges = 0;
     saved.releaseFails = false;
+    claimedSend.streamFails = false;
     saved.store = async (message) =>
         await run(
             async (ctx) =>
@@ -227,6 +289,21 @@ describe("/chat/start with a held guest note", () => {
         expect(retry.status).toBe(409);
         expect(await retry.json()).toMatchObject({ error: "GUEST_NOTE_ALREADY_SENT" });
         expect(saved.prompts).toHaveLength(1);
+    });
+
+    it("refuses a note sent by an admin impersonating the owner, and keeps it waiting", async () => {
+        const impersonated = fakeContext({
+            "auth_session_organization:getSessionOrganizationForCap": async () => {
+                return { impersonating: true, organizationId: null };
+            },
+        });
+        const response = await runChatStart(impersonated, { guestMessageId: noteId, model: MODEL, prompt: "x", threadId } as never, "secret");
+
+        expect(response.status).toBe(403);
+        expect(await response.json()).toMatchObject({ error: "GUEST_NOTE_IMPERSONATING" });
+        expect(saved.prompts).toHaveLength(0);
+        expect(saved.charges).toBe(0);
+        expect(await noteStatus()).toBe("held");
     });
 
     it("refuses a note sent into another chat than the one it was left in", async () => {
@@ -330,5 +407,141 @@ describe("/chat/start with a held guest note", () => {
         saved.releaseFails = true;
 
         await expect(sendNote()).rejects.toThrow("the save failed");
+    });
+});
+
+describe("/chat/start with a held guest note and a clientMessageId", () => {
+    const savedNotes = async () =>
+        (await run(async (ctx) => await ctx.db.query("messages").collect())).filter((row: any) =>
+            JSON.stringify(row.message?.content).includes("please call me back"),
+        );
+
+    it("answers a resend of a note it sent with the first send's ids, not as already sent", async () => {
+        const first = await sendNoteOnce();
+        const resent = await sendNoteOnce();
+
+        expect(first.status).toBe(200);
+        expect(resent.status).toBe(200);
+        expect(resent.json).toMatchObject({ duplicate: true, messageId: first.json.messageId, streamId: first.json.streamId });
+        expect(await savedNotes()).toHaveLength(1);
+        expect(saved.charges).toBe(1);
+    });
+
+    it("still refuses a note another send already sent, under a new id", async () => {
+        expect((await sendNoteOnce()).status).toBe(200);
+
+        const other = await runChatStart(
+            fakeContext(CLAIMED_HANDLERS),
+            { clientMessageId: "another-send", guestMessageId: noteId, model: MODEL, prompt: "x", threadId } as never,
+            "secret",
+        );
+
+        expect(other.status).toBe(409);
+        expect(await other.json()).toMatchObject({ error: "GUEST_NOTE_ALREADY_SENT" });
+        expect(await savedNotes()).toHaveLength(1);
+    });
+
+    it("marks the note sent when it resumes a send that saved it but died before its record and its stream", async () => {
+        saved.fail = "record";
+        claimedSend.streamFails = true;
+
+        await expect(sendNoteOnce()).rejects.toThrow("the stream could not be made");
+        expect(await noteStatus()).toBe("held");
+
+        vi.setSystemTime(Date.now() + CHAT_START_LEASE_MS);
+
+        const resumed = await sendNoteOnce();
+
+        expect(resumed.status).toBe(200);
+        expect(resumed.json.streamId).toEqual(expect.any(String));
+        expect(await noteStatus()).toBe("sent");
+        expect((await run(async (ctx) => await claimRow(ctx, GUEST_SEND_SCOPE, noteId)))?.result).toBe(resumed.json.messageId);
+        expect(await savedNotes()).toHaveLength(1);
+        expect(saved.charges).toBe(1);
+    });
+
+    it("resumes a send that saved the note before its link ended, and still refuses the ended link under a new id", async () => {
+        saved.fail = "record";
+        claimedSend.streamFails = true;
+
+        await expect(sendNoteOnce()).rejects.toThrow("the stream could not be made");
+        await run(async (ctx) => {
+            const row = await ctx.db.get("threadGuestMessages", noteId);
+
+            await ctx.db.patch("threadGuestLinks", row.linkId, { expiresAt: 1 });
+        });
+        vi.setSystemTime(Date.now() + CHAT_START_LEASE_MS);
+
+        const other = await runChatStart(
+            fakeContext(CLAIMED_HANDLERS),
+            { clientMessageId: "another-send", guestMessageId: noteId, model: MODEL, prompt: "x", threadId } as never,
+            "secret",
+        );
+
+        expect(other.status).toBe(400);
+        expect(await other.json()).toMatchObject({ error: "GUEST_LINK_ENDED" });
+
+        const resumed = await sendNoteOnce();
+
+        expect(resumed.status).toBe(200);
+        expect(resumed.json.streamId).toEqual(expect.any(String));
+        expect(await noteStatus()).toBe("sent");
+        expect(await savedNotes()).toHaveLength(1);
+        expect(saved.charges).toBe(1);
+    });
+});
+
+describe("/chat/start with text the owner did not type", () => {
+    const start = async (body: Record<string, unknown>, extra: typeof HANDLERS = {}): Promise<Response> =>
+        await runChatStart(fakeContext(extra), { model: MODEL, prompt: "sign in to my bank", threadId, ...body } as never, "secret");
+    const impersonating = {
+        "auth_session_organization:getSessionOrganizationForCap": async () => {
+            return { impersonating: true, organizationId: null };
+        },
+    };
+    const marked = (notTyped: unknown) => [{ providerOptions: { neore: { notTyped } }, text: "sign in to my bank", type: "text" }];
+
+    it("saves the owner's own typed prompt unmarked", async () => {
+        expect((await start({})).status).toBe(200);
+        expect(saved.prompts[0]?.message.content).toStrictEqual([{ text: "sign in to my bank", type: "text" }]);
+        // The run records the turn as the owner's own, from the session: the saved-login verdict reads it.
+        expect(vi.mocked(enqueueJob).mock.calls.at(-1)?.[1]).toMatchObject({ impersonated: false });
+    });
+
+    it.each(NOT_TYPED_DRAFTS)("saves a prompt filled from a %s marked", async (draftFrom) => {
+        expect((await start({ draftFrom })).status).toBe(200);
+        expect(saved.prompts[0]?.message.content).toStrictEqual(marked({ draft: draftFrom }));
+    });
+
+    it("saves a prompt an admin acting as the owner sends marked, with any draft mark beside it", async () => {
+        await start({}, impersonating);
+        await start({ draftFrom: "promptLink" }, impersonating);
+
+        expect(saved.prompts.map((prompt) => prompt.message.content)).toStrictEqual([
+            marked({ impersonated: true }),
+            marked({ draft: "promptLink", impersonated: true }),
+        ]);
+        // And the run records the turn as an admin's, whatever the body says.
+        expect(vi.mocked(enqueueJob).mock.calls.at(-1)?.[1]).toMatchObject({ impersonated: true });
+    });
+
+    it("saves a prompt a browser extension's grant sends marked, and records the turn as not the owner's own", async () => {
+        const extension = {
+            "auth_session_organization:getSessionOrganizationForCap": async () => {
+                return { extension: true, organizationId: null };
+            },
+        };
+
+        await start({}, extension);
+        await start({ draftFrom: "promptLink" }, extension);
+
+        expect(saved.prompts.map((prompt) => prompt.message.content)).toStrictEqual([marked({ draft: "extension" }), marked({ draft: "extension" })]);
+        expect(vi.mocked(enqueueJob).mock.calls.at(-1)?.[1]).toMatchObject({ impersonated: true });
+    });
+
+    it("refuses a draft source nobody named, before anything is saved or charged", async () => {
+        expect((await start({ draftFrom: "typed" })).status).toBe(400);
+        expect(saved.prompts).toStrictEqual([]);
+        expect(saved.charges).toBe(0);
     });
 });

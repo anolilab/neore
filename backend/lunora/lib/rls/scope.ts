@@ -265,7 +265,7 @@ export const parentKeyOf = async (ctx: { db: RawDatabase }, table: string, id: s
  */
 export const ADMITTED_THREAD_INDEXES = {
     documents: ["by_threadId_and_kind"],
-    followupSuggestions: ["by_thread"],
+    followupSuggestions: ["by_thread", "by_thread_and_message"],
     messages: ["by_threadId_order_stepOrder", "by_threadId_parentMessageId", "threadId_status_tool_order_stepOrder"],
     persistentStreams: ["by_threadId"],
     streamingMessages: ["threadId_state_order_stepOrder"],

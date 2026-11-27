@@ -1,0 +1,19 @@
+@neore/html-to-markdown
+
+Derived from turndown 7.2.5
+  Copyright (c) 2017 Dom Christie and contributors
+  Licensed under the MIT License (see LICENSE)
+  Source: https://github.com/mixmark-io/turndown (commit b86e2b18539fa4922acf7001902255e2ce5bf0b9)
+
+src/collapse-whitespace.ts is adapted from collapse-whitespace
+  Copyright (c) 2014 Luc Thevenard <lucthevenard@gmail.com>
+  Licensed under the MIT License (the notice is kept in the file header)
+
+test/fixtures/upstream-cases.json is generated from turndown's test/index.html
+  (MIT, Dom Christie and contributors)
+
+Runtime dependency: @mixmark-io/domino (MIT), used on Node and in tests only.
+Development dependency: turndown 7.2.5 (MIT), used by the differential test and benchmarks.
+
+Code in this package that is not derived from turndown is also MIT-licensed (see LICENSE). The package is
+MIT-licensed as a whole, unlike the rest of the repository, whose licence is LICENSE.md at the repository root.

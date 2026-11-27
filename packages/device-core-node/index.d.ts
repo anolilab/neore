@@ -76,6 +76,10 @@ export declare class DeviceCore {
    * local window. `after` is the `next` of the page before.
    */
   hostFilesList(deviceId: string, path: string, after?: string | undefined | null): Promise<string>
+  /** The folders inside an absolute path on a connected server (`{ path, parent, entries, next, host }`, JSON). */
+  hostBrowse(deviceId: string, path: string, after?: string | undefined | null): Promise<string>
+  /** Creates an absolute folder on a connected server (`{ path, created, … }`, JSON). */
+  hostMakeDir(deviceId: string, path: string): Promise<string>
   /** A file of a connected server as text (`{ text, truncated, host, path }`, JSON). */
   hostFileRead(deviceId: string, path: string): Promise<string>
   /**
@@ -174,7 +178,7 @@ export declare class DeviceCore {
   /** Answers every waiting request of one session cancelled. Call when the session is cancelled or ends. */
   acpPermissionCancelSession(sessionId: string): void
   /**
-   * Checks one relayed coding-agent command (`acp_start`, `acp_send`, `acp_cancel`, `acp_permission_answer`)
+   * Checks one relayed coding-agent command (`acp_start`, `acp_send`, `acp_cancel`, `acp_permission_answer`, `acp_set_config`)
    * without acting on it or spending its nonce (JSON `{ callId, expiresAt, command, refusal }`). The main process
    * writes its receipt, acts on `command`, then asks for the result with `acp_sign`.
    */
@@ -189,6 +193,25 @@ export declare class DeviceCore {
    * `already_answered` when it is no longer waiting.
    */
   acpPermissionAnswerRemote(sessionId: string, requestId: string, optionId: string): void
+  /**
+   * Starts a coding agent's terminal, which the person allowed (`terminal/create`; a `TerminalRequest`, JSON), in the
+   * shell sandbox. Resolves its handle at once; the command runs on. Rejects, with nothing started, for an agent not
+   * approved for the folder, a working folder outside it, too many terminals, or a computer with no sandbox.
+   */
+  acpTerminalStart(request: string): Promise<number>
+  /**
+   * Whether a coding agent's terminal could start in `folder` on this computer (a sandbox that can run it, and the folder
+   * shared with its tools). The desktop offers `terminal` to an agent only when this is true.
+   */
+  acpTerminalAvailable(folder: string): boolean
+  /** What a terminal printed so far (its tail) and, once it ended, how (`{ output, truncated, exitStatus }`, JSON). */
+  acpTerminalOutput(handle: number): string
+  /** Resolves how a terminal's command ended (`{ exitCode, signal }`, JSON), once it has. */
+  acpTerminalWait(handle: number): Promise<string>
+  /** Ends a terminal's command and everything it started. Its output stays readable until it is released. */
+  acpTerminalKill(handle: number): void
+  /** Ends a terminal and forgets it. A handle that is already gone is not an error. */
+  acpTerminalRelease(handle: number): void
   /** The most recent audit lines, newest first (each a JSON object). */
   auditTail(): Array<string>
   /**
@@ -196,7 +219,7 @@ export declare class DeviceCore {
    * runs on the blocking pool: a server that is mid-call holds its lock, and the main thread must not wait for it.
    */
   reapIdleServers(): Promise<boolean>
-  /** Stops every local MCP server. Call on quit. */
+  /** Stops every local MCP server and every agent's terminal. Call on quit. */
   stop(): void
 }
 

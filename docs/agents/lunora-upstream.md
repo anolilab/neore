@@ -6,8 +6,14 @@ repo-relative. Project-wide rules stay in the root `AGENTS.md`.
 ## Upstream: what is open, and what must not be re-filed
 
 **Every defect from the migration audit is fixed or declined** — that batch is
-closed out. One of ours is open: [#687](https://github.com/anolilab/lunora/issues/687)
-(cloud spend cap prices 35 meters against one observed; non-blocking).
+closed out. Open from us: [#687](https://github.com/anolilab/lunora/issues/687)
+(cloud spend cap prices 35 meters against one observed; non-blocking), and
+[#1709](https://github.com/anolilab/lunora/issues/1709) (codegen 443: `where` on an optional column rejects `null`;
+`agent/files.ts` filters with `{ isNull: true }` instead). Closed upstream and no longer held: [#1666](https://github.com/anolilab/lunora/issues/1666),
+[#1667](https://github.com/anolilab/lunora/issues/1667), [#1668](https://github.com/anolilab/lunora/issues/1668),
+[#1702](https://github.com/anolilab/lunora/issues/1702) (`LunoraPayment` drops `adapter`, `scoped()` replaces it),
+[#1703](https://github.com/anolilab/lunora/issues/1703) (advisor false positives, `advisor.accept`),
+[#1705](https://github.com/anolilab/lunora/issues/1705) (live provider status read, in alpha.279).
 Fixed upstream, with a choice here still in force: [#1037](https://github.com/anolilab/lunora/issues/1037)
 (`lunoraTest` now takes `queues` / `notify`; `notifications/push.test.ts` still splices one
 shared facade, since `lunora/notify.ts` makes a fresh memory store per ctx),
@@ -19,9 +25,32 @@ shared facade, since `lunora/notify.ts` makes a fresh memory store per ctx),
 The ORM-facade reads and
 `agent/admitted-thread-db.ts` stay, as ordinary code, not as a workaround).
 
-**Not filed yet (owner to decide):** in `lunoraTest` (`@lunora/server@alpha.273`), `rls()` ignores a range on the second
-index field of `messages` (read policy: `OR` of `{ userId }` and `{ threadId: { in } }`); the owner-policy `threadGuestLinks`
-honours it. `findSentNote` reads through `admittedThreadDb`; `agent/messages.ts#pinFollowingRowParent` is exposed.
+**Not filed yet (owner to decide):** `rls()` (`@lunora/server@alpha.273`) ignores a range on the second index field of
+`messages` (read policy: `OR` of `{ userId }` and `{ threadId: { in } }`); the owner-policy `threadGuestLinks` honours it.
+Once a request admitted two or more threads it drops the `threadId` range too, so a read returns every admitted thread's
+rows. `lunoraTest` runs the production engine (`createShardCtxDb` from `@lunora/shard-engine` with this middleware), so
+this is not test-only: a procedure that admits several threads reads each one's messages through a reader keyed on it
+(`admittedThreadDb`, `admittedThreadMessages`; `findSentNote`, `listSubAgentApprovals`).
+`agent/messages.ts#pinFollowingRowParent` is exposed.
+
+**Not filed yet (owner to decide): a failed vector upsert is not retried.** In `@lunora/do@alpha.282` the write-through
+vector sync runs after commit (`deferAfterCommit`); a failed Vectorize upsert is logged by `flushAfterCommit`, not thrown or
+re-queued, and nothing a mutation can read records it. The row then holds the new columns while the index keeps the old
+metadata, and a writer that compares against the row (the `archived` flag, `agent/thread-vector-archived.ts`) sees it as
+aligned. The remedy today is the operator's: `__lunora_admin__:backfillVectors` with `restart: true` re-upserts every
+vectorized row from its columns. An upstream retry, or a per-row "projection pending" marker, would close it.
+
+**Not filed yet (owner to decide): a subscription answer for a resume.** A reconnect the server answers with a `resume`
+frame calls no rows callback, so a live subscription cannot show the connection is back. The mobile project screen works
+around it with one direct read per refresh tick (`useProjectConfirm`, `apps/mobile/src/projects/use-projects.ts`). A
+public per-subscription `onAnswered(ok | refused)` that fires on data, `resume` and `settled` frames would replace that
+read; switch to it when it ships.
+
+**Not filed yet (owner to decide): seed the identity store from SSR.** `@lunora/react`'s `useAuth` / `useAuthState`
+read `"loading"` on the server and while hydrating (`getServerSnapshot`), and on the client until `getCurrentUser()`
+answers, even when SSR already minted the token. `apps/web/src/features/auth/components/optimistic-auth-gate.tsx`
+works around it with the dehydrated `authStatus` and a stored signed-in hint. An upstream option to seed the store
+(status and user) from SSR would let `<Authenticated>` render on the first paint and retire that gate.
 
 **Not filed yet (owner to decide): `.global()` writes and live queries.** In `@lunora/shard-engine@alpha.193`, only an
 insert into a `.global()` table re-runs the subscriptions that read it, and only on the writer's own Durable Object;
@@ -29,6 +58,33 @@ insert into a `.global()` table re-runs the subscriptions that read it, and only
 (`@lunora/do`'s `publishLiveFromAction`: "no cross-shard live fan-out"). A `.global()` shape (`defineShape`) is the one
 built-in that polls D1 (every 2s). Until then a list that other members change is read with refetches, not
 subscriptions: `projects_functions:listProjectRepos` is in `NEVER_LIVE` (`apps/web/src/lib/lunora/crpc.tsx`).
+
+**Not filed yet (owner to decide): a `.global()` `patchIf` cannot be held to a query budget.** In
+`@lunora/sql-store@alpha.239` a conditional patch reads the row (`SELECT … CASE WHEN <where>`), then writes it under the
+version it read; when the write misses and the next read still matches `where`, it goes round again, up to 16 times,
+then throws `occ`. No option caps the rounds and the result (`{ applied, doc }`) does not say how many ran, so a caller
+on the 50-query Free plan cannot stop a page early on contention. A round only repeats after a commit that left `where`
+true: the grant paths (`agent/grant-revision.ts`) condition every write on `revision`, and every writer but a merge's
+own `userId`/`ownerId` move changes it, so a race costs one read more and then misses. `GRANT_PAGE_STATEMENTS` keeps 18
+of the 50 for that. A burst of commits that keep `revision` to one row can still pass the limit; the invocation then
+fails, and the merge job's redelivery continues the page. A `maxAttempts` option or a reported `attempts` count would
+let the page stop early instead.
+
+**Not filed yet (owner to decide): a post-commit schedule handoff fails the committed write's caller.** In the installed
+`@lunora/server`, `ctx.scheduler.runAfter`/`runAt` inside a mutation only buffer the job (`withDeferredSchedules`); the
+settle after the commit hands it to the scheduler and, when that fails, keeps it in the outbox for a retry but still throws,
+so the caller sees an error for a write that committed. A `try`/`catch` around `runAfter` cannot see it. Until a settle that
+logs instead of throwing exists, a scheduling mutation's caller must be safe to retry: the host ingest's `session_open` is
+(`acp/ingest.ts#openSession` schedules `recordOpenedRunner` only while the session is `starting`, and the desktop posts the
+open again on an error, `apps/desktop/src/acp/session-link.ts`).
+
+**Not filed yet (owner to decide): removing a field without a whole-row replace.** In `@lunora/sql-store@alpha.239`,
+`patch`/`patchIf` refuse `undefined`, and a `null` on a `v.optional` `.global()` column is stored and read back as `null`,
+which the output validators reject. Removing a column is therefore a `replace`, whose OCC is checked against the row the
+replace reads itself, not the one the caller built it from, so any field another write changed after the caller's read is
+written back stale (`lib/patch.ts#patchRow`). A `patch`-with-unset (or a `replaceIf`) would close it. Until then a column
+that must be cleared under concurrency is emptied with a value its readers treat as none: `projects.runnerDeviceId` and
+friends become `""` on an organization move (`agent/projects.ts#updateProject`), as `organizationId` already does.
 
 Moving queue, mail, push and uploads onto Lunora (2026-10) filed and saw fixed,
 workarounds retired with `@lunora/cli@alpha.365`:
@@ -78,6 +134,7 @@ bound is listed only after its next write (no data exists yet).
 |                                                       |                                                                  |
 | ----------------------------------------------------- | ---------------------------------------------------------------- |
 | [#687](https://github.com/anolilab/lunora/issues/687) | Cloud prices 35 meters against one observed.                     |
+| [#1709](https://github.com/anolilab/lunora/issues/1709) | Codegen 443: `where` on an optional column rejects `null`.       |
 | [#360](https://github.com/anolilab/lunora/issues/360) | Pluggable queue drivers; feature request, closed as not planned. |
 
 Check
@@ -111,7 +168,7 @@ install. Use a builder chain.
 
 ## Reading advisories
 
-The tree draws **0 ERROR, 4 WARN, 64 INFO** (2026-11-04, codegen alpha.399), and every one
+The tree draws **0 ERROR (4 suppressed), 17 WARN, 100 INFO** (2026-11-21, codegen alpha.428), and every one
 left is by design: the `user` counts (better-auth writes that table outside `ctx.db`, so an
 aggregate counter would drift), `addTeamMember`'s captcha (an authenticated admin action), the
 usage backfill's re-arm (its cursor is the `usageBackfill` row), internal `owner_field` inserts,
@@ -143,8 +200,15 @@ on it, and a cap on a shared validator const does NOT count. Write
 which fields must use `document`, are documented there). The caps bound input;
 they were first added to keep the finding count under the TS2590 limit of
 [#823](https://github.com/anolilab/lunora/issues/823), which is fixed, so the
-count itself no longer matters. There is still no in-tree switch to silence an
-advisor rule: `lint: false` drops every finding, the ERROR gate included.
+count itself no longer matters. There is no switch to silence a whole
+advisor rule (`lint: false` drops every finding, the ERROR gate included), but one finding at one site is
+suppressed with `// lunora-advisor-exempt <rule_id> -- <reason>` on the line above it (lunora#1587); the codegen
+gate (strict under `CI`) and the deploy preflight then skip it, and codegen lists it under "suppressed". Four are
+(codegen 428): two plain helpers whose parameter is named `args` (`openHostSession`, `createAcpCall`: a helper
+write the advisor cannot trace to a procedure is ERROR by design, lunora#954/#960, so do not file it), and two
+public procedures whose owner or key is a column of a row the caller was checked against (`createPageInvite`,
+`getChatFileImageUrl`). Wrapping a `ctx.db` read in a call (`storedRow(await ctx.db…)`) hides the row's origin from
+the advisor: in a procedure that stamps an owner from that row, narrow at the use instead (`duplicatePrompt`).
 
 Three rules are worth knowing by name:
 
@@ -172,8 +236,9 @@ Three rules are worth knowing by name:
 
 ## Duplicate `@lunora/*` copies
 
-**All 36 `@lunora/*` packages plus `lunorash` resolve to ONE version each**,
-`@lunora/errors` included. That is not the
+**Three `@lunora/*` packages have two copies (2026-11-21, `cli` 505):** `queue` (143, 145) and `bindings` (151, 153),
+because `testing` 338 pins the older ones exactly, and `platform` (80, 83), which `lunorash` 479 pins. None is
+branded, so they cost nothing. Every other package resolves to ONE version, `@lunora/errors` included. That is not the
 steady state: the meta-packages (`cli`,
 `codegen`, `lunorash`, `studio`, `react`, `agent`, `runtime`, `server`) pin their
 siblings _exactly_, so whenever they lag the `alpha` dist-tag by different

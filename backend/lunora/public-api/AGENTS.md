@@ -4,8 +4,11 @@
 
 - **Public v1 API + `neore` CLI** (`backend/lunora/public-api/`, `apps/cli`) —
   one route table (`routes.ts`) feeds both the hono router and
-  `/api/v1/openapi.json`; every handler calls an EXISTING public procedure
-  through `ctx.runQuery(api.…)`. That works because `server.ts`'s
+  `/api/v1/openapi.json`; most handlers call an EXISTING public procedure
+  through `ctx.runQuery(api.…)`. The exception is `events/poll`, which calls
+  `internal.public_api.events.pollEvents` (the Events log has no public
+  procedure), so the router, not a procedure, enforces its scope and limit.
+  The `api.…` path works because `server.ts`'s
   `resolveIdentity` resolves an API key to the key owner's `userId` on
   `/api/v1/*` ONLY (and nothing but a key there — no JWT, no cookie), so the
   procedure's own auth, access checks and limits run unchanged; scopes and the
@@ -18,3 +21,7 @@
   `auth_api_keys.createScopedApiKey`. `auth.api` is typed without plugin
   endpoints (`buildAuthOptions` returns plain `BetterAuthOptions`) — use
   `ApiKeyAuthApi` from `public-api/identity.ts`.
+- **`clientMessageId` on `/chat`** — forwarded to `runChatStart` (`chat/start-claim.ts`), separate from
+  `Idempotency-Key`. A retry answers 200 with `duplicate: true` (not 202), and the start's 409/422 map to
+  `chat_start_in_progress` / `client_message_id_reused` in `chatStartError`; keep the zod rule in step with
+  `isValidClientMessageId`.

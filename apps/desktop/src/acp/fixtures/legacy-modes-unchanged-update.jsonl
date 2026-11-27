@@ -1,0 +1,9 @@
+# A legacy mode change in flight while the agent repeats its current mode and then names a mode it did not list, then its valid answer. Hand-written from the ACP v1 spec, not recorded from a real agent.
+{"out":{"id":"$1","method":"initialize","params":{"protocolVersion":1,"clientCapabilities":{"fs":{"readTextFile":false,"writeTextFile":false},"terminal":false},"clientInfo":{"name":"neore-desktop","title":"Neore","version":"9.9.9"}}}}
+{"in":{"id":"$1","result":{"protocolVersion":1,"agentCapabilities":{"loadSession":false,"promptCapabilities":{"image":false,"audio":false,"embeddedContext":false}},"agentInfo":{"name":"example-agent","version":"0.4.1"},"authMethods":[]}}}
+{"out":{"id":"$2","method":"session/new","params":{"cwd":"/work","mcpServers":[]}}}
+{"in":{"id":"$2","result":{"sessionId":"sess_1","modes":{"currentModeId":"ask","availableModes":[{"id":"ask","name":"Ask"},{"id":"code","name":"Code"}]},"models":{"currentModelId":"m1","availableModels":[{"modelId":"m1","name":"M1"}]}}}}
+{"out":{"id":"$3","method":"session/set_mode","params":{"sessionId":"sess_1","modeId":"code"}}}
+{"in":{"method":"session/update","params":{"sessionId":"sess_1","update":{"sessionUpdate":"current_mode_update","currentModeId":"ask"}}}}
+{"in":{"method":"session/update","params":{"sessionId":"sess_1","update":{"sessionUpdate":"current_mode_update","currentModeId":"zzz"}}}}
+{"in":{"id":"$3","result":{}}}

@@ -311,6 +311,53 @@ describe("pull request / thread links in GDPR flows", () => {
         expect(links[0]).toMatchObject({ kind: "opened", repository: "o/r", title: "mine" });
     });
 
+    it("exports each link's stored pull-request state and when it was read", async () => {
+        await harness.run(async (ctx: any) => {
+            const threadId = await ctx.db.insert("threads", { createdBy: A, mode: "text", status: "active", title: "mine", updatedAt: 1, userId: A });
+
+            await ctx.db.insert("pullRequestThreads", {
+                createdAt: 1,
+                kind: "opened",
+                number: 1,
+                repository: "o/r",
+                state: "closed",
+                stateCheckedAt: 500,
+                threadId,
+                title: "mine",
+                url: "https://github.com/o/r/pull/1",
+                userId: A,
+            });
+        });
+
+        const { links } = await harness.run(async (ctx: any) => await ctx.runQuery(collectPullRequestThreadsForExport as never, { userId: A } as never));
+
+        expect(links).toStrictEqual([expect.objectContaining({ state: "closed", stateCheckedAt: 500 })]);
+    });
+
+    it("exports a recorded watch read failure", async () => {
+        const failure = { at: 9, attempts: 3, status: "rate_limited" };
+
+        await harness.run(async (ctx: any) => {
+            const threadId = await ctx.db.insert("threads", { createdBy: A, mode: "text", status: "active", title: "mine", updatedAt: 1, userId: A });
+
+            await ctx.db.insert("pullRequestThreads", {
+                createdAt: 1,
+                kind: "linked",
+                number: 1,
+                repository: "o/r",
+                threadId,
+                title: "mine",
+                url: "https://github.com/o/r/pull/1",
+                userId: A,
+                watchReadFailure: failure,
+            });
+        });
+
+        const { links } = await harness.run(async (ctx: any) => await ctx.runQuery(collectPullRequestThreadsForExport as never, { userId: A } as never));
+
+        expect(links).toStrictEqual([expect.objectContaining({ watchReadFailure: failure })]);
+    });
+
     it("erases them in batches, only the user's own", async () => {
         await link(A, MANY);
         await link(B, 3);
@@ -321,6 +368,25 @@ describe("pull request / thread links in GDPR flows", () => {
         expect(await run()).toEqual({ hasMore: false });
         expect(await count(A)).toBe(0);
         expect(await count(B)).toBe(3);
+    });
+
+    it("erases the owner's scan position with their last batch of links", async () => {
+        await link(A, 3);
+        await link(B, 1);
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("pullRequestStateScans", { cursor: "scan-a", userId: A });
+            await ctx.db.insert("pullRequestStateScans", { cursor: "scan-b", userId: B });
+        });
+
+        const run = async () => await harness.run(async (ctx: any) => await ctx.runMutation(deleteUserPullRequestThreads as never, { userId: A } as never));
+        const scansOf = async (userId: string): Promise<number> =>
+            await harness.run(
+                async (ctx: any) => (await ctx.db.query("pullRequestStateScans").collect()).filter((row: { userId: string }) => row.userId === userId).length,
+            );
+
+        expect(await run()).toEqual({ hasMore: false });
+        expect(await scansOf(A)).toBe(0);
+        expect(await scansOf(B)).toBe(1);
     });
 
     it("is wired into both workflows under explicit ids", () => {
@@ -338,5 +404,37 @@ describe("pull request / thread links in GDPR flows", () => {
         expect(new Set(exported).size).toBe(exported.length);
         expect(new Set(deleted).size).toBe(deleted.length);
         expect(exportSource).toMatch(EXPORT_THREADS_ARGS);
+    });
+
+    it("exports a link's status-read time when it has one", async () => {
+        await harness.run(async (ctx: any) => {
+            const threadId = await ctx.db.insert("threads", {
+                createdBy: "user-c",
+                mode: "text",
+                status: "active",
+                title: "read",
+                updatedAt: 1,
+                userId: "user-c",
+            });
+
+            await ctx.db.insert("pullRequestThreads", {
+                createdAt: 1,
+                kind: "opened",
+                number: 1,
+                repository: "o/r",
+                statusReadAt: 42,
+                threadId,
+                title: "read",
+                url: "https://github.com/o/r/pull/1",
+                userId: "user-c",
+            });
+        });
+
+        const { links } = await collectAllPullRequestThreads(
+            async (cursor) =>
+                await harness.run(async (ctx: any) => await ctx.runQuery(collectPullRequestThreadsForExport as never, { cursor, userId: "user-c" } as never)),
+        );
+
+        expect(links).toMatchObject([{ statusReadAt: 42 }]);
     });
 });

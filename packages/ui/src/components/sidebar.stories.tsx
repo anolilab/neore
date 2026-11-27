@@ -1,7 +1,9 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { HomeIcon, InboxIcon, SettingsIcon } from "lucide-react";
-import { expect, userEvent } from "storybook/test";
+import { flushSync } from "react-dom";
+import { expect, screen, userEvent } from "storybook/test";
 
+import MOBILE_BREAKPOINT_QUERY from "../utils/breakpoints";
 import {
     Sidebar,
     SidebarContent,
@@ -15,6 +17,7 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
     SidebarProvider,
+    SidebarRail,
     SidebarTrigger,
 } from "./sidebar";
 
@@ -25,11 +28,24 @@ type LayoutProps = {
     defaultOpen?: "all" | (typeof NAMES)[number][];
     side?: "left" | "right";
     variant?: "sidebar" | "floating" | "inset";
+    /** Puts a 4rem launcher column at the viewport's edge, with the sidebar starting beside it (the app's layout). */
+    withLauncher?: boolean;
+    /** Adds the rail that reopens a collapsed sidebar from the viewport's edge. */
+    withRail?: boolean;
 };
 
-const Layout = ({ collapsible, defaultOpen = "all", side, variant }: LayoutProps) => (
+const Layout = ({ collapsible, defaultOpen = "all", side, variant, withLauncher = false, withRail = false }: LayoutProps) => (
     <SidebarProvider className="min-h-80" defaultOpen={defaultOpen} sidebarNames={NAMES}>
-        <Sidebar aria-label="Workspace" collapsible={collapsible} name="main" side={side} variant={variant}>
+        {withLauncher && <div className="bg-sidebar relative z-20 hidden h-svh w-16 shrink-0 md:block" data-testid="launcher" />}
+        <Sidebar
+            aria-label="Workspace"
+            className={withLauncher ? "left-16 [--sidebar-offset:4rem]" : undefined}
+            collapsible={collapsible}
+            name="main"
+            rail={withRail ? <SidebarRail name="main" side={side ?? "left"} /> : undefined}
+            side={side}
+            variant={variant}
+        >
             <SidebarHeader>
                 <p className="px-2 text-sm font-medium">Workspace</p>
             </SidebarHeader>
@@ -70,6 +86,8 @@ const Layout = ({ collapsible, defaultOpen = "all", side, variant }: LayoutProps
                 <SidebarTrigger name="main" />
                 <span className="text-sm">Page content</span>
             </header>
+            {/* Positioned and stacked, as a chat's scroll area is: the rail beside it must still be above it. */}
+            <div className="relative z-0 h-svh" data-testid="page-body" />
         </SidebarInset>
     </SidebarProvider>
 );
@@ -104,3 +122,229 @@ export const IconCollapsible: Story = { args: { collapsible: "icon" } };
 export const RightSide: Story = { args: { side: "right" } };
 
 export const Floating: Story = { args: { variant: "floating" } };
+
+/** The sidebar's box, the gap that holds the page's room for it, and the transitions running on each. */
+const sidebarParts = (canvasElement: HTMLElement) => {
+    // The slide is in the layout boxes, which have no role.
+    const container = canvasElement.querySelector<HTMLElement>('[data-slot="sidebar-container"]');
+    const gap = canvasElement.querySelector<HTMLElement>('[data-slot="sidebar-gap"]');
+
+    return { container, gap };
+};
+
+/** The CSS transitions on an element, by the property they animate, with the time each takes to start and to run. */
+const transitionsOf = (element: HTMLElement) =>
+    element
+        .getAnimations()
+        .filter((animation): animation is CSSTransition => animation instanceof CSSTransition)
+        .map((transition) => {
+            const timing = transition.effect?.getTiming();
+
+            return { delay: Number(timing?.delay ?? 0), duration: Number(timing?.duration ?? 0), property: transition.transitionProperty };
+        });
+
+const settled = async (element: HTMLElement) => {
+    await Promise.all(element.getAnimations().map((animation) => animation.finished));
+};
+
+/**
+ * Clicks `target`, commits the update at once, and reads `read` in the same task: what the click started is read where it starts,
+ * before any frame passes, however slow the runner.
+ */
+const clickAndRead = <T,>(target: HTMLElement, read: () => T): T => {
+    flushSync(() => {
+        target.click();
+    });
+
+    return read();
+};
+
+/** The rail, once it has settled, lies inside the viewport and is the element a click there reaches. */
+const expectRailReachable = async (canvasElement: HTMLElement) => {
+    const rail = canvasElement.querySelector<HTMLElement>('[data-slot="sidebar-rail"]');
+
+    await expect(rail).not.toBeNull();
+
+    if (!rail) {
+        return;
+    }
+
+    await settled(rail);
+
+    const box = rail.getBoundingClientRect();
+
+    await expect({ inside: box.width > 0 && box.left >= 0 && box.right <= globalThis.innerWidth }).toStrictEqual({ inside: true });
+    await expect(rail.contains(document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2))).toBe(true);
+};
+
+/**
+ * Closing and opening an off-canvas sidebar slides it (translate, on the compositor) and moves the page's edge once: when it has slid
+ * out, or at once when it opens. Animating the gap's width instead laid out and painted the page on every frame. The rail stays at the
+ * viewport's edge to open it again; with reduced motion everything settles at once.
+ */
+const slidePlay =
+    (side: "left" | "right") =>
+    async ({ canvasElement }: { canvasElement: HTMLElement }) => {
+        const { container, gap } = sidebarParts(canvasElement);
+        const trigger = canvasElement.querySelector<HTMLElement>('[data-slot="sidebar-trigger"]');
+        const sidebar = canvasElement.querySelector<HTMLElement>('[data-slot="sidebar"]');
+
+        await expect(trigger).not.toBeNull();
+
+        if (!trigger) {
+            return;
+        }
+
+        // On a phone the sidebar is a sheet, opened by the trigger: it slides in as a dialog, with no gap or sliding box.
+        if (globalThis.matchMedia(MOBILE_BREAKPOINT_QUERY).matches) {
+            await expect(container).toBeNull();
+            await userEvent.click(trigger);
+            await expect(await screen.findByRole("dialog", { name: "Sidebar" })).toBeVisible();
+
+            return;
+        }
+
+        // On a wider screen both boxes must be there: a missing one is a broken layout, not a phone.
+        await expect(container).not.toBeNull();
+        await expect(gap).not.toBeNull();
+
+        if (!container || !gap) {
+            return;
+        }
+
+        const { width } = container.getBoundingClientRect();
+        const isOffScreen = () => {
+            const box = container.getBoundingClientRect();
+
+            return side === "left" ? box.right <= 0 : box.left >= globalThis.innerWidth;
+        };
+        const moving = (element: HTMLElement) =>
+            transitionsOf(element)
+                .filter((transition) => transition.duration > 0.01)
+                .map((transition) => transition.property);
+        // Under reduced motion nothing may run or wait: a delayed resting place would hold the page's edge for the slide's length.
+        const movingOrWaiting = (element: HTMLElement) =>
+            transitionsOf(element)
+                .filter((transition) => transition.duration > 0.01 || transition.delay > 0)
+                .map((transition) => transition.property);
+
+        // Reduced motion: nothing slides; the box and the page's edge reach their places at once, together.
+        if (globalThis.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+            const closing = clickAndRead(trigger, () => [...movingOrWaiting(container), ...movingOrWaiting(gap)]);
+
+            await expect(closing).toStrictEqual([]);
+            await settled(container);
+            await settled(gap);
+            await expect(gap.getBoundingClientRect().width).toBe(0);
+            await expect(isOffScreen()).toBe(true);
+            await expectRailReachable(canvasElement);
+
+            const opening = clickAndRead(trigger, () => [...movingOrWaiting(container), ...movingOrWaiting(gap)]);
+
+            await expect(opening).toStrictEqual([]);
+            // The global reduced-motion rule leaves a 0.01 ms transition: settled within a frame.
+            await settled(container);
+            await settled(gap);
+            await expect(gap.getBoundingClientRect().width).toBe(width);
+            await expect(isOffScreen()).toBe(false);
+
+            return;
+        }
+
+        // Open, the rail sits on the sidebar's edge above the page, and a click there reaches it.
+        await expectRailReachable(canvasElement);
+
+        const closing = clickAndRead(trigger, () => {
+            return {
+                box: transitionsOf(container),
+                boxMoving: moving(container),
+                gap: transitionsOf(gap),
+                gapWidth: gap.getBoundingClientRect().width,
+            };
+        });
+
+        // Closing, read where it starts: the box slides, its resting place and the gap wait for the slide to end, and nothing animates
+        // the width.
+        await expect(closing.box).toContainEqual(expect.objectContaining({ duration: 200, property: "translate" }));
+        await expect(closing.boxMoving).toStrictEqual(["translate"]);
+        await expect(closing.gap).toStrictEqual([{ delay: 200, duration: 0, property: "width" }]);
+        await expect(closing.gapWidth).toBe(width);
+
+        await settled(container);
+        await settled(gap);
+
+        await expect(gap.getBoundingClientRect().width).toBe(0);
+        await expect(isOffScreen()).toBe(true);
+
+        // The rail stays at the viewport's edge, and a click on it opens the sidebar again.
+        await expectRailReachable(canvasElement);
+
+        const opening = clickAndRead(canvasElement.querySelector<HTMLElement>('[data-slot="sidebar-rail"]') ?? trigger, () => {
+            return { boxMoving: moving(container), gapWidth: gap.getBoundingClientRect().width, state: sidebar?.dataset.state };
+        });
+
+        // Opening, read where it starts: the rail's click opened it, the gap takes its width at once, and the box slides in over it.
+        await expect(opening.state).toBe("expanded");
+        await expect(opening.gapWidth).toBe(width);
+        await expect(opening.boxMoving).toStrictEqual(["translate"]);
+
+        await settled(container);
+
+        await expect(isOffScreen()).toBe(false);
+        await expect(container.getBoundingClientRect().width).toBe(width);
+    };
+
+export const SlidesClosedAndOpen: Story = { args: { withRail: true }, play: slidePlay("left"), tags: ["reduced-motion"] };
+
+export const SlidesClosedAndOpenOnTheRight: Story = { args: { side: "right", withRail: true }, play: slidePlay("right"), tags: ["reduced-motion"] };
+
+/**
+ * A sidebar that starts beside a launcher slides far enough to clear it: by its width plus the launcher's, so its last frames before
+ * it settles off screen do not sit over the launcher.
+ */
+export const SlidesClearOfTheLauncher: Story = {
+    args: { withLauncher: true },
+    play: async ({ canvasElement }) => {
+        if (globalThis.matchMedia(MOBILE_BREAKPOINT_QUERY).matches) {
+            return;
+        }
+
+        const { container } = sidebarParts(canvasElement);
+        const launcher = canvasElement.querySelector<HTMLElement>('[data-testid="launcher"]');
+        const trigger = canvasElement.querySelector<HTMLElement>('[data-slot="sidebar-trigger"]');
+
+        await expect(container).not.toBeNull();
+        await expect(launcher).not.toBeNull();
+        await expect(trigger).not.toBeNull();
+
+        if (!container || !launcher || !trigger) {
+            return;
+        }
+
+        const { width } = container.getBoundingClientRect();
+        const launcherBox = launcher.getBoundingClientRect();
+
+        await userEvent.click(trigger);
+
+        // Held a frame before the slide ends, with the box's resting place still to come: the box's last frame of the slide.
+        const transitions = container.getAnimations().filter((animation): animation is CSSTransition => animation instanceof CSSTransition);
+        const slide = transitions.find((transition) => transition.transitionProperty === "translate");
+
+        await expect(slide).toBeDefined();
+
+        for (const transition of transitions) {
+            transition.pause();
+            transition.currentTime = transition === slide ? 199 : 0;
+        }
+
+        // Within a few pixels of the end: the box's right edge has cleared the launcher, not stopped on its right edge.
+        await expect(container.getBoundingClientRect().right).toBeLessThanOrEqual(launcherBox.left + 4);
+
+        for (const transition of transitions) {
+            transition.finish();
+        }
+
+        await expect(container.getBoundingClientRect().right).toBeLessThanOrEqual(launcherBox.left);
+        await expect(width).toBeGreaterThan(0);
+    },
+};

@@ -5,6 +5,7 @@ import { AccessibilityInfo, Platform } from "react-native";
 
 import { useAuth } from "../auth/auth-state";
 import { bindLastThreadOwner } from "../chat/last-thread-store";
+import { withCatch } from "../lib/guarded";
 import { getClient } from "../lib/lunora";
 import type { ScopedCache } from "./cache";
 import { canWrite, INITIAL_CONNECTIVITY, isOffline as isOfflineState, isReachable, reduceConnectivity } from "./connectivity";
@@ -23,7 +24,7 @@ const nextTick = (tick: number): number => tick + 1;
  * coming back online moves `refreshTick` and nothing else.
  */
 export const OfflineProvider = ({ children }: { children: ReactNode }) => {
-    const { hasToken, retryToken, status, user } = useAuth();
+    const { hasToken, isConfirming, retryToken, status, user } = useAuth();
     const [connectivity, dispatch] = useReducer(reduceConnectivity, INITIAL_CONNECTIVITY);
     const [refreshTick, setRefreshTick] = useState(0);
     const [bound, setBound] = useState<{ cache: ScopedCache; userId: string } | undefined>();
@@ -72,11 +73,14 @@ export const OfflineProvider = ({ children }: { children: ReactNode }) => {
     }, []);
 
     // Signed in with no token: the server could not be reached to mint one, which is offline whatever the device says.
-    const isTokenMissing = status === "signed-in" && !hasToken;
+    // A start still confirming the stored user has not failed yet, so it shows no offline banner.
+    // It has no token to write with either, so its write controls wait as they do while a connection is checked.
+    const isTokenMissing = status === "signed-in" && !hasToken && !isConfirming;
+    const isTokenPending = status === "signed-in" && !hasToken && isConfirming;
 
     useEffect(() => {
-        dispatch({ missing: isTokenMissing, type: "token" });
-    }, [isTokenMissing]);
+        dispatch({ missing: isTokenMissing, pending: isTokenPending, type: "token" });
+    }, [isTokenMissing, isTokenPending]);
 
     useEffect(() => {
         refresher.current.update(isOffline);
@@ -106,23 +110,25 @@ export const OfflineProvider = ({ children }: { children: ReactNode }) => {
         const offlineCache = getOfflineCache();
         let isCancelled = false;
 
-        const run = async () => {
-            try {
-                if (status === "signed-out") {
-                    await offlineCache.clear();
-                } else if (status === "signed-in" && userId !== undefined) {
-                    // Like the cache, the saved chat to reopen accepts saves from this account only.
-                    bindLastThreadOwner(userId);
-                    await offlineCache.bindOwner(userId);
+        const update = async () => {
+            if (status === "signed-out") {
+                await offlineCache.clear();
+            } else if (status === "signed-in" && userId !== undefined) {
+                // Like the cache, the saved chat to reopen accepts saves from this account only.
+                bindLastThreadOwner(userId);
+                await offlineCache.bindOwner(userId);
 
-                    if (!isCancelled) {
-                        setBound({ cache: offlineCache.forOwner(userId), userId });
-                    }
+                if (!isCancelled) {
+                    setBound({ cache: offlineCache.forOwner(userId), userId });
                 }
-            } catch (error) {
+            }
+        };
+        // `withCatch`, not a `try` around `update`: the React Compiler skips a component whose `try` holds a condition.
+        const run = async () => {
+            await withCatch(update, (error: unknown) => {
                 // eslint-disable-next-line no-console -- no logger in the app; the app carries on without a cache, but not silently
                 console.warn("Could not update the offline cache.", error);
-            }
+            });
         };
 
         run();

@@ -326,7 +326,7 @@ describe("a backup model with a smaller window", () => {
     it("applyLateCompression compresses to the smaller of the two windows", () => {
         expect(applyLateCompression(big, "gemini-2.5-flash")).toBe(big);
 
-        const output = applyLateCompression(big, "gemini-2.5-flash", "gpt-4o");
+        const output = applyLateCompression(big, "gemini-2.5-flash", ["gpt-4o"]);
 
         expect(output).not.toBe(big);
         expect(estimateTokens(output)).toBeLessThan(128_000 * 0.85);
@@ -335,10 +335,18 @@ describe("a backup model with a smaller window", () => {
     it("buildRunStreamArgs compresses between steps to the smaller window", () => {
         type Prepare = { prepareStep: (options: { messages: ModelMessage[] }) => { messages: ModelMessage[] } | undefined };
         const alone = buildRunStreamArgs({ model: "gemini-2.5-flash", reasoningEffort: undefined }) as unknown as Prepare;
-        const withBackup = buildRunStreamArgs({ backupModelId: "gpt-4o", model: "gemini-2.5-flash", reasoningEffort: undefined }) as unknown as Prepare;
+        const withBackup = buildRunStreamArgs({ backupModelIds: ["gpt-4o"], model: "gemini-2.5-flash", reasoningEffort: undefined }) as unknown as Prepare;
 
         expect(alone.prepareStep({ messages: big })).toBeUndefined();
         expect(withBackup.prepareStep({ messages: big })?.messages.length).toBeLessThan(big.length);
+    });
+
+    it("sizes for the smallest window among several backups, whichever one the run lands on", () => {
+        expect(applyLateCompression(big, "gemini-2.5-flash", ["gemini-2.5-pro"])).toBe(big);
+
+        const output = applyLateCompression(big, "gemini-2.5-flash", ["gemini-2.5-pro", "gpt-4o"]);
+
+        expect(estimateTokens(output)).toBeLessThan(128_000 * 0.85);
     });
 });
 
@@ -346,7 +354,7 @@ describe("a backup that cannot call tools", () => {
     type Prepare = { prepareStep: (options: { messages: ModelMessage[] }) => { messages: ModelMessage[] } | undefined };
     const big = thread(10, 2, "y".repeat(40_000));
     const args = (hasTools: boolean) =>
-        buildRunStreamArgs({ backupModelId: "kimi-k2-instruct", hasTools, model: "gemini-2.5-flash", reasoningEffort: undefined }) as unknown as Prepare;
+        buildRunStreamArgs({ backupModelIds: ["kimi-k2-instruct"], hasTools, model: "gemini-2.5-flash", reasoningEffort: undefined }) as unknown as Prepare;
 
     it("does not shrink the context of a call that carries tools, since the backup would be skipped", () => {
         expect(args(true).prepareStep({ messages: big })).toBeUndefined();
@@ -373,7 +381,7 @@ describe("a backup that cannot see images", () => {
     const text = thread(10, 2, "y".repeat(40_000));
     const withImage = [...text, { content: [{ image: "x", type: "image" }], role: "user" }] as unknown as ModelMessage[];
     const args = () =>
-        buildRunStreamArgs({ backupModelId: BLIND_BACKUP, hasTools: false, model: "gemini-2.5-flash", reasoningEffort: undefined }) as unknown as Prepare;
+        buildRunStreamArgs({ backupModelIds: [BLIND_BACKUP], hasTools: false, model: "gemini-2.5-flash", reasoningEffort: undefined }) as unknown as Prepare;
 
     it("does not size a call carrying an image for it, since the backup would be skipped", () => {
         expect(args().prepareStep({ messages: withImage })).toBeUndefined();

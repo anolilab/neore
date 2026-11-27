@@ -107,6 +107,7 @@ const save = async (value: string | null, options: { approvalId?: string; caller
     await harness.run(
         async (ctx: any) =>
             await claimSecretAnswer(ctx, {
+                answeredByImpersonator: false,
                 approvalId: options.approvalId ?? "sec-1",
                 callerId: options.callerId ?? OWNER,
                 expectedUrl: options.expectedUrl,
@@ -392,6 +393,7 @@ describe("claimSecretAnswer", () => {
             harness.run(
                 async (ctx: any) =>
                     await claimAskUserAnswer(ctx, {
+                        answeredByImpersonator: false,
                         approvalId: "sec-1",
                         callerId: OWNER,
                         reply: { answer: "yes", kind: "answer" },

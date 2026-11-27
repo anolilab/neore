@@ -20,6 +20,7 @@
 
 import { Trans, useLingui } from "@lingui/react/macro";
 import type { Id } from "@neore/backend/dataModel";
+import { ImageOpenContext } from "@neore/chat-ui/chat/image-open-context";
 import { HOST_RUN_METADATA } from "@neore/chat-ui/utils/host-run-text";
 import type { StreamSpeaker, ToolProgressEvent } from "@neore/chat-ui/utils/stream-line";
 import { parseStreamLine } from "@neore/chat-ui/utils/stream-line";
@@ -35,6 +36,8 @@ import { SpeakerChip } from "@/features/chat/group/speaker-label";
 import type { UIMessage } from "@/lib/agent";
 import { useCRPC } from "@/lib/lunora/crpc";
 
+import type { HostActivityBody } from "./host-activity";
+import { HostActivity } from "./host-activity";
 import MessageContent from "./message-content";
 import { ToolProgressRows } from "./tool-progress-rows";
 
@@ -50,7 +53,7 @@ type StreamStatus = "pending" | "streaming" | "done" | "error" | "timeout";
 /** A coding agent's turn on a paired computer (`backend/lunora/acp/`): where the host is with it. */
 type HostState = "accepted" | "ended" | "received" | "running";
 /** `speaker`: group chat — the participant talking now; `text`/`reasoning` are theirs only. */
-type StreamBody = { hostState?: HostState; reasoning: string; speaker?: StreamSpeaker; status: StreamStatus; text: string };
+type StreamBody = { hostActivity?: HostActivityBody; hostState?: HostState; reasoning: string; speaker?: StreamSpeaker; status: StreamStatus; text: string };
 /** `restart`: steering — the reply continues below a message the user sent into it. */
 type StreamDelta = { reasoning: string; restart?: true; speaker?: StreamSpeaker; text: string };
 /** One relayed chunk: text for the reply, or — with no text — a running MCP tool call's progress. */
@@ -675,7 +678,7 @@ export const StreamingPlaceholder: FC<StreamingPlaceholderProps> = memo(({ class
     }, []);
 
     // Use the streaming hook - isDriven=true to trigger the gateway SSE connection
-    const { hostState, isReconnecting, reasoning, speaker, status, text, toolProgress } = useStream(sseUrl, isDriven, streamId as StreamId, {
+    const { hostActivity, hostState, isReconnecting, reasoning, speaker, status, text, toolProgress } = useStream(sseUrl, isDriven, streamId as StreamId, {
         onFirstToken: handleFirstToken,
         streamToken,
     });
@@ -737,9 +740,12 @@ export const StreamingPlaceholder: FC<StreamingPlaceholderProps> = memo(({ class
         return (
             <div className={cn("streaming-placeholder-compact", className)}>
                 <div className="message-text">
-                    <MessageContent isStreaming={isStreaming} message={streamingMessage} />
+                    <ImageOpenContext value={null}>
+                        <MessageContent isStreaming={isStreaming} message={streamingMessage} pinImages={false} />
+                    </ImageOpenContext>
                 </div>
                 {isStreaming && <ToolProgressRows state={toolProgress} />}
+                {isStreaming && <HostActivity activity={hostActivity} key={streamId} />}
                 {metricsBar}
             </div>
         );
@@ -759,9 +765,12 @@ export const StreamingPlaceholder: FC<StreamingPlaceholderProps> = memo(({ class
                 <MessageContentWrapper className="text-foreground col-span-2 col-start-2 row-start-1 text-[length:var(--assistant-body-size)] leading-(--assistant-body-leading) wrap-break-word dark:text-white">
                     {speaker && <SpeakerChip className="mb-1" name={speaker.name} />}
                     <div className="message-text text-[length:var(--assistant-body-size)] leading-(--assistant-body-leading)">
-                        <MessageContent isStreaming={isStreaming} message={streamingMessage} />
+                        <ImageOpenContext value={null}>
+                            <MessageContent isStreaming={isStreaming} message={streamingMessage} pinImages={false} />
+                        </ImageOpenContext>
                     </div>
                     {isStreaming && <ToolProgressRows state={toolProgress} />}
+                    {isStreaming && <HostActivity activity={hostActivity} key={streamId} />}
                     {isStreaming && <HostStateLine state={hostState} />}
                     {metricsBar}
                 </MessageContentWrapper>

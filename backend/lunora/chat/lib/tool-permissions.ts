@@ -63,6 +63,11 @@ export const TOOL_PERMISSION_MODES: ReadonlyArray<ToolPermissionMode> = ["auto",
 export const isToolPermissionMode = (value: unknown): value is ToolPermissionMode =>
     typeof value === "string" && (TOOL_PERMISSION_MODES as ReadonlyArray<string>).includes(value);
 
+const MODE_RANK: Record<ToolPermissionMode, number> = { ask: 1, auto: 2, off: 0 };
+
+/** The lower of a mode and a cap, in the order `off` < `ask` < `auto`. */
+export const clampToolPermission = (mode: ToolPermissionMode, cap: ToolPermissionMode): ToolPermissionMode => (MODE_RANK[mode] <= MODE_RANK[cap] ? mode : cap);
+
 /**
  * Stable preference key for a tool.
  *
@@ -80,27 +85,70 @@ export const toolPermissionKey = (source: ToolSource, toolName: string, owner?: 
 };
 
 /**
- * Built-ins that default to `ask`. `delegateToCodingAgent` spends the user's
+ * Built-ins that default to `ask`. `canvasAI` and the paid generation tools (imageGeneration, imageEditing, videoGeneration,
+ * musicGeneration) ask too: a default `auto` would run a paid call with no approval for anyone who has not set an override. `delegateToCodingAgent` spends the user's
  * own provider key on a long sandbox run and can push to their GitHub;
  * `delegateToSubAgent` and `messageWorker` start a background run charged to their task quota —
  * so the user sees the task before anything starts. `replyToReviewComment` and `rerunFailedChecks` act on a pull request
- * as the user (`mergePullRequest` asks every time: it needs a person). Headless callers lose them
+ * as the user (`mergePullRequest` asks every time: it needs a person; so does `signInWithSavedLogin`, which types a saved
+ * password for them). Headless callers lose them
  * (`ask` degrades to `off`), which is intended — except a sub-agent's own
  * delegation, which inherits the consent its parent call was given
  * (`sub-agents/execute.ts`).
  */
 export const BUILTIN_TOOLS_ASK_BY_DEFAULT: ReadonlySet<string> = new Set([
     "askUser",
+    "canvasAI",
     "delegateToCodingAgent",
     "delegateToSubAgent",
+    "imageEditing",
+    "imageGeneration",
     "mergePullRequest",
     "messageWorker",
+    "musicGeneration",
     "replyToReviewComment",
     "requestSecret",
     "rerunFailedChecks",
+    "signInWithSavedLogin",
+    "videoGeneration",
 ]);
 
 const SUB_AGENT_BUILTINS: ReadonlySet<string> = new Set(["delegateToSubAgent", "messageWorker"]);
+
+/**
+ * Built-ins that "Always allow" never grants. Each one spends money or sends something out as the person, and a stored
+ * `auto` would let every later call run unasked. An `always` answer for them is refused and the call still asks; an hour
+ * or today allow is unaffected.
+ *
+ * - imageGeneration, imageEditing, videoGeneration, musicGeneration: paid per generation on a metered provider (FAL),
+ *   each one counted against the user's daily bucket.
+ * - canvasAI: its generate and style operations call the same image generation and editing actions, so it is paid too.
+ * - delegateToCodingAgent: spends the user's own provider key on a sandbox run that can push to their GitHub.
+ * - delegateToSubAgent, messageWorker: start a run charged to the task quota, or send more work to a worker.
+ * - replyToReviewComment: posts a comment on a pull request as the person.
+ * - rerunFailedChecks: re-runs checks on a pull request with the person's GitHub access.
+ * - mergePullRequest: merges a pull request as the person.
+ * - signInWithSavedLogin: types a saved password for the person into a site.
+ *
+ * `tool-permissions.grants.test.ts` checks that every name here is a real built-in.
+ */
+export const ALWAYS_ALLOW_REFUSED_BUILTINS: ReadonlySet<string> = new Set([
+    "canvasAI",
+    "delegateToCodingAgent",
+    "delegateToSubAgent",
+    "imageEditing",
+    "imageGeneration",
+    "mergePullRequest",
+    "messageWorker",
+    "musicGeneration",
+    "replyToReviewComment",
+    "rerunFailedChecks",
+    "signInWithSavedLogin",
+    "videoGeneration",
+]);
+
+/** Whether an `always` answer for this permission key is refused: a built-in listed in {@link ALWAYS_ALLOW_REFUSED_BUILTINS}. */
+export const isAlwaysAllowRefused = (key: string): boolean => key.startsWith("builtin:") && ALWAYS_ALLOW_REFUSED_BUILTINS.has(key.slice("builtin:".length));
 
 export { BUILTIN_TOOLS_NEEDING_A_PERSON } from "./person-tools";
 
@@ -161,6 +209,12 @@ export interface ToolPermissionOptions {
     /** The instant the grants are judged at. Defaults to the clock. */
     now?: number;
     /**
+     * The broadest mode any run in this organization may give a tool (`org-policy.md` §6a). Absent: no cap (`auto`).
+     * A tool above it is held at it. Below `auto` nothing lifts an `ask` (a grant, the quick check, a headless
+     * inheritance), and device tools are removed: their approvals live on the member's computer.
+     */
+    permissionCap?: ToolPermissionMode;
+    /**
      * The thread's permission mode (`thread-permission-mode.ts`). Absent is `auto`, today's behaviour. Ignored by a headless run.
      * See {@link threadModeDefault} for what each value does.
      */
@@ -170,6 +224,12 @@ export interface ToolPermissionOptions {
      * headless run inherits nothing, and `off` stays off.
      */
     timedGrants?: ToolPermissionGrants;
+    /**
+     * Headless only: the mode of the bot the run belongs to (`bots.permissionMode`). Nobody is there to widen anything, so it
+     * applies only when it asks MORE than the headless defaults: `supervised` moves a default as it does in a chat, and its
+     * `ask` then meets the headless clamp below (removed, or paused when `headlessCanAsk`). `auto` and `full` change nothing.
+     */
+    unattendedMode?: ThreadPermissionMode;
 }
 
 export interface ResolvedToolPermission {
@@ -231,24 +291,35 @@ export const resolveToolPermissionWithGrant = (
     overrides: ToolPermissionOverrides | null | undefined,
     options: ToolPermissionOptions = {},
 ): ResolvedToolPermission => {
+    const cap = options.permissionCap ?? "auto";
     const override = overrides?.[descriptor.key];
     const builtinName = descriptor.source === "builtin" ? descriptor.key.slice("builtin:".length) : undefined;
     // Precedence: a mode the user set for THIS tool wins over the thread's mode in both directions ("Always allow" is not
     // taken back by `supervised`, a chosen `ask` is not lifted by `full`); the thread's mode moves only the default. A
-    // headless run ignores it: nobody is there, and its own clamp below decides.
-    const modeForDefault = options.headless ? undefined : options.threadMode;
-    let chosen = isToolPermissionMode(override)
-        ? override
-        : threadModeDefault(defaultToolPermission(descriptor.source, descriptor.annotations, builtinName), descriptor, builtinName, modeForDefault);
+    // headless run ignores it: nobody is there, and its own clamp below decides. The organization's cap then clamps
+    // whichever was chosen, so neither an override nor `full` lifts a tool above it, and everything below (grants,
+    // headless, the origin clamp) reads the clamped mode. A headless run takes only a bot's `supervised` (`unattendedMode`).
+    const headlessMode = options.unattendedMode === "supervised" ? "supervised" : undefined;
+    const modeForDefault = options.headless ? headlessMode : options.threadMode;
+    let chosen = clampToolPermission(
+        isToolPermissionMode(override)
+            ? override
+            : threadModeDefault(defaultToolPermission(descriptor.source, descriptor.annotations, builtinName), descriptor, builtinName, modeForDefault),
+        cap,
+    );
     let timedUntil: number | undefined;
 
-    // Before the origin clamp below, so an outside agent's grant-lifted tool is still `ask`.
-    if (chosen === "ask" && !options.headless && descriptor.source !== "device") {
+    // Before the origin clamp below, so an outside agent's grant-lifted tool is still `ask`. A grant lifts to `auto`, so it needs `auto` under the cap.
+    if (chosen === "ask" && cap === "auto" && !options.headless && descriptor.source !== "device") {
         timedUntil = grantExpiryFor(options.timedGrants, descriptor.key, options.now ?? Date.now());
 
         if (timedUntil !== undefined) {
             chosen = "auto";
         }
+    }
+
+    if (cap !== "auto" && descriptor.source === "device") {
+        return { mode: "off" };
     }
 
     if (options.apiKeyOrigin && descriptor.source === "device") {
@@ -276,7 +347,8 @@ export const resolveToolPermissionWithGrant = (
     }
 
     if (mode === "ask") {
-        if (builtinName !== undefined && options.headlessApproved?.has(builtinName)) {
+        // An inherited consent lifts to `auto`, so it needs `auto` under the cap.
+        if (cap === "auto" && builtinName !== undefined && options.headlessApproved?.has(builtinName)) {
             return { mode: "auto" };
         }
 
@@ -311,6 +383,27 @@ const needsApprovalUnless =
     };
 
 /**
+ * An `ask` tool that reads its target before it asks (`looksBeforeAsk`, the browser's clicks): its own `needsApproval` runs with
+ * `asking` set, so its read is kept for the approved click, and the call always asks. A read that throws still asks; its
+ * empty record then refuses the approved click.
+ */
+const askAfterLook = (own: OwnApproval): OwnApproval =>
+    async function needsApprovalAfterLook(this: unknown, input: unknown, options: NeedsApprovalOptions): Promise<boolean> {
+        try {
+            if (typeof own === "function") {
+                await (own as (this: unknown, input: unknown, options: unknown) => unknown).call(this, input, { ...options, asking: true });
+            }
+        } catch {
+            // The read failed: the call still asks, and its record stays empty.
+        }
+
+        // Always asks. A call whose preread skipped the look (no action budget then) must not reach `execute` unapproved: a budget
+        // freed before `execute` would let an ordinary-looking click run that nobody approved. The approval is then refused at
+        // `execute` (no record), which fails closed.
+        return true;
+    } as OwnApproval;
+
+/**
  * A timed allow's check: once the grant has lapsed the call asks (unless the quick check clears it), and it still asks
  * whenever the tool's own check does. A tool can decide per call that a person must click (a message to a worker on a
  * computer), and neither a grant nor the quick check lifts that.
@@ -327,11 +420,36 @@ const withLapse = (own: OwnApproval, expiresAt: number, afterLapse: AfterLapse):
     }
 
     return function needsApprovalOrLapsed(this: unknown, input: never, options: never) {
-        const ownAnswer = (own as (this: unknown, input: never, options: never) => boolean | Promise<boolean>).call(this, input, options);
-        const settle = (asked: boolean): boolean | Promise<boolean> => asked || lapsed(input, options);
+        // A call made after the lapse asks, so the tool's own check is asked as an ask is (`asking`): its decision keeps the
+        // target it reads, and the approved click is checked against it. A call inside the grant is looked at as before.
+        const isLapsed = Date.now() >= expiresAt;
+        const ownOptions = isLapsed ? ({ ...(options as NeedsApprovalOptions), asking: true } as never) : options;
+        const ownAnswer = (own as (this: unknown, input: never, options: never) => boolean | Promise<boolean>).call(this, input, ownOptions);
+        // The grant can run out during the tool's own check (a renderer read takes seconds). A check that started inside the grant
+        // ran without asking, so it recorded nothing: it runs again, asking, so the approved click has a target to be checked against.
+        const settle = async (asked: boolean): Promise<boolean> => {
+            if (asked) {
+                return true;
+            }
+
+            const isLapsedNow = await lapsed(input, options);
+
+            if (isLapsedNow && !isLapsed) {
+                try {
+                    await (own as (this: unknown, input: never, options: never) => unknown).call(this, input, {
+                        ...(options as NeedsApprovalOptions),
+                        asking: true,
+                    } as never);
+                } catch {
+                    // The look failed: the call still asks, and its record stays empty.
+                }
+            }
+
+            return isLapsedNow;
+        };
 
         return typeof ownAnswer === "boolean" ? settle(ownAnswer) : ownAnswer.then(settle);
-    } as OwnApproval;
+    } as unknown as OwnApproval;
 };
 
 /**
@@ -366,14 +484,26 @@ export const applyToolPermissions = (
         }
 
         // Only a tool the user left at its default `ask` can be put to the quick check; the rules are in `low-risk-approval.ts`.
+        // The quick check is an automatic approval, so it runs only where `auto` is allowed at all.
         const check =
-            options.lowRiskCheck && lowRiskIneligibleReason(descriptor, isToolPermissionMode(overrides?.[descriptor.key]), options) === null
+            options.lowRiskCheck &&
+            (options.permissionCap ?? "auto") === "auto" &&
+            lowRiskIneligibleReason(descriptor, isToolPermissionMode(overrides?.[descriptor.key]), options) === null
                 ? options.lowRiskCheck
                 : undefined;
 
         if (mode === "ask") {
             requiresApproval.push(name);
-            result[name] = { ...tool, needsApproval: check ? needsApprovalUnless(check, descriptor) : true } as ToolSet[string];
+
+            let askAnswer: OwnApproval = true;
+
+            if (check) {
+                askAnswer = needsApprovalUnless(check, descriptor);
+            } else if ((tool as { looksBeforeAsk?: boolean }).looksBeforeAsk === true) {
+                askAnswer = askAfterLook(tool.needsApproval);
+            }
+
+            result[name] = { ...tool, needsApproval: askAnswer } as ToolSet[string];
             continue;
         }
 

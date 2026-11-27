@@ -39,6 +39,7 @@ jobs:
             packages: "${{ steps.changes.outputs.packages }}"
             e2e: "${{ steps.changes.outputs.e2e }}"
             desktop: "${{ steps.changes.outputs.desktop }}"
+            timings-key: "${{ steps.timings.outputs.cache-matched-key }}"
         steps:
             - name: "Harden Runner"
               uses: "step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43" # v2.22.3
@@ -57,12 +58,30 @@ jobs:
                   token: "${{ github.token }}"
                   filters: ".github/file-filters.yml"
 
+            # Picks the test timings once for the whole run. A shard that looked them up itself could get a newer
+            # entry than its siblings (main saved one in between, or the shard was re-run), split the files
+            # differently, and leave some unrun with every shard green.
+            - name: "Pick the test timings"
+              id: "timings"
+              uses: "actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9" # v6.1.0
+              with:
+                  path: "scripts/vitest/timings"
+                  key: "test-timings-${{ github.sha }}"
+                  restore-keys: "test-timings-"
+                  lookup-only: true
+
+    # Three shards: the backend alone took over 8 of the job's 11 test minutes when it ran whole. Each shard runs a third of every
+    # project's files, balanced by recorded time (`scripts/vitest/time-sharding.ts`), so the shards end together.
     test:
-        name: "Test (node-24)"
+        name: "Test (node-24, shard ${{ matrix.shard }}/${{ strategy.job-total }})"
         if: "needs.files-changed.outputs.packages == 'true'"
         needs: "files-changed"
         runs-on: "ubuntu-24.04"
         timeout-minutes: 60
+        strategy:
+            fail-fast: false
+            matrix:
+                shard: [1, 2, 3]
         env:
             # Surfaced as env because the `secrets` context is not available in a
             # step-level `if:` — see the codecov step below.
@@ -75,12 +94,19 @@ jobs:
 
             # The standard runner has about 14 GB free, and the affected build and coverage run filled it: the job ran out
             # of disk ("No space left on device") and failed. Toolchains this job never uses are removed first.
+            # Runs in the background: in the foreground the removal took about 96 s. The wait step before the
+            # build reads its status file.
             - name: "Free runner disk"
               shell: "bash"
               run: |
-                  df -h /
-                  sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android /usr/local/share/boost /usr/share/swift /opt/hostedtoolcache/CodeQL
-                  df -h /
+                  (
+                      set +e
+                      df -h /
+                      sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android /usr/local/share/boost /usr/share/swift /opt/hostedtoolcache/CodeQL
+                      status=$?
+                      df -h /
+                      echo "${status}" > "${RUNNER_TEMP}/disk-status"
+                  ) > "${RUNNER_TEMP}/disk.log" 2>&1 < /dev/null &
 
             - name: "Git checkout ${{ env.HEAD_REPOSITORY }}:${{ env.HEAD_REF }}"
               uses: "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1" # v7.0.1
@@ -95,7 +121,6 @@ jobs:
                   enable-nx-cache: "false" # no Nx in this repo: the cache never hits
                   node-version: "24.22.1"
                   npm-version: "11"
-
             # services/document-parser is a Rust Worker: its `build:worker`
             # (which `test` depends on, and `lunora dev` runs on start) needs
             # rustc + wasm32 + worker-build.
@@ -117,24 +142,74 @@ jobs:
               shell: "bash"
               run: "bash .github/scripts/apt-retry.sh sudo apt-get install -y libdbus-1-dev pkg-config"
 
+            # Waits for the background disk cleanup started at the top of the job. Nothing before this step
+            # needs the removed directories, so the removal overlaps checkout and setup.
+            - name: "Finish freeing runner disk"
+              shell: "bash"
+              timeout-minutes: 5
+              run: |
+                  until test -s "${RUNNER_TEMP}/disk-status"; do sleep 1; done
+                  cat "${RUNNER_TEMP}/disk.log"
+                  exit "$(cat "${RUNNER_TEMP}/disk-status")"
+
+            # The web, backend, browser-extension and mobile builds are not inputs to the tests in this job.
+            # Web tests import the workspace packages' dist, which `build:packages` produces (the same step
+            # Storybook and E2E use). Backend tests read committed sources and the committed `_generated/`
+            # output. browser-extension and mobile depend on the backend, and vis expands `^build` past a
+            # query, so excluding them also keeps the backend Worker build out. Web's `tsc` runs in the Types
+            # job, and bundle.yml runs its `vite build` on every PR.
+            # `--if-present`: a change that selects only packages without a `build` target leaves nothing here.
             - name: "Build affected packages"
               shell: "bash"
               env:
-                  # Same fix, same reason as `deploy.yml`'s "Build app" step: the
-                  # standard runner is 2-core/7GB and Node sizes its default
-                  # old-space at ~2080MB. `@neore/web:build` dies there
-                  # with "FATAL ERROR: Ineffective mark-compacts near heap limit",
-                  # driven by the sourcemaps for the large code-split chunks
-                  # (univer-sheet-editor ~11MB, vendor-diagrams ~3.7MB).
+                  # Node's default old-space is ~2080MB on this 2-core/7GB runner.
                   NODE_OPTIONS: "--max-old-space-size=4096"
-              run: 'pnpm exec vis affected build --base "$VIS_BASE" --head "$VIS_HEAD" --fail-fast'
+              run: |
+                  pnpm run build:packages
+                  pnpm exec vis affected build --if-present --query "project!=@neore/web && project!=@neore/backend && project!=@neore/browser-extension && project!=@neore/mobile" --base "$VIS_BASE" --head "$VIS_HEAD" --fail-fast
+            - name: "Generate the Lunora backend code"
+              env:
+                  NODE_OPTIONS: "--max-old-space-size=4096"
+              run: "pnpm --filter @neore/backend run codegen"
+
+            # Run directly rather than through `vis affected`, which would pull in the backend Worker build.
+            # The app builds catch a broken bundle, which type checks and unit tests do not.
+            - name: "Build the browser extension and mobile app"
+              # A bundle check, not a test input: one shard is enough.
+              if: "matrix.shard == 1"
+              shell: "bash"
+              env:
+                  NODE_OPTIONS: "--max-old-space-size=4096"
+              run: |
+                  pnpm --filter @neore/browser-extension run build
+                  pnpm --filter @neore/mobile run build
+
+            # The timings `files-changed` picked for this run, recorded on main by `full-test.yml`. With none, every
+            # shard uses the committed seed. A miss fails on purpose: other timings would split the files differently
+            # from the shards that already ran. It happens when a shard alone is re-run after the entry was evicted;
+            # "Re-run all jobs" picks a fresh one.
+            - name: "Restore the test timings"
+              if: "needs.files-changed.outputs.timings-key != ''"
+              uses: "actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9" # v6.1.0
+              with:
+                  path: "scripts/vitest/timings"
+                  key: "${{ needs.files-changed.outputs.timings-key }}"
+                  fail-on-cache-miss: true
 
             # `--parallel 2`: the standard runner is 2-core/7GB and every project's vitest spawns its own
             # worker pool, so running all of them at once starved the suites (trivial tests timing out at
             # 5 s, a 50 ms tokenizer taking 5.6 s). Two at a time keeps the run well inside the timeout.
-            - name: "Run tests (affected)"
+            - name: "Run tests (affected, shard ${{ matrix.shard }}/${{ strategy.job-total }})"
               shell: "bash"
+              env:
+                  VITEST_SHARD: "${{ matrix.shard }}/${{ strategy.job-total }}"
               run: 'pnpm exec vis affected test:coverage --if-present --base "$VIS_BASE" --head "$VIS_HEAD" --fail-fast --parallel 2'
+
+            # The split's own tests. They belong to no project, so `vis` never collects them.
+            - name: "Test the shard split"
+              if: "matrix.shard == 1"
+              shell: "bash"
+              run: "pnpm exec vitest run --root scripts/vitest"
 
             # Skipped when CODECOV_TOKEN is unavailable, which is the normal case
             # for a pull_request from a fork: secrets are not exposed there, so
@@ -198,12 +273,15 @@ jobs:
                   npm-version: "11"
                   # The browsers come from the cache below (or its miss install), not from setup.
                   skip-playwright: "true"
-
             # Stories import `@neore/ai`, whose `dist` is gitignored; without it Vite cannot resolve
             # `@neore/ai/models` and every story that touches a model fails to load.
             - name: "Build workspace packages"
               shell: "bash"
               run: "pnpm run build:packages"
+            - name: "Generate the Lunora backend code"
+              env:
+                  NODE_OPTIONS: "--max-old-space-size=4096"
+              run: "pnpm --filter @neore/backend run codegen"
 
             - name: "Resolve the Playwright version"
               id: "playwright"
@@ -336,7 +414,6 @@ jobs:
                   npm-version: "11"
                   # The browsers come from the cache below (or its miss install), not from setup.
                   skip-playwright: "true"
-
             # Playwright's first `webServer` is the backend, and `buildAuth(env)`
             # refuses to start without a signing secret:
             #
@@ -389,6 +466,10 @@ jobs:
                       # Unlocks `POST /e2e/invitations`, which `apps/web/e2e/seed.ts`
                       # seeds through; the suite reads it back from this file.
                       echo "E2E_SEED_TOKEN=\"$(openssl rand -hex 32)\""
+                      # The shard registry refuses to register a shard without it, so the
+                      # deletion workflow misses cross-shard rows and the account-deletion
+                      # e2e never sees them go. The host signs its registry calls with it.
+                      echo "LUNORA_RELAY_SECRET=\"$(openssl rand -hex 32)\""
 
                       # Loopback origins. They cannot live in wrangler.jsonc
                       # (`lunora build` blocks on loopback addresses there), and
@@ -448,6 +529,10 @@ jobs:
             - name: "Build the document-parser Worker"
               shell: "bash"
               run: "pnpm --filter document-parser run build:worker"
+            - name: "Generate the Lunora backend code"
+              env:
+                  NODE_OPTIONS: "--max-old-space-size=4096"
+              run: "pnpm --filter @neore/backend run codegen"
 
             # `apps/web/.source` holds the `fumadocs-mdx:collections/*` virtual
             # modules and is gitignored, so a fresh checkout has none. `vite build`
@@ -509,8 +594,19 @@ jobs:
             # shutdown signal" (exit 143) during the guest-conversion test, and a
             # killed runner skips every later step, so nothing uploads; only this
             # step's own output survives up to the kill.
+            #
+            # NODE_OPTIONS: the backend's `lunora dev` runs codegen in-process
+            # on start, and that holds ~4.0 GB of live heap before the server is
+            # ready (measured 2026-11-21 on Node 24.22.1: main 4001 MB, a PR
+            # with +900 backend lines 4014 MB). Node's default limit on this
+            # 16 GB runner is ~4096 MB, so a run that lands a little high dies
+            # with "JavaScript heap out of memory" and Playwright reports
+            # "config.webServer was not able to start". 6144 leaves ~2 GB of
+            # headroom; the runner peaks at ~5.6 GB used of 16 GB.
             - name: "Run e2e tests"
               shell: "bash"
+              env:
+                  NODE_OPTIONS: "--max-old-space-size=6144"
               run: |
                   (
                       # The step runs under `-eo pipefail`; a SIGPIPE from `head` must not end the loop.
@@ -728,7 +824,6 @@ jobs:
                   enable-nx-cache: "false" # no Nx in this repo: the cache never hits
                   node-version: "22"
                   skip-playwright: "true"
-
             - name: "Install Rust (stable)"
               uses: "dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8" # v1
               with:
@@ -749,6 +844,10 @@ jobs:
             # else builds that package on this job.
             - name: "Build the shared capability rules"
               run: "pnpm --filter @neore/ai run build"
+            - name: "Generate the Lunora backend code"
+              env:
+                  NODE_OPTIONS: "--max-old-space-size=4096"
+              run: "pnpm --filter @neore/backend run codegen"
 
             - name: "Bundle the main process and preloads"
               run: "pnpm --filter @neore/desktop run build"
@@ -785,7 +884,6 @@ jobs:
                   enable-nx-cache: "false" # no Nx in this repo: the cache never hits
                   node-version: "22"
                   skip-playwright: "true"
-
             - name: "Install Rust (stable)"
               uses: "dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8" # v1
               with:
@@ -803,6 +901,10 @@ jobs:
             # else builds that package on this job.
             - name: "Build the shared capability rules"
               run: "pnpm --filter @neore/ai run build"
+            - name: "Generate the Lunora backend code"
+              env:
+                  NODE_OPTIONS: "--max-old-space-size=4096"
+              run: "pnpm --filter @neore/backend run codegen"
 
             - name: "Bundle the main process and preloads"
               run: "pnpm --filter @neore/desktop run build"
@@ -842,7 +944,6 @@ jobs:
                   enable-nx-cache: "false" # no Nx in this repo: the cache never hits
                   node-version: "22"
                   skip-playwright: "true"
-
             - name: "Install Rust (stable)"
               uses: "dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8" # v1
               with:
@@ -860,6 +961,10 @@ jobs:
             # else builds that package on this job.
             - name: "Build the shared capability rules"
               run: "pnpm --filter @neore/ai run build"
+            - name: "Generate the Lunora backend code"
+              env:
+                  NODE_OPTIONS: "--max-old-space-size=4096"
+              run: "pnpm --filter @neore/backend run codegen"
 
             - name: "Bundle the main process and preloads"
               run: "pnpm --filter @neore/desktop run build"

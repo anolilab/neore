@@ -1,7 +1,15 @@
 import type { ToolSet } from "ai";
 import { describe, expect, it, vi } from "vitest";
 
-import { applyToolPermissions, BUILTIN_TOOLS_ASK_BY_DEFAULT, defaultToolPermission, resolveToolPermission, toolPermissionKey } from "./tool-permissions";
+import {
+    applyToolPermissions,
+    BUILTIN_TOOLS_ASK_BY_DEFAULT,
+    clampToolPermission,
+    defaultToolPermission,
+    resolveToolPermission,
+    resolveToolPermissionWithGrant,
+    toolPermissionKey,
+} from "./tool-permissions";
 
 describe("defaultToolPermission", () => {
     it("defaults built-ins to auto", () => {
@@ -77,6 +85,20 @@ describe("sub-agent delegation", () => {
 
         expect(resolveToolPermission(mcp, undefined, inherited)).toBe("off");
     });
+});
+
+describe("paid media default", () => {
+    it.each(["canvasAI", "imageGeneration", "imageEditing", "videoGeneration", "musicGeneration"])(
+        "asks before a paid %s call unless the user chose otherwise",
+        (name) => {
+            const paid = { key: toolPermissionKey("builtin", name), source: "builtin" as const };
+
+            expect(BUILTIN_TOOLS_ASK_BY_DEFAULT.has(name)).toBe(true);
+            expect(defaultToolPermission("builtin", undefined, name)).toBe("ask");
+            expect(resolveToolPermission(paid, undefined)).toBe("ask");
+            expect(resolveToolPermission(paid, { [`builtin:${name}`]: "auto" })).toBe("auto");
+        },
+    );
 });
 
 describe("coding-agent delegation default", () => {
@@ -307,6 +329,19 @@ describe("time-boxed grants", () => {
         clock.mockRestore();
     });
 
+    it("an ask-mode call runs its preread with asking set, and always asks (a skipped ask would let an unapproved click run)", async () => {
+        // One preread that answers no: the wrapper must still ask, and must have run the preread for this call.
+        const preread = vi.fn(async () => false);
+        const tools = { mcp_Files__delete: { execute: async () => "ok", looksBeforeAsk: true, needsApproval: preread } } as unknown as ToolSet;
+        const { tools: built } = applyToolPermissions(tools, () => mcp, { [mcp.key]: "ask" });
+        const { needsApproval } = built.mcp_Files__delete as unknown as {
+            needsApproval: (input: unknown, options: object) => Promise<boolean>;
+        };
+
+        expect(await needsApproval({}, { toolCallId: "call-7" })).toBe(true);
+        expect(preread).toHaveBeenCalledWith({}, expect.objectContaining({ asking: true, toolCallId: "call-7" }));
+    });
+
     it("never lifts a tool's own approval check, whatever the grant says", async () => {
         const own = vi.fn(async (input: { host: boolean }) => input.host);
         const tools = { mcp_Files__delete: { execute: async () => "ok", needsApproval: own } } as unknown as ToolSet;
@@ -318,5 +353,106 @@ describe("time-boxed grants", () => {
         expect(await needsApproval({ host: true }, {})).toBe(true);
         expect(await needsApproval({ host: false }, {})).toBe(false);
         expect(own).toHaveBeenCalledTimes(2);
+    });
+
+    it("asks a lapsed call's own check as an ask does, so its decision keeps the target it reads", async () => {
+        const own = vi.fn(async (_input: unknown, options: { asking?: boolean }) => options.asking === true);
+        const tools = { mcp_Files__delete: { execute: async () => "ok", needsApproval: own } } as unknown as ToolSet;
+        const expiresAt = Date.now() + 60_000;
+        const { tools: built } = applyToolPermissions(tools, () => mcp, undefined, { timedGrants: { [mcp.key]: expiresAt } });
+        const { needsApproval } = built.mcp_Files__delete as unknown as {
+            needsApproval: (input: unknown, options: object) => Promise<boolean> | boolean;
+        };
+
+        // Inside the grant the check runs as it always did: no `asking`, and its own answer (no ask) stands.
+        expect(await needsApproval({}, {})).toBe(false);
+        expect(own).toHaveBeenLastCalledWith({}, {});
+
+        // After the lapse the call asks, and its check is asked with `asking`.
+        const clock = vi.spyOn(Date, "now").mockReturnValue(expiresAt + 1);
+
+        expect(await needsApproval({}, {})).toBe(true);
+        expect(own).toHaveBeenLastCalledWith({}, { asking: true });
+        clock.mockRestore();
+    });
+});
+
+describe("organization permission cap", () => {
+    const NOW = Date.UTC(2026, 10, 3, 12, 0, 0);
+    const read = { key: toolPermissionKey("builtin", "readFile"), source: "builtin" as const };
+    const delegate = { key: toolPermissionKey("builtin", "delegateToSubAgent"), source: "builtin" as const };
+    const mcp = { key: toolPermissionKey("mcp", "delete", "Files"), source: "mcp" as const };
+    const device = { key: toolPermissionKey("device", "fs_read", "dev-1"), source: "device" as const };
+
+    it("orders the modes off < ask < auto and clamps to the lower", () => {
+        expect(clampToolPermission("auto", "ask")).toBe("ask");
+        expect(clampToolPermission("auto", "off")).toBe("off");
+        expect(clampToolPermission("ask", "auto")).toBe("ask");
+        expect(clampToolPermission("off", "auto")).toBe("off");
+    });
+
+    it("changes nothing without a cap, or with a cap of auto", () => {
+        expect(resolveToolPermission(read, undefined)).toBe("auto");
+        expect(resolveToolPermission(read, undefined, { permissionCap: "auto" })).toBe("auto");
+        expect(resolveToolPermission(read, { [read.key]: "ask" }, { permissionCap: "auto" })).toBe("ask");
+    });
+
+    it("holds a tool the user set above the cap at the cap, and never raises one", () => {
+        expect(resolveToolPermission(read, { [read.key]: "auto" }, { permissionCap: "ask" })).toBe("ask");
+        expect(resolveToolPermission(read, { [read.key]: "auto" }, { permissionCap: "off" })).toBe("off");
+        expect(resolveToolPermission(read, { [read.key]: "off" }, { permissionCap: "ask" })).toBe("off");
+        expect(resolveToolPermission(mcp, { [mcp.key]: "ask" }, { permissionCap: "ask" })).toBe("ask");
+    });
+
+    it("does not lift an ask with a grant unless the cap allows auto", () => {
+        const timedGrants = { [mcp.key]: NOW + 60_000 };
+
+        expect(resolveToolPermissionWithGrant(mcp, undefined, { now: NOW, permissionCap: "ask", timedGrants })).toEqual({ mode: "ask" });
+        expect(resolveToolPermissionWithGrant(mcp, undefined, { now: NOW, permissionCap: "auto", timedGrants })).toEqual({
+            mode: "auto",
+            timedUntil: NOW + 60_000,
+        });
+    });
+
+    it("removes device tools under any cap below auto, whatever the user chose", () => {
+        expect(resolveToolPermission(device, undefined, { permissionCap: "ask" })).toBe("off");
+        expect(resolveToolPermission(device, { [device.key]: "auto" }, { permissionCap: "ask" })).toBe("off");
+        expect(resolveToolPermission(device, undefined, { permissionCap: "off" })).toBe("off");
+        expect(resolveToolPermission(device, undefined, { permissionCap: "auto" })).toBe("auto");
+    });
+
+    it("clamps before the headless rule, so a headless run under an ask cap has no tool it would have to ask for", () => {
+        // An auto built-in held at ask cannot pause a run nobody answers: it is removed.
+        expect(resolveToolPermission(read, undefined, { headless: true, permissionCap: "ask" })).toBe("off");
+        expect(resolveToolPermission(read, undefined, { headless: true })).toBe("auto");
+    });
+
+    it("does not let a headless inherited approval through under a cap below auto", () => {
+        const inherited = { headless: true, headlessApproved: new Set(["delegateToSubAgent"]) };
+
+        expect(resolveToolPermission(delegate, undefined, inherited)).toBe("auto");
+        expect(resolveToolPermission(delegate, undefined, { ...inherited, permissionCap: "ask" })).toBe("off");
+    });
+
+    it("runs the quick check only where auto is allowed", async () => {
+        const check = vi.fn(async () => true);
+        const descriptor = { key: toolPermissionKey("mcp", "get_forecast", "Weather"), source: "mcp" as const, trustId: "srv" };
+        const trusted = new Set(["srv"]);
+        const tools = () => ({ mcp_Weather__get_forecast: { execute: async () => "ok" } }) as unknown as ToolSet;
+        const needsApprovalOf = (cap: "ask" | "auto") => {
+            const { tools: built } = applyToolPermissions(tools(), () => descriptor, undefined, {
+                lowRiskCheck: check,
+                lowRiskTrusted: trusted,
+                permissionCap: cap,
+            });
+
+            return built.mcp_Weather__get_forecast as unknown as { needsApproval: unknown };
+        };
+
+        expect(await (needsApprovalOf("auto").needsApproval as (i: object, o: object) => Promise<boolean>)({}, { messages: [], toolCallId: "c" })).toBe(false);
+        expect(check).toHaveBeenCalledOnce();
+
+        expect(needsApprovalOf("ask").needsApproval).toBe(true);
+        expect(check).toHaveBeenCalledOnce();
     });
 });

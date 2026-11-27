@@ -17,13 +17,15 @@ import cn from "@neore/ui/utils/cn";
 import { skipToken, useMutation, useQuery } from "@tanstack/react-query";
 import { Loader2, ShieldQuestion, Square } from "lucide-react";
 import type { FC, KeyboardEvent } from "react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
-import { selectThreadQueue, usePromptQueueStore } from "@/features/chat/core/stores/prompt-queue-store";
+import { allowPromptQueueRestore, selectThreadQueue, usePromptQueueStore } from "@/features/chat/core/stores/prompt-queue-store";
 import { cleanPromptText } from "@/features/chat/core/utils/prompt-queue";
-import { useCRPC } from "@/lib/lunora/crpc";
+import { useComposerPrefill } from "@/features/chat/thread/composer-prefill";
+import ContextUsageMeter from "@/features/chat/thread/context-usage-meter";
+import { useCRPC, useLunoraAuth } from "@/lib/lunora/crpc";
 
 import DiffCommentsDraft from "./diff-comments-draft";
 import { caretAfterRemoval } from "./host-caret";
@@ -44,6 +46,15 @@ import {
 } from "./host-queue";
 import { MAX_HOST_PROMPT_CHARS, sendHostMessage } from "./host-send";
 import useHostSendErrorMessages from "./host-send-errors";
+import type { AgentCommand } from "./host-slash";
+import { insertCommand, matchingCommands, slashAtCursor } from "./host-slash";
+import { formatReportedCost } from "./reported-cost";
+
+/** The keys the open `/` menu takes for itself. */
+const SLASH_KEYS: ReadonlySet<string> = new Set(["ArrowDown", "ArrowUp", "Enter", "Escape", "Tab"]);
+
+/** The caret of the textarea: the end a selection moves from. A forward selection leaves it at the end, a backward one at the start. */
+const caretOf = (element: HTMLTextAreaElement): number => (element.selectionDirection === "backward" ? element.selectionStart : element.selectionEnd);
 
 /** How the last turn ended when the person should be offered a way on. */
 const CONTINUABLE: ReadonlySet<string> = new Set(["interrupted", "timeout"]);
@@ -172,16 +183,27 @@ const PermissionRequestCard: FC<{ busy: boolean; onAnswer: (optionId: string) =>
 };
 
 const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ className, threadId }) => {
-    const { t } = useLingui();
+    const { i18n, t } = useLingui();
     const crpc = useCRPC();
     const id = threadId as Id<"threads">;
     const [text, setText] = useState("");
+    const [cursor, setCursor] = useState(0);
+    const [activeIndex, setActiveIndex] = useState(0);
+    // The text an Escape closed the menu for: any edit reopens it.
+    const [closedFor, setClosedFor] = useState<{ start: number; text: string } | undefined>(undefined);
+    // The menu belongs to the draft being typed in: leaving the box closes it, as Escape does.
+    const [focused, setFocused] = useState(false);
+    const pendingCursor = useRef<number | undefined>(undefined);
+    const list = useRef<HTMLUListElement>(null);
+    const listId = useId();
     // Set when a paste was refused, so the field keeps saying why until the next accepted edit (the toast fades).
     const [refusedPaste, setRefusedPaste] = useState(false);
     // Counts the refusals, so a send clears only those that came before it, not one made while it was in flight.
     const refusals = useRef(0);
     // The box's text as the last change left it, read by a send that finishes after the person has typed.
     const boxText = useRef("");
+    // The fix prompts added while a direct send runs (`null` when none runs): they were not sent, so they outlast it.
+    const prefillsDuringSend = useRef<string[] | null>(null);
     // `mayBeTaken`: a send under the id failed in a way that does not say the backend refused it, so it may have started a turn.
     const attempt = useRef<{ id: string; mayBeTaken?: boolean; text: string } | undefined>(undefined);
     // Mirrors `attempt.current?.mayBeTaken` for render: a direct send whose answer was lost may be the turn running now.
@@ -253,9 +275,17 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
     // The reason the head was refused, kept beside the paused queue after the toast has gone.
     const [queueError, setQueueError] = useState<string | undefined>(undefined);
 
+    // Not before Lunora confirms the session: the optimistic chat layout (`OptimisticAuthGate`) paints before that.
+    const { isAuthenticated } = useLunoraAuth();
+
     useEffect(() => {
+        if (!isAuthenticated) {
+            return;
+        }
+
+        allowPromptQueueRestore();
         usePromptQueueStore.getState().hydrate(threadId);
-    }, [threadId]);
+    }, [isAuthenticated, threadId]);
 
     // The queue's state machine (`host-queue.ts`). The ref is the truth, written synchronously on every event, so a decision
     // made between two renders (a lock granted, an answer arriving) reads the current phase; the state re-renders from it.
@@ -335,6 +365,7 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
     const starting = status === "starting";
     const overLimit = trimmed.length > MAX_HOST_PROMPT_CHARS;
     const limitNote = overLimit || refusedPaste;
+    const usage = session?.agentState?.usage;
     const lastEnd = session?.lastEndReason;
     // With messages queued, Continue would wait behind them, so the queue's own Send next is the way on.
     const offerContinue = !running && !blocked && lastEnd !== undefined && CONTINUABLE.has(lastEnd) && queue.items.length === 0;
@@ -439,7 +470,13 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
         }
 
         const refusalsBefore = refusals.current;
+
+        prefillsDuringSend.current = queuedId === undefined && draft !== undefined ? [] : null;
+
         const result = await sendHostMessage({ requestId, text: prompt, threadId });
+        const prefills = prefillsDuringSend.current ?? [];
+
+        prefillsDuringSend.current = null;
 
         if (result.ok) {
             // A direct send's retry id is spent when it lands; a queued message never used it, so the draft's id is kept.
@@ -453,10 +490,22 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
             dispatch({ duplicate: result.duplicate, itemId: queuedId, streamId: result.streamId, type: "accepted" });
 
             // Only a textarea send has a draft; Continue sends a fixed prompt and leaves the box alone. A draft typed while the
-            // send was pending is not the one sent: the box and any refusal stay as they are.
-            if (queuedId === undefined && draft !== undefined && boxText.current === draft) {
-                boxText.current = "";
-                setText("");
+            // send was pending is not the one sent: the box and any refusal stay as they are. A fix prompt added meanwhile
+            // (the header's chip) was not sent either, but the sent text before it was: that text goes, so it is not sent twice,
+            // and the prompts stay. If the draft was also edited, what is left is the sent message: only the prompts stay.
+            if (queuedId === undefined && draft !== undefined && (boxText.current === draft || prefills.length > 0)) {
+                const now = boxText.current;
+                const sent = draft.trimEnd();
+                let rest = "";
+
+                if (now !== draft) {
+                    rest = now.startsWith(sent) ? now.slice(sent.length).trimStart() : prefills.filter((prefill) => now.includes(prefill)).join("\n");
+                }
+
+                // An unchanged box gets no text effect to place the caret, so none waits for a later edit.
+                pendingCursor.current = rest === "" || rest === now ? undefined : rest.length;
+                boxText.current = rest;
+                setText(rest);
 
                 if (refusals.current === refusalsBefore) {
                     setRefusedPaste(false);
@@ -695,7 +744,127 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
         submit(trimmed, text);
     };
 
+    const slash = slashAtCursor(text, cursor);
+    const commands = session?.agentState?.availableCommands;
+    const choices: AgentCommand[] =
+        slash === null || commands === undefined || (closedFor?.text === text && closedFor.start === slash.start)
+            ? []
+            : matchingCommands(commands, slash.query);
+    // A session that has ended disables the input, so its menu must not stay open over a control nobody can use.
+    const menuOpen = !blocked && focused && slash !== null && choices.length > 0;
+    const active = Math.min(activeIndex, Math.max(choices.length - 1, 0));
+    const agentLabel = session?.agentLabel ?? t`Agent`;
+
+    // After a pick the text is replaced; the cursor can only be placed once the textarea shows it.
+    useEffect(() => {
+        if (pendingCursor.current === undefined || boxRef.current === null) {
+            return;
+        }
+
+        boxRef.current.setSelectionRange(pendingCursor.current, pendingCursor.current);
+        pendingCursor.current = undefined;
+    }, [text]);
+
+    // The popup scrolls, so the active command is brought into view as the arrows move it.
+    useEffect(() => {
+        if (menuOpen) {
+            list.current?.children.item(active)?.scrollIntoView({ block: "nearest" });
+        }
+    }, [active, menuOpen]);
+
+    const pick = (command: AgentCommand) => {
+        if (slash === null) {
+            return;
+        }
+
+        const next = insertCommand(text, slash, command);
+
+        // A pick that would make the draft too long to send is refused, so the draft stays one the person can send.
+        if (next.text.length > MAX_HOST_PROMPT_CHARS) {
+            toast.error(t`That command would make the message too long to send.`);
+
+            return;
+        }
+
+        setCursor(next.cursor);
+        setActiveIndex(0);
+        boxRef.current?.focus();
+
+        if (next.text === text) {
+            // The text does not change, so the effect above would not run: the caret is placed now, or it would wait for a later edit.
+            pendingCursor.current = undefined;
+            boxRef.current?.setSelectionRange(next.cursor, next.cursor);
+
+            return;
+        }
+
+        pendingCursor.current = next.cursor;
+        boxText.current = next.text;
+        setText(next.text);
+    };
+
+    // A fix prompt from the header's pull request chip (`composer-prefill.ts`): added after the draft, never sent, cleaned of
+    // hidden characters as typed text is. One that would make the draft too long to send is refused, as a command pick is.
+    useComposerPrefill(threadId, (prefill) => {
+        const { current } = boxText;
+        const { text: prompt } = stripHiddenText(prefill);
+
+        if (!current.includes(prompt)) {
+            const { text: clean } = stripHiddenText(current.trim() === "" ? prompt : `${current.trimEnd()}\n${prompt}`, { keepTrailingJoiner: true });
+
+            if (clean.length > MAX_HOST_PROMPT_CHARS) {
+                toast.error(messages.too_large);
+
+                return;
+            }
+
+            prefillsDuringSend.current?.push(prompt);
+            pendingCursor.current = clean.length;
+            boxText.current = clean;
+            setText(clean);
+        }
+
+        boxRef.current?.focus();
+    });
+
+    // A caret move that lands in another slash query lists other commands: the highlight starts again at the first, as an edit does.
+    // A move within the same query keeps it.
+    const moveCaret = (element: HTMLTextAreaElement) => {
+        const position = caretOf(element);
+        const moved = slashAtCursor(text, position);
+
+        if (moved?.start !== slash?.start || moved?.query !== slash?.query) {
+            setActiveIndex(0);
+        }
+
+        setCursor(position);
+    };
+
     const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+        const chosen = choices[active];
+
+        // Shift+Enter and Shift+Tab keep their usual meaning (a newline, the previous control), Ctrl/Cmd+Enter still sends, and an
+        // arrow with a modifier (Shift extends the selection) is the textarea's, even while the menu is open.
+        const arrow = event.key === "ArrowDown" || event.key === "ArrowUp";
+        const modified = event.shiftKey || event.altKey || event.ctrlKey || event.metaKey;
+        // Enter and Tab with any modifier keep their usual meaning (Shift+Enter a newline, Ctrl/Cmd/Alt+Enter the send), and so does an arrow
+        // with a modifier, which the textarea uses to extend the selection.
+        const menuKey = SLASH_KEYS.has(event.key) && !((event.key === "Enter" || event.key === "Tab") && modified) && !(arrow && modified);
+
+        if (menuOpen && !event.nativeEvent.isComposing && menuKey) {
+            event.preventDefault();
+
+            if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+                setActiveIndex((active + (event.key === "ArrowDown" ? 1 : -1) + choices.length) % choices.length);
+            } else if (event.key === "Escape") {
+                setClosedFor(slash === null ? undefined : { start: slash.start, text });
+            } else if (chosen !== undefined && !event.shiftKey) {
+                pick(chosen);
+            }
+
+            return;
+        }
+
         if (!canSubmit || event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) {
             return;
         }
@@ -818,6 +987,7 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
                                             onChange={(event) => setEditing({ id: item.id, text: event.target.value })}
                                             ref={editorRef}
                                             rows={2}
+                                            spellCheck
                                             value={editing.text}
                                         />
                                         {onlyHidden && (
@@ -937,57 +1107,130 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
                     )}
                 </section>
             )}
-            <HostOptions options={session?.agentOptions} />
+            {usage !== undefined && usage.size > 0 && (
+                <div className="flex justify-end">
+                    <ContextUsageMeter
+                        contextWindow={usage.size}
+                        detail={usage.cost === undefined ? undefined : t`Cost reported by the agent: ${formatReportedCost(usage.cost, i18n.locale)}`}
+                        usedTokens={usage.used}
+                    />
+                </div>
+            )}
+            {/* Keyed by the session too: a new session in the thread starts with no change of its own waiting. */}
+            <HostOptions
+                ended={blocked}
+                key={`${threadId}:${session?._id ?? ""}`}
+                optionResult={session?.optionResult}
+                sessionId={session?._id ?? ""}
+                state={session?.agentState}
+                threadId={threadId}
+            />
             <div className="flex items-end gap-2">
-                <textarea
-                    aria-describedby={limitNote ? "host-composer-limit" : undefined}
-                    aria-invalid={limitNote || undefined}
-                    aria-label={t`Message to the coding agent`}
-                    className="bg-background min-h-11 flex-1 resize-none rounded-lg border px-3 py-2 text-sm disabled:opacity-60"
-                    // The box is the composer's focus area for F6, as the cloud composer's editor is (`composer-tiptap/editor-attributes.ts`).
-                    data-focus-area="composer"
-                    disabled={blocked}
-                    onChange={(event) => {
-                        // Typed and pasted text both come through here, whole: a length limit on the element would cut a paste
-                        // before its hidden characters are removed. A joiner at the end waits for the next letter.
-                        const element = event.currentTarget;
-                        const { selectionStart, selectionEnd, value } = element;
+                <div className="relative min-w-0 flex-1">
+                    {menuOpen && (
+                        <ul
+                            aria-label={t`Commands from ${agentLabel}`}
+                            className="bg-popover absolute bottom-full left-0 z-10 mb-1 max-h-64 w-full max-w-md overflow-auto rounded-lg border p-1 text-sm shadow-md"
+                            id={listId}
+                            ref={list}
+                            role="listbox"
+                        >
+                            {choices.map((command, index) => (
+                                // The keyboard picks from the box (aria-activedescendant), so an option is not focused and needs no key listener.
+                                // eslint-disable-next-line jsx-a11y/click-events-have-key-events -- the box owns the keyboard path for these options
+                                <li
+                                    aria-selected={index === active}
+                                    className={cn("flex cursor-pointer flex-col gap-0.5 rounded px-2 py-1.5", index === active && "bg-accent")}
+                                    id={`${listId}-${index}`}
+                                    key={command.name}
+                                    onClick={() => pick(command)}
+                                    onMouseDown={(event) => {
+                                        // Keeps the textarea focused; the pick runs on the click, which a touch or assistive technology also sends.
+                                        event.preventDefault();
+                                    }}
+                                    role="option"
+                                >
+                                    <span className="flex items-baseline gap-2">
+                                        <span className="font-mono font-medium">{`/${command.name}`}</span>
+                                        {command.hint !== undefined && command.hint !== "" && (
+                                            <span className="text-muted-foreground font-mono text-xs">{command.hint}</span>
+                                        )}
+                                        <span className="text-muted-foreground ml-auto shrink-0 rounded border px-1 text-xs">{agentLabel}</span>
+                                    </span>
+                                    {command.description !== undefined && command.description !== "" && (
+                                        <span className="text-muted-foreground text-xs">{command.description}</span>
+                                    )}
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                    <textarea
+                        aria-activedescendant={menuOpen ? `${listId}-${active}` : undefined}
+                        aria-autocomplete="list"
+                        aria-controls={menuOpen ? listId : undefined}
+                        aria-describedby={limitNote ? "host-composer-limit" : undefined}
+                        aria-expanded={menuOpen}
+                        aria-invalid={limitNote || undefined}
+                        aria-label={t`Message to the coding agent`}
+                        className="bg-background min-h-11 w-full resize-none rounded-lg border px-3 py-2 text-sm disabled:opacity-60"
+                        // The box is the composer's focus area for F6, as the cloud composer's editor is (`composer-tiptap/editor-attributes.ts`).
+                        data-focus-area="composer"
+                        disabled={blocked}
+                        onBlur={() => setFocused(false)}
+                        onChange={(event) => {
+                            // Typed and pasted text both come through here, whole: a length limit on the element would cut a paste
+                            // before its hidden characters are removed. A joiner at the end waits for the next letter.
+                            const element = event.currentTarget;
+                            const { selectionStart, selectionEnd, value } = element;
 
-                        // Refused before any scan: the controlled value stays as it was.
-                        if (exceedsRawInputLimit(value, MAX_HOST_PROMPT_CHARS)) {
-                            refusals.current += 1;
-                            setRefusedPaste(true);
-                            toast.error(messages.too_large);
+                            // Refused before any scan: the controlled value stays as it was.
+                            if (exceedsRawInputLimit(value, MAX_HOST_PROMPT_CHARS)) {
+                                refusals.current += 1;
+                                setRefusedPaste(true);
+                                toast.error(messages.too_large);
 
-                            return;
-                        }
+                                return;
+                            }
 
-                        setRefusedPaste(false);
+                            setRefusedPaste(false);
 
-                        const { removed, text: clean } = stripHiddenText(value, { keepTrailingJoiner: true });
+                            // Any edit reopens the menu: a dismissal holds for the text it was made on, and only until the next edit.
+                            setClosedFor(undefined);
+                            setActiveIndex(0);
 
-                        if (removed > 0) {
-                            // A stable id: repeated removals update one notification instead of stacking.
-                            toast.info(t`Hidden characters were removed from your message.`, { id: "host-composer-hidden-text" });
+                            const { removed, text: clean } = stripHiddenText(value, { keepTrailingJoiner: true });
+                            const hidden = removed > 0 ? findHiddenText(value, { keepTrailingJoiner: true }) : [];
 
                             // The controlled value is set back to the clean text after this handler, which moves the caret to the end.
-                            // Put it where the person left it, once that has happened.
-                            const hidden = findHiddenText(value, { keepTrailingJoiner: true });
-                            const start = caretAfterRemoval(selectionStart, hidden);
-                            const end = caretAfterRemoval(selectionEnd, hidden);
+                            // The menu's caret is where the person left it, once that has happened.
+                            setCursor(caretAfterRemoval(caretOf(element), hidden));
 
-                            queueMicrotask(() => element.setSelectionRange(start, end));
-                        }
+                            if (removed > 0) {
+                                // A stable id: repeated removals update one notification instead of stacking.
+                                toast.info(t`Hidden characters were removed from your message.`, { id: "host-composer-hidden-text" });
 
-                        boxText.current = clean;
-                        setText(clean);
-                    }}
-                    onKeyDown={onKeyDown}
-                    placeholder={t`Message the agent on your computer`}
-                    ref={boxRef}
-                    rows={2}
-                    value={text}
-                />
+                                // Put the selection where the person left it, once the controlled value has been set.
+                                const start = caretAfterRemoval(selectionStart, hidden);
+                                const end = caretAfterRemoval(selectionEnd, hidden);
+
+                                queueMicrotask(() => element.setSelectionRange(start, end));
+                            }
+
+                            boxText.current = clean;
+                            setText(clean);
+                        }}
+                        onClick={(event) => moveCaret(event.currentTarget)}
+                        onFocus={() => setFocused(true)}
+                        onKeyDown={onKeyDown}
+                        onKeyUp={(event) => moveCaret(event.currentTarget)}
+                        placeholder={t`Message the agent on your computer`}
+                        ref={boxRef}
+                        role="combobox"
+                        rows={2}
+                        spellCheck
+                        value={text}
+                    />
+                </div>
                 {running && !steerOnSend && !interrupting && !anyTried && canInterruptAndSend() && (
                     <Button disabled={cancel.isPending || !canSubmit} onClick={interrupt} type="button" variant="outline">
                         {t`Interrupt and send`}

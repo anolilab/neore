@@ -10,7 +10,7 @@ import { formatDateTime } from "@neore/ui/utils/locale-format";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import type { FC } from "react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import SettingsCard from "@/components/settings/settings-card";
@@ -27,7 +27,7 @@ import {
     pairNativeDevice,
     pairNativeHost,
     probeNativeHost,
-} from "@/lib/native/bridge";
+} from "@/lib/native/device-bridge";
 
 import { buildDeviceDiagnostics, routeOf } from "../lib/device-diagnostics";
 import { DEVICE_PAIRED_EVENT } from "../lib/device-events";
@@ -46,6 +46,8 @@ interface DeviceView {
     platform: NativeDevicePlatform;
     /** Unset: offered in any chat. A list: only threads of these projects (empty: nowhere). */
     projectIds?: string[];
+    /** The projects of `projectIds` with their titles. */
+    scopeProjects?: { _id: string; title: string }[];
     toolNames: string[];
     /** `ssh`: a server this desktop reaches over SSH and speaks for. */
     transport?: "headless" | "ssh";
@@ -70,51 +72,111 @@ const useNow = (): number => {
 /** The id of the update notice of a row, which the disabled Start buttons point at as their reason. */
 const updateNoticeId = (deviceId: string): string => `device-update-${deviceId}`;
 
+/** The class of the project picker, as the host options' selects. */
+const SELECT_CLASS = "border-input bg-background h-9 max-w-full min-w-0 rounded-md border px-2 py-1 text-sm disabled:opacity-60";
+
 /**
  * Starts a coding agent on the computer, for a pair the user approved in the desktop app's own window. Only a pair
- * the computer offered is listed, and the computer checks again before it starts anything.
+ * the computer offered is listed, and the computer checks again before it starts anything. A computer limited to some
+ * projects starts agents only in one of them, so the person picks which first (the only one is picked for them); the
+ * backend checks the choice again, both that they may use the project and that the computer is allowed in it.
  */
 export const StartAgents: FC<{ device: DeviceView; online: boolean }> = ({ device, online }) => {
     const { t } = useLingui();
     const crpc = useCRPC();
     const navigate = useNavigate();
+    const baseId = useId();
     const start = useMutation(crpc.acp.remote.startHostSession.mutationOptions());
     const offers = device.acpOffers ?? [];
+    const scope = device.projectIds;
+    const [picked, setPicked] = useState<string>("");
 
     if (offers.length === 0) {
         return null;
     }
 
     const outdated = device.updateRequired === true;
+    // The computer's projects come with the device row, so one past the first page of the person's projects is offered too.
+    const allowed = scope === undefined ? [] : (device.scopeProjects ?? []);
+    // The only allowed project is the one; of several, the person's pick while it is still allowed.
+    const projectId = allowed.length === 1 ? allowed[0]?._id : allowed.find((project) => project._id === picked)?._id;
+    const needsProject = scope !== undefined && projectId === undefined;
+    const onlyProject = allowed.length === 1 ? (allowed[0]?.title ?? "") : "";
+    const hintId = `${baseId}-project-hint`;
+
+    let hint: string | null = null;
+
+    if (scope !== undefined && allowed.length === 0) {
+        hint = t`This computer may only be used in some projects, and none of them is available to you. Change where it is offered below.`;
+    } else if (needsProject) {
+        hint = t`This computer may only be used in some projects. Choose the project to start the agent in.`;
+    }
+
+    const describedBy = [outdated ? updateNoticeId(device._id) : undefined, hint === null ? undefined : hintId].filter(Boolean).join(" ") || undefined;
 
     return (
-        <ul aria-label={t`Coding agents you can start on ${device.name}`} className="flex basis-full flex-wrap gap-2">
-            {offers.map((offer) => (
-                <li key={`${offer.agentKey}:${offer.folderId}`}>
-                    <Button
-                        aria-describedby={outdated ? updateNoticeId(device._id) : undefined}
-                        disabled={!online || outdated || start.isPending}
-                        onClick={() => {
-                            start.mutate(
-                                { agentKey: offer.agentKey, clientId: crypto.randomUUID(), deviceId: device._id as Id<"devices">, folderId: offer.folderId },
-                                {
-                                    onError: (error) => toast.error(error.message),
-                                    onSuccess: (result) => {
-                                        if (result.threadId !== undefined) {
-                                            void navigate({ params: { threadId: result.threadId }, to: "/chat/$threadId" });
-                                        }
-                                    },
-                                },
-                            );
-                        }}
-                        size="sm"
-                        variant="outline"
+        <div className="basis-full space-y-2">
+            {allowed.length > 1 && (
+                <div className="flex items-center gap-2">
+                    <Label className="text-xs font-normal" htmlFor={`${baseId}-project`}>{t`Project`}</Label>
+                    <select
+                        className={SELECT_CLASS}
+                        disabled={start.isPending}
+                        id={`${baseId}-project`}
+                        onChange={(event) => setPicked(event.target.value)}
+                        value={projectId ?? ""}
                     >
-                        {t`Start ${offer.agentLabel} in ${offer.folderLabel}`}
-                    </Button>
-                </li>
-            ))}
-        </ul>
+                        <option value="">{t`Choose a project`}</option>
+                        {allowed.map((project) => (
+                            <option key={project._id} value={project._id}>
+                                {project.title}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+            )}
+            {allowed.length === 1 && (
+                <p className="text-muted-foreground text-xs">{t`Starts in ${onlyProject}, the one project this computer may be used in.`}</p>
+            )}
+            {hint !== null && (
+                <p className="text-muted-foreground text-xs" id={hintId}>
+                    {hint}
+                </p>
+            )}
+            <ul aria-label={t`Coding agents you can start on ${device.name}`} className="flex flex-wrap gap-2">
+                {offers.map((offer) => (
+                    <li key={`${offer.agentKey}:${offer.folderId}`}>
+                        <Button
+                            aria-describedby={describedBy}
+                            disabled={!online || outdated || needsProject || start.isPending}
+                            onClick={() => {
+                                start.mutate(
+                                    {
+                                        agentKey: offer.agentKey,
+                                        clientId: crypto.randomUUID(),
+                                        deviceId: device._id as Id<"devices">,
+                                        folderId: offer.folderId,
+                                        ...(projectId !== undefined && { projectId: projectId as Id<"projects"> }),
+                                    },
+                                    {
+                                        onError: (error) => toast.error(error.message),
+                                        onSuccess: (result) => {
+                                            if (result.threadId !== undefined) {
+                                                void navigate({ params: { threadId: result.threadId }, to: "/chat/$threadId" });
+                                            }
+                                        },
+                                    },
+                                );
+                            }}
+                            size="sm"
+                            variant="outline"
+                        >
+                            {t`Start ${offer.agentLabel} in ${offer.folderLabel}`}
+                        </Button>
+                    </li>
+                ))}
+            </ul>
+        </div>
     );
 };
 

@@ -1,8 +1,9 @@
 import type { Infer, Validator } from "lunorash/server";
 import { v } from "lunorash/server";
 
+import { vPinnedGoal } from "../chat/goals/validators";
 import { vGroupChat } from "../chat/group/validators";
-import { vWorkerPolicy } from "../sub-agents/validators";
+import { vSubAgentRoles, vWorkerPolicy } from "../sub-agents/validators";
 import { vAgentRef } from "./agent-switch-validators";
 import { vVectorDimension } from "./vector/tables";
 
@@ -408,6 +409,8 @@ export const vMessageWithMetadataInternalFields = {
     providerMetadata,
     reasoning: v.optional(v.string()),
     reasoningDetails: v.optional(vReasoningDetails),
+    // The run that wrote the row (`schema.ts`, `replyId`); the save path sets it, so the validator must accept it.
+    replyId: v.optional(v.string()),
     sources: v.optional(v.array(vSource)),
     status: v.optional(vMessageStatus),
     text: v.optional(v.string()),
@@ -559,6 +562,8 @@ export const vStreamMessage = v.object({
     order: v.number(),
     provider: v.optional(v.string()),
     providerOptions, // Sent to model
+    // The run's stream id, the reply's `replyId` once its rows are saved.
+    runStreamId: v.optional(v.string()),
     status: v.union(v.literal("streaming"), v.literal("finished"), v.literal("aborted")),
     stepOrder: v.number(),
     streamId: v.string(),
@@ -585,6 +590,8 @@ export const vMessageDocFields = {
     error: v.optional(v.string()),
     fileIds: v.optional(v.array(v.string())),
     finishReason: v.optional(vFinishReason),
+    // Whether the run that wrote this row ran on the device (`agent/followup-suggestions.ts#stampRunLocality`).
+    localRun: v.optional(v.boolean()),
     // The result
     message: v.optional(vMessage),
     model: v.optional(v.string()),
@@ -598,6 +605,8 @@ export const vMessageDocFields = {
     reasoning: v.optional(v.string()),
 
     reasoningDetails: v.optional(vReasoningDetails),
+    // The run that wrote the row (`schema.ts`, `replyId`).
+    replyId: v.optional(v.string()),
     // Memories injected into this reply's prompt — `memory/functions.ts#getMessageMemoryUsage`.
     retrievedMemories: v.optional(v.array(v.object({ memoryId: v.string(), score: v.number() }))),
     sources: v.optional(v.array(vSource)),
@@ -617,6 +626,32 @@ export const vMessageDocFields = {
 };
 
 export const vMessageDoc = v.object(vMessageDocFields);
+
+/**
+ * Message columns no client reads: `publicMessage` (`agent/messages.ts`) leaves them out of every message read and stream, so
+ * `vMessageDocFields` does not declare them. `typedText` is the prompt search's index column (`schema.ts`); the search
+ * reads it through {@link vTypedPromptRow} only.
+ */
+export const SERVER_ONLY_MESSAGE_COLUMNS = ["typedText"] as const;
+
+/**
+ * A row of the typed-words index as the composer's prompt search reads it (`agent/messages.ts#typedTextSearch`,
+ * `#typedPromptRow`): what `chat/functions.ts#sentPromptOf` decides with, and the typed words. Server-only.
+ */
+export const vTypedPromptRow = v.object({
+    _creationTime: v.number(),
+    _id: v.string(),
+    agentName: v.optional(v.string()),
+    createdAt: v.optional(v.number()),
+    message: v.optional(vMessage),
+    order: v.number(),
+    stepOrder: v.number(),
+    threadId: v.string(),
+    tool: v.boolean(),
+    typedText: v.optional(v.string()),
+    userId: v.optional(v.string()),
+});
+export type TypedPromptRow = Infer<typeof vTypedPromptRow>;
 
 /** The columns `updateMessage` may patch; literal for the reason on `vThreadPatchFields`. */
 export const vMessagePatchFields = {
@@ -646,6 +681,9 @@ export type MessageDoc = Infer<typeof vMessageDoc>; // Public
  */
 export const vThreadCreateFields = {
     autoModel: v.optional(v.boolean()),
+    // A temporary chat's organization, for its cap alone: written by `agent/threads.ts#createTemporaryThread`, and kept on a
+    // lasting chat made from it when the owner has left that organization (`agent/threads.ts#lastingChatPlacement`).
+    capOrganizationId: v.optional(v.string()),
     category: v.optional(v.string()), // Auto-categorized thread topic
     createdBy: v.optional(v.string()),
     customSystemPrompt: v.optional(v.string()),
@@ -691,6 +729,8 @@ export const vThreadDocFields = {
     // Written only by `agent/branches.ts` (the switcher, regenerate, edit), so
     // deliberately not a create field.
     activeLeafMessageId: v.optional(v.string()),
+    // When the chat was last archived. Written by `markThreadArchived`; declared here so a read of an archived chat validates.
+    archivedAt: v.optional(v.number()),
     // Set when a run pauses for the owner, in the status write that ends the run
     // (`chat/lib/agent-run.ts#setThreadStatus`); removed when the thread runs again.
     awaitingInput: v.optional(v.union(v.literal("approval"), v.literal("question"))),
@@ -698,6 +738,11 @@ export const vThreadDocFields = {
     botId: v.optional(v.string()),
     contextResetMessageId: v.optional(v.string()),
     createdAt: v.optional(v.number()),
+    // Written only by a hard delete's first page (`agent/threads.ts`): the thread is going, so not a create or patch field.
+    deletingAt: v.optional(v.number()),
+    // Written only by the suggestion dispatch and the grant removal (`agent/followup-suggestions.ts`), as short leases.
+    followupDispatch: v.optional(v.object({ claimedAt: v.number(), expiresAt: v.number(), requestId: v.optional(v.string()) })),
+    followupRevoke: v.optional(v.object({ claimedAt: v.number(), expiresAt: v.number() })),
     // Written only by `chat/group/functions.ts`, which checks every participant
     // is a skill the owner may use — so it is deliberately not a create field.
     groupChat: v.optional(vGroupChat),
@@ -713,14 +758,30 @@ export const vThreadDocFields = {
     lastViewedAt: v.optional(v.number()),
     // Written only by `agent/thread-passcode.ts` (set on lock, cleared on removal).
     lockedAt: v.optional(v.number()),
+    // Written only by `source-control/pr-thread-links.ts` (set when a merge owes an archive, cleared once it settles); never a client field.
+    mergeOwed: v.optional(v.boolean()),
+    mergeOwedScan: v.optional(v.string()),
     order: v.optional(v.number()),
     // Written by `chat/thread-state.ts#setThreadPermissionMode` (the owner, for a cloud thread), by its internal
-    // `copyThreadPermissionMode` (a branch of the owner's own thread, after the owner check), and by the ACP handoff's insert
+    // `copyThreadPermissionMode` (a branch of the owner's own thread, or a new chat of the owner's bot taking the bot's mode, after the
+    // owner check), and by the ACP handoff's insert
     // (`acp/switch.ts`, carrying a cloud thread's mode to the thread that takes over).
     permissionMode: v.optional(v.union(v.literal("supervised"), v.literal("auto"), v.literal("full"))),
+    // Written only by `chat/goals/functions.ts` (set and clear), which checks the caller owns the thread.
+    pinnedGoal: v.optional(vPinnedGoal),
     // Written once by `acp/ingest.ts` when a host session opens, so deliberately not a create field: a client
     // that could set it could mint a host thread, or turn a cloud thread into one.
     runner: v.optional(v.literal("host")),
+    // The palette sync's claim on a thread's texts (`agent/thread-search.ts`). Internal, like the vector ids: `publicThread` omits it.
+    searchClaim: v.optional(
+        v.object({
+            expiresAt: v.number(),
+            id: v.string(),
+            texts: v.array(v.object({ kind: v.union(v.literal("summary"), v.literal("title")), text: v.string() })),
+        }),
+    ),
+    // When a sync last found the owner's model rules refusing the embedding model. Internal: `publicThread` omits it.
+    searchRefusedAt: v.optional(v.number()),
     // The newest snooze ordering, a choice or a wake (`agent/table-writes.ts#setThreadSnooze`, `#patchThread`).
     snoozeChosenAt: v.optional(v.number()),
     // Written only by `chat/thread-state.ts` (snooze / unsnooze), which checks the caller owns the thread.
@@ -729,9 +790,14 @@ export const vThreadDocFields = {
     // Written only by `agent/thread-summaries.ts` and `agent/branches.ts` (the edit bumps the epoch).
     summaryEpoch: v.optional(v.number()),
     summaryPathTooLongAt: v.optional(v.number()),
+    // Palette-search vector ids (`agent/thread-search.ts`). Internal: `publicThread` omits them, so no response carries them.
+    summaryVectorId: v.optional(v.string()),
     // Written only by `chat/tags/functions.ts`, which checks the ids belong to
     // the caller — so it is deliberately not a create field.
     tagIds: v.optional(v.array(v.string())),
+    titleVectorId: v.optional(v.string()),
+    // User turns on the thread, kept by the messages triggers. Internal: `publicThread` omits it.
+    userTurnCount: v.optional(v.number()),
     // Written only by `sub-agents/functions.ts#setWorkerPolicy`, which checks the caller owns the thread.
     workerPolicy: v.optional(vWorkerPolicy),
 };
@@ -783,7 +849,7 @@ export const vThreadRelationship = v.object({
     _creationTime: v.number(),
     _id: v.string(),
     branchPoint: v.optional(v.number()),
-    branchType: v.optional(v.union(v.literal("branch"), v.literal("continuation"))),
+    branchType: v.optional(v.union(v.literal("branch"), v.literal("continuation"), v.literal("side"))),
     createdAt: v.number(),
     parentThreadId: v.string(),
     threadId: v.string(),
@@ -868,12 +934,16 @@ export const vProjectCreateFields = {
     icon: v.optional(v.string()),
     // Gallery fields
     isPublic: v.optional(v.boolean()),
+    machineId: v.optional(v.id("devices")),
     order: v.optional(v.number()),
     organizationId: v.optional(v.string()),
+    path: v.optional(v.string()),
     pinnedAt: v.optional(v.number()),
     // Workflow fields
     projectType: v.optional(v.union(v.literal("chat"), v.literal("workflow"))),
     publicAccessToken: v.optional(v.string()),
+    // Written only through `projects/functions.ts:setProjectSubAgentRole`; here so every project output carries it.
+    subAgentRoles: v.optional(vSubAgentRoles),
     title: v.string(),
     userId: v.optional(v.string()),
     workflowContent: v.optional(vWorkflowContent),
@@ -884,6 +954,15 @@ export const vProjectDocFields = {
     _creationTime: v.number(),
     _id: v.string(),
     createdAt: v.number(),
+    // Set when the project changes organization; retires runner defaults from before (`acp/lib/project-runner.ts`).
+    organizationChangedAt: v.optional(v.number()),
+    // Written by `acp/lib/project-runner.ts`, never by a caller: the runner a new thread here starts on.
+    runnerAgentKey: v.optional(v.string()),
+    runnerDeviceId: v.optional(v.string()),
+    runnerFolderId: v.optional(v.string()),
+    runnerKind: v.optional(v.literal("host")),
+    runnerThreadAt: v.optional(v.number()),
+    runnerThreadId: v.optional(v.string()),
     updatedAt: v.optional(v.number()),
 };
 

@@ -217,6 +217,17 @@ describe("runTaskRound destination", () => {
         expect(state.runs[0]).toMatchObject({ system: "PROJECT CONTEXT:\nWrite for the finance team." });
     });
 
+    it("hands the run the project's auto files, which it lists and reads with instruction_read", async () => {
+        const instructions = [{ content: "Run the script.", description: "How to deploy", id: "d", title: "Deploy" }];
+
+        state.claim = claimWith({ projectId: "project-a" });
+        state.runProject = { instructions, projectId: "project-a" };
+
+        await runRound();
+
+        expect(state.runs[0]).toMatchObject({ projectInstructions: { instructions, projectId: "project-a" } });
+    });
+
     it("files nothing and gives no instructions when the owner lost the project since the claim", async () => {
         state.claim = claimWith({ projectId: "project-a" });
 
@@ -232,5 +243,13 @@ describe("runTaskRound destination", () => {
         await runRound();
 
         expect(state.runs[0]).toMatchObject({ reasoningEffort: 75 });
+    });
+
+    it("names the task as its sub-agents' chain source, so the task has one waiting child at most", async () => {
+        state.claim = claimWith({});
+
+        await runRound();
+
+        expect(state.runs[0]).toMatchObject({ chainSource: "task:task-1" });
     });
 });

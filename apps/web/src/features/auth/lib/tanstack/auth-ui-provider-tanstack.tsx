@@ -1,7 +1,10 @@
 import { useCallback, useMemo } from "react";
 
+import { authClient as sessionSource } from "@/lib/auth/client";
+
 import type { AuthUIProviderProps } from "../auth-ui-provider";
 import { AuthUIProvider } from "../auth-ui-provider";
+import { clearLastAccountHint } from "../last-account-hint";
 import useTanstackOptions from "./use-tanstack-options";
 
 const AuthUIProviderTanstack = ({
@@ -15,9 +18,10 @@ const AuthUIProviderTanstack = ({
 }: AuthUIProviderProps & {
     /**
      * For state that must not outlive the old account: called with "before" as an account switch starts (it may still fail),
-     * and with "after" once the switch has gone through. A sign-in is not a switch and calls neither.
+     * and with "after" once the switch has gone through, each with the departing user (read before the switch; undefined when
+     * the session was not read). A sign-in is not a switch and calls neither.
      */
-    onSessionSwitch?: (phase: "after" | "before") => void;
+    onSessionSwitch?: (phase: "after" | "before", departingUserId: string | undefined) => void;
 }) => {
     const { hooks: contextHooks, mutators: contextMutators, onSessionChange, optimistic } = useTanstackOptions({ authClient });
 
@@ -33,11 +37,18 @@ const AuthUIProviderTanstack = ({
         return {
             ...merged,
             setActiveSession: async (...parameters: Parameters<typeof setActiveSession>) => {
-                onSessionSwitch?.("before");
+                // The app's session (the client passed in is the same one), read without making the mutators depend on it.
+                const departing = sessionSource.$store.atoms.session?.get().data?.user.id;
+
+                onSessionSwitch?.("before", departing);
 
                 const result = await setActiveSession(...parameters);
 
-                onSessionSwitch?.("after");
+                // Only once the switch went through: the account left is no longer "the last one signed in", and the
+                // new one writes it when confirmed. A failed switch keeps it, since that account is still signed in.
+                clearLastAccountHint();
+
+                onSessionSwitch?.("after", departing);
 
                 return result;
             },

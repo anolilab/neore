@@ -25,9 +25,11 @@ import { formatNumber } from "@neore/ui/utils/locale-format";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangleIcon, EditIcon, InfoIcon, XIcon } from "lucide-react";
 import type { ChangeEvent, DragEvent, FC } from "react";
-import { memo, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { memo, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
+import { useAuthSession } from "@/features/auth/hooks/use-auth-session";
 import useInviteOnly from "@/features/auth/hooks/use-invite-only";
+import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
 import { isCompactCommand } from "@/features/chat/compaction/compaction-logic";
 import useCompactThread from "@/features/chat/compaction/use-compact-thread";
 import ReferenceStrip from "@/features/chat/components/reference-picker/reference-strip";
@@ -54,10 +56,16 @@ import { usePromptQueueStore } from "@/features/chat/core/stores/prompt-queue-st
 import { captureScreenFrame, isScreenCaptureSupported } from "@/features/chat/core/utils/capture-screen";
 import type { ComposerRestoreFile } from "@/features/chat/core/utils/composer-restore";
 import { loadRestoreFile, onComposerRestore, textAfterRestore } from "@/features/chat/core/utils/composer-restore";
-import { onComposerAttachRequest, onComposerSubmitRequest } from "@/features/chat/core/utils/composer-submit";
+import { onComposerAttachRequest, onComposerSubmitRequest, SIGNED_OUT } from "@/features/chat/core/utils/composer-submit";
+import type { DraftOrigin } from "@/features/chat/core/utils/draft-origin";
+import { composerDraftFrom, draftFromField, markComposerDraft } from "@/features/chat/core/utils/draft-origin";
+import { isSendStarting } from "@/features/chat/core/utils/send-in-flight";
 import ComposerPromptImprovementButton from "@/features/chat/prompt-improvement/components/composer-prompt-improvement-button";
+import { draftOwnership } from "@/features/chat/split/composer-drafts";
+import { restoreLiveComposerFor } from "@/features/chat/split/pane-state";
 import AutoReadReplies from "@/features/chat/voice-mode/auto-read-replies";
 import VoiceModeButton from "@/features/chat/voice-mode/voice-mode-button";
+import { useConnectionView } from "@/features/connection/hooks/use-connection";
 import { useUserPreferences } from "@/features/layout/hooks/use-ui-state";
 import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
 import { trackEvent } from "@/lib/analytics";
@@ -68,18 +76,28 @@ import type { ChatReference } from "./chat-reference";
 import { buildChatTranscript, chatReferenceFileName } from "./chat-reference";
 import CompletionSound from "./completion-sound";
 import type { TextFileResult } from "./composer-draft-file";
-import { attachLongPaste, draftFitsAsFile, moveDraftToFile, pasteHasText, undoLongPaste } from "./composer-draft-file";
+import { appendPastedText, attachLongPaste, draftFitsAsFile, insertPastedText, moveDraftToFile, pasteHasText, undoLongPaste } from "./composer-draft-file";
 import type { ComposerInputAreaRef } from "./composer-input-area";
 import ComposerInputArea from "./composer-input-area";
 import ComposerLongTextPrompt from "./composer-long-text-prompt";
+import { breaksBefore, inOpenFence, isLongPaste, onOwnLines, planPaste, planText } from "./composer-paste/paste-plan";
+import { takesPaste } from "./composer-paste/paste-target";
+import { prefillThreadOf, useComposerPrefill } from "./composer-prefill";
 import ComposerPromptQueue from "./composer-prompt-queue";
+import type { PickedPrompt } from "./composer-prompt-search";
+import ComposerPromptSearch from "./composer-prompt-search";
+import { composerSubmitIntent } from "./composer-submit-intent";
 import { isEditable, TextAttachmentEditorDialog } from "./composer-text-attachment-editor";
 import { quoteRestoreDraft } from "./composer-tiptap/extensions/quote-chip";
 import useComposerAutocomplete from "./composer-tiptap/use-composer-autocomplete";
 import interruptAndSend from "./interrupt-and-send";
 import { readChatMessages } from "./read-chat-messages";
 import ReplyCompleteAnnouncement from "./reply-complete-announcement";
+import TurnStepAnnouncement from "./turn-step-announcement";
+import type { UploadWait } from "./upload-send-wait";
+import { settleUploadWait, startUploadWait } from "./upload-send-wait";
 import { useAttachmentExtraction } from "./use-attachment-extraction";
+import useNextPromptSuggestion from "./use-next-prompt-suggestion";
 import { usePasteGuard } from "./use-paste-guard";
 import { PromptHistorySource, usePromptHistory } from "./use-prompt-history";
 
@@ -221,8 +239,10 @@ interface ComposerInputProps {
      * Used by comparison parent threads to fan-out the message to all child threads.
      * When set, neither sendMessage nor sendComparisonMessage is called.
      */
-    onSubmitOverride?: (text: string, attachments: PendingAttachment[]) => Promise<void>;
+    onSubmitOverride?: (text: string, attachments: PendingAttachment[], draftFrom?: DraftOrigin) => Promise<void>;
     placeholder?: string;
+    /** Whether the suggested next prompt may show here: text chats only. */
+    suggestPrompt?: boolean;
 }
 
 export interface ComposerInputRef {
@@ -463,6 +483,7 @@ const ComposerInput = ({
     autoFocus = true,
     className,
     compact = false,
+    suggestPrompt = true,
     disabled = false,
     maxRows = 5,
     onOpenDraw,
@@ -486,7 +507,7 @@ const ComposerInput = ({
     const lunora = useChatLunora();
     const crpc = useCRPC();
     const queryClient = useQueryClient();
-    const { isNewThread, threadId } = useChatThread();
+    const { isNewThread, threadId, threadLoad } = useChatThread();
     const { compact: compactThread } = useCompactThread(threadId);
     const { clear: clearThreadContext } = useClearContext(threadId);
     // The chat this composer shows now, and whether it is still mounted: a `/clear` that finishes after the person moved to
@@ -500,26 +521,62 @@ const ComposerInput = ({
             composerStateRef.current = { ...composerStateRef.current, mounted: false };
         };
     }, [threadId]);
+    // Read by a paste once its conversion is done: the composer may have been disabled meanwhile. Synced in the commit
+    // itself: a passive effect runs later, and a conversion that resumes in between would still read `false`.
+    const disabledRef = useRef(disabled);
+
+    useLayoutEffect(() => {
+        disabledRef.current = disabled;
+    }, [disabled]);
     // The thread a draft was last checked against, so the check below runs when the chat changes, not on every keystroke.
     const draftThread = useRef<string | null | undefined>(undefined);
+    // The fix prompts added while a comparison send runs (`null` when none runs): they were not sent, so they outlast it.
+    const prefillsDuringSend = useRef<string[] | null>(null);
     // Invite-only: a guest's comparison send is held for sign-in (a plain send is held in `ChatProvider`).
     const { mustSignIn } = useInviteOnly();
     const { getChatKey, isMounted, trackToast } = usePasteGuard(threadId);
 
     // Opt-in ghost text; `undefined` (off) unless the user enabled it in settings.
     const requestCompletion = useComposerAutocomplete();
+    const nextPromptSuggestion = useNextPromptSuggestion();
 
     // Comparison mode
     const comparisonMode = useModelStore((state) => state.comparisonMode);
     const selectedModelsForComparison = useModelStore((state) => state.selectedModelsForComparison);
     const { isLoading: isComparisonLoading, sendComparisonMessage } = useComparisonChat({ jwtToken });
     const isComparisonValid = comparisonMode && selectedModelsForComparison.length >= MIN_COMPARISON_MODELS;
+    // Where a send goes: the compared models, or empty for an ordinary send. A waiting send keeps the one it was pressed for.
+    const sendTarget = isComparisonValid ? selectedModelsForComparison.join("\n") : "";
 
     // SSE streaming in progress
     const isSSEStreaming = !!sseStreamState;
 
     // Composer state from store
     const { addAttachment, attachments, clear, removeAttachment, setText, text, updateAttachment } = useComposerState();
+    // Ctrl+R opens the search over the person's sent prompts (`composer-prompt-search.tsx`). Only a thread composer has one.
+    // The chat the search was opened in; `null` while it is closed. It belongs to that chat: the composer stays mounted when
+    // another chat opens, and a pick must not land in that chat's draft.
+    const [promptSearchThread, setPromptSearchThread] = useState<string | null>(null);
+    const promptSearchOpen = promptSearchThread !== null;
+    const promptSearchLocked = disabled || isComparisonLoading;
+
+    // A composer that locks, or moves to another chat, while the search is open closes it: a pick must not change a draft
+    // that is locked or another chat's. Adjusted during render, as `useDebouncedValue` does, so it never shows again.
+    if (promptSearchOpen && (promptSearchLocked || promptSearchThread !== (threadId ?? ""))) {
+        setPromptSearchThread(null);
+    }
+
+    const openPromptSearch = useCallback((): boolean => {
+        setPromptSearchThread(threadId ?? "");
+
+        return true;
+    }, [threadId]);
+    // Escape, the close button or the backdrop: the search opened from the editor without a trigger, so focus goes back to
+    // the editor, as after a pick. A close forced by a locked composer or another chat does not come through here.
+    const closePromptSearch = useCallback(() => {
+        setPromptSearchThread(null);
+        inputAreaRef.current?.focus();
+    }, []);
 
     // A `/compact` typed in one chat is not carried into the next: submitting it there would compact the chat that is open.
     useEffect(() => {
@@ -550,17 +607,69 @@ const ComposerInput = ({
     // The comparison parent fans out through `onSubmitOverride`, and the compact
     // landing bar has no thread to recall from or queue against.
     const isThreadComposer = !onSubmitOverride && !compact && Boolean(threadId);
+    // Sending needs the network; offline the draft stays where it is, and the send says why instead of hanging. A dropped
+    // live socket alone ("reconnecting") does not block: messages go over HTTP.
+    const isOffline = useConnectionView() === "offline";
 
     const getComposerText = useCallback(() => useChatUIStore.getState().composerText, []);
     const promptHistory = usePromptHistory(getComposerText);
+
+    // The prompt becomes the draft, and is never sent. Text already typed stays, with the prompt below it.
+    const pickSentPrompt = useCallback(
+        ({ draftFrom, text: prompt }: PickedPrompt) => {
+            const draft = useChatUIStore.getState().composerText;
+
+            // A picked prompt is a new draft: an ArrowUp recall ends here, so Escape keeps the picked text.
+            promptHistory.reset();
+
+            if (draft.trim() === "") {
+                setText(prompt);
+                // The prompt is the whole draft now, so it carries its own mark: none for the person's own words, whatever
+                // the blank draft held before (`noteSavedPrompt` treats a saved prompt that replaced the draft the same way).
+                useChatUIStore.getState().setComposerDraftFrom(draftFrom);
+            } else {
+                const addition = `\n${prompt}`;
+                const editor = inputAreaRef.current?.getEditor();
+                const shown = editor?.getEditor();
+
+                // While the editor shows the store's draft, the prompt goes in only through an editor transaction, so the draft's
+                // quote chips stay chips; a rebuild from the text would flatten them. Otherwise the store takes the whole draft.
+                const appendedInEditor =
+                    editor &&
+                    shown &&
+                    !shown.isDestroyed &&
+                    shown.state.doc.textBetween(0, shown.state.doc.content.size, "\n") === draft &&
+                    editor.appendText(addition);
+
+                if (!appendedInEditor) {
+                    setText(`${draft}${addition}`);
+                }
+
+                // A prompt saved as not typed by the person goes out marked again, as an ArrowUp recall does. An admin's writing
+                // (`impersonated`) replaces a weaker mark the draft already has; the person's own prompt keeps the draft's mark.
+                if (draftFrom !== undefined && (composerDraftFrom() === undefined || draftFrom === "impersonated")) {
+                    markComposerDraft(draftFrom);
+                }
+            }
+
+            setPromptSearchThread(null);
+            inputAreaRef.current?.focus();
+        },
+        [promptHistory, setText],
+    );
 
     // Reference images attached for the next outgoing message — rendered as a numbered strip
     // above the attachments row so the user can see (and the model will receive) them in order.
     const attachedReferences = useChatUIStore(selectAttachedReferences);
     const removeAttachedReference = useChatUIStore(selectRemoveAttachedReference);
 
-    // True while any attachment is still uploading — blocks send and shows spinner on button
+    // True while any attachment is still uploading: the input area shows the send-when-uploads-finish tooltip and holds
+    // back steer, queue and voice. Send stays enabled; a send pressed now waits through `uploadWait` below.
     const hasUploadingAttachments = attachments.some((a) => a.status === "pending" || a.status === "uploading");
+    // A send pressed while uploads run waits for them here; `settleUploadWait` decides when it goes out or stops.
+    const [uploadWait, setUploadWait] = useState<UploadWait | null>(null);
+    // The draft text being converted to a file while that upload runs; it leaves the draft once the upload succeeds.
+    const [converting, setConverting] = useState<string | null>(null);
     // bannedContent is subscribed because it drives render output (word highlights + error message).
     // isSubmitting / setIsSubmitting / setComposerBannedContent are only read inside callbacks
     // so we access them via getState() to avoid unnecessary re-renders (rerender-defer-reads).
@@ -831,26 +940,44 @@ const ComposerInput = ({
     }, [attachTextAsFile, removeAttachment, setText]);
 
     // The paste position as offsets into the plain draft text (the editor joins blocks with "\n"); the end when unknown.
-    const pasteSelection = useCallback((): { end: number; start: number } => {
+    // `textBefore` and `textAfter`: whether the caret's line has text on that side of it.
+    const pasteSelection = useCallback((): {
+        end: number;
+        lineAfter?: boolean;
+        lineBefore?: boolean;
+        start: number;
+        textAfter: boolean;
+        textBefore: boolean;
+    } => {
         const editor = inputAreaRef.current?.getEditor()?.getEditor();
 
         if (!editor || editor.isDestroyed) {
-            const { length } = useChatUIStore.getState().composerText;
+            const draft = useChatUIStore.getState().composerText;
 
-            return { end: length, start: length };
+            return { end: draft.length, start: draft.length, textAfter: false, textBefore: draft !== "" && !draft.endsWith("\n") };
         }
 
         const { doc, selection } = editor.state;
+        const isText = (node: { type: { name: string } } | null): boolean => node !== null && node.type.name !== "hardBreak";
+
+        const { $from, $to } = selection;
+        // The line just above or below the caret's own: the block before or after its paragraph, when that has text.
+        const lineBefore = $from.parentOffset === 0 && $from.depth > 0 && Boolean(doc.resolve($from.before()).nodeBefore?.textContent);
+        const lineAfter = $to.parentOffset === $to.parent.content.size && $to.depth > 0 && Boolean(doc.resolve($to.after()).nodeAfter?.textContent);
 
         return {
             end: doc.textBetween(0, selection.to, "\n").length,
+            lineAfter,
+            lineBefore,
             start: doc.textBetween(0, selection.from, "\n").length,
+            textAfter: isText($to.nodeAfter),
+            textBefore: isText($from.nodeBefore),
         };
     }, []);
 
     // The paste did not land in the draft, so say where it went and let the person take it back.
     const announcePasteAttached = useCallback(
-        (attachmentId: string, pastedText: string) => {
+        (attachmentId: string, pastedText: string, converted: boolean) => {
             const toastId = showInfo(t`Long text was attached as a file.`, {
                 action: {
                     label: t`Undo`,
@@ -863,6 +990,7 @@ const ComposerInput = ({
 
                         undoLongPaste({
                             attachmentId,
+                            converted,
                             getAttachmentIds: () => useChatUIStore.getState().composerAttachments.map((attachment) => attachment.id),
                             getDraft: () => useChatUIStore.getState().composerText,
                             pastedText,
@@ -910,45 +1038,116 @@ const ComposerInput = ({
                 }
             }
 
-            // Check for long text content
-            const { removed: pasteRemoved, text: pastedText } = stripHiddenText(e.clipboardData.getData("text/plain"));
+            const editorHandle = inputAreaRef.current?.getEditor();
+            const editor = editorHandle?.getEditor();
 
-            // Auto-convert if text is long (>500 chars or >10 lines)
-            if (pastedText && (pastedText.length > 500 || pastedText.split("\n").length > 10)) {
-                e.preventDefault();
+            // A disabled composer takes no paste: left to the editor, which refuses it.
+            if (!takesPaste(disabled, editor)) {
+                return;
+            }
 
-                // Read before the upload: the caret moves while it runs.
-                const selection = pasteSelection();
+            const live = editor && !editor.isDestroyed ? editor.state : undefined;
+            const plan = planPaste(e.clipboardData, {
+                inFence: inOpenFence(live ? live.doc.textBetween(0, live.selection.from, "\n") : useChatUIStore.getState().composerText),
+                plainOnly: editorHandle?.isPlainPaste(e) ?? false,
+                selectedText: live ? live.doc.textBetween(live.selection.from, live.selection.to, "\n") : "",
+            });
+            const plainText = e.clipboardData.getData("text/plain");
 
-                if (pasteRemoved > 0) {
-                    useChatUIStore.getState().noteComposerHiddenRemoved(pasteRemoved);
+            // Plain text the editor can paste itself: it does, as it always has.
+            if (plan.kind === "default" && !isLongPaste(stripHiddenText(plainText).text)) {
+                return;
+            }
+
+            e.preventDefault();
+
+            // Read before the conversion and the upload: the caret moves while they run.
+            const selection = pasteSelection();
+            const stateAtPaste = editor?.state;
+            const draftAtPaste = useChatUIStore.getState().composerText;
+            const chatKey = getChatKey();
+            // Converted text is measured as it lands: a short web page can be a long table.
+            // Converted Markdown that opens or ends with a table, fence, heading, list or quote keeps it off the text beside the
+            // caret; text as copied, including a conversion's plain-text fallback, goes in as it is.
+            const { markdown: converted, text: planned } = plan.kind === "default" ? { markdown: false, text: plainText } : await planText(plan);
+            const { removed: pasteRemoved, text: pastedText } = stripHiddenText(planned);
+
+            if (!pastedText) {
+                return;
+            }
+
+            // Another chat opened while the paste was converted: it is not written there, and the user is told so.
+            if (getChatKey() !== chatKey) {
+                showError(t`The chat changed before the paste was ready, so it was not inserted.`);
+
+                return;
+            }
+
+            // The composer was disabled while the paste was converted: nothing is written, through the editor or the store,
+            // and the user is told so.
+            if (!takesPaste(disabledRef.current, inputAreaRef.current?.getEditor()?.getEditor())) {
+                showInfo(t`The composer was locked before the paste was ready, so it was not inserted.`);
+
+                return;
+            }
+
+            if (pasteRemoved > 0) {
+                useChatUIStore.getState().noteComposerHiddenRemoved(pasteRemoved);
+            }
+
+            if (!isLongPaste(pastedText)) {
+                const draft = useChatUIStore.getState().composerText;
+                const inserted = converted ? onOwnLines(pastedText, selection.textBefore, selection.textAfter, selection) : pastedText;
+                const appended = appendPastedText(draft, pastedText, converted ? breaksBefore(pastedText) : 1);
+                const now = inputAreaRef.current?.getEditor();
+                const shown = now?.getEditor();
+
+                // While the editor shows the store's draft, the paste goes in only through an editor transaction, so its quote
+                // chips stay chips; a rebuild from the text would flatten them. Over the paste-time selection while the document
+                // is the one the paste was made in, otherwise at the end, on a line of its own: an edit meanwhile moved the text
+                // the caret was in, and the first line gets the breaks it needs there rather than those worked out for the caret.
+                if (now && shown && !shown.isDestroyed && shown.state.doc.textBetween(0, shown.state.doc.content.size, "\n") === draft) {
+                    if (!(stateAtPaste && now.pasteText(inserted, stateAtPaste)) && !now.appendText(appended.slice(draft.length))) {
+                        showInfo(t`The composer was locked before the paste was ready, so it was not inserted.`);
+                    }
+
+                    return;
                 }
 
-                await attachLongPaste({
-                    attach: attachTextAsFile,
-                    discard: removeAttachment,
-                    getAttachmentIds: () => useChatUIStore.getState().composerAttachments.map((attachment) => attachment.id),
-                    getChatKey,
-                    getDraft: () => useChatUIStore.getState().composerText,
-                    onAttached: (attachmentId) => {
-                        announcePasteAttached(attachmentId, pastedText);
-                    },
-                    onNotInserted: () => {
-                        showError(t`The pasted text could not be attached and was not inserted.`);
-                    },
-                    // A recognised failure was toasted where it was worded; the text is back in the composer.
-                    onFailure: (error) => {
-                        if (!toastedMessages.has(error)) {
-                            showError(error);
-                        }
-                    },
-                    pastedText,
-                    selection,
-                    setDraft: setText,
-                });
+                // No editor, or one the store's draft has not reached yet (it is rebuilt from that text next): the store takes
+                // it. A draft changed since the paste would otherwise be written over by the stale document's next change.
+                setText(draft === draftAtPaste ? insertPastedText(draft, inserted, selection.start, selection.end) : appended);
+
+                return;
             }
+
+            await attachLongPaste({
+                attach: attachTextAsFile,
+                canInsert: () => takesPaste(disabledRef.current, inputAreaRef.current?.getEditor()?.getEditor()),
+                converted,
+                discard: removeAttachment,
+                draftAtPaste,
+                getAttachmentIds: () => useChatUIStore.getState().composerAttachments.map((attachment) => attachment.id),
+                getChatKey,
+                getDraft: () => useChatUIStore.getState().composerText,
+                onAttached: (attachmentId) => {
+                    announcePasteAttached(attachmentId, pastedText, converted);
+                },
+                onNotInserted: () => {
+                    showError(t`The pasted text could not be attached and was not inserted.`);
+                },
+                // A recognised failure was toasted where it was worded; the text is back in the composer.
+                onFailure: (error) => {
+                    if (!toastedMessages.has(error)) {
+                        showError(error);
+                    }
+                },
+                pastedText,
+                selection,
+                setDraft: setText,
+            });
         },
-        [handleFileSelect, announcePasteAttached, attachTextAsFile, getChatKey, pasteSelection, removeAttachment, setText, t],
+        [handleFileSelect, announcePasteAttached, attachTextAsFile, disabled, getChatKey, pasteSelection, removeAttachment, setText, t],
     );
 
     // Handle text change — clear banned content error when user edits.
@@ -975,10 +1174,13 @@ const ComposerInput = ({
     const { mutateAsync: steerRun } = useMutation(crpc.chat.steering.steerRun.mutationOptions());
     const followUp = followUpControl(useRunnerCapabilities());
     const canSteer = isThreadComposer && !isComparisonValid && Boolean(sseStreamState) && attachments.length === 0 && attachedReferences.length === 0;
+    // The person's default for a send during a reply: on, a text-only send joins the reply as a steer. Absent means queue.
+    const followUpSteerDefault = useUserSettings().data?.followUpSteer === true;
 
     const handleSteer = useCallback(() => {
         const streamId = sseStreamState;
-        const steerText = text;
+        // From the store, as the mark below is: a key pressed right after an edit runs the previous render's handler.
+        const steerText = useChatUIStore.getState().composerText;
 
         if (
             !canSteer ||
@@ -992,11 +1194,21 @@ const ComposerInput = ({
             return;
         }
 
+        if (isOffline) {
+            showInfo(t`You are offline. Your message stays here; send it once you are back online.`, { id: "composer-offline-send" });
+
+            return;
+        }
+
         promptHistory.reset();
+
+        // Read before the draft is cleared: the steer, or the queued message it may become, carries it.
+        const draftFrom = composerDraftFrom();
+
         clear();
 
         if (followUp === "steer-restart") {
-            interruptAndSend(threadId, steerText, cancelStream);
+            interruptAndSend(threadId, steerText, cancelStream, draftFrom);
 
             return;
         }
@@ -1011,151 +1223,300 @@ const ComposerInput = ({
         // The chip exists before the call is made: the text is in the (persisted)
         // queue the moment it leaves the draft, and a prompt queued while the call
         // is out lands behind it. `pending` keeps the queue from acting on it.
-        enqueue(threadId, { attachments: [], steer: { id: steerId, pending: true, streamId }, text: steerText });
+        enqueue(threadId, { attachments: [], ...(draftFrom !== undefined && { draftFrom }), steer: { id: steerId, pending: true, streamId }, text: steerText });
 
         const unanswered = setTimeout(settleSteer, STEER_ANSWER_MS, threadId, steerId, "accepted");
 
-        void steerRun({ steerId, streamId: streamId as Id<"persistentStreams">, text: steerText, threadId: threadId as Id<"threads"> })
+        void steerRun({
+            ...draftFromField(draftFrom),
+            steerId,
+            streamId: streamId as Id<"persistentStreams">,
+            text: steerText,
+            threadId: threadId as Id<"threads">,
+        })
             .then(() => settleSteer(threadId, steerId, "accepted"))
             .catch((error: unknown) => settleSteer(threadId, steerId, wasRefused(error) ? "refused" : "accepted"))
             .finally(() => clearTimeout(unanswered));
-    }, [canSteer, cancelStream, clear, disabled, followUp, promptHistory, sseStreamState, steerRun, text, threadId]);
+    }, [canSteer, cancelStream, clear, isOffline, disabled, followUp, promptHistory, sseStreamState, steerRun, t, threadId]);
+
+    const notifyFailedUpload = useCallback(
+        (fileName: string) => {
+            showError(t`"${fileName}" could not be uploaded, so the message was not sent.`);
+        },
+        [t],
+    );
 
     // Handle submit — fully synchronous, fire-and-forget network call.
     // Optimistic state (user message + Thinking...) is shown immediately inside
     // sendMessage before the first await. The network request runs in the background.
     // Content safety (banned words) is validated server-side in the /chat/stream endpoint.
-    const handleSubmit = useCallback(() => {
-        // Read the draft from the store, not the render: a key pressed right after typing runs the handler of
-        // the previous render, which still sees the old (possibly empty) draft.
-        const { composerAttachments: draftAttachments, composerText: draftText } = useChatUIStore.getState();
+    const { data: sessionData, isPending: sessionPending } = useAuthSession();
+    // The account a send belongs to: the user's id, `signed-out` for a guest whose session has loaded, or undefined while
+    // it still loads. Only that last case is bound to the account that resolves; a guest who signs in cancels the wait.
+    const accountId = sessionData?.user?.id ?? (sessionPending ? undefined : SIGNED_OUT);
 
-        if (!draftText.trim() && draftAttachments.length === 0) {
-            return;
-        }
+    // `true` when the press did something with the draft (sent, queued, held, or said why not); `false` when it refused it
+    // without a word, so a send that waited on uploads can say why it did not go out.
+    // `explicitQueue` is the queue button's: it queues even where a send would steer. Any other argument (an event from a button) is a send.
+    const handleSubmit = useCallback(
+        (explicitQueue?: boolean): boolean => {
+            // Read the draft from the store, not the render: a key pressed right after typing runs the handler of
+            // the previous render, which still sees the old (possibly empty) draft.
+            // The draft's not-typed mark goes with it, down every path out (`draft-origin.ts`).
+            const { composerAttachments: draftAttachments, composerDraftFrom: draftFrom, composerText: draftText } = useChatUIStore.getState();
 
-        // The notice under the input says why; the server would answer with its size limit.
-        if (draftText.length > MAX_PROMPT_CHARS) {
-            return;
-        }
-
-        // Read isSubmitting via getState() — it's only needed as a guard here, not in render output.
-        // This avoids subscribing to isSubmitting and re-rendering ComposerInput on every submission.
-        if (disabled || useChatUIStore.getState().isSubmitting) {
-            return;
-        }
-
-        const pendingAttachments = draftAttachments.filter((a) => a.status !== "complete");
-
-        if (pendingAttachments.length > 0) {
-            return;
-        }
-
-        promptHistory.reset();
-
-        // `/compact` is a command, not a message: it condenses the thread's context and sends nothing. It runs before the
-        // size guard below, because a chat too large to send is the one that most needs compacting.
-        // A new chat has no thread yet: the command still runs, and answers that there is nothing to compact.
-        if ((isThreadComposer || !threadId) && draftAttachments.length === 0 && isCompactCommand(draftText)) {
-            clear();
-            void compactThread();
-
-            return;
-        }
-
-        // `/clear` starts a fresh context in this thread and sends nothing, as `/compact` does. A new chat has no thread: the
-        // command stays in the draft and the hook says why. The draft is cleared only once the reset is written.
-        if ((isThreadComposer || !threadId) && draftAttachments.length === 0 && isClearCommand(draftText)) {
-            const startedThreadId = threadId;
-            const finishClear = async () => {
-                if (!(await clearThreadContext())) {
-                    return;
-                }
-
-                const { mounted, threadId: currentThreadId } = composerStateRef.current;
-
-                // Only the command goes: an attachment or reference added while the reset was written stays.
-                if (clearsDraftAfterReset({ currentThreadId, draft: useChatUIStore.getState().composerText, mounted, startedThreadId })) {
-                    setText("");
-                }
-            };
-
-            void finishClear();
-
-            return;
-        }
-
-        // Block submission if context is too large
-        if (contextStats.totalChars >= CONTEXT_ERROR_THRESHOLD) {
-            return;
-        }
-
-        // A turn is still running: queue instead of sending. The queue sends it
-        // when the stream finishes (see ComposerPromptQueue).
-        if (isStreaming) {
-            if (!isThreadComposer || isComparisonValid || !threadId) {
-                return;
+            if (!draftText.trim() && draftAttachments.length === 0) {
+                return false;
             }
 
-            usePromptQueueStore
-                .getState()
-                .enqueue(threadId, { attachments: draftAttachments, references: useChatUIStore.getState().attachedReferences, text: draftText });
-            clear();
+            // The notice under the input says why; the server would answer with its size limit.
+            if (draftText.length > MAX_PROMPT_CHARS) {
+                return false;
+            }
 
-            return;
-        }
+            // Read isSubmitting via getState() — it's only needed as a guard here, not in render output.
+            // This avoids subscribing to isSubmitting and re-rendering ComposerInput on every submission.
+            if (disabled || useChatUIStore.getState().isSubmitting) {
+                return false;
+            }
 
-        // A comparison send does not go through `sendMessage`, where a guest's send is held under invite-only, so hold
-        // it here: the draft stays and sign-in opens.
-        if (mustSignIn && (onSubmitOverride || isComparisonValid)) {
-            holdForSignIn(draftText);
+            const pendingAttachments = draftAttachments.filter((a) => a.status !== "complete");
 
-            return;
-        }
+            // Text being converted to a file leaves the draft once its upload succeeds, so the wait is for the file alone.
+            const waitedText = converting !== null && draftText === converting ? "" : draftText;
 
-        // Set submitting flag briefly (guards against double-send, cleared inside sendMessage)
-        useChatUIStore.getState().setIsSubmitting(true);
+            if (pendingAttachments.length > 0) {
+                const failed = pendingAttachments.find((a) => a.status === "error");
 
-        if (onSubmitOverride) {
-            // Comparison parent: fan-out to all child threads
-            void onSubmitOverride(draftText, draftAttachments).then(() => {
+                if (failed) {
+                    notifyFailedUpload(failed.name);
+
+                    return true;
+                }
+
+                // Not sent yet: it waits for these uploads and goes out once they finish, if the draft stays as it is (see the
+                // effect after the auto-submit).
+                setUploadWait(
+                    startUploadWait(
+                        { attachments: draftAttachments, references: useChatUIStore.getState().attachedReferences, target: sendTarget, text: waitedText },
+                        threadId,
+                        accountId,
+                    ),
+                );
+
+                return true;
+            }
+
+            // Every upload is done, so this send goes out now: a wait still pending would read the cleared draft as an edit.
+            setUploadWait(null);
+
+            const intent = composerSubmitIntent({
+                hasAttachments: draftAttachments.length > 0,
+                isComparisonValid,
+                // Another send in this thread has begun (a guest note's) and its reply does not stream yet: this one waits too.
+                isStreaming: isStreaming || isSendStarting(threadId),
+                isThreadComposer,
+                text: draftText,
+                threadId,
+            });
+
+            // A follow-up while a reply streams only joins the local queue, which waits for the network before it sends.
+            if (isOffline && intent !== "queue") {
+                showInfo(t`You are offline. Your message stays here; send it once you are back online.`, { id: "composer-offline-send" });
+
+                return true;
+            }
+
+            promptHistory.reset();
+
+            // `/compact` is a command, not a message: it condenses the thread's context and sends nothing. It runs before the
+            // size guard below, because a chat too large to send is the one that most needs compacting.
+            // A new chat has no thread yet: the command still runs, and answers that there is nothing to compact.
+            if (intent === "compact") {
                 clear();
-                useChatUIStore.getState().setIsSubmitting(false);
+                void compactThread();
 
-                return undefined;
-            });
-        } else if (isComparisonValid) {
-            void sendComparisonMessage(draftText, selectedModelsForComparison, draftAttachments).then(() => {
-                useChatUIStore.getState().setIsSubmitting(false);
+                return true;
+            }
 
-                return undefined;
-            });
-        } else {
-            // Fire-and-forget: sendMessage updates optimistic state synchronously
-            // (clears composer, shows Thinking...) then runs the fetch in the background
-            void sendMessage(draftText, draftAttachments);
-        }
+            // `/clear` starts a fresh context in this thread and sends nothing, as `/compact` does. A new chat has no thread: the
+            // command stays in the draft and the hook says why. The draft is cleared only once the reset is written.
+            if (intent === "clear") {
+                const startedThreadId = threadId;
+                const finishClear = async () => {
+                    if (!(await clearThreadContext())) {
+                        return;
+                    }
 
-        onSubmitProp?.();
-    }, [
-        disabled,
-        mustSignIn,
-        sendMessage,
-        onSubmitProp,
-        contextStats,
-        isComparisonValid,
-        sendComparisonMessage,
-        selectedModelsForComparison,
-        onSubmitOverride,
-        clear,
-        promptHistory,
-        isStreaming,
-        isThreadComposer,
-        threadId,
-        compactThread,
-        clearThreadContext,
-        setText,
-    ]);
+                    const { mounted, threadId: currentThreadId } = composerStateRef.current;
+
+                    // Only the command goes: an attachment or reference added while the reset was written stays.
+                    if (clearsDraftAfterReset({ currentThreadId, draft: useChatUIStore.getState().composerText, mounted, startedThreadId })) {
+                        setText("");
+                    }
+                };
+
+                void finishClear();
+
+                return true;
+            }
+
+            // Block submission if context is too large
+            if (contextStats.totalChars >= CONTEXT_ERROR_THRESHOLD) {
+                return false;
+            }
+
+            // The person's default (`followUpSteer`): a text-only send during a reply joins it as a steer, as the Steer button does. A
+            // send that cannot steer now (offline, too long, or no steer capability) queues as before.
+            // The live draft is read again here: an attachment or reference added after the last render must queue with the text.
+            // A guest under invite-only is held for sign-in below, as any send is, so the default never steers for one.
+            if (
+                intent === "queue" &&
+                explicitQueue !== true &&
+                followUpSteerDefault &&
+                canSteer &&
+                followUp === "steer" &&
+                !mustSignIn &&
+                !disabled &&
+                !isOffline &&
+                draftAttachments.length === 0 &&
+                useChatUIStore.getState().attachedReferences.length === 0 &&
+                draftText.trim() !== "" &&
+                draftText.length <= MAX_PROMPT_CHARS
+            ) {
+                handleSteer();
+
+                return true;
+            }
+
+            // A turn is still running: queue instead of sending. The queue sends it
+            // when the stream finishes (see ComposerPromptQueue). A composer without a queue waits.
+            if (intent === "queue" || intent === "wait") {
+                if (intent === "queue" && threadId) {
+                    usePromptQueueStore.getState().enqueue(threadId, {
+                        attachments: draftAttachments,
+                        ...(draftFrom !== undefined && { draftFrom }),
+                        references: useChatUIStore.getState().attachedReferences,
+                        text: draftText,
+                    });
+                    clear();
+                }
+
+                // A composer without a queue only waits: nothing happened to the draft.
+                return intent === "queue" && Boolean(threadId);
+            }
+
+            // A comparison send does not go through `sendMessage`, where a guest's send is held under invite-only, so hold
+            // it here: the draft stays and sign-in opens.
+            if (mustSignIn && (onSubmitOverride || isComparisonValid)) {
+                holdForSignIn(draftText, draftFrom);
+
+                return true;
+            }
+
+            // Set submitting flag briefly (guards against double-send, cleared inside sendMessage)
+            useChatUIStore.getState().setIsSubmitting(true);
+
+            if (onSubmitOverride) {
+                prefillsDuringSend.current = [];
+                // Comparison parent: fan-out to all child threads
+                void onSubmitOverride(draftText, draftAttachments, draftFrom)
+                    .then(() => {
+                        const prefills = prefillsDuringSend.current ?? [];
+
+                        prefillsDuringSend.current = null;
+
+                        // What joined the draft while the send ran (a fix prompt from the header) stays; the sent text goes.
+                        // A prefill trims the draft's trailing whitespace before it appends (`textAfterRestore`), so match without it.
+                        const now = getComposerText();
+                        const sentText = draftText.trimEnd();
+
+                        if (now === draftText) {
+                            clear();
+                        } else if (now.startsWith(sentText)) {
+                            setText(now.slice(sentText.length).trimStart());
+
+                            for (const attachment of draftAttachments) {
+                                useChatUIStore.getState().removeAttachment(attachment.id);
+                            }
+                        } else {
+                            // Edited while it went out: what is left is the sent message, so it must not stay to be sent again. The fix
+                            // prompts that arrived meanwhile were not sent: they come back, still marked as not typed.
+                            clear();
+
+                            // A prompt the person deleted meanwhile stays deleted.
+                            const kept = prefills.filter((prefill) => now.includes(prefill));
+
+                            if (kept.length > 0) {
+                                setText(kept.join("\n"));
+                                markComposerDraft("suggestion");
+                            }
+                        }
+
+                        useChatUIStore.getState().setIsSubmitting(false);
+
+                        return undefined;
+                    })
+                    .catch((error: unknown) => {
+                        prefillsDuringSend.current = null;
+                        // The draft stays to send again; a send still marked as running would block that, and hold prompts back
+                        // (`composer-prefill.ts`) until a reload.
+                        useChatUIStore.getState().setIsSubmitting(false);
+
+                        throw error;
+                    });
+            } else if (isComparisonValid) {
+                void sendComparisonMessage(draftText, selectedModelsForComparison, draftAttachments, draftFrom).then(() => {
+                    useChatUIStore.getState().setIsSubmitting(false);
+
+                    return undefined;
+                });
+            } else {
+                // Fire-and-forget: sendMessage updates optimistic state synchronously
+                // (clears composer, shows Thinking...) then runs the fetch in the background
+                void sendMessage(draftText, draftAttachments, { draftFrom });
+            }
+
+            onSubmitProp?.();
+
+            return true;
+        },
+        [
+            canSteer,
+            followUp,
+            followUpSteerDefault,
+            handleSteer,
+            isOffline,
+            t,
+            disabled,
+            getComposerText,
+            mustSignIn,
+            sendMessage,
+            onSubmitProp,
+            contextStats,
+            isComparisonValid,
+            sendComparisonMessage,
+            selectedModelsForComparison,
+            onSubmitOverride,
+            clear,
+            promptHistory,
+            isStreaming,
+            isThreadComposer,
+            threadId,
+            compactThread,
+            clearThreadContext,
+            setText,
+            notifyFailedUpload,
+            accountId,
+            sendTarget,
+            converting,
+        ],
+    );
+
+    // The queue button queues explicitly: it never takes the default steer.
+    const queueMessage = useCallback((): void => {
+        handleSubmit(true);
+    }, [handleSubmit]);
 
     // "Send as a new chat" from outside the chat UI (the native shell's Quick
     // Composer — see `core/utils/composer-submit.ts`). Only the full new-thread
@@ -1172,30 +1533,42 @@ const ComposerInput = ({
         }
 
         return onComposerSubmitRequest(({ text: requested }) => {
+            // Sent from outside the chat (the Quick Composer): like a route's prefill, it is not stored over the chat's saved
+            // draft, which comes back once the send ends (`stored-drafts.ts`).
+            draftOwnership.prefill = requested;
             autoSubmitTextRef.current = requested;
             setText(requested);
+            // The shell hands over text from outside the page (a share, the Quick Composer): none of it counts as typed here.
+            markComposerDraft("shellLink");
             setAutoSubmitRequest((count) => count + 1);
         });
     }, [isAutoSubmitTarget, setText]);
 
     // The message a visitor sent before signing in (invite-only), sent once a real account's token is on the client.
     // The new-chat composer and a thread's composer both take it: sign-in returns to the URL it started from.
-    usePendingSend(!onSubmitOverride && !compact, (pending) => {
+    usePendingSend(!onSubmitOverride && !compact, ({ draftFrom, text: pending }) => {
+        draftOwnership.prefill = pending;
         autoSubmitTextRef.current = pending;
         setText(pending);
+
+        if (draftFrom !== undefined) {
+            markComposerDraft(draftFrom);
+        }
+
         setAutoSubmitRequest((count) => count + 1);
     });
 
-    // Files dropped on the dock icon (`core/utils/composer-submit.ts`) are attached the same way as a drop: uploaded, never sent.
+    // Files dropped on the dock icon or the sidebar (`core/utils/composer-submit.ts`) are attached the same way as a drop:
+    // uploaded, never sent, and only for the account they were dropped for, so the wait for the session comes first.
     useEffect(() => {
-        if (!isAutoSubmitTarget) {
+        if (!isAutoSubmitTarget || accountId === undefined) {
             return undefined;
         }
 
-        return onComposerAttachRequest(({ files }) => {
+        return onComposerAttachRequest(accountId, ({ files }) => {
             void handleFileSelect(files);
         });
-    }, [isAutoSubmitTarget, handleFileSelect]);
+    }, [accountId, isAutoSubmitTarget, handleFileSelect]);
 
     useEffect(() => {
         if (autoSubmitTextRef.current === null || autoSubmitTextRef.current !== text || disabled || isStreaming) {
@@ -1208,6 +1581,103 @@ const ComposerInput = ({
         handleSubmit();
     }, [autoSubmitRequest, disabled, handleSubmit, isStreaming, text]);
 
+    // A send that waited for uploads settles as they change: it goes out once they all complete, while a failed or removed
+    // upload stops it, so an unfinished attachment is never sent.
+    useEffect(() => {
+        // A conversion of the draft to a file is still running: the wait settles once it has ended, either way.
+        if (uploadWait === null || converting !== null) {
+            return;
+        }
+
+        // The session is still loading: the wait settles only once it knows the account it belongs to.
+        if (uploadWait.accountId === undefined && accountId === undefined) {
+            return;
+        }
+
+        // Send was pressed while the session was loading: the wait belongs to the account that resolves first, and only a
+        // later change of account cancels it.
+        if (uploadWait.accountId === undefined && accountId !== undefined) {
+            setUploadWait({ ...uploadWait, accountId });
+
+            return;
+        }
+
+        // Settle against the store, as `handleSubmit` reads it, so the draft judged here is the one that goes out.
+        const live = useChatUIStore.getState();
+        const outcome = settleUploadWait(
+            uploadWait,
+            { attachments: live.composerAttachments, references: live.attachedReferences, target: sendTarget, text: live.composerText },
+            threadId,
+            accountId,
+        );
+
+        if (outcome.kind === "waiting") {
+            return;
+        }
+
+        setUploadWait(null);
+
+        switch (outcome.kind) {
+            case "edited": {
+                showInfo(t`Your message changed while the uploads ran, so it was not sent. Press send to send it.`);
+
+                break;
+            }
+
+            case "failed": {
+                // The upload's own toast already gave the reason when it recognised the failure: one message is enough.
+                if (!toastedMessages.has(outcome.error ?? "")) {
+                    notifyFailedUpload(outcome.name);
+                }
+
+                break;
+            }
+
+            case "retargeted": {
+                showInfo(t`The model selection changed while the uploads ran, so the message was not sent. Press send to send it.`);
+
+                break;
+            }
+
+            case "send": {
+                // `handleSubmit` refuses some drafts without a word (a locked composer, a send in flight, a reply streaming
+                // with no queue, a draft too large for the model). Nobody pressed send just now, so the reason is given
+                // here, and the draft stays.
+                if (!handleSubmit()) {
+                    if (contextWarning?.level === "error") {
+                        showError(contextWarning.message);
+                    } else {
+                        showInfo(t`The uploads finished, but the message was not sent. Press send to send it.`);
+                    }
+                }
+
+                break;
+            }
+
+            default: {
+                // A chat change cancels the wait without a message: the draft belongs to the chat it was typed in.
+                break;
+            }
+        }
+    }, [
+        accountId,
+        attachedReferences,
+        attachments,
+        contextWarning,
+        converting,
+        disabled,
+        handleSubmit,
+        isComparisonValid,
+        isStreaming,
+        isThreadComposer,
+        notifyFailedUpload,
+        sendTarget,
+        t,
+        text,
+        threadId,
+        uploadWait,
+    ]);
+
     // Handle cancel/stop
     // A manual stop pauses the queue: the chips stay, nothing auto-sends.
     const handleCancel = useCallback(() => {
@@ -1215,6 +1685,8 @@ const ComposerInput = ({
             usePromptQueueStore.getState().setPaused(threadId, true);
         }
 
+        // A manual stop pauses everything that would send by itself, a send waiting on uploads included; the draft stays.
+        setUploadWait(null);
         cancelStream();
     }, [cancelStream, threadId]);
 
@@ -1324,10 +1796,55 @@ const ComposerInput = ({
                     setText(textAfterRestore(getComposerText(), payload));
                 }
 
+                // A marked restore marks the draft it joins. One that replaced the draft as a whole leaves none of the old text.
+                if (payload.draftFrom !== undefined) {
+                    markComposerDraft(payload.draftFrom);
+                } else if (payload.append !== true) {
+                    useChatUIStore.getState().setComposerDraftFrom(undefined);
+                }
+
                 void Promise.all(payload.files.map((file, index) => restoreFile(file, index)));
                 inputAreaRef.current?.focus();
             }),
         [getComposerText, promptHistory, restoreFile, setText],
+    );
+
+    // A prompt another part of the thread's UI wrote for this thread (`composer-prefill.ts`): added after what is typed,
+    // never sent. The same prompt twice is not added twice. A comparison parent's shared composer takes one too: its send
+    // fans out through `onSubmitOverride`, but the text belongs to this thread. The thread's parked draft comes back first,
+    // so a prompt taken as a pane mounts joins that draft instead of keeping it parked; both also wait for the stored draft
+    // (`awaitStoredDraft`): the comparison parent binds one too (`thread.tsx`). The person did not type the prompt, and it quotes host text: the draft is
+    // marked as a clicked suggestion, unless it already has a mark.
+    useComposerPrefill(
+        prefillThreadOf(threadId, compact, threadLoad),
+        (prefill) => {
+            if (threadId) {
+                restoreLiveComposerFor(threadId);
+            }
+
+            const current = getComposerText();
+            // The draft is stored without hidden characters (`setComposerText`), so the same prompt is compared the same way.
+            const { text: clean } = stripHiddenText(prefill);
+
+            promptHistory.reset();
+
+            if (!current.includes(clean)) {
+                // A rejection warning is about the text that was there: typing clears it (`handleTextChange`), so the prompt does too.
+                if (useChatUIStore.getState().composerBannedContent) {
+                    useChatUIStore.getState().setComposerBannedContent(null);
+                }
+
+                prefillsDuringSend.current?.push(clean);
+                setText(textAfterRestore(current, { append: true, files: [], text: clean }));
+
+                if (composerDraftFrom() === undefined) {
+                    markComposerDraft("suggestion");
+                }
+            }
+
+            inputAreaRef.current?.focus();
+        },
+        { awaitStoredDraft: true },
     );
 
     // Handle "Upload new file" from @ popup — open file dialog
@@ -1416,10 +1933,21 @@ const ComposerInput = ({
         const timestamp = new Date().toISOString().split("T", 1)[0];
         const file = new File([blob], `text-input-${timestamp}.txt`, { type: "text/plain" });
 
-        // Clear the text after successful conversion
+        // The text stays in the draft (and in its chat) until the upload succeeds. Meanwhile a send waits for the file alone
+        // and settles once the conversion ends: with the text cleared it sends the file, and a failure leaves the text.
+        setConverting(text);
+
         if (await attachGeneratedFile(file, t`Conversion failed`)) {
-            setText("");
+            if (useChatUIStore.getState().composerText === text) {
+                setText("");
+            } else {
+                // The draft was edited during the upload: what was typed stays, and a waiting send compares it with the text
+                // it was pressed on, so it ends with the edit notice instead of sending the file without it.
+                setUploadWait((wait) => (wait === null ? null : { ...wait, text }));
+            }
         }
+
+        setConverting(null);
     }, [text, attachGeneratedFile, setText, t]);
 
     // "@" a chat: read it through the thread view's own query (so the usual access and lock checks apply), then attach its text.
@@ -1453,9 +1981,13 @@ const ComposerInput = ({
     const handleAttachmentUpdate = useCallback(
         async (attachmentId: string, newFile: File) => {
             try {
+                const revision = useChatUIStore.getState().composerAttachments.find((attachment) => attachment.id === attachmentId)?.revision ?? 0;
+
+                // A user edit: a send waiting on this file ends rather than send the edited content without a new press.
                 updateAttachment(attachmentId, {
                     file: newFile,
                     name: newFile.name,
+                    revision: revision + 1,
                     status: "uploading",
                 });
 
@@ -1524,10 +2056,12 @@ const ComposerInput = ({
                 {failureAnnouncement}
             </span>
             {isThreadComposer && <PromptHistorySource onEntries={promptHistory.setEntries} />}
+            {isThreadComposer && promptSearchOpen && <ComposerPromptSearch onClose={closePromptSearch} onPick={pickSentPrompt} />}
             {isThreadComposer && <ComposerPromptQueue />}
             {isThreadComposer && <AutoReadReplies />}
             {isThreadComposer && <CompletionSound />}
             {isThreadComposer && <ReplyCompleteAnnouncement />}
+            {isThreadComposer && <TurnStepAnnouncement />}
 
             <ComposerInputArea
                 afterTextarea={
@@ -1601,9 +2135,13 @@ const ComposerInput = ({
                 hasCompletedAttachments={hasCompletedAttachments}
                 hiddenRemoved={hiddenRemoved}
                 isHistoryRecalled={isThreadComposer ? promptHistory.isRecalled : undefined}
+                isSendWaiting={uploadWait !== null}
                 isStreaming={isSSEStreaming || isComparisonLoading}
                 isUploading={hasUploadingAttachments}
                 maxRows={maxRows}
+                nextPromptHeld={hasAttachments || hasAttachedReferences}
+                nextPromptScope={threadId}
+                nextPromptSuggestion={compact || !suggestPrompt ? null : nextPromptSuggestion}
                 onAddAttachment={compact ? undefined : handleAddAttachment}
                 onAttachDraftAsFile={draftFitsFile ? handleAttachDraftAsFile : undefined}
                 onCancel={handleCancel}
@@ -1612,6 +2150,8 @@ const ComposerInput = ({
                 onDraw={compact ? undefined : onOpenDraw}
                 onHistoryNavigate={isThreadComposer ? promptHistory.navigate : undefined}
                 onPaste={compact ? undefined : handlePaste}
+                onPromptSearch={isThreadComposer && !promptSearchLocked ? openPromptSearch : undefined}
+                onQueue={queueMessage}
                 onSelectChat={compact ? undefined : handleSelectChat}
                 onSelectFileUpload={compact ? undefined : handleSelectFileUpload}
                 onSelectVaultFile={compact ? undefined : handleSelectVaultFile}

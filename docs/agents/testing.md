@@ -26,6 +26,14 @@ Rules for agents writing tests and for review bots reviewing them. Change this f
   not implementation details.
 - Mobile: test the pure rules directly; inject a store or a platform module rather than mocking native modules
   globally.
+- CI splits every project's unit tests into three shards by recorded time (`scripts/vitest/time-sharding.ts`). A project
+  with a `test:coverage` target spreads `timeSharding(import.meta.url)` into `test`, or every shard runs all its files.
+  `apps/cli` does not: Vitest refuses more shards than files, and it has two. Each test file must pass alone: a shard can
+  hold any subset.
+- An e2e shard failing with "config.webServer was not able to start" after "JavaScript heap out of memory" is the
+  backend's `lunora dev` startup (in-process codegen, ~4.0 GB live heap on 2026-11-21), not the PR's tests. The
+  "Run e2e tests" step sets `NODE_OPTIONS=--max-old-space-size=6144`. If it hits that limit, measure the heap on main
+  before raising it again.
 
 ## For reviewers
 

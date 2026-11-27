@@ -62,6 +62,8 @@ backend/lunora/email/templates/__fixtures__/
 packages/service-sdk/src/generated/
 # Recorded share pages: their inline scripts are captured bytes, not source to reformat.
 backend/lunora/chat-import/lib/fixtures/
+# Clipboard HTML as browsers hand it over: the whitespace and markup are what the paste converter is tested on.
+apps/web/src/features/chat/thread/composer-paste/__fixtures__/
 # Build output the browser extension writes next to `dist/`.
 apps/browser-extension/dist-firefox/
 apps/browser-extension/release/
@@ -92,3 +94,5 @@ docs/**/*.md
 docs/**/*.mdx
 /*.md
 /.github/*.md
+# Pasted-HTML fixtures: whitespace inside them is the input under test, so they are never reformatted.
+packages/html-to-markdown/bench/fixtures/

@@ -38,6 +38,7 @@ import { useChatIsStreaming, useChatMessages, useChatThread } from "@/features/c
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 import type { ComposerMode } from "@/features/chat/core/stores/model-store";
 import { useModelStore } from "@/features/chat/core/stores/model-store";
+import { markComposerDraft } from "@/features/chat/core/utils/draft-origin";
 import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
 
 // Skeleton cell indices — hoisted so the array is never recreated in JSX
@@ -231,6 +232,7 @@ const MediaGalleryView: FC<MediaGalleryViewProps> = ({ className, maxWidth = "65
                         alt: filePart.filename || t`Generated image`,
                         batchId: message.id,
                         createdAt,
+                        filename: filePart.filename,
                         id: `${message.id}-${items.length}`,
                         modelName,
                         nsfwStatus: filePart.nsfwStatus,
@@ -243,6 +245,7 @@ const MediaGalleryView: FC<MediaGalleryViewProps> = ({ className, maxWidth = "65
                         alt: filePart.filename || t`Generated video`,
                         batchId: message.id,
                         createdAt,
+                        filename: filePart.filename,
                         id: `${message.id}-${items.length}`,
                         modelName,
                         prompt,
@@ -323,8 +326,15 @@ const MediaGalleryView: FC<MediaGalleryViewProps> = ({ className, maxWidth = "65
         setSelectedItem(null);
         // Set the prompt in the composer
         setComposerText(newPrompt.trim());
+
+        // It starts as the item's stored prompt, which a model or another chat may have written: even edited, it is
+        // not all the person's own words (`draft-origin.ts`).
+        if (selectedItem?.prompt) {
+            markComposerDraft("galleryPrompt");
+        }
+
         setNewPrompt("");
-    }, [newPrompt, setComposerText]);
+    }, [newPrompt, selectedItem, setComposerText]);
 
     const formatDuration = (seconds: number): string => {
         if (seconds < 60) {

@@ -14,7 +14,7 @@ import {
     getNativeDeviceStatus,
     onNativeDeviceChanged,
     onNativeDeviceProgress,
-} from "@/lib/native/bridge";
+} from "@/lib/native/device-bridge";
 
 import { DEVICE_PAIRED_EVENT } from "../lib/device-events";
 import type { DeviceRelayPorts } from "../lib/device-relay";

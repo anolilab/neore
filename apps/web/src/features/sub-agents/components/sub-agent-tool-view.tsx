@@ -8,7 +8,8 @@
  * the card finds the run by the call's id and follows it through a live query.
  * The result itself is posted to the thread as a separate message. While the
  * run is working the card offers Stop; the child finishes the step it is in
- * (billed) and runs no more.
+ * (billed) and runs no more. A run waiting on its owner shows its requests here,
+ * answered on the child's thread (`SubAgentApprovals`).
  */
 
 import { useLingui } from "@lingui/react/macro";
@@ -21,8 +22,12 @@ import { Bot, CircleStop, ExternalLink, Loader2 } from "lucide-react";
 import type { FC } from "react";
 import { useId } from "react";
 
+import { useChatThread } from "@/features/chat/core/context/chat-context";
+import { useOpenChatClick } from "@/features/chat/split/use-open-chat";
 import { useCRPC } from "@/lib/lunora/crpc";
 import { showError } from "@/lib/toast";
+
+import SubAgentApprovals from "./sub-agent-approvals";
 
 type RunStatus = "awaiting" | "cancelled" | "failed" | "queued" | "running" | "succeeded";
 
@@ -31,11 +36,14 @@ const TASK_PREVIEW_MAX = 200;
 const SubAgentToolView: FC<{ part: ToolPart }> = ({ part }) => {
     const { t } = useLingui();
     const crpc = useCRPC();
+    const { threadId } = useChatThread();
     const headingId = useId();
+    const openChat = useOpenChatClick();
     const isDenied = part.state === "output-denied";
     const { data: run, isPending } = useQuery(
         crpc.sub_agents.functions.getRunByToolCall.queryOptions(isDenied || !part.toolCallId ? skipToken : { toolCallId: part.toolCallId }),
     );
+    const childThreadId = run?.childThreadId;
 
     const stop = useMutation(
         crpc.sub_agents.functions.cancelRun.mutationOptions({
@@ -48,7 +56,7 @@ const SubAgentToolView: FC<{ part: ToolPart }> = ({ part }) => {
     const output = part.state === "output-available" ? (part.output as { error?: string } | undefined) : undefined;
 
     const statusLabels: Record<RunStatus, string> = {
-        // Waiting on an approval its owner answers in the sub-agent's own thread (linked below): the owner has to act.
+        // Waiting on an approval its owner answers on this card or in the sub-agent's own thread: the owner has to act.
         awaiting: t`Waiting for your approval`,
         cancelled: t`Stopped`,
         failed: t`Failed`,
@@ -112,6 +120,8 @@ const SubAgentToolView: FC<{ part: ToolPart }> = ({ part }) => {
 
             {notice && <p className="text-muted-foreground mt-2 text-xs">{notice}</p>}
 
+            {run?.status === "awaiting" && threadId && <SubAgentApprovals parentThreadId={threadId} runId={run._id} />}
+
             {(run?.status === "running" || run?.status === "queued" || run?.status === "awaiting") && (
                 <Button className="mt-2" disabled={stop.isPending} onClick={() => stop.mutate({ runId: run._id })} size="sm" type="button" variant="outline">
                     <CircleStop aria-hidden="true" />
@@ -119,10 +129,29 @@ const SubAgentToolView: FC<{ part: ToolPart }> = ({ part }) => {
                 </Button>
             )}
 
-            {run?.childThreadId && (
+            {childThreadId && (
+                // The link keeps its address for the browser's own menu; the click chooses the place (`useOpenChatClick`).
                 <Link
                     className="text-primary-text mt-2 inline-flex items-center gap-1 text-xs underline-offset-4 hover:underline"
-                    params={{ threadId: run.childThreadId }}
+                    onAuxClick={(event) => {
+                        // Only the middle button places the chat; with Shift or Alt held the browser keeps its own action.
+                        if (event.button !== 1 || event.shiftKey || event.altKey) {
+                            return;
+                        }
+
+                        event.preventDefault();
+                        openChat(childThreadId, event, threadId);
+                    }}
+                    onClick={(event) => {
+                        // Shift and Alt are not placement keys: the browser keeps its own action (a new window, a download).
+                        if (event.shiftKey || event.altKey) {
+                            return;
+                        }
+
+                        event.preventDefault();
+                        openChat(childThreadId, event, threadId);
+                    }}
+                    params={{ threadId: childThreadId }}
                     to="/chat/$threadId"
                 >
                     <ExternalLink aria-hidden="true" className="size-3" />

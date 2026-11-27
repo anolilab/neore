@@ -7,14 +7,16 @@ import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import RouteErrorBoundary from "@/components/error-boundaries/route-error-boundary";
+import { useAuthActiveOrganization, useAuthSession } from "@/features/auth/hooks/use-auth-session";
 import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
-import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import Assistant from "@/features/chat/assistant";
 import { useLinkSearchAsWritten, usePromptLinkDraft } from "@/features/chat/core/hooks/use-prompt-link-draft";
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
+import { hasPendingComposerAttach } from "@/features/chat/core/utils/composer-submit";
+import { holdLandingDraft } from "@/features/chat/core/utils/draft-origin";
 import { readPromptLinkSearch } from "@/features/chat/core/utils/prompt-link";
 import { BOOTED_ON_CHAT_INDEX } from "@/features/chat/core/utils/resume-boot";
-import { LANDING_MESSAGE_KEY } from "@/features/marketing/stores/landing-store";
+import { LANDING_MESSAGE_KEY, takeLandingMessage } from "@/features/marketing/stores/landing-store";
 import { useFeatureFlaggedModelsSettled } from "@/hooks/use-feature-flagged-models";
 import { useCRPC } from "@/lib/lunora/crpc";
 
@@ -60,9 +62,10 @@ const ChatPage = () => {
     const navigate = useNavigate();
     const crpc = useCRPC();
     const { data: userSettings } = useUserSettings();
-    const { hooks } = useAuth();
-    const { data: activeOrganization, isPending: isOrgPending } = hooks.useActiveOrganization();
-    const { data: sessionData, isPending: isSessionPending } = hooks.useSession();
+    const { data: activeOrganization, isPending: isOrgPending } = useAuthActiveOrganization();
+    const { data: sessionData, isPending: isSessionPending } = useAuthSession();
+    // Dropped files waiting for this account's composer hold the resume-last-chat redirect (`hasPendingComposerAttach`).
+    const sessionUserId = sessionData?.user?.id;
     const activeTeamId = (sessionData?.session as { activeTeamId?: string | null } | undefined)?.activeTeamId ?? undefined;
     const resumeScopeReady = !isOrgPending && !isSessionPending;
     const resumeLastChat =
@@ -109,15 +112,16 @@ const ChatPage = () => {
             return;
         }
 
-        const message = sessionStorage.getItem(LANDING_MESSAGE_KEY);
+        const handOff = takeLandingMessage();
 
-        if (!message) {
+        if (!handOff) {
             return;
         }
 
-        sessionStorage.removeItem(LANDING_MESSAGE_KEY);
+        // Its mark goes to the composer with the text (`prefillDraftFrom`).
+        holdLandingDraft(handOff.text, handOff.from);
         initialMessageReadRef.current = true;
-        setInitialMessage(message);
+        setInitialMessage(handOff.text);
     }, [hasInitialMessage]);
 
     useEffect(() => {
@@ -143,7 +147,9 @@ const ChatPage = () => {
             composerText.trim() !== "" ||
             composerAttachments.length > 0 ||
             ((focused instanceof HTMLTextAreaElement || focused instanceof HTMLInputElement) && focused.value.trim() !== "") ||
-            (focused instanceof HTMLElement && focused.isContentEditable && (focused.textContent ?? "").trim() !== "");
+            (focused instanceof HTMLElement && focused.isContentEditable && (focused.textContent ?? "").trim() !== "") ||
+            // Files dropped on the sidebar or the dock icon wait for this page's composer.
+            hasPendingComposerAttach(sessionUserId);
 
         if (hasDraft) {
             return;
@@ -152,7 +158,7 @@ const ChatPage = () => {
         if (latestThreadId) {
             void navigate({ params: { threadId: latestThreadId }, replace: true, search: { initialMessage: undefined }, to: "/chat/$threadId" });
         }
-    }, [latestResolved, latestThreadId, navigationKey, navigate, resumeLastChat]);
+    }, [latestResolved, latestThreadId, navigationKey, navigate, resumeLastChat, sessionUserId]);
 
     useEffect(() => {
         if (!redirectReason || shownNotificationRef.current === redirectReason) {

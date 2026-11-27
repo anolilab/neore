@@ -15,10 +15,12 @@
     ],
     "type": "module",
     "scripts": {
+        "prebuild": "pnpm -w run codegen:backend",
         "build": "node scripts/generate-og.mjs && vite build && node scripts/generate-sw.mjs && tsc --noEmit",
         "build-storybook": "storybook build --output-dir storybook-static",
         "cf:typegen": "wrangler types",
         "clean": "rimraf node_modules dist .eslintcache .tanstack",
+        "predev": "pnpm -w run codegen:backend",
         "dev": "vite dev --port 5173",
         "email:dev": "email dev --dir src/components/emails --port 5555",
         "generate:pwa-assets": "pwa-assets-generator",
@@ -37,7 +39,7 @@
         "test:storybook": "vitest run --config vitest.storybook.config.ts",
         "translate:auto": "node scripts/translate-catalogs.mjs",
         "translate:clean": "lingui extract --clean",
-        "translate:compile": "lingui compile",
+        "translate:compile": "node scripts/check-locale-catalogs.mjs && lingui compile",
         "translate:extract": "lingui extract"
     },
     "dependencies": {
@@ -66,9 +68,9 @@
         "@fontsource-variable/geist": "catalog:style",
         "@fontsource-variable/geist-mono": "catalog:style",
         "@hcaptcha/react-hcaptcha": "catalog:security",
-        "@json-render/core": "0.22.0",
-        "@json-render/react": "0.22.0",
-        "@json-render/shadcn": "0.22.0",
+        "@json-render/core": "0.23.2",
+        "@json-render/react": "0.23.2",
+        "@json-render/shadcn": "0.23.2",
         "@lingui/core": "catalog:i18n",
         "@lingui/detect-locale": "catalog:i18n",
         "@lingui/react": "catalog:i18n",
@@ -81,6 +83,7 @@
         "@neore/backend": "workspace:*",
         "@neore/chat-ui": "workspace:*",
         "@neore/client-runtime": "workspace:*",
+        "@neore/html-to-markdown": "workspace:*",
         "@neore/ui": "workspace:*",
         "@onboardjs/core": "catalog:onboarding",
         "@onboardjs/posthog-plugin": "catalog:onboarding",
@@ -99,6 +102,7 @@
         "@tiptap/extension-character-count": "catalog:tiptap",
         "@tiptap/extension-code-block-lowlight": "catalog:tiptap",
         "@tiptap/extension-color": "catalog:tiptap",
+        "@tiptap/extension-emoji": "catalog:tiptap",
         "@tiptap/extension-highlight": "catalog:tiptap",
         "@tiptap/extension-image": "catalog:tiptap",
         "@tiptap/extension-link": "catalog:tiptap",
@@ -146,6 +150,7 @@
         "my-ua-parser": "catalog:utils",
         "nanoid": "catalog:utils",
         "next-themes": "catalog:ui",
+        "open-bot-avatar": "catalog:ui",
         "posthog-js": "catalog:analytics",
         "posthog-node": "catalog:analytics",
         "pptxgenjs": "catalog:utils",
@@ -156,6 +161,7 @@
         "react-hotkeys-hook": "catalog:utils",
         "react-qr-code": "catalog:utils",
         "remark-directive": "catalog:markdown",
+        "remark-parse": "catalog:markdown",
         "rooks": "catalog:utils",
         "shadcn": "catalog:ui",
         "slate": "catalog:editor",
@@ -165,6 +171,7 @@
         "streamdown": "catalog:markdown",
         "tailwindcss": "catalog:style",
         "unified": "catalog:markdown",
+        "web-vitals": "catalog:analytics",
         "workbox-window": "catalog:build",
         "zod": "catalog:utils",
         "zustand": "catalog:state"
@@ -216,10 +223,12 @@
         "eslint-plugin-testing-library": "catalog:lint",
         "eslint-plugin-validate-jsx-nesting": "catalog:lint",
         "eslint-plugin-zod": "catalog:lint",
+        "fake-indexeddb": "catalog:test",
         "fumadocs-mdx": "catalog:fumadocs",
         "jsdom": "catalog:test",
         "msw": "catalog:test",
         "msw-storybook-addon": "catalog:storybook",
+        "oxc-transform-react": "catalog:build",
         "playwright": "catalog:test",
         "prettier": "catalog:lint",
         "prettier-plugin-tailwindcss": "catalog:lint",
@@ -244,7 +253,7 @@
         "wrangler": "catalog:build"
     },
     "engines": {
-        "node": ">=22.x"
+        "node": "^22.18.0 || >=23.6.0"
     },
     "msw": {
         "workerDirectory": [

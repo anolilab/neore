@@ -26,6 +26,7 @@ use device_core::ssh::{
     HostKey, HostLink, Interact, SshError, SshPaths, Target, HOST_VERSION,
 };
 use device_core::store::{self, test_keychain, Host, Pairing, Settings};
+use device_core::test_dir::TestDir;
 use device_core::{DeviceState, Event};
 use serde_json::json;
 
@@ -394,7 +395,7 @@ fn it_connects_pins_the_key_and_runs_an_action_on_the_server() {
     assert_eq!(interact.offered.lock().unwrap().as_slice(), [expected]);
     assert_eq!(pinned_keys(&paths, &server.spec()).len(), 1);
 
-    let root = vectors::fixture("ssh");
+    let (_fixture, root) = vectors::fixture("ssh");
     let params = json!({ "tool": "fs_list", "input": { "path": root }, "roots": [root], "remainingMs": 60_000 });
     let outcome = connection.run(&params, Duration::from_secs(30)).unwrap();
 
@@ -594,7 +595,7 @@ fn closing_one_session_leaves_the_others_and_the_master_alone() {
     first.close();
     drop(first);
 
-    let root = vectors::fixture("ssh-shared");
+    let (_fixture, root) = vectors::fixture("ssh-shared");
     let params = json!({ "tool": "fs_list", "input": { "path": root }, "roots": [root], "remainingMs": 60_000 });
 
     assert_eq!(
@@ -743,7 +744,7 @@ fn a_data_folder_with_a_space_that_is_too_deep_for_a_socket_still_connects_over_
     assert!(master_is_running(&target, &paths));
     assert_eq!(pinned_keys(&paths, &server.spec()).len(), 1);
 
-    let root = vectors::fixture("ssh");
+    let (_fixture, root) = vectors::fixture("ssh-spaced");
     let params = json!({ "tool": "fs_list", "input": { "path": root }, "roots": [root], "remainingMs": 60_000 });
     let outcome = connection.run(&params, Duration::from_secs(30)).unwrap();
 
@@ -804,7 +805,9 @@ fn executables_under(root: &Path) -> Vec<PathBuf> {
     let mut files = Vec::new();
 
     files_under(root, &mut files);
-    files.retain(|file| fs::metadata(file).unwrap().permissions().mode() & 0o111 != 0);
+    // The server's cleanup can remove a temporary upload between the listing and this check; a file that is gone is not executable.
+    files
+        .retain(|file| fs::metadata(file).is_ok_and(|meta| meta.permissions().mode() & 0o111 != 0));
 
     files
 }
@@ -1757,7 +1760,7 @@ fn reaping_a_host_ends_the_commands_it_was_running() {
     let (target, paths) = (server.target("client"), server.paths("a"));
     let connection = connect(&server, &target, &paths, &trusting()).unwrap();
     let mut stale = spawn_host(&server, SPARE);
-    let root = vectors::fixture("ssh-reap-group");
+    let (_fixture, root) = vectors::fixture("ssh-reap-group");
     let request = json!({
         "kind": "request",
         "id": 1,
@@ -1838,10 +1841,9 @@ const BIG_FOLDER_FILES: usize = 10_000;
 
 /// A folder of `BIG_FOLDER_FILES` small files, a link out of it and a file outside that the link points at.
 /// Returns the folder and the bytes its files hold.
-fn big_folder(label: &str) -> (PathBuf, u64) {
-    let dir = std::env::temp_dir().join(format!("neore-big-{label}-{}", std::process::id()));
+fn big_folder(label: &str) -> (TestDir, PathBuf, u64) {
+    let dir = TestDir::new(&format!("big-{label}"));
 
-    let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(dir.join("big")).unwrap();
     fs::write(dir.join("secret.txt"), "outside-the-shared-folder").unwrap();
     std::os::unix::fs::symlink(dir.join("secret.txt"), dir.join("big/escape.txt")).unwrap();
@@ -1855,7 +1857,9 @@ fn big_folder(label: &str) -> (PathBuf, u64) {
         fs::write(dir.join(format!("big/file-{index:05}.txt")), content).unwrap();
     }
 
-    (fs::canonicalize(dir.join("big")).unwrap(), bytes)
+    let folder = fs::canonicalize(dir.join("big")).unwrap();
+
+    (dir, folder, bytes)
 }
 
 /// How long a 10,000-file folder may take to list and to download, each, over a real ssh session.
@@ -1876,7 +1880,7 @@ fn a_ten_thousand_file_folder_lists_and_downloads_within_the_budget() {
     let server = Server::start(&sshd, "files");
     let (target, paths) = (server.target("client"), server.paths("a"));
     let connection = connect(&server, &target, &paths, &trusting()).unwrap();
-    let (folder, bytes) = big_folder("ssh");
+    let (_dir, folder, bytes) = big_folder("ssh");
     let params = json!({ "roots": [folder], "path": "" });
 
     let started = Instant::now();
@@ -1999,9 +2003,8 @@ fn another_request_is_answered_while_a_download_waits_on_a_slow_disk() {
     let server = Server::start(&sshd, "slow");
     let (target, paths) = (server.target("client"), server.paths("a"));
     let connection = Arc::new(connect(&server, &target, &paths, &trusting()).unwrap());
-    let dir = std::env::temp_dir().join(format!("neore-slow-{}", std::process::id()));
+    let dir = TestDir::new("slow");
 
-    let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(dir.join("big")).unwrap();
     fs::write(dir.join("big/blob"), vec![7u8; 16 * 1024 * 1024]).unwrap();
 
@@ -2045,7 +2048,6 @@ fn another_request_is_answered_while_a_download_waits_on_a_slow_disk() {
         "the disk was not slow: {took:?}"
     );
 
-    let _ = fs::remove_dir_all(&dir);
     finish(&connection, &target, &paths);
 }
 
@@ -2107,7 +2109,7 @@ fn a_coding_agent_runs_on_the_server_without_the_clients_agent_socket_and_dies_w
     let (target, paths) = (server.target("client"), server.paths("c"));
     let interact = trusting();
     let connection = connect(&server, &target, &paths, &interact).unwrap();
-    let root = vectors::fixture("ssh-agent");
+    let (_fixture, root) = vectors::fixture("ssh-agent");
 
     assert!(
         connection.hello().agents,

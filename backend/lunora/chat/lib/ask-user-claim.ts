@@ -71,7 +71,8 @@ export const resolveQuestionAnswers = (
             throw new LunoraError("BAD_REQUEST", `Notes take up to ${String(ASK_USER_ANSWER_MAX)} characters`);
         }
 
-        if (selected.length === 0 && !note) {
+        // A multi-select question may go out with nothing picked: "none of these" is an answer. A single-choice one needs a pick or a note.
+        if (selected.length === 0 && !note && asked.multiSelect !== true) {
             throw new LunoraError("BAD_REQUEST", "Answer every question with a choice or a note");
         }
 
@@ -81,9 +82,16 @@ export const resolveQuestionAnswers = (
 
 export const claimAskUserAnswer = async (
     ctx: Pick<MutationCtx, "db">,
-    args: { approvalId: string; callerId: string; reply: AskUserReply; threadId: Id<"threads">; unlockProof?: string | null },
+    args: {
+        answeredByImpersonator: boolean;
+        approvalId: string;
+        callerId: string;
+        reply: AskUserReply;
+        threadId: Id<"threads">;
+        unlockProof?: string | null;
+    },
 ): Promise<ClaimResult & { answer?: string; answers?: AskUserQuestionAnswer[] }> => {
-    const { approvalId, callerId, reply, threadId, unlockProof } = args;
+    const { answeredByImpersonator, approvalId, callerId, reply, threadId, unlockProof } = args;
     const answer = reply.kind === "answer" ? normalizeAskUserAnswer(reply.answer) : undefined;
 
     if (reply.kind === "answer" && answer === undefined) {
@@ -91,6 +99,7 @@ export const claimAskUserAnswer = async (
     }
 
     const claim = await claimToolApproval(ctx, {
+        answeredByImpersonator,
         approvalId,
         callerId,
         decision: reply.kind === "dismiss" ? "deny" : "approve",

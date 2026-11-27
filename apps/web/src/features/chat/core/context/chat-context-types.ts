@@ -8,6 +8,8 @@ import type { useLunora } from "@/lib/lunora/crpc";
 import type { RateLimitPause } from "../../thread/rate-limit-pause-notice";
 import type { ThreadOwnerState } from "../../thread-list/lib/thread-state-rules";
 import type { PendingAttachment } from "../stores/chat-ui-store";
+import type { SendMessageOptions, SendOutcome } from "./send-message";
+import type { ThreadLoad } from "./thread-load";
 
 /**
  * Thread capabilities - what actions are available
@@ -66,7 +68,11 @@ export interface ChatThreadContextValue {
     model: string;
     thread: ThreadData | null | undefined;
     threadId: string | undefined;
+    /** Where the thread's read stands (`threadLoadOf`); absent where there is no such read (a stand-in provider): ready. */
+    threadLoad?: ThreadLoad;
 }
+
+export type ChatThreadIdentity = Pick<ChatThreadContextValue, "isNewThread" | "model" | "threadId">;
 
 export interface ChatMessagesContextValue {
     isEmpty: boolean;
@@ -116,9 +122,16 @@ export interface ChatActionsContextValue {
     error: AppError | null;
     jwtToken: string;
     lunora: ReturnType<typeof useLunora>;
-    regenerate: () => Promise<void>;
-    reloadMessage: (messageId: string) => Promise<void>;
-    sendMessage: (text: string, attachments?: PendingAttachment[]) => Promise<void>;
+    /** Resolves with the outcome of the reply it regenerated, as `reloadMessage` does, so the banner can say why nothing started. */
+    regenerate: () => Promise<boolean | "model-unavailable" | undefined>;
+
+    /**
+     * Resolves `false` when the reply's prompt is not among the loaded messages, so nothing was asked again.
+     * Resolves `"model-unavailable"` for a local reply whose model is not the one selected now: it is not sent to another model.
+     */
+    reloadMessage: (messageId: string) => Promise<boolean | "model-unavailable" | undefined>;
+    /** Resolves once the send has started or failed: a guest note's failure comes back here, not in the chat's error banner. */
+    sendMessage: (text: string, attachments?: PendingAttachment[], options?: SendMessageOptions) => Promise<SendOutcome>;
 }
 
 /**

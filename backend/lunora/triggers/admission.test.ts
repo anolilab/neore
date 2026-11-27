@@ -9,6 +9,7 @@ import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { internal } from "../_generated/internal";
+import { LEFT_ORGANIZATION_MESSAGE } from "../auth/lib/organization-policy";
 import schema from "../schema";
 import { claimKey, claimKeyFenced, releaseKey, TRIGGER_CLAIM_TTL_MS } from "../lib/claim-once";
 import { hmacSha256Hex } from "../lib/crypto";
@@ -265,6 +266,32 @@ describe("admitTriggerRun filter recheck", () => {
         const result = await harness.run(async (ctx: any) => await ctx.runMutation(admitTriggerRun, { triggerId }));
 
         expect(result).toBeNull();
+        expect(charged.rounds).toBe(1);
+    });
+});
+
+describe("admitTriggerRun organization membership", () => {
+    const inOrganization = async (): Promise<string> => {
+        const triggerId = await insertTrigger();
+
+        await harness.run(async (ctx: any) => await ctx.db.patch("triggers", triggerId, { organizationId: "org-a" }));
+
+        return triggerId;
+    };
+
+    it("refuses an owner who left the trigger's organization before charging a round", async () => {
+        const triggerId = await inOrganization();
+
+        expect(await admit(triggerId, undefined)).toBe(LEFT_ORGANIZATION_MESSAGE);
+        expect(charged.rounds).toBe(0);
+    });
+
+    it("admits and charges an owner who is still a member", async () => {
+        const triggerId = await inOrganization();
+
+        await harness.run(async (ctx: any) => await ctx.db.insert("member", { createdAt: 0, organizationId: "org-a", role: "member", userId: "u" }));
+
+        expect(await admit(triggerId, undefined)).toBeNull();
         expect(charged.rounds).toBe(1);
     });
 });

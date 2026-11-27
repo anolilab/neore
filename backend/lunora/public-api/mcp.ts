@@ -15,6 +15,7 @@
  * credential to ride.
  */
 import { PublicApiError } from "./errors";
+import { describeEvents, DEFAULT_MAX_EVENTS, EVENT_EXTENSION_ID, findEvent, MAX_EVENTS_LIMIT, parseEventArguments } from "./events-catalog";
 import { PUBLIC_API_PREFIX } from "./identity";
 import { IDEMPOTENCY_HEADER, parseIdempotencyKey } from "./idempotency";
 import { bodyJsonSchema, pathParameters, PUBLIC_API_VERSION, queryParameters } from "./openapi";
@@ -43,8 +44,46 @@ const PARSE_ERROR = -32_700;
 const INVALID_REQUEST = -32_600;
 const METHOD_NOT_FOUND = -32_601;
 const INVALID_PARAMS = -32_602;
+const INTERNAL_ERROR = -32_603;
 const HEADER_MISMATCH = -32_020;
 const UNSUPPORTED_VERSION = -32_022;
+const NOT_FOUND = -32_023;
+const FORBIDDEN = -32_024;
+// An Events call refused for the key's read allowance. A code of this server's own, beside the ones above.
+const RATE_LIMITED = -32_025;
+
+/** One `events/poll`, as the dispatcher reads it. `cursor` is what the client holds; `null` means "start from now". */
+export interface PollRequest {
+    cursor: string | null;
+    maxAgeMs?: number;
+    maxEvents: number;
+    name: string;
+    threadId?: string;
+}
+
+interface PollEvent {
+    data: Record<string, unknown>;
+    eventId: string;
+    name: string;
+    timestamp: number;
+}
+
+/** The `events/poll` result's body (the dispatcher adds `resultType`). */
+export interface PollResponse {
+    cursor: string;
+    events: PollEvent[];
+    hasMore: boolean;
+    nextPollMs: number;
+    truncated: boolean;
+}
+
+/**
+ * The Events extension's poll, run by the router as the key's owner on the owner's shard. It throws `PublicApiError`:
+ * `invalid_request` for a cursor this key was not given, `insufficient_scope` for a key without `threads:read`.
+ */
+interface EventsDependencies {
+    poll: (request: PollRequest) => Promise<PollResponse>;
+}
 
 export interface McpTool {
     annotations: { openWorldHint: false; readOnlyHint: boolean };
@@ -62,6 +101,8 @@ export interface McpDependencies {
     canUse: (route: RouteDefinition) => boolean;
     /** Charges the key's read limit for a request that is not a tool call (a tool call is charged by its route). Throws when over. */
     chargeProtocolCall: () => Promise<void>;
+    /** The Events extension's poll. Absent: the endpoint offers no `events/*` method at all. */
+    events?: EventsDependencies;
     request: Request;
     tools: ReadonlyArray<McpTool>;
 }
@@ -213,6 +254,9 @@ const rpcResponse = (body: Record<string, unknown>, status = 200): Response => R
 const rpcError = (id: unknown, code: number, message: string, options: { data?: unknown; status?: number } = {}): Response =>
     rpcResponse({ error: { code, message, ...(options.data !== undefined && { data: options.data }) }, id: id ?? null }, options.status ?? 200);
 
+/** A JSON-RPC request id as the wire may carry it, before it is checked. */
+type RpcId = number | string | undefined;
+
 interface RpcMessage {
     id?: number | string;
     method: string;
@@ -239,10 +283,10 @@ const parseRpcMessage = (raw: string): { message: RpcMessage } | { refusal: Resp
     const validParams = params === undefined || (typeof params === "object" && params !== null && !Array.isArray(params));
 
     if (jsonrpc !== "2.0" || typeof method !== "string" || !validId || !validParams) {
-        return { refusal: rpcError(validId ? (id as number | string | undefined) : null, INVALID_REQUEST, "Not a JSON-RPC 2.0 request.", { status: 400 }) };
+        return { refusal: rpcError(validId ? (id as RpcId) : null, INVALID_REQUEST, "Not a JSON-RPC 2.0 request.", { status: 400 }) };
     }
 
-    return { message: { id: id as number | string | undefined, method, params: params as Record<string, unknown> | undefined } };
+    return { message: { id: id as RpcId, method, params: params as Record<string, unknown> | undefined } };
 };
 
 /**
@@ -275,7 +319,8 @@ const resolveEra = (message: RpcMessage, headers: Headers): { modern: boolean } 
         return { refusal: unsupported(declared) };
     }
 
-    const name = message.method === "tools/call" ? message.params?.["name"] : undefined;
+    // `Mcp-Name` carries the tool name, or the event name for `events/poll` (SEP-3415, Routing Headers).
+    const name = message.method === "tools/call" || message.method === "events/poll" ? message.params?.["name"] : undefined;
 
     if (header !== declared || headers.get("Mcp-Method") !== message.method || (typeof name === "string" && headers.get("Mcp-Name") !== name)) {
         return {
@@ -286,6 +331,104 @@ const resolveEra = (message: RpcMessage, headers: Headers): { modern: boolean } 
     }
 
     return { modern: true };
+};
+
+/** Whether this request's `_meta` offers the Events extension (SEP-3415, Capability Negotiation). */
+const negotiatesEvents = (params: Record<string, unknown> | undefined): boolean => {
+    const client = (params?.["_meta"] as Record<string, unknown> | undefined)?.["io.modelcontextprotocol/clientCapabilities"] as
+        | { extensions?: Record<string, unknown> }
+        | undefined;
+    const settings = client?.extensions?.[EVENT_EXTENSION_ID];
+
+    return typeof settings === "object" && settings !== null && !Array.isArray(settings);
+};
+
+/** The `events/poll` arguments, checked as the spec's errors say: an unknown event is NotFound, a malformed request InvalidParams. */
+type PollParse = { refusal: Response } | { request: PollRequest };
+
+const parsePollParams = (id: RpcId, params: Record<string, unknown> | undefined): PollParse => {
+    const fields: Record<string, unknown> = params ?? {};
+    const { arguments: args, cursor, maxAgeMs, maxEvents, name } = fields;
+
+    if (typeof name !== "string") {
+        return { refusal: rpcError(id, INVALID_PARAMS, "`name` must be the event's name.") };
+    }
+
+    if (!findEvent(name)) {
+        return { refusal: rpcError(id, NOT_FOUND, `Unknown event: ${name}`, { data: { kind: "event" } }) };
+    }
+
+    const scoped = parseEventArguments(args);
+
+    if (scoped === null) {
+        return { refusal: rpcError(id, INVALID_PARAMS, "`arguments` do not match the event's inputSchema.") };
+    }
+
+    if (cursor !== undefined && cursor !== null && typeof cursor !== "string") {
+        return { refusal: rpcError(id, INVALID_PARAMS, "`cursor` must be a string or null.") };
+    }
+
+    if (maxAgeMs !== undefined && (typeof maxAgeMs !== "number" || !Number.isSafeInteger(maxAgeMs) || maxAgeMs < 0)) {
+        return { refusal: rpcError(id, INVALID_PARAMS, "`maxAgeMs` must be a non-negative integer.") };
+    }
+
+    if (maxEvents !== undefined && (typeof maxEvents !== "number" || !Number.isSafeInteger(maxEvents) || maxEvents < 1 || maxEvents > MAX_EVENTS_LIMIT)) {
+        return { refusal: rpcError(id, INVALID_PARAMS, `\`maxEvents\` must be an integer from 1 to ${MAX_EVENTS_LIMIT}.`) };
+    }
+
+    return {
+        request: {
+            cursor: typeof cursor === "string" ? cursor : null,
+            ...(typeof maxAgeMs === "number" && { maxAgeMs }),
+            maxEvents: typeof maxEvents === "number" ? maxEvents : DEFAULT_MAX_EVENTS,
+            name,
+            ...(scoped.threadId !== undefined && { threadId: scoped.threadId }),
+        },
+    };
+};
+
+/** Maps the router's errors for an Events call to the spec's codes; any other error is the endpoint's own and is rethrown. */
+const eventsFailure = (id: RpcId, error: unknown): Response => {
+    if (error instanceof PublicApiError && error.code === "invalid_request") {
+        return rpcError(id, INVALID_PARAMS, error.message);
+    }
+
+    if (error instanceof PublicApiError && error.code === "insufficient_scope") {
+        return rpcError(id, FORBIDDEN, "Forbidden", { data: { reason: "insufficient_scope", scope: "threads:read" } });
+    }
+
+    // A suspended account's poll: the log's own ban check, mapped the same way the other routes map it.
+    if (error instanceof PublicApiError && error.code === "forbidden") {
+        return rpcError(id, FORBIDDEN, error.message, { data: { reason: "forbidden" } });
+    }
+
+    if (error instanceof PublicApiError && error.code === "rate_limited") {
+        return rpcError(id, RATE_LIMITED, error.message, {
+            data: { reason: "rate_limited", retryAfterSeconds: error.details?.["retryAfterSeconds"] },
+            status: 429,
+        });
+    }
+
+    // Any other error the router reports, its generic `internal_error` included, is answered in the same shape, not sent as a REST body.
+    if (error instanceof PublicApiError) {
+        return rpcError(id, INTERNAL_ERROR, error.message, { data: { reason: error.code }, status: error.status });
+    }
+
+    throw error;
+};
+
+/**
+ * Charges an Events call. A charge refused for the key's read allowance is answered as that call's own error, with its request id, rather
+ * than thrown out of the endpoint as a REST body. Returns the refusal when the charge was refused, `undefined` when it went through.
+ */
+const chargeEvents = async (dependencies: McpDependencies, id: RpcId): Promise<Response | undefined> => {
+    try {
+        await dependencies.chargeProtocolCall();
+    } catch (error) {
+        return eventsFailure(id, error);
+    }
+
+    return undefined;
 };
 
 const callResult = async (response: Response): Promise<Record<string, unknown>> => {
@@ -315,12 +458,20 @@ export const serveMcp = async (rawBody: string, dependencies: McpDependencies): 
         return era.refusal;
     }
 
-    if (message.method !== "tools/call") {
+    // A tool call is charged by its route. Each Events method is charged in its own branch below, exactly once, so none is charged
+    // here as well: an `events/poll` the key may not make draws nothing, and the others are charged where they are answered or refused.
+    if (message.method !== "tools/call" && !message.method.startsWith("events/")) {
         await dependencies.chargeProtocolCall();
     }
 
-    // A notification (`notifications/initialized`) has no answer.
+    // A notification (`notifications/initialized`) has no answer. An Events notification is a call all the same: it draws on the read
+    // allowance here, since the Events branch below never answers it.
     if (message.id === undefined) {
+        // A notification is never answered with a body, so a refused charge is not reported: the call is drawn all the same.
+        if (message.method.startsWith("events/")) {
+            await chargeEvents(dependencies, undefined);
+        }
+
         return new Response(null, { status: 202 });
     }
 
@@ -329,6 +480,70 @@ export const serveMcp = async (rawBody: string, dependencies: McpDependencies): 
     const complete = era.modern ? { resultType: "complete" } : {};
     const respond = (result: Record<string, unknown>) => rpcResponse({ id, result: { ...result, ...complete } });
     const serverInfo = { name: "neore", version: PUBLIC_API_VERSION };
+    const { events } = dependencies;
+
+    // The Events methods exist only for a modern request that offered the extension (SEP-3415, Fallback): anything else is
+    // Method not found, as if the method did not exist.
+    if (method.startsWith("events/")) {
+        if (!era.modern || !negotiatesEvents(params) || events === undefined) {
+            // An unsupported poll is refused without reaching the router, so it is charged here, as every other protocol call is.
+            const refused = await chargeEvents(dependencies, id);
+
+            if (refused) {
+                return refused;
+            }
+
+            return rpcError(id, METHOD_NOT_FOUND, `Method not found: ${method}`, { status: era.modern ? 404 : 200 });
+        }
+
+        if (method === "events/list") {
+            const refused = await chargeEvents(dependencies, id);
+
+            if (refused) {
+                return refused;
+            }
+
+            return respond({ events: describeEvents() });
+        }
+
+        if (method === "events/poll") {
+            const polled = parsePollParams(id, params);
+
+            if ("refusal" in polled) {
+                // A malformed poll never reaches the router, so it is charged here, as every other protocol call is.
+                const refused = await chargeEvents(dependencies, id);
+
+                if (refused) {
+                    return refused;
+                }
+
+                return polled.refusal;
+            }
+
+            try {
+                const outcome = await events.poll(polled.request);
+
+                // The store keeps epoch milliseconds; the wire carries `timestamp` as ISO 8601, as the spec's event shape does.
+                return respond({
+                    ...outcome,
+                    events: outcome.events.map((event) => {
+                        return { ...event, timestamp: new Date(event.timestamp).toISOString() };
+                    }),
+                });
+            } catch (error) {
+                return eventsFailure(id, error);
+            }
+        }
+
+        // The rest of the extension (push, webhook) is a later part. Refused here, so charged here.
+        const refused = await chargeEvents(dependencies, id);
+
+        if (refused) {
+            return refused;
+        }
+
+        return rpcError(id, METHOD_NOT_FOUND, `Method not found: ${method}`, { status: 404 });
+    }
 
     switch (method) {
         case "initialize": {
@@ -352,7 +567,9 @@ export const serveMcp = async (rawBody: string, dependencies: McpDependencies): 
                 ? respond({
                       _meta: { [META_SERVER_INFO]: serverInfo },
                       cacheScope: "public",
-                      capabilities: { tools: {} },
+                      // Events is an extension (SEP-3415): settings `{}`, no `listChanged`, and no top-level `events` capability.
+                      // Advertised only where the Events extension is served: a configured endpoint answers its methods, an unconfigured one refuses them.
+                      capabilities: { ...(events !== undefined && { extensions: { [EVENT_EXTENSION_ID]: {} } }), tools: {} },
                       instructions: INSTRUCTIONS,
                       supportedVersions: SUPPORTED_VERSIONS,
                       ttlMs: 0,

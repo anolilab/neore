@@ -11,16 +11,27 @@ export const DEVICE_ONLINE_WINDOW_MS = 75_000;
 export const DEVICE_CLAIM_WINDOW_MS = 20_000;
 
 /**
- * `acp_*` calls (a coding agent's start, send, cancel and permission answers) are not device tools: they have
+ * `acp_*` calls (a coding agent's start, send, cancel, permission answers and option changes) are not device tools: they have
  * their own claim window and their own open-call budget, so a stuck send never blocks the cancel.
  */
 export const ACP_CLAIM_WINDOW_MS = 60_000;
 export const MAX_OPEN_ACP_CALLS_PER_DEVICE = 3;
 /** `acp_cancel` is counted apart: Stop must go out however many sends and answers are waiting. */
 export const MAX_OPEN_ACP_CANCELS_PER_DEVICE = 3;
+/** `acp_set_config` is counted apart too: a change of an option must not wait behind the sends and answers filling the budget above. */
+export const MAX_OPEN_ACP_SET_CONFIGS_PER_DEVICE = 3;
 
 /** The coding-agent call kinds, and the only names `isAcpTool` takes for one. A device cannot advertise any of them as a tool. */
-export const ACP_TOOLS: ReadonlyArray<string> = ["acp_start", "acp_send", "acp_cancel", "acp_permission_answer"];
+export const ACP_TOOLS: ReadonlyArray<string> = ["acp_start", "acp_send", "acp_cancel", "acp_permission_answer", "acp_set_config"];
+
+export const GLOBAL_INSTRUCTIONS_LIST_TOOL = "instructions_list";
+export const GLOBAL_INSTRUCTIONS_READ_TOOL = "instructions_read";
+
+/**
+ * Whether a device call is one of the two that carry the person's local instruction files (`../global-instructions.ts`).
+ * Only a click in project settings starts one: a manifest never offers them to a chat and `createDeviceCall` never signs one.
+ */
+export const isGlobalInstructionsTool = (toolName: string): boolean => toolName === GLOBAL_INSTRUCTIONS_LIST_TOOL || toolName === GLOBAL_INSTRUCTIONS_READ_TOOL;
 
 /**
  * A claimed `acp_*` call is a lease: not completed within this, it goes back to `pending` and can be claimed

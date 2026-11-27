@@ -40,6 +40,7 @@ import { useTheme } from "next-themes";
 import type { ChangeEvent, ComponentProps, FC } from "react";
 import { lazy, memo, Suspense, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 
+import { useAuthSession } from "@/features/auth/hooks/use-auth-session";
 import TooltipIconButton from "@/features/chat/components/tooltip-icon-button";
 import { useCanvasState } from "@/features/chat/core/stores/chat-ui-store";
 import OpenAsPageButton from "@/features/pages/components/open-as-page-button";
@@ -389,10 +390,12 @@ CanvasContent.displayName = "CanvasContent";
 
 const CanvasPanel: FC<CanvasPanelProps> = memo(({ className }) => {
     const { t } = useLingui();
+    const { data: sessionData } = useAuthSession();
     const {
         activeDocumentId,
         canvasDirty,
         canvasEditMode,
+        canvasThreadId,
         canvasViewMode,
         closeCanvas,
         isCanvasOpen,
@@ -422,11 +425,18 @@ const CanvasPanel: FC<CanvasPanelProps> = memo(({ className }) => {
     const { data: document } = useQuery({
         ...crpc.agent.documents.getDocument.queryOptions({
             documentId: activeDocumentId as Id<"documents">,
+            threadId: (canvasThreadId || undefined) as Id<"threads"> | undefined,
         }),
         enabled: !!activeDocumentId && isCanvasOpen,
     });
 
-    const { mutateAsync: updateDocument } = useMutation(crpc.agent.documents.updateDocument.mutationOptions());
+    const { mutateAsync: saveDocument } = useMutation(crpc.agent.documents.updateDocument.mutationOptions());
+    // A document in a shared thread is stored on the thread owner's shard, so every save names its thread to reach that shard.
+    const updateDocument = useCallback(
+        async (args: Omit<Parameters<typeof saveDocument>[0], "threadId">) =>
+            await saveDocument({ ...args, threadId: (canvasThreadId || undefined) as Id<"threads"> | undefined }),
+        [saveDocument, canvasThreadId],
+    );
 
     useEffect(() => {
         lastSeenVersionRef.current = 0;
@@ -536,13 +546,13 @@ const CanvasPanel: FC<CanvasPanelProps> = memo(({ className }) => {
             }
 
             localSaveRef.current = true;
-            setCanvasDirty(false);
             await updateDocument({
                 commit,
                 content,
                 contentJson,
                 documentId: activeDocumentId as Id<"documents">,
             });
+            setCanvasDirty(false);
             trackEvent("artifact_edited", { kind: document?.kind ?? "text" });
         },
         [activeDocumentId, updateDocument, setCanvasDirty, document?.kind],
@@ -555,11 +565,11 @@ const CanvasPanel: FC<CanvasPanelProps> = memo(({ className }) => {
             }
 
             localSaveRef.current = true;
-            setCanvasDirty(false);
             await updateDocument({
                 content,
                 documentId: activeDocumentId as Id<"documents">,
             });
+            setCanvasDirty(false);
         },
         [activeDocumentId, updateDocument, setCanvasDirty],
     );
@@ -571,11 +581,11 @@ const CanvasPanel: FC<CanvasPanelProps> = memo(({ className }) => {
             }
 
             localSaveRef.current = true;
-            setCanvasDirty(false);
             await updateDocument({
                 content: csv,
                 documentId: activeDocumentId as Id<"documents">,
             });
+            setCanvasDirty(false);
         },
         [activeDocumentId, updateDocument, setCanvasDirty],
     );
@@ -587,12 +597,12 @@ const CanvasPanel: FC<CanvasPanelProps> = memo(({ className }) => {
             }
 
             localSaveRef.current = true;
-            setCanvasDirty(false);
             await updateDocument({
                 content: previewDataUrl,
                 contentJson: canvasJson,
                 documentId: activeDocumentId as Id<"documents">,
             });
+            setCanvasDirty(false);
             trackEvent("artifact_edited", { kind: "design" });
         },
         [activeDocumentId, updateDocument, setCanvasDirty],
@@ -605,11 +615,11 @@ const CanvasPanel: FC<CanvasPanelProps> = memo(({ className }) => {
             }
 
             localSaveRef.current = true;
-            setCanvasDirty(false);
             await updateDocument({
                 content: pngDataUrl,
                 documentId: activeDocumentId as Id<"documents">,
             });
+            setCanvasDirty(false);
             trackEvent("artifact_edited", { kind: "image" });
         },
         [activeDocumentId, updateDocument, setCanvasDirty],
@@ -645,11 +655,11 @@ const CanvasPanel: FC<CanvasPanelProps> = memo(({ className }) => {
                 }
 
                 localSaveRef.current = true;
-                setCanvasDirty(false);
                 await updateDocument({
                     content: csv,
                     documentId: activeDocumentId as Id<"documents">,
                 });
+                setCanvasDirty(false);
                 showSuccess(t`Spreadsheet imported successfully.`);
             } catch {
                 showError(t`Failed to import the spreadsheet file.`);
@@ -707,8 +717,14 @@ const CanvasPanel: FC<CanvasPanelProps> = memo(({ className }) => {
         return null;
     }
 
-    const isEditable =
+    // The server says whether this caller may save (the author with the thread's write grant); a viewer sees the document without the edit controls.
+    // Only the author opens the document as a page (`createPageFromDocument`).
+    const isAuthor = !!document && document.userId === sessionData?.user?.id;
+    const canEdit = document?.canEdit === true;
+    // What the document is, for any viewer (its history is readable by a member too); whether the caller may edit it is `canEdit`.
+    const isOpenableKind =
         document?.kind === "text" || document?.kind === "code" || document?.kind === "sheet" || document?.kind === "design" || document?.kind === "image";
+    const isEditable = canEdit && isOpenableKind;
     const isStreaming = document?.status === "streaming";
     const canPreviewCode = document?.kind === "code" && getPreviewLanguage(document.language) !== undefined;
     const showCodePreview = canPreviewCode && codeView === "preview" && canvasViewMode !== "history";
@@ -768,13 +784,13 @@ const CanvasPanel: FC<CanvasPanelProps> = memo(({ className }) => {
                             {canvasEditMode === "edit" ? <EyeIcon className="size-4" /> : <PencilIcon className="size-4" />}
                         </TooltipIconButton>
                     )}
-                    {isEditable && !isStreaming && document && document.version > 1 && (
+                    {isOpenableKind && !isStreaming && document && document.version > 1 && (
                         <TooltipIconButton onClick={toggleHistory} tooltip={canvasViewMode === "history" ? t`Close history` : t`Version history`}>
                             <HistoryIcon className="size-4" />
                         </TooltipIconButton>
                     )}
                     {/* XLSX import (sheets only) */}
-                    {document?.kind === "sheet" && !isStreaming && (
+                    {document?.kind === "sheet" && canEdit && !isStreaming && (
                         <>
                             <input accept=".xlsx,.xls" className="hidden" onChange={handleXlsxImport} ref={xlsxInputRef} type="file" />
                             <TooltipIconButton onClick={() => xlsxInputRef.current?.click()} tooltip={t`Import XLSX`}>
@@ -782,7 +798,8 @@ const CanvasPanel: FC<CanvasPanelProps> = memo(({ className }) => {
                             </TooltipIconButton>
                         </>
                     )}
-                    {document?.kind === "text" && !isStreaming && <OpenAsPageButton documentId={document._id} />}
+                    {/* A page is made on the caller's own shard, so the button shows only where the document is stored there: the author's own thread. */}
+                    {document?.kind === "text" && isAuthor && document.ownsThread === true && !isStreaming && <OpenAsPageButton documentId={document._id} />}
                     <TooltipIconButton onClick={handleCopy} tooltip={t`Copy content`}>
                         {isCopied ? <CheckIcon className="size-4" /> : <CopyIcon className="size-4" />}
                     </TooltipIconButton>
@@ -825,7 +842,7 @@ const CanvasPanel: FC<CanvasPanelProps> = memo(({ className }) => {
             <CanvasAiDiffBanner onDismiss={handleBannerDismiss} onUndo={handleBannerUndo} onViewChanges={handleBannerViewChanges} visible={showAiDiffBanner} />
 
             {/* Quick action toolbar */}
-            {document && canvasEditMode === "edit" && !isStreaming && !showCodePreview && <CanvasToolbar documentKind={document.kind} />}
+            {document && isEditable && canvasEditMode === "edit" && !isStreaming && !showCodePreview && <CanvasToolbar documentKind={document.kind} />}
 
             {/* Content */}
             <div className="flex-1 overflow-auto">
@@ -843,7 +860,7 @@ const CanvasPanel: FC<CanvasPanelProps> = memo(({ className }) => {
                     <CanvasContent
                         codePreview={showCodePreview}
                         document={document}
-                        editMode={canvasEditMode}
+                        editMode={isEditable ? canvasEditMode : "preview"}
                         isStreaming={isStreaming}
                         onCodeSave={handleCodeSave}
                         onDesignSave={handleDesignSave}

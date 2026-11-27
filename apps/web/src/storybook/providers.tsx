@@ -8,13 +8,13 @@ import { TooltipProvider } from "@neore/ui/components/tooltip";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { createMemoryHistory, createRootRoute, createRoute, createRouter, Outlet, RouterProvider } from "@tanstack/react-router";
 import { ThemeProvider } from "next-themes";
-import { PostHogProvider } from "posthog-js/react";
 import type { ReactNode } from "react";
 import { createContext, use, useEffect, useMemo } from "react";
 
 import { AuthQueryProvider } from "@/features/auth/lib/auth-query-provider";
 import AuthUIProviderTanstack from "@/features/auth/lib/tanstack/auth-ui-provider-tanstack";
 import ConnectionProvider from "@/features/connection/components/connection-provider";
+import { PostHogClientContext } from "@/lib/analytics/posthog-client";
 import { authClient } from "@/lib/auth/client";
 import { getSharedSessionRead } from "@/lib/auth/shared-session";
 import env from "@/lib/env";
@@ -188,7 +188,7 @@ export const AppProviders = ({ children, connection, direction, featureFlags, pe
     const posthog = useMemo(() => fakePostHog(featureFlags), [featureFlags]);
 
     return (
-        <PostHogProvider client={posthog}>
+        <PostHogClientContext value={posthog}>
             <I18nProvider i18n={storyI18n}>
                 <DirectionProvider direction={direction}>
                     <QueryClientProvider client={clients.queryClient}>
@@ -207,7 +207,7 @@ export const AppProviders = ({ children, connection, direction, featureFlags, pe
                     </QueryClientProvider>
                 </DirectionProvider>
             </I18nProvider>
-        </PostHogProvider>
+        </PostHogClientContext>
     );
 };
 

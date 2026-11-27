@@ -65,6 +65,12 @@ export const createScopedApiKey = authAction
             throw new LunoraError("FORBIDDEN", "API keys cannot create API keys");
         }
 
+        // A key carries no impersonation mark, so one made while an admin acts as the account would pass every
+        // impersonation guard afterwards (`auth/impersonation-credential-guard.ts`).
+        if (ctx.user.impersonatedBy) {
+            throw new LunoraError("FORBIDDEN", "API keys cannot be created while impersonating");
+        }
+
         const name = args.name.trim();
 
         if (name.length === 0 || name.length > MAX_NAME_LENGTH) {

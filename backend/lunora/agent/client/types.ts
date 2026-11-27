@@ -14,12 +14,14 @@ import type {
     LanguageModelUsage,
     streamText,
     StreamTextResult,
+    Tool,
     ToolSet,
 } from "ai";
 
 import type { api } from "../../_generated/api";
 import type { ActionCtx as LunoraActionContext, MutationCtx as LunoraMutationContext, QueryCtx as LunoraQueryContext } from "../../_generated/server";
 import type { MessageDoc, ProviderMetadata, StreamDelta, StreamMessage, ThreadDoc } from "../validators";
+import type { NotTypedMarks } from "../../lib/not-typed-text";
 import type { StreamingOptions } from "./streaming";
 
 export interface Output<_T = any, _P = any, _E = any> {
@@ -84,7 +86,17 @@ export type AgentPrompt = {
     system?: string;
 };
 
+/** A tool as far as formatting a saved result of it goes. */
+export type HistoryFormatter = Pick<Tool, "toModelOutput">;
+
 export type Config = {
+    /**
+     * The tool whose `toModelOutput` formats a saved result of `toolName` that the run does not offer (a call with no
+     * tools, a tool switched off since): the agent factory hands the built-ins (`chat/lib/get-agent.ts`). Without it
+     * such a result reaches the model as saved.
+     */
+    builtInToolFormatter?: (toolName: string) => Promise<HistoryFormatter | undefined>;
+
     /**
      * The default settings to use for the LLM calls.
      * This can be overridden at each generate/stream callsite on a per-field
@@ -641,6 +653,12 @@ export type Options = {
     contextOptions?: ContextOptions;
 
     /**
+     * Labels one step's content as it is written, before its rows are saved, so a live MCP call carries its real names
+     * as the saved call will. Returns the new content, or `undefined` when nothing changed.
+     */
+    labelStepContent?: (content: unknown) => unknown[] | undefined;
+
+    /**
      * The run that saves (`chat/lib/run-epoch.ts`). Each step's rows are written by `addMessages`, which refuses the
      * write inside its own transaction once a newer run holds the stream, so a replaced run lands nothing beside it.
      */
@@ -674,7 +692,7 @@ export type Options = {
 };
 
 /** See {@link Options.takeSteer}. `null` when there is nothing to deliver. */
-export type TakeSteer = (at: { pendingMessageId: string }) => Promise<{ messageId: string; text: string } | null>;
+export type TakeSteer = (at: { pendingMessageId: string }) => Promise<{ messageId: string; notTyped?: NotTypedMarks; text: string } | null>;
 
 export type SyncStreamsReturnValue = { kind: "list"; messages: StreamMessage[] } | { deltas: StreamDelta[]; kind: "deltas" } | undefined;
 

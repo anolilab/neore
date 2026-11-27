@@ -123,6 +123,19 @@ export const markForkedContextReset = internalMutation
         return true;
     });
 
+/**
+ * A fork of a chat that handed its earlier conversation over (`agent-switch`): the copy keeps the handoff, since the
+ * quoted conversation is in its history and no quick approval may read that history as untainted.
+ */
+export const markForkedHandoff = internalMutation
+    .input({ threadId: v.id("threads") })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        await patchThread(ctx.db, args.threadId, { hasHandoff: true });
+
+        return null;
+    });
+
 export const clearContext = authAction
     .use(rateLimit("chat/update"))
     .input({
@@ -147,6 +160,7 @@ export const clearContext = authAction
         const result = hostSession
             ? await ctx.runMutation(internal.acp.switch.clearHostSession, {
                   clientId: args.clientId,
+                  organizationId: ctx.user.activeOrganization?.id,
                   threadId: args.threadId,
                   unlockProof: args.unlockProof,
                   userId,

@@ -1,0 +1,98 @@
+/**
+ * The session read behind an MCP app call's cap: a session that cannot be validated must not read as the personal space,
+ * and a valid one gives its verified active organization.
+ */
+import { lunoraTest } from "@lunora/testing";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+
+import schema from "../schema";
+import { getSessionOrganizationForCap } from "./session-organization";
+
+const USER = "user-a";
+const HOUR_MS = 60 * 60 * 1000;
+
+let harness: ReturnType<typeof lunoraTest>;
+
+const insertSession = async (fields: {
+    activeOrganizationId?: string;
+    clientGrant?: string;
+    expiresAt: number;
+    impersonatedBy?: string;
+    userId?: string;
+}): Promise<string> =>
+    await harness.run(
+        async (ctx: any) => await ctx.db.insert("session", { createdAt: 0, token: `token-${String(Math.random())}`, updatedAt: 0, userId: USER, ...fields }),
+    );
+
+const read = async (sessionId: string, userId = USER, viaGrant = false): Promise<unknown> =>
+    await harness.run(async (ctx: any) => await ctx.runQuery(getSessionOrganizationForCap, { sessionId, userId, viaGrant }));
+
+beforeEach(() => {
+    harness = lunoraTest(schema as never);
+});
+
+afterEach(() => {
+    harness.close();
+});
+
+describe("getSessionOrganizationForCap", () => {
+    it("gives the personal space for a valid session with no active organization", async () => {
+        expect(await read(await insertSession({ expiresAt: Date.now() + HOUR_MS }))).toStrictEqual({ organizationId: null });
+    });
+
+    it("gives the active organization of a valid session whose user is still a member", async () => {
+        await harness.run(async (ctx: any) => await ctx.db.insert("member", { createdAt: 0, organizationId: "org-a", role: "member", userId: USER }));
+
+        const sessionId = await insertSession({ activeOrganizationId: "org-a", expiresAt: Date.now() + HOUR_MS });
+
+        expect(await read(sessionId)).toStrictEqual({ organizationId: "org-a" });
+    });
+
+    it("marks a session an admin opened to act as the user", async () => {
+        expect(await read(await insertSession({ expiresAt: Date.now() + HOUR_MS, impersonatedBy: "admin-1" }))).toStrictEqual({
+            impersonating: true,
+            organizationId: null,
+        });
+    });
+
+    it.each([
+        ["the desktop app's grant", "desktop", {}],
+        ["the phone app's grant", "mobile", {}],
+        ["a browser extension's grant", "extension", { extension: true }],
+        ["a grant whose app was never recorded", undefined, { extension: true }],
+        ["a grant naming an app nobody classified", "watch", { extension: true }],
+    ])("reads %s from its session row, never the request", async (_name, clientGrant, marks) => {
+        const sessionId = await insertSession({ expiresAt: Date.now() + HOUR_MS, ...(clientGrant !== undefined && { clientGrant }) });
+
+        expect(await read(sessionId, USER, true)).toStrictEqual({ ...marks, organizationId: null });
+    });
+
+    it("marks an extension's session reached as a web session too", async () => {
+        expect(await read(await insertSession({ clientGrant: "extension", expiresAt: Date.now() + HOUR_MS }), USER, false)).toStrictEqual({
+            extension: true,
+            organizationId: null,
+        });
+    });
+
+    it("places a session that still names an organization its user has left in the personal space", async () => {
+        // The session still names the organization, but no membership row backs it (the user left or was removed), and
+        // nothing clears the field. It is valid, so it is not refused: it reads as the personal space, as the rest of the
+        // app reads it, and a chat filed under that organization is still capped by it.
+        const sessionId = await insertSession({ activeOrganizationId: "org-left", expiresAt: Date.now() + HOUR_MS });
+
+        expect(await read(sessionId)).toStrictEqual({ organizationId: null });
+    });
+
+    it("cannot validate an expired session, another user's session or a missing one", async () => {
+        const expired = await insertSession({ expiresAt: Date.now() - HOUR_MS });
+        const someoneElses = await insertSession({ expiresAt: Date.now() + HOUR_MS, userId: "user-b" });
+
+        expect(await read(expired)).toBeNull();
+        expect(await read(someoneElses)).toBeNull();
+        expect(await read("session-that-does-not-exist")).toBeNull();
+    });
+
+    it("refuses a session id longer than any id", async () => {
+        await expect(read("s".repeat(129))).rejects.toThrow();
+    });
+});
