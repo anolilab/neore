@@ -17,6 +17,7 @@ import { searchVectors } from "../agent/vector/index";
 import { validateVectorDimension, type VectorDimension } from "../agent/vector/tables";
 import { loadModelFilterRules } from "../chat/lib/model-filter-rules";
 import { extractKeywordTerms } from "../knowledge/hybrid";
+import { isSearchIndexBuilding } from "../lib/search-index";
 import { gatewayFetch } from "../lib/services";
 import { getMemoryEmbeddingModel, MEMORY_EMBEDDING_MODEL_NAME } from "./dedup";
 import {
@@ -114,7 +115,13 @@ export const retrieveRelevantMemories = internalAction
                           { hits: ActiveMemory[]; term: string }[]
                       >
                   ).catch((error: unknown) => {
-                      console.warn("[memory/retrieve] Keyword search failed, continuing without it:", error);
+                      // After a deploy that adds `search_memory_text`, Lunora refuses the index until its backfill covers
+                      // the existing rows: not ready yet rather than a failure, so the vector hits and the window decide.
+                      if (isSearchIndexBuilding(error)) {
+                          ctx.log.event("memory.keyword_search", { preparing: true });
+                      } else {
+                          console.warn("[memory/retrieve] Keyword search failed, continuing without it:", error);
+                      }
 
                       return [];
                   });

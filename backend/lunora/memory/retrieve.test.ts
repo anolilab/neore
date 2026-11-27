@@ -4,7 +4,7 @@
  * more than the injection does.
  */
 import { lunoraTest } from "@lunora/testing";
-import { v } from "lunorash/server";
+import { LunoraError, v } from "lunorash/server";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { registeredApi, registerModule } from "../../test/registered-api";
@@ -255,6 +255,30 @@ describe("candidates", () => {
 
         expect(await retrieve({ searchText: "whose serial is WTU-38817" })).toEqual([]);
         expect(await retrieve({ botId: "bot-b", searchText: "whose serial is WTU-38817" })).toEqual(["bike serial WTU-38817, bot b"]);
+    });
+
+    it("keeps the vector hits, and logs no warning or error, while the keyword index is still building", async () => {
+        await seed([{ embeddingId: "emb-trip", memory: "went to the coast in May", type: "activity" }]);
+        hits(["emb-trip", 0.9]);
+
+        const real = registry.get("memory_functions:searchMemoriesByKeyword");
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+        const error = vi.spyOn(console, "error").mockImplementation(() => {});
+
+        registry.set(
+            "memory_functions:searchMemoriesByKeyword",
+            internalQuery.input({ activeOn: v.optional(v.number()), terms: v.array(v.string()), userId: v.string() }).query(async () => {
+                throw new LunoraError("SEARCH_INDEX_BUILDING", "search index is still backfilling");
+            }),
+        );
+
+        try {
+            expect(await retrieve()).toEqual(["went to the coast in May"]);
+            expect(warn).not.toHaveBeenCalled();
+            expect(error).not.toHaveBeenCalled();
+        } finally {
+            registry.set("memory_functions:searchMemoriesByKeyword", real);
+        }
     });
 
     it("keeps the vector hits when the keyword search throws", async () => {
