@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 
 import schema from "../schema";
 import {
+    ADMISSION_RECLAIM_BATCH,
     PIN_WRITE_LEASE_MS,
     admitPinWrite,
     admitPinWriteAs,
@@ -111,8 +112,8 @@ describe("the pin-write lease", () => {
 
             const rows = await harness.run(async (context: any) => await context.db.pinWriteLeases.findMany({ where: { userId: "user-busy" } }));
 
-            // Twenty of the fifty expired rows go, and the admitted write's own row is added.
-            expect(rows.page).toHaveLength(50 - 20 + 1);
+            // One admission's batch of the fifty expired rows goes, and the admitted write's own row is added.
+            expect(rows.page).toHaveLength(50 - ADMISSION_RECLAIM_BATCH + 1);
         } finally {
             harness.close();
         }

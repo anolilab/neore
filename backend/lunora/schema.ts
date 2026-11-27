@@ -2450,8 +2450,8 @@ export const schema = defineSchema({
 
     // One row per admitted pin write: the time that write may still be in flight. A move waits for the latest of them to pass before it
     // sweeps the account's pins, and a refused write's route cleanup waits for the others (`lib/account-moves.ts`).
-    // Upgrade: the global-table provisioner creates a missing table but never adds a column to an existing one. A store that already holds
-    // this table from an earlier build needs `ALTER TABLE pinWriteLeases ADD COLUMN writerId TEXT` run on it once, or it must be reset.
+    // Upgrade: none by hand. The global-table provisioner adds `writerId` to a store's existing table after its sweep (`COLUMNS_ADDED_SINCE`
+    // in `auth/lib/ensure-global-tables.ts`), so a store from an earlier build needs nothing and is never reset for it.
     pinWriteLeases: defineTable({
         expiresAt: v.number(),
         userId: v.string(),

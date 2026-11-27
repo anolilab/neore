@@ -28,8 +28,15 @@ export type AccountMoveKind = "erasing" | "importing" | "merging";
  */
 export const PIN_WRITE_LEASE_MS = 60_000;
 
-/** Expired lease rows one admission, or one move's end, deletes at most. The rest are reclaimed by later calls. */
+/** Expired lease rows a move's end or its reclaim call deletes at most. Each delete is two global statements, so 20 is 40. */
 const LEASE_RECLAIM_BATCH = 20;
+
+/**
+ * Expired lease rows one pin admission deletes at most. An admission runs inside a pin write, which may also refuse and clean up its
+ * routes, so it keeps to 10 (20 statements); the rest are reclaimed by later admissions. Worst case for a refused write is in
+ * `chat/pins/functions.ts` (`REFUSED_WRITE_WORST`).
+ */
+export const ADMISSION_RECLAIM_BATCH = 10;
 
 /**
  * Every lease row of the account. Lunora returns a read one page at a time, so a lease past the first page is read too: a missed writer
@@ -99,7 +106,7 @@ export const admitPinWrite = async (context: Pick<MutationCtx, "db">, userId: st
     let reclaimed = 0;
 
     for (const lease of leases) {
-        if (lease.expiresAt > now || reclaimed >= LEASE_RECLAIM_BATCH) {
+        if (lease.expiresAt > now || reclaimed >= ADMISSION_RECLAIM_BATCH) {
             continue;
         }
 

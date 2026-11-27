@@ -3138,6 +3138,55 @@ describe("mergeGuestInto across two real shards", () => {
         }
     });
 
+    it("ends the guest's merging marker only after its deletion has returned, so a writer that sees no marker finds the guest's row gone", async () => {
+        const merge = twoShards();
+
+        // The guest's merging marker, read on the guest's shard. A writer refuses while it is live, and once it is gone the guest's row is too.
+        const mergingMarkerLive = async () =>
+            (await merge.shards.user.run(async (context: any) => {
+                const { page } = await context.db.accountMoves.findMany({ consistency: "primary", where: { userId: "guest" } });
+
+                return page.some((row: { kind: string }) => row.kind === "merging");
+            })) as boolean;
+
+        try {
+            // A thread on the guest's shard, so the merge has rows to move and reaches the guest's own deletion.
+            await merge.shards.guest.run(async (context: any) => await context.db.insert("threads", thread("the guest's")));
+
+            const markerAtDeletion: boolean[] = [];
+            const deletedBeforeMarkersDrop: boolean[] = [];
+            let deleted = false;
+
+            const call: ShardCall = async (reference, args, shardKey) => {
+                const name = reference.__lunoraRef.split(":", 2)[1]!;
+
+                if (name === "deleteMergedGuest") {
+                    markerAtDeletion.push(await mergingMarkerLive());
+
+                    const result = (await merge.call(reference, args, shardKey)) as { deleted: boolean };
+
+                    deleted ||= result.deleted;
+
+                    return result as never;
+                }
+
+                if (name === "dropImportMarkersPage") {
+                    deletedBeforeMarkersDrop.push(deleted);
+                }
+
+                return (await merge.call(reference, args, shardKey)) as never;
+            };
+
+            await mergeToEnd(call, "guest", "user");
+
+            expect(markerAtDeletion.length).toBeGreaterThan(0);
+            expect(markerAtDeletion.every(Boolean)).toBe(true);
+            expect(deletedBeforeMarkersDrop).toStrictEqual([true]);
+        } finally {
+            merge.close();
+        }
+    });
+
     it("keeps the guest while an owed pin restore still names it, and deletes the guest once that restore has settled", async () => {
         const merge = twoShards();
 

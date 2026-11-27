@@ -4,6 +4,7 @@ import type { Id } from "../../_generated/dataModel";
 import { internal } from "../../_generated/internal";
 import type { MutationCtx } from "../../_generated/server";
 import {
+    ADMISSION_RECLAIM_BATCH,
     admitPinWriteAs,
     hasAccountMove,
     isAccountMoving,
@@ -205,8 +206,26 @@ const recordSharedPinRoute = async (context: MutationCtx, threadId: Id<"threads"
     await context.db.insert("sharedPinRoutes", { createdAt: now, ownerId: thread.userId, threadId, userId });
 };
 
-/** The routes one mutation deletes at most. The rest go by a continuation job, so no mutation's writes grow with the route count. */
-const ROUTE_CLEANUP_BATCH = 100;
+/**
+ * The routes one cleanup pass deletes. A delete is two global statements, so a pass (one page read, then 2 per route) stays under the
+ * Worker's 50-statement budget: {@link CLEANUP_JOB_WORST}. The rest go by the continuation job.
+ */
+export const ROUTE_CLEANUP_BATCH = 20;
+
+/**
+ * The routes a refused write deletes inline, before its refusal is thrown. The write's admission and final check run in the same
+ * mutation, so this is kept small; the continuation job takes the rest.
+ */
+export const REFUSAL_ROUTE_BATCH = 4;
+
+/**
+ * Worst case, in global statements, of one refused pin write: its admission (`ADMISSION_RECLAIM_BATCH` lease deletes), its inline
+ * route cleanup (`REFUSAL_ROUTE_BATCH` deletes, with the owed row and its reads), and its checks, about 20. Under 50.
+ */
+export const REFUSED_WRITE_WORST = 2 * ADMISSION_RECLAIM_BATCH + 2 * REFUSAL_ROUTE_BATCH + 20;
+
+/** Worst case, in global statements, of one cleanup pass: its page read, then 2 per route. Under 50. */
+export const CLEANUP_JOB_WORST = 1 + 2 * ROUTE_CLEANUP_BATCH + 4;
 
 /**
  * Schedules a route cleanup for after this mutation commits. `ctx.scheduler` is rolled back with the mutation, so a pin delete that fails
@@ -442,8 +461,9 @@ export const dropRoutesWithoutPins = async (
         return;
     }
 
-    // A guest merge can leave more than one route for the same user and thread, and a survivor is a link: every route goes.
-    const { page } = await context.db.sharedPinRoutes.findMany({ consistency: "primary", limit: ROUTE_CLEANUP_BATCH, where: { threadId, userId } });
+    // A guest merge can leave more than one route for the same user and thread, and a survivor is a link: every route goes, a batch at a time.
+    const batch = refusal ? REFUSAL_ROUTE_BATCH : ROUTE_CLEANUP_BATCH;
+    const { page } = await context.db.sharedPinRoutes.findMany({ consistency: "primary", limit: batch, where: { threadId, userId } });
     const first = page[0];
 
     if (first === undefined) {
@@ -504,7 +524,7 @@ export const dropRoutesWithoutPins = async (
         await context.db.delete("pendingPinRestores", owedId);
     }
 
-    if (page.length < ROUTE_CLEANUP_BATCH) {
+    if (page.length < batch) {
         return;
     }
 

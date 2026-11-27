@@ -26,6 +26,10 @@ import {
     isPinShapeValid,
     PENDING_RESTORE_BATCH,
     PENDING_RESTORE_WORST,
+    REFUSAL_ROUTE_BATCH,
+    REFUSED_WRITE_WORST,
+    ROUTE_CLEANUP_BATCH,
+    CLEANUP_JOB_WORST,
     reassignUserPinsOnThread,
     restoreSharedPinRoutes,
     withSharedPinRoute,
@@ -577,6 +581,36 @@ describe("an account being moved or erased cannot add pins", () => {
             expect(leases.page).toStrictEqual([]);
         });
     });
+
+    it("refuses a document pin from an account whose row is gone, and leaves no pin, route or lease", async () => {
+        const GONE = "user-gone-doc";
+
+        const documentId = await harness.run(async (context: any) => {
+            await context.db.insert("threadAccess", { grantedAt: 0, grantedBy: OWNER, permission: "write", threadId, userId: GONE });
+
+            return await context.db.insert("documents", {
+                kind: "design",
+                messageId: "m-doc-gone",
+                status: "idle",
+                threadId,
+                title: "Gone banner",
+                userId: OWNER,
+                version: 1,
+            });
+        });
+
+        await expect(as(GONE).mutation(createDocumentPin as never, { documentId, threadId } as never)).rejects.toThrow(MOVED_ACCOUNT_ERROR);
+
+        await harness.run(async (context: any) => {
+            const pins = await context.db.threadPins.findMany({ consistency: "primary", where: { threadId } });
+            const routes = await context.db.sharedPinRoutes.findMany({ consistency: "primary", where: { threadId, userId: GONE } });
+            const leases = await context.db.pinWriteLeases.findMany({ consistency: "primary", where: { userId: GONE } });
+
+            expect(pins.page.filter((pin: { userId: string }) => pin.userId === GONE)).toStrictEqual([]);
+            expect(routes.page).toStrictEqual([]);
+            expect(leases.page).toStrictEqual([]);
+        });
+    });
 });
 
 describe("a failed pin write leaves its shared route", () => {
@@ -660,7 +694,7 @@ describe("a refused pin write takes back the route it wrote", () => {
             return await context.db.sharedPinRoutes.findMany({ where: { threadId } });
         });
 
-        expect(routes.page).toHaveLength(50);
+        expect(routes.page).toHaveLength(150 - REFUSAL_ROUTE_BATCH);
     });
 
     it("finishes the rest of the duplicate routes once the job runs, without a pin of the caller's left", async () => {
@@ -670,8 +704,8 @@ describe("a refused pin write takes back the route it wrote", () => {
             }
         });
 
-        // The job runs the same step again until a batch comes back short.
-        for (let batch = 0; batch < 2; batch += 1) {
+        // The job runs the same step again until no route is left: a batch at a time, so more passes than the routes need.
+        for (let pass = 0; pass < Math.ceil(150 / ROUTE_CLEANUP_BATCH) + 1; pass += 1) {
             await harness.run(async (context: any) => await dropRoutesWithoutPins(context, threadId, COLLABORATOR));
         }
 
@@ -1410,6 +1444,8 @@ describe("the owed restore reads its row, and each drain stays inside the statem
         expect(ERASE_DRAIN_WORST).toBeLessThan(50);
         expect(MATERIALIZE_WORST).toBeLessThan(50);
         expect(PENDING_RESTORE_WORST).toBeLessThan(50);
+        expect(REFUSED_WRITE_WORST).toBeLessThan(50);
+        expect(CLEANUP_JOB_WORST).toBeLessThan(50);
     });
 
     it("the erasure drain clears more rows than one call takes, one bounded call at a time", async () => {
