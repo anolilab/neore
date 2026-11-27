@@ -751,6 +751,34 @@ describe("reading past the first page", () => {
                 }
             });
 
+            it("finds a late-submitted and a same-second review on the page before a last page of older-submitted reviews", async () => {
+                // Seen review 9700 (page 98) was submitted at second 9700. The last page (100) holds only reviews submitted BEFORE it; page 99
+                // holds review 9850, created earlier but submitted late, and review 9851, submitted in the marker's own second.
+                const submittedAt = (id: number) => {
+                    if (id >= 9901) {
+                        return id - 9500;
+                    }
+
+                    if (id === 9850) {
+                        return 20_000;
+                    }
+
+                    return id === 9851 ? 9700 : id;
+                };
+                const { request, requests } = longList(100, submittedAt);
+                const reviews = await githubDriver.listReviews(request, REF, { readAll: true, seenId: "9700" });
+                const ids = reviews.items.map((item) => item.id);
+
+                // Within the budget: the first page, the seen review's time, ten pages from the last.
+                expect(requests).toHaveLength(12);
+                expect(ids).toContain("9850");
+                expect(ids).toContain("9851");
+                expect(ids).toContain("9700");
+                expect(ids[0]).toBe("9850");
+                // The same-second review sorts at or above the seen review, never below it.
+                expect(ids.indexOf("9851")).toBeLessThan(ids.indexOf("9700"));
+            });
+
             it("does not end the walk at a page of reviews with no submission time, and a review with no time is not newer", async () => {
                 // Pages 100 and 99 hold only reviews with no time; a late-submitted review sits on page 95, inside the budget.
                 const noTime = new Set(Array.from({ length: 200 }, (_, index) => 9801 + index));
