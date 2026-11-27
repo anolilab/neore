@@ -520,7 +520,7 @@ export const updatePlugin = authAction
             }
 
             // Webhook targets after the others, so a step that can issue a secret has as few steps after it as possible.
-            const webhookLast = [...triggerRewrites].sort((a, b) => Number(isWebhookEntry(a.entryKey)) - Number(isWebhookEntry(b.entryKey)));
+            const webhookLast = triggerRewrites.toSorted((a, b) => Number(isWebhookEntry(a.entryKey)) - Number(isWebhookEntry(b.entryKey)));
 
             for (const step of webhookLast) {
                 const entry = entries.find((candidate) => candidate.key === step.entryKey);
