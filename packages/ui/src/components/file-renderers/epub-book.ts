@@ -155,14 +155,18 @@ const LESS_THAN = /</gu;
  * `expression(`, `behavior:` or `-moz-binding:` (old engines ran script from them), and every `<` as the CSS escape `\3c `, so nothing in it
  * can end the element or begin markup. An ordinary sheet is otherwise as it was.
  */
-export const safeStylesheet = (css: string): string =>
-    css
-        .replaceAll(CSS_IMPORT, "")
-        .replaceAll(CSS_URL, (match, argument: string) =>
-            argument.trim().replaceAll(CSS_QUOTE, "").trim().toLowerCase().startsWith("data:") ? match : 'url("")',
-        )
-        .replaceAll(CSS_SCRIPTY, "blocked:")
-        .replaceAll(LESS_THAN, String.raw`\3c `);
+const dataOnly = (match: string, argument: string): string => {
+    const address = argument.trim().replaceAll(CSS_QUOTE, "").trim().toLowerCase();
+
+    return address.startsWith("data:") ? match : 'url("")';
+};
+
+export const safeStylesheet = (css: string): string => {
+    const withoutImports = css.replaceAll(CSS_IMPORT, "");
+    const dataUrlsOnly = withoutImports.replaceAll(CSS_URL, (match, argument: string) => dataOnly(match, argument));
+
+    return dataUrlsOnly.replaceAll(CSS_SCRIPTY, "blocked:").replaceAll(LESS_THAN, String.raw`\3c `);
+};
 
 const LANGUAGE = /^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8}){0,3}$/u;
 
@@ -205,7 +209,9 @@ export const chapterDocument = (body: string, styles: ReadonlyArray<string>, lan
         ...styles.map((style) => make("style", {}, safeStylesheet(style))),
     ];
 
-    frame.head.append(...head);
+    for (const node of head) {
+        frame.head.append(node);
+    }
 
     if (language !== undefined && LANGUAGE.test(language)) {
         frame.documentElement.setAttribute("lang", language);
