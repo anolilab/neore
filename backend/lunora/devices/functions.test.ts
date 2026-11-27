@@ -1717,9 +1717,11 @@ describe("the pending device alert sweep", () => {
     };
     const sweep = async () => await harness.run(async (ctx: any) => await ctx.runMutation(internals.sweepPendingDeviceAlerts, {}));
 
-    it("tells the owner of a pairing whose announcing call never came, and only once", async () => {
+    it("tells the owner of a signed-in pairing whose announcing call never came, and only once", async () => {
         const owner = await insertUser();
         const { deviceId } = await register(owner);
+
+        await as(owner).mutation(functions.heartbeatDevice as never, { deviceId } as never);
 
         expect(await alertsOf(owner)).toHaveLength(0);
 
@@ -1729,6 +1731,16 @@ describe("the pending device alert sweep", () => {
         await sweep();
         await as(owner).mutation(functions.announcePairedDevice as never, { deviceId } as never);
         expect(await alertsOf(owner)).toHaveLength(1);
+    });
+
+    it("does not tell the owner of a pairing that never signed in, as one cancelled on the computer", async () => {
+        const owner = await insertUser();
+
+        await register(owner);
+
+        await sweep();
+
+        expect(await alertsOf(owner)).toHaveLength(0);
     });
 
     it("leaves a device the owner was already told about alone", async () => {

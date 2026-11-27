@@ -483,9 +483,10 @@ export const announceHeadlessDevice = internalMutation
     });
 
 /**
- * Housekeeping (`lib/shard-housekeeping.ts`): announces each device whose owner has not been told yet. That is any pairing
- * whose announcing call never came (a closed tab, a dropped connection, a registration made without the page), so no
- * pairing depends on the caller staying around. Bounded per pass; a device still pending after a pass is taken by the next.
+ * Housekeeping (`lib/shard-housekeeping.ts`): announces each device that has signed in but whose owner has not been told
+ * yet, so a pairing whose announcing call never came (a closed tab, a dropped connection) still reaches its owner. A device
+ * that never signed in was cancelled on the computer, or never confirmed there: it stays unannounced, whatever its row says.
+ * Bounded per pass; a device still pending after a pass is taken by the next.
  */
 export const sweepPendingDeviceAlerts = internalMutation
     .input({})
@@ -494,6 +495,10 @@ export const sweepPendingDeviceAlerts = internalMutation
         const { page } = await ctx.db.devices.findMany({ limit: SWEEP_BATCH, where: { alertPending: true } });
 
         for (const device of page) {
+            if (device.lastSeenAt === undefined) {
+                continue;
+            }
+
             await announceNewDevice(ctx, device);
         }
 
