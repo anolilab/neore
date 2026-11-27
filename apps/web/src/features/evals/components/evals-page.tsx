@@ -78,7 +78,7 @@ const EvalsPage = () => {
         <div className="mx-auto max-w-7xl space-y-6">
             <header className="flex flex-wrap items-start justify-between gap-4">
                 <div className="space-y-1">
-                    <h1 className="text-xl font-semibold">{t`Evals`}</h1>
+                    <h1 className="text-xl font-semibold tracking-tight">{t`Evals`}</h1>
                     <p className="text-muted-foreground text-sm">
                         {t`Test your agents, models and knowledge base against a fixed set of cases, score every answer, and catch regressions between runs.`}
                     </p>
@@ -96,7 +96,7 @@ const EvalsPage = () => {
             )}
 
             {datasets && list.length === 0 && (
-                <Empty>
+                <Empty className="surface-raised py-16">
                     <EmptyHeader>
                         <EmptyMedia variant="icon">
                             <FlaskConical aria-hidden />
@@ -112,10 +112,10 @@ const EvalsPage = () => {
             {list.length > 0 && selected && (
                 <div className="flex flex-col gap-6 md:flex-row">
                     <nav aria-labelledby={navId} className="md:w-64 md:shrink-0">
-                        <h2 className="text-muted-foreground mb-2 text-xs font-medium" id={navId}>
+                        <h2 className="text-muted-foreground mb-2 px-1 font-mono text-xs" id={navId}>
                             {t`Datasets`}
                         </h2>
-                        <ul className="space-y-1">
+                        <ul className="surface-raised space-y-0.5 rounded-xl p-1.5">
                             {list.map((dataset) => {
                                 const isCurrent = dataset._id === selected._id;
 
@@ -124,8 +124,8 @@ const EvalsPage = () => {
                                         <button
                                             aria-current={isCurrent ? "true" : undefined}
                                             className={cn(
-                                                "hover:bg-muted focus-visible:ring-ring w-full rounded-md px-3 py-2 text-left text-sm outline-none focus-visible:ring-2",
-                                                isCurrent && "bg-muted font-medium",
+                                                "focus-visible:ring-ring w-full rounded-lg px-3 py-2 text-left text-sm outline-none focus-visible:ring-2",
+                                                isCurrent ? "surface-well font-medium" : "hover:bg-muted/50",
                                             )}
                                             onClick={() => setSelectedId(dataset._id)}
                                             type="button"

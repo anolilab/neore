@@ -24,11 +24,11 @@ export const useTaskStatusLabels = (): Record<TaskStatus, string> => {
 
 const STATUS_STYLE: Record<TaskStatus, { className: string; icon: ComponentType<{ "aria-hidden"?: boolean; className?: string }> }> = {
     blocked: { className: "text-muted-foreground", icon: Lock },
-    done: { className: "text-emerald-600 dark:text-emerald-400", icon: CheckCircle2 },
+    done: { className: "text-success-foreground", icon: CheckCircle2 },
     failed: { className: "text-destructive", icon: AlertCircle },
-    needs_review: { className: "text-amber-600 dark:text-amber-400", icon: Eye },
-    queued: { className: "text-sky-600 dark:text-sky-400", icon: CircleDashed },
-    running: { className: "text-sky-600 dark:text-sky-400", icon: Loader2 },
+    needs_review: { className: "text-warning-foreground", icon: Eye },
+    queued: { className: "text-info-foreground", icon: CircleDashed },
+    running: { className: "text-info-foreground", icon: Loader2 },
     todo: { className: "text-muted-foreground", icon: Circle },
 };
 

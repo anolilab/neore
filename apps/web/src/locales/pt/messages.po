@@ -382,7 +382,7 @@ msgid "{0, plural, one {# prompt found} other {# prompts found}}"
 msgstr "{0, plural, one {# prompt encontrado} other {# prompts encontrados}}"
 
 #. placeholder {0}: selectedPromptIds.size
-#: src/features/prompts/components/prompt-list.tsx:626
+#: src/features/prompts/components/prompt-list.tsx:628
 msgid "{0, plural, one {# prompt selected} other {# prompts selected}}"
 msgstr "{0, plural, one {# prompt selecionado} other {# prompts selecionados}}"
 
@@ -645,7 +645,7 @@ msgid "{0} eligible · {1} deleted · {2}ms"
 msgstr "{0} elegíveis · {1} excluídos · {2}ms"
 
 #. placeholder {0}: progress.failed
-#: src/features/tasks/components/goal-list.tsx:47
+#: src/features/tasks/components/goal-list.tsx:44
 msgid "{0} failed"
 msgstr "{0} com falha"
 
@@ -761,7 +761,7 @@ msgstr "{0} de {1} conversas importadas"
 
 #. placeholder {0}: progress.done
 #. placeholder {1}: progress.total
-#: src/features/tasks/components/goal-list.tsx:64
+#: src/features/tasks/components/goal-list.tsx:61
 msgid "{0} of {1} tasks done"
 msgstr "{0} de {1} tarefas concluídas"
 
@@ -813,7 +813,7 @@ msgid "{0} times"
 msgstr "{0} vezes"
 
 #. placeholder {0}: progress.needsReview
-#: src/features/tasks/components/goal-list.tsx:46
+#: src/features/tasks/components/goal-list.tsx:43
 msgid "{0} to review"
 msgstr "{0} para revisar"
 
@@ -839,7 +839,7 @@ msgid "{0} tools: {1}"
 msgstr "{0} ferramentas: {1}"
 
 #. placeholder {0}: overview.unreadCount
-#: src/features/home/components/home-page.tsx:223
+#: src/features/home/components/home-page.tsx:226
 msgid "{0} unread"
 msgstr "{0} não lidas"
 
@@ -2021,7 +2021,7 @@ msgstr "Uma ferramenta integrada pelo nome, a ferramenta de um servidor como ser
 msgid "a change is waiting to be read"
 msgstr "há uma alteração aguardando leitura"
 
-#: src/features/home/components/home-page.tsx:172
+#: src/features/home/components/home-page.tsx:175
 msgid "A chat is waiting for your answer"
 msgstr "Um chat está aguardando sua resposta"
 
@@ -2511,7 +2511,7 @@ msgid "Actions for project {0}"
 msgstr "Ações do projeto {0}"
 
 #. placeholder {0}: prompt.name
-#: src/features/prompts/components/prompt-item.tsx:168
+#: src/features/prompts/components/prompt-item.tsx:164
 msgid "Actions for prompt {0}"
 msgstr "Ações do prompt {0}"
 
@@ -2893,7 +2893,7 @@ msgstr "Adicionar título"
 msgid "Add to favorites"
 msgstr "Adicionar aos favoritos"
 
-#: src/features/prompts/components/prompt-item.tsx:218
+#: src/features/prompts/components/prompt-item.tsx:214
 #: src/features/prompts/components/prompt-list-view.tsx:222
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:878
 msgid "Add to Favorites"
@@ -3534,7 +3534,7 @@ msgstr "Alinhar verticalmente (V)"
 #: src/features/settings/components/chat/models-settings.tsx:440
 #: src/features/settings/components/chat/models-settings.tsx:461
 #: src/features/settings/connectors/connectors-page.tsx:63
-#: src/routes/(chat)/workflow/gallery.tsx:20
+#: src/routes/(chat)/workflow/gallery.tsx:19
 msgid "All"
 msgstr "Todos"
 
@@ -3575,7 +3575,7 @@ msgstr "Todas as categorias"
 msgid "All changes saved"
 msgstr "Todas as alterações salvas"
 
-#: src/features/home/components/home-page.tsx:243
+#: src/features/home/components/home-page.tsx:246
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:439
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:442
 msgid "All chats"
@@ -4637,7 +4637,7 @@ msgstr "Faça uma pergunta paralela sem interromper a resposta"
 msgid "Ask all models anything..."
 msgstr "Pergunte qualquer coisa a todos os modelos..."
 
-#: src/features/home/components/home-page.tsx:94
+#: src/features/home/components/home-page.tsx:97
 msgid "Ask anything to start a new chat…"
 msgstr "Pergunte qualquer coisa para iniciar um novo chat…"
 
@@ -4800,7 +4800,7 @@ msgstr "Auckland"
 #: src/features/workflow/components/gallery/gallery-card.tsx:25
 #: src/features/workflow/components/gallery/publish-dialog.tsx:31
 #: src/features/workflow/components/template-picker.tsx:18
-#: src/routes/(chat)/workflow/gallery.tsx:24
+#: src/routes/(chat)/workflow/gallery.tsx:23
 msgid "Audio"
 msgstr "Áudio"
 
@@ -5002,7 +5002,7 @@ msgstr "automação"
 #: src/features/workflow/components/gallery/gallery-card.tsx:26
 #: src/features/workflow/components/gallery/publish-dialog.tsx:32
 #: src/features/workflow/components/template-picker.tsx:19
-#: src/routes/(chat)/workflow/gallery.tsx:25
+#: src/routes/(chat)/workflow/gallery.tsx:24
 msgid "Automation"
 msgstr "Automação"
 
@@ -5111,7 +5111,7 @@ msgstr "Voltar à galeria"
 msgid "Back to settings sections"
 msgstr "Voltar às seções de configurações"
 
-#: src/routes/(chat)/workflow/gallery.tsx:95
+#: src/routes/(chat)/workflow/gallery.tsx:94
 msgid "Back to workflows"
 msgstr "Voltar aos fluxos de trabalho"
 
@@ -5753,7 +5753,7 @@ msgstr "navegar"
 msgid "Browse and restore previous versions of your workflow."
 msgstr "Navegue e restaure versões anteriores do seu fluxo de trabalho."
 
-#: src/routes/(chat)/workflow/gallery.tsx:103
+#: src/routes/(chat)/workflow/gallery.tsx:102
 msgid "Browse, fork, and remix workflows shared by the community"
 msgstr "Explore, copie e remixe fluxos de trabalho compartilhados pela comunidade"
 
@@ -6246,7 +6246,7 @@ msgstr "Cancelar ou fechar"
 msgid "Cancel run"
 msgstr "Cancelar execução"
 
-#: src/features/prompts/components/prompt-list.tsx:583
+#: src/features/prompts/components/prompt-list.tsx:585
 msgid "Cancel Selection"
 msgstr "Cancelar seleção"
 
@@ -7099,7 +7099,7 @@ msgstr "Falha na limpeza"
 #: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:254
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:98
 #: src/features/chat/thread/media-gallery-view.tsx:382
-#: src/features/prompts/components/prompt-list.tsx:614
+#: src/features/prompts/components/prompt-list.tsx:616
 #: src/features/settings/components/chat/api-keys-settings.tsx:382
 #: src/features/settings/components/chat/models-settings.tsx:474
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:370
@@ -7159,7 +7159,7 @@ msgid "Clear selection"
 msgstr "Limpar seleção"
 
 #: src/features/prompts/components/prompt-list-view.tsx:292
-#: src/features/prompts/components/prompt-list.tsx:636
+#: src/features/prompts/components/prompt-list.tsx:638
 msgid "Clear Selection"
 msgstr "Limpar seleção"
 
@@ -7762,7 +7762,7 @@ msgstr "Os commits são feitos com o seu nome e e-mail, e o Neore Agent aparece 
 msgid "Communication"
 msgstr "Comunicação"
 
-#: src/routes/(chat)/workflow/gallery.tsx:100
+#: src/routes/(chat)/workflow/gallery.tsx:99
 #: src/routes/(chat)/workflow/index.tsx:47
 msgid "Community Gallery"
 msgstr "Galeria da comunidade"
@@ -8789,7 +8789,7 @@ msgstr "Copiado para a área de transferência"
 #: src/components/copy-button.tsx:50
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:95
 #: src/features/chat/thread/message-item.tsx:357
-#: src/features/prompts/components/prompt-item.tsx:261
+#: src/features/prompts/components/prompt-item.tsx:256
 msgid "Copied!"
 msgstr "Copiado!"
 
@@ -8866,8 +8866,7 @@ msgstr "Copiar objeto"
 msgid "Copy prompt"
 msgstr "Copiar prompt"
 
-#: src/features/prompts/components/prompt-item.tsx:240
-#: src/features/prompts/components/prompt-item.tsx:266
+#: src/features/prompts/components/prompt-item.tsx:261
 msgid "Copy Prompt"
 msgstr "Copiar prompt"
 
@@ -8926,7 +8925,7 @@ msgstr "Copie este segredo agora e guarde-o com o remetente do webhook. Ele não
 msgid "Copy to clipboard"
 msgstr "Copiar para a área de transferência"
 
-#: src/features/prompts/components/prompt-item.tsx:189
+#: src/features/prompts/components/prompt-item.tsx:185
 #: src/features/prompts/components/prompt-list-view.tsx:204
 msgid "Copy to Clipboard"
 msgstr "Copiar para a área de transferência"
@@ -9851,7 +9850,7 @@ msgstr "Crie equipes para organizar os membros em grupos"
 msgid "Create Trigger"
 msgstr "Criar gatilho"
 
-#: src/routes/(chat)/workflow/index.tsx:65
+#: src/routes/(chat)/workflow/index.tsx:66
 msgid "Create Workflow"
 msgstr "Criar fluxo de trabalho"
 
@@ -9871,7 +9870,7 @@ msgstr "Crie sua primeira habilidade para automatizar fluxos de trabalho. Import
 msgid "Create your first trigger to automate agent execution on a schedule or via webhooks."
 msgstr "Crie seu primeiro gatilho para automatizar a execução de agentes por um agendamento ou via webhooks."
 
-#: src/routes/(chat)/workflow/index.tsx:62
+#: src/routes/(chat)/workflow/index.tsx:63
 msgid "Create your first workflow to automate AI tasks visually."
 msgstr "Crie seu primeiro fluxo de trabalho para automatizar tarefas de IA visualmente."
 
@@ -10688,7 +10687,7 @@ msgstr "O trabalho de {0} delegado é executado neste modelo."
 #: src/features/local-models/components/ollama-model-manager.tsx:336
 #: src/features/pages/components/page-tree-item.tsx:174
 #: src/features/pages/components/pages-sidebar.tsx:281
-#: src/features/prompts/components/prompt-item.tsx:228
+#: src/features/prompts/components/prompt-item.tsx:224
 #: src/features/prompts/components/prompt-list-view.tsx:227
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:751
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:890
@@ -10697,7 +10696,7 @@ msgstr "O trabalho de {0} delegado é executado neste modelo."
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:334
 #: src/features/settings/components/chat/trigger-settings.tsx:1088
 #: src/features/skills/components/skill-list.tsx:311
-#: src/features/tasks/components/goal-list.tsx:54
+#: src/features/tasks/components/goal-list.tsx:51
 #: src/features/tasks/components/task-card.tsx:113
 #: src/features/tasks/components/tasks-page.tsx:330
 #: src/features/vault/components/site-logins.tsx:655
@@ -10809,7 +10808,7 @@ msgstr "Excluir arquivo"
 msgid "Delete goal \"{deleteTitle}\"?"
 msgstr "Excluir a meta \"{deleteTitle}\"?"
 
-#: src/features/tasks/components/goal-list.tsx:54
+#: src/features/tasks/components/goal-list.tsx:51
 msgid "Delete goal {title}"
 msgstr "Excluir a meta {title}"
 
@@ -10872,7 +10871,7 @@ msgstr "Excluir predefinição?"
 msgid "Delete Project"
 msgstr "Excluir projeto"
 
-#: src/features/prompts/components/prompt-item.tsx:308
+#: src/features/prompts/components/prompt-item.tsx:303
 #: src/features/prompts/components/prompt-list-view.tsx:316
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:972
 msgid "Delete Prompt"
@@ -10904,7 +10903,7 @@ msgstr "Excluir selecionados"
 
 #: ../../packages/ui/src/components/canvas-editor/fabric-canvas-editor.tsx:624
 #: src/features/prompts/components/prompt-list-view.tsx:288
-#: src/features/prompts/components/prompt-list.tsx:632
+#: src/features/prompts/components/prompt-list.tsx:634
 msgid "Delete Selected"
 msgstr "Excluir selecionados"
 
@@ -11883,7 +11882,7 @@ msgstr "Os downloads abrem a página de versões do GitHub. Se nenhum instalador
 
 #: src/features/chat/link-preview/link-preview-card.tsx:117
 #: src/features/chat/thread-list/thread-node.tsx:894
-#: src/features/develop/components/inbox-list.tsx:118
+#: src/features/develop/components/inbox-list.tsx:119
 #: src/features/develop/components/pull-request-view.tsx:83
 #: src/features/skills/components/skill-builder-review.tsx:133
 msgid "Draft"
@@ -12229,11 +12228,11 @@ msgstr "Geração guiada por bordas"
 #: src/features/chat/thread/message-item.tsx:397
 #: src/features/develop/components/draft-comment-card.tsx:51
 #: src/features/pages/components/page-version-panel.tsx:50
-#: src/features/prompts/components/prompt-item.tsx:212
+#: src/features/prompts/components/prompt-item.tsx:208
 #: src/features/prompts/components/prompt-list-view.tsx:218
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:730
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:869
-#: src/features/tasks/components/goal-list.tsx:51
+#: src/features/tasks/components/goal-list.tsx:48
 #: src/features/tasks/components/task-card.tsx:110
 #: src/features/workflow/components/version-history.tsx:67
 msgid "Edit"
@@ -12296,7 +12295,7 @@ msgstr "Editar trecho"
 msgid "Edit goal"
 msgstr "Editar meta"
 
-#: src/features/tasks/components/goal-list.tsx:51
+#: src/features/tasks/components/goal-list.tsx:48
 msgid "Edit goal {title}"
 msgstr "Editar meta {title}"
 
@@ -12347,8 +12346,8 @@ msgid "Edit Project"
 msgstr "Editar projeto"
 
 #: src/features/prompts/components/prompt-form-dialog.tsx:237
+#: src/features/prompts/components/prompt-item.tsx:150
 #: src/features/prompts/components/prompt-item.tsx:154
-#: src/features/prompts/components/prompt-item.tsx:158
 msgid "Edit Prompt"
 msgstr "Editar prompt"
 
@@ -15093,7 +15092,7 @@ msgstr "Páginas favoritas"
 msgid "Favorites"
 msgstr "Favoritos"
 
-#: src/routes/(chat)/workflow/gallery.tsx:114
+#: src/routes/(chat)/workflow/gallery.tsx:113
 msgid "Featured"
 msgstr "Em destaque"
 
@@ -15398,7 +15397,7 @@ msgstr "Filtrar habilidades"
 msgid "Filter value"
 msgstr "Valor do filtro"
 
-#: src/features/prompts/components/prompt-list.tsx:599
+#: src/features/prompts/components/prompt-list.tsx:601
 msgid "Filter:"
 msgstr "Filtro:"
 
@@ -17525,7 +17524,7 @@ msgid "Holds until"
 msgstr "Válido até"
 
 #: src/components/error-boundaries/route-error-boundary.tsx:118
-#: src/features/home/components/home-page.tsx:130
+#: src/features/home/components/home-page.tsx:133
 #: src/features/layout/components/sidebar-shortcut.tsx:71
 #: src/features/layout/lib/dashboard-page-names.ts:24
 msgid "Home"
@@ -17810,7 +17809,7 @@ msgstr "ilustração"
 #: src/features/workflow/templates/index.ts:364
 #: src/features/workflow/types/index.ts:508
 #: src/features/workflow/types/index.ts:512
-#: src/routes/(chat)/workflow/gallery.tsx:21
+#: src/routes/(chat)/workflow/gallery.tsx:20
 msgid "Image"
 msgstr "Imagem"
 
@@ -20005,7 +20004,7 @@ msgstr "Listar todos os modelos disponíveis e preços"
 msgid "List everything you remember about me from our past conversations and your saved memory. Write one fact per line, in the third person, starting with \"The user\" (for example: \"The user works as a nurse in Hamburg.\"). Where you know when you learned a fact, add the date in brackets at the end of its line. Leave out passwords, keys, account numbers and health details. Write no introduction, headings or comments."
 msgstr "Liste tudo o que você lembra sobre mim de conversas anteriores e da sua memória salva. Escreva um fato por linha, em terceira pessoa, começando com \"The user\" (por exemplo: \"The user works as a nurse in Hamburg.\"). Quando souber quando aprendeu um fato, adicione a data entre colchetes no fim da linha. Deixe de fora senhas, chaves, números de conta e detalhes de saúde. Não escreva introdução, títulos ou comentários."
 
-#: src/features/prompts/components/prompt-list.tsx:560
+#: src/features/prompts/components/prompt-list.tsx:561
 msgid "List view"
 msgstr "Visualização em lista"
 
@@ -20096,7 +20095,7 @@ msgid "Load earlier messages"
 msgstr "Carregar mensagens anteriores"
 
 #: ../../packages/chat-ui/src/threads/thread-list.tsx:181
-#: src/features/develop/components/inbox-list.tsx:128
+#: src/features/develop/components/inbox-list.tsx:129
 #: src/features/settings/components/chat/mcp/server-catalog.tsx:215
 #: src/features/skills/components/skill-marketplace.tsx:227
 msgid "Load more"
@@ -20131,7 +20130,7 @@ msgstr "{0} de {1, plural, one {# arquivo carregado} other {# arquivos carregado
 
 #: ../../packages/ui/src/components/spinner.tsx:8
 #: src/features/develop/components/develop-page.tsx:28
-#: src/features/develop/components/inbox-list.tsx:86
+#: src/features/develop/components/inbox-list.tsx:87
 #: src/features/develop/components/pull-request-view.tsx:62
 #: src/features/develop/components/watched-repositories.tsx:171
 msgid "Loading"
@@ -20390,7 +20389,7 @@ msgstr "Carregando seus itens…"
 msgid "Loading your messages…"
 msgstr "Carregando suas mensagens…"
 
-#: src/features/home/components/home-page.tsx:138
+#: src/features/home/components/home-page.tsx:141
 msgid "Loading your overview…"
 msgstr "Carregando sua visão geral…"
 
@@ -22144,15 +22143,15 @@ msgstr "O modelo mais acessível da família Claude 4.x"
 msgid "Most capable language model"
 msgstr "O modelo de linguagem mais capaz"
 
-#: src/routes/(chat)/workflow/gallery.tsx:31
+#: src/routes/(chat)/workflow/gallery.tsx:30
 msgid "Most Forked"
 msgstr "Mais copiados"
 
-#: src/routes/(chat)/workflow/gallery.tsx:30
+#: src/routes/(chat)/workflow/gallery.tsx:29
 msgid "Most Popular"
 msgstr "Mais populares"
 
-#: src/routes/(chat)/workflow/gallery.tsx:29
+#: src/routes/(chat)/workflow/gallery.tsx:28
 msgid "Most Recent"
 msgstr "Mais recentes"
 
@@ -22637,7 +22636,7 @@ msgstr "Precisa de revisão"
 #: src/features/chat/browser-live-view/browser-human-check.tsx:496
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:541
 #: src/features/chat/thread-list/section-bar.tsx:46
-#: src/features/home/components/home-page.tsx:165
+#: src/features/home/components/home-page.tsx:168
 msgid "Needs you"
 msgstr "Precisa de você"
 
@@ -22969,7 +22968,7 @@ msgstr "A nova senha é obrigatória"
 msgid "New preset"
 msgstr "Nova predefinição"
 
-#: src/features/prompts/components/prompt-list.tsx:589
+#: src/features/prompts/components/prompt-list.tsx:591
 msgid "New Prompt"
 msgstr "Novo prompt"
 
@@ -23233,7 +23232,7 @@ msgstr "Nenhuma câmera selecionada"
 msgid "No cases yet. Add one by hand, import a CSV or JSONL file, or save a chat turn with \"Save as eval case\"."
 msgstr "Ainda não há casos. Adicione um manualmente, importe um arquivo CSV ou JSONL ou salve uma interação do chat com \"Salvar como caso de avaliação\"."
 
-#: src/features/home/components/home-page.tsx:250
+#: src/features/home/components/home-page.tsx:253
 msgid "No chats yet. Start one above."
 msgstr "Nenhum chat ainda. Comece um acima."
 
@@ -23627,7 +23626,7 @@ msgstr "Sem prompt"
 msgid "No prompts found matching \"{searchQuery}\""
 msgstr "Nenhum prompt encontrado para \"{searchQuery}\""
 
-#: src/features/prompts/components/prompt-list.tsx:645
+#: src/features/prompts/components/prompt-list.tsx:647
 msgid "No prompts found matching your search."
 msgstr "Nenhum prompt corresponde à sua pesquisa."
 
@@ -23840,7 +23839,7 @@ msgstr "Nenhuma ferramenta."
 msgid "No triggers yet"
 msgstr "Nenhum gatilho ainda"
 
-#: src/features/home/components/home-page.tsx:230
+#: src/features/home/components/home-page.tsx:233
 msgid "No unread notifications."
 msgstr "Nenhuma notificação não lida."
 
@@ -23886,7 +23885,7 @@ msgstr "Nenhum vídeo ainda"
 msgid "No workflows found"
 msgstr "Nenhum fluxo de trabalho encontrado"
 
-#: src/routes/(chat)/workflow/index.tsx:61
+#: src/routes/(chat)/workflow/index.tsx:62
 msgid "No workflows yet"
 msgstr "Nenhum fluxo de trabalho ainda"
 
@@ -24108,7 +24107,7 @@ msgstr "Nada encontrado"
 msgid "Nothing has run on a device yet."
 msgstr "Nada foi executado em um dispositivo ainda."
 
-#: src/features/develop/components/inbox-list.tsx:94
+#: src/features/develop/components/inbox-list.tsx:95
 msgid "Nothing here."
 msgstr "Nada aqui."
 
@@ -24116,7 +24115,7 @@ msgstr "Nada aqui."
 msgid "Nothing is listening at that address. Start Ollama or LM Studio's server, check the port, and make sure the URL ends in /v1."
 msgstr "Nada está respondendo nesse endereço. Inicie o servidor do Ollama ou do LM Studio, confira a porta e verifique se a URL termina em /v1."
 
-#: src/features/home/components/home-page.tsx:186
+#: src/features/home/components/home-page.tsx:189
 msgid "Nothing is running right now."
 msgstr "Nada está em execução agora."
 
@@ -24124,7 +24123,7 @@ msgstr "Nada está em execução agora."
 msgid "Nothing is saved, installed or enabled until you choose to save."
 msgstr "Nada é salvo, instalado ou ativado até você escolher salvar."
 
-#: src/features/home/components/home-page.tsx:167
+#: src/features/home/components/home-page.tsx:170
 msgid "Nothing is waiting on you."
 msgstr "Nada está esperando por você."
 
@@ -24140,7 +24139,7 @@ msgstr "Notificação"
 msgid "Notification workflows, channels, and recipient preferences"
 msgstr "Fluxos de notificação, canais e preferências de destinatários"
 
-#: src/features/home/components/home-page.tsx:227
+#: src/features/home/components/home-page.tsx:230
 #: src/features/notifications/components/notification-bell.tsx:72
 #: src/features/notifications/components/notification-bell.tsx:102
 #: src/features/notifications/components/notification-settings.tsx:251
@@ -25350,7 +25349,7 @@ msgstr "Otimizar prompt de sistema"
 msgid "Optimize thread system prompt"
 msgstr "Otimizar o prompt de sistema da conversa"
 
-#: src/features/prompts/components/prompt-item.tsx:196
+#: src/features/prompts/components/prompt-item.tsx:192
 #: src/features/prompts/components/prompt-list-view.tsx:209
 msgid "Optimize with AI"
 msgstr "Otimizar com IA"
@@ -25785,7 +25784,7 @@ msgstr "Página: {0}"
 #: src/features/layout/components/sidebar-shortcut.tsx:125
 #: src/features/pages/components/pages-sidebar.tsx:139
 #: src/features/pages/components/pages-sidebar.tsx:141
-#: src/routes/_shortcut/pages/index.tsx:11
+#: src/routes/_shortcut/pages/index.tsx:13
 msgid "Pages"
 msgstr "Páginas"
 
@@ -26339,7 +26338,7 @@ msgstr "Escolha um host ou um pull request"
 msgid "Pick a model to evaluate."
 msgstr "Escolha um modelo para avaliar."
 
-#: src/routes/_shortcut/pages/index.tsx:12
+#: src/routes/_shortcut/pages/index.tsx:14
 msgid "Pick a page on the left, or create one with the + button."
 msgstr "Escolha uma página à esquerda ou crie uma com o botão +."
 
@@ -27827,9 +27826,9 @@ msgstr "Colocar mensagem na fila"
 msgid "Queue message — sends when the current reply finishes"
 msgstr "Colocar mensagem na fila — será enviada quando a resposta atual terminar"
 
-#: src/features/home/components/home-page.tsx:113
-#: src/features/home/components/home-page.tsx:190
-#: src/features/home/components/home-page.tsx:198
+#: src/features/home/components/home-page.tsx:116
+#: src/features/home/components/home-page.tsx:193
+#: src/features/home/components/home-page.tsx:201
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:63
 #: src/features/sub-agents/components/worker-list.tsx:104
 #: src/features/sub-agents/components/worker-run-log.tsx:29
@@ -28354,7 +28353,7 @@ msgstr "Rebase e mesclagem"
 msgid "Recent"
 msgstr "Recentes"
 
-#: src/features/home/components/home-page.tsx:247
+#: src/features/home/components/home-page.tsx:250
 msgid "Recent chats"
 msgstr "Chats recentes"
 
@@ -28915,7 +28914,7 @@ msgstr "Remover filtro (com foco)"
 msgid "Remove from favorites"
 msgstr "Remover dos favoritos"
 
-#: src/features/prompts/components/prompt-item.tsx:218
+#: src/features/prompts/components/prompt-item.tsx:214
 #: src/features/prompts/components/prompt-list-view.tsx:222
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:739
 msgid "Remove from Favorites"
@@ -29606,7 +29605,7 @@ msgstr "Tentar novamente com observação"
 msgid "Retrying now"
 msgstr "Tentando agora"
 
-#: src/features/home/components/home-page.tsx:154
+#: src/features/home/components/home-page.tsx:157
 msgid "Retrying…"
 msgstr "Tentando novamente…"
 
@@ -29682,7 +29681,7 @@ msgid "Review submitted"
 msgstr "Revisão enviada"
 
 #. placeholder {0}: task.title
-#: src/features/home/components/home-page.tsx:177
+#: src/features/home/components/home-page.tsx:180
 msgid "Review task: {0}"
 msgstr "Revisar tarefa: {0}"
 
@@ -30029,10 +30028,10 @@ msgstr "Execute seu fluxo de trabalho para ver o histórico de execuções aqui.
 #: src/features/chat/thread/host-activity.tsx:142
 #: src/features/evals/components/run-detail.tsx:28
 #: src/features/evals/components/run-status.tsx:16
-#: src/features/home/components/home-page.tsx:116
-#: src/features/home/components/home-page.tsx:184
-#: src/features/home/components/home-page.tsx:190
-#: src/features/home/components/home-page.tsx:198
+#: src/features/home/components/home-page.tsx:119
+#: src/features/home/components/home-page.tsx:187
+#: src/features/home/components/home-page.tsx:193
+#: src/features/home/components/home-page.tsx:201
 #: src/features/settings/components/chat/trigger-settings.tsx:184
 #: src/features/tasks/components/task-detail-dialog.tsx:138
 #: src/features/tasks/components/task-status.tsx:20
@@ -30769,7 +30768,7 @@ msgstr "Pesquise conversas, navegue ou execute ações..."
 msgid "Search variables..."
 msgstr "Pesquisar variáveis..."
 
-#: src/routes/(chat)/workflow/gallery.tsx:129
+#: src/routes/(chat)/workflow/gallery.tsx:128
 msgid "Search workflows..."
 msgstr "Pesquisar fluxos de trabalho..."
 
@@ -30883,7 +30882,7 @@ msgstr "Seed"
 #: ../../packages/ui/src/components/data-grid/data-grid-column-header.tsx:30
 #: src/features/chat/forward/select-messages-action.tsx:29
 #: src/features/chat/thread-list/thread-node.tsx:769
-#: src/features/prompts/components/prompt-list.tsx:583
+#: src/features/prompts/components/prompt-list.tsx:585
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:220
 msgid "Select"
 msgstr "Selecionar"
@@ -31723,7 +31722,7 @@ msgstr "Mostrar tudo"
 msgid "Show all {lines} lines"
 msgstr "Mostrar todas as {lines} linhas"
 
-#: src/features/tasks/components/goal-list.tsx:73
+#: src/features/tasks/components/goal-list.tsx:70
 msgid "Show all tasks"
 msgstr "Mostrar todas as tarefas"
 
@@ -31813,7 +31812,7 @@ msgstr "Mostrar histórico de execuções"
 msgid "Show source"
 msgstr "Mostrar código-fonte"
 
-#: src/features/tasks/components/goal-list.tsx:73
+#: src/features/tasks/components/goal-list.tsx:70
 msgid "Show this goal's tasks"
 msgstr "Mostrar as tarefas desta meta"
 
@@ -32540,6 +32539,8 @@ msgid "Sort asc"
 msgstr "Ordem crescente"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-sort-menu.tsx:157
+#: src/features/prompts/components/prompt-list.tsx:518
+#: src/routes/(chat)/workflow/gallery.tsx:131
 msgid "Sort by"
 msgstr "Ordenar por"
 
@@ -32984,7 +32985,7 @@ msgstr "Comece uma conversa para fixar mensagens."
 msgid "Start a conversation, generate images, write a document in canvas, run code — no tab-switching, no copy-pasting between apps."
 msgstr "Inicie uma conversa, gere imagens, escreva um documento no canvas, execute código — sem trocar de aba, sem copiar e colar entre apps."
 
-#: src/features/home/components/home-page.tsx:83
+#: src/features/home/components/home-page.tsx:86
 msgid "Start a new chat"
 msgstr "Iniciar um novo chat"
 
@@ -33014,7 +33015,7 @@ msgstr "Começar um novo chat temporário ({0})"
 msgid "Start building"
 msgstr "Comece a construir"
 
-#: src/features/home/components/home-page.tsx:97
+#: src/features/home/components/home-page.tsx:100
 msgid "Start chat"
 msgstr "Iniciar chat"
 
@@ -34633,7 +34634,7 @@ msgstr "texto"
 #: src/features/workflow/components/template-picker.tsx:21
 #: src/features/workflow/types/index.ts:623
 #: src/features/workflow/types/index.ts:627
-#: src/routes/(chat)/workflow/gallery.tsx:22
+#: src/routes/(chat)/workflow/gallery.tsx:21
 msgid "Text"
 msgstr "Texto"
 
@@ -36829,7 +36830,7 @@ msgstr "Isso vai excluir permanentemente o projeto e todas as conversas associad
 
 #. placeholder {0}: prompt.name
 #. placeholder {0}: promptToDelete?.name
-#: src/features/prompts/components/prompt-item.tsx:300
+#: src/features/prompts/components/prompt-item.tsx:295
 #: src/features/prompts/components/prompt-list-view.tsx:300
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:962
 msgid "This will permanently delete the prompt \"{0}\". This action cannot be undone."
@@ -37682,7 +37683,7 @@ msgstr "Tente ajustar os termos da pesquisa."
 #: src/features/connection/components/offline-screen.tsx:64
 #: src/features/develop/components/files-tab.tsx:400
 #: src/features/develop/components/thread-pull-requests.tsx:325
-#: src/features/home/components/home-page.tsx:154
+#: src/features/home/components/home-page.tsx:157
 #: src/features/projects/components/computer-rule-file-import.tsx:495
 #: src/features/projects/components/project-repo-picker.tsx:190
 #: src/features/projects/components/project-repo-picker.tsx:198
@@ -38286,7 +38287,7 @@ msgstr "Até um chat ser pareado, o bot responde apenas que é privado. Envie /p
 msgid "Untitled"
 msgstr "Sem título"
 
-#: src/features/home/components/home-page.tsx:255
+#: src/features/home/components/home-page.tsx:258
 msgid "Untitled chat"
 msgstr "Chat sem título"
 
@@ -38747,11 +38748,11 @@ msgstr "Usar desenho"
 msgid "Use five cron fields, e.g. \"0 9 * * 1\" for Mondays at 09:00 UTC"
 msgstr "Use cinco campos cron, ex.: \"0 9 * * 1\" para segundas-feiras às 09:00 UTC"
 
-#: src/features/prompts/components/prompt-item.tsx:180
+#: src/features/prompts/components/prompt-item.tsx:176
 msgid "Use in Chat"
 msgstr "Usar no chat"
 
-#: src/features/prompts/components/prompt-item.tsx:184
+#: src/features/prompts/components/prompt-item.tsx:180
 msgid "Use in Temp Chat"
 msgstr "Usar no chat temporário"
 
@@ -39032,6 +39033,7 @@ msgid "Variables:"
 msgstr "Variáveis:"
 
 #: src/features/layout/components/sidebar-shortcut.tsx:141
+#: src/features/vault/components/header.tsx:12
 msgid "Vault"
 msgstr "Cofre"
 
@@ -39267,7 +39269,7 @@ msgstr "vídeo"
 #: src/features/workflow/components/template-picker.tsx:22
 #: src/features/workflow/types/index.ts:660
 #: src/features/workflow/types/index.ts:664
-#: src/routes/(chat)/workflow/gallery.tsx:23
+#: src/routes/(chat)/workflow/gallery.tsx:22
 msgid "Video"
 msgstr "Vídeo"
 
@@ -39424,7 +39426,7 @@ msgstr "Ver detalhes do erro"
 msgid "View full docs"
 msgstr "Ver documentação completa"
 
-#: src/features/prompts/components/prompt-item.tsx:203
+#: src/features/prompts/components/prompt-item.tsx:199
 #: src/features/prompts/components/prompt-list-view.tsx:213
 msgid "View History"
 msgstr "Ver histórico"
@@ -39769,14 +39771,14 @@ msgid "Waiting for your answer"
 msgstr "Aguardando sua resposta"
 
 #. placeholder {0}: approval.threadTitle
-#: src/features/home/components/home-page.tsx:172
+#: src/features/home/components/home-page.tsx:175
 msgid "Waiting for your answer in {0}"
 msgstr "Aguardando sua resposta em {0}"
 
 #: src/features/chat/thread-list/thread-node.tsx:824
 #: src/features/chat/thread-list/thread-node.tsx:831
 #: src/features/chat/thread/tool-approval.tsx:78
-#: src/features/home/components/home-page.tsx:116
+#: src/features/home/components/home-page.tsx:119
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:20
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:60
 msgid "Waiting for your approval"
@@ -40046,7 +40048,7 @@ msgstr "O que é o recurso Canvas?"
 msgid "What it evaluates"
 msgstr "O que ele avalia"
 
-#: src/features/home/components/home-page.tsx:131
+#: src/features/home/components/home-page.tsx:134
 msgid "What needs you, what's running, and where you left off."
 msgstr "O que precisa de você, o que está em execução e onde você parou."
 
@@ -41173,7 +41175,7 @@ msgstr "Sua organização gerencia o Daily Brief."
 msgid "Your organization's projects, summed over every member, for the selected period"
 msgstr "Os projetos da sua organização, somados entre todos os membros, para o período selecionado"
 
-#: src/features/home/components/home-page.tsx:144
+#: src/features/home/components/home-page.tsx:147
 msgid "Your overview could not be loaded."
 msgstr "Não foi possível carregar sua visão geral."
 

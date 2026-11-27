@@ -110,7 +110,7 @@ const NotificationList: FC<NotificationListProps> = ({ emptyLabel, items, onOpen
                             <span className={cn("block text-sm", item.read ? "text-muted-foreground" : "text-foreground font-medium")}>{headline(item)}</span>
                             <span className="text-muted-foreground block truncate text-xs">{item.title}</span>
                             {item.body && <span className="text-muted-foreground mt-0.5 line-clamp-3 block text-xs whitespace-pre-line">{item.body}</span>}
-                            <span className="text-muted-foreground/80 mt-0.5 block text-[11px]">
+                            <span className="text-muted-foreground mt-0.5 block text-[11px]">
                                 <time dateTime={new Date(item.createdAt).toISOString()}>{time}</time>
                                 {!item.read && <span className="sr-only">{t`, unread`}</span>}
                             </span>

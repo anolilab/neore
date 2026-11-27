@@ -7,8 +7,8 @@ const SkillHeader = () => {
 
     return (
         <div className="space-y-1">
-            <h1 className="text-2xl font-bold tracking-tight">{t`Skills`}</h1>
-            <p className="text-muted-foreground">{t`Manage your automation skills. Create custom workflows, import from GitHub, or install from the official catalog. Use them via slash commands.`}</p>
+            <h1 className="text-xl font-semibold tracking-tight">{t`Skills`}</h1>
+            <p className="text-muted-foreground max-w-3xl text-sm text-pretty">{t`Manage your automation skills. Create custom workflows, import from GitHub, or install from the official catalog. Use them via slash commands.`}</p>
         </div>
     );
 };

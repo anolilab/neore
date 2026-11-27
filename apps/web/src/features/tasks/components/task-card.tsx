@@ -48,7 +48,7 @@ const TaskCard = ({
     const { title } = task;
 
     return (
-        <article aria-label={title} className="bg-card border-border space-y-2 rounded-lg border p-3 text-sm shadow-xs">
+        <article aria-label={title} className="surface-raised space-y-2 rounded-lg p-3 text-sm">
             <div className="flex items-start justify-between gap-2">
                 <h3 className="min-w-0 font-medium">
                     <button className="text-left break-words hover:underline focus-visible:underline" onClick={onOpen} type="button">

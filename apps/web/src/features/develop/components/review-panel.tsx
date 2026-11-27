@@ -191,7 +191,7 @@ const ReviewPanel = ({
     const commentCount = stored?.comments.length ?? 0;
 
     return (
-        <section aria-labelledby={`${summaryId}-title`} className="space-y-3 rounded-md border p-3">
+        <section aria-labelledby={`${summaryId}-title`} className="surface-raised space-y-3 rounded-xl p-4">
             <h3 className="text-sm font-semibold" id={`${summaryId}-title`}>
                 {t`Your review`}
             </h3>

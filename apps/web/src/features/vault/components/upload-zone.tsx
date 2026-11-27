@@ -104,7 +104,7 @@ const VaultUploadZone = ({ children, onUpload }: Properties) => {
             <div className="pointer-events-none absolute top-0 right-0 left-0 z-[51] h-full w-full">
                 <div
                     className={cn(
-                        "bg-background flex h-full w-full items-center justify-center text-center dark:bg-[#1A1A1A]",
+                        "bg-surface-main flex h-full w-full items-center justify-center rounded-xl text-center",
                         isDragActive ? "visible" : "invisible",
                     )}
                 >
@@ -118,7 +118,7 @@ const VaultUploadZone = ({ children, onUpload }: Properties) => {
                             </Trans>
                         </p>
 
-                        <span className="text-xs text-[#878787]">
+                        <span className="text-muted-foreground text-xs">
                             <Trans>Max file size 5MB</Trans>
                         </span>
                     </div>

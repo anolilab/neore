@@ -148,7 +148,7 @@ const ChecksTab = ({
                     {t`Showing ${list.length} of ${plural(total, { one: "# check", other: "# checks" })}.`}
                 </p>
             )}
-            <ul className="rounded-md border">
+            <ul className="surface-raised overflow-hidden rounded-xl">
                 {list.map((check, index) => {
                     const href = safeExternalUrl(check.url);
                     const checkId = check.id;
@@ -157,7 +157,7 @@ const ChecksTab = ({
                         // A check name is not unique across runs and statuses, so the position keeps the key stable.
 
                         // eslint-disable-next-line react-x/no-array-index-key
-                        <li className="flex items-center gap-3 border-b px-3 py-2 text-sm last:border-b-0" key={`${check.name}-${index}`}>
+                        <li className="border-border/50 flex items-center gap-3 border-b px-4 py-2.5 text-sm last:border-b-0" key={`${check.name}-${index}`}>
                             <Badge variant={VARIANT[check.state]}>{labels[check.state]}</Badge>
                             {href ? (
                                 <a className="min-w-0 flex-1 truncate hover:underline" href={href} rel="noopener noreferrer" target="_blank">

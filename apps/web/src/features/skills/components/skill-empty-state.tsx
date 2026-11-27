@@ -20,12 +20,12 @@ const SkillEmptyState = ({ isLoggedIn, onCreateSkill, skillCount }: SkillEmptySt
     const { t } = useLingui();
 
     return (
-        <div className="flex h-96 flex-col items-center justify-center gap-4 rounded-lg border border-dashed p-8 text-center">
-            <div className="bg-muted flex size-16 items-center justify-center rounded-full">
-                <Zap className="text-muted-foreground size-8" />
+        <div className="surface-raised flex min-h-80 flex-col items-center justify-center gap-4 rounded-xl p-8 text-center">
+            <div className="surface-well flex size-12 items-center justify-center rounded-xl">
+                <Zap aria-hidden="true" className="text-muted-foreground size-6" />
             </div>
             <div className="space-y-2">
-                <h3 className="text-lg font-semibold">{t`No skills yet`}</h3>
+                <h2 className="text-[15px] font-semibold">{t`No skills yet`}</h2>
                 <p className="text-muted-foreground max-w-sm text-sm">
                     {t`Create your first skill to automate workflows. Import from GitHub, upload SKILL.md files, or install from the official catalog.`}
                 </p>

@@ -136,9 +136,9 @@ const PagesSidebar: FC = () => {
     };
 
     return (
-        <aside aria-label={t`Pages`} className="flex h-full w-64 shrink-0 flex-col border-r">
+        <aside aria-label={t`Pages`} className="bg-background border-border/50 flex h-full w-64 shrink-0 flex-col border-r">
             <div className="flex items-center justify-between gap-2 px-3 pt-3 pb-2">
-                <h2 className="text-sm font-semibold">{t`Pages`}</h2>
+                <h2 className="text-[15px] font-semibold">{t`Pages`}</h2>
                 <Button
                     aria-label={t`New page`}
                     disabled={createPage.isPending}
@@ -174,7 +174,7 @@ const PagesSidebar: FC = () => {
                                 {(results ?? []).map((result) => (
                                     <li key={result._id}>
                                         <Link
-                                            className="hover:bg-sidebar-accent/60 block rounded-md px-2 py-1.5"
+                                            className="hover:bg-surface-row-hover block rounded-lg px-2 py-1.5"
                                             params={{ pageId: result._id }}
                                             to="/pages/$pageId"
                                         >
@@ -189,7 +189,7 @@ const PagesSidebar: FC = () => {
                         <>
                             {favorites.length > 0 && (
                                 <nav aria-label={t`Favorite pages`}>
-                                    <h3 className="text-muted-foreground flex items-center gap-1 px-2 pb-1 text-xs font-medium">
+                                    <h3 className="text-muted-foreground flex items-center gap-1 px-2 pb-1 font-mono text-xs">
                                         <Star aria-hidden="true" className="size-3" />
                                         {t`Favorites`}
                                     </h3>
@@ -198,7 +198,7 @@ const PagesSidebar: FC = () => {
                                             <li key={page._id}>
                                                 <Link
                                                     aria-current={activePageId === page._id ? "page" : undefined}
-                                                    className="hover:bg-sidebar-accent/60 aria-[current=page]:bg-sidebar-accent flex items-center gap-1.5 rounded-md px-2 py-1 text-sm"
+                                                    className="hover:bg-surface-row-hover aria-[current=page]:bg-surface-row-active flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm"
                                                     params={{ pageId: page._id }}
                                                     to="/pages/$pageId"
                                                 >
@@ -213,7 +213,7 @@ const PagesSidebar: FC = () => {
                                 </nav>
                             )}
                             <nav aria-label={t`Your pages`}>
-                                <h3 className="text-muted-foreground px-2 pb-1 text-xs font-medium">{t`Private`}</h3>
+                                <h3 className="text-muted-foreground px-2 pb-1 font-mono text-xs">{t`Private`}</h3>
                                 {tree && nodes.length === 0 && <p className="text-muted-foreground px-2 text-xs">{t`No pages yet.`}</p>}
                                 <ul
                                     // Dropping on the list itself (below the last row) moves to the top level, at the end.
@@ -250,7 +250,7 @@ const PagesSidebar: FC = () => {
                             </nav>
                             {(tree?.shared.length ?? 0) > 0 && (
                                 <nav aria-label={t`Pages shared with you`}>
-                                    <h3 className="text-muted-foreground flex items-center gap-1 px-2 pb-1 text-xs font-medium">
+                                    <h3 className="text-muted-foreground flex items-center gap-1 px-2 pb-1 font-mono text-xs">
                                         <Users aria-hidden="true" className="size-3" />
                                         {t`Shared with me`}
                                     </h3>
@@ -259,7 +259,7 @@ const PagesSidebar: FC = () => {
                                             <li key={page._id}>
                                                 <Link
                                                     aria-current={activePageId === page._id ? "page" : undefined}
-                                                    className="hover:bg-sidebar-accent/60 aria-[current=page]:bg-sidebar-accent flex items-center gap-1.5 rounded-md px-2 py-1 text-sm"
+                                                    className="hover:bg-surface-row-hover aria-[current=page]:bg-surface-row-active flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm"
                                                     params={{ pageId: page._id }}
                                                     to="/pages/$pageId"
                                                 >

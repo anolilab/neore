@@ -20,7 +20,7 @@ const HostDetails: FC<{ host: CodeHost; now: number }> = ({ host, now }) => {
 
     return (
         <div className="space-y-4 p-4">
-            <h2 className="text-lg font-semibold">{host.name}</h2>
+            <h2 className="text-[15px] font-semibold">{host.name}</h2>
             <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
                 <dt className="text-muted-foreground">
                     <Trans>Platform</Trans>

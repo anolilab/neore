@@ -57,10 +57,10 @@ const MarketplaceCard = ({ onOpen, skill }: { onOpen: (id: Id<"skills">) => void
 
     return (
         <li>
-            <Card className="focus-within:ring-ring relative h-full transition-shadow focus-within:shadow-md focus-within:ring-2 hover:shadow-md">
+            <Card className="focus-within:outline-ring relative h-full focus-within:outline-2">
                 <CardHeader className="space-y-2 pb-3">
                     <div className="flex items-center gap-2">
-                        <div aria-hidden="true" className="bg-primary/10 text-primary-text flex size-8 shrink-0 items-center justify-center rounded-md">
+                        <div aria-hidden="true" className="surface-well text-primary-text flex size-8 shrink-0 items-center justify-center rounded-lg">
                             {skill.icon || <Zap className="size-4" />}
                         </div>
                         <div className="min-w-0">
@@ -82,7 +82,7 @@ const MarketplaceCard = ({ onOpen, skill }: { onOpen: (id: Id<"skills">) => void
                 <CardContent className="flex flex-wrap items-center gap-2 pt-0 text-xs">
                     {skill.category && <Badge variant="secondary">{skill.category}</Badge>}
                     <span className="text-muted-foreground inline-flex items-center gap-1">
-                        <Star aria-hidden="true" className="size-3 fill-amber-400 text-amber-400" />
+                        <Star aria-hidden="true" className="fill-warning text-warning size-3" />
                         {skill.ratingCount > 0 ? t`${formatRating(skill.rating)} (${skill.ratingCount})` : t`Not rated`}
                     </span>
                     <span className="text-muted-foreground">{t`${skill.usageCount} uses`}</span>
@@ -200,7 +200,7 @@ const SkillMarketplace = ({ onForked }: SkillMarketplaceProps) => {
             )}
 
             {skills && skills.length === 0 && (
-                <div className="flex h-64 flex-col items-center justify-center gap-2 rounded-lg border border-dashed p-6 text-center">
+                <div className="surface-raised flex h-64 flex-col items-center justify-center gap-2 rounded-xl p-6 text-center">
                     <Store aria-hidden="true" className="text-muted-foreground size-8" />
                     <p className="text-muted-foreground text-sm">
                         {isSearching ? t`No public skills match your search.` : t`No public skills yet. Publish one by setting a skill's visibility to Public.`}

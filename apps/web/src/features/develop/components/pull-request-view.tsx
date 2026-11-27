@@ -104,7 +104,7 @@ const PullRequestView = ({
                     {t`${detail.authorLogin} wants to merge ${plural(detail.commitCount, { one: "# commit", other: "# commits" })} into ${detail.baseBranch} from ${detail.headBranch}`}
                 </p>
                 <p className="text-sm">
-                    <span className="font-mono text-emerald-600 dark:text-emerald-400">+{detail.additions}</span>{" "}
+                    <span className="text-success-foreground font-mono">+{detail.additions}</span>{" "}
                     <span className="font-mono text-red-600 dark:text-red-400">−{detail.deletions}</span>{" "}
                     <span className="text-muted-foreground">{t`in ${plural(detail.changedFiles, { one: "# file", other: "# files" })}`}</span>
                 </p>

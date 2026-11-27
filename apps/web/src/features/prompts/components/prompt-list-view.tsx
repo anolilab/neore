@@ -76,7 +76,7 @@ const PromptListView = ({ onDelete, onDeleteMany, onEdit, onOptimize, onToggleFa
                 cell: ({ row }) => {
                     const prompt = row.original;
 
-                    return prompt.isFavorite ? <Star className="size-4 fill-current text-yellow-500" /> : null;
+                    return prompt.isFavorite ? <Star className="fill-warning text-warning size-4" /> : null;
                 },
                 enableResizing: false,
                 header: "",
@@ -91,7 +91,7 @@ const PromptListView = ({ onDelete, onDeleteMany, onEdit, onOptimize, onToggleFa
                     return (
                         <div className="flex items-center gap-2">
                             <span className="font-medium">{prompt.name}</span>
-                            {prompt.isFavorite && <Star className="size-3 fill-current text-yellow-500" />}
+                            {prompt.isFavorite && <Star className="fill-warning text-warning size-3" />}
                         </div>
                     );
                 },

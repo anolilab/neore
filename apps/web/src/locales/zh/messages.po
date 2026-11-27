@@ -382,7 +382,7 @@ msgid "{0, plural, one {# prompt found} other {# prompts found}}"
 msgstr "{0, plural, other {找到 # 条提示词}}"
 
 #. placeholder {0}: selectedPromptIds.size
-#: src/features/prompts/components/prompt-list.tsx:626
+#: src/features/prompts/components/prompt-list.tsx:628
 msgid "{0, plural, one {# prompt selected} other {# prompts selected}}"
 msgstr "{0, plural, other {已选择 # 个提示词}}"
 
@@ -645,7 +645,7 @@ msgid "{0} eligible · {1} deleted · {2}ms"
 msgstr "{0} 个符合条件 · 已删除 {1} 个 · {2}ms"
 
 #. placeholder {0}: progress.failed
-#: src/features/tasks/components/goal-list.tsx:47
+#: src/features/tasks/components/goal-list.tsx:44
 msgid "{0} failed"
 msgstr "{0} 个失败"
 
@@ -761,7 +761,7 @@ msgstr "已导入 {0}/{1} 个对话"
 
 #. placeholder {0}: progress.done
 #. placeholder {1}: progress.total
-#: src/features/tasks/components/goal-list.tsx:64
+#: src/features/tasks/components/goal-list.tsx:61
 msgid "{0} of {1} tasks done"
 msgstr "已完成 {0}/{1} 个任务"
 
@@ -813,7 +813,7 @@ msgid "{0} times"
 msgstr "{0} 次"
 
 #. placeholder {0}: progress.needsReview
-#: src/features/tasks/components/goal-list.tsx:46
+#: src/features/tasks/components/goal-list.tsx:43
 msgid "{0} to review"
 msgstr "{0} 个待审核"
 
@@ -839,7 +839,7 @@ msgid "{0} tools: {1}"
 msgstr "{0} 个工具：{1}"
 
 #. placeholder {0}: overview.unreadCount
-#: src/features/home/components/home-page.tsx:223
+#: src/features/home/components/home-page.tsx:226
 msgid "{0} unread"
 msgstr "{0} 条未读"
 
@@ -2021,7 +2021,7 @@ msgstr "内置工具用其名称，服务器的工具用 server:tool，整个服
 msgid "a change is waiting to be read"
 msgstr "有变更等待查看"
 
-#: src/features/home/components/home-page.tsx:172
+#: src/features/home/components/home-page.tsx:175
 msgid "A chat is waiting for your answer"
 msgstr "有一个对话在等待你的回复"
 
@@ -2511,7 +2511,7 @@ msgid "Actions for project {0}"
 msgstr "项目 {0} 的操作"
 
 #. placeholder {0}: prompt.name
-#: src/features/prompts/components/prompt-item.tsx:168
+#: src/features/prompts/components/prompt-item.tsx:164
 msgid "Actions for prompt {0}"
 msgstr "提示词 {0} 的操作"
 
@@ -2893,7 +2893,7 @@ msgstr "添加标题文字"
 msgid "Add to favorites"
 msgstr "添加到收藏"
 
-#: src/features/prompts/components/prompt-item.tsx:218
+#: src/features/prompts/components/prompt-item.tsx:214
 #: src/features/prompts/components/prompt-list-view.tsx:222
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:878
 msgid "Add to Favorites"
@@ -3534,7 +3534,7 @@ msgstr "垂直对齐（V）"
 #: src/features/settings/components/chat/models-settings.tsx:440
 #: src/features/settings/components/chat/models-settings.tsx:461
 #: src/features/settings/connectors/connectors-page.tsx:63
-#: src/routes/(chat)/workflow/gallery.tsx:20
+#: src/routes/(chat)/workflow/gallery.tsx:19
 msgid "All"
 msgstr "全部"
 
@@ -3575,7 +3575,7 @@ msgstr "所有分类"
 msgid "All changes saved"
 msgstr "所有更改已保存"
 
-#: src/features/home/components/home-page.tsx:243
+#: src/features/home/components/home-page.tsx:246
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:439
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:442
 msgid "All chats"
@@ -4637,7 +4637,7 @@ msgstr "在不打断回复的情况下提出旁支问题"
 msgid "Ask all models anything..."
 msgstr "向所有模型提问任何问题..."
 
-#: src/features/home/components/home-page.tsx:94
+#: src/features/home/components/home-page.tsx:97
 msgid "Ask anything to start a new chat…"
 msgstr "输入任何问题来开始新对话…"
 
@@ -4800,7 +4800,7 @@ msgstr "奥克兰"
 #: src/features/workflow/components/gallery/gallery-card.tsx:25
 #: src/features/workflow/components/gallery/publish-dialog.tsx:31
 #: src/features/workflow/components/template-picker.tsx:18
-#: src/routes/(chat)/workflow/gallery.tsx:24
+#: src/routes/(chat)/workflow/gallery.tsx:23
 msgid "Audio"
 msgstr "音频"
 
@@ -5002,7 +5002,7 @@ msgstr "自动化"
 #: src/features/workflow/components/gallery/gallery-card.tsx:26
 #: src/features/workflow/components/gallery/publish-dialog.tsx:32
 #: src/features/workflow/components/template-picker.tsx:19
-#: src/routes/(chat)/workflow/gallery.tsx:25
+#: src/routes/(chat)/workflow/gallery.tsx:24
 msgid "Automation"
 msgstr "自动化"
 
@@ -5111,7 +5111,7 @@ msgstr "返回图库"
 msgid "Back to settings sections"
 msgstr "返回设置分区"
 
-#: src/routes/(chat)/workflow/gallery.tsx:95
+#: src/routes/(chat)/workflow/gallery.tsx:94
 msgid "Back to workflows"
 msgstr "返回工作流"
 
@@ -5753,7 +5753,7 @@ msgstr "浏览"
 msgid "Browse and restore previous versions of your workflow."
 msgstr "浏览并恢复工作流的历史版本。"
 
-#: src/routes/(chat)/workflow/gallery.tsx:103
+#: src/routes/(chat)/workflow/gallery.tsx:102
 msgid "Browse, fork, and remix workflows shared by the community"
 msgstr "浏览、复刻并改编社区分享的工作流"
 
@@ -6246,7 +6246,7 @@ msgstr "取消或关闭"
 msgid "Cancel run"
 msgstr "取消运行"
 
-#: src/features/prompts/components/prompt-list.tsx:583
+#: src/features/prompts/components/prompt-list.tsx:585
 msgid "Cancel Selection"
 msgstr "取消选择"
 
@@ -7099,7 +7099,7 @@ msgstr "清理失败"
 #: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:254
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:98
 #: src/features/chat/thread/media-gallery-view.tsx:382
-#: src/features/prompts/components/prompt-list.tsx:614
+#: src/features/prompts/components/prompt-list.tsx:616
 #: src/features/settings/components/chat/api-keys-settings.tsx:382
 #: src/features/settings/components/chat/models-settings.tsx:474
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:370
@@ -7159,7 +7159,7 @@ msgid "Clear selection"
 msgstr "清除选择"
 
 #: src/features/prompts/components/prompt-list-view.tsx:292
-#: src/features/prompts/components/prompt-list.tsx:636
+#: src/features/prompts/components/prompt-list.tsx:638
 msgid "Clear Selection"
 msgstr "清除选择"
 
@@ -7762,7 +7762,7 @@ msgstr "提交将使用你的姓名和电子邮件，并将 Neore Agent 列为�
 msgid "Communication"
 msgstr "沟通"
 
-#: src/routes/(chat)/workflow/gallery.tsx:100
+#: src/routes/(chat)/workflow/gallery.tsx:99
 #: src/routes/(chat)/workflow/index.tsx:47
 msgid "Community Gallery"
 msgstr "社区画廊"
@@ -8789,7 +8789,7 @@ msgstr "已复制到剪贴板"
 #: src/components/copy-button.tsx:50
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:95
 #: src/features/chat/thread/message-item.tsx:357
-#: src/features/prompts/components/prompt-item.tsx:261
+#: src/features/prompts/components/prompt-item.tsx:256
 msgid "Copied!"
 msgstr "已复制！"
 
@@ -8866,8 +8866,7 @@ msgstr "复制对象"
 msgid "Copy prompt"
 msgstr "复制提示词"
 
-#: src/features/prompts/components/prompt-item.tsx:240
-#: src/features/prompts/components/prompt-item.tsx:266
+#: src/features/prompts/components/prompt-item.tsx:261
 msgid "Copy Prompt"
 msgstr "复制提示词"
 
@@ -8926,7 +8925,7 @@ msgstr "请立即复制此密钥并保存到你的 Webhook 发送方。之后将
 msgid "Copy to clipboard"
 msgstr "复制到剪贴板"
 
-#: src/features/prompts/components/prompt-item.tsx:189
+#: src/features/prompts/components/prompt-item.tsx:185
 #: src/features/prompts/components/prompt-list-view.tsx:204
 msgid "Copy to Clipboard"
 msgstr "复制到剪贴板"
@@ -9851,7 +9850,7 @@ msgstr "创建团队，将成员分组管理"
 msgid "Create Trigger"
 msgstr "创建触发器"
 
-#: src/routes/(chat)/workflow/index.tsx:65
+#: src/routes/(chat)/workflow/index.tsx:66
 msgid "Create Workflow"
 msgstr "创建工作流"
 
@@ -9871,7 +9870,7 @@ msgstr "创建你的第一个技能来自动化工作流。可以从 GitHub 导�
 msgid "Create your first trigger to automate agent execution on a schedule or via webhooks."
 msgstr "创建你的第一个触发器，通过计划或 Webhook 自动执行智能体。"
 
-#: src/routes/(chat)/workflow/index.tsx:62
+#: src/routes/(chat)/workflow/index.tsx:63
 msgid "Create your first workflow to automate AI tasks visually."
 msgstr "创建你的第一个工作流，可视化地自动化 AI 任务。"
 
@@ -10688,7 +10687,7 @@ msgstr "委派的{0}工作在此模型上运行。"
 #: src/features/local-models/components/ollama-model-manager.tsx:336
 #: src/features/pages/components/page-tree-item.tsx:174
 #: src/features/pages/components/pages-sidebar.tsx:281
-#: src/features/prompts/components/prompt-item.tsx:228
+#: src/features/prompts/components/prompt-item.tsx:224
 #: src/features/prompts/components/prompt-list-view.tsx:227
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:751
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:890
@@ -10697,7 +10696,7 @@ msgstr "委派的{0}工作在此模型上运行。"
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:334
 #: src/features/settings/components/chat/trigger-settings.tsx:1088
 #: src/features/skills/components/skill-list.tsx:311
-#: src/features/tasks/components/goal-list.tsx:54
+#: src/features/tasks/components/goal-list.tsx:51
 #: src/features/tasks/components/task-card.tsx:113
 #: src/features/tasks/components/tasks-page.tsx:330
 #: src/features/vault/components/site-logins.tsx:655
@@ -10809,7 +10808,7 @@ msgstr "删除文件"
 msgid "Delete goal \"{deleteTitle}\"?"
 msgstr "删除目标“{deleteTitle}”？"
 
-#: src/features/tasks/components/goal-list.tsx:54
+#: src/features/tasks/components/goal-list.tsx:51
 msgid "Delete goal {title}"
 msgstr "删除目标 {title}"
 
@@ -10872,7 +10871,7 @@ msgstr "删除预设？"
 msgid "Delete Project"
 msgstr "删除项目"
 
-#: src/features/prompts/components/prompt-item.tsx:308
+#: src/features/prompts/components/prompt-item.tsx:303
 #: src/features/prompts/components/prompt-list-view.tsx:316
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:972
 msgid "Delete Prompt"
@@ -10904,7 +10903,7 @@ msgstr "删除所选内容"
 
 #: ../../packages/ui/src/components/canvas-editor/fabric-canvas-editor.tsx:624
 #: src/features/prompts/components/prompt-list-view.tsx:288
-#: src/features/prompts/components/prompt-list.tsx:632
+#: src/features/prompts/components/prompt-list.tsx:634
 msgid "Delete Selected"
 msgstr "删除所选"
 
@@ -11883,7 +11882,7 @@ msgstr "下载会打开 GitHub 发布页面。如果页面上还没有安装包�
 
 #: src/features/chat/link-preview/link-preview-card.tsx:117
 #: src/features/chat/thread-list/thread-node.tsx:894
-#: src/features/develop/components/inbox-list.tsx:118
+#: src/features/develop/components/inbox-list.tsx:119
 #: src/features/develop/components/pull-request-view.tsx:83
 #: src/features/skills/components/skill-builder-review.tsx:133
 msgid "Draft"
@@ -12229,11 +12228,11 @@ msgstr "边缘引导生成"
 #: src/features/chat/thread/message-item.tsx:397
 #: src/features/develop/components/draft-comment-card.tsx:51
 #: src/features/pages/components/page-version-panel.tsx:50
-#: src/features/prompts/components/prompt-item.tsx:212
+#: src/features/prompts/components/prompt-item.tsx:208
 #: src/features/prompts/components/prompt-list-view.tsx:218
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:730
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:869
-#: src/features/tasks/components/goal-list.tsx:51
+#: src/features/tasks/components/goal-list.tsx:48
 #: src/features/tasks/components/task-card.tsx:110
 #: src/features/workflow/components/version-history.tsx:67
 msgid "Edit"
@@ -12296,7 +12295,7 @@ msgstr "编辑摘录"
 msgid "Edit goal"
 msgstr "编辑目标"
 
-#: src/features/tasks/components/goal-list.tsx:51
+#: src/features/tasks/components/goal-list.tsx:48
 msgid "Edit goal {title}"
 msgstr "编辑目标 {title}"
 
@@ -12347,8 +12346,8 @@ msgid "Edit Project"
 msgstr "编辑项目"
 
 #: src/features/prompts/components/prompt-form-dialog.tsx:237
+#: src/features/prompts/components/prompt-item.tsx:150
 #: src/features/prompts/components/prompt-item.tsx:154
-#: src/features/prompts/components/prompt-item.tsx:158
 msgid "Edit Prompt"
 msgstr "编辑提示词"
 
@@ -15093,7 +15092,7 @@ msgstr "收藏的页面"
 msgid "Favorites"
 msgstr "收藏"
 
-#: src/routes/(chat)/workflow/gallery.tsx:114
+#: src/routes/(chat)/workflow/gallery.tsx:113
 msgid "Featured"
 msgstr "精选"
 
@@ -15398,7 +15397,7 @@ msgstr "筛选技能"
 msgid "Filter value"
 msgstr "筛选值"
 
-#: src/features/prompts/components/prompt-list.tsx:599
+#: src/features/prompts/components/prompt-list.tsx:601
 msgid "Filter:"
 msgstr "筛选："
 
@@ -17525,7 +17524,7 @@ msgid "Holds until"
 msgstr "有效期至"
 
 #: src/components/error-boundaries/route-error-boundary.tsx:118
-#: src/features/home/components/home-page.tsx:130
+#: src/features/home/components/home-page.tsx:133
 #: src/features/layout/components/sidebar-shortcut.tsx:71
 #: src/features/layout/lib/dashboard-page-names.ts:24
 msgid "Home"
@@ -17810,7 +17809,7 @@ msgstr "插画"
 #: src/features/workflow/templates/index.ts:364
 #: src/features/workflow/types/index.ts:508
 #: src/features/workflow/types/index.ts:512
-#: src/routes/(chat)/workflow/gallery.tsx:21
+#: src/routes/(chat)/workflow/gallery.tsx:20
 msgid "Image"
 msgstr "图像"
 
@@ -20005,7 +20004,7 @@ msgstr "列出所有可用模型及价格"
 msgid "List everything you remember about me from our past conversations and your saved memory. Write one fact per line, in the third person, starting with \"The user\" (for example: \"The user works as a nurse in Hamburg.\"). Where you know when you learned a fact, add the date in brackets at the end of its line. Leave out passwords, keys, account numbers and health details. Write no introduction, headings or comments."
 msgstr "列出你从过往对话和已保存记忆中记得的关于我的所有内容。每行写一条事实，使用第三人称，以“用户”开头（例如：“用户在汉堡担任护士。”）。如果你知道某条事实是何时得知的，请在该行末尾用方括号添加日期。省略密码、密钥、账号和健康信息。不要写引言、标题或注释。"
 
-#: src/features/prompts/components/prompt-list.tsx:560
+#: src/features/prompts/components/prompt-list.tsx:561
 msgid "List view"
 msgstr "列表视图"
 
@@ -20096,7 +20095,7 @@ msgid "Load earlier messages"
 msgstr "加载更早的消息"
 
 #: ../../packages/chat-ui/src/threads/thread-list.tsx:181
-#: src/features/develop/components/inbox-list.tsx:128
+#: src/features/develop/components/inbox-list.tsx:129
 #: src/features/settings/components/chat/mcp/server-catalog.tsx:215
 #: src/features/skills/components/skill-marketplace.tsx:227
 msgid "Load more"
@@ -20131,7 +20130,7 @@ msgstr "已加载 {0}/{1, plural, other {# 个文件}}…"
 
 #: ../../packages/ui/src/components/spinner.tsx:8
 #: src/features/develop/components/develop-page.tsx:28
-#: src/features/develop/components/inbox-list.tsx:86
+#: src/features/develop/components/inbox-list.tsx:87
 #: src/features/develop/components/pull-request-view.tsx:62
 #: src/features/develop/components/watched-repositories.tsx:171
 msgid "Loading"
@@ -20390,7 +20389,7 @@ msgstr "正在加载你的项目…"
 msgid "Loading your messages…"
 msgstr "正在加载你的消息…"
 
-#: src/features/home/components/home-page.tsx:138
+#: src/features/home/components/home-page.tsx:141
 msgid "Loading your overview…"
 msgstr "正在加载概览…"
 
@@ -22144,15 +22143,15 @@ msgstr "Claude 4.x 系列中最实惠的模型"
 msgid "Most capable language model"
 msgstr "最强大的语言模型"
 
-#: src/routes/(chat)/workflow/gallery.tsx:31
+#: src/routes/(chat)/workflow/gallery.tsx:30
 msgid "Most Forked"
 msgstr "复刻最多"
 
-#: src/routes/(chat)/workflow/gallery.tsx:30
+#: src/routes/(chat)/workflow/gallery.tsx:29
 msgid "Most Popular"
 msgstr "最受欢迎"
 
-#: src/routes/(chat)/workflow/gallery.tsx:29
+#: src/routes/(chat)/workflow/gallery.tsx:28
 msgid "Most Recent"
 msgstr "最新"
 
@@ -22637,7 +22636,7 @@ msgstr "待审核"
 #: src/features/chat/browser-live-view/browser-human-check.tsx:496
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:541
 #: src/features/chat/thread-list/section-bar.tsx:46
-#: src/features/home/components/home-page.tsx:165
+#: src/features/home/components/home-page.tsx:168
 msgid "Needs you"
 msgstr "待你处理"
 
@@ -22969,7 +22968,7 @@ msgstr "请输入新密码"
 msgid "New preset"
 msgstr "新建预设"
 
-#: src/features/prompts/components/prompt-list.tsx:589
+#: src/features/prompts/components/prompt-list.tsx:591
 msgid "New Prompt"
 msgstr "新建提示词"
 
@@ -23233,7 +23232,7 @@ msgstr "未选择相机"
 msgid "No cases yet. Add one by hand, import a CSV or JSONL file, or save a chat turn with \"Save as eval case\"."
 msgstr "还没有用例。手动添加一个、导入 CSV 或 JSONL 文件，或用“保存为评测用例”保存一轮聊天。"
 
-#: src/features/home/components/home-page.tsx:250
+#: src/features/home/components/home-page.tsx:253
 msgid "No chats yet. Start one above."
 msgstr "还没有对话，在上方开始一个吧。"
 
@@ -23627,7 +23626,7 @@ msgstr "无提示词"
 msgid "No prompts found matching \"{searchQuery}\""
 msgstr "未找到与“{searchQuery}”匹配的提示词"
 
-#: src/features/prompts/components/prompt-list.tsx:645
+#: src/features/prompts/components/prompt-list.tsx:647
 msgid "No prompts found matching your search."
 msgstr "未找到与搜索匹配的提示词。"
 
@@ -23840,7 +23839,7 @@ msgstr "没有工具。"
 msgid "No triggers yet"
 msgstr "还没有触发器"
 
-#: src/features/home/components/home-page.tsx:230
+#: src/features/home/components/home-page.tsx:233
 msgid "No unread notifications."
 msgstr "没有未读通知。"
 
@@ -23886,7 +23885,7 @@ msgstr "还没有视频"
 msgid "No workflows found"
 msgstr "未找到工作流"
 
-#: src/routes/(chat)/workflow/index.tsx:61
+#: src/routes/(chat)/workflow/index.tsx:62
 msgid "No workflows yet"
 msgstr "还没有工作流"
 
@@ -24108,7 +24107,7 @@ msgstr "未找到结果"
 msgid "Nothing has run on a device yet."
 msgstr "尚未在任何设备上运行过操作。"
 
-#: src/features/develop/components/inbox-list.tsx:94
+#: src/features/develop/components/inbox-list.tsx:95
 msgid "Nothing here."
 msgstr "这里没有内容。"
 
@@ -24116,7 +24115,7 @@ msgstr "这里没有内容。"
 msgid "Nothing is listening at that address. Start Ollama or LM Studio's server, check the port, and make sure the URL ends in /v1."
 msgstr "该地址上没有服务在监听。请启动 Ollama 或 LM Studio 的服务器，检查端口，并确保 URL 以 /v1 结尾。"
 
-#: src/features/home/components/home-page.tsx:186
+#: src/features/home/components/home-page.tsx:189
 msgid "Nothing is running right now."
 msgstr "当前没有正在运行的内容。"
 
@@ -24124,7 +24123,7 @@ msgstr "当前没有正在运行的内容。"
 msgid "Nothing is saved, installed or enabled until you choose to save."
 msgstr "在你选择保存之前，不会保存、安装或启用任何内容。"
 
-#: src/features/home/components/home-page.tsx:167
+#: src/features/home/components/home-page.tsx:170
 msgid "Nothing is waiting on you."
 msgstr "没有等待你处理的事项。"
 
@@ -24140,7 +24139,7 @@ msgstr "通知"
 msgid "Notification workflows, channels, and recipient preferences"
 msgstr "通知工作流、渠道和收件人偏好"
 
-#: src/features/home/components/home-page.tsx:227
+#: src/features/home/components/home-page.tsx:230
 #: src/features/notifications/components/notification-bell.tsx:72
 #: src/features/notifications/components/notification-bell.tsx:102
 #: src/features/notifications/components/notification-settings.tsx:251
@@ -25350,7 +25349,7 @@ msgstr "优化系统提示词"
 msgid "Optimize thread system prompt"
 msgstr "优化对话系统提示词"
 
-#: src/features/prompts/components/prompt-item.tsx:196
+#: src/features/prompts/components/prompt-item.tsx:192
 #: src/features/prompts/components/prompt-list-view.tsx:209
 msgid "Optimize with AI"
 msgstr "用 AI 优化"
@@ -25785,7 +25784,7 @@ msgstr "页面：{0}"
 #: src/features/layout/components/sidebar-shortcut.tsx:125
 #: src/features/pages/components/pages-sidebar.tsx:139
 #: src/features/pages/components/pages-sidebar.tsx:141
-#: src/routes/_shortcut/pages/index.tsx:11
+#: src/routes/_shortcut/pages/index.tsx:13
 msgid "Pages"
 msgstr "页面"
 
@@ -26339,7 +26338,7 @@ msgstr "选择一个托管方或拉取请求"
 msgid "Pick a model to evaluate."
 msgstr "选择要评测的模型。"
 
-#: src/routes/_shortcut/pages/index.tsx:12
+#: src/routes/_shortcut/pages/index.tsx:14
 msgid "Pick a page on the left, or create one with the + button."
 msgstr "在左侧选择一个页面，或点击 + 按钮新建一个。"
 
@@ -27827,9 +27826,9 @@ msgstr "排队消息"
 msgid "Queue message — sends when the current reply finishes"
 msgstr "排队消息——当前回复完成后发送"
 
-#: src/features/home/components/home-page.tsx:113
-#: src/features/home/components/home-page.tsx:190
-#: src/features/home/components/home-page.tsx:198
+#: src/features/home/components/home-page.tsx:116
+#: src/features/home/components/home-page.tsx:193
+#: src/features/home/components/home-page.tsx:201
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:63
 #: src/features/sub-agents/components/worker-list.tsx:104
 #: src/features/sub-agents/components/worker-run-log.tsx:29
@@ -28354,7 +28353,7 @@ msgstr "变基并合并"
 msgid "Recent"
 msgstr "最近"
 
-#: src/features/home/components/home-page.tsx:247
+#: src/features/home/components/home-page.tsx:250
 msgid "Recent chats"
 msgstr "最近的对话"
 
@@ -28915,7 +28914,7 @@ msgstr "移除筛选（聚焦时）"
 msgid "Remove from favorites"
 msgstr "从收藏中移除"
 
-#: src/features/prompts/components/prompt-item.tsx:218
+#: src/features/prompts/components/prompt-item.tsx:214
 #: src/features/prompts/components/prompt-list-view.tsx:222
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:739
 msgid "Remove from Favorites"
@@ -29606,7 +29605,7 @@ msgstr "带备注重试"
 msgid "Retrying now"
 msgstr "正在重试"
 
-#: src/features/home/components/home-page.tsx:154
+#: src/features/home/components/home-page.tsx:157
 msgid "Retrying…"
 msgstr "正在重试…"
 
@@ -29682,7 +29681,7 @@ msgid "Review submitted"
 msgstr "审查已提交"
 
 #. placeholder {0}: task.title
-#: src/features/home/components/home-page.tsx:177
+#: src/features/home/components/home-page.tsx:180
 msgid "Review task: {0}"
 msgstr "审阅任务：{0}"
 
@@ -30029,10 +30028,10 @@ msgstr "运行你的工作流后，可在此查看执行历史。"
 #: src/features/chat/thread/host-activity.tsx:142
 #: src/features/evals/components/run-detail.tsx:28
 #: src/features/evals/components/run-status.tsx:16
-#: src/features/home/components/home-page.tsx:116
-#: src/features/home/components/home-page.tsx:184
-#: src/features/home/components/home-page.tsx:190
-#: src/features/home/components/home-page.tsx:198
+#: src/features/home/components/home-page.tsx:119
+#: src/features/home/components/home-page.tsx:187
+#: src/features/home/components/home-page.tsx:193
+#: src/features/home/components/home-page.tsx:201
 #: src/features/settings/components/chat/trigger-settings.tsx:184
 #: src/features/tasks/components/task-detail-dialog.tsx:138
 #: src/features/tasks/components/task-status.tsx:20
@@ -30769,7 +30768,7 @@ msgstr "搜索对话、导航或执行操作..."
 msgid "Search variables..."
 msgstr "搜索变量..."
 
-#: src/routes/(chat)/workflow/gallery.tsx:129
+#: src/routes/(chat)/workflow/gallery.tsx:128
 msgid "Search workflows..."
 msgstr "搜索工作流..."
 
@@ -30883,7 +30882,7 @@ msgstr "种子"
 #: ../../packages/ui/src/components/data-grid/data-grid-column-header.tsx:30
 #: src/features/chat/forward/select-messages-action.tsx:29
 #: src/features/chat/thread-list/thread-node.tsx:769
-#: src/features/prompts/components/prompt-list.tsx:583
+#: src/features/prompts/components/prompt-list.tsx:585
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:220
 msgid "Select"
 msgstr "选择"
@@ -31723,7 +31722,7 @@ msgstr "显示全部"
 msgid "Show all {lines} lines"
 msgstr "显示全部 {lines} 行"
 
-#: src/features/tasks/components/goal-list.tsx:73
+#: src/features/tasks/components/goal-list.tsx:70
 msgid "Show all tasks"
 msgstr "显示所有任务"
 
@@ -31813,7 +31812,7 @@ msgstr "显示运行历史"
 msgid "Show source"
 msgstr "显示源码"
 
-#: src/features/tasks/components/goal-list.tsx:73
+#: src/features/tasks/components/goal-list.tsx:70
 msgid "Show this goal's tasks"
 msgstr "显示此目标的任务"
 
@@ -32540,6 +32539,8 @@ msgid "Sort asc"
 msgstr "升序"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-sort-menu.tsx:157
+#: src/features/prompts/components/prompt-list.tsx:518
+#: src/routes/(chat)/workflow/gallery.tsx:131
 msgid "Sort by"
 msgstr "排序依据"
 
@@ -32984,7 +32985,7 @@ msgstr "开始对话以置顶消息。"
 msgid "Start a conversation, generate images, write a document in canvas, run code — no tab-switching, no copy-pasting between apps."
 msgstr "开始对话、生成图像、在画布中撰写文档、运行代码——无需切换标签页，也无需在应用间复制粘贴。"
 
-#: src/features/home/components/home-page.tsx:83
+#: src/features/home/components/home-page.tsx:86
 msgid "Start a new chat"
 msgstr "开始新对话"
 
@@ -33014,7 +33015,7 @@ msgstr "开始新的临时聊天（{0}）"
 msgid "Start building"
 msgstr "开始构建"
 
-#: src/features/home/components/home-page.tsx:97
+#: src/features/home/components/home-page.tsx:100
 msgid "Start chat"
 msgstr "开始对话"
 
@@ -34633,7 +34634,7 @@ msgstr "文本"
 #: src/features/workflow/components/template-picker.tsx:21
 #: src/features/workflow/types/index.ts:623
 #: src/features/workflow/types/index.ts:627
-#: src/routes/(chat)/workflow/gallery.tsx:22
+#: src/routes/(chat)/workflow/gallery.tsx:21
 msgid "Text"
 msgstr "文本"
 
@@ -36829,7 +36830,7 @@ msgstr "这将永久删除该项目及所有相关对话。此操作无法撤销
 
 #. placeholder {0}: prompt.name
 #. placeholder {0}: promptToDelete?.name
-#: src/features/prompts/components/prompt-item.tsx:300
+#: src/features/prompts/components/prompt-item.tsx:295
 #: src/features/prompts/components/prompt-list-view.tsx:300
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:962
 msgid "This will permanently delete the prompt \"{0}\". This action cannot be undone."
@@ -37682,7 +37683,7 @@ msgstr "尝试调整搜索词。"
 #: src/features/connection/components/offline-screen.tsx:64
 #: src/features/develop/components/files-tab.tsx:400
 #: src/features/develop/components/thread-pull-requests.tsx:325
-#: src/features/home/components/home-page.tsx:154
+#: src/features/home/components/home-page.tsx:157
 #: src/features/projects/components/computer-rule-file-import.tsx:495
 #: src/features/projects/components/project-repo-picker.tsx:190
 #: src/features/projects/components/project-repo-picker.tsx:198
@@ -38286,7 +38287,7 @@ msgstr "在聊天配对之前，机器人只会回复该聊天为私人聊天。
 msgid "Untitled"
 msgstr "无标题"
 
-#: src/features/home/components/home-page.tsx:255
+#: src/features/home/components/home-page.tsx:258
 msgid "Untitled chat"
 msgstr "未命名对话"
 
@@ -38747,11 +38748,11 @@ msgstr "使用绘图"
 msgid "Use five cron fields, e.g. \"0 9 * * 1\" for Mondays at 09:00 UTC"
 msgstr "使用五个 cron 字段，例如“0 9 * * 1”表示每周一 09:00 UTC"
 
-#: src/features/prompts/components/prompt-item.tsx:180
+#: src/features/prompts/components/prompt-item.tsx:176
 msgid "Use in Chat"
 msgstr "在聊天中使用"
 
-#: src/features/prompts/components/prompt-item.tsx:184
+#: src/features/prompts/components/prompt-item.tsx:180
 msgid "Use in Temp Chat"
 msgstr "在临时聊天中使用"
 
@@ -39032,6 +39033,7 @@ msgid "Variables:"
 msgstr "变量："
 
 #: src/features/layout/components/sidebar-shortcut.tsx:141
+#: src/features/vault/components/header.tsx:12
 msgid "Vault"
 msgstr "保险库"
 
@@ -39267,7 +39269,7 @@ msgstr "视频"
 #: src/features/workflow/components/template-picker.tsx:22
 #: src/features/workflow/types/index.ts:660
 #: src/features/workflow/types/index.ts:664
-#: src/routes/(chat)/workflow/gallery.tsx:23
+#: src/routes/(chat)/workflow/gallery.tsx:22
 msgid "Video"
 msgstr "视频"
 
@@ -39424,7 +39426,7 @@ msgstr "查看错误详情"
 msgid "View full docs"
 msgstr "查看完整文档"
 
-#: src/features/prompts/components/prompt-item.tsx:203
+#: src/features/prompts/components/prompt-item.tsx:199
 #: src/features/prompts/components/prompt-list-view.tsx:213
 msgid "View History"
 msgstr "查看历史"
@@ -39769,14 +39771,14 @@ msgid "Waiting for your answer"
 msgstr "正在等待你的回答"
 
 #. placeholder {0}: approval.threadTitle
-#: src/features/home/components/home-page.tsx:172
+#: src/features/home/components/home-page.tsx:175
 msgid "Waiting for your answer in {0}"
 msgstr "正在“{0}”中等待你的回答"
 
 #: src/features/chat/thread-list/thread-node.tsx:824
 #: src/features/chat/thread-list/thread-node.tsx:831
 #: src/features/chat/thread/tool-approval.tsx:78
-#: src/features/home/components/home-page.tsx:116
+#: src/features/home/components/home-page.tsx:119
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:20
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:60
 msgid "Waiting for your approval"
@@ -40046,7 +40048,7 @@ msgstr "什么是画布功能？"
 msgid "What it evaluates"
 msgstr "评测内容"
 
-#: src/features/home/components/home-page.tsx:131
+#: src/features/home/components/home-page.tsx:134
 msgid "What needs you, what's running, and where you left off."
 msgstr "待你处理的事项、正在运行的内容，以及你上次停下的地方。"
 
@@ -41173,7 +41175,7 @@ msgstr "每日简报由你的组织管理。"
 msgid "Your organization's projects, summed over every member, for the selected period"
 msgstr "所选期间内，组织所有成员汇总的项目用量"
 
-#: src/features/home/components/home-page.tsx:144
+#: src/features/home/components/home-page.tsx:147
 msgid "Your overview could not be loaded."
 msgstr "无法加载你的概览。"
 

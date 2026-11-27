@@ -7,7 +7,7 @@ import TasksPage from "@/features/tasks/components/tasks-page";
 export const Route = createFileRoute("/_shortcut/tasks")({
     component: () => (
         <RouteErrorBoundary routeName="/tasks">
-            <ScrollArea className="h-full w-full p-4">
+            <ScrollArea className="h-full w-full p-4 md:p-6">
                 <TasksPage />
             </ScrollArea>
         </RouteErrorBoundary>

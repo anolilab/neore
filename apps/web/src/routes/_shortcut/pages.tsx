@@ -8,9 +8,9 @@ export const Route = createFileRoute("/_shortcut/pages")({
         <RouteErrorBoundary routeName="/pages">
             <div className="flex h-full min-h-0 w-full">
                 <PagesSidebar />
-                <main className="flex min-w-0 flex-1">
+                <div className="flex min-w-0 flex-1">
                     <Outlet />
-                </main>
+                </div>
             </div>
         </RouteErrorBoundary>
     ),

@@ -7,7 +7,7 @@ import SkillsPage from "@/features/skills/components/skills-page";
 export const Route = createFileRoute("/_shortcut/skills")({
     component: () => (
         <RouteErrorBoundary routeName="/skills">
-            <ScrollArea className="h-full w-full p-4">
+            <ScrollArea className="h-full w-full p-4 md:p-6">
                 <SkillsPage />
             </ScrollArea>
         </RouteErrorBoundary>

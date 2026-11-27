@@ -26,32 +26,32 @@ type Properties = {
 const VaultItem = ({ data, small }: Properties) => {
     const getFileIcon = (fileType: string) => {
         if (fileType.startsWith("image/")) {
-            return <FileImage className="h-6 w-6 text-blue-600 dark:text-blue-400" />;
+            return <FileImage className="h-6 w-6" />;
         }
 
         if (fileType.startsWith("video/")) {
-            return <FileVideo className="h-6 w-6 text-red-600 dark:text-red-400" />;
+            return <FileVideo className="h-6 w-6" />;
         }
 
         if (fileType.startsWith("audio/")) {
-            return <FileAudio className="h-6 w-6 text-green-600 dark:text-green-400" />;
+            return <FileAudio className="h-6 w-6" />;
         }
 
         if (fileType === "application/pdf") {
-            return <FileText className="h-6 w-6 text-red-600 dark:text-red-400" />;
+            return <FileText className="h-6 w-6" />;
         }
 
         if (fileType.includes("zip") || fileType.includes("rar")) {
-            return <FileArchive className="h-6 w-6 text-yellow-600 dark:text-yellow-400" />;
+            return <FileArchive className="h-6 w-6" />;
         }
 
-        return <File className="h-6 w-6 text-gray-600 dark:text-gray-400" />;
+        return <File className="h-6 w-6" />;
     };
 
     return (
         <div
             className={cn(
-                "text-muted-foreground hover:bg-muted group relative flex h-72 flex-col gap-3 border p-4 transition-colors duration-200 dark:hover:bg-[#141414]",
+                "text-muted-foreground surface-raised hover:bg-muted/50 group relative flex h-72 flex-col gap-3 rounded-xl p-4 transition-colors duration-200",
                 small && "h-48",
             )}
         >
@@ -63,12 +63,14 @@ const VaultItem = ({ data, small }: Properties) => {
                 {data.fileType.startsWith("image/") && data.url ? (
                     <img alt={data.fileName} className="max-h-full max-w-full rounded-lg object-cover" src={data.url} />
                 ) : (
-                    <div className="rounded-lg bg-gray-100 p-2 dark:bg-gray-800">{getFileIcon(data.fileType)}</div>
+                    <div aria-hidden="true" className="surface-well rounded-lg p-3">
+                        {getFileIcon(data.fileType)}
+                    </div>
                 )}
             </div>
 
             <div className="mt-auto flex flex-col gap-1">
-                <h2 className="text-primary-text line-clamp-1 text-sm">{data.fileName}</h2>
+                <h2 className="text-foreground line-clamp-1 text-sm font-medium">{data.fileName}</h2>
                 <p className="text-muted-foreground text-xs">{formatFileSize(data.fileSize)}</p>
             </div>
         </div>

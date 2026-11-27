@@ -50,7 +50,7 @@ const PullRequestActionsPanel = ({
     }
 
     return (
-        <section aria-labelledby={titleId} className="space-y-3 rounded-md border p-3">
+        <section aria-labelledby={titleId} className="surface-raised space-y-3 rounded-xl p-4">
             <h3 className="text-sm font-semibold" id={titleId}>
                 {`${host.noun.charAt(0).toUpperCase()}${host.noun.slice(1)}`}
             </h3>
