@@ -41,8 +41,8 @@ const HostFork: FC<{ capabilities: CapabilityReportInput | undefined; disabled?:
         networkMode: "always",
         retry: 0,
         onError: (error) => {
-            // A refused fork was taken back, so the next click is a new fork under a new id, not a retry of this one.
-            clientId.current = undefined;
+            // The id stays: a fork that is refused or taken back gave its claim back, so the same id forks again, and one whose answer was
+            // lost (a dropped connection on this long call) is the same fork when it is tried again, not a second one.
             toast.error(getLocalizedError({ error, t }));
         },
         onSuccess: (result) => {

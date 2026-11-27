@@ -17,6 +17,7 @@ import { internalMutation } from "../_generated/server";
 import { insertThread, insertThreadRelationship } from "../agent/table-writes";
 import { stopHostTurn } from "./lib/finish";
 import { claimFence, claimRow, recordClaimResult, releaseClaim } from "../lib/claim-once";
+import { getMaxMessage } from "../agent/messages";
 import { discardNewThread } from "../chat/side-chat";
 import { authAction, authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { MAX_LENGTH } from "../lib/validators";
@@ -315,6 +316,8 @@ const vBegunFork = v.object({
             taintedBy: v.optional(v.array(vDeviceTaintSource)),
         }),
     ),
+    /** Whether the source chat has any message at all: with no settled one to copy up to, that tells a long or still-replying chat from an empty one. */
+    sourceHasMessages: v.optional(v.boolean()),
     started: v.boolean(),
     threadId: v.optional(v.string()),
 });
@@ -392,11 +395,14 @@ export const beginHostFork = internalMutation
 
         ctx.log.event("acp.fork_host_thread", { started: result.started });
 
+        const newest = await getMaxMessage(ctx, thread._id);
+
         // What the copied history carries with it (`/clear`, a handed-over conversation), marked on the new chat after the copy as a side chat does.
         return {
             ...result,
             ...(thread.hasContextReset === true && { hasContextReset: true }),
             ...(thread.hasHandoff === true && { hasHandoff: true }),
+            ...(newest !== null && newest !== undefined && { sourceHasMessages: true }),
             ...(result.started && {
                 open: {
                     agentKey: session.agentKey,
@@ -434,6 +440,37 @@ export const openHostFork = internalMutation
 
         if (!thread || thread.deleted === true || !isHostRunThread(thread) || !device?.encryptedSecret || !offer) {
             throw new LunoraError("BAD_REQUEST", "That agent is not approved for that folder on this computer. Approve it in the desktop app first.");
+        }
+
+        // The history was copied since the fork began, and the source, the caller's membership and the project may have changed meanwhile:
+        // everything a start refuses on is read again here, before anything is queued (the caller takes the new chat back on a refusal).
+        // A source that was locked or trashed after the copy is no source any more, whether or not there was anything to copy.
+        const source = await ctx.db.threads.findFirst({ consistency: "primary", where: { _id: args.forkOfThreadId, userId } });
+
+        if (!source || source.deleted === true || source.deletingAt !== undefined) {
+            throw new LunoraError("NOT_FOUND", "Chat not found");
+        }
+
+        if (isThreadLocked(source)) {
+            throw new LunoraError("FORBIDDEN", "Unlock this chat to fork it.");
+        }
+
+        const refused = await hostOrganizationRefusal(ctx, thread.organizationId || thread.capOrganizationId, userId);
+
+        if (refused) {
+            throw new LunoraError("FORBIDDEN", refused);
+        }
+
+        const project = thread.projectId ? await writableProject(ctx, thread.projectId, userId, { primary: true }) : null;
+
+        if (thread.projectId && !project) {
+            throw new LunoraError("FORBIDDEN", "Project not found or access denied");
+        }
+
+        if (!isDeviceInScope(device, project?._id)) {
+            throw new LunoraError("BAD_REQUEST", "That computer is not allowed in this project. Change which projects it may be used in, in its settings.", {
+                data: { code: HOST_START_OUT_OF_SCOPE },
+            });
         }
 
         const call = await openHostSession(
@@ -492,6 +529,13 @@ export const forkHostThreadRun = async (
             settledId === null
                 ? null
                 : await ctx.runQuery(internal.agent.branches.resolveForkEnd, { index: undefined, messageId: settledId, threadId: args.threadId });
+
+        // No settled message to copy up to is an empty chat to fork only when it has no message at all: a chat with messages and no settled one
+        // is still replying, or is longer than the scan for its last settled message reaches. Forking it would open a chat with none of its
+        // history, so it is refused (nothing is queued, and the new chat is taken back).
+        if (forkEnd === null && begun.sourceHasMessages === true) {
+            throw new LunoraError("BAD_REQUEST", "This chat cannot be forked yet: wait for its reply to finish, or it is too long to fork.");
+        }
 
         if (forkEnd !== null) {
             await ctx.runAction(internal.agent.messages.cloneThread, {

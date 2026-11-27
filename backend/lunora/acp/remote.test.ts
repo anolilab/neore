@@ -155,6 +155,8 @@ let manifestAt = 0;
 
 const OUT_OF_DATE = /out of date/;
 const NOT_ALLOWED = /does not allow agents on your computer/u;
+const NO_LONGER_MEMBER = /no longer a member/u;
+const LOCKED = /locked|Unlock/u;
 
 const manifest = async (deviceId: string, secret: string, extra: Record<string, unknown>) => {
     manifestAt += 1;
@@ -740,7 +742,7 @@ describe("forkHostThread", () => {
      * The history copy, wrapped: what the new chat has when the copy runs (a session, a queued `acp_start`) is recorded, the copy can be made
      * to fail, and the real copy runs in between. Put back by the caller (`registerModule(registry, "agent_messages", agentMessages)`).
      */
-    const probeCopy = (probe: { fail: boolean; queued: number[]; sessions: number[] }) => {
+    const probeCopy = (probe: { during?: () => Promise<void>; fail: boolean; queued: number[]; sessions: number[] }) => {
         registry.set(
             "agent_messages:cloneThread",
             internalAction
@@ -759,6 +761,8 @@ describe("forkHostThread", () => {
 
                     probe.sessions.push(childSessions.length);
                     probe.queued.push(queuedStarts.length);
+                    // Whatever changes while the history is being copied.
+                    await probe.during?.();
 
                     if (probe.fail) {
                         throw new Error("copy failed");
@@ -849,6 +853,161 @@ describe("forkHostThread", () => {
         } finally {
             registerModule(registry, "agent_messages", agentMessages);
         }
+    });
+
+    describe("what changes while the history is copied", () => {
+        const refuses = async (change: () => Promise<void>, message: string | RegExp, shape: (threadId: string) => Promise<void> = async () => {}) => {
+            const { threadId } = await started();
+            const probe = { during: change, fail: false, queued: [] as number[], sessions: [] as number[] };
+
+            await say(threadId, [["asked", "success", 0]]);
+            await shape(threadId);
+            probeCopy(probe);
+
+            try {
+                await expect(fork(threadId, "moving")).rejects.toThrow(message);
+                // Nothing was queued for the new chat, it was taken back, and its link and claim with it.
+                expect(await rows("acpSessions")).toHaveLength(1);
+                expect(await rows("deviceCalls", { toolName: "acp_start" })).toHaveLength(1);
+                expect(await rows("threadRelationships", { parentThreadId: threadId })).toHaveLength(0);
+            } finally {
+                registerModule(registry, "agent_messages", agentMessages);
+            }
+
+            return threadId;
+        };
+
+        it("refuses a member whose membership was revoked meanwhile, and queues nothing", async () => {
+            await run(async (ctx) => {
+                await ctx.db.insert("member", { createdAt: 0, organizationId: "org-a", role: "member", userId: ownerId });
+                await ctx.db.insert("organizationPolicies", {
+                    document: JSON.stringify({ permissionCap: "auto", schemaVersion: 1 }),
+                    organizationId: "org-a",
+                    revision: 1,
+                    schemaVersion: 1,
+                    updatedAt: Date.now(),
+                });
+            });
+            const revoked = await refuses(
+                async () => {
+                    await run(async (ctx) => {
+                        const { page } = await ctx.db.member.findMany({ where: { organizationId: "org-a", userId: ownerId } });
+
+                        for (const found of page) {
+                            await ctx.db.delete("member", found._id);
+                        }
+                    });
+                },
+                NO_LONGER_MEMBER,
+                async (threadId) => {
+                    await run(async (ctx) => {
+                        await ctx.db.patch("threads", threadId, { organizationId: "org-a" });
+                    });
+                },
+            );
+
+            // The chat it refused to fork is as it was: no other chat was made from it.
+            expect(await rows("threads", { createdBy: ownerId })).toHaveLength(1);
+            expect(String(revoked)).not.toBe("");
+        });
+
+        it("refuses a chat whose organization lowered its cap meanwhile", async () => {
+            await run(async (ctx) => {
+                await ctx.db.insert("member", { createdAt: 0, organizationId: "org-a", role: "member", userId: ownerId });
+                await ctx.db.insert("organizationPolicies", {
+                    document: JSON.stringify({ permissionCap: "auto", schemaVersion: 1 }),
+                    organizationId: "org-a",
+                    revision: 1,
+                    schemaVersion: 1,
+                    updatedAt: Date.now(),
+                });
+            });
+            const capped = await refuses(
+                async () => {
+                    await run(async (ctx) => {
+                        const { page } = await ctx.db.organizationPolicies.findMany({ where: { organizationId: "org-a" } });
+
+                        await ctx.db.patch("organizationPolicies", page[0]!._id, { document: JSON.stringify({ permissionCap: "ask", schemaVersion: 1 }) });
+                    });
+                },
+                NOT_ALLOWED,
+                async (threadId) => {
+                    await run(async (ctx) => {
+                        await ctx.db.patch("threads", threadId, { organizationId: "org-a" });
+                    });
+                },
+            );
+
+            // The chat it refused to fork is as it was: no other chat was made from it.
+            expect(await rows("threads", { createdBy: ownerId })).toHaveLength(1);
+            expect(String(capped)).not.toBe("");
+        });
+
+        it("refuses a source locked after the copy", async () => {
+            let source = "";
+
+            const locked = await refuses(
+                async () => {
+                    await run(async (ctx) => {
+                        await ctx.db.patch("threads", source, { lockedAt: Date.now() });
+                    });
+                },
+                LOCKED,
+                async (threadId) => {
+                    source = threadId;
+                },
+            );
+
+            // The chat it refused to fork is as it was: no other chat was made from it.
+            expect(await rows("threads", { createdBy: ownerId })).toHaveLength(1);
+            expect(String(locked)).not.toBe("");
+        });
+
+        it("refuses an empty source trashed after the fork began, which has nothing to copy and so no copy to refuse it", async () => {
+            const { threadId } = await started();
+            const begun = (await run(
+                async (ctx) => await ctx.runMutation(remote.beginHostFork, { clientId: "empty", threadId, userId: ownerId } as never),
+            )) as {
+                open: Record<string, unknown>;
+                threadId: string;
+            };
+
+            await run(async (ctx) => {
+                await ctx.db.patch("threads", threadId, { deleted: true });
+            });
+            // The session is queued last, by `openHostFork`: it reads the source again, and the trashed one refuses it.
+            await expect(
+                run(
+                    async (ctx) =>
+                        await ctx.runMutation(remote.openHostFork, {
+                            ...begun.open,
+                            clientId: "empty",
+                            forkOfThreadId: threadId,
+                            threadId: begun.threadId,
+                            userId: ownerId,
+                        } as never),
+                ),
+            ).rejects.toThrow("Chat not found");
+            expect(await rows("deviceCalls", { toolName: "acp_start" })).toHaveLength(1);
+        });
+    });
+
+    it("refuses a chat that has messages but none settled to copy up to, instead of forking it empty", async () => {
+        const { threadId } = await started();
+
+        await say(threadId, [["still being written", "pending", 0]]);
+        await expect(fork(threadId, "replying")).rejects.toThrow("cannot be forked yet");
+        expect(await rows("acpSessions")).toHaveLength(1);
+        expect(await rows("deviceCalls", { toolName: "acp_start" })).toHaveLength(1);
+        expect(await rows("threadRelationships", { parentThreadId: threadId })).toHaveLength(0);
+    });
+
+    it("forks a chat with no message at all", async () => {
+        const { threadId } = await started();
+        const result = (await fork(threadId)) as { started: boolean; threadId: string };
+
+        expect(result.started).toBe(true);
+        expect(await textOf(result.threadId)).toEqual([]);
     });
 
     it("answers a chat that is not the caller's as one that does not exist", async () => {

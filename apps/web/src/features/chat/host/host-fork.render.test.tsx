@@ -173,6 +173,26 @@ describe("HostFork", () => {
         expect(harness.navigated).toEqual([{ params: { threadId: "thread-fork" }, to: "/chat/$threadId" }]);
     });
 
+    it("tries the same id again after a failure, so a fork whose answer was lost is not made twice", async () => {
+        const user = userEvent.setup();
+
+        harness.error = new Error("network lost");
+        mount(FORKS);
+        await user.click(screen.getByRole("button", { name: "Fork here" }));
+        await screen.findByText(WARNING);
+        await user.click(screen.getAllByRole("button", { name: "Fork here" }).at(-1)!);
+        await waitFor(() => expect(harness.toasts).toHaveLength(1));
+
+        // The dialog is still open after a failure: confirming again is the retry.
+        harness.error = undefined;
+        await user.click(screen.getAllByRole("button", { name: "Fork here" }).at(-1)!);
+        await waitFor(() => expect(harness.calls).toHaveLength(2));
+
+        const [first, second] = harness.calls as { clientId: string }[];
+
+        expect(second?.clientId).toBe(first?.clientId);
+    });
+
     it("is off while the agent is still starting", () => {
         mount(FORKS, true);
 
