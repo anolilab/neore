@@ -30,3 +30,6 @@
   Outbound media ships only when a reply's assistant rows carry file parts
   (`listReplyMedia`, owner-granted storage only) — so without reply tools
   (`tools: "none"`, the default) nothing ever attaches one.
+  **`/memory`** (`lib/memory-command.ts`) is answered after the rate limits with a fixed digest
+  (`respond.ts#sendMemoryDigest`, `memory/export-format.ts`): no thread row, no model run, and only in the chat
+  the connection was paired in (`platformChatId`); in any other chat the owner gets a notice, never the digest.

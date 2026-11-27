@@ -88,6 +88,8 @@ const httpContext = (keys: Record<string, string>) => {
         context: context as never,
         /** Model replies scheduled — notices (pairing, private bot) are excluded. */
         replies: () => scheduled.filter((entry) => entry.path === "messenger_respond:generateAndSendResponse").map((entry) => entry.args),
+        /** Every scheduled action, by path. */
+        scheduledPaths: () => scheduled.map((entry) => entry.path),
     };
 };
 
@@ -214,6 +216,47 @@ describe("Telegram through acceptInbound", () => {
 
         expect(rows.map((row: { status: string; text: string }) => [row.text, row.status])).toStrictEqual([["what is this?", "pending"]]);
         expect(replies()[0]).toMatchObject({ messageId: rows[0]._id });
+    });
+
+    it("answers /memory with the digest only in the paired chat, never through the model or the thread", async () => {
+        const connectionId = await connection("telegram", { platformChatId: "77", platformUserId: SENDER });
+        const { context, replies, scheduledPaths } = httpContext(KEYS);
+        const inGroup = JSON.stringify({
+            message: {
+                chat: { id: -100, type: "group" },
+                date: NOW_SECONDS,
+                from: { first_name: "Ada", id: Number(SENDER), is_bot: false },
+                message_id: 2,
+                text: "/memory@my_bot",
+            },
+            update_id: 2,
+        });
+
+        expect(await statusOf(send(context, connectionId, update(1, NOW_SECONDS, "/memory")))).toBe(200);
+        expect(await statusOf(send(context, connectionId, inGroup))).toBe(200);
+
+        expect(scheduledPaths()).toStrictEqual(["messenger_respond:sendMemoryDigest", "messenger_respond:sendNotice"]);
+        expect(replies()).toHaveLength(0);
+        expect(await savedTexts()).toStrictEqual([]);
+    });
+
+    it("answers no /memory once the sender is over the rate limit", async () => {
+        const connectionId = await connection("telegram", { platformChatId: "77", platformUserId: SENDER });
+        const { context, scheduledPaths } = httpContext(KEYS);
+
+        rateLimit.ok = false;
+
+        expect(await statusOf(send(context, connectionId, update(1, NOW_SECONDS, "/memory")))).toBe(200);
+        expect(scheduledPaths()).toStrictEqual([]);
+        expect(rateLimit.operations).toContain("messenger/connection:free");
+    });
+
+    it("gives a stranger's /memory only the private-bot notice", async () => {
+        const connectionId = await connection("telegram", { platformChatId: "77", platformUserId: "someone-else" });
+        const { context, scheduledPaths } = httpContext(KEYS);
+
+        expect(await statusOf(send(context, connectionId, update(1, NOW_SECONDS, "/memory")))).toBe(200);
+        expect(scheduledPaths()).toStrictEqual(["messenger_respond:sendNotice"]);
     });
 
     it("refuses a wrong secret with 401 and drops an update older than Telegram retains", async () => {

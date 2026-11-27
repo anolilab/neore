@@ -1,5 +1,5 @@
 /**
- * The memory download: only the caller's active rows, read a page per call up to the cap,
+ * The memory download and the messenger digest: only the caller's active rows, read a page per call up to the cap,
  * grouped and dated in the user's timezone (UTC when unset or unknown), bot memories labelled by scope.
  */
 import { lunoraTest } from "@lunora/testing";
@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import schema from "../schema";
 import type { BotLabel, ExportMemoryRow } from "./export-format";
-import { formatMemoryMarkdown, MEMORY_EXPORT_MAX_ROWS, MEMORY_EXPORT_SCAN_ROWS } from "./export-format";
+import { formatMemoryDigest, formatMemoryMarkdown, MEMORY_DIGEST_MAX_CHARS, MEMORY_EXPORT_MAX_ROWS, MEMORY_EXPORT_SCAN_ROWS } from "./export-format";
 import { MEMORY_EXPORT_PAGE_ROWS, readBotLabels, readExportMemories, readMemoryExportPage, resolveMemoryBotLabels } from "./markdown-export";
 
 type Harness = ReturnType<typeof lunoraTest>;
@@ -127,6 +127,51 @@ describe("formatMemoryMarkdown", () => {
             "added by you",
             "imported from another assistant",
         ]);
+    });
+});
+
+describe("formatMemoryDigest", () => {
+    it("counts by type, lists pinned first and leaves out an unpinned fact past its end", () => {
+        const digest = formatMemoryDigest(
+            [
+                row({ importance: 9, memory: "Likes tea" }),
+                row({ memory: "Name is Ada", pinned: true, source: "manual", type: "identity" }),
+                row({ importance: 10, memory: "In Lisbon", type: "context", validUntil: "2026-03-05" }),
+                row({ botId: "bot-1", memory: "Prefers short answers", source: "compressed" }),
+            ],
+            { bots: new Map([["bot-1", { kind: "named", name: "Helper" }]]), now: NOW, timeZone: undefined, truncated: false },
+        );
+
+        expect(digest).toBe(
+            [
+                "4 memories (identity 1, preferences 2, context 1).",
+                "",
+                "📌 Name is Ada — added by you · all chats",
+                "• Likes tea — learned in chat · all chats",
+                "• Prefers short answers — summarised from earlier memories · bot “Helper”",
+                "",
+                "The full list, with dates: Settings → Personalization → Memory → Download memories.",
+            ].join("\n"),
+        );
+    });
+
+    it("stays under the message limit and keeps the pointer to the full list", () => {
+        const rows = Array.from({ length: 30 }, (_, index) => row({ memory: `${String(index)} ${"x".repeat(400)}` }));
+        const digest = formatMemoryDigest(rows, { bots: NO_BOTS, now: NOW, timeZone: "UTC", truncated: true });
+
+        expect(digest.length).toBeLessThanOrEqual(MEMORY_DIGEST_MAX_CHARS);
+        expect(digest.startsWith("More than 30 memories")).toBe(true);
+        expect(digest.endsWith("Download memories.")).toBe(true);
+        expect(digest).toContain("…");
+    });
+
+    it("fits a smaller platform limit, never past the digest's own", () => {
+        const rows = Array.from({ length: 30 }, (_, index) => row({ memory: `${String(index)} ${"x".repeat(150)}` }));
+
+        expect(formatMemoryDigest(rows, { bots: NO_BOTS, maxChars: 600, now: NOW, timeZone: "UTC", truncated: false }).length).toBeLessThanOrEqual(600);
+        expect(formatMemoryDigest(rows, { bots: NO_BOTS, maxChars: 5000, now: NOW, timeZone: "UTC", truncated: false }).length).toBeLessThanOrEqual(
+            MEMORY_DIGEST_MAX_CHARS,
+        );
     });
 });
 

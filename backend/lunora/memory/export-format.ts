@@ -1,6 +1,6 @@
 /**
- * The user's own memories as a Markdown file they can read, the one Memory settings downloads
- * (`exportMemoriesMarkdown`).
+ * The user's own memories as text they can read: the Markdown file Memory settings downloads
+ * (`exportMemoriesMarkdown`) and the short digest the messenger `/memory` command replies with.
  *
  * Pure: the rows, bot labels and clock come in; nothing is read here. Instants (`lastConfirmedAt`) become calendar
  * days in the user's timezone (UTC when unset or unknown, as everywhere in memory); the fact dates are stored as local
@@ -15,6 +15,7 @@ export interface ExportMemoryRow {
     botId?: string;
     eventEnd?: string;
     eventStart?: string;
+    importance?: number;
     importedFrom?: ImportApp;
     lastConfirmedAt: number;
     memory: string;
@@ -171,4 +172,63 @@ export const formatMemoryMarkdown = (rows: ReadonlyArray<ExportMemoryRow>, optio
     }
 
     return `${lines.join("\n")}\n`;
+};
+
+/** Below Discord's 2000-character message limit: the digest is one message on every platform that allows that much. */
+export const MEMORY_DIGEST_MAX_CHARS = 1800;
+export const MEMORY_DIGEST_TOP = 10;
+const DIGEST_LINE_MAX = 200;
+
+export const MEMORY_OFF_DIGEST = "Memory is off for your account, so nothing new is remembered. Turn it on in Settings → Personalization → Memory.";
+const DIGEST_POINTER = "The full list, with dates: Settings → Personalization → Memory → Download memories.";
+
+/** Pinned first, then the most important, then the most recently confirmed. */
+const byWeight = (a: ExportMemoryRow, b: ExportMemoryRow): number =>
+    Number(b.pinned) - Number(a.pinned) || (b.importance ?? 0) - (a.importance ?? 0) || b.lastConfirmedAt - a.lastConfirmedAt;
+
+/**
+ * The `/memory` reply: counts by type, then up to ten memories (pinned first; an unpinned one past its end date is
+ * left out), each with its source and scope as the file labels them, cut to `maxChars` (the platform's message limit, at most {@link MEMORY_DIGEST_MAX_CHARS}). The pointer to the
+ * full list always fits: lines are dropped first.
+ */
+export const formatMemoryDigest = (
+    rows: ReadonlyArray<ExportMemoryRow>,
+    options: { bots: ReadonlyMap<string, BotLabel>; maxChars?: number; now: number; timeZone: string | null | undefined; truncated: boolean },
+): string => {
+    if (rows.length === 0) {
+        return `Nothing is remembered yet.\n\n${DIGEST_POINTER}`;
+    }
+
+    const maxChars = Math.min(options.maxChars ?? MEMORY_DIGEST_MAX_CHARS, MEMORY_DIGEST_MAX_CHARS);
+    const today = exportDayOf(options.now, options.timeZone);
+    const counts = MEMORY_TYPES.map((type) => [type, rows.filter((row) => row.type === type).length] as const)
+        .filter(([, count]) => count > 0)
+        .map(([type, count]) => `${TYPE_TITLES[type].toLowerCase()} ${String(count)}`);
+    const total = `${options.truncated ? "More than " : ""}${String(rows.length)}`;
+    const head = `${total} ${rows.length === 1 ? "memory" : "memories"} (${counts.join(", ")}).`;
+    const top = rows
+        .filter((row) => row.pinned || !isExpired(row, today))
+        .toSorted(byWeight)
+        .slice(0, MEMORY_DIGEST_TOP)
+        .map((row) => {
+            const text = oneLine(row.memory);
+
+            const shown = text.length > DIGEST_LINE_MAX ? `${text.slice(0, DIGEST_LINE_MAX - 1)}…` : text;
+
+            return `${row.pinned ? "📌" : "•"} ${shown} — ${sourceOf(row)} · ${scopeOf(row, options.bots)}`;
+        });
+    const tail = `\n\n${DIGEST_POINTER}`;
+    let body = head;
+
+    for (const [index, entry] of top.entries()) {
+        const next = `${body}${index === 0 ? "\n\n" : "\n"}${entry}`;
+
+        if (next.length + tail.length > maxChars) {
+            break;
+        }
+
+        body = next;
+    }
+
+    return `${body}${tail}`;
 };

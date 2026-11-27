@@ -27,6 +27,8 @@ import type { Id } from "../_generated/dataModel";
 import type { ActionCtx } from "../_generated/server";
 import { internalAction } from "../_generated/server";
 import { loadModelFilterRules } from "../chat/lib/model-filter-rules";
+import { formatMemoryDigest, MEMORY_OFF_DIGEST } from "../memory/export-format";
+import { readBotLabels, readExportMemories } from "../memory/markdown-export";
 import { runHeadlessAgent } from "../chat/lib/headless-run";
 import type { Delivery } from "./lib/platform-media";
 import { requireKey } from "./lib/platform-media";
@@ -40,7 +42,7 @@ import { sendLineMessage } from "./platforms/line";
 import { sendSlackMessage } from "./platforms/slack";
 import { sendTeamsMessage } from "./platforms/teams";
 import { sendTelegramMessage } from "./platforms/telegram";
-import { sendWeChatMessage, WECHAT_SERVICE_WINDOW_MS } from "./platforms/wechat";
+import { sendWeChatMessage, WECHAT_SERVICE_WINDOW_MS, WECHAT_TEXT_MAX } from "./platforms/wechat";
 import { sendWhatsAppMessage, WHATSAPP_SERVICE_WINDOW_MS } from "./platforms/whatsapp";
 
 export { MESSENGER_MEDIA_MODEL } from "./lib/reply-tools";
@@ -368,17 +370,65 @@ export const sendNotice = internalAction
     })
     .output(v.null())
     .action(async ({ args: { text, userId, ...delivery }, ctx }) => {
-        if (!isReplyWindowOpen(delivery)) {
-            return null;
-        }
+        await sendFixedText(ctx, delivery, userId, async () => text);
 
-        try {
-            const messengerKeys = await ctx.runQuery(internal.auth.functions.getDecryptedMessengerKeysQuery, { userId });
+        return null;
+    });
 
-            await sendPlatformMessage(delivery, text, messengerKeys);
-        } catch (error) {
-            console.error(`[Messenger] Failed to send notice on ${delivery.platform}:`, error);
-        }
+/** Send a text built only once the reply window is known to be open; a failure is logged and swallowed, as for a notice. */
+const sendFixedText = async (ctx: ActionCtx, delivery: Delivery, userId: string, build: () => Promise<string>): Promise<void> => {
+    if (!isReplyWindowOpen(delivery)) {
+        return;
+    }
+
+    try {
+        const text = await build();
+        const messengerKeys = await ctx.runQuery(internal.auth.functions.getDecryptedMessengerKeysQuery, { userId });
+
+        await sendPlatformMessage(delivery, text, messengerKeys);
+    } catch (error) {
+        console.error(`[Messenger] Failed to send notice on ${delivery.platform}:`, error);
+    }
+};
+
+/** Platforms whose one message holds less than the digest's own limit. */
+const DIGEST_MAX_CHARS: Partial<Record<string, number>> = { wechat: WECHAT_TEXT_MAX };
+
+/** What `/memory` answers: that memory is off, or the digest of the active memories, cut to the platform's message. */
+export const memoryDigestText = async (ctx: Pick<ActionCtx, "runQuery">, userId: string, platform: string): Promise<string> => {
+    if (!(await ctx.runQuery(internal.memory.functions.isMemoryEnabled, { userId }))) {
+        return MEMORY_OFF_DIGEST;
+    }
+
+    const [{ rows, truncated }, timeZone] = await Promise.all([
+        readExportMemories(ctx, userId),
+        ctx.runQuery(internal.memory.functions.getUserTimeZone, { userId }),
+    ]);
+
+    // The same bot labels as the download, from one call; past the read limit every bot reads "a bot".
+    const { labels: bots } = await readBotLabels(ctx, userId, rows);
+
+    return formatMemoryDigest(rows, { bots, maxChars: DIGEST_MAX_CHARS[platform], now: Date.now(), timeZone, truncated });
+};
+
+/**
+ * The `/memory` reply (`lib/memory-command.ts`): the owner's memory digest, or that memory is off. No thread and no
+ * model run; the webhook schedules it only for the paired contact in the paired chat.
+ */
+export const sendMemoryDigest = internalAction
+    .input({
+        inboundAt: v.optional(v.number()),
+        platform: v.string(),
+        platformChatId: v.string(),
+        platformThreadTs: v.optional(v.string()),
+        replyToId: v.optional(v.string()),
+        replyToken: v.optional(v.string()),
+        serviceUrl: v.optional(v.string()),
+        userId: v.string(),
+    })
+    .output(v.null())
+    .action(async ({ args: { userId, ...delivery }, ctx }) => {
+        await sendFixedText(ctx, delivery, userId, async () => await memoryDigestText(ctx, userId, delivery.platform));
 
         return null;
     });

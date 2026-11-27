@@ -1,7 +1,7 @@
 /**
- * The user's own memories, read for the Markdown download in Memory settings (`./export-format.ts` writes it). Only
- * active rows: superseded history is in the account data export (`./gdpr.ts`). It works with memory off, so the user
- * can still see what is stored.
+ * The user's own memories, read for the Markdown download in Memory settings and the messenger `/memory` digest
+ * (`./export-format.ts` writes both). Only active rows: superseded history is in the account data export
+ * (`./gdpr.ts`). It works with memory off, so the user can still see what is stored.
  *
  * The newest {@link MEMORY_EXPORT_SCAN_ROWS} active rows (there is no pinned index), read a page per call and split in
  * memory: every pinned row among them, and the {@link MEMORY_EXPORT_MAX_ROWS} newest others. "Newest" is when a row was saved, not when
@@ -23,6 +23,7 @@ const vExportRow = v.object({
     botId: v.optional(v.string()),
     eventEnd: v.optional(v.string()),
     eventStart: v.optional(v.string()),
+    importance: v.optional(v.number()),
     importedFrom: v.optional(vImportApp),
     lastConfirmedAt: v.number(),
     memory: v.string(),
@@ -37,6 +38,7 @@ const toExportRow = (m: Doc<"memories">): ExportMemoryRow => {
         ...(m.botId !== undefined && { botId: m.botId as string }),
         ...(m.eventEnd !== undefined && { eventEnd: m.eventEnd }),
         ...(m.eventStart !== undefined && { eventStart: m.eventStart }),
+        ...(m.importance !== undefined && { importance: m.importance }),
         ...(m.importedFrom !== undefined && { importedFrom: m.importedFrom }),
         lastConfirmedAt: lastConfirmedOf(m),
         memory: m.memory,

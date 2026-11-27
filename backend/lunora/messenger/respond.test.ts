@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { mappedReferences } from "../../test/registered-api";
 
+import { MEMORY_OFF_DIGEST } from "../memory/export-format";
 import { AI_DISCLOSURE } from "./lib/pairing";
 import { MESSENGER_MEDIA_MODEL, MESSENGER_TOOL_REPLY_MAX_STEPS, MESSENGER_TOOL_SYSTEM } from "./lib/reply-tools";
 
@@ -22,6 +23,10 @@ const state = vi.hoisted(() => {
         disclosed: false,
         /** Discord and Slack: `true` delivered, `false` refused. */
         discord: true,
+        memoryEnabled: true,
+        /** The rows the memory page answers with, and the users it was asked for. */
+        memoryReads: [] as string[],
+        memoryRows: [] as Record<string, unknown>[],
         mutations: [] as { args: unknown; path: string }[],
         replyFiles: [] as { filename?: string; key: string; mediaType: string }[],
         runs: [] as Record<string, unknown>[],
@@ -129,7 +134,7 @@ vi.mock("../lib/storage-read", () => {
     };
 });
 
-const { respondToInbound } = await import("./respond");
+const { memoryDigestText, respondToInbound } = await import("./respond");
 
 const NOW = 1_800_000_000_000;
 const HOUR = 3_600_000;
@@ -175,6 +180,22 @@ const ctx = () =>
                 case "auth_functions:getUserRunPlanQuery": {
                     return null;
                 }
+                case "memory_functions:getUserTimeZone": {
+                    return null;
+                }
+                case "memory_functions:isMemoryEnabled": {
+                    return state.memoryEnabled;
+                }
+                case "memory_markdown_export:readMemoryExportPage": {
+                    state.memoryReads.push((args as { userId: string }).userId);
+
+                    return { cursor: null, isDone: true, rows: state.memoryRows };
+                }
+                case "memory_markdown_export:resolveMemoryBotLabels": {
+                    return (args as { botIds: string[] }).botIds.map((botId) => {
+                        return { botId, kind: "named", name: "Helper" };
+                    });
+                }
                 case "messenger_functions:aiDisclosureSent": {
                     return state.disclosed;
                 }
@@ -213,6 +234,9 @@ beforeEach(() => {
     state.afterRun = undefined;
     state.charge = "charged";
     state.disclosed = true;
+    state.memoryEnabled = true;
+    state.memoryReads = [];
+    state.memoryRows = [{ lastConfirmedAt: NOW, memory: "Likes tea", pinned: false, type: "preference" }];
     state.mutations = [];
     state.telegram = true;
     state.discord = true;
@@ -394,5 +418,36 @@ describe("reply windows", () => {
 
         expect(state.runs).toHaveLength(1);
         expect(state.sentMedia).toStrictEqual([{ chatId: "chat-1", mediaType: "image/png", platform: "wechat" }]);
+    });
+});
+
+describe("/memory digest", () => {
+    it("lists only the owner's memories with their labels, or says memory is off without reading any", async () => {
+        state.memoryRows.push({ botId: "bot-1", lastConfirmedAt: NOW, memory: "Prefers short answers", pinned: true, type: "preference" });
+
+        const digest = await memoryDigestText(ctx(), "owner", "telegram");
+
+        expect(digest).toContain("📌 Prefers short answers — learned in chat · bot “Helper”");
+        expect(digest).toContain("• Likes tea — learned in chat · all chats");
+        expect(state.memoryReads).toStrictEqual(["owner"]);
+
+        state.memoryEnabled = false;
+        state.memoryReads = [];
+
+        expect(await memoryDigestText(ctx(), "owner", "telegram")).toBe(MEMORY_OFF_DIGEST);
+        expect(state.memoryReads).toStrictEqual([]);
+    });
+
+    it("fits WeChat's 600-character message, pointer kept", async () => {
+        state.memoryRows = Array.from({ length: 30 }, (_, index) => {
+            return { lastConfirmedAt: NOW - index, memory: `${String(index)} ${"x".repeat(150)}`, pinned: false, type: "context" };
+        });
+
+        const wechat = await memoryDigestText(ctx(), "owner", "wechat");
+        const telegram = await memoryDigestText(ctx(), "owner", "telegram");
+
+        expect(wechat.length).toBeLessThanOrEqual(600);
+        expect(wechat.endsWith("Download memories.")).toBe(true);
+        expect(telegram.length).toBeGreaterThan(600);
     });
 });
