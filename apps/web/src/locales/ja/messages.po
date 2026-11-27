@@ -730,6 +730,8 @@ msgstr "新規 {0} 件、統合 {1} 件、昇格 {2} 件、矛盾解決 {3} 件�
 
 #. placeholder {0}: activeIndex + 1
 #. placeholder {1}: matches.length
+#. placeholder {1}: total.count
+#: src/features/chat/aside/find/aside-find-bar.tsx:165
 #: src/features/chat/thread/find/thread-find-bar.tsx:182
 msgid "{0} of {1}"
 msgstr "{0} / {1}"
@@ -2921,7 +2923,7 @@ msgstr "レビューに追加"
 msgid "Add to starred"
 msgstr "スターを付ける"
 
-#: src/features/chat/aside/aside-panel.tsx:168
+#: src/features/chat/aside/aside-panel.tsx:171
 msgid "Add to thread"
 msgstr "スレッドに追加"
 
@@ -2972,8 +2974,8 @@ msgstr "あなたが追加 · {learnedOn}"
 msgid "Added to favorites"
 msgstr "お気に入りに追加しました"
 
-#: src/features/chat/aside/aside-panel.tsx:155
-#: src/features/chat/aside/aside-panel.tsx:275
+#: src/features/chat/aside/aside-panel.tsx:158
+#: src/features/chat/aside/aside-panel.tsx:278
 msgid "Added to the thread"
 msgstr "スレッドに追加しました"
 
@@ -3007,7 +3009,7 @@ msgstr "このコンピュータでサーバーの追加がキャンセルされ
 msgid "Adding your earlier replies…"
 msgstr "以前の返信を追加しています…"
 
-#: src/features/chat/aside/aside-panel.tsx:168
+#: src/features/chat/aside/aside-panel.tsx:171
 #: src/features/projects/components/add-project-dialog.tsx:695
 msgid "Adding…"
 msgstr "追加中…"
@@ -4050,7 +4052,7 @@ msgstr "送信するには、すべての質問に選択肢またはメモで回
 msgid "Answer messages to a WeChat Official Account (safe mode). Beta: not yet tested against a live account."
 msgstr "WeChat 公式アカウント（安全モード）へのメッセージに応答します。ベータ版：実際のアカウントではまだテストされていません。"
 
-#: src/features/chat/aside/aside-panel.tsx:233
+#: src/features/chat/aside/aside-panel.tsx:236
 msgid "Answer ready"
 msgstr "回答の準備ができました"
 
@@ -4066,7 +4068,7 @@ msgstr "WhatsApp Business 番号（Meta Cloud API）経由で WhatsApp メッセ
 msgid "Answered"
 msgstr "回答済み"
 
-#: src/features/chat/aside/aside-panel.tsx:150
+#: src/features/chat/aside/aside-panel.tsx:153
 msgid "Answered without the conversation: this chat runs on your computer."
 msgstr "会話を使わずに回答しました。このチャットはお使いのコンピュータ上で実行されています。"
 
@@ -4620,13 +4622,13 @@ msgstr "昇順"
 msgid "ask"
 msgstr "質問"
 
-#: src/features/chat/aside/aside-panel.tsx:306
+#: src/features/chat/aside/aside-panel.tsx:311
 #: src/features/chat/sidebar/thread-sidebar.tsx:345
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:64
 msgid "Ask"
 msgstr "確認"
 
-#: src/features/chat/aside/aside-panel.tsx:302
+#: src/features/chat/aside/aside-panel.tsx:307
 msgid "Ask a quick question…"
 msgstr "簡単な質問をする…"
 
@@ -4658,7 +4660,7 @@ msgstr "GPT-4、Claude、Gemini に同じ質問をしましょう。同じプロ
 msgid "Ask me anything..."
 msgstr "何でも聞いてください..."
 
-#: src/features/chat/aside/aside-panel.tsx:294
+#: src/features/chat/aside/aside-panel.tsx:299
 msgid "Ask something without interrupting the reply. The question and the answer stay here unless you add them to the thread."
 msgstr "返信を中断せずに質問できます。質問と回答は、スレッドに追加しない限りここに残ります。"
 
@@ -5031,7 +5033,7 @@ msgstr "Neore で利用可能 — 無料で始められ、クレジットカー�
 msgid "Available once the reply is saved"
 msgstr "返信の保存後に利用できます"
 
-#: src/features/chat/aside/aside-panel.tsx:170
+#: src/features/chat/aside/aside-panel.tsx:173
 msgid "Available when the reply finishes"
 msgstr "返信の完了後に利用できます"
 
@@ -5116,7 +5118,7 @@ msgstr "エディターに戻る"
 msgid "Back to Gallery"
 msgstr "ギャラリーに戻る"
 
-#: src/components/settings/settings-modal.tsx:683
+#: src/components/settings/settings-modal.tsx:699
 msgid "Back to settings sections"
 msgstr "設定セクションに戻る"
 
@@ -7304,6 +7306,7 @@ msgstr "ダイアログとメニューを閉じる"
 msgid "Close execution history"
 msgstr "実行履歴を閉じる"
 
+#: src/features/chat/aside/find/aside-find-bar.tsx:200
 #: src/features/chat/thread/find/thread-find-bar.tsx:222
 msgid "Close find"
 msgstr "検索を閉じる"
@@ -8108,7 +8111,7 @@ msgstr "このスレッドの変数の値を設定します。プロンプトを
 msgid "Configure Variables"
 msgstr "変数を設定"
 
-#: src/components/settings/settings-modal.tsx:597
+#: src/components/settings/settings-modal.tsx:613
 msgid "Configure your application settings"
 msgstr "アプリケーションの設定を構成します"
 
@@ -9030,11 +9033,11 @@ msgstr "コスタリカ"
 msgid "Could not add the server."
 msgstr "サーバーを追加できませんでした。"
 
-#: src/features/chat/aside/aside-panel.tsx:106
+#: src/features/chat/aside/aside-panel.tsx:107
 msgid "Could not add this to the thread. Try again."
 msgstr "スレッドに追加できませんでした。もう一度お試しください。"
 
-#: src/features/chat/aside/aside-panel.tsx:95
+#: src/features/chat/aside/aside-panel.tsx:96
 msgid "Could not answer the question. Try again."
 msgstr "質問に回答できませんでした。もう一度お試しください。"
 
@@ -9716,7 +9719,7 @@ msgstr "タグを作成…"
 msgid "Create a task, give it success criteria, and run it. You can chain tasks with dependencies and repeat them on a schedule."
 msgstr "タスクを作成し、成功基準を設定して実行します。依存関係でタスクをつなげたり、スケジュールで繰り返したりできます。"
 
-#: src/components/settings/settings-modal.tsx:159
+#: src/components/settings/settings-modal.tsx:160
 msgid "Create an account"
 msgstr "アカウントを作成"
 
@@ -11586,7 +11589,7 @@ msgstr "メッセージを破棄: {snippet}"
 msgid "Dismiss setup suggestions"
 msgstr "セットアップの提案を閉じる"
 
-#: src/features/chat/aside/aside-panel.tsx:122
+#: src/features/chat/aside/aside-panel.tsx:125
 msgid "Dismiss this side question"
 msgstr "このサイドクエスチョンを閉じる"
 
@@ -15477,6 +15480,12 @@ msgstr "金融データと銀行接続の API"
 msgid "Find files"
 msgstr "ファイルを探す"
 
+#: src/features/chat/aside/find/aside-find-bar.tsx:170
+#: src/features/chat/aside/find/aside-find-bar.tsx:178
+#: src/features/chat/aside/find/aside-find-bar.tsx:184
+msgid "Find in side questions"
+msgstr "サイドクエスチョンを検索"
+
 #: ../../packages/ui/src/components/data-grid/data-grid-search.tsx:182
 msgid "Find in table..."
 msgstr "テーブル内を検索..."
@@ -17352,7 +17361,7 @@ msgstr "元データを隠す"
 msgid "Hide run history"
 msgstr "実行履歴を非表示"
 
-#: src/features/chat/aside/aside-panel.tsx:121
+#: src/features/chat/aside/aside-panel.tsx:124
 msgid "Hide this side question. It is already being answered and still counts as a message."
 msgstr "このサイドクエスチョンを非表示にします。すでに回答中で、メッセージとしてカウントされます。"
 
@@ -23125,6 +23134,7 @@ msgstr "次の項目"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:229
 #: ../../packages/ui/src/components/data-grid/data-grid-search.tsx:200
+#: src/features/chat/aside/find/aside-find-bar.tsx:197
 #: src/features/chat/thread/find/thread-find-bar.tsx:219
 msgid "Next match"
 msgstr "次の一致"
@@ -23523,6 +23533,7 @@ msgstr "レンズが選択されていません"
 msgid "No Markdown files were found to import."
 msgstr "インポートできる Markdown ファイルが見つかりませんでした。"
 
+#: src/features/chat/aside/find/aside-find-bar.tsx:165
 #: src/features/chat/thread/find/thread-find-bar.tsx:186
 msgid "No matches"
 msgstr "一致なし"
@@ -24683,7 +24694,7 @@ msgstr "最新の実行だけを確認したため、古いモデルが含まれ
 msgid "Only the owner can change who sees this skill."
 msgstr "このスキルの公開範囲を変更できるのはオーナーのみです。"
 
-#: src/features/chat/aside/aside-panel.tsx:104
+#: src/features/chat/aside/aside-panel.tsx:105
 msgid "Only the owner of a chat can add to it from here."
 msgstr "ここから追加できるのは、チャットの所有者のみです。"
 
@@ -25314,11 +25325,11 @@ msgstr "OpenAI の最小の LLM"
 msgid "OpenAI's smallest model for maximum speed"
 msgstr "最高速を実現する OpenAI の最小モデル"
 
-#: src/components/settings/settings-modal.tsx:413
+#: src/components/settings/settings-modal.tsx:429
 msgid "Opened {tabLabel}"
 msgstr "{tabLabel} を開きました"
 
-#: src/components/settings/settings-modal.tsx:413
+#: src/components/settings/settings-modal.tsx:429
 msgid "Opened {tabLabel}: {label}"
 msgstr "{tabLabel} を開きました: {label}"
 
@@ -27137,6 +27148,7 @@ msgstr "前の項目"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:233
 #: ../../packages/ui/src/components/data-grid/data-grid-search.tsx:189
+#: src/features/chat/aside/find/aside-find-bar.tsx:194
 #: src/features/chat/thread/find/thread-find-bar.tsx:216
 msgid "Previous match"
 msgstr "前の一致"
@@ -29353,7 +29365,7 @@ msgstr "必須の変数が入力されていません"
 msgid "Required."
 msgstr "必須。"
 
-#: src/components/settings/settings-modal.tsx:150
+#: src/components/settings/settings-modal.tsx:151
 msgid "requires an account"
 msgstr "にはアカウントが必要です"
 
@@ -31578,9 +31590,9 @@ msgid "Set up triggers to automate tasks on a schedule, via webhooks, or in resp
 msgstr "トリガーを設定して、スケジュール、Webhook、またはイベントに応じてタスクを自動化しましょう。"
 
 #: ../../packages/chat-ui/src/org-switcher/org-switcher.tsx:260
-#: src/components/settings/settings-modal.tsx:473
-#: src/components/settings/settings-modal.tsx:595
-#: src/components/settings/settings-modal.tsx:696
+#: src/components/settings/settings-modal.tsx:489
+#: src/components/settings/settings-modal.tsx:611
+#: src/components/settings/settings-modal.tsx:712
 #: src/features/layout/components/mobile-section-nav.tsx:59
 #: src/features/layout/lib/dashboard-page-names.ts:38
 msgid "Settings"
@@ -31966,12 +31978,12 @@ msgstr "サイドチャット"
 msgid "Side panel"
 msgstr "サイドパネル"
 
-#: src/features/chat/aside/aside-panel.tsx:208
-#: src/features/chat/aside/aside-panel.tsx:293
+#: src/features/chat/aside/aside-panel.tsx:211
+#: src/features/chat/aside/aside-panel.tsx:297
 msgid "Side question"
 msgstr "サイドクエスチョン"
 
-#: src/features/chat/aside/aside-panel.tsx:98
+#: src/features/chat/aside/aside-panel.tsx:99
 msgid "Side questions are not available for this chat, or the question is too long."
 msgstr "このチャットではサイドクエスチョンを利用できないか、質問が長すぎます。"
 
@@ -31991,7 +32003,7 @@ msgstr "サイドバーを右に"
 
 #: ../../packages/chat-ui/src/auth/login-form.tsx:43
 #: src/components/not-found.tsx:12
-#: src/components/settings/settings-modal.tsx:163
+#: src/components/settings/settings-modal.tsx:164
 #: src/features/auth/components/auth/auth-card.tsx:493
 #: src/features/auth/components/auth/forms/sign-in-form.tsx:415
 #: src/features/auth/components/device-approval.tsx:363
@@ -32065,7 +32077,7 @@ msgstr "サインインしてすべてのモデルを利用できます。"
 msgid "Sign in to your account"
 msgstr "アカウントにサインイン"
 
-#: src/components/settings/settings-modal.tsx:153
+#: src/components/settings/settings-modal.tsx:154
 msgid "Sign in to your account to use it."
 msgstr "利用するにはアカウントにサインインしてください。"
 
@@ -32115,7 +32127,7 @@ msgstr "サインアップ"
 msgid "Sign Up"
 msgstr "サインアップ"
 
-#: src/components/settings/settings-modal.tsx:153
+#: src/components/settings/settings-modal.tsx:154
 msgid "Sign up and subscribe for $8/mo to unlock all features."
 msgstr "サインアップして月額 $8 で登録すると、すべての機能を利用できます。"
 
@@ -32602,7 +32614,7 @@ msgid "Someone else has control of this browser."
 msgstr "このブラウザーは別の人が操作しています。"
 
 #: src/components/error-boundary.tsx:200
-#: src/components/settings/settings-modal.tsx:127
+#: src/components/settings/settings-modal.tsx:128
 #: src/features/pages/components/page-share-dialog.tsx:50
 msgid "Something went wrong"
 msgstr "問題が発生しました"
@@ -33062,7 +33074,7 @@ msgstr "会話を始める"
 msgid "Start a conversation of your own with the latest AI models."
 msgstr "最新の AI モデルで、自分の会話を始めましょう。"
 
-#: src/features/chat/aside/aside-panel.tsx:209
+#: src/features/chat/aside/aside-panel.tsx:212
 msgid "Start a conversation to ask a side question."
 msgstr "サイドクエスチョンをするには、会話を始めてください。"
 
@@ -35887,11 +35899,11 @@ msgstr "Bedrock コンソールでモデルアクセスを有効にしたリー�
 msgid "The reply goes back to the same chat. Files are fetched when the reply is made, with a 20 MB limit and a list of allowed types."
 msgstr "返信は同じチャットに戻されます。ファイルは返信の作成時に取得され、上限は 20 MB で、許可された種類の一覧があります。"
 
-#: src/features/chat/aside/aside-panel.tsx:102
+#: src/features/chat/aside/aside-panel.tsx:103
 msgid "The reply is still running. Add it when the reply finishes."
 msgstr "返信はまだ実行中です。返信が完了したら追加してください。"
 
-#: src/features/chat/aside/aside-panel.tsx:91
+#: src/features/chat/aside/aside-panel.tsx:92
 msgid "The reply is still running. Try again when it finishes."
 msgstr "返信はまだ実行中です。完了してからもう一度お試しください。"
 
@@ -36101,7 +36113,7 @@ msgstr "チャット内の Mermaid 図のテーマ。"
 msgid "Then download a model and use this base URL:"
 msgstr "次に、モデルをダウンロードして以下のベース URL を使用してください："
 
-#: src/features/chat/aside/aside-panel.tsx:92
+#: src/features/chat/aside/aside-panel.tsx:93
 msgid "There are no credits left to answer this. Add credits and try again."
 msgstr "これに回答するためのクレジットが残っていません。クレジットを追加して、もう一度お試しください。"
 
@@ -36210,8 +36222,8 @@ msgstr "思考機能を備えた視覚言語モデル"
 msgid "Thinking..."
 msgstr "考えています..."
 
-#: src/features/chat/aside/aside-panel.tsx:136
-#: src/features/chat/aside/aside-panel.tsx:225
+#: src/features/chat/aside/aside-panel.tsx:139
+#: src/features/chat/aside/aside-panel.tsx:228
 #: src/features/chat/voice-mode/voice-mode-button.tsx:70
 #: src/features/pages/components/page-agent-dialog.tsx:151
 #: src/features/skills/components/skill-builder-dialog.tsx:182
@@ -36274,8 +36286,8 @@ msgstr "このバンドルは他の人から提供されたものです"
 msgid "This bundle has no items."
 msgstr "このバンドルにはアイテムがありません。"
 
-#: src/features/chat/aside/aside-panel.tsx:103
-#: src/features/chat/aside/aside-panel.tsx:109
+#: src/features/chat/aside/aside-panel.tsx:104
+#: src/features/chat/aside/aside-panel.tsx:110
 msgid "This cannot be added to this chat."
 msgstr "これをこのチャットに追加することはできません。"
 
@@ -36580,8 +36592,8 @@ msgstr "この招待は有効期限が切れています"
 msgid "This invite is not valid"
 msgstr "この招待は無効です"
 
-#: src/features/chat/aside/aside-panel.tsx:90
-#: src/features/chat/aside/aside-panel.tsx:101
+#: src/features/chat/aside/aside-panel.tsx:91
+#: src/features/chat/aside/aside-panel.tsx:102
 msgid "This is already in the thread."
 msgstr "これはすでにスレッドにあります。"
 
@@ -37383,8 +37395,8 @@ msgstr "メッセージが多すぎます。後でもう一度お試しくださ
 msgid "Too many new contexts in a short while. Try again in a minute."
 msgstr "短時間に新しいコンテキストを開始しすぎました。1分後にもう一度お試しください。"
 
-#: src/features/chat/aside/aside-panel.tsx:97
-#: src/features/chat/aside/aside-panel.tsx:108
+#: src/features/chat/aside/aside-panel.tsx:98
+#: src/features/chat/aside/aside-panel.tsx:109
 msgid "Too many requests right now. Try again in a moment."
 msgstr "現在リクエストが多すぎます。しばらくしてからもう一度お試しください。"
 
@@ -37816,7 +37828,7 @@ msgstr "再試行"
 
 #: src/components/error-boundaries/global-error-boundary-provider.tsx:211
 #: src/components/error-boundaries/route-error-boundary.tsx:80
-#: src/components/settings/settings-modal.tsx:132
+#: src/components/settings/settings-modal.tsx:133
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:442
 msgid "Try Again"
 msgstr "もう一度試す"
@@ -38294,11 +38306,11 @@ msgstr "ノードのロックを解除"
 msgid "Unlock this chat"
 msgstr "このチャットのロックを解除"
 
-#: src/features/chat/aside/aside-panel.tsx:105
+#: src/features/chat/aside/aside-panel.tsx:106
 msgid "Unlock this chat to add this to the thread."
 msgstr "これをスレッドに追加するには、このチャットのロックを解除してください。"
 
-#: src/features/chat/aside/aside-panel.tsx:94
+#: src/features/chat/aside/aside-panel.tsx:95
 msgid "Unlock this chat to ask a side question."
 msgstr "サイドクエスチョンをするには、このチャットのロックを解除してください。"
 
@@ -40843,7 +40855,7 @@ msgstr "もう一度お試しいただけます！"
 msgid "You can view this page but not edit it."
 msgstr "このページは閲覧できますが、編集はできません。"
 
-#: src/features/chat/aside/aside-panel.tsx:93
+#: src/features/chat/aside/aside-panel.tsx:94
 msgid "You cannot ask a side question in this chat."
 msgstr "このチャットではサイドクエスチョンはできません。"
 
@@ -40920,8 +40932,8 @@ msgstr "管理者アカウントに戻りました"
 msgid "You have sent a lot of feedback recently. Please try again in an hour."
 msgstr "最近フィードバックを多く送信されています。1 時間ほどしてから、もう一度お試しください。"
 
-#: src/features/chat/aside/aside-panel.tsx:96
-#: src/features/chat/aside/aside-panel.tsx:107
+#: src/features/chat/aside/aside-panel.tsx:97
+#: src/features/chat/aside/aside-panel.tsx:108
 #: src/features/chat/compaction/use-compact-thread.ts:61
 msgid "You have used today's messages. Try again later."
 msgstr "今日のメッセージ数の上限に達しました。後でもう一度お試しください。"
@@ -41407,7 +41419,7 @@ msgstr "セッションの有効期限が切れました。ページを再読み
 msgid "Your session is not fresh. Please sign out and sign back in to delete your account."
 msgstr "セッションが最新ではありません。アカウントを削除するには、サインアウトしてから再度サインインしてください。"
 
-#: src/features/chat/aside/aside-panel.tsx:296
+#: src/features/chat/aside/aside-panel.tsx:301
 msgid "Your side question"
 msgstr "あなたのサイドクエスチョン"
 
