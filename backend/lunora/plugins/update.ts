@@ -17,6 +17,7 @@ import { MAX_LENGTH } from "../lib/validators";
 import { planFor } from "../skills/bundle";
 import { assertNoToolConfig, checkPluginFile } from "./install-action";
 import { entryHash, skillContent } from "./entry-hash";
+import { skillVisibility } from "../skills/access";
 import { liveHashOf } from "./live-hash";
 import { diffUpdate, isDowngrade, markerFor } from "./logic";
 import type { UpdateAction } from "./logic";
@@ -72,17 +73,22 @@ export const loadInstalledForUpdate = internalQuery
         const ownSlugs: { entryKey: string; slug: string }[] = [];
 
         for (const link of page) {
-            const currentHash = await liveHashOf(ctx, installId, link);
-
-            children.push({ contentHash: link.contentHash, currentHash, entryKey: link.entryKey, kind: link.kind });
+            let currentHash = await liveHashOf(ctx, installId, link);
 
             if (link.kind === "skill") {
                 const skill = await ctx.db.skills.findFirst({ consistency: "primary", where: { pluginMarker: markerFor(installId, link.entryKey) } });
 
                 if (skill) {
                     ownSlugs.push({ entryKey: link.entryKey, slug: skill.slug });
+
+                    // Visibility is not in the content hash: a skill shared beyond its owner reads as edited, so the diff keeps it.
+                    if (skillVisibility(skill) !== "private") {
+                        currentHash = "shared";
+                    }
                 }
             }
+
+            children.push({ contentHash: link.contentHash, currentHash, entryKey: link.entryKey, kind: link.kind });
         }
 
         return { children, generation: install.generation, installId, ownSlugs, status: install.status, version: install.version };
@@ -307,7 +313,7 @@ export const updatePlugin = authAction
 
                 const content = skillContent(entry.plan.create);
 
-                await ctx.runMutation(internal.plugins.update_apply.updateSkillChild, {
+                const rewritten = await ctx.runMutation(internal.plugins.update_apply.updateSkillChild, {
                     category: content.category,
                     config: content.config,
                     contentHash: await entryHash(entry),
@@ -324,7 +330,12 @@ export const updatePlugin = authAction
                     variables: content.variables,
                     version: content.version,
                 });
-                applied.push(step.entryKey);
+
+                if (rewritten) {
+                    applied.push(step.entryKey);
+                } else {
+                    skipped.push(step);
+                }
             }
 
             if (createKeys.size > 0) {

@@ -91,7 +91,7 @@ export const updateSkillChild = internalMutation
         variables: v.optional(v.any()),
         version: v.optional(v.string().max(64)),
     })
-    .output(v.null())
+    .output(v.boolean())
     .mutation(async ({ args, ctx }) => {
         await heldInstall(ctx, args.installId as Id<"pluginInstalls">, args.generation);
 
@@ -110,6 +110,15 @@ export const updateSkillChild = internalMutation
 
         if ((await skillRowHash(skill)) !== link.contentHash) {
             throw new LunoraError("CONFLICT", `The skill for "${args.entryKey}" was edited, so it is kept as it is`);
+        }
+
+        // Visibility is not part of the content hash. A skill shared beyond its owner is used by others, so it is not rewritten: it is
+        // detached, as removal does, and kept as it is.
+        if (skillVisibility(skill) !== "private") {
+            await ctx.db.patch("skills", skill._id as Id<"skills">, { pluginInstallId: "", pluginMarker: "" });
+            await ctx.db.delete("pluginItems", link._id as Id<"pluginItems">);
+
+            return false;
         }
 
         // The planned slug gets the same checks skill creation gives it: a reserved or malformed slug is refused, and so is one another skill now holds.
@@ -166,7 +175,7 @@ export const updateSkillChild = internalMutation
 
         await ctx.db.patch("pluginItems", link._id as Id<"pluginItems">, { contentHash: args.contentHash, pendingHash: "" });
 
-        return null;
+        return true;
     });
 
 export const finishUpdate = internalMutation

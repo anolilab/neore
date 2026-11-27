@@ -496,4 +496,42 @@ describe("applying an update", () => {
             "STALE_LEASE",
         );
     });
+
+    it("does not rewrite a skill that was made public after install, and detaches it", async () => {
+        const { installId, skillId } = await installed();
+
+        await run(async (context) => await context.db.patch("skills", skillId, { visibility: "public" }));
+
+        const generation = await run(
+            async (context) => await context.runMutation(beginUpdate, { expectedGeneration: 1, installId, targetVersion: "1.1.0", userId: OWNER }),
+        );
+        const rewritten = await run(
+            async (context) =>
+                await context.runMutation(updateSkillChild, {
+                    contentHash: await skillRowHash(REVISED),
+                    description: REVISED.description,
+                    entryKey: "skill:analyst",
+                    generation,
+                    installId,
+                    instructions: REVISED.instructions,
+                    name: REVISED.name,
+                    slug: REVISED.slug,
+                    userId: OWNER,
+                }),
+        );
+
+        expect(rewritten).toBe(false);
+        expect(await run(async (context) => await context.db.skills.findFirst({ where: { _id: skillId } }))).toMatchObject({
+            instructions: ANALYST.instructions,
+            pluginInstallId: "",
+            pluginMarker: "",
+        });
+        const links = await run(async (context) => {
+            const { page } = await context.db.pluginItems.findMany({ where: { installId } });
+
+            return page;
+        });
+
+        expect(links).toHaveLength(0);
+    });
 });
