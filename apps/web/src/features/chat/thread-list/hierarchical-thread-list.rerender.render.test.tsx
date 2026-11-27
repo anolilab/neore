@@ -391,6 +391,38 @@ afterEach(() => {
 });
 
 describe("the sidebar thread list", () => {
+    it("drops a selected thread the list no longer shows, so bulk delete never takes it", () => {
+        const setSelectedThreadIds = vi.fn();
+
+        render(
+            <HierarchicalThreadList
+                {...listProps}
+                currentThreadId={first}
+                selectedThreadIds={new Set([first, "hidden-thread"])}
+                setSelectedThreadIds={setSelectedThreadIds}
+            />,
+        );
+
+        const update = setSelectedThreadIds.mock.calls[0]?.[0] as (previous: Set<string>) => Set<string>;
+
+        expect([...update(new Set([first, "hidden-thread"]))]).toStrictEqual([first]);
+    });
+
+    it("leaves a selection of shown threads as it is", () => {
+        const setSelectedThreadIds = vi.fn();
+
+        render(
+            <HierarchicalThreadList
+                {...listProps}
+                currentThreadId={first}
+                selectedThreadIds={new Set([first, second])}
+                setSelectedThreadIds={setSelectedThreadIds}
+            />,
+        );
+
+        expect(setSelectedThreadIds).not.toHaveBeenCalled();
+    });
+
     it("re-renders only the row it leaves and the row it opens on a thread switch", () => {
         const { rerender } = render(<HierarchicalThreadList {...listProps} currentThreadId={first} />);
 

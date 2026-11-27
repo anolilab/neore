@@ -495,6 +495,27 @@ const HierarchicalThreadList: FC<
         () => (isSearching ? allThreadGroups : filterGroupsBySection(allThreadGroups, sectionFilter, currentThreadId)),
         [allThreadGroups, currentThreadId, isSearching, sectionFilter],
     );
+
+    // A selection made while searching spans every section; once search closes, the rows the section hides drop out of it, so
+    // bulk delete never takes a thread the list no longer shows. Collapsed groups still count as shown.
+    useEffect(() => {
+        if (selectedThreadIds.size === 0) {
+            return;
+        }
+
+        const shown = new Set<string>();
+        const collect = (node: BranchNode) => {
+            shown.add(node.threadId);
+            node.children.forEach((child) => collect(child));
+        };
+
+        filteredGroups.forEach((group) => group.threads.forEach((thread) => collect(thread)));
+
+        if ([...selectedThreadIds].some((id) => !shown.has(id))) {
+            setSelectedThreadIds((previous) => new Set([...previous].filter((id) => shown.has(id))));
+        }
+    }, [filteredGroups, selectedThreadIds, setSelectedThreadIds]);
+
     // The same groups keep the same list: a new array re-derives every row's inputs (the pull request counts' ids among them) for nothing.
     // Adjusted during render, as `previousInputs` in the list's owner does, so the list and the groups change together.
     const [shownGroups, setShownGroups] = useState<ThreadGroup[]>(filteredGroups);
