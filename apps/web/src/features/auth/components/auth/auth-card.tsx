@@ -2,7 +2,6 @@
 
 import { useLingui } from "@lingui/react/macro";
 import { Button, buttonVariants } from "@neore/ui/components/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@neore/ui/components/card";
 import { Separator } from "@neore/ui/components/separator";
 import useIsHydrated from "@neore/ui/hooks/use-hydrated";
 import cn from "@neore/ui/utils/cn";
@@ -151,11 +150,11 @@ const SocialSection: FC<SocialSectionProperties> = ({
     }
 
     return (
-        <div className="grid gap-4">
+        <div className="grid gap-2">
             {orderedSocialProviders.length + orderedGenericProviders.length > 0 && (
                 <div
                     className={cn(
-                        "flex w-full items-center justify-between gap-4",
+                        "flex w-full items-center justify-between gap-2",
                         socialLayout === "horizontal" && "flex-wrap",
                         socialLayout === "vertical" && "flex-col",
                         socialLayout === "grid" && "grid grid-cols-2",
@@ -214,10 +213,10 @@ const SeparatorSection: FC<SeparatorSectionProperties> = ({ classNames }) => {
     const { t } = useLingui();
 
     return (
-        <div className={cn("flex items-center gap-2", classNames?.continueWith)}>
+        <div className={cn("flex items-center gap-3", classNames?.continueWith)}>
             <Separator className={cn("!w-auto grow", classNames?.separator)} />
-            <span className="text-muted-foreground flex-shrink-0 text-sm">{t`or continue with`}</span>
-            <Separator className={cn("!w-auto grow", classNames?.separator)} />
+            <span className="text-muted-foreground flex-shrink-0 text-xs">{t`or continue with`}</span>
+            <Separator className={cn("bg-border/50 !w-auto grow", classNames?.separator)} />
         </div>
     );
 };
@@ -443,20 +442,20 @@ const AuthCard: FC<AuthCardProperties> = ({
     };
 
     return (
-        // Without the form, nothing gives the card its width: hold it at the sign-up form's (about 290px), within the screen.
-        <Card className={cn("w-full max-w-sm", signUpState !== "open" && "min-w-72", className, classNames?.base)}>
-            <CardHeader className={classNames?.header}>
+        // The page's panel (the `/auth` layout) or the login dialog supplies the surface; this holds the content to the panel's width.
+        <div className={cn("flex w-full max-w-sm flex-col gap-6", className, classNames?.base)}>
+            <div className={cn("grid gap-1.5 text-center", classNames?.header)}>
                 {cardHeader || (
                     <>
-                        <CardTitle className={cn("text-lg md:text-xl", classNames?.title)}>{title}</CardTitle>
-                        {description && <CardDescription className={cn("text-xs md:text-sm", classNames?.description)}>{description}</CardDescription>}
+                        <h1 className={cn("text-xl font-semibold", classNames?.title)}>{title}</h1>
+                        {description && <p className={cn("text-muted-foreground text-sm", classNames?.description)}>{description}</p>}
                     </>
                 )}
-            </CardHeader>
+            </div>
 
             {signUpState === "open" && (
-                <CardContent className={cn("grid gap-6", classNames?.content)}>
-                    <LastSignInMessage className="mb-2" classNames={LAST_SIGNIN_CLASSNAMES} />
+                <div className={cn("grid gap-6", classNames?.content)}>
+                    <LastSignInMessage classNames={LAST_SIGNIN_CLASSNAMES} />
 
                     {oneTap && ["EMAIL_OTP", "MAGIC_LINK", "SIGN_IN", "SIGN_UP"].includes(view) && <OneTap redirectTo={redirectTo} />}
 
@@ -473,11 +472,11 @@ const AuthCard: FC<AuthCardProperties> = ({
                             <SocialSection {...socialProperties} />
                         </>
                     )}
-                </CardContent>
+                </div>
             )}
 
             {credentials && signUp && (!SIGN_IN_LIKE_VIEWS.has(view) || canSignUp) && (
-                <CardFooter className={cn("text-muted-foreground justify-center gap-1.5 text-sm", classNames?.footer)}>
+                <div className={cn("text-muted-foreground flex items-center justify-center gap-1.5 text-sm", classNames?.footer)}>
                     {getFooterText()}
 
                     {SIGN_IN_LIKE_VIEWS.has(view) || view === "SIGN_UP" ? (
@@ -497,9 +496,9 @@ const AuthCard: FC<AuthCardProperties> = ({
                             {t`Go back`}
                         </Button>
                     )}
-                </CardFooter>
+                </div>
             )}
-        </Card>
+        </div>
     );
 };
 
