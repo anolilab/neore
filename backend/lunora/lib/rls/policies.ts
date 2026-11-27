@@ -491,6 +491,10 @@ export const UNPOLICED_TABLES: Record<string, string> = {
     projectRuleFiles:
         "one row per project; its `userId` copies the project's owner (re-stamped on account merge) for erasure only (`eraseProjectRuleFilesForUser`), and every access follows the project's check (`readableProject`, `projectWithEditableSettings` in `projects/functions.ts`)",
     promptHistory: "`userId` is the EDITOR of an org-shared prompt; read under the prompt's rule",
+    groupChatSkillIndex:
+        "per-owner state of the group-chat skill index (`chat/group/skill-index-backfill.ts`); written by the owner's shard sweep, erased with the account (`chat/gdpr.ts`); no client reads it",
+    groupChatSkills:
+        "rows of the group-chat skill index, kept by the `threads` triggers (`chat/group/skill-index.ts`); read only by plugin update and uninstall on the owner's shard, erased with the account (`chat/gdpr.ts`); no client reads it",
     pullRequestStateScans:
         "the housekeeping sweep's scan position over the owner's pull-request links; written and read only by `dispatchLinkedPullRequestChecks` on the owner's shard, erased with the links (`source-control/gdpr.ts`); no client reads it",
     rateLimit: "better-auth rate limiter",

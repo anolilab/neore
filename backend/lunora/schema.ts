@@ -15,6 +15,7 @@ import { defineSchema, defineTable, v } from "lunorash/server";
 
 import { vAcpAgentState, vAcpOptionResult, vAcpSessionStatus, vHostEndReason, vHostEvent, vHostState } from "./acp/validators";
 import { vAgentRef } from "./agent/agent-switch-validators";
+import { groupSkillIndexTriggers } from "./chat/group/skill-index";
 import { threadSearchMessageTriggers, threadSearchTriggers } from "./agent/thread-search-triggers";
 import { vGoalRunConfig, vGoalStatus as vThreadGoalStatus, vGoalStopReason, vGoalVerdict, vPinnedGoal } from "./chat/goals/validators";
 import { vGroupChat } from "./chat/group/validators";
@@ -1533,6 +1534,27 @@ export const schema = defineSchema({
         .shardBy("userId")
         .index("by_user_and_status", ["userId", "status"]),
 
+    // One per user: the backfill's position over the owner's threads, and `completedAt` once every thread is indexed
+    // (`chat/group/skill-index-backfill.ts`). Unset, readers scan as before.
+    groupChatSkillIndex: defineTable({
+        completedAt: v.optional(v.number()),
+        cursor: v.optional(v.string()),
+        userId: v.string(),
+    })
+        .shardBy("userId")
+        .index("by_userId", ["userId"]),
+
+    // One row per (group chat, skill it names), kept by the `threads` triggers (`chat/group/skill-index.ts`): which of an owner's
+    // group chats use a skill, without scanning their chats. Read only when the owner's `groupChatSkillIndex` row is complete.
+    groupChatSkills: defineTable({
+        skillId: v.string(),
+        threadId: v.string(),
+        userId: v.string(),
+    })
+        .shardBy("userId")
+        .index("by_user_and_skill", ["userId", "skillId"])
+        .index("by_thread", ["threadId"]),
+
     /**
      * Claim-once rows (`lib/claim-once.ts`): one per messenger event, trigger
      * webhook delivery or queue job that must happen at most once. `scope` names
@@ -1979,7 +2001,6 @@ export const schema = defineSchema({
                 thread: r.one("threads", { field: "threadId" }),
             };
         }),
-
     messengerConnections: defineTable({
         connectedAt: v.number(),
         displayName: v.optional(v.string()),
@@ -2014,7 +2035,6 @@ export const schema = defineSchema({
         .index("by_platform_and_chatId", ["platform", "platformChatId"])
         .index("by_platform_and_userId", ["platform", "platformUserId"])
         .index("by_status", ["status"]),
-
     nodeExecutions: defineTable({
         completedAt: v.optional(v.number()),
         error: v.optional(v.string()),
@@ -2027,6 +2047,7 @@ export const schema = defineSchema({
         status: v.union(v.literal("pending"), v.literal("running"), v.literal("completed"), v.literal("failed"), v.literal("skipped")),
         usage: v.optional(v.object({ completionTokens: v.number(), promptTokens: v.number(), totalTokens: v.number() })),
     }).index("by_execution_and_node", ["executionId", "nodeId"]),
+
     // The notification inbox (`notifications/`): one row per event for its
     // user, written only through `notify()`. `title` is the SUBJECT (a task's
     // title); the UI words what happened from `type` + `outcome`. Pruned after
@@ -2041,6 +2062,7 @@ export const schema = defineSchema({
         .index("by_userId_readAt_createdAt", ["userId", "readAt", "createdAt"])
         .index("by_userId_dedupeKey", ["userId", "dedupeKey"])
         .index("by_createdAt", ["createdAt"]),
+
     // One open connector OAuth flow. `state` is the SHA-256 of the value sent to
     // the provider; `flow` carries what completion needs (PKCE verifier and any
     // DCR client secret encrypted). Single-use: completion deletes the row.
@@ -2992,7 +3014,6 @@ export const schema = defineSchema({
         // Unique: two registrations of one phone racing each other must not leave a row for each account.
         .index("by_token", ["token"], { unique: true })
         .index("by_userId", ["userId"]),
-
     /**
      * better-auth's own rate-limit store.
      *
@@ -3040,6 +3061,7 @@ export const schema = defineSchema({
         .index("by_key", ["key"])
         // `lib/rate-limit-sweep.ts` deletes rows past every limit's retention.
         .index("by_ts", ["ts"]),
+
     /**
      * A value the agent asked the user for with `requestSecret` (an API key, a token),
      * kept behind the opaque `ref` the agent sees. `encryptedValue` is BYOK-style
@@ -3736,7 +3758,6 @@ export const schema = defineSchema({
         .index("teamId", ["teamId"])
         .index("organizationId", ["organizationId"])
         .triggers((t) => auditTriggersFor(t, "teamSettings", AUDIT_TABLES["teamSettings"]!)),
-
     temporaryThreads: defineTable({
         expiresAt: v.number(),
         retentionHours: v.optional(v.number()),
@@ -3783,6 +3804,7 @@ export const schema = defineSchema({
                 thread: r.one("threads", { field: "threadId" }),
             };
         }),
+
     /**
      * The last revision of a thread grant (`agent/grant-revision.ts`), one row per thread and grantee. It outlives the
      * grant row, so a grant written after a removal continues past the removal's revision and a denial names it. Erased
@@ -3801,7 +3823,6 @@ export const schema = defineSchema({
         .index("by_thread_and_user", ["threadId", "userId"], { unique: true })
         .index("by_user_and_owner", ["userId", "ownerId"])
         .index("by_owner", ["ownerId"]),
-
     /**
      * A rolling summary of the older rows of ONE path of a thread, made while it
      * sits idle (`agent/thread-summaries.ts`) and fed to the agent ahead of the
@@ -3835,7 +3856,6 @@ export const schema = defineSchema({
         .shardBy("userId")
         .index("by_threadId", ["threadId"])
         .index("by_userId", ["userId"]),
-
     // Whether a person follows a thread for new-reply notifications (`chat/follows/functions.ts`). A row exists only
     // once a state is set (by the person, or by share/accept); no row means "off".
     // Global (D1) like `threadAccess`: the follower, the thread's owner and the erasure of either read the same rows.
@@ -3854,6 +3874,7 @@ export const schema = defineSchema({
                 thread: r.one("threads", { field: "threadId" }),
             };
         }),
+
     threadGoals: defineTable({
         // The highest round whose review has been claimed (`chat/goals/internal.ts#claimGoalRound`):
         // the review job is queued at least once, and only the delivery that claims a round reviews it.
@@ -3889,6 +3910,7 @@ export const schema = defineSchema({
                 thread: r.one("threads", { field: "threadId" }),
             };
         }),
+
     /**
      * A guest link for one thread (`chat/guest-links.ts`): what a person without access can use to LEAVE a
      * message for the owner. It grants no read of the thread. Only the SHA-256 of the link token is stored
@@ -4218,7 +4240,9 @@ export const schema = defineSchema({
         .index("by_user_and_organization_and_updatedAt", ["userId", "organizationId", "updatedAt"])
         .searchIndex("title", { field: "title", filterFields: ["userId"] })
         .searchIndex("summary", { field: "summary", filterFields: ["userId"] })
-        .triggers((t) => threadSearchTriggers(t))
+        .triggers((t) => {
+            return { ...threadSearchTriggers(t), ...groupSkillIndexTriggers(t) };
+        })
         .relations((r) => {
             return {
                 access: r.many("threadAccess", { field: "threadId" }),

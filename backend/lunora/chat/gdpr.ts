@@ -131,7 +131,7 @@ export const eraseThreadPinsAndTagsBatch = async (ctx: MutationCtx, userId: stri
  * of each per call.
  */
 export const erasePersistentStreamsForUser = async (ctx: MutationCtx, userId: string): Promise<BatchResult> => {
-    const [streams, approvalRuns, secrets, goals, guestMessages, guestLinks] = await Promise.all([
+    const [streams, approvalRuns, secrets, goals, guestMessages, guestLinks, skillRows, indexState] = await Promise.all([
         ctx.db
             .query("persistentStreams")
             .withIndex("by_userId_status", (q) => q.eq("userId", userId))
@@ -157,6 +157,15 @@ export const erasePersistentStreamsForUser = async (ctx: MutationCtx, userId: st
             .query("threadGuestLinks")
             .withIndex("by_userId", (q) => q.eq("userId", userId))
             .take(BATCH),
+        // The group-chat skill index and its state (`chat/group/skill-index.ts`): derived from the threads, which go in their own step.
+        ctx.db
+            .query("groupChatSkills")
+            .withIndex("by_user_and_skill", (q) => q.eq("userId", userId))
+            .take(BATCH),
+        ctx.db
+            .query("groupChatSkillIndex")
+            .withIndex("by_userId", (q) => q.eq("userId", userId))
+            .take(BATCH),
     ]);
 
     await Promise.all([
@@ -164,6 +173,8 @@ export const erasePersistentStreamsForUser = async (ctx: MutationCtx, userId: st
         ...secrets.map(async (row) => await ctx.db.delete("requestedSecrets", row._id)),
         ...goals.map(async (row) => await ctx.db.delete("threadGoals", row._id)),
         ...guestMessages.map(async (row) => await ctx.db.delete("threadGuestMessages", row._id)),
+        ...skillRows.map(async (row) => await ctx.db.delete("groupChatSkills", row._id)),
+        ...indexState.map(async (row) => await ctx.db.delete("groupChatSkillIndex", row._id)),
     ]);
 
     // A link is removed only once no guest message can still reference it: a short batch of messages drained them all.
@@ -199,6 +210,8 @@ export const erasePersistentStreamsForUser = async (ctx: MutationCtx, userId: st
             secrets.length >= BATCH ||
             goals.length >= BATCH ||
             guestMessages.length >= BATCH ||
+            skillRows.length >= BATCH ||
+            indexState.length >= BATCH ||
             (messagesDrained && guestLinks.length >= BATCH),
     };
 };

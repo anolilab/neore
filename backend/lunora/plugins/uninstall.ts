@@ -17,6 +17,7 @@ import { LunoraError } from "lunorash/server";
 import type { Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { DEFAULT_GROUP_TITLE } from "../chat/group/functions";
+import { indexedGroupUsers } from "../chat/group/skill-index";
 import { skillVisibility } from "../skills/access";
 import { requireOwnerShard } from "./owner-shard";
 import { skillRowHash, triggerRowHash } from "./entry-hash";
@@ -112,7 +113,18 @@ export const uninstallRows = async (ctx: MutationCtx, userId: string, pluginSlug
 
     let scanFull = false;
 
-    if (skillIds.size > 0) {
+    const indexedUsers = skillIds.size > 0 ? await indexedGroupUsers(ctx, userId, [...skillIds], installId) : undefined;
+
+    if (indexedUsers) {
+        // The owner's group-chat index is complete: no scan, so no page to fill. A skill it cannot vouch for is kept, as a full scan keeps it.
+        scanFull = indexedUsers.unknown;
+
+        const [user] = indexedUsers.users;
+
+        if (user) {
+            throw new LunoraError("CONFLICT", `"${user.title ?? "A group chat"}" uses a skill of this plugin. Change that group chat first.`);
+        }
+    } else if (skillIds.size > 0) {
         const threads = await ctx.db
             .query("threads")
             .withIndex("by_user_and_updatedAt", (q) => q.eq("userId", userId))
@@ -346,7 +358,12 @@ export const finishUninstallRows = async (
     let usedByOthers = new Set<string>();
     let scanFull = false;
 
-    if (pendingSkills.length > 0) {
+    const indexedUsers = pendingSkills.length > 0 ? await indexedGroupUsers(ctx, install.userId, pendingSkills, installId) : undefined;
+
+    if (indexedUsers) {
+        scanFull = indexedUsers.unknown;
+        usedByOthers = new Set(indexedUsers.users.flatMap((thread) => thread.groupChat?.participants.map((participant) => participant.skillId) ?? []));
+    } else if (pendingSkills.length > 0) {
         const threads = await ctx.db
             .query("threads")
             .withIndex("by_user_and_updatedAt", (q) => q.eq("userId", install.userId))

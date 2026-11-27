@@ -41,6 +41,7 @@ import { skillVisibility } from "../skills/access";
 import { invalidateSkillsCache } from "../skills/cache";
 import { deleteSkillRows } from "../skills/functions";
 import { groupFingerprint } from "../chat/group/fingerprint";
+import { indexedGroupNames } from "../chat/group/skill-index";
 import { ensureSlugUnique, validateSlug } from "../skills/validators";
 import { heldInstall, heldInstallForShardWrite, patchInstallIf } from "./held-install";
 import { liveHashOf } from "./live-hash";
@@ -459,6 +460,13 @@ const linkFor = async (ctx: Pick<MutationCtx, "db">, installId: string, entryKey
 
 /** A group chat of the owner that names the skill as a participant or synthesizer, if any. Too many conversations to scan counts as a user. */
 const groupUsing = async (ctx: Pick<MutationCtx, "db">, skillId: string, userId: string): Promise<boolean> => {
+    // An owner whose group-chat index is complete is answered from it, however many chats they have; otherwise the bounded scan.
+    const indexed = await indexedGroupNames(ctx, userId, skillId);
+
+    if (indexed !== undefined) {
+        return indexed;
+    }
+
     const threads = await ctx.db
         .query("threads")
         .withIndex("by_user_and_updatedAt", (q) => q.eq("userId", userId))

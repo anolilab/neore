@@ -164,8 +164,10 @@ const NOT_MOVED = new Set(["cronRuns", "idempotencyClaims", "rateLimits"]);
 /**
  * Dropped with the guest's shard, never copied: a scan position into the guest's pull-request links, which the merge
  * re-inserts under new ids, so a carried cursor would point at nothing. The new account's sweep starts from its first link.
+ * The group-chat skill index is the same: its rows are made by the `threads` triggers as the guest's threads are imported, and the
+ * guest's "complete" mark says nothing about the new account's own threads, so it is never carried over.
  */
-const NOT_COPIED = new Set(["pullRequestStateScans"]);
+const NOT_COPIED = new Set(["groupChatSkillIndex", "groupChatSkills", "pullRequestStateScans"]);
 
 /**
  * The tables whose rows live on a user's shard — everything but `.global()` — sorted, but `threads` just before

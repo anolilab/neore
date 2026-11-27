@@ -101,6 +101,8 @@ const shardSweeps = (): ReadonlyArray<Sweep> => [
     { name: "pruneRetainedActivity", ref: internal.gdpr.retention.pruneRetainedActivity },
     // An export whose workflow died leaves its pieces and usage object on the shard; past their time to live, the sweep removes them.
     { name: "sweepUsageExportPieces", ref: internal.usage.gdpr.sweepUsageExportPieces },
+    // Indexes the owner's group chats by skill until the index is complete (`chat/group/skill-index-backfill.ts`); a no-op after.
+    { name: "sweepGroupSkillIndex", ref: internal.chat.group.skill_index_backfill.sweepGroupSkillIndex },
     { name: "sweepUsageRollup", ref: internal.usage.backfill.sweepUsageRollup },
     { name: "sweepStagedChatUploads", ref: internal.file.sweepStagedChatUploads },
     { name: "pruneExpiredToolPermissionGrants", ref: internal.chat.tool_permissions.pruneExpiredToolPermissionGrants },
