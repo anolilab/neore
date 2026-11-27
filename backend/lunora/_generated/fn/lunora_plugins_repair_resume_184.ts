@@ -2,14 +2,18 @@
 // Run `lunora codegen` to regenerate.
 
 import { DEFER_VALIDATION as DEFER, installCompiledValidatorMap } from "lunorash/values";
-import * as lunora_plugins_uninstall_185 from "../../plugins/uninstall.js";
+import * as lunora_plugins_repair_resume_184 from "../../plugins/repair-resume.js";
 
 /** Install the precompiled argument parsers before the module is dispatched. */
-installCompiledValidatorMap(lunora_plugins_uninstall_185.uninstallPlugin.args, (source) => {
+installCompiledValidatorMap(lunora_plugins_repair_resume_184.beginRepair.args, (source) => {
 if (typeof source !== "object" || source === null || Array.isArray(source)) return DEFER;
 if (Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null) return DEFER;
+if (typeof source["contentHash"] !== "string") return DEFER;
+if (source["contentHash"].length > 128) return DEFER;
 if (typeof source["pluginSlug"] !== "string") return DEFER;
 if (source["pluginSlug"].length > 64) return DEFER;
-return { "pluginSlug": source["pluginSlug"] };
+if (typeof source["userId"] !== "string") return DEFER;
+if (source["userId"].length > 128) return DEFER;
+return { "contentHash": source["contentHash"], "pluginSlug": source["pluginSlug"], "userId": source["userId"] };
 });
-export * from "../../plugins/uninstall.js";
+export * from "../../plugins/repair-resume.js";
