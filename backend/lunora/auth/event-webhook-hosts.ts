@@ -110,6 +110,11 @@ export const removeEventWebhookHost = authMutation
             throw new LunoraError("FORBIDDEN", "Callback hosts cannot be removed while impersonating");
         }
 
+        // A merge copies this account's approvals to the new account, so a removal made meanwhile would be undone by that copy.
+        if (await hasAccountMove(context, context.user.userId, "merging")) {
+            throw new LunoraError("FORBIDDEN", "Callback hosts cannot be removed while the account is being merged.");
+        }
+
         if (!onOwnShard(context.user.userId)) {
             throw new LunoraError("FORBIDDEN", "Callback hosts are saved on your own account only.");
         }

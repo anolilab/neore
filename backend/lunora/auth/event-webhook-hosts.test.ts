@@ -124,6 +124,22 @@ describe("the owner's approved callback hosts", () => {
         }
     });
 
+    it("refuses a removal while the account is merging, so the merge cannot undo it", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            const identity = await signedIn(harness);
+            const as = harness.withIdentity(identity as never);
+
+            await as.mutation(addEventWebhookHost as never, { host: "hooks.example.com" } as never);
+            await harness.run(async (context: any) => await beginAccountMove(context, identity.userId, "merging", Date.now()));
+
+            await expect(as.mutation(removeEventWebhookHost as never, { host: "hooks.example.com" } as never)).rejects.toMatchObject({ code: "FORBIDDEN" });
+        } finally {
+            harness.close();
+        }
+    });
+
     it("removes a host held in more rows than the add cap, so none of them is left approved", async () => {
         const harness = lunoraTest(schema as never);
 
