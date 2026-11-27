@@ -66,7 +66,7 @@ const InvitationCell = ({ className, classNames, invitation }: InvitationCellPro
     };
 
     return (
-        <Card className={cn("surface-row-card bg-surface-row rounded-xl flex-row items-center px-3.5 py-3", className, classNames?.cell)}>
+        <Card className={cn("surface-row-card rounded-none flex-row items-center px-0 py-3", className, classNames?.cell)}>
             <div className="flex flex-1 items-center gap-2">
                 <Avatar className="my-0.5 h-8 w-8 rounded-lg">
                     <AvatarFallback className="rounded-lg" name={invitation.email || undefined}>

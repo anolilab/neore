@@ -15,6 +15,7 @@ import AppSidebar from "@/features/layout/components/app-sidebar";
 import DashboardSidebarProvider from "@/features/layout/components/dashboard-sidebar-provider";
 import NavItems from "@/features/layout/components/nav-items";
 import SiteHeader from "@/features/layout/components/site-header";
+import { settingsLocation } from "@/features/settings/lib/settings-link";
 import { requireSession } from "@/lib/auth/route-guard";
 
 /** Descriptors, not strings: module scope — the component translates them (`i18n._`). */
@@ -158,7 +159,7 @@ export const Route = createFileRoute("/admin")({
         const result = await context.lunoraClient.query(api.auth.admin.isCurrentUserAdmin, {});
 
         if (!result?.isAdmin) {
-            throw redirect({ to: "/dashboard/settings/auth/account" });
+            throw redirect(settingsLocation("auth-account"));
         }
     },
     component: RouteComponent,

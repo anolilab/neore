@@ -230,3 +230,28 @@
 [data-focus-area]:not([contenteditable]):focus-visible {
     @apply outline-ring outline-2 -outline-offset-2 outline-solid;
 }
+
+/* Settings cards (`settings-card.tsx`): one box of rows split by hairlines, the action in the last row. */
+[data-slot="settings-card-body"] > div > [data-slot="card-content"] > * {
+    margin-block: 0;
+    padding-block: 0.875rem;
+}
+
+[data-slot="settings-card-body"] > div > [data-slot="card-content"] > * + *,
+[data-slot="settings-card-body"] > div + [data-slot="card-footer"] {
+    border-top: 1px solid var(--border);
+}
+
+/* A box with nothing in it (an empty list and no action) is not drawn. */
+[data-slot="settings-card-body"]:not(:has([data-slot="card-footer"])):has(> div > [data-slot="card-content"]:empty) {
+    display: none;
+}
+
+/* A list of rows (keys, sessions, members) sits flush: the rows draw their own hairlines. */
+[data-slot="settings-card-body"] :has(> .surface-row-card) {
+    gap: 0;
+}
+
+[data-slot="settings-card-body"] :has(> .surface-row-card) > * {
+    margin-block: 0;
+}

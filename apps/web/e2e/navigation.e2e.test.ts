@@ -51,10 +51,12 @@ test.describe("Protected routes while signed out", () => {
         await expect(page).toHaveURL(new RegExp(String.raw`${AUTH_PATHS.signIn}(\?.*)?$`));
     });
 
-    test("sends /dashboard/settings to sign-in", async ({ page }) => {
+    // An old settings URL is redirected to the chat with the settings modal open, but only after the session check.
+    test("sends an old settings page URL to sign-in instead of opening the settings modal", async ({ page }) => {
         await page.goto(PROTECTED_PATHS.settings);
 
         await expect(page).toHaveURL(SIGN_IN_URL_RE);
+        await expect(page.getByRole("dialog", { name: "Settings" })).toHaveCount(0);
     });
 
     test("does not leak the admin area", async ({ page }) => {

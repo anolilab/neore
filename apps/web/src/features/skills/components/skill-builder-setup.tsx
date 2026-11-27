@@ -2,10 +2,10 @@
 
 import { useLingui } from "@lingui/react/macro";
 import { Button } from "@neore/ui/components/button";
-import { useNavigate } from "@tanstack/react-router";
 import { Cable, X } from "lucide-react";
 import { useCallback, useEffect, useId, useState } from "react";
 
+import { useOpenSettings } from "@/components/settings/settings-link";
 import { requestMcpInstall } from "@/features/settings/components/chat/mcp/pending-install";
 
 import { isConnectorActionable } from "../lib/skill-builder";
@@ -70,16 +70,12 @@ interface SkillBuilderSetupProps {
 const SkillBuilderSetup = ({ onDismiss, onDone, pending }: SkillBuilderSetupProps) => {
     const { t } = useLingui();
     const id = useId();
-    const navigate = useNavigate();
+    const openSettings = useOpenSettings();
     const connectorStatus = useRecommendedConnectorStatuses(pending.connectors.map((connector) => connector.id));
 
     if (pending.mcpServers.length === 0 && pending.connectors.length === 0) {
         return null;
     }
-
-    const openSettings = (to: "/dashboard/settings/chat/mcp" | "/dashboard/settings/connectors") => {
-        navigate({ to }).catch(() => undefined);
-    };
 
     return (
         <section aria-labelledby={id} className="bg-muted/40 space-y-3 rounded-lg border p-4">
@@ -106,7 +102,7 @@ const SkillBuilderSetup = ({ onDismiss, onDone, pending }: SkillBuilderSetupProp
                             onClick={() => {
                                 requestMcpInstall(server);
                                 onDone({ ...pending, mcpServers: pending.mcpServers.filter((item) => item.server.id !== server.id) });
-                                openSettings("/dashboard/settings/chat/mcp");
+                                openSettings("chat-mcp");
                             }}
                             size="sm"
                             type="button"
@@ -127,7 +123,7 @@ const SkillBuilderSetup = ({ onDismiss, onDone, pending }: SkillBuilderSetupProp
                             <Button
                                 onClick={() => {
                                     onDone({ ...pending, connectors: pending.connectors.filter((item) => item.id !== connector.id) });
-                                    openSettings("/dashboard/settings/connectors");
+                                    openSettings("connectors");
                                 }}
                                 size="sm"
                                 type="button"

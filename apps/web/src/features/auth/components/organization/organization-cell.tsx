@@ -69,7 +69,7 @@ const OrganizationCell = ({ className, classNames, organization }: OrganizationC
 
     return (
         <>
-            <Card className={cn("surface-row-card bg-surface-row rounded-xl flex-row px-3.5 py-3", className, classNames?.cell)}>
+            <Card className={cn("surface-row-card rounded-none flex-row px-0 py-3", className, classNames?.cell)}>
                 <OrganizationView organization={organization} />
 
                 <DropdownMenu>

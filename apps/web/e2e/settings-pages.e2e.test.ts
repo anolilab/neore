@@ -1,15 +1,15 @@
 /**
- * Every settings page, opened once by a signed-in user, in English and in
- * German. A crash on `/dashboard/settings/chat/usage` (Lingui "Attempted to
- * call a translation function without setting a locale") reached main because
- * no spec ever opened that page; this sweep is the net for the next one.
+ * Every settings tab, opened once by a signed-in user through its old page URL, in English and in
+ * German. A crash on the usage page (Lingui "Attempted to call a translation function without setting
+ * a locale") reached main because no spec ever opened it; this sweep is the net for the next one.
  *
- * Each page must render its title — in the breadcrumb, and as the page's one
- * `h1` with the same name — show no error boundary and log no page
- * error or console error. The route list is checked against the route files on
- * disk, so a new settings page fails here until it is added to the sweep.
+ * Settings live in a modal now, and each old `/dashboard/settings/*` URL redirects to `/chat` with the modal
+ * open at that page's tab. Each URL must land there, show the tab's title (the navigation's current item, and
+ * the tab's one `h2` with the same name), show no error boundary and log no page error or console error. The
+ * path list is checked against the path table in `settings-link.ts`, so a page added to the table fails here
+ * until it is added to the sweep.
  */
-import { readdirSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 import type { ConsoleMessage, Page } from "@playwright/test";
@@ -17,39 +17,50 @@ import type { ConsoleMessage, Page } from "@playwright/test";
 import { expect, expectAssistantReply, openChat, sendMessage, settle, test } from "./chat-helpers";
 import { APP_BASE_URL } from "./fixtures";
 
-const SETTINGS_ROUTES_DIR = fileURLToPath(new URL("../src/routes/dashboard/settings", import.meta.url));
+const SETTINGS_LINK_SOURCE = fileURLToPath(new URL("../src/features/settings/lib/settings-link.ts", import.meta.url));
 
-/** Routes the sweep does not open, and why. */
-const SKIPPED_ROUTES = new Map<string, string>([
-    // The OAuth provider's redirect target: without a real `code`/`state` pair it only reports the failed exchange.
-    ["connectors/callback", "needs an OAuth redirect"],
-]);
+/** Every old settings page, as its path below `/dashboard/settings/`, with the modal tab it opens and that tab's English title. */
+const SETTINGS_PAGES = {
+    "app/customization": { tab: "app-customization", title: "Customization" },
+    "app/keyboard-shortcuts": { tab: "app-keyboard", title: "Keyboard Shortcuts" },
+    "app/personalization": { tab: "chat-personalization", title: "Personalization" },
+    "auth/account": { tab: "auth-account", title: "Account" },
+    "auth/api-keys": { tab: "auth-api-keys", title: "API Keys" },
+    "auth/members": { tab: "auth-members", title: "Members" },
+    "auth/organization": { tab: "auth-organization", title: "Organization" },
+    "auth/organizations": { tab: "auth-organizations", title: "Organizations" },
+    "auth/security": { tab: "auth-security", title: "Security" },
+    "auth/teams": { tab: "auth-teams", title: "Teams" },
+    "chat/agent": { tab: "chat-agent", title: "Agent" },
+    "chat/bots": { tab: "chat-bots", title: "Bots" },
+    "chat/devices": { tab: "chat-devices", title: "Devices" },
+    "chat/knowledge": { tab: "chat-knowledge", title: "Knowledge Base" },
+    "chat/mcp": { tab: "chat-mcp", title: "MCP Servers" },
+    "chat/model-filters": { tab: "chat-model-filters", title: "Model Restrictions" },
+    "chat/models": { tab: "chat-models", title: "Models" },
+    "chat/triggers": { tab: "chat-triggers", title: "Triggers" },
+    "chat/usage": { tab: "chat-usage", title: "Usage" },
+    connectors: { tab: "connectors", title: "Connectors" },
+    "connectors/messenger": { tab: "connectors-messenger", title: "Messenger" },
+    privacy: { tab: "privacy", title: "Privacy & Data" },
+} as const;
 
-/** Every settings page, as its path below `/dashboard/settings/`. */
-const SETTINGS_PAGES = [
-    "app/customization",
-    "app/keyboard-shortcuts",
-    "app/personalization",
-    "auth/account",
-    "auth/api-keys",
-    "auth/members",
-    "auth/organization",
-    "auth/organizations",
-    "auth/security",
-    "auth/teams",
-    "chat/agent",
-    "chat/bots",
-    "chat/devices",
-    "chat/knowledge",
-    "chat/mcp",
-    "chat/model-filters",
-    "chat/models",
-    "chat/triggers",
-    "chat/usage",
-    "connectors",
-    "connectors/messenger",
-    "privacy",
-] as const;
+type SettingsPath = keyof typeof SETTINGS_PAGES;
+
+// `"app/customization": "app-customization",` or `connectors: "connectors",`
+const PAIR_RE = /^ +(?:"([^"]+)"|([a-z]+)): "([^"]+)",$/gmu;
+
+/** The `path: tab` pairs of `TAB_BY_SETTINGS_PATH`, read from its source: the app's own table, not a copy of it. */
+const redirectTable = (): Record<string, string> => {
+    const source = readFileSync(SETTINGS_LINK_SOURCE, "utf8");
+    const table = source.slice(source.indexOf("TAB_BY_SETTINGS_PATH"));
+    const body = table.slice(table.indexOf("{"), table.indexOf("};"));
+
+    return Object.fromEntries([...body.matchAll(PAIR_RE)].map((match) => [match[1] ?? match[2] ?? "", match[3] ?? ""]));
+};
+
+/** The modal's URL for a tab: `/chat` with `settings` and `settingsTab` in its search. */
+const settingsUrlFor = (tab: string): RegExp => new RegExp(String.raw`/chat\?(?:.*&)?settingsTab=${tab}(?:&|$)`);
 
 /** Both error UIs: the app's `ErrorBoundary` / `ErrorComponent` and TanStack's default "Something went wrong!". */
 const ERROR_BOUNDARY_RE = /Something went wrong/i;
@@ -58,9 +69,6 @@ const ERROR_BOUNDARY_RE = /Something went wrong/i;
 const ONE_REPLY_RE = /(?:^|\D)1 (?:reply|Antwort)\b/;
 
 const NON_EMPTY_RE = /\S/;
-const ORGANIZATIONS_URL_RE = /\/dashboard\/settings\/auth\/organizations$/;
-const TSX_EXTENSION_RE = /\.tsx$/;
-const TRAILING_SLASH_RE = /\/$/;
 
 /**
  * Console noise that is not the page's fault. Each entry says why it is allowed;
@@ -74,17 +82,6 @@ const BENIGN_CONSOLE_ERRORS: { reason: string; test: RegExp }[] = [
         test: /^Failed to load resource/,
     },
 ];
-
-const routeFilesOnDisk = (directory: string, prefix = ""): string[] =>
-    readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
-        if (entry.isDirectory()) {
-            return routeFilesOnDisk(`${directory}/${entry.name}`, `${prefix}${entry.name}/`);
-        }
-
-        const name = entry.name.replace(TSX_EXTENSION_RE, "");
-
-        return name === "index" ? [prefix.replace(TRAILING_SLASH_RE, "")] : [`${prefix}${name}`];
-    });
 
 /** Record the page errors and unexpected console errors `page` produces from now on. */
 const collectErrors = (page: Page): string[] => {
@@ -108,31 +105,31 @@ const collectErrors = (page: Page): string[] => {
     return errors;
 };
 
-/** The page's visible title: the breadcrumb's current page. */
-const pageTitle = (page: Page) => page.locator("main").getByRole("navigation", { name: "breadcrumb" }).locator('[aria-current="page"]');
+/** The settings modal. */
+const settingsDialog = (page: Page) => page.getByRole("dialog", { name: "Settings" });
+
+/** The navigation's current item: the tab the modal shows. */
+const currentTabItem = (page: Page) => settingsDialog(page).getByRole("navigation").locator('[aria-current="true"]');
 
 /**
- * The page's `h1` — `sr-only`, rendered by the settings layout
- * (`SettingsPageOutline`) with the same name as the breadcrumb. Accessible, not
- * visible, so it is matched by role, which an `sr-only` element still has.
+ * The tab's title is the navigation's current item, and the tab has one `h2` with the same name (in the modal's own
+ * locale), so a screen-reader user can find the tab by its heading. In English the title is the expected one.
  */
-const pageHeading = (page: Page) => page.getByRole("heading", { level: 1 });
+const expectTabTitle = async (page: Page, path: SettingsPath, locale: string): Promise<void> => {
+    await expect.soft(currentTabItem(page), `${path} shows its title`).toHaveText(NON_EMPTY_RE, { timeout: 60_000 });
 
-/**
- * One `h1`, naming the page as the breadcrumb does (in the page's own locale),
- * so a screen-reader user can find the page by its heading.
- */
-const expectPageHeading = async (page: Page, path: string): Promise<void> => {
-    await expect.soft(pageTitle(page), `${path} shows its title`).toHaveText(NON_EMPTY_RE, { timeout: 60_000 });
+    const title = (await currentTabItem(page).textContent())?.trim() ?? "";
 
-    const title = (await pageTitle(page).textContent())?.trim() ?? "";
+    // Only English has the expected title to compare; another locale compares the page with itself.
+    expect.soft(locale === "en" ? title : SETTINGS_PAGES[path].title, `${path} opens the ${SETTINGS_PAGES[path].tab} tab`).toBe(SETTINGS_PAGES[path].title);
 
-    await expect.soft(pageHeading(page), `${path} has exactly one h1`).toHaveCount(1);
-    await expect.soft(pageHeading(page), `${path}'s h1 names the page`).toHaveText(title);
+    await expect
+        .soft(settingsDialog(page).getByRole("heading", { exact: true, level: 2, name: title }), `${path} has exactly one h2 naming the tab`)
+        .toHaveCount(1);
 };
 
 /**
- * Load a settings page.
+ * Load an old settings page URL; it redirects to the chat with the modal open.
  *
  * The sweep is two full page loads a second, from one IP. It used to reload any
  * page that got a 429 from `/api/auth/*` and wait out better-auth's per-IP
@@ -144,7 +141,7 @@ const expectPageHeading = async (page: Page, path: string): Promise<void> => {
  * `src/lib/auth/route-guard.ts`). A page that does not render here is the
  * page's — or that recovery's — fault.
  */
-const loadSettingsPage = async (page: Page, path: string, clearErrors: () => void): Promise<void> => {
+const loadSettingsPage = async (page: Page, path: SettingsPath, clearErrors: () => void): Promise<void> => {
     await settle(page);
     // Only this load's errors count.
     clearErrors();
@@ -153,22 +150,23 @@ const loadSettingsPage = async (page: Page, path: string, clearErrors: () => voi
 };
 
 /**
- * Open every settings page in turn and return the errors each one logged. Render
+ * Open every old settings page URL in turn and return the errors each one logged. Render
  * failures are soft assertions, so one broken page does not hide the next.
  */
 const sweepSettingsPages = async (page: Page, locale: string): Promise<Record<string, string[]>> => {
     const errors = collectErrors(page);
     const errorsByPage: Record<string, string[]> = {};
 
-    for (const path of SETTINGS_PAGES) {
+    for (const path of Object.keys(SETTINGS_PAGES) as SettingsPath[]) {
         await test.step(path, async () => {
             await loadSettingsPage(page, path, () => {
                 errors.length = 0;
             });
 
-            await expect(page, `${path} stays on its route`).toHaveURL(new RegExp(`/dashboard/settings/${path}(?:[?#]|$)`), { timeout: 60_000 });
+            await expect(page, `${path} redirects to the chat with its tab open`).toHaveURL(settingsUrlFor(SETTINGS_PAGES[path].tab), { timeout: 60_000 });
+            await expect(settingsDialog(page), `${path} opens the settings modal`).toBeVisible({ timeout: 60_000 });
             await expect(page.locator("html"), `${path} renders in ${locale}`).toHaveAttribute("lang", locale);
-            await expectPageHeading(page, path);
+            await expectTabTitle(page, path, locale);
             await expect.soft(page.getByText(ERROR_BOUNDARY_RE), `${path} shows no error boundary`).toHaveCount(0);
             // Queries resolve after the title paints; let the page finish asking before judging its console.
             await settle(page);
@@ -211,12 +209,10 @@ const createOrganization = async (page: Page): Promise<void> => {
 test.describe("Settings pages", () => {
     test.describe.configure({ timeout: 900_000 });
 
-    test("the sweep covers every settings route", () => {
-        const onDisk = routeFilesOnDisk(SETTINGS_ROUTES_DIR)
-            .filter((route) => !SKIPPED_ROUTES.has(route))
-            .toSorted((a, b) => a.localeCompare(b));
+    test("the sweep covers every old settings path", () => {
+        const sweptTabs = Object.fromEntries(Object.entries(SETTINGS_PAGES).map(([path, { tab }]) => [path, tab]));
 
-        expect(onDisk).toEqual([...SETTINGS_PAGES].toSorted((a, b) => a.localeCompare(b)));
+        expect(redirectTable()).toEqual(sweptTabs);
     });
 
     test("every settings page renders in English", async ({ userPage: page }) => {
@@ -230,16 +226,17 @@ test.describe("Settings pages", () => {
         expect(await sweepSettingsPages(page, "de")).toEqual({});
     });
 
-    test("without an organization, the organization pages send the user to the organization list", async ({ userPage: page }) => {
+    test("without an organization, the organization tabs send the user to the organization list", async ({ userPage: page }) => {
         for (const path of ["auth/organization", "auth/members"]) {
             await settle(page);
             await page.goto(`/dashboard/settings/${path}`, { timeout: 90_000 });
-            // It used to replace to `/auth/settings`, a route this app does not have.
-            await expect(page).toHaveURL(ORGANIZATIONS_URL_RE, { timeout: 60_000 });
+            // The tab has nothing to show, so the modal switches to the list (replacing its own history entry).
+            await expect(page).toHaveURL(settingsUrlFor("auth-organizations"), { timeout: 60_000 });
+            await expect(currentTabItem(page)).toHaveText("Organizations");
         }
     });
 
-    test("the usage page counts a reply in its activity heatmap", async ({ userPage: page }) => {
+    test("the usage tab counts a reply in its activity heatmap", async ({ userPage: page }) => {
         const prompt = `Usage heatmap probe ${Math.random().toString(36).slice(2, 7)}`;
 
         await openChat(page);
@@ -247,14 +244,14 @@ test.describe("Settings pages", () => {
         await expectAssistantReply(page, `Mock reply: ${prompt}`);
 
         const errors = collectErrors(page);
-        const activity = page.getByText(ONE_REPLY_RE).first();
+        const activity = settingsDialog(page).getByText(ONE_REPLY_RE).first();
 
         // The rollup is recorded by a job scheduled after the run, and the heatmap is a one-shot
         // query, so reload until it has landed.
         await expect(async () => {
             await settle(page);
             await page.goto("/dashboard/settings/chat/usage");
-            await expect(page.getByText("Activity", { exact: true })).toBeVisible({ timeout: 60_000 });
+            await expect(settingsDialog(page).getByText("Activity", { exact: true })).toBeVisible({ timeout: 60_000 });
             await expect(activity).toBeVisible({ timeout: 10_000 });
         }).toPass({ timeout: 180_000 });
 

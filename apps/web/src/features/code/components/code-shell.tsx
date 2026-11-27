@@ -2,11 +2,11 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@neore/ui/components/button";
 import cn from "@neore/ui/utils/cn";
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
 import { ArrowLeftIcon } from "lucide-react";
 import type { FC, ReactNode } from "react";
 import { useEffect, useState } from "react";
 
+import SettingsLink from "@/components/settings/settings-link";
 import CodeWorkspace from "@/features/code/components/code-workspace";
 import { useCodeModeEnabled } from "@/features/code/hooks/use-code-mode-enabled";
 import { hostTabId } from "@/features/code/lib/layout";
@@ -59,9 +59,9 @@ const HostsSection: FC<{ devices: Devices | undefined; now: number; onSelect: (i
             {devices && devices.length === 0 && (
                 <p className="text-muted-foreground px-2 text-sm">
                     <Trans>No paired computer yet.</Trans>{" "}
-                    <Link className="text-foreground underline underline-offset-2" to="/dashboard/settings/chat/devices">
+                    <SettingsLink className="text-foreground underline underline-offset-2" tab="chat-devices">
                         <Trans>Pair one in Settings</Trans>
-                    </Link>
+                    </SettingsLink>
                 </p>
             )}
             <ul className="space-y-0.5">
@@ -95,9 +95,9 @@ const PullRequestsSection: FC = () => {
         <Section id="code-pull-requests" title={t`Pull requests`}>
             <p className="text-muted-foreground px-2 text-sm">
                 <Trans>Connect a Git host to review pull requests here.</Trans>{" "}
-                <Link className="text-foreground underline underline-offset-2" to="/dashboard/settings/connectors">
+                <SettingsLink className="text-foreground underline underline-offset-2" tab="connectors">
                     <Trans>Open Connectors</Trans>
-                </Link>
+                </SettingsLink>
             </p>
         </Section>
     );

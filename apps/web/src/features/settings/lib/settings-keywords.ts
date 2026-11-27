@@ -80,8 +80,11 @@ export const SETTINGS_KEYWORDS: Record<SettingsTab, ReadonlyArray<SettingsKeywor
         { keywords: [msg`edit video`, msg`restyle`, msg`transform`], label: msg`Video to video`, section: msg`Video` },
         { keywords: [msg`mix`, msg`images and video`, msg`references`], label: msg`Mixed to video`, section: msg`Video` },
     ],
+    "chat-bots": [],
+    "chat-devices": [],
     "chat-knowledge": [],
     "chat-mcp": [{ keywords: [msg`catalog`, msg`browse`, msg`install`, msg`connectors`, msg`integrations`], label: msg`MCP Registry` }],
+    "chat-model-filters": [],
     "chat-models": [{ keywords: [msg`pinned`, msg`starred`, msg`picker`], label: msg`Favorite models` }],
     "chat-personalization": [
         { keywords: [msg`name`, msg`call me`], label: msg`Nickname`, section: msg`About You` },
@@ -102,6 +105,10 @@ export const SETTINGS_KEYWORDS: Record<SettingsTab, ReadonlyArray<SettingsKeywor
         { keywords: [msg`permissions`, msg`ask`, msg`auto`, msg`off`, msg`approval`], label: msg`Built-in tools` },
         { keywords: [msg`permissions`, msg`servers`, msg`approval`], label: msg`MCP tools` },
     ],
+    "chat-triggers": [],
+    "chat-usage": [],
+    connectors: [],
+    "connectors-messenger": [],
     privacy: [
         { keywords: [msg`download`, msg`gdpr`, msg`backup`, msg`my data`], label: msg`Data Export` },
         { keywords: [msg`chatgpt`, msg`claude`, msg`gemini`, msg`migrate`, msg`upload`], label: msg`Import Conversations` },

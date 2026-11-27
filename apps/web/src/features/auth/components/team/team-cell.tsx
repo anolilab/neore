@@ -44,7 +44,7 @@ const TeamCell = ({ className, classNames, refetchTeams, team }: TeamCellPropert
 
     return (
         <>
-            <Card className={cn("surface-row-card bg-surface-row rounded-xl flex-row items-center px-3.5 py-3", className, classNames?.cell)}>
+            <Card className={cn("surface-row-card rounded-none flex-row items-center px-0 py-3", className, classNames?.cell)}>
                 <div className="flex flex-col gap-1">
                     <span className="font-medium">{team.name}</span>
                     <span className="text-muted-foreground text-sm">

@@ -38,6 +38,7 @@ import ConnectionProvider from "@/features/connection/components/connection-prov
 import OfflineBanner from "@/features/connection/components/offline-banner";
 import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
 import type { SettingsTab } from "@/features/settings/lib/settings-navigation";
+import { isSettingsTab } from "@/features/settings/lib/settings-navigation";
 import usePostHogIdentity from "@/hooks/use-posthog-identity";
 import { authClient } from "@/lib/auth/client";
 import getSessionToken, { getSessionAuthState } from "@/lib/auth/server-functions";
@@ -108,6 +109,8 @@ const ChangelogPanel = lazy(() => import("@/features/changelog/components/change
 // Search params type for the root route
 export interface RootSearchParams {
     settings?: boolean;
+    /** An element id in the tab to scroll to (`#daily-brief`). */
+    settingsAnchor?: string;
     settingsTab?: SettingsTab;
 }
 
@@ -582,7 +585,8 @@ export const Route = createRootRouteWithContext<AppContext>()({
     validateSearch: (search: Record<string, unknown>): RootSearchParams => {
         return {
             settings: search.settings === true || search.settings === "true" || undefined,
-            settingsTab: search.settingsTab as SettingsTab | undefined,
+            settingsAnchor: typeof search.settingsAnchor === "string" ? search.settingsAnchor : undefined,
+            settingsTab: isSettingsTab(search.settingsTab) ? search.settingsTab : undefined,
         };
     },
     beforeLoad: rootBeforeLoad,

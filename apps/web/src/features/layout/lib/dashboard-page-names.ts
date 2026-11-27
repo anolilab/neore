@@ -88,21 +88,3 @@ export const breadcrumbLabel = (segment: string, translate: (descriptor: Message
 
     return name ? translate(DASHBOARD_PAGE_NAMES[name]) : segment;
 };
-
-/**
- * The name of the settings page at `pathname` — what its `h1` says — or
- * `undefined` off the settings tree and on a page without a name of its own
- * (the OAuth `callback`, which renders its own heading).
- */
-export const settingsPageName = (pathname: string): MessageDescriptor | undefined => {
-    const segments = pathname.split("/").filter(Boolean);
-
-    if (segments.length < 3 || segments[0] !== "dashboard" || segments[1] !== "settings") {
-        return undefined;
-    }
-
-    const last = segments.at(-1) ?? "";
-    const name = Object.hasOwn(SEGMENT_NAMES, last) ? SEGMENT_NAMES[last] : undefined;
-
-    return name ? DASHBOARD_PAGE_NAMES[name] : undefined;
-};

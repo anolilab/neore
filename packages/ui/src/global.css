@@ -126,7 +126,6 @@
     --surface-code: var(--brand-white);
     --surface-well-shadow: inset 0 1px 2px rgb(0 0 0 / 0.06), inset 0 0 0 1px rgb(0 0 0 / 0.05);
     --surface-edge: rgb(0 0 0 / 0.08);
-    --surface-row-edge: rgb(0 0 0 / 0.05);
     --surface-edge-top: rgb(255 255 255 / 0.9);
     --surface-drop: 0 1px 1px rgb(0 0 0 / 0.04), 0 6px 16px -10px rgb(0 0 0 / 0.14);
     /* The open thread's card: the accent fading from its top-left corner. */
@@ -209,7 +208,6 @@
     --surface-code: var(--surface-well);
     --surface-well-shadow: inset 0 1px 1px rgb(0 0 0 / 0.3), inset 0 0 0 1px rgb(255 255 255 / 0.03);
     --surface-edge: rgb(214 224 255 / 0.075);
-    --surface-row-edge: rgb(214 224 255 / 0.04);
     --surface-edge-top: rgb(255 255 255 / 0.035);
     --surface-drop: 0 1px 1px rgb(0 0 0 / 0.3), 0 8px 20px -12px rgb(0 0 0 / 0.7);
     --surface-glow: radial-gradient(90% 140% at 0% 0%, color-mix(in oklab, var(--primary) 8%, transparent), transparent 70%);
@@ -321,10 +319,16 @@
  * A soft list row inside a card (the thread-list look): the row fill and a faint edge, no drop. Pair it with
  * `bg-surface-row` so the Card's own `bg-card` is merged away; the box-shadow here replaces `surface-edge`.
  */
+/* A row in a list of rows inside one box (settings): flat, split from the row above by a hairline. */
 @utility surface-row-card {
-    background-color: var(--surface-row);
+    background-color: transparent;
+    border-radius: 0;
     /* Important: the Card's `surface-edge` is a sibling utility and would otherwise win on source order. */
-    box-shadow: inset 0 0 0 1px var(--surface-row-edge) !important;
+    box-shadow: none !important;
+
+    &:not(:first-child) {
+        border-top: 1px solid var(--border);
+    }
 }
 
 @layer base {

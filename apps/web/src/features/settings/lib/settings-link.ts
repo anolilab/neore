@@ -1,0 +1,115 @@
+import type { SettingsTab } from "./settings-navigation";
+
+/** Where the settings pages used to live. Notifications, emails and bookmarks still link here. */
+const SETTINGS_PATH_PREFIX = "/dashboard/settings";
+
+/** The old settings pages and the modal tab that shows each now. */
+const TAB_BY_SETTINGS_PATH: Readonly<Record<string, SettingsTab>> = {
+    "app/customization": "app-customization",
+    "app/keyboard-shortcuts": "app-keyboard",
+    "app/personalization": "chat-personalization",
+    "auth/account": "auth-account",
+    "auth/api-keys": "auth-api-keys",
+    "auth/members": "auth-members",
+    "auth/organization": "auth-organization",
+    "auth/organizations": "auth-organizations",
+    "auth/security": "auth-security",
+    "auth/teams": "auth-teams",
+    "chat/agent": "chat-agent",
+    "chat/bots": "chat-bots",
+    "chat/devices": "chat-devices",
+    "chat/knowledge": "chat-knowledge",
+    "chat/mcp": "chat-mcp",
+    "chat/model-filters": "chat-model-filters",
+    "chat/models": "chat-models",
+    "chat/triggers": "chat-triggers",
+    "chat/usage": "chat-usage",
+    connectors: "connectors",
+    "connectors/messenger": "connectors-messenger",
+    privacy: "privacy",
+};
+
+/** Settings paths that stay pages: the OAuth providers return to the callback, and admin has its own area. */
+const PAGE_PATHS = ["connectors/callback", "admin"];
+
+const DEFAULT_TAB: SettingsTab = "app-customization";
+
+/**
+ * The modal tab an old settings path stands for, or `undefined` for a path that is not a settings page. An unknown
+ * page under the settings path opens the first tab rather than a 404.
+ */
+export const settingsTabForPath = (pathname: string): SettingsTab | undefined => {
+    let path = pathname;
+
+    while (path.endsWith("/")) {
+        path = path.slice(0, -1);
+    }
+
+    if (path !== SETTINGS_PATH_PREFIX && !path.startsWith(`${SETTINGS_PATH_PREFIX}/`)) {
+        return undefined;
+    }
+
+    const rest = path.slice(SETTINGS_PATH_PREFIX.length + 1);
+
+    if (PAGE_PATHS.some((page) => rest === page || rest.startsWith(`${page}/`))) {
+        return undefined;
+    }
+
+    return TAB_BY_SETTINGS_PATH[rest] ?? DEFAULT_TAB;
+};
+
+/** The search keys that open the settings modal at a tab, on top of whatever the page already has. */
+export interface SettingsSearch {
+    settings: true;
+    settingsAnchor?: string;
+    settingsTab: SettingsTab;
+}
+
+/** A search updater that opens settings at `tab` and keeps the page and its own search. */
+export const settingsLinkSearch =
+    (tab: SettingsTab, anchor?: string) =>
+    (previous: Record<string, unknown>): Record<string, unknown> & SettingsSearch => {
+        return { ...previous, settings: true, settingsTab: tab, ...(anchor && { settingsAnchor: anchor }) };
+    };
+
+/**
+ * Where settings open when there is no page to stay on: an old settings URL, the OAuth callback, a page the user may
+ * not see. The chat, with the modal over it.
+ */
+export const settingsLocation = (tab: SettingsTab, anchor?: string): { search: SettingsSearch; to: "/chat" } => {
+    return { search: settingsLinkSearch(tab, anchor)({}), to: "/chat" };
+};
+
+const ANCHOR_WAIT_MS = 5000;
+
+/**
+ * Scrolls to the element `id` inside the tab once it is there: the tab is lazy, so the element can arrive after the
+ * modal opens. Calls `done` once it has scrolled, or after a few seconds without it. Returns a cancel.
+ */
+export const scrollToAnchorWhenRendered = (getRoot: () => HTMLElement | null, id: string, done: () => void): (() => void) => {
+    const startedAt = performance.now();
+    let frame = 0;
+
+    const look = () => {
+        const target = getRoot()?.querySelector<HTMLElement>(`#${CSS.escape(id)}`);
+
+        if (target) {
+            target.scrollIntoView({ block: "start" });
+            done();
+
+            return;
+        }
+
+        if (performance.now() - startedAt > ANCHOR_WAIT_MS) {
+            done();
+
+            return;
+        }
+
+        frame = requestAnimationFrame(look);
+    };
+
+    frame = requestAnimationFrame(look);
+
+    return () => cancelAnimationFrame(frame);
+};

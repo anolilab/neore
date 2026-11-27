@@ -100,7 +100,7 @@ const UserInvitationCell = ({ className, invitation, refetchInvitations }: UserI
     };
 
     return (
-        <Card className={cn("surface-row-card bg-surface-row rounded-xl flex-row items-center gap-4 px-3.5 py-3", className)}>
+        <Card className={cn("surface-row-card rounded-none flex-row items-center gap-4 px-0 py-3", className)}>
             <div className="flex flex-1 flex-col gap-1">
                 <span className="font-medium">{invitation.organizationName}</span>
                 <span className="text-muted-foreground text-sm">

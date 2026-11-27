@@ -3,11 +3,11 @@
 import { useLingui } from "@lingui/react/macro";
 import { Button } from "@neore/ui/components/button";
 import { useMutation } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
 import { Sunrise } from "lucide-react";
 import type { FC } from "react";
 import { useEffect, useId, useRef } from "react";
 
+import SettingsLink from "@/components/settings/settings-link";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 type Scheduled = { nextBriefAt: number; timeZone: string };
@@ -114,9 +114,9 @@ const DailyBriefOffer: FC<{ offered: boolean }> = ({ offered }) => {
                         >
                             {confirmation(outcome)}
                         </p>
-                        <Link className="text-primary-text text-xs font-medium hover:underline" hash="daily-brief" to="/dashboard/settings/auth/account">
+                        <SettingsLink anchor="daily-brief" className="text-primary-text text-xs font-medium hover:underline" tab="auth-account">
                             {outcome.kind === "on" ? t`Change it in settings` : t`Open settings`}
-                        </Link>
+                        </SettingsLink>
                     </div>
                 )}
             </div>

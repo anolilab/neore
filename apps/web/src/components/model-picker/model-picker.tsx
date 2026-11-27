@@ -18,12 +18,12 @@ import {
     CommandPanel,
 } from "@neore/ui/components/command";
 import cn from "@neore/ui/utils/cn";
-import { Link } from "@tanstack/react-router";
 import { ArrowDown, ArrowUp, CheckIcon, CheckSquare2, EyeOff, Image, Info, Layers2, Lock, Mic, Square, Star, Type, Video } from "lucide-react";
 import type { FC, ReactNode } from "react";
 import React, { memo, useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
+import SettingsLink from "@/components/settings/settings-link";
 import { useAuthSession } from "@/features/auth/hooks/use-auth-session";
 import useInviteOnly from "@/features/auth/hooks/use-invite-only";
 import useModelNicknames from "@/features/chat/core/hooks/use-model-nicknames";
@@ -864,7 +864,7 @@ const ModelPicker: FC<ModelPickerProps> = ({
                         setBlockedCreators((current) => withoutCreator(current, slug)).catch(() => toast.error(t`Failed to update filter rules`));
                     },
                 },
-                description: <Link to="/dashboard/settings/chat/model-filters">{t`Manage hidden labs`}</Link>,
+                description: <SettingsLink tab="chat-model-filters">{t`Manage hidden labs`}</SettingsLink>,
             });
         },
         [handleProviderSelectAll, selectedProvider, setBlockedCreators, t],

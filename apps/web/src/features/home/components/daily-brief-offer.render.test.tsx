@@ -65,7 +65,9 @@ vi.mock("@/lib/lunora/crpc", () => {
 
 vi.mock("@tanstack/react-router", () => {
     return {
-        Link: ({ children, hash, to }: { children: ReactNode; hash?: string; to: string }) => <a href={hash ? `${to}#${hash}` : to}>{children}</a>,
+        Link: ({ children, search }: { children: ReactNode; search: (previous: Record<string, unknown>) => Record<string, string> }) => (
+            <a href={`?${new URLSearchParams(search({})).toString()}`}>{children}</a>
+        ),
     };
 });
 
@@ -120,7 +122,10 @@ describe("daily brief offer", () => {
         expect(confirmation.textContent).toContain("Wednesday");
         expect(confirmation.textContent).toContain("07:12");
         expect(document.activeElement).toBe(confirmation);
-        expect(screen.getByRole("link", { name: "Change it in settings" }).getAttribute("href")).toBe("/dashboard/settings/auth/account#daily-brief");
+        // Settings open over this page, at the account tab, scrolled to the daily brief.
+        expect(screen.getByRole("link", { name: "Change it in settings" }).getAttribute("href")).toBe(
+            "?settings=true&settingsTab=auth-account&settingsAnchor=daily-brief",
+        );
         expect(screen.queryByRole("button", { name: "Turn it on" })).toBeNull();
     });
 

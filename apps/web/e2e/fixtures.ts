@@ -89,6 +89,7 @@ export const AUTH_PATHS = {
 export const PROTECTED_PATHS = {
     chat: "/chat",
     dashboard: "/dashboard",
+    /** An old settings page URL: signed in, it redirects to `/chat` with the settings modal open at that page's tab. */
     settings: "/dashboard/settings/app/personalization",
 } as const;
 

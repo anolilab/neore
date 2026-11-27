@@ -33,8 +33,8 @@ const SettingsCardFooter = ({
 }: SettingsCardFooterProperties) => (
     <CardFooter
         className={cn(
-            "flex flex-col justify-between gap-3 rounded-b-2xl pt-0 pb-4 md:flex-row md:items-center",
-            variant === "destructive" && "border-destructive/30 border-t pt-4",
+            // The box's last row: a hairline above it when rows come first (`styles.css`), none when it is the only row.
+            "flex flex-col justify-between gap-3 px-4 py-3 md:flex-row md:items-center",
             className,
             classNames?.footer,
         )}

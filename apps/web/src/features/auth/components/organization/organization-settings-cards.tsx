@@ -3,9 +3,9 @@
 import cn from "@neore/ui/utils/cn";
 import { useEffect } from "react";
 
+import { useOpenSettings } from "@/components/settings/settings-link";
 import { useActiveOrganization } from "@/features/auth/hooks/organization-management";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
-import { ORGANIZATIONS_SETTINGS_PATH } from "@/features/auth/lib/auth-view-paths";
 
 import type { AuthCardProps } from "../../types/ui-config-types";
 import DeleteOrganizationCard from "../organization/delete-organization-card";
@@ -14,7 +14,8 @@ import OrganizationNameCard from "../organization/organization-name-card";
 import OrganizationSlugCard from "../organization/organization-slug-card";
 
 const OrganizationSettingsCards = ({ className, classNames }: AuthCardProps) => {
-    const { authClient, organization, replace } = useAuth();
+    const { authClient, organization } = useAuth();
+    const openSettings = useOpenSettings();
 
     const { data: activeOrganization, isFetching: organizationFetching, isSuccess: organizationLoaded } = useActiveOrganization(authClient);
 
@@ -27,8 +28,10 @@ const OrganizationSettingsCards = ({ className, classNames }: AuthCardProps) => 
         }
 
         // No organization to show: send the user to the list, where one is created or chosen.
-        if (!activeOrganization) replace(ORGANIZATIONS_SETTINGS_PATH);
-    }, [activeOrganization, organizationLoaded, organizationFetching, replace]);
+        if (!activeOrganization) {
+            openSettings("auth-organizations", { replace: true });
+        }
+    }, [activeOrganization, organizationLoaded, organizationFetching, openSettings]);
 
     return (
         <div className={cn("flex w-full flex-col gap-4 md:gap-6", className, classNames?.card)}>

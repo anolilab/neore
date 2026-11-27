@@ -2,6 +2,7 @@ import { clickUntilVisible, expect, settle, test } from "./chat-helpers";
 import { findShardDatabase, queryBackend, shardRowsMentioning } from "./seed";
 
 const SIGN_IN_URL_RE = /\/auth\/sign-in/;
+const ACCOUNT_TAB_URL_RE = /\/chat\?(?:.*&)?settingsTab=auth-account(?:&|$)/;
 
 test.describe("Account deletion", () => {
     test("deleting the account signs the user out and removes their rows", async ({ user, userPage: page }) => {
@@ -24,10 +25,15 @@ test.describe("Account deletion", () => {
 
         await settle(page);
 
+        // The old account page URL redirects to the chat with the settings modal open at the Account tab.
         await page.goto("/dashboard/settings/auth/account");
+        await expect(page).toHaveURL(ACCOUNT_TAB_URL_RE, { timeout: 60_000 });
+
+        const settings = page.getByRole("dialog", { name: "Settings" });
         const dialog = page.getByRole("dialog", { name: "Delete Account" });
 
-        await clickUntilVisible(page.getByRole("button", { name: "Delete Account" }).first(), dialog);
+        await expect(settings).toBeVisible({ timeout: 60_000 });
+        await clickUntilVisible(settings.getByRole("button", { name: "Delete Account" }).first(), dialog);
 
         await expect(dialog.getByText("This permanently deletes your account")).toBeVisible();
         await dialog.getByRole("button", { name: "Delete Account" }).click();

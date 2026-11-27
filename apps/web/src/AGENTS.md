@@ -90,4 +90,8 @@ The rules for working in `apps/web/src`. The detail, reasoning and code examples
   `metadata.fileId`. Size limits: `attachmentSizeLimit` (documents from `@neore/backend/document-limits`).
 - Don't use the flattened `api.chat_functions.getThread` form; references and `crpc` nest by folder and file.
 - `"skip"` only for `useUIMessages` and the other `@/lib/agent` paginated hooks; `skipToken` everywhere else.
+- Settings are a modal over the current page, not pages. Link with `SettingsLink` / `useOpenSettings`
+  (`components/settings/settings-link.tsx`), never to `/dashboard/settings/*` (old URLs only redirect). A new tab goes
+  in `SETTINGS_TABS` and `SETTINGS_NAVIGATION` (`features/settings/lib/settings-navigation.ts`), `settings-keywords.ts`,
+  and the modal's lazy import, preload map and switch; add it to `TAB_BY_SETTINGS_PATH` only if it replaces an old page.
 - Always brace `if` bodies, even single statements (`if (condition) { return; }`).

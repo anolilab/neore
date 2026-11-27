@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { breadcrumbLabel, DASHBOARD_PAGE_NAMES, settingsPageName } from "./dashboard-page-names";
+import { breadcrumbLabel, DASHBOARD_PAGE_NAMES } from "./dashboard-page-names";
 
 // The unit-test transform does not compile Lingui macros (vi.mock is hoisted).
 vi.mock("@lingui/core/macro", () => {
@@ -28,24 +28,5 @@ describe(breadcrumbLabel, () => {
     it("does not read inherited keys as page names", () => {
         expect(breadcrumbLabel("constructor", translate)).toBe("constructor");
         expect(breadcrumbLabel("toString", translate)).toBe("toString");
-    });
-});
-
-describe(settingsPageName, () => {
-    it("names a settings page by its last segment, as the breadcrumb does", () => {
-        expect(settingsPageName("/dashboard/settings/app/customization")).toBe(DASHBOARD_PAGE_NAMES.customization);
-        expect(settingsPageName("/dashboard/settings/chat/model-filters")).toBe(DASHBOARD_PAGE_NAMES.modelRestrictions);
-        expect(settingsPageName("/dashboard/settings/privacy")).toBe(DASHBOARD_PAGE_NAMES.privacyAndData);
-        expect(settingsPageName("/dashboard/settings/connectors/")).toBe(DASHBOARD_PAGE_NAMES.connectors);
-    });
-
-    it("names nothing off the settings tree", () => {
-        expect(settingsPageName("/dashboard")).toBeUndefined();
-        expect(settingsPageName("/chat/settings/account")).toBeUndefined();
-    });
-
-    it("names nothing for a page without a name of its own", () => {
-        expect(settingsPageName("/dashboard/settings/connectors/callback")).toBeUndefined();
-        expect(settingsPageName("/dashboard/settings/chat/constructor")).toBeUndefined();
     });
 });
