@@ -35,7 +35,7 @@ import { authLogger } from "../lib/logger";
 import { noteShardActivity } from "../lib/shard-housekeeping";
 import { deleteShardRoute, deleteShardRoutesOf } from "../lib/shard-routes";
 import { dropPushDevicesOf } from "../notifications/push-device-writes";
-import { deleteEventWebhookHostsOf } from "./gdpr";
+import { deleteEventSubscriptionsOf, deleteEventWebhookHostsOf } from "./gdpr";
 
 /** Emails in the `ADMIN` allowlist, trimmed and lowercased. */
 export const adminEmails = (): string[] =>
@@ -98,6 +98,7 @@ export const promoteVerifiedAdmin = internalMutation.input({ userId: v.id("user"
 export const cascadeDeleteUser = internalMutation.input({ userId: v.id("user") }).mutation(async ({ args, ctx }) => {
     await cascadeDelete(ctx, args.userId);
     await deleteEventWebhookHostsOf(ctx, args.userId);
+    await deleteEventSubscriptionsOf(ctx, args.userId);
 });
 
 const cascadeDelete = async (ctx: MutationCtx, user: Id<"user">): Promise<void> => {

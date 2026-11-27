@@ -70,6 +70,39 @@ describe("the owner's approved callback hosts", () => {
         }
     });
 
+    it("erases the owner's Events subscriptions, with their callback secrets, in the cascade delete", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            const identity = await signedIn(harness);
+
+            await harness.run(async (context: any) => {
+                await context.db.insert("eventWebhookSubscriptions", {
+                    argumentsKey: "{}",
+                    createdAt: 0,
+                    expiresAt: Date.now() + 86_400_000,
+                    id: "sub_1",
+                    keyHash: "hash-1",
+                    minTimestamp: 0,
+                    name: "run.completed",
+                    principal: "key-1",
+                    scanSeq: 0,
+                    secretCiphertext: "ciphertext",
+                    updatedAt: 0,
+                    url: "https://hooks.example.com/neore",
+                    userId: identity.userId,
+                });
+            });
+            await harness.run(async (context: any) => await context.runMutation(cascadeDeleteUser, { userId: identity.userId }));
+
+            const left = await harness.run(async (context: any) => await context.db.eventWebhookSubscriptions.findMany({ where: { userId: identity.userId } }));
+
+            expect(left.page).toStrictEqual([]);
+        } finally {
+            harness.close();
+        }
+    });
+
     it("erases every host of the owner, past one page of rows, in the account's cascade delete", async () => {
         const harness = lunoraTest(schema as never);
 
