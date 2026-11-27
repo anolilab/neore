@@ -174,6 +174,8 @@ interface AssetReader {
     dataUrl: (path: string) => Promise<string | undefined>;
     /** Whether the chapter may still take another file at all (some budget and some count left): asked before a file is read. */
     mayRead: () => boolean;
+    /** Whether a style sheet has been refused for size or count: the chapter then reads no further sheet. */
+    refused: () => boolean;
     /** Charges a text that is to go into the document (a style sheet, after its addresses are rewritten) to the budget and the count; `false` when it does not fit. */
     spend: (length: number) => boolean;
     /** A text file of the archive. */
@@ -182,7 +184,9 @@ interface AssetReader {
 
 const assetReader = (zip: JSZip, signal?: AbortSignal): AssetReader => {
     const budget = { files: MAX_ASSETS_PER_CHAPTER, left: MAX_INLINED_CHARS };
-    const seen = new Map<string, string | undefined>();
+    let refusedSheet = false;
+    // What each file became, and what it costs each time it is written into the document.
+    const seen = new Map<string, { cost: number; url: string } | undefined>();
 
     return {
         budget,
@@ -190,7 +194,16 @@ const assetReader = (zip: JSZip, signal?: AbortSignal): AssetReader => {
             signal?.throwIfAborted();
 
             if (seen.has(path)) {
-                return seen.get(path);
+                const cached = seen.get(path);
+
+                // Every copy the document carries is charged, the first or not: a picture used many times cannot grow it past the budget.
+                if (cached === undefined || cached.cost > budget.left) {
+                    return undefined;
+                }
+
+                budget.left -= cached.cost;
+
+                return cached.url;
             }
 
             const type = MEDIA_TYPES[extensionOf(path)];
@@ -218,13 +231,16 @@ const assetReader = (zip: JSZip, signal?: AbortSignal): AssetReader => {
 
             const url = `data:${type};base64,${toBase64(bytes)}`;
 
-            seen.set(path, url);
+            seen.set(path, { cost: length, url });
 
             return url;
         },
-        mayRead: () => budget.files > 0 && budget.left > 0,
+        mayRead: () => budget.files > 0 && budget.left > 0 && !refusedSheet,
+        refused: () => refusedSheet,
         spend: (length) => {
             if (budget.files <= 0 || length > budget.left) {
+                refusedSheet = true;
+
                 return false;
             }
 
@@ -443,10 +459,27 @@ const readChapter = async (chapterPath: string, reader: AssetReader): Promise<{ 
     }
 
     for (const style of parsed.querySelectorAll("style")) {
-        const sheet = await inlineStylesheetUrls(style.textContent ?? "", directory, reader);
+        const inHead = style.closest("head") !== null;
 
-        // The chapter's own style element is charged the same way; one that does not fit is emptied.
-        style.textContent = reader.spend(sheet.length) ? sheet : "";
+        // After a sheet was refused for size or count, no further one is attempted: the rejection work is not repeated for each.
+        if (reader.refused()) {
+            style.textContent = "";
+
+            continue;
+        }
+
+        const sheet = await inlineStylesheetUrls(style.textContent ?? "", directory, reader);
+        const kept = reader.spend(sheet.length) ? sheet : "";
+
+        if (inHead) {
+            // A rule the chapter defines in its head (`p { white-space: pre-wrap }`) is kept, rewritten and charged like any sheet, and goes
+            // where the others go: only the body is the chapter's markup.
+            if (kept !== "") {
+                styles.push(kept);
+            }
+        } else {
+            style.textContent = kept;
+        }
     }
 
     for (const element of parsed.body.querySelectorAll("img[src], source[src], video[poster], image, input[src], audio[src]")) {

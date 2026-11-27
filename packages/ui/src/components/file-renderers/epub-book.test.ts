@@ -25,6 +25,7 @@ const PNG = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
 interface SampleChapter {
     body: string;
     file: string;
+    head?: string;
     id: string;
     label?: string;
 }
@@ -64,7 +65,7 @@ const book = async ({ chapters, files = {}, language = "en" }: SampleOptions): P
     for (const chapter of chapters) {
         zip.file(
             `OEBPS/${chapter.file}`,
-            `<?xml version="1.0"?><html xmlns="http://www.w3.org/1999/xhtml"><head><title>t</title></head><body>${chapter.body}</body></html>`,
+            `<?xml version="1.0"?><html xmlns="http://www.w3.org/1999/xhtml"><head><title>t</title>${chapter.head ?? ""}</head><body>${chapter.body}</body></html>`,
         );
     }
 
@@ -254,6 +255,21 @@ describe("reading a chapter", () => {
     });
 });
 
+describe("a picture used many times", () => {
+    it("is charged for every copy the chapter carries, and the budget stops the copies it cannot hold", async () => {
+        const picture = new Uint8Array(5 * 1024 * 1024).fill(9);
+        const body = '<img src="p.png"/>'.repeat(6);
+        const opened = await openEpub(await book({ chapters: [{ body, file: "one.xhtml", id: "c1" }], files: { "p.png": picture } }), folder.path);
+        const document = await opened.read("c1");
+        const sources = [...parse(document).querySelectorAll("img")].map((image) => image.getAttribute("src"));
+
+        // About 7 million characters a copy: three fit in 24 million, the rest are left without an address.
+        expect(sources.filter((source) => source?.startsWith("data:image/png"))).toHaveLength(3);
+        expect(sources.filter((source) => source === null)).toHaveLength(3);
+        opened.destroy();
+    });
+});
+
 describe("a chapter's style sheets", () => {
     const sheetsOf = (frame: Document): string[] => [...frame.head.querySelectorAll("style")].slice(1).map((element) => element.textContent ?? "");
     const links = (names: string[]) => names.map((name) => `<link rel="stylesheet" href="${name}"/>`).join("");
@@ -288,19 +304,55 @@ describe("a chapter's style sheets", () => {
         opened.destroy();
     });
 
-    it("leaves out whole a sheet that does not fit what is left of the budget, and keeps the ones that did", async () => {
+    it("leaves out whole a sheet that does not fit, and reads no further sheet once one was refused", async () => {
         const big = "a{}".repeat(5_000_000);
+        const read: string[] = [];
+        const original = JSZip.prototype.file;
+
+        vi.spyOn(JSZip.prototype, "file").mockImplementation(function (this: JSZip, ...args: unknown[]) {
+            if (typeof args[0] === "string") {
+                read.push(args[0]);
+            }
+
+            return (original as (...inner: unknown[]) => unknown).apply(this, args) as never;
+        } as never);
+
         const opened = await openEpub(
             await book({
-                chapters: [{ body: `${links(["small.css", "big1.css", "big2.css", "after.css"])}<p>x</p>`, file: "one.xhtml", id: "c1" }],
-                files: { "after.css": "p{after:1}", "big1.css": big, "big2.css": big, "small.css": "p{small:1}" },
+                chapters: [{ body: `${links(["small.css", "big1.css", "big2.css", "big3.css", "after.css"])}<p>x</p>`, file: "one.xhtml", id: "c1" }],
+                files: { "after.css": "p{after:1}", "big1.css": big, "big2.css": big, "big3.css": big, "small.css": "p{small:1}" },
             }),
             folder.path,
         );
-        const sheets = sheetsOf(parse(await opened.read("c1")));
 
-        // 15 million characters fit; a second 15 million would pass the 24 million the chapter may take, so it is left out entire, not cut.
-        expect(sheets.map((sheet) => sheet.length)).toEqual(["p{small:1}".length, big.length, "p{after:1}".length]);
+        read.length = 0;
+
+        const document = await opened.read("c1");
+        const sheets = sheetsOf(parse(document));
+
+        // 15 million characters fit; the second would pass the 24 million, so it is left out entire. No sheet after it is opened.
+        expect(sheets.map((sheet) => sheet.length)).toEqual(["p{small:1}".length, big.length]);
+        expect(read.some((path) => path.endsWith("big3.css"))).toBe(false);
+        expect(read.some((path) => path.endsWith("after.css"))).toBe(false);
+        opened.destroy();
+    });
+
+    it("keeps a rule the chapter defines in its head, rewritten like the other sheets", async () => {
+        const chapters = [
+            {
+                body: "<p>x</p>",
+                file: "one.xhtml",
+                head: '<style>p { white-space: pre-wrap } @import url("https://evil.example/a.css"); i { background: url(https://evil.example/b.png) } </style>',
+                id: "c1",
+            },
+        ];
+        const opened = await openEpub(await book({ chapters }), folder.path);
+        const document = await opened.read("c1");
+        const sheets = sheetsOf(parse(document));
+
+        expect(sheets.join("")).toContain("p { white-space: pre-wrap }");
+        expect(sheets.join("")).not.toContain("evil.example");
+        expect(sheets.join("")).not.toContain("@import");
         opened.destroy();
     });
 
