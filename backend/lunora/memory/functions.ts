@@ -551,24 +551,24 @@ const removeMemoryRow = async (ctx: MutationCtx, row: Doc<"memories">, userId: s
 };
 
 /**
- * Takes the deleted memories out of one page ({@link DIGEST_PAGE}) of the user's reflection digests, from `fromCreatedAt`
- * on. An entry of a deleted id goes; a digest whose entries all went is removed, one that still has others keeps them
- * (and its other fields), without its summary.
+ * Takes the deleted memories out of one page ({@link DIGEST_PAGE}) of the user's reflection digests, from `cursor` on.
+ * An entry of a deleted id goes; a digest whose entries all went is removed, one that still has others keeps them (and
+ * its other fields), without its summary.
  *
  * A digest's summary is model-written text with no pointer to the memories it drew on, so a deleted memory's wording can
  * sit in it with or without an entry in `learned` (a merge or a promotion puts rows in it that the list never names).
  * Nor can a creation time bound which digests could have quoted a row: a guest merge re-creates its rows. So every
  * digest of the user loses its summary ({@link DROPPED_DIGEST_SUMMARY}); nothing is regenerated here, and the digest's
- * other fields stay. Resolves where the next page starts (the `createdAt` of the first digest left), or `null` when the
- * user's digests are all done. A position, not a cursor: it stays right after a guest merge moves the rows.
+ * other fields stay. Resolves the cursor of the next page, or `null` when the user's digests are all done. The cursor
+ * orders rows by `createdAt` and then by their own id, so any number of digests sharing a `createdAt` is walked once.
  */
-const removeFromDigests = async (ctx: Pick<MutationCtx, "db">, userId: string, ids: ReadonlySet<string>, fromCreatedAt: number): Promise<number | null> => {
-    const rows = await ctx.db
+const removeFromDigests = async (ctx: Pick<MutationCtx, "db">, userId: string, ids: ReadonlySet<string>, cursor: string | null): Promise<string | null> => {
+    const { continueCursor, isDone, page } = await ctx.db
         .query("memoryDigests")
-        .withIndex("by_userId_createdAt", (q) => q.eq("userId", userId).gte("createdAt", fromCreatedAt))
-        .take(DIGEST_PAGE + 1);
+        .withIndex("by_userId_createdAt", (q) => q.eq("userId", userId))
+        .paginate({ cursor, numItems: DIGEST_PAGE });
 
-    for (const digest of rows.slice(0, DIGEST_PAGE)) {
+    for (const digest of page) {
         const learned = digest.learned.filter((entry) => !ids.has(entry.memoryId));
 
         if (learned.length === 0 && digest.learned.length > 0) {
@@ -585,7 +585,7 @@ const removeFromDigests = async (ctx: Pick<MutationCtx, "db">, userId: string, i
         }
     }
 
-    return rows[DIGEST_PAGE]?.createdAt ?? null;
+    return isDone ? null : continueCursor;
 };
 
 /**
@@ -624,8 +624,9 @@ const eraseOlderVersions = async (
         const older = await ctx.db
             .query("memories")
             .withIndex("by_userId_supersededBy", (q) => q.eq("userId", userId).eq("supersededBy", id))
-            .take(budget + 1);
-        // A row retired by itself (decay, expiry, compression) is its own `supersededBy`, never someone's older version.
+            .take(budget + 2);
+        // A row retired by itself (decay, expiry, compression) is its own `supersededBy`, never someone's older version. It
+        // can take one slot of the read, so the read is one longer: what is left after it still shows whether more follow.
         const rows = older.filter((row) => row._id !== id);
 
         const taken = rows.slice(0, budget);
@@ -644,12 +645,12 @@ const eraseOlderVersions = async (
     }
 
     // A step that removed nothing (the rest of a walk that ended) has nothing to take out of the digests.
-    const digestsFrom = removed.size > 0 ? await removeFromDigests(ctx, userId, removed, 0) : null;
+    const digestsCursor = removed.size > 0 ? await removeFromDigests(ctx, userId, removed, null) : null;
 
-    if (digestsFrom !== null) {
+    if (digestsCursor !== null) {
         // More digests than one write cleans: the rest is a record of its own, which carries the ids to take out.
         const dueAt = ctx.now + CLEANUP_GRACE_MS;
-        const digestsId = await ctx.db.insert("memoryCleanups", { dueAt, fromCreatedAt: digestsFrom, ids: [...removed], kind: "digests", userId });
+        const digestsId = await ctx.db.insert("memoryCleanups", { cursor: digestsCursor, dueAt, ids: [...removed], kind: "digests", userId });
 
         await wakeShardForCleanup(ctx, userId, dueAt);
         await armMemoryCleanup(ctx.scheduler, digestsId, userId, 0);
@@ -702,12 +703,12 @@ export const stepMemoryCleanup = internalMutation
         }
 
         if (row.kind === "digests") {
-            const next = await removeFromDigests(ctx, row.userId, new Set(row.ids), row.fromCreatedAt ?? 0);
+            const next = await removeFromDigests(ctx, row.userId, new Set(row.ids), row.cursor ?? null);
 
             if (next === null) {
                 await ctx.db.delete("memoryCleanups", row._id);
             } else {
-                await ctx.db.patch("memoryCleanups", row._id, { dueAt: ctx.now + CLEANUP_GRACE_MS, fromCreatedAt: next });
+                await ctx.db.patch("memoryCleanups", row._id, { cursor: next, dueAt: ctx.now + CLEANUP_GRACE_MS });
                 await wakeShardForCleanup(ctx, row.userId, ctx.now + CLEANUP_GRACE_MS);
             }
 

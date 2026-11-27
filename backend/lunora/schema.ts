@@ -1784,18 +1784,19 @@ export const schema = defineSchema({
     // survives a retry that cannot be scheduled or runs out (`memory/functions.ts`, `runMemoryCleanup`).
     // `vector`: the embedding of a retired or deleted memory whose delete failed. `chain`: the ids still to walk of a
     // delete's older versions, after the first write used its budget. `digests`: the deleted ids still to take out of the
-    // rest of the user's reflection digests (`ids`, from `fromCreatedAt` on). A scheduler job on the owner's shard works each
+    // rest of the user's reflection digests (`ids`, from `cursor` on). A scheduler job on the owner's shard works each
     // record at its `dueAt`; the housekeeping sweep arms any record that is due and has no live job.
     memoryCleanups: defineTable({
         // Steps that failed. At the cap the record keeps its row and its `dueAt` moves out of reach.
         attempts: v.optional(v.number()),
+        // `digests`: where the walk over the user's digests goes on, the pagination cursor of the last page read. It names
+        // positions by value (`createdAt`, then the row's own id), so rows that share a `createdAt` are not read twice or skipped.
+        cursor: v.optional(v.string()),
         // When the record is next worked: after a grace period at first, after a backoff once a step failed.
         dueAt: v.number(),
         embeddingId: v.optional(v.string()),
-        // `digests`: the deleted memories' ids, and the `createdAt` the walk over the user's digests goes on from (a
-        // position in the rows, not an opaque cursor: a guest merge moves the rows and the record).
-        fromCreatedAt: v.optional(v.number()),
         frontier: v.optional(v.array(v.id("memories"))),
+        // `digests`: the deleted memories' ids.
         ids: v.optional(v.array(v.string())),
         kind: v.union(v.literal("vector"), v.literal("chain"), v.literal("digests")),
         memoryId: v.optional(v.string()),

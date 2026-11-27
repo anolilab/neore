@@ -11708,6 +11708,12 @@
           "optional": true,
           "unique": false
         },
+        "cursor": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "dueAt": {
           "kind": "number",
           "nullable": false,
@@ -11716,12 +11722,6 @@
         },
         "embeddingId": {
           "kind": "string",
-          "nullable": false,
-          "optional": true,
-          "unique": false
-        },
-        "fromCreatedAt": {
-          "kind": "number",
           "nullable": false,
           "optional": true,
           "unique": false

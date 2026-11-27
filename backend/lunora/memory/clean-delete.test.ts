@@ -478,6 +478,42 @@ describe("a user with more digests than one write cleans", () => {
     });
 });
 
+describe("digests that share a createdAt", () => {
+    it("are all cleaned, however many, and the cleanup ends", async () => {
+        const gone = await seed("likes tea");
+
+        await run(async (ctx) => {
+            for (let index = 0; index < 250; index += 1) {
+                await ctx.db.insert("memoryDigests", {
+                    createdAt: 7000,
+                    learned: [
+                        { memory: "likes tea", memoryId: gone.memoryId, type: "preference" },
+                        { memory: `other ${index}`, memoryId: `other-${index}`, type: "preference" },
+                    ],
+                    localDay: "2026-09-24",
+                    stats: STATS,
+                    summary: "You like tea.",
+                    userId: OWNER,
+                });
+            }
+        });
+
+        await asOwner().mutation(deleteMemory as never, { memoryId: gone.memoryId } as never);
+
+        // 100 per write: the cleanup goes on until it has read them all, and then it is gone.
+        for (let round = 0; round < 5 && (await cleanups()).length > 0; round += 1) {
+            await runCleanup(cleanupJobs().at(-1)?.args);
+        }
+
+        const digests = await run(async (ctx) => await ctx.db.query("memoryDigests").collect());
+
+        expect(await cleanups()).toHaveLength(0);
+        expect(digests).toHaveLength(250);
+        expect(digests.every((digest) => digest.summary === "")).toBe(true);
+        expect(digests.some((digest) => (digest.learned as { memoryId: string }[]).some((entry) => entry.memoryId === gone.memoryId))).toBe(false);
+    });
+});
+
 describe("saving a digest while a memory is deleted", () => {
     it("keeps only entries whose memory still exists and is active, and drops the summary when it lost one", async () => {
         const kept = await seed("owns a bike");
@@ -643,6 +679,31 @@ describe("a long chain whose follow-up is lost", () => {
         expect(await rowOf(first)).toBeNull();
         expect(await memoryCount()).toBe(0);
         expect(await cleanups()).toHaveLength(0);
+    });
+});
+
+describe("an older version walk past a row that points at itself", () => {
+    it("erases every older version, not all but the one the self-pointing row's slot hid", async () => {
+        const root = await run(async (ctx) => {
+            const id = await ctx.db.insert("memories", { memory: "retired by itself", type: "preference", userId: OWNER });
+
+            await ctx.db.patch("memories", id, { supersededBy: id });
+
+            for (let index = 0; index < 101; index += 1) {
+                await ctx.db.insert("memories", { memory: `older ${index}`, supersededBy: id, type: "preference", userId: OWNER });
+            }
+
+            return id;
+        });
+        const cleanupId = await run(async (ctx) => await ctx.db.insert("memoryCleanups", { dueAt: 0, frontier: [root], kind: "chain", userId: OWNER }));
+
+        for (let round = 0; round < 3 && (await cleanupOf(cleanupId)) !== null; round += 1) {
+            await run(async (ctx) => await ctx.runMutation(stepMemoryCleanup, { cleanupId }));
+        }
+
+        // Only the self-pointing row is left: it is no one's older version.
+        expect(await memoryCount()).toBe(1);
+        expect(await cleanupOf(cleanupId)).toBeNull();
     });
 });
 
