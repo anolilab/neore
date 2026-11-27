@@ -33,6 +33,7 @@ import MemoryImportDialog from "./memory-import-dialog";
 import MemoryItem from "./memory-item";
 import type { MemoryType } from "./memory-types";
 import { isMemoryType, MEMORY_TYPES, useMemoryTypeLabels } from "./memory-types";
+import ScheduleIdeasSwitch from "./schedule-ideas-switch";
 
 type TypeFilter = MemoryType | "all";
 
@@ -173,6 +174,8 @@ const MemorySettings: FC = () => {
                     </label>
                     <Switch checked={memoryEnabled} id="memory-enabled-switch" onCheckedChange={handleToggleMemory} />
                 </div>
+
+                <ScheduleIdeasSwitch memoryEnabled={memoryEnabled} />
 
                 {/* Outside the enabled block: with memory off it offers to turn it on first. */}
                 <MemoryImportDialog memoryEnabled={memoryEnabled} onEnableMemory={handleEnableMemory} onImported={refresh} />

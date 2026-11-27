@@ -103,6 +103,29 @@ describe("useUpdateUserSettings.updateLatest", () => {
         expect(queryClient.getQueryData(QUERY_KEY)).toEqual({ threadTitleInstructions: "Short titles, no emoji" });
     });
 
+    it("sends each exact value in the order made, one at a time, so a quick on then off ends on the last tap", async () => {
+        const { queryClient, result } = setup();
+
+        act(() => {
+            void result.current.updateExact({ threadTitleInstructions: "Short titles" });
+            void result.current.updateExact({ threadTitleInstructions: "" });
+        });
+        await flush();
+
+        // The second waits for the first, so it cannot arrive before it; the cache already shows the last tap.
+        expect(harness.sent.map((request) => request.value)).toEqual(["Short titles"]);
+        expect(queryClient.getQueryData(QUERY_KEY)).toEqual({ threadTitleInstructions: "" });
+
+        await act(async () => {
+            harness.sent[0]?.release();
+            await Promise.resolve();
+        });
+        await flush();
+
+        // The intermediate value is not rebuilt from the cache into a second "".
+        expect(harness.sent.map((request) => request.value)).toEqual(["Short titles", ""]);
+    });
+
     it("still sends a reversal queued behind a save of a different value", async () => {
         const { result } = setup();
 
