@@ -421,6 +421,7 @@ const frontierOf = async (id: Id<"memoryCleanups">) => {
     return row?.frontier;
 };
 const GAVE_UP = /Gave up .*attempts/;
+const GIVE_UP_LOG = /Giving up|Gave up/;
 
 /** A walk with `count` older versions behind a root that is already deleted, as a long delete leaves it. */
 const seedChain = async (count: number): Promise<{ cleanupId: Id<"memoryCleanups">; older: Id<"memories">[] }> =>
@@ -837,13 +838,15 @@ describe("a cleanup step that fails", () => {
 
         const [record] = await cleanups();
         const cleanupId = record?._id as Id<"memoryCleanups">;
-        const givenUp = () => vi.mocked(memoryLogger.error).mock.calls.filter(([message]) => /Giving up|Gave up/.test(String(message)));
+        const givenUp = () => vi.mocked(memoryLogger.error).mock.calls.filter(([message]) => GIVE_UP_LOG.test(String(message)));
 
         // A failed step well below the cap: counted, retried later, and no error logged.
         vi.mocked(deleteVectorRow).mockRejectedValueOnce(new Error("still down"));
         await runCleanup({ cleanupId });
 
-        expect((await cleanupOf(cleanupId))?.attempts).toBe(1);
+        const afterOne = await cleanupOf(cleanupId);
+
+        expect(afterOne?.attempts).toBe(1);
         expect(givenUp()).toHaveLength(0);
 
         // The step that uses the last attempt logs the one error, from the record's own failure path.
@@ -852,7 +855,7 @@ describe("a cleanup step that fails", () => {
         await runCleanup({ cleanupId });
 
         expect(givenUp()).toHaveLength(1);
-        expect(String(givenUp()[0]?.[0])).toMatch(/Gave up/);
+        expect(String(givenUp()[0]?.[0])).toMatch(GAVE_UP);
     });
 
     it("does nothing for a record that has used its attempts", async () => {
