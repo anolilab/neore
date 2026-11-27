@@ -898,7 +898,7 @@ msgstr "{activeCount, plural, one {Tienes # mensajería conectada} other {Tienes
 msgid "{activeCount} of {0} MCP servers active"
 msgstr "{activeCount} de {0} servidores MCP activos"
 
-#: src/features/develop/components/thread-pull-requests.tsx:295
+#: src/features/develop/components/thread-pull-requests.tsx:298
 msgid "{address}: {reason}"
 msgstr "{address}: {reason}"
 
@@ -1620,7 +1620,7 @@ msgstr "{star, plural, one {# estrella} other {# estrellas}}"
 msgid "{stateLabel} Stop hands-free voice mode"
 msgstr "{stateLabel} Detener el modo de voz manos libres"
 
-#: src/features/develop/components/thread-pull-requests.tsx:387
+#: src/features/develop/components/thread-pull-requests.tsx:390
 msgid "{success, plural, one {# pull request linked.} other {# pull requests linked.}}"
 msgstr "{success, plural, one {# pull request vinculada.} other {# pull requests vinculadas.}}"
 
@@ -2810,7 +2810,7 @@ msgstr "Añadir prompt"
 msgid "Add Provider"
 msgstr "Añadir proveedor"
 
-#: src/features/develop/components/thread-pull-requests.tsx:365
+#: src/features/develop/components/thread-pull-requests.tsx:368
 msgid "Add pull requests that already exist to this thread. Each one is read from the host with your own connection first."
 msgstr "Añade a este hilo pull requests que ya existen. Cada una se lee primero del host con tu propia conexión."
 
@@ -3799,7 +3799,7 @@ msgstr "Alfabético"
 msgid "Already have an account?"
 msgstr "¿Ya tienes una cuenta?"
 
-#: src/features/develop/components/thread-pull-requests.tsx:229
+#: src/features/develop/components/thread-pull-requests.tsx:232
 msgid "Already linked to this thread."
 msgstr "Ya está vinculada a este hilo."
 
@@ -4853,8 +4853,8 @@ msgstr "Se requiere autenticación"
 msgid "auto"
 msgstr "auto"
 
-#: src/features/chat/sidebar/thread-context.tsx:54
-#: src/features/chat/sidebar/thread-context.tsx:98
+#: src/features/chat/sidebar/thread-context.tsx:59
+#: src/features/chat/sidebar/thread-context.tsx:102
 #: src/features/chat/thread/composer-image-settings.tsx:28
 #: src/features/chat/thread/composer-image-settings.tsx:52
 #: src/features/chat/thread/composer-image-settings.tsx:192
@@ -7273,7 +7273,7 @@ msgstr "Clonar o crear nuevo…"
 #: src/features/canvas/canvas-panel.tsx:835
 #: src/features/canvas/pdf-preview-panel.tsx:105
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:868
-#: src/features/develop/components/thread-pull-requests.tsx:410
+#: src/features/develop/components/thread-pull-requests.tsx:413
 #: src/features/evals/components/save-eval-case-action.tsx:95
 #: src/features/prompts/components/prompt-history-dialog.tsx:195
 #: src/features/settings/components/chat/custom-providers-settings.tsx:433
@@ -8031,7 +8031,7 @@ msgid "Compressing context..."
 msgstr "Comprimiendo el contexto..."
 
 #: src/features/auth/components/device-code-parts.tsx:76
-#: src/features/chat/sidebar/thread-context.tsx:64
+#: src/features/chat/sidebar/thread-context.tsx:69
 #: src/features/projects/components/computer-rule-file-import.tsx:502
 #: src/features/settings/components/chat/bots-settings.tsx:453
 msgid "Computer"
@@ -8300,7 +8300,7 @@ msgstr "Conectar WhatsApp"
 msgid "Connect your {label} account to see what needs your review, what is yours, and what is ready to merge."
 msgstr "Conecta tu cuenta de {label} para ver qué necesita tu revisión, qué es tuyo y qué está listo para fusionarse."
 
-#: src/features/develop/components/thread-pull-requests.tsx:234
+#: src/features/develop/components/thread-pull-requests.tsx:237
 msgid "Connect your Git host in settings to link a pull request."
 msgstr "Conecta tu host de Git en los ajustes para vincular una pull request."
 
@@ -8534,7 +8534,7 @@ msgstr "Seguridad del contenido"
 msgid "Content Slide"
 msgstr "Diapositiva de contenido"
 
-#: src/features/chat/sidebar/thread-context.tsx:62
+#: src/features/chat/sidebar/thread-context.tsx:67
 #: src/features/settings/components/personalization/memory-types.ts:26
 msgid "Context"
 msgstr "Contexto"
@@ -9225,7 +9225,7 @@ msgstr "No se pudo importar el flujo de trabajo"
 msgid "Could not keep this as yours. Try again."
 msgstr "No se pudo conservar como tuyo. Inténtalo de nuevo."
 
-#: src/features/develop/components/thread-pull-requests.tsx:311
+#: src/features/develop/components/thread-pull-requests.tsx:314
 msgid "Could not link. Try again."
 msgstr "No se pudo vincular. Inténtalo de nuevo."
 
@@ -9246,7 +9246,7 @@ msgstr "No se pudieron cargar más proyectos."
 msgid "Could not load statistics for this thread."
 msgstr "No se pudieron cargar las estadísticas de este hilo."
 
-#: src/features/develop/components/thread-pull-requests.tsx:329
+#: src/features/develop/components/thread-pull-requests.tsx:332
 msgid "Could not load the linked pull requests."
 msgstr "No se pudieron cargar las pull requests vinculadas."
 
@@ -11377,6 +11377,7 @@ msgstr "Actividad de dispositivos"
 msgid "Device name"
 msgstr "Nombre del dispositivo"
 
+#: src/features/chat/sidebar/thread-context.tsx:71
 #: src/features/devices/components/devices-settings.tsx:415
 msgid "Device removed"
 msgstr "Dispositivo eliminado"
@@ -12998,7 +12999,7 @@ msgstr "Introduce el nombre de la organización"
 msgid "Enter organization slug"
 msgstr "Introduce el slug de la organización"
 
-#: src/features/develop/components/thread-pull-requests.tsx:253
+#: src/features/develop/components/thread-pull-requests.tsx:256
 msgid "Enter pull requests as owner/name#123."
 msgstr "Escribe las pull requests como propietario/nombre#123."
 
@@ -16083,7 +16084,7 @@ msgid "Full 1080p high-definition video output"
 msgstr "Video en alta definición a 1080p completo"
 
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:77
-#: src/features/chat/sidebar/thread-context.tsx:55
+#: src/features/chat/sidebar/thread-context.tsx:60
 #: src/features/chat/thread/composer-permission-mode.tsx:43
 #: src/features/settings/components/chat/bots-settings.tsx:134
 #: src/features/settings/components/chat/new-chat-permission-mode-setting.tsx:42
@@ -16653,7 +16654,7 @@ msgstr "Subir a {parent}"
 #: src/features/chat/goal/composer-goal.tsx:77
 #: src/features/chat/goal/goal-notes.tsx:70
 #: src/features/chat/goal/goal-notes.tsx:77
-#: src/features/chat/sidebar/thread-context.tsx:87
+#: src/features/chat/sidebar/thread-context.tsx:91
 #: src/features/tasks/components/task-form-dialog.tsx:380
 msgid "Goal"
 msgstr "Objetivo"
@@ -19940,7 +19941,7 @@ msgstr "Líneas que no son JSON válido"
 
 #: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:340
 #: src/features/auth/components/settings/providers/provider-cell.tsx:117
-#: src/features/develop/components/thread-pull-requests.tsx:412
+#: src/features/develop/components/thread-pull-requests.tsx:415
 msgid "Link"
 msgstr "Vincular"
 
@@ -19948,7 +19949,7 @@ msgstr "Vincular"
 msgid "Link active until {expiresAt}"
 msgstr "Enlace activo hasta {expiresAt}"
 
-#: src/features/develop/components/thread-pull-requests.tsx:265
+#: src/features/develop/components/thread-pull-requests.tsx:268
 msgid "Link at most {MAX_PULL_REQUESTS_PER_ATTACH} pull requests at a time."
 msgstr "Vincula como máximo {MAX_PULL_REQUESTS_PER_ATTACH} pull requests a la vez."
 
@@ -19966,12 +19967,12 @@ msgstr "Vista previa de enlace"
 msgid "Link previews"
 msgstr "Vistas previas de enlaces"
 
-#: src/features/develop/components/thread-pull-requests.tsx:341
-#: src/features/develop/components/thread-pull-requests.tsx:345
+#: src/features/develop/components/thread-pull-requests.tsx:344
+#: src/features/develop/components/thread-pull-requests.tsx:348
 msgid "Link pull request"
 msgstr "Vincular pull request"
 
-#: src/features/develop/components/thread-pull-requests.tsx:364
+#: src/features/develop/components/thread-pull-requests.tsx:367
 msgid "Link pull requests"
 msgstr "Vincular pull requests"
 
@@ -19983,7 +19984,7 @@ msgstr "Vinculadas a mano"
 msgid "Linked pull requests: {linkedPullRequests}"
 msgstr "Pull requests vinculadas: {linkedPullRequests}"
 
-#: src/features/develop/components/thread-pull-requests.tsx:230
+#: src/features/develop/components/thread-pull-requests.tsx:233
 msgid "Linked to this thread."
 msgstr "Vinculada a este hilo."
 
@@ -19991,8 +19992,8 @@ msgstr "Vinculada a este hilo."
 msgid "LinkedIn Post"
 msgstr "Publicación de LinkedIn"
 
-#: src/features/develop/components/thread-pull-requests.tsx:393
-#: src/features/develop/components/thread-pull-requests.tsx:412
+#: src/features/develop/components/thread-pull-requests.tsx:396
+#: src/features/develop/components/thread-pull-requests.tsx:415
 msgid "Linking…"
 msgstr "Vinculando…"
 
@@ -20351,7 +20352,7 @@ msgstr "Cargando el enlace de invitado…"
 msgid "Loading the guide"
 msgstr "Cargando la guía"
 
-#: src/features/develop/components/thread-pull-requests.tsx:324
+#: src/features/develop/components/thread-pull-requests.tsx:327
 msgid "Loading the linked pull requests…"
 msgstr "Cargando las pull requests vinculadas…"
 
@@ -21834,7 +21835,7 @@ msgstr "Modo:"
 
 #: src/features/admin/components/admin-provider-cache-row.tsx:179
 #: src/features/chat/host/host-options.tsx:146
-#: src/features/chat/sidebar/thread-context.tsx:97
+#: src/features/chat/sidebar/thread-context.tsx:101
 #: src/features/evals/components/model-comparison.tsx:110
 #: src/features/evals/components/run-dialog.tsx:212
 #: src/features/prompts/components/prompt-form-dialog.tsx:387
@@ -24028,7 +24029,7 @@ msgstr "No entregado al líder"
 msgid "Not found"
 msgstr "No encontrado"
 
-#: src/features/develop/components/thread-pull-requests.tsx:398
+#: src/features/develop/components/thread-pull-requests.tsx:401
 msgid "Not linked"
 msgstr "No vinculada"
 
@@ -26246,7 +26247,7 @@ msgstr "Elimina de forma permanente tu cuenta y todos los datos asociados"
 msgid "Permission Level"
 msgstr "Nivel de permiso"
 
-#: src/features/chat/sidebar/thread-context.tsx:103
+#: src/features/chat/sidebar/thread-context.tsx:107
 #: src/features/chat/thread/composer-permission-mode.tsx:90
 #: src/features/settings/components/chat/bots-settings.tsx:430
 msgid "Permission mode"
@@ -27386,7 +27387,7 @@ msgstr "Progreso"
 msgid "Progress of {toolName}"
 msgstr "Progreso de {toolName}"
 
-#: src/features/chat/sidebar/thread-context.tsx:109
+#: src/features/chat/sidebar/thread-context.tsx:113
 #: src/features/devices/components/devices-settings.tsx:121
 #: src/features/projects/components/project-repo-picker.tsx:145
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:439
@@ -27743,9 +27744,9 @@ msgstr "Pull request abierta"
 msgid "Pull request settings updated"
 msgstr "Ajustes de pull requests actualizados"
 
-#: src/features/chat/sidebar/thread-context.tsx:81
+#: src/features/chat/sidebar/thread-context.tsx:86
 #: src/features/code/components/code-shell.tsx:95
-#: src/features/develop/components/thread-pull-requests.tsx:368
+#: src/features/develop/components/thread-pull-requests.tsx:371
 msgid "Pull requests"
 msgstr "Pull requests"
 
@@ -28398,7 +28399,7 @@ msgstr "Volver a conectar"
 msgid "Reconnect {0}"
 msgstr "Volver a conectar {0}"
 
-#: src/features/develop/components/thread-pull-requests.tsx:233
+#: src/features/develop/components/thread-pull-requests.tsx:236
 msgid "Reconnect your Git host in settings to link a pull request."
 msgstr "Reconecta tu host de Git en los ajustes para vincular una pull request."
 
@@ -30037,7 +30038,7 @@ msgstr "Ejecutar flujo de trabajo"
 msgid "Run your workflow to see execution history here."
 msgstr "Ejecuta tu flujo de trabajo para ver aquí el historial de ejecuciones."
 
-#: src/features/chat/sidebar/thread-context.tsx:72
+#: src/features/chat/sidebar/thread-context.tsx:78
 #: src/features/chat/thread/host-activity.tsx:142
 #: src/features/evals/components/run-detail.tsx:28
 #: src/features/evals/components/run-status.tsx:16
@@ -33970,7 +33971,7 @@ msgstr "Generación y refactorización de código en varios archivos superior"
 msgid "Superior understanding of complex visual concepts"
 msgstr "Comprensión superior de conceptos visuales complejos"
 
-#: src/features/chat/sidebar/thread-context.tsx:56
+#: src/features/chat/sidebar/thread-context.tsx:61
 #: src/features/chat/thread/composer-permission-mode.tsx:44
 #: src/features/settings/components/chat/bots-settings.tsx:135
 #: src/features/settings/components/chat/new-chat-permission-mode-setting.tsx:43
@@ -35433,7 +35434,7 @@ msgstr "El host"
 msgid "the host did not answer"
 msgstr "el equipo no respondió"
 
-#: src/features/develop/components/thread-pull-requests.tsx:232
+#: src/features/develop/components/thread-pull-requests.tsx:235
 msgid "The host did not answer. Try again."
 msgstr "El host no respondió. Inténtalo de nuevo."
 
@@ -35445,11 +35446,11 @@ msgstr "El host no respondió. Se volverá a intentar más tarde."
 msgid "the host did not change the option"
 msgstr "el equipo no cambió la opción"
 
-#: src/features/develop/components/thread-pull-requests.tsx:235
+#: src/features/develop/components/thread-pull-requests.tsx:238
 msgid "The host has no pull request at that address."
 msgstr "El host no tiene ninguna pull request en esa dirección."
 
-#: src/features/develop/components/thread-pull-requests.tsx:237
+#: src/features/develop/components/thread-pull-requests.tsx:240
 msgid "The host is limiting requests. Try again shortly."
 msgstr "El host está limitando las solicitudes. Inténtalo de nuevo en breve."
 
@@ -36668,7 +36669,7 @@ msgstr "Este prompt se usará en cada mensaje. Cada mensaje se procesa de forma 
 msgid "This prompt will configure:"
 msgstr "Este prompt configurará:"
 
-#: src/features/develop/components/thread-pull-requests.tsx:236
+#: src/features/develop/components/thread-pull-requests.tsx:239
 msgid "This pull request already has as many threads linked as it can keep."
 msgstr "Esta pull request ya tiene vinculados todos los hilos que puede conservar."
 
@@ -36781,7 +36782,7 @@ msgstr "Este texto solo contiene caracteres ocultos, así que no hay nada que gu
 msgid "This thread"
 msgstr "Esta conversación"
 
-#: src/features/develop/components/thread-pull-requests.tsx:238
+#: src/features/develop/components/thread-pull-requests.tsx:241
 msgid "This thread already has as many pull requests linked as it can keep."
 msgstr "Este hilo ya tiene vinculadas todas las pull requests que puede conservar."
 
@@ -37221,7 +37222,7 @@ msgstr "Número de tokens"
 msgid "Token usage and cost breakdown per model for the selected period"
 msgstr "Uso de tokens y desglose de costes por modelo para el periodo seleccionado"
 
-#: src/features/chat/sidebar/thread-context.tsx:115
+#: src/features/chat/sidebar/thread-context.tsx:119
 #: src/features/projects/components/project-usage-summary.tsx:40
 #: src/features/settings/components/chat/usage-project-breakdown.tsx:207
 #: src/features/settings/components/chat/usage-settings.tsx:326
@@ -37695,7 +37696,7 @@ msgstr "Prueba a ajustar los términos de búsqueda."
 #: src/features/chat/guest-links/guest-page.tsx:269
 #: src/features/connection/components/offline-screen.tsx:64
 #: src/features/develop/components/files-tab.tsx:400
-#: src/features/develop/components/thread-pull-requests.tsx:331
+#: src/features/develop/components/thread-pull-requests.tsx:334
 #: src/features/home/components/home-page.tsx:154
 #: src/features/projects/components/computer-rule-file-import.tsx:495
 #: src/features/projects/components/project-repo-picker.tsx:190
@@ -40738,7 +40739,7 @@ msgstr "Puedes ver esta página, pero no editarla."
 msgid "You cannot ask a side question in this chat."
 msgstr "No puedes hacer una pregunta aparte en este chat."
 
-#: src/features/develop/components/thread-pull-requests.tsx:231
+#: src/features/develop/components/thread-pull-requests.tsx:234
 msgid "You cannot see that pull request on the host."
 msgstr "No puedes ver esa pull request en el host."
 
