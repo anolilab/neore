@@ -367,7 +367,8 @@ export const SettingsModal: FC = () => {
         const stripModalSearchParams = (previous: Record<string, unknown>): Record<string, unknown> =>
             Object.fromEntries(Object.entries(previous).filter(([key]) => !MODAL_SEARCH_KEYS.has(key)));
 
-        navigate({ search: stripModalSearchParams as unknown as SearchUpdater });
+        // Replaced, not pushed: Back from here must go to the page before the settings link, not to the link again.
+        navigate({ replace: true, search: stripModalSearchParams as unknown as SearchUpdater });
     };
 
     // The control that switched the view is hidden by it, so on a phone focus moves to the view that appeared. Never on desktop, never on close.

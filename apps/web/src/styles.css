@@ -232,14 +232,15 @@
 }
 
 /* Settings cards (`settings-card.tsx`): one box of rows split by hairlines, the action in the last row. */
-[data-slot="settings-card-body"] > div > [data-slot="card-content"] > * {
+/* Until every tab is built from `SettingsRow` (which draws its own padding and hairline), its other children get the same. */
+[data-slot="settings-card-body"] > div > [data-slot="card-content"] > :not([data-slot="settings-row"]) {
     margin-block: 0;
     padding-block: 0.875rem;
 }
 
-[data-slot="settings-card-body"] > div > [data-slot="card-content"] > * + *,
+[data-slot="settings-card-body"] > div > [data-slot="card-content"] > * + :not([data-slot="settings-row"]),
 [data-slot="settings-card-body"] > div + [data-slot="card-footer"] {
-    border-top: 1px solid var(--border);
+    @apply border-border/50 border-t;
 }
 
 /* A box with nothing in it (an empty list and no action) is not drawn. */
