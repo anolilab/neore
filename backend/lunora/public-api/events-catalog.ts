@@ -3,8 +3,8 @@
  * the argument check `events/poll` runs before it reads anything. Pure, so the dispatcher, the router and the tests share
  * one definition.
  *
- * Part 1 offers poll only. Push (`events/stream`) and webhook (`events/subscribe`) are later parts, and their methods answer
- * `-32601` until then.
+ * Every event is offered by poll. Webhook delivery (`events/subscribe`, `events/unsubscribe`, `events-webhook.ts`) is wired in part 2a
+ * and its deliveries in part 2b. Push (`events/stream`) is a later part and answers `-32601`.
  *
  * Schema evolution (the spec's rule): a field may be added, never removed, retyped or narrowed, for the life of its name.
  * A breaking change gets a new name.

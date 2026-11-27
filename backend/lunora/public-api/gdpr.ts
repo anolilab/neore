@@ -1,12 +1,21 @@
 /**
- * The Events log in account deletion (`gdpr/workflows/deletion-workflow.ts`, step "delete-user-mcp-events") and in the account
- * export (`gdpr/workflows/export-workflow.ts`, step "collect-mcp-events"). The log holds the owner's run and approval events;
- * it is erased in batches, and the workflow calls again while `hasMore` says so.
+ * The Events log and the Events webhook subscriptions in account deletion (`gdpr/workflows/deletion-workflow.ts`, step
+ * "delete-user-mcp-events"), and the Events log in the account export (`gdpr/workflows/export-workflow.ts`, step
+ * "collect-mcp-events"). The log holds the owner's run and approval events; the subscriptions hold their callback URLs and
+ * encrypted secrets. Both are erased in batches, and the workflow calls again while `hasMore` says so.
  */
 import { v } from "lunorash/server";
 
 import type { Doc } from "../_generated/dataModel";
+import type { MutationCtx } from "../_generated/server";
 import { internalMutation, internalQuery } from "../_generated/server";
+import { MAX_SUBSCRIPTIONS } from "./events-webhook";
+
+/** Host rows read per page of the account export. */
+const EXPORT_HOST_PAGE = 100;
+
+/** The most host rows one export reads: a named ceiling, past which the export says it stopped (`hostsTruncated`). */
+const MAX_EXPORT_HOSTS = 5000;
 
 const BATCH = 200;
 
@@ -121,8 +130,8 @@ export const collectMcpEventsForExport = internalQuery
     });
 
 /**
- * Deletes up to `BATCH` of the user's events per call, then, once none are left, the user's sequence watermark. Idempotent on
- * retry.
+ * Deletes up to `BATCH` of the user's events and of their subscriptions per call. Once both are empty, the user's sequence
+ * watermark goes last, so the log is never left without the sequence it issues from. Idempotent on retry.
  */
 export const deleteUserMcpEvents = internalMutation
     .input({ userId: v.string() })
@@ -131,12 +140,21 @@ export const deleteUserMcpEvents = internalMutation
         // One row past the batch says whether more follow: a batch that ends the log is not reported as more.
         // From the primary: a replica that lags the deletion could report the log empty while rows remain.
         const { page } = await ctx.db.mcpEvents.findMany({ consistency: "primary", limit: BATCH + 1, where: { userId } });
+        const { page: subscriptions } = await ctx.db.eventWebhookSubscriptions.findMany({
+            consistency: "primary",
+            limit: BATCH + 1,
+            where: { userId },
+        });
 
         for (const row of page.slice(0, BATCH)) {
             await ctx.db.delete("mcpEvents", row._id);
         }
 
-        if (page.length > BATCH) {
+        for (const row of subscriptions.slice(0, BATCH)) {
+            await ctx.db.delete("eventWebhookSubscriptions", row._id);
+        }
+
+        if (page.length > BATCH || subscriptions.length > BATCH) {
             return { hasMore: true };
         }
 
@@ -148,3 +166,70 @@ export const deleteUserMcpEvents = internalMutation
 
         return { hasMore: false };
     });
+
+/**
+ * The owner's Events webhook hosts and subscriptions, for the account export. Only what the owner can read back: the host names, and each
+ * subscription's name, callback URL, arguments and times. The signing secret (ciphertext), the key hash and the API key id are left out.
+ */
+export const collectEventWebhooksForExport = internalQuery
+    .input({ userId: v.string() })
+    .output(
+        v.object({
+            hosts: v.array(v.object({ createdAt: v.number(), host: v.string() })),
+            hostsTruncated: v.boolean(),
+            subscriptions: v.array(v.object({ argumentsKey: v.string(), createdAt: v.number(), expiresAt: v.number(), name: v.string(), url: v.string() })),
+        }),
+    )
+    .query(async ({ args: { userId }, ctx }) => {
+        // Every page until the last; only the named ceiling stops it early, and then the export says so.
+        const hosts: Doc<"eventWebhookHosts">[] = [];
+        let cursor: string | null = null;
+        let hostsTruncated = false;
+
+        for (;;) {
+            const result: { continueCursor?: string | null; isDone: boolean; page: Doc<"eventWebhookHosts">[] } = await ctx.db.eventWebhookHosts.findMany({
+                consistency: "primary",
+                cursor,
+                limit: EXPORT_HOST_PAGE,
+                where: { userId },
+            });
+
+            hosts.push(...result.page);
+
+            if (result.isDone) {
+                break;
+            }
+
+            if (hosts.length >= MAX_EXPORT_HOSTS) {
+                hostsTruncated = true;
+                break;
+            }
+
+            cursor = result.continueCursor ?? null;
+        }
+
+        const { page: subscriptions } = await ctx.db.eventWebhookSubscriptions.findMany({
+            consistency: "primary",
+            limit: MAX_SUBSCRIPTIONS,
+            where: { userId },
+        });
+
+        return {
+            hosts: hosts.map((row) => {
+                return { createdAt: row.createdAt, host: row.host };
+            }),
+            hostsTruncated,
+            subscriptions: subscriptions.map((row) => {
+                return { argumentsKey: row.argumentsKey, createdAt: row.createdAt, expiresAt: row.expiresAt, name: row.name, url: row.url };
+            }),
+        };
+    });
+
+/** Erases the account's Events webhook subscriptions, with their callback URLs and secrets (the admin cleanup, `auth/hooks.ts`). */
+export const deleteEventSubscriptionsOf = async (ctx: Pick<MutationCtx, "db">, userId: string): Promise<void> => {
+    const { page } = await ctx.db.eventWebhookSubscriptions.findMany({ consistency: "primary", where: { userId } });
+
+    for (const row of page) {
+        await ctx.db.delete("eventWebhookSubscriptions", row._id);
+    }
+};

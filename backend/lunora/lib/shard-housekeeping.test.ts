@@ -56,6 +56,9 @@ beforeAll(async () => {
     const { sweepMemoryCleanups } = await import("../memory/functions");
 
     registry.set("memory_functions:sweepMemoryCleanups", sweepMemoryCleanups);
+    const { reapExpiredEventSubscriptions } = await import("../public-api/event-webhooks");
+
+    registry.set("public_api_event_webhooks:reapExpiredEventSubscriptions", reapExpiredEventSubscriptions);
 });
 
 const NOW = 10_000_000_000;

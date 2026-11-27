@@ -291,6 +291,9 @@ export const RATE_LIMIT_CONFIGS = {
     "evals/update:free": Ratelimit.fixedWindow(30, MINUTE),
 
     "evals/update:premium": Ratelimit.fixedWindow(90, MINUTE),
+    // Adding or removing an approved callback host for Events webhooks (`auth/event-webhook-hosts.ts`).
+    "eventWebhookHosts/update:free": Ratelimit.fixedWindow(20, MINUTE),
+    "eventWebhookHosts/update:premium": Ratelimit.fixedWindow(20, MINUTE),
     // "Send feedback" (`feedback/functions.ts`): enough for a burst of reports, not for a flood.
     "feedback/submit:free": Ratelimit.fixedWindow(10, HOUR),
     "feedback/submit:premium": Ratelimit.fixedWindow(30, HOUR),

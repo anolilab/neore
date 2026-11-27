@@ -1340,6 +1340,36 @@ export const schema = defineSchema({
         .index("by_user_and_status", ["userId", "status"])
         .index("by_dataset_and_createdAt", ["datasetId", "createdAt"]),
 
+    // The owner's approved callback hosts for Events webhooks (`auth/event-webhook-hosts.ts`). Written only from the owner's session.
+    eventWebhookHosts: defineTable({
+        createdAt: v.number(),
+        host: v.string(),
+        userId: v.string(),
+    })
+        .shardBy("userId")
+        .index("by_userId_host", ["userId", "host"]),
+
+    // An Events webhook subscription (`public-api/event-webhooks.ts`): one row per subscription key. The secret is encrypted
+    // ("tool-keys") and never read back. `scanSeq` is the log position the subscription has been scanned to.
+    eventWebhookSubscriptions: defineTable({
+        argumentsKey: v.string(),
+        createdAt: v.number(),
+        expiresAt: v.number(),
+        id: v.string(),
+        keyHash: v.string(),
+        minTimestamp: v.number(),
+        name: v.string(),
+        principal: v.string(),
+        scanSeq: v.number(),
+        secretCiphertext: v.string(),
+        updatedAt: v.number(),
+        url: v.string(),
+        userId: v.string(),
+    })
+        .shardBy("userId")
+        .index("by_userId_keyHash", ["userId", "keyHash"])
+        .index("by_expiresAt", ["expiresAt"]),
+
     /**
      * What a user sent through "Send feedback": a kind, their text, up to
      * `MAX_FEEDBACK_IMAGES` images (R2 keys under `feedback/<userId>/`) and,
