@@ -3,13 +3,14 @@
 import { useLingui } from "@lingui/react/macro";
 import { api } from "@neore/backend/api";
 import { Button } from "@neore/ui/components/button";
-import { Label } from "@neore/ui/components/label";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogPanel, DialogTitle } from "@neore/ui/components/responsive-dialog";
 import { Textarea } from "@neore/ui/components/textarea";
 import type { JSONContent } from "@tiptap/core";
 import type { FC } from "react";
 import { lazy, Suspense, useId, useState } from "react";
 
+import SettingsCard from "@/components/settings/settings-card";
+import SettingsRow from "@/components/settings/settings-row";
 import { useAction } from "@/lib/lunora/crpc";
 import { showError } from "@/lib/toast";
 
@@ -105,7 +106,7 @@ const PageAgentDialogBody: FC<Omit<PageAgentDialogProps, "open">> = ({ currentJs
             >
                 <DialogPanel>
                     {proposal ? (
-                        <div className="h-[60vh] overflow-hidden rounded-md border">
+                        <div className="surface-raised h-[60vh] overflow-hidden rounded-xl">
                             <Suspense
                                 fallback={
                                     <p className="text-muted-foreground p-3 text-xs" role="status">
@@ -117,16 +118,17 @@ const PageAgentDialogBody: FC<Omit<PageAgentDialogProps, "open">> = ({ currentJs
                             </Suspense>
                         </div>
                     ) : (
-                        <div className="space-y-2">
-                            <Label htmlFor={id}>{t`What should change?`}</Label>
-                            <Textarea
-                                id={id}
-                                maxLength={2000}
-                                onChange={(event) => setInstruction(event.target.value)}
-                                placeholder={t`e.g. Tighten the introduction and add a summary at the end`}
-                                value={instruction}
-                            />
-                        </div>
+                        <SettingsCard>
+                            <SettingsRow htmlFor={id} title={t`What should change?`}>
+                                <Textarea
+                                    id={id}
+                                    maxLength={2000}
+                                    onChange={(event) => setInstruction(event.target.value)}
+                                    placeholder={t`e.g. Tighten the introduction and add a summary at the end`}
+                                    value={instruction}
+                                />
+                            </SettingsRow>
+                        </SettingsCard>
                     )}
                     <p aria-live="polite" className="sr-only" role="status">
                         {liveStatus}
