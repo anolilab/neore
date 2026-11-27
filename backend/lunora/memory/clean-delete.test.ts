@@ -828,6 +828,33 @@ describe("a cleanup step that fails", () => {
         expect(JSON.stringify(vi.mocked(memoryLogger.error).mock.calls)).not.toContain("older 0");
     });
 
+    it("logs no give-up error for a vector step that fails below the cap, and exactly one when the cap is reached", async () => {
+        const old = await seed("likes tea");
+        const next = await seed("likes green tea");
+
+        vi.mocked(deleteVectorRow).mockRejectedValueOnce(new Error("vector index unavailable"));
+        await run(async (ctx) => await supersedeMemory(ctx as never, old.memoryId, next.memoryId, Date.now()));
+
+        const [record] = await cleanups();
+        const cleanupId = record?._id as Id<"memoryCleanups">;
+        const givenUp = () => vi.mocked(memoryLogger.error).mock.calls.filter(([message]) => /Giving up|Gave up/.test(String(message)));
+
+        // A failed step well below the cap: counted, retried later, and no error logged.
+        vi.mocked(deleteVectorRow).mockRejectedValueOnce(new Error("still down"));
+        await runCleanup({ cleanupId });
+
+        expect((await cleanupOf(cleanupId))?.attempts).toBe(1);
+        expect(givenUp()).toHaveLength(0);
+
+        // The step that uses the last attempt logs the one error, from the record's own failure path.
+        await run(async (ctx) => await ctx.db.patch("memoryCleanups", cleanupId, { attempts: 11 }));
+        vi.mocked(deleteVectorRow).mockRejectedValueOnce(new Error("still down"));
+        await runCleanup({ cleanupId });
+
+        expect(givenUp()).toHaveLength(1);
+        expect(String(givenUp()[0]?.[0])).toMatch(/Gave up/);
+    });
+
     it("does nothing for a record that has used its attempts", async () => {
         const { cleanupId, older } = await seedChain(3);
 

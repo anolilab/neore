@@ -396,7 +396,11 @@ const recordVectorDelete = async (ctx: Pick<MutationCtx, "db" | "now" | "schedul
  *
  * Resolves `true` when nothing is left to delete (done or already gone) and `false` while the vector may still be there.
  */
-const deleteMemoryVector = async (context: MutationCtx, orphan: OrphanedVector, attempt = 1): Promise<boolean> => {
+const deleteMemoryVector = async (
+    context: MutationCtx,
+    orphan: OrphanedVector,
+    { attempt = 1, fromCleanup = false }: { attempt?: number; fromCleanup?: boolean } = {},
+): Promise<boolean> => {
     let vectorId: Id<VectorTableName>;
     let vectorTable: VectorTableName;
 
@@ -430,6 +434,14 @@ const deleteMemoryVector = async (context: MutationCtx, orphan: OrphanedVector, 
 
         await recordVectorDelete(context, orphan);
 
+        // A cleanup step is a retry of its own: the record counts its attempts and logs the one error where they run out
+        // (`noteMemoryCleanupFailure`), and no ladder of scheduled retries is started beside it.
+        if (fromCleanup) {
+            memoryLogger.warn(`Vector delete failed again for memory ${orphan.memoryId} (embedding ${orphan.embeddingId}, user ${orphan.userId})`, error);
+
+            return false;
+        }
+
         if (attempt >= VECTOR_DELETE_ATTEMPTS) {
             memoryLogger.error(
                 `Giving up the scheduled retries of the vector of memory ${orphan.memoryId}: embedding ${orphan.embeddingId} of user ${orphan.userId} stays recorded for its cleanup job`,
@@ -455,8 +467,8 @@ const deleteMemoryVector = async (context: MutationCtx, orphan: OrphanedVector, 
 };
 
 /** A retry or a sweep pass over a recorded vector delete: when nothing is left of the vector, its record goes. */
-const resumeVectorDelete = async (context: MutationCtx, orphan: OrphanedVector, attempt: number): Promise<boolean> => {
-    const done = await deleteMemoryVector(context, orphan, attempt);
+const resumeVectorDelete = async (context: MutationCtx, orphan: OrphanedVector, options: { attempt?: number; fromCleanup?: boolean }): Promise<boolean> => {
+    const done = await deleteMemoryVector(context, orphan, options);
 
     if (done) {
         const records = await context.db
@@ -531,7 +543,7 @@ export const retryMemoryVectorDelete = internalMutation
     })
     .output(v.null())
     .mutation(async ({ args: { attempt, ...orphan }, ctx: context }) => {
-        await resumeVectorDelete(context, orphan, attempt);
+        await resumeVectorDelete(context, orphan, { attempt });
 
         return null;
     });
@@ -743,7 +755,7 @@ export const stepMemoryCleanup = internalMutation
             return { again: false, failed: false, userId: row.userId };
         }
 
-        const done = await resumeVectorDelete(ctx, { embeddingId: row.embeddingId, memoryId: row.memoryId ?? "", userId: row.userId }, VECTOR_DELETE_ATTEMPTS);
+        const done = await resumeVectorDelete(ctx, { embeddingId: row.embeddingId, memoryId: row.memoryId ?? "", userId: row.userId }, { fromCleanup: true });
 
         return { again: false, failed: !done, userId: row.userId };
     });
