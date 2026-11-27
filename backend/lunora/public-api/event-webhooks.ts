@@ -108,7 +108,8 @@ export const subscribeOn = async (ctx: Pick<MutationCtx, "db">, input: Subscribe
         }
     }
 
-    const watermark = await ctx.db.mcpEventWatermarks.findFirst({ where: { userId: input.userId } });
+    // From the primary: a lagging replica would give an older position, and a new subscriber would replay events recorded since.
+    const watermark = await ctx.db.mcpEventWatermarks.findFirst({ consistency: "primary", where: { userId: input.userId } });
     const latestSeq = watermark?.seq ?? 0;
     const oldestSeq = await oldestSeqOf(ctx, input.userId);
     let scanSeq = latestSeq;
