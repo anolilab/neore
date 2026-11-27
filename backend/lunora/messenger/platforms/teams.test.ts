@@ -36,7 +36,7 @@ const token = async (claims: Record<string, unknown> = {}, options: { exp?: numb
 
 const activity: TeamsActivity = {
     channelId: "msteams",
-    conversation: { id: "a:1conversation", tenantId: "tenant" },
+    conversation: { conversationType: "personal", id: "a:1conversation", tenantId: "tenant" },
     from: { aadObjectId: "aad-user", id: "29:1user", name: "Ada" },
     id: "1695463200000",
     serviceUrl: SERVICE_URL,
@@ -130,6 +130,7 @@ describe("parseTeamsActivity", () => {
         expect(parseTeamsActivity(activity)).toEqual({
             activityId: "1695463200000",
             chatId: "a:1conversation",
+            direct: true,
             eventId: "1695463200000",
             kind: "text",
             senderId: "aad-user",

@@ -45,7 +45,7 @@ export const WECHAT_SERVICE_WINDOW_MS = 48 * 60 * 60 * 1000;
 export const WECHAT_WINDOW_CLOSED_ERROR = 45_015;
 
 /** Customer-service text is capped at 2048 bytes; 600 characters stays under it even for CJK (3 bytes each). */
-const WECHAT_TEXT_MAX = 600;
+export const WECHAT_TEXT_MAX = 600;
 
 const sha1OfSorted = async (parts: string[]): Promise<string> => await digestHex("SHA-1", parts.toSorted(compareStrings).join(""));
 
@@ -184,6 +184,8 @@ export const parseWeChatMessage = (xml: string): InboundMessage | null => {
     return {
         ...(attachments.length > 0 && { attachments }),
         chatId: from,
+        // An official account's messages are one person writing to it; the reply goes back to that person alone.
+        direct: true,
         eventId: messageId,
         kind: inboundKind(text, attachments),
         senderId: from,
