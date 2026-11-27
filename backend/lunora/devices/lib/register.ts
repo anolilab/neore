@@ -7,7 +7,7 @@ import { LunoraError } from "lunorash/server";
 import type { Doc } from "../../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../../_generated/server";
 import { encryptKey } from "../../lib/encryption";
-import { notify } from "../../notifications/notify";
+import { notify, notifyQuietly } from "../../notifications/notify";
 import { setShardRoute } from "../../lib/shard-routes";
 import { DEVICE_LIMIT_CODE, MAX_DEVICES_PER_USER } from "./constants";
 import { generateDeviceSecret } from "./signing";
@@ -53,15 +53,19 @@ export const insertDevice = async (ctx: Pick<MutationCtx, "db" | "now">, device:
  * cleared here, in the same transaction as the alert, so a repeat call or the housekeeping sweep finds nothing left to do.
  * The registration never calls this: the callers that do run after the secret is returned, so a failure to hand the alert
  * off cannot cost the caller the device. It uses `notify`, not `notifyQuietly`: a failed alert write must roll the cleared flag
- * back with it, or nothing would ever retry the alert.
+ * back with it, or nothing would ever retry the alert. `quiet` is for a caller that must not fail on the alert (a revoke removes
+ * the device, so there is nothing left to retry): the flag is cleared and a failed write is dropped.
  */
-export const announceNewDevice = async (ctx: MutationCtx, device: Doc<"devices">): Promise<void> => {
+export const announceNewDevice = async (ctx: MutationCtx, device: Doc<"devices">, options: { quiet?: boolean } = {}): Promise<void> => {
     if (device.alertPending !== true) {
         return;
     }
 
     await ctx.db.patch("devices", device._id, { alertPending: false });
-    await notify(ctx, {
+
+    const send = options.quiet ? notifyQuietly : notify;
+
+    await send(ctx, {
         dedupeKey: `device-paired:${device._id as string}`,
         link: "/dashboard/settings/chat/devices",
         title: device.name,

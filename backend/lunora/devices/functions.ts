@@ -322,7 +322,8 @@ export const revokeDevice = authMutation
             // A device that signed in but whose owner was not told yet is announced before it goes: a quick revoke must not hide it.
             // One that never signed in was cancelled on the computer, and stays silent.
             if (revoked.alertPending === true && revoked.lastSeenAt !== undefined) {
-                await announceNewDevice(ctx, revoked);
+                // Quiet: a failed alert must not keep the device from being removed, and a removed device has nothing left to retry.
+                await announceNewDevice(ctx, revoked, { quiet: true });
             }
 
             await ctx.db.delete("devices", revoked._id);
