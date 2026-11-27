@@ -15,6 +15,14 @@
 import { differentEventDays, type FactDates, factDatesOf, hasFactDates, isExpired, sameFactDates } from "./dates";
 import type { MemoryType } from "./taxonomy";
 
+/**
+ * What a digest's generated `summary` becomes once it may quote a memory that is gone. The summary is free text the
+ * model wrote from the day's memories, merges and promotions and carries no pointer to the rows it drew on, so it
+ * cannot be edited down to what is left: it is cleared (the card then shows its stock line, not the deleted wording),
+ * never regenerated in a mutation. The digest's other fields stay.
+ */
+export const DROPPED_DIGEST_SUMMARY = "";
+
 // ============================================================================
 // Limits
 // ============================================================================
@@ -749,6 +757,22 @@ export interface ReflectionPromptInput {
     promotions: PromotionCandidate[];
     threadTitles: string[];
 }
+
+/**
+ * The memories the synthesis prompt shows, so the ones a digest summary can have quoted: the first
+ * `maxDigestItems` of the day's, every merge member and every promotion source. A memory the prompt cut is not one.
+ */
+export const reflectionSourceIds = (
+    learnedToday: ReadonlyArray<{ id: string }>,
+    plan: Pick<ReflectionPlan, "merges" | "promotions">,
+    limits: Pick<ReflectionLimits, "maxDigestItems"> = REFLECTION_LIMITS,
+): string[] => [
+    ...new Set([
+        ...learnedToday.slice(0, limits.maxDigestItems).map((memory) => memory.id),
+        ...plan.merges.flatMap((merge) => [merge.survivorId, ...merge.absorbedIds]),
+        ...plan.promotions.flatMap((candidate) => candidate.sourceIds),
+    ]),
+];
 
 /** Values are JSON-encoded so a memory cannot close the data block and speak as the prompt. */
 export const buildReflectionPrompt = (

@@ -68,7 +68,11 @@ describe("runChatStart", () => {
 
         expect(response.status).toBe(400);
         expect(await response.json()).toMatchObject({ error: expect.stringContaining("worker") });
-        expect(state.calls.filter((name) => !name.includes("gateThreadAction") && !name.includes("getSessionOrganizationForCap"))).toStrictEqual([]);
+        expect(
+            state.calls.filter(
+                (name) => !name.includes("gateThreadAction") && !name.includes("getSessionOrganizationForCap") && !name.includes("wakeLeaseHeldFor"),
+            ),
+        ).toStrictEqual([]);
     });
 
     it("refuses a regenerate in a worker's thread the same way", async () => {

@@ -204,6 +204,8 @@ const MessengerPlatformCard: FC<MessengerPlatformCardProps> = ({ beta, connectio
                     <Collapsible onOpenChange={setDetailsOpen} open={detailsOpen}>
                         <CollapsibleTrigger className="text-muted-foreground hover:text-foreground group inline-flex items-center gap-1 text-xs font-medium">
                             {t`Details`}
+                            {/* Each connected platform has one of these: the name tells them apart for a screen reader. */}
+                            <span className="sr-only">{`, ${name}`}</span>
                             <ChevronDown aria-hidden className="size-3 transition-transform group-data-[panel-open]:rotate-180" />
                         </CollapsibleTrigger>
                         <CollapsibleContent>

@@ -34,12 +34,19 @@ const EMBEDDING_TABLES = [
     "embeddings_1536",
 ] as const;
 
-/** Deletes an embedding row that may already be gone (a retried round, or a dangling id). */
-export const eraseEmbeddingRow = async (ctx: MutationCtx, id: string, what: string): Promise<void> => {
+/**
+ * Deletes an embedding row that may already be gone (a retried round, or a dangling id). Never throws: a failure is logged
+ * and resolves `false`, for a caller that holds the only reference to the vector and must keep it.
+ */
+export const eraseEmbeddingRow = async (ctx: MutationCtx, id: string, what: string): Promise<boolean> => {
     try {
         await deleteVectorRow(ctx.db, id as Id<VectorTableName>);
+
+        return true;
     } catch (error: unknown) {
         gdprLogger.error(`Failed to delete ${what} ${id}:`, error);
+
+        return false;
     }
 };
 

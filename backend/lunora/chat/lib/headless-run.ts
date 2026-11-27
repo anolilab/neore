@@ -4,9 +4,13 @@
  * so they read the user's settings the same way and differ only where they say
  * so:
  *
- * - `memory`: memories are retrieved into the system prompt and extracted from
- *   the exchange afterwards. Off for a messenger reply — its sender is a third
- *   party, who must neither read the owner's memories nor write to them.
+ * - `memory`: memories are retrieved into the system prompt. The run's own prompt is
+ *   never learned from: it has no typed words of the user's to quote, so its
+ *   extraction job (no `quotablePrompt`) stores nothing. Only a message the user
+ *   steers into a paused run can be learned, through the continuation's own
+ *   quotable steers (`learn: false` skips both, which triggers use). Off for a
+ *   messenger reply — its sender is a third party, who must neither read the
+ *   owner's memories nor write to them.
  * - `personalization`: `"full"` puts the user's about-me, nickname, profession,
  *   custom instructions and location into the prompt — for runs whose audience
  *   is the user. `"none"` for a messenger reply: its reader is a third party,
@@ -77,6 +81,45 @@ import { INSTRUCTION_READ_TOOL, renderInstructionList, type RunInstruction } fro
 /** No tools, so no permission keys or fingerprints: typed, so the union with the built tools' maps stays a plain record. */
 const NO_PERMISSION_KEYS: Record<string, string> = {};
 
+/** Thrown by a tool call the run's fence refused: the call did not run. */
+export class FencedRunError extends Error {
+    public constructor() {
+        super("The run was fenced: its lease no longer holds");
+        this.name = "FencedRunError";
+    }
+}
+
+/**
+ * The tools with every call checked against `fence` first: a call made once the fence has failed does not run. Only tools that execute
+ * are wrapped; the others pass through untouched.
+ */
+export const fenceTools = <T extends Record<string, unknown>>(tools: T, fence: () => Promise<boolean>): T =>
+    Object.fromEntries(
+        Object.entries(tools).map(([name, tool]) => {
+            const execute = (tool as { execute?: (...args: unknown[]) => unknown } | undefined)?.execute;
+
+            if (typeof execute !== "function") {
+                return [name, tool];
+            }
+
+            return [
+                name,
+                {
+                    ...(tool as object),
+                    // A plain function, not an arrow: `createTool`'s execute reads the run's context from `this` (`wrapTools` puts it on its copy
+                    // of the tool), so the call goes on with the `this` and the arguments the run gave, and only the lease check is added.
+                    async execute(this: unknown, ...args: unknown[]) {
+                        if (!(await fence())) {
+                            throw new FencedRunError();
+                        }
+
+                        return await execute.apply(this, args);
+                    },
+                },
+            ];
+        }),
+    ) as T;
+
 /** Autonomous work benefits from search; a skill's own search mode still wins. */
 const DEFAULT_HEADLESS_SEARCH_MODE: SearchMode = "web";
 
@@ -105,6 +148,12 @@ export interface HeadlessRunOptions {
      */
     chainSource?: string;
     /**
+     * Asked before every tool call, and after every step before the next model call: `false` ends the run. A tool call that finds it
+     * `false` does not run (it throws {@link FencedRunError}), and a step that finds it `false` is the last. For a run bound to something
+     * that can lapse mid-run (a wake turn's lease): the caller learns of it from its own check, since a stop is not an error.
+     */
+    fence?: () => Promise<boolean>;
+    /**
      * Send the model none of the thread's earlier turns, only this run's prompt: a scheduled task that
      * reuses one thread with a fresh context per run (`tasks/AGENTS.md`). The history stays in the thread.
      */
@@ -118,9 +167,15 @@ export interface HeadlessRunOptions {
     goal?: { maxRounds?: number; text: string };
     /** Leave an existing thread's status as it is, instead of marking it active when the run ends. */
     keepThreadStatus?: boolean;
+    /**
+     * `false`: memories are still read into the prompt, and no extraction job is scheduled, nor is the steers' extraction
+     * after a pause. Without it the run's own prompt still stores nothing (`extractMemories` fails closed without a
+     * `quotablePrompt`); only steers the user typed into a paused run can be learned from.
+     */
+    learn?: boolean;
     /** A step cap for a quick reply. Default: Deep Work's budget, with context compression between steps. */
     maxSteps?: number;
-    /** Retrieve memories before, and extract them after. */
+    /** Retrieve memories before, and extract them after (unless `learn` is `false`). */
     memory: boolean;
     model: string;
     /**
@@ -134,6 +189,12 @@ export interface HeadlessRunOptions {
      * that must give something back when a run never started tells the two apart with it.
      */
     onGenerationStart?: () => Promise<void> | void;
+    /**
+     * Called once, from the first step's `prepareStep`: after the agent has finished its own setup for the turn (context retrieval,
+     * saving the prompt) and immediately before the provider request. A failure before it never reached the provider; one that throws here
+     * stops the run before the request. For a caller that must keep a charge only once the provider is really asked (a wake turn).
+     */
+    onModelRequest?: () => Promise<void> | void;
     /** Called with the new thread's id before generation starts, so a failure can still point at it. */
     onThread?: (threadId: string) => Promise<void> | void;
     /**
@@ -287,7 +348,8 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
         ctx.runQuery(internal.auth.functions.getUserPreferencesQuery, { userId }),
         loadUserProviderKeys(ctx, userId),
     ]);
-    const extractMemory = options.memory && prefs.memoryEnabled;
+    const readMemory = options.memory && prefs.memoryEnabled;
+    const extractMemory = readMemory && options.learn !== false;
 
     // A run that continues a thread gets that thread's tools too (its linked pull requests); a new thread has none yet.
     const continuedThreadId = "threadId" in options.thread ? options.thread.threadId : undefined;
@@ -336,6 +398,10 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
     const toolAllowlist =
         options.toolAllowlist && options.toolAllowlistKeepsMcp ? [...options.toolAllowlist, ...Object.keys(toolResult.mcpLabels)] : options.toolAllowlist;
 
+    // A stop the caller asked for, or the fence failing: either ends the run after the step that just finished.
+    const { fence } = options;
+    const shouldStop = fence ? async () => (await options.shouldStop?.()) === true || !(await fence()) : options.shouldStop;
+
     // This run's own reply (`ToolCtx.replyKey`): two runs on one continued thread are two replies.
     const replyKey = `headless:${crypto.randomUUID()}`;
     // The thread this run ended on, once it exists: a failure after that is recorded in the Events log (`catch` below).
@@ -370,12 +436,12 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
             skillContext: skill ? { config: skill.config, instructions: skill.instructions } : undefined,
             threadId: existingThreadId,
             timezone: prefs.timezone,
-            tools: runTools,
+            tools: options.fence ? fenceTools(runTools, options.fence) : runTools,
             userId,
             userProviderKeys,
         });
 
-        const memoryContext = extractMemory && prompt ? await retrieveMemoryContext(ctx, userId, prompt, options.botId, prefs.timezone) : undefined;
+        const memoryContext = readMemory && prompt ? await retrieveMemoryContext(ctx, userId, prompt, options.botId, prefs.timezone) : undefined;
         // A run that lists none takes the project text chosen without the list's cost, when that differs.
         const runSystem = (instructions.length === 0 && options.projectInstructions?.systemWithoutInstructions) || options.system;
         const extraParts = [runSystem, renderInstructionList(instructions), memoryContext].filter((part): part is string => !!part);
@@ -391,7 +457,7 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
                 shouldAutoContinue,
             }),
             ...(prompt !== undefined && { prompt }),
-            ...(options.shouldStop && { stopWhen: [stepCountIs(options.maxSteps ?? getMaxSteps(true)), stopWhenRequested(options.shouldStop)] }),
+            ...(shouldStop && { stopWhen: [stepCountIs(options.maxSteps ?? getMaxSteps(true)), stopWhenRequested(shouldStop)] }),
             ...(system !== undefined && { system }),
         };
 
@@ -463,6 +529,22 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
 
             throw error;
         };
+
+        if (options.onModelRequest) {
+            const { onModelRequest } = options;
+            const inner = generateArgs.prepareStep as ((step: unknown) => unknown) | undefined;
+            let requested = false;
+
+            generateArgs.prepareStep = async (step: unknown) => {
+                if (!requested) {
+                    requested = true;
+                    await onModelRequest();
+                }
+
+                return await inner?.(step);
+            };
+        }
+
         const result = await thread.generateText(generateArgs as never, callOptions).catch(wakeOnFailure);
         const text = result.text ?? "";
         // When the prompt was saved, which the generation does after preparing its context: "tomorrow" in it is read against that day.
@@ -614,7 +696,7 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
             extract(text);
             // A stop writes no run event, as a chat's stop does not.
 
-            if (!(await options.shouldStop?.())) {
+            if (!(await shouldStop?.())) {
                 await recordEnd("succeeded");
             }
 
@@ -631,7 +713,7 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
             // A further round continues this run, so it reads the run's own turns: only the first generation starts fresh.
             runRound: async (instruction) => settle(await thread.generateText({ ...generateArgs, prompt: instruction } as never).catch(wakeOnFailure)),
             startedAt,
-            stopped: options.shouldStop,
+            stopped: shouldStop,
         });
 
         extract(outcome.result.text);

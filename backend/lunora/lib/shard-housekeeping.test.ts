@@ -53,6 +53,9 @@ beforeAll(async () => {
     const { resumeStalledGuestMergesOnTick } = await import("./account-merge");
 
     registry.set("lib_account_merge:resumeStalledGuestMergesOnTick", resumeStalledGuestMergesOnTick);
+    const { sweepMemoryCleanups } = await import("../memory/functions");
+
+    registry.set("memory_functions:sweepMemoryCleanups", sweepMemoryCleanups);
 });
 
 const NOW = 10_000_000_000;
@@ -578,6 +581,30 @@ describe("a stalled guest merge behind more active shards", () => {
         // Not the passed time the tick read, so not replaced: still due, and the next dispatch sends the tick again.
         expect(await dueOf("user")).toBe(NOW - 60_000 + 1);
         expect(await dispatchWith(dispatchDueShards)).toStrictEqual([{ path: "lib_shard_housekeeping:runShardTick", shardKey: "user" }]);
+    });
+
+    it("works a memory cleanup on a shard past the housekeeping horizon, and wakes it again for the next one", async () => {
+        const dormant = NOW - HOUSEKEEPING_HORIZON_MS - 1000;
+
+        await harness.run(async (ctx: any) => {
+            await ctx.db.insert("shardActivity", { lastActiveAt: dormant, nextDueAt: NOW - 60_000, shardKey: "user" });
+            await ctx.db.insert("memoryCleanups", { dueAt: NOW - 1000, frontier: [], kind: "chain", userId: "user" });
+        });
+        expect(needsHousekeeping({ lastActiveAt: dormant }, NOW)).toBe(false);
+
+        await runInShard("user", async () => await harness.run(async (ctx: any) => await ctx.runMutation(runShardTick, {})));
+
+        // A job for the record, and the shard woken for the record's new due time, not left unwoken until its owner is active.
+        expect(harness.scheduler.list().filter((job) => job.functionPath?.includes("runMemoryCleanup") === true)).toHaveLength(1);
+        expect(await dueOf("user")).toBeGreaterThan(NOW);
+
+        // Once that time comes, the root dispatch sends the tick to the shard whatever its owner's last activity.
+        await harness.run(async (ctx: any) => {
+            const row = await ctx.db.shardActivity.findFirst({ where: { shardKey: "user" } });
+
+            await ctx.db.patch("shardActivity", row._id, { nextDueAt: NOW - 1 });
+        });
+        expect(await dispatchWith(dispatchDueShards)).toContainEqual({ path: "lib_shard_housekeeping:runShardTick", shardKey: "user" });
     });
 
     it("keeps a due time saved while the dispatched tick is being sent, after the dispatch's clear", async () => {

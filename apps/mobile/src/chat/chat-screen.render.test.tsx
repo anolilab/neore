@@ -60,6 +60,8 @@ const stable = vi.hoisted(() => {
                 };
             },
             setAuthToken: noop,
+            // The browser link's live status: no browser runs in these chats.
+            subscribe: () => noop,
         },
         insets: { bottom: 0, left: 0, right: 0, top: 0 },
         offline: { cache: undefined, refreshTick: 0, reportRead: noop },

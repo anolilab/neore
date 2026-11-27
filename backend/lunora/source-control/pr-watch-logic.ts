@@ -178,11 +178,13 @@ export const decideWatch = (previous: PullRequestWatchState, observed: PullReque
     if (left && observed.seenReviewBeyondRead === "unknown") {
         // The seen review could not be looked up: it neither wakes nor moves, so the next read decides with it still in place.
     } else if (left && observed.seenReviewBeyondRead === "present") {
-        // The seen review exists beyond the read, and the list is in host order, not submission order: only a review by someone else
-        // submitted AFTER it is new (a review with no time, or the same time, is not), and the marker moves to the newest of those.
+        // The seen review exists beyond the read, and the list is in host order, not submission order, so submission time decides: a
+        // review by someone else submitted at or after the seen one is new, and the marker moves to the newest of those. EQUAL counts,
+        // because host times have one-second resolution and nothing here orders two reviews of one second (a spurious wake is
+        // accepted over a missed review). A review with no time is not newer.
         const seenAt = observed.seenReviewSubmittedAt ?? 0;
         const later = reviewsByOthers(observed)
-            .filter((other) => (other.submittedAt ?? 0) > seenAt)
+            .filter((other) => (other.submittedAt ?? 0) >= seenAt)
             .toSorted((a, b) => (b.submittedAt ?? 0) - (a.submittedAt ?? 0));
 
         if (later[0] !== undefined) {

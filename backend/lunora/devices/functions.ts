@@ -35,8 +35,9 @@ import {
     MAX_MANIFEST_BYTES,
 } from "./lib/constants";
 import { isAppVersion } from "./lib/app-version";
-import { scheduleClearDeviceProjects } from "./internal";
-import { assertRoomForDevice, insertDevice } from "./lib/register";
+import { scheduleClearDeviceProjects, scheduleRemovedDeviceAlert } from "./internal";
+import { noteShardActivity } from "../lib/shard-housekeeping";
+import { announceNewDevice, assertRoomForDevice, insertDevice } from "./lib/register";
 import { parseAcpOffers, parseManifestTools } from "./lib/manifest";
 import { filterOwnProjectIds, ownProjectTitles } from "./lib/scope";
 import { claimWindowMs, expireOpenCalls, isAcpTool, isDeviceOutdated, isForwardPhase } from "./lib/state";
@@ -138,15 +139,40 @@ export const registerDevice = authMutation
         }
 
         const { deviceId, secret } = await insertDevice(ctx, {
+            alertPending: true,
             name: args.name.trim(),
             platform: args.platform,
             userId,
             ...(args.viaDeviceId !== undefined && { transport: "ssh" as const, viaDeviceId: args.viaDeviceId }),
         });
 
+        // Makes the owner's shard eligible for the pending-alert sweep even if it has been dormant for a while. Best-effort.
+        await noteShardActivity(ctx, userId);
+
         ctx.log.event("devices.register_device", { platform: args.platform, ssh: args.viaDeviceId !== undefined });
 
         return { deviceId, secret };
+    });
+
+/**
+ * Tells the owner that a device was just paired from the web. A separate call after `registerDevice` returns, not part of
+ * it: the alert is scheduled work, and a failure to hand that work off after the commit must never cost the caller the
+ * device's secret. Idempotent per device (the notification's dedupe key), so a repeat call adds nothing.
+ */
+export const announcePairedDevice = authMutation
+    .input({ deviceId: v.id("devices") })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        const { userId } = ctx.user;
+        const device = await ctx.db.devices.findFirst({ where: { _id: args.deviceId, userId } });
+
+        if (!device) {
+            throw new LunoraError("NOT_FOUND", "Device not found");
+        }
+
+        await announceNewDevice(ctx, device);
+
+        return null;
     });
 
 /** The caller's paired devices. Online state is the client's to derive from `lastSeenAt` (`DEVICE_ONLINE_WINDOW_MS`). */
@@ -292,6 +318,15 @@ export const revokeDevice = authMutation
             // device delete would leave them cleared. A scheduled run clears them instead, and the scheduler call commits
             // with the revoke, so a revoke that fails queues nothing and can be retried.
             await scheduleClearDeviceProjects(ctx.scheduler, { machineId: revoked._id, userId });
+
+            // A device whose owner was not told yet is still announced when a revoke removes it: a quick revoke must not hide it.
+            // It counts as confirmed once it has signed a request (`lastSeenAt`), or once a machine paired by code has redeemed its
+            // code (`pairedByCode`). Queued, not sent here, so a failing notification write cannot keep the device from being removed.
+            // A device that did neither was cancelled on the computer, and stays silent.
+            if (revoked.alertPending === true && (revoked.lastSeenAt !== undefined || revoked.pairedByCode !== undefined)) {
+                await scheduleRemovedDeviceAlert(ctx.scheduler, { deviceId: revoked._id as string, name: revoked.name, userId });
+            }
+
             await ctx.db.delete("devices", revoked._id);
         }
 

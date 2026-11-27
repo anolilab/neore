@@ -41,13 +41,14 @@ import { gatewayFetch } from "../lib/services";
 import { runAfterOnShard } from "../lib/shard-scheduler";
 import { getUtilityModel } from "../lib/utility-model";
 import { runBeliefRevision } from "./extract";
-import { reembedRewordedMemory } from "./functions";
+import { reembedRewordedMemory, supersedeMemory } from "./functions";
 import {
     buildReflectionPrompt,
     checkReflectionEligibility,
     createReflectionBudget,
     decayToOps,
     digestDayOf,
+    DROPPED_DIGEST_SUMMARY,
     expiryToOps,
     estimateTokens,
     localDayOf,
@@ -55,6 +56,7 @@ import {
     nextReflectionRunAt,
     planActivityUpdate,
     planReflection,
+    reflectionSourceIds,
     promotionToOp,
     REFLECTION_LIMITS,
     REFLECTION_SYSTEM_PROMPT,
@@ -81,6 +83,8 @@ const REFLECTION_READ_CAP = 1000;
 
 /** Digests kept per user; older ones are pruned when a new one lands. */
 const DIGESTS_KEPT = 30;
+/** Sources one digest save checks for existence: the prompt carries at most a few dozen. */
+const SOURCE_CHECK_CAP = 200;
 
 /** Structured event per run, so skip reasons and spend are countable. */
 const REFLECTION_EVENT = "memory.reflection";
@@ -500,7 +504,7 @@ export const applyReflectionOps = internalMutation
                     });
 
                     for (const source of sources) {
-                        await ctx.db.patch("memories", source._id, { supersededBy: promotedId, updatedAt: now });
+                        await supersedeMemory(ctx, source._id, promotedId, now);
                         supersededIds.push(source._id);
                     }
 
@@ -535,7 +539,7 @@ export const applyReflectionOps = internalMutation
                         break;
                     }
 
-                    await ctx.db.patch("memories", row._id, { supersededBy: by._id, updatedAt: now });
+                    await supersedeMemory(ctx, row._id, by._id, now);
 
                     // The survivor takes the absorbed row's words when they were said later. Outside a merge, a survivor
                     // with no quote takes none: it is the newer belief that contradicts or reworded the absorbed one.
@@ -578,6 +582,8 @@ export const saveMemoryDigest = internalMutation
     .input({
         learned: v.array(v.object({ memory: v.string(), memoryId: v.string(), type: v.string() })),
         localDay: v.string(),
+        // The memories the digest was written from (the day's, merge members, promotion sources). A summary may quote any of them.
+        sourceIds: v.optional(v.array(v.string().max(MAX_LENGTH.id))),
         stats: v.object({
             contradictionsResolved: v.number(),
             decayed: v.number(),
@@ -590,8 +596,41 @@ export const saveMemoryDigest = internalMutation
         userId: v.string(),
     })
     .output(v.null())
-    .mutation(async ({ args, ctx }) => {
-        await ctx.db.insert("memoryDigests", { ...args, createdAt: ctx.now });
+    .mutation(async ({ args: { sourceIds, ...args }, ctx }) => {
+        // The run read its memories some time ago: a delete since then must not come back through this write. An entry
+        // stays only while its memory still exists, is the user's and is active, checked here in the write that inserts it.
+        // The summary is free text with no pointer to its sources, so a digest that lost an entry is saved without it.
+        const learned: typeof args.learned = [];
+
+        for (const entry of args.learned) {
+            const row = await ctx.db.get("memories", entry.memoryId as Id<"memories">);
+
+            if (row && row.userId === args.userId && !row.supersededBy) {
+                learned.push(entry);
+            }
+        }
+
+        const entriesLost = learned.length < args.learned.length;
+        let lost = entriesLost;
+
+        // The summary can also quote a source the list never names: any of them deleted since the run read it drops the summary.
+        // Only existence counts here: the run itself retires merge members, and a retired row is still there.
+        const toCheck = entriesLost ? [] : (sourceIds ?? []).slice(0, SOURCE_CHECK_CAP);
+
+        for (const id of toCheck) {
+            const row = await ctx.db.get("memories", id as Id<"memories">);
+
+            if (!row || row.userId !== args.userId) {
+                lost = true;
+                break;
+            }
+        }
+
+        if (entriesLost && learned.length === 0 && Object.values(args.stats).every((count) => count === 0)) {
+            return null;
+        }
+
+        await ctx.db.insert("memoryDigests", { ...args, createdAt: ctx.now, learned, summary: lost ? DROPPED_DIGEST_SUMMARY : args.summary });
 
         const older = await ctx.db
             .query("memoryDigests")
@@ -620,6 +659,7 @@ type ReflectionBudget = ReturnType<typeof createReflectionBudget>;
 interface ScopeOutcome {
     applied: number;
     learned: { memory: string; memoryId: string; type: string }[];
+    sourceIds: string[];
     stats: { contradictionsResolved: number; decayed: number; merged: number; newMemories: number; promoted: number; retired: number };
     summary: string;
 }
@@ -810,6 +850,8 @@ const reflectScope = async (
     return {
         applied: expiryApplied + result.applied,
         learned,
+        // What the synthesis prompt showed: its summary may quote any of it.
+        sourceIds: reflectionSourceIds(learnedToday, plan),
         stats: {
             // Counted from what is written: a revision whose wording was only a secret resolves nothing.
             contradictionsResolved: countResolvedContradictions(revisedPairs, committedOps),
@@ -868,12 +910,13 @@ export const runMemoryReflection = internalAction
 
         // The digest describes the user's own memories. A bot's changes are logged, not summarised.
         // ponytail: a bot has no digest of its own; add one per bot when someone asks for it.
-        const { learned, stats, summary } = userScope;
+        const { learned, sourceIds, stats, summary } = userScope;
 
         if (learned.length > 0 || Object.values(stats).some((count) => count > 0)) {
             await ctx.runMutation(internal.memory.reflection.saveMemoryDigest, {
                 learned,
                 localDay: digestDayOf(now, claim.timeZone),
+                sourceIds,
                 stats,
                 summary,
                 userId,
