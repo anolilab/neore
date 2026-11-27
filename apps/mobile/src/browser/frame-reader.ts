@@ -1,0 +1,142 @@
+/**
+ * Reads the browser's frame while a screen shows it: at the start, on a timer, and whenever the screen asks
+ * (`request`, on an agent action). One read is out at a time and is never dropped for a newer one; a request made while
+ * one is out, or within {@link FRAME_MIN_GAP_MS} of the last, is kept and served as soon as it may run. Only a read that
+ * answers after the reader stopped is dropped. Outside React, so the timing is tested without a screen.
+ */
+import { settleQuietly } from "@/offline/quietly";
+
+/** How often a frame is read while the screen is open and nothing else asked for one. */
+export const FRAME_REFRESH_MS = 10_000;
+
+/**
+ * A read asked for this soon after the last one waits: at most 12 a minute, what `browser/frame`'s free bucket refills,
+ * so a busy agent's actions never run the phone out of reads.
+ */
+export const FRAME_MIN_GAP_MS = 5000;
+
+export interface FrameReaderOptions<T> {
+    after?: (ms: number, run: () => void) => () => void;
+    every?: (ms: number, run: () => void) => () => void;
+
+    /**
+     * When the last read began, shared by the readers that come after this one (a screen back in front starts a new
+     * reader): the gap holds across them, so returning to the screen never reads sooner than any other request.
+     */
+    lastRead?: { at: number };
+    now?: () => number;
+    onAnswer: (answer: T) => void;
+    onFailure: (error: unknown) => void;
+    read: () => Promise<T>;
+}
+
+export interface FrameReader {
+    /** Asks for a read now, or as soon as the read out has answered and the gap has passed. */
+    request: () => void;
+    stop: () => void;
+}
+
+export const startFrameReader = <T>({
+    after = (ms, run) => {
+        const timer = setTimeout(run, ms);
+
+        return () => clearTimeout(timer);
+    },
+    every = (ms, run) => {
+        const timer = setInterval(run, ms);
+
+        return () => clearInterval(timer);
+    },
+    lastRead = { at: -Infinity },
+    now = Date.now,
+    onAnswer,
+    onFailure,
+    read,
+}: FrameReaderOptions<T>): FrameReader => {
+    /** Shared with the readers that come after this one: written, never replaced. */
+    const shared = lastRead;
+    let isStopped = false;
+    let isReading = false;
+    let isPending = false;
+    let cancelWait: (() => void) | undefined;
+    /** Set below: a read that answers serves a request kept while it was out. */
+    let request: () => void = () => {};
+
+    const run = (): void => {
+        // A read that starts serves any request kept for later: a timer still armed for one would start another unchecked.
+        cancelWait?.();
+        cancelWait = undefined;
+        isPending = false;
+        isReading = true;
+        shared.at = now();
+
+        settleQuietly(async () => {
+            try {
+                const answer = await read();
+
+                if (!isStopped) {
+                    onAnswer(answer);
+                }
+            } catch (error) {
+                if (!isStopped) {
+                    onFailure(error);
+                }
+            }
+
+            isReading = false;
+
+            if (isPending && !isStopped) {
+                request();
+            }
+        });
+    };
+
+    request = (): void => {
+        if (isStopped) {
+            return;
+        }
+
+        if (isReading) {
+            isPending = true;
+
+            return;
+        }
+
+        const wait = shared.at + FRAME_MIN_GAP_MS - now();
+
+        if (wait > 0) {
+            isPending = true;
+            // The kept request asks again when the gap ends, so the gap is checked once more (a timer can fire late).
+            cancelWait ??= after(wait, () => {
+                cancelWait = undefined;
+
+                if (isPending) {
+                    request();
+                }
+            });
+
+            return;
+        }
+
+        run();
+    };
+
+    // The first read too goes through the gap: a reader started just after another's read waits it out.
+    request();
+
+    // The timer asks like anything else, so the gap holds for it too; a tick while a read is out is skipped.
+    const cancel = every(FRAME_REFRESH_MS, () => {
+        if (!isReading) {
+            request();
+        }
+    });
+
+    return {
+        request,
+        stop: () => {
+            isStopped = true;
+            cancel();
+            cancelWait?.();
+        },
+    };
+};

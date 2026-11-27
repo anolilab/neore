@@ -1652,3 +1652,208 @@ describe("a headless machine paired by code", () => {
         ).rejects.toThrow(NOT_FOUND_ERROR);
     });
 });
+
+describe("the new-device alert", () => {
+    const alertsOf = async (userId: string) => {
+        const { page } = await harness.run(async (ctx: any) => await ctx.db.notifications.findMany({ where: { type: "device_paired", userId } }));
+
+        return page as { link?: string; title: string }[];
+    };
+
+    it("is sent by the separate announcement, not by the registration, and not again on a repeat or a reconnect", async () => {
+        const owner = await insertUser();
+        const { deviceId } = await register(owner);
+
+        expect(await alertsOf(owner)).toHaveLength(0);
+
+        await expect(as(owner).mutation(functions.announcePairedDevice as never, { deviceId } as never)).resolves.toBeNull();
+
+        const alerts = await alertsOf(owner);
+
+        expect(alerts).toHaveLength(1);
+        expect(alerts[0]).toMatchObject({ link: "/dashboard/settings/chat/devices", title: "Laptop" });
+
+        await as(owner).mutation(functions.announcePairedDevice as never, { deviceId } as never);
+        await expect(as(owner).mutation(functions.heartbeatDevice as never, { deviceId } as never)).resolves.toEqual({ paired: true });
+        expect(await alertsOf(owner)).toHaveLength(1);
+    });
+
+    it("refuses to announce another account's device", async () => {
+        const owner = await insertUser();
+        const stranger = await insertUser();
+        const { deviceId } = await register(owner);
+
+        await expect(as(stranger).mutation(functions.announcePairedDevice as never, { deviceId } as never)).rejects.toThrow();
+        expect(await alertsOf(owner)).toHaveLength(0);
+    });
+
+    it("is sent once for a machine paired by code, through its announcement, and a redemption retry adds none", async () => {
+        const owner = await insertUser();
+        const redeem = async () =>
+            (await harness.run(
+                async (ctx: any) =>
+                    await ctx.runMutation(internals.registerHeadlessDevice, { codeId: "code-alert", name: "build-box", platform: "linux", userId: owner }),
+            )) as { deviceId: string };
+        const announce = async (deviceId: string) =>
+            await harness.run(async (ctx: any) => await ctx.runMutation(internals.announceDeviceAlert, { deviceId, userId: owner }));
+
+        const { deviceId } = await redeem();
+
+        expect(await alertsOf(owner)).toHaveLength(0);
+        // The registration queues the alert in its own commit; the redemption does not send it from a call of its own.
+        expect(harness.scheduler.list().filter((job) => job.functionPath?.includes("announceDeviceAlert") === true)).toHaveLength(1);
+
+        await announce(deviceId);
+        await redeem();
+        await announce(deviceId);
+
+        expect(await alertsOf(owner)).toHaveLength(1);
+    });
+});
+
+describe("the pending device alert sweep", () => {
+    const alertsOf = async (userId: string) => {
+        const { page } = await harness.run(async (ctx: any) => await ctx.db.notifications.findMany({ where: { type: "device_paired", userId } }));
+
+        return page as { title: string }[];
+    };
+    const sweep = async () => await harness.run(async (ctx: any) => await ctx.runMutation(internals.sweepPendingDeviceAlerts, {}));
+    // The harness does not dispatch scheduled jobs: a test runs each queued alert with the job's own args, as the scheduler would.
+    const runQueuedAlerts = async () => {
+        for (const job of harness.scheduler.list()) {
+            if (job.functionPath?.includes("announceDeviceAlert") === true) {
+                await harness.run(async (ctx: any) => await ctx.runMutation(internals.announceDeviceAlert, job.args));
+            } else if (job.functionPath?.includes("sendRemovedDeviceAlert") === true) {
+                await harness.run(async (ctx: any) => await ctx.runMutation(internals.sendRemovedDeviceAlert, job.args));
+            }
+        }
+    };
+
+    it("tells the owner of a signed-in pairing whose announcing call never came, and only once", async () => {
+        const owner = await insertUser();
+        const { deviceId } = await register(owner);
+
+        await as(owner).mutation(functions.heartbeatDevice as never, { deviceId } as never);
+
+        expect(await alertsOf(owner)).toHaveLength(0);
+
+        await sweep();
+        await runQueuedAlerts();
+        expect(await alertsOf(owner)).toHaveLength(1);
+
+        await sweep();
+        await runQueuedAlerts();
+        await as(owner).mutation(functions.announcePairedDevice as never, { deviceId } as never);
+        expect(await alertsOf(owner)).toHaveLength(1);
+    });
+
+    it("tells the owner of a signed-in device revoked before its announcement, and not of one cancelled before it signed in", async () => {
+        const owner = await insertUser();
+        const signedIn = await register(owner);
+
+        await as(owner).mutation(functions.heartbeatDevice as never, { deviceId: signedIn.deviceId } as never);
+        const cancelled = (await as(owner).mutation(functions.registerDevice as never, { name: "Phone", platform: "linux" } as never)) as { deviceId: string };
+
+        await as(owner).mutation(functions.revokeDevice as never, { deviceId: signedIn.deviceId } as never);
+        await as(owner).mutation(functions.revokeDevice as never, { deviceId: cancelled.deviceId } as never);
+        await runQueuedAlerts();
+
+        const alerts = await alertsOf(owner);
+
+        expect(alerts.map((alert) => alert.title)).toEqual(["Laptop"]);
+    });
+
+    it("queues the alert of a signed-in device being removed, with its name, and does not write it inside the revoke", async () => {
+        const owner = await insertUser();
+        const { deviceId } = await register(owner);
+
+        await as(owner).mutation(functions.heartbeatDevice as never, { deviceId } as never);
+        await as(owner).mutation(functions.revokeDevice as never, { deviceId } as never);
+
+        // The device is gone and its alert is not written yet: the revoke only queues it.
+        await expect(as(owner).mutation(functions.heartbeatDevice as never, { deviceId } as never)).resolves.toEqual({ paired: false });
+        expect(await alertsOf(owner)).toHaveLength(0);
+        expect(
+            harness.scheduler
+                .list()
+                .filter((job) => job.functionPath?.includes("sendRemovedDeviceAlert") === true)
+                .map((job) => job.args),
+        ).toEqual([expect.objectContaining({ deviceId, name: "Laptop", userId: owner })]);
+
+        await runQueuedAlerts();
+
+        const alerts = await alertsOf(owner);
+
+        expect(alerts.map((alert) => alert.title)).toEqual(["Laptop"]);
+    });
+
+    it("tells the owner of a machine paired by code that is revoked before its alert job runs", async () => {
+        const owner = await insertUser();
+        const { deviceId } = (await harness.run(
+            async (ctx: any) =>
+                await ctx.runMutation(internals.registerHeadlessDevice, { codeId: "code-revoked-early", name: "build-box", platform: "linux", userId: owner }),
+        )) as { deviceId: string };
+
+        // No heartbeat: a code-paired machine is confirmed when its code is redeemed, not when it first signs in.
+        await as(owner).mutation(functions.revokeDevice as never, { deviceId } as never);
+
+        expect(await alertsOf(owner)).toHaveLength(0);
+        await runQueuedAlerts();
+
+        const alerts = await alertsOf(owner);
+
+        expect(alerts.map((alert) => alert.title)).toEqual(["build-box"]);
+    });
+
+    it("still tells the owner of a signed-in pairing when more cancelled pairings than one sweep reads are waiting", async () => {
+        const owner = await insertUser();
+
+        await harness.run(async (ctx: any) => {
+            for (let index = 0; index < 205; index += 1) {
+                await ctx.db.insert("devices", {
+                    alertPending: true,
+                    createdAt: Date.now(),
+                    name: `Cancelled ${index}`,
+                    platform: "linux",
+                    userId: owner,
+                });
+            }
+
+            await ctx.db.insert("devices", {
+                alertPending: true,
+                createdAt: Date.now(),
+                lastSeenAt: Date.now(),
+                name: "Laptop",
+                platform: "linux",
+                userId: owner,
+            });
+        });
+
+        await sweep();
+        await runQueuedAlerts();
+
+        const alerts = await alertsOf(owner);
+
+        expect(alerts.map((alert) => alert.title)).toEqual(["Laptop"]);
+    });
+
+    it("does not tell the owner of a pairing that never signed in, as one cancelled on the computer", async () => {
+        const owner = await insertUser();
+
+        await register(owner);
+
+        await sweep();
+
+        expect(await alertsOf(owner)).toHaveLength(0);
+    });
+
+    it("leaves a device the owner was already told about alone", async () => {
+        const owner = await insertUser();
+        const { deviceId } = await register(owner);
+
+        await as(owner).mutation(functions.announcePairedDevice as never, { deviceId } as never);
+        await sweep();
+
+        expect(await alertsOf(owner)).toHaveLength(1);
+    });
+});

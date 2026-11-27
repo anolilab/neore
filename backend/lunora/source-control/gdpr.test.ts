@@ -358,6 +358,30 @@ describe("pull request / thread links in GDPR flows", () => {
         expect(links).toStrictEqual([expect.objectContaining({ watchReadFailure: failure })]);
     });
 
+    it("exports a recorded wake failure", async () => {
+        const failure = { at: 9, attempts: 2, kind: "retryable", retryAt: 99 };
+
+        await harness.run(async (ctx: any) => {
+            const threadId = await ctx.db.insert("threads", { createdBy: A, mode: "text", status: "active", title: "mine", updatedAt: 1, userId: A });
+
+            await ctx.db.insert("pullRequestThreads", {
+                createdAt: 1,
+                kind: "linked",
+                number: 1,
+                repository: "o/r",
+                threadId,
+                title: "mine",
+                url: "https://github.com/o/r/pull/1",
+                userId: A,
+                watchWakeFailure: failure,
+            });
+        });
+
+        const { links } = await harness.run(async (ctx: any) => await ctx.runQuery(collectPullRequestThreadsForExport as never, { userId: A } as never));
+
+        expect(links).toStrictEqual([expect.objectContaining({ watchWakeFailure: failure })]);
+    });
+
     it("erases them in batches, only the user's own", async () => {
         await link(A, MANY);
         await link(B, 3);

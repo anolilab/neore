@@ -206,6 +206,23 @@ describe("the switch", () => {
         expect(await rowsOf("tasks", A)).toHaveLength(0);
     });
 
+    it("lists nothing and refuses an accept while memory is off, even with the switch on and a pending row", async () => {
+        await setSwitch(A, true);
+        await insert(A, [proposal()]);
+
+        const suggestionId = await pendingId(A);
+
+        await harness.run(async (ctx: any) => {
+            const [settings] = await ctx.db.query("userSettings").collect();
+
+            await ctx.db.patch("userSettings", settings._id, { memoryEnabled: false });
+        });
+
+        await expect(as(A).query(listTaskSuggestions as never, {} as never)).resolves.toEqual([]);
+        await expect(as(A).mutation(acceptTaskSuggestion as never, { suggestionId } as never)).rejects.toThrow("turned off");
+        expect(await rowsOf("tasks", A)).toHaveLength(0);
+    });
+
     it("erases every suggestion of the user, and only theirs", async () => {
         await setSwitch(A, true);
         await setSwitch(B, true);
