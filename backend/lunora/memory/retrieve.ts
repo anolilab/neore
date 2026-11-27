@@ -60,9 +60,13 @@ export const retrieveRelevantMemories = internalAction
             v.object({
                 category: v.string(),
                 confidence: v.number(),
+                eventEnd: v.optional(v.string()),
+                eventStart: v.optional(v.string()),
+                lastConfirmedAt: v.number(),
                 memory: v.string(),
                 memoryId: v.string(),
                 score: v.number(),
+                validUntil: v.optional(v.string()),
             }),
         ),
     )
@@ -83,6 +87,8 @@ export const retrieveRelevantMemories = internalAction
             confidence?: number | null;
             createdAt?: number;
             embeddingId?: string;
+            eventEnd?: string;
+            eventStart?: string;
             importance?: number | null;
             lastConfirmedAt: number;
             memory: string;

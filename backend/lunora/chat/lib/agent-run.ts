@@ -391,7 +391,18 @@ const RETRIEVAL_TEXT_LENGTH = 2000;
 export type RetrievedMemoryRef = { memoryId: string; score: number };
 
 /** A memory as retrieval returns it, for the per-minute cache. */
-type RetrievedMemory = { category: string; confidence: number; memory: string; memoryId: string; score: number };
+type RetrievedMemory = {
+    category: string;
+    confidence: number;
+    eventEnd?: string;
+    eventStart?: string;
+    /** Unset on an entry cached before retrieval returned it. */
+    lastConfirmedAt?: number;
+    memory: string;
+    memoryId: string;
+    score: number;
+    validUntil?: string;
+};
 
 /** Fewer words than this and the prompt is not searched for memories. */
 const MIN_MEMORY_SEARCH_WORDS = 3;
@@ -430,18 +441,35 @@ const retrievalCacheTtl = (timeZone: string | null | undefined): number => {
     return Math.max(0, Math.min(MEMORY_RETRIEVAL_CACHE_TTL_MS, instant - now - RETRIEVAL_SEARCH_MARGIN_MS));
 };
 
-/** The memory block for the system prompt, and which memories went into it. */
+/**
+ * The memory block for the system prompt, built when the prompt is put together: each memory's day is read from its
+ * time in the run's timezone, so a cached retrieval never carries a day of another timezone, and `now` is the run's.
+ */
+const memoryBlock = (memories: RetrievedMemory[], timeZone: string | null | undefined, now: number): string | undefined => {
+    if (memories.length === 0) {
+        return undefined;
+    }
+
+    const dated = memories.map((m) => {
+        return { ...m, ...(m.lastConfirmedAt !== undefined && { confirmedOn: localDayOf(m.lastConfirmedAt, timeZone) }) };
+    });
+
+    // The system prompt states the date only with a timezone (`getSystemPrompt`): without one, the block says the day.
+    return buildMemoryContext(dated, timeZone ? {} : { today: localDayOf(now, "UTC") });
+};
+
+/** The memories for the system prompt, and which of them go into it. */
 const retrieveMemories = async (
     ctx: ActionCtx,
     userId: string,
     searchText: string,
     botId?: string,
     timeZone?: string | null,
-): Promise<{ context: string | undefined; refs: RetrievedMemoryRef[] }> => {
+): Promise<{ memories: RetrievedMemory[]; refs: RetrievedMemoryRef[] }> => {
     // A prompt of two words or fewer ("thanks", "ok", "yes") has nothing to match
     // a memory against, so it skips the embedding and the vector search.
     if (countSearchWords(searchText) < MIN_MEMORY_SEARCH_WORDS) {
-        return { context: undefined, refs: [] };
+        return { memories: [], refs: [] };
     }
 
     try {
@@ -466,7 +494,7 @@ const retrieveMemories = async (
             : await callOnShard(internal.memory.retrieve.retrieveRelevantMemories, { botId, searchText, userId }, { shardKey: userId });
 
         return {
-            context: memories.length > 0 ? buildMemoryContext(memories) : undefined,
+            memories,
             refs: memories.map(({ memoryId, score }) => {
                 return { memoryId, score };
             }),
@@ -474,7 +502,7 @@ const retrieveMemories = async (
     } catch (error) {
         streamLogger.warn("[AgentRun] Memory retrieval failed:", error);
 
-        return { context: undefined, refs: [] };
+        return { memories: [], refs: [] };
     }
 };
 
@@ -485,9 +513,9 @@ export const retrieveMemoryContext = async (
     botId?: string,
     timeZone?: string | null,
 ): Promise<string | undefined> => {
-    const { context } = await retrieveMemories(ctx, userId, searchText, botId, timeZone);
+    const { memories } = await retrieveMemories(ctx, userId, searchText, botId, timeZone);
 
-    return context;
+    return memoryBlock(memories, timeZone, Date.now());
 };
 
 /**
@@ -559,7 +587,7 @@ export const loadRunContext = async (
 
         return bot ? { ...bot, botId: settings.botId } : null;
     });
-    const [prefs, threadSettings, userProviderKeys, memoryContext, knowledgeContext, project, bot, roleCatalog] = await Promise.all([
+    const [prefs, threadSettings, userProviderKeys, retrieved, knowledgeContext, project, bot, roleCatalog] = await Promise.all([
         prefsPromise,
         threadSettingsPromise,
         loadUserProviderKeys(ctx, userId),
@@ -587,10 +615,12 @@ export const loadRunContext = async (
         args.roleCatalog ? ctx.runQuery(internal.sub_agents.role_settings.getRoleCatalogForRun, { threadId, userId }) : null,
     ]);
 
+    // Built here, as the prompt is put together, so its "today" is this run's.
+    const memoryContext = memoryBlock(retrieved?.memories ?? [], prefs.timezone, Date.now());
     const customSystemPrompt = threadSettings?.customSystemPrompt ?? args.customSystemPrompt;
     const partsWith = (projectText: string | null | undefined): string[] =>
         [
-            memoryContext?.context,
+            memoryContext,
             knowledgeContext?.context,
             projectText ? `PROJECT CONTEXT:\n${projectText}` : undefined,
             bot ? `BOT (${bot.name}) INSTRUCTIONS:\n${bot.instructions}` : undefined,
@@ -631,14 +661,14 @@ export const loadRunContext = async (
         projectInstructions: project?.instructions ?? [],
         researchDepth: toResearchDepth(args.researchDepth),
         /** Memories injected above; `afterRun` records them on the reply. */
-        retrievedMemories: memoryContext?.refs ?? [],
+        retrievedMemories: retrieved?.refs ?? [],
         /** The sub-agent roles that have a model (`sub-agents/roles.ts`); the run adds it only while it can delegate. */
         roleCatalog: roleCatalog ?? undefined,
         /** One kind per piece of the system prompt above, for the saved-login verdict (`system-context-kinds.ts`). */
         systemContext: systemContextKinds({
             bot,
             knowledge: Boolean(knowledgeContext?.context),
-            memories: Boolean(memoryContext?.context),
+            memories: Boolean(memoryContext),
             personalization: personalization !== undefined || Boolean(prefs.location) || Boolean(prefs.language),
             personalizationByImpersonator: prefs.personalizationByImpersonator,
             project: Boolean(project),
@@ -649,7 +679,7 @@ export const loadRunContext = async (
         /** Knowledge, memory or project context is in the prompt: the quick check for low-risk tool calls never runs (`low-risk-approval.ts`). */
         untrustedContext: injectsUntrustedContext({
             knowledge: knowledgeContext?.context,
-            memory: memoryContext?.context,
+            memory: memoryContext,
             project: [project?.text, renderInstructionList(project?.instructions ?? [])].filter(Boolean).join("\n\n") || undefined,
             threadPrompt: threadSettings?.customSystemPrompt,
         }),

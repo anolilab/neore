@@ -5,6 +5,7 @@
  */
 
 import { tokenize } from "../knowledge/hybrid";
+import { factDatesOf } from "./dates";
 
 /**
  * The signals' weights, which add up to 1. Relevance leads: among rows of one topic the cosines are close, so the
@@ -64,11 +65,14 @@ export interface RankCandidate {
     confidence?: number | null;
     /** Set when the memory has a vector in the index. */
     embeddingId?: string | null;
+    eventEnd?: string | null;
+    eventStart?: string | null;
     importance?: number | null;
     lastConfirmedAt: number;
     memory: string;
     pinned?: boolean;
     type: string;
+    validUntil?: string | null;
 }
 
 /** A memory the prompt may receive. */
@@ -76,10 +80,15 @@ export interface RankedMemory {
     /** The memory's type (`taxonomy.ts`). Named `category` for the prompt builder and `search_memory`, which predate the taxonomy. */
     category: string;
     confidence: number;
+    eventEnd?: string;
+    eventStart?: string;
+    /** When it was last confirmed or saved: a time, never a day, so a cached copy is dated in the timezone of the run that reads it. */
+    lastConfirmedAt: number;
     memory: string;
     /** Recorded on the reply for the "why was this used" view. */
     memoryId: string;
     score: number;
+    validUntil?: string;
 }
 
 // ============================================================================
@@ -290,10 +299,12 @@ export const rankMemories = (input: {
                     category: m.type,
                     confidence: m.confidence ?? 70,
                     floor: hit === undefined && !missed ? minKeywordRelevance : minRelevance,
+                    lastConfirmedAt: m.lastConfirmedAt,
                     memory: m.memory,
                     memoryId: m._id,
                     score: computeScore(m, semanticScore, now),
                     semanticScore,
+                    ...factDatesOf(m),
                 };
             })
             // Confidence, importance and recency only order what is relevant: a fresh, pinned or confident row
