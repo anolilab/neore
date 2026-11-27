@@ -3,6 +3,7 @@
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 import { setPinOverride, useGoalComposer } from "@/features/chat/goal/goal-store";
 
 import ComposerStatusLine from "./composer-status-line";
@@ -99,6 +100,7 @@ beforeEach(() => {
     env.impersonating = false;
     useGoalComposer.setState({ enabled: false });
     setPinOverride(THREAD_ID, undefined);
+    useChatUIStore.setState({ composerAttachments: [], composerText: "" });
 });
 
 describe(ComposerStatusLine, () => {
@@ -123,6 +125,22 @@ describe(ComposerStatusLine, () => {
         renderLine();
 
         expect(screen.queryByText(GOAL)).toBeNull();
+    });
+
+    it("drops the goal chip for a draft of attachments with no text, which sends without a goal", () => {
+        env.cachedPin = { maxRounds: 3, text: "Ship it" };
+        useChatUIStore.setState({ composerAttachments: [{ id: "a1" } as never], composerText: " " });
+        renderLine();
+
+        expect(screen.queryByText(GOAL)).toBeNull();
+    });
+
+    it("keeps the goal chip once text is typed beside the attachments", () => {
+        env.cachedPin = { maxRounds: 3, text: "Ship it" };
+        useChatUIStore.setState({ composerAttachments: [{ id: "a1" } as never], composerText: "Draft the brief" });
+        renderLine();
+
+        expect(screen.getByText(GOAL)).toBeTruthy();
     });
 
     it("renders nothing with no goal, pinned or armed", () => {
