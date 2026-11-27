@@ -16,7 +16,7 @@ import type { ActionCtx, MutationCtx, QueryCtx } from "../_generated/server";
 import { internalMutation } from "../_generated/server";
 import { insertThread, insertThreadRelationship } from "../agent/table-writes";
 import { stopHostTurn } from "./lib/finish";
-import { claimFence, claimRow, recordClaimResult } from "../lib/claim-once";
+import { claimFence, claimRow, recordClaimResult, releaseClaim } from "../lib/claim-once";
 import { discardNewThread } from "../chat/side-chat";
 import { authAction, authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { MAX_LENGTH } from "../lib/validators";
@@ -34,6 +34,7 @@ import { projectRunnerOf, runnerStillOffered } from "./lib/project-runner";
 import { HOST_START_OUT_OF_SCOPE, offerOf, startFailureMessage, webSessionId } from "./lib/start";
 import { openHostSession } from "./lib/start-session";
 import type { DeviceTaintSource } from "../devices/lib/taint";
+import { vDeviceTaintSource } from "../devices/validators";
 import { readableProject, writableProject } from "../projects/functions";
 import { fitsIdBytes, vPendingPermission } from "./validators";
 
@@ -111,6 +112,8 @@ const waitingRequests = async (ctx: Pick<QueryCtx, "db">, stream: Doc<"persisten
 export interface StartHostSessionInput {
     agentKey: string;
     clientId: string;
+    /** Make the thread and take the claim, but queue no session: the caller does that once it has copied the history in (`forkHostThreadRun`). */
+    deferOpen?: boolean;
     deviceId: Id<"devices">;
     folderId: string;
     /** The chat this start forks (with `forkSessionId`): its claim and session id are its own, not an ordinary start's. */
@@ -242,6 +245,11 @@ export const startHostSessionFor = async (ctx: MutationCtx, userId: string, args
         userId,
     });
 
+    // A fork opens its session later: the history is copied into the new chat first, so an early turn finds the copied prompts in place.
+    if (args.deferOpen === true) {
+        return { started: true, threadId: threadId as string };
+    }
+
     const call = await openHostSession(
         ctx,
         {
@@ -294,9 +302,26 @@ export const startHostSession = authMutation
  * and the two share the folder. Owner only, and only an agent that said it forks sessions: one that did not would open an empty
  * session that only looks like a fork. A double tap forks once (`clientId`, as a start's).
  */
+/** What a begun fork answers: the new chat, the marks its copied history carries, and what opening its session needs (absent for a retry). */
+const vBegunFork = v.object({
+    hasContextReset: v.optional(v.boolean()),
+    hasHandoff: v.optional(v.boolean()),
+    open: v.optional(
+        v.object({
+            agentKey: v.string(),
+            deviceId: v.id("devices"),
+            folderId: v.string(),
+            forkSessionId: v.string(),
+            taintedBy: v.optional(v.array(vDeviceTaintSource)),
+        }),
+    ),
+    started: v.boolean(),
+    threadId: v.optional(v.string()),
+});
+
 export const beginHostFork = internalMutation
     .input({ clientId: v.string().max(MAX_LENGTH.id), threadId: v.id("threads"), userId: v.string() })
-    .output(v.object({ hasContextReset: v.optional(v.boolean()), hasHandoff: v.optional(v.boolean()), started: v.boolean(), threadId: v.optional(v.string()) }))
+    .output(vBegunFork)
     .mutation(async ({ args, ctx }) => {
         const { userId } = args;
         const thread = await ctx.db.threads.findFirst({ consistency: "primary", where: { _id: args.threadId, userId } });
@@ -341,10 +366,11 @@ export const beginHostFork = internalMutation
         const result = await startHostSessionFor(ctx, userId, {
             agentKey: session.agentKey,
             clientId: args.clientId,
-            deviceId: session.deviceId,
-            folderId: session.folderId,
             // Keyed by the source chat too (and a claim of their own): the id is the caller's per click, and one reused for another chat, or
             // for an ordinary start, is another operation, not a replay.
+            deferOpen: true,
+            deviceId: session.deviceId,
+            folderId: session.folderId,
             forkOfThreadId: String(thread._id),
             forkSessionId: nativeId,
             ...(organizationId && { organizationId }),
@@ -371,7 +397,74 @@ export const beginHostFork = internalMutation
             ...result,
             ...(thread.hasContextReset === true && { hasContextReset: true }),
             ...(thread.hasHandoff === true && { hasHandoff: true }),
+            ...(result.started && {
+                open: {
+                    agentKey: session.agentKey,
+                    deviceId: session.deviceId,
+                    folderId: session.folderId,
+                    forkSessionId: nativeId,
+                    ...(session.taintedBy !== undefined && session.taintedBy.length > 0 && { taintedBy: session.taintedBy }),
+                },
+            }),
         };
+    });
+
+/**
+ * The second half of a fork: queues the new chat's session, once its history is in place. The computer and the (agent, folder) pair are
+ * checked again, as for any start, and a session that cannot be queued throws so the caller takes the new chat back.
+ */
+export const openHostFork = internalMutation
+    .input({
+        agentKey: v.string(),
+        clientId: v.string().max(MAX_LENGTH.id),
+        deviceId: v.id("devices"),
+        folderId: v.string(),
+        forkOfThreadId: v.id("threads"),
+        forkSessionId: v.string(),
+        taintedBy: v.optional(v.array(vDeviceTaintSource)),
+        threadId: v.id("threads"),
+        userId: v.string(),
+    })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        const { userId } = args;
+        const thread = await ctx.db.threads.findFirst({ consistency: "primary", where: { _id: args.threadId, userId } });
+        const device = await ctx.db.devices.findFirst({ consistency: "primary", where: { _id: args.deviceId, userId } });
+        const offer = offerOf(device, args.agentKey, args.folderId);
+
+        if (!thread || thread.deleted === true || !isHostRunThread(thread) || !device?.encryptedSecret || !offer) {
+            throw new LunoraError("BAD_REQUEST", "That agent is not approved for that folder on this computer. Approve it in the desktop app first.");
+        }
+
+        const call = await openHostSession(
+            ctx,
+            {
+                device,
+                forkSessionId: args.forkSessionId,
+                hostSessionId: await webSessionId(userId, args.clientId, { kind: "fork", threadId: String(args.forkOfThreadId) }),
+                offer,
+                ...(args.taintedBy !== undefined && { taintedBy: args.taintedBy }),
+                threadId: thread._id,
+                userId,
+            },
+            ctx.now,
+        );
+
+        if ("error" in call) {
+            throw new LunoraError("BAD_REQUEST", startFailureMessage(call.error));
+        }
+
+        return null;
+    });
+
+/** Gives back the claim of a fork whose new chat was taken back, so the same click can fork again (a claim otherwise holds its key for a day). */
+export const releaseHostForkClaim = internalMutation
+    .input({ clientId: v.string().max(MAX_LENGTH.id), forkOfThreadId: v.id("threads"), userId: v.string() })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        await releaseClaim(ctx, "host-fork", `${args.userId}:${args.forkOfThreadId}:${args.clientId}`);
+
+        return null;
     });
 
 /**
@@ -386,8 +479,8 @@ export const forkHostThreadRun = async (
 ): Promise<{ started: boolean; threadId?: string }> => {
     const begun = await ctx.runMutation(internal.acp.remote.beginHostFork, args);
 
-    // A retry of a fork that went through: its history was copied by the first try.
-    if (!begun.started || begun.threadId === undefined) {
+    // A retry of a fork that went through: its history was copied and its session queued by the first try.
+    if (!begun.started || begun.threadId === undefined || begun.open === undefined) {
         return { started: begun.started, ...(begun.threadId !== undefined && { threadId: begun.threadId }) };
     }
 
@@ -419,8 +512,22 @@ export const forkHostThreadRun = async (
         if (begun.hasHandoff === true) {
             await ctx.runMutation(internal.chat.context_reset.markForkedHandoff, { threadId: newThreadId });
         }
+
+        // Last: the agent's session is queued only once the chat holds its history, so a turn that starts at once cannot meet the copy
+        // half done (and a copy that failed above queued nothing).
+        await ctx.runMutation(internal.acp.remote.openHostFork, {
+            ...begun.open,
+            clientId: args.clientId,
+            forkOfThreadId: args.threadId,
+            threadId: newThreadId,
+            userId: args.userId,
+        });
     } catch (error) {
         await discardNewThread(ctx, newThreadId);
+        // Best effort: a claim left behind only holds the key until it lapses.
+        await ctx
+            .runMutation(internal.acp.remote.releaseHostForkClaim, { clientId: args.clientId, forkOfThreadId: args.threadId, userId: args.userId })
+            .catch(() => undefined);
 
         throw error;
     }

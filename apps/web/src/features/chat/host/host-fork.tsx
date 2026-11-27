@@ -41,6 +41,8 @@ const HostFork: FC<{ capabilities: CapabilityReportInput | undefined; disabled?:
         networkMode: "always",
         retry: 0,
         onError: (error) => {
+            // A refused fork was taken back, so the next click is a new fork under a new id, not a retry of this one.
+            clientId.current = undefined;
             toast.error(getLocalizedError({ error, t }));
         },
         onSuccess: (result) => {

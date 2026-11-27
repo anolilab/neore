@@ -15773,11 +15773,11 @@ msgstr "パスワードをお忘れですか？"
 msgid "Fork"
 msgstr "フォーク"
 
-#: src/features/chat/host/host-fork.tsx:86
+#: src/features/chat/host/host-fork.tsx:88
 msgid "Fork here"
 msgstr "ここでフォーク"
 
-#: src/features/chat/host/host-fork.tsx:95
+#: src/features/chat/host/host-fork.tsx:97
 msgid "Fork this chat?"
 msgstr "このチャットをフォークしますか？"
 
@@ -34995,11 +34995,11 @@ msgstr "その提案はもう追加できません。"
 msgid "That suggestion is gone."
 msgstr "その提案は存在しなくなりました。"
 
-#: src/features/chat/host/host-fork.tsx:59
+#: src/features/chat/host/host-fork.tsx:61
 msgid "The chat was forked."
 msgstr "チャットをフォークしました。"
 
-#: src/features/chat/host/host-fork.tsx:90
+#: src/features/chat/host/host-fork.tsx:92
 msgid "The fork continues from this conversation in a new chat on the same computer and folder. Both chats work in that folder, so they can change the same files, and a git worktree there is shared too."
 msgstr "フォークはこの会話を、同じコンピューターの同じフォルダーにある新しいチャットで続けます。2つのチャットはそのフォルダーで作業するため、同じファイルを変更する可能性があり、そこにある git ワークツリーも共有されます。"
 

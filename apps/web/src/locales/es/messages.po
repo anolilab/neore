@@ -15773,11 +15773,11 @@ msgstr "¿Olvidaste tu contraseña?"
 msgid "Fork"
 msgstr "Bifurcar"
 
-#: src/features/chat/host/host-fork.tsx:86
+#: src/features/chat/host/host-fork.tsx:88
 msgid "Fork here"
 msgstr "Bifurcar aquí"
 
-#: src/features/chat/host/host-fork.tsx:95
+#: src/features/chat/host/host-fork.tsx:97
 msgid "Fork this chat?"
 msgstr "¿Bifurcar este chat?"
 
@@ -34995,11 +34995,11 @@ msgstr "Esa sugerencia ya no se puede añadir."
 msgid "That suggestion is gone."
 msgstr "Esa sugerencia ya no existe."
 
-#: src/features/chat/host/host-fork.tsx:59
+#: src/features/chat/host/host-fork.tsx:61
 msgid "The chat was forked."
 msgstr "El chat se bifurcó."
 
-#: src/features/chat/host/host-fork.tsx:90
+#: src/features/chat/host/host-fork.tsx:92
 msgid "The fork continues from this conversation in a new chat on the same computer and folder. Both chats work in that folder, so they can change the same files, and a git worktree there is shared too."
 msgstr "La bifurcación continúa esta conversación en un chat nuevo en el mismo equipo y la misma carpeta. Ambos chats trabajan en esa carpeta, así que pueden modificar los mismos archivos, y un worktree de git que haya allí también se comparte."
 

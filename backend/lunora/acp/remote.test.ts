@@ -95,6 +95,9 @@ const remote = await import("./remote");
 const { isOutOfScopeStart } = await import("./lib/start");
 const send = await import("./send");
 const { getHostSession } = await import("./functions");
+const { internalAction } = await import("../_generated/server");
+const { v } = await import("lunorash/server");
+const agentMessages = await import("../agent/messages");
 const streaming = await import("../chat/streaming/index");
 const { reapExpiredHostStreams } = await import("./lib/reap");
 
@@ -731,6 +734,121 @@ describe("forkHostThread", () => {
         );
 
         expect(await rows("threadRelationships", { threadId: result.threadId })).toHaveLength(0);
+    });
+
+    /**
+     * The history copy, wrapped: what the new chat has when the copy runs (a session, a queued `acp_start`) is recorded, the copy can be made
+     * to fail, and the real copy runs in between. Put back by the caller (`registerModule(registry, "agent_messages", agentMessages)`).
+     */
+    const probeCopy = (probe: { fail: boolean; queued: number[]; sessions: number[] }) => {
+        registry.set(
+            "agent_messages:cloneThread",
+            internalAction
+                .input({
+                    copyUserIdForVectorSearch: v.optional(v.boolean()),
+                    refuseTrashedSource: v.optional(v.boolean()),
+                    sourceThreadId: v.id("threads"),
+                    statuses: v.optional(v.array(v.string())),
+                    targetThreadId: v.id("threads"),
+                    upToAndIncludingMessageId: v.optional(v.id("messages")),
+                })
+                .output(v.number())
+                .action(async ({ args }) => {
+                    const childSessions = await rows("acpSessions", { threadId: args.targetThreadId });
+                    const queuedStarts = await rows("deviceCalls", { toolName: "acp_start" });
+
+                    probe.sessions.push(childSessions.length);
+                    probe.queued.push(queuedStarts.length);
+
+                    if (probe.fail) {
+                        throw new Error("copy failed");
+                    }
+
+                    // The real copy, batch by batch as `cloneThread` does it.
+                    let cursor: string | null = null;
+                    let copied = 0;
+
+                    for (let guard = 0; guard < 5; guard += 1) {
+                        const batch: { continueCursor: null | string; isDone: boolean; numCopied: number } = await run(
+                            async (inner) =>
+                                await inner.runMutation(agentMessages.cloneMessageBatch, { ...args, paginationOpts: { cursor, numItems: 50 } } as never),
+                        );
+
+                        copied += batch.numCopied;
+                        cursor = batch.continueCursor;
+
+                        if (batch.isDone) {
+                            break;
+                        }
+                    }
+
+                    return copied;
+                }),
+        );
+    };
+
+    it("copies the history before it queues the new chat's session, so a turn that starts at once finds the prompts in place", async () => {
+        const { device, threadId } = await started();
+        const probe = { fail: false, queued: [] as number[], sessions: [] as number[] };
+
+        await say(threadId, [
+            ["first question", "success", 0],
+            ["first answer", "success", 1],
+        ]);
+        probeCopy(probe);
+
+        try {
+            const result = (await fork(threadId)) as { threadId: string };
+
+            // When the copy ran, the new chat had no session and no `acp_start` of its own was queued yet (the source's is the one).
+            expect(probe.sessions).toEqual([0]);
+            expect(probe.queued).toEqual([1]);
+            // After the fork, the session is queued and the copied prompts are all there.
+            expect(await rows("acpSessions", { threadId: result.threadId })).toHaveLength(1);
+            expect(await rows("deviceCalls", { toolName: "acp_start" })).toHaveLength(2);
+            expect(await textOf(result.threadId)).toEqual(["first question", "first answer"]);
+
+            // A turn arriving as soon as the session opens (its `session_open`) leaves the copied prompts as they are.
+            const [opening] = await rows("acpSessions", { threadId: result.threadId });
+
+            await run(
+                async (ctx) =>
+                    await ctx.runMutation(applyHostEvents, {
+                        deviceId: device.deviceId,
+                        events: [{ ...SESSION_OPEN, fork: { forked: true } }],
+                        sessionId: opening?.hostSessionId as string,
+                    }),
+            );
+            expect(await textOf(result.threadId)).toEqual(["first question", "first answer"]);
+        } finally {
+            registerModule(registry, "agent_messages", agentMessages);
+        }
+    });
+
+    it("queues no session when the copy fails, takes the new chat back, and lets the same click fork again", async () => {
+        const { threadId } = await started();
+        const probe = { fail: true, queued: [] as number[], sessions: [] as number[] };
+
+        await say(threadId, [["asked", "success", 0]]);
+        probeCopy(probe);
+
+        try {
+            await expect(fork(threadId, "again")).rejects.toThrow("copy failed");
+
+            expect(await rows("acpSessions")).toHaveLength(1);
+            expect(await rows("deviceCalls", { toolName: "acp_start" })).toHaveLength(1);
+            expect(await rows("threadRelationships", { parentThreadId: threadId })).toHaveLength(0);
+
+            // The claim was given back: the same click, once the copy works, forks.
+            probe.fail = false;
+
+            const retry = (await fork(threadId, "again")) as { started: boolean; threadId: string };
+
+            expect(retry.started).toBe(true);
+            expect(await textOf(retry.threadId)).toEqual(["asked"]);
+        } finally {
+            registerModule(registry, "agent_messages", agentMessages);
+        }
     });
 
     it("answers a chat that is not the caller's as one that does not exist", async () => {

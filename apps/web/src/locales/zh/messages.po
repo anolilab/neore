@@ -15773,11 +15773,11 @@ msgstr "忘记密码？"
 msgid "Fork"
 msgstr "复刻"
 
-#: src/features/chat/host/host-fork.tsx:86
+#: src/features/chat/host/host-fork.tsx:88
 msgid "Fork here"
 msgstr "在此复刻"
 
-#: src/features/chat/host/host-fork.tsx:95
+#: src/features/chat/host/host-fork.tsx:97
 msgid "Fork this chat?"
 msgstr "要复刻此聊天吗？"
 
@@ -34995,11 +34995,11 @@ msgstr "该建议已无法再添加。"
 msgid "That suggestion is gone."
 msgstr "该建议已不存在。"
 
-#: src/features/chat/host/host-fork.tsx:59
+#: src/features/chat/host/host-fork.tsx:61
 msgid "The chat was forked."
 msgstr "已复刻该聊天。"
 
-#: src/features/chat/host/host-fork.tsx:90
+#: src/features/chat/host/host-fork.tsx:92
 msgid "The fork continues from this conversation in a new chat on the same computer and folder. Both chats work in that folder, so they can change the same files, and a git worktree there is shared too."
 msgstr "复刻会在同一台电脑的同一文件夹中，用新聊天继续此对话。两个聊天都在该文件夹中工作，因此可能修改相同的文件，其中的 git 工作树也会被共享。"
 
