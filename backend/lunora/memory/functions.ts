@@ -5,6 +5,7 @@ import { internal } from "../_generated/internal";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { internalMutation, internalQuery } from "../_generated/server";
+import { isAccountDeletionUnderway } from "../gdpr/deletion-guard";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { memoryLogger } from "../lib/logger";
 import { isThreadLocked } from "../lib/thread-lock";
@@ -14,6 +15,7 @@ import { dateColumns, factDatesOf, hasFactDates, isExpired, normalizeFactDates, 
 import {
     type ImportApp,
     importDedupKey,
+    IMPORT_ACCOUNT_DELETING_MESSAGE,
     IMPORT_MEMORY_OFF_MESSAGE,
     IMPORT_WIDE_WINDOW_ROWS,
     IMPORTED_CONFIDENCE,
@@ -24,6 +26,7 @@ import { botOwnerRows } from "./bot-owner";
 import { type MemoryEvidence, newestEvidence, vMemoryEvidence } from "./evidence";
 import { logRedaction, redactMemoryText } from "./redact";
 import { localDayOf } from "./reflection-logic";
+import { isUsableOn, mergeScopeWindows } from "./retrieve-ranking";
 import { lastConfirmedOf, type MemoryType, vMemoryType } from "./taxonomy";
 import { deleteVectorRow, patchMessage } from "../agent/table-writes";
 import { candidatesOnActivePath } from "../agent/branch-rows";
@@ -845,6 +848,8 @@ export const saveImportedMemoryBatch = internalMutation
                 type: vMemoryType,
             }),
         ),
+        // The background file import sets it: a batch claimed before an account deletion must write nothing once it is under way.
+        refuseDuringDeletion: v.optional(v.boolean()),
         userId: v.string(),
     })
     .output(
@@ -869,6 +874,11 @@ export const saveImportedMemoryBatch = internalMutation
 
         if (!(await readMemoryEnabled(ctx, args.userId))) {
             throw new LunoraError("FORBIDDEN", IMPORT_MEMORY_OFF_MESSAGE);
+        }
+
+        // In the writing mutation, so a save and the deletion sweep never interleave: nothing is written once deletion is under way.
+        if (args.refuseDuringDeletion === true && (await isAccountDeletionUnderway(ctx, args.userId))) {
+            throw new LunoraError("FORBIDDEN", IMPORT_ACCOUNT_DELETING_MESSAGE);
         }
 
         const today = localDayOf(now, await userTimeZone(ctx, args.userId));
@@ -1283,9 +1293,6 @@ export const getActiveMemoriesForUser = internalQuery
             scopes.push(null);
         }
 
-        // A pinned fact stays past its end date: pinning is how the user keeps it.
-        const usable = (m: Doc<"memories">): boolean => today === undefined || m.pinned === true || !isExpired(m, today);
-
         // The active-row index, so superseded rows are never read. Paged until `limit` usable rows or the scope ends,
         // so expired rows cannot fill the window; at most `ACTIVE_READ_MAX_ROWS` rows (or one page), a bounded read.
         const perScope = await Promise.all(
@@ -1307,7 +1314,7 @@ export const getActiveMemoriesForUser = internalQuery
                         .order("desc")
                         .paginate({ cursor, numItems: limit });
 
-                    kept.push(...result.page.filter((m) => usable(m)));
+                    kept.push(...result.page.filter((m) => isUsableOn(m, today)));
 
                     if (result.isDone) {
                         break;
@@ -1320,17 +1327,7 @@ export const getActiveMemoriesForUser = internalQuery
             }),
         );
 
-        // Each scope keeps up to `limit` of its own, so a busy bot cannot push the user's memories out. Merged in
-        // the order each index yields: type descending, then newest first.
-        const memories = perScope
-            .flatMap((rows) => rows.slice(0, limit))
-            .toSorted((a, b) => {
-                if (a.type !== b.type) {
-                    return a.type < b.type ? 1 : -1;
-                }
-
-                return b._creationTime - a._creationTime;
-            });
+        const memories = mergeScopeWindows(perScope, limit);
 
         return memories.map((m) => {
             return {

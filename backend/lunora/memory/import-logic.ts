@@ -23,6 +23,9 @@ export const IMPORTED_IMPORTANCE = 60;
 
 export const IMPORT_MEMORY_OFF_MESSAGE = "Turn on memory before bringing in memories";
 
+/** Why a memory import is refused, or stops, while the account is being deleted. */
+export const IMPORT_ACCOUNT_DELETING_MESSAGE = "The account is being deleted, so nothing more is imported.";
+
 /** Longest paste accepted. */
 export const IMPORT_MAX_INPUT_CHARS = 20_000;
 
@@ -77,8 +80,9 @@ const LINE_PREFIX_RE = /^(?:(?:[-*•·–>#]+|\d{1,3}[.)](?=\s)|\[[ x]\])\s*)+/
 const DATA_TAG_RE = /<\/?(?:pasted_memories|existing_memory|new_fact)\b[^>]*>?/giu;
 const EMPHASIS_RE = /\*\*|__|`/g;
 const WHITESPACE_RE = /\s+/g;
+
 // Every line ending a paste may carry: CRLF, a bare CR or LF, vertical tab, form feed, and the Unicode line and paragraph separators.
-const LINE_BREAK_RE = /\r\n?|[\n\v\f\u{2028}\u{2029}]/u;
+export const LINE_BREAK_RE = /\r\n?|[\n\v\f\u{2028}\u{2029}]/u;
 
 /**
  * Shapes that are a secret or sensitive identifier whatever words surround them:
@@ -107,8 +111,23 @@ const SENSITIVE_RES: ReadonlyArray<RegExp> = [
 
 export const looksSensitive = (line: string): boolean => SENSITIVE_RES.some((re) => re.test(line));
 
-/** Two lines that differ only in case or spacing are the same fact. */
-export const importDedupKey = (line: string): string => line.toLowerCase().replaceAll(WHITESPACE_RE, " ").trim();
+const FULL_WIDTH_RE = /[\u{FF01}-\u{FF5E}]/gu;
+const LIGATURE_RE = /[\u{FB00}-\u{FB06}]/gu;
+
+/**
+ * The one text normalisation for exact-match dedup: full-width ASCII and Latin ligatures folded to the letters they
+ * spell, then case, then whitespace. Two lines with the same key are the same fact; the save's exact-text check and the
+ * file import both use it, so they never disagree. Whole-string NFKC is not used: it also folds symbols that are
+ * different on purpose (`①` into `1`, `½` into `1⁄2`), and a fact about one would be dropped as a repeat of the other.
+ */
+export const importDedupKey = (line: string): string =>
+    line
+        .replaceAll(FULL_WIDTH_RE, (char) => String.fromCodePoint((char.codePointAt(0) ?? 0) - 0xfe_e0))
+        .replaceAll(LIGATURE_RE, (char) => char.normalize("NFKC"))
+        .normalize("NFC")
+        .toLowerCase()
+        .replaceAll(WHITESPACE_RE, " ")
+        .trim();
 
 /** Prompt tags removed until none is left: one removal can join the text around it into a new tag. */
 const stripDataTags = (text: string): string => {
@@ -118,24 +137,35 @@ const stripDataTags = (text: string): string => {
 };
 
 /** One line with wrapping removed and whitespace collapsed, not yet capped. Tags go last, after every step that could form one. */
-const unwrapImportLine = (raw: string): string =>
+export const unwrapImportLine = (raw: string): string =>
     stripDataTags(raw.trim().replace(LINE_PREFIX_RE, "").replaceAll(EMPHASIS_RE, "").replaceAll(WHITESPACE_RE, " ").trim()).trim();
 
 /** One line as stored: wrapping removed, whitespace collapsed, capped. Empty when nothing is left. */
 export const cleanImportLine = (raw: string): string => stripDataTags(unwrapImportLine(raw).slice(0, IMPORT_MAX_FACT_CHARS)).trim();
 
 /**
- * A raw line cleaned with its secrets redacted, or `null` when it was only a secret. Redacted as pasted and again once
- * unwrapped, since removing emphasis can join a token split by it (`github_**pat_…`), and only then cut to length, so
- * a cut never leaves the head of a token too short to be recognised.
+ * A raw line cleaned with its secrets redacted, not yet cut to length, or `null` when it was only a secret. Redacted as
+ * pasted and again once unwrapped, since removing emphasis can join a token split by it (`github_**pat_…`).
  */
-const redactImportLine = (raw: string): string | null => {
+export const redactImportText = (raw: string): string | null => {
     const redacted = redactMemoryText(raw);
-    const cleaned = redacted === null ? null : redactMemoryText(unwrapImportLine(redacted));
 
-    // Checked again after the cut: when the fact sits past the limit, the cut can leave only a label and its marker, or
-    // only the filler before a marker it removed, and a preview must not offer a line its save would drop.
-    return cleaned === null ? null : recheckCutMemoryText(cleaned, stripDataTags(capMemoryText(cleaned, IMPORT_MAX_FACT_CHARS)).trim());
+    return redacted === null ? null : redactMemoryText(unwrapImportLine(redacted));
+};
+
+/**
+ * Redacted text cut to length, never before its secrets are redacted, so a cut never leaves the head of a token too
+ * short to be recognised. Checked again after the cut: when the fact sits past the limit, the cut can leave only a label
+ * and its marker, or only the filler before a marker it removed, and a preview must not offer a line its save would drop.
+ */
+export const capImportText = (cleaned: string): string | null =>
+    recheckCutMemoryText(cleaned, stripDataTags(capMemoryText(cleaned, IMPORT_MAX_FACT_CHARS)).trim());
+
+/** One line as stored: redacted, then cut to length. `null` when it was only a secret. */
+const redactImportLine = (raw: string): string | null => {
+    const cleaned = redactImportText(raw);
+
+    return cleaned === null ? null : capImportText(cleaned);
 };
 
 /**

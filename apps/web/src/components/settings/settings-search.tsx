@@ -164,7 +164,7 @@ export const SettingsSearchField: FC<
                     </kbd>
                 )}
             </div>
-            <span aria-live="polite" className="sr-only" role="status">
+            <span aria-label={t`Search results`} aria-live="polite" className="sr-only" role="status">
                 {status}
             </span>
         </div>

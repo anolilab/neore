@@ -14,7 +14,7 @@ msgstr ""
 "Plural-Forms: \n"
 "X-Generator: @lingui/cli\n"
 
-#: src/features/settings/components/chat/usage-settings.tsx:613
+#: src/features/settings/components/chat/usage-settings.tsx:619
 msgid " · model: {modelFilter}"
 msgstr " · model: {modelFilter}"
 
@@ -179,7 +179,7 @@ msgstr "(osiągnięto limit)"
 msgid "(may be too long)"
 msgstr "(może być za długi)"
 
-#: src/features/settings/components/chat/usage-settings.tsx:483
+#: src/features/settings/components/chat/usage-settings.tsx:489
 msgid "(microdollars; 1,000,000 = $1)"
 msgstr "(mikrodolary; 1 000 000 = 1 $)"
 
@@ -215,7 +215,7 @@ msgid "(opens in new tab)"
 msgstr "(otwiera się w nowej karcie)"
 
 #: src/features/settings/components/chat/mcp/server-form.tsx:34
-#: src/features/settings/components/chat/usage-settings.tsx:527
+#: src/features/settings/components/chat/usage-settings.tsx:533
 msgid "(optional)"
 msgstr "(opcjonalnie)"
 
@@ -698,7 +698,7 @@ msgid "{0} lines"
 msgstr "Wiersze: {0}"
 
 #. placeholder {0}: stats.total
-#: src/features/settings/components/personalization/memory-settings.tsx:206
+#: src/features/settings/components/personalization/memory-settings.tsx:211
 msgid "{0} memories"
 msgstr "Wspomnienia: {0}"
 
@@ -788,7 +788,7 @@ msgid "{0} on {1}, in {2}"
 msgstr "{0} na {1}, w {2}"
 
 #. placeholder {0}: stats.pinned
-#: src/features/settings/components/personalization/memory-settings.tsx:207
+#: src/features/settings/components/personalization/memory-settings.tsx:212
 msgid "{0} pinned"
 msgstr "Przypięte: {0}"
 
@@ -1032,6 +1032,10 @@ msgstr "{days} d"
 #: src/features/settings/components/chat/api-keys-settings.tsx:288
 msgid "{days}d ago"
 msgstr "{days} d temu"
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:388
+msgid "{done} of {total} entries processed"
+msgstr "Przetworzono {done} z {total} wpisów"
 
 #: src/features/chat/thread/host-activity.tsx:70
 msgid "{done} of {total} task done"
@@ -1300,15 +1304,15 @@ msgstr "{maxReviewers, plural, one {Proś o co najwyżej # recenzenta naraz.} fe
 msgid "{maxRounds} rounds"
 msgstr "{maxRounds} rund"
 
-#: src/features/settings/components/chat/usage-settings.tsx:590
+#: src/features/settings/components/chat/usage-settings.tsx:596
 msgid "{metricLabel} > {threshold} per day"
 msgstr "{metricLabel} > {threshold} dziennie"
 
-#: src/features/settings/components/chat/usage-settings.tsx:594
+#: src/features/settings/components/chat/usage-settings.tsx:600
 msgid "{metricLabel} > {threshold} per hour"
 msgstr "{metricLabel} > {threshold} na godzinę"
 
-#: src/features/settings/components/chat/usage-settings.tsx:598
+#: src/features/settings/components/chat/usage-settings.tsx:604
 msgid "{metricLabel} > {threshold} per month"
 msgstr "{metricLabel} > {threshold} miesięcznie"
 
@@ -1523,7 +1527,7 @@ msgstr "{refusedLabel} nie ma formatu wymaganego w tej prośbie, więc nic nie z
 msgid "{renamed, plural, one {# name opened with id:, which names a file by its id, so it now opens with id-} other {# names opened with id:, which names a file by its id, so they now open with id-}} instead."
 msgstr "{renamed, plural, one {# nazwa zaczynała się od id:, które wskazuje plik po jego identyfikatorze, więc teraz zaczyna się od id-} few {# nazwy zaczynały się od id:, które wskazuje plik po jego identyfikatorze, więc teraz zaczynają się od id-} many {# nazw zaczynało się od id:, które wskazuje plik po jego identyfikatorze, więc teraz zaczynają się od id-} other {# nazwy zaczynało się od id:, które wskazuje plik po jego identyfikatorze, więc teraz zaczynają się od id-}}."
 
-#: src/features/settings/components/chat/usage-settings.tsx:386
+#: src/features/settings/components/chat/usage-settings.tsx:392
 #: src/routes/admin/gateway/index.tsx:67
 msgid "{requestCount} req"
 msgstr "{requestCount} żąd."
@@ -2484,7 +2488,7 @@ msgstr "Rozpoczęto usuwanie konta. Zostaniesz wylogowany."
 msgid "Accounts"
 msgstr "Konta"
 
-#: src/features/settings/components/chat/usage-settings.tsx:500
+#: src/features/settings/components/chat/usage-settings.tsx:506
 msgid "Action"
 msgstr "Akcja"
 
@@ -2631,11 +2635,11 @@ msgstr "Dodaj tag..."
 msgid "Add Account"
 msgstr "Dodaj konto"
 
-#: src/features/settings/components/chat/usage-settings.tsx:402
+#: src/features/settings/components/chat/usage-settings.tsx:408
 msgid "Add Alert"
 msgstr "Dodaj alert"
 
-#: src/features/settings/components/chat/usage-settings.tsx:649
+#: src/features/settings/components/chat/usage-settings.tsx:655
 msgid "Add an alert above to be notified when your usage crosses a threshold."
 msgstr "Dodaj alert powyżej, aby otrzymać powiadomienie, gdy użycie przekroczy próg."
 
@@ -3531,7 +3535,7 @@ msgid "All"
 msgstr "Wszystkie"
 
 #. placeholder {0}: memories.length
-#: src/features/settings/components/personalization/memory-settings.tsx:228
+#: src/features/settings/components/personalization/memory-settings.tsx:233
 msgid "All ({0})"
 msgstr "Wszystkie ({0})"
 
@@ -5816,15 +5820,15 @@ msgstr "budżetowy"
 msgid "Budget"
 msgstr "Budżet"
 
-#: src/features/settings/components/chat/usage-settings.tsx:207
+#: src/features/settings/components/chat/usage-settings.tsx:209
 msgid "Budget alert created"
 msgstr "Utworzono alert budżetowy"
 
-#: src/features/settings/components/chat/usage-settings.tsx:223
+#: src/features/settings/components/chat/usage-settings.tsx:225
 msgid "Budget alert deleted"
 msgstr "Usunięto alert budżetowy"
 
-#: src/features/settings/components/chat/usage-settings.tsx:404
+#: src/features/settings/components/chat/usage-settings.tsx:410
 msgid "Budget Alerts"
 msgstr "Alerty budżetowe"
 
@@ -6181,11 +6185,11 @@ msgstr "Kanada"
 #: src/features/settings/components/chat/rotate-webhook-secret-dialog.tsx:57
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:245
 #: src/features/settings/components/chat/trigger-settings.tsx:379
-#: src/features/settings/components/chat/usage-settings.tsx:554
-#: src/features/settings/components/chat/usage-settings.tsx:562
+#: src/features/settings/components/chat/usage-settings.tsx:560
+#: src/features/settings/components/chat/usage-settings.tsx:568
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:421
 #: src/features/settings/components/personalization/memory-item.tsx:356
-#: src/features/settings/components/personalization/memory-settings.tsx:190
+#: src/features/settings/components/personalization/memory-settings.tsx:191
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:381
 #: src/features/settings/connectors/messenger/messenger-setup-dialog.tsx:156
 #: src/features/skills/components/bundle-export-dialog.tsx:219
@@ -6212,6 +6216,10 @@ msgstr "Anuluj głęboką pracę"
 #: src/features/settings/components/privacy/data-export.tsx:112
 msgid "Cancel Export"
 msgstr "Anuluj eksport"
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:462
+msgid "Cancel import"
+msgstr "Anuluj import"
 
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:409
 msgid "Cancel Import"
@@ -6830,6 +6838,14 @@ msgstr "Chiński (tradycyjny)"
 msgid "Choose .md or .zip"
 msgstr "Wybierz .md lub .zip"
 
+#: src/features/settings/components/personalization/memory-file-import.tsx:406
+msgid "Choose a .txt file with one memory per line, or a .json file with a list of memories. The file can be up to {maxSize}."
+msgstr "Wybierz plik .txt z jednym wspomnieniem w wierszu albo plik .json z listą wspomnień. Plik może mieć do {maxSize}."
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:301
+msgid "Choose a .txt or .json file."
+msgstr "Wybierz plik .txt lub .json."
+
 #: src/features/settings/components/chat/default-models-settings.tsx:477
 msgid "Choose a model"
 msgstr "Wybierz model"
@@ -7087,11 +7103,11 @@ msgstr "Wyczyść wszystko"
 msgid "Clear All"
 msgstr "Wyczyść wszystko"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:180
+#: src/features/settings/components/personalization/memory-settings.tsx:181
 msgid "Clear All Memories"
 msgstr "Wyczyść wszystkie wspomnienia"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:184
+#: src/features/settings/components/personalization/memory-settings.tsx:185
 msgid "Clear all memories?"
 msgstr "Wyczyścić wszystkie wspomnienia?"
 
@@ -7142,7 +7158,7 @@ msgstr "Wyczyść filtr tagów"
 msgid "Clear the queue"
 msgstr "Wyczyść kolejkę"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:137
+#: src/features/settings/components/personalization/memory-settings.tsx:138
 msgid "Cleared {count} memories"
 msgstr "Wyczyszczone wspomnienia: {count}"
 
@@ -7540,7 +7556,7 @@ msgstr "Zwiń panel przeglądarki"
 msgid "Collapse chain of thought"
 msgstr "Zwiń łańcuch myśli"
 
-#: src/features/settings/components/chat/usage-settings.tsx:350
+#: src/features/settings/components/chat/usage-settings.tsx:356
 msgid "Collapse daily trend"
 msgstr "Zwiń trend dzienny"
 
@@ -7889,7 +7905,7 @@ msgstr "Ukończono"
 msgid "Completing the connection..."
 msgstr "Kończenie łączenia..."
 
-#: src/features/settings/components/chat/usage-settings.tsx:292
+#: src/features/settings/components/chat/usage-settings.tsx:298
 msgid "Completion Tokens"
 msgstr "Tokeny odpowiedzi"
 
@@ -8244,7 +8260,7 @@ msgstr "Połącz rozszerzenie przeglądarki Anole"
 msgid "Connect the host to keep this fresh."
 msgstr "Połącz hosta, aby to było aktualne."
 
-#: src/features/settings/connectors/connectors-page.tsx:34
+#: src/features/settings/connectors/connectors-page.tsx:41
 #~ msgid "Connect third-party services to extend AI capabilities with your data and tools."
 #~ msgstr "Połącz usługi zewnętrzne, aby rozszerzyć możliwości AI o twoje dane i narzędzia."
 
@@ -8929,7 +8945,7 @@ msgstr "Promień narożnika"
 #: src/features/evals/components/model-comparison.tsx:115
 #: src/features/evals/components/run-comparison.tsx:131
 #: src/features/evals/components/run-detail.tsx:226
-#: src/features/settings/components/chat/usage-settings.tsx:321
+#: src/features/settings/components/chat/usage-settings.tsx:327
 #: src/routes/admin/gateway/index.tsx:92
 msgid "Cost"
 msgstr "Koszt"
@@ -8938,7 +8954,7 @@ msgstr "Koszt"
 msgid "Cost {display}"
 msgstr "Koszt {display}"
 
-#: src/features/settings/components/chat/usage-settings.tsx:302
+#: src/features/settings/components/chat/usage-settings.tsx:308
 msgid "Cost by Model"
 msgstr "Koszt według modelu"
 
@@ -9024,6 +9040,10 @@ msgstr "Nie udało się dołączyć czatu"
 #: src/features/chat/thread/sandbox-files.tsx:296
 msgid "could not be saved"
 msgstr "nie udało się zapisać"
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:379
+msgid "Could not cancel the import."
+msgstr "Nie udało się anulować importu."
 
 #: src/features/chat/thread/composer-prompt-queue.tsx:469
 msgid "Could not cancel the message. It is still queued."
@@ -9174,6 +9194,10 @@ msgstr "Nie udało się wyeksportować przepływu pracy"
 #: src/features/skills/components/skill-generate-panel.tsx:62
 msgid "Could not generate a draft. Try again."
 msgstr "Nie udało się wygenerować szkicu. Spróbuj ponownie."
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:346
+msgid "Could not import the file."
+msgstr "Nie udało się zaimportować pliku."
 
 #: src/features/workflow/hooks/use-workflow-transfer.ts:82
 msgid "Could not import the workflow"
@@ -9336,6 +9360,14 @@ msgstr "Nie udało się odczytać tego czatu"
 #: src/features/chat/thread/composer-input.tsx:1974
 msgid "Could not read that chat. If it is locked, unlock it first."
 msgstr "Nie udało się odczytać tego czatu. Jeśli jest zablokowany, najpierw go odblokuj."
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:334
+msgid "Could not read the file."
+msgstr "Nie udało się odczytać pliku."
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:397
+msgid "Could not read the import's progress."
+msgstr "Nie udało się odczytać postępu importu."
 
 #: src/features/settings/components/personalization/memory-import-dialog.tsx:101
 msgid "Could not read the pasted list"
@@ -10221,7 +10253,7 @@ msgstr "Daily Brief włączony"
 msgid "Daily cost (microdollars)"
 msgstr "Koszt dzienny (mikrodolary)"
 
-#: src/features/settings/components/chat/usage-settings.tsx:346
+#: src/features/settings/components/chat/usage-settings.tsx:352
 msgid "Daily Cost Trend"
 msgstr "Dzienny trend kosztów"
 
@@ -10233,7 +10265,7 @@ msgstr "Dzienne podsumowanie skrzynki odbiorczej"
 msgid "Daily LLM spend and request volume"
 msgstr "Dzienne wydatki na LLM i liczba żądań"
 
-#: src/features/settings/components/chat/usage-settings.tsx:346
+#: src/features/settings/components/chat/usage-settings.tsx:352
 msgid "Daily spend and request volume"
 msgstr "Dzienne wydatki i liczba żądań"
 
@@ -10715,11 +10747,11 @@ msgstr "Usuń {title}"
 msgid "Delete Account"
 msgstr "Usuń konto"
 
-#: src/features/settings/components/chat/usage-settings.tsx:625
+#: src/features/settings/components/chat/usage-settings.tsx:631
 msgid "Delete alert \"{ruleName}\""
 msgstr "Usuń alert „{ruleName}”"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:191
+#: src/features/settings/components/personalization/memory-settings.tsx:192
 msgid "Delete All"
 msgstr "Usuń wszystko"
 
@@ -11987,7 +12019,7 @@ msgstr "dynamiczny ruch"
 msgid "Dyslexia-friendly"
 msgstr "Przyjazny dla dyslektyków"
 
-#: src/features/settings/components/chat/usage-settings.tsx:536
+#: src/features/settings/components/chat/usage-settings.tsx:542
 msgid "e.g. claude-opus-4 (leave blank for all models)"
 msgstr "np. claude-opus-4 (pozostaw puste dla wszystkich modeli)"
 
@@ -12007,7 +12039,7 @@ msgstr "np. Wymienia co najmniej pięć źródeł, każde z linkiem"
 msgid "e.g. Make the output a table and drop web search"
 msgstr "np. Zrób z wyniku tabelę i usuń wyszukiwanie w sieci"
 
-#: src/features/settings/components/chat/usage-settings.tsx:423
+#: src/features/settings/components/chat/usage-settings.tsx:429
 msgid "e.g. Monthly $10 limit"
 msgstr "np. Miesięczny limit 10 $"
 
@@ -12679,7 +12711,7 @@ msgstr "Włącz sugestie kolejnych pytań"
 msgid "Enable for Next Chat"
 msgstr "Włącz dla następnego czatu"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:169
+#: src/features/settings/components/personalization/memory-settings.tsx:170
 msgid "Enable memory"
 msgstr "Włącz pamięć"
 
@@ -13560,7 +13592,7 @@ msgstr "Rozszerz kanwę"
 msgid "Expand chain of thought"
 msgstr "Rozwiń łańcuch myśli"
 
-#: src/features/settings/components/chat/usage-settings.tsx:350
+#: src/features/settings/components/chat/usage-settings.tsx:356
 msgid "Expand daily trend"
 msgstr "Rozwiń trend dzienny"
 
@@ -13977,7 +14009,7 @@ msgstr "Nie udało się zmienić koloru tagu"
 msgid "Failed to clear filter rules"
 msgstr "Nie udało się wyczyścić reguł filtrowania"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:133
+#: src/features/settings/components/personalization/memory-settings.tsx:134
 msgid "Failed to clear memories"
 msgstr "Nie udało się wyczyścić wspomnień"
 
@@ -14022,7 +14054,7 @@ msgstr "Nie udało się utworzyć klucza API"
 msgid "Failed to create branch"
 msgstr "Nie udało się utworzyć gałęzi"
 
-#: src/features/settings/components/chat/usage-settings.tsx:212
+#: src/features/settings/components/chat/usage-settings.tsx:214
 msgid "Failed to create budget alert"
 msgstr "Nie udało się utworzyć alertu budżetowego"
 
@@ -14054,7 +14086,7 @@ msgstr "Nie udało się usunąć"
 msgid "Failed to delete {fileName}"
 msgstr "Nie udało się usunąć {fileName}"
 
-#: src/features/settings/components/chat/usage-settings.tsx:226
+#: src/features/settings/components/chat/usage-settings.tsx:228
 msgid "Failed to delete budget alert"
 msgstr "Nie udało się usunąć alertu budżetowego"
 
@@ -14070,7 +14102,7 @@ msgstr "Nie udało się usunąć pliku. Spróbuj ponownie."
 msgid "Failed to delete files"
 msgstr "Nie udało się usunąć plików"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:105
+#: src/features/settings/components/personalization/memory-settings.tsx:106
 msgid "Failed to delete memory"
 msgstr "Nie udało się usunąć wspomnienia"
 
@@ -14263,7 +14295,7 @@ msgstr "Nie udało się wczytać umiejętności"
 msgid "Failed to load spreadsheet"
 msgstr "Nie udało się wczytać arkusza kalkulacyjnego"
 
-#: src/features/settings/components/chat/usage-settings.tsx:269
+#: src/features/settings/components/chat/usage-settings.tsx:275
 msgid "Failed to load usage data. Ensure the LLM Gateway is running and reachable."
 msgstr "Nie udało się wczytać danych o użyciu. Upewnij się, że LLM Gateway działa i jest osiągalny."
 
@@ -14591,8 +14623,8 @@ msgstr "Nie udało się zaktualizować skrótów klawiszowych"
 msgid "Failed to update MCP server"
 msgstr "Nie udało się zaktualizować serwera MCP"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:116
-#: src/features/settings/components/personalization/memory-settings.tsx:124
+#: src/features/settings/components/personalization/memory-settings.tsx:117
+#: src/features/settings/components/personalization/memory-settings.tsx:125
 msgid "Failed to update memory"
 msgstr "Nie udało się zaktualizować wspomnienia"
 
@@ -14620,7 +14652,7 @@ msgstr "Nie udało się zaktualizować ustawień pull requestów"
 msgid "Failed to update reply tools"
 msgstr "Nie udało się zaktualizować narzędzi odpowiedzi"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:148
+#: src/features/settings/components/personalization/memory-settings.tsx:149
 msgid "Failed to update setting"
 msgstr "Nie udało się zaktualizować ustawienia"
 
@@ -15170,6 +15202,10 @@ msgstr "Rozmiar pliku przekracza {maxSize}"
 msgid "File size too large. Maximum 5MB allowed."
 msgstr "Plik jest za duży. Maksymalnie 5 MB."
 
+#: src/features/settings/components/personalization/memory-file-import.tsx:410
+msgid "File to import"
+msgstr "Plik do zaimportowania"
+
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:859
 msgid "File Too Large to Preview"
 msgstr "Plik jest za duży do podglądu"
@@ -15299,14 +15335,8 @@ msgid "Filter by role"
 msgstr "Filtruj według roli"
 
 #: src/features/chat/tags/thread-tag-filter.tsx:39
-#: src/features/chat/thread-list/thread-list-filter-menu.tsx:136
 #~ msgid "Filter by tag"
 #~ msgstr "Filtruj według tagu"
-
-#. placeholder {0}: activeTagIds.length
-#: src/features/chat/thread-list/thread-list-filter-menu.tsx:136
-#~ msgid "Filter by tag ({0} selected)"
-#~ msgstr "Filtruj według tagu (wybrano: {0})"
 
 #: src/features/chat/tags/thread-tag-filter.tsx:39
 #~ msgid "Filter by tag ({activeCount} selected)"
@@ -15320,7 +15350,7 @@ msgstr "Filtruj według typu"
 msgid "Filter condition"
 msgstr "Warunek filtra"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:214
+#: src/features/settings/components/personalization/memory-settings.tsx:219
 msgid "Filter memories by type"
 msgstr "Filtruj wspomnienia według typu"
 
@@ -16406,7 +16436,7 @@ msgstr "Uzyskaj klucz API"
 msgid "Get cited, multi-step analysis in minutes. Deep Research reads sources so you don't have to."
 msgstr "Uzyskaj wieloetapową analizę z cytatami w kilka minut. Dogłębny research czyta źródła za ciebie."
 
-#: src/features/settings/components/chat/usage-settings.tsx:403
+#: src/features/settings/components/chat/usage-settings.tsx:409
 msgid "Get notified or block requests when usage thresholds are reached"
 msgstr "Otrzymuj powiadomienia lub blokuj żądania po osiągnięciu progów użycia"
 
@@ -18032,9 +18062,17 @@ msgstr "Importuj rozmowy z ChatGPT, Google Gemini, Claude, eksportu danych Neore
 msgid "Import failed"
 msgstr "Import nie powiódł się"
 
+#: src/features/settings/components/personalization/memory-file-import.tsx:423
+msgid "Import file"
+msgstr "Importuj plik"
+
 #: src/features/projects/components/project-rule-files.tsx:968
 msgid "Import files"
 msgstr "Importuj pliki"
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:448
+msgid "Import finished."
+msgstr "Import zakończony."
 
 #: src/features/projects/components/repo-rule-file-import.tsx:216
 #: src/features/projects/components/repo-rule-file-import.tsx:378
@@ -18045,6 +18083,10 @@ msgstr "Importuj z repozytorium"
 #: src/features/projects/components/computer-rule-file-import.tsx:643
 msgid "Import from this computer"
 msgstr "Importuj z tego komputera"
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:403
+msgid "Import memories from a file"
+msgstr "Importuj wspomnienia z pliku"
 
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:423
 msgid "Import More"
@@ -18057,6 +18099,14 @@ msgstr "Importuj eksport z Notion (.zip)"
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:222
 msgid "Import one kind of export at a time."
 msgstr "Importuj jeden rodzaj eksportu naraz."
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:454
+msgid "Import progress"
+msgstr "Postęp importu"
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:440
+msgid "Import result"
+msgstr "Wynik importu"
 
 #: src/features/projects/components/project-rule-files.tsx:978
 msgid "Import rule folder"
@@ -18104,6 +18154,10 @@ msgstr "Zaimportowano strony z Notion: {added}; pominięto załączniki: {skippe
 msgid "Imported {added} Notion page(s)."
 msgstr "Zaimportowano strony z Notion: {added}."
 
+#: src/features/settings/components/personalization/memory-file-import.tsx:395
+msgid "Imported {imported} · Updated {updated} · Duplicates {duplicates} · Too long {tooLong} · Invalid {invalid}"
+msgstr "Zaimportowano {imported} · Zaktualizowano {updated} · Duplikaty {duplicates} · Za długie {tooLong} · Nieprawidłowe {invalid}"
+
 #. placeholder {0}: skill.slug
 #: src/features/skills/components/bundle-import-dialog.tsx:129
 msgid "Imported as /{0}."
@@ -18122,6 +18176,10 @@ msgstr "Zaimportowano umiejętność „{0}”"
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:396
 msgid "Importing from {0}..."
 msgstr "Importowanie z {0}..."
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:447
+msgid "Importing memories…"
+msgstr "Importowanie wspomnień…"
 
 #: src/features/marketing/components/gateway-footer.tsx:20
 #: src/features/marketing/components/gateway-footer.tsx:148
@@ -19311,20 +19369,20 @@ msgstr "Duży plakat"
 msgid "Last 24h"
 msgstr "Ostatnie 24 h"
 
-#: src/features/settings/components/chat/usage-settings.tsx:253
 #: src/features/settings/components/chat/usage-settings.tsx:259
+#: src/features/settings/components/chat/usage-settings.tsx:265
 msgid "Last 30 days"
 msgstr "Ostatnie 30 dni"
 
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:632
-#: src/features/settings/components/chat/usage-settings.tsx:250
-#: src/features/settings/components/chat/usage-settings.tsx:258
+#: src/features/settings/components/chat/usage-settings.tsx:256
+#: src/features/settings/components/chat/usage-settings.tsx:264
 #: src/routes/admin/gateway/index.tsx:234
 msgid "Last 7 days"
 msgstr "Ostatnie 7 dni"
 
-#: src/features/settings/components/chat/usage-settings.tsx:253
-#: src/features/settings/components/chat/usage-settings.tsx:260
+#: src/features/settings/components/chat/usage-settings.tsx:259
+#: src/features/settings/components/chat/usage-settings.tsx:266
 msgid "Last 90 days"
 msgstr "Ostatnie 90 dni"
 
@@ -19396,7 +19454,7 @@ msgstr "Ostatnio pominięte uruchomienie"
 msgid "Last slide"
 msgstr "Ostatni slajd"
 
-#: src/features/settings/components/chat/usage-settings.tsx:618
+#: src/features/settings/components/chat/usage-settings.tsx:624
 msgid "Last triggered: {lastTriggeredAt}"
 msgstr "Ostatnio uruchomiono: {lastTriggeredAt}"
 
@@ -21092,7 +21150,7 @@ msgstr "Serwer MCP: {0}"
 msgid "MCP Servers"
 msgstr "Serwery MCP"
 
-#: src/features/settings/components/chat/mcp-settings.tsx:413
+#: src/features/settings/components/chat/mcp-settings.tsx:427
 #~ msgid "MCP servers provide additional tools that the AI can use during conversations. Tools from connected servers are automatically available when chatting."
 #~ msgstr "Serwery MCP udostępniają dodatkowe narzędzia, których AI może używać podczas rozmów. Narzędzia z połączonych serwerów są automatycznie dostępne w czacie."
 
@@ -21227,7 +21285,7 @@ msgid "memories"
 msgstr "wspomnienia"
 
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:31
-#: src/features/settings/components/personalization/memory-settings.tsx:240
+#: src/features/settings/components/personalization/memory-settings.tsx:245
 msgid "Memories"
 msgstr "Wspomnienia"
 
@@ -21245,7 +21303,7 @@ msgid "Memories used for this reply ({0})"
 msgstr "Wspomnienia użyte w tej odpowiedzi ({0})"
 
 #: src/features/marketing/use-cases/use-case-data.ts:114
-#: src/features/settings/components/personalization/memory-settings.tsx:164
+#: src/features/settings/components/personalization/memory-settings.tsx:165
 #: src/features/settings/lib/settings-keywords.ts:99
 msgid "Memory"
 msgstr "Pamięć"
@@ -21254,17 +21312,25 @@ msgstr "Pamięć"
 msgid "Memory — what the agent keeps across chats"
 msgstr "Pamięć — co agent zapamiętuje między czatami"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:109
+#: src/features/settings/components/personalization/memory-settings.tsx:110
 msgid "Memory deleted"
 msgstr "Usunięto wspomnienie"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:146
+#: src/features/settings/components/personalization/memory-settings.tsx:147
 msgid "Memory disabled"
 msgstr "Wyłączono pamięć"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:146
+#: src/features/settings/components/personalization/memory-settings.tsx:147
 msgid "Memory enabled"
 msgstr "Włączono pamięć"
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:257
+msgid "Memory import finished"
+msgstr "Import wspomnień zakończony"
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:257
+msgid "Memory import stopped"
+msgstr "Import wspomnień zatrzymany"
 
 #: src/features/marketing/use-cases/use-case-data.ts:115
 msgid "Memory in Neore: the agent keeps useful facts about you across chats, you can review and edit them in settings, and it is off until you turn it on."
@@ -21502,7 +21568,7 @@ msgid "Meta's well-established and widely-deployed model"
 msgstr "Sprawdzony i szeroko wdrażany model od Meta"
 
 #: src/features/evals/components/run-comparison.tsx:102
-#: src/features/settings/components/chat/usage-settings.tsx:430
+#: src/features/settings/components/chat/usage-settings.tsx:436
 msgid "Metric"
 msgstr "Metryka"
 
@@ -21746,7 +21812,7 @@ msgstr "Tryb:"
 #: src/features/prompts/components/prompt-form-dialog.tsx:387
 #: src/features/settings/components/chat/bots-settings.tsx:414
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:257
-#: src/features/settings/components/chat/usage-settings.tsx:318
+#: src/features/settings/components/chat/usage-settings.tsx:324
 #: src/features/tasks/components/task-form-dialog.tsx:407
 #: src/features/workflow/components/nodes/ai-node.tsx:34
 #: src/features/workflow/components/nodes/background-removal-node.tsx:63
@@ -21795,7 +21861,7 @@ msgstr "Model wyłączony"
 msgid "Model enabled"
 msgstr "Model włączony"
 
-#: src/features/settings/components/chat/usage-settings.tsx:526
+#: src/features/settings/components/chat/usage-settings.tsx:532
 msgid "Model filter"
 msgstr "Filtr modeli"
 
@@ -22366,7 +22432,7 @@ msgstr "nazwa"
 #: src/features/settings/components/chat/native-providers-settings.tsx:503
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:156
 #: src/features/settings/components/chat/trigger-settings.tsx:218
-#: src/features/settings/components/chat/usage-settings.tsx:414
+#: src/features/settings/components/chat/usage-settings.tsx:420
 #: src/features/skills/components/skill-builder-diff.tsx:32
 #: src/features/skills/components/skill-builder-review.tsx:136
 #: src/features/skills/components/skill-form-dialog.tsx:201
@@ -22756,7 +22822,7 @@ msgstr "Nowy bot"
 msgid "New Branch"
 msgstr "Nowa gałąź"
 
-#: src/features/settings/components/chat/usage-settings.tsx:410
+#: src/features/settings/components/chat/usage-settings.tsx:416
 msgid "New Budget Alert"
 msgstr "Nowy alert budżetowy"
 
@@ -23130,7 +23196,7 @@ msgstr "Brak bota"
 msgid "No bots yet."
 msgstr "Brak botów."
 
-#: src/features/settings/components/chat/usage-settings.tsx:648
+#: src/features/settings/components/chat/usage-settings.tsx:654
 msgid "No budget alerts configured."
 msgstr "Nie skonfigurowano alertów budżetowych."
 
@@ -23214,7 +23280,7 @@ msgstr "Brak danych o kosztach za ten okres."
 msgid "No custom endpoints yet."
 msgstr "Nie ma jeszcze własnych endpointów."
 
-#: src/features/settings/components/chat/usage-settings.tsx:393
+#: src/features/settings/components/chat/usage-settings.tsx:399
 msgid "No daily data for this period."
 msgstr "Brak danych dziennych za ten okres."
 
@@ -23394,11 +23460,11 @@ msgstr "Nie skonfigurowano serwerów MCP. Dodaj serwer, aby rozszerzyć możliwo
 msgid "No members in this team yet"
 msgstr "W tym zespole nie ma jeszcze członków"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:256
+#: src/features/settings/components/personalization/memory-settings.tsx:261
 msgid "No memories of this type."
 msgstr "Brak wspomnień tego typu."
 
-#: src/features/settings/components/personalization/memory-settings.tsx:257
+#: src/features/settings/components/personalization/memory-settings.tsx:262
 msgid "No memories yet. The AI will start learning from your conversations automatically."
 msgstr "Nie ma jeszcze wspomnień. AI zacznie automatycznie uczyć się z twoich rozmów."
 
@@ -23761,7 +23827,7 @@ msgstr "Brak nieprzeczytanych powiadomień."
 msgid "No updates yet."
 msgstr "Nie ma jeszcze aktualizacji."
 
-#: src/features/settings/components/chat/usage-settings.tsx:312
+#: src/features/settings/components/chat/usage-settings.tsx:318
 #: src/routes/admin/gateway/index.tsx:125
 msgid "No usage data for this period."
 msgstr "Brak danych o użyciu za ten okres."
@@ -26126,7 +26192,8 @@ msgstr "Wydajność porównywalna z Mistral Small 24B"
 msgid "Performance Reviewer"
 msgstr "Recenzent wydajności"
 
-#: src/features/settings/components/chat/usage-settings.tsx:454
+#: src/features/settings/components/chat/usage-settings.tsx:248
+#: src/features/settings/components/chat/usage-settings.tsx:460
 msgid "Period"
 msgstr "Okres"
 
@@ -27457,7 +27524,7 @@ msgstr "Prompt do uruchomienia na wszystkich modelach..."
 msgid "Prompt tokens"
 msgstr "Tokeny promptu"
 
-#: src/features/settings/components/chat/usage-settings.tsx:287
+#: src/features/settings/components/chat/usage-settings.tsx:293
 msgid "Prompt Tokens"
 msgstr "Tokeny promptu"
 
@@ -29157,8 +29224,8 @@ msgstr "Wysyłanie prośby…"
 #: src/features/admin/components/admin-provider-cache-row.tsx:119
 #: src/features/admin/components/admin-provider-cache-row.tsx:143
 #: src/features/admin/components/admin-provider-cache-row.tsx:181
-#: src/features/settings/components/chat/usage-settings.tsx:277
-#: src/features/settings/components/chat/usage-settings.tsx:319
+#: src/features/settings/components/chat/usage-settings.tsx:283
+#: src/features/settings/components/chat/usage-settings.tsx:325
 #: src/routes/admin/gateway/index.tsx:89
 #: src/routes/admin/gateway/index.tsx:256
 msgid "Requests"
@@ -29840,7 +29907,7 @@ msgstr "Pliki reguł"
 msgid "Rule files saved."
 msgstr "Zapisano pliki reguł."
 
-#: src/features/settings/components/chat/usage-settings.tsx:189
+#: src/features/settings/components/chat/usage-settings.tsx:191
 msgid "Rule name is required"
 msgstr "Nazwa reguły jest wymagana"
 
@@ -30127,7 +30194,7 @@ msgstr "Zapisz i zamknij"
 msgid "Save 25%"
 msgstr "Oszczędź 25%"
 
-#: src/features/settings/components/chat/usage-settings.tsx:551
+#: src/features/settings/components/chat/usage-settings.tsx:557
 msgid "Save Alert"
 msgstr "Zapisz alert"
 
@@ -30144,7 +30211,7 @@ msgstr "Zapisz jako ustawienie wstępne"
 msgid "Save blocked websites"
 msgstr "Zapisz zablokowane strony internetowe"
 
-#: src/features/settings/components/chat/usage-settings.tsx:543
+#: src/features/settings/components/chat/usage-settings.tsx:549
 msgid "Save budget alert"
 msgstr "Zapisz alert budżetowy"
 
@@ -30585,6 +30652,7 @@ msgstr "Szukaj publicznych umiejętności…"
 msgid "Search Reddit posts"
 msgstr "Szukaj postów na Reddit"
 
+#: src/components/settings/settings-search.tsx:167
 #: src/features/pages/components/pages-sidebar.tsx:169
 msgid "Search results"
 msgstr "Wyniki wyszukiwania"
@@ -34956,7 +35024,7 @@ msgstr "Plan agenta"
 msgid "The agent's tool calls"
 msgstr "Wywołania narzędzi agenta"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:163
+#: src/features/settings/components/personalization/memory-settings.tsx:164
 msgid "The AI learns from your conversations to personalize its responses, and reflects on what it learned each night. Everything it remembers is listed here — edit, retype, pin or delete any of it."
 msgstr "AI uczy się z twoich rozmów, aby personalizować odpowiedzi, a każdej nocy analizuje to, czego się nauczyło. Wszystko, co pamięta, jest wymienione tutaj — możesz to edytować, zmienić typ, przypiąć lub usunąć."
 
@@ -35225,6 +35293,10 @@ msgstr "Rozszerzenie będzie mogło czytać i wysyłać czaty jako {0}. Możesz 
 msgid "The file is larger than {0} KB, which is more than a bundle can be."
 msgstr "Plik jest większy niż {0} KB, czyli więcej, niż może mieć pakiet."
 
+#: src/features/settings/components/personalization/memory-file-import.tsx:294
+msgid "The file is larger than {maxSize}. Choose a smaller file."
+msgstr "Plik jest większy niż {maxSize}. Wybierz mniejszy plik."
+
 #: src/features/skills/components/skill-import-dialog.tsx:91
 msgid "The file is larger than {megabytes} MB."
 msgstr "Plik jest większy niż {megabytes} MB."
@@ -35381,6 +35453,10 @@ msgstr "oprogramowanie hosta jest nieaktualne"
 #: ../../packages/ui/src/components/icon-picker.tsx:452
 msgid "The icons could not be loaded."
 msgstr "Nie udało się wczytać ikon."
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:396
+msgid "The import stopped before it finished."
+msgstr "Import zatrzymał się, zanim się zakończył."
 
 #: src/features/canvas/canvas-panel.tsx:648
 msgid "The imported file appears to be empty."
@@ -36713,7 +36789,7 @@ msgid "This will permanently delete {0} anonymous user accounts and all their da
 msgstr "Anonimowe konta użytkowników ({0}) i wszystkie ich dane zostaną trwale usunięte. Tej operacji nie można cofnąć."
 
 #. placeholder {0}: memories.length
-#: src/features/settings/components/personalization/memory-settings.tsx:186
+#: src/features/settings/components/personalization/memory-settings.tsx:187
 msgid "This will permanently delete all {0} memories and their daily digests. The AI will start learning fresh from your next conversation."
 msgstr "Wszystkie wspomnienia ({0}) i ich dzienne podsumowania zostaną trwale usunięte. AI zacznie uczyć się od nowa od twojej następnej rozmowy."
 
@@ -36892,7 +36968,7 @@ msgid "Three steps to use coding agents on your own machines. Skip any of them a
 msgstr "Trzy kroki, aby korzystać z agentów kodowania na własnych maszynach. Pomiń dowolny z nich i wróć później."
 
 #: src/features/canvas/canvas-panel.tsx:216
-#: src/features/settings/components/chat/usage-settings.tsx:481
+#: src/features/settings/components/chat/usage-settings.tsx:487
 msgid "Threshold"
 msgstr "Próg"
 
@@ -37098,13 +37174,13 @@ msgstr "Wpływ na koszt tokenów"
 msgid "Token count"
 msgstr "Liczba tokenów"
 
-#: src/features/settings/components/chat/usage-settings.tsx:302
+#: src/features/settings/components/chat/usage-settings.tsx:308
 msgid "Token usage and cost breakdown per model for the selected period"
 msgstr "Zużycie tokenów i koszty w podziale na modele w wybranym okresie"
 
 #: src/features/projects/components/project-usage-summary.tsx:40
 #: src/features/settings/components/chat/usage-project-breakdown.tsx:207
-#: src/features/settings/components/chat/usage-settings.tsx:320
+#: src/features/settings/components/chat/usage-settings.tsx:326
 #: src/features/settings/components/chat/usage-skill-breakdown.tsx:85
 msgid "Tokens"
 msgstr "Tokeny"
@@ -37308,7 +37384,7 @@ msgstr "Toronto"
 msgid "Total cost"
 msgstr "Koszt całkowity"
 
-#: src/features/settings/components/chat/usage-settings.tsx:282
+#: src/features/settings/components/chat/usage-settings.tsx:288
 #: src/routes/admin/gateway/index.tsx:262
 msgid "Total Cost"
 msgstr "Koszt całkowity"
@@ -37333,7 +37409,7 @@ msgstr "Śledź wszystkie działania administratorów w celu rozliczalności"
 msgid "Track every token and dollar."
 msgstr "Śledź każdy token i każdego dolara."
 
-#: src/features/settings/components/chat/usage-settings.tsx:242
+#: src/features/settings/components/chat/usage-settings.tsx:244
 msgid "Track your LLM token usage, cost, and set budget alerts"
 msgstr "Śledź zużycie tokenów LLM i koszty oraz ustawiaj alerty budżetowe"
 
@@ -37465,7 +37541,7 @@ msgstr "W koszu, tymczasowe, w trakcie usuwania lub osierocone"
 msgid "Triangle"
 msgstr "Trójkąt"
 
-#: src/features/settings/components/chat/usage-settings.tsx:411
+#: src/features/settings/components/chat/usage-settings.tsx:417
 msgid "Trigger a notification or block when a usage metric exceeds a threshold"
 msgstr "Wyślij powiadomienie lub zablokuj, gdy wskaźnik użycia przekroczy próg"
 
@@ -37583,6 +37659,7 @@ msgstr "Spróbuj zmienić wyszukiwane hasła."
 #: src/features/projects/components/project-repositories.tsx:297
 #: src/features/projects/components/repo-rule-file-import.tsx:183
 #: src/features/settings/components/chat/default-models-settings.tsx:467
+#: src/features/settings/components/personalization/memory-file-import.tsx:473
 #: src/features/tasks/components/task-form-dialog.tsx:459
 #: src/features/vault/components/site-logins.tsx:480
 #: src/features/vault/components/site-logins.tsx:612
@@ -37681,6 +37758,10 @@ msgstr "Wyłączyć automatyczne scalanie?"
 #: src/features/settings/components/personalization/memory-import-dialog.tsx:195
 msgid "Turn on memory"
 msgstr "Włącz pamięć"
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:428
+msgid "Turn on memory to import a file."
+msgstr "Włącz pamięć, aby zaimportować plik."
 
 #: src/features/skills/components/bundle-import-dialog.tsx:122
 msgid "Turns these tools off:"
@@ -38544,7 +38625,7 @@ msgstr "USA"
 msgid "Usage"
 msgstr "Użycie"
 
-#: src/features/settings/components/chat/usage-settings.tsx:241
+#: src/features/settings/components/chat/usage-settings.tsx:243
 msgid "Usage & Cost"
 msgstr "Użycie i koszty"
 

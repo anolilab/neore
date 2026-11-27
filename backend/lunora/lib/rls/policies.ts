@@ -207,6 +207,8 @@ const OWNER_TABLES = [
     "mcpServerGrants",
     "memories",
     "memoryDigests",
+    "memoryImportBatches",
+    "memoryImportJobs",
     "memoryReflectionState",
     "messengerConnections",
     "notifications",

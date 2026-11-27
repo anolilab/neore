@@ -14,7 +14,7 @@ msgstr ""
 "Plural-Forms: \n"
 "X-Generator: @lingui/cli\n"
 
-#: src/features/settings/components/chat/usage-settings.tsx:613
+#: src/features/settings/components/chat/usage-settings.tsx:619
 msgid " · model: {modelFilter}"
 msgstr " · 模型：{modelFilter}"
 
@@ -179,7 +179,7 @@ msgstr "（已达上限）"
 msgid "(may be too long)"
 msgstr "(可能过长)"
 
-#: src/features/settings/components/chat/usage-settings.tsx:483
+#: src/features/settings/components/chat/usage-settings.tsx:489
 msgid "(microdollars; 1,000,000 = $1)"
 msgstr "（微美元；1,000,000 = $1）"
 
@@ -215,7 +215,7 @@ msgid "(opens in new tab)"
 msgstr "（在新标签页中打开）"
 
 #: src/features/settings/components/chat/mcp/server-form.tsx:34
-#: src/features/settings/components/chat/usage-settings.tsx:527
+#: src/features/settings/components/chat/usage-settings.tsx:533
 msgid "(optional)"
 msgstr "（可选）"
 
@@ -698,7 +698,7 @@ msgid "{0} lines"
 msgstr "{0} 行"
 
 #. placeholder {0}: stats.total
-#: src/features/settings/components/personalization/memory-settings.tsx:206
+#: src/features/settings/components/personalization/memory-settings.tsx:211
 msgid "{0} memories"
 msgstr "{0} 条记忆"
 
@@ -788,7 +788,7 @@ msgid "{0} on {1}, in {2}"
 msgstr "{0}，位于 {1}，目录 {2}"
 
 #. placeholder {0}: stats.pinned
-#: src/features/settings/components/personalization/memory-settings.tsx:207
+#: src/features/settings/components/personalization/memory-settings.tsx:212
 msgid "{0} pinned"
 msgstr "{0} 条已置顶"
 
@@ -1032,6 +1032,10 @@ msgstr "{days}天"
 #: src/features/settings/components/chat/api-keys-settings.tsx:288
 msgid "{days}d ago"
 msgstr "{days} 天前"
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:388
+msgid "{done} of {total} entries processed"
+msgstr "已处理 {done} / {total} 条"
 
 #: src/features/chat/thread/host-activity.tsx:70
 msgid "{done} of {total} task done"
@@ -1300,15 +1304,15 @@ msgstr "{maxReviewers, plural, other {一次最多请求 # 位审查者。}}"
 msgid "{maxRounds} rounds"
 msgstr "{maxRounds} 轮"
 
-#: src/features/settings/components/chat/usage-settings.tsx:590
+#: src/features/settings/components/chat/usage-settings.tsx:596
 msgid "{metricLabel} > {threshold} per day"
 msgstr "{metricLabel} > 每天 {threshold}"
 
-#: src/features/settings/components/chat/usage-settings.tsx:594
+#: src/features/settings/components/chat/usage-settings.tsx:600
 msgid "{metricLabel} > {threshold} per hour"
 msgstr "{metricLabel} > 每小时 {threshold}"
 
-#: src/features/settings/components/chat/usage-settings.tsx:598
+#: src/features/settings/components/chat/usage-settings.tsx:604
 msgid "{metricLabel} > {threshold} per month"
 msgstr "{metricLabel} > 每月 {threshold}"
 
@@ -1523,7 +1527,7 @@ msgstr "{refusedLabel} 的格式不符合此请求的要求，因此未保存任
 msgid "{renamed, plural, one {# name opened with id:, which names a file by its id, so it now opens with id-} other {# names opened with id:, which names a file by its id, so they now open with id-}} instead."
 msgstr "{renamed, plural, other {# 个名称以 id: 开头（id: 按 ID 指代文件），现已改为以 id- 开头}}。"
 
-#: src/features/settings/components/chat/usage-settings.tsx:386
+#: src/features/settings/components/chat/usage-settings.tsx:392
 #: src/routes/admin/gateway/index.tsx:67
 msgid "{requestCount} req"
 msgstr "{requestCount} 次请求"
@@ -2484,7 +2488,7 @@ msgstr "已开始删除账号。你将被退出登录。"
 msgid "Accounts"
 msgstr "账号"
 
-#: src/features/settings/components/chat/usage-settings.tsx:500
+#: src/features/settings/components/chat/usage-settings.tsx:506
 msgid "Action"
 msgstr "操作"
 
@@ -2631,11 +2635,11 @@ msgstr "添加标签..."
 msgid "Add Account"
 msgstr "添加账号"
 
-#: src/features/settings/components/chat/usage-settings.tsx:402
+#: src/features/settings/components/chat/usage-settings.tsx:408
 msgid "Add Alert"
 msgstr "添加提醒"
 
-#: src/features/settings/components/chat/usage-settings.tsx:649
+#: src/features/settings/components/chat/usage-settings.tsx:655
 msgid "Add an alert above to be notified when your usage crosses a threshold."
 msgstr "在上方添加提醒，在用量超过阈值时收到通知。"
 
@@ -3531,7 +3535,7 @@ msgid "All"
 msgstr "全部"
 
 #. placeholder {0}: memories.length
-#: src/features/settings/components/personalization/memory-settings.tsx:228
+#: src/features/settings/components/personalization/memory-settings.tsx:233
 msgid "All ({0})"
 msgstr "全部（{0}）"
 
@@ -5816,15 +5820,15 @@ msgstr "经济"
 msgid "Budget"
 msgstr "预算"
 
-#: src/features/settings/components/chat/usage-settings.tsx:207
+#: src/features/settings/components/chat/usage-settings.tsx:209
 msgid "Budget alert created"
 msgstr "预算提醒已创建"
 
-#: src/features/settings/components/chat/usage-settings.tsx:223
+#: src/features/settings/components/chat/usage-settings.tsx:225
 msgid "Budget alert deleted"
 msgstr "预算提醒已删除"
 
-#: src/features/settings/components/chat/usage-settings.tsx:404
+#: src/features/settings/components/chat/usage-settings.tsx:410
 msgid "Budget Alerts"
 msgstr "预算提醒"
 
@@ -6181,11 +6185,11 @@ msgstr "加拿大"
 #: src/features/settings/components/chat/rotate-webhook-secret-dialog.tsx:57
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:245
 #: src/features/settings/components/chat/trigger-settings.tsx:379
-#: src/features/settings/components/chat/usage-settings.tsx:554
-#: src/features/settings/components/chat/usage-settings.tsx:562
+#: src/features/settings/components/chat/usage-settings.tsx:560
+#: src/features/settings/components/chat/usage-settings.tsx:568
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:421
 #: src/features/settings/components/personalization/memory-item.tsx:356
-#: src/features/settings/components/personalization/memory-settings.tsx:190
+#: src/features/settings/components/personalization/memory-settings.tsx:191
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:381
 #: src/features/settings/connectors/messenger/messenger-setup-dialog.tsx:156
 #: src/features/skills/components/bundle-export-dialog.tsx:219
@@ -6212,6 +6216,10 @@ msgstr "取消深度工作"
 #: src/features/settings/components/privacy/data-export.tsx:112
 msgid "Cancel Export"
 msgstr "取消导出"
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:462
+msgid "Cancel import"
+msgstr "取消导入"
 
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:409
 msgid "Cancel Import"
@@ -6830,6 +6838,14 @@ msgstr "中文（繁体）"
 msgid "Choose .md or .zip"
 msgstr "选择 .md 或 .zip"
 
+#: src/features/settings/components/personalization/memory-file-import.tsx:406
+msgid "Choose a .txt file with one memory per line, or a .json file with a list of memories. The file can be up to {maxSize}."
+msgstr "请选择每行一条记忆的 .txt 文件，或包含记忆列表的 .json 文件。文件大小最多为 {maxSize}。"
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:301
+msgid "Choose a .txt or .json file."
+msgstr "请选择 .txt 或 .json 文件。"
+
 #: src/features/settings/components/chat/default-models-settings.tsx:477
 msgid "Choose a model"
 msgstr "选择模型"
@@ -7087,11 +7103,11 @@ msgstr "全部清除"
 msgid "Clear All"
 msgstr "全部清除"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:180
+#: src/features/settings/components/personalization/memory-settings.tsx:181
 msgid "Clear All Memories"
 msgstr "清除所有记忆"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:184
+#: src/features/settings/components/personalization/memory-settings.tsx:185
 msgid "Clear all memories?"
 msgstr "清除所有记忆？"
 
@@ -7142,7 +7158,7 @@ msgstr "清除标签筛选"
 msgid "Clear the queue"
 msgstr "清空队列"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:137
+#: src/features/settings/components/personalization/memory-settings.tsx:138
 msgid "Cleared {count} memories"
 msgstr "已清除 {count} 条记忆"
 
@@ -7540,7 +7556,7 @@ msgstr "收起浏览器面板"
 msgid "Collapse chain of thought"
 msgstr "收起思维链"
 
-#: src/features/settings/components/chat/usage-settings.tsx:350
+#: src/features/settings/components/chat/usage-settings.tsx:356
 msgid "Collapse daily trend"
 msgstr "收起每日趋势"
 
@@ -7889,7 +7905,7 @@ msgstr "已完成"
 msgid "Completing the connection..."
 msgstr "正在完成连接..."
 
-#: src/features/settings/components/chat/usage-settings.tsx:292
+#: src/features/settings/components/chat/usage-settings.tsx:298
 msgid "Completion Tokens"
 msgstr "补全 token"
 
@@ -8244,7 +8260,7 @@ msgstr "连接 Anole 浏览器扩展"
 msgid "Connect the host to keep this fresh."
 msgstr "连接托管服务以保持内容最新。"
 
-#: src/features/settings/connectors/connectors-page.tsx:34
+#: src/features/settings/connectors/connectors-page.tsx:41
 #~ msgid "Connect third-party services to extend AI capabilities with your data and tools."
 #~ msgstr "连接第三方服务，用你的数据和工具扩展 AI 能力。"
 
@@ -8929,7 +8945,7 @@ msgstr "圆角半径"
 #: src/features/evals/components/model-comparison.tsx:115
 #: src/features/evals/components/run-comparison.tsx:131
 #: src/features/evals/components/run-detail.tsx:226
-#: src/features/settings/components/chat/usage-settings.tsx:321
+#: src/features/settings/components/chat/usage-settings.tsx:327
 #: src/routes/admin/gateway/index.tsx:92
 msgid "Cost"
 msgstr "费用"
@@ -8938,7 +8954,7 @@ msgstr "费用"
 msgid "Cost {display}"
 msgstr "费用 {display}"
 
-#: src/features/settings/components/chat/usage-settings.tsx:302
+#: src/features/settings/components/chat/usage-settings.tsx:308
 msgid "Cost by Model"
 msgstr "按模型统计费用"
 
@@ -9024,6 +9040,10 @@ msgstr "无法附加该聊天"
 #: src/features/chat/thread/sandbox-files.tsx:296
 msgid "could not be saved"
 msgstr "无法保存"
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:379
+msgid "Could not cancel the import."
+msgstr "无法取消导入。"
 
 #: src/features/chat/thread/composer-prompt-queue.tsx:469
 msgid "Could not cancel the message. It is still queued."
@@ -9174,6 +9194,10 @@ msgstr "无法导出工作流"
 #: src/features/skills/components/skill-generate-panel.tsx:62
 msgid "Could not generate a draft. Try again."
 msgstr "无法生成草稿，请重试。"
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:346
+msgid "Could not import the file."
+msgstr "无法导入该文件。"
 
 #: src/features/workflow/hooks/use-workflow-transfer.ts:82
 msgid "Could not import the workflow"
@@ -9336,6 +9360,14 @@ msgstr "无法读取该聊天"
 #: src/features/chat/thread/composer-input.tsx:1974
 msgid "Could not read that chat. If it is locked, unlock it first."
 msgstr "无法读取该聊天。如果已锁定，请先解锁。"
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:334
+msgid "Could not read the file."
+msgstr "无法读取该文件。"
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:397
+msgid "Could not read the import's progress."
+msgstr "无法读取导入进度。"
 
 #: src/features/settings/components/personalization/memory-import-dialog.tsx:101
 msgid "Could not read the pasted list"
@@ -10221,7 +10253,7 @@ msgstr "每日简报已开启"
 msgid "Daily cost (microdollars)"
 msgstr "每日费用（微美元）"
 
-#: src/features/settings/components/chat/usage-settings.tsx:346
+#: src/features/settings/components/chat/usage-settings.tsx:352
 msgid "Daily Cost Trend"
 msgstr "每日费用趋势"
 
@@ -10233,7 +10265,7 @@ msgstr "每日收件箱摘要"
 msgid "Daily LLM spend and request volume"
 msgstr "每日 LLM 支出和请求量"
 
-#: src/features/settings/components/chat/usage-settings.tsx:346
+#: src/features/settings/components/chat/usage-settings.tsx:352
 msgid "Daily spend and request volume"
 msgstr "每日支出和请求量"
 
@@ -10715,11 +10747,11 @@ msgstr "删除 {title}"
 msgid "Delete Account"
 msgstr "删除账号"
 
-#: src/features/settings/components/chat/usage-settings.tsx:625
+#: src/features/settings/components/chat/usage-settings.tsx:631
 msgid "Delete alert \"{ruleName}\""
 msgstr "删除提醒“{ruleName}”"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:191
+#: src/features/settings/components/personalization/memory-settings.tsx:192
 msgid "Delete All"
 msgstr "全部删除"
 
@@ -11987,7 +12019,7 @@ msgstr "动态运动"
 msgid "Dyslexia-friendly"
 msgstr "阅读障碍友好"
 
-#: src/features/settings/components/chat/usage-settings.tsx:536
+#: src/features/settings/components/chat/usage-settings.tsx:542
 msgid "e.g. claude-opus-4 (leave blank for all models)"
 msgstr "例如 claude-opus-4（留空表示所有模型）"
 
@@ -12007,7 +12039,7 @@ msgstr "例如：列出至少五个来源，每个附带链接"
 msgid "e.g. Make the output a table and drop web search"
 msgstr "例如：将输出改为表格，并去掉网络搜索"
 
-#: src/features/settings/components/chat/usage-settings.tsx:423
+#: src/features/settings/components/chat/usage-settings.tsx:429
 msgid "e.g. Monthly $10 limit"
 msgstr "例如 每月 $10 上限"
 
@@ -12679,7 +12711,7 @@ msgstr "启用后续建议"
 msgid "Enable for Next Chat"
 msgstr "为下一个聊天启用"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:169
+#: src/features/settings/components/personalization/memory-settings.tsx:170
 msgid "Enable memory"
 msgstr "启用记忆"
 
@@ -13560,7 +13592,7 @@ msgstr "扩展画布"
 msgid "Expand chain of thought"
 msgstr "展开思维链"
 
-#: src/features/settings/components/chat/usage-settings.tsx:350
+#: src/features/settings/components/chat/usage-settings.tsx:356
 msgid "Expand daily trend"
 msgstr "展开每日趋势"
 
@@ -13977,7 +14009,7 @@ msgstr "更改标签颜色失败"
 msgid "Failed to clear filter rules"
 msgstr "清除筛选规则失败"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:133
+#: src/features/settings/components/personalization/memory-settings.tsx:134
 msgid "Failed to clear memories"
 msgstr "清除记忆失败"
 
@@ -14022,7 +14054,7 @@ msgstr "创建 API 密钥失败"
 msgid "Failed to create branch"
 msgstr "创建分支失败"
 
-#: src/features/settings/components/chat/usage-settings.tsx:212
+#: src/features/settings/components/chat/usage-settings.tsx:214
 msgid "Failed to create budget alert"
 msgstr "创建预算提醒失败"
 
@@ -14054,7 +14086,7 @@ msgstr "删除失败"
 msgid "Failed to delete {fileName}"
 msgstr "删除 {fileName} 失败"
 
-#: src/features/settings/components/chat/usage-settings.tsx:226
+#: src/features/settings/components/chat/usage-settings.tsx:228
 msgid "Failed to delete budget alert"
 msgstr "删除预算提醒失败"
 
@@ -14070,7 +14102,7 @@ msgstr "删除文件失败，请重试。"
 msgid "Failed to delete files"
 msgstr "删除文件失败"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:105
+#: src/features/settings/components/personalization/memory-settings.tsx:106
 msgid "Failed to delete memory"
 msgstr "删除记忆失败"
 
@@ -14263,7 +14295,7 @@ msgstr "加载技能失败"
 msgid "Failed to load spreadsheet"
 msgstr "加载电子表格失败"
 
-#: src/features/settings/components/chat/usage-settings.tsx:269
+#: src/features/settings/components/chat/usage-settings.tsx:275
 msgid "Failed to load usage data. Ensure the LLM Gateway is running and reachable."
 msgstr "加载用量数据失败。请确保 LLM Gateway 正在运行且可访问。"
 
@@ -14591,8 +14623,8 @@ msgstr "更新键盘快捷键失败"
 msgid "Failed to update MCP server"
 msgstr "更新 MCP 服务器失败"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:116
-#: src/features/settings/components/personalization/memory-settings.tsx:124
+#: src/features/settings/components/personalization/memory-settings.tsx:117
+#: src/features/settings/components/personalization/memory-settings.tsx:125
 msgid "Failed to update memory"
 msgstr "更新记忆失败"
 
@@ -14620,7 +14652,7 @@ msgstr "无法更新拉取请求设置"
 msgid "Failed to update reply tools"
 msgstr "无法更新回复工具"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:148
+#: src/features/settings/components/personalization/memory-settings.tsx:149
 msgid "Failed to update setting"
 msgstr "更新设置失败"
 
@@ -15170,6 +15202,10 @@ msgstr "文件大小超过 {maxSize}"
 msgid "File size too large. Maximum 5MB allowed."
 msgstr "文件过大，最大允许 5MB。"
 
+#: src/features/settings/components/personalization/memory-file-import.tsx:410
+msgid "File to import"
+msgstr "要导入的文件"
+
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:859
 msgid "File Too Large to Preview"
 msgstr "文件过大，无法预览"
@@ -15299,14 +15335,8 @@ msgid "Filter by role"
 msgstr "按角色筛选"
 
 #: src/features/chat/tags/thread-tag-filter.tsx:39
-#: src/features/chat/thread-list/thread-list-filter-menu.tsx:136
 #~ msgid "Filter by tag"
 #~ msgstr "按标签筛选"
-
-#. placeholder {0}: activeTagIds.length
-#: src/features/chat/thread-list/thread-list-filter-menu.tsx:136
-#~ msgid "Filter by tag ({0} selected)"
-#~ msgstr "按标签筛选（已选 {0} 个）"
 
 #: src/features/chat/tags/thread-tag-filter.tsx:39
 #~ msgid "Filter by tag ({activeCount} selected)"
@@ -15320,7 +15350,7 @@ msgstr "按类型筛选"
 msgid "Filter condition"
 msgstr "筛选条件"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:214
+#: src/features/settings/components/personalization/memory-settings.tsx:219
 msgid "Filter memories by type"
 msgstr "按类型筛选记忆"
 
@@ -16406,7 +16436,7 @@ msgstr "获取 API 密钥"
 msgid "Get cited, multi-step analysis in minutes. Deep Research reads sources so you don't have to."
 msgstr "几分钟内获得带引用的多步骤分析。深度研究替你阅读资料来源。"
 
-#: src/features/settings/components/chat/usage-settings.tsx:403
+#: src/features/settings/components/chat/usage-settings.tsx:409
 msgid "Get notified or block requests when usage thresholds are reached"
 msgstr "在用量达到阈值时收到通知或阻止请求"
 
@@ -18032,9 +18062,17 @@ msgstr "从 ChatGPT、Google Gemini、Claude、Neore 数据导出，或本地 Cl
 msgid "Import failed"
 msgstr "导入失败"
 
+#: src/features/settings/components/personalization/memory-file-import.tsx:423
+msgid "Import file"
+msgstr "导入文件"
+
 #: src/features/projects/components/project-rule-files.tsx:968
 msgid "Import files"
 msgstr "导入文件"
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:448
+msgid "Import finished."
+msgstr "导入完成。"
 
 #: src/features/projects/components/repo-rule-file-import.tsx:216
 #: src/features/projects/components/repo-rule-file-import.tsx:378
@@ -18045,6 +18083,10 @@ msgstr "从仓库导入"
 #: src/features/projects/components/computer-rule-file-import.tsx:643
 msgid "Import from this computer"
 msgstr "从此电脑导入"
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:403
+msgid "Import memories from a file"
+msgstr "从文件导入记忆"
 
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:423
 msgid "Import More"
@@ -18057,6 +18099,14 @@ msgstr "导入 Notion 导出文件（.zip）"
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:222
 msgid "Import one kind of export at a time."
 msgstr "每次只能导入一种导出。"
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:454
+msgid "Import progress"
+msgstr "导入进度"
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:440
+msgid "Import result"
+msgstr "导入结果"
 
 #: src/features/projects/components/project-rule-files.tsx:978
 msgid "Import rule folder"
@@ -18104,6 +18154,10 @@ msgstr "已导入 {added} 个 Notion 页面；跳过了 {skipped} 个附件。"
 msgid "Imported {added} Notion page(s)."
 msgstr "已导入 {added} 个 Notion 页面。"
 
+#: src/features/settings/components/personalization/memory-file-import.tsx:395
+msgid "Imported {imported} · Updated {updated} · Duplicates {duplicates} · Too long {tooLong} · Invalid {invalid}"
+msgstr "已导入 {imported} · 已更新 {updated} · 重复 {duplicates} · 过长 {tooLong} · 无效 {invalid}"
+
 #. placeholder {0}: skill.slug
 #: src/features/skills/components/bundle-import-dialog.tsx:129
 msgid "Imported as /{0}."
@@ -18122,6 +18176,10 @@ msgstr "已导入技能“{0}”"
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:396
 msgid "Importing from {0}..."
 msgstr "正在从 {0} 导入..."
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:447
+msgid "Importing memories…"
+msgstr "正在导入记忆…"
 
 #: src/features/marketing/components/gateway-footer.tsx:20
 #: src/features/marketing/components/gateway-footer.tsx:148
@@ -19311,20 +19369,20 @@ msgstr "大幅海报"
 msgid "Last 24h"
 msgstr "最近 24 小时"
 
-#: src/features/settings/components/chat/usage-settings.tsx:253
 #: src/features/settings/components/chat/usage-settings.tsx:259
+#: src/features/settings/components/chat/usage-settings.tsx:265
 msgid "Last 30 days"
 msgstr "最近 30 天"
 
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:632
-#: src/features/settings/components/chat/usage-settings.tsx:250
-#: src/features/settings/components/chat/usage-settings.tsx:258
+#: src/features/settings/components/chat/usage-settings.tsx:256
+#: src/features/settings/components/chat/usage-settings.tsx:264
 #: src/routes/admin/gateway/index.tsx:234
 msgid "Last 7 days"
 msgstr "过去 7 天"
 
-#: src/features/settings/components/chat/usage-settings.tsx:253
-#: src/features/settings/components/chat/usage-settings.tsx:260
+#: src/features/settings/components/chat/usage-settings.tsx:259
+#: src/features/settings/components/chat/usage-settings.tsx:266
 msgid "Last 90 days"
 msgstr "最近 90 天"
 
@@ -19396,7 +19454,7 @@ msgstr "上次跳过的运行"
 msgid "Last slide"
 msgstr "最后一张幻灯片"
 
-#: src/features/settings/components/chat/usage-settings.tsx:618
+#: src/features/settings/components/chat/usage-settings.tsx:624
 msgid "Last triggered: {lastTriggeredAt}"
 msgstr "上次触发：{lastTriggeredAt}"
 
@@ -21092,7 +21150,7 @@ msgstr "MCP 服务器：{0}"
 msgid "MCP Servers"
 msgstr "MCP 服务器"
 
-#: src/features/settings/components/chat/mcp-settings.tsx:413
+#: src/features/settings/components/chat/mcp-settings.tsx:427
 #~ msgid "MCP servers provide additional tools that the AI can use during conversations. Tools from connected servers are automatically available when chatting."
 #~ msgstr "MCP 服务器提供额外的工具，供 AI 在对话中使用。已连接服务器的工具会在聊天时自动可用。"
 
@@ -21227,7 +21285,7 @@ msgid "memories"
 msgstr "记忆"
 
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:31
-#: src/features/settings/components/personalization/memory-settings.tsx:240
+#: src/features/settings/components/personalization/memory-settings.tsx:245
 msgid "Memories"
 msgstr "记忆"
 
@@ -21245,7 +21303,7 @@ msgid "Memories used for this reply ({0})"
 msgstr "此回复使用的记忆（{0}）"
 
 #: src/features/marketing/use-cases/use-case-data.ts:114
-#: src/features/settings/components/personalization/memory-settings.tsx:164
+#: src/features/settings/components/personalization/memory-settings.tsx:165
 #: src/features/settings/lib/settings-keywords.ts:99
 msgid "Memory"
 msgstr "记忆"
@@ -21254,17 +21312,25 @@ msgstr "记忆"
 msgid "Memory — what the agent keeps across chats"
 msgstr "记忆——智能体跨聊天保留的内容"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:109
+#: src/features/settings/components/personalization/memory-settings.tsx:110
 msgid "Memory deleted"
 msgstr "记忆已删除"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:146
+#: src/features/settings/components/personalization/memory-settings.tsx:147
 msgid "Memory disabled"
 msgstr "记忆已关闭"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:146
+#: src/features/settings/components/personalization/memory-settings.tsx:147
 msgid "Memory enabled"
 msgstr "记忆已开启"
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:257
+msgid "Memory import finished"
+msgstr "记忆导入已完成"
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:257
+msgid "Memory import stopped"
+msgstr "记忆导入已停止"
 
 #: src/features/marketing/use-cases/use-case-data.ts:115
 msgid "Memory in Neore: the agent keeps useful facts about you across chats, you can review and edit them in settings, and it is off until you turn it on."
@@ -21502,7 +21568,7 @@ msgid "Meta's well-established and widely-deployed model"
 msgstr "Meta 成熟且部署广泛的模型"
 
 #: src/features/evals/components/run-comparison.tsx:102
-#: src/features/settings/components/chat/usage-settings.tsx:430
+#: src/features/settings/components/chat/usage-settings.tsx:436
 msgid "Metric"
 msgstr "指标"
 
@@ -21746,7 +21812,7 @@ msgstr "模式："
 #: src/features/prompts/components/prompt-form-dialog.tsx:387
 #: src/features/settings/components/chat/bots-settings.tsx:414
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:257
-#: src/features/settings/components/chat/usage-settings.tsx:318
+#: src/features/settings/components/chat/usage-settings.tsx:324
 #: src/features/tasks/components/task-form-dialog.tsx:407
 #: src/features/workflow/components/nodes/ai-node.tsx:34
 #: src/features/workflow/components/nodes/background-removal-node.tsx:63
@@ -21795,7 +21861,7 @@ msgstr "模型已停用"
 msgid "Model enabled"
 msgstr "模型已启用"
 
-#: src/features/settings/components/chat/usage-settings.tsx:526
+#: src/features/settings/components/chat/usage-settings.tsx:532
 msgid "Model filter"
 msgstr "模型筛选"
 
@@ -22366,7 +22432,7 @@ msgstr "名称"
 #: src/features/settings/components/chat/native-providers-settings.tsx:503
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:156
 #: src/features/settings/components/chat/trigger-settings.tsx:218
-#: src/features/settings/components/chat/usage-settings.tsx:414
+#: src/features/settings/components/chat/usage-settings.tsx:420
 #: src/features/skills/components/skill-builder-diff.tsx:32
 #: src/features/skills/components/skill-builder-review.tsx:136
 #: src/features/skills/components/skill-form-dialog.tsx:201
@@ -22756,7 +22822,7 @@ msgstr "新建机器人"
 msgid "New Branch"
 msgstr "新建分支"
 
-#: src/features/settings/components/chat/usage-settings.tsx:410
+#: src/features/settings/components/chat/usage-settings.tsx:416
 msgid "New Budget Alert"
 msgstr "新建预算提醒"
 
@@ -23130,7 +23196,7 @@ msgstr "无机器人"
 msgid "No bots yet."
 msgstr "还没有机器人。"
 
-#: src/features/settings/components/chat/usage-settings.tsx:648
+#: src/features/settings/components/chat/usage-settings.tsx:654
 msgid "No budget alerts configured."
 msgstr "尚未配置预算提醒。"
 
@@ -23214,7 +23280,7 @@ msgstr "此期间无成本数据。"
 msgid "No custom endpoints yet."
 msgstr "还没有自定义端点。"
 
-#: src/features/settings/components/chat/usage-settings.tsx:393
+#: src/features/settings/components/chat/usage-settings.tsx:399
 msgid "No daily data for this period."
 msgstr "此期间无每日数据。"
 
@@ -23394,11 +23460,11 @@ msgstr "未配置 MCP 服务器。添加服务器以扩展 AI 能力。"
 msgid "No members in this team yet"
 msgstr "此团队还没有成员"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:256
+#: src/features/settings/components/personalization/memory-settings.tsx:261
 msgid "No memories of this type."
 msgstr "没有此类型的记忆。"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:257
+#: src/features/settings/components/personalization/memory-settings.tsx:262
 msgid "No memories yet. The AI will start learning from your conversations automatically."
 msgstr "还没有记忆。AI 会自动从你的对话中开始学习。"
 
@@ -23761,7 +23827,7 @@ msgstr "没有未读通知。"
 msgid "No updates yet."
 msgstr "还没有更新。"
 
-#: src/features/settings/components/chat/usage-settings.tsx:312
+#: src/features/settings/components/chat/usage-settings.tsx:318
 #: src/routes/admin/gateway/index.tsx:125
 msgid "No usage data for this period."
 msgstr "此期间无用量数据。"
@@ -26126,7 +26192,8 @@ msgstr "性能可与 Mistral Small 24B 媲美"
 msgid "Performance Reviewer"
 msgstr "性能审查员"
 
-#: src/features/settings/components/chat/usage-settings.tsx:454
+#: src/features/settings/components/chat/usage-settings.tsx:248
+#: src/features/settings/components/chat/usage-settings.tsx:460
 msgid "Period"
 msgstr "期间"
 
@@ -27457,7 +27524,7 @@ msgstr "要在所有模型上运行的提示词..."
 msgid "Prompt tokens"
 msgstr "提示词 token"
 
-#: src/features/settings/components/chat/usage-settings.tsx:287
+#: src/features/settings/components/chat/usage-settings.tsx:293
 msgid "Prompt Tokens"
 msgstr "提示词 token"
 
@@ -29157,8 +29224,8 @@ msgstr "正在请求…"
 #: src/features/admin/components/admin-provider-cache-row.tsx:119
 #: src/features/admin/components/admin-provider-cache-row.tsx:143
 #: src/features/admin/components/admin-provider-cache-row.tsx:181
-#: src/features/settings/components/chat/usage-settings.tsx:277
-#: src/features/settings/components/chat/usage-settings.tsx:319
+#: src/features/settings/components/chat/usage-settings.tsx:283
+#: src/features/settings/components/chat/usage-settings.tsx:325
 #: src/routes/admin/gateway/index.tsx:89
 #: src/routes/admin/gateway/index.tsx:256
 msgid "Requests"
@@ -29840,7 +29907,7 @@ msgstr "规则文件"
 msgid "Rule files saved."
 msgstr "规则文件已保存。"
 
-#: src/features/settings/components/chat/usage-settings.tsx:189
+#: src/features/settings/components/chat/usage-settings.tsx:191
 msgid "Rule name is required"
 msgstr "规则名称为必填项"
 
@@ -30127,7 +30194,7 @@ msgstr "保存并关闭"
 msgid "Save 25%"
 msgstr "节省 25%"
 
-#: src/features/settings/components/chat/usage-settings.tsx:551
+#: src/features/settings/components/chat/usage-settings.tsx:557
 msgid "Save Alert"
 msgstr "保存提醒"
 
@@ -30144,7 +30211,7 @@ msgstr "保存为预设"
 msgid "Save blocked websites"
 msgstr "保存屏蔽的网站"
 
-#: src/features/settings/components/chat/usage-settings.tsx:543
+#: src/features/settings/components/chat/usage-settings.tsx:549
 msgid "Save budget alert"
 msgstr "保存预算提醒"
 
@@ -30585,6 +30652,7 @@ msgstr "搜索公开技能…"
 msgid "Search Reddit posts"
 msgstr "搜索 Reddit 帖子"
 
+#: src/components/settings/settings-search.tsx:167
 #: src/features/pages/components/pages-sidebar.tsx:169
 msgid "Search results"
 msgstr "搜索结果"
@@ -34956,7 +35024,7 @@ msgstr "智能体的计划"
 msgid "The agent's tool calls"
 msgstr "智能体的工具调用"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:163
+#: src/features/settings/components/personalization/memory-settings.tsx:164
 msgid "The AI learns from your conversations to personalize its responses, and reflects on what it learned each night. Everything it remembers is listed here — edit, retype, pin or delete any of it."
 msgstr "AI 会从你的对话中学习以个性化回复，并在每晚反思所学内容。它记住的一切都列在这里——你可以编辑、修改类型、置顶或删除其中任何一条。"
 
@@ -35225,6 +35293,10 @@ msgstr "该扩展将能够以 {0} 的身份读取和发送聊天。你可以随�
 msgid "The file is larger than {0} KB, which is more than a bundle can be."
 msgstr "文件大于 {0} KB，超出了捆绑包的大小上限。"
 
+#: src/features/settings/components/personalization/memory-file-import.tsx:294
+msgid "The file is larger than {maxSize}. Choose a smaller file."
+msgstr "文件大于 {maxSize}。请选择更小的文件。"
+
 #: src/features/skills/components/skill-import-dialog.tsx:91
 msgid "The file is larger than {megabytes} MB."
 msgstr "文件大于 {megabytes} MB。"
@@ -35381,6 +35453,10 @@ msgstr "主机软件已过时"
 #: ../../packages/ui/src/components/icon-picker.tsx:452
 msgid "The icons could not be loaded."
 msgstr "无法加载图标。"
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:396
+msgid "The import stopped before it finished."
+msgstr "导入在完成前已停止。"
 
 #: src/features/canvas/canvas-panel.tsx:648
 msgid "The imported file appears to be empty."
@@ -36713,7 +36789,7 @@ msgid "This will permanently delete {0} anonymous user accounts and all their da
 msgstr "这将永久删除 {0} 个匿名用户账号及其所有数据。此操作无法撤销。"
 
 #. placeholder {0}: memories.length
-#: src/features/settings/components/personalization/memory-settings.tsx:186
+#: src/features/settings/components/personalization/memory-settings.tsx:187
 msgid "This will permanently delete all {0} memories and their daily digests. The AI will start learning fresh from your next conversation."
 msgstr "这将永久删除全部 {0} 条记忆及其每日摘要。AI 将从你的下一次对话开始重新学习。"
 
@@ -36892,7 +36968,7 @@ msgid "Three steps to use coding agents on your own machines. Skip any of them a
 msgstr "在你自己的设备上使用编码智能体需要三个步骤。可跳过任一步骤，稍后再回来完成。"
 
 #: src/features/canvas/canvas-panel.tsx:216
-#: src/features/settings/components/chat/usage-settings.tsx:481
+#: src/features/settings/components/chat/usage-settings.tsx:487
 msgid "Threshold"
 msgstr "阈值"
 
@@ -37098,13 +37174,13 @@ msgstr "Token 成本影响"
 msgid "Token count"
 msgstr "Token 数"
 
-#: src/features/settings/components/chat/usage-settings.tsx:302
+#: src/features/settings/components/chat/usage-settings.tsx:308
 msgid "Token usage and cost breakdown per model for the selected period"
 msgstr "所选期间内每个模型的 token 用量和成本明细"
 
 #: src/features/projects/components/project-usage-summary.tsx:40
 #: src/features/settings/components/chat/usage-project-breakdown.tsx:207
-#: src/features/settings/components/chat/usage-settings.tsx:320
+#: src/features/settings/components/chat/usage-settings.tsx:326
 #: src/features/settings/components/chat/usage-skill-breakdown.tsx:85
 msgid "Tokens"
 msgstr "Token"
@@ -37308,7 +37384,7 @@ msgstr "多伦多"
 msgid "Total cost"
 msgstr "总成本"
 
-#: src/features/settings/components/chat/usage-settings.tsx:282
+#: src/features/settings/components/chat/usage-settings.tsx:288
 #: src/routes/admin/gateway/index.tsx:262
 msgid "Total Cost"
 msgstr "总成本"
@@ -37333,7 +37409,7 @@ msgstr "追踪所有管理员操作，便于问责"
 msgid "Track every token and dollar."
 msgstr "追踪每一个 token 和每一美元。"
 
-#: src/features/settings/components/chat/usage-settings.tsx:242
+#: src/features/settings/components/chat/usage-settings.tsx:244
 msgid "Track your LLM token usage, cost, and set budget alerts"
 msgstr "追踪你的 LLM token 用量和成本，并设置预算提醒"
 
@@ -37465,7 +37541,7 @@ msgstr "已移至回收站、临时、正在删除或孤立"
 msgid "Triangle"
 msgstr "三角形"
 
-#: src/features/settings/components/chat/usage-settings.tsx:411
+#: src/features/settings/components/chat/usage-settings.tsx:417
 msgid "Trigger a notification or block when a usage metric exceeds a threshold"
 msgstr "当用量指标超过阈值时触发通知或阻止"
 
@@ -37583,6 +37659,7 @@ msgstr "尝试调整搜索词。"
 #: src/features/projects/components/project-repositories.tsx:297
 #: src/features/projects/components/repo-rule-file-import.tsx:183
 #: src/features/settings/components/chat/default-models-settings.tsx:467
+#: src/features/settings/components/personalization/memory-file-import.tsx:473
 #: src/features/tasks/components/task-form-dialog.tsx:459
 #: src/features/vault/components/site-logins.tsx:480
 #: src/features/vault/components/site-logins.tsx:612
@@ -37681,6 +37758,10 @@ msgstr "要关闭自动合并吗？"
 #: src/features/settings/components/personalization/memory-import-dialog.tsx:195
 msgid "Turn on memory"
 msgstr "开启记忆"
+
+#: src/features/settings/components/personalization/memory-file-import.tsx:428
+msgid "Turn on memory to import a file."
+msgstr "请先开启记忆，再导入文件。"
 
 #: src/features/skills/components/bundle-import-dialog.tsx:122
 msgid "Turns these tools off:"
@@ -38544,7 +38625,7 @@ msgstr "美国"
 msgid "Usage"
 msgstr "用量"
 
-#: src/features/settings/components/chat/usage-settings.tsx:241
+#: src/features/settings/components/chat/usage-settings.tsx:243
 msgid "Usage & Cost"
 msgstr "用量与成本"
 
