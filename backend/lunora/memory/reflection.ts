@@ -82,6 +82,8 @@ const REFLECTION_READ_CAP = 1000;
 
 /** Digests kept per user; older ones are pruned when a new one lands. */
 const DIGESTS_KEPT = 30;
+/** Sources one digest save checks for existence: the prompt carries at most a few dozen. */
+const SOURCE_CHECK_CAP = 200;
 
 /** Structured event per run, so skip reasons and spend are countable. */
 const REFLECTION_EVENT = "memory.reflection";
@@ -579,6 +581,8 @@ export const saveMemoryDigest = internalMutation
     .input({
         learned: v.array(v.object({ memory: v.string(), memoryId: v.string(), type: v.string() })),
         localDay: v.string(),
+        // The memories the digest was written from (the day's, merge members, promotion sources). A summary may quote any of them.
+        sourceIds: v.optional(v.array(v.string().max(MAX_LENGTH.id))),
         stats: v.object({
             contradictionsResolved: v.number(),
             decayed: v.number(),
@@ -591,7 +595,7 @@ export const saveMemoryDigest = internalMutation
         userId: v.string(),
     })
     .output(v.null())
-    .mutation(async ({ args, ctx }) => {
+    .mutation(async ({ args: { sourceIds, ...args }, ctx }) => {
         // The run read its memories some time ago: a delete since then must not come back through this write. An entry
         // stays only while its memory still exists, is the user's and is active, checked here in the write that inserts it.
         // The summary is free text with no pointer to its sources, so a digest that lost an entry is saved without it.
@@ -605,9 +609,23 @@ export const saveMemoryDigest = internalMutation
             }
         }
 
-        const lost = learned.length < args.learned.length;
+        const entriesLost = learned.length < args.learned.length;
+        let lost = entriesLost;
 
-        if (lost && learned.length === 0 && Object.values(args.stats).every((count) => count === 0)) {
+        // The summary can also quote a source the list never names: any of them deleted since the run read it drops the summary.
+        // Only existence counts here: the run itself retires merge members, and a retired row is still there.
+        const toCheck = entriesLost ? [] : (sourceIds ?? []).slice(0, SOURCE_CHECK_CAP);
+
+        for (const id of toCheck) {
+            const row = await ctx.db.get("memories", id as Id<"memories">).catch(() => null);
+
+            if (!row || row.userId !== args.userId) {
+                lost = true;
+                break;
+            }
+        }
+
+        if (entriesLost && learned.length === 0 && Object.values(args.stats).every((count) => count === 0)) {
             return null;
         }
 
@@ -640,6 +658,7 @@ type ReflectionBudget = ReturnType<typeof createReflectionBudget>;
 interface ScopeOutcome {
     applied: number;
     learned: { memory: string; memoryId: string; type: string }[];
+    sourceIds: string[];
     stats: { contradictionsResolved: number; decayed: number; merged: number; newMemories: number; promoted: number; retired: number };
     summary: string;
 }
@@ -830,6 +849,14 @@ const reflectScope = async (
     return {
         applied: expiryApplied + result.applied,
         learned,
+        // Everything the synthesis prompt was built from: its summary may quote any of it.
+        sourceIds: [
+            ...new Set([
+                ...learnedToday.map((m) => m.id),
+                ...plan.merges.flatMap((merge) => [merge.survivorId, ...merge.absorbedIds]),
+                ...plan.promotions.flatMap((candidate) => candidate.sourceIds),
+            ]),
+        ],
         stats: {
             // Counted from what is written: a revision whose wording was only a secret resolves nothing.
             contradictionsResolved: countResolvedContradictions(revisedPairs, committedOps),
@@ -888,12 +915,13 @@ export const runMemoryReflection = internalAction
 
         // The digest describes the user's own memories. A bot's changes are logged, not summarised.
         // ponytail: a bot has no digest of its own; add one per bot when someone asks for it.
-        const { learned, stats, summary } = userScope;
+        const { learned, sourceIds, stats, summary } = userScope;
 
         if (learned.length > 0 || Object.values(stats).some((count) => count > 0)) {
             await ctx.runMutation(internal.memory.reflection.saveMemoryDigest, {
                 learned,
                 localDay: digestDayOf(now, claim.timeZone),
+                sourceIds,
                 stats,
                 summary,
                 userId,

@@ -346,20 +346,21 @@ const ageCleanups = async () =>
 const sweep = async () => await run(async (ctx) => await ctx.runMutation(sweepMemoryCleanups as never, {} as never));
 
 describe("a digest summary after a delete", () => {
-    it("drops the summary of every digest that may quote the deleted memory, and keeps one from before it existed", async () => {
-        const before = await insertDigest([], "Learned that you drink coffee.", 1);
+    it("drops the summary of every digest of the user, whatever it lists and whenever it was written", async () => {
+        const unrelated = await insertDigest([], "Learned that you drink coffee.", 1);
         const first = await seed("likes tea");
         const second = await supersede(first.memoryId, "likes green tea");
         const other = await seed("owns a bike");
-        const mixed = await insertDigest(
+        // Lists the memory, though written before the row's creation time (a guest merge re-creates rows).
+        const early = await insertDigest(
             [
                 { memory: "likes green tea", memoryId: second, type: "preference" },
                 { memory: "owns a bike", memoryId: other.memoryId, type: "preference" },
             ],
             "You now like green tea and own a bike.",
-            Date.now() + 1000,
+            1,
         );
-        // Names no entry of the deleted memory, but was written after it existed: a merge or a promotion can put its wording in the summary.
+        // Names no entry of the deleted memory: a merge or a promotion can still put its wording in the summary.
         const unlisted = await insertDigest(
             [{ memory: "owns a bike", memoryId: other.memoryId, type: "preference" }],
             "Merged your tea notes.",
@@ -368,19 +369,14 @@ describe("a digest summary after a delete", () => {
 
         await asOwner().mutation(deleteMemory as never, { memoryId: second } as never);
 
-        const summaryOf = async (id: Id<"memoryDigests">) => {
-            const row = await run(async (ctx) => await ctx.db.get("memoryDigests", id));
+        const digestOf = async (id: Id<"memoryDigests">) => await run(async (ctx) => await ctx.db.get("memoryDigests", id));
+        const [earlyRow, unlistedRow, unrelatedRow] = await Promise.all([digestOf(early), digestOf(unlisted), digestOf(unrelated)]);
 
-            return row?.summary;
-        };
-
-        expect(await summaryOf(mixed)).toBe("");
-        expect(await summaryOf(unlisted)).toBe("");
-        expect(await summaryOf(before)).toBe("Learned that you drink coffee.");
+        expect(earlyRow?.summary).toBe("");
+        expect(unlistedRow?.summary).toBe("");
+        expect(unrelatedRow?.summary).toBe("");
         // The entry that stayed is still listed.
-        const left = await run(async (ctx) => await ctx.db.get("memoryDigests", mixed));
-
-        expect((left?.learned as { memoryId: string }[]).map((entry) => entry.memoryId)).toEqual([other.memoryId]);
+        expect((earlyRow?.learned as { memoryId: string }[]).map((entry) => entry.memoryId)).toEqual([other.memoryId]);
     });
 });
 
@@ -419,6 +415,32 @@ describe("saving a digest while a memory is deleted", () => {
         expect(JSON.stringify(digest)).not.toContain("likes tea");
     });
 
+    it("drops the summary when a source the prompt was built from is gone, though no listed entry is", async () => {
+        const kept = await seed("owns a bike");
+        const absorbed = await seed("lives in porto city");
+
+        await asOwner().mutation(deleteMemory as never, { memoryId: absorbed.memoryId } as never);
+        await run(
+            async (ctx) =>
+                await ctx.runMutation(
+                    saveMemoryDigest as never,
+                    {
+                        learned: [{ memory: "owns a bike", memoryId: kept.memoryId, type: "preference" }],
+                        localDay: "2026-09-24",
+                        sourceIds: [kept.memoryId, absorbed.memoryId],
+                        stats: STATS,
+                        summary: "Merged your Porto notes.",
+                        userId: OWNER,
+                    } as never,
+                ),
+        );
+
+        const [digest] = await run(async (ctx) => await ctx.db.query("memoryDigests").collect());
+
+        expect(digest?.summary).toBe("");
+        expect((digest?.learned as { memoryId: string }[]).map((entry) => entry.memoryId)).toEqual([kept.memoryId]);
+    });
+
     it("keeps the summary when every entry is still active", async () => {
         const kept = await seed("owns a bike");
 
@@ -429,6 +451,7 @@ describe("saving a digest while a memory is deleted", () => {
                     {
                         learned: [{ memory: "owns a bike", memoryId: kept.memoryId, type: "preference" }],
                         localDay: "2026-09-24",
+                        sourceIds: [kept.memoryId],
                         stats: STATS,
                         summary: "You own a bike.",
                         userId: OWNER,

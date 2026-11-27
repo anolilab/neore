@@ -519,11 +519,11 @@ const removeMemoryRow = async (ctx: MutationCtx, row: Doc<"memories">, userId: s
  *
  * A digest's summary is model-written text with no pointer to the memories it drew on, so a deleted memory's wording can
  * sit in it with or without an entry in `learned` (a merge or a promotion puts rows in it that the list never names).
- * `since` is the oldest creation time among the deleted rows: a digest written at or after it could have quoted one of
- * them, so its summary is cleared ({@link DROPPED_DIGEST_SUMMARY}); a digest written before every deleted row existed
- * could not, and keeps it. This errs toward clearing, and nothing is regenerated here.
+ * Nor can a creation time bound which digests could have quoted a row: a guest merge re-creates its rows. So every
+ * digest of the user loses its summary ({@link DROPPED_DIGEST_SUMMARY}), at most {@link DIGEST_SCAN} rows; nothing is
+ * regenerated here, and the digest's other fields stay.
  */
-const removeFromDigests = async (ctx: Pick<MutationCtx, "db">, userId: string, ids: ReadonlySet<string>, since: number): Promise<void> => {
+const removeFromDigests = async (ctx: Pick<MutationCtx, "db">, userId: string, ids: ReadonlySet<string>): Promise<void> => {
     const digests = await ctx.db
         .query("memoryDigests")
         .withIndex("by_userId_createdAt", (q) => q.eq("userId", userId))
@@ -531,18 +531,18 @@ const removeFromDigests = async (ctx: Pick<MutationCtx, "db">, userId: string, i
 
     for (const digest of digests) {
         const learned = digest.learned.filter((entry) => !ids.has(entry.memoryId));
-        const listed = learned.length !== digest.learned.length;
 
-        if (listed && learned.length === 0) {
+        if (learned.length === 0 && digest.learned.length > 0) {
             await ctx.db.delete("memoryDigests", digest._id);
 
             continue;
         }
 
-        const quoting = digest.createdAt >= since && digest.summary !== DROPPED_DIGEST_SUMMARY;
+        const listed = learned.length !== digest.learned.length;
+        const summed = digest.summary !== DROPPED_DIGEST_SUMMARY;
 
-        if (listed || quoting) {
-            await ctx.db.patch("memoryDigests", digest._id, { learned, ...(quoting && { summary: DROPPED_DIGEST_SUMMARY }) });
+        if (listed || summed) {
+            await ctx.db.patch("memoryDigests", digest._id, { learned, summary: DROPPED_DIGEST_SUMMARY });
         }
     }
 };
@@ -562,13 +562,12 @@ const eraseOlderVersions = async (
     userId: string,
     frontier: ReadonlyArray<Id<"memories">>,
     deleted: ReadonlyArray<string>,
-    options: { cleanupId?: Id<"memoryCleanups">; since?: number } = {},
+    options: { cleanupId?: Id<"memoryCleanups"> } = {},
 ): Promise<number> => {
     const removed = new Set<string>(deleted);
     const pending: Id<"memories">[] = [];
     const queue = [...frontier];
     let budget = CHAIN_DELETE_BATCH;
-    let since = options.since ?? Infinity;
 
     while (queue.length > 0) {
         const id = queue.shift() as Id<"memories">;
@@ -588,7 +587,6 @@ const eraseOlderVersions = async (
         const taken = rows.slice(0, budget);
 
         for (const row of taken) {
-            since = Math.min(since, row._creationTime);
             await removeMemoryRow(ctx, row, userId);
             removed.add(row._id);
             queue.push(row._id);
@@ -601,7 +599,7 @@ const eraseOlderVersions = async (
         }
     }
 
-    await removeFromDigests(ctx, userId, removed, since);
+    await removeFromDigests(ctx, userId, removed);
 
     if (pending.length === 0) {
         if (options.cleanupId) {
@@ -700,7 +698,7 @@ export const deleteMemory = authMutation
 
         await removeMemoryRow(context, memory, userId);
 
-        const olderVersions = await eraseOlderVersions(context, userId, [memory._id], [memory._id], { since: memory._creationTime });
+        const olderVersions = await eraseOlderVersions(context, userId, [memory._id], [memory._id]);
 
         context.log.event("memory.delete_memory", { hadEmbedding: Boolean(memory.embeddingId), olderVersions });
 
