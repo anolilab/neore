@@ -33,8 +33,8 @@ import { LunoraError, v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
 import type { Doc, Id } from "../_generated/dataModel";
-import { type ActionCtx, internalAction, internalMutation, type MutationCtx } from "../_generated/server";
-import { runHeadlessAgent } from "../chat/lib/headless-run";
+import { type ActionCtx, internalAction, internalMutation, internalQuery, type MutationCtx } from "../_generated/server";
+import { FencedRunError, runHeadlessAgent } from "../chat/lib/headless-run";
 import { enqueueJob } from "../lib/job-queue";
 import { JOB_LEASE_MS } from "../lib/job-once";
 import { threadHasLiveGrant } from "../agent/live-grant";
@@ -127,6 +127,9 @@ const markersOf = (watch: { checksHeadSha?: string; conflictHeadSha?: string; re
         ...(watch.reviewId !== undefined && { review: watch.reviewId }),
     };
 };
+
+/** The model a turn in the chat uses now: the active agent's if the chat was switched, else its own, else the default. */
+const modelOfThread = (thread: Doc<"threads"> | null): string => thread?.activeAgent?.model || thread?.model || DEFAULT_CHAT_MODEL;
 
 const currentMarker = (watch: { checksHeadSha?: string; conflictHeadSha?: string; reviewId?: string }, reason: WatchWakeReason): string | undefined =>
     markersOf(watch)[reason];
@@ -292,13 +295,17 @@ export const claimWatchWake = internalMutation
             return null;
         }
 
-        // An earlier turn for these very occurrences may already have generated (its settlement failed after the model ran): no second paid
-        // turn for the same markers, however long ago. A newer marker, or a kind it did not carry, is a new occurrence and stays eligible; a
-        // round refunded before the model was reached never set the flag and stays retryable.
+        // An earlier turn for these very occurrences may already have generated (it ended as a failure after the model ran, or was stopped):
+        // no second paid turn for the same markers. A newer marker, or a kind it did not carry, is a new occurrence and stays eligible; a
+        // round refunded before the model was reached never set the flag and stays retryable; and a turn settled as DELIVERED does not
+        // block, since it cleared its reasons: the same commit coming back later is delivered again.
         const last = link.watchWakeCompleted;
 
         if (
             last?.modelReached === true &&
+            // Only an occurrence that did NOT end as a delivery blocks: one whose turn was settled as delivered cleared its reasons, and the
+            // same markers coming back later (a reverted or re-run commit) are a new occurrence.
+            last.state === "running" &&
             last.startedAt === link.watch.startedAt &&
             last.run === link.watchRun &&
             reasons.every((reason) => last.reasons.includes(reason) && last.markers[reason] === currentMarker(link.watch ?? {}, reason))
@@ -327,6 +334,22 @@ export const claimWatchWake = internalMutation
 
         // Another watch's turn is running in this thread (a thread can link several pull requests): no replacement claim beside it.
         if (await wakeLeaseHeld(ctx, link.userId, link.threadId, ctx.now, link._id)) {
+            return null;
+        }
+
+        // The chat's model must be one a turn can run on: otherwise no lease is taken and no job is enqueued (each poll would queue one
+        // bound to fail). The reasons stay pending and the owner sees it once on `watchWakeFailure` (`unavailable`, with a retry time, so
+        // the next polls leave it until then); no failure is counted. The job checks again, as the model can change before it runs.
+        if (!isTaskModelAllowed(modelOfThread(thread), (id) => MODEL_LOOKUP.get(id))) {
+            await ctx.db.patch("pullRequestThreads", link._id, {
+                watchWakeFailure: {
+                    at: ctx.now,
+                    attempts: link.watchWakeFailure?.attempts ?? 0,
+                    kind: "unavailable",
+                    retryAt: ctx.now + PR_WATCH_WAKE_COOLDOWN_MS,
+                },
+            });
+
             return null;
         }
 
@@ -464,7 +487,7 @@ export const beginWatchWake = internalMutation
         const wakeThread = await ctx.db.get("threads", link.threadId);
         // A switched chat runs on the agent it was switched to (`threads.activeAgent`, the cache of the active path's agent), as a normal turn
         // there does; otherwise the chat's own model.
-        const model = wakeThread?.activeAgent?.model || wakeThread?.model || DEFAULT_CHAT_MODEL;
+        const model = modelOfThread(wakeThread);
 
         if (!isTaskModelAllowed(model, (id) => MODEL_LOOKUP.get(id))) {
             if (link.watchWakeFailure?.kind !== "unavailable") {
@@ -484,16 +507,26 @@ export const beginWatchWake = internalMutation
         // The round is charged to the daily limits only now, right before the model is asked: a job that skips the turn above charged nothing.
         const account = await loadTaskAccount(ctx, link.userId);
 
-        if (taskAccessProblem(account) !== undefined || account === null || !(await chargeRound(ctx, link.userId, account))) {
+        if (taskAccessProblem(account) !== undefined || account === null) {
             return await waits();
         }
+
+        // The window each limit is in is read BEFORE the charge and again after it: the limiter's result names no window, and a rollover
+        // between the charge and a later read would record the new window's end. The earlier end is kept, so a refund is paid only while
+        // a window both reads agree on is current, and never credits a later day.
+        const charged = roundQuotaKeys(account);
+        const endsBefore = await roundWindowEnds(ctx, link.userId, charged);
+
+        if (!(await chargeRound(ctx, link.userId, account))) {
+            return await waits();
+        }
+
+        const endsAfter = await roundWindowEnds(ctx, link.userId, charged);
+        const windowEnds = endsBefore.map((end, index) => Math.min(end, endsAfter[index] ?? end));
 
         // The exact limits this round was charged to, and when their windows end, are written in THIS transaction, with the occurrence about
         // to start: a job that dies after the charge and before the model leaves the refund owed, and a claim that finds the occurrence
         // started never generates again. The job gets the keys for its own refund path.
-        const charged = roundQuotaKeys(account);
-        const windowEnds = await roundWindowEnds(ctx, link.userId, charged);
-
         await ctx.db.patch("pullRequestThreads", link._id, {
             watchWakeCompleted: {
                 claim: args.claim,
@@ -556,6 +589,60 @@ export const keepWatchWakeCharge = internalMutation
         });
 
         return "kept" as const;
+    });
+
+/**
+ * The fence of a running wake turn, asked before every tool call and after every step (`now` is the job's clock, since a query has none of its own): whether the turn's lease is still its own and
+ * still in the future, the watch is the one polled and still running, and the chat can still take it (the owner's, not locked, deleted
+ * or being deleted). A turn that finds it false stops, and the job ends it as a fenced stop (`fencedWatchWake`).
+ */
+export const wakeFenceHolds = internalQuery
+    .input({ ...key, claim: v.number(), now: v.number() })
+    .output(v.boolean())
+    .query(async ({ args, ctx }) => {
+        const link = await ctx.db.get("pullRequestThreads", args.linkId);
+
+        if (
+            link === null ||
+            link.watchWakeLeaseUntil !== args.claim ||
+            args.now >= args.claim ||
+            link.watchActive !== true ||
+            link.watch === undefined ||
+            link.watch.stoppedAt !== undefined ||
+            link.watch.startedAt !== args.startedAt ||
+            link.watchRun !== args.run
+        ) {
+            return false;
+        }
+
+        const thread = await ctx.db.get("threads", link.threadId);
+
+        return thread !== null && thread.userId === link.userId && !isThreadLocked(thread) && thread.deleted !== true && thread.deletingAt === undefined;
+    });
+
+/**
+ * Ends a turn the fence stopped: the lease is released (if it is still this claim's), the occurrence is closed, and nothing else is
+ * written: no wake is counted, nothing more is charged, no failure is counted, and the reasons stay pending. The occurrence keeps its
+ * `modelReached` mark, so a turn that generated before the stop is never paid for again for the same markers.
+ */
+export const fencedWatchWake = internalMutation
+    .input({ claim: v.number(), linkId: v.id("pullRequestThreads") })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        const link = await ctx.db.get("pullRequestThreads", args.linkId);
+
+        if (link === null || link.watchWakeLeaseUntil !== args.claim) {
+            return null;
+        }
+
+        const record = link.watchWakeCompleted?.claim === args.claim ? link.watchWakeCompleted : undefined;
+
+        await ctx.db.patch("pullRequestThreads", link._id, {
+            watchWakeLeaseUntil: 0,
+            ...(record !== undefined && { watchWakeCompleted: { ...record, done: true } }),
+        });
+
+        return null;
     });
 
 /** Pays the refund owed on the link, once: the limits it names get one unit back each (while their window is current), then it is marked applied. */
@@ -752,12 +839,22 @@ export const runWatchWake = internalAction
 
         let delivered = false;
         let terminal = false;
+        // Set when the fence failed: the turn was stopped, which is neither a delivery nor a failure.
+        let fenced = false;
+        const fence = async (): Promise<boolean> => {
+            const holds = await ctx.runQuery(internal.source_control.pr_watch_wake.wakeFenceHolds, { ...identity, now: Date.now() });
+
+            fenced ||= !holds;
+
+            return holds;
+        };
         // From the first generation on, a failure may have been billed; before it, the round is given back.
         let reachedModel = false;
         let refused = false;
 
         try {
             await runHeadlessAgent(ctx, {
+                fence,
                 memory: false,
                 model: may.model,
                 // Recorded before the first generation: the round then stays charged, and a failure from here on is never refunded.
@@ -782,12 +879,16 @@ export const runWatchWake = internalAction
                 tools: "headless",
                 userId: args.userId,
             });
-            delivered = true;
+            delivered = !fenced;
         } catch (error) {
             // The turn did not complete: the reasons stay pending, and the failure is recorded so a retry waits and the streak is bounded.
             terminal = isTerminalWakeError(error);
 
-            if (!reachedModel) {
+            if (error instanceof FencedRunError) {
+                fenced = true;
+            }
+
+            if (!reachedModel && !fenced) {
                 await owedRefund(ctx, args.linkId, args.claim);
             }
 
@@ -796,6 +897,16 @@ export const runWatchWake = internalAction
 
         // Refused at the last check: already refunded and released by it, no failure counted and nothing settled.
         if (refused) {
+            return null;
+        }
+
+        // Stopped by the fence (the lease lapsed or no longer matches, the watch stopped, or the chat was locked or deleted): released and
+        // closed with nothing counted. The reasons stay pending, and the occurrence keeps its model-reached mark.
+        if (fenced) {
+            await retried(async () => {
+                await ctx.runMutation(internal.source_control.pr_watch_wake.fencedWatchWake, { claim: args.claim, linkId: args.linkId });
+            });
+
             return null;
         }
 

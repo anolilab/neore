@@ -77,6 +77,43 @@ import { INSTRUCTION_READ_TOOL, renderInstructionList, type RunInstruction } fro
 /** No tools, so no permission keys or fingerprints: typed, so the union with the built tools' maps stays a plain record. */
 const NO_PERMISSION_KEYS: Record<string, string> = {};
 
+/** Thrown by a tool call the run's fence refused: the call did not run. */
+export class FencedRunError extends Error {
+    public constructor() {
+        super("The run was fenced: its lease no longer holds");
+        this.name = "FencedRunError";
+    }
+}
+
+/**
+ * The tools with every call checked against `fence` first: a call made once the fence has failed does not run. Only tools that execute
+ * are wrapped; the others pass through untouched.
+ */
+export const fenceTools = <T extends Record<string, unknown>>(tools: T, fence: () => Promise<boolean>): T =>
+    Object.fromEntries(
+        Object.entries(tools).map(([name, tool]) => {
+            const execute = (tool as { execute?: (...args: unknown[]) => unknown } | undefined)?.execute;
+
+            if (typeof execute !== "function") {
+                return [name, tool];
+            }
+
+            return [
+                name,
+                {
+                    ...(tool as object),
+                    execute: async (...args: unknown[]) => {
+                        if (!(await fence())) {
+                            throw new FencedRunError();
+                        }
+
+                        return await execute.apply(tool, args);
+                    },
+                },
+            ];
+        }),
+    ) as T;
+
 /** Autonomous work benefits from search; a skill's own search mode still wins. */
 const DEFAULT_HEADLESS_SEARCH_MODE: SearchMode = "web";
 
@@ -104,6 +141,12 @@ export interface HeadlessRunOptions {
      * back to the per-thread cap.
      */
     chainSource?: string;
+    /**
+     * Asked before every tool call, and after every step before the next model call: `false` ends the run. A tool call that finds it
+     * `false` does not run (it throws {@link FencedRunError}), and a step that finds it `false` is the last. For a run bound to something
+     * that can lapse mid-run (a wake turn's lease): the caller learns of it from its own check, since a stop is not an error.
+     */
+    fence?: () => Promise<boolean>;
     /**
      * Send the model none of the thread's earlier turns, only this run's prompt: a scheduled task that
      * reuses one thread with a fresh context per run (`tasks/AGENTS.md`). The history stays in the thread.
@@ -336,6 +379,10 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
     const toolAllowlist =
         options.toolAllowlist && options.toolAllowlistKeepsMcp ? [...options.toolAllowlist, ...Object.keys(toolResult.mcpLabels)] : options.toolAllowlist;
 
+    // A stop the caller asked for, or the fence failing: either ends the run after the step that just finished.
+    const { fence } = options;
+    const shouldStop = fence ? async () => (await options.shouldStop?.()) === true || !(await fence()) : options.shouldStop;
+
     // This run's own reply (`ToolCtx.replyKey`): two runs on one continued thread are two replies.
     const replyKey = `headless:${crypto.randomUUID()}`;
     // The thread this run ended on, once it exists: a failure after that is recorded in the Events log (`catch` below).
@@ -370,7 +417,7 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
             skillContext: skill ? { config: skill.config, instructions: skill.instructions } : undefined,
             threadId: existingThreadId,
             timezone: prefs.timezone,
-            tools: runTools,
+            tools: options.fence ? fenceTools(runTools, options.fence) : runTools,
             userId,
             userProviderKeys,
         });
@@ -391,7 +438,7 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
                 shouldAutoContinue,
             }),
             ...(prompt !== undefined && { prompt }),
-            ...(options.shouldStop && { stopWhen: [stepCountIs(options.maxSteps ?? getMaxSteps(true)), stopWhenRequested(options.shouldStop)] }),
+            ...(shouldStop && { stopWhen: [stepCountIs(options.maxSteps ?? getMaxSteps(true)), stopWhenRequested(shouldStop)] }),
             ...(system !== undefined && { system }),
         };
 
@@ -614,7 +661,7 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
             extract(text);
             // A stop writes no run event, as a chat's stop does not.
 
-            if (!(await options.shouldStop?.())) {
+            if (!(await shouldStop?.())) {
                 await recordEnd("succeeded");
             }
 
@@ -631,7 +678,7 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
             // A further round continues this run, so it reads the run's own turns: only the first generation starts fresh.
             runRound: async (instruction) => settle(await thread.generateText({ ...generateArgs, prompt: instruction } as never).catch(wakeOnFailure)),
             startedAt,
-            stopped: options.shouldStop,
+            stopped: shouldStop,
         });
 
         extract(outcome.result.text);

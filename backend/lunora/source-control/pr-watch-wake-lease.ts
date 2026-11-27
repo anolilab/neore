@@ -11,6 +11,8 @@
  */
 import type { Id } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
+import { internalQuery } from "../_generated/server";
+import { v } from "lunorash/server";
 
 /**
  * Whether a wake lease is held on a link of the thread at `now`, other than `exceptLinkId`. Only the links whose lease time is later
@@ -32,3 +34,9 @@ export const wakeLeaseHeld = async (
 
     return live.some((link) => link._id !== exceptLinkId);
 };
+
+/** Whether a wake lease is held on the thread now: asked by a reply before it writes anything, so the reply waits (`chat/http.ts`). */
+export const wakeLeaseHeldFor = internalQuery
+    .input({ threadId: v.id("threads"), userId: v.string() })
+    .output(v.boolean())
+    .query(async ({ args, ctx }) => await wakeLeaseHeld(ctx, args.userId, args.threadId, ctx.now));

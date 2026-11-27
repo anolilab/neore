@@ -1014,6 +1014,15 @@ const runChatStartOnShard = async (
         messageContent.unshift(formatPageContextPart(pageContext));
     }
 
+    // A pull request watch is waking this chat (`source-control/pr-watch-wake-lease.ts`): the reply waits, refused before anything is written,
+    // so no half of a reply is saved. The same held-lease check the lock and the delete use.
+    if (
+        validThreadId &&
+        (await context.runQuery(internal.source_control.pr_watch_wake_lease.wakeLeaseHeldFor, { threadId: validThreadId as Id<"threads">, userId })) === true
+    ) {
+        return Response.json({ code: "PR_WATCH_WAKING", error: "A pull request watch is replying to this chat. Try again in a moment." }, { status: 409 });
+    }
+
     // Continuing a thread needs write access to it. Nothing checked this: the
     // continue branch below saved the prompt into whatever thread id it was
     // handed, so a signed-in caller could post into — and trigger replies in —
@@ -1021,6 +1030,7 @@ const runChatStartOnShard = async (
     // Read while the attachments load; answered after them, as before. A regenerate reads it too, but
     // only for the worker check below: its lock and owner checks stay with its own gate.
     const isRegenerate = Boolean(body.regenerate && body.parentId);
+
     const accessPromise = validThreadId
         ? context.runQuery(internal.chat.functions.gateThreadAction, {
               level: "write",

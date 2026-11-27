@@ -58,5 +58,5 @@
   recorded in `watchWakeCompleted` before settlement; `finishWatchWake` then counts the wake once (against the run it started under)
   and clears only the reasons whose occurrence marker is unchanged. A claim that finds an unsettled occurrence never generates again
   for it. A failed turn is recorded in `watchWakeFailure` with the cooldown as retry spacing; the watch stops at the third failure in
-  a row or at once on a terminal error. Locking or deleting the chat waits while a lease is held (`pr-watch-wake-lease.ts`). The agent
+  a row or at once on a terminal error. The claim refuses a chat model that is no longer available (noted once on `watchWakeFailure`, no job). The turn is fenced to its lease: before every tool call and after every step `wakeFenceHolds` must still say the lease is its own, in the future, the watch running and the chat takable, else the turn stops (`fencedWatchWake`: nothing counted, lease released, reasons pending, occurrence kept model-reached). Locking, deleting or REPLYING in the chat waits while a lease is held (`pr-watch-wake-lease.ts`, `chat/http.ts`). The agent
   tools `watchPullRequest` and `unwatchPullRequest` (both ask by default, never always-allow) use the same linked-pull-request gate.

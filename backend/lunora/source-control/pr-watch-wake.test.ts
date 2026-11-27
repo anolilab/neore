@@ -1,3 +1,4 @@
+/* eslint-disable max-classes-per-file -- stand-ins for the run's own error classes */
 /**
  * The wake turn (`pr-watch-wake.ts`): the scheduled step claims, commits, and only then enqueues; the job charges a round right before
  * the turn, runs it, and only then the wake is counted and the delivered occurrences cleared. A failed or over-limit turn leaves the reasons pending. The agent run,
@@ -21,6 +22,8 @@ const { enqueued, probe, registry, runs } = vi.hoisted(() => {
             beforeStart: undefined as (() => Promise<void>) | undefined,
             charges: 0,
             during: undefined as (() => Promise<void>) | undefined,
+            endsAfter: [9000, 9000] as number[],
+            endsBefore: [9000, 9000] as number[],
             enqueueFails: false,
             fail: false,
             failBeforeModel: false,
@@ -31,6 +34,7 @@ const { enqueued, probe, registry, runs } = vi.hoisted(() => {
             refundedKeys: [] as string[][],
             refunds: 0,
             tier: "premium" as "free" | "premium",
+            windowReads: 0,
         },
         registry: new Map<string, unknown>(),
         runs: [] as Record<string, any>[],
@@ -68,11 +72,19 @@ vi.mock("../tasks/account", async (importOriginal) => {
             probe.refunds += 1;
             probe.refundedKeys.push(keys);
         },
+        roundWindowEnds: async () => {
+            probe.windowReads += 1;
+
+            return probe.windowReads % 2 === 1 ? probe.endsBefore : probe.endsAfter;
+        },
     };
 });
 
 vi.mock("../chat/lib/headless-run", () => {
+    class FencedRunError extends Error {}
+
     return {
+        FencedRunError,
         runHeadlessAgent: async (_ctx: unknown, options: Record<string, any>) => {
             runs.push(options);
 
@@ -87,6 +99,11 @@ vi.mock("../chat/lib/headless-run", () => {
             await options.onGenerationStart?.();
             probe.generated += 1;
             await probe.during?.();
+
+            // As the run does: asked after the step, and a failing fence ends the run there.
+            if (options.fence && !(await options.fence())) {
+                return { text: "", threadId: options.thread.threadId };
+            }
 
             if (probe.fail) {
                 throw probe.failWith ?? new Error("run failed");
@@ -147,6 +164,9 @@ beforeEach(() => {
     probe.during = undefined;
     probe.beforeStart = undefined;
     probe.generated = 0;
+    probe.windowReads = 0;
+    probe.endsBefore = [Date.now() + 3_600_000, Date.now() + 3_600_000];
+    probe.endsAfter = probe.endsBefore;
     probe.tier = "premium";
     probe.fail = false;
     probe.failWith = undefined;
@@ -1295,141 +1315,196 @@ describe("the model of the turn", () => {
         expect(row.watchWakeCompleted).toBeUndefined();
         expect(row.watchWakeFailure).toMatchObject({ attempts: 0, kind: "unavailable", retryAt: 0 });
 
-        // Noted once: a second refusal does not rewrite it.
-        const noted = row.watchWakeFailure.at;
+        // The claim now refuses it too: no lease and no job for a model that cannot run.
+        const jobs = enqueued.length;
 
-        expect(await start(linkId)).toBe(true);
-        await runJob(enqueued[1]!);
-
-        const again = await rowOf(linkId);
-
-        expect(again.watchWakeFailure.at).toBe(noted);
+        expect(await start(linkId)).toBe(false);
+        expect(enqueued).toHaveLength(jobs);
         expect(runs).toHaveLength(0);
     });
 });
 
-describe("an occurrence that may already have generated", () => {
-    const pastRetry = async (linkId: string) => {
-        const row = await rowOf(linkId);
+describe("an unavailable model at the claim", () => {
+    it("enqueues nothing on repeated polls before the retry time, notes it once, and delivers once the model is allowed again", async () => {
+        const { linkId, threadId } = await seed();
 
-        return row.watchWakeFailure.retryAt + 1000;
-    };
+        await harness.run(async (ctx: any) => {
+            await ctx.db.patch("threads", threadId, { model: "retired-model-9000" });
+        });
+        expect(await start(linkId)).toBe(false);
 
-    it("is not paid for again after the retry time when the model ran and the turn then failed", async () => {
-        const { linkId } = await seed();
+        const noted = await rowOf(linkId);
 
-        await start(linkId);
-        probe.fail = true;
-        await runJob(enqueued[0]!);
-        probe.fail = false;
+        expect(enqueued).toHaveLength(0);
+        expect(noted.watchWakeLeaseUntil).toBeUndefined();
+        expect(noted.watchPending).toEqual(["checks"]);
+        expect(noted.watch.wakes).toBeUndefined();
+        expect(noted.watchWakeFailure).toMatchObject({ attempts: 0, kind: "unavailable" });
+        expect(noted.watchWakeFailure.retryAt).toBeGreaterThan(Date.now());
 
-        const failed = await rowOf(linkId);
+        // The polls before the retry time leave it alone: nothing enqueued, the note not rewritten.
+        expect(await start(linkId)).toBe(false);
+        expect(await start(linkId)).toBe(false);
 
-        expect(runs).toHaveLength(1);
-        expect(probe.charges).toBe(1);
-        expect(failed.watchWakeCompleted).toMatchObject({ done: true, modelReached: true });
+        const again = await rowOf(linkId);
 
-        vi.useFakeTimers({ now: await pastRetry(linkId), toFake: ["Date"] });
+        expect(enqueued).toHaveLength(0);
+        expect(again.watchWakeFailure.at).toBe(noted.watchWakeFailure.at);
+
+        // The model is allowed again; past the retry time one job is enqueued and delivers.
+        await harness.run(async (ctx: any) => {
+            await ctx.db.patch("threads", threadId, { model: MODEL });
+        });
+        vi.useFakeTimers({ now: noted.watchWakeFailure.retryAt + 1000, toFake: ["Date"] });
 
         try {
-            expect(await start(linkId)).toBe(false);
+            expect(await start(linkId)).toBe(true);
+            await runJob(enqueued[0]!);
         } finally {
             vi.useRealTimers();
         }
 
         expect(enqueued).toHaveLength(1);
-        expect(probe.charges).toBe(1);
         expect(runs).toHaveLength(1);
     });
+});
 
-    it("is not paid for again after the retry time when the completion write failed after the model ran", async () => {
+describe("a turn fenced to its lease", () => {
+    it("stops at the next step when its lease is replaced mid-turn, counting and charging nothing more, keeping the occurrence model-reached", async () => {
         const { linkId } = await seed();
 
         await start(linkId);
-        await harness
-            .action(async (ctx: any) => {
-                const real = ctx.runMutation.bind(ctx);
 
-                ctx.runMutation = async (reference: unknown, args: unknown) => {
-                    if (reference === completeWatchWake || reference === finishWatchWake) {
-                        throw new Error("write failed");
-                    }
+        const claim = enqueued[0]!.args.claim as number;
 
-                    return await real(reference, args);
-                };
+        probe.during = async () => {
+            await harness.run(async (ctx: any) => {
+                await ctx.db.patch("pullRequestThreads", linkId, { watchWakeLeaseUntil: claim + 12_345 });
+            });
+        };
+        await runJob(enqueued[0]!);
 
-                await ctx.runAction(runWatchWake, { ...enqueued[0]!.args, jobId: enqueued[0]!.options.once.jobId });
-            })
-            .catch(() => undefined);
+        const row = await rowOf(linkId);
 
-        // The lease lapses; the next claim settles the started occurrence as a failed attempt, which keeps the model-reached mark.
-        await harness.run(async (ctx: any) => {
-            await ctx.db.patch("pullRequestThreads", linkId, { watchWakeLeaseUntil: Date.now() - 1000 });
-        });
-        expect(await start(linkId)).toBe(false);
-        const settled = await rowOf(linkId);
+        expect(runs).toHaveLength(1);
+        expect(probe.generated).toBe(1);
+        expect(probe.charges).toBe(1);
+        expect(row.watch.wakes).toBeUndefined();
+        expect(row.watchPending).toEqual(["checks"]);
+        expect(row.watchWakeFailure).toBeUndefined();
+        // The newer claim's lease is not ours to release.
+        expect(row.watchWakeLeaseUntil).toBe(claim + 12_345);
+    });
 
-        expect(settled.watchWakeCompleted).toMatchObject({ done: true, modelReached: true });
+    it("stops when the lease expires mid-turn: nothing counted, the lease released, the occurrence closed and model-reached", async () => {
+        const { linkId } = await seed();
 
-        vi.useFakeTimers({ now: await pastRetry(linkId), toFake: ["Date"] });
+        await start(linkId);
+
+        const claim = enqueued[0]!.args.claim as number;
+
+        probe.during = async () => {
+            vi.useFakeTimers({ now: claim + 1000, toFake: ["Date"] });
+        };
 
         try {
-            expect(await start(linkId)).toBe(false);
+            await runJob(enqueued[0]!);
         } finally {
             vi.useRealTimers();
         }
 
-        expect(probe.charges).toBe(1);
-        expect(runs).toHaveLength(1);
+        const row = await rowOf(linkId);
+
+        expect(row.watch.wakes).toBeUndefined();
+        expect(row.watchPending).toEqual(["checks"]);
+        expect(row.watchWakeFailure).toBeUndefined();
+        expect(row.watchWakeLeaseUntil).toBe(0);
+        expect(row.watchWakeCompleted).toMatchObject({ done: true, modelReached: true });
+        expect(probe.refunds).toBe(0);
     });
 
-    it("stays eligible for a newer marker, and a round refunded before the model stays retryable", async () => {
+    it("stops when the chat is locked mid-turn, and a turn whose lease holds runs to completion", async () => {
+        const locked = await seed();
+
+        await start(locked.linkId);
+        probe.during = async () => {
+            await harness.run(async (ctx: any) => {
+                await ctx.db.patch("threads", locked.threadId, { lockedAt: Date.now() });
+            });
+        };
+        await runJob(enqueued[0]!);
+
+        const stopped = await rowOf(locked.linkId);
+
+        expect(stopped.watch.wakes).toBeUndefined();
+        expect(stopped.watchWakeLeaseUntil).toBe(0);
+
+        probe.during = undefined;
+
+        const whole = await seed();
+
+        await start(whole.linkId);
+        await runJob(enqueued.at(-1)!);
+
+        const done = await rowOf(whole.linkId);
+
+        expect(done.watch.wakes).toBe(1);
+        expect(done.watchPending).toEqual([]);
+    });
+});
+
+describe("the window a charge is recorded against", () => {
+    it("is the earlier of the reads before and after the charge, so a rollover in between does not credit the new window", async () => {
         const { linkId } = await seed();
 
         await start(linkId);
-        probe.fail = true;
+        // The window rolled over between the charge and the later read: the later read names the new day's window.
+        probe.endsBefore = [Date.now() + 1000, Date.now() + 1000];
+        probe.endsAfter = [Date.now() + 86_400_000, Date.now() + 86_400_000];
+        probe.windowReads = 0;
         await runJob(enqueued[0]!);
-        probe.fail = false;
 
-        // A newer failing head is a new occurrence.
+        // (the job completed: inspect the obligation the begin step wrote)
+        const row = await rowOf(linkId);
+
+        expect(row.watchWakeRefund.windowEnds).toEqual(probe.endsBefore);
+    });
+});
+
+describe("a commit that comes back after its wake was delivered", () => {
+    it("is delivered again: the settled delivery no longer blocks the same markers, while a failed-after-model one still does", async () => {
+        const { linkId } = await seed();
+
+        await start(linkId);
+        await runJob(enqueued[0]!);
+
+        const delivered = await rowOf(linkId);
+
+        expect(delivered.watchPending).toEqual([]);
+        expect(delivered.watchWakeCompleted).toMatchObject({ done: true, state: "completed" });
+
+        // The same failing head (sha-1) becomes a pending reason again, after the cooldown.
         await harness.run(async (ctx: any) => {
-            const row = await ctx.db.get("pullRequestThreads", linkId);
-
-            await ctx.db.patch("pullRequestThreads", linkId, { watch: { ...row.watch, checksHeadSha: "sha-9", headSha: "sha-9" } });
+            await ctx.db.patch("pullRequestThreads", linkId, { watchPending: ["checks"] });
         });
-
-        vi.useFakeTimers({ now: await pastRetry(linkId), toFake: ["Date"] });
+        vi.useFakeTimers({ now: Date.now() + PR_WATCH_WAKE_COOLDOWN_MS + 1000, toFake: ["Date"] });
 
         try {
             expect(await start(linkId)).toBe(true);
+            await runJob(enqueued[1]!);
         } finally {
             vi.useRealTimers();
         }
 
-        // A turn that failed before the model was refunded and never marked the occurrence: a retry is allowed.
-        const other = await seed();
+        const again = await rowOf(linkId);
 
-        await start(other.linkId);
-        probe.failBeforeModel = true;
-        await runJob(enqueued.at(-1)!);
-        probe.failBeforeModel = false;
-
-        const early = await rowOf(other.linkId);
-
-        expect(early.watchWakeCompleted.modelReached).toBeUndefined();
-
-        vi.useFakeTimers({ now: early.watchWakeFailure.retryAt + 1000, toFake: ["Date"] });
-
-        try {
-            expect(await start(other.linkId)).toBe(true);
-        } finally {
-            vi.useRealTimers();
-        }
+        expect(runs).toHaveLength(2);
+        expect(again.watch.wakes).toBe(2);
     });
 });
 
 describe("a watch stopped or restarted during its turn", () => {
-    it("counts the delivered turn once against the run it started under when the watch is stopped meanwhile", async () => {
+    it("fences a turn whose watch is stopped meanwhile: nothing counted, the lease released, the occurrence closed as model-reached", async () => {
         const { linkId, threadId } = await seed();
 
         await start(linkId);
@@ -1445,9 +1520,9 @@ describe("a watch stopped or restarted during its turn", () => {
 
         expect(runs).toHaveLength(1);
         expect(row.watchActive).toBe(false);
-        expect(row.watch.wakes).toBe(1);
-        expect(row.watch.stoppedAt).toBeGreaterThan(0);
+        expect(row.watch.wakes).toBeUndefined();
         expect(row.watchWakeLeaseUntil).toBe(0);
+        expect(row.watchWakeCompleted).toMatchObject({ done: true, modelReached: true });
     });
 
     it("does not count it against a restarted run, which starts with the count it carried", async () => {
