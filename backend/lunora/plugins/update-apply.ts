@@ -40,6 +40,7 @@ import { groupRowHash, normalizeGroupTitle, skillRowHash, triggerRowHash } from 
 import { skillVisibility } from "../skills/access";
 import { invalidateSkillsCache } from "../skills/cache";
 import { deleteSkillRows } from "../skills/functions";
+import { groupFingerprint } from "../chat/group/fingerprint";
 import { ensureSlugUnique, validateSlug } from "../skills/validators";
 import { heldInstall, heldInstallForShardWrite, patchInstallIf } from "./held-install";
 import { liveHashOf } from "./live-hash";
@@ -775,6 +776,8 @@ export const retireGroupChild = internalMutation
     })
     .output(
         v.object({
+            /** For `delete`: the group's fields as judged, which the delete checks again before it starts. */
+            fingerprint: v.optional(v.string()),
             outcome: v.union(v.literal("delete"), v.literal("detached"), v.literal("gone"), v.literal("kept")),
             /** The thread to delete, for `delete`. */
             threadId: v.optional(v.string()),
@@ -832,7 +835,7 @@ export const retireGroupChild = internalMutation
             return { outcome: "kept" };
         }
 
-        return { outcome: "delete", threadId };
+        return { fingerprint: groupFingerprint(thread), outcome: "delete", threadId };
     });
 
 /** The second half of removing a group chat: its thread is deleted, so its link goes. */

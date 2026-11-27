@@ -10,6 +10,7 @@ import { registeredApi } from "../../test/registered-api";
 import { schemaWithShardedTables } from "../lib/test-schema";
 import { buildBundleMarkdown } from "../skills/bundle-format";
 import { deleteAllForThreadIdAsync } from "../agent/threads";
+import { groupFingerprint } from "../chat/group/fingerprint";
 import { withPluginHeader } from "./export";
 import { bodyHash } from "./logic";
 
@@ -344,6 +345,81 @@ describe("plugin update with group chats", () => {
         expect(await markerOf("analyst")).toBeTruthy();
         expect(await markerOf("critic")).toBeTruthy();
         expect(await installRow()).toMatchObject({ partial: true, status: "installed" });
+    });
+
+    describe("the group delete fence", () => {
+        const deletePage = async (args: Record<string, unknown>) =>
+            await run(async (context) => await context.runMutation(deleteAllForThreadIdAsync, { detachSkills: false, ...args } as never));
+
+        it("deletes the group when the generation and fingerprint still match", async () => {
+            await install(["analyst", "critic"], { participants: ["analyst", "critic"], title: "Panel" });
+
+            const group = await firstGroup();
+            const row = await installRow();
+            const page = await deletePage({
+                expectedGroupFingerprint: groupFingerprint(group),
+                pluginGeneration: row.generation,
+                pluginInstallId: row._id,
+                threadId: group._id,
+            });
+
+            expect(page.kept).toBeUndefined();
+            expect(await groups()).toHaveLength(0);
+        });
+
+        it("keeps a group the owner edited after retire decided to delete it", async () => {
+            await install(["analyst", "critic"], { participants: ["analyst", "critic"], title: "Panel" });
+
+            const group = await firstGroup();
+            const row = await installRow();
+            const judged = groupFingerprint(group);
+
+            await run(async (context) => await context.db.patch("threads", group._id, { title: "My own title" }));
+
+            const page = await deletePage({
+                expectedGroupFingerprint: judged,
+                pluginGeneration: row.generation,
+                pluginInstallId: row._id,
+                threadId: group._id,
+            });
+
+            expect(page).toMatchObject({ isDone: true, kept: true });
+            expect(await firstGroup()).toMatchObject({ _id: group._id, pluginInstallId: "", pluginMarker: "", title: "My own title" });
+        });
+
+        it("keeps a group when another action took the install over", async () => {
+            await install(["analyst", "critic"], { participants: ["analyst", "critic"], title: "Panel" });
+
+            const group = await firstGroup();
+            const row = await installRow();
+            const page = await deletePage({
+                pluginGeneration: row.generation + 1,
+                pluginInstallId: row._id,
+                threadId: group._id,
+            });
+
+            expect(page).toMatchObject({ isDone: true, kept: true });
+            expect(await firstGroup()).toMatchObject({ _id: group._id, pluginInstallId: "" });
+        });
+
+        it("never stops a later page", async () => {
+            await install(["analyst", "critic"], { participants: ["analyst", "critic"], title: "Panel" });
+
+            const group = await firstGroup();
+            const row = await installRow();
+            const page = await deletePage({
+                expectedGroupFingerprint: "stale",
+                messagesDone: true,
+                pinsDone: true,
+                pluginGeneration: row.generation + 1,
+                pluginInstallId: row._id,
+                streamsDone: true,
+                threadId: group._id,
+            });
+
+            expect(page.kept).toBeUndefined();
+            expect(page.isDone).toBe(true);
+        });
     });
 
     it("a message that lands before the delete keeps the group detached, and the plugin's skills keep their links and markers", async () => {

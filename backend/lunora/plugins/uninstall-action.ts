@@ -85,6 +85,7 @@ export const uninstallPlugin = authAction
             for (;;) {
                 const page = await ctx.runMutation(internal.agent.threads.deleteAllForThreadIdAsync, {
                     ...next,
+                    pluginGeneration: begun.generation,
                     pluginInstallId: begun.installId,
                     threadId: threadId as Id<"threads">,
                 });

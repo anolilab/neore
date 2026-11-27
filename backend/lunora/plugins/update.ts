@@ -457,7 +457,7 @@ export const updatePlugin = authAction
             }
 
             for (const step of groupRemovals) {
-                const { outcome, threadId } = await ctx.runMutation(internal.plugins.update_apply.retireGroupChild, {
+                const { fingerprint, outcome, threadId } = await ctx.runMutation(internal.plugins.update_apply.retireGroupChild, {
                     detach: step.action === "detach",
                     entryKey: step.entryKey,
                     generation,
@@ -477,6 +477,8 @@ export const updatePlugin = authAction
                         const page = await ctx.runMutation(internal.agent.threads.deleteAllForThreadIdAsync, {
                             ...next,
                             detachSkills: false,
+                            expectedGroupFingerprint: fingerprint,
+                            pluginGeneration: generation,
                             pluginInstallId: installed.installId,
                             threadId: threadId as Id<"threads">,
                         });

@@ -28,6 +28,7 @@ import { patchById, patchRow, withoutUndefined } from "../lib/patch";
 import { paginationOptionsValidator, MAX_LENGTH } from "../lib/validators";
 import { endHostThread, restoreHostThread } from "../acp/lib/thread-removed";
 import { settleOwedMergesOf } from "../source-control/pr-thread-links";
+import { groupFingerprint } from "../chat/group/fingerprint";
 import { deleteMessage } from "./messages";
 import { deleteChatFileLinksForThread } from "./files";
 import { deleteStreamsPageForThreadId } from "./streams";
@@ -461,6 +462,11 @@ export const deleteAllForThreadIdAsync = internalMutation
         // False from a plugin update: a kept group is detached alone, as the plugin's skills it names usually stay in the plugin.
         // Unset or true (uninstall) detaches those skills with it.
         detachSkills: v.optional(v.boolean()),
+        // With `pluginInstallId`, checked on the first page only (the point of no return): the install must still be at this generation,
+        // and, when `expectedGroupFingerprint` is given, the group's fields must still match it (`chat/group/fingerprint.ts`).
+        // A mismatch keeps the group as a message does. Later pages never stop.
+        expectedGroupFingerprint: v.optional(v.string()),
+        pluginGeneration: v.optional(v.number()),
         // Set only by a plugin uninstall, which drives every page itself: the first call rechecks, in its transaction, that the group
         // is still the plugin's and still empty, and detaches and keeps it otherwise (`kept`). An incomplete page returns its
         // continuation (`next`) for the caller to pass back instead of scheduling the next page, so one party owns the pagination.
@@ -504,7 +510,18 @@ export const deleteAllForThreadIdAsync = internalMutation
                       .withIndex("by_thread", (q) => q.eq("threadId", args.threadId))
                       .first();
 
-            if (message || pin) {
+            let fenced = false;
+
+            if (!message && !pin && args.pluginGeneration !== undefined) {
+                const install = await ctx.db.pluginInstalls.findFirst({ consistency: "primary", where: { _id: args.pluginInstallId as Id<"pluginInstalls"> } });
+
+                fenced =
+                    !install ||
+                    install.generation !== args.pluginGeneration ||
+                    (args.expectedGroupFingerprint !== undefined && groupFingerprint(group) !== args.expectedGroupFingerprint);
+            }
+
+            if (message || pin || fenced) {
                 // Loaded lazily, as the sub-agent module above: the group and the plugin skills it names are detached together.
                 if (args.detachSkills === false) {
                     await ctx.db.patch("threads", args.threadId, { pluginInstallId: "", pluginMarker: "" });
