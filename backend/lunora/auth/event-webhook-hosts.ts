@@ -11,6 +11,7 @@ import { LunoraError, v } from "lunorash/server";
 import type { QueryCtx } from "../_generated/server";
 import { internalQuery } from "../_generated/server";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
+import { isErasing } from "../lib/account-moves";
 import { onOwnShard } from "../lib/own-shard";
 import { MAX_APPROVED_HOSTS, normalizeApprovedHost } from "../public-api/events-webhook";
 
@@ -73,6 +74,11 @@ export const addEventWebhookHost = authMutation
         }
 
         const { userId } = context.user;
+
+        // The erasure's host step runs once, before auth records go: a host approved after it would survive the erasure.
+        if (await isErasing(context, userId)) {
+            throw new LunoraError("FORBIDDEN", "This account is being deleted, so no callback host can be approved.");
+        }
 
         if (await isHostApproved(context, userId, host)) {
             return { host };

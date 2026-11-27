@@ -6,6 +6,7 @@
 import { lunoraTest } from "@lunora/testing";
 import { describe, expect, it } from "vitest";
 
+import { beginAccountMove } from "../lib/account-moves";
 import { cascadeDeleteUser } from "./hooks";
 import schema from "../schema";
 import { addEventWebhookHost, listEventWebhookHosts, removeEventWebhookHost } from "./event-webhook-hosts";
@@ -41,6 +42,25 @@ describe("the owner's approved callback hosts", () => {
 
             await as.mutation(addEventWebhookHost as never, { host: "hooks.example.com" } as never);
             await harness.run(async (context: any) => await context.runMutation(cascadeDeleteUser, { userId: identity.userId }));
+
+            const left = await harness.run(async (context: any) => await context.db.eventWebhookHosts.findMany({ where: { userId: identity.userId } }));
+
+            expect(left.page).toStrictEqual([]);
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("refuses a host approved once the account's erasure has begun, and stores nothing", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            const identity = await signedIn(harness);
+            const as = harness.withIdentity(identity as never);
+
+            await harness.run(async (context: any) => await beginAccountMove(context, identity.userId, "erasing", Date.now()));
+
+            await expect(as.mutation(addEventWebhookHost as never, { host: "hooks.example.com" } as never)).rejects.toMatchObject({ code: "FORBIDDEN" });
 
             const left = await harness.run(async (context: any) => await context.db.eventWebhookHosts.findMany({ where: { userId: identity.userId } }));
 
