@@ -297,6 +297,12 @@ const SWEEP_BATCH = 200;
 const ALERT_RETRY = { backoff: "exponential", baseMs: 5000, forever: true, maxMs: 300_000 } as const;
 
 /**
+ * The sweep's retry is bounded: a pass that finds a device still pending queues it again, so a write that keeps failing must not
+ * leave one forever-retrying job per pass behind it. Roughly half an hour of retries at the cap above.
+ */
+const SWEEP_ALERT_RETRY = { backoff: "exponential", baseMs: 5000, maxAttempts: 12, maxMs: 300_000 } as const;
+
+/**
  * Per-shard housekeeping (`lib/shard-housekeeping.ts`): expires open calls a
  * killed run left past their deadline, and prunes audit rows older than 30 days.
  */
@@ -543,7 +549,8 @@ export const scheduleRemovedDeviceAlert = async (scheduler: unknown, args: { dev
  * Housekeeping (`lib/shard-housekeeping.ts`): queues the owner's alert for each device that has signed in but whose owner has
  * not been told yet, so a pairing whose announcing call never came (a closed tab, a dropped connection) still reaches its owner.
  * A device that never signed in was cancelled on the computer, or never confirmed there: it stays unannounced, whatever its row
- * says. A device already queued is queued again; its alert's dedupe key keeps it to one notification. Bounded per pass.
+ * says. A device already queued is queued again, with a bounded retry (`SWEEP_ALERT_RETRY`); its alert's dedupe key keeps it to one
+ * notification. Bounded per pass.
  */
 export const sweepPendingDeviceAlerts = internalMutation
     .input({})
@@ -558,7 +565,7 @@ export const sweepPendingDeviceAlerts = internalMutation
                 0,
                 internal.devices.internal.announceDeviceAlert,
                 { deviceId: device._id as string, userId: device.userId },
-                ALERT_RETRY,
+                SWEEP_ALERT_RETRY,
             );
         }
 
