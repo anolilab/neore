@@ -3,10 +3,12 @@
  *
  *   1. `uninstallRows` (begin): refuses first, then takes the lease and sweeps. A group chat with messages refuses the whole
  *      uninstall, and so does a group chat of someone else that uses a skill of this plugin. An unedited skill is deleted with
- *      its rows. An edited skill is kept with its marker cleared. A trigger is kept and switched off. The plugin's own empty group
- *      chats are returned for deletion.
+ *      its rows. An edited skill is kept with its marker cleared. Triggers are switched off here and judged in the finish step.
+ *      The plugin's own empty group chats are returned for deletion.
  *   2. The action deletes those empty group chats, in pages (`deleteAllForThreadIdAsync`, which is only callable from an action).
- *   3. `finishUninstallRows` removes the links and the install, once every child that was going to go has gone.
+ *   3. `finishUninstallRows` deletes the held-back skills, then the plugin's triggers a few a call (an unedited one goes with its
+ *      runs and webhook route; an edited one is kept, detached and off), then removes the links and the install. The links go
+ *      last because the edited check reads their hashes.
  *
  * Cleared fields are "" rather than absent: the schema cannot clear an optional field with a patch.
  */
@@ -17,10 +19,11 @@ import type { MutationCtx } from "../_generated/server";
 import { DEFAULT_GROUP_TITLE } from "../chat/group/functions";
 import { skillVisibility } from "../skills/access";
 import { requireOwnerShard } from "./owner-shard";
-import { skillRowHash } from "./entry-hash";
+import { skillRowHash, triggerRowHash } from "./entry-hash";
 import { patchInstallIf, STALE } from "./held-install";
 import { LEASE_MS, parseMarker } from "./logic";
 import { deleteSkillRows } from "../skills/functions";
+import { deleteTriggerRows } from "../triggers/functions";
 
 /** How many of the owner's threads a scan reads. A scan that reaches it cannot prove a group is clear, so it refuses. */
 const GROUP_SCAN_LIMIT = 300;
@@ -166,10 +169,12 @@ export const uninstallRows = async (ctx: MutationCtx, userId: string, pluginSlug
         .withIndex("by_plugin_install", (q) => q.eq("pluginInstallId", installId))
         .collect();
 
+    // Switched off now, so none runs while the uninstall goes on. Deleting one reads and deletes its runs and its webhook route,
+    // so none is deleted here: the finish step judges each (edited or not) and deletes a few a call.
     for (const trigger of triggers) {
-        // Disabled as well: a kept trigger must not run after its plugin is gone.
-        await ctx.db.patch("triggers", trigger._id as Id<"triggers">, { enabled: false, pluginInstallId: "", pluginMarker: "" });
-        kept.push(trigger.name);
+        if (trigger.enabled) {
+            await ctx.db.patch("triggers", trigger._id as Id<"triggers">, { enabled: false });
+        }
     }
 
     return { generation, groups, installId, kept, pendingSkills, removed: 0 };
@@ -251,8 +256,63 @@ export interface UninstallFinished {
  */
 export const SKILLS_PER_CALL = 3;
 
+/** Triggers one finish call handles. A delete reads the trigger's runs and its claims and deletes its webhook route (a D1 statement). */
+export const TRIGGERS_PER_CALL = 3;
+
+/** Runs of one trigger a finish call deletes. A trigger with more keeps its place, and the next call deletes the next page. */
+const EXECUTIONS_PER_CALL = 200;
+
 /** Links one finish call deletes: each is a read and a delete against the invocation's D1 queries. */
 const LINKS_PER_CALL = 10;
+
+/**
+ * Handles up to `TRIGGERS_PER_CALL` triggers still attached to the install. An unedited one is deleted with its runs and webhook
+ * route; an edited one (or one without a link) is kept, detached and off, and reported. A trigger with many runs loses one page
+ * of them and stays attached, so the next call goes on. Returns true while triggers are left.
+ */
+const finishTriggers = async (ctx: MutationCtx, installId: string, userId: string, result: Omit<UninstallFinished, "hasMore">): Promise<boolean> => {
+    const triggers = await ctx.db
+        .query("triggers")
+        .withIndex("by_plugin_install", (q) => q.eq("pluginInstallId", installId))
+        .take(TRIGGERS_PER_CALL + 1);
+
+    if (triggers.length === 0) {
+        return false;
+    }
+
+    const links = await readAllPages(async (cursor) => await ctx.db.pluginItems.findMany({ consistency: "primary", cursor, where: { installId } }));
+    let partial = false;
+
+    for (const trigger of triggers.slice(0, TRIGGERS_PER_CALL)) {
+        const triggerId = trigger._id as Id<"triggers">;
+        const link = links.find((row) => row.entryKey === parseMarker(trigger.pluginMarker ?? "")?.entryKey);
+
+        if (trigger.userId !== userId || !link || (await triggerRowHash(trigger)) !== link.contentHash) {
+            await ctx.db.patch("triggers", triggerId, { enabled: false, pluginInstallId: "", pluginMarker: "" });
+            result.kept.push(trigger.name);
+            continue;
+        }
+
+        const runs = await ctx.db
+            .query("triggerExecutions")
+            .withIndex("by_triggerId_startedAt", (q) => q.eq("triggerId", triggerId))
+            .take(EXECUTIONS_PER_CALL + 1);
+
+        if (runs.length > EXECUTIONS_PER_CALL) {
+            for (const run of runs.slice(0, EXECUTIONS_PER_CALL)) {
+                await ctx.db.delete("triggerExecutions", run._id);
+            }
+
+            partial = true;
+            continue;
+        }
+
+        await deleteTriggerRows(ctx, triggerId);
+        result.removed += 1;
+    }
+
+    return partial || triggers.length > TRIGGERS_PER_CALL;
+};
 
 /**
  * The last step: the held-back skills, the links and the install go. Called once the group chats have been deleted. A pending
@@ -351,6 +411,11 @@ export const finishUninstallRows = async (
     // Skills first, a few a call; the links and the install wait for a call of their own, so no call adds link deletes on top of
     // skill deletes and passes the statement limit.
     if (allPending.length > 0) {
+        return { ...result, hasMore: true };
+    }
+
+    // Then the triggers, a few a call, while their links still hold the hashes that tell an edited one from an unedited one.
+    if (await finishTriggers(ctx, installId, install.userId, result)) {
         return { ...result, hasMore: true };
     }
 

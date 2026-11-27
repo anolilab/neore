@@ -1,6 +1,6 @@
 /**
- * The uninstall procedure: begin (refuse, lease, sweep), delete the plugin's empty group chats in pages, then finish (links and
- * install). The group chats are deleted from here because their deletion is paged and only runs from an action.
+ * The uninstall procedure: begin (refuse, lease, sweep), delete the plugin's empty group chats in pages, then finish (skills, triggers, links and
+ * install). Triggers: an unedited one is deleted with its runs and webhook route, an edited one is kept, detached and off. The group chats are deleted from here because their deletion is paged and only runs from an action.
  */
 import { LunoraError, v } from "lunorash/server";
 
@@ -115,7 +115,7 @@ export const uninstallPlugin = authAction
         let finishedKept = finished.kept;
         let finishedRemoved = finished.removed;
 
-        // A few skills, then a few links, a call: go on until the skills, the links and the install are gone.
+        // A few skills, then a few triggers, then a few links, a call: go on until the skills, the links and the install are gone.
         let remaining = begun.pendingSkills.slice(SKILLS_PER_CALL);
 
         while (finished.hasMore) {
