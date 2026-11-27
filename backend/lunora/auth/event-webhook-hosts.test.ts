@@ -124,6 +124,26 @@ describe("the owner's approved callback hosts", () => {
         }
     });
 
+    it("removes a host held in more rows than the add cap, so none of them is left approved", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            const identity = await signedIn(harness);
+            const as = harness.withIdentity(identity as never);
+
+            await harness.run(async (context: any) => {
+                for (let index = 0; index < 51; index += 1) {
+                    await context.db.insert("eventWebhookHosts", { createdAt: 0, host: "hooks.example.com", userId: identity.userId });
+                }
+            });
+
+            expect(await as.mutation(removeEventWebhookHost as never, { host: "hooks.example.com" } as never)).toStrictEqual({ removed: true });
+            expect(await as.query(listEventWebhookHosts as never, {} as never)).toStrictEqual({ hosts: [] });
+        } finally {
+            harness.close();
+        }
+    });
+
     it("counts distinct host names against the add cap, so duplicate rows from a merge do not refuse an eligible host", async () => {
         const harness = lunoraTest(schema as never);
 

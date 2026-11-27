@@ -124,7 +124,7 @@ export const removeEventWebhookHost = authMutation
         // From the primary: a duplicate row a replica has not seen would stay, and the host would still be approved.
         const { page } = await context.db.eventWebhookHosts.findMany({
             consistency: "primary",
-            limit: MAX_APPROVED_HOSTS,
+            limit: MAX_LISTED_APPROVED_HOSTS,
             where: { host, userId: context.user.userId },
         });
 
