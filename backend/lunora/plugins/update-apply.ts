@@ -22,6 +22,7 @@ import { invalidateSkillsCache } from "../skills/cache";
 import { deleteSkillRows } from "../skills/functions";
 import { ensureSlugUnique, validateSlug } from "../skills/validators";
 import { heldInstall, heldInstallForShardWrite, patchInstallIf } from "./held-install";
+import { liveHashOf } from "./live-hash";
 import { LEASE_MS, markerFor } from "./logic";
 import { refuseWhileErasing } from "./owner-shard";
 
@@ -178,13 +179,21 @@ export const updateSkillChild = internalMutation
     });
 
 export const finishUpdate = internalMutation
-    .input({ contentHash: v.string().max(128), generation: v.number(), installId: v.string().max(128), version: v.string().max(32) })
+    .input({
+        contentHash: v.string().max(128),
+        generation: v.number(),
+        installId: v.string().max(128),
+        /** Some step was skipped or kept: the install takes the new version while a child holds other content, so export must not call it complete. */
+        partial: v.boolean(),
+        version: v.string().max(32),
+    })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
         await heldInstall(ctx, args.installId as Id<"pluginInstalls">, args.generation);
 
         await patchInstallIf(ctx, args.installId as Id<"pluginInstalls">, args.generation, {
             contentHash: args.contentHash,
+            partial: args.partial,
             status: "installed",
             updatedAt: ctx.now,
             version: args.version,
@@ -224,6 +233,8 @@ export const failUpdate = internalMutation
         generation: v.number(),
         installId: v.string().max(128),
         keepForRepair: v.boolean(),
+        /** Some child was rewritten, removed or created before the failure, so the old version no longer describes every child. */
+        partial: v.boolean(),
     })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
@@ -232,6 +243,7 @@ export const failUpdate = internalMutation
         if (args.keepForRepair) {
             await patchInstallIf(ctx, args.installId as Id<"pluginInstalls">, args.generation, {
                 contentHash: args.contentHash,
+                partial: true,
                 status: "needs-repair",
                 updatedAt: ctx.now,
             });
@@ -240,6 +252,24 @@ export const failUpdate = internalMutation
         }
 
         const { page } = await ctx.db.pluginItems.findMany({ consistency: "primary", where: { installId: args.installId } });
+        let { partial } = args;
+
+        // A step that stopped between its row write and its link write left a pending hash: a child at the pending content is adopted, one
+        // still at the installed content is cleared, as repair does. A child that was adopted holds new content, so the install is partial.
+        for (const row of page) {
+            if (!row.pendingHash || row.state !== "created") {
+                continue;
+            }
+
+            const live = await liveHashOf(ctx, args.installId, row);
+
+            if (live === row.pendingHash) {
+                await ctx.db.patch("pluginItems", row._id as Id<"pluginItems">, { contentHash: row.pendingHash, pendingHash: "" });
+                partial = true;
+            } else if (live === row.contentHash) {
+                await ctx.db.patch("pluginItems", row._id as Id<"pluginItems">, { pendingHash: "" });
+            }
+        }
 
         // Only the links of this attempt: its intents (an intent has no child yet) and the links of the children it created whose
         // rollback removed the child. The install is released afterwards, so no new update can record links while this runs.
@@ -253,7 +283,7 @@ export const failUpdate = internalMutation
             }
         }
 
-        await patchInstallIf(ctx, args.installId as Id<"pluginInstalls">, args.generation, { status: "installed", updatedAt: ctx.now });
+        await patchInstallIf(ctx, args.installId as Id<"pluginInstalls">, args.generation, { partial, status: "installed", updatedAt: ctx.now });
 
         return null;
     });

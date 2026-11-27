@@ -1482,6 +1482,64 @@ describe("reassignGlobalRows", () => {
         }
     });
 
+    it("moves an install with its links, links first and a few a call, so a merge stopped midway never splits them", async () => {
+        const harness = lunoraTest(schemaWithShardedTables([...Object.keys(GLOBAL_USER_COLUMNS), "shardActivity"]) as never);
+
+        try {
+            const base = { contentHash: "a".repeat(64), createdAt: 0, generation: 1, status: "installed" as const, updatedAt: 0, version: "1.0.0" };
+            const installId = await harness.run(async (context: any) => {
+                const id = await context.db.insert("pluginInstalls", { ...base, pluginSlug: "only", userId: "guest" });
+
+                for (let index = 0; index < 10; index += 1) {
+                    await context.db.insert("pluginItems", {
+                        contentHash: "b".repeat(64),
+                        createdAt: 0,
+                        entryKey: `skill:${String(index)}`,
+                        installId: id,
+                        kind: "skill",
+                        state: "created",
+                        userId: "guest",
+                    });
+                }
+
+                return id;
+            });
+            const queries: number[] = [];
+
+            for (let call = 0; call < 10; call += 1) {
+                const count = { queries: 0 };
+                const { done } = await harness.run(
+                    async (context: any) => await mergePluginInstallsPage({ ...context, db: counting(context.db, count) }, "guest", "user"),
+                );
+
+                queries.push(count.queries);
+
+                const install = await harness.run(async (context: any) => await context.db.pluginInstalls.findFirst({ where: { _id: installId } }));
+                const { page: links } = await harness.run(async (context: any) => await context.db.pluginItems.findMany({ where: { installId } }));
+
+                // Until the last call the install is still the guest's, so the next call finds it and its remaining links.
+                if (links.some((link: any) => link.userId === "guest")) {
+                    expect(install.userId).toBe("guest");
+                }
+
+                if (done) {
+                    break;
+                }
+            }
+
+            const { page: links } = await harness.run(async (context: any) => await context.db.pluginItems.findMany({ where: { installId } }));
+            const install = await harness.run(async (context: any) => await context.db.pluginInstalls.findFirst({ where: { _id: installId } }));
+
+            expect(queries.length).toBeGreaterThan(2);
+            expect(Math.max(...queries)).toBeLessThanOrEqual(30);
+            expect(install.userId).toBe("user");
+            expect(links).toHaveLength(10);
+            expect(links.every((link: any) => link.userId === "user")).toBe(true);
+        } finally {
+            harness.close();
+        }
+    });
+
     it("reads a duplicate install's skills from the primary, so a lagging replica cannot leave one attached to a deleted install", async () => {
         const harness = lunoraTest(schemaWithShardedTables([...Object.keys(GLOBAL_USER_COLUMNS), "shardActivity"]) as never);
 

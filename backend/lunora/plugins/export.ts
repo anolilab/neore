@@ -9,9 +9,11 @@ import { v } from "lunorash/server";
 
 import type { Id } from "../_generated/dataModel";
 import { internalQuery } from "../_generated/server";
+import { skillVisibility } from "../skills/access";
+import { skillRowHash } from "./entry-hash";
 import { liveHashOf } from "./live-hash";
 import type { SkillKeyCache } from "./live-hash";
-import { isCompletePluginExport } from "./logic";
+import { isCompletePluginExport, markerFor } from "./logic";
 
 /** An entry key whose part after the kind is a bare position: an install made before declared keys. */
 const POSITIONAL_KEY_RE = /^\d+$/u;
@@ -95,12 +97,34 @@ export const pluginForSelection = internalQuery
             return null;
         }
 
+        // Some child holds content that is not this version's: the install is not the file it names.
+        if (install.partial === true) {
+            return null;
+        }
+
         const { page: links } = await ctx.db.pluginItems.findMany({ consistency: "primary", where: { installId } });
         const children = [];
         const skillKeys: SkillKeyCache = new Map();
 
         for (const link of links) {
-            const currentHash = await liveHashOf(ctx, installId, link, skillKeys);
+            let currentHash: string;
+
+            if (link.kind === "skill") {
+                // Read here, once: the row gives the live hash and the visibility (a shared skill is not a plugin file's content).
+                const skill = await ctx.db.skills.findFirst({ consistency: "primary", where: { pluginMarker: markerFor(installId, link.entryKey) } });
+
+                if (skill && skillVisibility(skill) !== "private") {
+                    return null;
+                }
+
+                currentHash = skill ? await skillRowHash(skill) : "missing";
+
+                if (skill) {
+                    skillKeys.set(skill._id as string, link.entryKey);
+                }
+            } else {
+                currentHash = await liveHashOf(ctx, installId, link, skillKeys);
+            }
 
             children.push({ contentHash: link.contentHash, currentHash, id: link.itemId ?? "", pendingHash: link.pendingHash, state: link.state });
         }

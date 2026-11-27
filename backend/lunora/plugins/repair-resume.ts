@@ -23,7 +23,7 @@ import { entryHash } from "./entry-hash";
 import { heldInstall, patchInstallIf, STALE } from "./held-install";
 import { LEASE_MS } from "./logic";
 import { refuseWhileErasing, requireOwnerShard } from "./owner-shard";
-import { repairableNow, repairRows } from "./repair";
+import { childIdByMarker, repairableNow, repairRows } from "./repair";
 import { vPluginItemKind } from "./validators";
 
 const vEntry = v.object({ contentHash: v.string().max(128), entryKey: v.string().max(256), kind: vPluginItemKind });
@@ -173,6 +173,12 @@ export const beginRepairRows = async (
 
     return { existing, generation, installId, kept: result.kept, linked: result.linked, missing, moreDropped: false, status: "needs-repair", unresolved };
 };
+
+/** The id of the child that carries a marker, if it exists and belongs to the owner: what a create that threw may have left behind. */
+export const childIdForMarker = internalMutation
+    .input({ kind: vPluginItemKind, marker: v.string().max(256), userId: v.string().max(128) })
+    .output(v.union(v.null(), v.string()))
+    .mutation(async ({ args, ctx }) => (await childIdByMarker(ctx, args.kind, args.marker, args.userId)) ?? null);
 
 /** A child repair is about to create is baselined on the plan that creates it, which may differ from the install's (a slug taken since). */
 export const setIntentHash = internalMutation

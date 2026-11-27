@@ -2472,6 +2472,9 @@ export const schema = defineSchema({
         generation: v.number(),
         installedAt: v.number(),
         leaseUntil: v.optional(v.number()),
+        // Set while some child holds content that is not the installed version's (an update skipped or kept a child, or stopped after
+        // rewriting some). Export refuses such an install as a plugin file; a later complete update clears it.
+        partial: v.optional(v.boolean()),
         pluginSlug: v.string(),
         status: vPluginInstallStatus,
         targetVersion: v.optional(v.string()),

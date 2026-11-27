@@ -145,8 +145,31 @@ describe("repair", () => {
 
         const install = await run(async (context) => await context.db.pluginInstalls.findFirst({ where: { _id: installId } }));
 
-        expect(install).toMatchObject({ status: "installed", version: "1.1.0" });
-        expect(install?.targetVersion).toBeUndefined();
+        // The target version reads as none once it equals the version; a removal would replace the whole row, which cannot be conditional.
+        expect(install).toMatchObject({ status: "installed", targetVersion: "1.1.0", version: "1.1.0" });
+    });
+
+    it("loses to a claim made after its read, and writes nothing over it", async () => {
+        const { generation, installId } = await run(
+            async (context) => await context.runMutation(createInstallRow, { contentHash: HASH, pluginSlug: SLUG, userId: OWNER, version: "1.0.0" }),
+        );
+
+        await run(async (context) => await context.runMutation(markNeedsRepair, { generation, installId }));
+
+        await expect(
+            run(async (context) => {
+                // A concurrent uninstall claims the install between repair's read and its write.
+                const { patchIf } = context.db;
+
+                context.db.patchIf = async (...args: unknown[]) => {
+                    await context.db.patch("pluginInstalls", installId, { generation: generation + 5, status: "uninstalling" });
+
+                    return await patchIf.apply(context.db, args);
+                };
+
+                return await repairRows(context, OWNER, SLUG);
+            }),
+        ).rejects.toThrow("STALE_LEASE");
     });
 
     it("refuses an install that finished", async () => {
@@ -266,7 +289,7 @@ describe("repair", () => {
 
             expect(link).toMatchObject({ contentHash: await skillRowHash(REVISED), pendingHash: "" });
             expect(install).toMatchObject({ contentHash: HASH, status: "installed", version: "1.0.0" });
-            expect(install?.targetVersion).toBeUndefined();
+            expect(install).toMatchObject({ partial: true, targetVersion: "1.0.0", version: "1.0.0" });
         });
 
         it("drops the intent of a new child the update never made, and keeps the install at its old version", async () => {
@@ -309,7 +332,7 @@ describe("repair", () => {
             const stopped = await run(async (context) => await context.db.pluginInstalls.findFirst({ where: { _id: installId } }));
 
             expect(stopped).toMatchObject({ status: "needs-repair", version: "1.0.0" });
-            expect(stopped?.targetVersion).toBeUndefined();
+            expect(stopped).toMatchObject({ targetVersion: "1.0.0", version: "1.0.0" });
 
             // The person puts the skill back to the installed content; the next repair finishes with the file hash's own version.
             await run(async (context) => {

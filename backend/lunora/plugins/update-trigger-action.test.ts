@@ -247,3 +247,51 @@ describe("a changed webhook trigger", () => {
         expect(page[0]).toMatchObject({ status: "installed", version: "1.0.0" });
     });
 });
+
+describe("a changed trigger that cannot be planned", () => {
+    let harness: ReturnType<typeof lunoraTest>;
+
+    beforeEach(async () => {
+        harness = lunoraTest(schemaWithShardedTables(["skills", "skillStats", "userSkills", "skillHistory"]) as never);
+
+        const first = await fileOf(["analyst"], "1.0.0");
+
+        await harness.withIdentity({ userId: OWNER } as never).action(procedureAt("plugins_install_action", "installPlugin"), {
+            contentHash: first.contentHash,
+            markdown: first.markdown,
+        } as never);
+    });
+
+    afterEach(() => {
+        harness.close();
+    });
+
+    it("is refused before anything is written, naming the problem", async () => {
+        const as = () => harness.withIdentity({ userId: OWNER } as never);
+        const body = buildBundleMarkdown({
+            description: "",
+            items: [
+                { key: "analyst", kind: "skill" as const, skill: skill("analyst") },
+                { key: "digest", kind: "trigger" as const, trigger: { ...DIGEST, model: "no-such-model" } },
+            ],
+            name: "Daily brief",
+        });
+        const contentHash = await bodyHash(body);
+        const markdown = withPluginHeader(body, { contentHash, slug: SLUG, version: "1.1.0" });
+        const preview = (await as().action(procedureAt("plugins_update", "previewUpdate"), { markdown } as never)) as PreviewResult;
+
+        await expect(
+            as().action(procedureAt("plugins_update", "updatePlugin"), {
+                confirmDowngrade: false,
+                contentHash,
+                expectedGeneration: preview.generation,
+                expectedInstallId: preview.installId,
+                markdown,
+            } as never),
+        ).rejects.toThrow("not available");
+
+        const { page } = await harness.run(async (context: any) => await context.db.pluginInstalls.findMany({ where: { userId: OWNER } }));
+
+        expect(page[0]).toMatchObject({ status: "installed", version: "1.0.0" });
+    });
+});

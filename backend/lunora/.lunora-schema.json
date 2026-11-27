@@ -22,7 +22,6 @@
     "backfill-pull-request-watch-active",
     "drop-agent-option-fields",
     "drop-thread-is-group-chat",
-    "note-skill-source-plugin",
     "session-options-to-session-state",
     "widen-not-typed-steer-collaborator",
     "widen-not-typed-steer-drafts"
@@ -22777,6 +22776,12 @@
         },
         "leaseUntil": {
           "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "partial": {
+          "kind": "boolean",
           "nullable": false,
           "optional": true,
           "unique": false

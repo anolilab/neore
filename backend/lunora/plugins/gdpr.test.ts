@@ -106,7 +106,7 @@ describe("account merge lists the plugin tables", () => {
     it("moves both plugin tables by their user column", () => {
         // The installs move in the merge's own step (`mergePluginInstallsPage`), so a plugin both accounts have is not installed twice.
         expect(GLOBAL_USER_COLUMNS.pluginInstalls).toEqual([]);
-        expect(GLOBAL_USER_COLUMNS.pluginItems).toEqual(["userId"]);
+        expect(GLOBAL_USER_COLUMNS.pluginItems).toEqual([]);
     });
 });
 

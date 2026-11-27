@@ -244,7 +244,7 @@ export const GLOBAL_USER_COLUMNS: Readonly<Record<string, ReadonlyArray<string>>
     // A plugin install is moved by its own step (`mergePluginInstallsPage`) ahead of this loop: a person has one install per plugin, so
     // an install of a plugin the new account already has is dropped with its links, and its children detached, rather than moved.
     pluginInstalls: [],
-    pluginItems: ["userId"],
+    pluginItems: [],
     projectRepositories: ["userId"],
     projectRuleFiles: ["userId"],
     projects: ["userId"],
@@ -2160,7 +2160,7 @@ const PLUGIN_MERGE_CHILDREN = 4;
  * Moves the guest's plugin installs to the new account, one install per plugin: for a plugin the new account already has, the
  * guest's install is not moved. Its children (skills, triggers, group chats) are detached, as an uninstall keeps an edited one,
  * and its links and the install row are deleted. A duplicate takes as many calls as it has rows (`done: false`); the rest of the
- * installs are patched as before. The guest's links of an install that is kept follow in the generic loop.
+ * installs are moved with their links (the links first, then the install), so no install is split from its links.
  * `statements` is the D1 work the call did.
  */
 export const mergePluginInstallsPage = async (ctx: MutationCtx, from: string, to: string): Promise<{ done: boolean; statements: number }> => {
@@ -2174,8 +2174,28 @@ export const mergePluginInstallsPage = async (ctx: MutationCtx, from: string, to
         statements += 1;
 
         if (!target) {
+            // The install's links move first, a few a call, and the install last: a merge stopped between two calls leaves the install
+            // still the guest's, found again by the next call, never an install whose links name another account.
+            const links = await ctx.db.pluginItems.findMany({ consistency: "primary", limit: PLUGIN_MERGE_CHILDREN + 1, where: { installId, userId: from } });
+
+            statements += 1;
+
+            for (const link of links.page.slice(0, PLUGIN_MERGE_CHILDREN)) {
+                await ctx.db.patch("pluginItems", link._id, { userId: to });
+                statements += 2;
+            }
+
+            if (links.page.length > PLUGIN_MERGE_CHILDREN) {
+                return { done: false, statements };
+            }
+
             await ctx.db.patch("pluginInstalls", install._id, { userId: to });
             statements += 2;
+
+            // An install with links is a call of its own, as a duplicate is.
+            if (links.page.length > 0) {
+                return { done: false, statements };
+            }
 
             continue;
         }

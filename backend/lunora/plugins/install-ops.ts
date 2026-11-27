@@ -78,7 +78,31 @@ export const childOps = (ctx: ActionCtx, options: ChildOptions): BundleOps => {
     /** One child: its intent first, then the create, then its link to the child. */
     const linked = async <T extends { id: string }>(kind: ChildKind, key: string, create: () => Promise<T>): Promise<T> => {
         const intentId = await keepLease(async () => await intentFor(key, kind));
-        const created = await create();
+        let created: T;
+
+        try {
+            created = await create();
+        } catch (error) {
+            // A create can throw after its first write (a skill's row commits before its bookkeeping rows), leaving a child that is in
+            // no rollback list. It is found by its marker and removed like a child whose link failed; one that cannot be removed is named.
+            if (!lostLease && !(error instanceof Error && error.message.includes("STALE_LEASE"))) {
+                const childId = await ctx
+                    .runMutation(internal.plugins.repair_resume.childIdForMarker, { kind, marker: markerFor(installId, key), userId })
+                    .catch(() => null);
+
+                if (childId !== null) {
+                    const removed = await remove(childId, kind)
+                        .then((outcome) => outcome !== undefined && !outcome.kept)
+                        .catch(() => false);
+
+                    if (!removed && !lostLease) {
+                        throw new BundleImportError(error instanceof Error ? error.message : "The child could not be created", [key]);
+                    }
+                }
+            }
+
+            throw error;
+        }
 
         try {
             await keepLease(

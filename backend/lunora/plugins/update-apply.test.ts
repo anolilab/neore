@@ -91,7 +91,8 @@ describe("applying an update", () => {
                 }),
         );
         await run(
-            async (context) => await context.runMutation(finishUpdate, { contentHash: await skillRowHash(REVISED), generation, installId, version: "1.1.0" }),
+            async (context) =>
+                await context.runMutation(finishUpdate, { contentHash: await skillRowHash(REVISED), generation, installId, partial: false, version: "1.1.0" }),
         );
 
         const skill = await run(async (context) => await context.db.skills.findFirst({ where: { _id: skillId } }));
@@ -341,7 +342,14 @@ describe("applying an update", () => {
         );
         await run(
             async (context) =>
-                await context.runMutation(failUpdate, { contentHash: HASH, createKeys: ["skill:new"], generation, installId, keepForRepair: false }),
+                await context.runMutation(failUpdate, {
+                    contentHash: HASH,
+                    createKeys: ["skill:new"],
+                    generation,
+                    installId,
+                    keepForRepair: false,
+                    partial: false,
+                }),
         );
 
         const install = await run(async (context) => await context.db.pluginInstalls.findFirst({ where: { _id: installId } }));
@@ -361,7 +369,10 @@ describe("applying an update", () => {
             async (context) => await context.runMutation(beginUpdate, { expectedGeneration: 1, installId, targetVersion: "1.1.0", userId: OWNER }),
         );
 
-        await run(async (context) => await context.runMutation(failUpdate, { contentHash: HASH, createKeys: [], generation, installId, keepForRepair: true }));
+        await run(
+            async (context) =>
+                await context.runMutation(failUpdate, { contentHash: HASH, createKeys: [], generation, installId, keepForRepair: true, partial: false }),
+        );
 
         expect(await run(async (context) => await context.db.pluginInstalls.findFirst({ where: { _id: installId } }))).toMatchObject({
             contentHash: HASH,
@@ -406,7 +417,14 @@ describe("applying an update", () => {
         await run(async (context) => await context.db.delete("skills", criticId));
         await run(
             async (context) =>
-                await context.runMutation(failUpdate, { contentHash: HASH, createKeys: ["skill:critic"], generation, installId, keepForRepair: false }),
+                await context.runMutation(failUpdate, {
+                    contentHash: HASH,
+                    createKeys: ["skill:critic"],
+                    generation,
+                    installId,
+                    keepForRepair: false,
+                    partial: false,
+                }),
         );
 
         const keys = await run(async (context) => {
@@ -438,7 +456,7 @@ describe("applying an update", () => {
 
         await run(async (context) => await context.db.patch("pluginInstalls", installId, { leaseUntil: Date.now() - 1 }));
         await expect(
-            run(async (context) => await context.runMutation(finishUpdate, { contentHash: HASH, generation, installId, version: "1.1.0" })),
+            run(async (context) => await context.runMutation(finishUpdate, { contentHash: HASH, generation, installId, partial: false, version: "1.1.0" })),
         ).rejects.toThrow("STALE_LEASE");
     });
 
@@ -489,7 +507,14 @@ describe("applying an update", () => {
 
         await run(
             async (context) =>
-                await context.runMutation(failUpdate, { contentHash: HASH, createKeys: ["skill:new"], generation, installId, keepForRepair: false }),
+                await context.runMutation(failUpdate, {
+                    contentHash: HASH,
+                    createKeys: ["skill:new"],
+                    generation,
+                    installId,
+                    keepForRepair: false,
+                    partial: false,
+                }),
         );
 
         const links = await run(async (context) => {
@@ -507,7 +532,10 @@ describe("applying an update", () => {
             async (context) => await context.runMutation(beginUpdate, { expectedGeneration: 1, installId, targetVersion: "1.1.0", userId: OWNER }),
         );
 
-        await run(async (context) => await context.runMutation(failUpdate, { contentHash: HASH, createKeys: [], generation, installId, keepForRepair: true }));
+        await run(
+            async (context) =>
+                await context.runMutation(failUpdate, { contentHash: HASH, createKeys: [], generation, installId, keepForRepair: true, partial: false }),
+        );
         await run(async (context) => await context.runMutation(finishInstall, { generation, installId }));
 
         expect(await run(async (context) => await context.db.pluginInstalls.findFirst({ where: { _id: installId } }))).toMatchObject({
@@ -562,5 +590,55 @@ describe("applying an update", () => {
         });
 
         expect(links).toMatchObject([{ entryKey: "skill:analyst", state: "created" }]);
+    });
+
+    it("failUpdate adopts a child whose row was written before its link, and marks the install partial", async () => {
+        const { installId, skillId } = await installed();
+        const generation = await run(
+            async (context) => await context.runMutation(beginUpdate, { expectedGeneration: 1, installId, targetVersion: "1.1.0", userId: OWNER }),
+        );
+        const link = await run(async (context) => {
+            const { page } = await context.db.pluginItems.findMany({ where: { installId } });
+
+            return page[0];
+        });
+
+        // updateSkillChild stopped after the row patch and before the link patch.
+        await run(async (context) => await context.db.patch("pluginItems", link._id, { pendingHash: await skillRowHash(REVISED) }));
+        await run(async (context) => await context.db.patch("skills", skillId, { instructions: REVISED.instructions }));
+        await run(
+            async (context) =>
+                await context.runMutation(failUpdate, { contentHash: HASH, createKeys: [], generation, installId, keepForRepair: false, partial: false }),
+        );
+
+        expect(await run(async (context) => await context.db.pluginItems.findFirst({ where: { _id: link._id } }))).toMatchObject({
+            contentHash: await skillRowHash(REVISED),
+            pendingHash: "",
+        });
+        expect(await run(async (context) => await context.db.pluginInstalls.findFirst({ where: { _id: installId } }))).toMatchObject({
+            partial: true,
+            status: "installed",
+        });
+    });
+
+    it("finishUpdate records that a step was skipped, and a complete update clears it", async () => {
+        const { installId } = await installed();
+        const first = await run(
+            async (context) => await context.runMutation(beginUpdate, { expectedGeneration: 1, installId, targetVersion: "1.1.0", userId: OWNER }),
+        );
+
+        await run(
+            async (context) => await context.runMutation(finishUpdate, { contentHash: HASH, generation: first, installId, partial: true, version: "1.1.0" }),
+        );
+        expect(await run(async (context) => await context.db.pluginInstalls.findFirst({ where: { _id: installId } }))).toMatchObject({ partial: true });
+
+        const second = await run(
+            async (context) => await context.runMutation(beginUpdate, { expectedGeneration: first, installId, targetVersion: "1.2.0", userId: OWNER }),
+        );
+
+        await run(
+            async (context) => await context.runMutation(finishUpdate, { contentHash: HASH, generation: second, installId, partial: false, version: "1.2.0" }),
+        );
+        expect(await run(async (context) => await context.db.pluginInstalls.findFirst({ where: { _id: installId } }))).toMatchObject({ partial: false });
     });
 });

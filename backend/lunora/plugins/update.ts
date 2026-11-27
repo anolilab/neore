@@ -16,9 +16,10 @@ import { assertSelectionImportable, BundleImportError, runBundleImport } from ".
 import { MAX_LENGTH } from "../lib/validators";
 import { planFor } from "../skills/bundle";
 import { assertNoToolConfig, checkPluginFile } from "./install-action";
-import { entryHash, skillContent } from "./entry-hash";
+import { entryHash, skillContent, skillRowHash } from "./entry-hash";
 import { skillVisibility } from "../skills/access";
 import { liveHashOf } from "./live-hash";
+import type { SkillKeyCache } from "./live-hash";
 import { diffUpdate, isDowngrade, markerFor } from "./logic";
 import type { UpdateAction } from "./logic";
 import { vPluginItemKind } from "./validators";
@@ -74,13 +75,19 @@ export const loadInstalledForUpdate = internalQuery
         const children: { contentHash: string; currentHash: string; entryKey: string; kind: "group" | "skill" | "trigger"; triggerType: string }[] = [];
         const ownSlugs: { entryKey: string; slug: string }[] = [];
 
+        const skillKeys: SkillKeyCache = new Map();
+
         for (const link of page) {
-            let currentHash = await liveHashOf(ctx, installId, link);
+            let currentHash: string;
 
             if (link.kind === "skill") {
+                // Read once: the row gives the live hash, the slug and the visibility.
                 const skill = await ctx.db.skills.findFirst({ consistency: "primary", where: { pluginMarker: markerFor(installId, link.entryKey) } });
 
+                currentHash = skill ? await skillRowHash(skill) : "missing";
+
                 if (skill) {
+                    skillKeys.set(skill._id as string, link.entryKey);
                     ownSlugs.push({ entryKey: link.entryKey, slug: skill.slug });
 
                     // Visibility is not in the content hash: a skill shared beyond its owner reads as edited, so the diff keeps it.
@@ -88,6 +95,8 @@ export const loadInstalledForUpdate = internalQuery
                         currentHash = "shared";
                     }
                 }
+            } else {
+                currentHash = await liveHashOf(ctx, installId, link, skillKeys);
             }
 
             let triggerType = "";
@@ -228,6 +237,27 @@ export const updatePlugin = authAction
             throw new LunoraError(
                 "UNPROCESSABLE",
                 `This version adds a group chat (${addedGroups.map((step) => step.entryKey).join(", ")}), which an update cannot create yet. Uninstall the plugin and install the new version instead.`,
+            );
+        }
+
+        // An entry that cannot be planned (a trigger whose model is gone, for instance) has no content: any step but "same" for it would be
+        // skipped while the new version is recorded.
+        const unplanned = plan.filter((step) => {
+            const entry = entries.find((candidate) => candidate.key === step.entryKey);
+
+            return step.action !== "same" && entry !== undefined && entry.plan === undefined;
+        });
+
+        if (unplanned.length > 0) {
+            throw new LunoraError(
+                "BAD_REQUEST",
+                unplanned
+                    .map((step) => {
+                        const entry = entries.find((candidate) => candidate.key === step.entryKey);
+
+                        return `${entry?.title ?? step.entryKey}: ${entry?.problems.join(" ") || "it cannot be planned"}`;
+                    })
+                    .join(" | "),
             );
         }
 
@@ -427,6 +457,8 @@ export const updatePlugin = authAction
                 contentHash: hash,
                 generation,
                 installId: installed.installId,
+                // A skipped or kept child still holds other content than the new version's.
+                partial: skipped.length > 0,
                 version: header.version,
             });
         } catch (error) {
@@ -442,6 +474,7 @@ export const updatePlugin = authAction
                     generation,
                     installId: installed.installId,
                     keepForRepair,
+                    partial: applied.length > 0 || importDone,
                 })
                 .catch(() => undefined);
 

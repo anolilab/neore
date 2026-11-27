@@ -8,7 +8,7 @@ vi.mock("../_generated/internal", () => {
     return {
         internal: {
             chat: { group: { functions: { createPluginGroupChat: "createGroup" } } },
-            plugins: { install_steps: { recordCreated: "recordCreated" } },
+            plugins: { install_steps: { recordCreated: "recordCreated" }, repair_resume: { childIdForMarker: "childFor" } },
             skills: { bundle: { removeImportedItem: "remove" }, create_skill: { createPluginSkill: "createSkill" } },
             triggers: { functions: { createPluginTrigger: "createTrigger" } },
         },
@@ -78,6 +78,38 @@ describe("child operations", () => {
             }
 
             return "skill-1";
+        });
+
+        await expect(ops.createSkill(SKILL, "skill:a")).rejects.toMatchObject({ leftBehind: ["skill:a"], name: "BundleImportError" });
+    });
+
+    it("removes a skill whose create threw after its row was written, found by its marker", async () => {
+        const calls: string[] = [];
+        const ops = opsWith(async (ref) => {
+            calls.push(ref);
+
+            if (ref === "createSkill") {
+                throw new Error("bookkeeping failed");
+            }
+
+            return ref === "childFor" ? "half-made-skill" : { kept: false };
+        });
+
+        await expect(ops.createSkill(SKILL, "skill:a")).rejects.toThrow("bookkeeping failed");
+        expect(calls).toEqual(["createSkill", "childFor", "remove"]);
+    });
+
+    it("names a half-made child in leftBehind when it cannot be removed", async () => {
+        const ops = opsWith(async (ref) => {
+            if (ref === "createSkill") {
+                throw new Error("bookkeeping failed");
+            }
+
+            if (ref === "remove") {
+                throw new Error("database busy");
+            }
+
+            return ref === "childFor" ? "half-made-skill" : null;
         });
 
         await expect(ops.createSkill(SKILL, "skill:a")).rejects.toMatchObject({ leftBehind: ["skill:a"], name: "BundleImportError" });

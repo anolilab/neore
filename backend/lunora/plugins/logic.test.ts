@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
 import {
-    actionsFor,
     bodyHash,
     canonicalJson,
     compareVersions,
@@ -15,27 +14,6 @@ import {
     parseMarker,
     shardWriteAllowed,
 } from "./logic";
-
-describe("actionsFor (the status table)", () => {
-    it.each([
-        ["installed", false, ["update", "uninstall"]],
-        ["installed", true, ["update", "uninstall"]],
-        ["needs-repair", false, ["repair", "uninstall"]],
-        ["needs-repair", true, ["repair", "uninstall"]],
-        ["installing", false, []],
-        ["installing", true, ["repair", "uninstall"]],
-        ["updating", false, []],
-        ["updating", true, ["repair"]],
-        ["uninstalling", false, []],
-        ["uninstalling", true, ["uninstall"]],
-    ] as const)("%s with lease expired=%s allows %j", (status, expired, allowed) => {
-        expect(actionsFor(status, expired)).toEqual(allowed);
-    });
-
-    it("never lets an update finish an update that is already half done", () => {
-        expect(actionsFor("updating", true)).not.toContain("update");
-    });
-});
 
 describe("leases and sharded writes", () => {
     it("expires at the lease end, not before", () => {

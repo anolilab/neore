@@ -19,37 +19,6 @@ export type ChildKind = Infer<typeof vPluginItemKind>;
 
 export type ChildState = Infer<typeof vPluginItemState>;
 
-export type InstallAction = "update" | "uninstall" | "repair";
-
-/**
- * The actions that may run from each status. A status with no holder (`installed`, `needs-repair`)
- * is always open. A status with a holder (`installing`, `updating`, `uninstalling`) opens only
- * once its lease has expired, and then only the actions that finish or undo the half-done work.
- */
-export const actionsFor = (status: InstallStatus, leaseExpired: boolean): InstallAction[] => {
-    switch (status) {
-        case "installed": {
-            return ["update", "uninstall"];
-        }
-        case "installing": {
-            return leaseExpired ? ["repair", "uninstall"] : [];
-        }
-        case "needs-repair": {
-            return ["repair", "uninstall"];
-        }
-        case "uninstalling": {
-            // A stopped uninstall is finished by running it again; repair does not take an uninstalling install.
-            return leaseExpired ? ["uninstall"] : [];
-        }
-        case "updating": {
-            return leaseExpired ? ["repair"] : [];
-        }
-        default: {
-            return [];
-        }
-    }
-};
-
 export const leaseExpired = (leaseUntil: number, now: number): boolean => now >= leaseUntil;
 
 /**

@@ -15,11 +15,12 @@ import type { MutationCtx } from "../_generated/server";
 import { liveHashOf } from "./live-hash";
 import { requireOwnerShard } from "./owner-shard";
 import { patchRow } from "../lib/patch";
+import { patchInstallIf, STALE } from "./held-install";
 import { markerFor } from "./logic";
 import type { ChildKind } from "./logic";
 
 /** The id of the child that carries a marker, if it exists and belongs to the owner. */
-const childIdByMarker = async (ctx: MutationCtx, kind: ChildKind, marker: string, userId: string): Promise<string | undefined> => {
+export const childIdByMarker = async (ctx: MutationCtx, kind: ChildKind, marker: string, userId: string): Promise<string | undefined> => {
     if (kind === "skill") {
         const skill = await ctx.db.skills.findFirst({ consistency: "primary", where: { pluginMarker: marker } });
 
@@ -120,13 +121,24 @@ const repairStoppedUpdate = async (ctx: MutationCtx, install: Doc<"pluginInstall
 
     const status = unresolved.length === 0 ? "installed" : "needs-repair";
 
-    await patchRow(ctx.db, "pluginInstalls", install, {
-        generation: install.generation + 1,
-        status,
-        // The file hash stays the old file's, so the version stays the old one: a later repair must not promote it to the target.
-        targetVersion: undefined,
-        updatedAt: ctx.now,
-    });
+    // One conditional write on the generation and status read at the start, so a concurrent claim is never overwritten (`STALE_LEASE`).
+    // The file hash stays the old file's, so the version stays the old one: a later repair must not promote it to the target. The target
+    // version is set equal to the version (it reads as none), since removing it would replace the whole row.
+    await patchInstallIf(
+        ctx,
+        install._id as Id<"pluginInstalls">,
+        install.generation,
+        {
+            generation: install.generation + 1,
+            // Some child may hold the target's content while the version stays the old one: export must not call the install complete.
+            partial: true,
+            status,
+            ...(install.targetVersion !== undefined && { targetVersion: install.version }),
+            updatedAt: ctx.now,
+        },
+        STALE,
+        install.status,
+    );
 
     return { kept: [], linked, missing: unresolved, moreDropped: false, status };
 };
@@ -280,24 +292,38 @@ export const repairRows = async (ctx: MutationCtx, userId: string, pluginSlug: s
     if (missing.length === 0) {
         // An update kept for repair holds its target version; finishing the repair makes it the installed one. The next generation
         // fences out the action that stopped: an installed row carries no lease, so its generation is all that refuses it.
-        await patchRow(ctx.db, "pluginInstalls", install, {
-            generation: install.generation + 1,
-            leaseUntil: undefined,
-            status: "installed",
-            targetVersion: undefined,
-            updatedAt: ctx.now,
-            version: install.targetVersion ?? install.version,
-        });
+        // One conditional write on the generation and status read at the start, so a concurrent uninstall's claim is never overwritten.
+        // The target version is set equal to the version (it reads as none), since removing it would replace the whole row; the lease
+        // stays, which an installed row ignores.
+        const version = install.targetVersion ?? install.version;
+
+        await patchInstallIf(
+            ctx,
+            install._id as Id<"pluginInstalls">,
+            install.generation,
+            {
+                generation: install.generation + 1,
+                status: "installed",
+                ...(install.targetVersion !== undefined && { targetVersion: version }),
+                updatedAt: ctx.now,
+                version,
+            },
+            STALE,
+            install.status,
+        );
 
         return { kept, linked, missing, moreDropped: false, status: "installed" };
     }
 
     if (install.status === "installing") {
-        await ctx.db.patch("pluginInstalls", install._id as Id<"pluginInstalls">, {
-            generation: install.generation + 1,
-            status: "needs-repair",
-            updatedAt: ctx.now,
-        });
+        await patchInstallIf(
+            ctx,
+            install._id as Id<"pluginInstalls">,
+            install.generation,
+            { generation: install.generation + 1, status: "needs-repair", updatedAt: ctx.now },
+            STALE,
+            install.status,
+        );
     }
 
     return { kept, linked, missing, moreDropped: false, status: "needs-repair" };
