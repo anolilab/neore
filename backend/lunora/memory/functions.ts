@@ -1375,7 +1375,8 @@ const KNOWN_TEXT_READ_ROWS = 2000;
 
 const WHITESPACE_RUN_RE = /\s+/gu;
 
-const textKey = (text: string): string => text.replaceAll(WHITESPACE_RUN_RE, " ").trim().toLowerCase();
+/** A memory's text as every same-text check compares it: trimmed, in lower case, each run of spaces one space. */
+export const textKey = (text: string): string => text.replaceAll(WHITESPACE_RUN_RE, " ").trim().toLowerCase();
 
 /**
  * The active rows of one scope in effect on the save's day, newest first: a requested fact whose text one already holds

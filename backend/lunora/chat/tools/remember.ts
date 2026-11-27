@@ -5,6 +5,7 @@ import { internal } from "../../_generated/internal";
 import type { ToolCtx as ToolContext } from "../../agent/client";
 import { createTool } from "../../agent/client";
 import { servesUser } from "../../lib/shard-context";
+import type { AskedRefusal } from "../../memory/extract";
 import type { RememberResult, RememberStatus } from "../../memory/remember";
 import toonEncodeOutput from "./toon-encode";
 
@@ -21,6 +22,34 @@ const NOTES: Record<RememberStatus, string> = {
         "Nothing was saved: what was found was not backed by the user's own typed words, or held a secret or health information, which memory never keeps.",
     saved: "Saved to memory as listed: `asked` marks what the user asked to remember.",
     unavailable: "Nothing was saved: memory could not be reached. Tell the user it did not work.",
+};
+
+/** Why an asked fact was refused while others were saved; only the reason goes back, never the refused text. */
+const REFUSED_NOTES: Record<AskedRefusal, string> = {
+    health: "it was about their health, which memory never keeps",
+    secret: "it was nothing but a secret, which memory never keeps",
+    unbacked: "it was not backed by their own typed words",
+};
+
+/** The note for an outcome, with each asked fact that was refused and why, and the refusal that stopped the request, if any. */
+const noteOf = (output: RememberResult): string => {
+    const refused = output.refused ?? [];
+    const parts = [NOTES[output.status]];
+
+    if (refused.length > 0) {
+        const reasons = [...new Set(refused)].map((reason) => REFUSED_NOTES[reason]);
+
+        parts.push(
+            `Not everything asked was saved: ${String(refused.length)} asked fact(s) were refused (${reasons.join("; ")}). Tell the user both what was saved and what was not.`,
+        );
+    }
+
+    // A request stopped part-way: what is listed was written, nothing after it.
+    if (output.stopped !== undefined) {
+        parts.push(`Then it stopped, and nothing more was saved: ${NOTES[output.stopped]}`);
+    }
+
+    return parts.join(" ");
 };
 
 /**
@@ -59,11 +88,8 @@ const rememberTool = createTool<Record<string, never>, RememberResult, ToolConte
     toModelOutput: (_context, { output }) =>
         toonEncodeOutput({
             facts: output.facts,
-            // A request stopped part-way: what is listed was written, nothing after it.
-            note:
-                output.stopped === undefined
-                    ? NOTES[output.status]
-                    : `${NOTES[output.status]} Then it stopped, and nothing more was saved: ${NOTES[output.stopped]}`,
+            note: noteOf(output),
+            ...(output.refused !== undefined && { refused: output.refused }),
             status: output.status,
         }),
 });

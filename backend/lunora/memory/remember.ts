@@ -15,7 +15,7 @@ import type { Id } from "../_generated/dataModel";
 import type { ActionCtx, QueryCtx } from "../_generated/server";
 import { internalAction, internalQuery } from "../_generated/server";
 import { typedTextOf } from "../chat/lib/attached-text";
-import { type ExtractionOutcome, vRunFact } from "./extract";
+import { type AskedRefusal, type ExtractionOutcome, vAskedRefusal, vRunFact } from "./extract";
 import { checkRequestedSource, REMEMBER_SCOPE, type RequestedRefusal, vRequestedRefusal } from "./functions";
 import { hasPrivacyMarker } from "./gate";
 
@@ -41,8 +41,11 @@ export const vRememberStatus = v.union(
 
 export type RememberStatus = Infer<typeof vRememberStatus>;
 
-/** The facts the run wrote, what became of what was asked, and the refusal that stopped the request after them, if one did. */
-export type RememberResult = { facts: ExtractionOutcome["facts"]; status: RememberStatus; stopped?: RequestedRefusal };
+/**
+ * The facts the run wrote, what became of what was asked, why each asked fact not kept was refused when others were, and the
+ * refusal that stopped the request after them, if one did.
+ */
+export type RememberResult = { facts: ExtractionOutcome["facts"]; refused?: AskedRefusal[]; status: RememberStatus; stopped?: RequestedRefusal };
 
 /**
  * What the extractor's run comes to for the tool, and whether the prompt's claim stays: it does when something was written
@@ -63,7 +66,16 @@ export const rememberResultOf = (outcome: ExtractionOutcome): { keepClaim: boole
             status = outcome.facts.some((fact) => fact.asked) ? "already_known" : "nothing_asked";
         }
 
-        return { keepClaim: true, result: { facts: outcome.facts, status, ...(outcome.blocked !== undefined && { stopped: outcome.blocked }) } };
+        // The claim stays: something was written. What was asked and refused is still told, so the reply names both.
+        return {
+            keepClaim: true,
+            result: {
+                facts: outcome.facts,
+                ...(outcome.refusedAsked.length > 0 && { refused: outcome.refusedAsked }),
+                status,
+                ...(outcome.blocked !== undefined && { stopped: outcome.blocked }),
+            },
+        };
     }
 
     if (outcome.blocked !== undefined || outcome.refused > 0) {
@@ -189,5 +201,7 @@ export const rememberFactFor = async (ctx: ActionCtx, args: Omit<SourceArgs, "no
 /** The `remember` tool's save, run on the user's own shard. */
 export const rememberFact = internalAction
     .input({ promptMessageId: v.string(), replyKey: v.optional(v.string()), threadId: v.id("threads"), userId: v.string() })
-    .output(v.object({ facts: v.array(vRunFact), status: vRememberStatus, stopped: v.optional(vRequestedRefusal) }))
+    .output(
+        v.object({ facts: v.array(vRunFact), refused: v.optional(v.array(vAskedRefusal)), status: vRememberStatus, stopped: v.optional(vRequestedRefusal) }),
+    )
     .action(async ({ args, ctx }) => await rememberFactFor(ctx, args));

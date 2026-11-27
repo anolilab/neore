@@ -60,7 +60,7 @@ import {
     type SimilarMemoryResult,
 } from "./dedup";
 import { evidenceMatchEnd, type MemoryEvidence, typedEvidenceQuote } from "./evidence";
-import { type RequestedRefusal, vRequestedRefusal } from "./functions";
+import { type RequestedRefusal, textKey, vRequestedRefusal } from "./functions";
 import { logRedaction, redactMemoryFacts, redactMemoryText, type RedactionCounts } from "./redact";
 import {
     describeFactDates,
@@ -137,6 +137,11 @@ const extractedFactSchema = z.object({
 /** What one fact of a run became: a new row, a row it confirmed, or a row it reworded; `memory` is the row's text now. */
 export const vRunFact = v.object({ asked: v.boolean(), memory: v.string(), status: v.union(v.literal("saved"), v.literal("known"), v.literal("updated")) });
 
+/** Why an asked fact was not kept: nothing but a secret, about the user's health, or not backed by their typed words. */
+export const vAskedRefusal = v.union(v.literal("secret"), v.literal("health"), v.literal("unbacked"));
+
+export type AskedRefusal = Infer<typeof vAskedRefusal>;
+
 /**
  * What an extraction run did, for a caller that waits on it (`memory/remember.ts`): whether the model was asked, how many
  * of its facts the evidence gate refused, and what the rest became. A scheduled run's caller ignores it.
@@ -147,9 +152,11 @@ export type ExtractionOutcome = {
     blocked?: RequestedRefusal;
     facts: Infer<typeof vRunFact>[];
     refused: number;
+    /** Each asked fact that was refused, by why only: a secret's or health fact's text never goes back to the model. */
+    refusedAsked: AskedRefusal[];
 };
 
-const NOT_ASKED: ExtractionOutcome = { asked: false, facts: [], refused: 0 };
+const NOT_ASKED: ExtractionOutcome = { asked: false, facts: [], refused: 0, refusedAsked: [] };
 
 /** How long, and how often, a job waits for a `remember` call still running on its prompt before it reads the prompt itself. */
 const REMEMBER_WAIT_MS = 30_000;
@@ -343,7 +350,15 @@ export const extractMemories = internalAction
         userId: v.string(),
         userMessage: v.string(),
     })
-    .output(v.object({ asked: v.boolean(), blocked: v.optional(vRequestedRefusal), facts: v.array(vRunFact), refused: v.number() }))
+    .output(
+        v.object({
+            asked: v.boolean(),
+            blocked: v.optional(vRequestedRefusal),
+            facts: v.array(vRunFact),
+            refused: v.number(),
+            refusedAsked: v.array(vAskedRefusal),
+        }),
+    )
     .action(async ({ args: input, ctx }): Promise<ExtractionOutcome> => {
         // A `remember` call extracts the prompt it was made in (`remember.ts`). One keyed read of its claim, made for every job with a
         // typed prompt, so no path of the reply (a pause, a resume, a recovery) can miss that the call ran: handled, the prompt is
@@ -556,10 +571,15 @@ ${args.requested ? REQUESTED_RULE : "Extract NEW facts about the user not alread
         // `quoteRefused`: a quote that is not the user's typed words, or one `evidenceQuote` refuses (secret-like, a health condition, too short).
         // `health`: a fact the extractor marked as about the user's health (`sensitive`), in any language, whoever asked.
         const dropped = { health: 0, noQuote: 0, quoteRefused: 0 };
+        const refusedAsked: AskedRefusal[] = Array.from({ length: secretsAsked }, () => "secret" as const);
 
         extractedFacts = extractedFacts.filter((fact) => {
             if (fact.sensitive === true) {
                 dropped.health += 1;
+
+                if (fact.asked === true) {
+                    refusedAsked.push("health");
+                }
 
                 return false;
             }
@@ -574,6 +594,10 @@ ${args.requested ? REQUESTED_RULE : "Extract NEW facts about the user not alread
                 dropped.quoteRefused += 1;
             }
 
+            if (fact.asked === true) {
+                refusedAsked.push("unbacked");
+            }
+
             return false;
         });
 
@@ -584,7 +608,7 @@ ${args.requested ? REQUESTED_RULE : "Extract NEW facts about the user not alread
         }
 
         if (extractedFacts.length === 0) {
-            return { asked: true, facts: [], refused };
+            return { asked: true, facts: [], refused, refusedAsked };
         }
 
         // The extractor can return one statement twice, asked once: the copy kept below carries the request either way.
@@ -735,7 +759,7 @@ ${args.requested ? REQUESTED_RULE : "Extract NEW facts about the user not alread
 
             // The extractor can return one statement twice: the second is the first, already settled (saved, merged
             // or confirmed), not a new fact.
-            if (handled.some((earlier) => sameFactDates(earlier.dates, dates) && earlier.memory.trim().toLowerCase() === fact.memory.trim().toLowerCase())) {
+            if (handled.some((earlier) => sameFactDates(earlier.dates, dates) && textKey(earlier.memory) === textKey(fact.memory))) {
                 continue;
             }
 
@@ -1009,11 +1033,11 @@ ${args.requested ? REQUESTED_RULE : "Extract NEW facts about the user not alread
             }
         }
 
-        return { asked: true, ...(blocked !== undefined && { blocked }), facts: outcomes, refused };
+        return { asked: true, ...(blocked !== undefined && { blocked }), facts: outcomes, refused, refusedAsked };
     });
 
-/** A fact's statement as the run's own twice-returned check reads it: its trimmed text in lower case, and its dates. */
-const statementKey = (fact: z.infer<typeof extractedFactSchema>): string => JSON.stringify([fact.memory.trim().toLowerCase(), normalizeFactDates(fact)]);
+/** A fact's statement as the run's own twice-returned check reads it: its text by `textKey`, as the save compares it, and its dates. */
+const statementKey = (fact: z.infer<typeof extractedFactSchema>): string => JSON.stringify([textKey(fact.memory), normalizeFactDates(fact)]);
 
 type SteerOffset = { at: number; from: number; messageId?: string; notTyped?: boolean };
 

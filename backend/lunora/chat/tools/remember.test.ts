@@ -42,4 +42,21 @@ describe("remember", () => {
         expect(headless.runAction).not.toHaveBeenCalled();
         expect(noTurn.runAction).not.toHaveBeenCalled();
     });
+
+    it("tells the model what was saved and which asked fact was refused and why", () => {
+        const tool = { ...rememberTool, ctx: contextWith({}) } as unknown as {
+            toModelOutput: (options: { input: unknown; output: unknown; toolCallId: string }) => unknown;
+        };
+        const encoded = JSON.stringify(
+            tool.toModelOutput({
+                input: {},
+                output: { facts: [{ asked: false, memory: "User works as a nurse", status: "saved" }], refused: ["health"], status: "saved" },
+                toolCallId: "call-1",
+            }),
+        );
+
+        expect(encoded).toContain("User works as a nurse");
+        expect(encoded).toContain("about their health");
+        expect(encoded).toContain("Tell the user both what was saved and what was not");
+    });
 });

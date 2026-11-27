@@ -432,6 +432,38 @@ describe(rememberFactFor, () => {
         expect(rows.map((row) => row.source)).toStrictEqual(["requested"]);
     });
 
+    it("saves one asked row, listed once, for a statement returned unasked first with other inner spacing", async () => {
+        answer([
+            { asked: false, memory: "User  is   vegan", quote: "I'm vegan" },
+            { memory: "User is vegan", quote: "I'm vegan" },
+        ]);
+
+        const result = await remember(await setUp());
+
+        expect(result).toMatchObject({ status: "saved" });
+        expect(result.facts).toHaveLength(1);
+        expect(result.facts[0]).toMatchObject({ asked: true, status: "saved" });
+        const rows = await memories();
+
+        expect(rows.map((row) => row.source)).toStrictEqual(["requested"]);
+    });
+
+    it("saves an unrelated fact beside an asked health fact, and says the asked one was refused and why", async () => {
+        answer([
+            { memory: "User takes Prozac", quote: "I take Prozac", sensitive: true },
+            { asked: false, memory: "User works as a nurse", quote: "I work as a nurse" },
+        ]);
+
+        await expect(remember(await setUp({ prompt: "Remember I take Prozac. I work as a nurse." }))).resolves.toStrictEqual({
+            facts: [{ asked: false, memory: "User works as a nurse", status: "saved" }],
+            refused: ["health"],
+            status: "saved",
+        });
+        const rows = await memories();
+
+        expect(rows.map((row) => row.memory)).toStrictEqual(["User works as a nurse"]);
+    });
+
     it("refuses a fact the extractor marks as about the user's health, and keeps a job in the field", async () => {
         answer([{ memory: "User takes Prozac", quote: "I take Prozac", sensitive: true }]);
 
@@ -681,7 +713,7 @@ describe(rememberResultOf, () => {
     const vegan = { asked: true, memory: "User is vegan", status: "saved" as const };
 
     it("lists what was written before a refusal stopped the request, and keeps the prompt handled", () => {
-        expect(rememberResultOf({ asked: true, blocked: "memory_off", facts: [vegan], refused: 0 })).toStrictEqual({
+        expect(rememberResultOf({ asked: true, blocked: "memory_off", facts: [vegan], refused: 0, refusedAsked: [] })).toStrictEqual({
             keepClaim: true,
             result: { facts: [vegan], status: "saved", stopped: "memory_off" },
         });
@@ -691,12 +723,12 @@ describe(rememberResultOf, () => {
         const known = { asked: true, memory: "User is vegan", status: "known" as const };
         const nurse = { asked: false, memory: "User works as a nurse", status: "saved" as const };
 
-        expect(rememberResultOf({ asked: true, facts: [known, nurse], refused: 0 }).result.status).toBe("saved");
-        expect(rememberResultOf({ asked: true, facts: [known], refused: 0 }).result.status).toBe("already_known");
+        expect(rememberResultOf({ asked: true, facts: [known, nurse], refused: 0, refusedAsked: [] }).result.status).toBe("saved");
+        expect(rememberResultOf({ asked: true, facts: [known], refused: 0, refusedAsked: [] }).result.status).toBe("already_known");
     });
 
     it("gives a refusal before any write as the reason, and leaves the prompt to a later call", () => {
-        expect(rememberResultOf({ asked: true, blocked: "not_private", facts: [], refused: 0 })).toStrictEqual({
+        expect(rememberResultOf({ asked: true, blocked: "not_private", facts: [], refused: 0, refusedAsked: [] })).toStrictEqual({
             keepClaim: false,
             result: { facts: [], status: "not_private" },
         });
