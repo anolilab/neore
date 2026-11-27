@@ -219,6 +219,34 @@ describe(createControlSession, () => {
         expect(session.state()).toStrictEqual({ kind: "idle", message: CONTROL_ENDED });
     });
 
+    it("renews a retaken claim while a renewal of the one handed back is still out", async () => {
+        const stale = Promise.withResolvers<{ until: number }>();
+        const keep = vi.fn(async () => {
+            return { until: NOW + 2 * CONTROL_LEASE_MS };
+        });
+
+        keep.mockImplementationOnce(async () => await stale.promise);
+
+        const take = vi.fn(async () => OK);
+
+        take.mockResolvedValueOnce(OK).mockResolvedValueOnce({ ...OK, claim: "c-2", claimId: "id-2" });
+
+        const { session, tick } = setup({ keep, take });
+
+        await session.take();
+        tick();
+        session.release("handed_back");
+        await session.take();
+        tick();
+
+        expect(keep).toHaveBeenLastCalledWith("c-2");
+        await vi.waitFor(() => expect(session.state()).toMatchObject({ claim: "c-2", until: NOW + 2 * CONTROL_LEASE_MS }));
+
+        // The old renewal answering late changes nothing for the new claim.
+        stale.resolve({ until: NOW + 9 * CONTROL_LEASE_MS });
+        await vi.waitFor(() => expect(session.state()).toMatchObject({ claim: "c-2", until: NOW + 2 * CONTROL_LEASE_MS }));
+    });
+
     it("counts a page that loaded as a renewal, from when it was asked for", async () => {
         const clock = { at: NOW };
         const ticks: (() => void)[] = [];

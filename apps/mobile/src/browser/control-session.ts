@@ -119,7 +119,8 @@ export const createControlSession = ({
      * status comes to say so while renewals keep failing.
      */
     let endsAt = 0;
-    let isKeeping = false;
+    /** The take whose renewal is out, if any: one left out for a claim handed back never holds up a newer take's. */
+    let keepingFor: number | undefined;
 
     /** Read through a call: `state` changes while a take awaits, which a narrowed `state.kind` would hide. */
     const isHolding = (): boolean => state.kind === "holding";
@@ -134,16 +135,20 @@ export const createControlSession = ({
     };
     const keep = async (claim: string): Promise<void> => {
         // One renewal at a time, timed from when it was sent: the server set its end then, not when the answer came.
-        if (isKeeping) {
+        if (keepingFor === attempt) {
             return;
         }
 
-        isKeeping = true;
+        const mine = attempt;
+
+        keepingFor = mine;
 
         const sentAt = deviceNow();
         const answer = await withCatch(async () => await api.keep(claim), () => "failed" as const);
 
-        isKeeping = false;
+        if (keepingFor === mine) {
+            keepingFor = undefined;
+        }
 
         // A renewal that did not go out changes nothing: the next one tries again, or the lease ends on the server.
         if (answer === "failed" || state.kind !== "holding" || state.claim !== claim) {
