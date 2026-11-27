@@ -71,6 +71,111 @@ afterEach(() => {
     loadModelFilterRules.mockReset();
 });
 
+describe("extractMemories with an empty quotable prompt", () => {
+    const runWith = async (extra: Record<string, unknown>) =>
+        await harness.action(
+            async (ctx: any) =>
+                await ctx.runAction(extractMemories, {
+                    assistantResponse: "Sure, here is one way.",
+                    quotablePrompt: "",
+                    threadId,
+                    userId: USER,
+                    userMessage: MESSAGE,
+                    ...extra,
+                }),
+        );
+
+    it("runs no gate, classifier or model call when no typed steer is left", async () => {
+        loadModelFilterRules.mockResolvedValue({});
+        generateText.mockResolvedValue({ output: { facts: [], remember: true } });
+
+        await expect(runWith({})).resolves.toBeUndefined();
+
+        expect(loadModelFilterRules).not.toHaveBeenCalled();
+        expect(generateText).not.toHaveBeenCalled();
+
+        const { page } = await harness.run(async (ctx: any) => await ctx.db.actionCache.findMany({}));
+
+        expect(page.filter((row: any) => row.name === "memory.processedExchange")).toHaveLength(0);
+    });
+
+    it("still reads a typed steer: the gate and the model run on its text", async () => {
+        const steer = "Actually I am vegetarian, please remember that about me";
+
+        loadModelFilterRules.mockResolvedValue({});
+        generateText.mockResolvedValue({ output: { facts: [], remember: true } });
+
+        await runWith({ steeredFrom: 0, steers: [{ at: 100, from: 0 }], userMessage: steer });
+
+        expect(loadModelFilterRules).toHaveBeenCalled();
+        expect(generateText).toHaveBeenCalled();
+        expect(generateText.mock.calls.some(([call]) => JSON.stringify(call).includes(steer))).toBe(true);
+    });
+});
+
+describe("extractMemories with a privacy marker in a part the extractor does not read", () => {
+    const TYPED = "Actually I am vegetarian, please remember that about me";
+
+    const run = async (extra: Record<string, unknown>) => {
+        loadModelFilterRules.mockResolvedValue({});
+        generateText.mockResolvedValue({ output: { facts: [{ memory: "User is vegetarian", type: "identity" }], remember: true } });
+
+        await harness.action(async (ctx: any) => await ctx.runAction(extractMemories, { assistantResponse: "Noted.", threadId, userId: USER, ...extra }));
+
+        const { page } = await harness.run(async (ctx: any) => await ctx.db.memories.findMany({}));
+
+        return page as unknown[];
+    };
+
+    it("skips the turn when a prompt that is not quotable holds the marker and a typed steer follows", async () => {
+        const prompt = "Forwarded draft [private] about my plans";
+
+        const stored = await run({
+            quotablePrompt: "",
+            steeredFrom: prompt.length + 2,
+            steers: [{ at: 100, from: prompt.length + 2 }],
+            userMessage: `${prompt}\n\n${TYPED}`,
+        });
+
+        expect(stored).toHaveLength(0);
+        expect(loadModelFilterRules).not.toHaveBeenCalled();
+        expect(generateText).not.toHaveBeenCalled();
+    });
+
+    it("skips the turn when a steer the owner did not type holds the marker", async () => {
+        const prompt = "Plan my week";
+
+        const stored = await run({
+            quotablePrompt: prompt,
+            steeredFrom: prompt.length + 2,
+            steers: [
+                { at: 100, from: prompt.length + 2, notTyped: true },
+                { at: 200, from: prompt.length + 2 + "🔒 do not keep this".length + 2 },
+            ],
+            userMessage: `${prompt}\n\n🔒 do not keep this\n\n${TYPED}`,
+        });
+
+        expect(stored).toHaveLength(0);
+        expect(loadModelFilterRules).not.toHaveBeenCalled();
+        expect(generateText).not.toHaveBeenCalled();
+    });
+
+    it("skips the turn when a typed steer holds the marker", async () => {
+        const prompt = "Plan my week";
+
+        const stored = await run({
+            quotablePrompt: prompt,
+            steeredFrom: prompt.length + 2,
+            steers: [{ at: 100, from: prompt.length + 2 }],
+            userMessage: `${prompt}\n\n${TYPED} [no-memory]`,
+        });
+
+        expect(stored).toHaveLength(0);
+        expect(loadModelFilterRules).not.toHaveBeenCalled();
+        expect(generateText).not.toHaveBeenCalled();
+    });
+});
+
 describe("extractMemories when the model filter rules cannot be read", () => {
     it("does not crash: the classifier fails open and the extraction skips quietly", async () => {
         loadModelFilterRules.mockRejectedValue(new NoAllowedUtilityModelError());
@@ -78,7 +183,13 @@ describe("extractMemories when the model filter rules cannot be read", () => {
         await expect(
             harness.action(
                 async (ctx: any) =>
-                    await ctx.runAction(extractMemories, { assistantResponse: "Sure, here is one way.", threadId, userId: USER, userMessage: MESSAGE }),
+                    await ctx.runAction(extractMemories, {
+                        assistantResponse: "Sure, here is one way.",
+                        quotablePrompt: MESSAGE,
+                        threadId,
+                        userId: USER,
+                        userMessage: MESSAGE,
+                    }),
             ),
         ).resolves.toBeUndefined();
 
@@ -89,7 +200,13 @@ describe("extractMemories when the model filter rules cannot be read", () => {
     const run = async () =>
         await harness.action(
             async (ctx: any) =>
-                await ctx.runAction(extractMemories, { assistantResponse: "Sure, here is one way.", threadId, userId: USER, userMessage: MESSAGE }),
+                await ctx.runAction(extractMemories, {
+                    assistantResponse: "Sure, here is one way.",
+                    quotablePrompt: MESSAGE,
+                    threadId,
+                    userId: USER,
+                    userMessage: MESSAGE,
+                }),
         );
     const processedRows = async () => {
         const { page } = await harness.run(async (ctx: any) => await ctx.db.actionCache.findMany({}));

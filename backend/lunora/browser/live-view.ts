@@ -20,7 +20,7 @@ import { MAX_LENGTH } from "../lib/validators";
 import { throwForbidden, throwThreadNotFound } from "../lib/error-helpers";
 import { hmacSha256Hex, timingSafeEqual } from "../lib/crypto";
 import { fetchWithDeadline } from "../lib/fetch-timeout";
-import { getRateLimitKey, getUserTier } from "../lib/rate-limiter";
+import { getRateLimitKey, getUserTier, rateLimitGuard } from "../lib/rate-limiter";
 import { systemDb } from "../lib/rls/scope";
 import { isServiceBound, serviceFetch } from "../lib/services";
 import { validateDomain } from "../chat/tools/utilities";
@@ -311,12 +311,16 @@ export const getReaderBrowser = internalQuery
             v.object({ kind: v.literal("none") }),
             v.object({
                 canControl: v.boolean(),
+                /** How many fresh leases were taken on the row (`controlClaims`): a change between two reads is a lease taken in between. */
+                controlClaims: v.number(),
                 /** Someone other than the caller drives the browser. */
                 controlledByOther: v.boolean(),
                 /** The caller holds a lease they have not handed back; with `claim`, the lease that claim names. */
                 inControl: v.boolean(),
                 kind: v.literal("watchable"),
                 providerSessionId: v.string(),
+                /** The revision of the caller's grant this read saw; none for the owner. */
+                revision: v.optional(v.number()),
             }),
         ),
     )
@@ -329,6 +333,7 @@ export const getReaderBrowser = internalQuery
 
         return {
             canControl: browser.canControl,
+            controlClaims: browser.session.controlClaims ?? 0,
             controlledByOther: browser.control !== undefined && !browser.control.byCaller,
             inControl:
                 browser.control?.byCaller === true &&
@@ -336,6 +341,7 @@ export const getReaderBrowser = internalQuery
                 (claim === undefined || browser.session.control?.claim === claim),
             kind: browser.kind,
             providerSessionId: browser.providerSessionId,
+            ...(browser.revision !== undefined && { revision: browser.revision }),
         };
     });
 
@@ -456,11 +462,30 @@ const activeNow = (session: Doc<"browserSessions">, now: number): { lastActivity
  * that view closed meanwhile), and one that succeeds drops it ({@link settleControlClaim}).
  */
 export const claimControl = internalMutation
-    .input({ threadId: v.id("threads"), userId: v.string() })
+    /**
+     * `exclusive`: another view of the caller's that holds the lease is not taken over (`held`), as another person's is
+     * not. `mine`: the claim the asking view holds, so its own lease (one it lost track of) is never `held` from it.
+     * `view`: the asking view's own name, kept beside the lease (`controlView`), which lifts `held` the same way when it matches.
+     */
+    .input({
+        exclusive: v.optional(v.boolean()),
+        mine: v.optional(v.string()),
+        threadId: v.id("threads"),
+        userId: v.string(),
+        view: v.optional(v.string()),
+    })
     .output(
         v.union(
             v.object({
-                kind: v.union(v.literal("busy"), v.literal("denied"), v.literal("none"), v.literal("read_only"), v.literal("taken"), v.literal("unavailable")),
+                kind: v.union(
+                    v.literal("busy"),
+                    v.literal("denied"),
+                    v.literal("held"),
+                    v.literal("none"),
+                    v.literal("read_only"),
+                    v.literal("taken"),
+                    v.literal("unavailable"),
+                ),
             }),
             v.object({
                 claim: v.string(),
@@ -471,6 +496,8 @@ export const claimControl = internalMutation
                 kind: v.literal("ok"),
                 /** A renewal: the claim it replaced, which a failed renewal puts back for the view that still holds it. */
                 previousClaim: v.optional(v.string()),
+                /** A renewal: the view name the lease had (`controlView`), which a failed renewal puts back with its claim. */
+                previousView: v.optional(v.string()),
                 providerSessionId: v.string(),
                 /** An earlier lease ended and the agent was not told yet: a dropped claim puts that note back. */
                 returned: v.optional(v.union(v.literal("browser_closed"), v.literal("handed_back"), v.literal("idle"), v.literal("left"))),
@@ -481,7 +508,7 @@ export const claimControl = internalMutation
             }),
         ),
     )
-    .mutation(async ({ args: { threadId, userId }, ctx }) => {
+    .mutation(async ({ args: { exclusive, mine, threadId, userId, view }, ctx }) => {
         const browser = await readerBrowser(ctx, threadId, userId, ctx.now, { primary: true });
 
         if (browser.kind !== "watchable") {
@@ -494,6 +521,17 @@ export const claimControl = internalMutation
 
         if (browser.control !== undefined && !browser.control.byCaller) {
             return { kind: "taken" as const };
+        }
+
+        // Another of the caller's views drives the browser (not handed back): an exclusive claim leaves it to that view.
+        if (
+            exclusive === true &&
+            browser.control !== undefined &&
+            browser.session.control?.ended === undefined &&
+            (mine === undefined || !claimNames(browser.session.control, mine)) &&
+            (view === undefined || browser.session.controlView !== view)
+        ) {
+            return { kind: "held" as const };
         }
 
         // An agent action still runs, on the browser the row names or on one it reads as reaped (the renderer may reconnect to it).
@@ -526,6 +564,9 @@ export const claimControl = internalMutation
                     since: current.since,
                     until,
                 },
+                // The view taking the lease names itself or no one: a takeover by a view that names none never keeps the
+                // previous holder's name, which would let that holder take it back past `exclusive`.
+                controlView: view,
             });
 
             return {
@@ -533,6 +574,7 @@ export const claimControl = internalMutation
                 fresh: false,
                 kind: "ok" as const,
                 previousClaim: current.renewing ?? current.claim,
+                ...(browser.session.controlView !== undefined && { previousView: browser.session.controlView }),
                 providerSessionId: browser.providerSessionId,
                 shardKey: browser.shardKey,
                 until,
@@ -545,6 +587,8 @@ export const claimControl = internalMutation
         await patchRow(ctx.db, "browserSessions", browser.session, {
             ...activeNow(browser.session, ctx.now),
             control: { by, claim, since: ctx.now, until },
+            controlClaims: (browser.session.controlClaims ?? 0) + 1,
+            controlView: view,
         });
 
         return {
@@ -569,11 +613,12 @@ export const dropControlClaim = internalMutation
         claim: v.string(),
         handedBack: v.optional(v.union(v.literal("browser_closed"), v.literal("handed_back"), v.literal("left"))),
         previousClaim: v.optional(v.string()),
+        previousView: v.optional(v.string()),
         returned: v.optional(v.union(v.literal("browser_closed"), v.literal("handed_back"), v.literal("idle"), v.literal("left"))),
         threadId: v.id("threads"),
         userId: v.string(),
     })
-    .mutation(async ({ args: { claim, handedBack, previousClaim, returned, threadId, userId }, ctx }) => {
+    .mutation(async ({ args: { claim, handedBack, previousClaim, previousView, returned, threadId, userId }, ctx }) => {
         const session = await activeThreadSession(ctx.db, threadId);
         const control = session?.control;
 
@@ -590,6 +635,7 @@ export const dropControlClaim = internalMutation
                     ended: handedBack,
                     until: Math.max(ctx.now, control.navigatingUntil ?? 0),
                 },
+                controlView: previousView,
             });
 
             return;
@@ -607,6 +653,8 @@ export const dropControlClaim = internalMutation
                               ended: control.renewingEnded ?? ("left" as const),
                               until: Math.max(ctx.now, control.navigatingUntil ?? 0),
                           },
+                // The view that held the lease keeps its name with it.
+                controlView: previousView,
             });
 
             return;
@@ -664,9 +712,21 @@ export const settleControlClaim = internalMutation
  * the claim after the provider minted it, and is never returned to a caller who no longer holds the lease.
  */
 export const takeControl = authAction
-    /** `renews`: the claim of the view this refreshes (its URL expired unconnected), so a renewal is told from a takeover. */
-    .input({ renews: v.optional(v.string().max(MAX_LENGTH.short)), threadId: v.id("threads") })
-    .use(rateLimit("browser/liveView"))
+    /**
+     * `renews`: the claim of the view this refreshes (its URL expired unconnected), so a renewal is told from a takeover.
+     * `exclusive`: never take the lease over from another of the caller's views (`held`), for a client (the phone) that
+     * must not pull control out from under a tab the person is driving; the view's own lease (`renews` names it) is not
+     * another view's. `view`: the client's own name for the view (the phone's screen), kept beside the lease, so a take
+     * whose answer was lost is not refused as another view's when that view asks again. `leaseOnly`: the lease alone,
+     * for a client that frames no view (the phone): no interactive view is minted, and the answer carries no `url`.
+     */
+    .input({
+        exclusive: v.optional(v.boolean()),
+        leaseOnly: v.optional(v.boolean()),
+        renews: v.optional(v.string().max(MAX_LENGTH.short)),
+        threadId: v.id("threads"),
+        view: v.optional(v.string().max(MAX_LENGTH.short)),
+    })
     .output(
         v.union(
             /**
@@ -678,21 +738,34 @@ export const takeControl = authAction
             v.object({
                 claim: v.string(),
                 claimId: v.string(),
-                connectBy: v.number(),
+                connectBy: v.optional(v.number()),
                 release: v.optional(v.string()),
                 status: v.literal("ok"),
                 until: v.number(),
-                url: v.string(),
+                url: v.optional(v.string()),
             }),
-            v.object({ status: v.union(v.literal("busy"), v.literal("ended"), v.literal("taken"), v.literal("unavailable")) }),
+            v.object({ status: v.union(v.literal("busy"), v.literal("ended"), v.literal("held"), v.literal("taken"), v.literal("unavailable")) }),
         ),
     )
-    .action(async ({ args: { renews, threadId }, ctx }) => {
+    .action(async ({ args: { exclusive, leaseOnly, renews, threadId, view }, ctx }) => {
         const { impersonatedBy, userId } = ctx.user;
 
         refuseImpersonation(impersonatedBy);
+        // A view minted at the provider is charged to the live view budget; a lease alone (the phone) to control's, so a
+        // phone that takes control again and again never uses up the budget the web card's views need.
+        await rateLimitGuard({
+            ...ctx,
+            rateLimitKey: leaseOnly === true ? "browser/control" : "browser/liveView",
+            user: { isAdmin: ctx.user.isAdmin, plan: ctx.user.plan, userId },
+        } as never);
 
-        const claim = await ctx.runMutation(internal.browser.live_view.claimControl, { threadId, userId });
+        const claim = await ctx.runMutation(internal.browser.live_view.claimControl, {
+            threadId,
+            userId,
+            ...(exclusive === true && { exclusive }),
+            ...(renews !== undefined && { mine: renews }),
+            ...(view !== undefined && { view }),
+        });
 
         if (claim.kind === "denied") {
             return throwThreadNotFound();
@@ -717,6 +790,7 @@ export const takeControl = authAction
                 userId,
                 ...(claim.handedBack !== undefined && { handedBack: claim.handedBack }),
                 ...(claim.previousClaim !== undefined && { previousClaim: claim.previousClaim }),
+                ...(claim.previousView !== undefined && { previousView: claim.previousView }),
                 ...(claim.returned !== undefined && { returned: claim.returned }),
             });
         };
@@ -727,23 +801,28 @@ export const takeControl = authAction
             return { status };
         };
 
-        if (CLOUDFLARE_ACCOUNT_ID === "" || BROWSER_LIVE_VIEW_API_TOKEN === "") {
-            return await refuse("unavailable", "not_configured");
-        }
+        // A client that frames no view takes the lease alone: no interactive view (a credential) is minted for it.
+        let url: string | undefined;
 
-        const request = liveViewRequest(CLOUDFLARE_ACCOUNT_ID, BROWSER_LIVE_VIEW_API_TOKEN, claim.providerSessionId, true);
-        const response = await fetchWithDeadline(request.url, request.init).catch(() => undefined);
+        if (leaseOnly !== true) {
+            if (CLOUDFLARE_ACCOUNT_ID === "" || BROWSER_LIVE_VIEW_API_TOKEN === "") {
+                return await refuse("unavailable", "not_configured");
+            }
 
-        if (!response?.ok) {
-            await response?.body?.cancel().catch(() => undefined);
+            const request = liveViewRequest(CLOUDFLARE_ACCOUNT_ID, BROWSER_LIVE_VIEW_API_TOKEN, claim.providerSessionId, true);
+            const response = await fetchWithDeadline(request.url, request.init).catch(() => undefined);
 
-            return await refuse(response?.status === 404 || response?.status === 410 ? "ended" : "unavailable", `provider_${response?.status ?? "error"}`);
-        }
+            if (!response?.ok) {
+                await response?.body?.cancel().catch(() => undefined);
 
-        const url = liveViewUrlFrom(await response.json().catch(() => null));
+                return await refuse(response?.status === 404 || response?.status === 410 ? "ended" : "unavailable", `provider_${response?.status ?? "error"}`);
+            }
 
-        if (url === undefined) {
-            return await refuse("unavailable", "bad_url");
+            url = liveViewUrlFrom(await response.json().catch(() => null));
+
+            if (url === undefined) {
+                return await refuse("unavailable", "bad_url");
+            }
         }
 
         // The provider call takes time: a grant removed or lowered, a chat locked or trashed, a lease handed back, taken
@@ -803,11 +882,10 @@ export const takeControl = authAction
         return {
             claim: claim.claim,
             claimId: await claimIdOf(claim.claim),
-            connectBy: Date.now() + LIVE_VIEW_CONNECT_DEADLINE_MS,
             ...(release !== undefined && { release }),
             status: "ok" as const,
             until: claim.until,
-            url,
+            ...(url !== undefined && { connectBy: Date.now() + LIVE_VIEW_CONNECT_DEADLINE_MS, url }),
         };
     });
 

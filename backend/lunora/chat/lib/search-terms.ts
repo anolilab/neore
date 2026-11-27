@@ -12,6 +12,10 @@ export const MAX_SEARCH_TERMS = 16;
 
 const MAX_TERM_LENGTH = 256;
 const WORD = /[\p{L}\p{N}]+/gu;
+// A run no term crosses: letters, digits and the marks written on them. Normalised whole, it reads as it does in the text.
+const WORD_RUN = /[\p{L}\p{M}\p{N}]+/gu;
+// One character with the combining marks written after it (or a run of marks with no character before them).
+const CHARACTER = /\P{M}\p{M}*|\p{M}+/gsu;
 const CJK_RUN = /[\p{Script_Extensions=Han}\p{Script_Extensions=Hiragana}\p{Script_Extensions=Katakana}\p{Script_Extensions=Hangul}]+/gu;
 const CJK = /[\p{Script_Extensions=Han}\p{Script_Extensions=Hiragana}\p{Script_Extensions=Katakana}\p{Script_Extensions=Hangul}]/u;
 // Combining marks are dropped, except the ones Cyrillic letters such as й are written with.
@@ -19,44 +23,97 @@ const ACCENTS = /(?<=\p{Script=Cyrillic})[\u{300}-\u{305}\u{307}\u{309}-\u{36F}]
 
 const normalize = (text: string): string => text.normalize("NFD").replaceAll(ACCENTS, "").normalize("NFC").toLowerCase();
 
-/** A word with Chinese, Japanese or Korean in it, as the analyzer splits it: other text kept whole, each such run in pairs. */
-const splitCjk = (word: string): string[] => {
+/**
+ * A normalised word with Chinese, Japanese or Korean in it, as the analyzer splits it: other text kept whole, each such
+ * run in pairs. Each term carries its offset in the word.
+ */
+const splitCjk = (word: string): { at: number; term: string }[] => {
     if (!CJK.test(word)) {
-        return [word];
+        return [{ at: 0, term: word }];
     }
 
-    const out: string[] = [];
+    const out: { at: number; term: string }[] = [];
     let last = 0;
 
     for (const match of word.matchAll(CJK_RUN)) {
         const characters = [...match[0]];
 
         if (match.index > last) {
-            out.push(word.slice(last, match.index));
+            out.push({ at: last, term: word.slice(last, match.index) });
         }
 
         last = match.index + match[0].length;
 
-        if (characters.length === 1) {
-            out.push(match[0]);
-            continue;
-        }
+        let at = match.index;
 
-        for (let index = 0; index + 1 < characters.length; index += 1) {
-            out.push(`${characters[index]}${characters[index + 1]}`);
+        for (let index = 0; index < Math.max(1, characters.length - 1); index += 1) {
+            out.push({ at, term: characters.length === 1 ? match[0] : `${characters[index]}${characters[index + 1]}` });
+            at += characters[index]!.length;
         }
     }
 
     if (last < word.length) {
-        out.push(word.slice(last));
+        out.push({ at: last, term: word.slice(last) });
     }
 
     return out;
 };
 
+/**
+ * Where each unit of `normalize(run)` came from in `run`: the run is normalised one character with its marks at a time,
+ * and while that reads the same as the whole run normalised, each unit maps to its character. Otherwise (a sequence that
+ * only composes across characters, such as Hangul jamo) every unit maps to the run's start.
+ */
+const foldedOrigins = (run: string, folded: string): ((index: number) => number) => {
+    const origins: number[] = [];
+    let joined = "";
+
+    for (const character of run.matchAll(CHARACTER)) {
+        const piece = normalize(character[0]);
+
+        joined += piece;
+
+        for (let index = 0; index < piece.length; index += 1) {
+            origins.push(character.index);
+        }
+    }
+
+    return joined === folded ? (index) => origins[index] ?? 0 : () => 0;
+};
+
+/**
+ * Every term of `text` as the index reads it, in order, repeats included. Each run of letters, marks and digits is
+ * normalised whole (no term crosses one), so the terms are the index's; a term past {@link MAX_TERM_LENGTH} is dropped, as
+ * the index drops it. With `offsets`, each term also carries the offset in `text` where it starts: its word's first
+ * character, or its own pair inside a run of Chinese, Japanese or Korean. Without, `at` is 0 and no character is
+ * normalised alone, which a search over many prompts cannot afford.
+ */
+const readTerms = (text: string, offsets: boolean): { at: number; term: string }[] => {
+    const out: { at: number; term: string }[] = [];
+
+    for (const run of text.matchAll(WORD_RUN)) {
+        const folded = normalize(run[0]);
+        const origin = offsets ? foldedOrigins(run[0], folded) : undefined;
+
+        for (const word of folded.matchAll(WORD)) {
+            const terms = splitCjk(word[0]);
+
+            for (const { at, term } of terms) {
+                if (term.length <= MAX_TERM_LENGTH) {
+                    out.push({ at: origin ? run.index + origin(word.index + at) : 0, term });
+                }
+            }
+        }
+    }
+
+    return out;
+};
+
+/** Every term of `text` with the offset in `text` where it starts ({@link readTerms}): for placing an excerpt, not for a search. */
+export const documentTermsAt = (text: string): { at: number; term: string }[] => readTerms(text, true);
+
 /** Every term of `text`, in order, repeats included: what the index stores for a document. */
-export const documentTerms = (text: string): string[] =>
-    (normalize(text).match(WORD) ?? []).flatMap((word) => splitCjk(word)).filter((term) => term.length <= MAX_TERM_LENGTH);
+export const documentTerms = (text: string): string[] => readTerms(text, false).map(({ term }) => term);
 
 /** The terms a search for `text` looks for: each once, at its last place. */
 export const queryTerms = (text: string): string[] => {
@@ -82,6 +139,17 @@ export const capSearchTerms = (text: string): string => {
 
     return terms.length <= MAX_SEARCH_TERMS ? text : terms.slice(0, MAX_SEARCH_TERMS).join(" ");
 };
+
+/** Whether a document term matches one of the query's terms as the index matches them: whole, the last one also as a start. */
+const termMatches = (candidate: string, query: ReadonlyArray<string>): boolean =>
+    query.some((term, index) => (index === query.length - 1 ? candidate.startsWith(term) : candidate === term));
+
+/**
+ * Where in `text` the first term of the query appears, matched as {@link matchesQueryTerms} matches it, on the terms the
+ * index reads ({@link documentTermsAt}): the offset in `text` itself, not in a cleaned copy. -1 when none does.
+ */
+export const firstTermIndex = (text: string, query: ReadonlyArray<string>): number =>
+    documentTermsAt(text).find(({ term }) => termMatches(term, query))?.at ?? -1;
 
 /** Whether `text` holds every term of the query: each one whole, the last one as the start of a term, as the index matches. */
 export const matchesQueryTerms = (text: string, query: ReadonlyArray<string>): boolean => {

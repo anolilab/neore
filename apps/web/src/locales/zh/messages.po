@@ -52,7 +52,7 @@ msgid "\"{0}\" has variables that need values."
 msgstr "“{0}” 中有变量需要填写。"
 
 #. placeholder {0}: task.title
-#: src/features/tasks/components/tasks-page.tsx:122
+#: src/features/tasks/components/tasks-page.tsx:124
 msgid "\"{0}\" will start once its dependencies are done"
 msgstr "“{0}” 将在其依赖项完成后开始"
 
@@ -135,7 +135,7 @@ msgstr "（默认）"
 msgid "(deleted case)"
 msgstr "（已删除的用例）"
 
-#: src/features/tasks/components/tasks-page.tsx:172
+#: src/features/tasks/components/tasks-page.tsx:174
 msgid "(deleted task)"
 msgstr "（已删除的任务）"
 
@@ -241,7 +241,7 @@ msgstr "（共享）"
 msgid "(too large)"
 msgstr "（太大）"
 
-#: src/features/tasks/components/tasks-page.tsx:182
+#: src/features/tasks/components/tasks-page.tsx:184
 msgid "(unavailable skill)"
 msgstr "（技能不可用）"
 
@@ -698,7 +698,7 @@ msgid "{0} lines"
 msgstr "{0} 行"
 
 #. placeholder {0}: stats.total
-#: src/features/settings/components/personalization/memory-settings.tsx:211
+#: src/features/settings/components/personalization/memory-settings.tsx:214
 msgid "{0} memories"
 msgstr "{0} 条记忆"
 
@@ -788,7 +788,7 @@ msgid "{0} on {1}, in {2}"
 msgstr "{0}，位于 {1}，目录 {2}"
 
 #. placeholder {0}: stats.pinned
-#: src/features/settings/components/personalization/memory-settings.tsx:212
+#: src/features/settings/components/personalization/memory-settings.tsx:215
 msgid "{0} pinned"
 msgstr "{0} 条已置顶"
 
@@ -1544,7 +1544,7 @@ msgstr "{resultCount, plural, other {# 条结果}}"
 msgid "{resultCount} results"
 msgstr "{resultCount} 个结果"
 
-#: src/features/tasks/components/tasks-page.tsx:218
+#: src/features/tasks/components/tasks-page.tsx:222
 msgid "{reviewCount} tasks need your review"
 msgstr "{reviewCount} 个任务需要你审核"
 
@@ -2402,8 +2402,13 @@ msgstr "强调色已更新"
 
 #: src/features/auth/components/organization/accept-invitation-card.tsx:192
 #: src/features/auth/components/organization/user-invitations-card.tsx:116
+#: src/features/tasks/components/task-suggestions.tsx:297
 msgid "Accept"
 msgstr "接受"
+
+#: src/features/tasks/components/task-suggestions.tsx:290
+msgid "Accept \"{title}\""
+msgstr "接受“{title}”"
 
 #: src/features/auth/components/organization/accept-invitation-card.tsx:157
 msgid "Accept Invitation"
@@ -3309,7 +3314,7 @@ msgstr "需要阿里巴巴新一代 MoE 高效代码模型的智能体编程工�
 msgid "agents"
 msgstr "智能体"
 
-#: src/features/tasks/components/tasks-page.tsx:195
+#: src/features/tasks/components/tasks-page.tsx:197
 msgid "Agents work your tasks on their own. A verifier checks each result against its success criteria, and anything it will not pass comes back to you."
 msgstr "智能体会自主处理你的任务。验证器会根据成功标准检查每个结果，未通过的会退回给你。"
 
@@ -3539,7 +3544,7 @@ msgid "All"
 msgstr "全部"
 
 #. placeholder {0}: memories.length
-#: src/features/settings/components/personalization/memory-settings.tsx:233
+#: src/features/settings/components/personalization/memory-settings.tsx:236
 msgid "All ({0})"
 msgstr "全部（{0}）"
 
@@ -3707,7 +3712,7 @@ msgstr "所有服务器"
 msgid "All shards measured."
 msgstr "所有分片均已测量。"
 
-#: src/features/tasks/components/tasks-page.tsx:251
+#: src/features/tasks/components/tasks-page.tsx:255
 msgid "All tasks"
 msgstr "所有任务"
 
@@ -5549,7 +5554,7 @@ msgstr "蓝色"
 msgid "Blue Channel"
 msgstr "蓝色通道"
 
-#: src/features/tasks/components/tasks-page.tsx:258
+#: src/features/tasks/components/tasks-page.tsx:262
 msgid "Board"
 msgstr "看板"
 
@@ -5758,8 +5763,8 @@ msgid "Browse, fork, and remix workflows shared by the community"
 msgstr "浏览、复刻并改编社区分享的工作流"
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:824
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1038
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1267
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1035
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1264
 msgid "Browser"
 msgstr "浏览器"
 
@@ -6198,7 +6203,7 @@ msgstr "加拿大"
 #: src/features/settings/components/chat/usage-settings.tsx:568
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:421
 #: src/features/settings/components/personalization/memory-item.tsx:356
-#: src/features/settings/components/personalization/memory-settings.tsx:191
+#: src/features/settings/components/personalization/memory-settings.tsx:194
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:381
 #: src/features/settings/connectors/messenger/messenger-setup-dialog.tsx:156
 #: src/features/skills/components/bundle-export-dialog.tsx:219
@@ -7116,11 +7121,11 @@ msgstr "全部清除"
 msgid "Clear All"
 msgstr "全部清除"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:181
+#: src/features/settings/components/personalization/memory-settings.tsx:184
 msgid "Clear All Memories"
 msgstr "清除所有记忆"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:185
+#: src/features/settings/components/personalization/memory-settings.tsx:188
 msgid "Clear all memories?"
 msgstr "清除所有记忆？"
 
@@ -7171,7 +7176,7 @@ msgstr "清除标签筛选"
 msgid "Clear the queue"
 msgstr "清空队列"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:138
+#: src/features/settings/components/personalization/memory-settings.tsx:139
 msgid "Cleared {count} memories"
 msgstr "已清除 {count} 条记忆"
 
@@ -8580,7 +8585,7 @@ msgstr "上下文感知生成"
 #: ../../packages/ui/src/components/data-grid/data-grid-paste-dialog.tsx:131
 #: src/features/auth/components/device-code-parts.tsx:189
 #: src/features/chat/host/host-composer.tsx:969
-#: src/features/chat/thread/message-item.tsx:546
+#: src/features/chat/thread/message-item.tsx:547
 #: src/features/skills/components/skill-builder-dialog.tsx:328
 msgid "Continue"
 msgstr "继续"
@@ -8646,11 +8651,11 @@ msgstr "通过光圈设置控制景深"
 msgid "Control how your personal information is displayed in the UI."
 msgstr "控制个人信息在界面中的显示方式。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:507
+#: src/features/chat/browser-live-view/browser-live-view.tsx:504
 msgid "Control of the browser is back with the agent: the server did not confirm in time that you still have it."
 msgstr "浏览器的控制权已交还给智能体：服务器未能及时确认你仍拥有控制权。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:508
+#: src/features/chat/browser-live-view/browser-live-view.tsx:505
 msgid "Control of the browser is back with the agent."
 msgstr "浏览器的控制权已交还给智能体。"
 
@@ -8788,7 +8793,7 @@ msgstr "已复制到剪贴板"
 
 #: src/components/copy-button.tsx:50
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:95
-#: src/features/chat/thread/message-item.tsx:357
+#: src/features/chat/thread/message-item.tsx:358
 #: src/features/prompts/components/prompt-item.tsx:261
 msgid "Copied!"
 msgstr "已复制！"
@@ -8799,7 +8804,7 @@ msgstr "已复制！"
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:100
 #: src/features/chat/guest-links/guest-link-panel.tsx:365
 #: src/features/chat/sharing/thread-share-button.tsx:399
-#: src/features/chat/thread/message-item.tsx:357
+#: src/features/chat/thread/message-item.tsx:358
 #: src/features/chat/thread/text-selection-menu.tsx:525
 #: src/features/settings/components/chat/trigger-settings.tsx:767
 #: src/features/skills/components/bundle-import-dialog.tsx:207
@@ -8816,7 +8821,7 @@ msgstr "复制 {0} 到剪贴板"
 msgid "Copy as Markdown"
 msgstr "复制为 Markdown"
 
-#: src/features/chat/thread/message-item.tsx:374
+#: src/features/chat/thread/message-item.tsx:375
 msgid "Copy as plain text"
 msgstr "复制为纯文本"
 
@@ -9703,7 +9708,7 @@ msgstr "在 api.slack.com/apps 创建一个启用了 Events API 的 Slack 应用
 msgid "Create a tag…"
 msgstr "创建标签…"
 
-#: src/features/tasks/components/tasks-page.tsx:243
+#: src/features/tasks/components/tasks-page.tsx:247
 msgid "Create a task, give it success criteria, and run it. You can chain tasks with dependencies and repeat them on a schedule."
 msgstr "创建任务，设定成功标准并运行。你可以通过依赖关系串联任务，并按计划重复执行。"
 
@@ -10386,6 +10391,14 @@ msgstr "日期和时间"
 msgid "Day"
 msgstr "日期"
 
+#: src/features/tasks/hooks/use-schedule-label.ts:64
+msgid "Day {monthDay} of every month at {time} UTC"
+msgstr "每月{monthDay}日 {time} UTC"
+
+#: src/features/tasks/hooks/use-schedule-label.ts:61
+msgid "Day {monthDay} of the months that have one, at {time} UTC"
+msgstr "每个有该日期的月份的 {monthDay} 日 {time} UTC"
+
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:131
 msgid "days"
 msgstr "天"
@@ -10699,7 +10712,7 @@ msgstr "委派的{0}工作在此模型上运行。"
 #: src/features/skills/components/skill-list.tsx:311
 #: src/features/tasks/components/goal-list.tsx:54
 #: src/features/tasks/components/task-card.tsx:113
-#: src/features/tasks/components/tasks-page.tsx:330
+#: src/features/tasks/components/tasks-page.tsx:334
 #: src/features/vault/components/site-logins.tsx:655
 msgid "Delete"
 msgstr "删除"
@@ -10766,7 +10779,7 @@ msgstr "删除账号"
 msgid "Delete alert \"{ruleName}\""
 msgstr "删除提醒“{ruleName}”"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:192
+#: src/features/settings/components/personalization/memory-settings.tsx:195
 msgid "Delete All"
 msgstr "全部删除"
 
@@ -10805,7 +10818,7 @@ msgstr "删除数据集“{0}”？"
 msgid "Delete File"
 msgstr "删除文件"
 
-#: src/features/tasks/components/tasks-page.tsx:340
+#: src/features/tasks/components/tasks-page.tsx:344
 msgid "Delete goal \"{deleteTitle}\"?"
 msgstr "删除目标“{deleteTitle}”？"
 
@@ -10934,7 +10947,7 @@ msgstr "删除标签"
 msgid "Delete tag {0}"
 msgstr "删除标签 {0}"
 
-#: src/features/tasks/components/tasks-page.tsx:340
+#: src/features/tasks/components/tasks-page.tsx:344
 msgid "Delete task \"{deleteTitle}\"?"
 msgstr "删除任务“{deleteTitle}”？"
 
@@ -11536,9 +11549,14 @@ msgstr "Discord 公钥"
 #: src/features/chat/thread/composer-long-text-prompt.tsx:71
 #: src/features/develop/components/guide-view.tsx:141
 #: src/features/devices/components/devices-settings.tsx:391
+#: src/features/tasks/components/task-suggestions.tsx:286
 #: src/features/workflow/components/nodes/file-node.tsx:231
 msgid "Dismiss"
 msgstr "关闭"
+
+#: src/features/tasks/components/task-suggestions.tsx:273
+msgid "Dismiss \"{title}\""
+msgstr "关闭“{title}”"
 
 #: src/features/settings/components/personalization/memory-digest-card.tsx:54
 msgid "Dismiss digest"
@@ -11795,7 +11813,7 @@ msgstr "下载模型"
 msgid "Download as CSV"
 msgstr "下载为 CSV"
 
-#: src/features/chat/thread/message-item.tsx:378
+#: src/features/chat/thread/message-item.tsx:379
 msgid "Download as Markdown"
 msgstr "下载为 Markdown"
 
@@ -12226,7 +12244,7 @@ msgstr "边缘引导生成"
 #: src/features/chat/host/host-composer.tsx:1060
 #: src/features/chat/thread-list/group-header.tsx:178
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:799
-#: src/features/chat/thread/message-item.tsx:397
+#: src/features/chat/thread/message-item.tsx:398
 #: src/features/develop/components/draft-comment-card.tsx:51
 #: src/features/pages/components/page-version-panel.tsx:50
 #: src/features/prompts/components/prompt-item.tsx:212
@@ -12728,7 +12746,7 @@ msgstr "启用后续建议"
 msgid "Enable for Next Chat"
 msgstr "为下一个聊天启用"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:170
+#: src/features/settings/components/personalization/memory-settings.tsx:171
 msgid "Enable memory"
 msgstr "启用记忆"
 
@@ -13345,6 +13363,10 @@ msgstr "事件"
 msgid "Event ends on"
 msgstr "活动结束于"
 
+#: src/features/tasks/hooks/use-schedule-label.ts:70
+msgid "Every {weekday} at {time} UTC"
+msgstr "每{weekday} {time} UTC"
+
 #: src/features/settings/components/chat/trigger-settings.tsx:174
 msgid "Every 6 hours"
 msgstr "每 6 小时"
@@ -13357,7 +13379,12 @@ msgstr "此机器人的每次聊天和计划运行只获得这些工具。你的
 msgid "Every chat, unless its project sets the role."
 msgstr "所有聊天，除非其项目设置了该角色。"
 
+#: src/features/tasks/hooks/use-schedule-label.ts:49
+msgid "Every day at {time} UTC"
+msgstr "每天 {time} UTC"
+
 #: src/features/tasks/components/task-form-dialog.tsx:126
+#: src/features/tasks/hooks/use-schedule-label.ts:19
 msgid "Every day at 09:00 UTC"
 msgstr "每天 09:00 UTC"
 
@@ -13366,8 +13393,13 @@ msgid "Every day at 8 AM"
 msgstr "每天早上 8 点"
 
 #: src/features/tasks/components/task-form-dialog.tsx:127
+#: src/features/tasks/hooks/use-schedule-label.ts:23
 msgid "Every hour"
 msgstr "每小时"
+
+#: src/features/tasks/hooks/use-schedule-label.ts:43
+msgid "Every hour at minute {minute}"
+msgstr "每小时，第 {minute} 分钟"
 
 #: src/features/marketing/components/landing-page.tsx:206
 msgid "Every leading AI model. One conversation."
@@ -14014,7 +14046,7 @@ msgstr "封禁用户失败"
 msgid "Failed to cancel export"
 msgstr "取消导出失败"
 
-#: src/features/tasks/components/tasks-page.tsx:128
+#: src/features/tasks/components/tasks-page.tsx:130
 msgid "Failed to cancel the task"
 msgstr "取消任务失败"
 
@@ -14026,7 +14058,7 @@ msgstr "更改标签颜色失败"
 msgid "Failed to clear filter rules"
 msgstr "清除筛选规则失败"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:134
+#: src/features/settings/components/personalization/memory-settings.tsx:135
 msgid "Failed to clear memories"
 msgstr "清除记忆失败"
 
@@ -14087,6 +14119,10 @@ msgstr "创建预设失败"
 msgid "Failed to create tag"
 msgstr "创建标签失败"
 
+#: src/features/tasks/components/task-suggestions.tsx:293
+msgid "Failed to create the task"
+msgstr "创建任务失败"
+
 #: src/features/settings/components/chat/trigger-settings.tsx:545
 msgid "Failed to create trigger"
 msgstr "创建触发器失败"
@@ -14095,7 +14131,7 @@ msgstr "创建触发器失败"
 msgid "Failed to cut to clipboard"
 msgstr "剪切到剪贴板失败"
 
-#: src/features/tasks/components/tasks-page.tsx:152
+#: src/features/tasks/components/tasks-page.tsx:154
 msgid "Failed to delete"
 msgstr "删除失败"
 
@@ -14119,7 +14155,7 @@ msgstr "删除文件失败，请重试。"
 msgid "Failed to delete files"
 msgstr "删除文件失败"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:106
+#: src/features/settings/components/personalization/memory-settings.tsx:107
 msgid "Failed to delete memory"
 msgstr "删除记忆失败"
 
@@ -14206,6 +14242,10 @@ msgstr "断开连接器失败"
 #: src/features/settings/components/personalization/memory-digest-card.tsx:32
 msgid "Failed to dismiss the digest"
 msgstr "关闭摘要失败"
+
+#: src/features/tasks/components/task-suggestions.tsx:280
+msgid "Failed to dismiss the suggestion"
+msgstr "关闭建议失败"
 
 #: src/features/settings/components/privacy/data-export.tsx:69
 msgid "Failed to download export"
@@ -14311,6 +14351,10 @@ msgstr "加载技能失败"
 #: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:482
 msgid "Failed to load spreadsheet"
 msgstr "加载电子表格失败"
+
+#: src/features/tasks/components/task-suggestions.tsx:186
+msgid "Failed to load the suggested tasks"
+msgstr "无法加载建议的任务"
 
 #: src/features/settings/components/chat/usage-settings.tsx:275
 msgid "Failed to load usage data. Ensure the LLM Gateway is running and reachable."
@@ -14554,7 +14598,7 @@ msgstr "开始连接失败"
 msgid "Failed to start the run"
 msgstr "开始运行失败"
 
-#: src/features/tasks/components/tasks-page.tsx:125
+#: src/features/tasks/components/tasks-page.tsx:127
 msgid "Failed to start the task"
 msgstr "开始任务失败"
 
@@ -14640,8 +14684,8 @@ msgstr "更新键盘快捷键失败"
 msgid "Failed to update MCP server"
 msgstr "更新 MCP 服务器失败"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:117
-#: src/features/settings/components/personalization/memory-settings.tsx:125
+#: src/features/settings/components/personalization/memory-settings.tsx:118
+#: src/features/settings/components/personalization/memory-settings.tsx:126
 msgid "Failed to update memory"
 msgstr "更新记忆失败"
 
@@ -14669,7 +14713,8 @@ msgstr "无法更新拉取请求设置"
 msgid "Failed to update reply tools"
 msgstr "无法更新回复工具"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:149
+#: src/features/settings/components/personalization/memory-settings.tsx:150
+#: src/features/settings/components/personalization/schedule-ideas-switch.tsx:42
 msgid "Failed to update setting"
 msgstr "更新设置失败"
 
@@ -15367,7 +15412,7 @@ msgstr "按类型筛选"
 msgid "Filter condition"
 msgstr "筛选条件"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:219
+#: src/features/settings/components/personalization/memory-settings.tsx:222
 msgid "Filter memories by type"
 msgstr "按类型筛选记忆"
 
@@ -15736,7 +15781,7 @@ msgstr "复刻"
 msgid "Fork {0} to edit a copy"
 msgstr "复刻 {0} 以编辑副本"
 
-#: src/features/chat/thread/message-item.tsx:409
+#: src/features/chat/thread/message-item.tsx:410
 msgid "Fork conversation"
 msgstr "复刻对话"
 
@@ -16268,7 +16313,7 @@ msgstr "根据描述生成"
 msgid "Generate ideas for a creative writing story"
 msgstr "为创意写作故事构思点子"
 
-#: src/features/chat/thread/message-item.tsx:428
+#: src/features/chat/thread/message-item.tsx:429
 msgid "Generate image"
 msgstr "生成图像"
 
@@ -16294,7 +16339,7 @@ msgstr "生成随机种子"
 msgid "Generate unique business ideas for 2025"
 msgstr "为 2025 年构思独特的商业点子"
 
-#: src/features/chat/thread/message-item.tsx:438
+#: src/features/chat/thread/message-item.tsx:439
 msgid "Generate video"
 msgstr "生成视频"
 
@@ -16307,7 +16352,7 @@ msgstr "生成视频"
 msgid "Generate videos from text or images"
 msgstr "根据文本或图像生成视频"
 
-#: src/features/chat/thread/message-item.tsx:448
+#: src/features/chat/thread/message-item.tsx:449
 msgid "Generate voice"
 msgstr "生成语音"
 
@@ -16527,7 +16572,7 @@ msgstr "授予他人访问此页面的权限，或发布一个只读链接。"
 msgid "Global analyst research, market analysis, and investment data"
 msgstr "全球分析师研究、市场分析和投资数据"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1138
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1135
 msgid "Go"
 msgstr "前往"
 
@@ -16674,7 +16719,7 @@ msgstr "目标：{goalTitle}"
 msgid "Goal: run until done"
 msgstr "目标：运行直至完成"
 
-#: src/features/tasks/components/tasks-page.tsx:224
+#: src/features/tasks/components/tasks-page.tsx:228
 msgid "Goals"
 msgstr "目标"
 
@@ -17112,7 +17157,7 @@ msgstr "高"
 msgid "Hand (pan)"
 msgstr "抓手（平移）"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1061
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1058
 msgid "Hand back"
 msgstr "交还"
 
@@ -17272,7 +17317,7 @@ msgstr "隐藏列"
 msgid "Hide follow-up suggestions"
 msgstr "隐藏后续建议"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1056
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1053
 msgid "Hide live view"
 msgstr "隐藏实时画面"
 
@@ -17744,6 +17789,10 @@ msgstr "非常适合简单的分类和提取任务"
 #: src/features/chat/thread/thread-welcome-suggestions.tsx:71
 msgid "Ideas"
 msgstr "创意"
+
+#: src/features/tasks/components/task-suggestions.tsx:172
+msgid "Ideas from your own recent messages. Nothing is created until you accept one."
+msgstr "根据你自己最近的消息生成的想法。在你接受之前不会创建任何内容。"
 
 #: src/features/settings/components/personalization/memory-types.ts:28
 msgid "Identity"
@@ -19082,7 +19131,7 @@ msgstr "保留为我的"
 msgid "Keep chats with an open pull request"
 msgstr "保留有打开的拉取请求的聊天"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1081
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1078
 msgid "Keep control"
 msgstr "保持控制"
 
@@ -19993,7 +20042,7 @@ msgstr "正在关联…"
 msgid "Linux"
 msgstr "Linux"
 
-#: src/features/tasks/components/tasks-page.tsx:262
+#: src/features/tasks/components/tasks-page.tsx:266
 msgid "List"
 msgstr "列表"
 
@@ -20058,11 +20107,11 @@ msgstr "实时预览——组件流式输出完成后渲染"
 msgid "Live preview — updating as the artifact streams"
 msgstr "实时预览——随工件流式输出实时更新"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1172
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1169
 msgid "Live view of the agent's browser (read-only)"
 msgstr "智能体浏览器的实时画面（只读）"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1172
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1169
 msgid "Live view of the agent's browser (you have control)"
 msgstr "智能体浏览器的实时画面（由你控制）"
 
@@ -20119,7 +20168,7 @@ msgid "Load preset"
 msgstr "加载预设"
 
 #: src/features/chat/thread/chat-error.tsx:47
-#: src/features/chat/thread/message-item.tsx:525
+#: src/features/chat/thread/message-item.tsx:526
 msgid "Load the earlier messages, then try again: this reply's prompt is not loaded."
 msgstr "请先加载更早的消息，然后重试：此回复对应的提问尚未加载。"
 
@@ -20332,7 +20381,7 @@ msgstr "正在加载电子表格…"
 msgid "Loading statistics…"
 msgstr "正在加载统计数据…"
 
-#: src/features/tasks/components/tasks-page.tsx:212
+#: src/features/tasks/components/tasks-page.tsx:216
 msgid "Loading tasks…"
 msgstr "正在加载任务…"
 
@@ -21304,7 +21353,7 @@ msgid "memories"
 msgstr "记忆"
 
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:31
-#: src/features/settings/components/personalization/memory-settings.tsx:245
+#: src/features/settings/components/personalization/memory-settings.tsx:248
 msgid "Memories"
 msgstr "记忆"
 
@@ -21322,7 +21371,7 @@ msgid "Memories used for this reply ({0})"
 msgstr "此回复使用的记忆（{0}）"
 
 #: src/features/marketing/use-cases/use-case-data.ts:114
-#: src/features/settings/components/personalization/memory-settings.tsx:165
+#: src/features/settings/components/personalization/memory-settings.tsx:166
 #: src/features/settings/lib/settings-keywords.ts:116
 msgid "Memory"
 msgstr "记忆"
@@ -21331,15 +21380,15 @@ msgstr "记忆"
 msgid "Memory — what the agent keeps across chats"
 msgstr "记忆——智能体跨聊天保留的内容"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:110
+#: src/features/settings/components/personalization/memory-settings.tsx:111
 msgid "Memory deleted"
 msgstr "记忆已删除"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:147
+#: src/features/settings/components/personalization/memory-settings.tsx:148
 msgid "Memory disabled"
 msgstr "记忆已关闭"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:147
+#: src/features/settings/components/personalization/memory-settings.tsx:148
 msgid "Memory enabled"
 msgstr "记忆已开启"
 
@@ -22018,6 +22067,7 @@ msgid "Mon"
 msgstr "周一"
 
 #: src/features/tasks/components/task-form-dialog.tsx:130
+#: src/features/tasks/hooks/use-schedule-label.ts:31
 msgid "Mondays at 09:00 UTC"
 msgstr "每周一 09:00 UTC"
 
@@ -22100,7 +22150,7 @@ msgstr "更多操作"
 msgid "More actions for {0}"
 msgstr "{0} 的更多操作"
 
-#: src/features/chat/thread/message-item.tsx:366
+#: src/features/chat/thread/message-item.tsx:367
 msgid "More copy options"
 msgstr "更多复制选项"
 
@@ -22911,7 +22961,7 @@ msgid "New first"
 msgstr "最新优先"
 
 #: src/features/tasks/components/goal-form-dialog.tsx:73
-#: src/features/tasks/components/tasks-page.tsx:201
+#: src/features/tasks/components/tasks-page.tsx:203
 msgid "New goal"
 msgstr "新建目标"
 
@@ -22978,7 +23028,7 @@ msgid "New tag"
 msgstr "新标签"
 
 #: src/features/tasks/components/task-form-dialog.tsx:206
-#: src/features/tasks/components/tasks-page.tsx:205
+#: src/features/tasks/components/tasks-page.tsx:207
 msgid "New task"
 msgstr "新建任务"
 
@@ -23420,6 +23470,10 @@ msgstr "还没有历史记录"
 msgid "No icon found"
 msgstr "未找到图标"
 
+#: src/features/settings/components/personalization/schedule-ideas-switch.tsx:54
+msgid "No ideas are made while memory is off."
+msgstr "记忆关闭时不会生成想法。"
+
 #: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:171
 #: src/features/chat/thread/media-gallery-view.tsx:353
 msgid "No images yet"
@@ -23429,7 +23483,7 @@ msgstr "还没有图片"
 msgid "No indexed files available. Files are still being processed."
 msgstr "没有已索引的文件。文件仍在处理中。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1078
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1075
 msgid "No input for a while: control goes back to the agent in under a minute."
 msgstr "已有一段时间没有输入：控制权将在一分钟内交还给智能体。"
 
@@ -23481,11 +23535,11 @@ msgstr "未配置 MCP 服务器。添加服务器以扩展 AI 能力。"
 msgid "No members in this team yet"
 msgstr "此团队还没有成员"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:261
+#: src/features/settings/components/personalization/memory-settings.tsx:264
 msgid "No memories of this type."
 msgstr "没有此类型的记忆。"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:262
+#: src/features/settings/components/personalization/memory-settings.tsx:265
 msgid "No memories yet. The AI will start learning from your conversations automatically."
 msgstr "还没有记忆。AI 会自动从你的对话中开始学习。"
 
@@ -23775,7 +23829,7 @@ msgstr "暂无摘要。点击“生成”来创建一个。"
 msgid "No tags yet"
 msgstr "还没有标签"
 
-#: src/features/tasks/components/tasks-page.tsx:242
+#: src/features/tasks/components/tasks-page.tsx:246
 msgid "No tasks yet"
 msgstr "还没有任务"
 
@@ -24419,6 +24473,10 @@ msgstr "下次访问聊天时将重新开始新手引导。"
 #: src/features/onboarding/components/onboarding-dialog.tsx:312
 msgid "Onboarding wizard"
 msgstr "新手引导向导"
+
+#: src/features/settings/components/personalization/schedule-ideas-switch.tsx:53
+msgid "Once a day, suggest recurring tasks based only on your own recent messages. Nothing is created until you accept a suggestion. Turning this off deletes the suggestions waiting for you."
+msgstr "每天根据你自己最近的消息建议一次重复任务。在你接受建议之前不会创建任何内容。关闭此项会删除等待处理的建议。"
 
 #: src/features/marketing/use-cases/use-case-data.ts:123
 msgid "Once a night, for users active that day, a reflection pass merges duplicates and promotes repeated facts."
@@ -25284,11 +25342,11 @@ msgstr "正在创建拉取请求…"
 msgid "Opening the assistant without a conversation takes you to your most recent one instead of a blank chat."
 msgstr "在没有对话的情况下打开助手，会带你到最近的对话，而不是空白对话。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1089
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1086
 msgid "Opening the live view…"
 msgstr "正在打开实时画面…"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1144
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1141
 msgid "Opening the page. This can take up to a minute."
 msgstr "正在打开页面，最多可能需要一分钟。"
 
@@ -25742,7 +25800,7 @@ msgstr "第 {currentPage} 页，共 {totalPages} 页"
 msgid "Page added. It is being fetched and indexed."
 msgstr "已添加网页，正在获取并建立索引。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1123
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1120
 #: src/features/settings/components/chat/event-trigger-fields.tsx:217
 msgid "Page address"
 msgstr "页面地址"
@@ -26443,7 +26501,7 @@ msgstr "置顶记忆"
 
 #: ../../packages/chat-ui/src/chat/message-item.tsx:144
 #: ../../packages/chat-ui/src/chat/message-item.tsx:193
-#: src/features/chat/thread/message-item.tsx:385
+#: src/features/chat/thread/message-item.tsx:386
 msgid "Pin message"
 msgstr "置顶消息"
 
@@ -28590,7 +28648,7 @@ msgid "Refresh installed models"
 msgstr "刷新已安装的模型"
 
 #: ../../packages/chat-ui/src/chat/message-item.tsx:198
-#: src/features/chat/thread/message-item.tsx:391
+#: src/features/chat/thread/message-item.tsx:392
 msgid "Regenerate"
 msgstr "重新生成"
 
@@ -29108,6 +29166,10 @@ msgstr "重复"
 msgid "Repeats ({0} UTC)"
 msgstr "重复（{0} UTC）"
 
+#: src/features/tasks/hooks/use-schedule-label.ts:37
+msgid "Repeats ({cronExpression} UTC)"
+msgstr "重复（{cronExpression} UTC）"
+
 #: src/features/settings/components/chat/api-keys-settings.tsx:378
 msgid "Replace"
 msgstr "替换"
@@ -29567,6 +29629,7 @@ msgstr "重试"
 #: src/features/settings/components/chat/bot-tool-selection.tsx:495
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:485
 #: src/features/tasks/components/task-detail-dialog.tsx:108
+#: src/features/tasks/components/task-suggestions.tsx:194
 #: src/features/workflow/components/nodes/file-node.tsx:221
 #: src/lib/toast.ts:70
 #: src/lib/toast.ts:171
@@ -30431,6 +30494,14 @@ msgstr "计划"
 msgid "Schedule {0}"
 msgstr "计划 {0}"
 
+#: src/features/settings/components/personalization/schedule-ideas-switch.tsx:37
+msgid "Schedule ideas disabled"
+msgstr "已关闭计划任务建议"
+
+#: src/features/settings/components/personalization/schedule-ideas-switch.tsx:37
+msgid "Schedule ideas enabled"
+msgstr "已开启计划任务建议"
+
 #: src/features/skills/components/bundle-import-dialog.tsx:55
 msgid "Schedule or webhook"
 msgstr "计划任务或 webhook"
@@ -31064,7 +31135,7 @@ msgid "Select the lens characteristics"
 msgstr "选择镜头特性"
 
 #: src/features/chat/thread/chat-error.tsx:49
-#: src/features/chat/thread/message-item.tsx:528
+#: src/features/chat/thread/message-item.tsx:529
 msgid "Select the model that wrote this reply to continue it."
 msgstr "请选择生成此回复的模型以继续。"
 
@@ -31716,12 +31787,17 @@ msgid "Show a message in the app when a chat waits for your answer or your appro
 msgstr "聊天等待你的回复或批准时在应用内显示提醒。"
 
 #: src/features/skills/components/bundle-import-dialog.tsx:99
+#: src/features/tasks/components/task-suggestions.tsx:265
 msgid "Show all"
 msgstr "显示全部"
 
 #: ../../packages/ui/src/components/chat-markdown.tsx:83
 msgid "Show all {lines} lines"
 msgstr "显示全部 {lines} 行"
+
+#: src/features/tasks/components/task-suggestions.tsx:255
+msgid "Show all instructions for \"{title}\""
+msgstr "显示“{title}”的全部说明"
 
 #: src/features/tasks/components/goal-list.tsx:73
 msgid "Show all tasks"
@@ -31766,8 +31842,13 @@ msgstr "显示标签"
 #: ../../packages/ui/src/components/chat-markdown.tsx:83
 #: src/features/chat/pins/pin-item.tsx:214
 #: src/features/skills/components/bundle-import-dialog.tsx:99
+#: src/features/tasks/components/task-suggestions.tsx:265
 msgid "Show less"
 msgstr "收起"
+
+#: src/features/tasks/components/task-suggestions.tsx:255
+msgid "Show less of the instructions for \"{title}\""
+msgstr "收起“{title}”的说明"
 
 #: src/features/chat/pins/pin-item.tsx:214
 msgid "Show more"
@@ -32502,8 +32583,8 @@ msgid "Some steps had no pricing data; the total is a minimum."
 msgstr "部分步骤缺少价格数据；总额为最低值。"
 
 #: src/features/chat/browser-live-view/browser-human-check.tsx:435
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1042
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1101
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1039
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1098
 msgid "Someone else has control of this browser."
 msgstr "其他人正在控制此浏览器。"
 
@@ -33851,6 +33932,10 @@ msgstr "已成功从 {0} 导入 {imported} 个对话"
 msgid "Suggest innovative solutions to reduce plastic waste"
 msgstr "提出减少塑料垃圾的创新方案"
 
+#: src/features/settings/components/personalization/schedule-ideas-switch.tsx:59
+msgid "Suggest scheduled tasks"
+msgstr "建议计划任务"
+
 #: src/features/chat/thread/thread-welcome-suggestions.tsx:107
 msgid "Suggest video ideas for a tech YouTube channel"
 msgstr "为科技类 YouTube 频道提供视频创意"
@@ -33868,9 +33953,21 @@ msgstr "建议的答案"
 msgid "Suggested next prompt: {nextPromptSuggestion}. Press Tab to insert."
 msgstr "建议的下一条提示：{nextPromptSuggestion}。按 Tab 键插入。"
 
+#: src/features/tasks/components/task-suggestions.tsx:170
+msgid "Suggested tasks"
+msgstr "建议的任务"
+
 #: src/features/chat/thread/composer-tiptap/composer-tiptap-editor.tsx:689
 msgid "Suggestion available, press Right Arrow to accept"
 msgstr "有可用建议，按右方向键接受"
+
+#: src/features/tasks/components/task-suggestions.tsx:279
+msgid "Suggestion dismissed: {title}"
+msgstr "建议已关闭：{title}"
+
+#: src/features/tasks/components/task-suggestions.tsx:176
+msgid "Suggestion updates"
+msgstr "建议更新"
 
 #: src/features/settings/lib/settings-keywords.ts:33
 msgid "suggestions"
@@ -34119,7 +34216,7 @@ msgstr "系统（默认）"
 msgid "System default"
 msgstr "系统默认"
 
-#: src/features/chat/thread/message-item.tsx:237
+#: src/features/chat/thread/message-item.tsx:238
 msgid "System message:"
 msgstr "系统消息："
 
@@ -34216,7 +34313,7 @@ msgid "Take an input image, remove the background, then apply style transfer"
 msgstr "输入一张图像，移除背景，然后应用风格迁移"
 
 #: src/features/chat/browser-live-view/browser-human-check.tsx:588
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1066
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1063
 msgid "Take control"
 msgstr "接管控制"
 
@@ -34232,7 +34329,7 @@ msgstr "接管控制，完成验证，然后把浏览器交还。"
 msgid "Take turns"
 msgstr "轮流发言"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:356
+#: src/features/chat/browser-live-view/browser-live-view.tsx:353
 msgid "Taking control is not available while impersonating."
 msgstr "模拟登录期间无法接管控制。"
 
@@ -34285,6 +34382,10 @@ msgstr "任务"
 msgid "Task approved"
 msgstr "任务已批准"
 
+#: src/features/tasks/components/task-suggestions.tsx:293
+msgid "Task created: {title}"
+msgstr "任务已创建：{title}"
+
 #: src/features/tasks/components/task-detail-dialog.tsx:211
 msgid "Task details, your review and the run history."
 msgstr "任务详情、你的审核以及运行历史。"
@@ -34335,18 +34436,18 @@ msgstr "任务已排队等待再次运行"
 msgid "Task rejected"
 msgstr "任务已拒绝"
 
-#: src/features/tasks/components/tasks-page.tsx:255
+#: src/features/tasks/components/tasks-page.tsx:259
 msgid "Task views"
 msgstr "任务视图"
 
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:34
 #: src/features/layout/components/sidebar-shortcut.tsx:101
-#: src/features/tasks/components/tasks-page.tsx:192
+#: src/features/tasks/components/tasks-page.tsx:194
 msgid "Tasks"
 msgstr "任务"
 
 #. placeholder {0}: goalTitleById.get(selectedGoalId) ?? ""
-#: src/features/tasks/components/tasks-page.tsx:251
+#: src/features/tasks/components/tasks-page.tsx:255
 msgid "Tasks for {0}"
 msgstr "{0} 的任务"
 
@@ -34875,12 +34976,12 @@ msgid "That message was already sent."
 msgstr "该消息已发送。"
 
 #. placeholder {0}: result.error
-#: src/features/chat/browser-live-view/browser-live-view.tsx:942
+#: src/features/chat/browser-live-view/browser-live-view.tsx:939
 msgid "That page could not be opened: {0}"
 msgstr "无法打开该页面：{0}"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:656
-#: src/features/chat/browser-live-view/browser-live-view.tsx:962
+#: src/features/chat/browser-live-view/browser-live-view.tsx:653
+#: src/features/chat/browser-live-view/browser-live-view.tsx:959
 msgid "That page could not be opened."
 msgstr "无法打开该页面。"
 
@@ -34989,7 +35090,7 @@ msgstr "智能体未提供该选项"
 msgid "The agent finished without giving a guide. Write it again."
 msgstr "智能体已结束，但未给出指南。请重新撰写。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1100
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1097
 msgid "The agent is finishing a browser action, which can take over a minute. Try again shortly."
 msgstr "智能体正在完成一项浏览器操作，可能需要一分钟以上。请稍后再试。"
 
@@ -35001,7 +35102,7 @@ msgstr "智能体仍在打开会话。请稍后重试。"
 msgid "The agent is still working on the last message."
 msgstr "智能体仍在处理上一条消息。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1039
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1036
 msgid "The agent is using a browser"
 msgstr "智能体正在使用浏览器"
 
@@ -35025,7 +35126,7 @@ msgstr "智能体未更改任何文件。"
 msgid "The agent on your computer is reading the change…"
 msgstr "你电脑上的智能体正在读取此变更…"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:936
+#: src/features/chat/browser-live-view/browser-live-view.tsx:933
 msgid "The agent's browser closed while the page loaded."
 msgstr "页面加载期间，智能体的浏览器已关闭。"
 
@@ -35037,7 +35138,7 @@ msgstr "代理的浏览器在 {site} 上遇到了只有真人才能通过的页�
 msgid "The agent's browser reached a page only a person can clear. The agent waits and will not try to get around it."
 msgstr "代理的浏览器遇到了只有真人才能通过的页面。代理会等待，不会尝试绕过它。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:818
+#: src/features/chat/browser-live-view/browser-live-view.tsx:815
 msgid "The agent's browser was replaced, and control went back to the agent. You can take control again."
 msgstr "智能体的浏览器已被替换，控制权已交还给智能体。你可以再次接管控制。"
 
@@ -35054,7 +35155,7 @@ msgstr "智能体的计划"
 msgid "The agent's tool calls"
 msgstr "智能体的工具调用"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:164
+#: src/features/settings/components/personalization/memory-settings.tsx:165
 msgid "The AI learns from your conversations to personalize its responses, and reflects on what it learned each night. Everything it remembers is listed here — edit, retype, pin or delete any of it."
 msgstr "AI 会从你的对话中学习以个性化回复，并在每晚反思所学内容。它记住的一切都列在这里——你可以编辑、修改类型、置顶或删除其中任何一条。"
 
@@ -35115,7 +35216,7 @@ msgstr "目前无法接管此浏览器。如果仍需要该页面，请让代理
 msgid "The browser cannot read this video to capture a frame"
 msgstr "浏览器无法读取此视频，因此无法截取帧"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:911
+#: src/features/chat/browser-live-view/browser-live-view.tsx:908
 msgid "The browser could not be handed back. The agent gets it back on its own after two minutes without input."
 msgstr "无法交还浏览器。两分钟内没有输入后，它会自动回到智能体手中。"
 
@@ -35379,7 +35480,7 @@ msgstr "免费方案包括：在精选的快速、低成本模型上每天 20 �
 msgid "The full system prompt to send to the model..."
 msgstr "发送给模型的完整系统提示词..."
 
-#: src/features/tasks/components/tasks-page.tsx:333
+#: src/features/tasks/components/tasks-page.tsx:337
 msgid "The goal is removed; its tasks stay, without a goal."
 msgstr "目标将被删除；其任务会保留，但不再属于任何目标。"
 
@@ -35532,11 +35633,11 @@ msgstr "链接可能有误，或者所有者已将该对话设为私有或删除
 msgid "The link may be wrong, or its owner has unpublished or deleted the page."
 msgstr "链接可能有误，或者所有者已取消发布或删除该页面。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1109
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1106
 msgid "The live view could not be opened."
 msgstr "无法打开实时画面。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1094
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1091
 msgid "The live view is not available right now."
 msgstr "实时画面暂时不可用。"
 
@@ -35691,7 +35792,7 @@ msgstr "页面现在显示的是另一个版本。请从你的版本中复制想
 msgid "The page with the login form. Leave empty to start at the site's front page."
 msgstr "包含登录表单的页面。留空则从网站首页开始。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1149
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1146
 msgid "The page you opened is still loading."
 msgstr "你打开的页面仍在加载。"
 
@@ -35882,7 +35983,7 @@ msgstr "子代理无法启动。"
 msgid "The tag \"{pendingDeleteName}\" will be removed from every chat that has it. The chats themselves are not deleted."
 msgstr "标签“{pendingDeleteName}”将从所有使用它的聊天中移除。聊天本身不会被删除。"
 
-#: src/features/tasks/components/tasks-page.tsx:334
+#: src/features/tasks/components/tasks-page.tsx:338
 msgid "The task and its run history are removed. Tasks that depend on it stop waiting for it."
 msgstr "任务及其运行历史将被删除。依赖它的任务将不再等待它。"
 
@@ -36819,7 +36920,7 @@ msgid "This will permanently delete {0} anonymous user accounts and all their da
 msgstr "这将永久删除 {0} 个匿名用户账号及其所有数据。此操作无法撤销。"
 
 #. placeholder {0}: memories.length
-#: src/features/settings/components/personalization/memory-settings.tsx:187
+#: src/features/settings/components/personalization/memory-settings.tsx:190
 msgid "This will permanently delete all {0} memories and their daily digests. The AI will start learning fresh from your next conversation."
 msgstr "这将永久删除全部 {0} 条记忆及其每日摘要。AI 将从你的下一次对话开始重新学习。"
 
@@ -37253,7 +37354,7 @@ msgstr "尝试次数过多。请稍等几秒后重试。"
 msgid "too many files"
 msgstr "文件过多"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1108
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1105
 msgid "Too many live views were opened. Try again later."
 msgstr "打开的实时画面过多，请稍后再试。"
 
@@ -37676,8 +37777,8 @@ msgstr "尝试调整搜索词。"
 #: src/features/auth/components/device-approval.tsx:95
 #: src/features/auth/components/device-approval.tsx:338
 #: src/features/chat/browser-live-view/browser-human-check.tsx:578
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1113
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1280
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1110
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1277
 #: src/features/chat/guest-links/guest-page.tsx:269
 #: src/features/connection/components/offline-screen.tsx:64
 #: src/features/develop/components/files-tab.tsx:400
@@ -39799,7 +39900,7 @@ msgstr "想从这里继续吗？"
 msgid "Watch"
 msgstr "监视"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1056
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1053
 msgid "Watch live"
 msgstr "观看实时画面"
 
@@ -39950,7 +40051,12 @@ msgstr "WeChat Token"
 msgid "Wed"
 msgstr "周三"
 
+#: src/features/tasks/hooks/use-schedule-label.ts:53
+msgid "Weekdays at {time} UTC"
+msgstr "工作日 {time} UTC"
+
 #: src/features/tasks/components/task-form-dialog.tsx:129
+#: src/features/tasks/hooks/use-schedule-label.ts:27
 msgid "Weekdays at 09:00 UTC"
 msgstr "工作日 09:00 UTC"
 
@@ -40240,7 +40346,7 @@ msgstr "让想法<0/><1>化为行动。</1>"
 msgid "Where you stay in control"
 msgstr "你始终掌控"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1269
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1266
 msgid "Whether the agent is using a browser could not be checked."
 msgstr "无法检查智能体是否正在使用浏览器。"
 
@@ -40744,8 +40850,8 @@ msgstr "你已拒绝此验证。在本次回复中，智能体不会再使用此
 msgid "You get a notification when a run finishes, needs your review or fails. A finished run links to its chat, and a run that needs review links to the tasks board."
 msgstr "运行完成、需要你审阅或失败时，你会收到通知。已完成的运行会链接到其聊天，需要审阅的运行会链接到任务看板。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:541
-#: src/features/chat/browser-live-view/browser-live-view.tsx:890
+#: src/features/chat/browser-live-view/browser-live-view.tsx:538
+#: src/features/chat/browser-live-view/browser-live-view.tsx:887
 msgid "You handed the browser back to the agent."
 msgstr "你已将浏览器交还给智能体。"
 
@@ -40811,7 +40917,7 @@ msgstr "今天的翻译次数已用完。请稍后再试。"
 msgid "You marked this check done. The agent looks at the page again before it goes on."
 msgstr "你已将此验证标记为完成。智能体会在继续之前再次查看页面。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:356
+#: src/features/chat/browser-live-view/browser-live-view.tsx:353
 msgid "You may not take control of this browser."
 msgstr "你无法控制此浏览器。"
 
@@ -40819,10 +40925,10 @@ msgstr "你无法控制此浏览器。"
 msgid "You need to sign in to access this page."
 msgstr "你需要登录才能访问此页面。"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:546
-#: src/features/chat/browser-live-view/browser-live-view.tsx:709
-#: src/features/chat/browser-live-view/browser-live-view.tsx:890
-#: src/features/chat/browser-live-view/browser-live-view.tsx:938
+#: src/features/chat/browser-live-view/browser-live-view.tsx:543
+#: src/features/chat/browser-live-view/browser-live-view.tsx:706
+#: src/features/chat/browser-live-view/browser-live-view.tsx:887
+#: src/features/chat/browser-live-view/browser-live-view.tsx:935
 msgid "You no longer have control of the browser."
 msgstr "你已不再控制此浏览器。"
 
@@ -40991,7 +41097,7 @@ msgstr "你的聊天和 {0}"
 msgid "Your chats and the bots you chose"
 msgstr "你的聊天和你选择的机器人"
 
-#: src/features/chat/browser-live-view/browser-live-view.tsx:1158
+#: src/features/chat/browser-live-view/browser-live-view.tsx:1155
 msgid "Your clicks, typing and scrolling in the view go to the browser. The agent waits until you hand it back."
 msgstr "你在画面中的点击、输入和滚动都会发送到浏览器。在你交还之前，智能体会等待。"
 

@@ -14,6 +14,7 @@ import type { Doc, Id } from "../../../_generated/dataModel";
 import { internal } from "../../../_generated/internal";
 import { internalMutation } from "../../../_generated/server";
 import { enqueueJob } from "../../../lib/job-queue";
+import { hasNotTypedMarks } from "../../../lib/not-typed-text";
 import { patchRow } from "../../../lib/patch";
 import { activeGoalsOf } from "../../goals/rows";
 import { runAfterWithRetry } from "../../../lib/shard-scheduler";
@@ -253,7 +254,9 @@ const vVerdict = v.union(
         /** The steer rows delivered into the reply, in order: their text is what a memory quoting a steer reads. */
         steerRowIds: v.optional(v.array(v.string())),
         /** Each delivered steer with when it was sent and its text length, in order: how a recovered reply splits its rows. */
-        steers: v.optional(v.array(v.object({ messageId: v.string(), sentAt: v.optional(v.number()), textLength: v.optional(v.number()) }))),
+        steers: v.optional(
+            v.array(v.object({ messageId: v.string(), notTyped: v.optional(v.boolean()), sentAt: v.optional(v.number()), textLength: v.optional(v.number()) })),
+        ),
         threadId: v.string(),
         timeZone: v.optional(v.string()),
         userId: v.string(),
@@ -378,11 +381,14 @@ export const inspectRun = internalMutation
                 ),
             ];
 
+            // The steers the owner did not type (`notTypedSteers`): a recovered reply must not quote them either.
+            const notTypedIds = new Set((stream.notTypedSteers ?? []).filter((entry) => hasNotTypedMarks(entry.notTyped)).map((entry) => entry.id));
             const steers = ((stream.steers as SteerEntry[] | undefined) ?? []).flatMap((entry) =>
                 entry.status === "delivered" && entry.messageId !== undefined
                     ? [
                           {
                               messageId: entry.messageId,
+                              ...(notTypedIds.has(entry.id) && { notTyped: true }),
                               ...(entry.sentAt !== undefined && { sentAt: entry.sentAt }),
                               ...(entry.textLength !== undefined && { textLength: entry.textLength }),
                           },

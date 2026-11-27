@@ -33,6 +33,7 @@ import MemoryImportDialog from "./memory-import-dialog";
 import MemoryItem from "./memory-item";
 import type { MemoryType } from "./memory-types";
 import { isMemoryType, MEMORY_TYPES, useMemoryTypeLabels } from "./memory-types";
+import ScheduleIdeasSwitch from "./schedule-ideas-switch";
 
 type TypeFilter = MemoryType | "all";
 
@@ -169,6 +170,8 @@ const MemorySettings: FC = () => {
                 htmlFor="memory-enabled-switch"
                 title={t`Enable memory`}
             />
+
+            <ScheduleIdeasSwitch memoryEnabled={memoryEnabled} />
 
             {/* Outside the enabled block: with memory off it offers to turn it on first. */}
             <div className="border-border/50 flex flex-wrap items-center gap-2 border-t py-3">
