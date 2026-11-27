@@ -87,7 +87,7 @@ const sidebarHeader = (
 const NAV_CLASSES = {
     button: "h-8 gap-2.5 rounded-lg px-2 text-sm",
     buttonActive: "bg-surface-well dark:bg-surface-row-active text-foreground shadow-none!",
-    group: "pl-2",
+    group: "px-2",
 };
 
 const RouteComponent = () => {
