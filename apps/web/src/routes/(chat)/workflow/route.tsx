@@ -6,7 +6,7 @@ import SidebarShortcut from "@/features/layout/components/sidebar-shortcut";
 const WorkflowLayout = () => (
     <div className="flex h-dvh w-full">
         <SidebarShortcut userDropdown />
-        <SidebarInset className="bg-surface-main surface-edge overflow-hidden md:m-2 md:ml-0 md:rounded-2xl">
+        <SidebarInset className="bg-surface-main surface-edge overflow-hidden md:m-2 md:rounded-2xl">
             <Outlet />
         </SidebarInset>
     </div>
