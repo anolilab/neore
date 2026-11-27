@@ -704,7 +704,8 @@ const eraseOlderVersions = async (
     await wakeShardForCleanup(ctx, userId, dueAt);
 
     if (cleanupId) {
-        await ctx.db.patch("memoryCleanups", cleanupId, { dueAt, frontier: pending });
+        // A saved position is progress: the failures counted so far were not in a row, and the backoff is over.
+        await ctx.db.patch("memoryCleanups", cleanupId, { attempts: 0, dueAt, frontier: pending });
 
         return { cleanupId, olderVersions };
     }
@@ -729,6 +730,11 @@ export const stepMemoryCleanup = internalMutation
             return { again: false, failed: false, userId: row?.userId ?? "" };
         }
 
+        // An account being erased: the erasure removes its records and the vectors they name (`gdpr.ts`), so no step runs meanwhile.
+        if (await isAccountDeletionUnderway(ctx, row.userId)) {
+            return { again: false, failed: false, userId: row.userId };
+        }
+
         if (row.kind === "chain") {
             const next = await eraseOlderVersions(ctx, row.userId, row.frontier ?? [], [], row._id, row.startedAt ?? ctx.now);
 
@@ -741,7 +747,7 @@ export const stepMemoryCleanup = internalMutation
             if (next === null) {
                 await ctx.db.delete("memoryCleanups", row._id);
             } else {
-                await ctx.db.patch("memoryCleanups", row._id, { cursor: next, dueAt: ctx.now + CLEANUP_GRACE_MS });
+                await ctx.db.patch("memoryCleanups", row._id, { attempts: 0, cursor: next, dueAt: ctx.now + CLEANUP_GRACE_MS });
                 await wakeShardForCleanup(ctx, row.userId, ctx.now + CLEANUP_GRACE_MS);
             }
 

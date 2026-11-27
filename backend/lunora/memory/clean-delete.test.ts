@@ -858,6 +858,59 @@ describe("a cleanup step that fails", () => {
         expect(String(givenUp()[0]?.[0])).toMatch(GAVE_UP);
     });
 
+    it("counts consecutive failures, so a long walk with a failure after every step is finished and never given up", async () => {
+        // 3000 ids with no older versions: 15 steps of 200 lookups.
+        const cleanupId = await run(async (ctx) => {
+            const ids = Array.from({ length: 3000 }, () => crypto.randomUUID() as Id<"memories">);
+
+            return await ctx.db.insert("memoryCleanups", { dueAt: 0, frontier: ids, kind: "chain", userId: OWNER });
+        });
+        let failures = 0;
+
+        for (let round = 0; round < 40 && (await cleanupOf(cleanupId)) !== null; round += 1) {
+            await run(async (ctx) => await ctx.runMutation(stepMemoryCleanup, { cleanupId }));
+
+            if ((await cleanupOf(cleanupId)) === null) {
+                break;
+            }
+
+            // A failure after the step that made progress: counted as one, not added to the ones before it.
+            await run(async (ctx) => await ctx.runMutation(noteMemoryCleanupFailure, { cleanupId }));
+            failures += 1;
+
+            const counted = await cleanupOf(cleanupId);
+
+            expect(counted?.attempts).toBe(1);
+        }
+
+        // More failures than the cap, none given up, and the walk is done.
+        expect(failures).toBeGreaterThan(12);
+        expect(await cleanupOf(cleanupId)).toBeNull();
+        expect(memoryLogger.error).not.toHaveBeenCalledWith(expect.stringMatching(GAVE_UP));
+    });
+
+    it("stands down while the account is being erased", async () => {
+        const { cleanupId, older } = await seedChain(3);
+
+        await run(
+            async (ctx) =>
+                await ctx.db.insert("gdprRequests", {
+                    requestedAt: 1,
+                    requestType: "deletion",
+                    status: "processing",
+                    userEmail: "a@example.com",
+                    userId: OWNER,
+                }),
+        );
+
+        const step: any = await run(async (ctx) => await ctx.runMutation(stepMemoryCleanup, { cleanupId }));
+
+        // Terminal, and nothing walked: the erasure removes the record and what it names.
+        expect(step).toMatchObject({ again: false, failed: false });
+        expect(await memoryCount()).toBe(older.length);
+        expect(await cleanupOf(cleanupId)).not.toBeNull();
+    });
+
     it("does nothing for a record that has used its attempts", async () => {
         const { cleanupId, older } = await seedChain(3);
 
