@@ -117,9 +117,12 @@ export const chargeRound = async (ctx: MutationCtx, userId: string, account: Tas
     return true;
 };
 
-/** Gives back what {@link chargeRound} took, for a round that was refused before it ran (a limiter refund never goes below what was spent). */
-export const refundRound = async (ctx: MutationCtx, userId: string, account: TaskAccount, kind: "chat" | "task" = "task"): Promise<void> => {
-    for (const key of roundQuotaKeys(account, kind)) {
+/**
+ * Gives back one unit to each of the named limits: the exact keys a charge took (`roundQuotaKeys` at the time), not a set derived again
+ * from the account now, which a plan change in between would turn into other limits. The limiter leaves a window that has rolled over alone.
+ */
+export const refundRoundKeys = async (ctx: MutationCtx, userId: string, keys: ReadonlyArray<string>): Promise<void> => {
+    for (const key of keys) {
         await createRatelimit(key, ctx.db as never).refund(userId);
     }
 };

@@ -38,7 +38,8 @@ import { loadEligibleThread } from "../devices/internal";
 import { enqueueJob } from "../lib/job-queue";
 import { JOB_LEASE_MS } from "../lib/job-once";
 import { isThreadLocked } from "../lib/thread-lock";
-import { chargeRound, loadTaskAccount, refundRound, taskAccessProblem } from "../tasks/account";
+import { chargeRound, loadTaskAccount, refundRoundKeys, roundQuotaKeys, taskAccessProblem } from "../tasks/account";
+import { heldWakeLeases } from "./pr-watch-wake-lease";
 import { PR_WATCH_MAX_WAKES, PR_WATCH_WAKE_COOLDOWN_MS, type WatchWakeReason } from "./pr-watch-logic";
 
 /**
@@ -66,6 +67,12 @@ export const isTerminalWakeError = (error: unknown): boolean =>
 
 const vReason = v.union(v.literal("checks"), v.literal("conflict"), v.literal("review"));
 const vMarkers = v.object({ checks: v.optional(v.string()), conflict: v.optional(v.string()), review: v.optional(v.string()) });
+
+const vBegin = v.union(
+    v.object({ status: v.literal("stale") }),
+    v.object({ status: v.literal("wait") }),
+    v.object({ charged: v.array(v.string()), status: v.literal("run") }),
+);
 
 const vTurn = v.object({
     claim: v.number(),
@@ -177,6 +184,13 @@ export const claimWatchWake = internalMutation
             return null;
         }
 
+        // Another watch's turn is running in this thread (a thread can link several pull requests): no replacement claim beside it.
+        const running = await heldWakeLeases(ctx, link.userId, link.threadId, ctx.now, link._id);
+
+        if (running.length > 0) {
+            return null;
+        }
+
         // An unattended turn answers to the same limits as a task or trigger run: the account must be allowed to run them. The round is
         // charged by the job, right before the model is asked (`beginWatchWake`).
         if (taskAccessProblem(await loadTaskAccount(ctx, link.userId)) !== undefined) {
@@ -258,13 +272,13 @@ export const startWatchWake = internalAction
  */
 export const beginWatchWake = internalMutation
     .input({ ...key, claim: v.number() })
-    .output(v.union(v.literal("run"), v.literal("stale"), v.literal("wait")))
+    .output(vBegin)
     .mutation(async ({ args, ctx }) => {
         const link = await ctx.db.get("pullRequestThreads", args.linkId);
 
         // Not this claim's lease (a newer claim replaced it): leave it alone, it is not ours to free.
         if (link === null || link.watchWakeLeaseUntil !== args.claim) {
-            return "stale" as const;
+            return { status: "stale" as const };
         }
 
         const same =
@@ -277,7 +291,7 @@ export const beginWatchWake = internalMutation
         if (!same || ctx.now >= args.claim) {
             await ctx.db.patch("pullRequestThreads", link._id, { watchWakeLeaseUntil: 0 });
 
-            return "stale" as const;
+            return { status: "stale" as const };
         }
 
         const waits = async () => {
@@ -291,7 +305,7 @@ export const beginWatchWake = internalMutation
                 watchWakeLeaseUntil: 0,
             });
 
-            return "wait" as const;
+            return { status: "wait" as const };
         };
 
         if ((await wakeableThread(ctx, link)) === null) {
@@ -305,19 +319,19 @@ export const beginWatchWake = internalMutation
             return await waits();
         }
 
-        return "run" as const;
+        // The exact limits this round was charged to, handed to the job so a refund gives back those and not whatever the plan maps to later.
+        return { charged: roundQuotaKeys(account), status: "run" as const };
     });
 
-/** Gives the round back for a turn that failed before it reached the model; never called for one that made a model call. */
+/**
+ * Gives the round back for a turn that failed before it reached the model (never one that made a model call): one unit to each limit
+ * the charge took, as `beginWatchWake` reported them.
+ */
 export const refundWatchWakeRound = internalMutation
-    .input({ userId: v.string() })
+    .input({ charged: v.array(v.string()), userId: v.string() })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
-        const account = await loadTaskAccount(ctx, args.userId);
-
-        if (account !== null) {
-            await refundRound(ctx, args.userId, account);
-        }
+        await refundRoundKeys(ctx, args.userId, args.charged);
 
         return null;
     });
@@ -423,9 +437,11 @@ export const runWatchWake = internalAction
         // Checked again right before the turn: a watch stopped since the claim, a reply that started, a lock or a delete.
         const may = await ctx.runMutation(internal.source_control.pr_watch_wake.beginWatchWake, identity);
 
-        if (may !== "run") {
+        if (may.status !== "run") {
             return null;
         }
+
+        const { charged } = may;
 
         let delivered = false;
         let terminal = false;
@@ -453,9 +469,11 @@ export const runWatchWake = internalAction
             terminal = isTerminalWakeError(error);
 
             if (!reachedModel) {
-                await ctx.runMutation(internal.source_control.pr_watch_wake.refundWatchWakeRound, { userId: args.userId }).catch((refundError: unknown) => {
-                    console.warn("[pr-watch-wake] could not give the round back", { linkId: args.linkId, refundError });
-                });
+                await ctx
+                    .runMutation(internal.source_control.pr_watch_wake.refundWatchWakeRound, { charged, userId: args.userId })
+                    .catch((refundError: unknown) => {
+                        console.warn("[pr-watch-wake] could not give the round back", { linkId: args.linkId, refundError });
+                    });
             }
 
             console.warn("[pr-watch-wake] the wake turn failed", { error, linkId: args.linkId, terminal });

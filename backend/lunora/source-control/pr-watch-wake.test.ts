@@ -24,7 +24,9 @@ const { enqueued, probe, registry, runs } = vi.hoisted(() => {
             failWith: undefined as unknown,
             leaseSeenAtEnqueue: undefined as number | undefined,
             readLease: undefined as ((linkId: string) => Promise<number | undefined>) | undefined,
+            refundedKeys: [] as string[][],
             refunds: 0,
+            tier: "premium" as "free" | "premium",
         },
         registry: new Map<string, unknown>(),
         runs: [] as Record<string, any>[],
@@ -56,10 +58,11 @@ vi.mock("../tasks/account", async (importOriginal) => {
             return probe.allowRound;
         },
         loadTaskAccount: async () => {
-            return { isAdmin: false, isAnonymous: probe.anonymous, tier: "free" as const };
+            return { isAdmin: false, isAnonymous: probe.anonymous, tier: probe.tier };
         },
-        refundRound: async () => {
+        refundRoundKeys: async (_ctx: unknown, _userId: string, keys: string[]) => {
             probe.refunds += 1;
+            probe.refundedKeys.push(keys);
         },
     };
 });
@@ -70,6 +73,9 @@ vi.mock("../chat/lib/headless-run", () => {
             runs.push(options);
 
             if (probe.failBeforeModel) {
+                // The plan changes between the charge and the refund.
+                probe.tier = "free";
+
                 throw probe.failWith ?? new Error("failed before the model");
             }
 
@@ -125,6 +131,8 @@ beforeEach(() => {
     probe.leaseSeenAtEnqueue = undefined;
     probe.readLease = undefined;
     probe.refunds = 0;
+    probe.refundedKeys = [];
+    probe.tier = "premium";
     probe.fail = false;
     probe.failWith = undefined;
     harness = lunoraTest(schema as never);
@@ -264,6 +272,39 @@ describe("the scheduled step", () => {
         expect(await start(stopped.linkId)).toBe(false);
         expect(await start(locked.linkId)).toBe(false);
         expect(await start(busy.linkId)).toBe(false);
+    });
+
+    it("refuses a claim in a thread another watch's turn is running in", async () => {
+        const first = await seed();
+        const second = await harness.run(async (ctx: any) => {
+            const link = await ctx.db.get("pullRequestThreads", first.linkId);
+
+            return String(
+                await ctx.db.insert("pullRequestThreads", {
+                    createdAt: 0,
+                    kind: "linked",
+                    number: 8,
+                    repository: "octo/hello",
+                    threadId: link.threadId,
+                    title: "pull 8",
+                    url: "https://github.com/octo/hello/pull/8",
+                    userId: OWNER,
+                    watch: { baselined: true, checksHeadSha: "sha-1", headSha: "sha-1", startedAt: STARTED_AT },
+                    watchActive: true,
+                    watchPending: ["checks"],
+                    watchRun: "run-1",
+                }),
+            );
+        });
+
+        expect(await start(first.linkId)).toBe(true);
+        // The same thread, a different pull request: it waits for the first turn.
+        expect(await start(second)).toBe(false);
+        expect(enqueued).toHaveLength(1);
+
+        // Once the first turn has ended, the second goes ahead.
+        await runJob(enqueued[0]!);
+        expect(await start(second)).toBe(true);
     });
 
     it("hands the lease to one claimant only, also past the old 14-minute mark", async () => {
@@ -601,6 +642,10 @@ describe("the check right before the turn", () => {
         await runJob(first.job);
         expect(probe.charges).toBe(1);
         expect(probe.refunds).toBe(1);
+        // The buckets the charge took (premium), not the ones the account maps to when the refund runs (free).
+        expect(probe.refundedKeys[0]).toEqual(["chat/dailyText:premium", "tasks/dailyRuns:premium"]);
+        expect(probe.tier).toBe("free");
+        probe.tier = "premium";
 
         probe.failBeforeModel = false;
         enqueued.length = 0;
@@ -638,8 +683,8 @@ describe("the check right before the turn", () => {
         const { job, linkId } = await claimed();
         const begin = async (claim: number) => await harness.run(async (ctx: any) => await ctx.runMutation(beginWatchWake, { ...key(linkId), claim }));
 
-        expect(await begin(job.args.claim)).toBe("run");
-        expect(await begin(1)).toBe("stale");
+        expect(await begin(job.args.claim)).toMatchObject({ charged: expect.any(Array), status: "run" });
+        expect(await begin(1)).toEqual({ status: "stale" });
     });
 });
 
