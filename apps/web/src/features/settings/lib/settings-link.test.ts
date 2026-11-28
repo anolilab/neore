@@ -1,6 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { adminPathFor, anchorFromHash, settingsAnchorForPath, settingsLinkSearch, settingsLocation, settingsTabForPath } from "./settings-link";
+import {
+    adminPathFor,
+    anchorFromHash,
+    scrollToAnchorWhenRendered,
+    settingsAnchorForPath,
+    settingsLinkSearch,
+    settingsLocation,
+    settingsTabForPath,
+} from "./settings-link";
 
 describe("settingsTabForPath", () => {
     it.each([
@@ -114,5 +122,49 @@ describe("adminPathFor", () => {
     it("leaves every other path alone", () => {
         expect(adminPathFor("/dashboard/settings/administrator")).toBeUndefined();
         expect(adminPathFor("/dashboard/settings/auth/account")).toBeUndefined();
+    });
+});
+
+describe(scrollToAnchorWhenRendered, () => {
+    afterEach(() => {
+        vi.useRealTimers();
+        document.body.replaceChildren();
+    });
+
+    const mount = (html: string): HTMLElement => {
+        const root = document.createElement("div");
+
+        root.innerHTML = html;
+        document.body.append(root);
+
+        for (const element of root.querySelectorAll<HTMLElement>("*")) {
+            element.scrollIntoView = vi.fn();
+        }
+
+        return root;
+    };
+
+    it("moves focus to the control the link names", () => {
+        vi.useFakeTimers();
+        const root = mount('<label for="daily-brief">Daily brief</label><button id="daily-brief" role="switch"></button>');
+        const done = vi.fn();
+
+        scrollToAnchorWhenRendered(() => root, "daily-brief", done);
+        vi.advanceTimersToNextFrame();
+
+        expect(document.activeElement?.id).toBe("daily-brief");
+        expect(root.querySelector("#daily-brief")?.hasAttribute("tabindex")).toBe(false);
+        expect(done).toHaveBeenCalledTimes(1);
+    });
+
+    it("focuses a card the link names without making it a tab stop", () => {
+        vi.useFakeTimers();
+        const root = mount('<section id="devices-ssh"><h3>Servers over SSH</h3><button>Add</button></section>');
+
+        scrollToAnchorWhenRendered(() => root, "devices-ssh", vi.fn());
+        vi.advanceTimersToNextFrame();
+
+        expect(document.activeElement?.id).toBe("devices-ssh");
+        expect(root.querySelector<HTMLElement>("#devices-ssh")?.tabIndex).toBe(-1);
     });
 });

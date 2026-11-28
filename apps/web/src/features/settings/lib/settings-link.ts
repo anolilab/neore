@@ -147,8 +147,8 @@ export const settingsLocation = (tab: SettingsTab, anchor?: string): { search: S
 const ANCHOR_WAIT_MS = 5000;
 
 /**
- * Scrolls to the element `id` inside the tab once it is there: the tab is lazy, so the element can arrive after the
- * modal opens. Calls `done` once it has scrolled, or after a few seconds without it. Returns a cancel.
+ * Scrolls to the element `id` inside the tab once it is there, and moves focus to it: the tab is lazy, so the element
+ * can arrive after the modal opens. Calls `done` once it has scrolled, or after a few seconds without it. Returns a cancel.
  */
 export const scrollToAnchorWhenRendered = (getRoot: () => HTMLElement | null, id: string, done: () => void): (() => void) => {
     const startedAt = performance.now();
@@ -159,6 +159,13 @@ export const scrollToAnchorWhenRendered = (getRoot: () => HTMLElement | null, id
 
         if (target) {
             target.scrollIntoView({ block: "start" });
+
+            // Anchors name a control (a switch, a select) or a whole card: a card takes focus without becoming a tab stop.
+            if (target.tabIndex < 0 && !target.hasAttribute("tabindex")) {
+                target.tabIndex = -1;
+            }
+
+            target.focus({ preventScroll: true });
             done();
 
             return;
