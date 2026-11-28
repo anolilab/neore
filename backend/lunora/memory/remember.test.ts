@@ -15,10 +15,14 @@ import { internal } from "../_generated/internal";
 import { runAfterOnShard } from "../lib/shard-scheduler";
 import { saveMemoryBatch } from "./functions";
 import { rememberFactFor, rememberResultOf } from "./remember";
-import { REMEMBER_CALL_TIMEOUT_MS, REMEMBER_DISPATCH_TTL_MS, rememberDispatchInFlight } from "./remember-dispatch";
+import { dispatchCallDeadline, REMEMBER_CALL_MARGIN_MS, REMEMBER_DISPATCH_TTL_MS, rememberDispatchInFlight, takeRememberDispatch } from "./remember-dispatch";
 
-const { generateText, getUtilityModel, registry } = vi.hoisted(() => {
+const { embedMany, generateText, getUtilityModel, registry } = vi.hoisted(() => {
     return {
+        // The harness has no embedding model: dedup runs on text, unless a test hooks the call.
+        embedMany: vi.fn(async (): Promise<{ embeddings: number[][] }> => {
+            throw new Error("no embeddings in this test");
+        }),
         generateText: vi.fn(),
         getUtilityModel: vi.fn(async () => {
             return {};
@@ -47,6 +51,12 @@ vi.mock("../lib/shard-scheduler", async (importOriginal) => {
 
     return { ...original, runAfterOnShard: vi.fn(original.runAfterOnShard) };
 });
+// The dispatch claim's take stays real; a test can move the clock on right after it.
+vi.mock("./remember-dispatch", async (importOriginal) => {
+    const original = await importOriginal<typeof import("./remember-dispatch")>();
+
+    return { ...original, takeRememberDispatch: vi.fn(original.takeRememberDispatch) };
+});
 // The owner's lock attempt reads its identity from the harness.
 vi.mock("../auth/session", async (importOriginal) => {
     return {
@@ -60,11 +70,7 @@ vi.mock("../lib/services", () => {
     return { gatewayFetch: () => async () => new Response("{}") };
 });
 vi.mock("../agent/client/search", () => {
-    return {
-        embedMany: async () => {
-            throw new Error("no embeddings in this test");
-        },
-    };
+    return { embedMany };
 });
 
 const USER = "user-a";
@@ -176,6 +182,13 @@ beforeAll(async () => {
     registerModule(registry, "agent_thread_lock", await import("../agent/thread-lock"));
 });
 
+/** The prompt's remember claim, apart from the chat's dispatch claim a run also holds. */
+const rememberClaimOf = async (ctx: any, promptMessageId: string) =>
+    await ctx.db
+        .query("idempotencyClaims")
+        .withIndex("by_scope_key", (q: any) => q.eq("scope", "memory-remember").eq("key", promptMessageId))
+        .first();
+
 /** The owner locks the chat through the real mutation, as the lock button does. */
 const lockChat = async (threadId: string) =>
     await harness.withIdentity({ userId: USER } as never).mutation(enableThreadLock as never, { passcode: "correct horse battery", threadId } as never);
@@ -193,6 +206,7 @@ beforeEach(() => {
 afterEach(() => {
     harness.close();
     generateText.mockReset();
+    embedMany.mockClear();
 
     if (previousSecret === undefined) {
         delete process.env.STORAGE_SIGNING_SECRET;
@@ -583,37 +597,108 @@ describe(rememberFactFor, () => {
         await expect(lockChat(ids.threadId)).resolves.toBeDefined();
     });
 
-    it("aborts a provider call that outlives its deadline before the chat's claim lapses, and lets the lock through", async () => {
-        const ids = await setUp();
-        const timeout = AbortSignal.timeout.bind(AbortSignal);
-        const deadlines: number[] = [];
+    describe("the model call's deadline, timed from the chat's dispatch claim", () => {
+        const NOW = 1_800_000_000_000;
 
-        // The deadline the call is given, run short here so the test does not wait it out.
-        const spy = vi.spyOn(AbortSignal, "timeout").mockImplementation((ms: number) => {
-            deadlines.push(ms);
+        /** Moves the clock on by `gapMs` right after the request takes its dispatch claim, before the model call. */
+        const gapAfterClaim = (gapMs: number) => {
+            vi.mocked(takeRememberDispatch).mockImplementationOnce(async (...args) => {
+                const actual = await vi.importActual<typeof import("./remember-dispatch")>("./remember-dispatch");
+                const claim = await actual.takeRememberDispatch(...args);
 
-            return timeout(5);
+                vi.setSystemTime(Date.now() + gapMs);
+
+                return claim;
+            });
+        };
+
+        beforeEach(() => {
+            vi.useFakeTimers({ now: NOW, toFake: ["Date"] });
         });
 
-        // A provider that never answers: only the abort ends the call.
-        generateText.mockImplementationOnce(
-            async ({ abortSignal }: { abortSignal?: AbortSignal }) =>
-                await new Promise((_resolve, reject) => {
-                    abortSignal?.addEventListener("abort", () => reject(abortSignal.reason));
-                }),
-        );
+        afterEach(() => {
+            vi.useRealTimers();
+        });
 
-        try {
+        it("makes no model call when the claim has less than its margin left, and lets the lock through", async () => {
+            answer([{ memory: "User is vegan", quote: "I'm vegan" }]);
+
+            const ids = await setUp();
+
+            gapAfterClaim(REMEMBER_DISPATCH_TTL_MS - REMEMBER_CALL_MARGIN_MS + 1000);
+
             await expect(remember(ids)).resolves.toStrictEqual({ facts: [], status: "unavailable" });
-        } finally {
-            spy.mockRestore();
-        }
+            expect(generateText).not.toHaveBeenCalled();
+            await expect(dispatchInFlight(ids.threadId)).resolves.toBe(false);
+            await expect(lockChat(ids.threadId)).resolves.toBeDefined();
+            expect(await memories()).toHaveLength(0);
+        });
 
-        expect(deadlines).toStrictEqual([REMEMBER_CALL_TIMEOUT_MS]);
-        expect(REMEMBER_CALL_TIMEOUT_MS).toBeLessThan(REMEMBER_DISPATCH_TTL_MS);
+        it("aborts a provider call at what is left of the claim, less the margin, and lets the lock through", async () => {
+            const ids = await setUp();
+            const deadline = new AbortController();
+            const deadlines: number[] = [];
+
+            // The deadline the call is given is recorded; the test passes it itself, so nothing waits on a timer.
+            const spy = vi.spyOn(AbortSignal, "timeout").mockImplementation((ms: number) => {
+                deadlines.push(ms);
+
+                return deadline.signal;
+            });
+
+            gapAfterClaim(5000);
+            // A provider that has not answered when the deadline passes: only the abort ends the call.
+            generateText.mockImplementationOnce(
+                async ({ abortSignal }: { abortSignal?: AbortSignal }) =>
+                    await new Promise((_resolve, reject) => {
+                        abortSignal?.addEventListener("abort", () => reject(abortSignal.reason));
+                        deadline.abort(new DOMException("The deadline passed", "TimeoutError"));
+                    }),
+            );
+
+            try {
+                await expect(remember(ids)).resolves.toStrictEqual({ facts: [], status: "unavailable" });
+            } finally {
+                spy.mockRestore();
+            }
+
+            expect(deadlines).toStrictEqual([REMEMBER_DISPATCH_TTL_MS - 5000 - REMEMBER_CALL_MARGIN_MS]);
+            await expect(dispatchInFlight(ids.threadId)).resolves.toBe(false);
+            await expect(lockChat(ids.threadId)).resolves.toBeDefined();
+            expect(await memories()).toHaveLength(0);
+        });
+    });
+
+    it("keeps the chat's lock off from the extraction call through the embedding call, and lets it through once the run ends", async () => {
+        answer([{ memory: "User is vegan", quote: "I'm vegan" }]);
+
+        const ids = await setUp();
+        let lockDuringEmbedding: unknown;
+
+        // After the extraction call, while the facts are with the embedding model: the lock is refused.
+        embedMany.mockImplementationOnce(async () => {
+            lockDuringEmbedding = await lockChat(ids.threadId).catch((error: unknown) => error);
+
+            throw new Error("no embeddings in this test");
+        });
+
+        await expect(remember(ids)).resolves.toMatchObject({ status: "saved" });
+        expect(embedMany).toHaveBeenCalledTimes(1);
+        expect(lockDuringEmbedding).toMatchObject({ code: "CONFLICT" });
         await expect(dispatchInFlight(ids.threadId)).resolves.toBe(false);
         await expect(lockChat(ids.threadId)).resolves.toBeDefined();
-        expect(await memories()).toHaveLength(0);
+    });
+
+    it("reads a request typed after a long preamble: the model gets the prompt's start and end, and the quote is checked on all of it", async () => {
+        answer([{ memory: "User is vegan", quote: "I'm vegan" }]);
+
+        const preamble = "Some background on my week. ".repeat(120);
+
+        await expect(remember(await setUp({ prompt: `${preamble}Please remember that I'm vegan.` }))).resolves.toMatchObject({
+            facts: [{ asked: true, memory: "User is vegan", status: "saved" }],
+        });
+        expect(extractorPrompt()).toContain("Please remember that I'm vegan.");
+        expect(extractorPrompt()).not.toContain(preamble);
     });
 
     it("refuses a fact the extractor marks as about the user's health, and keeps a job in the field", async () => {
@@ -714,7 +799,7 @@ describe(rememberFactFor, () => {
         answer([{ memory: "User is vegan", quote: "I'm vegan" }]);
 
         const ids = await setUp();
-        const claimOf = async () => await harness.run(async (ctx: any) => await ctx.db.query("idempotencyClaims").first());
+        const claimOf = async () => await harness.run(async (ctx: any) => await rememberClaimOf(ctx, ids.promptMessageId));
 
         // A request that died without its release: its claim lapsed after the few minutes a running one is held.
         await harness.run(async (ctx: any) => {
@@ -735,7 +820,7 @@ describe(rememberFactFor, () => {
         generateText.mockImplementationOnce(async () => {
             // The running claim lapses before the write: nothing holds the prompt when the request marks it done.
             await harness.run(async (ctx: any) => {
-                const claim = await ctx.db.query("idempotencyClaims").first();
+                const claim = await rememberClaimOf(ctx, ids.promptMessageId);
 
                 await ctx.db.patch("idempotencyClaims", claim._id, { expiresAt: 0 });
             });
@@ -745,7 +830,7 @@ describe(rememberFactFor, () => {
 
         await expect(remember(ids)).resolves.toMatchObject({ status: "saved" });
 
-        const claim = await harness.run(async (ctx: any) => await ctx.db.query("idempotencyClaims").first());
+        const claim = await harness.run(async (ctx: any) => await rememberClaimOf(ctx, ids.promptMessageId));
 
         expect(claim).toMatchObject({ result: "done", userId: USER });
         expect(claim.expiresAt).toBeGreaterThan(Date.now());
@@ -758,7 +843,7 @@ describe(rememberFactFor, () => {
         generateText.mockImplementationOnce(async () => {
             // This request's claim lapses, and a newer request takes the prompt while this one still runs.
             await harness.run(async (ctx: any) => {
-                const claim = await ctx.db.query("idempotencyClaims").first();
+                const claim = await rememberClaimOf(ctx, ids.promptMessageId);
 
                 newer = claim.claimedAt + 1;
                 await ctx.db.delete("idempotencyClaims", claim._id);
@@ -775,7 +860,7 @@ describe(rememberFactFor, () => {
 
         await expect(remember(ids)).resolves.toMatchObject({ status: "saved" });
 
-        const claim = await harness.run(async (ctx: any) => await ctx.db.query("idempotencyClaims").first());
+        const claim = await harness.run(async (ctx: any) => await rememberClaimOf(ctx, ids.promptMessageId));
 
         expect(claim.claimedAt).toBe(newer);
         expect(claim.result).toBeUndefined();
@@ -974,6 +1059,20 @@ describe(rememberFactFor, () => {
             expect(saved).toStrictEqual([first, { known: first, text: "User flies to Paris" }]);
             expect(await memories()).toHaveLength(1);
         });
+    });
+});
+
+describe(dispatchCallDeadline, () => {
+    const claimedAt = 1_800_000_000_000;
+    const expiresAt = claimedAt + REMEMBER_DISPATCH_TTL_MS;
+
+    it("leaves the call what is left of the claim, less the margin, as of the clock it is given", () => {
+        expect(dispatchCallDeadline(expiresAt, claimedAt + 5000)).toBe(REMEMBER_DISPATCH_TTL_MS - 5000 - REMEMBER_CALL_MARGIN_MS);
+    });
+
+    it("leaves no call once less than the margin is left", () => {
+        expect(dispatchCallDeadline(expiresAt, expiresAt - REMEMBER_CALL_MARGIN_MS + 1000)).toBeNull();
+        expect(dispatchCallDeadline(expiresAt, expiresAt - REMEMBER_CALL_MARGIN_MS)).toBeNull();
     });
 });
 

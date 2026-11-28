@@ -9,14 +9,22 @@ import { claimFence, dropExpiredClaimsWithPrefix, hasClaimWithPrefix, releaseCla
 
 export const REMEMBER_DISPATCH_SCOPE = "memory-remember-dispatch";
 
-/** Longer than the extractor's call may take; a claim whose release never lands frees the chat by itself. */
-export const REMEMBER_DISPATCH_TTL_MS = 2 * 60 * 1000;
+/** Longer than the run's model calls (extraction, embedding, belief revision) may take; a claim never released frees the chat by itself. */
+export const REMEMBER_DISPATCH_TTL_MS = 3 * 60 * 1000;
+
+/** The time a dispatch call leaves unused before its claim lapses: the prompt is never out while the chat can be locked. */
+export const REMEMBER_CALL_MARGIN_MS = 10 * 1000;
 
 /**
- * The extractor's model call under a dispatch claim is aborted after this, well inside the claim's life: a slow gateway can
- * never send the prompt after the claim lapsed and the chat was locked.
+ * How long the extractor's model call may run under a claim that lapses at `expiresAt`, as of `now`: what is left of the
+ * claim, less the margin. `null` when nothing is left, so the call is not made. Timed from the claim, not from the call,
+ * so the time between the two never stretches the call past the claim's life.
  */
-export const REMEMBER_CALL_TIMEOUT_MS = 90 * 1000;
+export const dispatchCallDeadline = (expiresAt: number, now: number): number | null => {
+    const remaining = expiresAt - now - REMEMBER_CALL_MARGIN_MS;
+
+    return remaining > 0 ? remaining : null;
+};
 
 const dispatchKey = (threadId: string, promptMessageId: string): string => `${threadId}:${promptMessageId}`;
 
@@ -24,15 +32,24 @@ const dispatchKey = (threadId: string, promptMessageId: string): string => `${th
 export const rememberDispatchInFlight = async (ctx: Pick<QueryCtx, "db">, threadId: Id<"threads">): Promise<boolean> =>
     await hasClaimWithPrefix(ctx, REMEMBER_DISPATCH_SCOPE, `${threadId}:`);
 
-/** Takes the call's dispatch claim; the caller has checked the chat in the same transaction. Its `claimedAt`, or `null` when one is held. */
-export const takeRememberDispatch = async (ctx: Pick<MutationCtx, "db">, threadId: string, promptMessageId: string): Promise<number | null> => {
+/**
+ * Takes the call's dispatch claim; the caller has checked the chat in the same transaction. Its `claimedAt` and when it
+ * lapses, or `null` when one is held.
+ */
+export const takeRememberDispatch = async (
+    ctx: Pick<MutationCtx, "db">,
+    threadId: string,
+    promptMessageId: string,
+): Promise<{ claimedAt: number; expiresAt: number } | null> => {
     // Dispatches whose release never landed are cleared here, so the lock's check reads a short range.
     await dropExpiredClaimsWithPrefix(ctx, REMEMBER_DISPATCH_SCOPE, `${threadId}:`);
 
-    return await claimFence(ctx, REMEMBER_DISPATCH_SCOPE, dispatchKey(threadId, promptMessageId), { ttlMs: REMEMBER_DISPATCH_TTL_MS });
+    const claimedAt = await claimFence(ctx, REMEMBER_DISPATCH_SCOPE, dispatchKey(threadId, promptMessageId), { ttlMs: REMEMBER_DISPATCH_TTL_MS });
+
+    return claimedAt === null ? null : { claimedAt, expiresAt: claimedAt + REMEMBER_DISPATCH_TTL_MS };
 };
 
-/** The call was answered: its dispatch claim goes, and the chat may be locked. */
-export const dropRememberDispatch = async (ctx: Pick<MutationCtx, "db">, threadId: string, promptMessageId: string, claimedAt: number): Promise<void> => {
+/** The run's model calls are answered: its dispatch claim goes, and the chat may be locked. With no `claimedAt`, whichever this prompt holds. */
+export const dropRememberDispatch = async (ctx: Pick<MutationCtx, "db">, threadId: string, promptMessageId: string, claimedAt?: number): Promise<void> => {
     await releaseClaim(ctx, REMEMBER_DISPATCH_SCOPE, dispatchKey(threadId, promptMessageId), claimedAt);
 };

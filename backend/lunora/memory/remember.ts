@@ -206,6 +206,13 @@ export const rememberFactFor = async (ctx: ActionCtx, args: Omit<SourceArgs, "no
         await release(ctx, { ...claim, claimedAt });
 
         throw error;
+    } finally {
+        // Whatever ended the run, early or by a throw, its dispatch claim goes, so the chat's lock does not wait it out.
+        await ctx
+            .runMutation(internal.memory.functions.endRememberDispatch, { promptMessageId: args.promptMessageId, threadId: args.threadId })
+            .catch((error: unknown) => {
+                console.warn("[memory/remember] The chat's dispatch claim could not be released; it lapses on its own:", error);
+            });
     }
 
     const { keepClaim, result } = rememberResultOf(outcome);
