@@ -13,7 +13,7 @@ import { currentSentPrompt, SENT_PROMPT_LINEAGE_READS, searchSentPrompts } from 
 import { typedTextColumn } from "../agent/shared";
 import { getMessagesByIdsUnfiltered, publicMessage } from "../agent/messages";
 import { patchMessage } from "../agent/table-writes";
-import { documentTextPart, guestTextPart, outsideAgentTextPart, typedTextOf } from "./lib/attached-text";
+import { appWrittenTextPart, documentTextPart, guestTextPart, outsideAgentTextPart, typedTextOf } from "./lib/attached-text";
 import { imagePromptPart } from "./lib/first-user-prompt";
 import { GOAL_CONTINUATION_AGENT } from "./goals/shared";
 
@@ -539,7 +539,7 @@ describe("searchSentPrompts", () => {
         }
     });
 
-    it("lists and searches only what was typed, never an attached document, a quoted line or the image request's placeholder", async () => {
+    it("lists and searches only what was typed, never an attached document, a quoted line, the image request's placeholder or a prompt the app wrote", async () => {
         const harness = lunoraTest(schema as never);
 
         try {
@@ -549,6 +549,9 @@ describe("searchSentPrompts", () => {
                 const quote = "> the deploy log says retry later\n\nwhy did the deploy fail";
                 const typed = (text: string, order: number, parts: unknown = text) =>
                     insertMessage(context, { content: parts, createdAt: order + 1, order, role: "user", text, threadId: thread, userId: OWNER });
+
+                // A task's instructions, a brief or a pull request chat's opener: saved as the person's row, typed by nobody.
+                await typed("summarise the weekly report", 5, [appWrittenTextPart("summarise the weekly report")]);
 
                 return {
                     imageAsked: await typed("Generate an image", 3, [imagePromptPart()]),

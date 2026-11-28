@@ -61,6 +61,7 @@ import {
     withoutAskToolsOnLastStep,
 } from "./agent-run";
 import { buildAgentTools } from "./agent-tools";
+import { appWrittenPrompt } from "./attached-text";
 import { collectApprovalRequestIds, collectAskUserApprovalIds } from "./tool-approval-claim";
 import { ASK_USER_TOOL_NAME } from "../tools/ask-user-constants";
 import { REQUEST_SECRET_TOOL_NAME } from "../tools/request-secret-constants";
@@ -222,8 +223,14 @@ export interface HeadlessRunOptions {
      * project, so its continuation reads that project's files.
      */
     projectInstructions?: { instructions: ReadonlyArray<RunInstruction>; projectId: string; systemWithoutInstructions?: string };
-    /** Omitted when continuing a thread: its latest message is the prompt. */
+    /**
+     * Omitted when continuing a thread: its latest message is the prompt. Saved as text the app wrote (`appWrittenTextPart`):
+     * no person typed a task's instructions, a trigger's template, a brief or an eval case, so no prompt search lists it as
+     * theirs. `promptTyped` saves it as typed, only for words a person typed in the composer.
+     */
     prompt?: string;
+    /** The prompt is what a person typed into the thread (a message to a worker): saved as typed, not as the app's text. */
+    promptTyped?: true;
     /** Reasoning effort on the chat's 0-100 scale; wins over the skill's. Unset leaves it to the skill, then the model. */
     reasoningEffort?: number;
     /**
@@ -456,7 +463,7 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
                 reasoningEffort: options.reasoningEffort ?? skill?.config?.reasoningEffort,
                 shouldAutoContinue,
             }),
-            ...(prompt !== undefined && { prompt }),
+            ...(prompt !== undefined && { prompt: options.promptTyped ? prompt : appWrittenPrompt(prompt) }),
             ...(shouldStop && { stopWhen: [stepCountIs(options.maxSteps ?? getMaxSteps(true)), stopWhenRequested(shouldStop)] }),
             ...(system !== undefined && { system }),
         };
@@ -711,7 +718,9 @@ export const runHeadlessAgent = async (ctx: ActionCtx, rawOptions: HeadlessRunOp
             review: async ({ round, transcript }) =>
                 await reviewRound({ gateway: gatewayFetch(ctx), goal: goalText, round, rules: modelFilterRules, threadId, transcript, userId }),
             // A further round continues this run, so it reads the run's own turns: only the first generation starts fresh.
-            runRound: async (instruction) => settle(await thread.generateText({ ...generateArgs, prompt: instruction } as never).catch(wakeOnFailure)),
+            // A round's instruction is the app's, like the interactive goal's continuation (`GOAL_CONTINUATION_AGENT`).
+            runRound: async (instruction) =>
+                settle(await thread.generateText({ ...generateArgs, prompt: appWrittenPrompt(instruction) } as never).catch(wakeOnFailure)),
             startedAt,
             stopped: shouldStop,
         });

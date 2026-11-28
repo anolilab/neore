@@ -53,6 +53,10 @@ describe("pastChatSnippet", () => {
             [`${"targetx".repeat(40)} ${pad}target here${tail}`, ["target"], "target here"],
             // Written decomposed: `e` and a combining acute are one word for the index.
             [`${pad}cafe\u{301}noir tonight${tail}`, ["cafenoir"], "noir tonight"],
+            // A zero-width character after the space before the match is dropped; the space between the words stays.
+            [`${pad}book \u{200B}Lisbon soon${tail}`, ["lisbon"], "book Lisbon soon"],
+            // A Greek word ending in a final sigma beside Chinese in one run: the match is placed at its own pair.
+            [`${pad}ΟΔΟΣ${"甲".repeat(400)}目标 here${tail}`, ["目标"], "目标 here"],
         ];
 
         for (const [typed, terms, expected] of cases) {

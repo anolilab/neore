@@ -7,7 +7,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 
 import { registeredApi, registerModule } from "../../test/registered-api";
 import schema from "../schema";
-import { documentTextPart } from "../chat/lib/attached-text";
+import { appWrittenTextPart, documentTextPart } from "../chat/lib/attached-text";
 import { addMessagesHandler } from "../agent/messages";
 import { enableThreadLock } from "../agent/thread-lock";
 import { extractMemories } from "./extract";
@@ -353,6 +353,8 @@ describe(rememberFactFor, () => {
         ["a sub-agent's or worker's thread", { subAgentChild: true as const }, "not_private"],
         ["a task's thread", { thread: { tags: ["task"] } }, "not_private"],
         ["a row that is not the user's prompt", { promptRow: { message: { content: ASK, role: "assistant" } } }, "not_your_words"],
+        // A task's instructions or a pull request's opener saved in the person's own chat: the app wrote them.
+        ["a prompt the app wrote", { prompt: [appWrittenTextPart(ASK)] }, "not_your_words"],
         // A prompt a task or sub-agent wrote and another run already answered: its completed reply is another run's.
         ["a prompt another run answered first", { replies: [{ replyId: "stream-0" }] }, "not_your_words"],
         // A regenerate: the earlier reply's rows, then this reply's.

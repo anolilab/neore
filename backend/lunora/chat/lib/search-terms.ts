@@ -59,10 +59,14 @@ const splitCjk = (word: string): { at: number; term: string }[] => {
     return out;
 };
 
+// A Greek final sigma: lower-cased only at a word's end, so one character alone reads `σ` where the whole run reads `ς`.
+const FINAL_SIGMA_RE = /ς/gu;
+
 /**
  * Where each unit of `normalize(run)` came from in `run`: the run is normalised one character with its marks at a time,
- * and while that reads the same as the whole run normalised, each unit maps to its character. Otherwise (a sequence that
- * only composes across characters, such as Hangul jamo) every unit maps to the run's start.
+ * and while that reads the same as the whole run normalised (a final sigma counting as a sigma, the one case-folding rule
+ * that reads the next character and keeps the length), each unit maps to its character. Otherwise (a sequence that only
+ * composes across characters, such as Hangul jamo) every unit maps to the run's start.
  */
 const foldedOrigins = (run: string, folded: string): ((index: number) => number) => {
     const origins: number[] = [];
@@ -78,7 +82,7 @@ const foldedOrigins = (run: string, folded: string): ((index: number) => number)
         }
     }
 
-    return joined === folded ? (index) => origins[index] ?? 0 : () => 0;
+    return joined.replaceAll(FINAL_SIGMA_RE, "σ") === folded.replaceAll(FINAL_SIGMA_RE, "σ") ? (index) => origins[index] ?? 0 : () => 0;
 };
 
 /**

@@ -165,8 +165,8 @@ export const runSubAgent = internalAction.input({ runId: v.id("subAgentRuns") })
             ...(claim.mode !== "worker" && chainPausesForApproval(claim.chainSource) && { pauseForApproval: { subAgentRunId: runId } }),
             ...(!canNest(claim.depth) && { withheldTools: [SUB_AGENT_TOOL_NAME, MESSAGE_WORKER_TOOL_NAME] }),
             personalization: "full",
-            // A message the user typed into the worker's thread is the prompt as written.
-            prompt: worker && claim.clientId !== undefined ? claim.task : buildSubAgentPrompt(claim.task),
+            // A message the user typed into the worker's thread is the prompt as written, and saved as typed.
+            ...(worker && claim.clientId !== undefined ? { prompt: claim.task, promptTyped: true as const } : { prompt: buildSubAgentPrompt(claim.task) }),
             // A failed read is not a stop request: the run goes on and asks again after the next step.
             shouldStop: async () =>
                 await ctx.runQuery(internal.sub_agents.functions.shouldRunStop, { runId }).catch((error: unknown) => {

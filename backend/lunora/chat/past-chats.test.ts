@@ -11,6 +11,7 @@ import { internalQuery } from "../lib/crpc";
 import schema from "../schema";
 import { typedTextColumn } from "../agent/shared";
 import { searchPastChats } from "./past-chats";
+import { appWrittenTextPart } from "./lib/attached-text";
 
 const registry = vi.hoisted(() => new Map<string, unknown>());
 
@@ -40,13 +41,17 @@ const NOW = Date.UTC(2026, 3, 1);
 type Hit = { sentAt: number; snippet: string; title: string };
 type Result = { hits: Hit[]; preparing?: true; truncated?: true; unavailable?: string };
 
-const insertPrompt = (context: any, fields: { createdAt?: number; order?: number; role?: string; text: string; threadId: string; userId?: string }) => {
+const insertPrompt = (
+    context: any,
+    fields: { content?: unknown; createdAt?: number; order?: number; role?: string; text: string; threadId: string; userId?: string },
+) => {
     const role = fields.role ?? "user";
-    const typedText = typedTextColumn({ content: fields.text, role } as never, fields.text);
+    const content = fields.content ?? fields.text;
+    const typedText = typedTextColumn({ content, role } as never, fields.text);
 
     return context.db.insert("messages", {
         createdAt: fields.createdAt ?? SENT_AT,
-        message: { content: fields.text, role },
+        message: { content, role },
         ...(typedText !== undefined && { typedText }),
         order: fields.order ?? 0,
         status: "success",
@@ -225,6 +230,13 @@ describe("searchPastChats", () => {
                     threadId: await insertUntaggedThread(context, "Branch of a task", task),
                 });
                 await insertPrompt(context, { createdAt: SENT_AT + 13, text: "Lisbon imported", threadId: await insertUntaggedThread(context, "Import") });
+                // A task run into one of the person's chats saves its instructions there as the app's text.
+                await insertPrompt(context, {
+                    content: [appWrittenTextPart("Lisbon from a task's instructions")],
+                    createdAt: SENT_AT + 14,
+                    text: "Lisbon from a task's instructions",
+                    threadId: await insertThread(context, { title: "Task run in a chat" }),
+                });
 
                 return here;
             });

@@ -3,6 +3,7 @@ import { LunoraError } from "lunorash/server";
 import type { Doc, Id } from "../../_generated/dataModel";
 import type { MutationCtx } from "../../_generated/server";
 import { addMessagesHandler } from "../../agent/messages";
+import { appWrittenTextPart } from "../../chat/lib/attached-text";
 import { createHostStream } from "../../chat/streaming/persistent/host";
 import { createAcpCall, type AcpCallResult } from "../../devices/lib/acp-call";
 import type { DeviceTaintSource } from "../../devices/lib/taint";
@@ -19,6 +20,8 @@ import { touchSession } from "./sessions";
 export const queueHostTurn = async (
     ctx: MutationCtx,
     args: {
+        /** The text is the app's, not typed by the person (a host worker's brief from its lead): saved as `appWrittenTextPart`. */
+        appWritten?: boolean;
         /** What an agent that took the thread over is told first (`pending-handoff.ts`): sent in the call, never saved as the user's message. */
         handoff?: string;
         session: Doc<"acpSessions">;
@@ -30,7 +33,7 @@ export const queueHostTurn = async (
     },
     now: number,
 ): Promise<{ error: Extract<AcpCallResult, { error: string }>["error"] } | { messageId: string; streamId: Id<"persistentStreams">; turnId: string }> => {
-    const { handoff, session, taintedBy, text, threadId, userId } = args;
+    const { appWritten, handoff, session, taintedBy, text, threadId, userId } = args;
     const turnId = crypto.randomUUID();
     const call = await createAcpCall(
         ctx,
@@ -52,7 +55,7 @@ export const queueHostTurn = async (
 
     const { messages } = await addMessagesHandler(ctx, {
         fromUser: true,
-        messages: [{ message: { content: text, role: "user" }, status: "success" }],
+        messages: [{ message: { content: appWritten === true ? [appWrittenTextPart(text)] : text, role: "user" }, status: "success" }],
         threadId,
         userId,
     });
