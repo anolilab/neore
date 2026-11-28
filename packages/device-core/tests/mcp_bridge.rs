@@ -205,6 +205,11 @@ fn only_an_http_or_https_address_without_credentials_and_valid_headers_are_taken
             "too short to keep out of the chat",
         ),
         (
+            "https://h/mcp?accesstoken=abc",
+            "",
+            "too short to keep out of the chat",
+        ),
+        (
             "https://h/mcp",
             r#"{"X-ClientSecret":"abc"}"#,
             "too short to keep out of the chat",

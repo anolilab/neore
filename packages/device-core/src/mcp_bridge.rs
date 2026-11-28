@@ -144,9 +144,17 @@ fn holds_a_credential(name: &str) -> bool {
                 | "cookie"
                 | "token"
                 | "key"
-                | "apikey"
                 | "secret"
                 | "password"
+                | "passwd"
+                // Joined, as some servers write them.
+                | "apikey"
+                | "accesstoken"
+                | "authtoken"
+                | "apitoken"
+                | "refreshtoken"
+                | "clientsecret"
+                | "sessionid"
         )
     })
 }
