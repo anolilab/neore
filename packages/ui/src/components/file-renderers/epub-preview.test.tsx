@@ -675,7 +675,9 @@ describe("EpubPreview while a chapter is read", () => {
             release = resolve;
         });
         await mount();
-        expect(view.container.querySelector("[role=status]")?.textContent).toContain("Loading preview");
+        const statuses = [...view.container.querySelectorAll("[role=status]")].map((element) => element.textContent);
+
+        expect(statuses.some((text) => text?.includes("Loading preview"))).toBe(true);
         expect(frame().hasAttribute("srcdoc")).toBe(false);
 
         release();
@@ -687,5 +689,19 @@ describe("EpubPreview while a chapter is read", () => {
         });
         expect(frame().hasAttribute("srcdoc")).toBe(true);
         expect(view.container.textContent).not.toContain("Loading preview");
+    });
+});
+
+describe("EpubPreview layout", () => {
+    it("puts the chapter controls before the frame, and a frame that leaves room for them in the 32rem box a panel gives a preview", async () => {
+        answer(new Uint8Array([1]));
+        await mount();
+
+        const controls = button("Next chapter");
+        const position = controls.compareDocumentPosition(frame());
+
+        // jsdom cannot measure layout: what is checked is the order in the document and the classes that size the frame.
+        expect(position & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(frame().className).toContain("h-[26rem]");
     });
 });

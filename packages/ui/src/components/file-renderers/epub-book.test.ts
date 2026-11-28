@@ -680,6 +680,42 @@ describe("a chapter's style sheets", () => {
         opened.destroy();
     });
 
+    it("reads a hexadecimal escape in an unquoted address, and still finds the file", async () => {
+        const opened = await openEpub(
+            await book({
+                chapters: [{ body: `${links(["../main.css"])}<p>x</p>`, file: "text/one.xhtml", id: "c1" }],
+                files: { "images/p.png": PNG, "main.css": String.raw`.a{background:url(\69mages/p.png)} .b{background:url(images\2f p.png)}` },
+            }),
+            folder.path,
+        );
+        const sheet = sheetsOf(parse(await opened.read("c1"))).join("");
+
+        expect(sheet.match(/url\("data:image\/png;base64,/gu)).toHaveLength(2);
+        opened.destroy();
+    });
+
+    it("leaves an alternate style sheet out, as a browser does until it is chosen, and takes no budget for it", async () => {
+        const opened = await openEpub(
+            await book({
+                chapters: [
+                    {
+                        body: "<p>x</p>",
+                        file: "text/one.xhtml",
+                        head: '<link rel="stylesheet" href="../main.css"/><link rel="alternate stylesheet" href="../night.css" title="Night"/>',
+                        id: "c1",
+                    },
+                ],
+                files: { "main.css": ".day{x:1}", "night.css": ".night{x:1}" },
+            }),
+            folder.path,
+        );
+        const sheet = sheetsOf(parse(await opened.read("c1"))).join("");
+
+        expect(sheet).toContain(".day{x:1}");
+        expect(sheet).not.toContain(".night{x:1}");
+        opened.destroy();
+    });
+
     it("leaves text that looks like an import inside a string as text", async () => {
         const opened = await openEpub(
             await book({

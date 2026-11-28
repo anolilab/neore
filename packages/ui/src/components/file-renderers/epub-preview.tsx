@@ -325,26 +325,8 @@ const EpubPreview: FC<EpubPreviewProps> = memo(({ className, filename, maxBytes 
                 </div>
             ) : (
                 <>
-                    {/* An empty `sandbox` is the strictest one: no `allow-scripts`, no `allow-same-origin`. Never add either. */}
-                    <iframe
-                        className="bg-background h-[500px] w-full border-0"
-                        referrerPolicy="no-referrer"
-                        sandbox=""
-                        srcDoc={shown !== undefined && shown.book === book && shown.id === chapterId && shown.key === key ? shown.doc : undefined}
-                        title={chapter?.title ?? label}
-                    />
-                    {/* The chapter's document is still being read: say so, instead of an empty frame. */}
-                    {!(shown !== undefined && shown.book === book && shown.id === chapterId && shown.key === key) && (
-                        <p aria-live="polite" className="text-muted-foreground px-3 py-1 text-xs" role="status">
-                            {t`Loading preview…`}
-                        </p>
-                    )}
-                    {shown?.failed === true && shown.book === book && shown.id === chapterId && shown.key === key && (
-                        <p className="text-destructive px-3 py-1 text-xs" role="status">
-                            {t`This preview could not be loaded.`}
-                        </p>
-                    )}
-                    <div className="bg-muted/50 flex items-center justify-between gap-2 border-t px-3 py-1.5">
+                    {/* The chapter controls come first: in a panel of limited height the frame may be cut off, and these must not be. */}
+                    <div className="bg-muted/50 flex items-center justify-between gap-2 border-b px-3 py-1.5">
                         <button
                             aria-label={t`Previous chapter`}
                             className="hover:bg-accent inline-flex min-h-11 min-w-11 items-center justify-center rounded disabled:opacity-40"
@@ -367,6 +349,26 @@ const EpubPreview: FC<EpubPreviewProps> = memo(({ className, filename, maxBytes 
                             <ChevronRight aria-hidden="true" className="size-4" />
                         </button>
                     </div>
+                    {/* An empty `sandbox` is the strictest one: no `allow-scripts`, no `allow-same-origin`. Never add either. */}
+                    <iframe
+                        // 26rem: with the header and the controls (each at least 44 px) it fits the 32rem box the sandbox panel puts a preview in.
+                        className="bg-background h-[26rem] w-full border-0"
+                        referrerPolicy="no-referrer"
+                        sandbox=""
+                        srcDoc={shown !== undefined && shown.book === book && shown.id === chapterId && shown.key === key ? shown.doc : undefined}
+                        title={chapter?.title ?? label}
+                    />
+                    {/* The chapter's document is still being read: say so, instead of an empty frame. */}
+                    {!(shown !== undefined && shown.book === book && shown.id === chapterId && shown.key === key) && (
+                        <p aria-live="polite" className="text-muted-foreground px-3 py-1 text-xs" role="status">
+                            {t`Loading preview…`}
+                        </p>
+                    )}
+                    {shown?.failed === true && shown.book === book && shown.id === chapterId && shown.key === key && (
+                        <p className="text-destructive px-3 py-1 text-xs" role="status">
+                            {t`This preview could not be loaded.`}
+                        </p>
+                    )}
                 </>
             )}
         </div>

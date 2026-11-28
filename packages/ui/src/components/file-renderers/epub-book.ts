@@ -401,6 +401,7 @@ const assetReader = (zip: JSZip, declared: ReadonlyMap<string, string>, signal?:
 
 // A quoted address reads an escaped character inside it (`\"`), so a quote or a parenthesis in a file name does not end it early.
 const CSS_URL = /url\(("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|[^)]*)\)/gisu;
+const CSS_HEX_ESCAPE = /\\([\da-f]{1,6})\s?/giu;
 const CSS_ESCAPED = /\\([\s\S])/gu;
 const CSS_QUOTE = /^["']|["']$/gu;
 const CSS_SCRIPTY = /expression\s*\(|-moz-binding\s*:|behaviou?r\s*:/giu;
@@ -410,7 +411,18 @@ const IMAGE_SET = /(?:-webkit-)?image-set\s*\((?:[^()]|\([^()]*\))*\)/giu;
 const SRC_FUNCTION = /(?<![\w-])src\s*\((?:[^()]|\([^()]*\))*\)/giu;
 
 /** The address a `url()` argument names: trimmed, unquoted, and with each backslash escape read as the character it escapes. */
-const addressOf = (argument: string): string => argument.trim().replaceAll(CSS_QUOTE, "").replaceAll(CSS_ESCAPED, "$1").trim();
+const addressOf = (argument: string): string =>
+    argument
+        .trim()
+        .replaceAll(CSS_QUOTE, "")
+        .replaceAll(CSS_HEX_ESCAPE, (_match, hex: string) => {
+            const code = Number.parseInt(hex, 16);
+
+            // A value that is not a character (zero, a surrogate, past the last code point) is the replacement character, as CSS says.
+            return code === 0 || code > 0x10_ff_ff || (code >= 0xd8_00 && code <= 0xdf_ff) ? "\u{FFFD}" : String.fromCodePoint(code);
+        })
+        .replaceAll(CSS_ESCAPED, "$1")
+        .trim();
 
 const isDataUrl = (address: string): boolean => addressOf(address).toLowerCase().startsWith("data:");
 
@@ -986,7 +998,7 @@ const readChapter = async (chapterPath: string, reader: AssetReader): Promise<{ 
 
     // Linked and inline styles in the order the chapter writes them, each rewritten and charged as it is reached: a later rule wins over an
     // earlier one as in the source. Sheets of the head go to `styles` in that order; a `<style>` in the body stays where it is.
-    for (const item of parsed.querySelectorAll('link[rel~="stylesheet" i][href], style')) {
+    for (const item of parsed.querySelectorAll('link[rel~="stylesheet" i][href]:not([rel~="alternate" i]), style')) {
         const isLink = item.localName === "link";
         const inHead = item.closest("head") !== null;
 
