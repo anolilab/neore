@@ -89,6 +89,7 @@ const InvitationCell = ({ className, classNames, invitation }: InvitationCellPro
                 <DropdownMenuTrigger
                     render={
                         <Button
+                            aria-label={t`More actions`}
                             className={cn("relative ms-auto", classNames?.button, classNames?.outlineButton)}
                             disabled={isLoading}
                             size="icon"

@@ -76,6 +76,7 @@ const OrganizationCell = ({ className, classNames, organization }: OrganizationC
                     <DropdownMenuTrigger
                         render={
                             <Button
+                                aria-label={t`More actions`}
                                 className={cn("relative ms-auto", classNames?.button, classNames?.outlineButton)}
                                 disabled={isManagingOrganization}
                                 size="icon"

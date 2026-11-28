@@ -56,6 +56,7 @@ const MemberCell = ({ className, classNames, hideActions, member }: MemberCellPr
                         <DropdownMenuTrigger
                             render={
                                 <Button
+                                    aria-label={t`More actions`}
                                     className={cn("relative ms-auto", classNames?.button, classNames?.outlineButton)}
                                     size="icon"
                                     type="button"
