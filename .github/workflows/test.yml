@@ -729,7 +729,7 @@ jobs:
             - name: "Run the mcp-bridge feature's tests"
               timeout-minutes: 20
               shell: "bash"
-              run: "cargo test --manifest-path packages/device-core/Cargo.toml --no-default-features --features mcp-bridge --test mcp_bridge"
+              run: "cargo test --manifest-path packages/device-core/Cargo.toml --no-default-features --features mcp-bridge --test mcp_bridge && cargo test --manifest-path packages/device-core/Cargo.toml --no-default-features --features mcp-bridge --lib mcp_bridge::"
 
             # Records whether this runner's OpenSSH can multiplex (ControlMaster), for the plan's S5 note. The
             # step fails when it cannot reach a verdict (no sshd, no login), so a broken setup gets fixed.

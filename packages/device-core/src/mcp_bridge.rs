@@ -484,6 +484,14 @@ pub fn parse_target(url: &str, headers: &str) -> Result<Target, String> {
         .map(str::to_owned)
         .collect();
 
+    // A non-ASCII letter has a case that the ASCII-blind match does not see: both its cases are listed too.
+    let cased: Vec<String> = secrets
+        .iter()
+        .filter(|secret| !secret.is_ascii())
+        .flat_map(|secret| [secret.to_lowercase(), secret.to_uppercase()])
+        .collect();
+
+    secrets.extend(cased);
     sort_longest_first(&mut secrets);
 
     // A short host (`nas`) is still the address: blanked where it stands as a word.
