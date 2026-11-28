@@ -1418,6 +1418,15 @@ sleep 1"#
         );
     }
 
+    /// Returns once another call holds the server table while it waits on the server this call holds.
+    #[cfg(unix)]
+    fn until_another_call_waits(manager: &McpManager) {
+        assert!(
+            wait_until(|| manager.processes.try_lock().is_err()),
+            "the other call never came"
+        );
+    }
+
     /// A server like the bridge: its first copy (counted in `starts`) answers every call with the session-gone error,
     /// any later copy answers with a result.
     #[cfg(unix)]
@@ -1460,7 +1469,7 @@ sleep 1"#
                     // The first call holds the old copy, so the second waits on it.
                     if calls.fetch_add(1, Ordering::SeqCst) == 0 {
                         entered.store(true, Ordering::SeqCst);
-                        std::thread::sleep(Duration::from_millis(300));
+                        until_another_call_waits(&manager);
                     }
 
                     process.request("tools/list", json!({}), Duration::from_secs(10))
@@ -1505,7 +1514,7 @@ sleep 1"#
             std::thread::spawn(move || {
                 manager.with(&old, None, |process| {
                     entered.store(true, Ordering::SeqCst);
-                    std::thread::sleep(Duration::from_millis(300));
+                    until_another_call_waits(&manager);
                     process.request("tools/list", json!({}), Duration::from_secs(10))
                 })
             })

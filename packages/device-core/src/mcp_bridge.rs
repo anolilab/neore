@@ -86,7 +86,18 @@ fn redact(value: &mut Value, secrets: &[String]) {
 
             scrub(&mut text, secrets);
 
-            if text != written {
+            // Parsing can respell it (`12345678e7`): the value is compared too. Only a large one, so a secret like
+            // `00000000` does not blank every zero.
+            let same_value = number.as_f64().is_some_and(|number| {
+                number.abs() >= 1e7
+                    && secrets
+                        .iter()
+                        .any(|secret| secret.parse::<f64>().ok() == Some(number))
+            });
+
+            if same_value {
+                *value = Value::String("[redacted]".into());
+            } else if text != written {
                 *value = Value::String(text);
             }
         }
@@ -107,23 +118,37 @@ fn redact(value: &mut Value, secrets: &[String]) {
 
 /// Whether a header or a query parameter carries a credential by its name. Its secret must be long enough to blank out
 /// of what the server says (`MIN_REDACTED_BYTES`), or the address or header is refused.
-/// By whole words, so `x-api-key` and `access_token` are one, and `max_tokens` or `author` is not.
+/// By whole words, split at punctuation and at a capital (`x-api-key`, `access_token`, `clientSecret` are; `max_tokens` or
+/// `author` is not).
 fn holds_a_credential(name: &str) -> bool {
-    name.to_ascii_lowercase()
-        .split(['-', '_', '.'])
-        .any(|word| {
-            matches!(
-                word,
-                "auth"
-                    | "authorization"
-                    | "cookie"
-                    | "token"
-                    | "key"
-                    | "apikey"
-                    | "secret"
-                    | "password"
-            )
-        })
+    let mut words = String::with_capacity(name.len() * 2);
+
+    for (at, character) in name.char_indices() {
+        let after_lower = name[..at]
+            .chars()
+            .next_back()
+            .is_some_and(|before| before.is_ascii_lowercase());
+
+        if character.is_ascii_uppercase() && after_lower {
+            words.push('-');
+        }
+
+        words.push(character.to_ascii_lowercase());
+    }
+
+    words.split(['-', '_', '.']).any(|word| {
+        matches!(
+            word,
+            "auth"
+                | "authorization"
+                | "cookie"
+                | "token"
+                | "key"
+                | "apikey"
+                | "secret"
+                | "password"
+        )
+    })
 }
 
 /// A header's credential: the whole value, and the part after its scheme (`Bearer <credential>`, however spaced).
@@ -215,8 +240,8 @@ pub fn parse_target(url: &str, headers: &str) -> Result<Target, String> {
 
     let mut parsed = Vec::with_capacity(given.len());
 
-    for (name, value) in &given {
-        let name = HeaderName::from_bytes(name.as_bytes())
+    for (written, value) in &given {
+        let name = HeaderName::from_bytes(written.as_bytes())
             .map_err(|_| "a header name is not valid".to_owned())?;
 
         if RESERVED_HEADERS.contains(&name.as_str()) {
@@ -234,7 +259,8 @@ pub fn parse_target(url: &str, headers: &str) -> Result<Target, String> {
             .filter(|_| name == "cookie")
             .map(|(_, cookie)| cookie);
 
-        if holds_a_credential(name.as_str())
+        // As written: the parsed name is lowercased, which hides `clientSecret`'s words.
+        if holds_a_credential(written)
             && credentials(value)
                 .chain(cookies)
                 .any(|secret| secret.len() < MIN_REDACTED_BYTES)
