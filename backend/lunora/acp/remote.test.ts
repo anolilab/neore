@@ -98,6 +98,8 @@ const { getHostSession } = await import("./functions");
 const { internalAction, internalMutation, internalQuery } = await import("../_generated/server");
 const agentBranches = await import("../agent/branches");
 const agentThreads = await import("../agent/threads");
+const { insertAgentSwitchRow } = await import("../agent/table-writes");
+const { restoreHostThread } = await import("./lib/thread-removed");
 const { v } = await import("lunorash/server");
 const agentMessages = await import("../agent/messages");
 const { pendingHandoffOf } = await import("./lib/pending-handoff");
@@ -746,7 +748,7 @@ describe("forkHostThread", () => {
      * The history copy, wrapped: what the new chat has when the copy runs (a session, a queued `acp_start`) is recorded, the copy can be made
      * to fail, and the real copy runs in between. Put back by the caller (`registerModule(registry, "agent_messages", agentMessages)`).
      */
-    const probeCopy = (probe: { during?: () => Promise<void>; fail: boolean; queued: number[]; sessions: number[] }) => {
+    const probeCopy = (probe: { after?: () => Promise<void>; during?: () => Promise<void>; fail: boolean; queued: number[]; sessions: number[] }) => {
         registry.set(
             "agent_messages:cloneThread",
             internalAction
@@ -789,6 +791,9 @@ describe("forkHostThread", () => {
                             break;
                         }
                     }
+
+                    // Whatever changes once the history is in the new chat, before its session is queued.
+                    await probe.after?.();
 
                     return copied;
                 }),
@@ -860,9 +865,14 @@ describe("forkHostThread", () => {
     });
 
     describe("what changes while the history is copied", () => {
-        const refuses = async (change: () => Promise<void>, message: string | RegExp, shape: (threadId: string) => Promise<void> = async () => {}) => {
+        const refuses = async (
+            change: () => Promise<void>,
+            message: string | RegExp,
+            shape: (threadId: string) => Promise<void> = async () => {},
+            when: "after" | "during" = "during",
+        ) => {
             const { threadId } = await started();
-            const probe = { during: change, fail: false, queued: [] as number[], sessions: [] as number[] };
+            const probe = { fail: false, queued: [] as number[], sessions: [] as number[], ...(when === "after" ? { after: change } : { during: change }) };
 
             await say(threadId, [["asked", "success", 0]]);
             await shape(threadId);
@@ -960,6 +970,8 @@ describe("forkHostThread", () => {
                 async (threadId) => {
                     source = threadId;
                 },
+                // After the history is in the new chat: the copy itself refuses a locked source, so only the check made when the session is queued can catch this.
+                "after",
             );
 
             // The chat it refused to fork is as it was: no other chat was made from it.
@@ -1109,6 +1121,67 @@ describe("forkHostThread", () => {
             expect(await outcomeOfSend(result.threadId)).toBe("sent");
         });
 
+        it("hands the fallback to the thread's current session only, after a switch opened a newer one", async () => {
+            const { device, threadId } = await started();
+
+            await say(threadId, [["asked", "success", 0]]);
+
+            const result = (await fork(threadId)) as { threadId: string };
+            const [older] = await rows("acpSessions", { threadId: result.threadId });
+
+            // A switch opened the next session of the chat while the older one's report was still on its way.
+            await run(async (ctx) => {
+                await ctx.db.insert("acpSessions", {
+                    agentKey: "claude",
+                    agentLabel: "Claude Code",
+                    createdAt: Date.now() + 1,
+                    deviceId: device.deviceId,
+                    folderId: "f1",
+                    folderLabel: "neore",
+                    hostSessionId: "host-next",
+                    status: "idle",
+                    threadId: result.threadId,
+                    updatedAt: Date.now() + 1,
+                    userId: ownerId,
+                } as never);
+            });
+            await run(
+                async (ctx) =>
+                    await ctx.runMutation(applyHostEvents, {
+                        deviceId: device.deviceId,
+                        events: [{ ...SESSION_OPEN, fork: { forked: false, reason: "fork_failed" } }],
+                        sessionId: older?.hostSessionId as string,
+                    }),
+            );
+            expect(await dividersOf(result.threadId)).toHaveLength(0);
+            expect(await handoffOf(result.threadId)).toBeUndefined();
+        });
+
+        it("still hands the fallback over when the copied history ends in a native switch divider", async () => {
+            const { device, threadId } = await started();
+
+            await say(threadId, [
+                ["asked", "success", 0],
+                ["answered", "success", 1],
+            ]);
+
+            const result = (await fork(threadId)) as { threadId: string };
+
+            await run(async (ctx) => {
+                const agent = { agentKey: "claude", agentLabel: "Claude Code", folderId: "f1", folderLabel: "neore", hostId: "h", kind: "host" as const };
+
+                await insertAgentSwitchRow(ctx.db, {
+                    order: 2,
+                    part: { from: agent, mode: "native", startMessageId: "first", to: agent },
+                    threadId: result.threadId,
+                    userId: ownerId,
+                } as never);
+            });
+            await open(device, result.threadId, { forked: false, reason: "fork_unsupported" });
+            expect(await dividersOf(result.threadId)).toHaveLength(2);
+            expect(await handoffOf(result.threadId)).toContain("asked");
+        });
+
         it("adds no divider and no summary when the agent forked its own session", async () => {
             const { device, threadId } = await started();
 
@@ -1172,6 +1245,7 @@ describe("forkHostThread", () => {
         const forkHostThreadRunOf = () => async (args: { clientId: string; threadId: never; userId: string }) =>
             await remote.forkHostThreadRun(
                 {
+                    log: { event: vi.fn() },
                     runAction: async () => 0,
                     runMutation: async () => {
                         return { started: false };
@@ -1448,6 +1522,8 @@ describe("forkHostThread", () => {
 
             try {
                 await expect(fork(threadId, "cleanup")).rejects.toThrow("copy failed");
+                // The new chat is gone although removing its link failed.
+                expect(await rows("threads", { createdBy: ownerId })).toHaveLength(1);
             } finally {
                 registerModule(registry, "agent_threads", agentThreads);
             }
@@ -1462,6 +1538,114 @@ describe("forkHostThread", () => {
             } finally {
                 registerModule(registry, "agent_messages", agentMessages);
             }
+        });
+
+        it("logs the fork on a replay too, not only when it made a new chat", async () => {
+            const event = vi.fn();
+            const replayed = await remote.forkHostThreadRun(
+                {
+                    log: { event },
+                    runAction: async () => 0,
+                    runMutation: async () => {
+                        return { started: false, threadId: "t-old" };
+                    },
+                    runQuery: async () => null,
+                } as never,
+                { clientId: "c", threadId: "t" as never, userId: ownerId },
+            );
+
+            expect(replayed).toEqual({ started: false, threadId: "t-old" });
+            expect(event).toHaveBeenCalledWith("acp.fork_host_thread", { started: false });
+        });
+
+        it("keeps a fork's source chat from taking a turn until the fork's agent has said whether it forked", async () => {
+            const { device, threadId } = await started();
+            const result = (await fork(threadId)) as { threadId: string };
+
+            expect(await outcomeOfSend(threadId)).toBe("session_starting");
+
+            const [opening] = await rows("acpSessions", { threadId: result.threadId });
+
+            await run(
+                async (ctx) =>
+                    await ctx.runMutation(applyHostEvents, {
+                        deviceId: device.deviceId,
+                        events: [{ ...SESSION_OPEN, fork: { forked: true } }],
+                        sessionId: opening?.hostSessionId as string,
+                    }),
+            );
+            expect(await outcomeOfSend(threadId)).toBe("sent");
+        });
+
+        it("does not give a restored fork a session to wait on when the computer never took its start", async () => {
+            const { threadId } = await started();
+            const result = (await fork(threadId)) as { threadId: string };
+            const [child] = await rows("acpSessions", { threadId: result.threadId });
+
+            await run(async (ctx) => {
+                await ctx.db.patch("acpSessions", child!._id, { status: "ended" });
+                await restoreHostThread(ctx, (await ctx.db.get("threads", result.threadId)) as never, Date.now());
+            });
+            expect(await sessionStatusOf(result.threadId)).toBe("ended");
+        });
+
+        it("reads one branch for the copy and the open check: a switch after the fork began is refused before anything is copied", async () => {
+            const { threadId } = await started();
+
+            await say(threadId, [["asked", "success", 0]]);
+
+            const [message] = await rows("messages", { threadId });
+
+            registry.set(
+                "agent_branches:lastSettledMessageId",
+                internalQuery
+                    .input({ threadId: v.id("threads") })
+                    .output(v.union(v.null(), v.string()))
+                    .query(async ({ args }) => {
+                        const settled = await run(async (inner) => await inner.runQuery(agentBranches.lastSettledMessageId, { threadId: args.threadId }));
+
+                        // The chat moves to another branch between the settled read and the copy.
+                        await run(async (ctx) => {
+                            await ctx.db.patch("threads", threadId, { activeLeafMessageId: message!._id });
+                        });
+
+                        return settled;
+                    }),
+            );
+
+            try {
+                await expect(fork(threadId, "one-leaf")).rejects.toThrow("switched branch");
+                expect(await rows("deviceCalls", { toolName: "acp_start" })).toHaveLength(1);
+            } finally {
+                registerModule(registry, "agent_branches", agentBranches);
+            }
+        });
+
+        it("forks a chat whose only rows after the copy's end are agent-switch dividers", async () => {
+            const { threadId } = await started();
+
+            await say(threadId, [
+                ["asked", "success", 0],
+                ["answered", "success", 1],
+            ]);
+            await run(async (ctx) => {
+                const agent = { agentKey: "claude", agentLabel: "Claude Code", folderId: "f1", folderLabel: "neore", hostId: "h", kind: "host" as const };
+
+                await insertAgentSwitchRow(ctx.db, {
+                    order: 2,
+                    part: { from: agent, mode: "native", startMessageId: "first", to: agent },
+                    threadId,
+                    userId: ownerId,
+                } as never);
+            });
+
+            const result = (await fork(threadId)) as { started: boolean; threadId: string };
+
+            expect(result.started).toBe(true);
+            // The divider is copied with the history it follows (it has no text).
+            const copied = await textOf(result.threadId);
+
+            expect(copied.slice(0, 2)).toEqual(["asked", "answered"]);
         });
 
         it("never answers a begun fork with no chat as a success", async () => {

@@ -80,6 +80,12 @@ export const restoreHostThread = async (ctx: MutationCtx, thread: Pick<Doc<"thre
 
     const session = await sessionOfThread(ctx, thread._id);
 
+    // A fork the agent never opened stays ended: the delete came before the computer took its `acp_start`, which then lapses, and a session
+    // brought back as `offline` would wait on a start that can no longer open it.
+    if (session?.awaitingForkResult === true) {
+        return;
+    }
+
     // A revoked device is deleted, and its sessions stay ended: nothing is left to post.
     if (session?.status === "ended" && (await ctx.db.devices.findFirst({ where: { _id: session.deviceId } }))) {
         await ctx.db.patch("acpSessions", session._id, { status: "offline", updatedAt: now });

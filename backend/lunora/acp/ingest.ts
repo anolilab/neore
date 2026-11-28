@@ -104,7 +104,10 @@ const openSession = async (ctx: MutationCtx, device: Doc<"devices">, hostSession
         // source chat's conversation, so the chat is not a branch of it, and the link made when the fork was queued is taken back. Whatever
         // the session's state now (the chat may have been deleted, which ends it, and restored since). Once: the row records that it was
         // handled, so a report sent again after a prompt adds no second divider and attaches no second summary.
-        const handleFallback = open.fork?.forked === false && existing.forkFallbackAt === undefined;
+        // Only for the thread's current session: a delete and restore can leave an earlier session's report pending while a switch has
+        // opened the next one, and its divider and summary would then land in the thread of an agent that never lacked the history.
+        const currentSession = open.fork?.forked === false && existing.forkFallbackAt === undefined ? await sessionOfThread(ctx, existing.threadId) : null;
+        const handleFallback = currentSession?._id === existing._id;
 
         if (handleFallback) {
             const { page: links } = await ctx.db.threadRelationships.findMany({ where: { threadId: existing.threadId } });

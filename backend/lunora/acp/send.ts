@@ -15,6 +15,7 @@ import { v } from "lunorash/server";
 
 import { stripHiddenText } from "@neore/ai/utils";
 
+import type { Id } from "../_generated/dataModel";
 import { internal } from "../_generated/internal";
 import type { MutationCtx } from "../_generated/server";
 import { internalMutation } from "../_generated/server";
@@ -81,6 +82,21 @@ export interface SendToHostInput {
 }
 
 /** The body of {@link sendToHost}, callable from a mutation that sends a prompt as part of its own write. */
+/** Whether a chat forked from this one has a session that has not yet reported whether the agent forked (`acpSessions.awaitingForkResult`). */
+const hasUndecidedFork = async (ctx: MutationCtx, threadId: Id<"threads">): Promise<boolean> => {
+    const { page: links } = await ctx.db.threadRelationships.findMany({ limit: 20, where: { branchType: "branch", parentThreadId: threadId } });
+
+    for (const link of links) {
+        const child = await sessionOfThread(ctx, link.threadId);
+
+        if (child?.awaitingForkResult === true) {
+            return true;
+        }
+    }
+
+    return false;
+};
+
 export const sendToHostFor = async (ctx: MutationCtx, args: SendToHostInput): Promise<Infer<typeof vSendResult>> => {
     const { requestId, userId } = args;
     // Every caller passes through here (the HTTP action, and the pull-request guide, whose text carries third-party content),
@@ -130,6 +146,12 @@ export const sendToHostFor = async (ctx: MutationCtx, args: SendToHostInput): Pr
     }
 
     const session = await sessionOfThread(ctx, threadId);
+
+    // A fork of this chat is waiting for its agent to say whether it forked its session: a turn sent here now would be in the source's
+    // session before the fork is decided, and the fork would hold it while its chat does not show it.
+    if (await hasUndecidedFork(ctx, threadId)) {
+        return { outcome: "session_starting" as const };
+    }
 
     // A fork's chat exists before its session does (the history is copied in first): a prompt now would land among the copied rows.
     if (!session && (await ctx.db.threadRelationships.findFirst({ where: { branchType: "branch", threadId } })) !== null) {

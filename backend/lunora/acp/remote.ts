@@ -436,8 +436,6 @@ export const beginHostFork = internalMutation
             });
         }
 
-        ctx.log.event("acp.fork_host_thread", { started: result.started });
-
         const newest = await getMaxMessage(ctx, thread._id);
 
         // What the copied history carries with it (`/clear`, a handed-over conversation), marked on the new chat after the copy as a side chat does.
@@ -588,32 +586,35 @@ export const openHostFork = internalMutation
 
 /**
  * Whether the copy's last message (`endId`) is the newest message of the chat's active path, ignoring agent-switch dividers: anything after
- * it (a reply still being written, an unanswered tool call) is in the agent's session and not in the copy. False too when the path is longer than the walk reads.
+ * it (a reply still being written, an unanswered tool call) is in the agent's session and not in the copy. `branch` when the chat is no
+ * longer on the leaf the fork began on (`sourceLeafId`), so the copy and the open check read one branch. The walk stops at the copy's end.
  */
 export const forkEndsPath = internalQuery
-    .input({ endId: v.id("messages"), threadId: v.id("threads") })
-    .output(v.boolean())
+    .input({ endId: v.id("messages"), sourceLeafId: v.optional(v.string()), threadId: v.id("threads") })
+    .output(v.union(v.literal("ok"), v.literal("branch"), v.literal("tail")))
     .query(async ({ args, ctx }) => {
         const thread = await ctx.db.get("threads", args.threadId);
         const leaf = thread ? await leafRowOf(ctx, thread) : null;
 
-        if (!leaf) {
-            return false;
+        if (!thread || !leaf) {
+            return "tail" as const;
         }
 
-        const { rows } = await walkPath(ctx, args.threadId, leaf, { limit: FORK_TAIL_ROWS });
-
-        for (const row of rows) {
-            if (row._id === args.endId) {
-                return true;
-            }
-
-            if (row.message !== undefined && !agentSwitchOf(row)) {
-                return false;
-            }
+        if ((thread.activeLeafMessageId as string | undefined) !== args.sourceLeafId) {
+            return "branch" as const;
         }
 
-        return false;
+        if (leaf._id === args.endId) {
+            return "ok" as const;
+        }
+
+        const { next, rows } = await walkPath(ctx, args.threadId, leaf, { limit: FORK_TAIL_ROWS, stopAtId: args.endId });
+
+        if (rows.some((row) => row.message !== undefined && !agentSwitchOf(row))) {
+            return "tail" as const;
+        }
+
+        return next?._id === args.endId ? ("ok" as const) : ("tail" as const);
     });
 
 /** Gives back the claim of a fork whose new chat was taken back, so the same click can fork again (a claim otherwise holds its key for a day). */
@@ -634,7 +635,7 @@ export const releaseHostForkClaim = internalMutation
  * as a side chat does, so no empty chat is left for a person who never asked for one.
  */
 export const forkHostThreadRun = async (
-    ctx: Pick<ActionCtx, "runAction" | "runMutation" | "runQuery">,
+    ctx: Pick<ActionCtx, "log" | "runAction" | "runMutation" | "runQuery">,
     args: { clientId: string; threadId: Id<"threads">; userId: string },
 ): Promise<{ started: boolean; threadId?: string }> => {
     const begun = await ctx.runMutation(internal.acp.remote.beginHostFork, args);
@@ -646,7 +647,10 @@ export const forkHostThreadRun = async (
     }
 
     if (!begun.started || begun.open === undefined) {
-        return { started: begun.started, ...(begun.threadId !== undefined && { threadId: begun.threadId }) };
+        // Logged on every way a fork succeeds, a replay included.
+        ctx.log.event("acp.fork_host_thread", { started: begun.started });
+
+        return { started: begun.started, threadId: begun.threadId };
     }
 
     const newThreadId = begun.threadId as Id<"threads">;
@@ -667,8 +671,20 @@ export const forkHostThreadRun = async (
 
         // The copy ends where the agent's session does: a message after it (a reply being written, a tool call with no result) is in the
         // session and not in the copied chat, so the fork waits for it.
-        if (forkEnd !== null && !(await ctx.runQuery(internal.acp.remote.forkEndsPath, { endId: forkEnd.endId, threadId: args.threadId }))) {
-            throw new LunoraError("BAD_REQUEST", "This chat cannot be forked yet: wait for its reply to finish.");
+        if (forkEnd !== null) {
+            const ends = await ctx.runQuery(internal.acp.remote.forkEndsPath, {
+                endId: forkEnd.endId,
+                sourceLeafId: begun.open.sourceLeafId,
+                threadId: args.threadId,
+            });
+
+            if (ends === "branch") {
+                throw new LunoraError("CONFLICT", "This chat switched branch while it was being forked. Fork it again.");
+            }
+
+            if (ends === "tail") {
+                throw new LunoraError("BAD_REQUEST", "This chat cannot be forked yet: wait for its reply to finish.");
+            }
         }
 
         if (forkEnd !== null) {
@@ -715,6 +731,8 @@ export const forkHostThreadRun = async (
 
         throw error;
     }
+
+    ctx.log.event("acp.fork_host_thread", { started: true });
 
     return { started: true, threadId: begun.threadId };
 };

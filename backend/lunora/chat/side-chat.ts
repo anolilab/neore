@@ -171,7 +171,13 @@ export const refusedOutcome = (log: { event: (name: string, fields: { reason: st
  * until the row is gone, then the usual delete clears what is left (streams, pins, routes).
  */
 export const discardNewThread = async (ctx: Pick<ActionCtx, "runMutation">, threadId: Id<"threads">): Promise<void> => {
-    await ctx.runMutation(internal.agent.threads.deleteThreadRelationship, { threadId });
+    // A failed link removal must not leave the child behind: the rest is removed first, and the failure is reported after it.
+    const linkFailure = await ctx
+        .runMutation(internal.agent.threads.deleteThreadRelationship, { threadId })
+        .then(() => undefined)
+        .catch((error: unknown) => {
+            return { error };
+        });
 
     let cursor: string | undefined;
 
@@ -186,6 +192,10 @@ export const discardNewThread = async (ctx: Pick<ActionCtx, "runMutation">, thre
     }
 
     await ctx.runMutation(internal.agent.threads.deleteAllForThreadIdAsync, { threadId });
+
+    if (linkFailure !== undefined) {
+        throw linkFailure.error;
+    }
 };
 
 export const createSideChat = authAction

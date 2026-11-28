@@ -1,7 +1,6 @@
 import type { Doc } from "../../_generated/dataModel";
 import type { MutationCtx } from "../../_generated/server";
 import { leafRowOf } from "../../agent/agent-switch";
-import { agentSwitchOf } from "../../agent/agent-switch-logic";
 import { composeHandoff, composeTailHandoff, HandoffTooLargeError, jsonBytes } from "../../agent/handoff";
 import { collectHandoffSource } from "../../agent/handoff-source";
 import { insertAgentSwitchRow, patchAgentSwitchRow, patchThread } from "../../agent/table-writes";
@@ -30,7 +29,8 @@ export const markForkFellBack = async (ctx: MutationCtx, session: Doc<"acpSessio
 
     const leaf = await leafRowOf(ctx, thread);
 
-    if (!leaf || agentSwitchOf(leaf)) {
+    // A divider as the leaf (a native switch copied in) does not end the fallback: the fresh session still needs the handoff after it.
+    if (!leaf) {
         return;
     }
 
