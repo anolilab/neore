@@ -98,9 +98,13 @@ const MemorySettings: FC = () => {
         enabled: memoryEnabled,
     });
 
+    // Moved by every change made here, so the open retired list is read again too (a delete takes retired rows with it).
+    const [readCount, setReadCount] = useState(0);
+
     const refresh = useCallback(() => {
         void refetchMemories();
         void refetchStats();
+        setReadCount((count) => count + 1);
     }, [refetchMemories, refetchStats]);
 
     const { isPending: isDeleting, mutate: deleteMemory } = useMutation({
@@ -248,7 +252,7 @@ const MemorySettings: FC = () => {
                             </div>
                         )}
 
-                        <RetiredMemories onBroughtBack={refresh} />
+                        <RetiredMemories onBroughtBack={refresh} readCount={readCount} />
 
                         {/* Clear all */}
                         {memories && memories.length > 0 && (

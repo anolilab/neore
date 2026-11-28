@@ -68,7 +68,7 @@ const renderList = (onBroughtBack: () => void = vi.fn()): void => {
 
     render(
         <QueryClientProvider client={client}>
-            <RetiredMemories onBroughtBack={onBroughtBack} />
+            <RetiredMemories onBroughtBack={onBroughtBack} readCount={0} />
         </QueryClientProvider>,
     );
 };
@@ -122,6 +122,27 @@ describe("RetiredMemories", () => {
         expect(document.activeElement).toBe(screen.getByRole("heading", { name: RETIRED_HEADING }));
         expect(screen.getByRole("status").textContent).toBe("Memory brought back.");
         expect(screen.getByText("Has a cold")).toBeTruthy();
+    });
+
+    it("reads the open list again after a change elsewhere on the page", async () => {
+        const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+        const view = render(
+            <QueryClientProvider client={client}>
+                <RetiredMemories onBroughtBack={vi.fn()} readCount={0} />
+            </QueryClientProvider>,
+        );
+
+        fireEvent.click(screen.getByRole("button", { name: RETIRED_HEADING }));
+        await screen.findByText("Likes tea");
+        harness.page = [];
+        view.rerender(
+            <QueryClientProvider client={client}>
+                <RetiredMemories onBroughtBack={vi.fn()} readCount={1} />
+            </QueryClientProvider>,
+        );
+
+        expect(await screen.findByText("No retired memories.")).toBeTruthy();
+        expect(harness.listRequests).toBe(2);
     });
 
     it("keeps the row and says so when bringing it back fails", async () => {

@@ -9,6 +9,7 @@ import type { Id } from "../_generated/dataModel";
 import { memoryLogger } from "../lib/logger";
 import schema from "../schema";
 import { applyReflectionOps } from "./reflection";
+import { findContradictionCandidates } from "./reflection-logic";
 import { bringBackMemory, BROUGHT_BACK_CONFIDENCE, listRetiredMemories } from "./retired";
 
 const { sessionFrom } = vi.hoisted(() => {
@@ -170,6 +171,19 @@ describe("bringBackMemory", () => {
         const afterReflection = await rowOf(old);
 
         expect(afterReflection?.supersededBy).toBeUndefined();
+    });
+
+    it("leaves the row that replaced it the newer statement at the next reflection, however recently the old one came back", () => {
+        const memory = { confidence: 80, importance: 50, pinned: false, type: "preference" as const, updatedAt: 9000 };
+        const [pair] = findContradictionCandidates(
+            [
+                { ...memory, createdAt: 1000, id: "brought-back", lastConfirmedAt: 9000, text: "prefers tabs for indentation in code" },
+                { ...memory, createdAt: 2000, id: "successor", lastConfirmedAt: 3000, text: "prefers spaces for indentation in code" },
+            ],
+            { maxBeliefRevisions: 5 },
+        );
+
+        expect(pair).toMatchObject({ newerId: "successor", olderId: "brought-back" });
     });
 
     it("refuses another user's row, a deleted id and an active row", async () => {

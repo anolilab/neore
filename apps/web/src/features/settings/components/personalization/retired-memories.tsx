@@ -99,6 +99,8 @@ const RetiredPage: FC<RetiredPageProps> = ({ cursor, hidden, isLast, onBroughtBa
     const crpc = useCRPC();
     const { data, isError, isPending, refetch } = useQuery({
         ...crpc.memory.retired.listRetiredMemories.queryOptions({ paginationOpts: { cursor, numItems: 25 } }, { live: false }),
+        // Mounted again after each change on the page (see `readCount`): a delete may have taken retired rows with it.
+        refetchOnMount: "always",
     });
 
     if (isPending) {
@@ -143,13 +145,15 @@ const RetiredPage: FC<RetiredPageProps> = ({ cursor, hidden, isLast, onBroughtBa
 interface RetiredMemoriesProps {
     /** Called after a memory came back, so the list of current memories is read again. */
     onBroughtBack: () => void;
+    /** Moves on each change the page made (a delete, a clear, an import): the open list is read again. */
+    readCount: number;
 }
 
 /**
  * Memories that stopped being current (replaced, merged, combined, expired or faded) but were kept, with why and when,
  * and a way to bring one back. Deleted memories are gone and never listed. Read only once opened.
  */
-const RetiredMemories: FC<RetiredMemoriesProps> = ({ onBroughtBack }) => {
+const RetiredMemories: FC<RetiredMemoriesProps> = ({ onBroughtBack, readCount }) => {
     const { t } = useLingui();
     const regionId = useId();
     const headingRef = useRef<HTMLHeadingElement>(null);
@@ -193,7 +197,7 @@ const RetiredMemories: FC<RetiredMemoriesProps> = ({ onBroughtBack }) => {
                             cursor={cursor}
                             hidden={hidden}
                             isLast={index === cursors.length - 1}
-                            key={cursor ?? "first"}
+                            key={`${String(readCount)}:${cursor ?? "first"}`}
                             onBroughtBack={handleBroughtBack}
                             onLoadMore={(next: string) => setCursors((previous) => [...previous, next])}
                         />
