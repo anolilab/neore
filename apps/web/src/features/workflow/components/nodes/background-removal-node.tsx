@@ -72,7 +72,13 @@ const BackgroundRemovalNodeComponent = (props: NodeProps<Node<BackgroundRemovalN
                     <Label className="text-muted-foreground text-xs" htmlFor={`${id}-format`}>
                         <Trans>Output Format</Trans>
                     </Label>
-                    <Select onValueChange={handleFormatChange} value={data.outputFormat ?? "png"}>
+                    <Select
+                        items={OUTPUT_FORMATS.map((option) => {
+                            return { label: i18n._(option.label), value: option.value };
+                        })}
+                        onValueChange={handleFormatChange}
+                        value={data.outputFormat ?? "png"}
+                    >
                         <SelectTrigger className="nodrag h-8 text-sm" id={`${id}-format`}>
                             <SelectValue />
                         </SelectTrigger>

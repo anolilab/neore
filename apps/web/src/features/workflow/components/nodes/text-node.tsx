@@ -24,6 +24,11 @@ const TEMPLATE_FORMATS: Record<TemplateFormat, true> = { json: true, text: true,
 
 const isTemplateFormat = (value: string): value is TemplateFormat => Object.hasOwn(TEMPLATE_FORMATS, value);
 
+const MODE_ITEMS = {
+    input: <Trans>Input (Rich Text)</Trans>,
+    transform: <Trans>Transform (Template)</Trans>,
+};
+
 const TextNodeComponent = (props: NodeProps<Node<TextNodeData>>) => {
     const selectId = useId();
     const { data, id } = props;
@@ -123,17 +128,16 @@ const TextNodeComponent = (props: NodeProps<Node<TextNodeData>>) => {
                     <Label className="text-muted-foreground text-xs" htmlFor={selectId}>
                         <Trans>Mode</Trans>
                     </Label>
-                    <Select onValueChange={handleModeChange} value={data.mode}>
+                    <Select items={MODE_ITEMS} onValueChange={handleModeChange} value={data.mode}>
                         <SelectTrigger className="nodrag h-8 text-sm" id={selectId}>
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="input">
-                                <Trans>Input (Rich Text)</Trans>
-                            </SelectItem>
-                            <SelectItem value="transform">
-                                <Trans>Transform (Template)</Trans>
-                            </SelectItem>
+                            {Object.entries(MODE_ITEMS).map(([value, label]) => (
+                                <SelectItem key={value} value={value}>
+                                    {label}
+                                </SelectItem>
+                            ))}
                         </SelectContent>
                     </Select>
                 </div>

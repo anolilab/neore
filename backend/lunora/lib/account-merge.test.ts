@@ -3705,13 +3705,14 @@ describe("mergeGuestInto across two real shards", () => {
             let newer: MergeProgress | null = null;
 
             // The first delivery has read the row and pauses past its lease. The guest edits the row, and a redelivery takes
-            // the lease over and spends one clear step on it: it imports the edit and deletes the guest's copy; its chain has
-            // more runs to go.
+            // the lease over and runs on from the first delivery's saved progress: it imports the edit; its chain has more runs to go.
             merge.onceBefore("importShardRows", async () => {
                 await merge.lapseLease();
                 await merge.shards.guest.run(async (context: any) => await context.db.patch("threads", id, { title: "edited during the merge", updatedAt: 2 }));
+                // The progress the first delivery saved is ahead of the `resume` given here, so the redelivery goes on from the record
+                // (`acquireMergeLease`). It gets a whole run's budget, so it imports the edit within this call.
                 ({ next: newer } = await mergeGuestInto(merge.call, REFERENCES, "guest", "user", {
-                    budget: MERGE_LEASE_CALLS + MERGE_STOP_CALLS + 5,
+                    budget: MERGE_CALLS_PER_RUN,
                     resume: { cursor: null, moved: 0, phase: "clear", run: 1, table: "threads" },
                 }));
             });

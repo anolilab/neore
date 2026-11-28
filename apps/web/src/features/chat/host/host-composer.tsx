@@ -219,6 +219,10 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
         isFetchedAfterMount: sessionFetched,
         refetch: refetchSession,
     } = useQuery(crpc.acp.functions.getHostSession.queryOptions({ threadId }));
+    // The computer this chat runs on is older than the backend still serves (`updateRequired`, the floor the refusal uses): said before a send
+    // is refused, not after. Read like the Devices page reads it; no computer found, or none reported, is not a skew.
+    const { data: devices } = useQuery(crpc.devices.functions.listDevices.queryOptions({}));
+    const computerOutdated = session?.deviceId !== undefined && devices?.find((device) => device._id === session.deviceId)?.updateRequired === true;
     // A locked chat answers its stream query only with the passcode proof, so the proof goes with it; otherwise a turn that
     // is running reads as idle and the queue retries against it.
     const unlockProof = useUnlockProof(threadId);
@@ -952,6 +956,11 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
             {status === "ended" && (
                 <p className="text-muted-foreground text-sm" role="status">
                     {t`This session has ended. Start a new one from the desktop app.`}
+                </p>
+            )}
+            {computerOutdated && (
+                <p className="text-destructive text-sm" role="status">
+                    {t`Neore on this computer is out of date, so the agent cannot use it. Update the app there to turn it back on.`}
                 </p>
             )}
             {offerContinue && (

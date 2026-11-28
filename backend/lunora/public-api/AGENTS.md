@@ -25,3 +25,5 @@
   `Idempotency-Key`. A retry answers 200 with `duplicate: true` (not 202), and the start's 409/422 map to
   `chat_start_in_progress` / `client_message_id_reused` in `chatStartError`; keep the zod rule in step with
   `isValidClientMessageId`.
+- **`reasoningEffort` on `/chat`** — an integer 0 to 100 (the app's slider scale; the CLI's `--effort`), forwarded to
+  `runChatStart` as the send's effort. The MCP `create_thread` and `send_message` tools take it too, as they are this route.

@@ -27,9 +27,13 @@ import type { Id } from "../_generated/dataModel";
 import type { ActionCtx } from "../_generated/server";
 import { internalAction } from "../_generated/server";
 import { loadModelFilterRules } from "../chat/lib/model-filter-rules";
+import { digestCandidates, formatMemoryDigest, MEMORY_DIGEST_SOURCE_CHECKS, MEMORY_OFF_DIGEST } from "../memory/export-format";
+import { readBotLabels, readExportMemories } from "../memory/markdown-export";
+import { memoryLogger } from "../lib/logger";
 import { runHeadlessAgent } from "../chat/lib/headless-run";
 import type { Delivery } from "./lib/platform-media";
 import { requireKey } from "./lib/platform-media";
+import { MEMORY_DIGEST_FAILED_NOTICE } from "./lib/memory-command";
 import { AI_DISCLOSURE } from "./lib/pairing";
 import type { ReplyToolPlan } from "./lib/reply-tools";
 import { chooseReplyModel, MESSENGER_TEXT_REPLY_MAX_STEPS, MESSENGER_TOOL_REPLY_MAX_STEPS, MESSENGER_TOOL_SYSTEM, planReplyTools } from "./lib/reply-tools";
@@ -40,7 +44,7 @@ import { sendLineMessage } from "./platforms/line";
 import { sendSlackMessage } from "./platforms/slack";
 import { sendTeamsMessage } from "./platforms/teams";
 import { sendTelegramMessage } from "./platforms/telegram";
-import { sendWeChatMessage, WECHAT_SERVICE_WINDOW_MS } from "./platforms/wechat";
+import { sendWeChatMessage, WECHAT_SERVICE_WINDOW_MS, WECHAT_TEXT_MAX } from "./platforms/wechat";
 import { sendWhatsAppMessage, WHATSAPP_SERVICE_WINDOW_MS } from "./platforms/whatsapp";
 
 export { MESSENGER_MEDIA_MODEL } from "./lib/reply-tools";
@@ -368,17 +372,132 @@ export const sendNotice = internalAction
     })
     .output(v.null())
     .action(async ({ args: { text, userId, ...delivery }, ctx }) => {
-        if (!isReplyWindowOpen(delivery)) {
-            return null;
-        }
+        await sendFixedText(ctx, delivery, userId, text);
 
-        try {
-            const messengerKeys = await ctx.runQuery(internal.auth.functions.getDecryptedMessengerKeysQuery, { userId });
+        return null;
+    });
 
-            await sendPlatformMessage(delivery, text, messengerKeys);
-        } catch (error) {
-            console.error(`[Messenger] Failed to send notice on ${delivery.platform}:`, error);
-        }
+/** Send a fixed text while the reply window is open; a failed send is logged and swallowed, as for a notice. */
+const sendFixedText = async (ctx: Pick<ActionCtx, "runQuery">, delivery: Delivery, userId: string, text: string): Promise<void> => {
+    if (!isReplyWindowOpen(delivery)) {
+        return;
+    }
+
+    try {
+        const messengerKeys = await ctx.runQuery(internal.auth.functions.getDecryptedMessengerKeysQuery, { userId });
+
+        await sendPlatformMessage(delivery, text, messengerKeys);
+    } catch (error) {
+        console.error(`[Messenger] Failed to send notice on ${delivery.platform}:`, error);
+    }
+};
+
+/** Platforms whose one message holds less than the digest's own limit. */
+const DIGEST_MAX_CHARS: Partial<Record<string, number>> = { wechat: WECHAT_TEXT_MAX };
+
+/** What `/memory` answers: that memory is off, or the digest of the active memories, cut to the platform's message. */
+export const memoryDigestText = async (ctx: Pick<ActionCtx, "runQuery">, userId: string, platform: string): Promise<string> => {
+    if (!(await ctx.runQuery(internal.memory.functions.isMemoryEnabled, { userId }))) {
+        return MEMORY_OFF_DIGEST;
+    }
+
+    const [{ rows, truncated }, timeZone] = await Promise.all([
+        readExportMemories(ctx, userId),
+        ctx.runQuery(internal.memory.functions.getUserTimeZone, { userId }),
+    ]);
+
+    const now = Date.now();
+    // The same bot labels as the download, from one call; past the read limit every bot reads "a bot".
+    const { labels: bots } = await readBotLabels(ctx, userId, rows);
+    // Unlike the download (the signed-in owner, who sees the same rows in settings), a phone may be read by anyone holding
+    // it: memories whose source chat is locked, in the trash or gone are left out. One read for the candidates checked.
+    const sourceIds = [
+        ...new Set(
+            digestCandidates(rows, now, timeZone)
+                .slice(0, MEMORY_DIGEST_SOURCE_CHECKS)
+                .flatMap((row) => (row.sourceThreadId === undefined ? [] : [row.sourceThreadId])),
+        ),
+    ];
+    const hiddenSources = new Set(
+        sourceIds.length === 0 ? [] : await ctx.runQuery(internal.memory.markdown_export.readHiddenSourceThreads, { threadIds: sourceIds, userId }),
+    );
+
+    return formatMemoryDigest(rows, { bots, hiddenSources, maxChars: DIGEST_MAX_CHARS[platform], now, timeZone, truncated });
+};
+
+interface MemoryDigestArgs extends Delivery {
+    connectionId: Id<"messengerConnections">;
+    /** The contact who sent `/memory`, as the webhook saw it. */
+    platformUserId: string;
+    userId: string;
+}
+
+/**
+ * Whether the connection is still paired to the same owner, contact and chat as when `/memory` was queued: a pairing
+ * reset or re-paired in between (a new code, another contact) answers nothing.
+ */
+const stillPairedAs = async (ctx: Pick<ActionCtx, "runQuery">, args: MemoryDigestArgs): Promise<boolean> => {
+    const connection = await ctx.runQuery(internal.messenger.functions.getConnectionById, { connectionId: args.connectionId });
+
+    return (
+        connection !== null &&
+        connection.status === "active" &&
+        connection.userId === args.userId &&
+        connection.platform === args.platform &&
+        connection.platformUserId === args.platformUserId &&
+        connection.platformChatId === args.platformChatId
+    );
+};
+
+/** What a failed read is logged with: its name and code, never its message (which could quote what was read). */
+const failureCause = (error: unknown): { code?: string; name: string } => {
+    const code = (error as { code?: unknown } | null)?.code;
+
+    return { ...(typeof code === "string" && { code }), name: error instanceof Error ? error.name : typeof error };
+};
+
+/**
+ * The `/memory` reply (`lib/memory-command.ts`): the owner's memory digest, that memory is off, or, when the read
+ * fails, that it could not be read. Nothing is read or sent once the reply window closed or the pairing changed, and
+ * the pairing is checked again just before the send.
+ */
+export const answerMemoryCommand = async (ctx: Pick<ActionCtx, "runQuery">, args: MemoryDigestArgs): Promise<void> => {
+    // `args` is the delivery too: the extra ids it carries are not read by the send.
+    if (!isReplyWindowOpen(args) || !(await stillPairedAs(ctx, args))) {
+        return;
+    }
+
+    const text = await memoryDigestText(ctx, args.userId, args.platform).catch((error: unknown) => {
+        memoryLogger.error("memory_digest: the owner's memories could not be read for /memory", failureCause(error));
+
+        return MEMORY_DIGEST_FAILED_NOTICE;
+    });
+
+    // Building the digest takes several reads: the pairing is read again right before the send, by the same rule.
+    if (!(await stillPairedAs(ctx, args))) {
+        return;
+    }
+
+    await sendFixedText(ctx, args, args.userId, text);
+};
+
+/** Scheduled by the webhook only for the paired contact in the paired, one-to-one chat (`answerMemoryCommand`). */
+export const sendMemoryDigest = internalAction
+    .input({
+        connectionId: v.id("messengerConnections"),
+        inboundAt: v.optional(v.number()),
+        platform: v.string(),
+        platformChatId: v.string(),
+        platformThreadTs: v.optional(v.string()),
+        platformUserId: v.string(),
+        replyToId: v.optional(v.string()),
+        replyToken: v.optional(v.string()),
+        serviceUrl: v.optional(v.string()),
+        userId: v.string(),
+    })
+    .output(v.null())
+    .action(async ({ args, ctx }) => {
+        await answerMemoryCommand(ctx, args);
 
         return null;
     });

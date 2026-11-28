@@ -36,6 +36,7 @@ const ModelSelect = ({ label, note, onChange, options, placeholder, value }: Mod
                 {label}
             </Label>
             <Select
+                items={options}
                 onValueChange={(next) => {
                     if (next) {
                         onChange(next);

@@ -37,6 +37,10 @@ const SPEED_OPTIONS: { label: string; value: number }[] = [
     { label: "1.5×", value: 1.5 },
 ];
 
+const SPEED_ITEMS = SPEED_OPTIONS.map((option) => {
+    return { label: option.label, value: String(option.value) };
+});
+
 const ComposerAudioSettings: FC<ComposerAudioSettingsProps> = ({ className, disabled, onSettingsChange, settings }) => {
     const { t } = useLingui();
 
@@ -51,6 +55,7 @@ const ComposerAudioSettings: FC<ComposerAudioSettingsProps> = ({ className, disa
                         <div className="inline-flex">
                             <Select
                                 disabled={disabled}
+                                items={VOICE_OPTIONS}
                                 onValueChange={(value) => onSettingsChange({ voice: value ?? undefined })}
                                 value={settings.voice || "alloy"}
                             >
@@ -81,6 +86,7 @@ const ComposerAudioSettings: FC<ComposerAudioSettingsProps> = ({ className, disa
                         <div className="inline-flex">
                             <Select
                                 disabled={disabled}
+                                items={SPEED_ITEMS}
                                 onValueChange={(value) => onSettingsChange({ speed: Number(value) })}
                                 value={String(settings.speed || 1)}
                             >

@@ -194,6 +194,9 @@ describe("isPublicIPv6", () => {
         "2001:2::1",
         "3fff::1",
         "3fff:fff::1",
+        "2001:10::1",
+        "2001:1f::1",
+        "2001:20::1",
     ])("refuses %s", (address) => {
         expect(isPublicIPv6(address)).toBe(false);
     });

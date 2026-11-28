@@ -4,7 +4,7 @@
  * more than the injection does.
  */
 import { lunoraTest } from "@lunora/testing";
-import { v } from "lunorash/server";
+import { LunoraError, v } from "lunorash/server";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { registeredApi, registerModule } from "../../test/registered-api";
@@ -225,6 +225,117 @@ describe("candidates", () => {
         hits(...near.map((row, i): [string, number] => [row.embeddingId, 0.3 - i / 1000]));
 
         expect(await retrieve({ searchText: "dog named Rex" })).toEqual(["adopted a dog named Rex"]);
+    });
+
+    it("finds an old memory outside the window by a rare word the vector search misses, and when the embedding fails", async () => {
+        const part = "ordered replacement part KX-2291 for the dishwasher";
+
+        await seed([{ embeddingId: "emb-part", lastConfirmedAt: 0, memory: part }, ...filler(CANDIDATE_WINDOW_SIZE + 5)]);
+
+        // The index answers nothing near it, and the row is older than the newest 100: only the keyword search reaches it.
+        expect(await retrieve({ searchText: "did I already order KX-2291" })).toEqual([part]);
+
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+        embedMany.mockRejectedValue(new Error("gateway down"));
+
+        expect(await retrieve({ searchText: "did I already order KX-2291" })).toEqual([part]);
+        expect(warn).toHaveBeenCalledWith(expect.stringContaining("Vector search failed"), expect.anything());
+    });
+
+    it("finds an identifier beside a two-letter word: a short term loses nothing", async () => {
+        const part = "ordered replacement part KX-2291 for the dishwasher";
+
+        await seed([{ embeddingId: "emb-part", lastConfirmedAt: 0, memory: part }, ...filler(CANDIDATE_WINDOW_SIZE + 5)]);
+
+        expect(await retrieve({ searchText: "AI KX-2291" })).toEqual([part]);
+    });
+
+    it("finds a memory by a serial longer than the index's 16 search terms", async () => {
+        const serial = "A1-01-02-03-04-05-06-07-08-09-10-11-12-13-14-15-16";
+
+        await seed([{ embeddingId: "emb-serial", lastConfirmedAt: 0, memory: `router serial ${serial}` }, ...filler(CANDIDATE_WINDOW_SIZE + 5)]);
+
+        expect(await retrieve({ searchText: `where is ${serial}` })).toEqual([`router serial ${serial}`]);
+    });
+
+    it("scores the words of a search past its first 2,000 characters", async () => {
+        await seed([{ memory: "descaled the kettle" }]);
+
+        // The embedding reads the first 2,000 characters; the keyword score reads all of it.
+        expect(await retrieve({ searchText: `${"the ".repeat(600)}kettle` })).toEqual(["descaled the kettle"]);
+    });
+
+    it("never finds by keyword a superseded row, a fact past its end date, or another bot's row", async () => {
+        await harness.run(async (ctx: any) => {
+            const base = { lastConfirmedAt: 0, source: "auto", type: "preference", updatedAt: 0, userId: USER };
+            const newer = await ctx.db.insert("memories", { ...base, memory: "rides a bike" });
+
+            await ctx.db.insert("memories", { ...base, memory: "bike serial WTU-38817, old note", supersededBy: newer });
+            await ctx.db.insert("memories", { ...base, memory: "bike serial WTU-38817, lapsed", validUntil: "2020-01-01" });
+            await ctx.db.insert("memories", { ...base, botId: "bot-b", memory: "bike serial WTU-38817, bot b" });
+        });
+
+        expect(await retrieve({ searchText: "whose serial is WTU-38817" })).toEqual([]);
+        expect(await retrieve({ botId: "bot-b", searchText: "whose serial is WTU-38817" })).toEqual(["bike serial WTU-38817, bot b"]);
+    });
+
+    it("keeps the vector hits, and logs no warning or error, while the keyword index is still building", async () => {
+        await seed([{ embeddingId: "emb-trip", memory: "went to the coast in May", type: "activity" }]);
+        hits(["emb-trip", 0.9]);
+
+        const real = registry.get("memory_functions:searchMemoriesByKeyword");
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+        const error = vi.spyOn(console, "error").mockImplementation(() => {});
+
+        registry.set(
+            "memory_functions:searchMemoriesByKeyword",
+            internalQuery
+                .input({
+                    activeOn: v.optional(v.number()),
+                    terms: v.array(v.object({ code: v.boolean(), term: v.string(), tokens: v.array(v.string()) })),
+                    userId: v.string(),
+                })
+                .query(async () => {
+                    throw new LunoraError("SEARCH_INDEX_BUILDING", "search index is still backfilling");
+                }),
+        );
+
+        try {
+            expect(await retrieve()).toEqual(["went to the coast in May"]);
+            expect(warn).not.toHaveBeenCalled();
+            expect(error).not.toHaveBeenCalled();
+        } finally {
+            registry.set("memory_functions:searchMemoriesByKeyword", real);
+        }
+    });
+
+    it("keeps the vector hits when the keyword search throws", async () => {
+        await seed([{ embeddingId: "emb-trip", memory: "went to the coast in May", type: "activity" }]);
+        hits(["emb-trip", 0.9]);
+
+        const real = registry.get("memory_functions:searchMemoriesByKeyword");
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+        registry.set(
+            "memory_functions:searchMemoriesByKeyword",
+            internalQuery
+                .input({
+                    activeOn: v.optional(v.number()),
+                    terms: v.array(v.object({ code: v.boolean(), term: v.string(), tokens: v.array(v.string()) })),
+                    userId: v.string(),
+                })
+                .query(async () => {
+                    throw new Error("index unavailable");
+                }),
+        );
+
+        try {
+            expect(await retrieve()).toEqual(["went to the coast in May"]);
+            expect(warn).toHaveBeenCalledWith(expect.stringContaining("Keyword search failed"), expect.anything());
+        } finally {
+            registry.set("memory_functions:searchMemoriesByKeyword", real);
+        }
     });
 
     it("leaves out a hit on a fact past its end date", async () => {

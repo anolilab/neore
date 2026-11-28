@@ -158,6 +158,8 @@ export const parseWhatsAppWebhook = (body: unknown, phoneNumberId: string): Inbo
                 messages.push({
                     ...(attachments.length > 0 && { attachments }),
                     chatId: message.from,
+                    // The reply goes to the sender's own number, never to a group.
+                    direct: true,
                     eventId: message.id,
                     kind: inboundKind(text, attachments),
                     senderId: message.from,

@@ -216,7 +216,13 @@ const CharacterRefNodeComponent = (props: NodeProps<Node<CharacterRefNodeData>>)
                     <Label className="text-muted-foreground text-xs" htmlFor={`${id}-mode`}>
                         <Trans>Reference Mode</Trans>
                     </Label>
-                    <Select onValueChange={handleModeChange} value={data.mode ?? "face"}>
+                    <Select
+                        items={MODE_OPTIONS.map((option) => {
+                            return { label: i18n._(option.label), value: option.value };
+                        })}
+                        onValueChange={handleModeChange}
+                        value={data.mode ?? "face"}
+                    >
                         <SelectTrigger className="nodrag h-8 text-sm" id={`${id}-mode`}>
                             <SelectValue />
                         </SelectTrigger>

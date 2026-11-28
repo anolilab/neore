@@ -101,6 +101,7 @@ export const parseLineWebhook = (body: unknown): LineInboundMessage[] => {
         messages.push({
             ...(attachments.length > 0 && { attachments }),
             chatId,
+            direct: event.source?.type === "user",
             eventId: event.webhookEventId,
             kind: inboundKind(text, attachments),
             replyToken: event.replyToken,

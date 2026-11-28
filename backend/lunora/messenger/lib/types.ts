@@ -10,6 +10,16 @@ export interface InboundMessage {
     attachments?: InboundAttachment[];
     /** Chat to reply into (DM partner, group, channel or conversation id). */
     chatId: string;
+    /**
+     * The platform says this is a one-to-one chat with the sender (no group, channel or room). Only then may a reply
+     * show what is remembered about the owner (`/memory`); absent or false is treated as a group.
+     */
+    direct?: boolean;
+    /**
+     * The platform names no chat type for this message at all (a Discord gateway message), so it is never `direct`
+     * and the `/memory` notice points to the one way that can be told apart (the slash command).
+     */
+    directUnknown?: true;
     /** Platform-unique id of this message or event — the dedupe key. */
     eventId: string;
     /**
@@ -27,6 +37,15 @@ export interface InboundMessage {
     /** When the platform says the message was sent (ms). */
     timestampMs: number;
 }
+
+/**
+ * The text without a leading bot mention: Slack's `<@U123>` (or `<@U123|name>`) and Discord's `<@123>` / `<@!123>`, so
+ * a command typed after one (`<@U123> /memory`) still matches. Teams' `<at>` and Feishu's `@_user_1` are dropped by
+ * their parsers already.
+ */
+const LEADING_MENTION = /^\s*<@!?[\w.|-]+>\s*/u;
+
+export const withoutLeadingMention = (text: string): string => text.replace(LEADING_MENTION, "");
 
 /** Reply sent for stickers, locations, contacts and the like, which the bot does not read. */
 export const UNSUPPORTED_CONTENT_NOTICE =

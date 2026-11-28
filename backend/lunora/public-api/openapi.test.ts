@@ -139,6 +139,17 @@ describe("OpenAPI document", () => {
         expect(responses["200"]!.description).toContain("clientMessageId");
     });
 
+    it("carries an optional reasoningEffort, 0 to 100, in the POST /chat body", () => {
+        const operation = paths["/chat"]!["post"]! as { requestBody: { content: Record<string, { schema: unknown }> } };
+        const body = objectSchemas(operation.requestBody.content["application/json"]!.schema);
+        const effort = body.find((schema) => schema.properties?.["reasoningEffort"])?.properties?.["reasoningEffort"] as
+            | { maximum?: number; minimum?: number; type?: string }
+            | undefined;
+
+        expect(effort).toMatchObject({ maximum: 100, minimum: 0, type: "integer" });
+        expect(body.every((schema) => !(schema.required ?? []).includes("reasoningEffort"))).toBe(true);
+    });
+
     it("carries clientMessageId in the POST /chat body, and duplicate with the first send's ids in its 200", () => {
         const operation = paths["/chat"]!["post"]! as {
             requestBody: { content: Record<string, { schema: unknown }> };

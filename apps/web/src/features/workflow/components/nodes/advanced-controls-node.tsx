@@ -128,7 +128,7 @@ const AdvancedControlsNodeComponent = (props: NodeProps<Node<AdvancedControlsNod
                     <Label className="text-muted-foreground text-xs" htmlFor={`${id}-sampler`}>
                         <Trans>Sampler</Trans>
                     </Label>
-                    <Select onValueChange={handleSamplerChange} value={data.sampler ?? "euler_a"}>
+                    <Select items={SAMPLERS} onValueChange={handleSamplerChange} value={data.sampler ?? "euler_a"}>
                         <SelectTrigger className="nodrag h-8 text-sm" id={`${id}-sampler`}>
                             <SelectValue />
                         </SelectTrigger>
@@ -150,7 +150,7 @@ const AdvancedControlsNodeComponent = (props: NodeProps<Node<AdvancedControlsNod
                     <Label className="text-muted-foreground text-xs" htmlFor={`${id}-scheduler`}>
                         <Trans>Scheduler</Trans>
                     </Label>
-                    <Select onValueChange={handleSchedulerChange} value={data.scheduler ?? "normal"}>
+                    <Select items={SCHEDULERS} onValueChange={handleSchedulerChange} value={data.scheduler ?? "normal"}>
                         <SelectTrigger className="nodrag h-8 text-sm" id={`${id}-scheduler`}>
                             <SelectValue />
                         </SelectTrigger>

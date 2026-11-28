@@ -103,6 +103,8 @@ describe("pairing code helpers", () => {
         expect(parsePairCommand("/pair K7QM-2XPA")).toBe("K7QM-2XPA");
         expect(parsePairCommand("pair k7qm2xpa")).toBe("k7qm2xpa");
         expect(parsePairCommand("/pair@my_bot K7QM-2XPA")).toBe("K7QM-2XPA");
+        expect(parsePairCommand("<@U0BOT> /pair K7QM-2XPA")).toBe("K7QM-2XPA");
+        expect(parsePairCommand("<@!123> pair K7QM-2XPA")).toBe("K7QM-2XPA");
         expect(parsePairCommand("hello there")).toBeNull();
         expect(parsePairCommand("/pair")).toBeNull();
         expect(parsePairCommand(undefined)).toBeNull();
