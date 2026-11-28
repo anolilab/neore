@@ -53,8 +53,9 @@ export const markForkFellBack = async (ctx: MutationCtx, session: Doc<"acpSessio
         handoff = composeHandoff({ kind: "portable", omittedTurns: 0, tail: [] });
     }
 
+    // Never dropped for its size: the divider and a note that earlier turns are not included still go in, so the chat says it started fresh.
     if (jsonBytes(handoff) > FORK_HANDOFF_MAX_BYTES) {
-        return;
+        handoff = composeHandoff({ kind: "portable", omittedTurns: 0, tail: [] });
     }
 
     const agent = {

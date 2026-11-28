@@ -131,6 +131,11 @@ export const sendToHostFor = async (ctx: MutationCtx, args: SendToHostInput): Pr
 
     const session = await sessionOfThread(ctx, threadId);
 
+    // A fork's chat exists before its session does (the history is copied in first): a prompt now would land among the copied rows.
+    if (!session && (await ctx.db.threadRelationships.findFirst({ where: { branchType: "branch", threadId } })) !== null) {
+        return { outcome: "session_starting" as const };
+    }
+
     if (!session || session.status === "ended") {
         return { outcome: "session_ended" as const };
     }
