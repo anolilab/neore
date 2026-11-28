@@ -309,6 +309,7 @@ describe("Prompt System Tests", () => {
 
             expect(prompt).toContain("remember something in the message that started this reply");
             expect(prompt).toContain("ask them to send the request as a new message");
+            expect(prompt).toContain("forget something in the message that started this reply, call forget");
         });
 
         it("should always include agent loop framework", () => {

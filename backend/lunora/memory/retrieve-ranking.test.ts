@@ -406,6 +406,22 @@ describe("rankMemories", () => {
         expect(rank(many, scores).map((m) => m.memoryId)).toEqual(["m6", "m7", "m8", "m9", "m10", "m11", "m0", "m1"]);
     });
 
+    it("gives a row's relevance as the better of its cosine and its keyword share, and orders by it on request", () => {
+        const fresh = { confidence: 100, importance: 100 };
+        const old = { confidence: 0, importance: 0, lastConfirmedAt: NOW - 400 * DAY };
+        const rows = [candidate("recent", fresh), candidate("words", old)];
+        const input = { candidates: rows, keywordScores: new Map([["words", 1]]), limit: 1, minRelevance: 0.35, now: NOW, threshold: 0 };
+        const vectorScores = new Map([
+            ["recent", 0.7],
+            ["words", 0.6],
+        ]);
+
+        // A vector hit's keyword share still counts toward its relevance, though not toward its score.
+        expect(rankMemories({ ...input, limit: 2, vectorScores }).find((m) => m.memoryId === "words")?.relevance).toBe(1);
+        expect(rankMemories({ ...input, vectorScores }).map((m) => m.memoryId)).toStrictEqual(["recent"]);
+        expect(rankMemories({ ...input, orderByRelevance: true, vectorScores }).map((m) => m.memoryId)).toStrictEqual(["words"]);
+    });
+
     it("returns only the fields of a retrieved memory", () => {
         expect(Object.keys(rank([candidate("a")], [["a", 1]])[0]!).toSorted((a, b) => a.localeCompare(b))).toEqual([
             "category",
@@ -413,6 +429,7 @@ describe("rankMemories", () => {
             "lastConfirmedAt",
             "memory",
             "memoryId",
+            "relevance",
             "score",
         ]);
     });

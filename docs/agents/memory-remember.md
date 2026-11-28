@@ -66,3 +66,43 @@ Paths are relative to `backend/lunora/`.
   language. A quote main's quote check refuses for a health word is reported as `health`.
 - When something was written, each asked fact refused (secret, health, unbacked) is still reported by its reason only
   (`refused`), so the reply names both. When nothing survives, the result is `refused` only if an asked fact was.
+
+## Forget
+
+- `forget` (`chat/tools/forget.ts`, `memory/forget.ts`) is remember's counterpart, under the same source rules: memory
+  on, the owner's private typed chat, the turn's fresh prompt (`checkRequestedSource`, `not_your_words` reported as
+  `not_your_request`), never headless (`BUILTIN_TOOLS_NOT_HEADLESS`). A privacy marker in the prompt refuses it before
+  the search and before a delete (`private_message`), reading and writing nothing. Memory off answers `memory_off`; deleting in
+  settings still works then.
+- A lookup (`query`) is the model's wording. It is never saved as a memory, though it stays in the chat as the `forget`
+  tool call's input, like any tool input. It runs `retrieveRelevantMemories` in its
+  search mode, scoped to the user's rows and this chat's bot's, with `dispatchExpiresAt`: the embedding call holds the
+  chat's dispatch claim (`takeRememberDispatch`, keyed by a random lookup id) and ends before it lapses: the time left is
+  measured when the call starts, after the model's setup (`withClaimDeadline`). Once the search is done the source is
+  checked again (`recheckForgetSource`, a mutation, so grants are read from the primary), so a chat shared or locked
+  during the search returns no candidate text.
+- A lookup never deletes: text the model read (a page, a tool result, a document) can steer what it asks for, so only the
+  user's approval of a call naming `memories` deletes. Up to 5 candidates come back, ordered by relevance alone before
+  the search's cut (`orderByRelevance`: the better of the vector cosine and the keyword share, `RankedMemory.relevance`),
+  never by `score`, which adds recency.
+- A call naming `memories` has its own `needsApproval: true`, which `applyToolPermissions` keeps under auto, full and a
+  time-boxed allow (an `ask` mode asks for lookups too). The web card lists the texts and offers Approve and Deny only.
+  The phone's alert offers Deny alone (`TOOL_DENY_ONLY_CATEGORY`): it cannot show the texts, so a tap opens the chat.
+  The write checks each id: the user's, in the chat's scopes, not superseded, and still reading as the text shown
+  (`textKey`), at most 5 distinct ids per call. An id is deleted only if every text it was confirmed with matches; one
+  edited in place since the lookup, or named with a text it does not read, is offered again with what it reads now. A memory superseded since the user was asked is not deleted: the
+  version in effect (its supersede chain, at most 20 hops) or, for one compression retired into a merge (a row
+  retired by itself names no successor), what a search for the approved text finds now comes back as a candidate
+  (`changed`, one per confirmed id, though several share a successor), and the user is asked again. A successor the same
+  confirm deletes is not offered back. What was deleted is always kept: a merged row whose search finds nothing to offer
+  counts as gone (`merged`), and the model tells the user it was merged into a memory that no longer matches, so they
+  can ask again; a search that fails or cannot take the chat's claim counts the id as `unchecked`, to ask again in a
+  moment. If the search is refused (the chat no longer the user's alone, memory off, the request no longer current),
+  the result carries counts only (`deletedCount`), no text, and the note names that reason. Deletion is `deleteMemoryRows`, the settings delete: vector, older versions, digests.
+- A lookup (in `beginForgetLookup`, whatever it finds) and a confirm (in its write, whatever is still there to delete) mark the prompt (`FORGET_SCOPE`,
+  held a day). `rememberClaimState` reads the mark as `done`, so the reply's extraction cuts the prompt and reads only
+  steers, at an approval pause and at the end alike: "forget that I live in Berlin" is not learned again from itself.
+  An extraction already out when the mark lands is caught in its writes: `saveMemoryBatch`, `confirmMemories` and
+  `reviseExtractedMemory` write nothing whose quote comes from a marked prompt (`fromForgetPrompt`, by
+  `evidence.messageId`), except a fact a remember request saves as asked.
+  The cost: a new fact in that same message ("I moved to Hamburg") is not learned from it either; `remember` saves it.

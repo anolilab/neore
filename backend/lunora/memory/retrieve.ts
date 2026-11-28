@@ -20,6 +20,7 @@ import { isSearchIndexBuilding } from "../lib/search-index";
 import { gatewayFetch } from "../lib/services";
 import { getMemoryEmbeddingModel, MEMORY_EMBEDDING_MODEL_NAME } from "./dedup";
 import { localDayOf } from "./reflection-logic";
+import { withClaimDeadline } from "./remember-dispatch";
 import {
     CANDIDATE_WINDOW_SIZE,
     fuseSearchHits,
@@ -54,10 +55,17 @@ export const retrieveRelevantMemories = internalAction
     .input({
         /** The bot the chat runs as: its memories join the user's own. Unset = the user's own only. */
         botId: v.optional(v.string()),
+        /**
+         * When the chat's dispatch claim the caller holds lapses (`forget.ts`): the embedding call ends before it, and is not
+         * made with no time left (`withClaimDeadline`), so the search is by keyword. Unset: no claim, no deadline.
+         */
+        dispatchExpiresAt: v.optional(v.number()),
         /** Most memories returned for a `search`: up to `SEARCH_MAX_RESULTS`. Unused for injection, which keeps its own cap. */
         limit: v.optional(v.number()),
         // The user's local day when the caller asked: part of the chat-side cache key, not read by the search.
         localDay: v.optional(v.string()),
+        /** A `search` ordered by relevance alone before its `limit`, not by `score` (`forget.ts`). */
+        orderByRelevance: v.optional(v.boolean()),
         /** The `search_memory` tool: a lower relevance floor, no score threshold, and `limit` rows instead of the injection cap. */
         search: v.optional(v.boolean()),
         searchText: v.string(),
@@ -78,6 +86,7 @@ export const retrieveRelevantMemories = internalAction
                 lastConfirmedAt: v.number(),
                 memory: v.string(),
                 memoryId: v.string(),
+                relevance: v.number(),
                 score: v.number(),
                 validUntil: v.optional(v.string()),
             }),
@@ -151,19 +160,25 @@ export const retrieveRelevantMemories = internalAction
             const rules = await loadModelFilterRules(ctx, args.userId);
             const { embeddingModelAllowed } = await import("../chat/lib/gateway-embedding-model");
 
-            // Rules that refuse the embedding model leave keyword scoring alone: the gateway would refuse the call.
+            // Rules that refuse the embedding model leave keyword scoring alone: the gateway would refuse the call. So does a
+            // dispatch claim with no time left once the model is set up (`withClaimDeadline`).
             if (embeddingModelAllowed(rules)) {
                 const embeddingModel = await getMemoryEmbeddingModel(gatewayFetch(ctx), rules);
                 const { embedMany } = await import("../agent/client/search");
 
-                const { embeddings } = await embedMany(ctx, {
-                    embeddingModel,
-                    threadId: undefined,
-                    userId: args.userId,
-                    values: [args.searchText.slice(0, 2000)],
-                });
+                const embedded = await withClaimDeadline(
+                    args.dispatchExpiresAt,
+                    async (abortSignal) =>
+                        await embedMany(ctx, {
+                            abortSignal,
+                            embeddingModel,
+                            threadId: undefined,
+                            userId: args.userId,
+                            values: [args.searchText.slice(0, 2000)],
+                        }),
+                );
 
-                const queryVector = embeddings[0];
+                const queryVector = embedded?.embeddings[0];
 
                 if (queryVector && queryVector.length > 0) {
                     const dimension = queryVector.length;
@@ -242,6 +257,7 @@ export const retrieveRelevantMemories = internalAction
                 limit: Math.min(Math.max(Math.trunc(args.limit ?? SEARCH_MAX_RESULTS), 1), SEARCH_MAX_RESULTS),
                 minKeywordRelevance: SEARCH_MIN_KEYWORD_RELEVANCE,
                 minRelevance: SEARCH_MIN_RELEVANCE,
+                orderByRelevance: args.orderByRelevance === true,
                 threshold: SEARCH_THRESHOLD,
             }),
             now,
