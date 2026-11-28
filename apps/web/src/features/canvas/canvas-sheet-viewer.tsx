@@ -69,7 +69,7 @@ const CanvasSheetViewer: FC<CanvasSheetViewerProps> = ({ className, content }) =
         <div className={cn("overflow-auto", className)}>
             <table className="w-full border-collapse text-sm">
                 <thead>
-                    <tr className="bg-muted/50 border-b">
+                    <tr className="bg-surface-row border-border/50 border-b">
                         {headers.map((header, i) => (
                             <th className="border-r px-3 py-2 text-left font-medium whitespace-nowrap last:border-r-0" key={i}>
                                 {header}

@@ -80,7 +80,7 @@ export const AskUserAnswerList: FC<{ entries: ReadonlyArray<AskUserAnswerEntry> 
     return (
         <ul className="mt-2 flex flex-col gap-2">
             {entries.map((entry) => (
-                <li className="bg-background rounded-md border px-3 py-2 text-sm" key={entry.question}>
+                <li className="surface-well rounded-lg px-3 py-2 text-sm" key={entry.question}>
                     <p className="text-muted-foreground text-xs whitespace-pre-wrap">{entry.question}</p>
                     <p className="whitespace-pre-wrap">
                         <span className="sr-only">{t`Your answer:`} </span>

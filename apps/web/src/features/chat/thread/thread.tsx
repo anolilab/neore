@@ -85,7 +85,7 @@ interface ThreadProps {
     splitPane?: boolean;
 }
 
-const FLOATING_BUTTON_CLASS = cn("rounded-full shadow-md", "bg-background hover:bg-accent border", "transition-all duration-200");
+const FLOATING_BUTTON_CLASS = cn("surface-raised rounded-full", "hover:bg-surface-row-hover", "transition-colors duration-200");
 
 /**
  * Scroll buttons - appear when user scrolls up

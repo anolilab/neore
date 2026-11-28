@@ -47,7 +47,7 @@ const HostChanges: FC<HostChangesProps> = ({ changes, messageId, threadId }) => 
     };
 
     return (
-        <section aria-label={t`Files changed by this turn`} className="border-border my-2 rounded-md border text-sm" data-testid="host-changes">
+        <section aria-label={t`Files changed by this turn`} className="surface-raised my-2 overflow-hidden rounded-xl text-sm" data-testid="host-changes">
             <div className="flex items-center justify-between gap-2 px-3 py-2">
                 <p className="font-medium">
                     <Plural one="# file changed" other="# files changed" value={files.length} />{" "}
@@ -60,7 +60,7 @@ const HostChanges: FC<HostChangesProps> = ({ changes, messageId, threadId }) => 
                     </Button>
                 )}
             </div>
-            <ul className="border-border divide-border divide-y border-t">
+            <ul className="border-border/50 divide-border/50 divide-y border-t">
                 {files.map((file) => (
                     <li key={file.path}>
                         <div className="flex items-center justify-between gap-2 px-3 py-1">

@@ -92,19 +92,15 @@ export const ToolApprovalCard: FC<ToolApprovalCardProps> = ({ approvalId, canAll
     }
 
     return (
-        <div
-            aria-labelledby={headingId}
-            className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-3 dark:border-amber-700 dark:bg-amber-950/40"
-            role="group"
-        >
+        <div aria-labelledby={headingId} className="surface-raised mb-4 rounded-xl p-3" role="group">
             <div className="flex items-start gap-2">
-                <ShieldAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                <ShieldAlert aria-hidden="true" className="text-attention mt-0.5 size-4 shrink-0" />
                 <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-amber-900 dark:text-amber-100" id={headingId}>
+                    <p className="text-sm font-medium" id={headingId}>
                         {heading}
                     </p>
-                    {server && <p className="text-xs text-amber-800 dark:text-amber-200">{server}</p>}
-                    <p className="text-xs text-amber-800 dark:text-amber-200" role="status">
+                    {server && <p className="text-muted-foreground text-xs">{server}</p>}
+                    <p className="text-muted-foreground text-xs" role="status">
                         {statusText}
                     </p>
                 </div>
@@ -112,10 +108,8 @@ export const ToolApprovalCard: FC<ToolApprovalCardProps> = ({ approvalId, canAll
 
             {inputPreview && (
                 <details className="mt-2">
-                    <summary className="cursor-pointer text-xs text-amber-900 dark:text-amber-100">{t`Show what it will send`}</summary>
-                    <pre className="mt-1 max-h-48 overflow-auto rounded bg-white/60 p-2 font-mono text-xs whitespace-pre-wrap dark:bg-black/30">
-                        {inputPreview}
-                    </pre>
+                    <summary className="text-muted-foreground hover:text-foreground cursor-pointer text-xs">{t`Show what it will send`}</summary>
+                    <pre className="surface-well mt-1 max-h-48 overflow-auto rounded-lg p-2 font-mono text-xs whitespace-pre-wrap">{inputPreview}</pre>
                 </details>
             )}
 
@@ -135,13 +129,17 @@ export const ToolApprovalCard: FC<ToolApprovalCardProps> = ({ approvalId, canAll
                     </Button>
                     {canAllowForAPeriod && (
                         <>
-                            <Button aria-label={t`Allow ${tool} for 1 hour`} disabled={isDisabled} onClick={() => respond("hour")} size="sm" variant="ghost">
+                            <Button disabled={isDisabled} onClick={() => respond("hour")} size="sm" variant="ghost">
                                 <Clock aria-hidden="true" />
                                 {t`Allow for 1 hour`}
+                                {/* The name starts with the visible text and ends with the tool, which the card names above. */}
+                                <span className="sr-only">, {tool}</span>
                             </Button>
-                            <Button aria-label={t`Allow ${tool} for today`} disabled={isDisabled} onClick={() => respond("today")} size="sm" variant="ghost">
+                            <Button disabled={isDisabled} onClick={() => respond("today")} size="sm" variant="ghost">
                                 <Clock aria-hidden="true" />
                                 {t`Allow for today`}
+                                {/* The name starts with the visible text and ends with the tool, which the card names above. */}
+                                <span className="sr-only">, {tool}</span>
                             </Button>
                         </>
                     )}

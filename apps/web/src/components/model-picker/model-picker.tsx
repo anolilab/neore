@@ -218,7 +218,7 @@ const ModelDetailPanel = memo<{ displayName: string; model: GatewayModel }>(({ d
             {/* Description */}
             {model.desc ? (
                 <div className="border-border/40 border-t px-4 py-3">
-                    <p className="text-muted-foreground mb-1.5 text-[9px] font-semibold tracking-widest uppercase">
+                    <p className="text-muted-foreground mb-1.5 font-mono text-[11px]">
                         <Trans>Description</Trans>
                     </p>
                     <p className="text-muted-foreground text-[11.5px] leading-relaxed">
@@ -230,13 +230,13 @@ const ModelDetailPanel = memo<{ displayName: string; model: GatewayModel }>(({ d
             {/* Features */}
             {capabilities.length > 0 ? (
                 <div className="border-border/40 border-t px-4 py-3">
-                    <p className="text-muted-foreground mb-1.5 text-[9px] font-semibold tracking-widest uppercase">
+                    <p className="text-muted-foreground mb-1.5 font-mono text-[11px]">
                         <Trans>Features</Trans>
                     </p>
                     <div className="flex flex-wrap gap-1">
                         {capabilities.map((cap) => (
                             <span
-                                className="border-border/40 text-muted-foreground bg-muted/50 inline-flex h-5 items-center rounded-md border px-1.5 text-[10px] font-medium"
+                                className="surface-well text-muted-foreground inline-flex h-5 items-center rounded-md px-1.5 text-[10px] font-medium"
                                 key={cap.label}
                             >
                                 {displayCapability(cap.label)}
@@ -249,7 +249,7 @@ const ModelDetailPanel = memo<{ displayName: string; model: GatewayModel }>(({ d
             {/* Pricing — absent means unknown, not free */}
             {model.pricing ? (
                 <div className="border-border/40 border-t px-4 py-3">
-                    <p className="text-muted-foreground mb-1.5 text-[9px] font-semibold tracking-widest uppercase">
+                    <p className="text-muted-foreground mb-1.5 font-mono text-[11px]">
                         <Trans>Price per 1M tokens</Trans>
                     </p>
                     <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11.5px]">
@@ -279,13 +279,13 @@ const ModelDetailPanel = memo<{ displayName: string; model: GatewayModel }>(({ d
             <div className="border-border/40 border-t px-4 py-3">
                 <div className="grid grid-cols-2 gap-x-4 gap-y-3">
                     <div>
-                        <p className="text-muted-foreground mb-0.5 text-[9px] font-semibold tracking-widest uppercase">
+                        <p className="text-muted-foreground mb-0.5 font-mono text-[11px]">
                             <Trans>Provider</Trans>
                         </p>
                         <p className="text-foreground text-[11.5px] font-medium">{providerDisplay}</p>
                     </div>
                     <div>
-                        <p className="text-muted-foreground mb-0.5 text-[9px] font-semibold tracking-widest uppercase">
+                        <p className="text-muted-foreground mb-0.5 font-mono text-[11px]">
                             <Trans>Developer</Trans>
                         </p>
                         <p className="text-foreground text-[11.5px] font-medium">{developerDisplay}</p>
@@ -549,10 +549,10 @@ const ModelRow = memo<{
                 <CommandItem
                     aria-disabled={isDisabled || undefined}
                     className={cn(
-                        "flex-row !items-center rounded-md py-2 pl-2 transition-colors duration-100",
+                        "data-highlighted:bg-surface-row-hover data-highlighted:text-foreground flex-row !items-center rounded-lg py-2 pl-2 transition-colors duration-100",
                         onMove ? "pr-26" : "pr-14",
-                        isSelected && selectionMode === "single" ? "bg-accent/60" : "",
-                        isParallelSelected && selectionMode === "parallel" ? "bg-accent/40" : "",
+                        isSelected && selectionMode === "single" ? "bg-surface-row-active surface-edge" : "",
+                        isParallelSelected && selectionMode === "parallel" ? "bg-surface-row-active" : "",
                     )}
                     data-model-id={item.model.id}
                     onClick={(e: React.MouseEvent & { preventBaseUIHandler?: () => void }) => {
@@ -652,11 +652,7 @@ const ModelGroupRenderer = memo<{
         toggleFavorite,
     }) => (
         <CommandGroup items={group.items}>
-            {showGroupLabel ? (
-                <CommandGroupLabel className="text-muted-foreground px-3 pt-3 pb-0.5 text-[10px] font-semibold tracking-widest uppercase">
-                    {group.value}
-                </CommandGroupLabel>
-            ) : null}
+            {showGroupLabel ? <CommandGroupLabel className="text-muted-foreground px-3 pt-3 pb-0.5 font-mono text-xs">{group.value}</CommandGroupLabel> : null}
             <CommandCollection>
                 {(item: ModelItem) => {
                     const isParallelSelected = parallelSelectedIds.has(item.model.id);
@@ -1191,12 +1187,12 @@ const ModelPicker: FC<ModelPickerProps> = ({
                         {/* Pill toggle — hidden for anonymous users */}
                         {!isAnonymous && (
                             <div className="mr-2 ml-auto">
-                                <div className="bg-muted/70 flex items-center rounded-md p-0.5">
+                                <div className="surface-well flex items-center rounded-lg p-0.5">
                                     <button
                                         className={cn(
                                             "rounded-[5px] px-2.5 py-1 text-[11.5px] font-medium transition-all duration-150",
                                             selectionMode === "single"
-                                                ? "bg-background text-foreground shadow-sm"
+                                                ? "bg-surface-row-active surface-edge text-foreground"
                                                 : "text-muted-foreground hover:text-muted-foreground",
                                         )}
                                         onClick={() => handleSelectionModeChange("single")}
@@ -1208,7 +1204,7 @@ const ModelPicker: FC<ModelPickerProps> = ({
                                         className={cn(
                                             "rounded-[5px] px-2.5 py-1 text-[11.5px] font-medium transition-all duration-150",
                                             selectionMode === "parallel"
-                                                ? "bg-background text-foreground shadow-sm"
+                                                ? "bg-surface-row-active surface-edge text-foreground"
                                                 : "text-muted-foreground hover:text-muted-foreground",
                                         )}
                                         onClick={() => handleSelectionModeChange("parallel")}
@@ -1225,13 +1221,13 @@ const ModelPicker: FC<ModelPickerProps> = ({
                     <div className="flex items-center gap-1 border-t px-2 py-1.5">
                         {!hideModeFilter && (
                             <>
-                                <span className="text-muted-foreground mr-1 text-[10px] font-medium tracking-wider uppercase">{t`Type`}</span>
+                                <span className="text-muted-foreground mr-1 font-mono text-[11px]">{t`Type`}</span>
                                 <button
                                     className={cn(
                                         "rounded-md px-2 py-1 text-[11px] font-medium transition-all duration-150",
                                         modeFilter === null
                                             ? "bg-primary/10 text-primary-text"
-                                            : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
+                                            : "text-muted-foreground hover:text-foreground hover:bg-surface-row-hover",
                                     )}
                                     onClick={() => setModeFilter(null)}
                                     type="button"
@@ -1243,7 +1239,7 @@ const ModelPicker: FC<ModelPickerProps> = ({
                                         "flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-all duration-150",
                                         modeFilter === "text"
                                             ? "bg-primary/10 text-primary-text"
-                                            : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
+                                            : "text-muted-foreground hover:text-foreground hover:bg-surface-row-hover",
                                     )}
                                     onClick={() => setModeFilter("text")}
                                     type="button"
@@ -1256,7 +1252,7 @@ const ModelPicker: FC<ModelPickerProps> = ({
                                         "flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-all duration-150",
                                         modeFilter === "image"
                                             ? "bg-primary/10 text-primary-text"
-                                            : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
+                                            : "text-muted-foreground hover:text-foreground hover:bg-surface-row-hover",
                                     )}
                                     onClick={() => setModeFilter("image")}
                                     type="button"
@@ -1269,7 +1265,7 @@ const ModelPicker: FC<ModelPickerProps> = ({
                                         "flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-all duration-150",
                                         modeFilter === "video"
                                             ? "bg-primary/10 text-primary-text"
-                                            : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
+                                            : "text-muted-foreground hover:text-foreground hover:bg-surface-row-hover",
                                     )}
                                     onClick={() => setModeFilter("video")}
                                     type="button"
@@ -1282,7 +1278,7 @@ const ModelPicker: FC<ModelPickerProps> = ({
                                         "flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-all duration-150",
                                         modeFilter === "speech-to-text"
                                             ? "bg-primary/10 text-primary-text"
-                                            : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
+                                            : "text-muted-foreground hover:text-foreground hover:bg-surface-row-hover",
                                     )}
                                     onClick={() => setModeFilter("speech-to-text")}
                                     type="button"
@@ -1294,7 +1290,7 @@ const ModelPicker: FC<ModelPickerProps> = ({
                         )}
                         <select
                             aria-label={t`Sort models`}
-                            className="text-muted-foreground hover:text-foreground focus-visible:outline-ring bg-background ml-auto rounded-md border px-1.5 py-1 text-[11px] font-medium focus-visible:outline-2"
+                            className="text-muted-foreground hover:text-foreground focus-visible:outline-ring surface-well ml-auto rounded-lg px-1.5 py-1 text-[11px] font-medium focus-visible:outline-2"
                             onChange={(event) => setSort(event.target.value as ModelSort)}
                             onKeyDown={(event) => event.stopPropagation()}
                             value={sort}
@@ -1424,7 +1420,7 @@ const ModelPicker: FC<ModelPickerProps> = ({
             <PopoverPrimitive.Portal>
                 <PopoverPrimitive.Positioner align="start" anchor={pickerRef} className="isolate z-50" side="right" sideOffset={8}>
                     <PopoverPrimitive.Popup
-                        className="bg-popover text-popover-foreground ring-foreground/10 data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 data-closed:zoom-out-95 data-open:zoom-in-95 data-[side=right]:slide-in-from-left-2 w-64 origin-(--transform-origin) overflow-hidden rounded-lg shadow-md ring-1 outline-hidden duration-100"
+                        className="bg-popover text-popover-foreground surface-edge data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 data-closed:zoom-out-95 data-open:zoom-in-95 data-[side=right]:slide-in-from-left-2 w-64 origin-(--transform-origin) overflow-hidden rounded-xl outline-hidden duration-100"
                         data-slot="popover-content"
                         onMouseEnter={cancelInfoClose}
                         onMouseLeave={scheduleInfoClose}

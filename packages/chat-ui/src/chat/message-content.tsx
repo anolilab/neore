@@ -222,56 +222,39 @@ const makeDefaultToolCall = (
         // By real names first; the runtime-name key only matches unlabelled (older) parts.
         const meta = toolMeta && mcpInfo ? (toolMeta.get(mcpToolMetaKey(mcpInfo.serverName, mcpInfo.toolName)) ?? toolMeta.get(rawToolName)) : undefined;
         const hasMcpApp = !!meta && !!McpApp && hasOutput;
+        // On the error tint the muted grey is too faint to read; the labels take the card's red there instead.
+        const detailLabelClass = cn("font-mono text-xs", !isError && "text-muted-foreground");
 
         return (
-            <div
-                className={cn(
-                    "mb-4 rounded-lg border",
-                    isError
-                        ? "border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/50"
-                        : "border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-900/50",
-                )}
-            >
+            <div className={cn("surface-edge mb-4 rounded-xl", isError ? "bg-destructive/10" : "bg-surface-panel")}>
                 <button
                     aria-expanded={isExpanded}
-                    className={cn(
-                        "flex w-full items-center gap-2 p-3 text-left text-sm font-medium",
-                        isError ? "text-red-800 dark:text-red-200" : "text-gray-800 dark:text-gray-200",
-                    )}
+                    className={cn("flex w-full items-center gap-2 p-3 text-left text-sm font-medium", isError && "text-destructive")}
                     onClick={() => setIsExpanded(!isExpanded)}
                     type="button"
                 >
                     {isExpanded ? <ChevronDown aria-hidden="true" className="size-4" /> : <ChevronRight aria-hidden="true" className="size-4" />}
                     <span className="font-mono">{displayName}</span>
                     {mcpInfo && (
-                        <span className="rounded-full bg-purple-100 px-1.5 py-0.5 text-[10px] font-medium text-purple-700 dark:bg-purple-900/50 dark:text-purple-300">
-                            {mcpInfo.serverName}
-                        </span>
+                        <span className="surface-well text-muted-foreground rounded-full px-1.5 py-0.5 font-mono text-[10px]">{mcpInfo.serverName}</span>
                     )}
                     {isLoading && <span className="ml-2 animate-pulse text-xs opacity-80 dark:opacity-100">{t`Running...`}</span>}
-                    {isError && <AlertCircle aria-hidden="true" className="ml-2 size-4 text-red-700 dark:text-red-400" />}
+                    {isError && <AlertCircle aria-hidden="true" className="text-destructive ml-2 size-4" />}
                 </button>
 
                 {/* MCP App interactive view — shown directly below the header when available */}
                 {hasMcpApp && McpApp && (
-                    <div className="border-t border-gray-200 p-3 dark:border-gray-700">
+                    <div className="border-border/50 border-t p-3">
                         <McpApp part={part} resourceUri={meta.resourceUri} serverName={meta.serverName} toolName={mcpInfo!.toolName} />
                     </div>
                 )}
 
                 {/* Collapsible JSON details — always available for debugging */}
                 {isExpanded && (
-                    <div
-                        className={cn(
-                            "border-t p-3 text-sm",
-                            isError
-                                ? "border-red-200 text-red-700 dark:border-red-800 dark:text-red-300"
-                                : "border-gray-200 text-gray-700 dark:border-gray-700 dark:text-gray-300",
-                        )}
-                    >
+                    <div className={cn("border-border/50 border-t p-3 text-sm", isError ? "text-destructive" : "text-foreground")}>
                         {!!part.input && (
                             <div className="mb-2">
-                                <span className="text-xs font-semibold uppercase opacity-80 dark:opacity-100">{t`Input:`}</span>
+                                <span className={detailLabelClass}>{t`Input:`}</span>
                                 <pre className="mt-1 overflow-x-auto font-mono text-xs whitespace-pre-wrap">
                                     {String(typeof part.input === "string" ? part.input : JSON.stringify(part.input, null, 2))}
                                 </pre>
@@ -279,7 +262,7 @@ const makeDefaultToolCall = (
                         )}
                         {!!part.output && (
                             <div>
-                                <span className="text-xs font-semibold uppercase opacity-80 dark:opacity-100">{t`Output:`}</span>
+                                <span className={detailLabelClass}>{t`Output:`}</span>
                                 <pre className="mt-1 overflow-x-auto font-mono text-xs whitespace-pre-wrap">
                                     {String(typeof part.output === "string" ? part.output : JSON.stringify(part.output, null, 2))}
                                 </pre>
@@ -287,14 +270,14 @@ const makeDefaultToolCall = (
                         )}
                         {part.output === undefined && part.outputRef && (
                             <div>
-                                <span className="text-xs font-semibold uppercase opacity-80 dark:opacity-100">{t`Output:`}</span>
+                                <span className={detailLabelClass}>{t`Output:`}</span>
                                 {/* Keyed by the ref: a live update that swaps the part must not show the previous output. */}
                                 <TrimmedToolOutput key={`${part.outputRef.messageId}:${part.outputRef.toolCallId}`} outputRef={part.outputRef} />
                             </div>
                         )}
                         {part.errorText && (
-                            <div className="text-red-700 dark:text-red-400">
-                                <span className="text-xs font-semibold uppercase opacity-80 dark:opacity-100">{t`Error:`}</span>
+                            <div className="text-destructive">
+                                <span className={detailLabelClass}>{t`Error:`}</span>
                                 <pre className="mt-1 font-mono text-xs whitespace-pre-wrap">{part.errorText}</pre>
                             </div>
                         )}
@@ -350,8 +333,8 @@ const PresentationGenerating: FC<{ title?: string }> = memo(({ title }) => {
     const { t } = useLingui();
 
     return (
-        <div className="my-2 flex w-full max-w-sm items-center gap-3 rounded-lg border p-3">
-            <div className="bg-muted flex size-10 shrink-0 items-center justify-center rounded-md">
+        <div className="surface-raised my-2 flex w-full max-w-sm items-center gap-3 rounded-xl p-3">
+            <div className="surface-well flex size-10 shrink-0 items-center justify-center rounded-lg">
                 <Presentation className="text-muted-foreground size-5" />
             </div>
             <div className="min-w-0 flex-1">
@@ -374,8 +357,8 @@ const FileLoadingFallback: FC<{ name?: string }> = memo(({ name }) => {
     const { t } = useLingui();
 
     return (
-        <div className="my-2 flex w-full max-w-sm items-center gap-3 rounded-lg border p-3">
-            <div className="bg-muted flex size-10 shrink-0 animate-pulse items-center justify-center rounded-md" />
+        <div className="surface-raised my-2 flex w-full max-w-sm items-center gap-3 rounded-xl p-3">
+            <div className="surface-well flex size-10 shrink-0 animate-pulse items-center justify-center rounded-lg" />
             <div className="min-w-0 flex-1">
                 <div className="truncate text-sm font-medium">{name || t`Loading file…`}</div>
                 <div className="text-muted-foreground flex items-center gap-1.5 text-xs">
@@ -1194,8 +1177,8 @@ const MessageContent: FC<MessageContentProps> = memo(({ citationLabel, className
                             const { slideNumber } = output;
 
                             renderedParts.push(
-                                <div className="my-2 flex w-full max-w-sm items-center gap-3 rounded-lg border p-3" key={key}>
-                                    <div className="bg-muted flex size-10 shrink-0 items-center justify-center rounded-md">
+                                <div className="surface-raised my-2 flex w-full max-w-sm items-center gap-3 rounded-xl p-3" key={key}>
+                                    <div className="surface-well flex size-10 shrink-0 items-center justify-center rounded-lg">
                                         <Presentation className="text-muted-foreground size-5" />
                                     </div>
                                     <div className="min-w-0 flex-1">

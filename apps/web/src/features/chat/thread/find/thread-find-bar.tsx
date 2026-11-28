@@ -190,7 +190,7 @@ const ThreadFindBar: FC = () => {
     return (
         <form
             aria-label={t`Find in thread`}
-            className="bg-popover text-popover-foreground absolute top-2 right-6 z-20 flex max-w-[calc(100%-2rem)] items-center gap-1 rounded-lg border p-1 shadow-md"
+            className="bg-popover text-popover-foreground surface-edge absolute top-2 right-6 z-20 flex max-w-[calc(100%-2rem)] items-center gap-1 rounded-xl p-1"
             noValidate
             onSubmit={handleSubmit}
             ref={barRef}

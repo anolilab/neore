@@ -768,7 +768,7 @@ msgid "{0} of {1} tasks done"
 msgstr "{0} di {1} attività completate"
 
 #. placeholder {0}: parallelSelectedIds.size
-#: src/components/model-picker/model-picker.tsx:1392
+#: src/components/model-picker/model-picker.tsx:1388
 msgid "{0} of {MAX_PARALLEL} selected"
 msgstr "{0} di {MAX_PARALLEL} selezionati"
 
@@ -1242,7 +1242,7 @@ msgstr "{itemCount, plural, one {{nodeName}: # elemento, oggetto} other {{nodeNa
 msgid "{itemCount, plural, one {# item} other {# items}}"
 msgstr "{itemCount, plural, one {# elemento} other {# elementi}}"
 
-#: src/components/model-picker/model-picker.tsx:1093
+#: src/components/model-picker/model-picker.tsx:1089
 msgid "{label} added to starred"
 msgstr "{label} aggiunto ai preferiti"
 
@@ -1278,7 +1278,7 @@ msgid "{label} is not connected."
 msgstr "{label} non è connesso."
 
 #. placeholder {0}: ids.length
-#: src/components/model-picker/model-picker.tsx:1033
+#: src/components/model-picker/model-picker.tsx:1029
 msgid "{label} moved to position {position} of {0} in starred"
 msgstr "{label} spostato in posizione {position} di {0} tra i contrassegnati"
 
@@ -1290,7 +1290,7 @@ msgstr "{label} ha rifiutato questa richiesta. Il tuo account potrebbe non avere
 msgid "{label} refused this. Your account may lack access."
 msgstr "{label} ha rifiutato la richiesta. Il tuo account potrebbe non avere accesso."
 
-#: src/components/model-picker/model-picker.tsx:1093
+#: src/components/model-picker/model-picker.tsx:1089
 msgid "{label} removed from starred"
 msgstr "{label} rimosso dai preferiti"
 
@@ -1420,7 +1420,7 @@ msgstr "{name} non ha risposto in tempo. Apri l’app desktop su quel computer e
 msgid "{name} disconnected"
 msgstr "{name} disconnesso"
 
-#: src/components/model-picker/model-picker.tsx:860
+#: src/components/model-picker/model-picker.tsx:856
 msgid "{name} hidden from the model picker"
 msgstr "{name} nascosto dal selettore dei modelli"
 
@@ -2507,7 +2507,7 @@ msgstr "Azione"
 msgid "Action Log"
 msgstr "Registro azioni"
 
-#: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:428
+#: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:420
 #: src/features/evals/components/dataset-panel.tsx:149
 msgid "Actions"
 msgstr "Azioni"
@@ -3412,7 +3412,7 @@ msgstr "Generazione di video con IA"
 msgid "AI-assisted bug triage with full recording context"
 msgstr "Triage dei bug assistito dall'IA con il contesto completo della registrazione"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:434
+#: ../../packages/chat-ui/src/chat/message-content.tsx:417
 msgid "AI-generated"
 msgstr "Generato dall'IA"
 
@@ -3537,8 +3537,8 @@ msgstr "Allinea verticalmente (V)"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:731
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:793
-#: src/components/model-picker/model-picker.tsx:1239
-#: src/components/model-picker/model-picker.tsx:1317
+#: src/components/model-picker/model-picker.tsx:1235
+#: src/components/model-picker/model-picker.tsx:1313
 #: src/features/chat/thread-list/thread-list-filter-menu.tsx:120
 #: src/features/marketing/components/tutorials-page.tsx:130
 #: src/features/settings/components/chat/models-settings.tsx:419
@@ -3630,7 +3630,7 @@ msgid "All MCP servers active"
 msgstr "Tutti i server MCP attivi"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:677
-#: src/components/model-picker/model-picker.tsx:1187
+#: src/components/model-picker/model-picker.tsx:1183
 #: src/features/marketing/components/model-detail-page.tsx:165
 msgid "All models"
 msgstr "Tutti i modelli"
@@ -3738,11 +3738,11 @@ msgstr "Tutti i casi d’uso"
 msgid "All Users"
 msgstr "Tutti gli utenti"
 
-#: src/features/chat/thread/tool-approval.tsx:169
+#: src/features/chat/thread/tool-approval.tsx:167
 msgid "Allow \"{tool}\" from {server}?"
 msgstr "Consentire \"{tool}\" da {server}?"
 
-#: src/features/chat/thread/tool-approval.tsx:169
+#: src/features/chat/thread/tool-approval.tsx:167
 msgid "Allow \"{tool}\"?"
 msgstr "Consentire \"{tool}\"?"
 
@@ -3751,18 +3751,18 @@ msgid "Allow \"delete_files\" from the drafts server?"
 msgstr "Consentire «delete_files» dal server delle bozze?"
 
 #: src/features/chat/thread/tool-approval.tsx:138
-msgid "Allow {tool} for 1 hour"
-msgstr "Consenti {tool} per 1 ora"
+#~ msgid "Allow {tool} for 1 hour"
+#~ msgstr "Consenti {tool} per 1 ora"
 
 #: src/features/chat/thread/tool-approval.tsx:142
-msgid "Allow {tool} for today"
-msgstr "Consenti {tool} per oggi"
+#~ msgid "Allow {tool} for today"
+#~ msgstr "Consenti {tool} per oggi"
 
-#: src/features/chat/thread/tool-approval.tsx:140
+#: src/features/chat/thread/tool-approval.tsx:134
 msgid "Allow for 1 hour"
 msgstr "Consenti per 1 ora"
 
-#: src/features/chat/thread/tool-approval.tsx:144
+#: src/features/chat/thread/tool-approval.tsx:140
 msgid "Allow for today"
 msgstr "Consenti per oggi"
 
@@ -3824,12 +3824,12 @@ msgstr "Stanno visualizzando anche"
 msgid "Always"
 msgstr "Sempre"
 
-#: src/features/chat/thread/tool-approval.tsx:134
+#: src/features/chat/thread/tool-approval.tsx:128
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:35
 msgid "Always allow"
 msgstr "Consenti sempre"
 
-#: src/features/chat/thread/tool-approval.tsx:132
+#: src/features/chat/thread/tool-approval.tsx:126
 msgid "Always allow {tool}"
 msgstr "Consenti sempre {tool}"
 
@@ -3917,7 +3917,7 @@ msgstr "Si è verificato un errore"
 msgid "An error occurred during One Tap sign in"
 msgstr "Si è verificato un errore durante l'accesso con One Tap"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1282
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1265
 msgid "An error occurred while generating the response."
 msgstr "Si è verificato un errore durante la generazione della risposta."
 
@@ -4255,7 +4255,7 @@ msgid "Applies to"
 msgstr "Si applica a"
 
 #: src/features/canvas/canvas-panel.tsx:120
-#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:333
+#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:331
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:430
 #: src/features/prompts/components/prompt-optimize-dialog.tsx:212
 msgid "Apply"
@@ -4319,14 +4319,14 @@ msgid "Approvals in Neore: a tool you set to Ask stops before it runs, and you d
 msgstr "Approvazioni in Neore: uno strumento impostato su Chiedi si ferma prima di essere eseguito, e decidi tu con l’input esatto davanti."
 
 #: src/features/auth/components/device-approval.tsx:242
-#: src/features/chat/thread/tool-approval.tsx:126
+#: src/features/chat/thread/tool-approval.tsx:120
 #: src/features/develop/components/review-panel.tsx:64
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:32
 #: src/features/tasks/components/task-detail-dialog.tsx:104
 msgid "Approve"
 msgstr "Approva"
 
-#: src/features/chat/thread/tool-approval.tsx:124
+#: src/features/chat/thread/tool-approval.tsx:118
 msgid "Approve {tool} once"
 msgstr "Approva {tool} una volta"
 
@@ -4804,7 +4804,7 @@ msgid "Auckland"
 msgstr "Auckland"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:781
-#: src/components/model-picker/model-picker.tsx:1291
+#: src/components/model-picker/model-picker.tsx:1287
 #: src/features/chat/sidebar/usage-card.tsx:131
 #: src/features/chat/thread/composer.tsx:133
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:85
@@ -5770,13 +5770,13 @@ msgstr "Sfoglia e ripristina le versioni precedenti del tuo workflow."
 msgid "Browse, fork, and remix workflows shared by the community"
 msgstr "Sfoglia, duplica e rielabora i workflow condivisi dalla community"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:824
+#: ../../packages/chat-ui/src/chat/message-content.tsx:807
 #: src/features/chat/browser-live-view/browser-live-view.tsx:1035
 #: src/features/chat/browser-live-view/browser-live-view.tsx:1264
 msgid "Browser"
 msgstr "Browser"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:847
+#: ../../packages/chat-ui/src/chat/message-content.tsx:830
 msgid "Browser action failed"
 msgstr "Azione del browser non riuscita"
 
@@ -5792,7 +5792,7 @@ msgstr "Impostazioni dei clic del browser aggiornate"
 msgid "Browser Clicks"
 msgstr "Clic del browser"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:845
+#: ../../packages/chat-ui/src/chat/message-content.tsx:828
 msgid "Browser error"
 msgstr "Errore del browser"
 
@@ -5801,7 +5801,7 @@ msgid "Browser notes"
 msgstr "Note sui browser"
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:262
-#: ../../packages/chat-ui/src/chat/message-content.tsx:802
+#: ../../packages/chat-ui/src/chat/message-content.tsx:785
 #: src/features/chat/image-gallery/thread-image-gallery.tsx:72
 msgid "Browser screenshot"
 msgstr "Screenshot del browser"
@@ -5810,7 +5810,7 @@ msgstr "Screenshot del browser"
 msgid "Browser Session"
 msgstr "Sessione del browser"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:751
+#: ../../packages/chat-ui/src/chat/message-content.tsx:734
 msgid "Browser working..."
 msgstr "Il browser è al lavoro..."
 
@@ -6795,7 +6795,7 @@ msgstr "Verifica in corso"
 msgid "Checking code, a draft or a plan for mistakes."
 msgstr "Controllare codice, una bozza o un piano alla ricerca di errori."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:451
+#: ../../packages/chat-ui/src/chat/message-content.tsx:434
 msgid "Checking image safety..."
 msgstr "Verifica della sicurezza dell'immagine..."
 
@@ -7197,7 +7197,7 @@ msgstr "Clic"
 msgid "Click \"{selector}\""
 msgstr "Clic su \"{selector}\""
 
-#: src/components/model-picker/model-picker.tsx:1350
+#: src/components/model-picker/model-picker.tsx:1346
 msgid "Click ★ on any model in All models to add it here."
 msgstr "Clicca ★ su un modello in Tutti i modelli per aggiungerlo qui."
 
@@ -7237,7 +7237,7 @@ msgstr "Clicca per modificare"
 msgid "Click to edit..."
 msgstr "Fai clic per modificare..."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:743
+#: ../../packages/chat-ui/src/chat/message-content.tsx:726
 msgid "Clicking element..."
 msgstr "Clic sull'elemento..."
 
@@ -7281,7 +7281,7 @@ msgstr "Clona o crea nuovo…"
 #: ../../packages/ui/src/components/sheet.tsx:75
 #: src/components/command-palette.tsx:1097
 #: src/features/admin/components/user-sessions-dialog.tsx:159
-#: src/features/canvas/canvas-panel.tsx:835
+#: src/features/canvas/canvas-panel.tsx:839
 #: src/features/canvas/pdf-preview-panel.tsx:105
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:868
 #: src/features/develop/components/thread-pull-requests.tsx:417
@@ -7317,7 +7317,7 @@ msgstr "Chiudi la ricerca"
 msgid "Close full screen"
 msgstr "Esci da schermo intero"
 
-#: src/features/canvas/canvas-panel.tsx:788
+#: src/features/canvas/canvas-panel.tsx:792
 msgid "Close history"
 msgstr "Chiudi cronologia"
 
@@ -7386,7 +7386,7 @@ msgstr "I modelli Cloudflare Workers AI vengono eseguiti ovunque Cloudflare abbi
 #: src/features/auth/components/device-code-parts.tsx:46
 #: src/features/auth/components/device-code-parts.tsx:80
 #: src/features/auth/components/device-code-parts.tsx:134
-#: src/features/canvas/canvas-panel.tsx:770
+#: src/features/canvas/canvas-panel.tsx:774
 #: src/features/chat/thread/composer-search-mode.tsx:57
 #: src/features/code/components/code-workspace.tsx:219
 #: src/features/layout/components/workspace-switch.tsx:48
@@ -7410,7 +7410,7 @@ msgstr "Esecuzione di codice"
 msgid "Code execution and sandbox files"
 msgstr "Esecuzione di codice e file della sandbox"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:719
+#: ../../packages/chat-ui/src/chat/message-content.tsx:702
 msgid "Code execution failed"
 msgstr "Esecuzione del codice non riuscita"
 
@@ -7434,7 +7434,7 @@ msgstr "La modalità Code non è ancora disponibile per il tuo account."
 msgid "Code navigation"
 msgstr "Navigazione del codice"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:671
+#: ../../packages/chat-ui/src/chat/message-content.tsx:654
 #: src/features/chat/image-gallery/thread-image-gallery.tsx:76
 msgid "Code output"
 msgstr "Output del codice"
@@ -7452,7 +7452,7 @@ msgstr "Pannello di revisione del codice"
 msgid "Code Sandbox"
 msgstr "Sandbox di codice"
 
-#: src/features/canvas/canvas-panel.tsx:763
+#: src/features/canvas/canvas-panel.tsx:767
 msgid "Code view"
 msgstr "Vista codice"
 
@@ -7679,7 +7679,7 @@ msgstr "Il comando deve avere al massimo {SKILL_SLUG_MAX} caratteri"
 msgid "Command Palette"
 msgstr "Riquadro comandi"
 
-#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:553
+#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:545
 msgid "Commands"
 msgstr "Comandi"
 
@@ -8125,7 +8125,7 @@ msgstr "Configurato"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:882
 #: ../../packages/ui/src/components/confirm-dialog.tsx:29
-#: src/components/model-picker/model-picker.tsx:1414
+#: src/components/model-picker/model-picker.tsx:1410
 msgid "Confirm"
 msgstr "Conferma"
 
@@ -8840,7 +8840,7 @@ msgstr "Copia come testo semplice"
 msgid "Copy command: {label}"
 msgstr "Copia comando: {label}"
 
-#: src/features/canvas/canvas-panel.tsx:803
+#: src/features/canvas/canvas-panel.tsx:807
 msgid "Copy content"
 msgstr "Copia contenuto"
 
@@ -9482,7 +9482,7 @@ msgstr "Impossibile salvare l’accesso."
 msgid "Could not save the memories"
 msgstr "Impossibile salvare le memorie"
 
-#: src/components/model-picker/model-picker.tsx:1036
+#: src/components/model-picker/model-picker.tsx:1032
 msgid "Could not save the new order for {label}"
 msgstr "Impossibile salvare il nuovo ordine per {label}"
 
@@ -9923,7 +9923,7 @@ msgstr "Creazione del bot…"
 msgid "Creating branch..."
 msgstr "Creazione del ramo..."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:361
+#: ../../packages/chat-ui/src/chat/message-content.tsx:344
 msgid "Creating slides..."
 msgstr "Creazione delle slide..."
 
@@ -10654,7 +10654,7 @@ msgstr "Modello predefinito aggiornato"
 msgid "Default Models"
 msgstr "Modelli predefiniti"
 
-#: src/components/model-picker/model-picker.tsx:1302
+#: src/components/model-picker/model-picker.tsx:1298
 msgid "Default order"
 msgstr "Ordine predefinito"
 
@@ -11103,12 +11103,12 @@ msgid "Density updated"
 msgstr "Densità aggiornata"
 
 #: src/features/auth/components/device-approval.tsx:233
-#: src/features/chat/thread/tool-approval.tsx:130
+#: src/features/chat/thread/tool-approval.tsx:124
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:34
 msgid "Deny"
 msgstr "Rifiuta"
 
-#: src/features/chat/thread/tool-approval.tsx:128
+#: src/features/chat/thread/tool-approval.tsx:122
 msgid "Deny {tool}"
 msgstr "Rifiuta {tool}"
 
@@ -11671,7 +11671,7 @@ msgid "Do you want to add more rows?"
 msgstr "Vuoi aggiungere altre righe?"
 
 #: ../../packages/chat-ui/src/chat/document-artifact.tsx:44
-#: ../../packages/chat-ui/src/chat/message-content.tsx:336
+#: ../../packages/chat-ui/src/chat/message-content.tsx:319
 #: ../../packages/ui/src/components/file-renderers/docx-preview.tsx:115
 #: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:182
 msgid "Document"
@@ -11772,8 +11772,8 @@ msgstr "scarica"
 #: ../../packages/ui/src/components/media-preview-dialog.tsx:183
 #: ../../packages/ui/src/components/save-file-button.tsx:27
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:82
-#: src/features/canvas/canvas-panel.tsx:811
-#: src/features/canvas/canvas-panel.tsx:828
+#: src/features/canvas/canvas-panel.tsx:815
+#: src/features/canvas/canvas-panel.tsx:832
 #: src/features/download/components/download-page.tsx:120
 #: src/features/skills/components/bundle-export-dialog.tsx:227
 #: src/features/workflow/components/nodes/node-expand-modal.tsx:300
@@ -11786,7 +11786,7 @@ msgid "Download — Neore Desktop"
 msgstr "Scarica — Neore Desktop"
 
 #. placeholder {0}: part.filename
-#: ../../packages/chat-ui/src/chat/message-content.tsx:492
+#: ../../packages/chat-ui/src/chat/message-content.tsx:475
 msgid "Download {0}"
 msgstr "Scarica {0}"
 
@@ -11821,7 +11821,7 @@ msgstr "Scarica una copia di tutti i tuoi dati personali in formato JSON (Art. 2
 msgid "Download a model"
 msgstr "Scarica un modello"
 
-#: src/features/canvas/canvas-panel.tsx:819
+#: src/features/canvas/canvas-panel.tsx:823
 msgid "Download as CSV"
 msgstr "Scarica come CSV"
 
@@ -11829,7 +11829,7 @@ msgstr "Scarica come CSV"
 msgid "Download as Markdown"
 msgstr "Scarica come Markdown"
 
-#: src/features/canvas/canvas-panel.tsx:823
+#: src/features/canvas/canvas-panel.tsx:827
 msgid "Download as XLSX"
 msgstr "Scarica come XLSX"
 
@@ -11845,7 +11845,7 @@ msgstr "Scarica documento"
 msgid "Download Export"
 msgstr "Scarica esportazione"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:531
+#: ../../packages/chat-ui/src/chat/message-content.tsx:514
 #: ../../packages/ui/src/components/file-renderers/generic-file-card.tsx:88
 msgid "Download file"
 msgstr "Scarica file"
@@ -11855,8 +11855,8 @@ msgstr "Scarica file"
 msgid "Download for {0}"
 msgstr "Scarica per {0}"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:492
-#: ../../packages/chat-ui/src/chat/message-content.tsx:499
+#: ../../packages/chat-ui/src/chat/message-content.tsx:475
+#: ../../packages/chat-ui/src/chat/message-content.tsx:482
 msgid "Download image"
 msgstr "Scarica immagine"
 
@@ -12126,7 +12126,7 @@ msgstr "ad es. Pianificazione finanziaria"
 msgid "e.g., Make it more concise, add technical details, improve clarity, add examples..."
 msgstr "ad es. Rendilo più conciso, aggiungi dettagli tecnici, migliora la chiarezza, aggiungi esempi..."
 
-#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:244
+#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:242
 msgid "e.g., Make it more concise, add technical details, improve clarity..."
 msgstr "ad es. Rendilo più conciso, aggiungi dettagli tecnici, migliora la chiarezza..."
 
@@ -12134,7 +12134,7 @@ msgstr "ad es. Rendilo più conciso, aggiungi dettagli tecnici, migliora la chia
 msgid "e.g., Make it more concise, require markdown output, add safety rules..."
 msgstr "ad es. Rendilo più conciso, richiedi output in Markdown, aggiungi regole di sicurezza..."
 
-#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:307
+#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:305
 msgid "e.g., Make it stricter about JSON output, add a code example..."
 msgstr "ad es. Rendilo più rigoroso sull'output JSON, aggiungi un esempio di codice..."
 
@@ -12256,7 +12256,7 @@ msgid "Edge-guided generation"
 msgstr "Generazione guidata dai bordi"
 
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:141
-#: src/features/canvas/canvas-panel.tsx:783
+#: src/features/canvas/canvas-panel.tsx:787
 #: src/features/chat/host/host-composer.tsx:1060
 #: src/features/chat/thread-list/group-header.tsx:178
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:799
@@ -13298,7 +13298,7 @@ msgstr "Tasso di errore"
 msgid "Error trace:"
 msgstr "Traccia dell'errore:"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:297
+#: ../../packages/chat-ui/src/chat/message-content.tsx:280
 msgid "Error:"
 msgstr "Errore:"
 
@@ -13593,7 +13593,7 @@ msgstr "Esecuzione degli strumenti..."
 msgid "Execution"
 msgstr "Esecuzione"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:709
+#: ../../packages/chat-ui/src/chat/message-content.tsx:692
 msgid "Execution failed"
 msgstr "Esecuzione non riuscita"
 
@@ -13618,7 +13618,7 @@ msgstr "esiste"
 msgid "Exit {0}"
 msgstr "Uscita {0}"
 
-#: src/features/canvas/canvas-panel.tsx:832
+#: src/features/canvas/canvas-panel.tsx:836
 msgid "Exit fullscreen"
 msgstr "Esci da schermo intero"
 
@@ -13941,11 +13941,11 @@ msgstr "Estrai pagina"
 msgid "Extract subject"
 msgstr "Estrai soggetto"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:815
+#: ../../packages/chat-ui/src/chat/message-content.tsx:798
 msgid "Extracted"
 msgstr "Estratto"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:744
+#: ../../packages/chat-ui/src/chat/message-content.tsx:727
 msgid "Extracting content..."
 msgstr "Estrazione del contenuto..."
 
@@ -14685,8 +14685,8 @@ msgstr "Impossibile aggiornare il preferito"
 msgid "Failed to update favorite status"
 msgstr "Impossibile aggiornare lo stato di preferito"
 
-#: src/components/model-picker/model-picker.tsx:855
-#: src/components/model-picker/model-picker.tsx:864
+#: src/components/model-picker/model-picker.tsx:851
+#: src/components/model-picker/model-picker.tsx:860
 #: src/features/settings/components/chat/model-filter-settings.tsx:56
 #: src/features/settings/components/chat/model-filter-settings.tsx:67
 msgid "Failed to update filter rules"
@@ -16181,7 +16181,7 @@ msgstr "Hero a tutta larghezza"
 msgid "Full-width promotional"
 msgstr "Promozionale a tutta larghezza"
 
-#: src/features/canvas/canvas-panel.tsx:832
+#: src/features/canvas/canvas-panel.tsx:836
 msgid "Fullscreen"
 msgstr "Schermo intero"
 
@@ -16408,7 +16408,7 @@ msgstr "Video generato"
 msgid "Generated videos will appear here. Start by describing what you want to create in the composer below."
 msgstr "I video generati compariranno qui. Inizia descrivendo cosa vuoi creare nel campo qui sotto."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:546
+#: ../../packages/chat-ui/src/chat/message-content.tsx:529
 msgid "Generating audio..."
 msgstr "Generazione dell'audio..."
 
@@ -16416,12 +16416,12 @@ msgstr "Generazione dell'audio..."
 msgid "Generating draft…"
 msgstr "Generazione della bozza…"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:547
+#: ../../packages/chat-ui/src/chat/message-content.tsx:530
 #: src/features/chat/thread/media-gallery-view.tsx:405
 msgid "Generating image..."
 msgstr "Generazione dell'immagine..."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:358
+#: ../../packages/chat-ui/src/chat/message-content.tsx:341
 msgid "Generating presentation..."
 msgstr "Generazione della presentazione..."
 
@@ -16429,7 +16429,7 @@ msgstr "Generazione della presentazione..."
 msgid "Generating response"
 msgstr "Generazione della risposta"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:548
+#: ../../packages/chat-ui/src/chat/message-content.tsx:531
 #: src/features/chat/thread/media-gallery-view.tsx:405
 msgid "Generating video..."
 msgstr "Generazione del video..."
@@ -17124,7 +17124,7 @@ msgstr "Account ospite"
 msgid "Guest accounts"
 msgstr "Account ospite"
 
-#: src/components/model-picker/model-picker.tsx:1141
+#: src/components/model-picker/model-picker.tsx:1137
 msgid "Guest accounts use free models only."
 msgstr "Gli account ospite usano solo modelli gratuiti."
 
@@ -17324,7 +17324,7 @@ msgstr "Nascosto nel selettore dei modelli"
 msgid "Hide {fieldLabel}"
 msgstr "Nascondi {fieldLabel}"
 
-#: src/components/model-picker/model-picker.tsx:1326
+#: src/components/model-picker/model-picker.tsx:1322
 msgid "Hide {name} from model picker"
 msgstr "Nascondi {name} dal selettore dei modelli"
 
@@ -17859,14 +17859,14 @@ msgid "illustration"
 msgstr "illustrazione"
 
 #: ../../packages/chat-ui/src/chat/document-artifact.tsx:42
-#: ../../packages/chat-ui/src/chat/message-content.tsx:483
+#: ../../packages/chat-ui/src/chat/message-content.tsx:466
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:755
 #: ../../packages/ui/src/components/ai-elements/attachments-utilities.tsx:47
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:107
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:109
 #: ../../packages/ui/src/components/canvas-editor/canvas-element-palette.tsx:330
 #: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:343
-#: src/components/model-picker/model-picker.tsx:1265
+#: src/components/model-picker/model-picker.tsx:1261
 #: src/features/chat/image-gallery/thread-image-gallery.tsx:80
 #: src/features/chat/sidebar/usage-card.tsx:129
 #: src/features/chat/thread/composer.tsx:131
@@ -18221,7 +18221,7 @@ msgstr "Importa workflow"
 msgid "Import workflow (ZIP or JSON)"
 msgstr "Importa workflow (ZIP o JSON)"
 
-#: src/features/canvas/canvas-panel.tsx:796
+#: src/features/canvas/canvas-panel.tsx:800
 msgid "Import XLSX"
 msgstr "Importa XLSX"
 
@@ -18280,7 +18280,7 @@ msgstr "Importazione dei ricordi in corso…"
 msgid "Imprint"
 msgstr "Note legali"
 
-#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:343
+#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:341
 msgid "Improve"
 msgstr "Migliora"
 
@@ -18325,7 +18325,7 @@ msgstr "Dinamica dei movimenti migliorata rispetto a Kling 2.x"
 msgid "Improved multimodal reasoning"
 msgstr "Ragionamento multimodale migliorato"
 
-#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:261
+#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:259
 msgid "Improved Prompt"
 msgstr "Prompt migliorato"
 
@@ -18353,7 +18353,7 @@ msgstr "Miglioramento del prompt..."
 msgid "Improving your prompt..."
 msgstr "Miglioramento del prompt in corso..."
 
-#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:340
+#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:338
 msgid "Improving..."
 msgstr "Miglioramento..."
 
@@ -18567,7 +18567,7 @@ msgstr "Modello di input"
 msgid "Input tokens"
 msgstr "Token di input"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:274
+#: ../../packages/chat-ui/src/chat/message-content.tsx:257
 msgid "Input:"
 msgstr "Input:"
 
@@ -18583,7 +18583,7 @@ msgstr "Inserisci colonna dopo"
 msgid "Insert column before"
 msgstr "Inserisci colonna prima"
 
-#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:617
+#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:609
 msgid "Insert Prompt"
 msgstr "Inserisci prompt"
 
@@ -18895,7 +18895,7 @@ msgstr "Inviti"
 msgid "Invoke a skill"
 msgstr "Richiama una skill"
 
-#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:650
+#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:642
 msgid "Invoke Skill"
 msgstr "Richiama skill"
 
@@ -18990,7 +18990,7 @@ msgstr "Ha aperto una sessione diversa dalla propria, quindi la conversazione è
 msgid "It was not saved. Paste it again and save."
 msgstr "Non è stato salvato. Incollalo di nuovo e salva."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:457
+#: ../../packages/chat-ui/src/chat/message-content.tsx:440
 msgid "It will be visible once approved by a moderator"
 msgstr "Sarà visibile dopo l'approvazione di un moderatore"
 
@@ -19543,7 +19543,7 @@ msgstr "Ultimo accesso: {lastSeen}"
 msgid "Last skipped run"
 msgstr "Ultima esecuzione saltata"
 
-#: src/features/slides/components/full-screen-presentation-viewer.tsx:432
+#: src/features/slides/components/full-screen-presentation-viewer.tsx:430
 msgid "Last slide"
 msgstr "Ultima slide"
 
@@ -20247,7 +20247,7 @@ msgstr "Caricamento dei dataset…"
 msgid "Loading devices..."
 msgstr "Caricamento dispositivi..."
 
-#: src/features/canvas/canvas-panel.tsx:851
+#: src/features/canvas/canvas-panel.tsx:855
 msgid "Loading document..."
 msgstr "Caricamento del documento..."
 
@@ -20258,7 +20258,7 @@ msgstr "Caricamento del documento…"
 #: src/features/canvas/canvas-panel.tsx:102
 #: src/features/canvas/canvas-panel.tsx:293
 #: src/features/canvas/canvas-panel.tsx:370
-#: src/features/canvas/canvas-panel.tsx:855
+#: src/features/canvas/canvas-panel.tsx:859
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:916
 msgid "Loading editor..."
 msgstr "Caricamento dell'editor..."
@@ -20273,7 +20273,7 @@ msgstr "Caricamento dell'editor…"
 msgid "Loading feedback"
 msgstr "Caricamento del feedback"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:380
+#: ../../packages/chat-ui/src/chat/message-content.tsx:363
 #: ../../packages/ui/src/components/file-renderers/fetched-text-preview.tsx:67
 msgid "Loading file…"
 msgstr "Caricamento file…"
@@ -20480,7 +20480,7 @@ msgstr "Caricamento di server, connettori e computer…"
 #: ../../packages/chat-ui/src/threads/thread-list.tsx:178
 #: ../../packages/ui/src/components/elevenlabs/mic-selector.tsx:62
 #: src/components/default-loading.tsx:8
-#: src/features/canvas/canvas-panel.tsx:747
+#: src/features/canvas/canvas-panel.tsx:751
 #: src/features/changelog/components/changelog-panel.tsx:109
 #: src/features/chat/split/chat-split-view.tsx:213
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:874
@@ -20497,7 +20497,7 @@ msgstr "Caricamento di server, connettori e computer…"
 msgid "Loading..."
 msgstr "Caricamento..."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:383
+#: ../../packages/chat-ui/src/chat/message-content.tsx:366
 #: src/features/admin/components/admin-provider-cache-row.tsx:85
 #: src/features/auth/components/device-approval.tsx:349
 #: src/features/chat/thread/memory-usage-action.tsx:46
@@ -20580,7 +20580,7 @@ msgid "Locked chats do not reveal their project, so some may be missing here."
 msgstr "Le chat bloccate non mostrano il loro progetto, quindi qui potrebbero mancarne alcune."
 
 #. placeholder {0}: getModelModeName(anchorMode)
-#: src/components/model-picker/model-picker.tsx:1397
+#: src/components/model-picker/model-picker.tsx:1393
 msgid "Locked to {0} models"
 msgstr "Limitato ai modelli {0}"
 
@@ -20947,7 +20947,7 @@ msgstr "Maltese (Malta)"
 msgid "Manage Consent Preferences"
 msgstr "Gestisci preferenze di consenso"
 
-#: src/components/model-picker/model-picker.tsx:867
+#: src/components/model-picker/model-picker.tsx:863
 msgid "Manage hidden labs"
 msgstr "Gestisci i lab nascosti"
 
@@ -21174,7 +21174,7 @@ msgid "Max size: {size} • Max {maxFiles} files"
 msgstr "Dimensione max: {size} • Max {maxFiles} file"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:859
-#: src/components/model-picker/model-picker.tsx:1391
+#: src/components/model-picker/model-picker.tsx:1387
 msgid "Maximum {MAX_PARALLEL} models reached"
 msgstr "Raggiunto il massimo di {MAX_PARALLEL} modelli"
 
@@ -22537,7 +22537,7 @@ msgstr "nome"
 msgid "Name"
 msgstr "Nome"
 
-#: src/components/model-picker/model-picker.tsx:1303
+#: src/components/model-picker/model-picker.tsx:1299
 msgid "Name (A to Z)"
 msgstr "Nome (dalla A alla Z)"
 
@@ -22684,11 +22684,11 @@ msgstr "Naviga tra le conversazioni"
 msgid "navigate within each column"
 msgstr "spostati all’interno di ogni colonna"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:816
+#: ../../packages/chat-ui/src/chat/message-content.tsx:799
 msgid "Navigated"
 msgstr "Navigato"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:751
+#: ../../packages/chat-ui/src/chat/message-content.tsx:734
 msgid "Navigating to {target}..."
 msgstr "Navigazione verso {target}..."
 
@@ -22983,7 +22983,7 @@ msgstr "Nuovo dataset"
 msgid "New Export"
 msgstr "Nuova esportazione"
 
-#: src/components/model-picker/model-picker.tsx:1304
+#: src/components/model-picker/model-picker.tsx:1300
 msgid "New first"
 msgstr "Prima le nuove"
 
@@ -23168,7 +23168,7 @@ msgstr "domanda successiva"
 
 #: ../../packages/ui/src/components/carousel.tsx:171
 #: ../../packages/ui/src/components/file-renderers/pptx-preview.tsx:283
-#: src/features/slides/components/full-screen-presentation-viewer.tsx:421
+#: src/features/slides/components/full-screen-presentation-viewer.tsx:419
 msgid "Next slide"
 msgstr "Slide successiva"
 
@@ -23599,7 +23599,7 @@ msgid "No models found matching your filters."
 msgstr "Nessun modello corrisponde ai tuoi filtri."
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:825
-#: src/components/model-picker/model-picker.tsx:1355
+#: src/components/model-picker/model-picker.tsx:1351
 msgid "No models found."
 msgstr "Nessun modello trovato."
 
@@ -23771,7 +23771,7 @@ msgstr "Ancora nessuna risposta"
 msgid "No results"
 msgstr "Nessun risultato"
 
-#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:678
+#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:670
 msgid "No results found"
 msgstr "Nessun risultato trovato"
 
@@ -23845,7 +23845,7 @@ msgid "No speech detected. Hands-free mode stopped."
 msgstr "Nessuna voce rilevata. Modalità a mani libere interrotta."
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:818
-#: src/components/model-picker/model-picker.tsx:1348
+#: src/components/model-picker/model-picker.tsx:1344
 msgid "No starred models"
 msgstr "Nessun modello contrassegnato"
 
@@ -23952,7 +23952,7 @@ msgstr "Nessuna variabile configurata. Aggiungi variabili per personalizzare il 
 msgid "No variables detected. Use {VARIABLE_PLACEHOLDER} syntax to add dynamic content."
 msgstr "Nessuna variabile rilevata. Usa la sintassi {VARIABLE_PLACEHOLDER} per aggiungere contenuti dinamici."
 
-#: src/features/chat/thread/composer-tiptap/variable-autocomplete-popup.tsx:236
+#: src/features/chat/thread/composer-tiptap/variable-autocomplete-popup.tsx:228
 #: src/features/prompts/components/variable-autocomplete.tsx:135
 msgid "No variables found"
 msgstr "Nessuna variabile trovata"
@@ -24183,7 +24183,7 @@ msgstr "Nota per: {0}"
 msgid "Note: Modules are applied per conversation, not per message. Enable only the modules you need to optimize token usage."
 msgstr "Nota: i moduli si applicano per conversazione, non per messaggio. Attiva solo i moduli che ti servono per ottimizzare l’uso dei token."
 
-#: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:486
+#: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:478
 msgid "Nothing found"
 msgstr "Nessun risultato"
 
@@ -24773,7 +24773,7 @@ msgstr "Ops! Qualcosa è andato storto"
 msgid "Opacity"
 msgstr "Opacità"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:796
+#: ../../packages/chat-ui/src/chat/message-content.tsx:779
 #: src/components/command-palette.tsx:1089
 #: src/features/chat/link-preview/link-preview-card.tsx:117
 #: src/features/develop/components/pull-request-actions-panel.tsx:112
@@ -25707,7 +25707,7 @@ msgstr "Obsoleto"
 msgid "Outpaint"
 msgstr "Outpaint"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:646
+#: ../../packages/chat-ui/src/chat/message-content.tsx:629
 #: ../../packages/ui/src/components/ai-elements/context.tsx:277
 #: src/components/model-picker/model-picker.tsx:261
 #: src/features/devices/components/device-tool-call.tsx:173
@@ -25771,8 +25771,8 @@ msgstr "Tipo di output"
 msgid "Output-format focused"
 msgstr "Incentrato sul formato di output"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:282
-#: ../../packages/chat-ui/src/chat/message-content.tsx:290
+#: ../../packages/chat-ui/src/chat/message-content.tsx:265
+#: ../../packages/chat-ui/src/chat/message-content.tsx:273
 msgid "Output:"
 msgstr "Output:"
 
@@ -25816,7 +25816,7 @@ msgstr "owner/name"
 msgid "Pacific Time (US & Canada)"
 msgstr "Ora del Pacifico (USA e Canada)"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:750
+#: ../../packages/chat-ui/src/chat/message-content.tsx:733
 msgid "page"
 msgstr "pagina"
 
@@ -25947,7 +25947,7 @@ msgid "Paraguay"
 msgstr "Paraguay"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:709
-#: src/components/model-picker/model-picker.tsx:1217
+#: src/components/model-picker/model-picker.tsx:1213
 msgid "Parallel"
 msgstr "In parallelo"
 
@@ -25982,7 +25982,7 @@ msgstr "Parte di una dipendenza circolare"
 
 #: src/features/chat/group/create-group-chat-button.tsx:191
 #: src/features/chat/group/group-participant-bar.tsx:138
-#: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:400
+#: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:392
 msgid "Participants"
 msgstr "Partecipanti"
 
@@ -27072,8 +27072,8 @@ msgstr "anteprima"
 #: ../../packages/ui/src/components/ai-elements/web-preview.tsx:163
 #: ../../packages/ui/src/components/media-preview-dialog.tsx:62
 #: ../../packages/ui/src/components/media-preview-dialog.tsx:139
-#: src/features/canvas/canvas-panel.tsx:778
-#: src/features/canvas/canvas-panel.tsx:783
+#: src/features/canvas/canvas-panel.tsx:782
+#: src/features/canvas/canvas-panel.tsx:787
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:790
 #: src/features/prompts/components/variable-fill-dialog.tsx:174
 #: src/features/settings/components/personalization/memory-import-dialog.tsx:317
@@ -27193,11 +27193,11 @@ msgstr "Versione precedente"
 msgid "Price per 1M tokens"
 msgstr "Prezzo per 1 M di token"
 
-#: src/components/model-picker/model-picker.tsx:1306
+#: src/components/model-picker/model-picker.tsx:1302
 msgid "Price: high to low"
 msgstr "Prezzo: dal più alto al più basso"
 
-#: src/components/model-picker/model-picker.tsx:1305
+#: src/components/model-picker/model-picker.tsx:1301
 msgid "Price: low to high"
 msgstr "Prezzo: dal più basso al più alto"
 
@@ -27595,7 +27595,7 @@ msgstr "Prompt eliminato"
 msgid "Prompt format"
 msgstr "Formato del prompt"
 
-#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:358
+#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:355
 msgid "Prompt improved"
 msgstr "Prompt migliorato"
 
@@ -27658,7 +27658,7 @@ msgstr "Prompt aggiornato"
 msgid "Prompt updated with optimized content"
 msgstr "Prompt aggiornato con il contenuto ottimizzato"
 
-#: src/features/chat/thread/composer-tiptap/variable-autocomplete-popup.tsx:243
+#: src/features/chat/thread/composer-tiptap/variable-autocomplete-popup.tsx:235
 #: src/features/prompts/components/variable-autocomplete.tsx:146
 msgid "Prompt Variables"
 msgstr "Variabili del prompt"
@@ -28631,7 +28631,7 @@ msgstr "riferimenti"
 msgid "References"
 msgstr "Riferimenti"
 
-#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:317
+#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:315
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:360
 #: src/features/skills/components/skill-builder-dialog.tsx:279
 #: src/features/skills/components/skill-builder-dialog.tsx:307
@@ -28642,7 +28642,7 @@ msgstr "Perfeziona"
 msgid "Refine Edge Detection"
 msgstr "Rifinisci il rilevamento dei bordi"
 
-#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:297
+#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:295
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:342
 msgid "Refine with feedback (optional)"
 msgstr "Perfeziona con un feedback (facoltativo)"
@@ -30142,7 +30142,7 @@ msgstr "Esegui il workflow per vedere qui la cronologia delle esecuzioni."
 msgid "Running"
 msgstr "In esecuzione"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:607
+#: ../../packages/chat-ui/src/chat/message-content.tsx:590
 msgid "Running code..."
 msgstr "Esecuzione del codice..."
 
@@ -30150,7 +30150,7 @@ msgstr "Esecuzione del codice..."
 msgid "Running on {device}…"
 msgstr "In esecuzione su {device}…"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:251
+#: ../../packages/chat-ui/src/chat/message-content.tsx:241
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:258
 #: src/features/workflow/components/canvas/workflow-controls.tsx:622
 #: src/features/workflow/components/nodes/base-node.tsx:263
@@ -30582,7 +30582,7 @@ msgid "Screen capture failed. Please try again."
 msgstr "Acquisizione dello schermo non riuscita. Riprova."
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:118
-#: ../../packages/chat-ui/src/chat/message-content.tsx:792
+#: ../../packages/chat-ui/src/chat/message-content.tsx:775
 msgid "Screenshot"
 msgstr "Screenshot"
 
@@ -30677,7 +30677,7 @@ msgstr "La ricerca di \"{searchQuery}\" non è riuscita. Riprova."
 msgid "Search fields..."
 msgstr "Cerca campi..."
 
-#: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:392
+#: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:384
 msgid "Search files and chats..."
 msgstr "Cerca file e chat..."
 
@@ -30752,7 +30752,7 @@ msgid "Search models by name, ID, or provider..."
 msgstr "Cerca modelli per nome, ID o provider..."
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:642
-#: src/components/model-picker/model-picker.tsx:1157
+#: src/components/model-picker/model-picker.tsx:1153
 msgid "Search models..."
 msgstr "Cerca modelli..."
 
@@ -30873,7 +30873,7 @@ msgstr "Cerca thread ({focusSearchShortcut})"
 msgid "Search threads, navigate, or perform actions..."
 msgstr "Cerca conversazioni, naviga o esegui azioni..."
 
-#: src/features/chat/thread/composer-tiptap/variable-autocomplete-popup.tsx:230
+#: src/features/chat/thread/composer-tiptap/variable-autocomplete-popup.tsx:222
 #: src/features/prompts/components/variable-autocomplete.tsx:264
 msgid "Search variables..."
 msgstr "Cerca variabili..."
@@ -31107,6 +31107,7 @@ msgid "Select mode"
 msgstr "Modalità selezione"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker-button.tsx:211
+#: src/components/model-picker/model-picker-button.tsx:243
 msgid "Select model"
 msgstr "Seleziona modello"
 
@@ -31948,7 +31949,7 @@ msgstr "Mostra orari"
 msgid "Show up to {rowLimit} rows ({byteCount} bytes)"
 msgstr "Mostra fino a {rowLimit} righe ({byteCount} byte)"
 
-#: src/features/chat/thread/tool-approval.tsx:115
+#: src/features/chat/thread/tool-approval.tsx:111
 msgid "Show what it will send"
 msgstr "Mostra cosa invierà"
 
@@ -32082,7 +32083,7 @@ msgstr "Accedi all'app desktop di Neore"
 msgid "Sign in to unlock all models"
 msgstr "Accedi per sbloccare tutti i modelli"
 
-#: src/components/model-picker/model-picker.tsx:1148
+#: src/components/model-picker/model-picker.tsx:1144
 msgid "Sign in to unlock all models."
 msgstr "Accedi per sbloccare tutti i modelli."
 
@@ -32232,7 +32233,7 @@ msgid "Singapore"
 msgstr "Singapore"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:696
-#: src/components/model-picker/model-picker.tsx:1205
+#: src/components/model-picker/model-picker.tsx:1201
 msgid "Single"
 msgstr "Singolo"
 
@@ -32449,7 +32450,7 @@ msgstr "Slide {streamingSlideNumber}"
 msgid "Slide title"
 msgstr "Titolo della slide"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1205
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1188
 msgid "Slide updated"
 msgstr "Slide aggiornata"
 
@@ -32612,7 +32613,7 @@ msgstr "Solide capacità generaliste"
 msgid "Solid performance across most task types"
 msgstr "Prestazioni solide nella maggior parte dei tipi di attività"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:701
+#: ../../packages/chat-ui/src/chat/message-content.tsx:684
 msgid "Some images from this run could not be saved."
 msgstr "Alcune immagini di questa esecuzione non sono state salvate."
 
@@ -32674,7 +32675,7 @@ msgstr "Ordine decrescente"
 msgid "Sort direction"
 msgstr "Direzione di ordinamento"
 
-#: src/components/model-picker/model-picker.tsx:1296
+#: src/components/model-picker/model-picker.tsx:1292
 msgid "Sort models"
 msgstr "Ordina i modelli"
 
@@ -32711,7 +32712,7 @@ msgstr "Effetti sonori attivati"
 msgid "Source"
 msgstr "Fonte"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1351
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1334
 #: src/features/chat/thread/message-content.tsx:161
 msgid "Source {index}"
 msgstr "Fonte {index}"
@@ -33064,7 +33065,7 @@ msgid "starred"
 msgstr "preferiti"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:661
-#: src/components/model-picker/model-picker.tsx:1174
+#: src/components/model-picker/model-picker.tsx:1170
 msgid "Starred"
 msgstr "Contrassegnati"
 
@@ -33881,7 +33882,7 @@ msgid "Style-consistent video generation guided by reference images to maintain 
 msgstr "Generazione video con stile coerente, guidata da immagini di riferimento per mantenere la coerenza visiva"
 
 #. placeholder {0}: styleLabels.user[style].label
-#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:234
+#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:233
 msgid "Style: {0}"
 msgstr "Stile: {0}"
 
@@ -33935,7 +33936,7 @@ msgstr "Invia la revisione"
 msgid "Submitting…"
 msgstr "Invio in corso…"
 
-#: src/components/model-picker/model-picker.tsx:1144
+#: src/components/model-picker/model-picker.tsx:1140
 msgid "Subscribe for $8/mo to unlock all models."
 msgstr "Abbonati a 8 $/mese per sbloccare tutti i modelli."
 
@@ -34176,7 +34177,7 @@ msgstr "Passa da OpenAI a Google, Anthropic e altri con un solo parametro. Nessu
 msgid "switch model"
 msgstr "cambia modello"
 
-#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:574
+#: src/features/chat/thread/composer-tiptap/slash-command-popup.tsx:566
 msgid "Switch Model"
 msgstr "Cambia modello"
 
@@ -34372,7 +34373,7 @@ msgstr "A turno"
 msgid "Taking control is not available while impersonating."
 msgstr "Non è possibile prendere il controllo durante l'impersonificazione."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:745
+#: ../../packages/chat-ui/src/chat/message-content.tsx:728
 msgid "Taking screenshot..."
 msgstr "Acquisizione screenshot..."
 
@@ -34757,7 +34758,7 @@ msgstr "testo"
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:743
 #: ../../packages/ui/src/components/canvas-editor/canvas-element-palette.tsx:317
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:351
-#: src/components/model-picker/model-picker.tsx:1252
+#: src/components/model-picker/model-picker.tsx:1248
 #: src/features/chat/sidebar/usage-card.tsx:128
 #: src/features/chat/thread/composer.tsx:130
 #: src/features/marketing/components/landing-footer.tsx:164
@@ -35636,7 +35637,7 @@ msgstr "L'importazione si è interrotta prima di finire."
 msgid "The imported file appears to be empty."
 msgstr "Il file importato sembra vuoto."
 
-#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:290
+#: src/features/chat/prompt-improvement/components/prompt-improvement-panel.tsx:288
 msgid "The improved prompt will appear here..."
 msgstr "Il prompt migliorato comparirà qui..."
 
@@ -35986,7 +35987,7 @@ msgstr "La cartella delle regole contiene {0, plural, one {# file in più} other
 msgid "The run goes where you chose: a new chat each time, the same chat as before, or the same chat with a fresh context."
 msgstr "L’esecuzione va dove hai scelto: una nuova chat ogni volta, la stessa chat di prima, oppure la stessa chat con un contesto nuovo."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:827
+#: ../../packages/chat-ui/src/chat/message-content.tsx:810
 msgid "The screenshot could not be saved."
 msgstr "Non è stato possibile salvare lo screenshot."
 
@@ -36230,7 +36231,7 @@ msgid "Thinking-enabled vision-language model"
 msgstr "Modello visione-linguaggio con pensiero"
 
 #: ../../packages/chat-ui/src/chat/auto-continue-status.tsx:54
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1267
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1250
 #: ../../packages/ui/src/components/ai-elements/reasoning.tsx:114
 #: src/features/chat/thread/streaming-placeholder.tsx:808
 msgid "Thinking..."
@@ -36590,7 +36591,7 @@ msgstr "Questo host è usato da una regola Match in ~/.ssh/config, che Neore non
 msgid "This host uses {key} in ~/.ssh/config, which Neore does not support."
 msgstr "Questo host usa {key} in ~/.ssh/config, che Neore non supporta."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:456
+#: ../../packages/chat-ui/src/chat/message-content.tsx:439
 msgid "This image has been flagged for review"
 msgstr "Questa immagine è stata segnalata per la revisione"
 
@@ -37995,7 +37996,7 @@ msgstr "L'autenticazione a due fattori è attualmente attiva per il tuo account.
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:125
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:720
-#: src/components/model-picker/model-picker.tsx:1228
+#: src/components/model-picker/model-picker.tsx:1224
 #: src/features/devices/components/device-tool-call.tsx:118
 msgid "Type"
 msgstr "Tipo"
@@ -38044,7 +38045,7 @@ msgstr "Scrivi il tuo messaggio..."
 msgid "Typeface for the whole interface. Code blocks always stay monospace."
 msgstr "Carattere per l’intera interfaccia. I blocchi di codice restano sempre in monospazio."
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:746
+#: ../../packages/chat-ui/src/chat/message-content.tsx:729
 msgid "Typing text..."
 msgstr "Digitazione del testo..."
 
@@ -38200,7 +38201,7 @@ msgstr "Sottolineato"
 #: ../../packages/ui/src/components/canvas-editor/fabric-canvas-editor.tsx:604
 #: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:290
 #: ../../packages/ui/src/components/tiptap-editor.tsx:183
-#: src/components/model-picker/model-picker.tsx:862
+#: src/components/model-picker/model-picker.tsx:858
 #: src/features/canvas/canvas-panel.tsx:245
 #: src/features/canvas/components/canvas-ai-diff-banner.tsx:51
 #: src/features/chat/thread-list/hooks/use-thread-handlers.tsx:186
@@ -38380,7 +38381,7 @@ msgstr "Ritira pubblicazione"
 msgid "Unread"
 msgstr "Non letto"
 
-#: src/features/canvas/canvas-panel.tsx:749
+#: src/features/canvas/canvas-panel.tsx:753
 msgid "Unsaved changes"
 msgstr "Modifiche non salvate"
 
@@ -38572,11 +38573,11 @@ msgstr "Prestazioni di frontiera OpenAI aggiornate"
 msgid "Updated reasoning capabilities over the original R1"
 msgstr "Capacità di ragionamento aggiornate rispetto all’R1 originale"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1203
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1186
 msgid "Updated slide"
 msgstr "Slide aggiornata"
 
-#: ../../packages/chat-ui/src/chat/message-content.tsx:1203
+#: ../../packages/chat-ui/src/chat/message-content.tsx:1186
 msgid "Updated slide {slideNumber}"
 msgstr "Slide {slideNumber} aggiornata"
 
@@ -38709,7 +38710,7 @@ msgstr "Carica immagine / video"
 msgid "Upload Logo"
 msgstr "Carica logo"
 
-#: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:440
+#: src/features/chat/thread/composer-tiptap/file-mention-popup.tsx:432
 msgid "Upload new file"
 msgstr "Carica nuovo file"
 
@@ -39327,7 +39328,7 @@ msgstr "Contenuto della versione {0}"
 msgid "Version {position} of {total}"
 msgstr "Versione {position} di {total}"
 
-#: src/features/canvas/canvas-panel.tsx:788
+#: src/features/canvas/canvas-panel.tsx:792
 #: src/features/pages/components/page-version-panel.tsx:81
 #: src/features/pages/components/page-version-panel.tsx:83
 #: src/features/pages/components/page-view.tsx:448
@@ -39395,7 +39396,7 @@ msgid "video"
 msgstr "video"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker.tsx:767
-#: src/components/model-picker/model-picker.tsx:1278
+#: src/components/model-picker/model-picker.tsx:1274
 #: src/features/chat/sidebar/usage-card.tsx:130
 #: src/features/chat/thread/composer.tsx:132
 #: src/features/marketing/components/landing-footer.tsx:166
