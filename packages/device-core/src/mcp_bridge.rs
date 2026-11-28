@@ -394,6 +394,19 @@ pub fn parse_target(url: &str, headers: &str) -> Result<Target, String> {
             .filter(|_| name == "cookie")
             .map(|(_, cookie)| cookie);
 
+        // A compound credential's own credentials (`id=client,secret=…`): a field named as one. The scheme before the
+        // first field (`Digest username`) is not part of its name.
+        let fields = pairs(value, ',')
+            .chain(pairs(value, ';'))
+            .filter(|(field, _)| {
+                holds_a_credential(
+                    field
+                        .rsplit(|character: char| character.is_ascii_whitespace())
+                        .next()
+                        .unwrap_or(field),
+                )
+            })
+            .map(|(_, secret)| secret.trim_matches('"'));
         let login = basic_login(value);
         let phrase = login
             .as_deref()
@@ -404,6 +417,7 @@ pub fn parse_target(url: &str, headers: &str) -> Result<Target, String> {
         if holds_a_credential(written)
             && credentials(value)
                 .chain(cookies)
+                .chain(fields)
                 .chain(phrase)
                 .any(|secret| secret.len() < MIN_REDACTED_BYTES)
         {

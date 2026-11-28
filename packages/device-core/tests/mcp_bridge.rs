@@ -163,6 +163,12 @@ fn only_an_http_or_https_address_without_credentials_and_valid_headers_are_taken
     assert!(parse_target("https://mcp.internal.example/mcp", "").is_ok());
     // Ordinary names that only contain a credential word.
     assert!(parse_target("https://h/mcp?author=ai&max_tokens=50&keyword=ab", "").is_ok());
+    // A Digest header's public fields may be short; its `response` is the long one.
+    assert!(parse_target(
+        "https://h/mcp",
+        &json!({ "Authorization": format!(r#"Digest username="u", algorithm=MD5, qop=auth, nc=00000001, response="{}""#, "0".repeat(32)) }).to_string(),
+    )
+    .is_ok());
     assert!(parse_target("http://10.0.0.5:8080/mcp", &authorization()).is_ok());
 
     for (url, headers, expected) in [
@@ -213,6 +219,12 @@ fn only_an_http_or_https_address_without_credentials_and_valid_headers_are_taken
         (
             "https://h/mcp?sessionId=abc",
             "",
+            "too short to keep out of the chat",
+        ),
+        // A compound credential with a short field named as one.
+        (
+            "https://h/mcp",
+            r#"{"X-Api-Key":"id=client-one,secret=abc"}"#,
             "too short to keep out of the chat",
         ),
         // `Basic bWFyaWU6YWJj`: marie:abc, a password too short.
