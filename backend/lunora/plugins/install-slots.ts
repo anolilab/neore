@@ -19,7 +19,7 @@ const isLeftover = async (ctx: MutationCtx, slot: SlotRow): Promise<boolean> => 
         return slot.createdAt + LEASE_MS < ctx.now;
     }
 
-    return !(await ctx.db.pluginInstalls.findFirst({ consistency: "primary", where: { _id: slot.installId } }));
+    return !(await ctx.db.pluginInstalls.findFirst({ consistency: "primary", where: { _id: slot.installId as Id<"pluginInstalls"> } }));
 };
 
 /**
