@@ -60,6 +60,23 @@ describe("timeWindowOf", () => {
         // The perfect sets no tense: a booking asked of is usually ahead
         ["what have I booked for December", ["2026-12-01", "2026-12-31"]],
         ["was habe ich im Dezember gebucht", ["2026-12-01", "2026-12-31"]],
+        // Two days off, before the one-day words
+        ["what is on the day after tomorrow", ["2026-11-29", "2026-11-29"]],
+        ["who did I meet the day before yesterday", ["2026-11-25", "2026-11-25"]],
+        ["was steht übermorgen an", ["2026-11-29", "2026-11-29"]],
+        ["was war vorgestern", ["2026-11-25", "2026-11-25"]],
+        // Several phrases are one window while it stays within a month; past that, the first alone
+        ["what is on today or tomorrow", ["2026-11-27", "2026-11-28"]],
+        ["was steht heute oder morgen an", ["2026-11-27", "2026-11-28"]],
+        ["what did I do last week or in May", ["2026-11-16", "2026-11-22"]],
+        // Agenda words ask of what is ahead
+        ["what is scheduled for January", ["2027-01-01", "2027-01-31"]],
+        ["was steht im Januar an", ["2027-01-01", "2027-01-31"]],
+        // `vor` is a future cue only as the particle that ends the clause, never "before"
+        ["Was war im Mai vor der Reise?", ["2026-05-01", "2026-05-31"]],
+        ["Was war im Dezember vor der Reise?", ["2025-12-01", "2025-12-31"]],
+        ["was habe ich im Dezember vor der Reise gemacht", ["2025-12-01", "2025-12-31"]],
+        ["was habe ich vor drei Tagen gemacht", ["2026-11-24", "2026-11-24"]],
         // A shifted month keeps a day or year after it; the year wins over the shift
         ["what is on next May 3", ["2027-05-03", "2027-05-03"]],
         ["what did I do last May 2023", ["2023-05-01", "2023-05-31"]],

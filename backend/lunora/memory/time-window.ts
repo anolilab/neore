@@ -28,12 +28,16 @@ export type TimePhrase =
      * `yearShift`: a relative year beside the month ("in May last year"), counted from today's year. `nearest`: a shift
      * word before it ("next May", "letzten Mai"), the first such month after today or the last before it.
      */
-    (
+    {
+        /** The question's other phrases ("today or tomorrow"), joined into one window when it stays short. */
+        also?: TimePhrase[];
+        onlyTime?: boolean;
+    } & (
         | { day?: number; kind: "date"; month: number; nearest?: Shift; tense: Tense; year?: number; yearShift?: Shift }
         | { days: number; kind: "offset" }
         | { kind: "relative"; shift: Shift; unit: Unit }
         | { kind: "year"; year: number }
-    ) & { onlyTime?: boolean };
+    );
 
 interface Lexicon {
     /** Words after a number of days that count back (`3 days ago`). */
@@ -45,13 +49,15 @@ interface Lexicon {
     /** Question and agenda words: a question of only these and time words asks about the time alone. */
     asking: string[];
     /**
-     * A day word, and the words before it that make it something else (`guten Morgen` is no tomorrow), right before it
-     * or with an adjective between (`am frühen Morgen`).
+     * A day word, and the words right before it that make it something else (`guten Morgen` is no tomorrow); `articles`
+     * also do with an adjective between (`am frühen Morgen`).
      */
-    days: Record<string, { blockedAfter?: string[]; offset: number }>;
+    days: Record<string, { articles?: string[]; blockedAfter?: string[]; offset: number }>;
     dayUnits: string[];
     /** Words of a question about what will be (a month without a year is then the next one). */
     future: string[];
+    /** A future form no list can hold, the word at `index` of the question. */
+    futureForm?: (index: number, words: ReadonlyArray<string>) => boolean;
     /** Words that mark the next word as a month or a year: a preposition. */
     leads: string[];
     months: string[][];
@@ -61,6 +67,8 @@ interface Lexicon {
     /** A simple-past form no list can hold (a regular `-ed` verb after `I`), the word at `index` of the question. */
     pastForm?: (index: number, words: ReadonlyArray<string>) => boolean;
     shifts: Record<string, Shift>;
+    /** Three words for two days off: `day after tomorrow`, `day before yesterday`. */
+    twoDays?: Record<string, number>;
     units: Record<string, Unit>;
     /** Words that mark the next number as a year (`in 2023`); fewer than `leads`, so `an essay of 2050 words` is no year. */
     yearLeads: string[];
@@ -82,7 +90,7 @@ const ENGLISH: Lexicon = {
     ),
     days: { today: { offset: 0 }, tomorrow: { offset: 1 }, tonight: { offset: 0 }, yesterday: { offset: -1 } },
     dayUnits: ["day", "days"],
-    future: ["will", "plan", "plans", "planned", "planning", "upcoming", "coming", "going", "next"],
+    future: ["will", "plan", "plans", "planned", "planning", "upcoming", "coming", "going", "next", "scheduled", "schedule", "agenda"],
     leads: ["in", "on", "during", "for", "of", "since", "until", "by", "from", "before", "after"],
     months: monthsOf("january february march april may june july august september october november december"),
     numbers: { a: 1, eight: 8, five: 5, four: 4, nine: 9, one: 1, seven: 7, six: 6, ten: 10, three: 3, two: 2 },
@@ -101,9 +109,13 @@ const ENGLISH: Lexicon = {
         return regular || ["bought", "happened", "lived", "met"].includes(word);
     },
     shifts: { coming: 1, last: -1, next: 1, this: 0 },
+    twoDays: { "day after tomorrow": 2, "day before yesterday": -2 },
     units: { month: "month", week: "week", year: "year" },
     yearLeads: ["in", "during", "since", "until"],
 };
+
+/** Articles and prepositions before a noun, also with an adjective between: `am (frühen) Morgen`. */
+const GERMAN_ARTICLES = ["am", "jeden", "diesen", "den", "einen", "einem", "dem", "der", "vom"];
 
 const GERMAN: Lexicon = {
     agoAfter: [],
@@ -116,10 +128,16 @@ const GERMAN: Lexicon = {
         gestern: { offset: -1 },
         heute: { offset: 0 },
         // `heute Morgen` reads `heute` first; `guten Morgen`, `am (frühen) Morgen`, `jeden Morgen` are mornings, not tomorrow.
-        morgen: { blockedAfter: ["guten", "am", "jeden", "diesen", "den", "einen", "einem", "dem", "der", "vom", "heute", "gestern"], offset: 1 },
+        morgen: { articles: GERMAN_ARTICLES, blockedAfter: ["guten", "heute", "gestern", ...GERMAN_ARTICLES], offset: 1 },
+        übermorgen: { offset: 2 },
+        vorgestern: { offset: -2 },
     },
     dayUnits: ["tag", "tage", "tagen"],
-    future: ["werde", "wird", "werden", "plane", "planen", "geplant", "pläne", "plan", "vor", "bevorstehend", "ansteht", "kommenden", "nächsten"],
+    future: ["werde", "wird", "werden", "plane", "planen", "geplant", "pläne", "plan", "bevorstehend", "ansteht", "kommenden", "nächsten"],
+    // `vor` of `vorhaben` and `an` of `anstehen` end their clause ("was habe ich am 3. April vor", "was steht im Januar
+    // an"); "vor der Reise" and "vor drei Tagen" are before.
+    futureForm: (index, words) =>
+        index === words.length - 1 && (words[index] === "vor" || (words[index] === "an" && words.some((word) => word === "steht" || word === "stehen"))),
     leads: ["im", "in", "am", "seit", "bis", "für", "ab", "vom", "von", "zum", "anfang", "ende", "mitte", "jahr"],
     months: monthsOf("januar,jänner februar märz,maerz april mai juni juli august september oktober november dezember"),
     numbers: { acht: 8, drei: 3, ein: 1, einem: 1, einen: 1, fünf: 5, neun: 9, sechs: 6, sieben: 7, vier: 4, zehn: 10, zwei: 2 },
@@ -189,7 +207,7 @@ const monthIndexOf = (word: string | undefined, lexicon: Lexicon): number | unde
 };
 
 /** `2026-12-03` or `2026-12`, spelled with hyphens. */
-const isoAt = (text: string, tokens: Token[], at: number): TimePhrase | undefined => {
+const isoAt = (text: string, tokens: Token[], at: number): Read | undefined => {
     const [year, month, day] = [tokens[at], tokens[at + 1], tokens[at + 2]];
     const joined = (a: Token | undefined, b: Token | undefined): boolean => a !== undefined && b !== undefined && text.slice(a.end, b.start) === "-";
 
@@ -200,26 +218,40 @@ const isoAt = (text: string, tokens: Token[], at: number): TimePhrase | undefine
     // `2026-12-03` and `2026-12-3` alike.
     const withDay = joined(month, day) && ISO_DAY_RE.test(day!.word);
 
-    return { ...(withDay && { day: Number(day!.word) }), kind: "date", month: Number(month!.word), tense: undefined, year: Number(year!.word) };
+    return {
+        phrase: { ...(withDay && { day: Number(day!.word) }), kind: "date", month: Number(month!.word), tense: undefined, year: Number(year!.word) },
+        size: withDay ? 3 : 2,
+    };
 };
 
-/** A phrase starting at token `at`, in one language. */
-const phraseAt = (words: string[], at: number, lexicon: Lexicon, tense: Tense): TimePhrase | undefined => {
-    const [word, next, after] = [words[at]!, words[at + 1], words[at + 2]];
-    const day = lexicon.days[word];
+/** A phrase read at a token, and how many tokens it took. */
+interface Read {
+    phrase: TimePhrase;
+    size: number;
+}
 
+/** A phrase starting at token `at`, in one language. */
+const phraseAt = (words: string[], at: number, lexicon: Lexicon, tense: Tense): Read | undefined => {
+    const [word, next, after] = [words[at]!, words[at + 1], words[at + 2]];
+    const twoDays = lexicon.twoDays?.[`${word} ${next ?? ""} ${after ?? ""}`];
+
+    if (twoDays !== undefined) {
+        return { phrase: { days: twoDays, kind: "offset" }, size: 3 };
+    }
+
+    const day = lexicon.days[word];
     const [before, adjective] = [words[at - 2] ?? "", words[at - 1] ?? ""];
-    const blocked = day?.blockedAfter?.includes(adjective) === true || (isAdjective(adjective) && day?.blockedAfter?.includes(before) === true);
+    const blocked = day?.blockedAfter?.includes(adjective) === true || (isAdjective(adjective) && day?.articles?.includes(before) === true);
 
     if (day !== undefined && !blocked) {
-        return { days: day.offset, kind: "offset" };
+        return { phrase: { days: day.offset, kind: "offset" }, size: 1 };
     }
 
     const shift = lexicon.shifts[word];
     const unit = next === undefined ? undefined : lexicon.units[next];
 
     if (shift !== undefined && unit !== undefined) {
-        return { kind: "relative", shift, unit };
+        return { phrase: { kind: "relative", shift, unit }, size: 2 };
     }
 
     // `next May`, `letzten Mai`, `next May 3`; a year after it wins over the shift (`last May 2023`). `this May` is left
@@ -231,11 +263,14 @@ const phraseAt = (words: string[], at: number, lexicon: Lexicon, tense: Tense): 
         const shiftedYear = yearOf(shiftedDay === undefined ? after : words[at + 3]);
 
         return {
-            kind: "date",
-            month: shiftedMonth,
-            tense,
-            ...(shiftedDay !== undefined && { day: shiftedDay }),
-            ...(shiftedYear === undefined ? { nearest: shift } : { year: shiftedYear }),
+            phrase: {
+                kind: "date",
+                month: shiftedMonth,
+                tense,
+                ...(shiftedDay !== undefined && { day: shiftedDay }),
+                ...(shiftedYear === undefined ? { nearest: shift } : { year: shiftedYear }),
+            },
+            size: 2 + (shiftedDay === undefined ? 0 : 1) + (shiftedYear === undefined ? 0 : 1),
         };
     }
 
@@ -243,17 +278,17 @@ const phraseAt = (words: string[], at: number, lexicon: Lexicon, tense: Tense): 
     const isDays = after !== undefined && lexicon.dayUnits.includes(after);
 
     if (count !== undefined && isDays && lexicon.ahead.includes(word)) {
-        return { days: count, kind: "offset" };
+        return { phrase: { days: count, kind: "offset" }, size: 3 };
     }
 
     if (count !== undefined && isDays && lexicon.agoBefore.includes(word)) {
-        return { days: -count, kind: "offset" };
+        return { phrase: { days: -count, kind: "offset" }, size: 3 };
     }
 
     const leadingCount = countOf(word, lexicon);
 
     if (leadingCount !== undefined && next !== undefined && lexicon.dayUnits.includes(next) && after !== undefined && lexicon.agoAfter.includes(after)) {
-        return { days: -leadingCount, kind: "offset" };
+        return { phrase: { days: -leadingCount, kind: "offset" }, size: 3 };
     }
 
     // `3 December`, `3rd of December`, `am 3. Dezember`, with a year after or without.
@@ -261,9 +296,13 @@ const phraseAt = (words: string[], at: number, lexicon: Lexicon, tense: Tense): 
     const ofMonth = monthIndexOf(next === "of" ? after : next, lexicon);
 
     if (dayFirst !== undefined && ofMonth !== undefined) {
-        const year = yearOf(words[at + (next === "of" ? 3 : 2)]);
+        const monthSize = next === "of" ? 3 : 2;
+        const year = yearOf(words[at + monthSize]);
 
-        return { day: dayFirst, kind: "date", month: ofMonth, tense, ...(year !== undefined && { year }) };
+        return {
+            phrase: { day: dayFirst, kind: "date", month: ofMonth, tense, ...(year !== undefined && { year }) },
+            size: monthSize + (year === undefined ? 0 : 1),
+        };
     }
 
     // A month beside a preposition, a day number or a year: `in May`, `December 3`, `May 2023`.
@@ -272,12 +311,15 @@ const phraseAt = (words: string[], at: number, lexicon: Lexicon, tense: Tense): 
     const yearAfter = yearOf(dayAfter === undefined ? next : after);
 
     if (month !== undefined && (lexicon.leads.includes(words[at - 1] ?? "") || dayAfter !== undefined || yearAfter !== undefined)) {
-        return { kind: "date", month, tense, ...(dayAfter !== undefined && { day: dayAfter }), ...(yearAfter !== undefined && { year: yearAfter }) };
+        return {
+            phrase: { kind: "date", month, tense, ...(dayAfter !== undefined && { day: dayAfter }), ...(yearAfter !== undefined && { year: yearAfter }) },
+            size: 1 + (dayAfter === undefined ? 0 : 1) + (yearAfter === undefined ? 0 : 1),
+        };
     }
 
     const year = yearOf(next);
 
-    return lexicon.yearLeads.includes(word) && year !== undefined ? { kind: "year", year } : undefined;
+    return lexicon.yearLeads.includes(word) && year !== undefined ? { phrase: { kind: "year", year }, size: 2 } : undefined;
 };
 
 /**
@@ -286,7 +328,7 @@ const phraseAt = (words: string[], at: number, lexicon: Lexicon, tense: Tense): 
  */
 const tenseOf = (words: string[], lexicon: Lexicon): Tense => {
     const past = words.some((word, index) => lexicon.past.includes(word) || lexicon.pastForm?.(index, words) === true);
-    const future = words.some((word) => lexicon.future.includes(word));
+    const future = words.some((word, index) => lexicon.future.includes(word) || lexicon.futureForm?.(index, words) === true);
 
     if (past === future) {
         return undefined;
@@ -322,9 +364,6 @@ const LEXICON_WORDS = new Map(
 
 const isNumber = (word: string): boolean => SMALL_NUMBER_RE.test(word) || DAY_NUMBER_RE.test(word) || YEAR_RE.test(word);
 
-/** The tokens after a phrase's first one that it may use: `3rd of December 2023`, `nächstes Jahr am 3. April`. */
-const PHRASE_SPAN = 4;
-
 /** The words that may join a month and a relative year: `in May last year`, `letztes Jahr im Mai`. */
 const MAX_YEAR_GAP = 4;
 
@@ -340,14 +379,14 @@ export const readTimePhrase = (text: string): TimePhrase | undefined => {
     const ranked = LEXICONS.toSorted((a, b) => known(b) - known(a)).map((lexicon) => {
         return { lexicon, tense: tenseOf(words, lexicon) };
     });
-    const phraseFrom = (index: number): TimePhrase | undefined => ranked.map(({ lexicon, tense }) => phraseAt(words, index, lexicon, tense)).find(Boolean);
+    const phraseFrom = (index: number): Read | undefined => ranked.map(({ lexicon, tense }) => phraseAt(words, index, lexicon, tense)).find(Boolean);
     // A month without a year and a relative year near it are one time: `in May last year` is May of 2025.
-    const firstNear = (from: number, wanted: (near: TimePhrase) => boolean): TimePhrase | undefined => {
+    const firstNear = (from: number, wanted: (near: TimePhrase) => boolean): { read: Read; start: number } | undefined => {
         for (let index = from + 1; index <= from + MAX_YEAR_GAP && index < tokens.length; index += 1) {
             const near = phraseFrom(index);
 
-            if (near !== undefined && wanted(near)) {
-                return near;
+            if (near !== undefined && wanted(near.phrase)) {
+                return { read: near, start: index };
             }
         }
 
@@ -355,54 +394,72 @@ export const readTimePhrase = (text: string): TimePhrase | undefined => {
     };
     const isRelativeYear = (near: TimePhrase): boolean => near.kind === "relative" && near.unit === "year";
     const isYearlessMonth = (near: TimePhrase): boolean => near.kind === "date" && near.year === undefined;
-    const withNearYear = (phrase: TimePhrase, index: number): TimePhrase => {
+    const withNearYear = ({ phrase, size }: Read, index: number): Read => {
+        // The joined phrase runs to the end of the later one.
+        const through = (near: { read: Read; start: number }): number => Math.max(size, near.start - index + near.read.size);
+
         if (phrase.kind === "date" && phrase.year === undefined) {
             const near = firstNear(index, isRelativeYear);
 
-            return near?.kind === "relative" ? { ...phrase, yearShift: near.shift } : phrase;
+            return near?.read.phrase.kind === "relative" ? { phrase: { ...phrase, yearShift: near.read.phrase.shift }, size: through(near) } : { phrase, size };
         }
 
         if (phrase.kind !== "relative" || phrase.unit !== "year") {
-            return phrase;
+            return { phrase, size };
         }
 
         const month = firstNear(index, isYearlessMonth);
 
-        return month?.kind === "date" ? { ...month, yearShift: phrase.shift } : phrase;
+        return month?.read.phrase.kind === "date" ? { phrase: { ...month.read.phrase, yearShift: phrase.shift }, size: through(month) } : { phrase, size };
     };
 
-    const at = (read: (index: number) => TimePhrase | undefined): { phrase: TimePhrase; start: number } | undefined => {
-        for (let index = 0; index < tokens.length; index += 1) {
-            const phrase = read(index);
+    // Every phrase in order, each read from where the one before it ends.
+    const readAll = (read: (index: number) => Read | undefined): { read: Read; start: number }[] => {
+        const found: { read: Read; start: number }[] = [];
+        let index = 0;
 
-            if (phrase !== undefined) {
-                return { phrase, start: index };
+        while (index < tokens.length) {
+            const next = read(index);
+
+            if (next === undefined) {
+                index += 1;
+            } else {
+                found.push({ read: next, start: index });
+                index += next.size;
             }
         }
 
-        return undefined;
+        return found;
     };
 
-    const found =
-        at((index) => isoAt(lowered, tokens, index)) ??
-        at((index) => {
-            const near = phraseFrom(index);
+    // An ISO date is the most exact a question can be and is read alone; otherwise every phrase is, the first leading.
+    const iso = readAll((index) => isoAt(lowered, tokens, index));
+    const phrases =
+        iso.length > 0
+            ? iso.slice(0, 1)
+            : readAll((index) => {
+                  const near = phraseFrom(index);
 
-            return near === undefined ? undefined : withNearYear(near, index);
-        });
+                  return near === undefined ? undefined : withNearYear(near, index);
+              });
+    const [first, ...rest] = phrases;
 
-    if (found === undefined) {
+    if (first === undefined) {
         return undefined;
     }
 
     // A question cut at `MAX_TEXT_LENGTH` may name a topic past the cut: it is never about the time alone. A number is a
-    // time word only inside the phrase (`in 100 days`); `42` in "what is on 42 tomorrow" is something else.
+    // time word only inside a phrase (`in 100 days`); `42` in "what is on 42 tomorrow" is something else.
     const whole = text.length <= MAX_TEXT_LENGTH;
-    const inPhrase = (index: number): boolean => index >= found.start && index <= found.start + PHRASE_SPAN;
+    const inPhrase = (index: number): boolean => phrases.some(({ read, start }) => index >= start && index < start + read.size);
     const isTimeWord = (word: string, index: number): boolean =>
         isNumber(word) ? inPhrase(index) : LEXICONS.some((lexicon) => LEXICON_WORDS.get(lexicon)!.has(word));
 
-    return { ...found.phrase, onlyTime: whole && words.every((word, index) => isTimeWord(word, index)) };
+    return {
+        ...first.read.phrase,
+        ...(rest.length > 0 && { also: rest.map(({ read }) => read.phrase) }),
+        onlyTime: whole && words.every((word, index) => isTimeWord(word, index)),
+    };
 };
 
 const pad = (value: number): string => String(value).padStart(2, "0");
@@ -428,6 +485,9 @@ const calendarSpan = (year: number, month: number, day: number | undefined): Spa
     return month >= 1 && month <= 12 ? { end: dayOf(year, month + 1, 0), start: dayOf(year, month, 1) } : undefined;
 };
 
+/** The widest window several phrases are joined into: about a month. */
+const MAX_JOINED_DAYS = 31;
+
 /**
  * The window a phrase names, read on `today` (the user's local day). A month or day without a year is the latest one
  * on or before today for a question about what was, the next one ending on or after today for one about what will be,
@@ -436,7 +496,23 @@ const calendarSpan = (year: number, month: number, day: number | undefined): Spa
 export const windowOf = (phrase: TimePhrase, today: string): TimeWindow | undefined => {
     const span = spanOf(phrase, today);
 
-    return span === undefined ? undefined : { ...span, ...(phrase.onlyTime === true && { onlyTime: true }), today };
+    if (span === undefined) {
+        return undefined;
+    }
+
+    // "today or tomorrow" is both days: every phrase's window joined, from the earliest start to the latest end, while
+    // that stays within `MAX_JOINED_DAYS`; past it, the first phrase alone.
+    const spans = [span, ...(phrase.also ?? []).map((other) => spanOf(other, today)).filter((other) => other !== undefined)];
+    // Days as `YYYY-MM-DD` sort as text.
+    const joined = {
+        end: spans
+            .map(({ end }) => end)
+            .toSorted((a, b) => a.localeCompare(b))
+            .at(-1)!,
+        start: spans.map(({ start }) => start).toSorted((a, b) => a.localeCompare(b))[0]!,
+    };
+
+    return { ...(windowDays(joined) <= MAX_JOINED_DAYS ? joined : span), ...(phrase.onlyTime === true && { onlyTime: true }), today };
 };
 
 const spanOf = (phrase: TimePhrase, today: string): Span | undefined => {
