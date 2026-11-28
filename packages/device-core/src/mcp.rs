@@ -149,8 +149,12 @@ fn write_message(stdin: &Mutex<ChildStdin>, message: &Value) -> Result<(), Strin
         .map_err(|error| format!("the server closed its input: {error}"))
 }
 
-/// Parses one line of server output: a response goes to its waiter; a request
-/// FROM the server (sampling, roots…) is refused — this client offers none.
+/// The error `neore-host mcp-bridge` answers a call with once the HTTP server ended the session. The server never ran
+/// that call, so `McpManager::with` stops the bridge and sends the call once more to a new one (a new session).
+pub const SESSION_GONE: &str = "the MCP server ended the session";
+
+/// Parses one line of server output: a response goes to its waiter; a `ping` FROM the server gets the empty result the
+/// protocol asks for, any other request (sampling, roots…) is refused — this client offers none.
 pub fn route_line(line: &str, pending: &Pending, stdin: &Mutex<ChildStdin>) {
     let Ok(message) = serde_json::from_str::<Value>(line) else {
         return;
@@ -160,6 +164,9 @@ pub fn route_line(line: &str, pending: &Pending, stdin: &Mutex<ChildStdin>) {
     let is_request = message.get("method").is_some();
 
     match (id, is_request) {
+        (Some(id), true) if message["method"] == "ping" => {
+            let _ = write_message(stdin, &json!({ "jsonrpc": "2.0", "id": id, "result": {} }));
+        }
         (Some(id), true) => {
             let _ = write_message(
                 stdin,
@@ -745,7 +752,9 @@ impl McpManager {
         let process = self.process(config, policy)?;
         let first = work(&mut process.lock().unwrap());
 
-        if first.is_ok() || process.lock().unwrap().is_alive() {
+        let session_gone = matches!(&first, Err(error) if error == SESSION_GONE);
+
+        if first.is_ok() || (!session_gone && process.lock().unwrap().is_alive()) {
             return first;
         }
 
@@ -754,7 +763,11 @@ impl McpManager {
 
             match processes.get(&config.name) {
                 Some(current) if Arc::ptr_eq(current, &process) => {
-                    processes.remove(&config.name);
+                    // A bridge whose session ended keeps running: it must not run beside its replacement.
+                    if let Some(stale) = processes.remove(&config.name) {
+                        stale.lock().unwrap_or_else(PoisonError::into_inner).kill();
+                    }
+
                     self.process_locked(&mut processes, config, policy)?
                 }
                 _ => return first,
@@ -1344,6 +1357,82 @@ sleep 1"#
 
         assert_eq!(running, vec!["other".to_owned()]);
         assert!(manager.retiring.lock().unwrap().is_empty());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_call_whose_session_ended_is_sent_once_more_to_a_new_bridge_and_the_old_one_is_stopped() {
+        let root = temp_root("session-gone");
+        let starts = root.join("starts");
+        // Like the bridge: answers `initialize`, then answers the call (id 2) with the session-gone error and keeps
+        // running.
+        let script = format!(
+            r#"echo $$ >> '{}'; read l; echo '{{"jsonrpc":"2.0","id":1,"result":{{"protocolVersion":"2025-06-18","capabilities":{{}},"serverInfo":{{"name":"f","version":"1"}}}}}}'; read l; read l; echo '{{"jsonrpc":"2.0","id":2,"error":{{"code":-32000,"message":"{SESSION_GONE}"}}}}'; sleep 30"#,
+            starts.display()
+        );
+
+        std::fs::create_dir_all(&root).unwrap();
+
+        let config = McpServerConfig {
+            args: vec!["-c".into(), script],
+            ..idle_server("session-gone")
+        };
+        let manager = McpManager::new(root.to_path_buf());
+        let pids = || -> Vec<libc::pid_t> {
+            std::fs::read_to_string(&starts)
+                .unwrap()
+                .lines()
+                .map(|pid| pid.parse().unwrap())
+                .collect()
+        };
+        let old_stopped_first = std::cell::Cell::new(false);
+        let called = manager.with(&config, None, |process| {
+            if let [old, _] = pids()[..] {
+                old_stopped_first.set(pid_gone(old));
+            }
+
+            process.request("tools/list", json!({}), Duration::from_secs(10))
+        });
+
+        assert_eq!(called, Err(SESSION_GONE.to_owned()));
+        assert_eq!(pids().len(), 2, "the call was not sent to a new bridge");
+        assert!(
+            old_stopped_first.get(),
+            "the old bridge ran beside the new one"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_ping_from_the_server_gets_an_empty_result_and_other_requests_are_refused() {
+        let mut child = Command::new("cat")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .spawn()
+            .unwrap();
+        let stdin = Mutex::new(child.stdin.take().unwrap());
+        let mut replies = BufReader::new(child.stdout.take().unwrap()).lines();
+        let pending = Pending::default();
+
+        route_line(
+            r#"{"jsonrpc":"2.0","id":"p","method":"ping"}"#,
+            &pending,
+            &stdin,
+        );
+        route_line(
+            r#"{"jsonrpc":"2.0","id":"s","method":"sampling/createMessage"}"#,
+            &pending,
+            &stdin,
+        );
+
+        let ping: Value = serde_json::from_str(&replies.next().unwrap().unwrap()).unwrap();
+        let other: Value = serde_json::from_str(&replies.next().unwrap().unwrap()).unwrap();
+
+        assert_eq!(ping, json!({ "jsonrpc": "2.0", "id": "p", "result": {} }));
+        assert_eq!(other["error"]["code"], -32601);
+
+        drop(stdin);
+        let _ = child.wait();
     }
 
     #[cfg(unix)]

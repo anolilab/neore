@@ -15,12 +15,15 @@
 use std::collections::BTreeMap;
 use std::io::{self, BufRead, BufReader, Read, Write};
 use std::process::ExitCode;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
 use serde_json::{json, Value};
 use ureq::http::{HeaderName, HeaderValue, Uri};
+
+use crate::mcp::SESSION_GONE;
 
 /// The server's address: `http://` or `https://`, no user name or password in it.
 pub const URL_VAR: &str = "NEORE_MCP_BRIDGE_URL";
@@ -128,25 +131,21 @@ struct Headers {
     version: Option<HeaderValue>,
 }
 
-impl Headers {
-    fn learned(answer: &Value, id: Option<HeaderValue>) -> Headers {
-        Headers {
-            id,
-            version: answer
-                .pointer("/result/protocolVersion")
-                .and_then(Value::as_str)
-                .and_then(|version| HeaderValue::from_str(version).ok()),
-        }
-    }
+fn version_of(answer: &Value) -> Option<HeaderValue> {
+    answer
+        .pointer("/result/protocolVersion")
+        .and_then(Value::as_str)
+        .and_then(|version| HeaderValue::from_str(version).ok())
+}
+
+fn is_initialize(message: &Value) -> bool {
+    message.get("method").and_then(Value::as_str) == Some("initialize")
 }
 
 /// How one POST ended.
 enum Sent {
-    /// The answer to a request, with the session id the response carried.
-    Answered {
-        answer: Value,
-        session_id: Option<HeaderValue>,
-    },
+    /// The answer to a request.
+    Answered(Value),
     /// Taken with nothing to say back (a notification or a response).
     Accepted,
     /// The server no longer knows the session.
@@ -205,6 +204,11 @@ fn request_id(message: &Value) -> Option<&Value> {
     message.get("method").and(message.get("id"))
 }
 
+/// Whether `message` is the response to the request `id`. Anything else must not reach that request's caller.
+fn is_answer_to(message: &Value, id: &Value) -> bool {
+    message.get("method").is_none() && message.get("id") == Some(id)
+}
+
 /// Visible ASCII only, as the transport requires of a session id.
 fn session_id_of(response: &ureq::http::Response<ureq::Body>) -> Option<HeaderValue> {
     response
@@ -225,8 +229,9 @@ struct Bridge<W> {
     target: Target,
     session: Mutex<Headers>,
     output: Mutex<W>,
-    /// Called when the server ended the session: the process exits, so `mcp.rs` starts a new one.
-    on_session_gone: fn(),
+    /// Set once the server ended the session. From then on every request is answered with `SESSION_GONE` without being
+    /// sent, so the server never saw it and `mcp.rs` can send it once more to a new bridge.
+    ended: AtomicBool,
 }
 
 impl<W: Write> Bridge<W> {
@@ -267,8 +272,8 @@ impl<W: Write> Bridge<W> {
         request.send(message.to_string())
     }
 
-    /// One POST and its reply. With `emit`, every message of the reply goes to the client as it arrives.
-    fn send(&self, message: &Value, session: &Headers, emit: bool) -> Sent {
+    /// One POST and its reply. Every message of the reply goes to the client as it arrives.
+    fn send(&self, message: &Value, session: &Headers) -> Sent {
         let mut response = match self.post(message, session) {
             Ok(response) => response,
             Err(error) => return Sent::Failed(describe(&error).into()),
@@ -286,7 +291,13 @@ impl<W: Write> Bridge<W> {
         let Some(id) = request_id(message) else {
             return Sent::Accepted;
         };
-        let session_id = session_id_of(&response);
+
+        // Taken before the answer is read: the server may ask something (a ping) on the stream first, and the reply to
+        // it must carry the session.
+        if is_initialize(message) {
+            self.session.lock().unwrap().id = session_id_of(&response);
+        }
+
         let content_type = response
             .headers()
             .get("content-type")
@@ -299,20 +310,20 @@ impl<W: Write> Bridge<W> {
             .limit(MAX_REPLY_BYTES)
             .reader();
         let answer = if content_type.starts_with("text/event-stream") {
-            self.read_events(body, id, emit)
+            self.read_events(body, id)
         } else if content_type.starts_with("application/json") {
-            self.read_json(body, emit)
+            self.read_json(body, id)
         } else {
             Err("the MCP server sent no answer".to_owned())
         };
 
         match answer {
-            Ok(answer) => Sent::Answered { answer, session_id },
+            Ok(answer) => Sent::Answered(answer),
             Err(reason) => Sent::Failed(reason),
         }
     }
 
-    fn read_json(&self, body: impl Read, emit: bool) -> Result<Value, String> {
+    fn read_json(&self, body: impl Read, id: &Value) -> Result<Value, String> {
         let mut text = String::new();
 
         BufReader::new(body)
@@ -320,19 +331,19 @@ impl<W: Write> Bridge<W> {
             .map_err(|error| read_failure(&error))?;
 
         match serde_json::from_str::<Value>(&text) {
-            Ok(reply) if reply.is_object() => {
-                if emit {
-                    self.write(&reply);
-                }
-
+            Ok(reply) if is_answer_to(&reply, id) => {
+                self.write(&reply);
                 Ok(reply)
+            }
+            Ok(reply) if reply.is_object() => {
+                Err("the MCP server answered a different request".into())
             }
             _ => Err("the MCP server's answer is not one JSON-RPC message".into()),
         }
     }
 
     /// Reads an event stream up to the answer to `id`, then stops reading.
-    fn read_events(&self, body: impl Read, id: &Value, emit: bool) -> Result<Value, String> {
+    fn read_events(&self, body: impl Read, id: &Value) -> Result<Value, String> {
         let mut data = String::new();
 
         for line in BufReader::new(body).split(b'\n') {
@@ -362,11 +373,11 @@ impl<W: Write> Bridge<W> {
                 continue;
             }
 
-            if emit {
+            // The server's own requests and notifications go to the client; of the responses, only this request's.
+            if message.get("method").is_some() {
                 self.write(&message);
-            }
-
-            if message.get("method").is_none() && message.get("id") == Some(id) {
+            } else if is_answer_to(&message, id) {
+                self.write(&message);
                 return Ok(message);
             }
         }
@@ -377,25 +388,31 @@ impl<W: Write> Bridge<W> {
     /// Relays one message from the client; a request that fails is answered with an error. `initialize` opens the
     /// session every later message carries.
     fn relay(&self, message: &Value) {
-        let sent = if message.get("method").and_then(Value::as_str) == Some("initialize") {
-            let mut session = self.session.lock().unwrap();
-            let sent = self.send(message, &Headers::default(), true);
+        let sent = if is_initialize(message) {
+            *self.session.lock().unwrap() = Headers::default();
+            self.ended.store(false, Ordering::SeqCst);
 
-            *session = match &sent {
-                Sent::Answered { answer, session_id } => {
-                    Headers::learned(answer, session_id.clone())
-                }
-                _ => Headers::default(),
-            };
+            let sent = self.send(message, &Headers::default());
+
+            match &sent {
+                Sent::Answered(answer) => self.session.lock().unwrap().version = version_of(answer),
+                _ => *self.session.lock().unwrap() = Headers::default(),
+            }
+
             sent
+        } else if self.ended.load(Ordering::SeqCst) {
+            Sent::SessionGone
         } else {
             let headers = self.session.lock().unwrap().clone();
 
-            self.send(message, &headers, true)
+            self.send(message, &headers)
         };
         let reason = match sent {
-            Sent::Answered { .. } | Sent::Accepted => return,
-            Sent::SessionGone => return (self.on_session_gone)(),
+            Sent::Answered(_) | Sent::Accepted => return,
+            Sent::SessionGone => {
+                self.ended.store(true, Ordering::SeqCst);
+                SESSION_GONE.to_owned()
+            }
             Sent::Failed(reason) => reason,
         };
 
@@ -406,23 +423,19 @@ impl<W: Write> Bridge<W> {
     }
 }
 
-/// Relays `input` (one JSON-RPC message per line) until it ends. Requests run side by side; anything else (`initialize`,
-/// notifications, responses) is sent before the next line is read, so `notifications/initialized` always comes before the
-/// request that follows it.
-pub fn run<W: Write + Send + 'static>(
-    target: Target,
-    input: impl BufRead,
-    output: W,
-    on_session_gone: fn(),
-) {
+/// Relays `input` (one JSON-RPC message per line) until it ends. Requests run side by side; notifications and responses
+/// are sent before the next line is read, so `notifications/initialized` always comes before the request that follows
+/// it. While `initialize` runs, only responses go out: the server may ping before it answers, and waits for the reply.
+pub fn run<W: Write + Send + 'static>(target: Target, input: impl BufRead, output: W) {
     let bridge = Arc::new(Bridge {
         agent: agent(),
         target,
         session: Mutex::new(Headers::default()),
         output: Mutex::new(output),
-        on_session_gone,
+        ended: AtomicBool::new(false),
     });
     let mut running: Vec<JoinHandle<()>> = Vec::new();
+    let mut opening: Option<JoinHandle<()>> = None;
 
     for line in input.lines().map_while(Result::ok) {
         let Ok(message) = serde_json::from_str::<Value>(&line) else {
@@ -435,13 +448,22 @@ pub fn run<W: Write + Send + 'static>(
             continue;
         }
 
-        let initialize = message.get("method").and_then(Value::as_str) == Some("initialize");
-
-        if initialize || request_id(&message).is_none() {
-            if initialize {
-                running.drain(..).for_each(|handle| drop(handle.join()));
+        if message.get("method").is_some() {
+            if let Some(handle) = opening.take() {
+                drop(handle.join());
             }
+        }
 
+        if is_initialize(&message) {
+            running.drain(..).for_each(|handle| drop(handle.join()));
+
+            let bridge = bridge.clone();
+
+            opening = Some(thread::spawn(move || bridge.relay(&message)));
+            continue;
+        }
+
+        if request_id(&message).is_none() {
             bridge.relay(&message);
             continue;
         }
@@ -457,7 +479,10 @@ pub fn run<W: Write + Send + 'static>(
         running.push(thread::spawn(move || bridge.relay(&message)));
     }
 
-    running.into_iter().for_each(|handle| drop(handle.join()));
+    opening
+        .into_iter()
+        .chain(running)
+        .for_each(|handle| drop(handle.join()));
 }
 
 /// `neore-host mcp-bridge`, reading its target from the environment.
@@ -467,9 +492,7 @@ pub fn main() -> ExitCode {
 
     match parse_target(&url, &headers) {
         Ok(target) => {
-            run(target, io::stdin().lock(), io::stdout(), || {
-                std::process::exit(1)
-            });
+            run(target, io::stdin().lock(), io::stdout());
             ExitCode::SUCCESS
         }
         Err(error) => {

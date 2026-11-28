@@ -5,10 +5,11 @@
 #![cfg(feature = "mcp-bridge")]
 
 use std::io::{BufRead, BufReader, Cursor, Read, Write};
-use std::net::TcpListener;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::net::{TcpListener, TcpStream};
 use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 
+use device_core::mcp::SESSION_GONE;
 use device_core::mcp_bridge::{parse_target, run};
 use serde_json::{json, Value};
 
@@ -33,6 +34,40 @@ impl Seen {
 type Answer = dyn Fn(&Seen) -> String + Send + Sync;
 type Log = Arc<Mutex<Vec<Seen>>>;
 
+fn read_request(stream: &TcpStream) -> Seen {
+    let mut reader = BufReader::new(stream);
+    let mut lines = Vec::new();
+
+    loop {
+        let mut line = String::new();
+
+        if reader.read_line(&mut line).unwrap_or(0) == 0 || line.trim_end().is_empty() {
+            break;
+        }
+
+        lines.push(line.trim_end().to_owned());
+    }
+
+    let headers = lines
+        .iter()
+        .filter_map(|line| line.split_once(':'))
+        .map(|(key, value)| (key.trim().to_owned(), value.trim().to_owned()))
+        .collect();
+    let mut request = Seen {
+        headers,
+        body: Value::Null,
+    };
+    let length = request
+        .header("content-length")
+        .and_then(|value| value.parse().ok())
+        .unwrap_or(0);
+    let mut body = vec![0; length];
+
+    reader.read_exact(&mut body).unwrap();
+    request.body = serde_json::from_slice(&body).unwrap_or(Value::Null);
+    request
+}
+
 /// Answers each request with `answer(request)`, one connection at a time.
 fn serve(answer: Box<Answer>) -> (String, Log) {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
@@ -42,36 +77,7 @@ fn serve(answer: Box<Answer>) -> (String, Log) {
 
     std::thread::spawn(move || {
         for mut stream in listener.incoming().flatten() {
-            let mut reader = BufReader::new(stream.try_clone().unwrap());
-            let mut lines = Vec::new();
-
-            loop {
-                let mut line = String::new();
-
-                if reader.read_line(&mut line).unwrap_or(0) == 0 || line.trim_end().is_empty() {
-                    break;
-                }
-
-                lines.push(line.trim_end().to_owned());
-            }
-
-            let headers = lines
-                .iter()
-                .filter_map(|line| line.split_once(':'))
-                .map(|(key, value)| (key.trim().to_owned(), value.trim().to_owned()))
-                .collect();
-            let mut request = Seen {
-                headers,
-                body: Value::Null,
-            };
-            let length = request
-                .header("content-length")
-                .and_then(|value| value.parse().ok())
-                .unwrap_or(0);
-            let mut body = vec![0; length];
-
-            reader.read_exact(&mut body).unwrap();
-            request.body = serde_json::from_slice(&body).unwrap_or(Value::Null);
+            let request = read_request(&stream);
 
             log.lock().unwrap().push(request.clone());
             let _ = stream.write_all(answer(&request).as_bytes());
@@ -125,8 +131,6 @@ fn request(id: i64, method: &str) -> Value {
     json!({ "jsonrpc": "2.0", "id": id, "method": method })
 }
 
-static SESSION_GONE: AtomicBool = AtomicBool::new(false);
-
 /// Runs the bridge over `messages` against `url` and returns what it wrote back.
 fn relay(url: &str, headers: &str, messages: &[Value]) -> Vec<Value> {
     let input: String = messages
@@ -139,9 +143,6 @@ fn relay(url: &str, headers: &str, messages: &[Value]) -> Vec<Value> {
         parse_target(url, headers).unwrap(),
         Cursor::new(input),
         output.clone(),
-        || {
-            SESSION_GONE.store(true, Ordering::SeqCst);
-        },
     );
 
     let text = String::from_utf8(output.0.lock().unwrap().clone()).unwrap();
@@ -280,6 +281,12 @@ fn a_failure_is_answered_as_an_error_that_names_no_address_and_a_redirect_is_not
     let (url, seen) = serve(Box::new(|request| match request.body["method"].as_str() {
         Some("initialize") => json_reply(request, json!({ "protocolVersion": "2025-06-18" }), None),
         Some("tools/list") => reply("500 Internal Server Error", &[], "boom"),
+        // A well-formed answer, but to another request: it must not reach this caller.
+        Some("resources/list") => reply(
+            "200 OK",
+            &[("Content-Type", "application/json")],
+            &json!({ "jsonrpc": "2.0", "id": 99, "result": {} }).to_string(),
+        ),
         _ => reply(
             "307 Temporary Redirect",
             &[("Location", "http://127.0.0.1:1/elsewhere")],
@@ -298,6 +305,7 @@ fn a_failure_is_answered_as_an_error_that_names_no_address_and_a_redirect_is_not
             initialize(),
             request(2, "tools/list"),
             request(3, "tools/call"),
+            request(4, "resources/list"),
         ],
     );
     let error_of = |id: i64| {
@@ -309,8 +317,16 @@ fn a_failure_is_answered_as_an_error_that_names_no_address_and_a_redirect_is_not
     assert_eq!(error_of(2), Some(json!("the MCP server answered HTTP 500")));
     assert_eq!(error_of(3), Some(json!("the MCP server answered HTTP 307")));
     assert_eq!(
+        error_of(4),
+        Some(json!("the MCP server answered a different request"))
+    );
+    assert!(
+        written.iter().all(|message| message["id"] != 99),
+        "{written:?}"
+    );
+    assert_eq!(
         seen.lock().unwrap().len(),
-        3,
+        4,
         "the redirect must not be followed"
     );
     assert_eq!(
@@ -324,8 +340,8 @@ fn a_failure_is_answered_as_an_error_that_names_no_address_and_a_redirect_is_not
 }
 
 #[test]
-fn a_session_the_server_ended_ends_the_bridge_without_an_answer() {
-    let (url, _) = serve(Box::new(|request| match request.body["method"].as_str() {
+fn once_the_server_ended_the_session_every_call_is_answered_as_such_without_being_sent() {
+    let (url, seen) = serve(Box::new(|request| match request.body["method"].as_str() {
         Some("initialize") => json_reply(
             request,
             json!({ "protocolVersion": "2025-06-18" }),
@@ -333,9 +349,130 @@ fn a_session_the_server_ended_ends_the_bridge_without_an_answer() {
         ),
         _ => reply("404 Not Found", &[], ""),
     }));
-    let written = relay(&url, "", &[initialize(), request(2, "tools/list")]);
+    let initialized = json!({ "jsonrpc": "2.0", "method": "notifications/initialized" });
+    let first = relay(&url, "", &[initialize(), request(2, "tools/list")]);
+    // The end shows on a notification here: the call after it is answered without being sent, so the server never saw it.
+    let second = relay(
+        &url,
+        "",
+        &[initialize(), initialized, request(2, "tools/list")],
+    );
 
-    // No answer for the call: `mcp.rs` sees the process end, starts it again (a new session) and sends the call once more.
-    assert_eq!(written.len(), 1, "{written:?}");
-    assert!(SESSION_GONE.load(Ordering::SeqCst));
+    // `mcp.rs` reads that error, stops the bridge and sends the call once more to a new one (a new session).
+    for written in [&first, &second] {
+        assert_eq!(written.len(), 2, "{written:?}");
+        assert_eq!(written[1]["id"], 2);
+        assert_eq!(written[1]["error"]["message"], SESSION_GONE);
+    }
+
+    let methods: Vec<Value> = seen
+        .lock()
+        .unwrap()
+        .iter()
+        .map(|request| request.body["method"].clone())
+        .collect();
+
+    assert_eq!(
+        methods,
+        [
+            "initialize",
+            "tools/list",
+            "initialize",
+            "notifications/initialized"
+        ]
+    );
+}
+
+#[test]
+fn a_ping_the_server_sends_before_it_answers_initialize_gets_its_reply_within_the_session() {
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let url = format!("http://{}/mcp", listener.local_addr().unwrap());
+    // Opens the session's stream with a ping and answers `initialize` only once the reply to it arrived (or after a few
+    // seconds, so the test fails instead of hanging). A reply outside the session is turned away.
+    let server = std::thread::spawn(move || {
+        let (mut opening, _) = listener.accept().unwrap();
+
+        assert_eq!(read_request(&opening).body["method"], "initialize");
+
+        let ping = json!({ "jsonrpc": "2.0", "id": "ping-1", "method": "ping" });
+
+        write!(opening, "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nMcp-Session-Id: s-1\r\nConnection: close\r\n\r\ndata: {ping}\n\n").unwrap();
+        opening.flush().unwrap();
+        listener.set_nonblocking(true).unwrap();
+
+        let deadline = Instant::now() + Duration::from_secs(5);
+        let pong = loop {
+            match listener.accept() {
+                Ok((mut stream, _)) => {
+                    stream.set_nonblocking(false).unwrap();
+
+                    let pong = read_request(&stream);
+                    let status = if pong.header("mcp-session-id") == Some("s-1") {
+                        "202 Accepted"
+                    } else {
+                        "404 Not Found"
+                    };
+
+                    let _ = stream.write_all(reply(status, &[], "").as_bytes());
+                    break Some(pong);
+                }
+                Err(_) if Instant::now() < deadline => {
+                    std::thread::sleep(Duration::from_millis(20))
+                }
+                Err(_) => break None,
+            }
+        };
+        let answer =
+            json!({ "jsonrpc": "2.0", "id": 1, "result": { "protocolVersion": "2025-06-18" } });
+
+        let _ = write!(opening, "data: {answer}\n\n");
+        pong
+    });
+    let (reader, mut writer) = std::io::pipe().unwrap();
+    let output = Output::default();
+    let bridge = {
+        let (target, output) = (parse_target(&url, "").unwrap(), output.clone());
+
+        std::thread::spawn(move || run(target, BufReader::new(reader), output))
+    };
+    let written = |count: usize| {
+        let deadline = Instant::now() + Duration::from_secs(10);
+
+        loop {
+            let text = String::from_utf8(output.0.lock().unwrap().clone()).unwrap();
+            let lines: Vec<Value> = text
+                .lines()
+                .map(|line| serde_json::from_str(line).unwrap())
+                .collect();
+
+            if lines.len() >= count || Instant::now() > deadline {
+                break lines;
+            }
+
+            std::thread::sleep(Duration::from_millis(20));
+        }
+    };
+
+    writeln!(writer, "{}", initialize()).unwrap();
+    assert_eq!(written(1)[0]["method"], "ping");
+
+    // Like `mcp.rs`: the reply goes in only once the ping came out.
+    writeln!(
+        writer,
+        "{}",
+        json!({ "jsonrpc": "2.0", "id": "ping-1", "result": {} })
+    )
+    .unwrap();
+
+    let pong = server
+        .join()
+        .unwrap()
+        .expect("the reply to the ping never reached the server");
+
+    assert_eq!(pong.body["id"], "ping-1");
+    assert_eq!(pong.header("mcp-session-id"), Some("s-1"));
+    assert_eq!(written(2)[1]["id"], 1);
+
+    drop(writer);
+    bridge.join().unwrap();
 }
