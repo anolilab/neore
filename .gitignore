@@ -32,6 +32,8 @@ apps/web/source.generated.ts
 
 .playwright-mcp
 .wrangler/
+# Per-service wrangler config `lunora dev` writes next to each in-session service (`.wrangler.lunora-service.<pid>.<n>.jsonc`).
+.wrangler.lunora-service.*.jsonc
 
 # Lunora build output + local Miniflare state (`lunora build` / `lunora dev`).
 # 52M after one `lunora build`; nothing here is a source artifact.

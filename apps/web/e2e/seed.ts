@@ -24,7 +24,17 @@ const BACKEND_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "
 const D1_DIR = path.join(BACKEND_DIR, ".wrangler/state/v3/d1/miniflare-D1DatabaseObject");
 const SHARD_DO_DIR = path.join(BACKEND_DIR, ".wrangler/state/v3/do/neore-backend-ShardDO");
 
-const LOCAL_URL = /localhost|127\.0\.0\.1/;
+const LOOPBACK_HOSTS = new Set(["127.0.0.1", "[::1]", "localhost"]);
+
+/** Whether `url` names this machine by exact host. A substring match would accept `localhost.example.com`. */
+export const isLoopbackUrl = (url: string): boolean => {
+    try {
+        return LOOPBACK_HOSTS.has(new URL(url).hostname);
+    } catch {
+        return false;
+    }
+};
+
 const DEV_VARS_LINE = /^E2E_SEED_TOKEN="?([^"\s]+)/m;
 
 const authHeaders = { "Content-Type": "application/json", Origin: APP_BASE_URL };
@@ -63,7 +73,7 @@ const openDatabase = async (file: string): Promise<SqliteDatabase> => {
 
 /** The backend's D1 file — the one that holds the better-auth `user` table. */
 export const findBackendDatabase = async (): Promise<string> => {
-    if (!LOCAL_URL.test(LUNORA_URL)) {
+    if (!isLoopbackUrl(LUNORA_URL)) {
         throw new Error(`[e2e] Refusing to seed a non-local backend: ${LUNORA_URL}`);
     }
 
@@ -149,7 +159,7 @@ const seedToken = (): string => {
 
 /** Invite `email` and return the plaintext token — the `?invite=` value. Re-inviting replaces the token. */
 export const inviteEmail = async (email: string): Promise<string> => {
-    if (!LOCAL_URL.test(LUNORA_URL)) {
+    if (!isLoopbackUrl(LUNORA_URL)) {
         throw new Error(`[e2e] Refusing to seed a non-local backend: ${LUNORA_URL}`);
     }
 
