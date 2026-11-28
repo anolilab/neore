@@ -3,7 +3,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import type { RouteComponent } from "@tanstack/react-router";
 import type { ComponentType, ReactNode } from "react";
 import { useEffect, useState } from "react";
-import { expect, screen } from "storybook/test";
+import { expect, screen, waitFor } from "storybook/test";
 
 import CaseFormDialog from "@/features/evals/components/case-form-dialog";
 import DatasetFormDialog from "@/features/evals/components/dataset-form-dialog";
@@ -184,7 +184,17 @@ export const SkillBuilderRefined: Story = {
             "Every Monday, summarise new GitHub issues in my repo",
         );
         await userEvent.click(await pressable(screen, "Continue"));
-        await userEvent.type(await screen.findByLabelText("What should change?", undefined, WAIT), "Keep it under ten lines");
+        const change = await screen.findByLabelText("What should change?", undefined, WAIT);
+
+        // The review step grows the dialog as it appears; a click on the field while it moves can miss it, so type until it holds the text.
+        await waitFor(
+            async () => {
+                await userEvent.clear(change);
+                await userEvent.type(change, "Keep it under ten lines");
+                await expect(change).toHaveValue("Keep it under ten lines");
+            },
+            { timeout: 10_000 },
+        );
         await userEvent.click(await pressable(screen, "Refine"));
         await expect(await screen.findByRole("list", { name: "Changes from the last refinement" }, WAIT)).toBeVisible();
     },
