@@ -144,7 +144,7 @@ describe("isCloudflareAddress", () => {
 });
 
 describe("postCheckedHttps", () => {
-    it("connects to the checked address and keeps the host name for the certificate", async () => {
+    it("checks the host name's addresses, then connects by host name and starts TLS with no options", async () => {
         const connection = fakeConnect("HTTP/1.1 204 No Content\r\n\r\n");
         const fetch = dnsFetch({ A: ["93.184.216.34"] });
 
@@ -154,8 +154,8 @@ describe("postCheckedHttps", () => {
         );
 
         expect(result).toEqual({ status: 204 });
-        expect(connection.connect).toHaveBeenCalledWith({ hostname: "93.184.216.34", port: 443 }, { allowHalfOpen: false, secureTransport: "starttls" });
-        expect(connection.startTls).toHaveBeenCalledWith({ expectedServerHostname: "hooks.example.com" });
+        expect(connection.connect).toHaveBeenCalledWith({ hostname: "hooks.example.com", port: 443 }, { allowHalfOpen: false, secureTransport: "starttls" });
+        expect(connection.startTls).toHaveBeenCalledWith();
 
         const sent = connection.written.join("");
 

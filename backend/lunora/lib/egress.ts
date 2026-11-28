@@ -1,10 +1,12 @@
 /**
- * Outbound POSTs to a user-configured https URL, with the address checked at connect time.
+ * Outbound POSTs to a user-configured https URL, with the host name's addresses checked before connect.
  *
  * A Worker's `fetch` does not say which address a host name connected to, so a name that resolves to a private address
- * cannot be refused there. This module resolves the name itself (DNS over HTTPS), refuses the request if any answer is not
- * a public address, and then connects to the checked address. The host name is still used for the TLS certificate check,
- * so the connection is to the checked address and the certificate is for the host the user named.
+ * cannot be refused there. This module resolves the name itself (DNS over HTTPS) and refuses the request if any answer is
+ * not a public address. It then connects by host name and starts TLS with no options, the documented call shape: the
+ * deployed runtime rejects the certificate when the connect target is an IP and the TLS name is given separately.
+ * The runtime resolves the name again when it connects, so the check is an early refusal, not a pin: an answer that changes
+ * between the two lookups is not caught.
  *
  * Only https on port 443 is allowed, with no credentials. Redirects are not followed: the status comes back as it is.
  * `postCheckedHttps` reads the status and no body; `requestCheckedHttps` also returns the body, up to `MAX_REPLY_BYTES`.
@@ -243,7 +245,7 @@ export const isCloudflareAddress = (address: string): boolean => {
 export interface EgressSocket {
     close: () => Promise<void>;
     readable: ReadableStream<Uint8Array>;
-    startTls: (options: { expectedServerHostname: string }) => EgressSocket;
+    startTls: () => EgressSocket;
     writable: WritableStream<Uint8Array>;
 }
 
@@ -619,8 +621,8 @@ const readReply = async (socket: EgressSocket): Promise<EgressBodyResponse> => {
 };
 
 /**
- * POSTs `request.body` to `request.url` at the first checked address, and reads the answer with `read`. Shared by the two
- * public entry points below, so the address check, the pin, the deadline and the cleanup are written once.
+ * POSTs `request.body` to `request.url` after the address check, and reads the answer with `read`. Shared by the two
+ * public entry points below, so the address check, the deadline and the cleanup are written once.
  */
 const checkedPost = async <T>(request: EgressRequest, dependencies: EgressDependencies, read: (socket: EgressSocket) => Promise<T>): Promise<T> => {
     const target = parseTarget(request.url);
@@ -635,18 +637,18 @@ const checkedPost = async <T>(request: EgressRequest, dependencies: EgressDepend
     };
 
     const attempt = async (): Promise<T> => {
-        const [address] = await resolveChecked(target.hostname, dependencies, controller.signal);
+        await resolveChecked(target.hostname, dependencies, controller.signal);
 
         // The deadline can pass while a lookup is in flight. Cleanup has already run by then, so open nothing.
         if (controller.signal.aborted) {
             throw new EgressError("timeout", "The request timed out.");
         }
 
-        const plain = dependencies.connect({ hostname: address as string, port: HTTPS_PORT }, { allowHalfOpen: false, secureTransport: "starttls" });
+        const plain = dependencies.connect({ hostname: target.hostname, port: HTTPS_PORT }, { allowHalfOpen: false, secureTransport: "starttls" });
 
         opened.push(plain);
 
-        const socket = plain.startTls({ expectedServerHostname: target.hostname });
+        const socket = plain.startTls();
 
         opened.push(socket);
         await writeRequest(socket, target, request);
@@ -687,7 +689,7 @@ const checkedPost = async <T>(request: EgressRequest, dependencies: EgressDepend
 };
 
 /**
- * POSTs `request.body` to `request.url` at the first checked address, and returns the status. A 3xx is returned as it is, and
+ * POSTs `request.body` to `request.url` after the address check, and returns the status. A 3xx is returned as it is, and
  * no body is read. Any refusal, failure or timeout throws an `EgressError` with a code and no URL or body in the message.
  */
 export const postCheckedHttps = async (request: EgressRequest, dependencies: EgressDependencies): Promise<EgressResponse> =>

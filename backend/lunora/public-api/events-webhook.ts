@@ -9,9 +9,9 @@
  * Not implemented: `deliveryStatus`, which the spec allows a server to omit.
  *
  * Address checks: every callback POST goes through `requestCheckedHttps` (`lib/egress.ts`), which resolves the host name, refuses
- * any private or reserved answer, and connects to the checked address. The connection is pinned, so a name that changes its
- * answer between a check and a request cannot send the request somewhere else. The subscribe-time check in
- * `events-webhook-address.ts` is an early refusal only; the connect-time check is the one that decides.
+ * any private or reserved answer, and then connects by host name. The runtime resolves the name again, so a name that changes
+ * its answer between the check and the connect is not caught. The subscribe-time check in `events-webhook-address.ts` and the
+ * connect-time check are both early refusals.
  */
 import { base64ToBytes, bytesToBase64, sha256Hex } from "../lib/crypto";
 import { type EventArguments, findEvent, parseEventArguments } from "./events-catalog";
