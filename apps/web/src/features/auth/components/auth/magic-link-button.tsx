@@ -23,13 +23,13 @@ const MagicLinkButton = ({ classNames, isSubmitting, redirectTo, view }: MagicLi
 
     return (
         <Button
-            className={cn("w-full", classNames?.form?.button, classNames?.form?.secondaryButton)}
+            className={cn("w-full", classNames?.form?.button, classNames?.form?.outlineButton)}
             disabled={isSubmitting}
             onClick={() => {
                 navigate(`${basePath}/${view === "MAGIC_LINK" || !credentials ? viewPaths.SIGN_IN : viewPaths.MAGIC_LINK}${authViewSearch(redirectTo)}`);
             }}
             type="button"
-            variant="secondary"
+            variant="outline"
         >
             {view === "MAGIC_LINK" ? <LockIcon className={classNames?.form?.icon} /> : <MailIcon className={classNames?.form?.icon} />}
             {view === "MAGIC_LINK" ? t`Sign in with password` : t`Sign in with magic link`}

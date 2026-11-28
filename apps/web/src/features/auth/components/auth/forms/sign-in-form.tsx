@@ -360,7 +360,7 @@ const SignInForm = ({ className, classNames, isSubmitting, passwordValidation, r
 
                                 {credentials?.forgotPassword && (
                                     <Link
-                                        className={cn("text-sm hover:underline", classNames?.forgotPasswordLink)}
+                                        className={cn("text-muted-foreground hover:text-foreground text-sm hover:underline", classNames?.forgotPasswordLink)}
                                         to={`${basePath}/${viewPaths.FORGOT_PASSWORD}${isHydrated ? authViewSearch(redirectTo) : ""}`}
                                     >
                                         {t`Forgot password?`}

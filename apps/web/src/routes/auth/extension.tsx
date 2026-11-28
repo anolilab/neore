@@ -56,7 +56,7 @@ const ExtensionAuthorize = () => {
 
     if (!codeChallenge || !redirectUri || !state) {
         return (
-            <p className="text-center text-sm text-red-600" role="alert">
+            <p className="text-destructive text-center text-sm" role="alert">
                 {t`This sign-in link is incomplete. Start signing in from the extension again.`}
             </p>
         );
@@ -64,7 +64,7 @@ const ExtensionAuthorize = () => {
 
     if (isPending || !data?.user) {
         return (
-            <p className="text-center text-sm text-gray-600" role="status">
+            <p className="text-muted-foreground text-center text-sm" role="status">
                 {t`Loading…`}
             </p>
         );
@@ -75,7 +75,7 @@ const ExtensionAuthorize = () => {
 
         return (
             <div className="flex flex-col gap-4 text-center">
-                <p className="text-sm text-gray-700">{t`You are browsing as a guest. Sign in with your account to connect the extension.`}</p>
+                <p className="text-muted-foreground text-sm">{t`You are browsing as a guest. Sign in with your account to connect the extension.`}</p>
                 <a className="text-sm font-medium underline underline-offset-4" href={`/auth/sign-in?redirectTo=${encodeURIComponent(here)}`}>
                     {t`Sign in`}
                 </a>
@@ -87,7 +87,7 @@ const ExtensionAuthorize = () => {
 
     if (isDone) {
         return (
-            <p className="text-center text-sm text-gray-700" role="status">
+            <p className="text-muted-foreground text-center text-sm" role="status">
                 {isNativeApp ? t`Signed in. Return to the Neore app — you can close this tab.` : t`Connected. You can close this window.`}
             </p>
         );
@@ -132,13 +132,13 @@ const ExtensionAuthorize = () => {
     return (
         <div className="flex flex-col gap-4">
             <h1 className="text-center text-xl font-semibold">{isNativeApp ? t`Sign in to the Neore desktop app` : t`Connect the Anole browser extension`}</h1>
-            <p className="text-center text-sm text-gray-700">
+            <p className="text-muted-foreground text-center text-sm">
                 {isNativeApp
                     ? t`The Neore app on this device will be signed in as ${data.user.email}. Only continue if you started signing in from the app just now.`
                     : t`The extension will be able to read and send chats as ${data.user.email}. You can disconnect it at any time by signing out in the extension or ending its session in your account settings.`}
             </p>
             {error && (
-                <p className="text-center text-sm text-red-600" role="alert">
+                <p className="text-destructive text-center text-sm" role="alert">
                     {error}
                 </p>
             )}

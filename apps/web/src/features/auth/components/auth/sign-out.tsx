@@ -70,7 +70,7 @@ const SignOut = () => {
         );
     }, [authClient, basePath, releasePush, viewPaths]);
 
-    return <Loader2 className="animate-spin" />;
+    return <Loader2 className="text-muted-foreground mx-auto animate-spin" />;
 };
 
 export default SignOut;
