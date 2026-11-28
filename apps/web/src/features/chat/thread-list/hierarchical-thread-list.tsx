@@ -597,8 +597,8 @@ const HierarchicalThreadList: FC<
         return new Set([DEFAULT_CHAT_MODEL, ...Object.values(saved).filter((model): model is string => typeof model === "string")]);
     }, [aiPreferences]);
     // The project list is one page; when it is cut, the few projects of rows beyond it are read by id, not left unnamed.
-    // The project list is one page. When it is cut, the projects of the rows on screen (search results included) that the
-    // page lacks are read by id, a few at most: a long list of them would cost a request each to load the sidebar.
+    // The project list is one page. When it is cut, the projects of the rows on screen (search results included, collapsed
+    // groups and closed branches not) that the page lacks are read by id, a few at most: each costs a request.
     const { hasMore: projectListCut } = useProjectList();
     // A string first: the shown groups are rebuilt on every thread switch, and a new array each time would re-render every row.
     const unlistedProjectIdsKey = useMemo(() => {
@@ -612,13 +612,20 @@ const HierarchicalThreadList: FC<
                 ids.add(node.projectId);
             }
 
-            node.children.forEach((child) => collect(child));
+            // Only the rows on screen, as the list draws them: an open branch's children, a collapsed group's nothing.
+            if (expandedThreads.has(node.threadId)) {
+                node.children.forEach((child) => collect(child));
+            }
         };
 
-        filteredGroups.forEach((group) => group.threads.forEach((thread) => collect(thread)));
+        filteredGroups.forEach((group) => {
+            if (!group.isCollapsed) {
+                group.threads.forEach((thread) => collect(thread));
+            }
+        });
 
         return [...ids].slice(0, MAX_UNLISTED_PROJECT_LOOKUPS).join(",");
-    }, [filteredGroups, projectListCut, projectsMap]);
+    }, [expandedThreads, filteredGroups, projectListCut, projectsMap]);
     const unlistedProjectIds = useMemo(() => (unlistedProjectIdsKey ? unlistedProjectIdsKey.split(",") : []), [unlistedProjectIdsKey]);
     // Serialised, so the hints below change only when a title does, not on every render; JSON keeps any title intact.
     const unlistedTitlesKey = useQueries({
