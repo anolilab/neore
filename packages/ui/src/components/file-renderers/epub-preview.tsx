@@ -5,8 +5,8 @@
  * Shows a book's chapters in reading order, one at a time, with previous and next controls.
  *
  * Each chapter is shown in a frame with an empty `sandbox`: no scripts, no same origin, no forms, no popups. That frame is the whole
- * boundary: the chapter's markup is not cleaned, so a script in it never runs (`epub-book.ts` also sets a policy that refuses every
- * request). A file larger than `maxBytes` (the office-file cap by default) is refused before it is parsed.
+ * boundary: a script in a chapter never runs, whatever the markup holds. The markup is also cleaned (`epub-book.ts`: `neutralize`, `safeStylesheet`) and
+ * the document carries a policy that refuses every request, as second layers. A file larger than `maxBytes` (the office-file cap by default) is refused before it is parsed.
  *
  * NOT exported from the barrel index. Import directly:
  *
@@ -330,7 +330,7 @@ const EpubPreview: FC<EpubPreviewProps> = memo(({ className, filename, maxBytes 
                     />
                     {shown?.failed === true && shown.book === book && shown.id === chapterId && shown.key === key && (
                         <p className="text-destructive px-3 py-1 text-xs" role="status">
-                            {t`Could not preview · Click to download`}
+                            {t`This preview could not be loaded.`}
                         </p>
                     )}
                     <div className="bg-muted/50 flex items-center justify-between gap-2 border-t px-3 py-1.5">

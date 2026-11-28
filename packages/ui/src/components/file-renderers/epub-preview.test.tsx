@@ -335,7 +335,7 @@ describe("EpubPreview failures", () => {
                 await Promise.resolve();
             });
 
-            expect(view.container.textContent).toContain("Could not preview");
+            expect(view.container.textContent).toContain("This preview could not be loaded.");
             expect(view.container.querySelector("iframe")).not.toBeNull();
             expect(book.destroyed).toBe(0);
 

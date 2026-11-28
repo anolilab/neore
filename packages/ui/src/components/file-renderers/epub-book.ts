@@ -16,7 +16,7 @@ import type { EpubToc, SpineItem } from "@lingo-reader/epub-parser";
 import JSZip from "jszip";
 
 /** The chapter kinds a reader shows; the rest of a spine (a cover image, a style sheet) is not a page of text. */
-const READABLE_TYPES: ReadonlySet<string> = new Set(["application/xhtml+xml", "text/html"]);
+const READABLE_TYPES: ReadonlySet<string> = new Set(["application/xhtml+xml", "image/svg+xml", "text/html"]);
 
 export interface EpubChapter {
     id: string;
@@ -179,6 +179,8 @@ const extensionOf = (path: string): string => path.split(".").pop()?.toLowerCase
 /** What a chapter's reads draw on: one budget for its styles and its markup, a count of distinct files, and a reader of the archive. */
 interface AssetReader {
     budget: { files: number; left: number };
+    /** Throws when the read was abandoned: asked after each completed read, before any more is parsed or built. */
+    check: () => void;
     /** A file as a `data:` URL, or `undefined` when it is not in the archive, does not fit the budget or the count, or is not a kind that is inlined. */
     dataUrl: (path: string) => Promise<string | undefined>;
     /** Whether `length` characters could still be spent (without spending them). */
@@ -187,12 +189,17 @@ interface AssetReader {
     mayRead: () => boolean;
     /** Whether a style sheet has been refused for size or count: the chapter then reads no further sheet. */
     refused: () => boolean;
+    restore: (state: { attributed: number; files: number; left: number; pictureCharged: number }) => void;
     /** The size of a file as the archive's directory declares it, when it does; read before the file is, so one too big is never opened. */
     size: (path: string) => number | undefined;
+    /** The budget and count as they stand: taken before a sheet is rewritten, given back with `restore` if the sheet is not kept. */
+    snapshot: () => { attributed: number; files: number; left: number; pictureCharged: number };
     /** Charges a text that is to go into the document (a style sheet, after its addresses are rewritten) to the budget and the count; `false` when it does not fit. */
     spend: (length: number) => boolean;
     /** As `spend`, for a sheet whose `data:` pictures were already charged when they were read: only the rest of its text is charged now. */
     spendSheet: (length: number) => boolean;
+    /** Takes one file from the chapter's count (an `@import` is a file); `false` when none is left. */
+    takeFile: () => boolean;
     /** A text file of the archive. */
     text: (path: string) => Promise<string | undefined>;
 }
@@ -208,6 +215,7 @@ const assetReader = (zip: JSZip, signal?: AbortSignal): AssetReader => {
 
     return {
         budget,
+        check: () => signal?.throwIfAborted(),
         dataUrl: async (path) => {
             signal?.throwIfAborted();
 
@@ -237,6 +245,8 @@ const assetReader = (zip: JSZip, signal?: AbortSignal): AssetReader => {
             budget.files -= 1;
 
             const bytes = await entry.async("uint8array");
+
+            signal?.throwIfAborted();
             // From the size, before the encoding: one that will not fit is never encoded.
             const length = `data:${type};base64,`.length + Math.ceil(bytes.length / 3) * 4;
 
@@ -258,7 +268,16 @@ const assetReader = (zip: JSZip, signal?: AbortSignal): AssetReader => {
         fits: (length) => budget.files > 0 && length <= budget.left,
         mayRead: () => budget.files > 0 && budget.left > 0 && !refusedSheet,
         refused: () => refusedSheet,
+        restore: (state) => {
+            budget.files = state.files;
+            budget.left = state.left;
+            pictureCharged = state.pictureCharged;
+            attributed = state.attributed;
+        },
         size: (path) => (zip.file(path) as { _data?: { uncompressedSize?: number } } | null)?._data?.uncompressedSize,
+        snapshot: () => {
+            return { attributed, files: budget.files, left: budget.left, pictureCharged };
+        },
         spend: (length) => {
             if (budget.files <= 0 || length > budget.left) {
                 refusedSheet = true;
@@ -288,10 +307,23 @@ const assetReader = (zip: JSZip, signal?: AbortSignal): AssetReader => {
 
             return true;
         },
+        takeFile: () => {
+            if (budget.files <= 0) {
+                return false;
+            }
+
+            budget.files -= 1;
+
+            return true;
+        },
         text: async (path) => {
             signal?.throwIfAborted();
 
-            return (await zip.file(path)?.async("string")) ?? undefined;
+            const read = (await zip.file(path)?.async("string")) ?? undefined;
+
+            signal?.throwIfAborted();
+
+            return read;
         },
     };
 };
@@ -340,6 +372,50 @@ const inlineStylesheetUrls = async (css: string, directory: string, reader: Asse
 
         return url === undefined ? match : `url("${url}")`;
     });
+};
+
+const IMPORT_RULE = /@import\s+(?:url\(\s*)?(?:"([^"]*)"|'([^']*)'|([^\s;)]*))[^;{]*;?/giu;
+const MAX_IMPORT_DEPTH = 4;
+
+/**
+ * A sheet's text with each `@import` that names a file of the archive replaced, at its position, by that file's text, itself expanded and with
+ * its own addresses read from its own folder. An import that does not resolve to a file of the archive, is already being read further up (a
+ * cycle), is too deep, or does not fit the chapter's count and budget is dropped. What this returns is raw text: the caller cleans and charges it.
+ */
+const expandImports = async (css: string, directory: string, reader: AssetReader, stack: ReadonlyArray<string>): Promise<string> => {
+    const rules = [...css.matchAll(IMPORT_RULE)];
+    let out = "";
+    let at = 0;
+
+    for (const rule of rules) {
+        out += css.slice(at, rule.index);
+        at = rule.index + rule[0].length;
+
+        const path = resolveInArchive((rule[1] ?? rule[2] ?? rule[3] ?? "").trim(), directory);
+        const declared = path === undefined ? undefined : reader.size(path);
+
+        if (
+            path === undefined ||
+            stack.includes(path) ||
+            stack.length >= MAX_IMPORT_DEPTH ||
+            (declared !== undefined && !reader.fits(declared)) ||
+            !reader.takeFile()
+        ) {
+            continue;
+        }
+
+        const text = await reader.text(path);
+
+        if (text === undefined || !reader.fits(text.length + 3 * countLessThan(text))) {
+            continue;
+        }
+
+        const expanded = await expandImports(text, directoryOf(path), reader, [...stack, path]);
+
+        out += await inlineStylesheetUrls(expanded, directoryOf(path), reader);
+    }
+
+    return out + css.slice(at);
 };
 
 /**
@@ -446,7 +522,8 @@ export const chapterDocument = (markup: string, styles: ReadonlyArray<string>, l
         make("meta", { content: FRAME_POLICY, "http-equiv": "Content-Security-Policy" }),
         // eslint-disable-next-line unicorn/text-encoding-identifier-case -- the HTML label; `utf8` is not the one a document names
         make("meta", { charset: "utf-8" }),
-        make("base", { target: "_blank" }),
+        // `about:srcdoc`: a `#` link resolves against the document itself, not the page that holds the frame.
+        make("base", { href: "about:srcdoc", target: "_blank" }),
         make("style", {}, BASE_STYLE),
         ...styles.map((style) => make("style", {}, safeStylesheet(style))),
     ];
@@ -526,78 +603,82 @@ const readChapter = async (chapterPath: string, reader: AssetReader): Promise<{ 
     const parsed = parseChapter(source);
     const styles: string[] = [];
 
-    for (const link of parsed.querySelectorAll('link[rel~="stylesheet" i][href]')) {
-        // Asked before the file is read: with the budget or the count spent, no further sheet is even opened.
-        if (!reader.mayRead()) {
-            break;
-        }
-
-        const path = resolveInArchive(link.getAttribute("href") ?? "", directory);
-        const declared = path === undefined ? undefined : reader.size(path);
-
-        // A sheet whose declared size cannot fit is refused whole before it is read or rewritten: the rewrite can only make it longer.
-        if (declared !== undefined && !reader.fits(declared)) {
-            reader.spendSheet(Infinity);
-
-            break;
-        }
-
-        const text = path === undefined ? undefined : await reader.text(path);
-
-        if (path !== undefined && text !== undefined && !reader.fits(text.length)) {
-            reader.spendSheet(Infinity);
-
-            break;
-        }
-
-        if (path !== undefined && text !== undefined) {
-            // What cleaning can make of it, worked out before anything is rewritten: every `<` becomes four characters.
-            if (!reader.fits(text.length + 3 * countLessThan(text))) {
-                reader.spendSheet(Infinity);
-
-                break;
-            }
-
-            // Cleaned FIRST, and the exact text that will be written is what is charged; the document does not clean it again by growing it.
-            const sheet = safeStylesheet(await inlineStylesheetUrls(text, directoryOf(path), reader));
-
-            // A sheet that does not fit is left out whole, not cut: half a sheet would style a chapter wrongly.
-            if (reader.spendSheet(sheet.length)) {
-                styles.push(sheet);
-            }
-        }
-    }
-
-    for (const style of parsed.querySelectorAll("style")) {
-        const inHead = style.closest("head") !== null;
+    // Linked and inline styles in the order the chapter writes them, each rewritten and charged as it is reached: a later rule wins over an
+    // earlier one as in the source. Sheets of the head go to `styles` in that order; a `<style>` in the body stays where it is.
+    for (const item of parsed.querySelectorAll('link[rel~="stylesheet" i][href], style')) {
+        const isLink = item.localName === "link";
+        const inHead = item.closest("head") !== null;
 
         // After a sheet was refused for size or count, no further one is attempted: the rejection work is not repeated for each.
-        if (reader.refused()) {
-            style.textContent = "";
+        if (reader.refused() || !reader.mayRead()) {
+            if (!isLink) {
+                item.textContent = "";
+            }
 
             continue;
         }
 
-        const own = style.textContent ?? "";
+        let text: string | undefined = item.textContent ?? "";
+        let base = directory;
+        let self: string[] = [];
 
-        if (!reader.fits(own.length + 3 * countLessThan(own))) {
+        if (isLink) {
+            const path = resolveInArchive(item.getAttribute("href") ?? "", directory);
+            const declared = path === undefined ? undefined : reader.size(path);
+
+            // A sheet whose declared size cannot fit is refused whole before it is read or rewritten: the rewrite can only make it longer.
+            if (declared !== undefined && !reader.fits(declared)) {
+                reader.spendSheet(Infinity);
+
+                continue;
+            }
+
+            text = path === undefined ? undefined : await reader.text(path);
+            base = path === undefined ? directory : directoryOf(path);
+            // The sheet itself is the first of the files being read: an import that leads back to it is a cycle.
+            self = path === undefined ? [] : [path];
+        }
+
+        reader.check();
+
+        if (text === undefined) {
+            continue;
+        }
+
+        // What cleaning can make of it, worked out before anything is rewritten: every `<` becomes four characters.
+        if (!reader.fits(text.length + 3 * countLessThan(text))) {
             reader.spendSheet(Infinity);
-            style.textContent = "";
+
+            if (!isLink) {
+                item.textContent = "";
+            }
 
             continue;
         }
 
-        const sheet = safeStylesheet(await inlineStylesheetUrls(own, directory, reader));
-        const kept = reader.spendSheet(sheet.length) ? sheet : "";
+        // What the pictures and imports of this sheet take is staged: kept only if the sheet is, so a rejected sheet leaves the room it used.
+        const staged = reader.snapshot();
+        // Imports first, then addresses, then cleaned; the exact text that will be written is what is charged.
+        const expanded = await expandImports(text, base, reader, self);
+        const sheet = safeStylesheet(await inlineStylesheetUrls(expanded, base, reader));
 
-        if (inHead) {
-            // A rule the chapter defines in its head (`p { white-space: pre-wrap }`) is kept, rewritten and charged like any sheet, and goes
-            // where the others go: only the body is the chapter's markup.
+        reader.check();
+
+        // A sheet that does not fit is left out whole, not cut: half a sheet would style a chapter wrongly.
+        const fits = reader.spendSheet(sheet.length);
+
+        if (!fits) {
+            reader.restore(staged);
+        }
+
+        const kept = fits ? sheet : "";
+
+        if (isLink || inHead) {
             if (kept !== "") {
                 styles.push(kept);
             }
         } else {
-            style.textContent = kept;
+            item.textContent = kept;
         }
     }
 
