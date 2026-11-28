@@ -1996,6 +1996,10 @@ msgstr "El mensaje de un invitado solo se envía a través de un modelo alojado.
 msgid "A guide for this {requestNoun} is already being written."
 msgstr "Ya se está escribiendo una guía para este {requestNoun}."
 
+#: src/features/auth/components/settings/event-webhook/event-webhook-hosts-card.tsx:58
+msgid "A host name can contain only letters, digits, dots and hyphens."
+msgstr "Un nombre de host solo puede contener letras, dígitos, puntos y guiones."
+
 #: src/features/evals/components/case-fields.tsx:26
 msgid "A JSON Schema the answer must satisfy"
 msgstr "Un JSON Schema que la respuesta debe cumplir"
@@ -4156,6 +4160,10 @@ msgstr "Aprobar"
 msgid "Approve {tool} once"
 msgstr "Aprobar {tool} una vez"
 
+#: src/features/auth/components/settings/event-webhook/event-webhook-hosts-card.tsx:170
+msgid "Approve a callback host"
+msgstr "Aprobar un host de devolución de llamada"
+
 #: src/features/auth/components/device-approval.tsx:89
 #: src/features/auth/components/device-approval.tsx:250
 #: src/features/auth/components/device-approval.tsx:327
@@ -4167,9 +4175,17 @@ msgstr "Aprobar {tool} una vez"
 msgid "Approve a code"
 msgstr "Aprobar un código"
 
+#: src/features/auth/components/settings/event-webhook/event-webhook-hosts-card.tsx:184
+msgid "Approve host"
+msgstr "Aprobar host"
+
 #: src/features/marketing/use-cases/use-case-data.ts:59
 msgid "Approve runs the call once and the reply continues from its result. Deny sends a denial back to the model, which carries on without that tool."
 msgstr "Aprobar ejecuta la llamada una vez y la respuesta continúa a partir de su resultado. Denegar envía una negativa al modelo, que sigue sin esa herramienta."
+
+#: src/features/auth/components/settings/event-webhook/event-webhook-hosts-card.tsx:165
+msgid "Approve the callback hosts that Events webhooks may send to."
+msgstr "Aprueba los hosts de devolución de llamada a los que los webhooks de eventos pueden enviar."
 
 #: src/features/auth/components/device-approval.tsx:128
 #: src/features/auth/components/device-approval.tsx:133
@@ -4181,6 +4197,11 @@ msgstr "Aprobado"
 msgid "Approved — running tool"
 msgstr "Aprobado: ejecutando herramienta"
 
+#. placeholder {0}: new Date(row.createdAt).toLocaleDateString(i18n.locale)
+#: src/features/auth/components/settings/event-webhook/event-webhook-hosts-card.tsx:119
+msgid "Approved {0}"
+msgstr "Aprobado {0}"
+
 #: src/features/develop/components/inbox-list.tsx:56
 msgid "Approved and not a draft. Branch protection is not checked."
 msgstr "Aprobada y no es un borrador. No se comprueba la protección de ramas."
@@ -4189,7 +4210,12 @@ msgstr "Aprobada y no es un borrador. No se comprueba la protección de ramas."
 msgid "Approved automatically — low risk"
 msgstr "Aprobado automáticamente: riesgo bajo"
 
+#: src/features/auth/components/settings/event-webhook/event-webhook-hosts-card.tsx:113
+msgid "Approved hosts"
+msgstr "Hosts aprobados"
+
 #: src/features/auth/components/device-approval.tsx:122
+#: src/features/auth/components/settings/event-webhook/event-webhook-hosts-card.tsx:184
 msgid "Approving…"
 msgstr "Aprobando…"
 
@@ -4897,7 +4923,7 @@ msgstr "Volver al editor"
 msgid "Back to Gallery"
 msgstr "Volver a la galería"
 
-#: src/components/settings/settings-modal.tsx:595
+#: src/components/settings/settings-modal.tsx:601
 msgid "Back to settings sections"
 msgstr "Volver a las secciones de ajustes"
 
@@ -5883,6 +5909,7 @@ msgstr "Canadá"
 #: src/features/auth/components/organization/update-member-role-dialog.tsx:135
 #: src/features/auth/components/settings/account/delete-account-dialog.tsx:141
 #: src/features/auth/components/settings/api-key/api-key-delete-dialog.tsx:109
+#: src/features/auth/components/settings/event-webhook/event-webhook-hosts-card.tsx:136
 #: src/features/auth/components/settings/two-factor/two-factor-password-dialog.tsx:174
 #: src/features/auth/components/team/add-team-member-dialog.tsx:136
 #: src/features/auth/components/team/create-team-dialog.tsx:117
@@ -7750,7 +7777,7 @@ msgstr "Configura los valores de las variables para esta conversación. Estos va
 msgid "Configure Variables"
 msgstr "Configurar variables"
 
-#: src/components/settings/settings-modal.tsx:510
+#: src/components/settings/settings-modal.tsx:516
 msgid "Configure your application settings"
 msgstr "Configura los ajustes de la aplicación"
 
@@ -7789,6 +7816,10 @@ msgstr "Confirmar contraseña"
 #: src/features/auth/components/settings/security/change-password-card.tsx:58
 msgid "Confirm password is required"
 msgstr "La confirmación de la contraseña es obligatoria"
+
+#: src/features/auth/components/settings/event-webhook/event-webhook-hosts-card.tsx:133
+msgid "Confirm removal"
+msgstr "Confirmar eliminación"
 
 #: src/features/auth/components/auth/convert-anonymous-account.tsx:231
 msgid "Confirm your password"
@@ -8667,6 +8698,10 @@ msgstr "No se pudo responder. Inténtalo de nuevo."
 msgid "Could not apply the changes"
 msgstr "No se pudieron aplicar los cambios"
 
+#: src/features/auth/components/settings/event-webhook/event-webhook-hosts-card.tsx:85
+msgid "Could not approve the host. Try again."
+msgstr "No se pudo aprobar el host. Inténtalo de nuevo."
+
 #. placeholder {0}: failed.join(", ")
 #: src/features/chat/thread/use-ask-user-attachments.ts:186
 msgid "Could not attach {0}. The other files were attached; try those again."
@@ -8847,6 +8882,10 @@ msgstr "No se pudo vincular. Inténtalo de nuevo."
 msgid "Could not load API keys. Try again later."
 msgstr "No se pudieron cargar las claves de API. Inténtalo de nuevo más tarde."
 
+#: src/features/auth/components/settings/event-webhook/event-webhook-hosts-card.tsx:108
+msgid "Could not load approved hosts. Try again later."
+msgstr "No se pudieron cargar los hosts aprobados. Inténtalo más tarde."
+
 #: src/features/canvas/canvas-panel.tsx:131
 msgid "Could not load image"
 msgstr "No se pudo cargar la imagen"
@@ -9013,6 +9052,10 @@ msgstr "No se pudo actualizar este {requestNoun} desde {0}. Lo que ves puede est
 #: src/features/devices/components/devices-settings.tsx:347
 msgid "Could not remove the device."
 msgstr "No se pudo eliminar el dispositivo."
+
+#: src/features/auth/components/settings/event-webhook/event-webhook-hosts-card.tsx:97
+msgid "Could not remove the host. Try again."
+msgstr "No se pudo eliminar el host. Inténtalo de nuevo."
 
 #: src/features/chat/group/group-participant-bar.tsx:187
 msgid "Could not remove the participant"
@@ -9288,7 +9331,7 @@ msgstr "Crea una etiqueta…"
 msgid "Create a task, give it success criteria, and run it. You can chain tasks with dependencies and repeat them on a schedule."
 msgstr "Crea una tarea, dale criterios de éxito y ejecútala. Puedes encadenar tareas con dependencias y repetirlas según una programación."
 
-#: src/components/settings/settings-modal.tsx:162
+#: src/components/settings/settings-modal.tsx:163
 msgid "Create an account"
 msgstr "Crear una cuenta"
 
@@ -12476,6 +12519,14 @@ msgstr "intro"
 msgid "Enter a different code"
 msgstr "Introduce un código diferente"
 
+#: src/features/auth/components/settings/event-webhook/event-webhook-hosts-card.tsx:43
+msgid "Enter a host name, not an IP address."
+msgstr "Introduce un nombre de host, no una dirección IP."
+
+#: src/features/auth/components/settings/event-webhook/event-webhook-hosts-card.tsx:40
+msgid "Enter a host name."
+msgstr "Introduce un nombre de host."
+
 #: src/features/local-models/components/ollama-model-manager.tsx:106
 msgid "Enter a model name such as llama3.2 or qwen3:8b"
 msgstr "Introduce un nombre de modelo como llama3.2 o qwen3:8b"
@@ -12577,6 +12628,18 @@ msgstr "Introduce el código que muestra `neore login --device` o `neore-host pa
 #: src/features/settings/components/chat/custom-providers-settings.tsx:113
 msgid "Enter the endpoint URL first"
 msgstr "Introduce primero la URL del endpoint"
+
+#: src/features/auth/components/settings/event-webhook/event-webhook-hosts-card.tsx:49
+msgid "Enter the host name only, without a path or @."
+msgstr "Introduce solo el nombre de host, sin ruta ni @."
+
+#: src/features/auth/components/settings/event-webhook/event-webhook-hosts-card.tsx:52
+msgid "Enter the host name only, without a port."
+msgstr "Introduce solo el nombre de host, sin puerto."
+
+#: src/features/auth/components/settings/event-webhook/event-webhook-hosts-card.tsx:55
+msgid "Enter the host name only, without https://."
+msgstr "Introduce solo el nombre de host, sin https://."
 
 #: src/features/develop/components/pull-request-reviewers-action.tsx:139
 msgid "Enter the logins of the people {hostLabel} should ask to review this {requestNoun}. Reviewers already requested stay requested."
@@ -12891,6 +12954,14 @@ msgstr "Evento"
 #: src/features/settings/components/personalization/memory-item.tsx:207
 msgid "Event ends on"
 msgstr "El evento termina el"
+
+#: src/features/auth/components/settings/event-webhook/event-webhook-hosts-card.tsx:165
+msgid "Event webhook hosts"
+msgstr "Hosts de webhooks de eventos"
+
+#: src/features/auth/components/settings/event-webhook/event-webhook-hosts-card.tsx:124
+msgid "Events to this host will stop."
+msgstr "Los eventos a este host se detendrán."
 
 #: src/features/settings/components/chat/trigger-settings.tsx:174
 msgid "Every 6 hours"
@@ -19564,6 +19635,10 @@ msgstr "Cargando"
 msgid "Loading API keys…"
 msgstr "Cargando claves de API…"
 
+#: src/features/auth/components/settings/event-webhook/event-webhook-hosts-card.tsx:104
+msgid "Loading approved hosts…"
+msgstr "Cargando hosts aprobados…"
+
 #: src/features/canvas/canvas-panel.tsx:318
 msgid "Loading canvas editor..."
 msgstr "Cargando el editor de lienzo..."
@@ -22755,6 +22830,10 @@ msgstr "No hay historial disponible"
 msgid "No history yet"
 msgstr "Aún no hay historial"
 
+#: src/features/auth/components/settings/event-webhook/event-webhook-hosts-card.tsx:159
+msgid "No hosts approved yet. Events are not sent to a callback until its host is approved."
+msgstr "Aún no hay hosts aprobados. Los eventos no se envían a un callback hasta que se aprueba su host."
+
 #: ../../packages/ui/src/components/icon-picker.tsx:381
 msgid "No icon found"
 msgstr "No se encontró ningún icono"
@@ -24554,11 +24633,11 @@ msgstr "El LLM más pequeño de OpenAI"
 msgid "OpenAI's smallest model for maximum speed"
 msgstr "El modelo más pequeño de OpenAI para la máxima velocidad"
 
-#: src/components/settings/settings-modal.tsx:342
+#: src/components/settings/settings-modal.tsx:343
 msgid "Opened {tabLabel}"
 msgstr "Se abrió {tabLabel}"
 
-#: src/components/settings/settings-modal.tsx:342
+#: src/components/settings/settings-modal.tsx:343
 msgid "Opened {tabLabel}: {label}"
 msgstr "Se abrió {tabLabel}: {label}"
 
@@ -27965,6 +28044,7 @@ msgstr "Recordarme"
 
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:195
 #: ../../packages/ui/src/components/combobox.tsx:304
+#: src/features/auth/components/settings/event-webhook/event-webhook-hosts-card.tsx:149
 #: src/features/chat/host/host-composer.tsx:1033
 #: src/features/chat/sharing/thread-share-button.tsx:300
 #: src/features/chat/sharing/thread-share-button.tsx:372
@@ -27997,6 +28077,7 @@ msgstr "¿Eliminar «{0}»?"
 #. placeholder {0}: file.name
 #. placeholder {0}: participant.name
 #. placeholder {0}: provider.name
+#: src/features/auth/components/settings/event-webhook/event-webhook-hosts-card.tsx:141
 #: src/features/chat/group/group-participant-bar.tsx:210
 #: src/features/chat/thread/ask-user-prompt.tsx:287
 #: src/features/prompts/components/thread-variables-config.tsx:232
@@ -28457,7 +28538,7 @@ msgstr "Faltan variables obligatorias"
 msgid "Required."
 msgstr "Obligatorio."
 
-#: src/components/settings/settings-modal.tsx:153
+#: src/components/settings/settings-modal.tsx:154
 msgid "requires an account"
 msgstr "requiere una cuenta"
 
@@ -30576,8 +30657,8 @@ msgid "Set up triggers to automate tasks on a schedule, via webhooks, or in resp
 msgstr "Configura disparadores para automatizar tareas de forma programada, mediante webhooks o en respuesta a eventos."
 
 #: ../../packages/chat-ui/src/org-switcher/org-switcher.tsx:260
-#: src/components/settings/settings-modal.tsx:407
-#: src/components/settings/settings-modal.tsx:508
+#: src/components/settings/settings-modal.tsx:408
+#: src/components/settings/settings-modal.tsx:514
 #: src/features/layout/components/mobile-section-nav.tsx:59
 #: src/features/layout/lib/dashboard-page-names.ts:38
 msgid "Settings"
@@ -30957,7 +31038,7 @@ msgstr "Barra lateral derecha"
 
 #: ../../packages/chat-ui/src/auth/login-form.tsx:43
 #: src/components/not-found.tsx:12
-#: src/components/settings/settings-modal.tsx:166
+#: src/components/settings/settings-modal.tsx:167
 #: src/features/auth/components/auth/auth-card.tsx:493
 #: src/features/auth/components/auth/forms/sign-in-form.tsx:415
 #: src/features/auth/components/device-approval.tsx:363
@@ -31031,7 +31112,7 @@ msgstr "Inicia sesión para desbloquear todos los modelos."
 msgid "Sign in to your account"
 msgstr "Inicia sesión en tu cuenta"
 
-#: src/components/settings/settings-modal.tsx:156
+#: src/components/settings/settings-modal.tsx:157
 msgid "Sign in to your account to use it."
 msgstr "Inicia sesión con tu cuenta para usarlo."
 
@@ -31081,7 +31162,7 @@ msgstr "Regístrate"
 msgid "Sign Up"
 msgstr "Registrarse"
 
-#: src/components/settings/settings-modal.tsx:156
+#: src/components/settings/settings-modal.tsx:157
 msgid "Sign up and subscribe for $8/mo to unlock all features."
 msgstr "Regístrate y suscríbete por 8 $/mes para desbloquear todas las funciones."
 
@@ -31550,7 +31631,7 @@ msgid "Someone else has control of this browser."
 msgstr "Otra persona tiene el control de este navegador."
 
 #: src/components/error-boundary.tsx:200
-#: src/components/settings/settings-modal.tsx:130
+#: src/components/settings/settings-modal.tsx:131
 #: src/features/pages/components/page-share-dialog.tsx:50
 msgid "Something went wrong"
 msgstr "Algo salió mal"
@@ -34445,6 +34526,14 @@ msgstr "El host lista como máximo {commitLimit, plural, one {# commit} other {#
 msgid "The host lists at most {fileLimit, plural, one {# file} other {# files}} for one change. {leftOut, plural, one {# more is not shown here.} other {# more are not shown here.}}"
 msgstr "El host lista como máximo {fileLimit, plural, one {# archivo} other {# archivos}} por cambio. {leftOut, plural, one {# más no se muestra aquí.} other {# más no se muestran aquí.}}"
 
+#: src/features/auth/components/settings/event-webhook/event-webhook-hosts-card.tsx:46
+msgid "The host name is too long."
+msgstr "El nombre de host es demasiado largo."
+
+#: src/features/auth/components/settings/event-webhook/event-webhook-hosts-card.tsx:188
+msgid "The host name only, such as hooks.example.com. HTTPS on the standard port."
+msgstr "Solo el nombre de host, por ejemplo hooks.example.com. HTTPS en el puerto estándar."
+
 #: src/features/develop/components/files-tab.tsx:216
 msgid "The host sent no diff for this file (binary, or too large for it)."
 msgstr "El host no envió ningún diff para este archivo (es binario o demasiado grande para él)."
@@ -36564,7 +36653,7 @@ msgstr "Reintentar"
 
 #: src/components/error-boundaries/global-error-boundary-provider.tsx:211
 #: src/components/error-boundaries/route-error-boundary.tsx:80
-#: src/components/settings/settings-modal.tsx:135
+#: src/components/settings/settings-modal.tsx:136
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:442
 msgid "Try Again"
 msgstr "Intentar de nuevo"
