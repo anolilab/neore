@@ -22,6 +22,7 @@ import {
     dropImportMarkersPage,
     dropRowsGoneFromGuest,
     drainTakenBackThread,
+    EVENT_COPY_PAGE_SIZE,
     importShardRows,
     listRowsMissingOnGuest,
     listShardRowsPage,
@@ -202,6 +203,17 @@ const asLeaseHolder = async (context: any, procedure: unknown, args: Record<stri
 
     return await context.runMutation(procedure, { from: "guest", generation, to: "user", ...args });
 };
+
+/** Guest Events past one clear page, so over many copy pages. */
+const PAGED_EVENTS = MERGE_PAGE_SIZE + EVENT_COPY_PAGE_SIZE + 1;
+/**
+ * A run budget small enough that the copy of {@link PAGED_EVENTS} stops partway through the log, and large enough that the rest of the
+ * merge takes few runs: about 70, not the 250 a budget of four calls takes, which ran past the test timeout on a loaded machine.
+ */
+const PAGED_EVENTS_BUDGET = MERGE_LEASE_CALLS + MERGE_STOP_CALLS + 10;
+
+/** Whether a run stopped inside the Events copy with more of the log to read. */
+const stoppedMidEventsCopy = (runs: MergeProgress[]): boolean => runs.some((run) => run.phase === "copy" && run.table === "mcpEvents" && run.cursor !== null);
 
 /** Every run of a merge, as the queue would chain them: each from where the last stopped, until one says it is done. */
 const mergeToEnd = async (
@@ -2643,7 +2655,7 @@ describe("mergeGuestInto across two real shards", () => {
                 await context.db.insert("mcpEventWatermarks", { seq: 1, userId: "user" });
             });
             await merge.shards.guest.run(async (context: any) => {
-                for (let seq = 1; seq <= 250; seq += 1) {
+                for (let seq = 1; seq <= PAGED_EVENTS; seq += 1) {
                     await context.db.insert("mcpEvents", {
                         createdAt: Date.now(),
                         data: "{}",
@@ -2655,13 +2667,13 @@ describe("mergeGuestInto across two real shards", () => {
                     });
                 }
 
-                await context.db.insert("mcpEventWatermarks", { seq: 250, userId: "guest" });
+                await context.db.insert("mcpEventWatermarks", { seq: PAGED_EVENTS, userId: "guest" });
             });
 
             // A small budget, so the copy spans runs: the log is copied a page per call, not in one go.
-            const { runs } = await mergeToEnd(merge.call, "guest", "user", { budget: MERGE_LEASE_CALLS + MERGE_STOP_CALLS + 4 });
+            const { runs } = await mergeToEnd(merge.call, "guest", "user", { budget: PAGED_EVENTS_BUDGET });
 
-            expect(runs.length).toBeGreaterThan(1);
+            expect(stoppedMidEventsCopy(runs)).toBe(true);
 
             const onUser = (await merge.shards.user.run(async (context: any) => {
                 const { page } = await context.db.mcpEvents.findMany({ limit: 1000, where: { userId: "user" } });
@@ -2670,8 +2682,8 @@ describe("mergeGuestInto across two real shards", () => {
                 return { seqs: page.map((row: { seq: number }) => row.seq).toSorted((a: number, b: number) => a - b), watermark: watermark?.seq };
             })) as { seqs: number[]; watermark: number };
 
-            expect(onUser.seqs).toStrictEqual(Array.from({ length: 251 }, (_, index) => index + 1));
-            expect(onUser.watermark).toBe(251);
+            expect(onUser.seqs).toStrictEqual(Array.from({ length: PAGED_EVENTS + 1 }, (_, index) => index + 1));
+            expect(onUser.watermark).toBe(PAGED_EVENTS + 1);
 
             const leftOnGuest = (await merge.shards.guest.run(async (context: any) => {
                 const { page } = await context.db.mcpEvents.findMany({ limit: 1000, where: { userId: "guest" } });
@@ -3089,7 +3101,7 @@ describe("mergeGuestInto across two real shards", () => {
         try {
             // Inserted from the highest seq down, so creation order is the reverse of sequence order.
             await merge.shards.guest.run(async (context: any) => {
-                for (let seq = 250; seq >= 1; seq -= 1) {
+                for (let seq = PAGED_EVENTS; seq >= 1; seq -= 1) {
                     await context.db.insert("mcpEvents", {
                         createdAt: Date.now(),
                         data: "{}",
@@ -3101,10 +3113,12 @@ describe("mergeGuestInto across two real shards", () => {
                     });
                 }
 
-                await context.db.insert("mcpEventWatermarks", { seq: 250, userId: "guest" });
+                await context.db.insert("mcpEventWatermarks", { seq: PAGED_EVENTS, userId: "guest" });
             });
 
-            await mergeToEnd(merge.call, "guest", "user", { budget: MERGE_LEASE_CALLS + MERGE_STOP_CALLS + 4 });
+            const { runs } = await mergeToEnd(merge.call, "guest", "user", { budget: PAGED_EVENTS_BUDGET });
+
+            expect(stoppedMidEventsCopy(runs)).toBe(true);
 
             const eventIds = (await merge.shards.user.run(async (context: any) => {
                 const { page } = await context.db.mcpEvents.findMany({ limit: 1000, orderBy: [{ seq: "asc" }], where: { userId: "user" } });
@@ -3112,8 +3126,8 @@ describe("mergeGuestInto across two real shards", () => {
                 return page.map((row: { eventId: string }) => row.eventId);
             })) as string[];
 
-            // The copies take the next numbers in the guest's own sequence order, so their ids read 1 to 250 in order.
-            expect(eventIds).toStrictEqual(Array.from({ length: 250 }, (_, index) => `run:g${String(index + 1)}`));
+            // The copies take the next numbers in the guest's own sequence order, so their ids read in order.
+            expect(eventIds).toStrictEqual(Array.from({ length: PAGED_EVENTS }, (_, index) => `run:g${String(index + 1)}`));
         } finally {
             merge.close();
         }

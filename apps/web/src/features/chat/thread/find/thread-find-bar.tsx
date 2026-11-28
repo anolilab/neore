@@ -4,7 +4,7 @@ import { useLingui } from "@lingui/react/macro";
 import { Input } from "@neore/ui/components/input";
 import { ChevronDownIcon, ChevronUpIcon, XIcon } from "lucide-react";
 import type { ChangeEvent, FC, FormEvent, KeyboardEvent } from "react";
-import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import TooltipIconButton from "@/features/chat/components/tooltip-icon-button";
 import { useChatMessages, useChatThread } from "@/features/chat/core/context/chat-context";
@@ -28,6 +28,8 @@ const ThreadFindBar: FC = () => {
     const { loadMore, messages, messagesStatus } = useChatMessages();
     const { threadId } = useChatThread();
     const [isOpen, setIsOpen] = useState(false);
+    // Bumped by every open, so the shortcut pressed again with the bar open focuses and selects the field again.
+    const [openRequest, setOpenRequest] = useState(0);
     const [query, setQuery] = useState("");
     const [index, setIndex] = useState(0);
     // Bumped by every navigation, so stepping onto the same message scrolls back to it.
@@ -84,17 +86,24 @@ const ThreadFindBar: FC = () => {
             }
 
             setIsOpen(true);
-            // The input mounts with the bar; focus it once it is there.
-            requestAnimationFrame(() => {
-                inputRef.current?.focus();
-                inputRef.current?.select();
-            });
+            setOpenRequest((count) => count + 1);
         };
 
         globalThis.addEventListener(FIND_IN_THREAD_EVENT, open);
 
         return () => globalThis.removeEventListener(FIND_IN_THREAD_EVENT, open);
     }, []);
+
+    // In the commit that mounts the field, not a frame later: a frame can come before that commit (the field is not there yet)
+    // or after the first keys (selecting them, so the next key replaces them).
+    useLayoutEffect(() => {
+        if (openRequest === 0) {
+            return;
+        }
+
+        inputRef.current?.focus();
+        inputRef.current?.select();
+    }, [openRequest]);
 
     useEffect(() => {
         if (isOpen && currentMessageId !== undefined) {
