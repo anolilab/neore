@@ -43,7 +43,7 @@ import { messageCarriesGuestText, promptCannotBeQuoted } from "../chat/lib/attac
 import type { typedTextOf } from "../chat/lib/attached-text";
 import { GOAL_CONTINUATION_AGENT } from "../chat/goals/shared";
 import { isTypedChatKind } from "../chat/lib/typed-chat-kind";
-import { claimRow, putClaimResult } from "../lib/claim-once";
+import { claimFence, claimRow, putClaimResult } from "../lib/claim-once";
 import { dropRememberDispatch, takeRememberDispatch } from "./remember-dispatch";
 
 /**
@@ -79,11 +79,48 @@ export const REMEMBER_SCOPE = "memory-remember";
 /** The `result` a remember request records on its claim once it wrote something or found nothing asked: the prompt is handled. */
 const REMEMBER_DONE = "done";
 
-/** Where a prompt's remember request stands: none (or given back), still running, or handled (`REMEMBER_DONE`). */
+/**
+ * The mark a `forget` call leaves on its prompt (`forget.ts`), held a day like a handled remember request: the message asks to
+ * forget, so the reply's extraction must not learn what it names from it again. Read beside the remember claim below.
+ */
+export const FORGET_SCOPE = "memory-forget";
+const FORGET_MARK_TTL_MS = 24 * 60 * 60 * 1000;
+
+/** Marks the prompt as one a `forget` call ran for; a mark already there stands. Called in the forget call's own write. */
+export const markForgetPrompt = async (ctx: Pick<MutationCtx, "db">, promptMessageId: string, userId: string): Promise<void> => {
+    await claimFence(ctx, FORGET_SCOPE, promptMessageId, { ttlMs: FORGET_MARK_TTL_MS, userId });
+};
+
+/**
+ * Whether the words an extracted fact was taken from (`evidence.messageId`) are a prompt a `forget` call marked, read in the
+ * writing mutation: an extraction already out when the mark landed writes nothing from that prompt. `marks` keeps one read per prompt.
+ */
+const fromForgetPrompt = async (ctx: Pick<QueryCtx, "db">, evidence: { messageId?: string } | undefined, marks: Map<string, boolean>): Promise<boolean> => {
+    const messageId = evidence?.messageId;
+
+    if (messageId === undefined) {
+        return false;
+    }
+
+    if (!marks.has(messageId)) {
+        marks.set(messageId, (await claimRow(ctx, FORGET_SCOPE, messageId)) !== null);
+    }
+
+    return marks.get(messageId) === true;
+};
+
+/**
+ * Where a prompt's remember request stands: none (or given back), still running, or handled (`REMEMBER_DONE`). A prompt a
+ * `forget` call marked is handled too, whatever remember did: its extraction reads only steers.
+ */
 export const rememberClaimState = internalQuery
     .input({ promptMessageId: v.string() })
     .output(v.union(v.literal("none"), v.literal("pending"), v.literal("done")))
     .query(async ({ args, ctx }) => {
+        if (await claimRow(ctx, FORGET_SCOPE, args.promptMessageId)) {
+            return "done" as const;
+        }
+
         const row = await claimRow(ctx, REMEMBER_SCOPE, args.promptMessageId);
 
         if (!row) {
@@ -1064,9 +1101,26 @@ export const sweepMemoryCleanups = internalMutation
     });
 
 /**
- * Delete a specific memory owned by the authenticated user, and every older version of it: the rows it superseded
- * (their wording is the same fact, only older) with their vectors, and its entries in the reflection digests.
+ * Deletes memories the caller has checked are the user's, and every older version of each: the rows they superseded
+ * (their wording is the same fact, only older) with their vectors, and their entries in the reflection digests. The one
+ * delete path, for the settings list and the `forget` tool alike (`forget.ts`).
  */
+export const deleteMemoryRows = async (context: MutationCtx, rows: ReadonlyArray<Doc<"memories">>, userId: string): Promise<{ olderVersions: number }> => {
+    for (const row of rows) {
+        await removeMemoryRow(context, row, userId);
+    }
+
+    const ids = rows.map((row) => row._id);
+    const { cleanupId, olderVersions } = await eraseOlderVersions(context, userId, ids, ids, undefined, context.now);
+
+    if (cleanupId) {
+        await armMemoryCleanup(context.scheduler, cleanupId, userId, 0);
+    }
+
+    return { olderVersions };
+};
+
+/** Delete a specific memory owned by the authenticated user, with its older versions and digest entries (`deleteMemoryRows`). */
 export const deleteMemory = authMutation
     .use(rateLimit("memory/update"))
     .input({
@@ -1076,14 +1130,7 @@ export const deleteMemory = authMutation
     .mutation(async ({ args: { memoryId }, ctx: context }) => {
         const { userId } = context.user;
         const memory = await requireOwnMemory(context, memoryId, userId);
-
-        await removeMemoryRow(context, memory, userId);
-
-        const { cleanupId, olderVersions } = await eraseOlderVersions(context, userId, [memory._id], [memory._id], undefined, context.now);
-
-        if (cleanupId) {
-            await armMemoryCleanup(context.scheduler, cleanupId, userId, 0);
-        }
+        const { olderVersions } = await deleteMemoryRows(context, [memory], userId);
 
         context.log.event("memory.delete_memory", { hadEmbedding: Boolean(memory.embeddingId), olderVersions });
 
@@ -1457,7 +1504,15 @@ export const saveMemoryBatch = internalMutation
             activeRows = retired === undefined ? activeRows : activeRows?.filter((row) => row._id !== retired);
         };
 
+        const forgetMarks = new Map<string, boolean>();
+
         for (const { evidenceFrom, supersedesBase, supersedesDates, ...mem } of args.memories) {
+            // A fact learned from a prompt the user asked to forget from is not saved; one they asked to remember is.
+            if (args.compressedFrom === undefined && mem.source !== "requested" && (await fromForgetPrompt(ctx, mem.evidence, forgetMarks))) {
+                memoryIds.push(null);
+                continue;
+            }
+
             // A supersession applies only while its target still reads as the text, and holds the dates, the decision was
             // made on, in the same scope, unpinned and active. Otherwise the new memory is saved beside it.
             const target = mem.supersedes ? await ctx.db.get("memories", mem.supersedes) : null;
@@ -1858,6 +1913,8 @@ export const linkMemoryEmbeddings = internalMutation
  */
 export const reviseExtractedMemory = internalMutation
     .input({
+        // A fact a remember request asked for: written even from a prompt a `forget` call marked.
+        asked: v.optional(v.boolean()),
         base: v.string(),
         botId: v.optional(v.string()),
         confidence: v.number(),
@@ -1880,6 +1937,12 @@ export const reviseExtractedMemory = internalMutation
 
         if (check && "refused" in check) {
             return check;
+        }
+
+        // A revision from a prompt the user asked to forget from does not apply unless the user asked to remember the fact;
+        // its fallback save is refused the same way (`saveMemoryBatch`).
+        if (args.asked !== true && (await fromForgetPrompt(ctx, args.evidence, new Map()))) {
+            return false;
         }
 
         const row = await ctx.db.get("memories", args.memoryId);
@@ -1974,7 +2037,8 @@ export const updateMemoryInternal = internalMutation
  */
 export const confirmMemories = internalMutation
     .input({
-        confirms: v.array(v.object({ base: v.string(), evidence: v.optional(vMemoryEvidence), memoryId: v.id("memories") })),
+        // `asked`: a fact a remember request asked for, confirmed even from a prompt a `forget` call marked.
+        confirms: v.array(v.object({ asked: v.optional(v.boolean()), base: v.string(), evidence: v.optional(vMemoryEvidence), memoryId: v.id("memories") })),
         // A request's confirmations: nothing is confirmed unless the request may still be written (`checkRequestedSource`).
         requested: v.optional(vRequestedSource),
         userId: v.string(),
@@ -1990,8 +2054,15 @@ export const confirmMemories = internalMutation
 
         // Indexes of the confirmations that did not apply: their row no longer reads as the text the fact matched.
         const unconfirmed: number[] = [];
+        const forgetMarks = new Map<string, boolean>();
 
-        for (const [index, { base, evidence, memoryId }] of args.confirms.entries()) {
+        for (const [index, { asked, base, evidence, memoryId }] of args.confirms.entries()) {
+            // A restatement in a prompt the user asked to forget from confirms nothing: it falls back to the save, which drops it.
+            if (asked !== true && (await fromForgetPrompt(ctx, evidence, forgetMarks))) {
+                unconfirmed.push(index);
+                continue;
+            }
+
             const memory = await ctx.db.get("memories", memoryId);
 
             if (memory?.userId === args.userId && !memory.supersededBy && memory.memory === base) {

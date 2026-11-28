@@ -4,7 +4,7 @@ import { useLingui } from "@lingui/react/macro";
 import { Button } from "@neore/ui/components/button";
 import { Kbd } from "@neore/ui/components/kbd";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@neore/ui/components/tooltip";
-import { formatShortcutForDisplay } from "@neore/ui/utils/keyboard-shortcuts";
+import { formatShortcutForDisplay, getPlatformModifierForEvents } from "@neore/ui/utils/keyboard-shortcuts";
 import { useNavigate } from "@tanstack/react-router";
 import { FolderPlus, Search, SquarePen } from "lucide-react";
 import type { FC } from "react";
@@ -12,14 +12,13 @@ import { memo, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 
 import CreateGroupChatButton from "@/features/chat/group/create-group-chat-button";
+import { shortcutToKeys } from "@/features/keyboard/lib/shortcut-sheet";
 import { useKeyboardShortcuts } from "@/features/layout/hooks/use-ui-state";
 
 import SearchBar from "./search-bar";
 import SectionBar from "./section-bar";
 import { useThreadListUIStore } from "./stores/thread-list-ui-store";
 import ThreadListFilterMenu from "./thread-list-filter-menu";
-
-const MODIFIER_SYMBOLS: Readonly<Record<string, string>> = { Alt: "⌥", Ctrl: "⌃", Shift: "⇧" };
 
 interface ThreadListDockProperties {
     isSearchLoading?: boolean;
@@ -35,11 +34,11 @@ const ThreadListDock: FC<ThreadListDockProperties> = memo(({ isSearchLoading = f
     const searchRowRef = useRef<HTMLDivElement>(null);
     const { keyboardShortcuts } = useKeyboardShortcuts();
     const focusSearchShortcut = formatShortcutForDisplay(keyboardShortcuts.focusSearch);
-    // The hint beside the label is compact (modifier symbols: Ctrl+Shift+F reads "⌃⇧F"), and only while it fits: a long chord stays in the tooltip.
-    const compactShortcut = focusSearchShortcut
-        .split(" + ")
-        .map((part) => MODIFIER_SYMBOLS[part] ?? part)
-        .join("");
+    // The hint beside the label prints the keys as the platform does, like the shortcuts sheet: "⌘⇧F" on a Mac, "Ctrl+Shift+F"
+    // elsewhere. It shows only while it fits; a longer chord stays in the tooltip.
+    const isMac = getPlatformModifierForEvents() === "cmd";
+    const shortcutKeys = shortcutToKeys(keyboardShortcuts.focusSearch, isMac);
+    const compactShortcut = shortcutKeys.join(isMac ? "" : "+");
     const shownShortcut = compactShortcut.length <= 6 ? compactShortcut : "";
     // An unbound shortcut is "": the tooltip then names the action alone.
     const newThreadShortcut = formatShortcutForDisplay(keyboardShortcuts.newChat);

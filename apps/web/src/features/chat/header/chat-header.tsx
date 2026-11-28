@@ -20,7 +20,7 @@ import ThreadPullRequests from "@/features/develop/components/thread-pull-reques
 import SiteHeader from "@/features/layout/components/site-header";
 
 import KBAttachmentButton from "./kb-attachment-button";
-import TemporaryChatDropdown from "./temporary-chat-dropdown";
+import TemporaryChatDropdown, { useTemporaryChatActive } from "./temporary-chat-dropdown";
 import ThemeRow from "./theme-row";
 import ThreadDownloadButton from "./thread-download-button";
 
@@ -58,6 +58,7 @@ const ChatSiteHeader: FC<{ threadId?: string }> = ({ threadId }) => {
     useTitleSaveRevision();
     const { setThreadMetadata } = useThreadActions();
     const model = threadData?.model;
+    const temporaryChatActive = useTemporaryChatActive(actualThreadId);
     // Shown as it is: no copy of its own, so a rename from the list is what the header renders next time.
     const currentTitle = (isValid ? titleOnScreen(actualThreadId ?? "", threadData?.title) : threadData?.title) || title;
 
@@ -137,13 +138,15 @@ const ChatSiteHeader: FC<{ threadId?: string }> = ({ threadId }) => {
             anonymousUserBanner={<AnonymousUserBanner />}
             menu={
                 <>
+                    {/* While a chat is (or the next one will be) temporary, its hourglass stays in sight: the warning that it is auto-deleted. */}
+                    {temporaryChatActive && <TemporaryChatDropdown threadId={actualThreadId} />}
                     <ThreadShareButton threadId={actualThreadId} />
                     <SidebarTrigger className="text-muted-foreground hover:text-foreground" icon={<PanelRightIcon />} name="right" />
                 </>
             }
             overflow={
                 <>
-                    <TemporaryChatDropdown label={t`Temporary chat`} threadId={actualThreadId} />
+                    {!temporaryChatActive && <TemporaryChatDropdown label={t`Temporary chat`} threadId={actualThreadId} />}
                     <ThreadImagesButton label={t`Images in this chat`} threadId={actualThreadId} />
                     <KBAttachmentButton label={t`Knowledge base`} threadId={actualThreadId} />
                     <ThreadDownloadButton label={t`Chat actions`} model={model} threadId={actualThreadId} />

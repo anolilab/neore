@@ -11,6 +11,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@neore/ui/components/to
 import { ImagesIcon } from "lucide-react";
 import type { FC } from "react";
 
+import { useOverflowReturnTarget } from "@/features/layout/components/mobile-header-actions";
+
 import { OVERFLOW_ROW_CLASS } from "../header/header-row";
 import { useImageGalleryStore } from "./image-gallery-store";
 import useThreadImages from "./use-thread-images";
@@ -18,6 +20,7 @@ import useThreadImages from "./use-thread-images";
 const ThreadImagesButton: FC<{ label?: string; threadId: string | undefined }> = ({ label, threadId }) => {
     const { t } = useLingui();
     const openAt = useImageGalleryStore((state) => state.openAt);
+    const returnTargetFor = useOverflowReturnTarget();
     // Image and video mode show their own grid of the chat's media, with its own preview, and no message to go to.
     const listShown = useImageGalleryStore((state) => (threadId ? (state.listShown[threadId] ?? true) : true));
     const images = useThreadImages();
@@ -33,7 +36,7 @@ const ThreadImagesButton: FC<{ label?: string; threadId: string | undefined }> =
                     <Button
                         aria-label={t`Images in this chat (${images.length})`}
                         className={label ? OVERFLOW_ROW_CLASS : undefined}
-                        onClick={(event) => openAt(threadId, null, event.currentTarget)}
+                        onClick={(event) => openAt(threadId, null, returnTargetFor(event.currentTarget))}
                         size={label ? "default" : "icon"}
                         variant="ghost"
                     >

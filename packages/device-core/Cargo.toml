@@ -23,12 +23,20 @@ default = ["keychain"]
 # keychain), and the registry installs (`acp_install.rs`, which unpacks archives). `actions`, `fs`, `shell` and
 # `sandbox` build without it, so `neore-host` links no archive code.
 keychain = ["dep:keyring", "dep:flate2", "dep:tar", "dep:zip"]
-# A headless machine that pairs itself by code and keeps its own device secret (`headless/`). The only build of the
-# host that makes an outbound connection (to the backend, to pair).
+# A headless machine that pairs itself by code and keeps its own device secret (`headless/`). It connects out to the
+# backend, to pair; `mcp-bridge` connects out only to the MCP server it is given.
 headless = ["keychain", "dep:ureq", "dep:zeroize"]
+# `neore-host mcp-bridge` (`mcp_bridge.rs`): relays a local MCP server's stdio to one MCP server over HTTP. Keyless, so a
+# host built with it still links no keyring; the addon never turns it on.
+mcp-bridge = ["dep:ureq"]
 # `store::test_keychain`, the in-memory keychain the integration tests install. Off in every build that ships: only
 # this crate's own dev-dependency below turns it on, so `install()` is not in the addon or the host.
 test-support = []
+
+# The relay of `neore-host mcp-bridge` against a fake MCP server.
+[[test]]
+name = "mcp_bridge"
+required-features = ["mcp-bridge"]
 
 [dev-dependencies]
 device-core = { path = ".", default-features = false, features = ["test-support"] }

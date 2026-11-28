@@ -42,7 +42,7 @@ const OWN_OUTPUT_TOOLS: ReadonlySet<string> = new Set([
     "videoGeneration",
 ]);
 
-const KNOWLEDGE_TOOLS: ReadonlySet<string> = new Set(["knowledgeSearch", "remember", "searchMemory", "searchPastChats"]);
+const KNOWLEDGE_TOOLS: ReadonlySet<string> = new Set(["forget", "knowledgeSearch", "remember", "searchMemory", "searchPastChats"]);
 
 /** The taint one tool result adds; `null` for our own output. */
 export const taintOfTool = (toolName: string): DeviceTaintSource | null => {
