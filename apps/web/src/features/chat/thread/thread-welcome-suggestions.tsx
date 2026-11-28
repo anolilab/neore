@@ -154,48 +154,46 @@ const ThreadWelcomeSuggestions: FC<{ className?: string; opensBelow?: boolean }>
         }
     }, [activeTab, isOpen, opensBelow]);
 
-    return (
-        <div className={cn("flex w-full flex-col", opensBelow && "relative", className)} ref={containerRef}>
-            <Tabs className="flex flex-col gap-2" onValueChange={handleTabChange} value={activeTab}>
-                {isOpen && activeTab !== "" && (
-                    <div
-                        className={cn("surface-raised max-h-56 overflow-y-auto rounded-xl p-1", opensBelow && "absolute inset-x-0 top-full z-20")}
-                        ref={listRef}
-                    >
-                        {Object.entries(categories).map(([key, category]) => {
-                            if (key !== activeTab) {
-                                return undefined;
-                            }
+    const suggestionList = isOpen && activeTab !== "" && (
+        <div className={cn("surface-raised max-h-56 overflow-y-auto rounded-xl p-1", opensBelow && "absolute inset-x-0 top-full z-20")} ref={listRef}>
+            {Object.entries(categories).map(([key, category]) => {
+                if (key !== activeTab) {
+                    return undefined;
+                }
 
-                            const Icon = category.icon;
+                const Icon = category.icon;
+
+                return (
+                    <div className="flex flex-col" key={key}>
+                        {category.suggestions.map((suggestion) => {
+                            const suggestionKey = `${key}-${suggestion}`;
 
                             return (
-                                <div className="flex flex-col" key={key}>
-                                    {category.suggestions.map((suggestion) => {
-                                        const suggestionKey = `${key}-${suggestion}`;
-
-                                        return (
-                                            <button
-                                                className={cn(
-                                                    "group relative flex min-h-[44px] w-full cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors outline-none",
-                                                    "focus-visible:ring-ring focus-visible:ring-2",
-                                                    "hover:bg-surface-row-hover focus-visible:bg-surface-row-hover active:bg-surface-row-active",
-                                                )}
-                                                key={suggestionKey}
-                                                onClick={suggestionHandlers[suggestionKey]}
-                                                type="button"
-                                            >
-                                                <Icon className="text-muted-foreground group-hover:text-foreground dark:text-muted-foreground dark:group-hover:text-foreground size-4 shrink-0 transition-colors" />
-                                                <span className="text-foreground flex-1 leading-relaxed">{suggestion}</span>
-                                            </button>
-                                        );
-                                    })}
-                                </div>
+                                <button
+                                    className={cn(
+                                        "group relative flex min-h-[44px] w-full cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors outline-none",
+                                        "focus-visible:ring-ring focus-visible:ring-2",
+                                        "hover:bg-surface-row-hover focus-visible:bg-surface-row-hover active:bg-surface-row-active",
+                                    )}
+                                    key={suggestionKey}
+                                    onClick={suggestionHandlers[suggestionKey]}
+                                    type="button"
+                                >
+                                    <Icon className="text-muted-foreground group-hover:text-foreground dark:text-muted-foreground dark:group-hover:text-foreground size-4 shrink-0 transition-colors" />
+                                    <span className="text-foreground flex-1 leading-relaxed">{suggestion}</span>
+                                </button>
                             );
                         })}
                     </div>
-                )}
+                );
+            })}
+        </div>
+    );
 
+    return (
+        <div className={cn("flex w-full flex-col", opensBelow && "relative", className)} ref={containerRef}>
+            <Tabs className="flex flex-col gap-2" onValueChange={handleTabChange} value={activeTab}>
+                {!opensBelow && suggestionList}
                 <TabsList
                     className="h-auto w-full flex-wrap justify-center gap-1.5 bg-transparent p-0 group-data-horizontal/tabs:h-auto dark:bg-transparent"
                     variant="line"
@@ -215,6 +213,8 @@ const ThreadWelcomeSuggestions: FC<{ className?: string; opensBelow?: boolean }>
                         );
                     })}
                 </TabsList>
+                {/* Below the chips it also follows them in the page, so Tab from a category reaches its choices next. */}
+                {opensBelow && suggestionList}
             </Tabs>
         </div>
     );
