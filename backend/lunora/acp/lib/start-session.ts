@@ -33,6 +33,8 @@ export const openHostSession = async (
     await ctx.db.insert("acpSessions", {
         agentKey: offer.agentKey,
         agentLabel: offer.agentLabel,
+        // A fork's session says in its first open whether the agent forked: turns wait for it (`sendToHostFor`).
+        ...(forkSessionId !== undefined && { awaitingForkResult: true }),
         createdAt: now,
         deviceId: device._id,
         folderId: offer.folderId,

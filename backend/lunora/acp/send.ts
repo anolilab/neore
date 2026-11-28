@@ -135,6 +135,12 @@ export const sendToHostFor = async (ctx: MutationCtx, args: SendToHostInput): Pr
         return { outcome: "session_ended" as const };
     }
 
+    // A fork's agent has not said yet whether it forked: if it did not, a summary of the copied history goes with the first prompt, and a
+    // prompt taken before that report would be saved ahead of the divider that marks it (`acp/lib/fork-fallback.ts`).
+    if (session.awaitingForkResult === true) {
+        return { outcome: "session_starting" as const };
+    }
+
     // The agent was asked to load its own saved session and has not said whether it did. If it fails, the conversation
     // has to go with the first prompt (`pendingHandoffOf`): a prompt saved before that would end the wait for it.
     if (session.status === "starting" && (await awaitingReattach(ctx, thread))) {

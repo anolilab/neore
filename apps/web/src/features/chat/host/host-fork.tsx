@@ -23,6 +23,16 @@ import { toast } from "sonner";
 import { getLocalizedError } from "@/features/auth/lib/utilities";
 import { useLunoraActionOptions } from "@/lib/lunora/crpc";
 
+/** The codes of a refusal that made nothing and holds no claim: the same click is a new fork when it is tried again. */
+const DEFINITE_REFUSALS = new Set(["BAD_REQUEST", "FORBIDDEN", "NOT_FOUND"]);
+
+/** Whether the server refused the call outright (`LunoraError`, as `code` or as a domain `data.code`). A dropped connection or a timeout is not one. */
+const isDefiniteRefusal = (error: unknown): boolean => {
+    const { code, data } = (typeof error === "object" && error !== null ? error : {}) as { code?: unknown; data?: { code?: unknown } };
+
+    return [code, data?.code].some((candidate) => typeof candidate === "string" && DEFINITE_REFUSALS.has(candidate));
+};
+
 const HostFork: FC<{ capabilities: CapabilityReportInput | undefined; disabled?: boolean; threadId: string }> = ({ capabilities, disabled, threadId }) => {
     const { t } = useLingui();
     const navigate = useNavigate();
@@ -41,15 +51,18 @@ const HostFork: FC<{ capabilities: CapabilityReportInput | undefined; disabled?:
         networkMode: "always",
         retry: 0,
         onError: (error) => {
-            // The id stays: a fork that is refused or taken back gave its claim back, so the same id forks again, and one whose answer was
-            // lost (a dropped connection on this long call) is the same fork when it is tried again, not a second one.
+            // The id stays unless the server refused the call outright (it made nothing, so the next click is a new fork): a fork whose answer
+            // was lost (a dropped connection or a timeout on this long call) may have been made, and is the same fork when it is tried again.
+            if (isDefiniteRefusal(error)) {
+                clientId.current = undefined;
+            }
+
             toast.error(getLocalizedError({ error, t }));
         },
         onSuccess: (result) => {
-            // No chat in the answer: this fork is still being made (a retry of one in flight). Nothing opens and nothing is cleared, so the
-            // same click, tried again in a moment, gets the chat.
+            // No chat in the answer is no finished fork: the dialog stays open and the id is kept, so the same click, tried again in a moment, gets the chat.
             if (result.threadId === undefined) {
-                toast.info(t`This fork is still being made. Try again in a moment.`);
+                toast.error(t`This fork is still being made. Try again in a moment.`);
 
                 return;
             }
@@ -80,6 +93,11 @@ const HostFork: FC<{ capabilities: CapabilityReportInput | undefined; disabled?:
     }
 
     const confirm = () => {
+        // The agent can start again (`disabled`) while the dialog is open: a fork then would be refused, or made from a session not ready.
+        if (disabled === true || fork.isPending) {
+            return;
+        }
+
         clientId.current ??= crypto.randomUUID();
         // The route's own id type is a branded string; the thread id the composer holds is that thread's.
         fork.mutate({ clientId: clientId.current, threadId: threadId as never });
@@ -92,6 +110,7 @@ const HostFork: FC<{ capabilities: CapabilityReportInput | undefined; disabled?:
                 {t`Fork here`}
             </Button>
             <ConfirmDialog
+                confirmDisabled={disabled === true}
                 confirmLabel={t`Fork here`}
                 description={t`The fork continues from this conversation in a new chat on the same computer and folder. Both chats work in that folder, so they can change the same files, and a git worktree there is shared too.`}
                 loading={fork.isPending}

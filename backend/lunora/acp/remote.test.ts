@@ -95,7 +95,8 @@ const remote = await import("./remote");
 const { isOutOfScopeStart } = await import("./lib/start");
 const send = await import("./send");
 const { getHostSession } = await import("./functions");
-const { internalAction } = await import("../_generated/server");
+const { internalAction, internalQuery } = await import("../_generated/server");
+const agentBranches = await import("../agent/branches");
 const { v } = await import("lunorash/server");
 const agentMessages = await import("../agent/messages");
 const { pendingHandoffOf } = await import("./lib/pending-handoff");
@@ -1055,6 +1056,56 @@ describe("forkHostThread", () => {
             expect(await dividersOf(result.threadId)).toHaveLength(1);
         });
 
+        it("marks it once when the report arrives again after a prompt, though the newest row is then no divider", async () => {
+            const { device, threadId } = await started();
+
+            await say(threadId, [["asked", "success", 0]]);
+
+            const result = (await fork(threadId)) as { threadId: string };
+
+            await open(device, result.threadId, { forked: false, reason: "fork_failed" });
+            // A prompt after the divider: the leaf is a plain message now, which the leaf check alone would take for an unmarked chat.
+            await say(result.threadId, [["a later prompt", "success", 10]]);
+            await open(device, result.threadId, { forked: false, reason: "fork_failed" });
+            expect(await dividersOf(result.threadId)).toHaveLength(1);
+        });
+
+        it("takes no turn until the agent says whether it forked, and takes them once it has, whichever way", async () => {
+            const { device, threadId } = await started();
+
+            await say(threadId, [["asked", "success", 0]]);
+
+            const result = (await fork(threadId)) as { threadId: string };
+
+            // The prompt that arrives while the session is `starting` would be saved ahead of the divider and lose the summary.
+            expect(await outcomeOfSend(result.threadId)).toBe("session_starting");
+
+            await open(device, result.threadId, { forked: false, reason: "fork_unsupported" });
+
+            const [opened] = await rows("acpSessions", { threadId: result.threadId });
+
+            expect(opened?.awaitingForkResult).toBeUndefined();
+            expect(opened?.forkFallbackAt).toBeDefined();
+            // The first turn will carry the summary, since the divider was in place before it was taken.
+            expect(await handoffOf(result.threadId)).toContain("asked");
+            expect(await outcomeOfSend(result.threadId)).toBe("sent");
+        });
+
+        it("takes turns again when an older desktop opens the session with no fork report", async () => {
+            const { device, threadId } = await started();
+            const result = (await fork(threadId)) as { threadId: string };
+
+            expect(await outcomeOfSend(result.threadId)).toBe("session_starting");
+
+            const [opening] = await rows("acpSessions", { threadId: result.threadId });
+
+            await run(
+                async (ctx) =>
+                    await ctx.runMutation(applyHostEvents, { deviceId: device.deviceId, events: [SESSION_OPEN], sessionId: opening?.hostSessionId as string }),
+            );
+            expect(await outcomeOfSend(result.threadId)).toBe("sent");
+        });
+
         it("adds no divider and no summary when the agent forked its own session", async () => {
             const { device, threadId } = await started();
 
@@ -1155,20 +1206,27 @@ describe("forkHostThread", () => {
             expect(await rows("deviceCalls", { toolName: "acp_start" })).toHaveLength(1);
         });
 
-        it("answers a retry of a fork still being made with no chat, so the client does not mistake it for a finished one", async () => {
+        it("answers a retry of a fork still being made with a retryable conflict, never with no chat", async () => {
             const { threadId } = await started();
             const begun = await begin(threadId, "inflight");
 
             expect(begun.started).toBe(true);
             // The first run is between its two halves: the chat exists, its session is not queued yet.
-            expect(await fork(threadId, "inflight")).toEqual({ started: false });
+            await expect(fork(threadId, "inflight")).rejects.toThrow("still being made");
+            // Whatever changes in the source meanwhile (its agent no longer forks), the retry is still told the same, not a refusal to fork.
+            const [source] = await rows("acpSessions", { threadId });
+
+            await run(async (ctx) => {
+                await ctx.db.patch("acpSessions", source!._id, { capabilities: report({ reason: "not_offered", supported: false }) });
+            });
+            await expect(fork(threadId, "inflight")).rejects.toThrow("still being made");
         });
 
         it("frees the key of a fork the action never finished once its short claim lapses, so a retry forks", async () => {
             const { device, threadId } = await started();
 
             await begin(threadId, "cut-off");
-            expect(await fork(threadId, "cut-off")).toEqual({ started: false });
+            await expect(fork(threadId, "cut-off")).rejects.toThrow("still being made");
 
             // Ten minutes on (the computer has been heard from since).
             vi.setSystemTime(Date.now() + 11 * 60_000);
@@ -1180,6 +1238,175 @@ describe("forkHostThread", () => {
 
             expect(retry.started).toBe(true);
         });
+
+        it("lets only the attempt that took a claim give it back, so a late failure does not clear a retry's claim", async () => {
+            const { device, threadId } = await started();
+            const first = await begin(threadId, "late");
+
+            vi.setSystemTime(Date.now() + 11 * 60_000);
+            await run(async (ctx) => {
+                await ctx.db.patch("devices", device.deviceId, { lastSeenAt: Date.now() });
+            });
+
+            // The first attempt's claim lapsed and a retry took the key.
+            const retry = await begin(threadId, "late");
+
+            expect(retry.open.claimedAt).toBeGreaterThan(first.open.claimedAt as number);
+
+            const release = async (claimedAt: unknown) =>
+                await run(
+                    async (ctx) =>
+                        await ctx.runMutation(remote.releaseHostForkClaim, { claimedAt, clientId: "late", forkOfThreadId: threadId, userId: ownerId } as never),
+                );
+
+            // The first attempt fails late: its release finds the retry's claim and leaves it.
+            await release(first.open.claimedAt);
+            await expect(fork(threadId, "late")).rejects.toThrow("still being made");
+
+            // The first attempt cannot queue its session under the retry's claim either.
+            await expect(
+                run(
+                    async (ctx) =>
+                        await ctx.runMutation(remote.openHostFork, {
+                            ...first.open,
+                            clientId: "late",
+                            forkOfThreadId: threadId,
+                            threadId: first.threadId,
+                            userId: ownerId,
+                        } as never),
+                ),
+            ).rejects.toThrow("took too long");
+            expect(await rows("deviceCalls", { toolName: "acp_start" })).toHaveLength(1);
+
+            // The retry's own release does clear it.
+            await release(retry.open.claimedAt);
+            expect((await fork(threadId, "late")) as { started: boolean }).toMatchObject({ started: true });
+        });
+
+        it("answers a retry during the copy with a conflict, and takes no turn into the new chat until the copy is done", async () => {
+            const { threadId } = await started();
+            const seen: { retry?: string; send?: unknown } = {};
+            const probe = {
+                during: async () => {
+                    const [link] = await rows("threadRelationships", { parentThreadId: threadId });
+
+                    seen.retry = await fork(threadId, "mid")
+                        .then(() => "answered")
+                        .catch((error: Error) => error.message);
+
+                    const sent = await sendText(link!.threadId as string);
+
+                    seen.send = sent.outcome;
+                },
+                fail: false,
+                queued: [] as number[],
+                sessions: [] as number[],
+            };
+
+            await say(threadId, [["asked", "success", 0]]);
+            probeCopy(probe);
+
+            try {
+                const first = (await fork(threadId, "mid")) as { threadId: string };
+
+                expect(seen.retry).toContain("still being made");
+                // The new chat has no session while its history is copied, so a turn into it is refused, not saved over the copy.
+                expect(seen.send).toBe("session_ended");
+                expect(await textOf(first.threadId)).toEqual(["asked"]);
+                // Once the session is queued the retry gets the finished fork.
+                expect(await fork(threadId, "mid")).toEqual({ started: false, threadId: first.threadId });
+            } finally {
+                registerModule(registry, "agent_messages", agentMessages);
+            }
+        });
+
+        it("does not hand a retry the chat of a fork that was deleted since", async () => {
+            const { threadId } = await started();
+            const first = (await fork(threadId, "gone")) as { threadId: string };
+
+            await run(async (ctx) => {
+                await ctx.db.patch("threads", first.threadId, { deleted: true });
+            });
+            await expect(fork(threadId, "gone")).rejects.toThrow("removed");
+        });
+
+        it("refuses a source that is replying now", async () => {
+            const { threadId } = await started();
+
+            await say(threadId, [
+                ["asked", "success", 0],
+                ["answered", "success", 1],
+            ]);
+            await run(async (ctx) => {
+                await ctx.db.insert("persistentStreams", {
+                    expiresAt: Date.now() + 60_000,
+                    hostState: "accepted",
+                    messageId: "m",
+                    producer: "host",
+                    status: "streaming",
+                    threadId,
+                } as never);
+            });
+            await expect(fork(threadId, "busy")).rejects.toThrow("still replying");
+            expect(await rows("acpSessions")).toHaveLength(1);
+        });
+
+        it("refuses a source that took a message after the fork began, so the agent's session holds nothing the copy lacks", async () => {
+            const { threadId } = await started();
+            const probe = {
+                during: async () => {
+                    await say(threadId, [["a turn the fork's session will see", "success", 1]]);
+                },
+                fail: false,
+                queued: [] as number[],
+                sessions: [] as number[],
+            };
+
+            await say(threadId, [["asked", "success", 0]]);
+            probeCopy(probe);
+
+            try {
+                await expect(fork(threadId, "grew")).rejects.toThrow("changed while it was being forked");
+                expect(await rows("deviceCalls", { toolName: "acp_start" })).toHaveLength(1);
+            } finally {
+                registerModule(registry, "agent_messages", agentMessages);
+            }
+        });
+
+        it("refuses a fork whose agent stopped forking, or moved to another folder, while the history was copied", async () => {
+            const { threadId } = await started();
+            const [source] = await rows("acpSessions", { threadId });
+            const probe = {
+                during: async () => {
+                    await run(async (ctx) => {
+                        await ctx.db.patch("acpSessions", source!._id, { capabilities: report({ reason: "not_offered", supported: false }) });
+                    });
+                },
+                fail: false,
+                queued: [] as number[],
+                sessions: [] as number[],
+            };
+
+            await say(threadId, [["asked", "success", 0]]);
+            probeCopy(probe);
+
+            try {
+                await expect(fork(threadId, "no-fork")).rejects.toThrow("agent changed while it was being forked");
+
+                await run(async (ctx) => {
+                    await ctx.db.patch("acpSessions", source!._id, { capabilities: FORKABLE });
+                });
+                probe.during = async () => {
+                    await run(async (ctx) => {
+                        await ctx.db.patch("acpSessions", source!._id, { agentKey: "codex" });
+                    });
+                };
+                await expect(fork(threadId, "other-agent")).rejects.toThrow("agent changed while it was being forked");
+                expect(await rows("deviceCalls", { toolName: "acp_start" })).toHaveLength(1);
+            } finally {
+                registerModule(registry, "agent_messages", agentMessages);
+            }
+        });
     });
 
     it("refuses a chat that has messages but none settled to copy up to, instead of forking it empty", async () => {
@@ -1190,6 +1417,40 @@ describe("forkHostThread", () => {
         expect(await rows("acpSessions")).toHaveLength(1);
         expect(await rows("deviceCalls", { toolName: "acp_start" })).toHaveLength(1);
         expect(await rows("threadRelationships", { parentThreadId: threadId })).toHaveLength(0);
+    });
+
+    it("refuses a chat longer than the scan for its last settled message reaches, instead of forking it without its history", async () => {
+        const { threadId } = await started();
+
+        await say(threadId, [
+            ["q1", "success", 0],
+            ["a1", "success", 1],
+            ["q2", "success", 2],
+            ["a2", "success", 3],
+            ["q3", "success", 4],
+            ["a3", "success", 5],
+        ]);
+        // The real scan with the smallest budget: two pages of two rows end before the path does, so it has no answer.
+        registry.set(
+            "agent_branches:lastSettledMessageId",
+            internalQuery
+                .input({ threadId: v.id("threads") })
+                .output(v.union(v.null(), v.string()))
+                .query(
+                    async ({ args }) =>
+                        await run(
+                            async (inner) => await inner.runQuery(agentBranches.lastSettledMessageId, { maxPages: 1, pageSize: 2, threadId: args.threadId }),
+                        ),
+                ),
+        );
+
+        try {
+            await expect(fork(threadId, "long")).rejects.toThrow("too long to fork");
+            expect(await rows("acpSessions")).toHaveLength(1);
+            expect(await rows("threads", { createdBy: ownerId })).toHaveLength(1);
+        } finally {
+            registerModule(registry, "agent_branches", agentBranches);
+        }
     });
 
     it("forks a chat with no message at all", async () => {

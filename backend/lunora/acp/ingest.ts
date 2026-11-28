@@ -102,8 +102,11 @@ const openSession = async (ctx: MutationCtx, device: Doc<"devices">, hostSession
     if (existing) {
         // A session started as a fork that the agent did not fork (`fork_unsupported`, `fork_failed`) opened fresh: it holds none of the
         // source chat's conversation, so the chat is not a branch of it, and the link made when the fork was queued is taken back. Whatever
-        // the session's state now (the chat may have been deleted, which ends it, and restored since), and again for a report sent twice.
-        if (open.fork?.forked === false) {
+        // the session's state now (the chat may have been deleted, which ends it, and restored since). Once: the row records that it was
+        // handled, so a report sent again after a prompt adds no second divider and attaches no second summary.
+        const handleFallback = open.fork?.forked === false && existing.forkFallbackAt === undefined;
+
+        if (handleFallback) {
             const { page: links } = await ctx.db.threadRelationships.findMany({ where: { threadId: existing.threadId } });
 
             for (const link of links) {
@@ -114,6 +117,12 @@ const openSession = async (ctx: MutationCtx, device: Doc<"devices">, hostSession
 
             // The agent did not fork, so it starts fresh: the copied history is marked as handed over, and a summary of it goes in the first turn.
             await markForkFellBack(ctx, existing);
+        }
+
+        // The agent has answered, whichever way (an older desktop sends no fork report), and a fallback is handled in this same transaction:
+        // turns are taken again, and a report sent twice finds the mark.
+        if (handleFallback || existing.awaitingForkResult === true) {
+            await patchRow(ctx.db, "acpSessions", existing, { awaitingForkResult: undefined, ...(handleFallback && { forkFallbackAt: now }) });
         }
 
         // A thread deleted in the app ends its session: the desktop learns it is over instead of posting into it.

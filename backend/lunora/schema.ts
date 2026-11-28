@@ -199,11 +199,16 @@ export const schema = defineSchema({
         agentStateAt: v.optional(v.number()),
         // The desktop's sequence number of the newest report applied to `agentState`. Unset until a report carries one.
         agentStateSeq: v.optional(v.number()),
+        // A session opened as a fork waits for the agent's first `session_open` (which says whether it forked): no turn is taken until it
+        // arrives, so the fallback summary of a fork that did not fork lands before the first prompt. Cleared by that open.
+        awaitingForkResult: v.optional(v.boolean()),
         capabilities: v.optional(vCapabilityReport),
         createdAt: v.number(),
         deviceId: v.id("devices"),
         folderId: v.string(),
         folderLabel: v.string(),
+        // When a failed fork's fallback (divider, summary, link taken back) was handled: a report sent again later adds nothing.
+        forkFallbackAt: v.optional(v.number()),
         // When a prompt sent from the app carried the handoff this session was opened for (`acp/lib/send-turn.ts`). A prompt typed
         // in the computer's own window is a turn too but carries none, so a turn alone does not show the agent got it. Unset: not yet.
         handoffSentAt: v.optional(v.number()),
