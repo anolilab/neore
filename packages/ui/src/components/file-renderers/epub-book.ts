@@ -432,7 +432,19 @@ const inlineStylesheetUrls = async (css: string, directory: string, reader: Asse
 };
 
 const ASCII_LETTER = /[a-z]/iu;
-const IMPORT_AT = /@import/giu;
+const IMPORT_AT = /@import(?![\w-])/giu;
+const SPACE = /\s/u;
+
+/** Whether the `@import` at `index` of `code` starts a statement: it is the first thing in the sheet, or follows a `;`, `{` or `}`. One inside a value is text. */
+const startsStatement = (code: string, index: number): boolean => {
+    let at = index - 1;
+
+    while (at >= 0 && SPACE.test(code[at] ?? "")) {
+        at -= 1;
+    }
+
+    return at < 0 || ";{}".includes(code[at] ?? "");
+};
 const IMPORT_END = /[;{]/u;
 const IMPORT_RULE_STICKY = /@import\s+(?:url\(\s*)?(?:"([^"]*)"|'([^']*)'|([^\s;)]*))([^;{]*);?/iuy;
 
@@ -509,7 +521,7 @@ const expandImports = async (
     let resume = 0;
 
     for (const found of code.matchAll(IMPORT_AT)) {
-        if (found.index < resume) {
+        if (found.index < resume || !startsStatement(code, found.index)) {
             continue;
         }
 
@@ -694,7 +706,7 @@ const withoutImportRules = (css: string): string => {
     let at = 0;
 
     for (const found of code.matchAll(IMPORT_AT)) {
-        if (found.index < at) {
+        if (found.index < at || !startsStatement(code, found.index)) {
             continue;
         }
 

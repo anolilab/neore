@@ -621,6 +621,26 @@ describe("a chapter's style sheets", () => {
         opened.destroy();
     });
 
+    it("keeps a declaration whose value merely contains import-like text, and still drops a real import", async () => {
+        const opened = await openEpub(
+            await book({
+                chapters: [{ body: `${links(["../main.css"])}<p>x</p>`, file: "text/one.xhtml", id: "c1" }],
+                files: {
+                    "base.css": ".base{x:1}",
+                    "main.css": '@import "base.css"; p{color:red; font-family:foo@import bar; margin:0} a{color:blue} b[title~=@import]{color:green}',
+                },
+            }),
+            folder.path,
+        );
+        const sheet = sheetsOf(parse(await opened.read("c1"))).join("");
+
+        expect(sheet).toContain(".base{x:1}");
+        expect(sheet).toContain("p{color:red; font-family:foo@import bar; margin:0}");
+        expect(sheet).toContain("a{color:blue}");
+        expect(sheet).toContain("b[title~=@import]{color:green}");
+        opened.destroy();
+    });
+
     it("leaves text that looks like an import inside a string as text", async () => {
         const opened = await openEpub(
             await book({
