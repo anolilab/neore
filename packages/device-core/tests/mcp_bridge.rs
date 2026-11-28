@@ -515,7 +515,9 @@ fn a_cookie_or_a_key_in_the_address_the_server_echoes_does_not_reach_the_client(
             _ => {
                 // The query value decoded, a token without the extra space, and a credential of digits as a number;
                 // a path segment, a digest field and the session id.
-                let result = json!({ "echoed": echoed, "pin": 444_444_444_444_u64, "code": 1.2345678e14, "count": 3, "near": 9_007_199_254_740_992_u64, "more": more });
+                let address = request.header("host").unwrap_or_default();
+                // Its own address; and a key that blanks to one already there.
+                let result = json!({ "echoed": echoed, "pin": 444_444_444_444_u64, "code": 1.2345678e14, "count": 3, "near": 9_007_199_254_740_992_u64, "more": more, "at": format!("http://{address}/x"), "[redacted]": 1, opened.clone(): 2 });
 
                 json_reply(request, result, None)
             }
@@ -539,7 +541,7 @@ fn a_cookie_or_a_key_in_the_address_the_server_echoes_does_not_reach_the_client(
 
     assert_eq!(
         answer["result"],
-        json!({ "echoed": "saw [redacted], [redacted] and [redacted]", "pin": "[redacted]", "code": "[redacted]", "count": 3, "near": 9_007_199_254_740_992_u64, "more": "[redacted] [redacted] [redacted]" }),
+        json!({ "echoed": "saw [redacted], [redacted] and [redacted]", "pin": "[redacted]", "code": "[redacted]", "count": 3, "near": 9_007_199_254_740_992_u64, "more": "[redacted] [redacted] [redacted]", "at": "http://[redacted]/x", "[redacted]": 1, "[redacted] (2)": 2 }),
         "{answer}"
     );
 }

@@ -128,14 +128,27 @@ fn redact(value: &mut Value, secrets: &[String]) {
         }
         Value::Array(items) => items.iter_mut().for_each(|item| redact(item, secrets)),
         Value::Object(fields) => {
-            *fields = std::mem::take(fields)
-                .into_iter()
-                .map(|(mut key, mut item)| {
-                    scrub(&mut key, secrets);
-                    redact(&mut item, secrets);
-                    (key, item)
-                })
-                .collect();
+            let mut kept = serde_json::Map::new();
+
+            for (mut key, mut item) in std::mem::take(fields) {
+                scrub(&mut key, secrets);
+                redact(&mut item, secrets);
+
+                // Two keys can blank to the same text: neither field is lost.
+                let mut unique = key.clone();
+
+                for count in 2.. {
+                    if !kept.contains_key(&unique) {
+                        break;
+                    }
+
+                    unique = format!("{key} ({count})");
+                }
+
+                kept.insert(unique, item);
+            }
+
+            *fields = kept;
         }
         _ => {}
     }
@@ -328,6 +341,8 @@ pub fn parse_target(url: &str, headers: &str) -> Result<Target, String> {
     // Each header's credential, each cookie's value and each field of a compound one (`Digest …, response="…"`); each
     // name and value in the address's query and each segment of its path (`/mcp/<key>`), as written and decoded.
     let path: Vec<String> = uri.path().split('/').map(percent_decoded).collect();
+    // The address itself: the cloud learns only the server's name.
+    let authority = [authority.as_str(), authority.host()];
     let mut secrets: Vec<String> = given
         .values()
         .flat_map(|value| {
@@ -342,6 +357,7 @@ pub fn parse_target(url: &str, headers: &str) -> Result<Target, String> {
         )
         .chain(pairs(raw_query, '&').flat_map(|(name, value)| [name, value]))
         .chain(path.iter().map(String::as_str))
+        .chain(authority)
         .chain(uri.path().split('/'))
         .filter(|secret| secret.len() >= MIN_REDACTED_BYTES)
         .map(str::to_owned)
