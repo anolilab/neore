@@ -22,7 +22,7 @@ import { assertOfficeZipWithinLimits, OFFICE_ZIP_MAX_ENTRIES, OFFICE_ZIP_MAX_UNC
 import { saveOnClick } from "@ui/utils/save-from-url";
 import { BookOpen, ChevronLeft, ChevronRight, Download } from "lucide-react";
 import type { FC } from "react";
-import { memo, useEffect, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 
 import type { OpenedEpub } from "./epub-book";
 import { assertZipDirectoryExact, openEpub } from "./epub-book";
@@ -152,9 +152,11 @@ const EpubPreview: FC<EpubPreviewProps> = memo(({ className, filename, maxBytes 
     // A result belongs to the file AND the cap it was read under: a book read for another file, or under another cap, is never shown for this
     // one, and a book whose load was torn down (the effect's cleanup destroys it) is not one to show again if the same file comes back.
     const key = `${url}\n${String(maxBytes)}`;
-    const [loaded, setLoaded] = useState<{ key: string; load: Load }>({ key, load: { status: "loading" } });
+    // `serial` names the load: the place is kept against it and not against the book, so a place does not keep an earlier book's archive reachable.
+    const [loaded, setLoaded] = useState<{ key: string; load: Load; serial: number }>({ key, load: { status: "loading" }, serial: 0 });
+    const loads = useRef(0);
     const [shown, setShown] = useState<{ book: OpenedEpub; doc: string; failed?: boolean; id: string; key: string } | undefined>();
-    const [position, setPosition] = useState<{ book: OpenedEpub | undefined; index: number }>({ book: undefined, index: 0 });
+    const [position, setPosition] = useState<{ index: number; serial: number }>({ index: 0, serial: -1 });
 
     // Dropped when the file or cap changes: an earlier file's chapter and book are not kept reachable (adjusted while rendering, not in an effect).
     if (shown !== undefined && shown.key !== key) {
@@ -165,7 +167,7 @@ const EpubPreview: FC<EpubPreviewProps> = memo(({ className, filename, maxBytes 
     const load: Load = isLive ? loaded.load : { status: "loading" };
     const liveBook = load.status === "ready" ? load.book : undefined;
     // The place belongs to the book it was made in, and never passes the end of this one: a one-chapter book is not at "chapter 3".
-    const index = liveBook !== undefined && position.book === liveBook ? Math.min(position.index, liveBook.chapters.length - 1) : 0;
+    const index = liveBook !== undefined && position.serial === loaded.serial ? Math.min(position.index, liveBook.chapters.length - 1) : 0;
 
     useEffect(() => {
         if (refused) {
@@ -173,6 +175,10 @@ const EpubPreview: FC<EpubPreviewProps> = memo(({ className, filename, maxBytes 
         }
 
         const controller = new AbortController();
+
+        loads.current += 1;
+
+        const serial = loads.current;
         let opened: OpenedEpub | undefined;
         let cancelled = false;
         let deadline: ReturnType<typeof setTimeout> | undefined;
@@ -201,18 +207,18 @@ const EpubPreview: FC<EpubPreviewProps> = memo(({ className, filename, maxBytes 
                 // A book with nothing to read is not kept: its parsed archive goes with it.
                 if (opened.chapters.length === 0) {
                     opened.destroy();
-                    setLoaded({ key, load: { status: "failed" } });
+                    setLoaded({ key, load: { status: "failed" }, serial });
 
                     return;
                 }
 
-                setLoaded({ key, load: { book: opened, status: "ready" } });
+                setLoaded({ key, load: { book: opened, status: "ready" }, serial });
             } catch (error) {
                 // A book that arrives after the deadline is released, not shown.
                 loading.then((late) => late.destroy()).catch(() => undefined);
 
                 if (!cancelled) {
-                    setLoaded({ key, load: error === TooLarge ? { status: "too-large" } : { status: "failed" } });
+                    setLoaded({ key, load: error === TooLarge ? { status: "too-large" } : { status: "failed" }, serial });
                 }
             } finally {
                 clearTimeout(deadline);
@@ -292,7 +298,7 @@ const EpubPreview: FC<EpubPreviewProps> = memo(({ className, filename, maxBytes 
 
     const total = load.status === "ready" ? load.book.chapters.length : 0;
     const label = t`Chapter ${index + 1} of ${total}`;
-    const go = (to: number) => setPosition({ book: liveBook, index: to });
+    const go = (to: number) => setPosition({ index: to, serial: loaded.serial });
 
     return (
         <div className={cn("my-2 w-full max-w-2xl overflow-hidden rounded-lg border", className)}>

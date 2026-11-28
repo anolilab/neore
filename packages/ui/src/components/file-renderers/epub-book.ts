@@ -152,8 +152,9 @@ export const assertZipDirectoryExact = (buffer: ArrayBuffer): void => {
         at += 46 + view.getUint16(at + 28, true) + view.getUint16(at + 30, true) + view.getUint16(at + 32, true);
     }
 
-    // No further record after the declared ones, and the directory is as long as the end record says.
-    if ((at + 4 <= buffer.byteLength && view.getUint32(at, true) === CENTRAL_SIGNATURE) || at - start !== size) {
+    // No further record after the declared ones, the directory is as long as the end record says, and it ends at the end record: bytes between
+    // them make the zip library move its offsets, and read a directory other than the one that was counted.
+    if ((at + 4 <= buffer.byteLength && view.getUint32(at, true) === CENTRAL_SIGNATURE) || at - start !== size || at !== end) {
         throw new Error("Corrupt ZIP directory");
     }
 };
@@ -406,7 +407,9 @@ const assetReader = (zip: JSZip, declared: ReadonlyMap<string, string>, signal?:
 };
 
 // A quoted address reads an escaped character inside it (`\"`), so a quote or a parenthesis in a file name does not end it early.
-const CSS_URL = /url\(("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|[^)]*)\)/gisu;
+const QUOTED_ADDRESS = String.raw`(?:"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')`;
+// Spaces are allowed around a quoted address (`url( "a)b.png" )`); an unquoted one runs to the first `)`.
+const CSS_URL = new RegExp(String.raw`url\((\s*${QUOTED_ADDRESS}\s*|[^)]*)\)`, "gisu");
 const CSS_HEX_ESCAPE = /\\([\da-f]{1,6})\s?/giu;
 const CSS_ESCAPED = /\\([\s\S])/gu;
 const CSS_QUOTE = /^["']|["']$/gu;
@@ -655,13 +658,16 @@ const expandImports = async (
             continue;
         }
 
+        // What the expansion of this file adds is already in `produced` as the file's own imports were reached (each added its piece), and in the
+        // text it returns: so the piece replaces those, not adds to them, or a leaf two levels down would be counted twice.
+        const before = produced.length;
         const expanded = await expandImports(text, directoryOf(path), reader, [...stack, path], produced);
 
         const inlined = await inlineStylesheetUrls(expanded, directoryOf(path), reader);
 
         const piece = conditioned ? `@media ${media} { ${inlined} }` : inlined;
 
-        produced.length += piece.length;
+        produced.length = before + piece.length;
         out += piece;
     }
 
@@ -691,6 +697,8 @@ const EMBEDDING_ELEMENTS = "iframe, frame, frameset, object, embed, link";
 const DEFERRING_ELEMENTS = "template, set, animate, animatetransform, animatemotion";
 const SPLIT_CANDIDATE = /[\s,]+/u;
 const SELF_CONTAINED = /^\s*(?:data:|#)/iu;
+/** The first candidate of a `srcset`: its address, and its descriptor when it has one. */
+const FIRST_CANDIDATE = /^\s*([^\s,]+)(?:\s+([\d.]+[wx]))?/u;
 const SINGLE_DATA_CANDIDATE = /^\s*data:\S*(?:\s+[\d.]+[wx])?\s*$/iu;
 
 /**
@@ -806,6 +814,9 @@ const withoutImportRules = (css: string): string => {
     return out + text.slice(at);
 };
 
+/** A style sheet of a chapter's head: its text, or its text with the media condition its `<link>` or `<style>` carried. */
+export type ChapterStyle = string | { media: string; text: string };
+
 /**
  * A chapter's markup as a whole document. The policy is the first element of the head, written before any of the chapter is; the markup is
  * then parsed by the browser's own parser in a document of its own that loads and runs nothing, neutralized (`neutralize`), and only then moved
@@ -813,7 +824,7 @@ const withoutImportRules = (css: string): string => {
  */
 export const chapterDocument = (
     markup: string,
-    styles: ReadonlyArray<string>,
+    styles: ReadonlyArray<ChapterStyle>,
     language?: string,
     bodyAttributes: Readonly<Record<string, string>> = {},
 ): string => {
@@ -841,7 +852,10 @@ export const chapterDocument = (
         // `about:srcdoc`: a `#` link resolves against the document itself, not the page that holds the frame.
         make("base", { href: "about:srcdoc", target: "_blank" }),
         make("style", {}, BASE_STYLE),
-        ...styles.map((style) => make("style", {}, safeStylesheet(style))),
+        // A sheet written for a media condition keeps it, as an attribute: a print-only sheet must not style the chapter on a screen.
+        ...styles.map((style) =>
+            typeof style === "string" ? make("style", {}, safeStylesheet(style)) : make("style", { media: style.media }, safeStylesheet(style.text)),
+        ),
     ];
 
     for (const node of head) {
@@ -952,38 +966,62 @@ const cloneIntoHtml = (node: Node, html: Document): Node => {
     return made;
 };
 
-const ENTITY_DECLARATION = /<!ENTITY/iu;
-
-// A document-type declaration with an internal subset (`<!DOCTYPE x [ ... ]>`), or any `<!ENTITY`. The external form, as in an XHTML 1.1 chapter,
-// has neither. Not one regular expression with a lazy scan to the next `>`: a source of many `<!DOCTYPE` with no `>` would make each one scan to
-// the end. Here every declaration is searched from where the last one ended, so each character is looked at a bounded number of times.
+// Whether the source declares an entity: an `<!ENTITY`, or a document-type declaration with an internal subset (`<!DOCTYPE x [ ... ]>`). The
+// external form, as in an XHTML 1.1 chapter, has neither. One pass from the start: a comment, a CDATA section and a processing instruction are
+// skipped whole (text in them is not a declaration, and a declaration written after one is still seen: a `<!--` inside a processing instruction
+// does not open a comment), and every search starts where the last one ended, so each character is looked at a bounded number of times. Not a
+// regular expression that scans to the next `>` from each `<!DOCTYPE`: many of them with no `>` would make each scan run to the end.
 const declaresEntities = (source: string): boolean => {
-    if (ENTITY_DECLARATION.test(source)) {
-        return true;
-    }
-
     const lower = source.toLowerCase();
-    let from = 0;
+    // Where the construct that starts at `from` ends, after `marker`; -1 when it is never closed.
+    const closing = (marker: string, from: number): number => {
+        const found = lower.indexOf(marker, from);
+
+        return found === -1 ? -1 : found + marker.length;
+    };
+    let at = 0;
 
     for (;;) {
-        const start = lower.indexOf("<!doctype", from);
+        const start = lower.indexOf("<", at);
 
         if (start === -1) {
             return false;
         }
 
-        const end = lower.indexOf(">", start);
+        if (lower[start + 1] !== "!" && lower[start + 1] !== "?") {
+            at = start + 1;
 
-        // No `>` after it means none after any later one: the declaration is not complete, and the parser decides what it is.
+            continue;
+        }
+
+        let end: number;
+
+        if (lower.startsWith("<?", start)) {
+            end = closing("?>", start + 2);
+        } else if (lower.startsWith("<!--", start)) {
+            end = closing("-->", start + 4);
+        } else if (lower.startsWith("<![cdata[", start)) {
+            end = closing("]]>", start + 9);
+        } else if (lower.startsWith("<!entity", start)) {
+            return true;
+        } else if (lower.startsWith("<!doctype", start)) {
+            end = closing(">", start);
+
+            if (end !== -1 && lower.slice(start, end).includes("[")) {
+                return true;
+            }
+        } else {
+            at = start + 2;
+
+            continue;
+        }
+
+        // Not closed: the rest of the source is inside it, or it is not well-formed and the parser decides what it is. Nothing after it is read as XML.
         if (end === -1) {
             return false;
         }
 
-        if (lower.slice(start, end).includes("[")) {
-            return true;
-        }
-
-        from = end + 1;
+        at = end;
     }
 };
 
@@ -1018,7 +1056,7 @@ const parseChapter = (source: string): Document => {
     return html;
 };
 
-const readChapter = async (chapterPath: string, reader: AssetReader): Promise<{ body: Record<string, string>; markup: string; styles: string[] }> => {
+const readChapter = async (chapterPath: string, reader: AssetReader): Promise<{ body: Record<string, string>; markup: string; styles: ChapterStyle[] }> => {
     // Refused from the archive's declared size before it is inflated: a chapter over the cap is never read into a string.
     if ((reader.size(chapterPath) ?? 0) > MAX_CHAPTER_CHARS) {
         throw new Error("chapter too large");
@@ -1043,7 +1081,7 @@ const readChapter = async (chapterPath: string, reader: AssetReader): Promise<{ 
 
     const directory = directoryOf(chapterPath);
     const parsed = parseChapter(source);
-    const styles: string[] = [];
+    const styles: ChapterStyle[] = [];
 
     // Linked and inline styles in the order the chapter writes them, each rewritten and charged as it is reached: a later rule wins over an
     // earlier one as in the source. Sheets of the head go to `styles` in that order; a `<style>` in the body stays where it is.
@@ -1117,8 +1155,10 @@ const readChapter = async (chapterPath: string, reader: AssetReader): Promise<{ 
         const kept = fits ? sheet : "";
 
         if (isLink || inHead) {
+            const media = (item.getAttribute("media") ?? "").trim();
+
             if (kept !== "") {
-                styles.push(kept);
+                styles.push(media === "" || MEDIA_ALL.test(media) ? kept : { media, text: kept });
             }
         } else {
             item.textContent = kept;
@@ -1140,12 +1180,13 @@ const readChapter = async (chapterPath: string, reader: AssetReader): Promise<{ 
     // A picture an inline `style` names, and the first candidate of a `srcset` an `img` has no `src` beside.
     // The candidates of a `<picture>`: each `source` keeps its `media` and `type`, and its first candidate becomes the one data address.
     for (const candidate of parsed.body.querySelectorAll("source[srcset]")) {
-        const first = candidate.getAttribute("srcset")?.trim().split(SPLIT_CANDIDATE, 1)[0];
-        const path = first === undefined ? undefined : resolveInArchive(first, directory);
+        const first = FIRST_CANDIDATE.exec(candidate.getAttribute("srcset") ?? "");
+        const path = first?.[1] === undefined ? undefined : resolveInArchive(first[1], directory);
         const url = path === undefined ? undefined : await reader.dataUrl(path);
 
+        // The candidate's descriptor (`2x`, `480w`) goes with it: without one the browser reads it as 1x. A candidate with none is written with none.
         if (url !== undefined) {
-            candidate.setAttribute("srcset", url);
+            candidate.setAttribute("srcset", first?.[2] === undefined ? url : `${url} ${first[2]}`);
         }
     }
 

@@ -590,41 +590,6 @@ describe("EpubPreview redirects", () => {
 });
 
 describe("EpubPreview position and controls", () => {
-    it("starts a different book at its first chapter, so a one-chapter book is never at chapter 3", async () => {
-        answer(new Uint8Array([1]));
-        await act(async () => {
-            view.root.render(
-                <FetchableOriginsProvider origins={[ORIGIN]}>
-                    <EpubPreview filename="a.epub" url={`${ORIGIN}/a.epub`} />
-                </FetchableOriginsProvider>,
-            );
-        });
-        await act(async () => {
-            await Promise.resolve();
-        });
-        await click(button("Next chapter"));
-        await click(button("Next chapter"));
-        expect(view.container.textContent).toContain("Chapter 3 of 3");
-
-        book.chapters = 1;
-        await act(async () => {
-            view.root.render(
-                <FetchableOriginsProvider origins={[ORIGIN]}>
-                    <EpubPreview filename="b.epub" url={`${ORIGIN}/b.epub`} />
-                </FetchableOriginsProvider>,
-            );
-        });
-        await act(async () => {
-            await Promise.resolve();
-        });
-        await act(async () => {
-            await Promise.resolve();
-        });
-
-        expect(view.container.textContent).toContain("Chapter 1 of 1");
-        expect(view.container.textContent).not.toContain("Chapter 3 of 1");
-    });
-
     it("gives the chapter buttons and the download link a hit area of at least 44 px", async () => {
         answer(new Uint8Array([1]));
         await mount();
@@ -670,6 +635,25 @@ describe("EpubPreview position when the person comes back to a book", () => {
         await show(`${ORIGIN}/a.epub`);
         expect(view.container.textContent).toContain("Chapter 1 of 3");
         expect(view.container.textContent).not.toContain("Chapter 3 of 1");
+    });
+
+    it("keeps the chapter when the same book is rendered again with other props, as it does not make a new load", async () => {
+        answer(new Uint8Array([1]));
+        await show(`${ORIGIN}/a.epub`);
+        await click(button("Next chapter"));
+        expect(view.container.textContent).toContain("Chapter 2 of 3");
+
+        await act(async () => {
+            view.root.render(
+                <FetchableOriginsProvider origins={[ORIGIN]}>
+                    <EpubPreview className="other" filename="renamed.epub" url={`${ORIGIN}/a.epub`} />
+                </FetchableOriginsProvider>,
+            );
+        });
+
+        // The place is tied to the load, not held with the book itself (so no earlier book is kept reachable by it); the DOM cannot show that, and
+        // this shows what must still hold: a render that does not start a load keeps the place.
+        expect(view.container.textContent).toContain("Chapter 2 of 3");
     });
 });
 

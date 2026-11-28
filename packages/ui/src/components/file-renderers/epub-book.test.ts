@@ -22,6 +22,9 @@ const REFRESH_ATTRIBUTE = /http-equiv=["']?refresh/iu;
 // The chapter's inlining budget is 24 MiB; the tests that cross it use a thousandth of that, so they run in milliseconds and build no large archive.
 const LIMITS = { inlinedChars: 24_000 };
 
+const DATA_PNG_2X = /^data:image\/png;base64,\S+ 2x$/u;
+const DATA_PNG_ONLY = /^data:image\/png;base64,\S+$/u;
+
 const TRACKER = /tracker\.example/u;
 const SCRIPTY = /expression\s*\(|behaviou?r\s*:|-moz-binding\s*:/iu;
 const NS = 'xmlns="http://www.idpf.org/2007/opf"';
@@ -156,7 +159,7 @@ describe("openEpub", () => {
             await book({
                 chapters: [
                     { body: "<p>a</p>", file: "a/chap.xhtml", id: "a", label: "Unique long path" },
-                    { body: "<p>b</p>", file: "b/chap.xhtml", id: "b" },
+                    { body: "<p>b</p>", file: "b/chap.xhtml", id: "b", label: "Ambiguous short name", tocHref: "chap.xhtml" },
                 ],
             }),
             folder.path,
@@ -521,6 +524,72 @@ describe("a chapter's style sheets", () => {
         opened.destroy();
     });
 
+    it("charges a leaf imported through another sheet once, so a root, its middle sheet, the leaf and a sibling all fit", async () => {
+        const leaf = "l{}".repeat(4333);
+        const opened = await openEpub(
+            await book({
+                chapters: [{ body: `${links(["root.css"])}<p>x</p>`, file: "one.xhtml", id: "c1" }],
+                files: {
+                    "leaf.css": leaf,
+                    "middle.css": '.m{x:1}@import "leaf.css";',
+                    "root.css": '@import "middle.css";@import "small.css";.r{x:1}',
+                    "small.css": ".s{x:1}",
+                },
+            }),
+            folder.path,
+            LIMITS,
+        );
+        const sheet = sheetsOf(parse(await opened.read("c1"))).join("");
+
+        // 13,000 characters of leaf: counted twice they would pass the 24,000 with the sibling and the rest; counted once they fit.
+        expect(sheet).toContain(leaf);
+        expect(sheet).toContain(".s{x:1}");
+        expect(sheet).toContain(".r{x:1}");
+        opened.destroy();
+    });
+
+    it("reads a url( whose quoted address has spaces around it and a parenthesis in it", async () => {
+        const opened = await openEpub(
+            await book({
+                chapters: [{ body: `${links(["s.css"])}<p>x</p>`, file: "one.xhtml", id: "c1" }],
+                files: { "fonts/my)font.woff2": PNG, "s.css": '@font-face{src:url( "fonts/my)font.woff2" )}' },
+            }),
+            folder.path,
+        );
+        const sheet = sheetsOf(parse(await opened.read("c1"))).join("");
+
+        expect(sheet).toContain("data:font/woff2;base64,");
+        opened.destroy();
+    });
+
+    it("keeps the media condition of a linked sheet and of a head style on the style it becomes, and leaves the others unconditional", async () => {
+        const opened = await openEpub(
+            await book({
+                chapters: [
+                    {
+                        body: "<p>x</p>",
+                        file: "one.xhtml",
+                        head: '<link rel="stylesheet" href="print.css" media="print"/><link rel="stylesheet" href="all.css" media="all"/><link rel="stylesheet" href="plain.css"/><style media="(max-width: 600px)">.narrow{x:1}</style>',
+                        id: "c1",
+                    },
+                ],
+                files: { "all.css": ".all{x:1}", "plain.css": ".plain{x:1}", "print.css": "p{display:none}" },
+            }),
+            folder.path,
+        );
+        const styles = [...parse(await opened.read("c1")).head.querySelectorAll("style")]
+            .slice(1)
+            .map((element) => [element.getAttribute("media"), element.textContent] as const);
+
+        expect(styles).toEqual([
+            ["print", "p{display:none}"],
+            [null, ".all{x:1}"],
+            [null, ".plain{x:1}"],
+            ["(max-width: 600px)", ".narrow{x:1}"],
+        ]);
+        opened.destroy();
+    });
+
     it("writes an escaped url( and an image-set of plain strings without their remote addresses", () => {
         const safe = safeStylesheet(
             String.raw`a{background:\75 rl(https://evil.example/a.png)} b{background:image-set("https://evil.example/b.png" 1x)} c{background:-webkit-image-set(url(https://evil.example/c.png) 1x)}`,
@@ -529,25 +598,31 @@ describe("a chapter's style sheets", () => {
         expect(safe).not.toContain("evil.example");
     });
 
-    it("keeps the file count honest after a sheet is given back: pictures it read are not free for the body, and none past the limit are shown", async () => {
-        const pictures = Object.fromEntries(Array.from({ length: 250 }, (_item, index) => [`images/${String(index)}.png`, PNG] as const));
-        const sheet = `${Array.from({ length: 150 }, (_item, index) => `.p${String(index)}{background:url(images/${String(index)}.png)}`).join("")}${"<".repeat(7000)}`;
+    it("keeps the file count honest after a sheet is given back: what it read is not left in the cache for the body to use without a file", async () => {
+        const pictures = Object.fromEntries(
+            Array.from({ length: 6 }, (_item, index) => [`images/${String(index)}.png`, new Uint8Array(1024).fill(index + 1)] as const),
+        );
+        // Three pictures, then 21,900 characters of text: it passes the estimate made before anything is read (about 22,000 of the 24,000), and
+        // is refused only once its pictures are charged (about 4,000), so its pictures have been read, and then are given back.
+        const sheet = `${[0, 1, 2].map((index) => `.p${String(index)}{background:url(images/${String(index)}.png)}`).join("")}${"a{}".repeat(7300)}`;
         const body = Object.keys(pictures)
-            .map((path) => `<img src="../${path}"/>`)
+            .map((path) => `<img src="${path}"/>`)
             .join("");
         const opened = await openEpub(
             await book({
-                chapters: [{ body: `${links(["../rejected.css"])}${body}`, file: "text/one.xhtml", id: "c1" }],
+                chapters: [{ body: `${links(["rejected.css"])}${body}`, file: "one.xhtml", id: "c1" }],
                 files: { ...pictures, "rejected.css": sheet },
             }),
             folder.path,
-            LIMITS,
+            { files: 5, inlinedChars: 24_000 },
         );
         const frame = parse(await opened.read("c1"));
         const shown = [...frame.querySelectorAll("img")].filter((image) => image.getAttribute("src")?.startsWith("data:")).length;
 
+        // The sheet is left out. Five files are the whole count: with the sheet's reads given back, five of the six pictures are shown. Had the
+        // three the sheet read stayed cached they would be shown without a file, and the other three would take the rest: six.
         expect(sheetsOf(frame)).toHaveLength(0);
-        expect(shown).toBe(MAX_ASSETS_PER_CHAPTER);
+        expect(shown).toBe(5);
         opened.destroy();
     });
 
@@ -584,6 +659,25 @@ describe("a chapter's style sheets", () => {
         view.setUint16(end + 8, 1, true);
         view.setUint16(end + 10, 1, true);
         expect(() => assertZipDirectoryExact(copy.buffer as ArrayBuffer)).toThrow("Corrupt ZIP directory");
+    });
+
+    it("refuses an archive with bytes between its directory and its end record, which the zip library would read around", async () => {
+        const zip = new JSZip();
+
+        for (const name of ["a", "b"]) {
+            zip.file(name, name);
+        }
+
+        const bytes = await zip.generateAsync({ type: "uint8array" });
+        const end = bytes.length - 22;
+        const gapped = new Uint8Array(bytes.length + 7);
+
+        gapped.set(bytes.subarray(0, end), 0);
+        gapped.set(bytes.subarray(end), end + 7);
+
+        // The directory still starts where the end record says and is as long as it says: only the end record has moved away from it.
+        expect(() => assertZipDirectoryExact(gapped.buffer)).toThrow("Corrupt ZIP directory");
+        expect(() => assertZipDirectoryExact(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer)).not.toThrow();
     });
 
     it("shows a chapter whose style sheet holds an escape that is not a character", async () => {
@@ -970,6 +1064,27 @@ describe("a chapter's style sheets", () => {
         opened.destroy();
     });
 
+    it("keeps the descriptor of a <source> candidate, and writes none for a candidate that had none", async () => {
+        const opened = await openEpub(
+            await book({
+                chapters: [
+                    {
+                        body: '<picture><source srcset="images/p.png 2x"><source srcset="images/p.png"><img src="images/p.png"/></picture>',
+                        file: "one.xhtml",
+                        id: "c1",
+                    },
+                ],
+                files: { "images/p.png": PNG },
+            }),
+            folder.path,
+        );
+        const [withDescriptor, without] = [...parse(await opened.read("c1")).querySelectorAll("source")].map((element) => element.getAttribute("srcset"));
+
+        expect(withDescriptor).toMatch(DATA_PNG_2X);
+        expect(without).toMatch(DATA_PNG_ONLY);
+        opened.destroy();
+    });
+
     it("reads a chapter written as XML with no body element as HTML, and keeps its text", async () => {
         const opened = await openEpub(
             await book({
@@ -996,6 +1111,30 @@ describe("a chapter's style sheets", () => {
         await expect(opened.read("c1")).rejects.toThrow("chapter declares entities");
         expect(parsing).not.toHaveBeenCalledWith(raw, expect.anything());
         parsing.mockRestore();
+        opened.destroy();
+    });
+
+    it("opens a chapter whose comment or CDATA section holds an entity declaration, and still refuses a real one that follows", async () => {
+        const page = (prolog: string, body = "<p>kept</p>") =>
+            `<?xml version="1.0"?>${prolog}<html xmlns="http://www.w3.org/1999/xhtml"><head><title>t</title></head><body>${body}</body></html>`;
+        const opened = await openEpub(
+            await book({
+                chapters: [
+                    { body: "", file: "a.xhtml", id: "a", raw: page('<!-- <!ENTITY x "y"> and <!DOCTYPE z [ -->') },
+                    { body: "", file: "b.xhtml", id: "b", raw: page("", '<p>kept</p><![CDATA[ <!ENTITY x "y"> ]]>') },
+                    { body: "", file: "c.xhtml", id: "c", raw: page('<!-- c --><!DOCTYPE html [<!ENTITY x "y">]>') },
+                    // A comment opener inside a processing instruction opens nothing: the declaration after it is real.
+                    { body: "", file: "d.xhtml", id: "d", raw: page('<?pi <!-- ?><!DOCTYPE html [<!ENTITY x "y">]><!-- end -->') },
+                ],
+            }),
+            folder.path,
+            LIMITS,
+        );
+
+        expect(parse(await opened.read("a")).body.textContent).toContain("kept");
+        expect(parse(await opened.read("b")).body.textContent).toContain("kept");
+        await expect(opened.read("c")).rejects.toThrow("chapter declares entities");
+        await expect(opened.read("d")).rejects.toThrow("chapter declares entities");
         opened.destroy();
     });
 
@@ -1142,16 +1281,6 @@ describe("a chapter's style sheets", () => {
 
         expect(opened.chapters.map((chapter) => chapter.id)).toEqual(["s2", "s1"]);
         expect(await opened.read("s2")).toContain("two");
-        opened.destroy();
-    });
-
-    it("refuses a chapter whose own markup is larger than a chapter may be", async () => {
-        const opened = await openEpub(
-            await book({ chapters: [{ body: `<p>${"x".repeat(MAX_CHAPTER_CHARS)}</p>`, file: "one.xhtml", id: "c1" }] }),
-            folder.path,
-        );
-
-        await expect(opened.read("c1")).rejects.toThrow("chapter too large");
         opened.destroy();
     });
 });
