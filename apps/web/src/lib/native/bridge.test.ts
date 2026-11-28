@@ -5,6 +5,7 @@ import {
     isNativeShell,
     LONG_REPLY_MS,
     notifyNative,
+    openPageWindow,
     openThreadWindow,
     setNativeBadge,
     shouldNotifyReplyFinished,
@@ -45,6 +46,7 @@ type Native = {
     onMenuCommand?: ReturnType<typeof vi.fn>;
     onSignIn?: ReturnType<typeof vi.fn>;
     onSystemAccentColor?: ReturnType<typeof vi.fn>;
+    openPageWindow?: ReturnType<typeof vi.fn>;
     openThreadWindow?: ReturnType<typeof vi.fn>;
     setBadge?: ReturnType<typeof vi.fn>;
     startBrowserSignIn?: ReturnType<typeof vi.fn>;
@@ -420,6 +422,31 @@ describe("thread windows", () => {
         });
 
         expect(await openThreadWindow("../settings")).toBe(false);
+    });
+
+    it("opens a page window only when the shell advertises page-windows", async () => {
+        const openPageWindowMock = vi.fn(async () => undefined);
+
+        installNative({ openPageWindow: openPageWindowMock });
+
+        expect(await openPageWindow("page_1")).toBe(false);
+        expect(openPageWindowMock).not.toHaveBeenCalled();
+
+        installNative({ capabilities: ["page-windows"], openPageWindow: openPageWindowMock });
+
+        expect(await openPageWindow("page_1")).toBe(true);
+        expect(openPageWindowMock).toHaveBeenCalledWith("page_1");
+    });
+
+    it("reports a refused page id as false", async () => {
+        installNative({
+            capabilities: ["page-windows"],
+            openPageWindow: vi.fn(async () => {
+                throw new Error("open-page-window: invalid page id");
+            }),
+        });
+
+        expect(await openPageWindow("../settings")).toBe(false);
     });
 });
 

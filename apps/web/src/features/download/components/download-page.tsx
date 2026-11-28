@@ -10,7 +10,9 @@ import Navbar from "@/features/marketing/components/navbar-menu";
 import { trackEvent } from "@/lib/analytics";
 
 import type { DesktopArch, DesktopPlatform } from "../lib/detect-platform";
-import { detectPlatform } from "../lib/detect-platform";
+import { detectPlatform, isIosDevice } from "../lib/detect-platform";
+import { APP_MANIFEST_HREF } from "../lib/install-prompt-store";
+import { useInstallApp } from "../lib/use-install-app";
 
 // Installers are published on the GitHub release created by .github/workflows/desktop.yml.
 // A release starts as a draft, which is not visible on the public releases page, so until
@@ -52,6 +54,8 @@ const DownloadPage = () => {
     const userAgent = useSyncExternalStore(noopSubscribe, getClientUserAgent, getServerUserAgent);
     const maxTouchPoints = useSyncExternalStore(noopSubscribe, getClientTouchPoints, getServerTouchPoints);
     const detected = useMemo(() => detectPlatform(userAgent, maxTouchPoints), [userAgent, maxTouchPoints]);
+    const isIos = useMemo(() => isIosDevice(userAgent, maxTouchPoints), [userAgent, maxTouchPoints]);
+    const { canInstall, install, installed } = useInstallApp(APP_MANIFEST_HREF);
 
     const primaryPlatform = detected.platform === "other" ? null : detected.platform;
 
@@ -94,6 +98,35 @@ const DownloadPage = () => {
                                 </p>
                             )}
                         </div>
+                    ) : null}
+
+                    {installed ? (
+                        <p className="text-brand-graphite mb-12 text-sm">
+                            <Trans>Neore is installed on this device.</Trans>
+                        </p>
+                    ) : null}
+
+                    {!installed && canInstall ? (
+                        <div className="mb-12">
+                            <p className="text-brand-graphite mb-4 text-sm">
+                                <Trans>Or install Neore in this browser. It then opens in its own window, like an app.</Trans>
+                            </p>
+                            <button
+                                className={cn(buttonVariants({ size: "lg", variant: "outline" }))}
+                                onClick={() => {
+                                    void install();
+                                }}
+                                type="button"
+                            >
+                                <Trans>Install Neore as an app</Trans>
+                            </button>
+                        </div>
+                    ) : null}
+
+                    {!installed && !canInstall && isIos ? (
+                        <p className="text-brand-graphite mb-12 text-sm">
+                            <Trans>To install Neore on iPhone or iPad, tap Share in Safari, then Add to Home Screen.</Trans>
+                        </p>
                     ) : null}
 
                     <section aria-labelledby="all-installers-heading">

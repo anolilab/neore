@@ -14,6 +14,8 @@ export const CHANNEL = {
     /** The page's last `onMenuCommand` subscriber unsubscribed: its window's commands are held again. */
     menuCommandsUnready: "neore:menu-commands-unready",
     notify: "neore:notify",
+    /** Opens one page in its own window; the site passes the page id, the shell builds the URL. */
+    openPageWindow: "neore:open-page-window",
     /** Opens one thread in its own window; the site passes the thread id, the shell builds the URL. */
     openThreadWindow: "neore:open-thread-window",
     /** Quick Composer only: its own page sends these, nothing else. */

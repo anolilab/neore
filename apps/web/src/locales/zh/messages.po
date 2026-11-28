@@ -1062,11 +1062,11 @@ msgstr "{duration, plural, other {思考了 # 秒}}"
 msgid "{edgeCount, plural, one {# edge} other {# edges}}"
 msgstr "{edgeCount, plural, other {# 条连线}}"
 
-#: src/features/pages/components/page-view.tsx:477
+#: src/features/pages/components/page-view.tsx:484
 msgid "{editorNames} is editing this page."
 msgstr "{editorNames} 正在编辑此页面。"
 
-#: src/features/pages/components/page-view.tsx:476
+#: src/features/pages/components/page-view.tsx:483
 msgid "{editorNames} is editing this page. If you both change the same version, the second save is stopped and asked what to do."
 msgstr "{editorNames} 正在编辑此页面。如果你们修改了同一个版本，后保存的一方会被拦下并询问如何处理。"
 
@@ -2876,7 +2876,7 @@ msgid "Add title text"
 msgstr "添加标题文字"
 
 #: src/features/pages/components/page-tree-item.tsx:152
-#: src/features/pages/components/page-view.tsx:418
+#: src/features/pages/components/page-view.tsx:425
 msgid "Add to favorites"
 msgstr "添加到收藏"
 
@@ -3241,7 +3241,7 @@ msgstr "在此激活连接后，你将获得一个 webhook URL，需在 Slack �
 msgid "After outside content"
 msgstr "在外部内容之后"
 
-#: src/features/chat/host/host-composer.tsx:756
+#: src/features/chat/host/host-composer.tsx:760
 #: src/features/evals/components/dataset-panel.tsx:102
 #: src/features/layout/lib/dashboard-page-names.ts:14
 #: src/features/settings/lib/settings-navigation.ts:94
@@ -3593,7 +3593,7 @@ msgstr "已清除所有筛选规则"
 msgid "All Icons"
 msgstr "所有图标"
 
-#: src/features/download/components/download-page.tsx:101
+#: src/features/download/components/download-page.tsx:134
 msgid "All installers"
 msgstr "所有安装包"
 
@@ -3789,7 +3789,7 @@ msgstr "已有账号？"
 msgid "Already linked to this thread."
 msgstr "已关联到此对话。"
 
-#: src/features/pages/components/page-view.tsx:402
+#: src/features/pages/components/page-view.tsx:407
 msgid "Also viewing"
 msgstr "同时在看"
 
@@ -6129,7 +6129,7 @@ msgstr "加拿大"
 #: src/features/chat/forward/forward-selection-bar.tsx:78
 #: src/features/chat/group/create-group-chat-button.tsx:240
 #: src/features/chat/host/diff-comment-form.tsx:81
-#: src/features/chat/host/host-composer.tsx:1017
+#: src/features/chat/host/host-composer.tsx:1026
 #: src/features/chat/lock/thread-lock-dialog.tsx:211
 #: src/features/chat/model-settings/agent-switch-confirm-dialog.tsx:70
 #: src/features/chat/pins/pin-item.tsx:303
@@ -6769,7 +6769,7 @@ msgstr "正在检查图片安全性..."
 msgid "Checking the code…"
 msgstr "正在检查代码…"
 
-#: src/features/chat/host/host-composer.tsx:1250
+#: src/features/chat/host/host-composer.tsx:1259
 msgid "Checking whether a message sent now interrupts the reply or waits behind it."
 msgstr "正在确认现在发送的消息是中断回复，还是排在其后等待。"
 
@@ -7648,13 +7648,13 @@ msgstr "命令面板"
 msgid "Commands"
 msgstr "命令"
 
-#: src/features/chat/host/host-composer.tsx:1132
+#: src/features/chat/host/host-composer.tsx:1141
 msgid "Commands from {agentLabel}"
 msgstr "来自 {agentLabel} 的命令"
 
 #: src/features/develop/components/review-panel.tsx:64
 #: src/features/pages/components/page-comments-panel.tsx:146
-#: src/features/pages/components/page-view.tsx:429
+#: src/features/pages/components/page-view.tsx:436
 #: src/features/workflow/components/nodes/comment-node.tsx:95
 #: src/features/workflow/types/index.ts:461
 #: src/features/workflow/types/index.ts:465
@@ -7698,7 +7698,7 @@ msgstr "评论整个文件 {0}"
 
 #: src/features/pages/components/page-comments-panel.tsx:135
 #: src/features/pages/components/page-comments-panel.tsx:137
-#: src/features/pages/components/page-view.tsx:439
+#: src/features/pages/components/page-view.tsx:446
 msgid "Comments"
 msgstr "评论"
 
@@ -8551,7 +8551,7 @@ msgstr "上下文感知生成"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-paste-dialog.tsx:131
 #: src/features/auth/components/device-code-parts.tsx:189
-#: src/features/chat/host/host-composer.tsx:969
+#: src/features/chat/host/host-composer.tsx:978
 #: src/features/chat/thread/message-item.tsx:546
 #: src/features/skills/components/skill-builder-dialog.tsx:328
 msgid "Continue"
@@ -8569,7 +8569,7 @@ msgstr "继续被中断的回复"
 msgid "Continue the same thread"
 msgstr "在同一对话中继续"
 
-#: src/features/chat/host/host-composer.tsx:963
+#: src/features/chat/host/host-composer.tsx:972
 msgid "Continue where you left off."
 msgstr "从上次中断的地方继续。"
 
@@ -8948,7 +8948,7 @@ msgid "Cost cap (USD)"
 msgstr "费用上限（美元）"
 
 #. placeholder {0}: formatReportedCost(usage.cost, i18n.locale)
-#: src/features/chat/host/host-composer.tsx:1114
+#: src/features/chat/host/host-composer.tsx:1123
 msgid "Cost reported by the agent: {0}"
 msgstr "智能体报告的费用：{0}"
 
@@ -9387,11 +9387,11 @@ msgstr "无法移除参与者"
 msgid "Could not rename the device."
 msgstr "无法重命名该设备。"
 
-#: src/features/pages/components/page-view.tsx:372
+#: src/features/pages/components/page-view.tsx:377
 msgid "Could not rename the page"
 msgstr "无法重命名页面"
 
-#: src/features/pages/components/page-view.tsx:283
+#: src/features/pages/components/page-view.tsx:288
 msgid "Could not restore this version"
 msgstr "无法恢复此版本"
 
@@ -9441,8 +9441,8 @@ msgstr "无法保存记忆"
 msgid "Could not save the new order for {label}"
 msgstr "无法保存{label}的新顺序"
 
-#: src/features/pages/components/page-view.tsx:160
-#: src/features/pages/components/page-view.tsx:248
+#: src/features/pages/components/page-view.tsx:165
+#: src/features/pages/components/page-view.tsx:253
 msgid "Could not save the page"
 msgstr "无法保存页面"
 
@@ -9471,7 +9471,7 @@ msgstr "无法发送更改。"
 msgid "Could not send the message."
 msgstr "无法发送消息。"
 
-#: src/features/chat/host/host-composer.tsx:921
+#: src/features/chat/host/host-composer.tsx:925
 msgid "Could not send your answer."
 msgstr "无法发送你的回答。"
 
@@ -9522,7 +9522,7 @@ msgstr "无法停止对话"
 msgid "Could not stop the reply. Please try again."
 msgstr "无法停止回复。请重试。"
 
-#: src/features/chat/host/host-composer.tsx:339
+#: src/features/chat/host/host-composer.tsx:343
 msgid "Could not stop the reply. Your message is queued; send it next when you are ready."
 msgstr "无法停止回复。你的消息已排队；准备好后再接着发送。"
 
@@ -11254,7 +11254,7 @@ msgstr "制作 logo、图标和品牌素材、最注重文字与排版精度的�
 msgid "Designing a system or a change that spans several parts."
 msgstr "设计涉及多个部分的系统或更改。"
 
-#: src/features/download/components/download-page.tsx:65
+#: src/features/download/components/download-page.tsx:69
 msgid "Desktop"
 msgstr "桌面"
 
@@ -11722,7 +11722,7 @@ msgstr "下载"
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:82
 #: src/features/canvas/canvas-panel.tsx:811
 #: src/features/canvas/canvas-panel.tsx:828
-#: src/features/download/components/download-page.tsx:120
+#: src/features/download/components/download-page.tsx:153
 #: src/features/skills/components/bundle-export-dialog.tsx:227
 #: src/features/workflow/components/nodes/node-expand-modal.tsx:300
 #: src/features/workflow/components/nodes/node-expand-modal.tsx:303
@@ -11799,7 +11799,7 @@ msgid "Download file"
 msgstr "下载文件"
 
 #. placeholder {0}: PLATFORM_NAMES[primaryPlatform]
-#: src/features/download/components/download-page.tsx:89
+#: src/features/download/components/download-page.tsx:93
 msgid "Download for {0}"
 msgstr "下载 {0} 版"
 
@@ -11820,7 +11820,7 @@ msgstr "下载 Markdown"
 msgid "Download memories (Markdown)"
 msgstr "下载记忆（Markdown）"
 
-#: src/features/download/components/download-page.tsx:68
+#: src/features/download/components/download-page.tsx:72
 msgid "Download Neore for desktop"
 msgstr "下载 Neore 桌面版"
 
@@ -11859,7 +11859,7 @@ msgstr "下载 Word 文档"
 msgid "Downloading..."
 msgstr "正在下载..."
 
-#: src/features/download/components/download-page.tsx:130
+#: src/features/download/components/download-page.tsx:163
 msgid "Downloads open the GitHub releases page. If no installers are listed there yet, the desktop release has not been published."
 msgstr "下载会打开 GitHub 发布页面。如果页面上还没有安装包，说明桌面版尚未发布。"
 
@@ -12205,7 +12205,7 @@ msgstr "边缘引导生成"
 
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:141
 #: src/features/canvas/canvas-panel.tsx:783
-#: src/features/chat/host/host-composer.tsx:1060
+#: src/features/chat/host/host-composer.tsx:1069
 #: src/features/chat/thread-list/group-header.tsx:138
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:799
 #: src/features/chat/thread/message-item.tsx:397
@@ -12338,12 +12338,12 @@ msgstr "编辑提示词"
 msgid "Edit Provider"
 msgstr "编辑提供商"
 
-#: src/features/chat/host/host-composer.tsx:984
+#: src/features/chat/host/host-composer.tsx:993
 msgid "Edit queued message"
 msgstr "编辑排队的消息"
 
 #. placeholder {0}: index + 1
-#: src/features/chat/host/host-composer.tsx:1053
+#: src/features/chat/host/host-composer.tsx:1062
 msgid "Edit queued message {0}"
 msgstr "编辑排队的消息 {0}"
 
@@ -17256,7 +17256,7 @@ msgstr "以下是摘要，未完成事项列在前面。"
 msgid "Here they are: planning, budget and next steps."
 msgstr "以下是：规划、预算和后续步骤。"
 
-#: src/features/chat/host/host-composer.tsx:1210
+#: src/features/chat/host/host-composer.tsx:1219
 msgid "Hidden characters were removed from your message."
 msgstr "已从你的消息中移除隐藏字符。"
 
@@ -18566,9 +18566,17 @@ msgstr "安装编码智能体"
 msgid "Install a coding agent in the Neore desktop app and approve it for a folder on a paired computer. The install happens in the desktop window, not here."
 msgstr "在 Neore 桌面应用中安装编码智能体，并为已配对电脑上的某个文件夹批准它。安装在桌面窗口中进行，而非此处。"
 
+#: src/features/download/components/download-page.tsx:121
+msgid "Install Neore as an app"
+msgstr "将 Neore 安装为应用"
+
 #: src/features/settings/connectors/messenger/messenger-setup-dialog.tsx:72
 msgid "Install the bot in Teams (via a Teams app manifest or the Developer Portal) and send it a message."
 msgstr "在 Teams 中安装机器人（通过 Teams 应用清单或开发者门户），并给它发送一条消息。"
+
+#: src/features/pages/components/page-install-button.tsx:30
+msgid "Install this page"
+msgstr "安装此页面"
 
 #: src/features/skills/components/marketplace-skill-detail-dialog.tsx:219
 #: src/features/skills/components/skill-item.tsx:120
@@ -18665,8 +18673,8 @@ msgstr "中断并重新开始"
 msgid "Interrupt and restart — stops the current reply and sends this"
 msgstr "中断并重新开始——停止当前回复并发送此内容"
 
-#: src/features/chat/host/host-composer.tsx:731
-#: src/features/chat/host/host-composer.tsx:1236
+#: src/features/chat/host/host-composer.tsx:735
+#: src/features/chat/host/host-composer.tsx:1245
 msgid "Interrupt and send"
 msgstr "中断并发送"
 
@@ -18916,7 +18924,7 @@ msgstr "它不存在，或你的 {label} 账号看不到它。"
 msgid "It is on {hostLabel} now."
 msgstr "现已在 {hostLabel} 上。"
 
-#: src/features/pages/components/page-view.tsx:190
+#: src/features/pages/components/page-view.tsx:195
 msgid "It may have been deleted, or you no longer have access."
 msgstr "它可能已被删除，或者你已无权访问。"
 
@@ -20273,7 +20281,7 @@ msgstr "正在加载新手引导"
 msgid "Loading output..."
 msgstr "正在加载输出..."
 
-#: src/features/pages/components/page-view.tsx:181
+#: src/features/pages/components/page-view.tsx:186
 msgid "Loading page…"
 msgstr "正在加载页面…"
 
@@ -21489,7 +21497,7 @@ msgstr "最大对话的消息行数"
 msgid "Message selection"
 msgstr "消息选择"
 
-#: src/features/chat/host/host-composer.tsx:1226
+#: src/features/chat/host/host-composer.tsx:1235
 msgid "Message the agent on your computer"
 msgstr "向你电脑上的智能体发送消息"
 
@@ -21501,7 +21509,7 @@ msgstr "向工作进程发送消息"
 msgid "Message the worker..."
 msgstr "向工作进程发送消息..."
 
-#: src/features/chat/host/host-composer.tsx:1174
+#: src/features/chat/host/host-composer.tsx:1183
 msgid "Message to the coding agent"
 msgstr "给编码智能体的消息"
 
@@ -22706,7 +22714,7 @@ msgstr "Neore 无法连接服务器。它将继续尝试重新连接。"
 msgid "Neore Chat"
 msgstr "Neore Chat"
 
-#: src/routes/__root.tsx:607
+#: src/routes/__root.tsx:608
 msgid "Neore Chat is a modern AI chat application. Chat with the latest AI models, organise your conversations, and stay productive."
 msgstr "Neore Chat 是一款现代 AI 聊天应用。与最新的 AI 模型聊天，整理你的对话，保持高效。"
 
@@ -22746,10 +22754,15 @@ msgstr "Neore Gateway 支持 OpenAI（GPT-4o、o1、o3、DALL-E）、Google（Ge
 msgid "Neore includes 30+ models: GPT-4, Claude, Gemini, and DeepSeek for chat. FLUX, Imagen, Stable Diffusion, and Recraft for images. Runway, Luma, Kling, and Pika for video. Switch between any of them mid-conversation."
 msgstr "Neore 包含 30+ 个模型：聊天有 GPT-4、Claude、Gemini 和 DeepSeek；图像有 FLUX、Imagen、Stable Diffusion 和 Recraft；视频有 Runway、Luma、Kling 和 Pika。可在对话中随时切换。"
 
+#: src/features/download/components/download-page.tsx:105
+msgid "Neore is installed on this device."
+msgstr "Neore 已安装在此设备上。"
+
 #: src/features/develop/components/watched-repositories.tsx:146
 msgid "Neore keeps these up to date and tells you when someone asks for your review."
 msgstr "Neore 会让这些内容保持最新，并在有人请求你审查时通知你。"
 
+#: src/features/chat/host/host-composer.tsx:963
 #: src/features/devices/components/devices-settings.tsx:367
 msgid "Neore on this computer is out of date, so the agent cannot use it. Update the app there to turn it back on."
 msgstr "这台电脑上的 Neore 版本过旧，智能体无法使用它。请在该电脑上更新应用以重新启用。"
@@ -24802,6 +24815,7 @@ msgstr "全屏打开"
 
 #: src/features/chat/thread-list/thread-node.tsx:805
 #: src/features/chat/thread-list/thread-node.tsx:818
+#: src/features/pages/components/page-window-button.tsx:23
 msgid "Open in new window"
 msgstr "在新窗口中打开"
 
@@ -25458,6 +25472,10 @@ msgstr "或通过链接获取"
 msgid "Or from a terminal:"
 msgstr "或在终端中："
 
+#: src/features/download/components/download-page.tsx:112
+msgid "Or install Neore in this browser. It then opens in its own window, like an app."
+msgstr "也可以在此浏览器中安装 Neore。安装后它会像应用一样在独立窗口中打开。"
+
 #: src/features/chat/thread/ask-user-prompt.tsx:269
 msgid "Or type your own answer…"
 msgstr "或输入你自己的回答…"
@@ -25756,7 +25774,7 @@ msgid "Page address"
 msgstr "页面地址"
 
 #: src/features/pages/components/page-agent-dialog.tsx:90
-#: src/features/pages/components/page-view.tsx:435
+#: src/features/pages/components/page-view.tsx:442
 msgid "Page agent"
 msgstr "页面智能体"
 
@@ -25773,11 +25791,11 @@ msgid "Page not available"
 msgstr "页面不可用"
 
 #: src/components/not-found.tsx:128
-#: src/features/pages/components/page-view.tsx:189
+#: src/features/pages/components/page-view.tsx:194
 msgid "Page not found"
 msgstr "未找到页面"
 
-#: src/features/pages/components/page-view.tsx:487
+#: src/features/pages/components/page-view.tsx:494
 msgid "Page title"
 msgstr "页面标题"
 
@@ -26261,7 +26279,7 @@ msgstr "{0} 的权限模式"
 msgid "Permission mode: {0}"
 msgstr "权限模式：{0}"
 
-#: src/features/chat/host/host-composer.tsx:934
+#: src/features/chat/host/host-composer.tsx:938
 msgid "Permission requests from the agent"
 msgstr "来自智能体的权限请求"
 
@@ -27824,7 +27842,7 @@ msgstr "查询用量分析和成本"
 msgid "Question"
 msgstr "问题"
 
-#: src/features/chat/host/host-composer.tsx:733
+#: src/features/chat/host/host-composer.tsx:737
 msgid "Queue"
 msgstr "队列"
 
@@ -27846,16 +27864,16 @@ msgstr "排队消息——当前回复完成后发送"
 msgid "Queued"
 msgstr "排队中"
 
-#: src/features/chat/host/host-composer.tsx:374
+#: src/features/chat/host/host-composer.tsx:378
 #: src/features/chat/thread/composer-prompt-queue.tsx:1175
 msgid "Queued messages"
 msgstr "排队中的消息"
 
-#: src/features/chat/host/host-composer.tsx:1104
+#: src/features/chat/host/host-composer.tsx:1113
 msgid "Queued messages go out in order once the reply ends."
 msgstr "回复结束后，排队的消息会按顺序发送。"
 
-#: src/features/chat/host/host-composer.tsx:377
+#: src/features/chat/host/host-composer.tsx:381
 msgid "Queued messages: {queuedTotal}"
 msgstr "排队中的消息：{queuedTotal}"
 
@@ -28783,7 +28801,7 @@ msgstr "记住我"
 
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:195
 #: ../../packages/ui/src/components/combobox.tsx:304
-#: src/features/chat/host/host-composer.tsx:1078
+#: src/features/chat/host/host-composer.tsx:1087
 #: src/features/chat/sharing/thread-share-button.tsx:300
 #: src/features/chat/sharing/thread-share-button.tsx:372
 #: src/features/chat/thread/composer-input.tsx:356
@@ -28917,7 +28935,7 @@ msgid "Remove filter (when focused)"
 msgstr "移除筛选（聚焦时）"
 
 #: src/features/pages/components/page-tree-item.tsx:152
-#: src/features/pages/components/page-view.tsx:418
+#: src/features/pages/components/page-view.tsx:425
 msgid "Remove from favorites"
 msgstr "从收藏中移除"
 
@@ -28981,7 +28999,7 @@ msgid "Remove provider?"
 msgstr "要移除提供商吗？"
 
 #. placeholder {0}: index + 1
-#: src/features/chat/host/host-composer.tsx:1064
+#: src/features/chat/host/host-composer.tsx:1073
 msgid "Remove queued message {0}"
 msgstr "移除排队的消息 {0}"
 
@@ -29563,7 +29581,7 @@ msgstr "检索：命中 {0} · MRR {1} · 精确率 {2} · 召回率 {3}"
 msgid "retry"
 msgstr "重试"
 
-#: src/features/chat/host/host-composer.tsx:1093
+#: src/features/chat/host/host-composer.tsx:1102
 #: src/features/chat/thread/chat-error.tsx:64
 #: src/features/chat/thread/request-secret-prompt.tsx:475
 #: src/features/chat/translation/message-translation.tsx:88
@@ -30200,7 +30218,7 @@ msgstr "沙特阿拉伯"
 #: src/features/auth/components/settings/security/change-password-card.tsx:248
 #: src/features/auth/components/team/team-settings-dialog.tsx:218
 #: src/features/chat/goal/pinned-goal.tsx:134
-#: src/features/chat/host/host-composer.tsx:1006
+#: src/features/chat/host/host-composer.tsx:1015
 #: src/features/chat/pins/pin-item.tsx:304
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:394
 #: src/features/chat/thread-list/rename-thread-dialog.tsx:181
@@ -31041,7 +31059,7 @@ msgstr "选择角色"
 msgid "Select row"
 msgstr "选择行"
 
-#: src/features/pages/components/page-view.tsx:305
+#: src/features/pages/components/page-view.tsx:310
 msgid "Select some text to comment on"
 msgstr "选择一些文本进行评论"
 
@@ -31139,7 +31157,7 @@ msgid "Semi-realistic visual style"
 msgstr "半写实视觉风格"
 
 #: src/features/chat/guest-links/guest-link-panel.tsx:430
-#: src/features/chat/host/host-composer.tsx:728
+#: src/features/chat/host/host-composer.tsx:732
 #: src/features/feedback/components/send-feedback-dialog.tsx:389
 #: src/features/sub-agents/components/worker-composer.tsx:160
 msgid "Send"
@@ -31231,17 +31249,17 @@ msgstr "消息发送方式"
 msgid "Send messages to the AI bot via Telegram. Conversations appear as threads in your chat list."
 msgstr "通过 Telegram 向 AI 机器人发送消息。对话会显示在你的聊天列表中。"
 
-#: src/features/chat/host/host-composer.tsx:1035
+#: src/features/chat/host/host-composer.tsx:1044
 #: src/features/chat/thread/composer-prompt-queue.tsx:1207
 msgid "Send next"
 msgstr "发送下一条"
 
-#: src/features/chat/host/host-composer.tsx:1048
+#: src/features/chat/host/host-composer.tsx:1057
 msgid "Send now"
 msgstr "立即发送"
 
 #. placeholder {0}: index + 1
-#: src/features/chat/host/host-composer.tsx:1041
+#: src/features/chat/host/host-composer.tsx:1050
 msgid "Send queued message {0} now"
 msgstr "立即发送排队消息 {0}"
 
@@ -31553,7 +31571,7 @@ msgstr "仍在测量的分片：{0}。测量更多分片以完成。"
 msgid "Shards that could not be measured are left out of the totals: {0}."
 msgstr "无法测量的分片未计入合计：{0}。"
 
-#: src/features/pages/components/page-view.tsx:459
+#: src/features/pages/components/page-view.tsx:466
 msgid "Share"
 msgstr "分享"
 
@@ -32241,7 +32259,7 @@ msgstr "跳过 CLIP 层（0 = 不跳过，1-2 = 更风格化）"
 msgid "Skip questions"
 msgstr "跳过问题"
 
-#: src/routes/__root.tsx:505
+#: src/routes/__root.tsx:506
 msgid "Skip to content"
 msgstr "跳到内容"
 
@@ -33155,7 +33173,7 @@ msgstr "正在开始导入..."
 msgid "Starting test drive…"
 msgstr "正在开始试运行…"
 
-#: src/features/chat/host/host-composer.tsx:949
+#: src/features/chat/host/host-composer.tsx:953
 msgid "Starting the agent on your computer. A message you send now goes out once it is up."
 msgstr "正在你的电脑上启动智能体。你现在发送的消息会在其启动后发出。"
 
@@ -33280,7 +33298,7 @@ msgstr "股票"
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:231
 #: src/features/chat/goal/goal-notes.tsx:85
 #: src/features/chat/group/group-participant-bar.tsx:234
-#: src/features/chat/host/host-composer.tsx:1240
+#: src/features/chat/host/host-composer.tsx:1249
 #: src/features/chat/thread/rate-limit-pause-notice.tsx:153
 #: src/features/develop/components/watched-repositories.tsx:86
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:367
@@ -34798,7 +34816,7 @@ msgstr "谢谢！你的反馈已发送。"
 msgid "That agent session has ended."
 msgstr "该智能体会话已结束。"
 
-#: src/features/chat/host/host-composer.tsx:784
+#: src/features/chat/host/host-composer.tsx:788
 msgid "That command would make the message too long to send."
 msgstr "该命令会使消息过长，无法发送。"
 
@@ -34908,7 +34926,7 @@ msgstr "该路径是文件。"
 msgid "That prompt is no longer available. Pick another."
 msgstr "该提示词已不可用，请选择其他提示词。"
 
-#: src/features/chat/host/host-composer.tsx:924
+#: src/features/chat/host/host-composer.tsx:928
 msgid "That request is no longer waiting."
 msgstr "该请求已不再等待处理。"
 
@@ -35191,7 +35209,7 @@ msgstr "聊天中会显示一张卡片，包含工具名称、来源服务器，
 msgid "The chat will no longer be pinned. You can pin it again from the list."
 msgstr "对话将不再置顶。你可以在列表中重新置顶。"
 
-#: src/features/chat/host/host-composer.tsx:1091
+#: src/features/chat/host/host-composer.tsx:1100
 msgid "The chat's state could not be read, so queued messages wait."
 msgstr "无法读取聊天状态，因此排队的消息等待中。"
 
@@ -35272,7 +35290,7 @@ msgstr "描述已被截断。"
 msgid "The description of \"{name}\" must be at most {limit} characters on one line."
 msgstr "\"{name}\" 的描述必须为一行，最多 {limit} 个字符。"
 
-#: src/features/download/components/download-page.tsx:71
+#: src/features/download/components/download-page.tsx:75
 msgid "The desktop app runs on macOS, Windows and Linux. Installers are attached to a desktop release on GitHub, and they appear there once that release is published."
 msgstr "桌面应用支持 macOS、Windows 和 Linux。安装包附在 GitHub 上的桌面版发布中，发布后会在那里显示。"
 
@@ -35524,7 +35542,7 @@ msgstr "上次删除请求失败。你可以再次请求。"
 msgid "the last time"
 msgstr "登录"
 
-#: src/features/chat/host/host-composer.tsx:959
+#: src/features/chat/host/host-composer.tsx:968
 msgid "The last turn stopped before it finished."
 msgstr "上一轮在完成前就停止了。"
 
@@ -35761,7 +35779,7 @@ msgstr "无法加载提供商缓存读数。"
 msgid "The provider cache readings could not be refreshed. The figures below are from {0}."
 msgstr "无法刷新提供商缓存读数。以下数据来自 {0}。"
 
-#: src/features/chat/host/host-composer.tsx:1099
+#: src/features/chat/host/host-composer.tsx:1108
 msgid "The queue is paused. Send next to go on with the queued messages."
 msgstr "队列已暂停。点击“发送下一条”以继续发送排队的消息。"
 
@@ -35793,7 +35811,7 @@ msgstr "回复仍在运行。请在回复完成后再添加。"
 msgid "The reply is still running. Try again when it finishes."
 msgstr "回复仍在运行。请在其完成后重试。"
 
-#: src/features/chat/host/host-composer.tsx:338
+#: src/features/chat/host/host-composer.tsx:342
 msgid "The reply stopped, but the stop did not reach the computer, so the agent may still be running. Send next once it has stopped."
 msgstr "回复已停止，但停止指令未能到达电脑，代理可能仍在运行。它停止后，请点击“发送下一条”。"
 
@@ -36735,7 +36753,7 @@ msgstr "此服务器的注册表条目要求填写以下值，它们将填入 UR
 msgid "This session has ended."
 msgstr "此会话已结束。"
 
-#: src/features/chat/host/host-composer.tsx:954
+#: src/features/chat/host/host-composer.tsx:958
 #: src/features/chat/host/host-send-errors.ts:21
 msgid "This session has ended. Start a new one from the desktop app."
 msgstr "此会话已结束。请从桌面应用开始新的会话。"
@@ -36776,7 +36794,7 @@ msgstr "此子代理运行已不可用。"
 msgid "This task has not run yet."
 msgstr "此任务尚未运行。"
 
-#: src/features/chat/host/host-composer.tsx:995
+#: src/features/chat/host/host-composer.tsx:1004
 msgid "This text is only hidden characters, so there is nothing to save."
 msgstr "此文本仅包含隐藏字符，因此没有可保存的内容。"
 
@@ -37108,6 +37126,10 @@ msgstr "到 {0}"
 #: src/features/tasks/components/task-status.tsx:21
 msgid "To do"
 msgstr "待办"
+
+#: src/features/download/components/download-page.tsx:128
+msgid "To install Neore on iPhone or iPad, tap Share in Safari, then Add to Home Screen."
+msgstr "要在 iPhone 或 iPad 上安装 Neore，请在 Safari 中点按“分享”，然后点按“添加到主屏幕”。"
 
 #: ../../packages/chat-ui/src/threads/thread-list.tsx:47
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:631
@@ -38282,9 +38304,9 @@ msgid "Until a chat is paired, the bot answers only that it is private. Send /pa
 msgstr "在聊天配对之前，机器人只会回复该聊天为私人聊天。请发送 /pair 并附上设置中的验证码，以关联你的联系人。"
 
 #: src/features/pages/components/page-tree-item.tsx:53
-#: src/features/pages/components/page-view.tsx:390
-#: src/features/pages/components/page-view.tsx:397
-#: src/features/pages/components/page-view.tsx:500
+#: src/features/pages/components/page-view.tsx:395
+#: src/features/pages/components/page-view.tsx:402
+#: src/features/pages/components/page-view.tsx:507
 #: src/features/pages/components/pages-sidebar.tsx:61
 #: src/features/pages/components/pages-sidebar.tsx:181
 #: src/features/pages/components/pages-sidebar.tsx:208
@@ -39192,7 +39214,7 @@ msgstr "第 {position}/{total} 个版本"
 #: src/features/canvas/canvas-panel.tsx:788
 #: src/features/pages/components/page-version-panel.tsx:81
 #: src/features/pages/components/page-version-panel.tsx:83
-#: src/features/pages/components/page-view.tsx:448
+#: src/features/pages/components/page-view.tsx:455
 msgid "Version history"
 msgstr "版本历史"
 
@@ -40635,7 +40657,7 @@ msgstr "昨天"
 msgid "You"
 msgstr "你"
 
-#: src/features/pages/components/page-view.tsx:378
+#: src/features/pages/components/page-view.tsx:383
 msgid "You (another tab)"
 msgstr "你（另一个标签页）"
 
@@ -40708,7 +40730,7 @@ msgstr "你监视的仓库数量已达上限。"
 msgid "You can add {0} more skills on this plan. Untick some skills or upgrade."
 msgstr "此套餐还可再添加 {0} 个技能。请取消勾选一些技能，或升级。"
 
-#: src/features/pages/components/page-view.tsx:482
+#: src/features/pages/components/page-view.tsx:489
 msgid "You can comment on this page but not edit it."
 msgstr "你可以评论此页面，但不能编辑。"
 
@@ -40728,7 +40750,7 @@ msgstr "你可以管理对不同类型数据处理的同意偏好，包括分析
 msgid "You can try again now!"
 msgstr "现在可以重试了！"
 
-#: src/features/pages/components/page-view.tsx:482
+#: src/features/pages/components/page-view.tsx:489
 msgid "You can view this page but not edit it."
 msgstr "你可以查看此页面，但不能编辑。"
 
@@ -40981,7 +41003,7 @@ msgstr "无法加载你的机器人。加载完成后才能保存对已保存登
 msgid "Your browser blocked access to local network devices for this site. Allow \"Local network access\" in the site settings (the icon left of the address bar), then try again."
 msgstr "你的浏览器阻止了此网站访问本地网络设备。请在网站设置（地址栏左侧的图标）中允许“本地网络访问”，然后重试。"
 
-#: src/features/download/components/download-page.tsx:93
+#: src/features/download/components/download-page.tsx:97
 msgid "Your browser does not say which processor you have, so choose the matching installer below."
 msgstr "你的浏览器无法识别处理器类型，请从下方选择对应的安装包。"
 

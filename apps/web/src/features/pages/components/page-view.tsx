@@ -15,6 +15,7 @@ import { Fragment, useCallback, useEffect, useId, useRef, useState } from "react
 import { useCRPC } from "@/lib/lunora/crpc";
 import { showError, showWarning } from "@/lib/toast";
 
+import { usePageManifestLink } from "../hooks/use-page-manifest-link";
 import usePagePresence from "../hooks/use-page-presence";
 import { focusCommentAnchor, markSelection, removeCommentMark } from "../lib/comment-mark";
 import type { RevisionConflict } from "../lib/revision-conflict";
@@ -24,9 +25,11 @@ import type { DraftComment } from "./page-comments-panel";
 import PageCommentsPanel from "./page-comments-panel";
 import PageConflictBanner from "./page-conflict-banner";
 import PageEditor from "./page-editor";
+import PageInstallButton from "./page-install-button";
 import PageKeptDraft from "./page-kept-draft";
 import PageShareDialog from "./page-share-dialog";
 import PageVersionPanel from "./page-version-panel";
+import PageWindowButton from "./page-window-button";
 
 type Permission = "admin" | "comment" | "read" | "write";
 
@@ -58,6 +61,8 @@ const PageView: FC<{ pageId: string }> = ({ pageId }) => {
     const [conflict, setConflict] = useState<(RevisionConflict & { reason: "agent" | "edit" | "restore"; versionId?: string }) | null>(null);
     const [resolving, setResolving] = useState(false);
     const [keptDraft, setKeptDraft] = useState<string | null>(null);
+
+    usePageManifestLink(pageId);
     const presence = usePagePresence(pageId);
     const { markEditing } = presence;
 
@@ -414,6 +419,8 @@ const PageView: FC<{ pageId: string }> = ({ pageId }) => {
                         </ul>
                     )}
                     <div className="flex items-center gap-1">
+                        <PageInstallButton pageId={pageId} />
+                        <PageWindowButton pageId={pageId} />
                         <Button
                             aria-label={page.isFavorite ? t`Remove from favorites` : t`Add to favorites`}
                             aria-pressed={page.isFavorite}

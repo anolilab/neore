@@ -52,6 +52,7 @@ import { Route as AuthSignUpRouteImport } from './routes/auth/sign-up'
 import { Route as DashboardIndexRouteImport } from './routes/dashboard/index'
 import { Route as DocsIndexRouteImport } from './routes/docs/index'
 import { Route as DocsSplatRouteImport } from './routes/docs/$'
+import { Route as PageManifestPageIdRouteImport } from './routes/page-manifest/$pageId'
 import { Route as chatChatIndexRouteImport } from './routes/(chat)/chat/index'
 import { Route as chatChatThreadIdRouteImport } from './routes/(chat)/chat/$threadId'
 import { Route as chatWorkflowIndexRouteImport } from './routes/(chat)/workflow/index'
@@ -312,6 +313,11 @@ const DocsSplatRoute = DocsSplatRouteImport.update({
   id: '/$',
   path: '/$',
   getParentRoute: () => DocsRouteRoute,
+} as any)
+const PageManifestPageIdRoute = PageManifestPageIdRouteImport.update({
+  id: '/page-manifest/$pageId',
+  path: '/page-manifest/$pageId',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const chatChatIndexRoute = chatChatIndexRouteImport.update({
   id: '/chat/',
@@ -614,6 +620,7 @@ export interface FileRoutesByFullPath {
   '/auth/sign-out': typeof AuthSignOutRoute
   '/auth/sign-up': typeof AuthSignUpRoute
   '/docs/$': typeof DocsSplatRoute
+  '/page-manifest/$pageId': typeof PageManifestPageIdRoute
   '/admin/': typeof AdminIndexRoute
   '/dashboard/': typeof DashboardIndexRoute
   '/docs/': typeof DocsIndexRoute
@@ -698,6 +705,7 @@ export interface FileRoutesByTo {
   '/auth/sign-out': typeof AuthSignOutRoute
   '/auth/sign-up': typeof AuthSignUpRoute
   '/docs/$': typeof DocsSplatRoute
+  '/page-manifest/$pageId': typeof PageManifestPageIdRoute
   '/admin': typeof AdminIndexRoute
   '/dashboard': typeof DashboardIndexRoute
   '/docs': typeof DocsIndexRoute
@@ -790,6 +798,7 @@ export interface FileRoutesById {
   '/auth/sign-out': typeof AuthSignOutRoute
   '/auth/sign-up': typeof AuthSignUpRoute
   '/docs/$': typeof DocsSplatRoute
+  '/page-manifest/$pageId': typeof PageManifestPageIdRoute
   '/(public)/': typeof publicIndexRoute
   '/admin/': typeof AdminIndexRoute
   '/dashboard/': typeof DashboardIndexRoute
@@ -883,6 +892,7 @@ export interface FileRouteTypes {
     | '/auth/sign-out'
     | '/auth/sign-up'
     | '/docs/$'
+    | '/page-manifest/$pageId'
     | '/admin/'
     | '/dashboard/'
     | '/docs/'
@@ -967,6 +977,7 @@ export interface FileRouteTypes {
     | '/auth/sign-out'
     | '/auth/sign-up'
     | '/docs/$'
+    | '/page-manifest/$pageId'
     | '/admin'
     | '/dashboard'
     | '/docs'
@@ -1058,6 +1069,7 @@ export interface FileRouteTypes {
     | '/auth/sign-out'
     | '/auth/sign-up'
     | '/docs/$'
+    | '/page-manifest/$pageId'
     | '/(public)/'
     | '/admin/'
     | '/dashboard/'
@@ -1126,6 +1138,7 @@ export interface RootRouteChildren {
   publicGuestRoute: typeof publicGuestRoute
   publicImpressumRoute: typeof publicImpressumRoute
   ApiScribeTokenRoute: typeof ApiScribeTokenRoute
+  PageManifestPageIdRoute: typeof PageManifestPageIdRoute
   publicIndexRoute: typeof publicIndexRoute
   publicInviteInviteTokenRoute: typeof publicInviteInviteTokenRoute
   publicModelsModelSlugRoute: typeof publicModelsModelSlugRoute
@@ -1441,6 +1454,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/docs/$'
       preLoaderRoute: typeof DocsSplatRouteImport
       parentRoute: typeof DocsRouteRoute
+    }
+    '/page-manifest/$pageId': {
+      id: '/page-manifest/$pageId'
+      path: '/page-manifest/$pageId'
+      fullPath: '/page-manifest/$pageId'
+      preLoaderRoute: typeof PageManifestPageIdRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/(chat)/chat/': {
       id: '/(chat)/chat/'
@@ -2017,6 +2037,7 @@ const rootRouteChildren: RootRouteChildren = {
   publicGuestRoute: publicGuestRoute,
   publicImpressumRoute: publicImpressumRoute,
   ApiScribeTokenRoute: ApiScribeTokenRoute,
+  PageManifestPageIdRoute: PageManifestPageIdRoute,
   publicIndexRoute: publicIndexRoute,
   publicInviteInviteTokenRoute: publicInviteInviteTokenRoute,
   publicModelsModelSlugRoute: publicModelsModelSlugRoute,

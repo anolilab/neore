@@ -74,6 +74,9 @@ export const isSameOrigin = (origin: URL, url: URL): boolean => url.origin === o
 
 export const newChatUrl = (origin: URL): URL => new URL("chat", origin);
 
+/** The page route a page window loads. Same id rule as a thread: a page id is refused exactly when a thread id is. */
+export const pageUrl = (origin: URL, id: string): URL | undefined => (isValidThreadId(id) ? new URL(`pages/${id}`, origin) : undefined);
+
 export const threadUrl = (origin: URL, id: string): URL | undefined => {
     if (id === "default" || !isValidThreadId(id)) {
         return undefined;

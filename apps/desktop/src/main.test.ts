@@ -827,6 +827,23 @@ describe("IPC", () => {
 
         expect(fake().windows).toHaveLength(opened);
     });
+
+    it("opens a page in its own window, refuses an untrusted sender or a bad id, and brings an open page forward", () => {
+        const openPage = fake().ipc.get("neore:open-page-window");
+        const untrusted = { ...siteSender(), senderFrame: null };
+
+        expect(() => openPage?.(untrusted, "page-1")).toThrow("untrusted");
+        expect(() => openPage?.(siteSender(), "../settings")).toThrow("invalid page id");
+
+        const before = fake().windows.length;
+
+        openPage?.(siteSender(), "page-1");
+        expect(fake().windows).toHaveLength(before + 1);
+        expect(topFrameOf(fake().windows.at(-1) as FakeWindow, `${SITE}/pages/page-1`)).toBeDefined();
+
+        openPage?.(siteSender(), "page-1");
+        expect(fake().windows).toHaveLength(before + 1);
+    });
 });
 
 describe("look and application menu", () => {

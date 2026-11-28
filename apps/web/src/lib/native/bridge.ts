@@ -36,6 +36,7 @@ export interface NativeBridge {
     onSignIn: (handler: () => void) => UnlistenFunction;
     /** Each change of the OS accent colour. Only with the `system-accent` capability. */
     onSystemAccentColor?: (handler: (hex: string | null) => void) => UnlistenFunction;
+    openPageWindow: (pageId: string) => Promise<void>;
     openThreadWindow: (threadId: string) => Promise<void>;
     /** The dock / launcher badge count. Optional: older shells lack it. */
     setBadge?: (count: number) => Promise<void>;
@@ -148,6 +149,24 @@ export const openThreadWindow = async (threadId: string): Promise<boolean> => {
 
     try {
         await getNative()?.openThreadWindow(threadId);
+
+        return true;
+    } catch {
+        return false;
+    }
+};
+
+/** Whether the shell can open a page in its own window. Known synchronously, so a control can show or hide itself. */
+export const supportsPageWindows = (): boolean => getNative()?.capabilities.includes("page-windows") === true;
+
+/** Opens the page in its own shell window. `false` unless the shell advertises `page-windows`, or when it refuses the id. */
+export const openPageWindow = async (pageId: string): Promise<boolean> => {
+    if (!supportsPageWindows()) {
+        return false;
+    }
+
+    try {
+        await getNative()?.openPageWindow(pageId);
 
         return true;
     } catch {
