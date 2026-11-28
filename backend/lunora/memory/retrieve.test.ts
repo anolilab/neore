@@ -72,6 +72,7 @@ afterEach(() => {
 interface Seed {
     botId?: string;
     embeddingId?: string;
+    eventStart?: string;
     lastConfirmedAt?: number;
     memory: string;
     pinned?: boolean;
@@ -102,7 +103,7 @@ const hits = (...found: [string, number][]) =>
         }),
     );
 
-const retrieve = async (args: { botId?: string; limit?: number; search?: boolean; searchText?: string } = {}): Promise<string[]> => {
+const retrieve = async (args: { botId?: string; limit?: number; search?: boolean; searchText?: string; timeZone?: string | null } = {}): Promise<string[]> => {
     const rows = (await harness.action(
         async (ctx: any) => await ctx.runAction(retrieveRelevantMemories, { searchText: "what did I do on my trip", userId: USER, ...args }),
     )) as { memory: string }[];
@@ -343,6 +344,37 @@ describe("candidates", () => {
         hits(["emb-old", 0.95]);
 
         expect(await retrieve()).toEqual([]);
+    });
+});
+
+describe("the asked time", () => {
+    it("reads tomorrow in the run's timezone, else the user's stored one", async () => {
+        // 23:30 UTC on the 27th: already the 28th in Berlin.
+        vi.useFakeTimers({ toFake: ["Date"] });
+        vi.setSystemTime(Date.UTC(2026, 10, 27, 23, 30));
+
+        try {
+            await harness.run(async (ctx: any) => {
+                const settings = await ctx.db
+                    .query("userSettings")
+                    .withIndex("by_userId", (q: any) => q.eq("userId", USER))
+                    .unique();
+
+                await ctx.db.patch("userSettings", settings._id, { timezone: "Europe/Berlin" });
+            });
+            await seed([
+                { eventStart: "2026-11-28", memory: "dentist at nine", type: "activity" },
+                { eventStart: "2026-11-29", memory: "haircut after work", type: "activity" },
+            ]);
+
+            expect(await retrieve({ searchText: "what is coming up tomorrow" })).toEqual(["haircut after work"]);
+            expect(await retrieve({ searchText: "what is coming up tomorrow", timeZone: "UTC" })).toEqual(["dentist at nine"]);
+            // `null`: the caller read no stored zone, so the stored Berlin one is not read again and the day is UTC's.
+            expect(await retrieve({ searchText: "what is coming up tomorrow", timeZone: null })).toEqual(["dentist at nine"]);
+            expect(await retrieve({ searchText: "what is coming up soon" })).toEqual([]);
+        } finally {
+            vi.useRealTimers();
+        }
     });
 });
 
