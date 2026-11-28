@@ -836,7 +836,7 @@ msgstr "{0} strumenti rilevati"
 
 #. placeholder {0}: device.toolNames.length
 #. placeholder {1}: device.toolNames.join(", ")
-#: src/features/devices/components/devices-settings.tsx:355
+#: src/features/devices/components/devices-settings.tsx:361
 msgid "{0} tools: {1}"
 msgstr "{0} strumenti: {1}"
 
@@ -1628,19 +1628,19 @@ msgstr "{stateLabel} Interrompi la modalità vocale a mani libere"
 msgid "{success, plural, one {# pull request linked.} other {# pull requests linked.}}"
 msgstr "{success, plural, one {# pull request collegata.} other {# pull request collegate.}}"
 
-#: src/features/devices/components/devices-settings.tsx:222
+#: src/features/devices/components/devices-settings.tsx:228
 msgid "{text} (gave up after {attempts} attempts)"
 msgstr "{text} (rinunciato dopo {attempts} tentativi)"
 
-#: src/features/onboarding/components/setup-checklist.tsx:138
+#: src/features/onboarding/components/setup-checklist.tsx:153
 msgid "{title} is done."
 msgstr "{title} è completata."
 
-#: src/features/onboarding/components/setup-checklist.tsx:141
+#: src/features/onboarding/components/setup-checklist.tsx:156
 msgid "{title} is skipped."
 msgstr "{title} è saltata."
 
-#: src/features/onboarding/components/setup-checklist.tsx:141
+#: src/features/onboarding/components/setup-checklist.tsx:156
 msgid "{title} is to do."
 msgstr "{title} è da fare."
 
@@ -1921,7 +1921,7 @@ msgstr "30 giorni"
 msgid "30+ AI models for chat, images, video, documents, and code. One workspace, one subscription — free to start."
 msgstr "Oltre 30 modelli di IA per chat, immagini, video, documenti e codice. Un unico spazio di lavoro, un solo abbonamento: inizia gratis."
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:40
+#: src/features/onboarding/components/onboarding-dialog.tsx:46
 msgid "30+ Models, One Thread"
 msgstr "Oltre 30 modelli, una sola conversazione"
 
@@ -2275,7 +2275,7 @@ msgstr "Un’esecuzione non scrive mai in una chat bloccata o condivisa tramite 
 msgid "A run's thread is filed in this project. Moving the task to another project starts a new thread."
 msgstr "Il thread di un'esecuzione viene archiviato in questo progetto. Spostare l'attività in un altro progetto avvia un nuovo thread."
 
-#: src/features/settings/components/chat/bots-settings.tsx:451
+#: src/features/settings/components/chat/bots-settings.tsx:455
 msgid "A sandbox the bot keeps between chats. Paused when idle, not billed while paused."
 msgstr "Una sandbox che il bot conserva tra una chat e l’altra. In pausa quando è inattiva, non viene fatturata mentre è in pausa."
 
@@ -2331,8 +2331,8 @@ msgstr "Uno strumento non può essere contemporaneamente aggiunto e disattivato"
 msgid "A tool that needs your approval pauses the turn with a card. Only the owner answers, and the queued speakers continue afterwards."
 msgstr "Uno strumento che richiede la tua approvazione mette in pausa il turno con una scheda. Solo il proprietario risponde, poi gli interlocutori in coda continuano."
 
-#: src/features/settings/components/chat/bots-settings.tsx:223
-#: src/features/settings/components/chat/bots-settings.tsx:275
+#: src/features/settings/components/chat/bots-settings.tsx:225
+#: src/features/settings/components/chat/bots-settings.tsx:279
 msgid "A tool you typed was not added. Add it or clear the field first."
 msgstr "Uno strumento che hai digitato non è stato aggiunto. Aggiungilo o svuota prima il campo."
 
@@ -2447,8 +2447,8 @@ msgid "Access for {name}"
 msgstr "Accesso per {name}"
 
 #: src/features/onboarding/components/onboarding-dialog.tsx:41
-msgid "Access GPT-4, Claude, Gemini, and more from a single conversation. Switch models mid-thread to compare answers."
-msgstr "Accedi a GPT-4, Claude, Gemini e altri da un'unica conversazione. Cambia modello a metà conversazione per confrontare le risposte."
+#~ msgid "Access GPT-4, Claude, Gemini, and more from a single conversation. Switch models mid-thread to compare answers."
+#~ msgstr "Accedi a GPT-4, Claude, Gemini e altri da un'unica conversazione. Cambia modello a metà conversazione per confrontare le risposte."
 
 #: src/features/settings/components/chat/native-providers-settings.tsx:598
 msgid "Access key ID"
@@ -2634,7 +2634,7 @@ msgstr "Aggiungi una nota..."
 msgid "Add a note…"
 msgstr "Aggiungi una nota…"
 
-#: src/features/devices/components/devices-settings.tsx:538
+#: src/features/devices/components/devices-settings.tsx:544
 msgid "Add a server over SSH"
 msgstr "Aggiungi un server tramite SSH"
 
@@ -2663,7 +2663,7 @@ msgstr "Aggiungi un avviso qui sopra per ricevere una notifica quando il tuo uti
 msgid "Add an extra layer of security to your account by enabling two-factor authentication."
 msgstr "Aggiungi un ulteriore livello di sicurezza al tuo account attivando l'autenticazione a due fattori."
 
-#: src/features/onboarding/components/setup-checklist.tsx:132
+#: src/features/onboarding/components/setup-checklist.tsx:147
 msgid "Add an SSH server"
 msgstr "Aggiungi un server SSH"
 
@@ -3007,7 +3007,7 @@ msgstr "Aggiunta documenti… {0} di {1}"
 msgid "Adding the project…"
 msgstr "Aggiunta del progetto…"
 
-#: src/features/devices/components/devices-settings.tsx:518
+#: src/features/devices/components/devices-settings.tsx:524
 msgid "Adding the server was cancelled on this computer."
 msgstr "L’aggiunta del server è stata annullata su questo computer."
 
@@ -3020,7 +3020,7 @@ msgstr "Aggiunta delle tue risposte precedenti…"
 msgid "Adding…"
 msgstr "Aggiunta in corso…"
 
-#: src/features/devices/components/devices-settings.tsx:551
+#: src/features/devices/components/devices-settings.tsx:557
 msgid "Address"
 msgstr "Indirizzo"
 
@@ -3270,7 +3270,7 @@ msgstr "Dopo aver attivato qui la connessione, riceverai un URL del webhook da i
 msgid "After activating the connection here, you'll get a webhook URL to set as the Request URL in your Slack App's Event Subscriptions."
 msgstr "Dopo aver attivato qui la connessione, riceverai un URL del webhook da impostare come Request URL nelle Event Subscriptions della tua app Slack."
 
-#: src/features/devices/components/devices-settings.tsx:464
+#: src/features/devices/components/devices-settings.tsx:470
 msgid "After outside content"
 msgstr "Dopo contenuti esterni"
 
@@ -4886,7 +4886,7 @@ msgstr "auto"
 #: src/features/chat/thread/composer-video-settings.tsx:24
 #: src/features/chat/thread/media-gallery-view.tsx:65
 #: src/features/chat/thread/media-gallery-view.tsx:519
-#: src/features/settings/components/chat/bots-settings.tsx:133
+#: src/features/settings/components/chat/bots-settings.tsx:134
 #: src/features/settings/components/chat/new-chat-permission-mode-setting.tsx:41
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:64
 msgid "Auto"
@@ -5111,8 +5111,8 @@ msgstr "Azure OpenAI"
 msgid "Azure portal → your OpenAI resource → Keys and Endpoint. Encrypted at rest and never shown again."
 msgstr "Portale di Azure → la tua risorsa OpenAI → Chiavi ed endpoint. Crittografata a riposo e mai più mostrata."
 
-#: src/features/code/components/code-shell.tsx:162
-#: src/features/onboarding/components/onboarding-dialog.tsx:394
+#: src/features/code/components/code-shell.tsx:167
+#: src/features/onboarding/components/onboarding-dialog.tsx:460
 #: src/features/pages/components/page-version-panel.tsx:88
 #: src/features/projects/components/add-project-dialog.tsx:692
 #: src/features/settings/components/personalization/memory-import-dialog.tsx:309
@@ -5622,11 +5622,11 @@ msgstr "Bosniaco"
 msgid "Bosnian (Bosnia)"
 msgstr "Bosniaco (Bosnia)"
 
-#: src/features/settings/components/chat/bots-settings.tsx:243
+#: src/features/settings/components/chat/bots-settings.tsx:245
 msgid "Bot created"
 msgstr "Bot creato"
 
-#: src/features/settings/components/chat/bots-settings.tsx:365
+#: src/features/settings/components/chat/bots-settings.tsx:369
 msgid "Bot deleted"
 msgstr "Bot eliminato"
 
@@ -5903,7 +5903,7 @@ msgstr "Pensato per <0>flussi di lavoro reali.</0>"
 msgid "Built for expert developers and complex systems"
 msgstr "Pensato per sviluppatori esperti e sistemi complessi"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:37
+#: src/features/onboarding/components/onboarding-dialog.tsx:41
 msgid "Built-in Canvas Editor"
 msgstr "Editor canvas integrato"
 
@@ -6213,7 +6213,7 @@ msgstr "Canada"
 #: src/features/prompts/components/prompt-optimize-dialog.tsx:194
 #: src/features/prompts/components/variable-fill-dialog.tsx:185
 #: src/features/settings/components/chat/api-keys-settings.tsx:437
-#: src/features/settings/components/chat/bots-settings.tsx:570
+#: src/features/settings/components/chat/bots-settings.tsx:574
 #: src/features/settings/components/chat/custom-providers-settings.tsx:630
 #: src/features/settings/components/chat/mcp/server-form.tsx:334
 #: src/features/settings/components/chat/native-providers-settings.tsx:705
@@ -6594,8 +6594,9 @@ msgstr "chat"
 #: src/features/layout/components/sidebar-shortcut.tsx:79
 #: src/features/layout/components/workspace-switch.tsx:47
 #: src/features/layout/lib/dashboard-page-names.ts:20
+#: src/features/onboarding/components/onboarding-dialog.tsx:131
 #: src/features/settings/components/account/account-settings.tsx:355
-#: src/features/settings/components/chat/bots-settings.tsx:520
+#: src/features/settings/components/chat/bots-settings.tsx:524
 #: src/features/settings/lib/settings-keywords.ts:33
 #: src/features/settings/lib/settings-navigation.ts:121
 msgid "Chat"
@@ -6801,7 +6802,8 @@ msgstr "Le integrazioni selezionate ti verranno proposte per la configurazione d
 msgid "Checked: {0}"
 msgstr "Controllato: {0}"
 
-#: src/features/onboarding/components/setup-checklist.tsx:161
+#: src/features/code/components/git-host-step.tsx:23
+#: src/features/onboarding/components/setup-checklist.tsx:176
 msgid "Checking"
 msgstr "Verifica in corso"
 
@@ -6890,7 +6892,7 @@ msgstr "Scegli un modello"
 msgid "Choose a model for each kind of work the assistant hands to a sub-agent. A role with a model is offered to the assistant; one without stays off."
 msgstr "Scegli un modello per ogni tipo di lavoro che l'assistente affida a un subagente. Un ruolo con un modello viene offerto all'assistente; uno senza resta disattivato."
 
-#: src/features/devices/components/devices-settings.tsx:129
+#: src/features/devices/components/devices-settings.tsx:131
 msgid "Choose a project"
 msgstr "Scegli un progetto"
 
@@ -6946,7 +6948,7 @@ msgstr "Scegli come vengono assegnati i turni: supervisore (un passaggio di inst
 msgid "Choose how you review this before you submit it."
 msgstr "Scegli come rivedere questo elemento prima di inviarlo."
 
-#: src/features/code/components/code-workspace.tsx:48
+#: src/features/code/components/code-workspace.tsx:50
 msgid "Choose one on the left to start."
 msgstr "Scegline uno a sinistra per iniziare."
 
@@ -7312,7 +7314,7 @@ msgid "Close"
 msgstr "Chiudi"
 
 #. placeholder {0}: titleOf(tabId)
-#: src/features/code/components/code-workspace.tsx:121
+#: src/features/code/components/code-workspace.tsx:125
 msgid "Close {0}"
 msgstr "Chiudi {0}"
 
@@ -7341,9 +7343,9 @@ msgstr "Chiudi cronologia"
 msgid "Close node search"
 msgstr "Chiudi ricerca nodi"
 
-#: src/features/code/components/code-workspace.tsx:73
-#: src/features/code/components/code-workspace.tsx:147
-#: src/features/code/components/code-workspace.tsx:150
+#: src/features/code/components/code-workspace.tsx:76
+#: src/features/code/components/code-workspace.tsx:151
+#: src/features/code/components/code-workspace.tsx:154
 msgid "Close pane"
 msgstr "Chiudi riquadro"
 
@@ -7404,8 +7406,9 @@ msgstr "I modelli Cloudflare Workers AI vengono eseguiti ovunque Cloudflare abbi
 #: src/features/auth/components/device-code-parts.tsx:134
 #: src/features/canvas/canvas-panel.tsx:774
 #: src/features/chat/thread/composer-search-mode.tsx:57
-#: src/features/code/components/code-workspace.tsx:219
+#: src/features/code/components/code-workspace.tsx:225
 #: src/features/layout/components/workspace-switch.tsx:48
+#: src/features/onboarding/components/onboarding-dialog.tsx:137
 #: src/features/workflow/components/nodes/code-node.tsx:60
 #: src/features/workflow/types/index.ts:451
 #: src/features/workflow/types/index.ts:455
@@ -7442,11 +7445,11 @@ msgstr "Tema di evidenziazione del codice aggiornato"
 msgid "Code is required"
 msgstr "Il codice è obbligatorio"
 
-#: src/features/code/components/code-shell.tsx:136
+#: src/features/code/components/code-shell.tsx:139
 msgid "Code mode is not available for your account yet."
 msgstr "La modalità Code non è ancora disponibile per il tuo account."
 
-#: src/features/code/components/code-shell.tsx:151
+#: src/features/code/components/code-shell.tsx:156
 msgid "Code navigation"
 msgstr "Navigazione del codice"
 
@@ -7518,20 +7521,20 @@ msgstr "Esecuzione dell'agente di coding completata"
 msgid "Coding agent run was not approved."
 msgstr "L'esecuzione dell'agente di coding non è stata approvata."
 
-#: src/features/code/components/code-shell.tsx:110
+#: src/features/code/components/code-shell.tsx:111
 msgid "Coding agent runs"
 msgstr "Esecuzioni dell’agente di programmazione"
 
 #. placeholder {0}: device.name
-#: src/features/devices/components/devices-settings.tsx:146
+#: src/features/devices/components/devices-settings.tsx:148
 msgid "Coding agents you can start on {0}"
 msgstr "Agenti di programmazione che puoi avviare su {0}"
 
-#: src/features/onboarding/components/setup-checklist.tsx:164
+#: src/features/onboarding/components/setup-checklist.tsx:298
 msgid "Coding setup"
 msgstr "Configurazione del coding"
 
-#: src/features/onboarding/components/setup-checklist.tsx:166
+#: src/features/onboarding/components/setup-checklist.tsx:213
 msgid "Coding setup steps"
 msgstr "Passaggi di configurazione del coding"
 
@@ -7877,11 +7880,11 @@ msgstr "Confronta prima di decidere"
 msgid "Compare concepts across FLUX, Runway, and Stable Diffusion. Pick the best style, not the only option."
 msgstr "Confronta idee tra FLUX, Runway e Stable Diffusion. Scegli lo stile migliore, non l'unica opzione."
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:74
+#: src/features/onboarding/components/onboarding-dialog.tsx:80
 msgid "Compare how different AI models explain quantum computing to a beginner."
 msgstr "Confronta come diversi modelli di IA spiegano l'informatica quantistica a un principiante."
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:73
+#: src/features/onboarding/components/onboarding-dialog.tsx:79
 msgid "Compare models"
 msgstr "Confronta i modelli"
 
@@ -8061,7 +8064,7 @@ msgstr "Compressione del contesto..."
 #: src/features/auth/components/device-code-parts.tsx:76
 #: src/features/chat/sidebar/thread-context.tsx:74
 #: src/features/projects/components/computer-rule-file-import.tsx:502
-#: src/features/settings/components/chat/bots-settings.tsx:453
+#: src/features/settings/components/chat/bots-settings.tsx:457
 msgid "Computer"
 msgstr "Computer"
 
@@ -8191,7 +8194,7 @@ msgstr "Conferma la tua password"
 msgid "Conflicts with {base}"
 msgstr "Conflitti con {base}"
 
-#: src/features/devices/components/devices-settings.tsx:297
+#: src/features/devices/components/devices-settings.tsx:303
 #: src/features/settings/connectors/messenger/messenger-platform-card.tsx:174
 #: src/features/skills/components/skill-builder-setup.tsx:132
 #: src/routes/auth/extension.tsx:156
@@ -8216,7 +8219,13 @@ msgstr "Connetti {label} per vedere qui cosa richiede la tua revisione."
 msgid "Connect a bot you own to a messaging app and message your agent from your phone. Messages from the app have their own pairing and rate-limit checks, then land in the same chat history as your web chats."
 msgstr "Collega un bot di tua proprietà a un’app di messaggistica e scrivi al tuo agente dal telefono. I messaggi dall’app hanno i propri controlli di abbinamento e di frequenza, poi finiscono nella stessa cronologia delle chat web."
 
-#: src/features/code/components/code-shell.tsx:97
+#: src/features/code/components/git-host-step.tsx:31
+#: src/features/code/components/git-host-step.tsx:36
+msgid "Connect a Git host"
+msgstr "Collega un host Git"
+
+#: src/features/code/components/code-shell.tsx:98
+#: src/features/code/components/git-host-step.tsx:28
 msgid "Connect a Git host to review pull requests here."
 msgstr "Connetti un host Git per rivedere qui le pull request."
 
@@ -8235,7 +8244,7 @@ msgstr "Collega un nodo audio/file come input"
 msgid "Connect an image node as input"
 msgstr "Collega un nodo immagine come input"
 
-#: src/features/devices/components/devices-settings.tsx:569
+#: src/features/devices/components/devices-settings.tsx:575
 msgid "Connect and add"
 msgstr "Connetti e aggiungi"
 
@@ -8414,7 +8423,7 @@ msgstr "connessione non riuscita"
 msgid "Connection failed"
 msgstr "Connessione non riuscita"
 
-#: src/features/devices/components/devices-settings.tsx:377
+#: src/features/devices/components/devices-settings.tsx:383
 msgid "Connection lost"
 msgstr "Connessione persa"
 
@@ -8861,12 +8870,12 @@ msgstr "Copia comando: {label}"
 msgid "Copy content"
 msgstr "Copia contenuto"
 
-#: src/features/devices/components/devices-settings.tsx:395
+#: src/features/devices/components/devices-settings.tsx:401
 msgid "Copy diagnostics"
 msgstr "Copia diagnostica"
 
 #. placeholder {0}: device.name
-#: src/features/devices/components/devices-settings.tsx:394
+#: src/features/devices/components/devices-settings.tsx:400
 msgid "Copy diagnostics for {0}"
 msgstr "Copia la diagnostica di {0}"
 
@@ -9049,7 +9058,7 @@ msgstr "Applicazioni attente ai costi che richiedono l'IA affidabile di Google a
 msgid "Costa Rica"
 msgstr "Costa Rica"
 
-#: src/features/devices/components/devices-settings.tsx:530
+#: src/features/devices/components/devices-settings.tsx:536
 msgid "Could not add the server."
 msgstr "Impossibile aggiungere il server."
 
@@ -9107,7 +9116,7 @@ msgstr "Impossibile modificare Auto. Riprova."
 msgid "Could not change push notifications. Try again."
 msgstr "Impossibile modificare le notifiche push. Riprova."
 
-#: src/features/settings/components/chat/bots-settings.tsx:265
+#: src/features/settings/components/chat/bots-settings.tsx:269
 msgid "Could not change the bot's permission mode."
 msgstr "Impossibile modificare la modalità di autorizzazione del bot."
 
@@ -9124,7 +9133,8 @@ msgstr "Impossibile cambiare la modalità di autorizzazione. Riprova."
 msgid "Could not change where this device is offered."
 msgstr "Impossibile cambiare dove viene offerto questo dispositivo."
 
-#: src/features/onboarding/components/setup-checklist.tsx:161
+#: src/features/code/components/git-host-step.tsx:23
+#: src/features/onboarding/components/setup-checklist.tsx:176
 msgid "Could not check"
 msgstr "Impossibile verificare"
 
@@ -9137,7 +9147,7 @@ msgstr "Impossibile compattare la conversazione. Riprova."
 msgid "Could not confirm that {0} was started again. Check on {hostLabel} before you try again."
 msgstr "Impossibile confermare che {0} sia stato riavviato. Controlla su {hostLabel} prima di riprovare."
 
-#: src/features/settings/components/chat/bots-settings.tsx:328
+#: src/features/settings/components/chat/bots-settings.tsx:332
 msgid "Could not confirm that the bot's tools were saved. Check them and try again."
 msgstr "Impossibile confermare che gli strumenti del bot siano stati salvati. Controllali e riprova."
 
@@ -9157,7 +9167,7 @@ msgstr "Impossibile confermarlo. Controlla su {hostLabel} prima di riprovare."
 msgid "Could not confirm the change to auto-merge. Check on {hostLabel} before you try again."
 msgstr "Impossibile confermare la modifica dell’unione automatica. Controlla su {hostLabel} prima di riprovare."
 
-#: src/features/devices/components/devices-settings.tsx:318
+#: src/features/devices/components/devices-settings.tsx:324
 msgid "Could not connect to the server."
 msgstr "Impossibile connettersi al server."
 
@@ -9184,7 +9194,7 @@ msgstr "Impossibile copiare il segreto. Selezionalo e copialo manualmente."
 
 #: src/features/auth/components/settings/api-key/use-copy-to-clipboard.ts:18
 #: src/features/chat/thread/copy-last-code-block.tsx:41
-#: src/features/devices/components/devices-settings.tsx:270
+#: src/features/devices/components/devices-settings.tsx:276
 msgid "Could not copy to the clipboard"
 msgstr "Impossibile copiare negli appunti"
 
@@ -9196,7 +9206,7 @@ msgstr "Impossibile copiare; seleziona il testo"
 msgid "Could not create a collection for this import. Try again."
 msgstr "Impossibile creare una raccolta per questa importazione. Riprova."
 
-#: src/features/settings/components/chat/bots-settings.tsx:245
+#: src/features/settings/components/chat/bots-settings.tsx:247
 msgid "Could not create the bot."
 msgstr "Impossibile creare il bot."
 
@@ -9209,7 +9219,7 @@ msgstr "Impossibile creare la chat di gruppo"
 msgid "Could not create the page"
 msgstr "Impossibile creare la pagina"
 
-#: src/features/settings/components/chat/bots-settings.tsx:367
+#: src/features/settings/components/chat/bots-settings.tsx:371
 msgid "Could not delete the bot."
 msgstr "Impossibile eliminare il bot."
 
@@ -9344,7 +9354,7 @@ msgstr "Impossibile caricare i dettagli di fatturazione della tua organizzazione
 msgid "Could not load your roles."
 msgstr "Impossibile caricare i tuoi ruoli."
 
-#: src/features/onboarding/components/setup-checklist.tsx:230
+#: src/features/onboarding/components/setup-checklist.tsx:272
 msgid "Could not load your saved choices, so Skip and Resume are off until it is read again."
 msgstr "Impossibile caricare le tue scelte salvate, quindi Salta e Riprendi restano disattivati finché non vengono rilette."
 
@@ -9368,7 +9378,7 @@ msgstr "Impossibile aprire come pagina"
 msgid "Could not open the pull request."
 msgstr "Impossibile aprire la pull request."
 
-#: src/features/devices/components/devices-settings.tsx:637
+#: src/features/devices/components/devices-settings.tsx:643
 msgid "Could not pair this computer. Try again."
 msgstr "Impossibile associare questo computer. Riprova."
 
@@ -9423,7 +9433,7 @@ msgstr "Impossibile leggere l’elenco incollato"
 msgid "Could not read what blocks {name}. Try again"
 msgstr "Impossibile leggere cosa blocca {name}. Riprova"
 
-#: src/features/onboarding/components/setup-checklist.tsx:216
+#: src/features/onboarding/components/setup-checklist.tsx:258
 msgid "Could not read your devices, so the steps cannot be checked yet. The links still work."
 msgstr "Impossibile leggere i tuoi dispositivi, quindi i passaggi non possono ancora essere verificati. I link funzionano comunque."
 
@@ -9436,7 +9446,7 @@ msgstr "Impossibile perfezionare la bozza. Riprova."
 msgid "Could not refresh this {requestNoun} from {0}. What you see may be out of date."
 msgstr "Impossibile aggiornare questa {requestNoun} da {0}. Ciò che vedi potrebbe non essere aggiornato."
 
-#: src/features/devices/components/devices-settings.tsx:412
+#: src/features/devices/components/devices-settings.tsx:418
 msgid "Could not remove the device."
 msgstr "Impossibile rimuovere il dispositivo."
 
@@ -9444,7 +9454,7 @@ msgstr "Impossibile rimuovere il dispositivo."
 msgid "Could not remove the participant"
 msgstr "Impossibile rimuovere il partecipante"
 
-#: src/features/devices/components/devices-settings.tsx:347
+#: src/features/devices/components/devices-settings.tsx:353
 msgid "Could not rename the device."
 msgstr "Impossibile rinominare il dispositivo."
 
@@ -9465,12 +9475,12 @@ msgid "Could not retry. Please try again."
 msgstr "Impossibile riprovare. Riprova."
 
 #: src/features/chat/goal/pinned-goal.tsx:155
-#: src/features/onboarding/components/setup-checklist.tsx:99
-#: src/features/onboarding/components/setup-checklist.tsx:180
+#: src/features/onboarding/components/setup-checklist.tsx:114
+#: src/features/onboarding/components/setup-checklist.tsx:223
 msgid "Could not save that choice. Try again."
 msgstr "Impossibile salvare questa scelta. Riprova."
 
-#: src/features/settings/components/chat/bots-settings.tsx:320
+#: src/features/settings/components/chat/bots-settings.tsx:324
 msgid "Could not save the bot's tools. Its tools are unchanged."
 msgstr "Impossibile salvare gli strumenti del bot. I suoi strumenti restano invariati."
 
@@ -9554,7 +9564,7 @@ msgstr "Impossibile disconnettersi"
 msgid "Could not snooze the thread. Please try again."
 msgstr "Impossibile posticipare il thread. Riprova."
 
-#: src/features/settings/components/chat/bots-settings.tsx:255
+#: src/features/settings/components/chat/bots-settings.tsx:259
 msgid "Could not start a chat with this bot."
 msgstr "Impossibile avviare una chat con questo bot."
 
@@ -9765,7 +9775,7 @@ msgstr "Crea e gestisci le chiavi API per l'accesso programmatico al tuo account
 msgid "Create API Key"
 msgstr "Crea chiave API"
 
-#: src/features/settings/components/chat/bots-settings.tsx:376
+#: src/features/settings/components/chat/bots-settings.tsx:380
 msgid "Create bot"
 msgstr "Crea bot"
 
@@ -9799,7 +9809,7 @@ msgstr "Crea chat di gruppo"
 msgid "Create guest link"
 msgstr "Crea link ospite"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:39
+#: src/features/onboarding/components/onboarding-dialog.tsx:43
 msgid "Create Images and Videos"
 msgstr "Crea immagini e video"
 
@@ -9929,8 +9939,8 @@ msgstr "Creata: {createdAt}"
 msgid "Creates a single-use link, valid for 7 days. Whoever opens it signed in gets access."
 msgstr "Crea un link monouso valido per 7 giorni. Chi lo apre dopo aver effettuato l'accesso ottiene l'accesso."
 
-#: src/features/settings/components/chat/bots-settings.tsx:376
-#: src/features/settings/components/chat/bots-settings.tsx:457
+#: src/features/settings/components/chat/bots-settings.tsx:380
+#: src/features/settings/components/chat/bots-settings.tsx:461
 msgid "Creating bot…"
 msgstr "Creazione del bot…"
 
@@ -10196,7 +10206,7 @@ msgstr "stili personalizzati"
 msgid "Custom System Prompt"
 msgstr "Prompt di sistema personalizzato"
 
-#: src/features/settings/components/chat/bots-settings.tsx:476
+#: src/features/settings/components/chat/bots-settings.tsx:480
 msgid "Custom tools"
 msgstr "Strumenti personalizzati"
 
@@ -10733,8 +10743,8 @@ msgstr "Il lavoro di {0} delegato viene eseguito su questo modello."
 #: src/features/prompts/components/prompt-list-view.tsx:227
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:751
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:890
-#: src/features/settings/components/chat/bots-settings.tsx:529
-#: src/features/settings/components/chat/bots-settings.tsx:583
+#: src/features/settings/components/chat/bots-settings.tsx:533
+#: src/features/settings/components/chat/bots-settings.tsx:587
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:335
 #: src/features/settings/components/chat/trigger-settings.tsx:1094
 #: src/features/skills/components/skill-list.tsx:311
@@ -10762,7 +10772,7 @@ msgstr "Eliminare “{pendingDeleteTitle}”?"
 #. placeholder {0}: model.name
 #. placeholder {0}: server.name
 #: src/features/local-models/components/ollama-model-manager.tsx:265
-#: src/features/settings/components/chat/bots-settings.tsx:523
+#: src/features/settings/components/chat/bots-settings.tsx:527
 #: src/features/settings/components/chat/mcp/server-list.tsx:174
 #: src/features/skills/components/skill-item.tsx:190
 msgid "Delete {0}"
@@ -10776,7 +10786,7 @@ msgstr "Elimina {0} utenti"
 #. placeholder {0}: deleting.name
 #. placeholder {0}: pendingDelete?.name ?? ""
 #: src/features/local-models/components/ollama-model-manager.tsx:342
-#: src/features/settings/components/chat/bots-settings.tsx:593
+#: src/features/settings/components/chat/bots-settings.tsx:597
 msgid "Delete {0}?"
 msgstr "Eliminare {0}?"
 
@@ -11095,7 +11105,7 @@ msgstr "Attività impegnative in cui contano soprattutto la massima capacità de
 
 #: src/features/auth/components/device-approval.tsx:130
 #: src/features/auth/components/device-approval.tsx:134
-#: src/features/devices/components/devices-settings.tsx:449
+#: src/features/devices/components/devices-settings.tsx:455
 msgid "Denied"
 msgstr "Negato"
 
@@ -11262,7 +11272,7 @@ msgstr "Descrivi il tuo workflow... ad es. \"Genera un'immagine da un testo, aum
 #: src/features/prompts/components/prompt-list-view.tsx:117
 #: src/features/prompts/components/prompt-list-view.tsx:120
 #: src/features/prompts/components/variable-definitions.tsx:122
-#: src/features/settings/components/chat/bots-settings.tsx:386
+#: src/features/settings/components/chat/bots-settings.tsx:390
 #: src/features/skills/components/bundle-import-dialog.tsx:120
 #: src/features/skills/components/bundle-import-dialog.tsx:153
 #: src/features/skills/components/skill-builder-diff.tsx:28
@@ -11405,27 +11415,27 @@ msgstr "Sviluppatori che hanno bisogno di solide capacità di programmazione e g
 msgid "Development"
 msgstr "Sviluppo"
 
-#: src/features/devices/components/devices-settings.tsx:718
+#: src/features/devices/components/devices-settings.tsx:724
 #: src/features/settings/lib/settings-keywords.ts:88
 msgid "Device activity"
 msgstr "Attività dei dispositivi"
 
-#: src/features/devices/components/devices-settings.tsx:336
+#: src/features/devices/components/devices-settings.tsx:342
 msgid "Device name"
 msgstr "Nome del dispositivo"
 
 #: src/features/chat/sidebar/thread-context.tsx:68
-#: src/features/devices/components/devices-settings.tsx:415
+#: src/features/devices/components/devices-settings.tsx:421
 msgid "Device removed"
 msgstr "Dispositivo rimosso"
 
-#: src/features/devices/components/devices-settings.tsx:649
+#: src/features/devices/components/devices-settings.tsx:655
 #: src/features/layout/lib/dashboard-page-names.ts:23
 #: src/features/settings/lib/settings-navigation.ts:118
 msgid "Devices"
 msgstr "Dispositivi"
 
-#: src/features/devices/components/devices-settings.tsx:282
+#: src/features/devices/components/devices-settings.tsx:288
 msgid "Diagnostics copied"
 msgstr "Diagnostica copiata"
 
@@ -11540,7 +11550,7 @@ msgstr "Scartare le modifiche ai file di regole?"
 msgid "Discard the review"
 msgstr "Scarta la revisione"
 
-#: src/features/devices/components/devices-settings.tsx:300
+#: src/features/devices/components/devices-settings.tsx:306
 #: src/features/settings/connectors/connector-card.tsx:143
 #: src/features/settings/connectors/connector-card.tsx:233
 msgid "Disconnect"
@@ -11577,7 +11587,7 @@ msgstr "Chiave pubblica Discord"
 #: src/features/chat/thread/ask-user-prompt.tsx:345
 #: src/features/chat/thread/composer-long-text-prompt.tsx:71
 #: src/features/develop/components/guide-view.tsx:141
-#: src/features/devices/components/devices-settings.tsx:391
+#: src/features/devices/components/devices-settings.tsx:397
 #: src/features/tasks/components/task-suggestions.tsx:286
 #: src/features/workflow/components/nodes/file-node.tsx:231
 msgid "Dismiss"
@@ -11743,9 +11753,10 @@ msgstr "Non usare le tue istruzioni predefinite in questo progetto"
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:120
 #: src/features/chat/thread/host-activity.tsx:78
 #: src/features/chat/thread/host-activity.tsx:133
+#: src/features/code/components/git-host-step.tsx:21
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:184
-#: src/features/devices/components/devices-settings.tsx:448
-#: src/features/onboarding/components/setup-checklist.tsx:135
+#: src/features/devices/components/devices-settings.tsx:454
+#: src/features/onboarding/components/setup-checklist.tsx:150
 #: src/features/skills/components/bundle-import-dialog.tsx:253
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:65
 #: src/features/sub-agents/components/worker-run-log.tsx:29
@@ -13405,7 +13416,7 @@ msgstr "Ogni {weekday} alle {time} UTC"
 msgid "Every 6 hours"
 msgstr "Ogni 6 ore"
 
-#: src/features/settings/components/chat/bots-settings.tsx:548
+#: src/features/settings/components/chat/bots-settings.tsx:552
 msgid "Every chat and scheduled run of this bot gets only these tools. Your tool permissions still apply."
 msgstr "Ogni chat ed esecuzione pianificata di questo bot riceve solo questi strumenti. I tuoi permessi sugli strumenti restano validi."
 
@@ -13756,7 +13767,7 @@ msgid "expired"
 msgstr "scaduto"
 
 #: src/features/chat/thread-list/thread-node.tsx:412
-#: src/features/devices/components/devices-settings.tsx:450
+#: src/features/devices/components/devices-settings.tsx:456
 #: src/features/settings/connectors/connector-card.tsx:78
 msgid "Expired"
 msgstr "Scaduto"
@@ -14022,7 +14033,7 @@ msgstr "non riuscito"
 #: src/features/chat/thread/host-activity.tsx:139
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:181
 #: src/features/develop/components/checks-tab.tsx:78
-#: src/features/devices/components/devices-settings.tsx:451
+#: src/features/devices/components/devices-settings.tsx:457
 #: src/features/evals/components/model-comparison.tsx:112
 #: src/features/evals/components/run-status.tsx:15
 #: src/features/settings/components/chat/trigger-settings.tsx:181
@@ -16171,7 +16182,7 @@ msgstr "Output video in alta definizione Full 1080p"
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:77
 #: src/features/chat/sidebar/thread-context.tsx:64
 #: src/features/chat/thread/composer-permission-mode.tsx:43
-#: src/features/settings/components/chat/bots-settings.tsx:134
+#: src/features/settings/components/chat/bots-settings.tsx:135
 #: src/features/settings/components/chat/new-chat-permission-mode-setting.tsx:42
 msgid "Full access"
 msgstr "Accesso completo"
@@ -16327,7 +16338,7 @@ msgstr "Crea lo storyboard di un breve documentario"
 msgid "Generate a video from a text description"
 msgstr "Genera un video da una descrizione testuale"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:68
+#: src/features/onboarding/components/onboarding-dialog.tsx:74
 msgid "Generate an image"
 msgstr "Genera un'immagine"
 
@@ -16339,7 +16350,7 @@ msgstr "Genera un'immagine da un prompt testuale"
 msgid "Generate an image from a text prompt and upscale it to 4x"
 msgstr "Genera un'immagine da un prompt testuale e aumentane la risoluzione di 4 volte"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:69
+#: src/features/onboarding/components/onboarding-dialog.tsx:75
 msgid "Generate an image of a cozy reading nook with warm lighting and plants."
 msgstr "Genera l'immagine di un accogliente angolo lettura con luce calda e piante."
 
@@ -16368,13 +16379,17 @@ msgstr "Genera immagine"
 msgid "Generate Image"
 msgstr "Genera immagine"
 
+#: src/features/onboarding/components/onboarding-dialog.tsx:42
+msgid "Generate images and videos with leading image and video models, all from the same chat."
+msgstr "Genera immagini e video con i migliori modelli di immagini e video, tutto dalla stessa chat."
+
 #: src/features/workflow/templates/index.ts:307
 msgid "Generate images with consistent character appearance"
 msgstr "Genera immagini con un aspetto coerente dei personaggi"
 
 #: src/features/onboarding/components/onboarding-dialog.tsx:38
-msgid "Generate images with FLUX and Stable Diffusion, create videos with Runway and Luma — all from the same chat."
-msgstr "Genera immagini con FLUX e Stable Diffusion, crea video con Runway e Luma, tutto dalla stessa chat."
+#~ msgid "Generate images with FLUX and Stable Diffusion, create videos with Runway and Luma — all from the same chat."
+#~ msgstr "Genera immagini con FLUX e Stable Diffusion, crea video con Runway e Luma, tutto dalla stessa chat."
 
 #: src/features/workflow/components/nodes/advanced-controls-node.tsx:213
 #: src/features/workflow/components/nodes/advanced-controls-node.tsx:217
@@ -16679,7 +16694,7 @@ msgstr "Vai al messaggio: {snippet}"
 msgid "Go to next page"
 msgstr "Vai alla pagina successiva"
 
-#: src/features/onboarding/components/setup-checklist.tsx:125
+#: src/features/onboarding/components/setup-checklist.tsx:140
 msgid "Go to pairing"
 msgstr "Vai all’abbinamento"
 
@@ -16695,7 +16710,7 @@ msgstr "Vai ai prompt"
 msgid "Go to reply"
 msgstr "Vai alla risposta"
 
-#: src/features/onboarding/components/setup-checklist.tsx:130
+#: src/features/onboarding/components/setup-checklist.tsx:145
 msgid "Go to servers"
 msgstr "Vai ai server"
 
@@ -16720,7 +16735,7 @@ msgid "Go to slide {slideNumber}"
 msgstr "Vai alla slide {slideNumber}"
 
 #. placeholder {0}: index + 1
-#: src/features/onboarding/components/onboarding-dialog.tsx:362
+#: src/features/onboarding/components/onboarding-dialog.tsx:428
 msgid "Go to step {0}"
 msgstr "Vai al passaggio {0}"
 
@@ -17253,7 +17268,7 @@ msgstr "Voce della modalità a mani libere aggiornata"
 msgid "Happens on"
 msgstr "Si svolge il"
 
-#: src/features/settings/components/chat/bots-settings.tsx:475
+#: src/features/settings/components/chat/bots-settings.tsx:479
 msgid "Has a computer"
 msgstr "Ha un computer"
 
@@ -17314,7 +17329,7 @@ msgstr "Ciao {0}! Cosa vuoi fare oggi?"
 msgid "Help"
 msgstr "Aiuto"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:64
+#: src/features/onboarding/components/onboarding-dialog.tsx:70
 msgid "Help me write a professional email to introduce myself to a new team."
 msgstr "Aiutami a scrivere un'email professionale per presentarmi a un nuovo team."
 
@@ -17329,6 +17344,10 @@ msgstr "Aiuta l'IA a capirti meglio condividendo alcune informazioni su di te. V
 #: src/features/marketing/use-cases/visuals/messaging-visual.tsx:45
 msgid "Here is a summary, with the open items first."
 msgstr "Ecco un riepilogo, con prima i punti aperti."
+
+#: src/features/onboarding/components/onboarding-dialog.tsx:44
+msgid "Here is what coding agents need. Skip any step and finish it later on the Code page."
+msgstr "Ecco cosa serve agli agenti di programmazione. Salta qualsiasi passaggio e completalo più tardi nella pagina Codice."
 
 #: src/features/appearance/components/appearance-controls.tsx:289
 msgid "Here they are: planning, budget and next steps."
@@ -17645,11 +17664,11 @@ msgid "Horizontal Strips"
 msgstr "Strisce orizzontali"
 
 #. placeholder {0}: host.name
-#: src/features/code/components/code-workspace.tsx:87
+#: src/features/code/components/code-workspace.tsx:91
 msgid "Host: {0}"
 msgstr "Host: {0}"
 
-#: src/features/code/components/code-shell.tsx:58
+#: src/features/code/components/code-shell.tsx:59
 msgid "Hosts"
 msgstr "Host"
 
@@ -17683,6 +17702,10 @@ msgstr "Passa il mouse su un giorno, oppure seleziona il grafico e usa i tasti f
 #: src/features/chat/thread/thread-welcome.tsx:30
 msgid "How can I help you today?"
 msgstr "Come posso aiutarti oggi?"
+
+#: src/features/onboarding/components/onboarding-dialog.tsx:142
+msgid "How do you want to start?"
+msgstr "Come vuoi iniziare?"
 
 #. placeholder {0}: model.name
 #. placeholder {1}: copy.comparisonNoun
@@ -18641,11 +18664,11 @@ msgstr "installa"
 msgid "Install"
 msgstr "Installa"
 
-#: src/features/onboarding/components/setup-checklist.tsx:122
+#: src/features/onboarding/components/setup-checklist.tsx:137
 msgid "Install a coding agent"
 msgstr "Installa un agente di coding"
 
-#: src/features/onboarding/components/setup-checklist.tsx:121
+#: src/features/onboarding/components/setup-checklist.tsx:136
 msgid "Install a coding agent in the Neore desktop app and approve it for a folder on a paired computer. The install happens in the desktop window, not here."
 msgstr "Installa un agente di coding nell’app desktop di Neore e approvalo per una cartella su un computer abbinato. L’installazione avviene nella finestra desktop, non qui."
 
@@ -18677,7 +18700,7 @@ msgid "instructions"
 msgstr "istruzioni"
 
 #: src/features/projects/components/project-rule-files.tsx:347
-#: src/features/settings/components/chat/bots-settings.tsx:395
+#: src/features/settings/components/chat/bots-settings.tsx:399
 #: src/features/skills/components/bundle-import-dialog.tsx:121
 #: src/features/skills/components/bundle-import-dialog.tsx:155
 #: src/features/skills/components/marketplace-skill-detail-dialog.tsx:155
@@ -19145,7 +19168,7 @@ msgstr "proprio ora"
 msgid "Just now"
 msgstr "Proprio ora"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:416
+#: src/features/onboarding/components/onboarding-dialog.tsx:365
 msgid "Just start chatting"
 msgstr "Inizia subito a chattare"
 
@@ -19229,7 +19252,7 @@ msgstr "Kenya"
 msgid "Kept as yours"
 msgstr "Mantenuto come tuo"
 
-#: src/features/devices/components/devices-settings.tsx:563
+#: src/features/devices/components/devices-settings.tsx:569
 msgid "Key file (optional, absolute path)"
 msgstr "File della chiave (facoltativo, percorso assoluto)"
 
@@ -19886,15 +19909,15 @@ msgstr "Lascia che un controllo rapido approvi le chiamate a basso rischio"
 msgid "Let replies use tools"
 msgstr "Consenti strumenti nelle risposte"
 
-#: src/features/devices/components/devices-settings.tsx:647
+#: src/features/devices/components/devices-settings.tsx:653
 msgid "Let the agent use files, a terminal and local MCP servers on your own computer through the Neore desktop app. Every action asks you on that computer first, and nothing runs from shared chats or background tasks."
 msgstr "Consenti all'agente di usare file, un terminale e server MCP locali sul tuo computer tramite l'app desktop di Neore. Ogni azione ti chiede prima conferma su quel computer e nulla viene eseguito da chat condivise o attività in background."
 
-#: src/features/devices/components/devices-settings.tsx:709
+#: src/features/devices/components/devices-settings.tsx:715
 msgid "Let the agent work on a server you reach over SSH, with your own SSH client and keys. Neore asks you to trust the server's key the first time, and every action asks you on this computer before it is sent. The server holds no secret of yours."
 msgstr "Lascia che l’agente lavori su un server a cui accedi tramite SSH, con il tuo client SSH e le tue chiavi. Neore ti chiede di considerare attendibile la chiave del server la prima volta e ogni azione richiede la tua conferma su questo computer prima di essere inviata. Il server non conserva alcun tuo segreto."
 
-#: src/features/onboarding/components/setup-checklist.tsx:131
+#: src/features/onboarding/components/setup-checklist.tsx:146
 msgid "Let the agent work on a server you reach over SSH. Needs a paired computer, and the form to add one is in the desktop app."
 msgstr "Lascia che l’agente lavori su un server a cui ti colleghi via SSH. Serve un computer abbinato, e il modulo per aggiungerlo si trova nell’app desktop."
 
@@ -20354,8 +20377,8 @@ msgstr "Caricamento dettagli del nodo..."
 msgid "Loading older messages..."
 msgstr "Caricamento messaggi precedenti..."
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:285
-#: src/features/onboarding/components/onboarding-dialog.tsx:288
+#: src/features/onboarding/components/onboarding-dialog.tsx:341
+#: src/features/onboarding/components/onboarding-dialog.tsx:344
 msgid "Loading onboarding"
 msgstr "Caricamento dell'onboarding"
 
@@ -20533,9 +20556,9 @@ msgstr "Caricamento..."
 #: src/features/auth/components/device-approval.tsx:349
 #: src/features/chat/thread/memory-usage-action.tsx:46
 #: src/features/chat/thread/request-secret-prompt.tsx:478
-#: src/features/code/components/code-workspace.tsx:90
+#: src/features/code/components/code-workspace.tsx:94
 #: src/features/pages/components/public-page-view.tsx:66
-#: src/features/settings/components/chat/bots-settings.tsx:464
+#: src/features/settings/components/chat/bots-settings.tsx:468
 #: src/features/settings/components/personalization/memory-item.tsx:129
 #: src/routes/auth/extension.tsx:68
 msgid "Loading…"
@@ -21937,7 +21960,7 @@ msgstr "Modalità:"
 #: src/features/evals/components/model-comparison.tsx:110
 #: src/features/evals/components/run-dialog.tsx:212
 #: src/features/prompts/components/prompt-form-dialog.tsx:351
-#: src/features/settings/components/chat/bots-settings.tsx:414
+#: src/features/settings/components/chat/bots-settings.tsx:418
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:257
 #: src/features/settings/components/chat/usage-settings.tsx:328
 #: src/features/tasks/components/task-form-dialog.tsx:407
@@ -22509,11 +22532,11 @@ msgstr "Silenzia conversazione"
 msgid "my data"
 msgstr "i miei dati"
 
-#: src/features/devices/components/devices-settings.tsx:609
+#: src/features/devices/components/devices-settings.tsx:615
 msgid "My Linux computer"
 msgstr "Il mio computer Linux"
 
-#: src/features/devices/components/devices-settings.tsx:609
+#: src/features/devices/components/devices-settings.tsx:615
 msgid "My Mac"
 msgstr "Il mio Mac"
 
@@ -22525,7 +22548,7 @@ msgstr "Il mio server MCP"
 msgid "My skills"
 msgstr "Le mie skill"
 
-#: src/features/devices/components/devices-settings.tsx:609
+#: src/features/devices/components/devices-settings.tsx:615
 msgid "My Windows PC"
 msgstr "Il mio PC Windows"
 
@@ -22551,14 +22574,14 @@ msgstr "nome"
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:478
 #: src/features/auth/components/settings/account/update-name-card.tsx:23
 #: src/features/auth/components/settings/api-key/create-api-key-dialog.tsx:125
-#: src/features/devices/components/devices-settings.tsx:547
+#: src/features/devices/components/devices-settings.tsx:553
 #: src/features/evals/components/dataset-form-dialog.tsx:81
 #: src/features/knowledge/components/collection-dialog.tsx:57
 #: src/features/projects/components/project-rule-files.tsx:262
 #: src/features/prompts/components/prompt-form-dialog.tsx:232
 #: src/features/prompts/components/prompt-list-view.tsx:98
 #: src/features/prompts/components/prompt-list-view.tsx:101
-#: src/features/settings/components/chat/bots-settings.tsx:377
+#: src/features/settings/components/chat/bots-settings.tsx:381
 #: src/features/settings/components/chat/custom-providers-settings.tsx:486
 #: src/features/settings/components/chat/mcp/server-form.tsx:194
 #: src/features/settings/components/chat/native-providers-settings.tsx:503
@@ -22577,7 +22600,7 @@ msgid "Name (A to Z)"
 msgstr "Nome (dalla A alla Z)"
 
 #. placeholder {0}: bot.name
-#: src/features/settings/components/chat/bots-settings.tsx:479
+#: src/features/settings/components/chat/bots-settings.tsx:483
 msgid "Name and instructions of {0}"
 msgstr "Nome e istruzioni di {0}"
 
@@ -22783,7 +22806,7 @@ msgid "Neore (timestamped)"
 msgstr "Neore (con timestamp)"
 
 #. placeholder {0}: device.appVersion
-#: src/features/devices/components/devices-settings.tsx:360
+#: src/features/devices/components/devices-settings.tsx:366
 msgid "Neore {0}"
 msgstr "Neore {0}"
 
@@ -22848,7 +22871,7 @@ msgid "Neore keeps these up to date and tells you when someone asks for your rev
 msgstr "Neore li tiene aggiornati e ti avvisa quando qualcuno chiede la tua revisione."
 
 #: src/features/chat/host/host-composer.tsx:963
-#: src/features/devices/components/devices-settings.tsx:369
+#: src/features/devices/components/devices-settings.tsx:375
 msgid "Neore on this computer is out of date, so the agent cannot use it. Update the app there to turn it back on."
 msgstr "Neore su questo computer non è aggiornato, quindi l’agente non può usarlo. Aggiorna l’app su quel computer per riattivarlo."
 
@@ -22860,7 +22883,7 @@ msgstr "Neore sul tuo computer non è aggiornato. Aggiornalo e riprova."
 msgid "Neore use cases"
 msgstr "Casi d’uso di Neore"
 
-#: src/features/devices/components/devices-settings.tsx:360
+#: src/features/devices/components/devices-settings.tsx:366
 msgid "Neore version not reported"
 msgstr "Versione di Neore non comunicata"
 
@@ -22947,7 +22970,7 @@ msgstr "Nuovo"
 msgid "New Azure Bots are single-tenant: set the Teams Tenant ID key, or replies cannot authenticate."
 msgstr "I nuovi Azure Bot sono single-tenant: imposta la chiave Teams Tenant ID, altrimenti le risposte non potranno autenticarsi."
 
-#: src/features/settings/components/chat/bots-settings.tsx:376
+#: src/features/settings/components/chat/bots-settings.tsx:380
 #: src/features/settings/lib/settings-keywords.ts:84
 msgid "New bot"
 msgstr "Nuovo bot"
@@ -22997,7 +23020,7 @@ msgstr "Le nuove chat nascono permanenti"
 msgid "New chats start temporary"
 msgstr "Le nuove chat nascono temporanee"
 
-#: src/features/settings/components/chat/bots-settings.tsx:263
+#: src/features/settings/components/chat/bots-settings.tsx:267
 msgid "New chats with this bot start in the chosen mode"
 msgstr "Le nuove chat con questo bot iniziano nella modalità scelta"
 
@@ -23158,7 +23181,7 @@ msgstr "Immagine hero per newsletter"
 #: ../../packages/ui/src/components/pagination.tsx:52
 #: ../../packages/ui/src/components/spreadsheet/csv-renderer.tsx:342
 #: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:656
-#: src/features/onboarding/components/onboarding-dialog.tsx:416
+#: src/features/onboarding/components/onboarding-dialog.tsx:482
 msgid "Next"
 msgstr "Avanti"
 
@@ -23328,7 +23351,7 @@ msgstr "Nessun registro di controllo trovato"
 msgid "No bot"
 msgstr "Nessun bot"
 
-#: src/features/settings/components/chat/bots-settings.tsx:467
+#: src/features/settings/components/chat/bots-settings.tsx:471
 msgid "No bots yet."
 msgstr "Ancora nessun bot."
 
@@ -23447,7 +23470,7 @@ msgstr "Nessuna descrizione"
 msgid "No description provided."
 msgstr "Nessuna descrizione fornita."
 
-#: src/features/devices/components/devices-settings.tsx:704
+#: src/features/devices/components/devices-settings.tsx:710
 msgid "No devices paired."
 msgstr "Nessun dispositivo associato."
 
@@ -23687,7 +23710,7 @@ msgstr "Nessuna pagina trovata. Esporta da Notion come \"Markdown & CSV\" o \"HT
 msgid "No pages yet."
 msgstr "Ancora nessuna pagina."
 
-#: src/features/code/components/code-shell.tsx:61
+#: src/features/code/components/code-shell.tsx:62
 msgid "No paired computer yet."
 msgstr "Ancora nessun computer associato."
 
@@ -23949,7 +23972,7 @@ msgstr "Ancora nessuna conversazione"
 msgid "No tier data yet. Tier info is recorded for new requests after the gateway upgrade."
 msgstr "Ancora nessun dato sui piani. Le informazioni sul piano vengono registrate per le nuove richieste dopo l’aggiornamento del gateway."
 
-#: src/features/devices/components/devices-settings.tsx:355
+#: src/features/devices/components/devices-settings.tsx:361
 msgid "No tools shared yet"
 msgstr "Nessuno strumento condiviso"
 
@@ -24225,7 +24248,7 @@ msgstr "Nota: i moduli si applicano per conversazione, non per messaggio. Attiva
 msgid "Nothing found"
 msgstr "Nessun risultato"
 
-#: src/features/devices/components/devices-settings.tsx:443
+#: src/features/devices/components/devices-settings.tsx:449
 msgid "Nothing has run on a device yet."
 msgstr "Non è ancora stato eseguito nulla su un dispositivo."
 
@@ -24400,9 +24423,9 @@ msgstr "Offerto solo nelle chat che appartengono ai progetti indicati sopra. Val
 msgid "Official"
 msgstr "Ufficiale"
 
-#: src/features/code/components/code-shell.tsx:81
+#: src/features/code/components/code-shell.tsx:82
 #: src/features/code/components/host-details.tsx:32
-#: src/features/devices/components/devices-settings.tsx:376
+#: src/features/devices/components/devices-settings.tsx:382
 #: src/routes/admin/gateway/index.tsx:37
 msgid "Offline"
 msgstr "Offline"
@@ -24517,19 +24540,23 @@ msgstr "Opzione on-premise"
 msgid "Onboarding"
 msgstr "Onboarding"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:253
+#: src/features/onboarding/components/onboarding-dialog.tsx:309
 msgid "Onboarding complete"
 msgstr "Onboarding completato"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:272
+#: src/features/onboarding/components/onboarding-dialog.tsx:328
 msgid "Onboarding complete. Redirecting to chat."
 msgstr "Onboarding completato. Reindirizzamento alla chat."
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:316
+#: src/features/onboarding/components/onboarding-dialog.tsx:328
+msgid "Onboarding complete. Redirecting to Code."
+msgstr "Introduzione completata. Reindirizzamento a Codice."
+
+#: src/features/onboarding/components/onboarding-dialog.tsx:375
 msgid "Onboarding progress"
 msgstr "Avanzamento dell'onboarding"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:358
+#: src/features/onboarding/components/onboarding-dialog.tsx:424
 msgid "Onboarding steps"
 msgstr "Passaggi dell'onboarding"
 
@@ -24537,7 +24564,7 @@ msgstr "Passaggi dell'onboarding"
 msgid "Onboarding will restart on your next visit to chat."
 msgstr "L'onboarding ripartirà alla tua prossima visita alla chat."
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:312
+#: src/features/onboarding/components/onboarding-dialog.tsx:371
 msgid "Onboarding wizard"
 msgstr "Procedura guidata di onboarding"
 
@@ -24617,7 +24644,7 @@ msgstr "Un solo abbonamento. <0>Ogni modello.</0>"
 msgid "One workspace for 30+ AI models. Chat, generate images, create videos, write documents, and run code — one account, one price."
 msgstr "Un unico spazio di lavoro per oltre 30 modelli di IA. Chatta, genera immagini, crea video, scrivi documenti ed esegui codice: un solo account, un solo prezzo."
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:42
+#: src/features/onboarding/components/onboarding-dialog.tsx:48
 msgid "One workspace for chat, images, video, documents, and code. 30+ AI models, one subscription."
 msgstr "Un unico spazio di lavoro per chat, immagini, video, documenti e codice. Oltre 30 modelli di IA, un solo abbonamento."
 
@@ -24637,9 +24664,9 @@ msgstr "La password monouso non è valida"
 msgid "One-time password is required"
 msgstr "La password monouso è obbligatoria"
 
-#: src/features/code/components/code-shell.tsx:81
+#: src/features/code/components/code-shell.tsx:82
 #: src/features/code/components/host-details.tsx:32
-#: src/features/devices/components/devices-settings.tsx:376
+#: src/features/devices/components/devices-settings.tsx:382
 msgid "Online"
 msgstr "Online"
 
@@ -24858,6 +24885,10 @@ msgstr "Apri come pagina"
 msgid "Open chat"
 msgstr "Apri chat"
 
+#: src/features/onboarding/components/onboarding-dialog.tsx:365
+msgid "Open Code"
+msgstr "Apri Codice"
+
 #: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:75
 msgid "Open command palette"
 msgstr "Apri il riquadro comandi"
@@ -24866,7 +24897,8 @@ msgstr "Apri il riquadro comandi"
 msgid "Open connectors"
 msgstr "Apri i connettori"
 
-#: src/features/code/components/code-shell.tsx:99
+#: src/features/code/components/code-shell.tsx:100
+#: src/features/code/components/git-host-step.tsx:35
 msgid "Open Connectors"
 msgstr "Apri i connettori"
 
@@ -24954,7 +24986,7 @@ msgstr "Apri il selettore dei modelli"
 msgid "Open Model Picker"
 msgstr "Apri il selettore dei modelli"
 
-#: src/features/devices/components/devices-settings.tsx:652
+#: src/features/devices/components/devices-settings.tsx:658
 msgid "Open Neore in the desktop app to pair this computer. Devices you paired before are listed below."
 msgstr "Apri Neore nell'app desktop per associare questo computer. I dispositivi già associati sono elencati qui sotto."
 
@@ -25046,7 +25078,7 @@ msgstr "La flessibilità dell’open source"
 msgid "Open source foundation with broad community support"
 msgstr "Base open source con un ampio supporto della community"
 
-#: src/features/code/components/code-workspace.tsx:102
+#: src/features/code/components/code-workspace.tsx:106
 msgid "Open tabs"
 msgstr "Schede aperte"
 
@@ -25924,15 +25956,15 @@ msgstr "Pagine condivise con te"
 msgid "Paint over the areas you want to edit. White regions will be regenerated, dark regions will be preserved."
 msgstr "Dipingi sulle aree che vuoi modificare. Le aree bianche verranno rigenerate, quelle scure verranno mantenute."
 
-#: src/features/onboarding/components/setup-checklist.tsx:127
+#: src/features/onboarding/components/setup-checklist.tsx:142
 msgid "Pair a computer"
 msgstr "Abbina un computer"
 
-#: src/features/onboarding/components/setup-checklist.tsx:126
+#: src/features/onboarding/components/setup-checklist.tsx:141
 msgid "Pair a computer in the Neore desktop app so agents can work on your files. You confirm the pairing on that computer, and the step is done once any computer is paired with your account."
 msgstr "Abbina un computer nell’app desktop di Neore così gli agenti possono lavorare sui tuoi file. Confermi l’abbinamento su quel computer, e il passaggio è completato appena un computer qualsiasi è abbinato al tuo account."
 
-#: src/features/code/components/code-shell.tsx:63
+#: src/features/code/components/code-shell.tsx:64
 msgid "Pair one in Settings"
 msgstr "Associane uno nelle impostazioni"
 
@@ -25952,7 +25984,7 @@ msgstr "Abbinare questa macchina?"
 msgid "Paired"
 msgstr "Abbinato"
 
-#: src/features/devices/components/devices-settings.tsx:689
+#: src/features/devices/components/devices-settings.tsx:695
 msgid "Paired devices"
 msgstr "Dispositivi associati"
 
@@ -25960,7 +25992,7 @@ msgstr "Dispositivi associati"
 msgid "Pairing request"
 msgstr "Richiesta di abbinamento"
 
-#: src/features/devices/components/devices-settings.tsx:625
+#: src/features/devices/components/devices-settings.tsx:631
 msgid "Pairing was cancelled on this computer."
 msgstr "L'associazione è stata annullata su questo computer."
 
@@ -25977,8 +26009,8 @@ msgid "Panama"
 msgstr "Panama"
 
 #. placeholder {0}: index + 1
-#: src/features/code/components/code-workspace.tsx:70
-#: src/features/code/components/code-workspace.tsx:95
+#: src/features/code/components/code-workspace.tsx:73
+#: src/features/code/components/code-workspace.tsx:99
 msgid "Pane {0}"
 msgstr "Riquadro {0}"
 
@@ -26368,12 +26400,12 @@ msgstr "Livello di permesso"
 
 #: src/features/chat/sidebar/thread-context.tsx:116
 #: src/features/chat/thread/composer-permission-mode.tsx:90
-#: src/features/settings/components/chat/bots-settings.tsx:430
+#: src/features/settings/components/chat/bots-settings.tsx:434
 msgid "Permission mode"
 msgstr "Modalità di autorizzazione"
 
 #. placeholder {0}: bot.name
-#: src/features/settings/components/chat/bots-settings.tsx:493
+#: src/features/settings/components/chat/bots-settings.tsx:497
 msgid "Permission mode for {0}"
 msgstr "Modalità di autorizzazione per {0}"
 
@@ -26460,7 +26492,7 @@ msgstr "fotorealismo"
 msgid "Pick a dataset"
 msgstr "Scegli un dataset"
 
-#: src/features/code/components/code-workspace.tsx:45
+#: src/features/code/components/code-workspace.tsx:47
 msgid "Pick a host or a pull request"
 msgstr "Scegli un host o una pull request"
 
@@ -26484,7 +26516,7 @@ msgstr "Scegli una skill"
 msgid "Pick a skill to evaluate."
 msgstr "Scegli una skill da valutare."
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:43
+#: src/features/onboarding/components/onboarding-dialog.tsx:49
 msgid "Pick a starting point or jump straight into chat."
 msgstr "Scegli un punto di partenza o passa subito alla chat."
 
@@ -26786,7 +26818,7 @@ msgstr "Look hollywoodiano raffinato"
 msgid "Popular"
 msgstr "Popolare"
 
-#: src/features/devices/components/devices-settings.tsx:559
+#: src/features/devices/components/devices-settings.tsx:565
 msgid "Port"
 msgstr "Porta"
 
@@ -27516,7 +27548,7 @@ msgid "Progress of {toolName}"
 msgstr "Avanzamento di {toolName}"
 
 #: src/features/chat/sidebar/thread-context.tsx:122
-#: src/features/devices/components/devices-settings.tsx:121
+#: src/features/devices/components/devices-settings.tsx:123
 #: src/features/projects/components/project-repo-picker.tsx:145
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:439
 #: src/features/settings/components/chat/usage-project-breakdown.tsx:205
@@ -27873,7 +27905,7 @@ msgid "Pull request settings updated"
 msgstr "Impostazioni delle pull request aggiornate"
 
 #: src/features/chat/sidebar/thread-context.tsx:93
-#: src/features/code/components/code-shell.tsx:95
+#: src/features/code/components/code-shell.tsx:96
 #: src/features/develop/components/thread-pull-requests.tsx:375
 msgid "Pull requests"
 msgstr "Pull request"
@@ -28252,7 +28284,7 @@ msgstr "Sola lettura"
 msgid "Read the docs"
 msgstr "Leggi la documentazione"
 
-#: src/features/onboarding/components/setup-checklist.tsx:120
+#: src/features/onboarding/components/setup-checklist.tsx:135
 msgid "Read the guide"
 msgstr "Leggi la guida"
 
@@ -28536,7 +28568,7 @@ msgstr "Ricollega {0}"
 msgid "Reconnect your Git host in settings to link a pull request."
 msgstr "Riconnetti il tuo host Git nelle impostazioni per collegare una pull request."
 
-#: src/features/devices/components/devices-settings.tsx:378
+#: src/features/devices/components/devices-settings.tsx:384
 msgid "Reconnecting"
 msgstr "Riconnessione"
 
@@ -28930,8 +28962,8 @@ msgstr "Ricordami"
 #: src/features/chat/thread/composer-input.tsx:368
 #: src/features/chat/thread/composer-input.tsx:422
 #: src/features/chat/thread/composer-input.tsx:431
-#: src/features/devices/components/devices-settings.tsx:398
-#: src/features/devices/components/devices-settings.tsx:405
+#: src/features/devices/components/devices-settings.tsx:404
+#: src/features/devices/components/devices-settings.tsx:411
 #: src/features/projects/components/project-form-dialog.tsx:328
 #: src/features/projects/components/project-form-dialog.tsx:369
 #: src/features/settings/components/chat/custom-providers-settings.tsx:645
@@ -28948,7 +28980,7 @@ msgid "Remove \"{0}\"?"
 msgstr "Rimuovere \"{0}\"?"
 
 #. placeholder {0}: device.name
-#: src/features/devices/components/devices-settings.tsx:422
+#: src/features/devices/components/devices-settings.tsx:428
 msgid "Remove “{0}”?"
 msgstr "Rimuovere «{0}»?"
 
@@ -29447,7 +29479,7 @@ msgstr "ricerca"
 msgid "Research"
 msgstr "Ricerca"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:78
+#: src/features/onboarding/components/onboarding-dialog.tsx:84
 msgid "Research a topic"
 msgstr "Fai una ricerca su un argomento"
 
@@ -29455,7 +29487,7 @@ msgstr "Fai una ricerca su un argomento"
 msgid "Research a topic in depth..."
 msgstr "Approfondisci un argomento..."
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:79
+#: src/features/onboarding/components/onboarding-dialog.tsx:85
 msgid "Research the latest developments in renewable energy storage technology."
 msgstr "Cerca gli ultimi sviluppi nelle tecnologie di accumulo di energia rinnovabile."
 
@@ -29545,7 +29577,7 @@ msgstr "Ridimensiona colonna {label}"
 msgid "Resize chats {index} and {next}"
 msgstr "Ridimensiona le chat {index} e {next}"
 
-#: src/features/code/components/code-workspace.tsx:241
+#: src/features/code/components/code-workspace.tsx:248
 msgid "Resize panes"
 msgstr "Ridimensiona i riquadri"
 
@@ -29647,7 +29679,7 @@ msgid "Result not delivered"
 msgstr "Risultato non consegnato"
 
 #: src/features/chat/thread/rate-limit-pause-notice.tsx:149
-#: src/features/onboarding/components/setup-checklist.tsx:202
+#: src/features/onboarding/components/setup-checklist.tsx:243
 #: src/features/settings/connectors/messenger/messenger-platform-card.tsx:157
 msgid "Resume"
 msgstr "Riprendi"
@@ -29711,9 +29743,9 @@ msgstr "riprova"
 #: src/features/chat/thread/chat-error.tsx:64
 #: src/features/chat/thread/request-secret-prompt.tsx:475
 #: src/features/chat/translation/message-translation.tsx:88
-#: src/features/devices/components/devices-settings.tsx:302
+#: src/features/devices/components/devices-settings.tsx:308
 #: src/features/local-models/components/ollama-model-manager.tsx:188
-#: src/features/onboarding/components/setup-checklist.tsx:238
+#: src/features/onboarding/components/setup-checklist.tsx:280
 #: src/features/settings/components/chat/agent-settings.tsx:213
 #: src/features/settings/components/chat/bot-tool-selection.tsx:495
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:485
@@ -29738,7 +29770,7 @@ msgstr "Riprova tra {retryAfterMinutes} min"
 msgid "Retry now"
 msgstr "Riprova ora"
 
-#: src/features/onboarding/components/setup-checklist.tsx:224
+#: src/features/onboarding/components/setup-checklist.tsx:266
 msgid "Retry the device check"
 msgstr "Riprova il controllo del dispositivo"
 
@@ -30252,7 +30284,7 @@ msgstr "Viene eseguito una volta, poi si disattiva da solo. Per un orario ripetu
 msgid "Runs when a webhook is received, on {0}. You get a new signing secret and URL for it."
 msgstr "Viene eseguito quando si riceve un webhook, su {0}. Ricevi un nuovo segreto di firma e un nuovo URL."
 
-#: src/features/code/components/code-shell.tsx:112
+#: src/features/code/components/code-shell.tsx:113
 msgid "Runs you start from a chat appear here."
 msgstr "Le esecuzioni che avvii da una chat appaiono qui."
 
@@ -30461,7 +30493,7 @@ msgstr "Salva skill"
 msgid "Save these backup codes in a safe place. You can use them to access your account if you lose your two-factor authentication device."
 msgstr "Conserva questi codici di backup in un luogo sicuro. Puoi usarli per accedere al tuo account se perdi il dispositivo di autenticazione a due fattori."
 
-#: src/features/settings/components/chat/bots-settings.tsx:573
+#: src/features/settings/components/chat/bots-settings.tsx:577
 msgid "Save tools"
 msgstr "Salva strumenti"
 
@@ -30519,8 +30551,8 @@ msgstr "Salvato su {hostLabel}."
 msgid "Saved to \"{0}\""
 msgstr "Salvato in \"{0}\""
 
-#: src/features/settings/components/chat/bots-settings.tsx:573
-#: src/features/settings/components/chat/bots-settings.tsx:576
+#: src/features/settings/components/chat/bots-settings.tsx:577
+#: src/features/settings/components/chat/bots-settings.tsx:580
 msgid "Saving tools…"
 msgstr "Salvataggio degli strumenti…"
 
@@ -31474,7 +31506,7 @@ msgstr "Invio in corso…"
 
 #: src/features/chat/guest-links/guest-link-panel.tsx:283
 #: src/features/chat/guest-links/guest-link-panel.tsx:411
-#: src/features/devices/components/devices-settings.tsx:452
+#: src/features/devices/components/devices-settings.tsx:458
 msgid "Sent"
 msgstr "Inviato"
 
@@ -31542,7 +31574,7 @@ msgstr "Serif"
 msgid "Served from cache"
 msgstr "Serviti dalla cache"
 
-#: src/features/devices/components/devices-settings.tsx:527
+#: src/features/devices/components/devices-settings.tsx:533
 msgid "Server added. Choose which of its folders to share in the desktop app."
 msgstr "Server aggiunto. Scegli quali sue cartelle condividere nell’app desktop."
 
@@ -31562,7 +31594,7 @@ msgstr "Il nome del server è obbligatorio"
 msgid "server not reachable"
 msgstr "server non raggiungibile"
 
-#: src/features/devices/components/devices-settings.tsx:375
+#: src/features/devices/components/devices-settings.tsx:381
 msgid "Server over SSH"
 msgstr "Server tramite SSH"
 
@@ -31586,7 +31618,7 @@ msgstr "Database Postgres serverless con branching"
 msgid "servers"
 msgstr "server"
 
-#: src/features/devices/components/devices-settings.tsx:711
+#: src/features/devices/components/devices-settings.tsx:717
 msgid "Servers over SSH"
 msgstr "Server tramite SSH"
 
@@ -31652,6 +31684,18 @@ msgstr "Configura una nuova esecuzione automatica degli agenti"
 #: src/features/develop/components/watched-repositories.tsx:43
 msgid "Set up a webhook"
 msgstr "Configura un webhook"
+
+#: src/features/onboarding/components/onboarding-dialog.tsx:45
+msgid "Set up coding"
+msgstr "Configura il codice"
+
+#: src/features/onboarding/components/onboarding-dialog.tsx:134
+msgid "Set up coding agents on your computers."
+msgstr "Configura gli agenti di programmazione sui tuoi computer."
+
+#: src/features/onboarding/components/setup-checklist.tsx:295
+msgid "Set up coding agents on your own machines. Skip any step and come back later."
+msgstr "Configura gli agenti di programmazione sulle tue macchine. Salta qualsiasi passaggio e torna più tardi."
 
 #: src/features/marketing/components/tutorials-page.tsx:88
 msgid "Set up triggers to automate tasks on a schedule, via webhooks, or in response to events."
@@ -31768,7 +31812,7 @@ msgstr "condivisa"
 msgid "Shared conversation"
 msgstr "Conversazione condivisa"
 
-#: src/features/devices/components/devices-settings.tsx:682
+#: src/features/devices/components/devices-settings.tsx:688
 msgid "Shared folders and local servers…"
 msgstr "Cartelle condivise e server locali…"
 
@@ -32400,8 +32444,8 @@ msgstr "Impossibile caricare le skill. Puoi comunque inoltrare senza una skill."
 msgid "Skills views"
 msgstr "Viste delle skill"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:404
-#: src/features/onboarding/components/setup-checklist.tsx:202
+#: src/features/onboarding/components/onboarding-dialog.tsx:470
+#: src/features/onboarding/components/setup-checklist.tsx:243
 msgid "Skip"
 msgstr "Salta"
 
@@ -32417,13 +32461,13 @@ msgstr "Salta le domande"
 msgid "Skip to content"
 msgstr "Vai al contenuto"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:399
+#: src/features/onboarding/components/onboarding-dialog.tsx:465
 msgid "Skip tour"
 msgstr "Salta il tour"
 
 #: src/features/develop/components/checks-tab.tsx:81
 #: src/features/evals/components/run-detail.tsx:36
-#: src/features/onboarding/components/setup-checklist.tsx:135
+#: src/features/onboarding/components/setup-checklist.tsx:150
 #: src/features/settings/components/chat/trigger-settings.tsx:182
 msgid "Skipped"
 msgstr "Saltato"
@@ -32973,8 +33017,8 @@ msgstr "Spesi {0} su un limite di {1}."
 msgid "Split cell"
 msgstr "Dividi cella"
 
-#: src/features/code/components/code-workspace.tsx:135
 #: src/features/code/components/code-workspace.tsx:139
+#: src/features/code/components/code-workspace.tsx:143
 msgid "Split right"
 msgstr "Dividi a destra"
 
@@ -33137,7 +33181,7 @@ msgstr "Inizio"
 
 #. placeholder {0}: offer.agentLabel
 #. placeholder {1}: offer.folderLabel
-#: src/features/devices/components/devices-settings.tsx:174
+#: src/features/devices/components/devices-settings.tsx:180
 msgid "Start {0} in {1}"
 msgstr "Avvia {0} in {1}"
 
@@ -33270,7 +33314,7 @@ msgstr "Avvia prova"
 msgid "Start writing..."
 msgstr "Inizia a scrivere..."
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:44
+#: src/features/onboarding/components/onboarding-dialog.tsx:50
 msgid "Start Your First Chat"
 msgstr "Inizia la tua prima chat"
 
@@ -33352,7 +33396,7 @@ msgstr "Avvio dell'input vocale…"
 msgid "Starting…"
 msgstr "Avvio…"
 
-#: src/features/devices/components/devices-settings.tsx:139
+#: src/features/devices/components/devices-settings.tsx:141
 msgid "Starts in {onlyProject}, the one project this computer may be used in."
 msgstr "Si avvia in {onlyProject}, l’unico progetto in cui è possibile usare questo computer."
 
@@ -33418,7 +33462,7 @@ msgid "Steering:"
 msgstr "Indicazioni:"
 
 #. placeholder {0}: currentIndex + 1
-#: src/features/onboarding/components/onboarding-dialog.tsx:354
+#: src/features/onboarding/components/onboarding-dialog.tsx:420
 msgid "Step {0} of {totalSteps}: {title}"
 msgstr "Passaggio {0} di {totalSteps}: {title}"
 
@@ -34159,7 +34203,7 @@ msgstr "Comprensione superiore di concetti visivi complessi"
 
 #: src/features/chat/sidebar/thread-context.tsx:65
 #: src/features/chat/thread/composer-permission-mode.tsx:44
-#: src/features/settings/components/chat/bots-settings.tsx:135
+#: src/features/settings/components/chat/bots-settings.tsx:136
 #: src/features/settings/components/chat/new-chat-permission-mode-setting.tsx:43
 msgid "Supervised"
 msgstr "Supervisionato"
@@ -34439,6 +34483,10 @@ msgstr "Non è possibile prendere il controllo durante l'impersonificazione."
 #: ../../packages/chat-ui/src/chat/message-content.tsx:728
 msgid "Taking screenshot..."
 msgstr "Acquisizione screenshot..."
+
+#: src/features/onboarding/components/onboarding-dialog.tsx:128
+msgid "Talk to any model and make images and documents."
+msgstr "Parla con qualsiasi modello e crea immagini e documenti."
 
 #: src/features/marketing/components/gateway-landing-page.tsx:859
 #: src/features/marketing/components/landing-page.tsx:1097
@@ -35138,7 +35186,7 @@ msgstr "L’agente ha risposto in ritardo: {0} è ora {1}."
 msgid "The agent asks before a risky action"
 msgstr "L’agente chiede prima di un’azione rischiosa"
 
-#: src/features/devices/components/devices-settings.tsx:406
+#: src/features/devices/components/devices-settings.tsx:412
 msgid "The agent can no longer ask this device for anything. Its activity log stays until it expires."
 msgstr "L'agente non potrà più chiedere nulla a questo dispositivo. Il registro delle attività resta finché non scade."
 
@@ -35295,7 +35343,7 @@ msgstr "L’assistente sta chiedendo un segreto"
 msgid "The assistant needs a secret"
 msgstr "L’assistente ha bisogno di un segreto"
 
-#: src/features/settings/components/chat/bots-settings.tsx:584
+#: src/features/settings/components/chat/bots-settings.tsx:588
 msgid "The bot and its computer are removed. Its chats stay, as plain chats."
 msgstr "Il bot e il suo computer vengono rimossi. Le sue chat restano, come normali chat."
 
@@ -35307,7 +35355,7 @@ msgstr "Il bot riceve solo gli strumenti che consenti. Se non ne consenti nessun
 msgid "The bot sets the model for this chat."
 msgstr "Il bot imposta il modello per questa chat."
 
-#: src/features/settings/components/chat/bots-settings.tsx:354
+#: src/features/settings/components/chat/bots-settings.tsx:358
 msgid "The bot's tools were saved"
 msgstr "Gli strumenti del bot sono stati salvati"
 
@@ -35428,7 +35476,7 @@ msgstr "La condizione viene verificata senza interpellare un modello; l’agente
 msgid "The connection could not be completed."
 msgstr "Impossibile completare la connessione."
 
-#: src/features/devices/components/devices-settings.tsx:219
+#: src/features/devices/components/devices-settings.tsx:225
 msgid "The connection was lost."
 msgstr "La connessione è stata persa."
 
@@ -35808,7 +35856,7 @@ msgstr "Il registro MCP non è disponibile al momento. Vengono mostrati i server
 msgid "The message could not be sent. Check your connection and try again."
 msgstr "Impossibile inviare il messaggio. Controlla la connessione e riprova."
 
-#: src/features/settings/components/chat/bots-settings.tsx:427
+#: src/features/settings/components/chat/bots-settings.tsx:431
 msgid "The mode each new chat with this bot starts in. You can still change it per chat. Scheduled runs use it only when it asks more."
 msgstr "La modalità in cui inizia ogni nuova chat con questo bot. Puoi comunque cambiarla per ogni chat. Le esecuzioni pianificate la usano solo quando chiede più conferme."
 
@@ -36332,11 +36380,11 @@ msgstr "Questa azione non può essere annullata. L'organizzazione e tutti i dati
 msgid "This agent cannot resume its own session, so the conversation was handed over"
 msgstr "Questo agente non può riprendere la propria sessione, quindi la conversazione è stata passata"
 
-#: src/features/settings/components/chat/bots-settings.tsx:299
+#: src/features/settings/components/chat/bots-settings.tsx:303
 msgid "This bot's tools were changed elsewhere. Close this dialog and open it again to see them."
 msgstr "Gli strumenti di questo bot sono stati modificati altrove. Chiudi questa finestra e riaprila per vederli."
 
-#: src/features/settings/components/chat/bots-settings.tsx:313
+#: src/features/settings/components/chat/bots-settings.tsx:317
 msgid "This bot's tools were changed elsewhere. They are shown as saved now; make your change again."
 msgstr "Gli strumenti di questo bot sono stati modificati altrove. Ora sono mostrati come salvati; ripeti la modifica."
 
@@ -36482,7 +36530,7 @@ msgstr "La modalità di questo confronto si applica a ogni colonna. Modificala n
 msgid "this computer"
 msgstr "questo computer"
 
-#: src/features/devices/components/devices-settings.tsx:374
+#: src/features/devices/components/devices-settings.tsx:380
 #: src/features/projects/components/add-project-dialog.tsx:174
 #: src/features/projects/components/add-project-dialog.tsx:178
 #: src/features/settings/components/chat/custom-providers-settings.tsx:360
@@ -36501,28 +36549,28 @@ msgstr "Questo computer non è più abbinato."
 msgid "This computer is no longer paired. Pair it again in Settings → Devices."
 msgstr "Questo computer non è più associato. Associalo di nuovo in Impostazioni → Dispositivi."
 
-#: src/features/devices/components/devices-settings.tsx:669
+#: src/features/devices/components/devices-settings.tsx:675
 msgid "This computer is not paired yet."
 msgstr "Questo computer non è ancora associato."
 
 #. placeholder {0}: pairedHere.name
-#: src/features/devices/components/devices-settings.tsx:685
+#: src/features/devices/components/devices-settings.tsx:691
 msgid "This computer is paired as “{0}”."
 msgstr "Questo computer è associato come «{0}»."
 
-#: src/features/devices/components/devices-settings.tsx:669
+#: src/features/devices/components/devices-settings.tsx:675
 msgid "This computer is paired with another account."
 msgstr "Questo computer è associato a un altro account."
 
-#: src/features/devices/components/devices-settings.tsx:634
+#: src/features/devices/components/devices-settings.tsx:640
 msgid "This computer is paired. Choose which folders to share in the desktop app."
 msgstr "Questo computer è associato. Scegli nell'app desktop quali cartelle condividere."
 
-#: src/features/devices/components/devices-settings.tsx:110
+#: src/features/devices/components/devices-settings.tsx:112
 msgid "This computer may only be used in some projects, and none of them is available to you. Change where it is offered below."
 msgstr "Questo computer può essere usato solo in alcuni progetti e nessuno di essi è disponibile per te. Cambia qui sotto dove viene offerto."
 
-#: src/features/devices/components/devices-settings.tsx:112
+#: src/features/devices/components/devices-settings.tsx:114
 msgid "This computer may only be used in some projects. Choose the project to start the agent in."
 msgstr "Questo computer può essere usato solo in alcuni progetti. Scegli il progetto in cui avviare l’agente."
 
@@ -37201,7 +37249,7 @@ msgstr "Le conversazioni conservano tutta la cronologia. Crea branch delle idee,
 msgid "Threads working on this {requestNoun}"
 msgstr "Thread che lavorano su questa {requestNoun}"
 
-#: src/features/onboarding/components/setup-checklist.tsx:164
+#: src/features/onboarding/components/setup-checklist.tsx:296
 msgid "Three steps to use coding agents on your own machines. Skip any of them and come back later."
 msgstr "Tre passaggi per usare gli agenti di coding sulle tue macchine. Salta quelli che non ti servono e torna più tardi."
 
@@ -37300,7 +37348,8 @@ msgid "to {0}"
 msgstr "a {0}"
 
 #: src/features/chat/thread/host-activity.tsx:81
-#: src/features/onboarding/components/setup-checklist.tsx:135
+#: src/features/code/components/git-host-step.tsx:18
+#: src/features/onboarding/components/setup-checklist.tsx:150
 #: src/features/tasks/components/task-status.tsx:21
 msgid "To do"
 msgstr "Da fare"
@@ -37531,7 +37580,7 @@ msgid "Tool results of 64 KB or more, in threads idle at least {0} days"
 msgstr "Risultati degli strumenti di 64 KB o più, nelle conversazioni inattive da almeno {0} giorni"
 
 #: src/features/settings/components/chat/bot-tool-selection.tsx:467
-#: src/features/settings/components/chat/bots-settings.tsx:517
+#: src/features/settings/components/chat/bots-settings.tsx:521
 #: src/features/settings/components/chat/custom-providers-settings.tsx:365
 #: src/features/skills/components/marketplace-skill-detail-dialog.tsx:134
 #: src/features/skills/components/skill-form-dialog.tsx:408
@@ -37541,8 +37590,8 @@ msgstr "Strumenti"
 
 #. placeholder {0}: bot.name
 #. placeholder {0}: editingTools?.name ?? ""
-#: src/features/settings/components/chat/bots-settings.tsx:499
-#: src/features/settings/components/chat/bots-settings.tsx:547
+#: src/features/settings/components/chat/bots-settings.tsx:503
+#: src/features/settings/components/chat/bots-settings.tsx:551
 msgid "Tools for {0}"
 msgstr "Strumenti di {0}"
 
@@ -38975,6 +39024,10 @@ msgstr "Usalo da un client MCP"
 msgid "Use lowercase letters, numbers and single hyphens only"
 msgstr "Usa solo lettere minuscole, numeri e singoli trattini"
 
+#: src/features/onboarding/components/onboarding-dialog.tsx:47
+msgid "Use models from many providers in a single conversation. Switch models mid-thread to compare answers."
+msgstr "Usa modelli di molti provider in un’unica conversazione. Cambia modello a metà thread per confrontare le risposte."
+
 #: src/features/chat/thread/media-gallery-view.tsx:641
 msgid "Use Original Prompt"
 msgstr "Usa il prompt originale"
@@ -39000,7 +39053,7 @@ msgstr "Usa i modelli consentiti dall'organizzazione"
 msgid "Use these keyboard shortcuts to navigate and interact with the data grid more efficiently."
 msgstr "Usa queste scorciatoie da tastiera per muoverti e interagire con la griglia dati in modo più efficiente."
 
-#: src/features/devices/components/devices-settings.tsx:666
+#: src/features/devices/components/devices-settings.tsx:672
 msgid "Use this computer for agent tools"
 msgstr "Usa questo computer per gli strumenti dell'agente"
 
@@ -39040,7 +39093,7 @@ msgstr "utente"
 #: src/features/auth/components/user-view.tsx:35
 #: src/features/auth/components/user-view.tsx:38
 #: src/features/auth/components/user-view.tsx:44
-#: src/features/devices/components/devices-settings.tsx:555
+#: src/features/devices/components/devices-settings.tsx:561
 #: src/features/layout/components/nav-user.tsx:373
 #: src/features/layout/components/nav-user.tsx:373
 #: src/features/layout/components/sidebar-shortcut.tsx:217
@@ -39933,7 +39986,7 @@ msgstr "In attesa che {device} lo prenda in carico…"
 msgid "Waiting for {name}…"
 msgstr "In attesa di {name}…"
 
-#: src/features/devices/components/devices-settings.tsx:447
+#: src/features/devices/components/devices-settings.tsx:453
 msgid "Waiting for approval"
 msgstr "In attesa di approvazione"
 
@@ -40188,8 +40241,8 @@ msgstr "Peso"
 msgid "Welcome back"
 msgstr "Bentornato"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:45
-#: src/features/onboarding/components/onboarding-dialog.tsx:311
+#: src/features/onboarding/components/onboarding-dialog.tsx:51
+#: src/features/onboarding/components/onboarding-dialog.tsx:370
 msgid "Welcome to Neore"
 msgstr "Benvenuto in Neore"
 
@@ -40298,7 +40351,7 @@ msgstr "Come dovrebbe chiamarti l'IA?"
 msgid "What should the guide pay attention to?"
 msgstr "A cosa deve prestare attenzione la guida?"
 
-#: src/features/devices/components/devices-settings.tsx:718
+#: src/features/devices/components/devices-settings.tsx:724
 msgid "What the agent asked your devices to do in the last 30 days."
 msgstr "Ciò che l'agente ha chiesto ai tuoi dispositivi negli ultimi 30 giorni."
 
@@ -40554,7 +40607,7 @@ msgstr "Con email/password"
 msgid "With this, it fires when the text starts to contain the phrase, not on every change."
 msgstr "Con questa opzione, si attiva quando il testo inizia a contenere la frase, non a ogni modifica."
 
-#: src/features/devices/components/devices-settings.tsx:565
+#: src/features/devices/components/devices-settings.tsx:571
 msgid "Without one, your SSH agent and default keys are used. Passwords are not supported yet."
 msgstr "Senza di essa, vengono usati il tuo agente SSH e le chiavi predefinite. Le password non sono ancora supportate."
 
@@ -40679,7 +40732,7 @@ msgstr "Scrivila di nuovo"
 msgid "Write long-form content alongside chat"
 msgstr "Scrivi contenuti lunghi accanto alla chat"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:36
+#: src/features/onboarding/components/onboarding-dialog.tsx:40
 msgid "Write long-form content in a side-by-side canvas editor. Go from chat to finished document without switching tools."
 msgstr "Scrivi contenuti lunghi in un editor canvas affiancato. Passa dalla chat al documento finito senza cambiare strumento."
 
@@ -40687,7 +40740,7 @@ msgstr "Scrivi contenuti lunghi in un editor canvas affiancato. Passa dalla chat
 msgid "Write some code for me..."
 msgstr "Scrivi del codice per me..."
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:63
+#: src/features/onboarding/components/onboarding-dialog.tsx:69
 msgid "Write something"
 msgstr "Scrivi qualcosa"
 
@@ -41072,7 +41125,7 @@ msgstr "Ti servirà un'app di autenticazione come Google Authenticator o Authy p
 msgid "You're all caught up."
 msgstr "Sei in pari."
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:269
+#: src/features/onboarding/components/onboarding-dialog.tsx:325
 msgid "You're all set!"
 msgstr "È tutto pronto!"
 
@@ -41175,7 +41228,7 @@ msgstr "Il tuo background, le tue preferenze o la tua località, per aiutare l'I
 msgid "Your backup models were changed in another tab. The saved list is shown again."
 msgstr "I tuoi modelli di riserva sono stati modificati in un'altra scheda. Viene di nuovo mostrato l'elenco salvato."
 
-#: src/features/settings/components/chat/bots-settings.tsx:461
+#: src/features/settings/components/chat/bots-settings.tsx:465
 #: src/features/settings/lib/settings-keywords.ts:85
 msgid "Your bots"
 msgstr "I tuoi bot"
