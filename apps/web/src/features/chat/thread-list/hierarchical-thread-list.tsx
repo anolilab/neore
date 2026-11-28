@@ -588,13 +588,10 @@ const HierarchicalThreadList: FC<
     // The rows' second line names a project by its title, and a model only when it is not one a new chat starts on.
     const { data: aiPreferences, isError: preferencesFailed } = useQuery(crpc.auth.functions.getAIUserPreferences.queryOptions({}));
     const defaultModels = useMemo(() => {
-        // A failed read never answers: the rows then go by the app's default alone, as they did before saved defaults counted.
-        if (preferencesFailed) {
-            return new Set([DEFAULT_CHAT_MODEL]);
-        }
-
         if (aiPreferences === undefined) {
-            return undefined;
+            // A first read that failed never answers: the rows then go by the app's default alone. A failed refresh keeps the
+            // preferences already read, below.
+            return preferencesFailed ? new Set([DEFAULT_CHAT_MODEL]) : undefined;
         }
 
         const saved = (aiPreferences?.defaultModels ?? {}) as Record<string, string | undefined>;
