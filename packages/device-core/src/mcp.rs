@@ -1431,10 +1431,17 @@ sleep 1"#
     /// A server like the bridge: its first copy (counted in `starts`) answers every call with the session-gone error,
     /// any later copy answers with a result.
     #[cfg(unix)]
-    fn gone_once_script(starts: &Path) -> String {
-        r#"echo $$ >> 'STARTS'; n=$(wc -l < 'STARTS'); read l; echo '{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-06-18","capabilities":{},"serverInfo":{"name":"f","version":"1"}}}'; read l; while read l; do id=$(printf '%s' "$l" | sed 's/.*"id":\([0-9]*\).*/\1/'); if [ $n -eq 1 ]; then echo "{\"jsonrpc\":\"2.0\",\"id\":$id,\"error\":{\"code\":-32000,\"message\":\"GONE\"}}"; else echo "{\"jsonrpc\":\"2.0\",\"id\":$id,\"result\":{}}"; fi; done"#
-        .replace("STARTS", &starts.display().to_string())
-        .replace("GONE", SESSION_GONE)
+    fn gone_once_args(starts: &Path) -> Vec<String> {
+        // The path goes in as `$1`, never into the script's text, so no character in it can change the script.
+        let script = r#"echo $$ >> "$1"; n=$(wc -l < "$1"); read l; echo '{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-06-18","capabilities":{},"serverInfo":{"name":"f","version":"1"}}}'; read l; while read l; do id=$(printf '%s' "$l" | sed 's/.*"id":\([0-9]*\).*/\1/'); if [ $n -eq 1 ]; then echo "{\"jsonrpc\":\"2.0\",\"id\":$id,\"error\":{\"code\":-32000,\"message\":\"GONE\"}}"; else echo "{\"jsonrpc\":\"2.0\",\"id\":$id,\"result\":{}}"; fi; done"#
+            .replace("GONE", SESSION_GONE);
+
+        vec![
+            "-c".into(),
+            script,
+            "sh".into(),
+            starts.display().to_string(),
+        ]
     }
 
     #[cfg(unix)]
@@ -1444,12 +1451,11 @@ sleep 1"#
 
         let root = temp_root("session-gone-two");
         let starts = root.join("starts");
-        let script = gone_once_script(&starts);
 
         std::fs::create_dir_all(&root).unwrap();
 
         let config = McpServerConfig {
-            args: vec!["-c".into(), script],
+            args: gone_once_args(&starts),
             ..idle_server("session-gone-two")
         };
         let manager = Arc::new(McpManager::new(root.to_path_buf()));
@@ -1494,12 +1500,11 @@ sleep 1"#
 
         let root = temp_root("session-gone-edited");
         let starts = root.join("starts");
-        let script = gone_once_script(&starts);
 
         std::fs::create_dir_all(&root).unwrap();
 
         let old = McpServerConfig {
-            args: vec!["-c".into(), script],
+            args: gone_once_args(&starts),
             ..idle_server("session-gone-edited")
         };
         // The person edits the server while a call on the old settings is still running.

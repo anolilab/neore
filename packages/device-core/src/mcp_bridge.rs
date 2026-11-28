@@ -662,13 +662,24 @@ impl<W: Write> Bridge<W> {
             None => {}
         }
 
-        // The id is the server's to match its reply by (a ping): it is never blanked.
+        // The id is the server's to match its reply by (a ping), and a cursor goes back to it as it was (`mcp.rs` sends
+        // it with the next page and nowhere else): neither is blanked.
         let id = message.get("id").cloned();
+        let cursor = message.pointer("/result/nextCursor").cloned();
 
         redact(&mut message, &secrets);
 
         if let (Some(id), Some(object)) = (id, message.as_object_mut()) {
             object.insert("id".to_owned(), id);
+        }
+
+        if let (Some(cursor), Some(result)) = (
+            cursor,
+            message
+                .pointer_mut("/result")
+                .and_then(Value::as_object_mut),
+        ) {
+            result.insert("nextCursor".to_owned(), cursor);
         }
 
         if let Some(text) = message.pointer_mut("/error/message") {

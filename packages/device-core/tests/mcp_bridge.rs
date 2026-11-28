@@ -419,8 +419,8 @@ fn a_header_value_the_server_echoes_does_not_reach_the_client() {
             let token = request.header("authorization").unwrap_or_default();
 
             if request.body["method"] == "tools/list" {
-                // A schema that names a field by the token.
-                let tools = json!({ "tools": [{ "name": "t", "inputSchema": { "properties": { token: {} } } }] });
+                // A schema that names a field by the token, and a cursor that holds it: the cursor goes back as it was.
+                let tools = json!({ "tools": [{ "name": "t", "inputSchema": { "properties": { token: {} } } }], "nextCursor": format!("after-{token}") });
 
                 return json_reply(request, tools, None);
             }
@@ -454,7 +454,14 @@ fn a_header_value_the_server_echoes_does_not_reach_the_client() {
         listed["result"]["tools"][0]["inputSchema"]["properties"]["[redacted]"].is_object(),
         "{listed}"
     );
-    assert!(!listed.to_string().contains(&token), "{listed}");
+    assert!(
+        !listed["result"]["tools"].to_string().contains(&token),
+        "{listed}"
+    );
+    assert_eq!(
+        listed["result"]["nextCursor"],
+        format!("after-Bearer {token}")
+    );
 
     assert_eq!(
         refused["error"]["message"], "refused [redacted]",
