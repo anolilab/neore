@@ -135,7 +135,7 @@ describe(scrollToAnchorWhenRendered, () => {
         const root = document.createElement("div");
 
         root.innerHTML = html;
-        document.body.append(root);
+        document.body.insertAdjacentElement("beforeend", root);
 
         for (const element of root.querySelectorAll<HTMLElement>("*")) {
             element.scrollIntoView = vi.fn();
