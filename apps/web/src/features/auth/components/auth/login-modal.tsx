@@ -48,8 +48,8 @@ const LoginModal: FC<LoginModalProperties> = ({ onOpenChange, open, redirectTo }
                 </DialogHeader>
                 <AuthCard
                     classNames={{
-                        // Centered: the card is narrower than the dialog, and a left-aligned card leaves the gap on the right.
-                        base: "mx-auto border-0 shadow-none ring-0 bg-transparent",
+                        // Centered: the content is narrower than the dialog, and left-aligned it leaves the gap on the right.
+                        base: "mx-auto p-6 sm:p-8",
                     }}
                     redirectTo={redirectTo}
                     view="SIGN_IN"

@@ -89,7 +89,7 @@ const NotificationList: FC<NotificationListProps> = ({ emptyLabel, items, onOpen
     }
 
     return (
-        <ul className="divide-border divide-y">
+        <ul className="divide-border/50 divide-y">
             {items.map((item) => {
                 const Icon = TYPE_ICONS[item.type] ?? Bell;
                 const OutcomeIcon = item.outcome === undefined ? undefined : OUTCOME_ICONS[item.outcome];
@@ -120,7 +120,8 @@ const NotificationList: FC<NotificationListProps> = ({ emptyLabel, items, onOpen
                         {!item.read && <span aria-hidden="true" className="bg-primary mt-1.5 size-2 shrink-0 rounded-full" />}
                     </>
                 );
-                const rowClass = "hover:bg-accent focus-visible:bg-accent flex w-full items-start gap-3 px-3 py-2.5 text-left outline-none transition-colors";
+                const rowClass =
+                    "hover:bg-surface-row-hover focus-visible:bg-surface-row-hover focus-visible:ring-ring flex w-full items-start gap-3 px-3 py-2.5 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-inset";
 
                 return (
                     <li key={item._id}>

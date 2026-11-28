@@ -86,10 +86,10 @@ const CanvasToolbar: FC<CanvasToolbarProps> = ({ className, documentKind }) => {
     };
 
     return (
-        <div className={cn("flex flex-wrap gap-1.5 border-b px-4 py-2", className)}>
+        <div className={cn("border-border/50 flex flex-wrap gap-1.5 border-b px-4 py-2", className)}>
             {actions.map((action) => (
                 <button
-                    className="bg-muted hover:bg-accent text-muted-foreground hover:text-accent-foreground rounded-md px-2.5 py-1 text-xs transition-colors"
+                    className="surface-well hover:bg-surface-row-hover text-muted-foreground hover:text-foreground rounded-lg px-2.5 py-1 text-xs transition-colors"
                     key={action.label}
                     onClick={() => handleAction(action)}
                     type="button"

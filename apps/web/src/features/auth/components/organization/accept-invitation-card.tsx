@@ -2,7 +2,6 @@
 
 import { useLingui } from "@lingui/react/macro";
 import { Button } from "@neore/ui/components/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@neore/ui/components/card";
 import { Skeleton } from "@neore/ui/components/skeleton";
 import cn from "@neore/ui/utils/cn";
 import { useParams } from "@tanstack/react-router";
@@ -19,27 +18,27 @@ import { getLocalizedError } from "../../lib/utilities";
 import OrganizationView from "./organization-view";
 
 const AcceptInvitationSkeleton = ({ className, classNames }: AcceptInvitationCardProperties) => (
-    <Card className={cn("w-full max-w-sm", className, classNames?.base)}>
-        <CardHeader className={cn("justify-items-center", classNames?.header)}>
+    <div className={cn("flex w-full max-w-sm flex-col gap-6", className, classNames?.base)}>
+        <div className={cn("grid justify-items-center gap-1.5", classNames?.header)}>
             <Skeleton className={cn("my-1 h-5 w-full max-w-32 md:h-5.5 md:w-40", classNames?.skeleton)} />
 
             <Skeleton className={cn("my-0.5 h-3 w-full max-w-56 md:h-3.5 md:w-64", classNames?.skeleton)} />
-        </CardHeader>
+        </div>
 
-        <CardContent className={cn("flex flex-col gap-6 truncate", classNames?.content)}>
-            <Card className={cn("flex-row items-center p-4")}>
+        <div className={cn("flex flex-col gap-6 truncate", classNames?.content)}>
+            <div className="border-border/50 flex items-center rounded-xl border p-3">
                 <OrganizationView isPending />
 
                 <Skeleton className="mt-0.5 ml-auto h-4 w-full max-w-14 shrink-2" />
-            </Card>
+            </div>
 
             <div className="grid grid-cols-2 gap-3">
                 <Skeleton className="h-9 w-full" />
 
                 <Skeleton className="h-9 w-full" />
             </div>
-        </CardContent>
-    </Card>
+        </div>
+    </div>
 );
 
 const AcceptInvitationContent = ({ className, classNames, invitationId }: AcceptInvitationCardProperties & { invitationId: string }) => {
@@ -152,17 +151,15 @@ const AcceptInvitationContent = ({ className, classNames, invitationId }: Accept
     const roleLabel = roles.find((r) => r.role === invitation?.role)?.label || invitation?.role;
 
     return (
-        <Card className={cn("w-full max-w-sm", className, classNames?.base)}>
-            <CardHeader className={cn("justify-items-center text-center", classNames?.header)}>
-                <CardTitle className={cn("text-lg md:text-xl", classNames?.title)}>{t`Accept Invitation`}</CardTitle>
+        <div className={cn("flex w-full max-w-sm flex-col gap-6", className, classNames?.base)}>
+            <div className={cn("grid gap-1.5 text-center", classNames?.header)}>
+                <h1 className={cn("text-xl font-semibold", classNames?.title)}>{t`Accept Invitation`}</h1>
 
-                <CardDescription className={cn("text-xs md:text-sm", classNames?.description)}>
-                    {t`You've been invited to join an organization`}
-                </CardDescription>
-            </CardHeader>
+                <p className={cn("text-muted-foreground text-sm", classNames?.description)}>{t`You've been invited to join an organization`}</p>
+            </div>
 
-            <CardContent className={cn("flex flex-col gap-6 truncate", classNames?.content)}>
-                <Card className={cn("flex-row items-center p-4")}>
+            <div className={cn("flex flex-col gap-6 truncate", classNames?.content)}>
+                <div className="border-border/50 flex items-center rounded-xl border p-3">
                     <OrganizationView
                         organization={
                             invitation
@@ -177,7 +174,7 @@ const AcceptInvitationContent = ({ className, classNames, invitationId }: Accept
                     />
 
                     <p className="text-muted-foreground ml-auto text-sm">{roleLabel}</p>
-                </Card>
+                </div>
 
                 <div className="grid grid-cols-2 gap-3">
                     <Button className={cn(classNames?.button, classNames?.outlineButton)} disabled={isProcessing} onClick={rejectInvitation} variant="outline">
@@ -192,8 +189,8 @@ const AcceptInvitationContent = ({ className, classNames, invitationId }: Accept
                         {t`Accept`}
                     </Button>
                 </div>
-            </CardContent>
-        </Card>
+            </div>
+        </div>
     );
 };
 

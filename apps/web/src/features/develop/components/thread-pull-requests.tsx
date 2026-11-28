@@ -8,9 +8,10 @@ import { Button } from "@neore/ui/components/button";
 import { Dialog, DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogPopup, DialogTitle } from "@neore/ui/components/dialog";
 import { Input } from "@neore/ui/components/input";
 import { Label } from "@neore/ui/components/label";
+import cn from "@neore/ui/utils/cn";
 import { skipToken, useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { GitPullRequestArrow } from "lucide-react";
+import { GitPullRequestArrow, GitPullRequestCreate } from "lucide-react";
 import type { ReactNode, RefObject } from "react";
 import { useEffect, useId, useRef, useState } from "react";
 
@@ -109,10 +110,13 @@ const LinkedPullRequest = ({ link, onFocusLost, readStatus, threadId }: LinkedPu
  * somewhere else is left where it is.
  */
 export const LinkedPullRequestList = ({
+    compact = false,
     fallbackFocus,
     links,
     threadId,
 }: {
+    /** One row that never wraps: links past the width are clipped, not stacked under the header. */
+    compact?: boolean;
     fallbackFocus: RefObject<HTMLElement | null>;
     links: ReadonlyArray<PullRequestAddress & { statusReadAt?: number }>;
     threadId: string;
@@ -154,8 +158,12 @@ export const LinkedPullRequestList = ({
         return null;
     }
 
+    // Compact: one row that scrolls sideways, with no bar, so a link that Tab reaches past the edge scrolls into view.
     return (
-        <ul className="flex flex-wrap items-center gap-2" ref={listRef}>
+        <ul
+            className={cn("flex items-center gap-2", compact ? "max-w-80 min-w-0 flex-nowrap overflow-x-auto [scrollbar-width:none]" : "flex-wrap")}
+            ref={listRef}
+        >
             {links.map((link) => {
                 const key = linkKey(link);
 
@@ -192,7 +200,12 @@ type AttachStatus =
  * shows what blocks it with an action that writes a fix prompt into the composer, and a dialog links more by hand. Only the thread's owner sees it, and the list is asked for after first paint, so the header does
  * not add to the queries that wait for it.
  */
-const ThreadPullRequests = ({ threadId }: { threadId: string | undefined }) => {
+
+/**
+ * `compact` is the header's form: one row that never wraps, the Link button an icon with its name kept for screen readers. The
+ * thread's context box shows the full button.
+ */
+const ThreadPullRequests = ({ compact = false, threadId }: { compact?: boolean; threadId: string | undefined }) => {
     const { t } = useLingui();
     const dialogId = useId();
     const ready = useAfterFirstPaint();
@@ -312,7 +325,7 @@ const ThreadPullRequests = ({ threadId }: { threadId: string | undefined }) => {
     };
 
     return (
-        <div className="flex flex-wrap items-center gap-2">
+        <div className={cn("flex items-center gap-2", compact ? "min-w-0 flex-nowrap" : "flex-wrap")}>
             {links.isPending && links.fetchStatus === "fetching" && (
                 <span className="sr-only" role="status">
                     {t`Loading the linked pull requests…`}
@@ -326,9 +339,17 @@ const ThreadPullRequests = ({ threadId }: { threadId: string | undefined }) => {
                     </Button>
                 </p>
             )}
-            <LinkedPullRequestList fallbackFocus={linkButtonRef} links={links.data ?? []} threadId={threadId} />
-            <Button onClick={() => setOpen(true)} ref={linkButtonRef} size="sm" variant="ghost">
-                {t`Link pull request`}
+            <LinkedPullRequestList compact={compact} fallbackFocus={linkButtonRef} links={links.data ?? []} threadId={threadId} />
+            <Button
+                className={cn(compact && "size-7 shrink-0 p-0")}
+                onClick={() => setOpen(true)}
+                ref={linkButtonRef}
+                size="sm"
+                title={compact ? t`Link pull request` : undefined}
+                variant="ghost"
+            >
+                {compact && <GitPullRequestCreate aria-hidden="true" className="size-4" />}
+                <span className={cn(compact && "sr-only")}>{t`Link pull request`}</span>
             </Button>
             <Dialog
                 onOpenChange={(next) => {

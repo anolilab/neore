@@ -482,7 +482,7 @@ const TextSelectionMenu: FC<TextSelectionMenuProps> = ({ isTextModel = true, thr
                     <motion.div
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         aria-label={t`Selection actions`}
-                        className="bg-background border-border fixed z-50 flex -translate-x-1/2 items-center gap-1 rounded-lg border p-1 shadow-md"
+                        className="bg-popover text-popover-foreground surface-edge fixed z-50 flex -translate-x-1/2 items-center gap-1 rounded-xl p-1"
                         exit={{ opacity: 0, scale: 0.92, transition: { duration: 0.1 }, y: 3 }}
                         initial={{ opacity: 0, scale: 0.92, y: 3 }}
                         key="text-selection-menu"

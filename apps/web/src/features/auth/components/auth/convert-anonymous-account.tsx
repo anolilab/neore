@@ -3,7 +3,6 @@
 import { useLingui } from "@lingui/react/macro";
 import { Alert, AlertDescription } from "@neore/ui/components/alert";
 import { Button } from "@neore/ui/components/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@neore/ui/components/card";
 import { useAppForm } from "@neore/ui/components/form";
 import PasswordInput from "@neore/ui/components/form/password-input";
 import { Input } from "@neore/ui/components/input";
@@ -148,15 +147,15 @@ const ConvertAnonymousAccount = ({ className, classNames, onSuccess, passwordVal
     const isSubmitting = useStore(form.store, (state) => state.isSubmitting);
 
     return (
-        <Card className={cn("w-full max-w-md", className, classNames?.base)}>
-            <CardHeader className={classNames?.cardHeader}>
-                <CardTitle className={cn("text-lg", classNames?.cardTitle)}>{t`Convert to Full Account`}</CardTitle>
-                <CardDescription className={classNames?.cardDescription}>
+        <div className={cn("flex w-full max-w-sm flex-col gap-6", className, classNames?.base)}>
+            <div className={cn("grid gap-1.5 text-center", classNames?.cardHeader)}>
+                <h1 className={cn("text-xl font-semibold", classNames?.cardTitle)}>{t`Convert to Full Account`}</h1>
+                <p className={cn("text-muted-foreground text-sm", classNames?.cardDescription)}>
                     {t`Create a permanent account to save your data and access it from any device.`}
-                </CardDescription>
-            </CardHeader>
+                </p>
+            </div>
 
-            <CardContent className={cn("grid gap-4", classNames?.cardContent)}>
+            <div className={cn("grid gap-6", classNames?.cardContent)}>
                 <Alert className={cn("text-sm", classNames?.alert)}>
                     <AlertCircle className="h-4 w-4" />
                     <AlertDescription>{t`Your current anonymous session will be converted to a permanent account.`}</AlertDescription>
@@ -164,7 +163,7 @@ const ConvertAnonymousAccount = ({ className, classNames, onSuccess, passwordVal
 
                 <form.AppForm>
                     <form
-                        className={cn("grid gap-4", classNames?.form)}
+                        className={cn("grid gap-6", classNames?.form)}
                         noValidate={isHydrated}
                         onSubmit={(e) => {
                             e.preventDefault();
@@ -245,8 +244,8 @@ const ConvertAnonymousAccount = ({ className, classNames, onSuccess, passwordVal
                         </Button>
                     </form>
                 </form.AppForm>
-            </CardContent>
-        </Card>
+            </div>
+        </div>
     );
 };
 

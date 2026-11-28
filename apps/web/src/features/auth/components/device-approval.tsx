@@ -87,7 +87,7 @@ const ProblemMessage = ({ headingRef, onRetry, problem }: { headingRef?: Ref<HTM
     return (
         <div className="flex flex-col gap-4 text-center">
             <Heading headingRef={headingRef}>{t`Approve a code`}</Heading>
-            <p className="text-sm text-red-600" role="alert">
+            <p className="text-destructive text-sm" role="alert">
                 {messages[problem]}
             </p>
             {isRetryable && (
@@ -189,7 +189,7 @@ const Review = ({ email, lookup, onRefresh, userCode }: ReviewProps) => {
         body = (
             <div className="flex flex-col gap-4 text-center">
                 <Heading headingRef={resultHeading}>{outcomes[decision].title}</Heading>
-                <p className="text-sm text-gray-700">{outcomes[decision].detail}</p>
+                <p className="text-muted-foreground text-sm">{outcomes[decision].detail}</p>
             </div>
         );
     } else if (!lookup.isMine) {
@@ -203,21 +203,21 @@ const Review = ({ email, lookup, onRefresh, userCode }: ReviewProps) => {
                 <Heading>{isHost ? t`Pair this machine?` : t`Sign in the command line?`}</Heading>
                 {isHost ? (
                     <>
-                        <p className="text-center text-sm text-gray-700">
+                        <p className="text-muted-foreground text-center text-sm">
                             {t`The machine below will become a device of ${email}. Until you revoke it in Settings, the assistant can run tools on it in the chats of the projects you choose for it there, and you can start coding agents on it yourself. The assistant won't use it in any chat until you choose projects. Its device secret goes only to that machine, never to this page.`}
                         </p>
                         <MachineCodeDetails code={formatCode(userCode)} hostname={lookup.hostname} platform={lookup.platform} storage={lookup.storage} />
                     </>
                 ) : (
                     <>
-                        <p className="text-center text-sm text-gray-700">
+                        <p className="text-muted-foreground text-center text-sm">
                             {t`The command line on the computer below will be signed in as ${email}, with read-only access to your chats, skills, tasks, knowledge and memories through the API. It gets its own API key, which you can revoke in Settings.`}
                         </p>
                         <DeviceCodeDetails code={formatCode(userCode)} hostname={lookup.hostname} />
                     </>
                 )}
                 {error && (
-                    <p className="text-center text-sm text-red-600" role="alert">
+                    <p className="text-destructive text-center text-sm" role="alert">
                         {error}
                     </p>
                 )}
@@ -248,7 +248,7 @@ const Review = ({ email, lookup, onRefresh, userCode }: ReviewProps) => {
         body = (
             <div className="flex flex-col gap-4 text-center">
                 <Heading headingRef={resultHeading}>{t`Approve a code`}</Heading>
-                <p className="text-sm text-gray-700">{t`This code has already been answered.`}</p>
+                <p className="text-muted-foreground text-sm">{t`This code has already been answered.`}</p>
             </div>
         );
     }
@@ -325,7 +325,7 @@ export const DeviceApproval = ({ onCode, rawCode }: { onCode: (code: string) => 
         return (
             <div className="flex flex-col gap-4 text-center">
                 <Heading>{t`Approve a code`}</Heading>
-                <p className="text-sm text-red-600" role="alert">
+                <p className="text-destructive text-sm" role="alert">
                     {t`We could not check that you are signed in. Try again in a moment.`}
                 </p>
                 <Button
@@ -345,7 +345,7 @@ export const DeviceApproval = ({ onCode, rawCode }: { onCode: (code: string) => 
         return (
             <div className="flex flex-col gap-4">
                 <Heading>{t`Approve a code`}</Heading>
-                <p className="text-center text-sm text-gray-600" role="status">
+                <p className="text-muted-foreground text-center text-sm" role="status">
                     {t`Loading…`}
                 </p>
             </div>
@@ -358,7 +358,7 @@ export const DeviceApproval = ({ onCode, rawCode }: { onCode: (code: string) => 
         return (
             <div className="flex flex-col gap-4 text-center">
                 <Heading>{t`Approve a code`}</Heading>
-                <p className="text-sm text-gray-700">{t`You are browsing as a guest. Sign in with your account to approve this code.`}</p>
+                <p className="text-muted-foreground text-sm">{t`You are browsing as a guest. Sign in with your account to approve this code.`}</p>
                 <a className="text-sm font-medium underline underline-offset-4" href={`/auth/sign-in?redirectTo=${encodeURIComponent(here)}`}>
                     {t`Sign in`}
                 </a>
@@ -394,7 +394,7 @@ export const DeviceApproval = ({ onCode, rawCode }: { onCode: (code: string) => 
         return (
             <div className="flex flex-col gap-4">
                 <Heading>{t`Approve a code`}</Heading>
-                <p className="text-center text-sm text-gray-600" role="status">
+                <p className="text-muted-foreground text-center text-sm" role="status">
                     {t`Checking the code…`}
                 </p>
             </div>

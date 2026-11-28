@@ -24,7 +24,7 @@ const ConvertAccountPage = () => {
     }
 
     return (
-        <div className="flex min-h-screen items-center justify-center p-4">
+        <>
             {canSignUp ? (
                 <ConvertAnonymousAccount
                     onSuccess={() => {
@@ -35,7 +35,7 @@ const ConvertAccountPage = () => {
                 // Says that registration is by invitation (or nothing until the backend has answered), with a sign-in link.
                 <AuthCard view="SIGN_UP" />
             )}
-        </div>
+        </>
     );
 };
 

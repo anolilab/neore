@@ -269,7 +269,7 @@ const ComposerFollowupSuggestions: FC = () => {
                                         animate={{ opacity: 1, y: 0 }}
                                         className={cn(
                                             "group flex max-w-xs cursor-pointer items-center gap-1.5 rounded-2xl border px-3 py-1.5 text-left text-sm transition-all outline-none",
-                                            "border-border/60 bg-muted/50 hover:bg-muted hover:border-border",
+                                            "border-border/50 bg-surface-row hover:bg-surface-row-hover",
                                             "focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-offset-1",
                                             "active:scale-[0.98]",
                                         )}

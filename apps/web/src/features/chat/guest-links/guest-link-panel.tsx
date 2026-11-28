@@ -405,7 +405,7 @@ const GuestLinkPanel: FC<GuestLinkPanelProps> = ({ locked = false, revokeLink, s
                         const snippet = characters.length > 40 ? `${characters.slice(0, 40).join("")}…` : note.text;
 
                         return (
-                            <li className="border-border flex flex-col gap-2 rounded-md border p-2" key={note.id}>
+                            <li className="surface-well flex flex-col gap-2 rounded-lg p-2" key={note.id}>
                                 <p className="text-sm break-words whitespace-pre-wrap">{note.text}</p>
                                 <div className="flex items-center justify-between gap-2">
                                     <Badge variant={note.status === "held" ? "secondary" : "default"}>{note.status === "held" ? t`Waiting` : t`Sent`}</Badge>

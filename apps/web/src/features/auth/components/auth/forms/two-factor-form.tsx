@@ -226,7 +226,7 @@ const TwoFactorForm = ({ className, classNames, isSubmitting, otpSeparators = 0,
                         <div className={classNames?.label}>
                             {t`Using an authenticator app like`}{" "}
                             <a
-                                className="text-blue-500 hover:underline"
+                                className="text-primary-text underline underline-offset-4"
                                 href="https://www.google.com/search?q=google+authenticator"
                                 rel="noreferrer"
                                 target="_blank"
@@ -235,7 +235,7 @@ const TwoFactorForm = ({ className, classNames, isSubmitting, otpSeparators = 0,
                             </a>
                             ,{" "}
                             <a
-                                className="text-blue-500 hover:underline"
+                                className="text-primary-text underline underline-offset-4"
                                 href="https://www.google.com/search?q=google+authenticator"
                                 rel="noreferrer"
                                 target="_blank"
@@ -244,7 +244,7 @@ const TwoFactorForm = ({ className, classNames, isSubmitting, otpSeparators = 0,
                             </a>{" "}
                             {t`or`}{" "}
                             <a
-                                className="text-blue-500 hover:underline"
+                                className="text-primary-text underline underline-offset-4"
                                 href="https://www.google.com/search?q=google+authenticator"
                                 rel="noreferrer"
                                 target="_blank"
@@ -253,14 +253,14 @@ const TwoFactorForm = ({ className, classNames, isSubmitting, otpSeparators = 0,
                             </a>
                             , {t`scan this QR code. it will generate a 6 digit code for you to enter below.`}
                         </div>
-                        <QrCodeSvg className={cn("mx-auto border shadow-xs", classNames?.qrCode)} value={totpURI} />
+                        <QrCodeSvg className={cn("border-border/50 mx-auto rounded-lg border", classNames?.qrCode)} value={totpURI} />
 
                         {totpSecret && (
                             <div className="max-w-sm space-y-2">
                                 <p className="text-muted-foreground text-center text-sm">
                                     {t`Scan not working? Copy this code key and enter it manually in your authentication app.`}
                                 </p>
-                                <div className="bg-muted/50 flex items-center justify-center gap-2 rounded-md border p-3">
+                                <div className="surface-well flex items-center justify-center gap-2 rounded-lg p-3">
                                     <code className="font-mono text-sm break-all">{totpSecret}</code>
                                     <CopyButton textToCopy={totpSecret} />
                                 </div>
@@ -279,7 +279,10 @@ const TwoFactorForm = ({ className, classNames, isSubmitting, otpSeparators = 0,
 
                                         {!isHideForgotAuthenticator && (
                                             <Link
-                                                className={cn("text-sm hover:underline", classNames?.forgotPasswordLink)}
+                                                className={cn(
+                                                    "text-muted-foreground hover:text-foreground text-sm hover:underline",
+                                                    classNames?.forgotPasswordLink,
+                                                )}
                                                 to={`${basePath}/${viewPaths.RECOVER_ACCOUNT}${isHydrated ? globalThis.location.search : ""}`}
                                             >
                                                 {t`Forgot authenticator`}
@@ -361,13 +364,13 @@ const TwoFactorForm = ({ className, classNames, isSubmitting, otpSeparators = 0,
 
                     {method !== "otp" && twoFactor?.includes("otp") && (
                         <Button
-                            className={cn(classNames?.button, classNames?.secondaryButton)}
+                            className={cn(classNames?.button, classNames?.outlineButton)}
                             disabled={isBusy}
                             onClick={() => {
                                 setMethod("otp");
                             }}
                             type="button"
-                            variant="secondary"
+                            variant="outline"
                         >
                             <SendIcon className={classNames?.icon} />
                             {t`Send verification code`}
@@ -376,13 +379,13 @@ const TwoFactorForm = ({ className, classNames, isSubmitting, otpSeparators = 0,
 
                     {method !== "totp" && twoFactor?.includes("totp") && (
                         <Button
-                            className={cn(classNames?.button, classNames?.secondaryButton)}
+                            className={cn(classNames?.button, classNames?.outlineButton)}
                             disabled={isBusy}
                             onClick={() => {
                                 setMethod("totp");
                             }}
                             type="button"
-                            variant="secondary"
+                            variant="outline"
                         >
                             <QrCodeIcon className={classNames?.icon} />
                             {t`Continue with authenticator`}

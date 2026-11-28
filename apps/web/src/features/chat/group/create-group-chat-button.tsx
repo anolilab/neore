@@ -158,7 +158,7 @@ const CreateGroupChatButton: FC<CreateGroupChatButtonProperties> = ({ className,
                                             <li key={template.id}>
                                                 <button
                                                     aria-busy={isStarting}
-                                                    className="hover:bg-muted focus-visible:ring-ring flex w-full flex-col items-start rounded-md border p-2.5 text-left text-sm focus-visible:ring-2 focus-visible:outline-none disabled:opacity-50"
+                                                    className="border-border/50 bg-surface-row hover:bg-surface-row-hover focus-visible:ring-ring flex w-full flex-col items-start rounded-lg border p-2.5 text-left text-sm focus-visible:ring-2 focus-visible:outline-none disabled:opacity-50"
                                                     disabled={isPending}
                                                     onClick={() => startFromTemplate(template)}
                                                     type="button"

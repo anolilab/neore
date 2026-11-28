@@ -32,7 +32,7 @@ const ReferenceStrip: FC<ReferenceStripProps> = ({ className, numbered = true, o
                 const ordinal = index + 1;
 
                 return (
-                    <li className="group relative size-14 overflow-hidden rounded-md border" key={ref.id}>
+                    <li className="border-border/50 group relative size-14 overflow-hidden rounded-lg border" key={ref.id}>
                         <img alt={t`Reference ${ordinal}`} className="size-full object-cover" loading="lazy" src={ref.url} />
 
                         {numbered && (
