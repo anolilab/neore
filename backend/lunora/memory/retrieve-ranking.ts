@@ -8,6 +8,8 @@ import { bm25Idf, bm25TermFactor, MAX_KEYWORD_TERMS, reciprocalRankFusion, score
 import { factDatesOf } from "./dates";
 import { canonicalOf, salientTermsOf, searchTokensOf, termCount, termIndexOf } from "./search-terms";
 import type { SalientTerm } from "./search-terms";
+import { windowDays } from "./time-window";
+import type { Span, TimeWindow } from "./time-window";
 
 /**
  * The signals' weights, which add up to 1. Relevance leads: among rows of one topic the cosines are close, so the
@@ -537,6 +539,63 @@ const keywordRelevanceOf = (keyword: number, floor: number, { counts, rare }: { 
 };
 
 /**
+ * What the time a question asks about (`time-window.ts`) adds to a memory's score: an event overlapping one of its
+ * spans, a fact that holds through one (its end date is in or after the span and not before today, the span reaching
+ * today or later), or a fact that ended before every span starts (a pinned one past its date, or one ending before an
+ * asked time ahead). Bounded: the most it moves a score is `event`, so it reorders rows of one topic and never outweighs
+ * relevance.
+ */
+export const TIME_WEIGHTS = { ended: -0.1, event: 0.2, holds: 0.05 };
+
+/**
+ * The widest span, in days, in which an event's date alone makes it relevant, for a question about the time alone
+ * (`TimeWindow.onlyTime`): a day, a week, a month. "What is coming up tomorrow" names no topic, so no vector or word of
+ * it finds the appointment; "what is the weather tomorrow" names one, and the events of tomorrow are not its answer. A
+ * year is too wide for its date to say the row is what was asked.
+ */
+export const DATE_RELEVANCE_MAX_DAYS = 31;
+
+/**
+ * The longest event, in days, its date alone makes relevant: an appointment or a trip. A period that overlaps the asked
+ * time (where the user lived, a job) is not what "what is coming up tomorrow" asks of; it can still rank by the boost.
+ */
+export const DATE_RELEVANCE_MAX_EVENT_DAYS = 7;
+
+const overlaps = (start: string, end: string, span: Span): boolean => start <= span.end && end >= span.start;
+
+/**
+ * The time signal of a memory for a window: its weight, and whether it is a short event in a span narrow enough for its
+ * date to decide (each span on its own: "3 December or in 2027" still finds the appointment on the 3rd).
+ */
+const timeSignalOf = (m: RankCandidate, window: TimeWindow): { dated: boolean; signal: number } => {
+    const { eventStart } = m;
+    const eventEnd = m.eventEnd ?? eventStart;
+
+    if (eventStart && eventEnd && window.spans.some((span) => overlaps(eventStart, eventEnd, span))) {
+        const short = windowDays({ end: eventEnd, start: eventStart }) <= DATE_RELEVANCE_MAX_EVENT_DAYS;
+        const narrow = window.spans.some((span) => windowDays(span) <= DATE_RELEVANCE_MAX_DAYS && overlaps(eventStart, eventEnd, span));
+
+        return { dated: short && narrow, signal: TIME_WEIGHTS.event };
+    }
+
+    const { validUntil } = m;
+
+    if (!validUntil) {
+        return { dated: false, signal: 0 };
+    }
+
+    if (window.spans.every((span) => validUntil < span.start)) {
+        return { dated: false, signal: TIME_WEIGHTS.ended };
+    }
+
+    // Only a fact still in effect today, for a span reaching today or later: a fact's start is unknown, so holding now
+    // says nothing of a year before, and a pinned fact past its end date holds nothing now.
+    const holds = validUntil >= window.today && window.spans.some((span) => span.end >= window.today && validUntil >= span.start);
+
+    return { dated: false, signal: holds ? TIME_WEIGHTS.holds : 0 };
+};
+
+/**
  * Scores each candidate and keeps the ones to inject. Relevance is a vector hit's cosine similarity; a candidate
  * without a hit falls back to its keyword score (`keywordSignalsFor`) and the keyword floor, unless the vector search
  * is decisive (`vectorSearched`: it ran, its hits resolved, and they fill the cut, `vectorCutIsFull`) and the memory has a
@@ -548,6 +607,11 @@ const keywordRelevanceOf = (keyword: number, floor: number, { counts, rare }: { 
  * found by keyword, whatever the vector search says of it: it takes the better of the two. Under the relevance floor,
  * or under the score threshold, a candidate is left out; the rest is sorted best first and cut to `limit`. `now` is
  * when scoring happens (recency counts from it).
+ *
+ * With a `timeWindow`, each candidate adds its time signal (`timeSignalOf`), and, for a question about the time alone,
+ * an event of at most `DATE_RELEVANCE_MAX_EVENT_DAYS` in one of its spans of at most `DATE_RELEVANCE_MAX_DAYS` is
+ * relevant by its date. The demotion only reorders: the threshold reads the score without it. The returned
+ * score is capped at 1 (the "memories used" view shows it as a share). Without a window nothing changes.
  */
 export const rankMemories = (input: {
     candidates: RankCandidate[];
@@ -561,6 +625,8 @@ export const rankMemories = (input: {
     /** Candidates holding the query's rare term: found by keyword even when the vector search lacks them or scores them low. */
     rareTermMatches?: ReadonlySet<string>;
     threshold?: number;
+    /** The time the search asks about, when it names one. */
+    timeWindow?: TimeWindow;
     vectorScores: ReadonlyMap<string, number>;
     /** A vector search ran, its hits resolved and filled the cut: an old embedded memory it lacks is not relevant. */
     vectorSearched?: boolean;
@@ -574,9 +640,11 @@ export const rankMemories = (input: {
         now,
         rareTermMatches = new Set<string>(),
         threshold = AUTO_INJECT_THRESHOLD,
+        timeWindow,
         vectorScores,
         vectorSearched = false,
     } = input;
+    const dateDecides = timeWindow?.onlyTime === true;
 
     return (
         candidates
@@ -590,24 +658,31 @@ export const rankMemories = (input: {
                     counts: hit === undefined && !missed,
                     rare: rareTermMatches.has(m._id),
                 });
-                const semanticScore = Math.max(byVector ?? 0, byKeyword ?? 0);
+                const { dated, signal } = timeWindow === undefined ? { dated: false, signal: 0 } : timeSignalOf(m, timeWindow);
+                // An event of a narrow window is relevant by its date, at least as much as a row at the relevance floor.
+                const byDate = dateDecides && dated ? minRelevance : undefined;
+                const score = computeScore(m, Math.max(byVector ?? 0, byKeyword ?? 0, byDate ?? 0), now);
 
                 return {
                     category: m.type,
                     confidence: m.confidence ?? 70,
+                    gate: score + Math.max(0, signal),
                     lastConfirmedAt: m.lastConfirmedAt,
                     memory: m.memory,
                     memoryId: m._id,
-                    relevant: byVector !== undefined || byKeyword !== undefined,
-                    score: computeScore(m, semanticScore, now),
+                    relevant: byVector !== undefined || byKeyword !== undefined || byDate !== undefined,
+                    score: score + signal,
                     ...factDatesOf(m),
                 };
             })
             // Confidence, importance and recency only order what is relevant: a fresh, pinned or confident row
             // with no relevance never clears the bar on those terms alone.
-            .filter((m) => m.relevant && m.score >= threshold)
+            .filter((m) => m.relevant && m.gate >= threshold)
             .toSorted((a, b) => b.score - a.score)
             .slice(0, limit)
-            .map(({ relevant: _relevant, ...ranked }) => ranked)
+            // Overwriting `score` keeps its place among the keys.
+            .map(({ gate: _gate, relevant: _relevant, ...ranked }) => {
+                return { ...ranked, score: Math.min(1, ranked.score) };
+            })
     );
 };
