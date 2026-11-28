@@ -4,7 +4,7 @@ import cn from "@neore/ui/utils/cn";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeftIcon } from "lucide-react";
 import type { FC, ReactNode } from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 
 import SettingsLink from "@/components/settings/settings-link";
 import CodeSetup from "@/features/code/components/code-setup";
@@ -125,6 +125,7 @@ const CodeShell: FC = () => {
     // host to pick; otherwise the workspace (the setup steps, or its loading state) comes first.
     const [listChoice, setListChoice] = useState<boolean | undefined>(undefined);
     const [setupInList, setSetupInList] = useState(false);
+    const setupPanelId = useId();
     const now = useNow();
     const dispatch = useCodeLayoutStore((state) => state.dispatch);
     const activeTab = useCodeLayoutStore((state) => state.layout.panes[state.layout.activePane]?.active);
@@ -160,14 +161,24 @@ const CodeShell: FC = () => {
                 aria-label={t`Code navigation`}
                 className={cn("bg-background border-border/50 w-full shrink-0 overflow-y-auto md:block md:w-72 md:border-r", listOpen ? "block" : "hidden")}
             >
-                {setup === "needed" && (
-                    // On a phone the steps open here in the list: the workspace may hold a host tab, and the steps show only in an
-                    // empty pane.
+                {/* On a phone the steps open here in the list: the workspace may hold a host tab, and the steps show only in an empty
+                    pane. Once opened they stay while open, so skipping the last step keeps the focused button and its messages. */}
+                {(setup === "needed" || setupInList) && (
                     <div className="p-2 md:hidden">
-                        <Button aria-expanded={setupInList} className="min-h-11" onClick={() => setSetupInList((open) => !open)} variant="outline">
+                        <Button
+                            aria-controls={setupInList ? setupPanelId : undefined}
+                            aria-expanded={setupInList}
+                            className="min-h-11"
+                            onClick={() => setSetupInList((open) => !open)}
+                            variant="outline"
+                        >
                             {t`Coding setup`}
                         </Button>
-                        {setupInList && <CodeSetup devices={devices ?? []} />}
+                        {setupInList && (
+                            <div id={setupPanelId}>
+                                <CodeSetup devices={devices ?? []} />
+                            </div>
+                        )}
                     </div>
                 )}
                 <HostsSection devices={devices} now={now} onSelect={openHost} selected={selectedId} />
