@@ -2,6 +2,7 @@
 
 import { useLingui } from "@lingui/react/macro";
 import { Button } from "@neore/ui/components/button";
+import { Kbd } from "@neore/ui/components/kbd";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@neore/ui/components/tooltip";
 import { formatShortcutForDisplay } from "@neore/ui/utils/keyboard-shortcuts";
 import { useNavigate } from "@tanstack/react-router";
@@ -18,6 +19,8 @@ import SectionBar from "./section-bar";
 import { useThreadListUIStore } from "./stores/thread-list-ui-store";
 import ThreadListFilterMenu from "./thread-list-filter-menu";
 
+const MODIFIER_SYMBOLS: Readonly<Record<string, string>> = { Alt: "⌥", Ctrl: "⌃", Shift: "⇧" };
+
 interface ThreadListDockProperties {
     isSearchLoading?: boolean;
 }
@@ -31,9 +34,14 @@ const ThreadListDock: FC<ThreadListDockProperties> = memo(({ isSearchLoading = f
     const navigate = useNavigate();
     const { keyboardShortcuts } = useKeyboardShortcuts();
     const focusSearchShortcut = formatShortcutForDisplay(keyboardShortcuts.focusSearch);
-    // Compact, and only while it fits beside the label: a long chord stays in the tooltip.
-    const compactShortcut = focusSearchShortcut.replaceAll(" ", "");
-    const shownShortcut = compactShortcut.length <= 8 ? compactShortcut : "";
+    // The hint beside the label is compact (modifier symbols: Ctrl+Shift+F reads "⌃⇧F"), and only while it fits: a long chord stays in the tooltip.
+    const compactShortcut = focusSearchShortcut
+        .split(" + ")
+        .map((part) => MODIFIER_SYMBOLS[part] ?? part)
+        .join("");
+    const shownShortcut = compactShortcut.length <= 6 ? compactShortcut : "";
+    // An unbound shortcut is "": the tooltip then names the action alone.
+    const newThreadShortcut = formatShortcutForDisplay(keyboardShortcuts.newChat);
     const [isGroupChatOpen, setIsGroupChatOpen] = useState(false);
 
     const { openAddProjectDialog, searchQuery, searchType, setSearchQuery, showSearch, toggleShowSearch } = useThreadListUIStore(
@@ -79,34 +87,37 @@ const ThreadListDock: FC<ThreadListDockProperties> = memo(({ isSearchLoading = f
                             searchType={searchType}
                         />
                     ) : (
-                        <Tooltip>
-                            <TooltipTrigger
-                                render={
-                                    <button
-                                        aria-expanded={false}
-                                        aria-label={closedSearchLabel}
-                                        className="text-muted-foreground hover:text-foreground focus-visible:ring-ring flex h-[34px] min-w-0 flex-1 items-center gap-2 rounded-[10px] px-2.5 text-[13.5px] focus-visible:ring-2 focus-visible:outline-none"
-                                        data-search-toggle=""
-                                        onClick={toggleShowSearch}
-                                        type="button"
-                                    >
-                                        <Search aria-hidden="true" className="size-4 shrink-0" />
-                                        <span aria-hidden="true" className="truncate">
-                                            {t`Search`}
-                                        </span>
-                                        {shownShortcut && (
-                                            <kbd
-                                                aria-hidden="true"
-                                                className="surface-edge ml-auto shrink-0 rounded px-1.5 py-px font-mono text-[10px] font-medium whitespace-nowrap"
-                                            >
-                                                {shownShortcut}
-                                            </kbd>
-                                        )}
-                                    </button>
-                                }
-                            />
-                            <TooltipContent>{closedSearchTooltip}</TooltipContent>
-                        </Tooltip>
+                        // The shortcut is drawn over the button, not inside it: it is a hint, not part of the button's name.
+                        <div className="relative flex min-w-0 flex-1">
+                            <Tooltip>
+                                <TooltipTrigger
+                                    render={
+                                        <button
+                                            aria-expanded={false}
+                                            aria-label={closedSearchLabel}
+                                            className="text-muted-foreground hover:text-foreground focus-visible:ring-ring flex h-[34px] min-w-0 flex-1 items-center gap-2 rounded-[10px] px-2.5 text-[13.5px] focus-visible:ring-2 focus-visible:outline-none"
+                                            data-search-toggle=""
+                                            onClick={toggleShowSearch}
+                                            type="button"
+                                        >
+                                            <Search aria-hidden="true" className="size-4 shrink-0" />
+                                            <span aria-hidden="true" className="truncate">
+                                                {t`Search`}
+                                            </span>
+                                        </button>
+                                    }
+                                />
+                                <TooltipContent>{closedSearchTooltip}</TooltipContent>
+                            </Tooltip>
+                            {shownShortcut && (
+                                <kbd
+                                    aria-hidden="true"
+                                    className="surface-edge pointer-events-none absolute end-2.5 top-1/2 -translate-y-1/2 rounded px-1.5 py-px font-mono text-[10px] font-medium whitespace-nowrap"
+                                >
+                                    {shownShortcut}
+                                </kbd>
+                            )}
+                        </div>
                     )}
                     <ThreadListFilterMenu
                         onNewGroupChat={() => {
@@ -143,7 +154,10 @@ const ThreadListDock: FC<ThreadListDockProperties> = memo(({ isSearchLoading = f
                                 </Button>
                             }
                         />
-                        <TooltipContent>{t`New Thread`}</TooltipContent>
+                        <TooltipContent className="flex items-center gap-2">
+                            {t`New Thread`}
+                            {newThreadShortcut && <Kbd>{newThreadShortcut.replaceAll(" ", "")}</Kbd>}
+                        </TooltipContent>
                     </Tooltip>
                 </div>
             </TooltipProvider>

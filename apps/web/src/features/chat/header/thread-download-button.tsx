@@ -16,14 +16,17 @@ import type { DownloadFormat } from "@/lib/download";
 import { formatAsMarkdown, handleDownload } from "@/lib/download";
 import { useLunora } from "@/lib/lunora/crpc";
 
+import { OVERFLOW_ROW_CLASS } from "./header-row";
 import ThreadStatsDialog from "./thread-stats-dialog";
 
 interface Props {
+    /** Shows the button as a labelled row (the overflow menu). */
+    label?: string;
     model?: string;
     threadId?: string;
 }
 
-const ThreadDownloadButton: FC<Props> = ({ model, threadId }) => {
+const ThreadDownloadButton: FC<Props> = ({ label, model, threadId }) => {
     const { t } = useLingui();
     const [loading, setLoading] = useState(false);
     const [isStatsOpen, setIsStatsOpen] = useState(false);
@@ -100,9 +103,14 @@ const ThreadDownloadButton: FC<Props> = ({ model, threadId }) => {
                     render={
                         <DropdownMenuTrigger
                             render={
-                                <Button disabled={isDisabled} size="icon" variant="ghost">
+                                <Button
+                                    className={label ? OVERFLOW_ROW_CLASS : undefined}
+                                    disabled={isDisabled}
+                                    size={label ? "default" : "icon"}
+                                    variant="ghost"
+                                >
                                     <DownloadIcon className="h-4 w-4" />
-                                    <span className="sr-only">{t`Chat actions`}</span>
+                                    {label ?? <span className="sr-only">{t`Chat actions`}</span>}
                                 </Button>
                             }
                         />

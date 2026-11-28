@@ -17,6 +17,8 @@ import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
 import { useModelStore } from "@/features/chat/core/stores/model-store";
 import { useCRPC } from "@/lib/lunora/crpc";
 
+import { OVERFLOW_ROW_CLASS } from "./header-row";
+
 // Preset retention values in hours
 const RETENTION_VALUES = [1, 3, 6, 12, 24, 48, 72];
 
@@ -25,10 +27,12 @@ const millisecondsUntil = (timestamp: number): number => timestamp - Date.now();
 
 interface TemporaryChatDropdownProps {
     className?: string;
+    /** Shows the button as a labelled row (the overflow menu). */
+    label?: string;
     threadId?: string;
 }
 
-const TemporaryChatDropdown: FC<TemporaryChatDropdownProps> = ({ className, threadId }) => {
+const TemporaryChatDropdown: FC<TemporaryChatDropdownProps> = ({ className, label, threadId }) => {
     const { t } = useLingui();
     const crpc = useCRPC();
     const { data: userSettings } = useUserSettings();
@@ -273,12 +277,23 @@ const TemporaryChatDropdown: FC<TemporaryChatDropdownProps> = ({ className, thre
                             <PopoverTrigger
                                 render={
                                     <Button
-                                        aria-label={getAriaLabel()}
-                                        className={cn(className, (isTemporary || nextChatTemporary) && "text-orange-500 hover:text-orange-600")}
-                                        size="icon"
+                                        aria-label={label ? undefined : getAriaLabel()}
+                                        className={cn(
+                                            className,
+                                            label && OVERFLOW_ROW_CLASS,
+                                            (isTemporary || nextChatTemporary) && "text-orange-500 hover:text-orange-600",
+                                        )}
+                                        size={label ? "default" : "icon"}
                                         variant="ghost"
                                     >
                                         <HourglassIcon aria-hidden="true" className="size-4" />
+                                        {label && (
+                                            <>
+                                                {label}
+                                                {/* The row names the control; its state (on, expires at) is read after the name. */}
+                                                <span className="sr-only">{`, ${getAriaLabel()}`}</span>
+                                            </>
+                                        )}
                                     </Button>
                                 }
                             />

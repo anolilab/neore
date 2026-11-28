@@ -14,13 +14,17 @@ import { toast } from "sonner";
 
 import { useCRPC } from "@/lib/lunora/crpc";
 
+import { OVERFLOW_ROW_CLASS } from "./header-row";
+
 type KnowledgeFile = Doc<"knowledgeFiles">;
 
 interface KBAttachmentButtonProps {
+    /** Shows the button as a labelled row (the overflow menu). */
+    label?: string;
     threadId?: string;
 }
 
-const KBAttachmentButton: FC<KBAttachmentButtonProps> = ({ threadId }) => {
+const KBAttachmentButton: FC<KBAttachmentButtonProps> = ({ label, threadId }) => {
     const { t } = useLingui();
     const crpc = useCRPC();
     const queryClient = useQueryClient();
@@ -165,8 +169,8 @@ const KBAttachmentButton: FC<KBAttachmentButtonProps> = ({ threadId }) => {
                                 <Button
                                     aria-label={t`Knowledge base`}
                                     aria-pressed={attachedCount > 0}
-                                    className={cn("relative", attachedCount > 0 && "text-primary-text")}
-                                    size="icon"
+                                    className={cn("relative", label && OVERFLOW_ROW_CLASS, attachedCount > 0 && "text-primary-text")}
+                                    size={label ? "default" : "icon"}
                                     variant="ghost"
                                 >
                                     <BookOpenIcon className="h-4 w-4" />
@@ -175,7 +179,7 @@ const KBAttachmentButton: FC<KBAttachmentButtonProps> = ({ threadId }) => {
                                             {attachedCount}
                                         </span>
                                     )}
-                                    <span className="sr-only">{t`Knowledge base`}</span>
+                                    {label ?? <span className="sr-only">{t`Knowledge base`}</span>}
                                 </Button>
                             }
                         />

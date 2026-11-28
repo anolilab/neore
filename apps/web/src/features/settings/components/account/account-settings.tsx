@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import SettingsCard from "@/components/settings/settings-card";
 import SettingsRow from "@/components/settings/settings-row";
 import AppearanceControls from "@/features/appearance/components/appearance-controls";
+import ColorModePicker from "@/features/appearance/components/color-mode-picker";
 import useIsAnonymous from "@/features/auth/hooks/use-is-anonymous";
 import { useUpdateUserSettings, useUserSettings } from "@/features/auth/hooks/use-user-settings";
 import { createLanguageList } from "@/features/chat/core/utils/language-utilities";
@@ -162,28 +163,9 @@ const AccountSettings: FC = () => {
 
     return (
         <div className="space-y-6">
-            <SettingsCard description={t`Control how your personal information is displayed in the UI.`} title={t`Privacy`}>
-                <CardContent className="space-y-4">
-                    <SettingsRow
-                        control={
-                            <Switch
-                                checked={hidePersonalInfo}
-                                id="hide-personal-info"
-                                onCheckedChange={(checked) => {
-                                    setHidePersonalInfo(checked);
-                                    toast.success(checked ? t`Personal information is now hidden` : t`Personal information is now visible`);
-                                }}
-                            />
-                        }
-                        description={t`Hides your name and email from the UI.`}
-                        htmlFor="hide-personal-info"
-                        title={t`Hide Personal Information`}
-                    />
-                </CardContent>
-            </SettingsCard>
-
             <SettingsCard description={t`Customize the appearance of the application.`} title={t`Appearance`}>
                 <CardContent className="space-y-4">
+                    <ColorModePicker />
                     <AppearanceControls />
                     <SettingsRow
                         control={
@@ -206,6 +188,26 @@ const AccountSettings: FC = () => {
                         description={t`Set the text direction for the application. RTL is used for languages like Arabic, Hebrew, and Persian.`}
                         htmlFor="direction"
                         title={t`Text Direction`}
+                    />
+                </CardContent>
+            </SettingsCard>
+
+            <SettingsCard description={t`Control how your personal information is displayed in the UI.`} title={t`Privacy`}>
+                <CardContent className="space-y-4">
+                    <SettingsRow
+                        control={
+                            <Switch
+                                checked={hidePersonalInfo}
+                                id="hide-personal-info"
+                                onCheckedChange={(checked) => {
+                                    setHidePersonalInfo(checked);
+                                    toast.success(checked ? t`Personal information is now hidden` : t`Personal information is now visible`);
+                                }}
+                            />
+                        }
+                        description={t`Hides your name and email from the UI.`}
+                        htmlFor="hide-personal-info"
+                        title={t`Hide Personal Information`}
                     />
                 </CardContent>
             </SettingsCard>

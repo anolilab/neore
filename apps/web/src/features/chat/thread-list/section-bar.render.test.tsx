@@ -65,6 +65,19 @@ describe("SectionBar", () => {
         expect(pressed()).toEqual(["Active, 9"]);
     });
 
+    it("shows no number for an empty section, keeps its name and gives every button a visible name", () => {
+        act(() => {
+            useThreadListUIStore.getState().setSectionCounts({ ...counts, archived: 0, working: 0 });
+        });
+        render(<SectionBar />);
+
+        const working = screen.getByRole("button", { name: "Working, 0" });
+
+        expect(working.textContent).toBe("Working");
+        expect(screen.getByRole("button", { name: "Archived, 0" }).textContent).toBe("Archived");
+        expect(screen.getByRole("button", { name: "Active, 9" }).textContent).toBe("Active 9");
+    });
+
     it("shows only the clicked section", () => {
         render(<SectionBar />);
 
