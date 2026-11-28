@@ -34,6 +34,7 @@ import MemoryImportDialog from "./memory-import-dialog";
 import MemoryItem from "./memory-item";
 import type { MemoryType } from "./memory-types";
 import { isMemoryType, MEMORY_TYPES, useMemoryTypeLabels } from "./memory-types";
+import RetiredMemories from "./retired-memories";
 import ScheduleIdeasSwitch from "./schedule-ideas-switch";
 
 type TypeFilter = MemoryType | "all";
@@ -246,6 +247,8 @@ const MemorySettings: FC = () => {
                                     : t`No memories yet. The AI will start learning from your conversations automatically.`}
                             </div>
                         )}
+
+                        <RetiredMemories onBroughtBack={refresh} />
 
                         {/* Clear all */}
                         {memories && memories.length > 0 && (

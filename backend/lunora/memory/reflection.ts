@@ -42,6 +42,7 @@ import { runAfterOnShard } from "../lib/shard-scheduler";
 import { getUtilityModel } from "../lib/utility-model";
 import { runBeliefRevision } from "./extract";
 import { reembedRewordedMemory, supersedeMemory } from "./functions";
+import { reflectionRetiredReason } from "./retired";
 import {
     buildReflectionPrompt,
     checkReflectionEligibility,
@@ -504,7 +505,7 @@ export const applyReflectionOps = internalMutation
                     });
 
                     for (const source of sources) {
-                        await supersedeMemory(ctx, source._id, promotedId, now);
+                        await supersedeMemory(ctx, source._id, promotedId, now, "merged");
                         supersededIds.push(source._id);
                     }
 
@@ -539,7 +540,7 @@ export const applyReflectionOps = internalMutation
                         break;
                     }
 
-                    await supersedeMemory(ctx, row._id, by._id, now);
+                    await supersedeMemory(ctx, row._id, by._id, now, reflectionRetiredReason(op));
 
                     // The survivor takes the absorbed row's words when they were said later. Outside a merge, a survivor
                     // with no quote takes none: it is the newer belief that contradicts or reworded the absorbed one.

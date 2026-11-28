@@ -29,6 +29,7 @@ import { type MemoryEvidence, newestEvidence, vMemoryEvidence } from "./evidence
 import { logRedaction, redactMemoryText } from "./redact";
 import { DROPPED_DIGEST_SUMMARY, localDayOf } from "./reflection-logic";
 import { byNewest, isUsableOn, KEYWORD_LOOKUP_LIMIT, keywordLookupOf, lookupSearchesOf, mergeScopeWindows, scopesOf } from "./retrieve-ranking";
+import type { MemoryRetiredReason } from "./retired";
 import { lastConfirmedOf, MEMORY_TYPES, type MemoryType, vMemoryType } from "./taxonomy";
 import { deleteVectorRow, patchMessage } from "../agent/table-writes";
 import { candidatesOnActivePath } from "../agent/branch-rows";
@@ -331,7 +332,7 @@ const toMemoryView = (m: Doc<"memories">, botNames: ReadonlyMap<string, string>,
 };
 
 /** Loads a memory the caller owns, or throws. */
-const requireOwnMemory = async (ctx: Pick<MutationCtx, "db">, memoryId: string, userId: string): Promise<Doc<"memories">> => {
+export const requireOwnMemory = async (ctx: Pick<MutationCtx, "db">, memoryId: string, userId: string): Promise<Doc<"memories">> => {
     const memory = await ctx.db.get("memories", memoryId as Id<"memories">);
 
     if (!memory) {
@@ -346,7 +347,7 @@ const requireOwnMemory = async (ctx: Pick<MutationCtx, "db">, memoryId: string, 
 };
 
 /** The user's timezone (`userSettings.timezone`); unset reads as UTC wherever it is used. */
-const userTimeZone = async (ctx: Pick<QueryCtx, "db">, userId: string): Promise<string | undefined> => {
+export const userTimeZone = async (ctx: Pick<QueryCtx, "db">, userId: string): Promise<string | undefined> => {
     const settings = await ctx.db
         .query("userSettings")
         .withIndex("by_userId", (q) => q.eq("userId", userId))
@@ -740,12 +741,18 @@ export const reembedRewordedMemory = async (ctx: MutationCtx, memoryId: Id<"memo
 
 /**
  * Ends a row's life as a current memory: `supersededBy` points at what replaced it (itself, for a decay, an expiry or a
- * compression), and its vector goes in the same write, so a retired row never takes a slot in a meaning search. The row
+ * compression), `retiredReason` and `retiredAt` say why and when (Memory settings shows them), and its vector goes in the same write, so a retired row never takes a slot in a meaning search. The row
  * stays as history. The vector delete is a row delete the vector sync follows after commit; a failure of it is logged,
  * recorded in `memoryCleanups` in this write and retried (`deleteMemoryVector`), and never undoes the retirement. Nothing
  * here swallows an error: a write that cannot even record the pending delete fails whole, so the row keeps its `embeddingId`.
  */
-export const supersedeMemory = async (ctx: MutationCtx, memoryId: Id<"memories">, supersededBy: Id<"memories">, now: number): Promise<void> => {
+export const supersedeMemory = async (
+    ctx: MutationCtx,
+    memoryId: Id<"memories">,
+    supersededBy: Id<"memories">,
+    now: number,
+    retiredReason: MemoryRetiredReason,
+): Promise<void> => {
     // Read again here: the caller's copy may predate an earlier write of the same mutation, and the row is replaced when its vector link is cleared.
     const row = await ctx.db.get("memories", memoryId);
 
@@ -755,7 +762,7 @@ export const supersedeMemory = async (ctx: MutationCtx, memoryId: Id<"memories">
 
     const { embeddingId } = row;
 
-    await patchRow(ctx.db, "memories", row, { supersededBy, updatedAt: now, ...(embeddingId && { embeddingId: undefined }) });
+    await patchRow(ctx.db, "memories", row, { retiredAt: now, retiredReason, supersededBy, updatedAt: now, ...(embeddingId && { embeddingId: undefined }) });
 
     if (!embeddingId) {
         return;
@@ -1413,7 +1420,7 @@ const insertMemory = async (ctx: MutationCtx, mem: MemoryInsert, now: number): P
     });
 
     if (mem.supersedes) {
-        await supersedeMemory(ctx, mem.supersedes, memoryId, now);
+        await supersedeMemory(ctx, mem.supersedes, memoryId, now, "revised");
     }
 
     return memoryId;
@@ -1537,7 +1544,7 @@ export const saveMemoryBatch = internalMutation
 
             if (known) {
                 if (supersedes !== undefined && supersedes !== known._id) {
-                    await supersedeMemory(ctx, supersedes, known._id, now);
+                    await supersedeMemory(ctx, supersedes, known._id, now, "revised");
                     retire(supersedes);
                 }
 
@@ -1592,7 +1599,7 @@ export const saveMemoryBatch = internalMutation
         const compressedFrom = args.compressedFrom ?? [];
 
         for (const id of compressedFrom) {
-            await supersedeMemory(ctx, id, id, now);
+            await supersedeMemory(ctx, id, id, now, "compressed");
         }
 
         return memoryIds;
@@ -1829,7 +1836,7 @@ export const saveImportedMemoryBatch = internalMutation
                 await ctx.db.patch("memories", known, { lastConfirmedAt: now });
 
                 if (supersedes) {
-                    await supersedeMemory(ctx, supersedes, known, now);
+                    await supersedeMemory(ctx, supersedes, known, now, "revised");
                 }
 
                 kept.add(known);

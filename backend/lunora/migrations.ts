@@ -431,3 +431,25 @@ export const backfillPullRequestWatchActive = defineMigration({
         return { ...document, watchActive: true };
     },
 });
+
+/**
+ * `memories.retiredAt` (with `retiredReason`) is set by `supersedeMemory` since Memory settings lists retired rows by it
+ * (`memory/retired.ts`, `by_userId_retiredAt`). A row retired before has `supersededBy` and no `retiredAt`, so the list
+ * could not reach it. This sets `retiredAt` to the row's last write (`updatedAt`, which the retirement stamped, else its
+ * creation time). No reason is filled: why it was retired was never kept, and the list reads it as unknown.
+ *
+ * Idempotent: a row with `retiredAt`, or an active one, is skipped. There is no `down`: a rollback cannot tell a filled
+ * row from one a retirement stamped after this ran.
+ */
+export const backfillMemoryRetiredAt = defineMigration({
+    id: "backfill-memory-retired-at",
+    table: "memories",
+    // `undefined` leaves the row untouched: skipped, not rewritten (`MigrationTransform`).
+    up: (document) => {
+        if (document.supersededBy === undefined || document.supersededBy === null || document.retiredAt !== undefined) {
+            return undefined;
+        }
+
+        return { ...document, retiredAt: (document.updatedAt as number | undefined) ?? (document._creationTime as number) };
+    },
+});

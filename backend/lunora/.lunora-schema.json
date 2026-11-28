@@ -18,6 +18,7 @@
     "add-run-args-system-context",
     "add-steer-text-length",
     "backfill-approval-organization",
+    "backfill-memory-retired-at",
     "backfill-message-typed-text",
     "backfill-pull-request-watch-active",
     "drop-agent-option-fields",
@@ -11678,6 +11679,62 @@
           "optional": true,
           "unique": false
         },
+        "retiredAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
+        "retiredReason": {
+          "kind": "union",
+          "nullable": false,
+          "optional": true,
+          "unique": false,
+          "members": [
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"compressed\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"contradicted\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"decayed\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"expired\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"merged\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"revised\""
+            }
+          ]
+        },
         "source": {
           "kind": "union",
           "nullable": false,
@@ -11832,6 +11889,13 @@
             "botId",
             "supersededBy",
             "type"
+          ],
+          "unique": false
+        },
+        "by_userId_retiredAt": {
+          "fields": [
+            "userId",
+            "retiredAt"
           ],
           "unique": false
         },
