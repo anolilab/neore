@@ -67,6 +67,15 @@ const PaneView: FC<PaneViewProps> = ({ canClose, canSplit, hosts, index, loaded,
     const { t } = useLingui();
     const dispatch = useCodeLayoutStore((state) => state.dispatch);
     const focus = () => dispatch({ paneIndex: index, type: "focus" });
+    // Once shown, the steps stay while the pane is empty: skipping the last one must not pull the list (and the focused
+    // button, its announcement and a failed save's message) out from under the user.
+    const [setupShown, setSetupShown] = useState(false);
+
+    if (setup === "needed" && !setupShown) {
+        setSetupShown(true);
+    }
+
+    const showSetup = setup === "needed" || (setupShown && setup === "ready");
 
     if (pane.tabs.length === 0) {
         return (
@@ -83,8 +92,8 @@ const PaneView: FC<PaneViewProps> = ({ canClose, canSplit, hosts, index, loaded,
                         {t`Loading…`}
                     </p>
                 )}
-                {setup === "needed" && <CodeSetup devices={[...hosts.values()]} />}
-                {setup === "ready" && <EmptyPane />}
+                {showSetup && <CodeSetup devices={[...hosts.values()]} />}
+                {setup === "ready" && !showSetup && <EmptyPane />}
             </section>
         );
     }

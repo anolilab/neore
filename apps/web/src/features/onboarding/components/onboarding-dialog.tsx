@@ -173,7 +173,16 @@ const OnboardingContent = ({ codeEnabled, onComplete }: { codeEnabled: boolean |
 
     // The first step's choice decides which steps follow; the later steps belong to one path each.
     const [choice, setChoice] = useState<OnboardingPath>("chat");
-    const path: OnboardingPath = currentStep?.id === "code" ? "code" : choice;
+    // The Code path counts only while Code mode is on; a choice left from before it was withdrawn falls back to the tour.
+    const path: OnboardingPath = currentStep?.id === "code" || (choice === "code" && codeEnabled === true) ? "code" : "chat";
+
+    // A tour restored on the Code step never saw the picker: remember the choice, so Back or a progress dot to the welcome
+    // step and then Next return here.
+    useEffect(() => {
+        if (currentStep?.id === "code") {
+            setChoice("code");
+        }
+    }, [currentStep?.id]);
 
     // A tour saved on the Code step, reopened once Code mode is no longer offered, starts over at the welcome step.
     useEffect(() => {
@@ -247,21 +256,13 @@ const OnboardingContent = ({ codeEnabled, onComplete }: { codeEnabled: boolean |
         });
 
         // The coding path is not in the tour's chain of steps, so it is entered by name.
-        await (isFirstStep && choice === "code" ? goToStep("code") : next());
-    }, [isLastStep, isFirstStep, choice, path, goToStep, next, finishOnboarding, currentStep?.id, currentIndex]);
+        await (isFirstStep && path === "code" ? goToStep("code") : next());
+    }, [isLastStep, isFirstStep, path, goToStep, next, finishOnboarding, currentStep?.id, currentIndex]);
 
     const handlePrevious = useCallback(async () => {
         setDirection(-1);
 
-        if (currentStep?.id === "code") {
-            // A tour restored on this step never saw the picker: going back keeps its Code choice, so Next returns here.
-            setChoice("code");
-            await goToStep("welcome");
-
-            return;
-        }
-
-        await previous();
+        await (currentStep?.id === "code" ? goToStep("welcome") : previous());
     }, [currentStep?.id, goToStep, previous]);
 
     const handleSkip = useCallback(() => {

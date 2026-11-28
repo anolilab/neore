@@ -1,5 +1,5 @@
 import { useLingui } from "@lingui/react/macro";
-import { buttonVariants } from "@neore/ui/components/button";
+import { Button, buttonVariants } from "@neore/ui/components/button";
 import type { FC } from "react";
 
 import SettingsLink from "@/components/settings/settings-link";
@@ -13,14 +13,17 @@ import SetupStepRow from "@/features/onboarding/components/setup-step-row";
 const GitHostStep: FC<{ withAction?: boolean }> = ({ withAction = true }) => {
     const { t } = useLingui();
     const host = useDevelopHost();
-    const connected = host.data?.connected === true;
-    const pending = host.data === undefined;
+    // A failed read wins over what the cache still holds: the query does not retry by itself, so the row offers it.
+    const failed = host.isError;
+    const connected = !failed && host.data?.connected === true;
     let statusLabel = t`To do`;
 
-    if (connected) {
+    if (failed) {
+        statusLabel = t`Could not check`;
+    } else if (connected) {
         statusLabel = t`Done`;
-    } else if (pending) {
-        statusLabel = host.isError ? t`Could not check` : t`Checking`;
+    } else if (host.data === undefined) {
+        statusLabel = t`Checking`;
     }
 
     return (
@@ -30,6 +33,19 @@ const GitHostStep: FC<{ withAction?: boolean }> = ({ withAction = true }) => {
             statusLabel={statusLabel}
             title={t`Connect a Git host`}
         >
+            {failed && (
+                <Button
+                    disabled={host.isFetching}
+                    onClick={() => {
+                        host.refetch().catch(() => {});
+                    }}
+                    size="sm"
+                    variant="ghost"
+                >
+                    {t`Retry`}
+                    <span className="sr-only">: {t`Connect a Git host`}</span>
+                </Button>
+            )}
             {!connected && withAction && (
                 <SettingsLink className={buttonVariants({ size: "sm", variant: "outline" })} tab="connectors">
                     {t`Open Connectors`}
