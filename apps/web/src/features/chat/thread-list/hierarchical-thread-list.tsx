@@ -586,8 +586,13 @@ const HierarchicalThreadList: FC<
     }, [projects]);
 
     // The rows' second line names a project by its title, and a model only when it is not one a new chat starts on.
-    const { data: aiPreferences } = useQuery(crpc.auth.functions.getAIUserPreferences.queryOptions({}));
+    const { data: aiPreferences, isError: preferencesFailed } = useQuery(crpc.auth.functions.getAIUserPreferences.queryOptions({}));
     const defaultModels = useMemo(() => {
+        // A failed read never answers: the rows then go by the app's default alone, as they did before saved defaults counted.
+        if (preferencesFailed) {
+            return new Set([DEFAULT_CHAT_MODEL]);
+        }
+
         if (aiPreferences === undefined) {
             return undefined;
         }
@@ -595,8 +600,7 @@ const HierarchicalThreadList: FC<
         const saved = (aiPreferences?.defaultModels ?? {}) as Record<string, string | undefined>;
 
         return new Set([DEFAULT_CHAT_MODEL, ...Object.values(saved).filter((model): model is string => typeof model === "string")]);
-    }, [aiPreferences]);
-    // The project list is one page; when it is cut, the few projects of rows beyond it are read by id, not left unnamed.
+    }, [aiPreferences, preferencesFailed]);
     // The project list is one page. When it is cut, the projects of the rows on screen (search results included, collapsed
     // groups and closed branches not) that the page lacks are read by id, a few at most: each costs a request.
     const { hasMore: projectListCut } = useProjectList();
