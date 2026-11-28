@@ -216,6 +216,7 @@ catalogs:
     slate-dom: 0.147.3
     slate-react: 0.147.6
   file-renderers:
+    "@lingo-reader/epub-parser": 0.4.7
     hls.js: 1.7.4
     mammoth: 1.13.0
     # EXACTLY the pdfjs-dist react-pdf depends on (11.1.0 -> 6.5.438): the viewer
