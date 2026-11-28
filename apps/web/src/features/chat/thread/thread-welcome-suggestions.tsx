@@ -11,17 +11,22 @@ import { Tabs, TabsList, TabsTrigger } from "@neore/ui/components/tabs";
 import cn from "@neore/ui/utils/cn";
 import { BookOpen, CheckCircle2, FileText, Lightbulb, Search, Video } from "lucide-react";
 import type { FC } from "react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useOutsideClick } from "rooks";
 
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 import { markComposerDraft } from "@/features/chat/core/utils/draft-origin";
 
-const ThreadWelcomeSuggestions: FC<{ className?: string }> = ({ className }) => {
+/**
+ * `opensBelow`: the chips sit under the composer in a centred layout, so the picked category's list opens below them over what follows
+ * (an overlay, out of flow) instead of pushing the centred composer up.
+ */
+const ThreadWelcomeSuggestions: FC<{ className?: string; opensBelow?: boolean }> = ({ className, opensBelow = false }) => {
     const { t } = useLingui();
     const setComposerText = useChatUIStore((state) => state.setComposerText);
     const [activeTab, setActiveTab] = useState<string>("");
     const [isOpen, setIsOpen] = useState(false);
+    const listRef = useRef<HTMLDivElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
 
     const handleSuggestionClick = (prompt: string) => {
@@ -141,45 +146,54 @@ const ThreadWelcomeSuggestions: FC<{ className?: string }> = ({ className }) => 
 
     const suggestionHandlers = buildSuggestionHandlers();
 
-    return (
-        <div className={cn("flex w-full flex-col", className)} ref={containerRef}>
-            <Tabs className="flex flex-col gap-2" onValueChange={handleTabChange} value={activeTab}>
-                {isOpen && activeTab !== "" && (
-                    <div className="surface-raised max-h-56 overflow-y-auto rounded-xl p-1">
-                        {Object.entries(categories).map(([key, category]) => {
-                            if (key !== activeTab) {
-                                return undefined;
-                            }
+    // Below the centred composer the list opens over the page: on a short window it would run past the bottom, so it scrolls into
+    // view as it opens (and as another tab replaces it).
+    useEffect(() => {
+        if (isOpen && opensBelow) {
+            listRef.current?.scrollIntoView({ block: "nearest" });
+        }
+    }, [activeTab, isOpen, opensBelow]);
 
-                            const Icon = category.icon;
+    const suggestionList = isOpen && activeTab !== "" && (
+        <div className={cn("surface-raised max-h-56 overflow-y-auto rounded-xl p-1", opensBelow && "absolute inset-x-0 top-full z-20")} ref={listRef}>
+            {Object.entries(categories).map(([key, category]) => {
+                if (key !== activeTab) {
+                    return undefined;
+                }
+
+                const Icon = category.icon;
+
+                return (
+                    <div className="flex flex-col" key={key}>
+                        {category.suggestions.map((suggestion) => {
+                            const suggestionKey = `${key}-${suggestion}`;
 
                             return (
-                                <div className="flex flex-col" key={key}>
-                                    {category.suggestions.map((suggestion) => {
-                                        const suggestionKey = `${key}-${suggestion}`;
-
-                                        return (
-                                            <button
-                                                className={cn(
-                                                    "group relative flex min-h-[44px] w-full cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors outline-none",
-                                                    "focus-visible:ring-ring focus-visible:ring-2",
-                                                    "hover:bg-surface-row-hover focus-visible:bg-surface-row-hover active:bg-surface-row-active",
-                                                )}
-                                                key={suggestionKey}
-                                                onClick={suggestionHandlers[suggestionKey]}
-                                                type="button"
-                                            >
-                                                <Icon className="text-muted-foreground group-hover:text-foreground dark:text-muted-foreground dark:group-hover:text-foreground size-4 shrink-0 transition-colors" />
-                                                <span className="text-foreground flex-1 leading-relaxed">{suggestion}</span>
-                                            </button>
-                                        );
-                                    })}
-                                </div>
+                                <button
+                                    className={cn(
+                                        "group relative flex min-h-[44px] w-full cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors outline-none",
+                                        "focus-visible:ring-ring focus-visible:ring-2",
+                                        "hover:bg-surface-row-hover focus-visible:bg-surface-row-hover active:bg-surface-row-active",
+                                    )}
+                                    key={suggestionKey}
+                                    onClick={suggestionHandlers[suggestionKey]}
+                                    type="button"
+                                >
+                                    <Icon className="text-muted-foreground group-hover:text-foreground dark:text-muted-foreground dark:group-hover:text-foreground size-4 shrink-0 transition-colors" />
+                                    <span className="text-foreground flex-1 leading-relaxed">{suggestion}</span>
+                                </button>
                             );
                         })}
                     </div>
-                )}
+                );
+            })}
+        </div>
+    );
 
+    return (
+        <div className={cn("flex w-full flex-col", opensBelow && "relative", className)} ref={containerRef}>
+            <Tabs className="flex flex-col gap-2" onValueChange={handleTabChange} value={activeTab}>
+                {!opensBelow && suggestionList}
                 <TabsList
                     className="h-auto w-full flex-wrap justify-center gap-1.5 bg-transparent p-0 group-data-horizontal/tabs:h-auto dark:bg-transparent"
                     variant="line"
@@ -199,6 +213,8 @@ const ThreadWelcomeSuggestions: FC<{ className?: string }> = ({ className }) => 
                         );
                     })}
                 </TabsList>
+                {/* Below the chips it also follows them in the page, so Tab from a category reaches its choices next. */}
+                {opensBelow && suggestionList}
             </Tabs>
         </div>
     );

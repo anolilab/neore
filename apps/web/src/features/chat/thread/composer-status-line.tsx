@@ -2,10 +2,9 @@
 
 import { useLingui } from "@lingui/react/macro";
 import { useUnlockProof } from "@neore/client-runtime";
-import cn from "@neore/ui/utils/cn";
 import { skipToken, useQuery } from "@tanstack/react-query";
 import { Bot, ShieldAlert, Target } from "lucide-react";
-import type { FC, ReactNode } from "react";
+import type { FC } from "react";
 
 import { useImpersonating } from "@/features/admin/hooks/use-is-impersonating";
 import { useChatIsStreaming, useChatThread } from "@/features/chat/core/context/chat-context";
@@ -17,17 +16,11 @@ import { useGoalComposer, usePinOverride } from "@/features/chat/goal/goal-store
 import { useLocalModelTarget } from "@/features/local-models/hooks/use-local-model-turn";
 import { useCRPC } from "@/lib/lunora/crpc";
 
+import ComposerChip from "./composer-chip";
 import { useBotThread } from "./composer-model-selector";
 import { useShownPermissionMode } from "./composer-permission-mode";
 import { useResearchDepthLabels } from "./composer-research-depth";
 import { useSearchModeInfo } from "./composer-search-mode";
-
-/** One quiet chip. Information, not a control: no button, no hover. */
-const StatusChip: FC<{ children: ReactNode; className?: string }> = ({ children, className }) => (
-    <span className={cn("bg-surface-row-active text-muted-foreground inline-flex h-[22px] items-center gap-1.5 rounded-full px-2 text-xs", className)}>
-        {children}
-    </span>
-);
 
 /**
  * Whether the chat has a pinned goal the next send will run, read as the send reads it (`send-message.ts`): this tab's
@@ -95,34 +88,34 @@ const ComposerStatusLine: FC<ComposerStatusLineProps> = ({ researchDepth, search
     return (
         <div aria-label={t`Composer status`} className="flex flex-wrap items-center gap-1.5" role="group">
             {replying && (
-                <StatusChip className="text-primary-text">
+                <ComposerChip className="text-primary-text">
                     <span aria-hidden="true" className="bg-primary-text size-1.5 shrink-0 rounded-full" />
                     {t`Replying`}
-                </StatusChip>
+                </ComposerChip>
             )}
             {searching && (
-                <StatusChip>
+                <ComposerChip>
                     <SearchIcon aria-hidden="true" className="size-3 shrink-0" />
                     {`${searchInfo.label} · ${depthLabels[researchDepth]}`}
-                </StatusChip>
+                </ComposerChip>
             )}
             {goal && (
-                <StatusChip>
+                <ComposerChip>
                     <Target aria-hidden="true" className="size-3 shrink-0" />
                     {t`Goal: run until done`}
-                </StatusChip>
+                </ComposerChip>
             )}
             {fullAccess && (
-                <StatusChip className="text-attention bg-attention/10">
+                <ComposerChip className="text-attention bg-attention/10">
                     <ShieldAlert aria-hidden="true" className="size-3 shrink-0" />
                     {t`Tools run without asking`}
-                </StatusChip>
+                </ComposerChip>
             )}
             {isBotThread && (
-                <StatusChip>
+                <ComposerChip>
                     <Bot aria-hidden="true" className="size-3 shrink-0" />
                     {t`The bot sets the model for this chat.`}
-                </StatusChip>
+                </ComposerChip>
             )}
         </div>
     );

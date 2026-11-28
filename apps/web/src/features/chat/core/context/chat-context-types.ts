@@ -51,6 +51,8 @@ export interface ThreadData extends ThreadOwnerState {
     parentThreadId?: string;
     /** How much of a cloud run the owner leaves unasked; unset is "auto". Owner-only, never on a host thread. */
     permissionMode?: "auto" | "full" | "supervised";
+    /** The project the chat is filed in; unset for a chat in none. */
+    projectId?: string;
     reasoningEffort?: number;
     /** `host`: a coding agent on a paired computer runs the turns (`backend/lunora/acp/`). Unset: the cloud. */
     runner?: "host";

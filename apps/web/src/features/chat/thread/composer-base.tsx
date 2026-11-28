@@ -30,6 +30,8 @@ export interface ComposerBaseProps {
     className?: string;
     /** Compact mode - hides bottom toolbar for minimal appearance */
     compact?: boolean;
+    /** Where the chat runs (its project), as chips under the panel; the slot is hidden while it holds nothing */
+    context?: ReactNode;
     /** Data attribute for drag state */
     isDragging?: boolean;
     /** Current composer mode */
@@ -66,6 +68,7 @@ const ComposerBase = ({
     children,
     className,
     compact = false,
+    context,
     isDragging,
     mode,
     modeTabs,
@@ -171,6 +174,8 @@ const ComposerBase = ({
                     </AnimatePresence>
                 </div>
             </motion.div>
+            {/* Context row, under the panel: where the chat runs. The wrapper hides itself while the row renders nothing. */}
+            {context && <div className="px-2 pt-2 empty:hidden">{context}</div>}
         </motion.div>
     );
 };

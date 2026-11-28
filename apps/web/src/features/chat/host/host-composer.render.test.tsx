@@ -1017,6 +1017,33 @@ describe("the coding-agent composer", () => {
         });
     });
 
+    describe("the context row under the message box", () => {
+        const mountWithRow = (devices: unknown) => {
+            mount({
+                ...session({ agentLabel: "Example agent", deviceId: "device-1", folderLabel: "~/Projects/billing" }),
+                "devices.functions.listDevices": devices,
+            });
+        };
+
+        it("names the computer, the folder and the agent", async () => {
+            mountWithRow([{ _id: "device-1", name: "Laptop", updateRequired: false }]);
+
+            const row = await screen.findByRole("group", { name: "Context" });
+
+            await waitFor(() => expect(row.textContent).toContain("Laptop"));
+            expect(row.textContent).toContain("~/Projects/billing");
+            expect(row.textContent).toContain("Example agent");
+        });
+
+        it("names a computer that is no longer in the list as removed", async () => {
+            mountWithRow([]);
+
+            const row = await screen.findByRole("group", { name: "Context" });
+
+            await waitFor(() => expect(row.textContent).toContain("Device removed"));
+        });
+    });
+
     it("offers Continue after a restart or a timeout, and sends it as a message", async () => {
         mount(session({ lastEndReason: "interrupted" }));
 
@@ -2233,11 +2260,13 @@ describe("the agent's slash commands", () => {
         expect(screen.queryByRole("listbox")).toBeNull();
         typeInto(box, "/");
 
-        expect(await screen.findByRole("listbox", { name: "Commands from Example agent" })).toBeTruthy();
+        const list = await screen.findByRole("listbox", { name: "Commands from Example agent" });
+
         // The suggestions are filtered from what was typed, so assistive technology is told the box autocompletes into a list.
         expect(box.getAttribute("aria-autocomplete")).toBe("list");
         expect(screen.getAllByRole("option")).toHaveLength(3);
-        expect(screen.getAllByText("Example agent")).toHaveLength(3);
+        // Each option names the agent; the context row under the box names it too, so the count is the list's own.
+        expect(within(list).getAllByText("Example agent")).toHaveLength(3);
 
         typeInto(box, "/re");
 

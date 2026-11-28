@@ -64,6 +64,7 @@ import ThreadShortcutsListener from "./thread-shortcuts-listener";
 import type { ThreadViewportRef } from "./thread-viewport";
 import ThreadViewport from "./thread-viewport";
 import ThreadWelcome from "./thread-welcome";
+import useCentredComposer from "./use-centred-composer";
 import { useComparisonModelSync } from "./use-comparison-model-sync";
 import { useThreadPaneState } from "./use-thread-pane-state";
 
@@ -131,6 +132,7 @@ const ScrollToBottomButton: FC<{ canJumpToPrompt: boolean; className?: string; o
 const ThreadContent: FC<ThreadProps> = ({ className, composerActive = true, initialMessage, maxWidth = "65ch", onActivateComposer, splitPane = false }) => {
     const { t } = useLingui();
     const viewportRef = useRef<ThreadViewportRef>(null);
+    const centredWidth = useCentredComposer();
     const isEmpty = useChatIsEmpty();
     const { isStreaming } = useChatIsStreaming();
     const { isNewThread, thread, threadId, threadLoad } = useChatThread();
@@ -302,6 +304,11 @@ const ThreadContent: FC<ThreadProps> = ({ className, composerActive = true, init
     // Show message list when we have messages OR when streaming is active.
     // isStreaming covers the brief transition after activeStreamId clears.
     const showMessageList = !isEmpty || isStreaming;
+    // A new text chat (no thread id yet, so the `/chat` page) in the one-chat view puts the composer under the greeting in the vertical
+    // centre. The first send navigates to the chat's own page, where `isNewThread` is already false: the composer is at the bottom from its
+    // first render there, with no second centred one. A failed send does not navigate, so the draft stays where it was typed.
+    const centredLayout = isNewThread && composerMode === "text" && !showMessageList && !splitPane;
+    const welcomeBelow = centredWidth && centredLayout;
 
     const handleScrollToBottom = () => {
         viewportRef.current?.scrollToBottom();
@@ -332,6 +339,8 @@ const ThreadContent: FC<ThreadProps> = ({ className, composerActive = true, init
                     <div
                         className={clsx("assistant-message flex min-h-full w-full flex-col", {
                             "prose prose-slate dark:prose-invert max-w-(--thread-max-width)": composerMode === "text",
+                            // The greeting and the composer sit together in the vertical centre (no phone, no touch screen: see `use-centred-composer.ts`).
+                            "md:pointer-fine:justify-center": centredLayout,
                         })}
                     >
                         {composerMode !== "text" && (
@@ -353,13 +362,23 @@ const ThreadContent: FC<ThreadProps> = ({ className, composerActive = true, init
                             </div>
                         )}
                         {composerMode === "text" && !showMessageList && (
-                            <div className="flex flex-1 flex-col items-center justify-center">
+                            <div
+                                className={clsx(
+                                    "flex flex-1 flex-col items-center justify-center",
+                                    centredLayout && "md:pointer-fine:flex-none md:pointer-fine:pb-6",
+                                )}
+                            >
                                 <ThreadWelcome />
                             </div>
                         )}
 
-                        {/* Footer with composer */}
-                        <div className="sticky bottom-0 mx-auto flex w-full max-w-(--thread-max-width) flex-col items-center justify-end rounded-t-lg bg-inherit pb-7">
+                        {/* Footer with composer. Centred layout: it stays in the flow under the greeting instead of sticking to the bottom. */}
+                        <div
+                            className={clsx(
+                                "sticky bottom-0 mx-auto flex w-full max-w-(--thread-max-width) flex-col items-center justify-end rounded-t-lg bg-inherit pb-7",
+                                centredLayout && "md:pointer-fine:static",
+                            )}
+                        >
                             <ScrollToBottomButton canJumpToPrompt={composerMode === "text"} className="z-10" onClick={handleScrollToBottom} />
                             {/* Error display. In split view the focused pane shows the same failed read, so it is not announced twice. */}
                             {paneReadFailed && !splitPane && (
@@ -407,6 +426,7 @@ const ThreadContent: FC<ThreadProps> = ({ className, composerActive = true, init
                                         initialMessage={initialMessage}
                                         key={threadId}
                                         splitPane={splitPane}
+                                        welcomeBelow={welcomeBelow}
                                     />
                                 ) : (
                                     <ComposerStub onActivate={onActivateComposer} />

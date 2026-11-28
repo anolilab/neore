@@ -29,6 +29,7 @@ import { useCRPC, useLunoraAuth } from "@/lib/lunora/crpc";
 
 import DiffCommentsDraft from "./diff-comments-draft";
 import { caretAfterRemoval } from "./host-caret";
+import HostContextRow from "./host-context-row";
 import { exceedsRawInputLimit } from "./host-input";
 import HostOptions from "./host-options";
 import type { HostQueueEffect, HostQueueEvent, HostQueueState } from "./host-queue";
@@ -221,7 +222,10 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
     } = useQuery(crpc.acp.functions.getHostSession.queryOptions({ threadId }));
     // The computer this chat runs on is older than the backend still serves (`updateRequired`, the floor the refusal uses): said before a send
     // is refused, not after. Read like the Devices page reads it; no computer found, or none reported, is not a skew.
-    const { data: devices } = useQuery(crpc.devices.functions.listDevices.queryOptions({}));
+    const { data: devices, isError: devicesFailed } = useQuery(crpc.devices.functions.listDevices.queryOptions({}));
+    // Removed only on a list that answered: a failed read keeps a cached name, or says nothing, rather than "removed".
+    const sessionDeviceName = session ? devices?.find((device) => device._id === session.deviceId)?.name : undefined;
+    const deviceName = sessionDeviceName ?? (devices && !devicesFailed ? null : undefined);
     const computerOutdated = session?.deviceId !== undefined && devices?.find((device) => device._id === session.deviceId)?.updateRequired === true;
     // A locked chat answers its stream query only with the passcode proof, so the proof goes with it; otherwise a turn that
     // is running reads as idle and the queue retries against it.
@@ -1254,6 +1258,10 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
                     {sendLabel}
                 </Button>
             </div>
+            {/* Where the agent works, under the box; the controls above it are what changes the next message. */}
+            {session !== undefined && session !== null && (
+                <HostContextRow agentLabel={session.agentLabel} deviceName={deviceName} folderLabel={session.folderLabel} />
+            )}
             {waitsForSetting && (
                 <p className="text-muted-foreground text-xs" role="status">
                     {t`Checking whether a message sent now interrupts the reply or waits behind it.`}

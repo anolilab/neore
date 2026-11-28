@@ -61,6 +61,7 @@ import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 import { ComposerBase } from "./composer-base";
+import ComposerContext from "./composer-context";
 import ComposerContextCount from "./composer-context-count";
 import ComposerFollowupSuggestions from "./composer-followup-suggestions";
 import type { ComposerInputRef } from "./composer-input";
@@ -69,7 +70,6 @@ import ComposerLanguageSelector from "./composer-language-selector";
 import ComposerMCPSelector from "./composer-mcp-selector";
 import ComposerModelSelector from "./composer-model-selector";
 import ComposerThreadPermissionMode, { usePermissionModeSaving } from "./composer-permission-mode";
-import ComposerProjectHint from "./composer-project-hint";
 import ComposerReferencesButton from "./composer-references-button";
 import ComposerResearchDepth from "./composer-research-depth";
 import ComposerSearchMode from "./composer-search-mode";
@@ -121,6 +121,8 @@ interface ComposerProps {
     placeholder?: string;
     /** A split pane's composer remounts on every focus change, so its initial message is written once per chat. */
     splitPane?: boolean;
+    /** The thread centres this composer under its greeting (an empty chat at desktop width): the welcome suggestions go under the box. */
+    welcomeBelow?: boolean;
 }
 
 type ComposerModeOption = { icon: typeof FileText; id: ComposerMode; label: MessageDescriptor };
@@ -253,6 +255,7 @@ const Composer: FC<ComposerProps> = ({
     onSubmitOverride,
     placeholder,
     splitPane = false,
+    welcomeBelow = false,
 }) => {
     const { t } = useLingui();
     const crpc = useCRPC();
@@ -628,16 +631,13 @@ const Composer: FC<ComposerProps> = ({
                             key="text-suggestions"
                             transition={SLIDE_TRANSITION}
                         >
-                            {/* Welcome suggestions for empty threads */}
-                            {!minimal && isEmpty && <ThreadWelcomeSuggestions className="mb-3" key={threadId} />}
+                            {/* Welcome suggestions for empty threads; under the box instead where the thread centres the composer (below) */}
+                            {!minimal && isEmpty && !welcomeBelow && <ThreadWelcomeSuggestions className="mb-3" key={threadId} />}
 
                             {/* Followup suggestions - only for text mode, hide while streaming or regenerating */}
                             {/* The owner's setting decides whether a thread has suggestions (the cache is written only when it is on), so a viewer's own
                                 setting does not hide a shared thread's panel. */}
                             {!minimal && !isImageModel && !isVideoModel && !isAudioModel && !isStreaming && !isSubmitting && <ComposerFollowupSuggestions />}
-
-                            {/* Project hint for a new thread's first message - not in a comparison fan-out, which files nothing */}
-                            {!minimal && !onSubmitOverride && !isStreaming && !isSubmitting && <ComposerProjectHint />}
 
                             {/* Search suggestions while typing - only in search modes */}
                             {composerMode === "text" && searchMode !== "chat" && !isStreaming && !isSubmitting && <ComposerSearchSuggestions />}
@@ -754,6 +754,10 @@ const Composer: FC<ComposerProps> = ({
                         </>
                     }
                     compact={compact}
+                    // Where the chat is filed, under the panel. Not in a comparison fan-out, which files nothing.
+                    context={
+                        !minimal && !onSubmitOverride ? <ComposerContext busy={isStreaming || isSubmitting} textMode={composerMode === "text"} /> : undefined
+                    }
                     mode={composerMode}
                     modeSettings={
                         composerMode === "text" ? null : (
@@ -783,6 +787,11 @@ const Composer: FC<ComposerProps> = ({
                         suggestPrompt={composerMode === "text" && !minimal}
                     />
                 </ComposerBase>
+
+                {/* Welcome suggestions under the box, where the thread centres the composer under its greeting. Their list opens downwards. */}
+                {!minimal && isEmpty && welcomeBelow && composerMode === "text" && !isDrawOpen && (
+                    <ThreadWelcomeSuggestions className="mt-3" key={threadId} opensBelow />
+                )}
             </div>
         </LazyMotion>
     );
