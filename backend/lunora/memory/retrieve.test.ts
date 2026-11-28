@@ -103,7 +103,7 @@ const hits = (...found: [string, number][]) =>
         }),
     );
 
-const retrieve = async (args: { botId?: string; limit?: number; search?: boolean; searchText?: string; timeZone?: string } = {}): Promise<string[]> => {
+const retrieve = async (args: { botId?: string; limit?: number; search?: boolean; searchText?: string; timeZone?: string | null } = {}): Promise<string[]> => {
     const rows = (await harness.action(
         async (ctx: any) => await ctx.runAction(retrieveRelevantMemories, { searchText: "what did I do on my trip", userId: USER, ...args }),
     )) as { memory: string }[];
@@ -369,6 +369,8 @@ describe("the asked time", () => {
 
             expect(await retrieve({ searchText: "what is coming up tomorrow" })).toEqual(["haircut after work"]);
             expect(await retrieve({ searchText: "what is coming up tomorrow", timeZone: "UTC" })).toEqual(["dentist at nine"]);
+            // `null`: the caller read no stored zone, so the stored Berlin one is not read again and the day is UTC's.
+            expect(await retrieve({ searchText: "what is coming up tomorrow", timeZone: null })).toEqual(["dentist at nine"]);
             expect(await retrieve({ searchText: "what is coming up soon" })).toEqual([]);
         } finally {
             vi.useRealTimers();

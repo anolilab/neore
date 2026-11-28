@@ -24,9 +24,12 @@ type Tense = "future" | "past" | undefined;
 
 /** A time phrase before it is resolved against a day. */
 export type TimePhrase =
-    /** `yearShift`: a relative year beside the month ("in May last year"), counted from today's year. */
+    /**
+     * `yearShift`: a relative year beside the month ("in May last year"), counted from today's year. `nearest`: a shift
+     * word before it ("next May", "letzten Mai"), the first such month after today or the last before it.
+     */
     (
-        | { day?: number; kind: "date"; month: number; tense: Tense; year?: number; yearShift?: Shift }
+        | { day?: number; kind: "date"; month: number; nearest?: Shift; tense: Tense; year?: number; yearShift?: Shift }
         | { days: number; kind: "offset" }
         | { kind: "relative"; shift: Shift; unit: Unit }
         | { kind: "year"; year: number }
@@ -55,6 +58,8 @@ interface Lexicon {
     numbers: Record<string, number>;
     /** Words of a question about what was (a month without a year is then the latest one). */
     past: string[];
+    /** A past form no list can hold: a regular `-ed` verb after `I`, a `ge…t` participle beside `habe`. */
+    pastForm: (word: string, before: string | undefined, words: ReadonlyArray<string>) => boolean;
     shifts: Record<string, Shift>;
     units: Record<string, Unit>;
     /** Words that mark the next number as a year (`in 2023`); fewer than `leads`, so `an essay of 2050 words` is no year. */
@@ -81,11 +86,15 @@ const ENGLISH: Lexicon = {
     leads: ["in", "on", "during", "for", "of", "since", "until", "by", "from", "before", "after"],
     months: monthsOf("january february march april may june july august september october november december"),
     numbers: { a: 1, eight: 8, five: 5, four: 4, nine: 9, one: 1, seven: 7, six: 6, ten: 10, three: 3, two: 2 },
-    past: ["did", "was", "were", "had", "went", "ago", "last"],
+    past: ["did", "was", "were", "had", "went", "ago", "last", "happened", "lived", "bought", "saw", "met"],
+    // `I booked`, `we moved`; `I need` and `we feed` are not past.
+    pastForm: (word, before) => (before === "i" || before === "we") && word.length >= 4 && word.endsWith("ed") && !word.endsWith("eed"),
     shifts: { coming: 1, last: -1, next: 1, this: 0 },
     units: { month: "month", week: "week", year: "year" },
     yearLeads: ["in", "during", "since", "until"],
 };
+
+const GERMAN_FUTURE = ["werde", "wird", "werden", "plane", "planen", "geplant", "pläne", "plan", "vor", "bevorstehend", "ansteht", "kommenden", "nächsten"];
 
 const GERMAN: Lexicon = {
     agoAfter: [],
@@ -101,11 +110,18 @@ const GERMAN: Lexicon = {
         morgen: { blockedAfter: ["guten", "am", "jeden", "diesen", "den", "einen", "dem", "der", "vom", "heute", "gestern"], offset: 1 },
     },
     dayUnits: ["tag", "tage", "tagen"],
-    future: ["werde", "wird", "werden", "plane", "planen", "geplant", "pläne", "plan", "vor", "bevorstehend", "ansteht", "kommenden", "nächsten"],
+    future: GERMAN_FUTURE,
     leads: ["im", "in", "am", "seit", "bis", "für", "ab", "vom", "von", "zum", "anfang", "ende", "mitte", "jahr"],
     months: monthsOf("januar,jänner februar märz,maerz april mai juni juli august september oktober november dezember"),
     numbers: { acht: 8, drei: 3, ein: 1, einem: 1, einen: 1, fünf: 5, neun: 9, sechs: 6, sieben: 7, vier: 4, zehn: 10, zwei: 2 },
-    past: ["war", "waren", "warst", "hatte", "hatten", "gemacht", "gewesen", "letzten", "gestern"],
+    past: ["war", "waren", "warst", "hatte", "hatten", "gemacht", "gewesen", "letzten", "gestern", "passiert", "gekauft"],
+    // `habe … gekauft`; a future participle (`geplant`) stays future.
+    pastForm: (word, _before, words) =>
+        word.length >= 6 &&
+        word.startsWith("ge") &&
+        word.endsWith("t") &&
+        !GERMAN_FUTURE.includes(word) &&
+        words.some((other) => ["habe", "haben", "hast", "hat", "hatte"].includes(other)),
     shifts: inflected([
         ["dies", 0],
         ["letzt", -1],
@@ -129,6 +145,7 @@ const TOKEN_RE = /[\p{L}\p{N}]+/gu;
 const YEAR_RE = /^(?:19|20|21)\d{2}$/u;
 const DAY_NUMBER_RE = /^(\d{1,2})(?:st|nd|rd|th)?$/u;
 const SMALL_NUMBER_RE = /^\d{1,3}$/u;
+const ISO_DAY_RE = /^\d{1,2}$/u;
 /** A German adjective's ending before a noun: `frühen`, `späten`, `ganzen`. */
 const isAdjective = (word: string): boolean => word.length > 3 && ["en", "em", "er"].some((ending) => word.endsWith(ending));
 
@@ -175,7 +192,8 @@ const isoAt = (text: string, tokens: Token[], at: number): TimePhrase | undefine
         return undefined;
     }
 
-    const withDay = joined(month, day) && day!.word.length === 2;
+    // `2026-12-03` and `2026-12-3` alike.
+    const withDay = joined(month, day) && ISO_DAY_RE.test(day!.word);
 
     return { ...(withDay && { day: Number(day!.word) }), kind: "date", month: Number(month!.word), tense: undefined, year: Number(year!.word) };
 };
@@ -197,6 +215,13 @@ const phraseAt = (words: string[], at: number, lexicon: Lexicon, tense: Tense): 
 
     if (shift !== undefined && unit !== undefined) {
         return { kind: "relative", shift, unit };
+    }
+
+    // `next May`, `letzten Mai`; `this May` is left to the rest (`this may take long` is no month).
+    const shiftedMonth = shift === undefined || shift === 0 ? undefined : monthIndexOf(next, lexicon);
+
+    if (shift !== undefined && shiftedMonth !== undefined) {
+        return { kind: "date", month: shiftedMonth, nearest: shift, tense };
     }
 
     const count = countOf(next, lexicon);
@@ -245,7 +270,8 @@ const phraseAt = (words: string[], at: number, lexicon: Lexicon, tense: Tense): 
  * `was` is German `what`); `undefined` when it says neither or both.
  */
 const tenseOf = (words: string[], lexicon: Lexicon): Tense => {
-    const [past, future] = [words.some((word) => lexicon.past.includes(word)), words.some((word) => lexicon.future.includes(word))];
+    const past = words.some((word, index) => lexicon.past.includes(word) || lexicon.pastForm(word, words[index - 1], words));
+    const future = words.some((word) => lexicon.future.includes(word));
 
     if (past === future) {
         return undefined;
@@ -397,6 +423,14 @@ const spanOf = (phrase: TimePhrase, today: string): Span | undefined => {
         }
 
         const current = calendarSpan(year, phrase.month, phrase.day);
+
+        if (phrase.nearest === 1) {
+            return current !== undefined && current.start > today ? current : calendarSpan(year + 1, phrase.month, phrase.day);
+        }
+
+        if (phrase.nearest === -1) {
+            return current !== undefined && current.end < today ? current : calendarSpan(year - 1, phrase.month, phrase.day);
+        }
 
         if (phrase.tense === "past" && current !== undefined && current.start > today) {
             return calendarSpan(year - 1, phrase.month, phrase.day);

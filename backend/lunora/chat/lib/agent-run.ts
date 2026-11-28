@@ -481,7 +481,7 @@ const retrieveMemories = async (
         // from a 60 s cache. A memory deleted in that minute can still reach one
         // reply, which is the cost of skipping the embedding call.
         const memories = servesUser(userId)
-            ? await new ActionCache<{ botId?: string; localDay?: string; searchText: string; timeZone?: string; userId: string }, RetrievedMemory[]>(
+            ? await new ActionCache<{ botId?: string; localDay?: string; searchText: string; timeZone: string | null; userId: string }, RetrievedMemory[]>(
                   undefined,
                   {
                       action: internal.memory.retrieve.retrieveRelevantMemories,
@@ -492,12 +492,13 @@ const retrieveMemories = async (
                   botId,
                   localDay: timeZone === undefined ? undefined : localDayOf(Date.now(), timeZone),
                   searchText: searchText.trim().toLowerCase(),
-                  ...(timeZone && { timeZone }),
+                  // Read with the preferences: `null` is "none stored", so retrieval does not read it again.
+                  timeZone: timeZone ?? null,
                   userId,
               })
             : await callOnShard(
                   internal.memory.retrieve.retrieveRelevantMemories,
-                  { botId, searchText, ...(timeZone && { timeZone }), userId },
+                  { botId, searchText, timeZone: timeZone ?? null, userId },
                   { shardKey: userId },
               );
 

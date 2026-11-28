@@ -41,6 +41,23 @@ describe("timeWindowOf", () => {
         ["where did I travel in May 2023", ["2023-05-01", "2023-05-31"]],
         ["where was I living in 2023", ["2023-01-01", "2023-12-31"]],
         ["what was I doing on 2026-11-22", ["2026-11-22", "2026-11-22"]],
+        ["what is due on 2026-12-3", ["2026-12-03", "2026-12-03"]],
+        // A shift word before a month: the next one after today, the last one before it
+        ["what is planned for next May", ["2027-05-01", "2027-05-31"]],
+        ["what did I do last May", ["2026-05-01", "2026-05-31"]],
+        ["what did I do last December", ["2025-12-01", "2025-12-31"]],
+        ["was habe ich nächsten Mai vor", ["2027-05-01", "2027-05-31"]],
+        ["was war letzten Dezember", ["2025-12-01", "2025-12-31"]],
+        // Past forms beyond the list: a regular verb after `I`, a German participle beside `habe`
+        ["what happened in December", ["2025-12-01", "2025-12-31"]],
+        ["where I lived in May", ["2026-05-01", "2026-05-31"]],
+        ["where I lived in December", ["2025-12-01", "2025-12-31"]],
+        ["what I booked in December", ["2025-12-01", "2025-12-31"]],
+        ["was ist im Dezember passiert", ["2025-12-01", "2025-12-31"]],
+        ["was habe ich im Dezember gekauft", ["2025-12-01", "2025-12-31"]],
+        // No past cue: `need` is no `-ed` verb, `geplant` stays future
+        ["I need the car in December", ["2026-12-01", "2026-12-31"]],
+        ["was habe ich für Januar geplant", ["2027-01-01", "2027-01-31"]],
         ["the bills of 2026-10", ["2026-10-01", "2026-10-31"]],
         // German
         ["was steht morgen an", ["2026-11-28", "2026-11-28"]],
@@ -76,6 +93,7 @@ describe("timeWindowOf", () => {
     it.each([
         "what is my favourite coffee",
         "I may go there with friends",
+        "this may take a while",
         "march to the beat",
         "guten Morgen, wie geht's",
         "was mache ich jeden Morgen",

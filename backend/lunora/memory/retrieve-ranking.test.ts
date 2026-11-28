@@ -468,6 +468,20 @@ describe("rankMemories", () => {
             expect(timed(rows, [], { ...week, onlyTime: false })).toEqual([]);
         });
 
+        it("gives no holds bonus to a pinned fact past its end date", () => {
+            // Ended 2026-11-25, two days before today, but after the window began: in the window, yet holding nothing now.
+            const month = { end: "2026-11-30", start: "2026-11-01", today: "2026-11-27" };
+            const rows = [
+                candidate("expired", { ...plain, pinned: true, validUntil: "2026-11-25" }),
+                candidate("current", { ...plain, pinned: true, validUntil: "2026-12-31" }),
+            ];
+            const ranked = timed(rows, at({ current: 0.6, expired: 0.6 }), month);
+            const base = rank([rows[0]!], at({ expired: 0.6 }))[0]!.score;
+
+            expect(ranked.find((m) => m.memoryId === "expired")!.score).toBeCloseTo(base, 10);
+            expect(ranked.find((m) => m.memoryId === "current")!.score).toBeCloseTo(base + TIME_WEIGHTS.holds, 10);
+        });
+
         it("caps the returned score at 1", () => {
             expect(timed([candidate("a", { eventStart: "2026-12-01" })], at({ a: 1 }))[0]!.score).toBe(1);
         });

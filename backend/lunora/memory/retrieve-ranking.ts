@@ -540,7 +540,7 @@ const keywordRelevanceOf = (keyword: number, floor: number, { counts, rare }: { 
 
 /**
  * What the time a question asks about (`time-window.ts`) adds to a memory's score: an event in the window, a fact that
- * holds through it (its end date is in or after the window, which is today or later), or a fact that ended before the
+ * holds through it (its end date is in or after the window and not before today, the window reaching today or later), or a fact that ended before the
  * window starts (a pinned one past its date, or one ending before an asked time ahead). Bounded: the most it moves a
  * score is `event`, so it reorders rows of one topic and never outweighs relevance.
  */
@@ -568,8 +568,9 @@ const timeSignalOf = (m: RankCandidate, window: TimeWindow): { inWindow: boolean
         return { inWindow: false, signal: TIME_WEIGHTS.ended };
     }
 
-    // Only a window reaching today or later: a fact's start is unknown, so holding now says nothing of a year before.
-    return { inWindow: false, signal: window.end >= window.today ? TIME_WEIGHTS.holds : 0 };
+    // Only a fact still in effect today, for a window reaching today or later: a fact's start is unknown, so holding now
+    // says nothing of a year before, and a pinned fact past its end date holds nothing now.
+    return { inWindow: false, signal: m.validUntil >= window.today && window.end >= window.today ? TIME_WEIGHTS.holds : 0 };
 };
 
 /**
