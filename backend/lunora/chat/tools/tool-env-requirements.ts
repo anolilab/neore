@@ -79,6 +79,7 @@ export const ALWAYS_AVAILABLE_TOOLS = [
     "searchMemory",
     "searchPastChats",
     "remember",
+    "forget",
     "knowledgeSearch",
     "taskList",
     "canvasAI",

@@ -4,7 +4,7 @@
 import { describe, expect, it } from "vitest";
 
 import { approvalActionsFor, registerApprovalActionsWith } from "./approval-category";
-import { APPROVE_ACTION, DENY_ACTION, TOOL_APPROVAL_CATEGORY } from "./approval-response";
+import { APPROVE_ACTION, DENY_ACTION, TOOL_APPROVAL_CATEGORY, TOOL_DENY_ONLY_CATEGORY } from "./approval-response";
 
 describe("registerApprovalActionsWith", () => {
     it("registers the tool approval category with approve and deny, each needing the device unlocked and opening the app", async () => {
@@ -14,7 +14,7 @@ describe("registerApprovalActionsWith", () => {
             calls.push({ actions, identifier });
         });
 
-        expect(calls).toHaveLength(1);
+        expect(calls).toHaveLength(2);
         expect(calls[0]?.identifier).toBe(TOOL_APPROVAL_CATEGORY);
         expect(calls[0]?.actions).toStrictEqual([
             { buttonTitle: "Approve", identifier: APPROVE_ACTION, options: { isAuthenticationRequired: true, opensAppToForeground: true } },
@@ -24,6 +24,17 @@ describe("registerApprovalActionsWith", () => {
                 options: { isAuthenticationRequired: true, isDestructive: true, opensAppToForeground: true },
             },
         ]);
+    });
+
+    it("registers a deny-only category, with no approve action, for an approval only read in the chat", async () => {
+        const calls: { actions: { identifier: string }[]; identifier: string }[] = [];
+
+        await registerApprovalActionsWith(async (identifier, actions) => {
+            calls.push({ actions, identifier });
+        });
+
+        expect(calls[1]?.identifier).toBe(TOOL_DENY_ONLY_CATEGORY);
+        expect(calls[1]?.actions.map((action) => action.identifier)).toStrictEqual([DENY_ACTION]);
     });
 
     it("lets a failed registration reach the caller, so the setup can retry", async () => {
