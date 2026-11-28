@@ -327,6 +327,7 @@ describe("timeWindowOf", () => {
         expect(windowOf("between 2026-12-10 and 2026-12-03")).toEqual(["2026-12-03", "2026-12-10"]);
         expect(timeWindowOf("what is on between 2026-12-03 and 2026-12-10", TODAY)?.onlyTime).toBe(true);
         expect(timeWindowOf("was steht zwischen 2026-12-03 und 2026-12-10 an", TODAY)?.onlyTime).toBe(true);
+        expect(timeWindowOf("was steht vom 3. bis 10. Dezember an", TODAY)?.onlyTime).toBe(true);
     });
 
     it("reads an ISO date only of digits, its month 1 to 12", () => {
@@ -380,6 +381,25 @@ describe("timeWindowOf", () => {
         ["was ist nach 2026-12-03", ["2026-12-04", OPEN_END]],
         ["was steht bis zum 2026-12-03 an", [TODAY, "2026-12-03"]],
     ])("reads %j as a range", (text, expected) => {
+        expect(windowOf(text)).toEqual(expected);
+    });
+
+    it.each([
+        // One span from the first time to the second, each read with the question's tense: never from today.
+        ["what did I do from March 3 until March 10", ["2026-03-03", "2026-03-10"]],
+        ["from the 3rd to the 10th of December", ["2026-12-03", "2026-12-10"]],
+        ["was steht vom 3. bis 10. Dezember an", ["2026-12-03", "2026-12-10"]],
+        ["was war von Mai bis Juli", ["2026-05-01", "2026-07-31"]],
+        ["wo habe ich von 2021 bis 2023 gewohnt", ["2021-01-01", "2023-12-31"]],
+        // An end before the start is the next one; a start without a year takes the end's.
+        ["what is planned from December 20 to January 5", ["2026-12-20", "2027-01-05"]],
+        ["what did I do from November 20 until December 5", ["2026-11-20", "2026-12-05"]],
+        ["what did I do from May to June 2024", ["2024-05-01", "2024-06-30"]],
+        ["from December to January 2025", ["2024-12-01", "2025-01-31"]],
+        // `until` alone still runs from today, and `from` alone is a lead.
+        ["until March 10", [TODAY, "2027-03-10"]],
+        ["what did I do from May", ["2026-05-01", "2026-05-31"]],
+    ])("reads %j as one span", (text, expected) => {
         expect(windowOf(text)).toEqual(expected);
     });
 

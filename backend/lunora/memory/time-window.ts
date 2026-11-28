@@ -48,7 +48,8 @@ export type TimePhrase =
      * `yearShift`: a relative year beside the month ("in May last year"), counted from today's year. `nearest`: a shift
      * word before it ("next May", "letzten Mai"), the first such month after today or the last before it. `part`: the
      * part of the month asked ("Ende Mai"), of the month the other fields name. `bound`: a range word before a month, a
-     * day or a year ("since May"). `between`: the days from one ISO date to another.
+     * day or a year ("since May"). `between`: the days from one time to another (`between` two ISO dates, `from X
+     * until Y`).
      */
     {
         /** The question's other phrases ("today or tomorrow"), each a span of its own. */
@@ -96,6 +97,10 @@ interface Lexicon {
     past: string[];
     /** A simple-past form no list can hold (a regular `-ed` verb after `I`), the word at `index` of the question. */
     pastForm?: (index: number, words: ReadonlyArray<string>) => boolean;
+    /** The words that end a range a word of `rangeStarts` opened: `from X until Y`, `vom 3. bis 10. Dezember`. */
+    rangeEnds: string[];
+    /** The words that open a range from one time to another: `from`, `vom`. */
+    rangeStarts: string[];
     shifts: Record<string, Shift>;
     /** Three words for two days off: `day after tomorrow`, `day before yesterday`. */
     twoDays?: Record<string, number>;
@@ -147,6 +152,8 @@ const ENGLISH: Lexicon = {
 
         return regular || ["bought", "happened", "lived", "met"].includes(word);
     },
+    rangeEnds: ["to", "until"],
+    rangeStarts: ["from"],
     shifts: { coming: 1, last: -1, next: 1, this: 0 },
     twoDays: { "day after tomorrow": 2, "day before yesterday": -2 },
     units: { month: "month", week: "week", year: "year" },
@@ -197,6 +204,8 @@ const GERMAN: Lexicon = {
     // German asks of the past in the perfect. Any other participle beside `habe` sets no tense: `was habe ich im
     // Dezember gebucht` asks of a booking ahead.
     past: ["war", "waren", "warst", "hatte", "hatten", "gemacht", "gewesen", "letzten", "gestern", "passiert"],
+    rangeEnds: ["bis"],
+    rangeStarts: ["vom", "von"],
     shifts: inflected([
         ["dies", 0],
         ["letzt", -1],
@@ -420,6 +429,8 @@ const LEXICON_WORDS = new Map(
                 lexicon.future,
                 lexicon.leads,
                 lexicon.past,
+                lexicon.rangeEnds,
+                lexicon.rangeStarts,
                 lexicon.yearLeads,
                 ...lexicon.months,
                 Object.keys(lexicon.bounds),
@@ -633,6 +644,40 @@ export const readTimePhrase = (text: string): TimePhrase | undefined => {
 
         return undefined;
     };
+    // `from X until Y`, `von Mai bis Juli`, `vom 3. bis 10. Dezember`: one span from X to Y, each read with the question's
+    // tense, never reaching to today as `until` alone does. A bare day before the end takes the end's month and year.
+    const rangeAt = (index: number): Read | undefined => {
+        const lexicon = ranked.find(({ lexicon: { rangeStarts } }) => rangeStarts.includes(words[index] ?? ""))?.lexicon;
+
+        if (lexicon === undefined) {
+            return undefined;
+        }
+
+        const fromAt = index + (BOUND_ARTICLES.has(words[index + 1] ?? "") ? 2 : 1);
+        const from = readAt(fromAt) ?? yearAt(fromAt);
+        const fromDay = from === undefined ? dayNumberOf(words[fromAt]) : undefined;
+        const endAt = fromAt + (from?.size ?? 1);
+        const toAt = endAt + (BOUND_ARTICLES.has(words[endAt + 1] ?? "") ? 2 : 1);
+        const to = lexicon.rangeEnds.includes(words[endAt] ?? "") ? (readAt(toAt) ?? yearAt(toAt)) : undefined;
+        const isTime = (read: Read | undefined): read is Read =>
+            read !== undefined && read.more === undefined && (read.phrase.kind === "date" || read.phrase.kind === "year");
+
+        if (!isTime(to) || !joinedThrough(index, toAt)) {
+            return undefined;
+        }
+
+        const size = toAt - index + to.size;
+
+        if (isTime(from)) {
+            return { phrase: { from: from.phrase, kind: "between", to: to.phrase }, size };
+        }
+
+        if (fromDay === undefined || to.phrase.kind !== "date") {
+            return undefined;
+        }
+
+        return { phrase: { from: { ...to.phrase, day: fromDay, part: undefined }, kind: "between", to: to.phrase }, size };
+    };
     // A phrase at a token: a range word before a month, a day or a year (`since May`, `bis 2023`), the part of a month
     // asked (`Ende Mai`), else the time itself with its group and year. A range word before any other time (`vor drei
     // Tagen`, `bis morgen`) reads as before.
@@ -644,6 +689,12 @@ export const readTimePhrase = (text: string): TimePhrase | undefined => {
         return year === undefined ? undefined : { phrase: { kind: "year", year }, size: 1 };
     };
     const readAt = (index: number): Read | undefined => {
+        const range = rangeAt(index);
+
+        if (range !== undefined) {
+            return range;
+        }
+
         const bound = boundAt(index);
 
         if (bound !== undefined) {
@@ -890,6 +941,10 @@ const dateSpanOf = (phrase: Extract<TimePhrase, { kind: "date" }>, today: string
     return phrase.tense === "future" && current !== undefined && current.end < today ? calendarSpan(year + 1, phrase.month, phrase.day) : current;
 };
 
+/** A month or a day named without a year, a relative year or a shift word (`May`, `3 December`). */
+const isYearless = (phrase: TimePhrase): phrase is Extract<TimePhrase, { kind: "date" }> =>
+    phrase.kind === "date" && phrase.year === undefined && phrase.yearShift === undefined && phrase.nearest === undefined;
+
 function spanOf(phrase: TimePhrase, today: string): Span | undefined {
     const [year, month, day] = today.split("-").map(Number) as [number, number, number];
 
@@ -905,10 +960,29 @@ function spanOf(phrase: TimePhrase, today: string): Span | undefined {
     }
 
     if (phrase.kind === "between") {
-        const [from, to] = [spanOf(phrase.from, today), spanOf(phrase.to, today)];
+        const { from: start, to: end } = phrase;
+        let to = spanOf(end, today);
+        let from = spanOf(start, today);
 
         if (from === undefined || to === undefined) {
             return undefined;
+        }
+
+        // A month or day named without a year takes the year of the other end, the latest that keeps the range in order:
+        // "from May to June 2024" is May 2024, "from December 20 to January 5" runs into the January after, and "from
+        // November 20 until December 5" asked of the past stays in one year.
+        const endYear = Number(to.start.slice(0, 4));
+        const startYear = Number(from.start.slice(0, 4));
+
+        if (isYearless(start) && !isYearless(end)) {
+            from =
+                [endYear, endYear - 1].map((asked) => spanOf({ ...start, year: asked }, today)).find((span) => span !== undefined && span.start <= to!.end) ??
+                from;
+        } else if (to.end < from.start && isYearless(end)) {
+            to =
+                [startYear, startYear + 1]
+                    .map((asked) => spanOf({ ...end, year: asked }, today))
+                    .find((span) => span !== undefined && span.end >= from!.start) ?? to;
         }
 
         // Days sort as text: the earliest start to the latest end, whichever was named first.
