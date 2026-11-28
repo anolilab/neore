@@ -43,9 +43,11 @@ The rules are summarized in `packages/device-core/AGENTS.md`, which agents load 
   `NEORE_MCP_BRIDGE_HEADERS`, never argv; only `http`/`https`, no user name or password in the URL; redirects are not
   followed and no proxy is read from the environment, so the headers go to that one host. Its error texts and stderr
   never name the address or a header value: they reach the chat, and the cloud learns only the server's name. TLS
-  trusts the bundled public roots only, never a skip-verify switch. When the server drops the session (404), the
-  bridge answers that call and every later one with `mcp::SESSION_GONE` without sending it; `McpManager::with` stops
-  the bridge before it sends the call once more to a new one (any other failure is not retried on a live server). Not wired into settings yet.
+  trusts the bundled public roots only, never a skip-verify switch. What the server says is passed on with every
+  header value blanked (keys too), so a header that holds a credential must be at least 8 characters. When the server
+  drops the session (404), the bridge answers that call and every later one with `mcp::SESSION_GONE` without sending
+  it; `McpManager::with` stops the bridge before it sends the call once more to a new one (any other failure is not
+  retried on a live server). Not wired into settings yet.
   Where there is no sandbox the call
   is REFUSED unless the user turned off "Require sandbox for shell commands and local MCP servers"
   (stored inverted, `allowUnsandboxedShell`, so absent = required). Allow

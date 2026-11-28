@@ -53,7 +53,7 @@ const RESERVED_HEADERS: &[&str] = &[
 ];
 
 /// A header value (or the credential after its scheme) shorter than this stays in what the server says: replacing it
-/// could garble an answer, and a secret is longer.
+/// could garble an answer. A header that holds a credential must be at least this long.
 const MIN_REDACTED_BYTES: usize = 8;
 
 /// Where the bridge sends, checked once at start.
@@ -65,20 +65,53 @@ pub struct Target {
     secrets: Vec<String>,
 }
 
-/// Replaces every `secret` in the strings of `value`.
+fn scrub(text: &mut String, secrets: &[String]) {
+    for secret in secrets {
+        if text.contains(secret.as_str()) {
+            *text = text.replace(secret.as_str(), "[redacted]");
+        }
+    }
+}
+
+/// Replaces every `secret` in the strings of `value`, object keys included (a tool's schema names its fields by them).
 fn redact(value: &mut Value, secrets: &[String]) {
     match value {
-        Value::String(text) => {
-            for secret in secrets {
-                if text.contains(secret.as_str()) {
-                    *text = text.replace(secret.as_str(), "[redacted]");
-                }
-            }
-        }
+        Value::String(text) => scrub(text, secrets),
         Value::Array(items) => items.iter_mut().for_each(|item| redact(item, secrets)),
-        Value::Object(fields) => fields.values_mut().for_each(|item| redact(item, secrets)),
+        Value::Object(fields) => {
+            *fields = std::mem::take(fields)
+                .into_iter()
+                .map(|(mut key, mut item)| {
+                    scrub(&mut key, secrets);
+                    redact(&mut item, secrets);
+                    (key, item)
+                })
+                .collect();
+        }
         _ => {}
     }
+}
+
+/// Whether a header carries a credential by its name. Its secret must be long enough to blank out of what the server
+/// says (`MIN_REDACTED_BYTES`), or the header is refused.
+fn holds_a_credential(name: &HeaderName) -> bool {
+    let name = name.as_str();
+
+    matches!(name, "authorization" | "proxy-authorization" | "cookie")
+        || ["auth", "token", "key", "secret", "password"]
+            .iter()
+            .any(|word| name.contains(word))
+}
+
+/// The parts of a header value that are blanked: the whole value, and the credential after its scheme
+/// (`Bearer <credential>`).
+fn secret_parts(value: &str) -> impl Iterator<Item = &str> {
+    [
+        Some(value),
+        value.split_once(' ').map(|(_, credential)| credential),
+    ]
+    .into_iter()
+    .flatten()
 }
 
 /// Checks the address and headers. The errors name neither the address nor a header value.
@@ -133,22 +166,24 @@ pub fn parse_target(url: &str, headers: &str) -> Result<Target, String> {
             return Err(format!("the value of {name} is too long"));
         }
 
-        let mut value = HeaderValue::from_str(value)
+        let mut header = HeaderValue::from_str(value)
             .map_err(|_| format!("the value of {name} is not valid"))?;
 
-        value.set_sensitive(true);
-        parsed.push((name, value));
+        if holds_a_credential(&name)
+            && secret_parts(value).any(|secret| secret.len() < MIN_REDACTED_BYTES)
+        {
+            return Err(format!(
+                "the value of {name} is too short to keep out of the chat ({MIN_REDACTED_BYTES} characters at least)"
+            ));
+        }
+
+        header.set_sensitive(true);
+        parsed.push((name, header));
     }
 
     let mut secrets: Vec<String> = given
         .values()
-        .flat_map(|value| {
-            [
-                Some(value.as_str()),
-                value.split_once(' ').map(|(_, credential)| credential),
-            ]
-        })
-        .flatten()
+        .flat_map(|value| secret_parts(value))
         .filter(|secret| secret.len() >= MIN_REDACTED_BYTES)
         .map(str::to_owned)
         .collect();

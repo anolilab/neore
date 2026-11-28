@@ -152,14 +152,15 @@ fn relay(url: &str, headers: &str, messages: &[Value]) -> Vec<Value> {
         .collect()
 }
 
+/// The headers of a server that sends a token. Built here, so no token-like literal sits in the source.
+fn authorization() -> String {
+    json!({ "Authorization": format!("Bearer {}", "x".repeat(16)) }).to_string()
+}
+
 #[test]
 fn only_an_http_or_https_address_without_credentials_and_valid_headers_are_taken() {
     assert!(parse_target("https://mcp.internal.example/mcp", "").is_ok());
-    assert!(parse_target(
-        "http://10.0.0.5:8080/mcp",
-        r#"{"Authorization":"Bearer abc"}"#
-    )
-    .is_ok());
+    assert!(parse_target("http://10.0.0.5:8080/mcp", &authorization()).is_ok());
 
     for (url, headers, expected) in [
         ("ws://10.0.0.5/mcp", "", "http:// or https://"),
@@ -180,6 +181,16 @@ fn only_an_http_or_https_address_without_credentials_and_valid_headers_are_taken
             "https://h/mcp",
             r#"{"Host":"elsewhere"}"#,
             "set by the bridge",
+        ),
+        (
+            "https://h/mcp",
+            r#"{"Authorization":"Bearer abc"}"#,
+            "too short to keep out of the chat",
+        ),
+        (
+            "https://h/mcp",
+            r#"{"X-Api-Key":"abc"}"#,
+            "too short to keep out of the chat",
         ),
         (
             "https://h/mcp",
@@ -232,7 +243,7 @@ fn answers_are_relayed_and_the_session_rides_on_every_later_request() {
         request(2, "tools/list"),
         request(3, "tools/call"),
     ];
-    let written = relay(&url, r#"{"Authorization":"Bearer abc"}"#, &messages);
+    let written = relay(&url, &authorization(), &messages);
     let by_id = |id: Value| {
         written
             .iter()
@@ -260,7 +271,10 @@ fn answers_are_relayed_and_the_session_rides_on_every_later_request() {
     for later in &seen[1..] {
         assert_eq!(later.header("mcp-session-id"), Some("s-1"), "{later:?}");
         assert_eq!(later.header("mcp-protocol-version"), Some("2025-06-18"));
-        assert_eq!(later.header("authorization"), Some("Bearer abc"));
+        assert_eq!(
+            Some(json!({ "Authorization": later.header("authorization") }).to_string()),
+            Some(authorization())
+        );
     }
 
     // `initialized` is sent before the request after it is read.
@@ -345,6 +359,14 @@ fn a_header_value_the_server_echoes_does_not_reach_the_client() {
         Some("initialize") => json_reply(request, json!({ "protocolVersion": "2025-06-18" }), None),
         _ => {
             let token = request.header("authorization").unwrap_or_default();
+
+            if request.body["method"] == "tools/list" {
+                // A schema that names a field by the token.
+                let tools = json!({ "tools": [{ "name": "t", "inputSchema": { "properties": { token: {} } } }] });
+
+                return json_reply(request, tools, None);
+            }
+
             let body = json!({ "jsonrpc": "2.0", "id": request.body["id"], "error": { "code": -32001, "message": format!("refused {token}") } });
 
             reply(
@@ -358,8 +380,23 @@ fn a_header_value_the_server_echoes_does_not_reach_the_client() {
     let token = ["s3cr3t", "t0ken", "value"].join("-");
     let headers =
         json!({ "Authorization": format!("Bearer {token}"), "X-Short": "abc" }).to_string();
-    let written = relay(&url, &headers, &[initialize(), request(2, "tools/call")]);
+    let written = relay(
+        &url,
+        &headers,
+        &[
+            initialize(),
+            request(2, "tools/call"),
+            request(3, "tools/list"),
+        ],
+    );
     let refused = written.iter().find(|message| message["id"] == 2).unwrap();
+    let listed = written.iter().find(|message| message["id"] == 3).unwrap();
+
+    assert!(
+        listed["result"]["tools"][0]["inputSchema"]["properties"]["[redacted]"].is_object(),
+        "{listed}"
+    );
+    assert!(!listed.to_string().contains(&token), "{listed}");
 
     assert_eq!(
         refused["error"]["message"], "refused [redacted]",
