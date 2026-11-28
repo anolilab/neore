@@ -179,10 +179,14 @@ const createGate = () => {
 
 const ownerMismatch = () => Object.assign(new Error("another account"), { data: { code: "SETUP_OWNER_MISMATCH" } });
 
-const renderChecklist = (serverFormShown = true, client = new QueryClient({ defaultOptions: { mutations: { retry: false }, queries: { retry: false } } })) => {
+const renderChecklist = (
+    serverFormShown = true,
+    client = new QueryClient({ defaultOptions: { mutations: { retry: false }, queries: { retry: false } } }),
+    surface?: "code" | "dialog" | "settings",
+) => {
     const tree = () => (
         <QueryClientProvider client={client}>
-            <SetupChecklist serverFormShown={serverFormShown} />
+            <SetupChecklist serverFormShown={serverFormShown} surface={surface} />
         </QueryClientProvider>
     );
 
@@ -242,6 +246,16 @@ describe("<SetupChecklist>", () => {
         expect(screen.getByRole("link", { name: REGoToPairing }).getAttribute("href")).toBe("#devices-pairing");
         expect(screen.getByRole("link", { name: REReadTheGuide }).getAttribute("href")).toBe("/docs/devices#coding-agents-on-a-computer");
         expect(screen.queryByRole("link", { name: REGoToServers })).toBeNull();
+    });
+
+    it("keeps only the guide link in the welcome dialog, where the page's controls and settings are out of reach", async () => {
+        renderChecklist(false, undefined, "dialog");
+
+        expect(await screen.findAllByText("(To do)")).toHaveLength(3);
+        expect(screen.getByRole("link", { name: REReadTheGuide }).getAttribute("target")).toBe("_blank");
+        expect(screen.queryByRole("link", { name: REGoToPairing })).toBeNull();
+        expect(screen.queryByRole("link", { name: REGoToServers })).toBeNull();
+        expect(screen.getAllByRole("button", { name: RESkip })).toHaveLength(3);
     });
 
     it("links the servers step to its card when the card is on the page", async () => {

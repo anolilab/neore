@@ -6,19 +6,22 @@ import { Dialog, DialogPopup, DialogTitle } from "@neore/ui/components/dialog";
 import cn from "@neore/ui/utils/cn";
 import type { OnboardingError } from "@onboardjs/react";
 import { OnboardingErrorBoundary, OnboardingProvider, useOnboarding } from "@onboardjs/react";
-import { ArrowLeft, ArrowRight, BrainCircuit, Check, FileText, Image, Loader2, MessageSquare, Repeat, Search, Sparkles } from "lucide-react";
+import { ArrowLeft, ArrowRight, BrainCircuit, Check, FileText, Image, Loader2, MessageSquare, Repeat, Search, Sparkles, Terminal } from "lucide-react";
 import { AnimatePresence, motion, MotionConfig } from "motion/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import useIsAnonymous from "@/features/auth/hooks/use-is-anonymous";
+import GitHostStep from "@/features/code/components/git-host-step";
+import { useCodeModeEnabled } from "@/features/code/hooks/use-code-mode-enabled";
 import { useUserPreferences } from "@/features/layout/hooks/use-ui-state";
 import { handOffLandingMessage } from "@/features/marketing/stores/landing-store";
 import { trackEvent } from "@/lib/analytics";
 
 import useOnboardingPlugins from "../hooks/use-onboarding-plugins";
 import { shouldShowOnboarding } from "../should-show-onboarding";
-import type { NeoreOnboardingPayload } from "../steps";
-import { ONBOARDING_FLOW_ID, ONBOARDING_PERSISTENCE_KEY, onboardingSteps } from "../steps";
+import type { NeoreOnboardingPayload, OnboardingPath } from "../steps";
+import { ONBOARDING_FLOW_ID, ONBOARDING_PATH_STEPS, ONBOARDING_PERSISTENCE_KEY, onboardingSteps } from "../steps";
+import SetupChecklist from "./setup-checklist";
 
 const STEP_ICONS: Record<NeoreOnboardingPayload["icon"], React.ReactNode> = {
     "brain-circuit": <BrainCircuit aria-hidden="true" className="size-8" />,
@@ -26,6 +29,7 @@ const STEP_ICONS: Record<NeoreOnboardingPayload["icon"], React.ReactNode> = {
     "message-square": <MessageSquare aria-hidden="true" className="size-8" />,
     repeat: <Repeat aria-hidden="true" className="size-8" />,
     sparkles: <Sparkles aria-hidden="true" className="size-8" />,
+    terminal: <Terminal aria-hidden="true" className="size-8" />,
 };
 
 const useStepTranslations = () => {
@@ -35,10 +39,12 @@ const useStepTranslations = () => {
         return {
             "canvas-editor-description": t`Write long-form content in a side-by-side canvas editor. Go from chat to finished document without switching tools.`,
             "canvas-title": t`Built-in Canvas Editor`,
-            "media-generation-description": t`Generate images with FLUX and Stable Diffusion, create videos with Runway and Luma — all from the same chat.`,
+            "media-generation-description": t`Generate images and videos with leading image and video models, all from the same chat.`,
             "media-title": t`Create Images and Videos`,
+            "code-setup-description": t`Here is what coding agents need. Skip any step and finish it later on the Code page.`,
+            "code-setup-title": t`Set up coding`,
             "models-title": t`30+ Models, One Thread`,
-            "multi-model-description": t`Access GPT-4, Claude, Gemini, and more from a single conversation. Switch models mid-thread to compare answers.`,
+            "multi-model-description": t`Use models from many providers in a single conversation. Switch models mid-thread to compare answers.`,
             "one-workspace-description": t`One workspace for chat, images, video, documents, and code. 30+ AI models, one subscription.`,
             "start-chatting-description": t`Pick a starting point or jump straight into chat.`,
             "start-title": t`Start Your First Chat`,
@@ -114,19 +120,68 @@ const navigateToChatWithPrompt = (prompt: string): void => {
     globalThis.location.assign("/chat?initialMessage=true");
 };
 
-const OnboardingContent = ({ onComplete }: { onComplete: () => void }) => {
+/** The first step's two ways in: the tour of what chat can do, or the setup for coding agents. */
+const PathPicker: React.FC<{ onChange: (path: OnboardingPath) => void; value: OnboardingPath }> = ({ onChange, value }) => {
     const { t } = useLingui();
-    const { currentStep, goToStep, loading, next, previous, skip, state } = useOnboarding();
+    const options: { description: string; icon: React.ReactNode; id: OnboardingPath; label: string }[] = [
+        {
+            description: t`Talk to any model and make images and documents.`,
+            icon: <MessageSquare aria-hidden="true" className="size-4" />,
+            id: "chat",
+            label: t`Chat`,
+        },
+        {
+            description: t`Set up coding agents on your computers.`,
+            icon: <Terminal aria-hidden="true" className="size-4" />,
+            id: "code",
+            label: t`Code`,
+        },
+    ];
+
+    return (
+        <div aria-label={t`How do you want to start?`} className="mt-2 grid w-full max-w-sm grid-cols-2 gap-2" role="group">
+            {options.map((option) => (
+                <button
+                    aria-pressed={value === option.id}
+                    className={cn(
+                        "flex flex-col items-start gap-1 rounded-lg border p-3 text-left text-xs transition-colors",
+                        value === option.id ? "border-primary bg-primary/5" : "border-border hover:border-primary/50 hover:bg-primary/5",
+                    )}
+                    key={option.id}
+                    onClick={() => onChange(option.id)}
+                    type="button"
+                >
+                    <span className="flex items-center gap-2 text-sm font-medium">
+                        <span className="text-primary-text shrink-0">{option.icon}</span>
+                        {option.label}
+                    </span>
+                    <span className="text-muted-foreground">{option.description}</span>
+                </button>
+            ))}
+        </div>
+    );
+};
+
+const OnboardingContent = ({ codeEnabled, onComplete }: { codeEnabled: boolean; onComplete: () => void }) => {
+    const { t } = useLingui();
+    const { currentStep, goToStep, loading, next, previous, skip } = useOnboarding();
     const translations = useStepTranslations();
     const contentRef = useRef<HTMLDivElement>(null);
     const [direction, setDirection] = useState(1); // 1 = forward, -1 = backward
     const [showSuccess, setShowSuccess] = useState(false);
 
-    const currentIndex = (state?.currentStepNumber ?? 1) - 1;
-    const isFirstStep = state?.isFirstStep ?? true;
-    const isLastStep = state?.isLastStep ?? false;
-    const totalSteps = state?.totalSteps ?? onboardingSteps.length;
-    const progressPercentage = state?.progressPercentage ?? 0;
+    // The first step's choice decides which steps follow; the later steps belong to one path each.
+    const [choice, setChoice] = useState<OnboardingPath>("chat");
+    const path: OnboardingPath = currentStep?.id === "code" ? "code" : choice;
+    const pathSteps = onboardingSteps.filter((step) => ONBOARDING_PATH_STEPS[path].includes(String(step.id)));
+    const currentIndex = Math.max(
+        0,
+        pathSteps.findIndex((step) => step.id === currentStep?.id),
+    );
+    const isFirstStep = currentStep?.id === "welcome";
+    const isLastStep = currentIndex === pathSteps.length - 1;
+    const totalSteps = pathSteps.length;
+    const progressPercentage = ((currentIndex + 1) / totalSteps) * 100;
 
     const payload = currentStep?.payload as NeoreOnboardingPayload | undefined;
 
@@ -150,7 +205,7 @@ const OnboardingContent = ({ onComplete }: { onComplete: () => void }) => {
     }, [currentIndex]);
 
     const finishOnboarding = useCallback(
-        (prompt?: string) => {
+        (prompt?: string, destination = "/chat") => {
             setShowSuccess(true);
 
             // Brief success state before navigating
@@ -161,7 +216,7 @@ const OnboardingContent = ({ onComplete }: { onComplete: () => void }) => {
                 if (prompt) {
                     navigateToChatWithPrompt(prompt);
                 } else {
-                    globalThis.location.assign("/chat");
+                    globalThis.location.assign(destination);
                 }
             }, 800);
         },
@@ -173,7 +228,7 @@ const OnboardingContent = ({ onComplete }: { onComplete: () => void }) => {
 
         if (isLastStep) {
             trackEvent("onboarding_completed", {});
-            finishOnboarding();
+            finishOnboarding(undefined, path === "code" ? "/code" : "/chat");
 
             return;
         }
@@ -183,13 +238,14 @@ const OnboardingContent = ({ onComplete }: { onComplete: () => void }) => {
             step_index: currentIndex,
         });
 
-        await next();
-    }, [isLastStep, next, finishOnboarding, currentStep?.id, currentIndex]);
+        // The coding path is not in the tour's chain of steps, so it is entered by name.
+        await (isFirstStep && choice === "code" ? goToStep("code") : next());
+    }, [isLastStep, isFirstStep, choice, path, goToStep, next, finishOnboarding, currentStep?.id, currentIndex]);
 
     const handlePrevious = useCallback(async () => {
         setDirection(-1);
-        await previous();
-    }, [previous]);
+        await (currentStep?.id === "code" ? goToStep("welcome") : previous());
+    }, [currentStep?.id, goToStep, previous]);
 
     const handleSkip = useCallback(() => {
         trackEvent("onboarding_skipped", { at_step: String(currentStep?.id ?? "unknown") });
@@ -269,7 +325,7 @@ const OnboardingContent = ({ onComplete }: { onComplete: () => void }) => {
                             {t`You're all set!`}
                         </motion.p>
                         <span className="sr-only" role="status">
-                            {t`Onboarding complete. Redirecting to chat.`}
+                            {path === "code" ? t`Onboarding complete. Redirecting to Code.` : t`Onboarding complete. Redirecting to chat.`}
                         </span>
                     </div>
                 </DialogPopup>
@@ -305,9 +361,12 @@ const OnboardingContent = ({ onComplete }: { onComplete: () => void }) => {
         initial: { opacity: 0, x: direction > 0 ? 40 : -40 },
     };
 
+    const isCodeStep = currentStep?.id === "code";
+    const finishLabel = path === "code" ? t`Open Code` : t`Just start chatting`;
+
     return (
         <Dialog open>
-            <DialogPopup className="w-full max-w-md overflow-hidden" showCloseButton={false}>
+            <DialogPopup className={cn("w-full overflow-hidden", isCodeStep ? "max-w-xl" : "max-w-md")} showCloseButton={false}>
                 <DialogTitle className="sr-only">{t`Welcome to Neore`}</DialogTitle>
                 <div aria-label={t`Onboarding wizard`} className="flex flex-col" onKeyDown={handleKeyDown} ref={contentRef} role="region" tabIndex={-1}>
                     {/* Progress bar */}
@@ -327,13 +386,14 @@ const OnboardingContent = ({ onComplete }: { onComplete: () => void }) => {
                     <div
                         className={cn(
                             "relative flex items-center justify-center overflow-hidden px-8 pt-8 pb-6",
-                            isLastStep ? "min-h-[340px]" : "min-h-[280px]",
+                            currentStep?.id === "start" ? "min-h-[340px]" : "min-h-[280px]",
+                            isCodeStep && "items-start",
                         )}
                     >
                         <AnimatePresence initial={false} mode="wait">
                             <motion.div
                                 animate={motionVariants.animate}
-                                className="flex flex-col items-center gap-4 text-center"
+                                className={cn("flex flex-col items-center gap-4 text-center", isCodeStep && "w-full")}
                                 exit={motionVariants.exit}
                                 initial={motionVariants.initial}
                                 key={currentStep?.id}
@@ -344,7 +404,13 @@ const OnboardingContent = ({ onComplete }: { onComplete: () => void }) => {
                                 </div>
                                 <h2 className="font-heading text-xl font-semibold">{title}</h2>
                                 <p className="text-muted-foreground max-w-sm text-sm leading-relaxed">{description}</p>
-                                {isLastStep && <TemplatePicker onSelectTemplate={(prompt: string) => finishOnboarding(prompt)} />}
+                                {isFirstStep && codeEnabled && <PathPicker onChange={setChoice} value={choice} />}
+                                {currentStep?.id === "start" && <TemplatePicker onSelectTemplate={(prompt: string) => finishOnboarding(prompt)} />}
+                                {isCodeStep && (
+                                    <div className="max-h-[min(50vh,360px)] w-full overflow-y-auto text-left">
+                                        <SetupChecklist extra={<GitHostStep withAction={false} />} serverFormShown={false} surface="dialog" />
+                                    </div>
+                                )}
                             </motion.div>
                         </AnimatePresence>
                     </div>
@@ -356,7 +422,7 @@ const OnboardingContent = ({ onComplete }: { onComplete: () => void }) => {
 
                     {/* Progress dots — clickable, with adequate touch targets */}
                     <nav aria-label={t`Onboarding steps`} className="flex items-center justify-center gap-1 pb-6">
-                        {onboardingSteps.map((step, index) => (
+                        {pathSteps.map((step, index) => (
                             <button
                                 aria-current={index === currentIndex ? "step" : undefined}
                                 aria-label={t`Go to step ${index + 1}`}
@@ -413,7 +479,7 @@ const OnboardingContent = ({ onComplete }: { onComplete: () => void }) => {
                                 size="sm"
                             >
                                 {loading.isEngineProcessing ? <Loader2 aria-hidden="true" className="mr-1 size-4 animate-spin" /> : null}
-                                {isLastStep ? t`Just start chatting` : t`Next`}
+                                {isLastStep ? finishLabel : t`Next`}
                                 {!isLastStep && <ArrowRight aria-hidden="true" className="ml-1 size-4" />}
                             </Button>
                         </div>
@@ -426,6 +492,8 @@ const OnboardingContent = ({ onComplete }: { onComplete: () => void }) => {
 
 const OnboardingDialog = () => {
     const { onboardingCompleted, setOnboardingCompleted } = useUserPreferences();
+    // The Code path is only offered where Code mode is: it ends on a page that is not there otherwise.
+    const codeEnabled = useCodeModeEnabled() === true;
     const { user } = useIsAnonymous();
 
     const handleFlowComplete = () => {
@@ -464,7 +532,7 @@ const OnboardingDialog = () => {
                     plugins={plugins}
                     steps={onboardingSteps}
                 >
-                    <OnboardingContent onComplete={handleFlowComplete} />
+                    <OnboardingContent codeEnabled={codeEnabled} onComplete={handleFlowComplete} />
                 </OnboardingProvider>
             </MotionConfig>
         </OnboardingErrorBoundary>

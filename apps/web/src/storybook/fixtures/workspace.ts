@@ -207,7 +207,12 @@ export const workflowFixtures = (options: { gallery?: GalleryWorkflow[]; workflo
 
 type Devices = ReturnOf<typeof api.devices.functions.listDevices>;
 
-export const codeFixtures = (devices: Devices = [] as Devices): LunoraFixture[] => [lunora(api.devices.functions.listDevices, devices)];
+/** The Code page: the paired computers, and whether the account has connected a Git host (the last setup step). */
+export const codeFixtures = (devices: Devices = [] as Devices, options: { gitConnected?: boolean } = {}): LunoraFixture[] => [
+    lunora(api.devices.functions.listDevices, devices),
+    lunora(api.source_control.functions.getDevelopHost, { connected: options.gitConnected ?? false, host: HOST } as never),
+    lunora(api.auth.setup_steps.setSetupStepSkipped, null),
+];
 
 export const DEVICES = [
     {
@@ -228,4 +233,13 @@ export const DEVICES = [
         toolNames: ["bash"],
         updateRequired: false,
     },
+] as Devices;
+
+/** A computer that has an approved coding agent for a folder: the "install a coding agent" step is done. */
+export const DEVICES_WITH_AGENT = [
+    {
+        ...DEVICES[0],
+        acpOffers: [{ agentKey: "claude", agentLabel: "Claude Code", folderId: "folder_1", folderLabel: "storefront" }],
+    },
+    DEVICES[1],
 ] as Devices;

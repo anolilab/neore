@@ -7,8 +7,10 @@ import { Columns2Icon, XIcon } from "lucide-react";
 import type { FC, MouseEvent } from "react";
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 
+import CodeSetup from "@/features/code/components/code-setup";
 import type { CodeHost } from "@/features/code/components/host-details";
 import HostDetails from "@/features/code/components/host-details";
+import type { CodeSetupState } from "@/features/code/hooks/use-code-setup";
 import type { Pane } from "@/features/code/lib/layout";
 import { hostTabId, MAX_PANES } from "@/features/code/lib/layout";
 import { useCodeLayoutStore } from "@/features/code/stores/code-layout-store";
@@ -58,9 +60,10 @@ type PaneViewProps = {
     loaded: boolean;
     now: number;
     pane: Pane;
+    setup: CodeSetupState;
 };
 
-const PaneView: FC<PaneViewProps> = ({ canClose, canSplit, hosts, index, loaded, now, pane }) => {
+const PaneView: FC<PaneViewProps> = ({ canClose, canSplit, hosts, index, loaded, now, pane, setup }) => {
     const { t } = useLingui();
     const dispatch = useCodeLayoutStore((state) => state.dispatch);
     const focus = () => dispatch({ paneIndex: index, type: "focus" });
@@ -75,7 +78,8 @@ const PaneView: FC<PaneViewProps> = ({ canClose, canSplit, hosts, index, loaded,
                         </Button>
                     </div>
                 )}
-                <EmptyPane />
+                {setup === "needed" && <CodeSetup />}
+                {setup === "ready" && <EmptyPane />}
             </section>
         );
     }
@@ -174,10 +178,12 @@ type CodeWorkspaceProps = {
     /** The devices the shell already loaded; nothing here subscribes again. `undefined` while loading. */
     devices: CodeHost[] | undefined;
     now: number;
+    /** Whether the coding setup still has an open step: an empty pane then shows the steps, not the "pick a host" message. */
+    setup?: CodeSetupState;
 };
 
 /** The main area of /code: one or two panes side by side, each with its own tab strip. */
-const CodeWorkspace: FC<CodeWorkspaceProps> = ({ className, devices, now }) => {
+const CodeWorkspace: FC<CodeWorkspaceProps> = ({ className, devices, now, setup = "ready" }) => {
     const { t } = useLingui();
     const layout = useCodeLayoutStore((state) => state.layout);
     const dispatch = useCodeLayoutStore((state) => state.dispatch);
@@ -227,6 +233,7 @@ const CodeWorkspace: FC<CodeWorkspaceProps> = ({ className, devices, now }) => {
                     loaded={devices !== undefined}
                     now={now}
                     pane={visible[0]!}
+                    setup={setup}
                 />
             ) : (
                 <ResizablePanelGroup
@@ -236,11 +243,11 @@ const CodeWorkspace: FC<CodeWorkspaceProps> = ({ className, devices, now }) => {
                     onLayoutChanged={onLayoutChanged}
                 >
                     <ResizablePanel id="pane-0" minSize="20%">
-                        <PaneView canClose canSplit={false} hosts={hosts} index={0} loaded={devices !== undefined} now={now} pane={visible[0]!} />
+                        <PaneView canClose canSplit={false} hosts={hosts} index={0} loaded={devices !== undefined} now={now} pane={visible[0]!} setup={setup} />
                     </ResizablePanel>
                     <ResizableHandle aria-label={t`Resize panes`} withHandle />
                     <ResizablePanel id="pane-1" minSize="20%">
-                        <PaneView canClose canSplit={false} hosts={hosts} index={1} loaded={devices !== undefined} now={now} pane={visible[1]!} />
+                        <PaneView canClose canSplit={false} hosts={hosts} index={1} loaded={devices !== undefined} now={now} pane={visible[1]!} setup={setup} />
                     </ResizablePanel>
                 </ResizablePanelGroup>
             )}

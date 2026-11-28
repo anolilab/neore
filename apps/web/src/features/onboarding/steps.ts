@@ -3,13 +3,22 @@ import type { OnboardingStep } from "@onboardjs/react";
 export interface NeoreOnboardingPayload {
     description: string;
     /** lucide-react icon name used by the step component */
-    icon: "brain-circuit" | "file-text" | "message-square" | "repeat" | "sparkles";
+    icon: "brain-circuit" | "file-text" | "message-square" | "repeat" | "sparkles" | "terminal";
     title: string;
 }
 
 export const ONBOARDING_FLOW_ID = "neore-welcome";
 
 export const ONBOARDING_PERSISTENCE_KEY = "neore-onboarding-progress";
+
+/** The two paths the first step offers. */
+export type OnboardingPath = "chat" | "code";
+
+/** Step ids per path: the tour for chat, the coding setup for code. Both start at the welcome step. */
+export const ONBOARDING_PATH_STEPS: Record<OnboardingPath, ReadonlyArray<string>> = {
+    chat: ["welcome", "models", "media", "canvas", "start"],
+    code: ["welcome", "code"],
+};
 
 export const onboardingSteps: OnboardingStep[] = [
     {
@@ -56,6 +65,16 @@ export const onboardingSteps: OnboardingStep[] = [
             title: "start-title",
         } satisfies NeoreOnboardingPayload,
         // Last step: an explicit end, not the array order running out.
+        nextStep: null,
+    },
+    {
+        // Reached only from the first step's "Code" choice, never by `nextStep` of the tour.
+        id: "code",
+        payload: {
+            description: "code-setup-description",
+            icon: "terminal",
+            title: "code-setup-title",
+        } satisfies NeoreOnboardingPayload,
         nextStep: null,
     },
 ];

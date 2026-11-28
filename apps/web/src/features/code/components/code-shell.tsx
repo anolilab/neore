@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 import SettingsLink from "@/components/settings/settings-link";
 import CodeWorkspace from "@/features/code/components/code-workspace";
 import { useCodeModeEnabled } from "@/features/code/hooks/use-code-mode-enabled";
+import { useCodeSetup } from "@/features/code/hooks/use-code-setup";
 import { hostTabId } from "@/features/code/lib/layout";
 import { useCodeLayoutStore } from "@/features/code/stores/code-layout-store";
 import { isDeviceOnline } from "@/features/devices/lib/device-relay";
@@ -119,11 +120,13 @@ const RunsSection: FC = () => {
 const CodeShell: FC = () => {
     const { t } = useLingui();
     const enabled = useCodeModeEnabled();
-    const [listOpen, setListOpen] = useState(true);
+    // Until a choice is made the list opens first, unless the setup steps are waiting and there is no host: on a phone the steps are then the first thing to see.
+    const [listChoice, setListChoice] = useState<boolean | undefined>(undefined);
     const now = useNow();
     const dispatch = useCodeLayoutStore((state) => state.dispatch);
     const activeTab = useCodeLayoutStore((state) => state.layout.panes[state.layout.activePane]?.active);
-    const { data: devices } = useDevices(enabled === true);
+    const { data: devices, isError: devicesFailed } = useDevices(enabled === true);
+    const setup = useCodeSetup(devices, devicesFailed);
 
     if (enabled === undefined) {
         return null;
@@ -139,10 +142,12 @@ const CodeShell: FC = () => {
         );
     }
 
+    // Hosts to pick from come first; the steps come first only when there is no host yet.
+    const listOpen = listChoice ?? !(setup === "needed" && (devices?.length ?? 0) === 0);
     const selectedId = activeTab?.startsWith("host:") ? activeTab.slice("host:".length) : undefined;
     const openHost = (id: string) => {
         dispatch({ tabId: hostTabId(id), type: "open" });
-        setListOpen(false);
+        setListChoice(false);
     };
 
     return (
@@ -157,12 +162,12 @@ const CodeShell: FC = () => {
             </aside>
             <div className={cn("min-w-0 flex-1 flex-col md:flex", listOpen ? "hidden" : "flex")}>
                 <div className="p-2 md:hidden">
-                    <Button className="min-h-11" onClick={() => setListOpen(true)} variant="ghost">
+                    <Button className="min-h-11" onClick={() => setListChoice(true)} variant="ghost">
                         <ArrowLeftIcon aria-hidden="true" className="size-4" />
                         <Trans>Back</Trans>
                     </Button>
                 </div>
-                <CodeWorkspace devices={devices} now={now} />
+                <CodeWorkspace devices={devices} now={now} setup={setup} />
             </div>
         </>
     );
