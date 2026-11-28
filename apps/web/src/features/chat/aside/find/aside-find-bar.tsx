@@ -28,6 +28,7 @@ const AsideFindBar: FC = () => {
     const { t } = useLingui();
     const [isOpen, setIsOpen] = useState(false);
     const [query, setQuery] = useState("");
+    const [openRequest, setOpenRequest] = useState(0);
     // The step the reader asked for. It can name another hit once an earlier answer adds one, so the counter shows `position`.
     const [index, setIndex] = useState(0);
     const [position, setPosition] = useState(0);
@@ -56,17 +57,24 @@ const AsideFindBar: FC = () => {
             }
 
             setIsOpen(true);
-            // The input mounts with the bar; focus it once it is there.
-            requestAnimationFrame(() => {
-                inputRef.current?.focus();
-                inputRef.current?.select();
-            });
+            setOpenRequest((request) => request + 1);
         };
 
         globalThis.addEventListener(ASIDE_FIND_EVENT, open);
 
         return () => globalThis.removeEventListener(ASIDE_FIND_EVENT, open);
     }, []);
+
+    // The input mounts with the bar, so it is focused after the render that shows it: a frame can come before that
+    // render on a slow machine. Every open counts, so Find again while open selects the query once more.
+    useEffect(() => {
+        if (openRequest === 0) {
+            return;
+        }
+
+        inputRef.current?.focus();
+        inputRef.current?.select();
+    }, [openRequest]);
 
     const close = useCallback(() => {
         setIsOpen(false);
