@@ -61,9 +61,11 @@ type PaneViewProps = {
     now: number;
     pane: Pane;
     setup: CodeSetupState;
+    /** Another pane on the page already shows the setup steps: one list on the page, so this one shows the empty state. */
+    setupElsewhere?: boolean;
 };
 
-const PaneView: FC<PaneViewProps> = ({ canClose, canSplit, hosts, index, loaded, now, pane, setup }) => {
+const PaneView: FC<PaneViewProps> = ({ canClose, canSplit, hosts, index, loaded, now, pane, setup, setupElsewhere = false }) => {
     const { t } = useLingui();
     const dispatch = useCodeLayoutStore((state) => state.dispatch);
     const focus = () => dispatch({ paneIndex: index, type: "focus" });
@@ -71,16 +73,16 @@ const PaneView: FC<PaneViewProps> = ({ canClose, canSplit, hosts, index, loaded,
     // button, its announcement and a failed save's message) out from under the user.
     const [setupShown, setSetupShown] = useState(false);
 
-    if (setup === "needed" && !setupShown && pane.tabs.length === 0) {
+    if (setup === "needed" && !setupShown && pane.tabs.length === 0 && !setupElsewhere) {
         setSetupShown(true);
     }
 
     // A tab opened ends that: once it closes again, a finished setup gives way to the host prompt.
-    if (setupShown && pane.tabs.length > 0) {
+    if (setupShown && (pane.tabs.length > 0 || setupElsewhere)) {
         setSetupShown(false);
     }
 
-    const showSetup = setup === "needed" || (setupShown && setup === "ready");
+    const showSetup = !setupElsewhere && (setup === "needed" || (setupShown && setup === "ready"));
 
     if (pane.tabs.length === 0) {
         return (
@@ -92,13 +94,13 @@ const PaneView: FC<PaneViewProps> = ({ canClose, canSplit, hosts, index, loaded,
                         </Button>
                     </div>
                 )}
-                {setup === "loading" && (
+                {setup === "loading" && !setupElsewhere && (
                     <p className="text-muted-foreground flex flex-1 items-center justify-center p-6 text-sm" role="status">
                         {t`Loading…`}
                     </p>
                 )}
                 {showSetup && <CodeSetup devices={[...hosts.values()]} />}
-                {setup === "ready" && !showSetup && <EmptyPane />}
+                {(setup === "ready" || setupElsewhere) && !showSetup && <EmptyPane />}
             </section>
         );
     }
@@ -275,7 +277,8 @@ const CodeWorkspace: FC<CodeWorkspaceProps> = ({ className, devices, now, setup 
                             now={now}
                             pane={visible[1]!}
                             // One setup list on the page: with the first pane empty too, it is already there.
-                            setup={visible[0]!.tabs.length === 0 ? "ready" : setup}
+                            setup={setup}
+                            setupElsewhere={visible[0]!.tabs.length === 0}
                         />
                     </ResizablePanel>
                 </ResizablePanelGroup>
