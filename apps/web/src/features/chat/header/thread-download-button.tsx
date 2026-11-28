@@ -8,10 +8,11 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Tooltip, TooltipContent, TooltipTrigger } from "@neore/ui/components/tooltip";
 import { ClipboardCopyIcon, DownloadIcon, FileJsonIcon, FileTextIcon, FileTypeIcon, GaugeIcon, ShrinkIcon } from "lucide-react";
 import type { FC } from "react";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import useCompactThread from "@/features/chat/compaction/use-compact-thread";
+import { useOverflowReturnTarget } from "@/features/layout/components/mobile-header-actions";
 import type { DownloadFormat } from "@/lib/download";
 import { formatAsMarkdown, handleDownload } from "@/lib/download";
 import { useLunora } from "@/lib/lunora/crpc";
@@ -30,6 +31,9 @@ const ThreadDownloadButton: FC<Props> = ({ label, model, threadId }) => {
     const { t } = useLingui();
     const [loading, setLoading] = useState(false);
     const [isStatsOpen, setIsStatsOpen] = useState(false);
+    // The statistics open from a menu item, gone when they close: focus goes back to the button (or the overflow menu's trigger).
+    const triggerRef = useRef<HTMLButtonElement>(null);
+    const returnTargetFor = useOverflowReturnTarget();
     const lunora = useLunora();
     const { compact, isCompacting } = useCompactThread(threadId);
 
@@ -106,6 +110,7 @@ const ThreadDownloadButton: FC<Props> = ({ label, model, threadId }) => {
                                 <Button
                                     className={label ? OVERFLOW_ROW_CLASS : undefined}
                                     disabled={isDisabled}
+                                    ref={triggerRef}
                                     size={label ? "default" : "icon"}
                                     variant="ghost"
                                 >
@@ -152,7 +157,15 @@ const ThreadDownloadButton: FC<Props> = ({ label, model, threadId }) => {
                 </DropdownMenuContent>
             </DropdownMenu>
             <TooltipContent side="bottom">{t`Chat actions`}</TooltipContent>
-            {model && threadId && <ThreadStatsDialog model={model} onOpenChange={setIsStatsOpen} open={isStatsOpen} threadId={threadId} />}
+            {model && threadId && (
+                <ThreadStatsDialog
+                    model={model}
+                    onOpenChange={setIsStatsOpen}
+                    open={isStatsOpen}
+                    returnFocus={() => (triggerRef.current ? returnTargetFor(triggerRef.current) : null)}
+                    threadId={threadId}
+                />
+            )}
         </Tooltip>
     );
 };
