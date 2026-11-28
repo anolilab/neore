@@ -242,6 +242,21 @@ describe("thread list cache", () => {
         expect(readThreadListCache("alice")?.threads.map((row) => row._id)).toContain("t8");
     });
 
+    it("keeps what a row's model line reads, Auto and the agent's model, across a reload", () => {
+        const list = listFor("alice");
+
+        list.threads.page.push({ ...list.threads.page[0], _id: "t8", activeAgent: { model: "acme/agent-model", name: "Ada" }, autoModel: false } as never);
+        list.threads.page.push({ ...list.threads.page[0], _id: "t7", autoModel: true } as never);
+        writeThreadListCache("alice", list);
+
+        const stored = readThreadListCache("alice");
+        const rows = stored === undefined ? [] : (toThreadListData(stored).threads.page as Record<string, unknown>[]);
+
+        expect(rows.find((row) => row._id === "t8")).toMatchObject({ activeAgent: { model: "acme/agent-model" }, autoModel: false });
+        expect(rows.find((row) => row._id === "t8")).not.toHaveProperty("activeAgentModel");
+        expect(rows.find((row) => row._id === "t7")).toMatchObject({ autoModel: true });
+    });
+
     it("stores no title for a locked chat", () => {
         const list = listFor("alice");
 

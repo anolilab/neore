@@ -4,7 +4,6 @@ import { useLingui } from "@lingui/react/macro";
 import type { Id } from "@neore/backend/dataModel";
 import { Button } from "@neore/ui/components/button";
 import { Label } from "@neore/ui/components/label";
-import { Separator } from "@neore/ui/components/separator";
 import { Sidebar, SidebarContent, SidebarRail } from "@neore/ui/components/sidebar";
 import { Switch } from "@neore/ui/components/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@neore/ui/components/tabs";
@@ -30,6 +29,7 @@ import { useCRPC } from "@/lib/lunora/crpc";
 
 import type { ThreadContextRecord } from "./thread-context";
 import ThreadContext from "./thread-context";
+import { effectiveRightSidebarTab, isTextModelId } from "./use-thread-context-shown";
 
 interface ThreadSidebarProps {
     threadId?: string;
@@ -137,81 +137,94 @@ const ThreadSummary: FC<{ threadId?: string }> = ({ threadId }) => {
         }
     };
 
+    const generateButton = threadId && isTextModel && (
+        <Button className="h-7 gap-1.5 px-2 text-xs" disabled={isGeneratingSummary} onClick={handleGenerateSummary} size="sm" variant="ghost">
+            {isGeneratingSummary ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}
+            {isGeneratingSummary ? t`Generating...` : t`Generate`}
+        </Button>
+    );
+
     return (
         <div className="space-y-5 py-4 pr-2 pl-1">
             {!isNewThread && threadId && <ThreadContext thread={thread as ThreadContextRecord} threadId={threadId} />}
 
-            <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                    <h2 className="text-foreground text-base font-semibold">{t`Thread summary`}</h2>
-                    {threadId && isTextModel && (
-                        <Button className="h-7 gap-1.5 px-2 text-xs" disabled={isGeneratingSummary} onClick={handleGenerateSummary} size="sm" variant="ghost">
-                            {isGeneratingSummary ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}
-                            {isGeneratingSummary ? t`Generating...` : t`Generate`}
-                        </Button>
-                    )}
+            {thread?.summary && isTextModel ? (
+                <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                        <h2 className="text-foreground text-[15px] font-semibold">{t`Thread summary`}</h2>
+                        {generateButton}
+                    </div>
+                    <div className="text-muted-foreground surface-well rounded-[10px] px-3 py-2.5 text-[12.5px] leading-relaxed">
+                        <p className="whitespace-pre-line">{thread.summary}</p>
+                    </div>
                 </div>
-                <div className="text-muted-foreground surface-well rounded-[10px] px-3 py-2.5 text-[12.5px] leading-relaxed">
+            ) : (
+                // Nothing to read yet: one row with its action, not a box of instructions.
+                <div className="surface-edge flex min-h-9 flex-wrap items-center justify-between gap-x-2 rounded-xl py-1 pr-1.5 pl-3">
+                    <h2 className="text-foreground text-sm font-medium">{t`Thread summary`}</h2>
                     {isTextModel ? (
-                        <p className="whitespace-pre-line">{thread?.summary || t`No summary available. Click "Generate" to create one.`}</p>
+                        generateButton
                     ) : (
-                        <p className="text-muted-foreground italic">{t`Summary is only available for text models.`}</p>
+                        <p className="text-muted-foreground min-w-0 text-xs italic">{t`Summary is only available for text models.`}</p>
                     )}
                 </div>
-            </div>
+            )}
 
-            <Separator />
+            <section aria-labelledby="thread-settings-heading" className="space-y-3">
+                <h2 className="text-foreground text-[15px] font-semibold" id="thread-settings-heading">
+                    {t`Thread settings`}
+                </h2>
+                <div className="divide-border/50 border-border/50 divide-y rounded-xl border *:p-3">
+                    <div className="flex items-center justify-between gap-3">
+                        <div className="flex flex-col gap-1">
+                            <Label className="text-foreground text-sm font-medium">{t`Stateless Mode`}</Label>
+                            <p className="text-muted-foreground text-xs">
+                                {t`Process each message independently with only the system prompt and current input. No chat history context.`}
+                            </p>
+                        </div>
+                        <Switch aria-label={t`Stateless Mode`} checked={statelessMode} onCheckedChange={handleStatelessModeChange} />
+                    </div>
 
-            <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                    <div className="flex flex-col gap-1">
-                        <Label className="text-foreground text-sm font-medium">{t`Stateless Mode`}</Label>
+                    <div className="space-y-2">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                            <Label className="text-foreground text-sm font-medium" htmlFor="custom-system-prompt">
+                                {t`Custom System Prompt`}
+                            </Label>
+                            <div className="flex items-center gap-2">
+                                <ApplyPresetMenu modelId={thread?.model} onApply={handleOptimizedSystemPrompt} />
+                                <Button onClick={() => setIsOptimizerOpen(true)} size="sm" type="button" variant="outline">
+                                    <Sparkles aria-hidden="true" className="mr-1.5 size-3.5" />
+                                    {t`Optimize`}
+                                </Button>
+                            </div>
+                        </div>
+                        <Textarea
+                            className="bg-surface-well dark:bg-surface-well rounded-[10px] border-transparent [box-shadow:var(--surface-well-shadow)]"
+                            expandable
+                            expandableDialogTitle={t`Custom System Prompt`}
+                            id="custom-system-prompt"
+                            onBlur={(e) => {
+                                if (promptTimeoutRef.current) {
+                                    clearTimeout(promptTimeoutRef.current);
+                                    promptTimeoutRef.current = null;
+                                }
+
+                                updateThread({ customSystemPrompt: e.target.value || undefined });
+                            }}
+                            onChange={(e) => {
+                                handleCustomSystemPromptChange(e.target.value);
+                            }}
+                            placeholder={t`Enter your custom system prompt here. This will be used for every message.`}
+                            value={customSystemPrompt}
+                        />
                         <p className="text-muted-foreground text-xs">
-                            {t`Process each message independently with only the system prompt and current input. No chat history context.`}
+                            {statelessMode
+                                ? t`This prompt will be used for every message. Each message is processed independently without chat history.`
+                                : t`This prompt will be used for every message alongside the conversation history.`}
                         </p>
                     </div>
-                    <Switch aria-label={t`Stateless Mode`} checked={statelessMode} onCheckedChange={handleStatelessModeChange} />
                 </div>
-
-                <div className="space-y-2">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                        <Label className="text-foreground text-sm font-medium" htmlFor="custom-system-prompt">
-                            {t`Custom System Prompt`}
-                        </Label>
-                        <div className="flex items-center gap-2">
-                            <ApplyPresetMenu modelId={thread?.model} onApply={handleOptimizedSystemPrompt} />
-                            <Button onClick={() => setIsOptimizerOpen(true)} size="sm" type="button" variant="outline">
-                                <Sparkles aria-hidden="true" className="mr-1.5 size-3.5" />
-                                {t`Optimize`}
-                            </Button>
-                        </div>
-                    </div>
-                    <Textarea
-                        className="bg-surface-well dark:bg-surface-well rounded-[10px] border-transparent [box-shadow:var(--surface-well-shadow)]"
-                        expandable
-                        expandableDialogTitle={t`Custom System Prompt`}
-                        id="custom-system-prompt"
-                        onBlur={(e) => {
-                            if (promptTimeoutRef.current) {
-                                clearTimeout(promptTimeoutRef.current);
-                                promptTimeoutRef.current = null;
-                            }
-
-                            updateThread({ customSystemPrompt: e.target.value || undefined });
-                        }}
-                        onChange={(e) => {
-                            handleCustomSystemPromptChange(e.target.value);
-                        }}
-                        placeholder={t`Enter your custom system prompt here. This will be used for every message.`}
-                        value={customSystemPrompt}
-                    />
-                    <p className="text-muted-foreground text-xs">
-                        {statelessMode
-                            ? t`This prompt will be used for every message. Each message is processed independently without chat history.`
-                            : t`This prompt will be used for every message alongside the conversation history.`}
-                    </p>
-                </div>
-            </div>
+            </section>
             <SystemPromptOptimizerDialog
                 initialPrompt={customSystemPrompt}
                 modelId={thread?.model}
@@ -308,13 +321,12 @@ const ThreadSidebar: FC<ThreadSidebarProps> = ({ threadId }) => {
     const storedRightSidebarTab = useChatUIStore((state) => state.activeRightSidebarTab);
     const setActiveRightSidebarTab = useChatUIStore((state) => state.setActiveRightSidebarTab);
     const flaggedModels = useFeatureFlaggedModels();
-    const modelsMap = new Map(flaggedModels.map((m) => [m.id, m]));
 
     const { thread } = useModelCombobox({ threadId });
-    const isTextModel = !thread?.model || (modelsMap.get(thread.model)?.mode ?? "text") === "text";
+    const isTextModel = isTextModelId(thread?.model, flaggedModels);
     // The Ask tab exists for text models only: a thread switched to another model falls back to the summary tab. Pins stay,
-    // since an image chat's replies are what people pin there.
-    const activeRightSidebarTab = !isTextModel && storedRightSidebarTab === ASIDE_TAB ? "summary" : storedRightSidebarTab;
+    // since an image chat's replies are what people pin there. The header reads the same rule (`useThreadContextShown`).
+    const activeRightSidebarTab = effectiveRightSidebarTab(storedRightSidebarTab, isTextModel);
 
     return (
         <Sidebar

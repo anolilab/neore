@@ -236,6 +236,8 @@ const useThreadGroups = (
             const { scheduled } = thread;
 
             return {
+                activeAgent: thread.activeAgent,
+                autoModel: thread.autoModel,
                 awaitingInput: thread.awaitingInput,
                 branchPoint: 0,
                 branchType: "branch",

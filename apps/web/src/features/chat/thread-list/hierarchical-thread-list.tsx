@@ -3,9 +3,10 @@ import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalList
 import { CSS } from "@dnd-kit/utilities";
 import { plural } from "@lingui/core/macro";
 import { Plural, useLingui } from "@lingui/react/macro";
+import { DEFAULT_CHAT_MODEL } from "@neore/ai/constants";
 import type { Id } from "@neore/backend/dataModel";
 import { Button } from "@neore/ui/components/button";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueries, useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { Loader2, Trash2, X } from "lucide-react";
@@ -19,6 +20,7 @@ import {
     useDeleteProject,
     useMoveThreadToProject,
     usePinProject,
+    useProjectList,
     useProjects,
     useUnpinProject,
     useUpdateProjectOrder,
@@ -32,6 +34,7 @@ import applyDragEnd from "./apply-drag-end";
 import ThreadGroupRenderer from "./components/thread-group-renderer";
 import { KeyboardSelectionProvider } from "./contexts/keyboard-selection-context";
 import { SearchQueryContext } from "./contexts/search-query-context";
+import { GroupProjectContext, ThreadRowHintsContext } from "./contexts/thread-row-hints-context";
 import GroupHeader from "./group-header";
 import useKeyboardNavigation from "./hooks/use-keyboard-navigation";
 import useStableCallback from "./hooks/use-stable-callback";
@@ -48,6 +51,9 @@ import { isThreadLocked } from "./thread-lock";
 import type { BranchNode, GroupType, HierarchicalThreadListProperties, MinimalThreadRelationship, ThreadGroup } from "./types";
 import type { ThreadDateRange } from "./utilities";
 import { getGroupType, isDragBlocked, isGroupFullySelected, selectThreadIdsByDate } from "./utilities";
+
+/** The most projects beyond the project list's first page whose titles the list reads by id. */
+const MAX_UNLISTED_PROJECT_LOOKUPS = 20;
 
 // Lazy: a dialog opened on demand, with its icon picker and project panels.
 const ProjectFormDialog = lazy(() => import("@/features/projects/components/project-form-dialog"));
@@ -195,6 +201,12 @@ const SortableProjectGroup: FC<{ children: (listeners: any) => ReactNode; projec
 // Main Components
 // ============================================================================
 
+/**
+ * One row of the virtualized list. A thread row carries the project of its section: it renders apart from the section's wrapper,
+ * so the row could not otherwise tell that the section already names its project.
+ */
+type VirtualItem = { group: ThreadGroup; groupType: GroupType; type: "group" } | { groupProjectId?: string; index: number; thread: BranchNode; type: "thread" };
+
 // Separate component for virtualized rendering to isolate useVirtualizer from React Compiler
 // This allows the main component to be optimized while keeping virtualization working
 // Component to make project groups droppable
@@ -219,7 +231,7 @@ const ProjectGroupContainer: FC<{ children: ReactNode; isProjectGroup: boolean; 
             ref={setNodeRef}
             style={{ minHeight: "40px", position: "relative" }}
         >
-            {children}
+            <GroupProjectContext value={projectId}>{children}</GroupProjectContext>
         </div>
     );
 };
@@ -253,7 +265,7 @@ const VirtualizedThreadList: FC<{
     toggleExpanded: (threadId: string) => void;
     toggleGroupCollapsed: (groupType: GroupType, projectId?: string) => void;
     updateThread: (threadId: string, model: string, status: "archived" | "active") => void;
-    virtualItems: ({ group: ThreadGroup; groupType: GroupType; type: "group" } | { index: number; thread: BranchNode; type: "thread" })[];
+    virtualItems: VirtualItem[];
 }> = memo(({ virtualItems, ...props }) => {
     const parentReference = useRef<HTMLDivElement>(null);
     const { t } = useLingui();
@@ -354,27 +366,29 @@ const VirtualizedThreadList: FC<{
                                     );
                                 })()
                             ) : (
-                                <div className="pb-1.5">
-                                    <SortableThreadItem
-                                        expandedThreads={props.expandedThreads}
-                                        handleCreateBranch={props.handleCreateBranch}
-                                        handleDeleteThread={props.handleDeleteThread}
-                                        handleDownloadThread={props.handleDownloadThread}
-                                        handleMouseEnter={props.handleMouseEnter}
-                                        handlePinThread={props.handlePinThread}
-                                        handleThreadToggle={props.handleThreadToggle}
-                                        handleUnpinThread={props.handleUnpinThread}
-                                        index={item.index}
-                                        isSelected={props.selectedThreadIds.has(item.thread.threadId)}
-                                        isSelectionMode={props.isSelectionMode}
-                                        key={item.thread.threadId}
-                                        loadingStates={props.loadingStates}
-                                        node={item.thread}
-                                        selectedThreadIds={props.selectedThreadIds}
-                                        toggleExpanded={props.toggleExpanded}
-                                        updateThread={props.updateThread}
-                                    />
-                                </div>
+                                <GroupProjectContext value={item.groupProjectId}>
+                                    <div className="pb-1.5">
+                                        <SortableThreadItem
+                                            expandedThreads={props.expandedThreads}
+                                            handleCreateBranch={props.handleCreateBranch}
+                                            handleDeleteThread={props.handleDeleteThread}
+                                            handleDownloadThread={props.handleDownloadThread}
+                                            handleMouseEnter={props.handleMouseEnter}
+                                            handlePinThread={props.handlePinThread}
+                                            handleThreadToggle={props.handleThreadToggle}
+                                            handleUnpinThread={props.handleUnpinThread}
+                                            index={item.index}
+                                            isSelected={props.selectedThreadIds.has(item.thread.threadId)}
+                                            isSelectionMode={props.isSelectionMode}
+                                            key={item.thread.threadId}
+                                            loadingStates={props.loadingStates}
+                                            node={item.thread}
+                                            selectedThreadIds={props.selectedThreadIds}
+                                            toggleExpanded={props.toggleExpanded}
+                                            updateThread={props.updateThread}
+                                        />
+                                    </div>
+                                </GroupProjectContext>
                             )}
                         </div>
                     );
@@ -570,6 +584,74 @@ const HierarchicalThreadList: FC<
 
         return map;
     }, [projects]);
+
+    // The rows' second line names a project by its title, and a model only when it is not one a new chat starts on.
+    const { data: aiPreferences, isError: preferencesFailed } = useQuery(crpc.auth.functions.getAIUserPreferences.queryOptions({}));
+    const defaultModels = useMemo(() => {
+        if (aiPreferences === undefined) {
+            // A first read that failed never answers: the rows then go by the app's default alone. A failed refresh keeps the
+            // preferences already read, below.
+            return preferencesFailed ? new Set([DEFAULT_CHAT_MODEL]) : undefined;
+        }
+
+        const saved = (aiPreferences?.defaultModels ?? {}) as Record<string, string | undefined>;
+
+        return new Set([DEFAULT_CHAT_MODEL, ...Object.values(saved).filter((model): model is string => typeof model === "string")]);
+    }, [aiPreferences, preferencesFailed]);
+    // The project list is one page. When it is cut, the projects of the rows on screen (search results included, collapsed
+    // groups and closed branches not) that the page lacks are read by id, a few at most: each costs a request.
+    const { hasMore: projectListCut } = useProjectList();
+    // A string first: the shown groups are rebuilt on every thread switch, and a new array each time would re-render every row.
+    const unlistedProjectIdsKey = useMemo(() => {
+        if (!projectListCut) {
+            return "";
+        }
+
+        const ids = new Set<string>();
+        const collect = (node: BranchNode) => {
+            if (node.projectId && !projectsMap.has(node.projectId)) {
+                ids.add(node.projectId);
+            }
+
+            // Only the rows on screen, as the list draws them: an open branch's children, a collapsed group's nothing.
+            if (expandedThreads.has(node.threadId)) {
+                node.children.forEach((child) => collect(child));
+            }
+        };
+
+        filteredGroups.forEach((group) => {
+            if (!group.isCollapsed) {
+                group.threads.forEach((thread) => collect(thread));
+            }
+        });
+
+        return [...ids].slice(0, MAX_UNLISTED_PROJECT_LOOKUPS).join(",");
+    }, [expandedThreads, filteredGroups, projectListCut, projectsMap]);
+    const unlistedProjectIds = useMemo(() => (unlistedProjectIdsKey ? unlistedProjectIdsKey.split(",") : []), [unlistedProjectIdsKey]);
+    // Serialised, so the hints below change only when a title does, not on every render; JSON keeps any title intact.
+    const unlistedTitlesKey = useQueries({
+        combine: (results) => JSON.stringify(results.map((query) => query.data?.title ?? null)),
+        queries: unlistedProjectIds.map((projectId) => crpc.projects.functions.getProject.queryOptions({ projectId: projectId as Id<"projects"> })),
+    });
+    const rowHints = useMemo(() => {
+        const projectTitles = new Map<string, string>();
+
+        for (const [projectId, project] of projectsMap) {
+            projectTitles.set(projectId, project.title);
+        }
+
+        const unlistedTitles = JSON.parse(unlistedTitlesKey) as (string | null)[];
+
+        unlistedProjectIds.forEach((projectId, index) => {
+            const title = unlistedTitles[index];
+
+            if (title) {
+                projectTitles.set(projectId, title);
+            }
+        });
+
+        return { defaultModels, projectTitles };
+    }, [defaultModels, projectsMap, unlistedProjectIds, unlistedTitlesKey]);
 
     const handleEditProject = useCallback(
         (projectId: string) => {
@@ -931,7 +1013,7 @@ const HierarchicalThreadList: FC<
 
     // Flatten all visible items for virtualization (groups + threads)
     const virtualItems = useMemo(() => {
-        const items: ({ group: ThreadGroup; groupType: GroupType; type: "group" } | { index: number; thread: BranchNode; type: "thread" })[] = [];
+        const items: VirtualItem[] = [];
 
         threadGroups.forEach((group) => {
             const groupType = getGroupType(group);
@@ -940,7 +1022,7 @@ const HierarchicalThreadList: FC<
 
             if (!group.isCollapsed) {
                 group.threads.forEach((thread, index) => {
-                    items.push({ index, thread, type: "thread" });
+                    items.push({ groupProjectId: groupType === "project" ? group.projectId : undefined, index, thread, type: "thread" });
                 });
             }
         });
@@ -1213,76 +1295,78 @@ const HierarchicalThreadList: FC<
         <PullRequestCountsProvider threadIds={visibleThreadIds}>
             <KeyboardSelectionProvider threadId={keyboardThreadId}>
                 <SearchQueryContext value={searchQuery}>
-                    <div
-                        className="focus-visible:ring-ring/50 relative flex flex-col gap-2 rounded-md outline-none focus-visible:ring-2"
-                        ref={listRootReference}
-                        tabIndex={-1}
-                    >
-                        {isSelectionMode && (
-                            <SelectionToolbar
-                                isAllSelected={isAllSelected}
-                                onClearSelection={handleClearSelection}
-                                onDeleteSelected={handleBulkDelete}
-                                onDone={onExitSelectionMode}
-                                onSelectAll={handleSelectAll}
-                                onSelectByDate={handleSelectByDate}
-                                selectedCount={selectedThreadIds.size}
-                            />
-                        )}
-                        <DndContext collisionDetection={closestCorners} onDragEnd={handleDragEnd} sensors={sensors}>
-                            {renderThreadGroups()}
-                        </DndContext>
-                        {hasOpenedProjectForm && (
-                            <Suspense fallback={null}>
-                                <ProjectFormDialog
-                                    editingProject={editingProject}
-                                    onClose={() => setShowProjectFormDialog(false)}
-                                    open={showProjectFormDialog}
+                    <ThreadRowHintsContext value={rowHints}>
+                        <div
+                            className="focus-visible:ring-ring/50 relative flex flex-col gap-2 rounded-md outline-none focus-visible:ring-2"
+                            ref={listRootReference}
+                            tabIndex={-1}
+                        >
+                            {isSelectionMode && (
+                                <SelectionToolbar
+                                    isAllSelected={isAllSelected}
+                                    onClearSelection={handleClearSelection}
+                                    onDeleteSelected={handleBulkDelete}
+                                    onDone={onExitSelectionMode}
+                                    onSelectAll={handleSelectAll}
+                                    onSelectByDate={handleSelectByDate}
+                                    selectedCount={selectedThreadIds.size}
                                 />
-                            </Suspense>
-                        )}
-                        <DeleteConfirmationDialog
-                            description={t`This will permanently delete the project and all associated threads. This action cannot be undone.`}
-                            isDeleting={isDeletingProject}
-                            itemName={projectToDelete?.name}
-                            onConfirm={handleConfirmDeleteProject}
-                            onOpenChange={(open) => {
-                                if (!open) {
-                                    setProjectToDelete(null);
-                                }
-                            }}
-                            open={!!projectToDelete}
-                            title={t`Delete Project`}
-                        />
-                        {threadHandlers.confirmDialog}
-                        {snoozeThread && (
-                            <SnoozeUntilDialog
-                                key={snoozeThread.threadId}
+                            )}
+                            <DndContext collisionDetection={closestCorners} onDragEnd={handleDragEnd} sensors={sensors}>
+                                {renderThreadGroups()}
+                            </DndContext>
+                            {hasOpenedProjectForm && (
+                                <Suspense fallback={null}>
+                                    <ProjectFormDialog
+                                        editingProject={editingProject}
+                                        onClose={() => setShowProjectFormDialog(false)}
+                                        open={showProjectFormDialog}
+                                    />
+                                </Suspense>
+                            )}
+                            <DeleteConfirmationDialog
+                                description={t`This will permanently delete the project and all associated threads. This action cannot be undone.`}
+                                isDeleting={isDeletingProject}
+                                itemName={projectToDelete?.name}
+                                onConfirm={handleConfirmDeleteProject}
                                 onOpenChange={(open) => {
                                     if (!open) {
-                                        setSnoozeThreadId(null);
+                                        setProjectToDelete(null);
                                     }
                                 }}
-                                open
-                                previousUntil={snoozeThread.snoozedUntil}
-                                restoreFocus={() => renameFocusTarget(listRootReference.current, snoozeThread.threadId)}
-                                threadId={snoozeThread.threadId}
+                                open={!!projectToDelete}
+                                title={t`Delete Project`}
                             />
-                        )}
-                        {renameThread && !isThreadLocked(renameThread.lockedAt) && (
-                            <RenameThreadDialog
-                                onOpenChange={(open) => {
-                                    if (!open) {
-                                        setRenameThreadId(null);
-                                    }
-                                }}
-                                open
-                                restoreFocus={() => renameFocusTarget(listRootReference.current, renameThread.threadId)}
-                                storedTitle={renameThread.storedTitle ?? renameThread.title}
-                                threadId={renameThread.threadId}
-                            />
-                        )}
-                    </div>
+                            {threadHandlers.confirmDialog}
+                            {snoozeThread && (
+                                <SnoozeUntilDialog
+                                    key={snoozeThread.threadId}
+                                    onOpenChange={(open) => {
+                                        if (!open) {
+                                            setSnoozeThreadId(null);
+                                        }
+                                    }}
+                                    open
+                                    previousUntil={snoozeThread.snoozedUntil}
+                                    restoreFocus={() => renameFocusTarget(listRootReference.current, snoozeThread.threadId)}
+                                    threadId={snoozeThread.threadId}
+                                />
+                            )}
+                            {renameThread && !isThreadLocked(renameThread.lockedAt) && (
+                                <RenameThreadDialog
+                                    onOpenChange={(open) => {
+                                        if (!open) {
+                                            setRenameThreadId(null);
+                                        }
+                                    }}
+                                    open
+                                    restoreFocus={() => renameFocusTarget(listRootReference.current, renameThread.threadId)}
+                                    storedTitle={renameThread.storedTitle ?? renameThread.title}
+                                    threadId={renameThread.threadId}
+                                />
+                            )}
+                        </div>
+                    </ThreadRowHintsContext>
                 </SearchQueryContext>
             </KeyboardSelectionProvider>
         </PullRequestCountsProvider>

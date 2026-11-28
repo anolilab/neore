@@ -78,6 +78,7 @@ import { openThreadWindow, supportsThreadWindows } from "@/lib/native/bridge";
 import { showError, showWarning } from "@/lib/toast";
 
 import { useIsKeyboardSelected } from "./contexts/keyboard-selection-context";
+import { useGroupProjectId, useThreadRowHints } from "./contexts/thread-row-hints-context";
 import useCanHover from "./hooks/use-can-hover";
 import { useConfirmBeforeDelete } from "./hooks/use-confirm-before-delete";
 import useMinuteClock from "./hooks/use-minute-clock";
@@ -764,9 +765,24 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
     const hasCategory = node.category !== undefined && node.category !== "" && node.category !== "general";
     const hasMatches = node.relevantMessages !== undefined && node.relevantMessages.length > 0;
     const isHostRun = node.runner === "host";
-    // The model stands in when nothing else has anything to say; a locked chat shows nothing about itself.
-    const cachedModelName = useCachedModelName(isLocked ? undefined : node.model);
-    const modelName = !isLocked && node.model ? (cachedModelName ?? node.model.split("/").pop() ?? node.model) : undefined;
+    // What tells this thread from the next: its project (unless the section already is that project) and its model (unless it is the
+    // one a new chat starts on, which every other row would only repeat). A locked chat shows nothing about itself.
+    const { defaultModels, projectTitles } = useThreadRowHints();
+    const groupProjectId = useGroupProjectId();
+    const projectName = !isLocked && node.projectId && node.projectId !== groupProjectId ? projectTitles.get(node.projectId) : undefined;
+    // After an agent switch the agent's model is the one the thread runs on; a thread on your computer runs the coding agent's own.
+    const runModel = node.activeAgent?.model ?? node.model;
+    const isAutoModel = node.autoModel === true && node.activeAgent === undefined;
+    const hasOwnModel = !isLocked && !isHostRun && defaultModels !== undefined && (isAutoModel || (runModel !== undefined && !defaultModels.has(runModel)));
+    const cachedModelName = useCachedModelName(hasOwnModel && !isAutoModel ? runModel : undefined);
+    let modelName: string | undefined;
+
+    if (hasOwnModel) {
+        modelName = isAutoModel ? t`Auto` : (cachedModelName ?? runModel?.split("/").pop() ?? runModel);
+    }
+
+    const detail = [projectName, modelName].filter(Boolean).join(" · ");
+    const hasDetail = detail !== "";
     const hasMeta =
         hasChildren ||
         hasTags ||
@@ -779,8 +795,8 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
         isArchived ||
         !!node.source ||
         hasMatches;
-    const showsModelFallback = !hasMeta && modelName !== undefined;
-    const hasSecondLine = hasMeta || showsModelFallback;
+    // Only a row with something to say gets the second line: a plain chat on the default model stays one line.
+    const hasSecondLine = hasMeta || hasDetail;
 
     const content = (
         <div
@@ -1004,7 +1020,7 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                         </Tooltip>
                     )}
                     {isArchived && <ArchiveIcon aria-hidden="true" className="size-3 shrink-0" />}
-                    {showsModelFallback && <span className="min-w-0 truncate">{modelName}</span>}
+                    {hasDetail && <span className="min-w-0 truncate">{detail}</span>}
                     <span className="ml-auto flex shrink-0 items-center gap-1.5">
                         {hasMatches && (
                             <span className="bg-primary/10 text-primary-text shrink-0 rounded-full px-1.5 py-0.5 text-xs">

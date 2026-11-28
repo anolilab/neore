@@ -16,6 +16,7 @@ import { useThreadActions } from "@/features/chat/core/stores/thread-store-hooks
 import GroupParticipantBar from "@/features/chat/group/group-participant-bar";
 import ThreadImagesButton from "@/features/chat/image-gallery/thread-images-button";
 import ThreadShareButton from "@/features/chat/sharing/thread-share-button";
+import { useThreadContextShown } from "@/features/chat/sidebar/use-thread-context-shown";
 import ThreadPullRequests from "@/features/develop/components/thread-pull-requests";
 import SiteHeader from "@/features/layout/components/site-header";
 
@@ -57,6 +58,8 @@ const ChatSiteHeader: FC<{ threadId?: string }> = ({ threadId }) => {
     useTitleSaveRevision();
     const { setThreadMetadata } = useThreadActions();
     const model = threadData?.model;
+    // The panel shows this same thread (the page's own or the focused pane's), so its context box is the header's thread's.
+    const isContextShown = useThreadContextShown(validThreadId, model) && isValid;
     // Shown as it is: no copy of its own, so a rename from the list is what the header renders next time.
     const currentTitle = (isValid ? titleOnScreen(actualThreadId ?? "", threadData?.title) : threadData?.title) || title;
 
@@ -175,7 +178,9 @@ const ChatSiteHeader: FC<{ threadId?: string }> = ({ threadId }) => {
                     </Badge>
                 )}
                 <GroupParticipantBar isRunning={threadData?.status === "running"} threadId={validThreadId} />
-                <ThreadPullRequests compact key={validThreadId} threadId={validThreadId} />
+                {/* The context box lists the same pull requests: with it on screen the header leaves them out, and keeps the Link entry
+                    for when the panel is closed or on another tab. */}
+                {!isContextShown && <ThreadPullRequests compact key={validThreadId} threadId={validThreadId} />}
             </div>
         </SiteHeader>
     );

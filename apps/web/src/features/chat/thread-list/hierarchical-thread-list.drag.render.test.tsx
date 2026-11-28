@@ -45,6 +45,12 @@ vi.mock("@tanstack/react-query", () => {
         useMutation: () => {
             return { mutateAsync: vi.fn() };
         },
+        // The rows read the AI preferences for their default model; nothing here depends on the answer.
+        // No project beyond the list's first page here, so nothing is read by id.
+        useQueries: ({ combine }: { combine?: (results: unknown[]) => unknown }) => combine?.([]) ?? [],
+        useQuery: () => {
+            return { data: undefined };
+        },
     };
 });
 
@@ -56,6 +62,15 @@ vi.mock("@/lib/lunora/crpc", () => {
     return {
         useCRPC: () => {
             return {
+                auth: {
+                    functions: {
+                        getAIUserPreferences: {
+                            queryOptions: () => {
+                                return {};
+                            },
+                        },
+                    },
+                },
                 chat: {
                     functions: {
                         updateThreadOrder: {
@@ -83,6 +98,9 @@ vi.mock("@/features/projects/hooks/use-projects", () => {
         useDeleteProject: mutation,
         useMoveThreadToProject: mutation,
         usePinProject: mutation,
+        useProjectList: () => {
+            return { hasMore: false, projects: [] };
+        },
         useProjects: () => [],
         useUnpinProject: mutation,
         useUpdateProjectOrder: mutation,

@@ -10,7 +10,11 @@ import { clearComposerDrafts, saveComposerDraft } from "@/features/chat/split/co
 import { useSplitLayoutStore } from "@/features/chat/split/split-layout-store";
 import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
 
+import { GroupProjectContext, ThreadRowHintsContext } from "./contexts/thread-row-hints-context";
+
 const LINKED_PULL_REQUESTS = /Linked pull requests/u;
+const PROJECT_NAME = /Q1 Launch/u;
+const PROJECT_OR_MODEL = /Q1 Launch|deep-model-2/u;
 
 const navigate = vi.hoisted(() => vi.fn());
 
@@ -465,10 +469,85 @@ describe("ThreadNode", () => {
         expect(screen.getByRole("button", { name: EXPAND_BRANCHES_NAME })).toBeTruthy();
     });
 
-    it("falls back to the model's name in the second line when nothing else is attached", () => {
-        render(<ThreadNode {...baseProps} node={{ ...baseProps.node, children: [], expiresAt: undefined, model: "acme/fast-model-1" }} />);
+    describe("with a detail in the second line", () => {
+        const plain = { ...baseProps.node, children: [], expiresAt: undefined };
+        const DEFAULT = "acme/fast-model-1";
+        const OTHER = "acme/deep-model-2";
 
-        expect(screen.getByText("fast-model-1")).toBeTruthy();
+        /** The row as the list renders it: the hints the list answered once, and the project section the row sits in. */
+        const renderIn = (node: object, { defaultModels = [DEFAULT], group }: { defaultModels?: string[] | null; group?: string } = {}) =>
+            render(
+                <ThreadRowHintsContext
+                    value={{ defaultModels: defaultModels === null ? undefined : new Set(defaultModels), projectTitles: new Map([["p1", "Q1 Launch"]]) }}
+                >
+                    <GroupProjectContext value={group}>
+                        <ThreadNode {...baseProps} node={{ ...plain, ...node }} />
+                    </GroupProjectContext>
+                </ThreadRowHintsContext>,
+            );
+
+        it("says nothing for a plain chat on the default model, so no row repeats the model every other row has", () => {
+            renderIn({ model: DEFAULT });
+
+            expect(screen.queryByText("fast-model-1")).toBeNull();
+            expect(screen.queryByText("Claude Sonnet 4.5")).toBeNull();
+        });
+
+        it("names the model when it is not the default", () => {
+            renderIn({ model: OTHER });
+
+            expect(screen.getByText("deep-model-2")).toBeTruthy();
+        });
+
+        it("says nothing for an image chat on the user's image default, which is a default of its own kind", () => {
+            renderIn({ model: OTHER }, { defaultModels: [DEFAULT, OTHER] });
+
+            expect(screen.queryByText("deep-model-2")).toBeNull();
+        });
+
+        it("names no model before the default is known, so none shows and goes", () => {
+            renderIn({ model: OTHER }, { defaultModels: null });
+
+            expect(screen.queryByText("deep-model-2")).toBeNull();
+        });
+
+        it("follows the agent a thread was switched to, not the model it was created on", () => {
+            renderIn({ activeAgent: { model: DEFAULT }, model: OTHER });
+
+            expect(screen.queryByText("deep-model-2")).toBeNull();
+        });
+
+        it("says Auto for a thread on Auto", () => {
+            renderIn({ autoModel: true, model: DEFAULT });
+
+            expect(screen.getByText("Auto")).toBeTruthy();
+        });
+
+        it("names the project of a row that sits outside its project's section, with the model when that differs", () => {
+            renderIn({ model: OTHER, projectId: "p1" });
+
+            expect(screen.getByText("Q1 Launch · deep-model-2")).toBeTruthy();
+        });
+
+        it("leaves the project out inside its own section, which names it already", () => {
+            renderIn({ model: DEFAULT, projectId: "p1" }, { group: "p1" });
+
+            expect(screen.queryByText(PROJECT_NAME)).toBeNull();
+        });
+
+        it("names the project of a thread on your computer and not its model, which is the coding agent's", () => {
+            renderIn({ model: OTHER, projectId: "p1", runner: "host" });
+
+            expect(screen.getByText("Runs on your computer")).toBeTruthy();
+            expect(screen.getByText("Q1 Launch")).toBeTruthy();
+            expect(screen.queryByText("deep-model-2")).toBeNull();
+        });
+
+        it("shows nothing about a locked chat", () => {
+            renderIn({ lockedAt: 1, model: OTHER, projectId: "p1" });
+
+            expect(screen.queryByText(PROJECT_OR_MODEL)).toBeNull();
+        });
     });
 
     it("lifts the open thread's card and indents a branch", () => {

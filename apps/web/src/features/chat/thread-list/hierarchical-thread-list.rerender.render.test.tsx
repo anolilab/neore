@@ -119,6 +119,8 @@ vi.mock("@tanstack/react-query", () => {
         useMutation: () => {
             return { isPending: false, mutate: () => {}, mutateAsync: async () => {} };
         },
+        // No project beyond the list's first page here, so nothing is read by id.
+        useQueries: ({ combine }: { combine?: (results: unknown[]) => unknown }) => combine?.([]) ?? [],
         useQuery: () => {
             return { data: undefined, isLoading: false, isPending: false };
         },
@@ -184,12 +186,17 @@ vi.mock("@/hooks/use-after-first-paint", () => {
 
 vi.mock("@/features/projects/hooks/use-projects", () => {
     const mutation = { mutateAsync: async () => {} };
+    // One array, as the real hook's memo gives: a fresh one per render would hand every row a new context value.
+    const noProjects: never[] = [];
 
     return {
         useDeleteProject: () => mutation,
         useMoveThreadToProject: () => mutation,
         usePinProject: () => mutation,
-        useProjects: () => [],
+        useProjectList: () => {
+            return { hasMore: false, projects: noProjects };
+        },
+        useProjects: () => noProjects,
         useUnpinProject: () => mutation,
         useUpdateProjectOrder: () => mutation,
     };

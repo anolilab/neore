@@ -2,6 +2,9 @@ import type { ThreadTag } from "@/features/chat/tags/thread-tag-logic";
 
 // Type definitions for thread hierarchy
 export interface BranchNode {
+    /** After an agent switch, the agent's model is the one the thread runs on (`threads.activeAgent`); `model` stays the creation model. */
+    activeAgent?: { model?: string };
+    autoModel?: boolean; // Chosen by Auto: no single model to name
     /** Set while the thread waits for its owner: a tool approval or a question. Owned threads only. */
     awaitingInput?: "approval" | "question";
     branchPoint: number;

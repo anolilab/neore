@@ -16,6 +16,8 @@ export const preferences = (overrides: Partial<Preferences> = {}): Preferences =
     return {
         _creationTime: CREATED,
         _id: "prefs_storybook" as Preferences["_id"],
+        // The model the mock threads run on, so a thread list row names a model only when it is another one.
+        defaultModels: { textToText: "anthropic/claude-sonnet-4.5" },
         userId: OWNER,
         ...overrides,
     };
