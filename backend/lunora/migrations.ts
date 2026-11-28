@@ -1,6 +1,7 @@
 import { defineMigration } from "lunorash/server";
 
 import { typedTextColumn } from "./agent/shared";
+import { isAppWrittenByText, isAppWrittenInThread, needsThreadTags } from "./chat/lib/app-written-prompts";
 import type { Message } from "./agent/validators";
 import { getMaxSteps } from "./chat/lib/auto-continue";
 
@@ -380,6 +381,49 @@ export const backfillMessageTypedText = defineMigration({
 
         // `undefined` leaves the row untouched: skipped, not rewritten (`MigrationTransform`).
         return typedText === undefined ? undefined : { ...document, typedText };
+    },
+});
+
+/**
+ * A prompt the app writes into a user row is saved as `appWrittenTextPart` (`chat/lib/attached-text.ts`), so it has no
+ * `typedText`. A row saved before that mark, or filled by the backfill above, still reads as the person's typing: the
+ * composer's prompt search lists it and the past-chat search may find it. This clears `typedText` on such a row, told by
+ * what its writer leaves (`chat/lib/app-written-prompts.ts`): a task's instructions and a goal round's or pull request
+ * wake's prompt anywhere, a lead's brief in a sub-agent's or worker's chat, the pull request chat's opener, and the first
+ * prompt of a trigger's or eval's chat. A person's own words keep theirs. Only `typedText` goes: `text` and the message
+ * are copied through, so the transcript is unchanged.
+ *
+ * A batch is one read of 32 rows, one thread read for a first prompt or a row with an opening that needs its chat, and one
+ * rewrite per cleared row. Idempotent: a cleared row has no `typedText` and is skipped. Declared after the backfill above,
+ * so a shard that runs both fills first and clears after. There is no `down`.
+ */
+export const clearAppWrittenTypedText = defineMigration({
+    batchSize: 32,
+    id: "clear-app-written-typed-text",
+    table: "messages",
+    up: async (document, context) => {
+        const text = document.text as string | undefined;
+        const order = document.order as number | undefined;
+
+        if (document.typedText === undefined || (document.message as Message | undefined)?.role !== "user" || text === undefined || order === undefined) {
+            return undefined;
+        }
+
+        const row = { order, text };
+        let appWritten = isAppWrittenByText(text);
+
+        if (!appWritten && needsThreadTags(row) && typeof document.threadId === "string") {
+            const thread = await context.db.get("threads", document.threadId);
+
+            appWritten = isAppWrittenInThread(row, (thread?.tags as string[] | undefined) ?? []);
+        }
+
+        if (!appWritten) {
+            return undefined;
+        }
+
+        // The runner replaces the row with what is returned, so a row without the key has it cleared.
+        return Object.fromEntries(Object.entries(document).filter(([key]) => key !== "typedText")) as typeof document;
     },
 });
 

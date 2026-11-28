@@ -249,11 +249,21 @@ export const searchPastChats = internalQuery
 
             unjudged.clear();
 
-            for (const { message } of elsewhere) {
+            // Only a chat holding a row that is no repeat of an earlier one keeps a read: a copy of this chat's prompt, or a
+            // branch whose every row an earlier chat already holds, is dropped by `seen` below unless that earlier row is not
+            // listed, and then it is judged within what is left.
+            const firstKeys = new Set(seen);
+
+            for (const { message, typed: words } of elsewhere) {
+                const key = copyKey(message, words);
                 const thread = threads.get(message.threadId) ?? null;
 
-                if (listable(thread) && judgedWithoutLinks(thread) === undefined && !sources.has(thread._id)) {
-                    unjudged.add(thread._id);
+                if (!firstKeys.has(key)) {
+                    firstKeys.add(key);
+
+                    if (listable(thread) && judgedWithoutLinks(thread) === undefined && !sources.has(thread._id)) {
+                        unjudged.add(thread._id);
+                    }
                 }
             }
 

@@ -4,7 +4,8 @@ import { runDataMigration } from "lunorash/do";
 import { describe, expect, it } from "vitest";
 
 import { documentTextPart } from "./chat/lib/attached-text";
-import { backfillMessageTypedText } from "./migrations";
+import { buildTaskPrompt } from "./tasks/logic";
+import { backfillMessageTypedText, clearAppWrittenTypedText } from "./migrations";
 
 type Row = Record<string, unknown>;
 
@@ -150,5 +151,44 @@ describe("backfillMessageTypedText", () => {
         expect(stored.filter((row) => row.typedText !== undefined)).toHaveLength(63);
         expect(stored.filter((row) => row.text === "> only a quote").every((row) => row.typedText === undefined)).toBe(true);
         expect(stored.every((row, index) => row.text === rows[index]?.text)).toBe(true);
+    });
+});
+
+describe("clearAppWrittenTypedText", () => {
+    const taskPrompt = buildTaskPrompt({ instructions: "Sum the sales", title: "Report" });
+    const threads: Record<string, Row> = { chat: { _id: "chat", tags: ["chat"] }, trigger: { _id: "trigger", tags: ["trigger"] } };
+    const typedRow = (id: string, text: string, extra: Row = {}): Row => {
+        return { ...userRow(id, text), order: 0, typedText: text, ...extra };
+    };
+
+    it("clears the typed words of a prompt the app wrote, keeping its text, and leaves a person's prompt typed", async () => {
+        expect.assertions(4);
+
+        const shard = shardMessages([
+            typedRow("m1", taskPrompt, { order: 3, threadId: "chat" }),
+            typedRow("m2", "Summarise today's alerts", { threadId: "trigger" }),
+            typedRow("m3", "Now only the critical ones", { order: 1, threadId: "trigger" }),
+            typedRow("m4", "Plan the Lisbon trip", { threadId: "chat" }),
+        ]);
+        const db = { get: async (table: string, id: string) => (table === "threads" ? (threads[id] ?? null) : null) };
+        const writer = { ...shard.writer, get: async (table: string, id: string) => (table === "threads" ? db.get(table, id) : shard.writer.get(table, id)) };
+
+        await expect(
+            runDataMigration({ migration: clearAppWrittenTypedText as never, sql: shardSql() as never, writer: writer as never }),
+        ).resolves.toMatchObject({ changed: 2, processed: 4, status: "completed" });
+
+        const stored = Object.fromEntries([...shard.rows.values()].map((row) => [row._id, row]));
+
+        expect([stored.m1?.typedText, stored.m2?.typedText]).toStrictEqual([undefined, undefined]);
+        expect([stored.m3?.typedText, stored.m4?.typedText]).toStrictEqual(["Now only the critical ones", "Plan the Lisbon trip"]);
+        expect(stored.m1?.text).toBe(taskPrompt);
+    });
+
+    it("skips a row with no typed words, so a second run changes nothing", async () => {
+        expect.assertions(1);
+
+        const cleared = { ...userRow("m1", taskPrompt), order: 3 };
+
+        await expect((clearAppWrittenTypedText.up as unknown as Transform)(cleared, { db: { get: async () => null } })).resolves.toBeUndefined();
     });
 });

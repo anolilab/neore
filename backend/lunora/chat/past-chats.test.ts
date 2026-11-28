@@ -429,6 +429,59 @@ describe("searchPastChats", () => {
         }
     });
 
+    it("holds no read for copies it drops: this chat's copies and later branches of a listed chat leave a deep branch its reads", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            const current = await harness.run(async (context: any) => {
+                await withMemory(context);
+
+                const here = await insertThread(context, { title: "Today" });
+                const listed = await insertThread(context, { title: "Listed" });
+                const plain = await insertThread(context, { title: "Plain" });
+
+                await insertPrompt(context, { createdAt: SENT_AT, text: "Lisbon from today", threadId: here });
+                await insertPrompt(context, { createdAt: SENT_AT + 1, text: "Lisbon already listed", threadId: listed });
+
+                // Branches holding only copies: of this chat's prompt, and of a prompt another chat already lists.
+                for (let index = 0; index < 40; index += 1) {
+                    await insertPrompt(context, {
+                        createdAt: SENT_AT,
+                        text: "Lisbon from today",
+                        threadId: await insertUntaggedThread(context, `Copy ${String(index)}`, here),
+                    });
+                }
+
+                for (let index = 0; index < 22; index += 1) {
+                    await insertPrompt(context, {
+                        createdAt: SENT_AT + 1,
+                        text: "Lisbon already listed",
+                        threadId: await insertUntaggedThread(context, `Branch ${String(index)}`, listed),
+                    });
+                }
+
+                // Three untagged copies from a typed chat: three reads.
+                const first = await insertUntaggedThread(context, "Deep 1", plain);
+                const second = await insertUntaggedThread(context, "Deep 2", first);
+
+                await insertPrompt(context, {
+                    createdAt: SENT_AT + 2,
+                    text: "Lisbon deep down",
+                    threadId: await insertUntaggedThread(context, "Deep", second),
+                });
+
+                return here;
+            });
+
+            const { hits } = await searchIn(harness, { query: "Lisbon", threadId: current });
+
+            // The listed prompt comes once, from whichever of its copies ranks first; the deep branch is judged too.
+            expect(hits.map((hit) => hit.snippet).toSorted((a, b) => a.localeCompare(b))).toStrictEqual(["Lisbon already listed", "Lisbon deep down"]);
+        } finally {
+            harness.close();
+        }
+    });
+
     it("does not call a full window cut short when it gave every hit asked for", async () => {
         const harness = lunoraTest(schema as never);
 

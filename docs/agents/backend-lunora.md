@@ -305,18 +305,22 @@ Long form of two `backend/lunora/agent/AGENTS.md` bullets.
 
 **`messages.typedText`.** `text` stays the message as it was sent; `typedText` holds only what the person typed
 (`typedTextColumn` over `typedTextOf`: no attachment, quote, guest note or placeholder) and is what the composer's prompt
-search indexes (`typed_text_search`). Every writer of a user row's `text` sets it beside it: `addMessagesHandler`,
-`updateMessage`, and `insertMessageRow`/`patchMessage` (`table-writes.ts`) for the others (the reply rewrite in
-`branches.ts` edits assistant rows only). A new writer goes through one of them, or the index and `text` disagree. Text the
-app writes into a user row is saved as `appWrittenTextPart` (`chat/lib/attached-text.ts`), which `typedTextOf` skips and
-`promptCannotBeQuoted` refuses: every `runHeadlessAgent` prompt and goal round (a task's instructions, a trigger's
-template, a sub-agent's or worker's brief, an eval case, a pull request wake), a host worker's brief and the pull-request guide's host
-prompt (`queueHostTurn` with `appWritten`) and the pull request chat's opener. A headless caller passes `promptTyped` only for words a person typed
-(a message to a worker). Rows saved before the mark keep their `typedText`, so the readers' chat-kind allow-list
-(`isTypedChatKind`) stays. Imported chats (`chat-import/`, `acp/lib/import.ts`) stay typed: the person typed those words,
-elsewhere. It is
-server-only: not in `vMessageDocFields`, stripped by `publicMessage` from every message read; the search reads it as
-`vTypedPromptRow` (`typedTextSearch`, `typedPromptRow`).
+search indexes (`typed_text_search`). It is server-only: not in `vMessageDocFields`, stripped by `publicMessage` from
+every message read; the search reads it as `vTypedPromptRow` (`typedTextSearch`, `typedPromptRow`). Every writer of a
+user row's `text` sets it beside it: `addMessagesHandler`, `updateMessage`, and `insertMessageRow`/`patchMessage`
+(`table-writes.ts`) for the others (the reply rewrite in `branches.ts` edits assistant rows only). A new writer goes
+through one of them, or the index and `text` disagree.
+
+Text the app writes into a user row is saved as `appWrittenTextPart` (`chat/lib/attached-text.ts`), which `typedTextOf`
+skips and `promptCannotBeQuoted` refuses: every `runHeadlessAgent` prompt and goal round (a task's instructions, a
+trigger's template, a sub-agent's or worker's brief, an eval case, a pull request wake), a host worker's brief and the
+pull-request guide's host prompt (`queueHostTurn` with `appWritten`) and the pull request chat's opener. A headless
+caller passes `promptTyped` only for words a person typed (a message to a worker). Rows saved before the mark lose their
+`typedText` through the `clear-app-written-typed-text` migration, which tells them apart by what each writer leaves
+(`chat/lib/app-written-prompts.ts`: the builder's fixed opening, the thread's tag, the first prompt of a trigger's or
+eval's chat); a builder's new opening needs a row in `app-written-prompts.test.ts`. The readers' chat-kind allow-list
+(`isTypedChatKind`) stays as defence. Imported chats (`chat-import/`, `acp/lib/import.ts`) stay typed: the person typed
+those words, elsewhere.
 
 **Archived flag on thread vectors.** It is a row column because Lunora's vector sync writes metadata after commit, so
 keeping it current is a row patch. A failed schedule from the threads update trigger fails the write; the job retries
