@@ -41,7 +41,7 @@ const CodeNodeComponent = (props: NodeProps<Node<CodeNodeData>>) => {
                     <Label className="text-muted-foreground text-xs">
                         <Trans>Language</Trans>
                     </Label>
-                    <Select onValueChange={handleLanguageChange} value={data.language}>
+                    <Select items={LANGUAGES} onValueChange={handleLanguageChange} value={data.language}>
                         <SelectTrigger className="nodrag h-8 text-sm">
                             <SelectValue />
                         </SelectTrigger>

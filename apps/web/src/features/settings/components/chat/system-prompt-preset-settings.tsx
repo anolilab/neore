@@ -186,6 +186,7 @@ const SystemPromptPresetSettings: FC = () => {
                 <FieldLabel htmlFor={`${mode}-preset-model`}>{t`Target model (optional)`}</FieldLabel>
                 <FieldDescription>{t`Leave empty for "any model".`}</FieldDescription>
                 <Select<string>
+                    items={[{ label: t`Any model`, value: ANY_MODEL_VALUE }]}
                     onValueChange={(value) =>
                         setFormData((current) => {
                             return {

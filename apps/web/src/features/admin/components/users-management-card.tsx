@@ -87,6 +87,9 @@ const UsersManagementCard = ({
         onUserUpdated?.();
     };
 
+    const roleItems = { all: t`All Roles`, admin: t`Admins Only`, user: t`Users Only` };
+    const userTypeItems = { all: t`All Types`, user: t`Regular Users`, anonymous: t`Anonymous` };
+
     const cardTitle = title || t`User Management`;
     const cardDescription = description || t`View and manage all users in the system`;
 
@@ -122,25 +125,29 @@ const UsersManagementCard = ({
                         <Input className="pl-9" onChange={(e) => setSearch(e.target.value)} placeholder={t`Search by name or email...`} value={search} />
                     </div>
 
-                    <Select onValueChange={(v) => setRoleFilter(v as typeof roleFilter)} value={roleFilter}>
+                    <Select items={roleItems} onValueChange={(v) => setRoleFilter(v as typeof roleFilter)} value={roleFilter}>
                         <SelectTrigger className="w-full sm:w-[150px]">
                             <SelectValue placeholder={t`Filter by role`} />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="all">{t`All Roles`}</SelectItem>
-                            <SelectItem value="admin">{t`Admins Only`}</SelectItem>
-                            <SelectItem value="user">{t`Users Only`}</SelectItem>
+                            {Object.entries(roleItems).map(([value, label]) => (
+                                <SelectItem key={value} value={value}>
+                                    {label}
+                                </SelectItem>
+                            ))}
                         </SelectContent>
                     </Select>
 
-                    <Select onValueChange={(v) => setUserTypeFilter(v as typeof userTypeFilter)} value={userTypeFilter}>
+                    <Select items={userTypeItems} onValueChange={(v) => setUserTypeFilter(v as typeof userTypeFilter)} value={userTypeFilter}>
                         <SelectTrigger className="w-full sm:w-[150px]">
                             <SelectValue placeholder={t`Filter by type`} />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="all">{t`All Types`}</SelectItem>
-                            <SelectItem value="user">{t`Regular Users`}</SelectItem>
-                            <SelectItem value="anonymous">{t`Anonymous`}</SelectItem>
+                            {Object.entries(userTypeItems).map(([value, label]) => (
+                                <SelectItem key={value} value={value}>
+                                    {label}
+                                </SelectItem>
+                            ))}
                         </SelectContent>
                     </Select>
                 </div>

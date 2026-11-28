@@ -97,7 +97,7 @@ const UpscaleNodeComponent = (props: NodeProps<Node<UpscaleNodeData>>) => {
                     <Label className="text-muted-foreground text-xs">
                         <Trans>Scale Factor</Trans>
                     </Label>
-                    <Select onValueChange={handleScaleChange} value={String(data.scale ?? 2)}>
+                    <Select items={scaleOptions} onValueChange={handleScaleChange} value={String(data.scale ?? 2)}>
                         <SelectTrigger className="nodrag h-8 text-sm">
                             <SelectValue />
                         </SelectTrigger>

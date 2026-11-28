@@ -188,7 +188,13 @@ const PublishDialogComponent = ({
                         <Label>
                             <Trans>Category</Trans>
                         </Label>
-                        <Select onValueChange={(v) => setCategory(v as GalleryCategory)} value={category}>
+                        <Select
+                            items={CATEGORIES.map((cat) => {
+                                return { label: i18n._(cat.label), value: cat.value };
+                            })}
+                            onValueChange={(v) => setCategory(v as GalleryCategory)}
+                            value={category}
+                        >
                             <SelectTrigger>
                                 <SelectValue />
                             </SelectTrigger>

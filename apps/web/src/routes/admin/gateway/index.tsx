@@ -222,7 +222,7 @@ const GatewayAnalyticsPage = () => {
                     <Trans>Smart routing decisions, model usage, and provider health</Trans>
                 </p>
 
-                <Select onValueChange={(v) => v && setPeriod(v as "24h" | "7d")} value={period}>
+                <Select items={{ "24h": t`Last 24h`, "7d": t`Last 7 days` }} onValueChange={(v) => v && setPeriod(v as "24h" | "7d")} value={period}>
                     <SelectTrigger className="w-[120px]">
                         <SelectValue />
                     </SelectTrigger>

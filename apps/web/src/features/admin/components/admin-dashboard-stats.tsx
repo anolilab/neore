@@ -115,6 +115,8 @@ const AdminDashboardStats = () => {
         return null;
     }
 
+    const growthItems = { all: t`All Users`, regular: t`Regular`, anonymous: t`Anonymous` };
+
     return (
         <div className="space-y-6">
             {/* Stats Grid */}
@@ -172,14 +174,16 @@ const AdminDashboardStats = () => {
                         <CardTitle>{t`User Growth (Last 7 Days)`}</CardTitle>
                         <CardDescription>{t`New user registrations per day`}</CardDescription>
                     </div>
-                    <Select onValueChange={(v) => setGrowthFilter(v as typeof growthFilter)} value={growthFilter}>
+                    <Select items={growthItems} onValueChange={(v) => setGrowthFilter(v as typeof growthFilter)} value={growthFilter}>
                         <SelectTrigger className="w-[140px]">
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="all">{t`All Users`}</SelectItem>
-                            <SelectItem value="regular">{t`Regular`}</SelectItem>
-                            <SelectItem value="anonymous">{t`Anonymous`}</SelectItem>
+                            {Object.entries(growthItems).map(([value, label]) => (
+                                <SelectItem key={value} value={value}>
+                                    {label}
+                                </SelectItem>
+                            ))}
                         </SelectContent>
                     </Select>
                 </CardHeader>

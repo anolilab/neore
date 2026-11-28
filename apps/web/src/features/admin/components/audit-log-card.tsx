@@ -122,6 +122,18 @@ const AuditLogCard = () => {
             <div className="text-muted-foreground py-8 text-center">{t`No audit logs found`}</div>
         );
 
+    const actionItems = {
+        all: t`All Actions`,
+        "user.role.update": t`Role Updates`,
+        "user.ban": t`Bans`,
+        "user.unban": t`Unbans`,
+        "user.sessions.revoke": t`Session Revocations`,
+        "user.impersonate.start": t`Impersonation Start`,
+        "user.impersonate.stop": t`Impersonation Stop`,
+        "admin.grant": t`Admin Grants`,
+        "admin.revoke": t`Admin Revocations`,
+    };
+
     return (
         <Card>
             <CardHeader>
@@ -131,20 +143,16 @@ const AuditLogCard = () => {
                         <CardDescription>{t`Track all admin actions for accountability`}</CardDescription>
                     </div>
 
-                    <Select onValueChange={(value) => value && setActionFilter(value)} value={actionFilter}>
+                    <Select items={actionItems} onValueChange={(value) => value && setActionFilter(value)} value={actionFilter}>
                         <SelectTrigger className="w-[180px]">
                             <SelectValue placeholder={t`Filter by action`} />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="all">{t`All Actions`}</SelectItem>
-                            <SelectItem value="user.role.update">{t`Role Updates`}</SelectItem>
-                            <SelectItem value="user.ban">{t`Bans`}</SelectItem>
-                            <SelectItem value="user.unban">{t`Unbans`}</SelectItem>
-                            <SelectItem value="user.sessions.revoke">{t`Session Revocations`}</SelectItem>
-                            <SelectItem value="user.impersonate.start">{t`Impersonation Start`}</SelectItem>
-                            <SelectItem value="user.impersonate.stop">{t`Impersonation Stop`}</SelectItem>
-                            <SelectItem value="admin.grant">{t`Admin Grants`}</SelectItem>
-                            <SelectItem value="admin.revoke">{t`Admin Revocations`}</SelectItem>
+                            {Object.entries(actionItems).map(([value, label]) => (
+                                <SelectItem key={value} value={value}>
+                                    {label}
+                                </SelectItem>
+                            ))}
                         </SelectContent>
                     </Select>
                 </div>
