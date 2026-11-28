@@ -157,6 +157,19 @@ describe(scrollToAnchorWhenRendered, () => {
         expect(done).toHaveBeenCalledTimes(1);
     });
 
+    it("focuses the row of a disabled control the link names, which cannot take focus itself", () => {
+        vi.useFakeTimers();
+        const root = mount(
+            '<section><div id="row"><label for="push-notifications">Push notifications</label><button disabled id="push-notifications" role="switch"></button></div></section>',
+        );
+
+        scrollToAnchorWhenRendered(() => root, "push-notifications", vi.fn());
+        vi.advanceTimersToNextFrame();
+
+        expect(document.activeElement?.id).toBe("row");
+        expect(root.querySelector<HTMLElement>("#row")?.tabIndex).toBe(-1);
+    });
+
     it("focuses a card the link names without making it a tab stop", () => {
         vi.useFakeTimers();
         const root = mount('<section id="devices-ssh"><h3>Servers over SSH</h3><button>Add</button></section>');

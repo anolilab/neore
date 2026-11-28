@@ -10,6 +10,7 @@ import type { FC, ReactNode } from "react";
 import { createContext, use, useCallback, useMemo, useRef, useState } from "react";
 import { useMediaMatch } from "rooks";
 
+import type { PagesTreeView } from "./pages-sidebar";
 import PagesSidebar from "./pages-sidebar";
 
 /** Tailwind's `lg`: from here the tree sits beside the page; below it the tree is a drawer (or the content, on the list). */
@@ -108,6 +109,13 @@ const PagesLayout: FC<{ children: ReactNode }> = ({ children }) => {
         return false;
     }, []);
 
+    // One search and one set of open branches for both trees, so a resize across `lg` keeps the view the reader had.
+    const [query, setQuery] = useState("");
+    const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
+    const view = useMemo<PagesTreeView>(() => {
+        return { expanded, query, setExpanded, setQuery };
+    }, [expanded, query]);
+
     const drawer = useMemo<PagesDrawer>(() => {
         return { open, registerToggle, setOpen };
     }, [open, registerToggle, setOpen]);
@@ -115,7 +123,7 @@ const PagesLayout: FC<{ children: ReactNode }> = ({ children }) => {
     return (
         <PagesDrawerContext value={drawer}>
             <div className="flex h-full min-h-0 w-full" ref={listRef}>
-                <PagesSidebar className={treeIsContent ? "max-lg:w-full max-lg:border-r-0" : "max-lg:hidden"} />
+                <PagesSidebar className={treeIsContent ? "max-lg:w-full max-lg:border-r-0" : "max-lg:hidden"} view={view} />
                 <div className={cn("flex min-w-0 flex-1", treeIsContent && "max-lg:hidden")}>{children}</div>
             </div>
             <Sheet onOpenChange={setOpen} open={open}>
@@ -134,7 +142,7 @@ const PagesLayout: FC<{ children: ReactNode }> = ({ children }) => {
                     showCloseButton={false}
                     side="left"
                 >
-                    <PagesSidebar className="w-full flex-1 border-r-0 bg-transparent" />
+                    <PagesSidebar className="w-full flex-1 border-r-0 bg-transparent" view={view} />
                 </SheetContent>
             </Sheet>
         </PagesDrawerContext>

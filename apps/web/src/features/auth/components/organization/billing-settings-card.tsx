@@ -51,6 +51,7 @@ const BillingSettingsEditor = ({ billingInfo, className, classNames, ...properti
     const { toast } = useAuth();
     const { t } = useLingui();
     const billingEmailId = useId();
+    const allowedModelsId = useId();
     const crpc = useCRPC();
     const queryClient = useQueryClient();
 
@@ -225,6 +226,7 @@ const BillingSettingsEditor = ({ billingInfo, className, classNames, ...properti
                     {/* Allowed Models */}
                     <SettingsRow
                         description={t`Select which AI models organization members can use. Leave empty for enterprise to allow all models.`}
+                        htmlFor={allowedModelsId}
                         title={t`Allowed AI Models`}
                     >
                         <div className="space-y-2">
@@ -253,7 +255,7 @@ const BillingSettingsEditor = ({ billingInfo, className, classNames, ...properti
                                 }}
                                 value=""
                             >
-                                <SelectTrigger className={classNames?.input}>
+                                <SelectTrigger className={classNames?.input} id={allowedModelsId}>
                                     <SelectValue placeholder={t`Add a model...`} />
                                 </SelectTrigger>
                                 <SelectContent>
