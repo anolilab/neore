@@ -254,8 +254,12 @@ const initialiseState: StateCreator<ThreadListUIStore> = (set) => {
 };
 
 const persistedState = persist(subscribeWithSelector(initialiseState), {
+    // Nothing saved (none yet, or storage blocked) keeps the choice in memory: the bar rehydrates on every mount, and a reset
+    // to Active would drop the section picked earlier in this visit.
     merge: (persisted, current) => {
-        return { ...current, sectionFilter: sanitizeSectionFilter((persisted as { sectionFilter?: unknown } | undefined)?.sectionFilter) };
+        const saved = (persisted as { sectionFilter?: unknown } | undefined)?.sectionFilter;
+
+        return { ...current, sectionFilter: saved === undefined ? current.sectionFilter : sanitizeSectionFilter(saved) };
     },
     name: "thread-list-sections",
     onRehydrateStorage: () => () => {

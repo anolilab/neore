@@ -147,6 +147,28 @@ describe("SectionBar", () => {
         expect(pressed()).toEqual(["Snoozed, 3"]);
     });
 
+    it("keeps the choice made this visit when storage is blocked and the bar mounts again", async () => {
+        const getItem = vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+            throw new Error("blocked");
+        });
+
+        try {
+            const { unmount } = render(<SectionBar />);
+
+            fireEvent.click(screen.getByRole("button", { name: "Snoozed, 3" }));
+            unmount();
+
+            render(<SectionBar />);
+            await act(async () => {
+                await useThreadListUIStore.persist.rehydrate();
+            });
+
+            expect(pressed()).toEqual(["Snoozed, 3"]);
+        } finally {
+            getItem.mockRestore();
+        }
+    });
+
     it("falls back to Active for a saved choice that names nothing known", async () => {
         localStorage.setItem("thread-list-sections", JSON.stringify({ state: { sectionFilter: ["gone"] }, version: 1 }));
         render(<SectionBar />);
