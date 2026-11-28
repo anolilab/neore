@@ -181,10 +181,14 @@ interface AssetReader {
     budget: { files: number; left: number };
     /** A file as a `data:` URL, or `undefined` when it is not in the archive, does not fit the budget or the count, or is not a kind that is inlined. */
     dataUrl: (path: string) => Promise<string | undefined>;
+    /** Whether `length` characters could still be spent (without spending them). */
+    fits: (length: number) => boolean;
     /** Whether the chapter may still take another file at all (some budget and some count left): asked before a file is read. */
     mayRead: () => boolean;
     /** Whether a style sheet has been refused for size or count: the chapter then reads no further sheet. */
     refused: () => boolean;
+    /** The size of a file as the archive's directory declares it, when it does; read before the file is, so one too big is never opened. */
+    size: (path: string) => number | undefined;
     /** Charges a text that is to go into the document (a style sheet, after its addresses are rewritten) to the budget and the count; `false` when it does not fit. */
     spend: (length: number) => boolean;
     /** As `spend`, for a sheet whose `data:` pictures were already charged when they were read: only the rest of its text is charged now. */
@@ -197,7 +201,8 @@ const assetReader = (zip: JSZip, signal?: AbortSignal): AssetReader => {
     const budget = { files: MAX_ASSETS_PER_CHAPTER, left: MAX_INLINED_CHARS };
     let refusedSheet = false;
     // The cost of pictures already counted against a sheet: they are charged once, when read, not again as part of the sheet.
-    let chargedForSheets = 0;
+    let pictureCharged = 0;
+    let attributed = 0;
     // What each file became, and what it costs each time it is written into the document.
     const seen = new Map<string, { cost: number; url: string } | undefined>();
 
@@ -215,6 +220,7 @@ const assetReader = (zip: JSZip, signal?: AbortSignal): AssetReader => {
                 }
 
                 budget.left -= cached.cost;
+                pictureCharged += cached.cost;
 
                 return cached.url;
             }
@@ -241,6 +247,7 @@ const assetReader = (zip: JSZip, signal?: AbortSignal): AssetReader => {
             }
 
             budget.left -= length;
+            pictureCharged += length;
 
             const url = `data:${type};base64,${toBase64(bytes)}`;
 
@@ -248,8 +255,10 @@ const assetReader = (zip: JSZip, signal?: AbortSignal): AssetReader => {
 
             return url;
         },
+        fits: (length) => budget.files > 0 && length <= budget.left,
         mayRead: () => budget.files > 0 && budget.left > 0 && !refusedSheet,
         refused: () => refusedSheet,
+        size: (path) => (zip.file(path) as { _data?: { uncompressedSize?: number } } | null)?._data?.uncompressedSize,
         spend: (length) => {
             if (budget.files <= 0 || length > budget.left) {
                 refusedSheet = true;
@@ -263,16 +272,9 @@ const assetReader = (zip: JSZip, signal?: AbortSignal): AssetReader => {
             return true;
         },
         spendSheet: (length) => {
-            let counted = 0;
-
-            for (const item of seen.values()) {
-                counted += item?.cost ?? 0;
-            }
-
-            const inlined = counted - chargedForSheets;
+            // The pictures a sheet carries were charged as they were read; only the rest of its text is charged now.
+            const inlined = pictureCharged - attributed;
             const rest = Math.max(0, length - inlined);
-
-            chargedForSheets += inlined;
 
             if (budget.files <= 0 || rest > budget.left) {
                 refusedSheet = true;
@@ -280,6 +282,7 @@ const assetReader = (zip: JSZip, signal?: AbortSignal): AssetReader => {
                 return false;
             }
 
+            attributed = pictureCharged;
             budget.files -= 1;
             budget.left -= rest;
 
@@ -317,24 +320,23 @@ export const safeStylesheet = (css: string): string => {
 
 /** A style sheet's relative `url()`s replaced by the files they name, within the chapter's budget; the rest are left for `safeStylesheet` to empty. */
 const inlineStylesheetUrls = async (css: string, directory: string, reader: AssetReader): Promise<string> => {
+    // One answer per OCCURRENCE, in order: a file named many times is written many times, so it is charged each time (`dataUrl` charges a copy
+    // it already has as it does the first), and once the budget is spent the rest of the occurrences are left as they were.
     const found = [...css.matchAll(CSS_URL)].map((match) => match[1] ?? "");
-    const replaced = new Map<string, string>();
+    const answers: (string | undefined)[] = [];
 
     for (const argument of found) {
-        const reference = argument.trim().replaceAll(CSS_QUOTE, "").trim();
-        const path = resolveInArchive(reference, directory);
+        const path = resolveInArchive(argument.trim().replaceAll(CSS_QUOTE, "").trim(), directory);
 
-        if (path !== undefined && !replaced.has(argument)) {
-            const url = await reader.dataUrl(path);
-
-            if (url !== undefined) {
-                replaced.set(argument, url);
-            }
-        }
+        answers.push(path === undefined ? undefined : await reader.dataUrl(path));
     }
 
-    return css.replaceAll(CSS_URL, (match, argument: string) => {
-        const url = replaced.get(argument);
+    let at = 0;
+
+    return css.replaceAll(CSS_URL, (match) => {
+        const url = answers[at];
+
+        at += 1;
 
         return url === undefined ? match : `url("${url}")`;
     });
@@ -470,6 +472,16 @@ export const chapterDocument = (markup: string, styles: ReadonlyArray<string>, l
     return `<!doctype html>${frame.documentElement.outerHTML}`;
 };
 
+const countLessThan = (text: string): number => {
+    let count = 0;
+
+    for (let at = text.indexOf("<"); at !== -1; at = text.indexOf("<", at + 1)) {
+        count += 1;
+    }
+
+    return count;
+};
+
 /** A chapter read from the archive: its markup with its pictures inlined, and its styles, in the order the chapter names them. */
 
 /**
@@ -521,10 +533,33 @@ const readChapter = async (chapterPath: string, reader: AssetReader): Promise<{ 
         }
 
         const path = resolveInArchive(link.getAttribute("href") ?? "", directory);
+        const declared = path === undefined ? undefined : reader.size(path);
+
+        // A sheet whose declared size cannot fit is refused whole before it is read or rewritten: the rewrite can only make it longer.
+        if (declared !== undefined && !reader.fits(declared)) {
+            reader.spendSheet(Infinity);
+
+            break;
+        }
+
         const text = path === undefined ? undefined : await reader.text(path);
 
+        if (path !== undefined && text !== undefined && !reader.fits(text.length)) {
+            reader.spendSheet(Infinity);
+
+            break;
+        }
+
         if (path !== undefined && text !== undefined) {
-            const sheet = await inlineStylesheetUrls(text, directoryOf(path), reader);
+            // What cleaning can make of it, worked out before anything is rewritten: every `<` becomes four characters.
+            if (!reader.fits(text.length + 3 * countLessThan(text))) {
+                reader.spendSheet(Infinity);
+
+                break;
+            }
+
+            // Cleaned FIRST, and the exact text that will be written is what is charged; the document does not clean it again by growing it.
+            const sheet = safeStylesheet(await inlineStylesheetUrls(text, directoryOf(path), reader));
 
             // A sheet that does not fit is left out whole, not cut: half a sheet would style a chapter wrongly.
             if (reader.spendSheet(sheet.length)) {
@@ -543,7 +578,16 @@ const readChapter = async (chapterPath: string, reader: AssetReader): Promise<{ 
             continue;
         }
 
-        const sheet = await inlineStylesheetUrls(style.textContent ?? "", directory, reader);
+        const own = style.textContent ?? "";
+
+        if (!reader.fits(own.length + 3 * countLessThan(own))) {
+            reader.spendSheet(Infinity);
+            style.textContent = "";
+
+            continue;
+        }
+
+        const sheet = safeStylesheet(await inlineStylesheetUrls(own, directory, reader));
         const kept = reader.spendSheet(sheet.length) ? sheet : "";
 
         if (inHead) {

@@ -518,3 +518,62 @@ describe("EpubPreview other books and bodies", () => {
         expect(book.opened).toBe(0);
     });
 });
+
+describe("EpubPreview redirects", () => {
+    const answerRedirected = (finalUrl: string) => {
+        vi.stubGlobal("fetch", async () => {
+            view.fetched += 1;
+
+            const response = new Response(new Uint8Array([1]), { status: 200 });
+
+            Object.defineProperties(response, {
+                redirected: { value: true },
+                url: { value: finalUrl },
+            });
+
+            return response;
+        });
+    };
+
+    it("follows a redirect that stays on the file's own origin, and the book opens", async () => {
+        answerRedirected(`${ORIGIN}/other/path/book.epub`);
+        await mount();
+
+        expect(view.container.querySelector("iframe")).not.toBeNull();
+        expect(book.opened).toBe(1);
+    });
+
+    it("refuses a redirect to another origin, reads nothing from it, and shows the could-not-preview state", async () => {
+        let cancelled = false;
+
+        vi.stubGlobal("fetch", async () => {
+            view.fetched += 1;
+
+            const response = new Response(
+                new ReadableStream<Uint8Array>({
+                    cancel() {
+                        cancelled = true;
+                    },
+                    pull(controller) {
+                        controller.enqueue(new Uint8Array(10));
+                    },
+                }),
+                { status: 200 },
+            );
+
+            Object.defineProperties(response, {
+                redirected: { value: true },
+                url: { value: "https://elsewhere.example/book.epub" },
+            });
+
+            return response;
+        });
+        await mount();
+
+        expect(view.container.textContent).toContain("Could not preview");
+        expect(view.container.querySelector("iframe")).toBeNull();
+        expect(cancelled).toBe(true);
+        expect(book.opened).toBe(0);
+        expect(book.guardArgs).toEqual([]);
+    });
+});

@@ -351,6 +351,85 @@ describe("a chapter's style sheets", () => {
         opened.destroy();
     });
 
+    it("charges a picture a style sheet repeats for every occurrence, and stops writing it once the budget is spent", async () => {
+        const picture = new Uint8Array(5 * 1024 * 1024).fill(3);
+        const css = Array.from({ length: 8 }, (_item, index) => `.a${String(index)}{background:url(images/big.png)}`).join("\n");
+        const opened = await openEpub(
+            await book({
+                chapters: [{ body: `${links(["../s.css"])}<p>x</p>`, file: "text/one.xhtml", id: "c1" }],
+                files: { "images/big.png": picture, "s.css": css },
+            }),
+            folder.path,
+        );
+        const document = await opened.read("c1");
+        const sheet = sheetsOf(parse(document)).join("");
+
+        // About 7 million characters an occurrence: three fit in 24 million; the others are left without an address, never written.
+        expect(sheet.match(/url\("data:image\/png/gu)).toHaveLength(3);
+        expect(sheet.match(/url\(""\)/gu)).toHaveLength(5);
+        expect(sheet.length).toBeLessThan(24 * 1024 * 1024);
+        opened.destroy();
+    });
+
+    it("refuses a sheet too big for what is left before it is read or rewritten, and still rewrites one that fits", async () => {
+        const probe = new JSZip();
+
+        probe.file("a", "x");
+
+        const prototype = Object.getPrototypeOf(probe.file("a")) as { async: (...args: unknown[]) => Promise<unknown> };
+        const opened = await openEpub(
+            await book({
+                chapters: [{ body: `${links(["../fits.css", "../huge.css", "../after.css"])}<p>x</p>`, file: "text/one.xhtml", id: "c1" }],
+                files: {
+                    "after.css": "p{after:1}",
+                    "fits.css": ".t{background:url(images/p.png)}",
+                    "huge.css": "a{}".repeat(9_000_000),
+                    "images/p.png": PNG,
+                },
+            }),
+            folder.path,
+        );
+        const asyncSpy = vi.spyOn(prototype, "async");
+        const document = await opened.read("c1");
+        const names = asyncSpy.mock.instances.map((entry) => (entry as unknown as { name: string }).name);
+        const sheets = sheetsOf(parse(document));
+
+        expect(names.some((name) => name.endsWith("huge.css"))).toBe(false);
+        expect(names.some((name) => name.endsWith("after.css"))).toBe(false);
+        expect(sheets).toHaveLength(1);
+        expect(sheets[0]).toContain('url("data:image/png;base64,');
+        opened.destroy();
+    });
+
+    it("charges a sheet for the text it becomes once cleaned: a sheet of < stops at the budget and the document never passes it", async () => {
+        const limit = 24 * 1024 * 1024;
+        // Each `<` is written as four characters: 5 million of them are 20 million, 7 million would be 28.
+        const fits = "<".repeat(5_000_000);
+        const tooBig = "<".repeat(7_000_000);
+        const opened = await openEpub(
+            await book({
+                chapters: [{ body: `${links(["../fits.css", "../big.css"])}<p>x</p>`, file: "text/one.xhtml", id: "c1" }],
+                files: { "big.css": tooBig, "fits.css": fits },
+            }),
+            folder.path,
+        );
+        const document = await opened.read("c1");
+        const sheets = sheetsOf(parse(document));
+
+        expect(sheets).toHaveLength(1);
+        expect(sheets[0]?.length).toBe(20_000_000);
+        expect(document.length).toBeLessThan(limit);
+        opened.destroy();
+    });
+
+    it("leaves the head's own style as cleaned once: it is not made longer again by the document", () => {
+        const css = "p{content:'<<<<'}";
+        const safe = safeStylesheet(css);
+
+        expect(safeStylesheet(safe)).toBe(safe);
+        expect(parse(chapterDocument("<p>x</p>", [safe])).head.querySelectorAll("style")[1]?.textContent).toBe(safe);
+    });
+
     it("refuses a chapter whose own markup is larger than a chapter may be", async () => {
         const opened = await openEpub(
             await book({ chapters: [{ body: `<p>${"x".repeat(MAX_CHAPTER_CHARS)}</p>`, file: "one.xhtml", id: "c1" }] }),

@@ -86,8 +86,25 @@ const readCapped = async (response: Response, maxBytes: number): Promise<ArrayBu
     return bytes.buffer;
 };
 
+const originOf = (address: string): string | undefined => {
+    try {
+        return new URL(address, globalThis.location?.origin).origin;
+    } catch {
+        return undefined;
+    }
+};
+
 const fetchBook = async (url: string, maxBytes: number, signal: AbortSignal): Promise<OpenedEpub> => {
     const response = await fetch(url, { signal });
+
+    // A redirect is followed only when it stays on the file's own origin. A browser does not hand a script the address of a redirect it is told
+    // not to follow, so the answer is judged by where it came from: one that was redirected to another origin is let go unread and refused.
+    // The size cap and the abort signal are those of the one request, whatever its hops.
+    if (response.redirected && originOf(response.url) !== originOf(url)) {
+        await response.body?.cancel().catch(() => undefined);
+
+        throw new Error("redirected to another origin");
+    }
 
     if (!response.ok) {
         // An error answer may stream: it is let go, not left holding the connection.
@@ -135,6 +152,12 @@ const EpubPreview: FC<EpubPreviewProps> = memo(({ className, filename, maxBytes 
     const [loaded, setLoaded] = useState<{ key: string; load: Load }>({ key, load: { status: "loading" } });
     const [shown, setShown] = useState<{ book: OpenedEpub; doc: string; failed?: boolean; id: string; key: string } | undefined>();
     const [position, setPosition] = useState({ index: 0, key });
+
+    // Dropped when the file or cap changes: an earlier file's chapter and book are not kept reachable (adjusted while rendering, not in an effect).
+    if (shown !== undefined && shown.key !== key) {
+        setShown(undefined);
+    }
+
     const isLive = loaded.key === key && !(loaded.load.status === "ready" && loaded.load.book.destroyed);
     const load: Load = isLive ? loaded.load : { status: "loading" };
     const index = position.key === key ? position.index : 0;
