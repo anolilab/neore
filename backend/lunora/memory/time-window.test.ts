@@ -54,7 +54,15 @@ describe("timeWindowOf", () => {
         ["where I lived in December", ["2025-12-01", "2025-12-31"]],
         ["what I booked in December", ["2025-12-01", "2025-12-31"]],
         ["was ist im Dezember passiert", ["2025-12-01", "2025-12-31"]],
-        ["was habe ich im Dezember gekauft", ["2025-12-01", "2025-12-31"]],
+        ["I booked a table in December", ["2025-12-01", "2025-12-31"]],
+        ["wo war ich im Mai", ["2026-05-01", "2026-05-31"]],
+        ["wo war ich im Dezember", ["2025-12-01", "2025-12-31"]],
+        // The perfect sets no tense: a booking asked of is usually ahead
+        ["what have I booked for December", ["2026-12-01", "2026-12-31"]],
+        ["was habe ich im Dezember gebucht", ["2026-12-01", "2026-12-31"]],
+        // A shifted month keeps a day or year after it; the year wins over the shift
+        ["what is on next May 3", ["2027-05-03", "2027-05-03"]],
+        ["what did I do last May 2023", ["2023-05-01", "2023-05-31"]],
         // No past cue: `need` is no `-ed` verb, `geplant` stays future
         ["I need the car in December", ["2026-12-01", "2026-12-31"]],
         ["was habe ich für Januar geplant", ["2027-01-01", "2027-01-31"]],
@@ -121,6 +129,8 @@ describe("timeWindowOf", () => {
         ).toEqual([true, true, true, true]);
         // A count of days is a time word; a question cut past the scanned length may name its topic after the cut.
         expect(only("what is coming up in 100 days")).toBe(true);
+        // A number is a time word only inside the phrase.
+        expect(only("what is on 42 tomorrow")).toBe(false);
         expect(only(`what is coming up tomorrow ${"and ".repeat(250)}about the weather`)).toBe(false);
         expect(["what is the weather like tomorrow", "draft an email saying I am away next week", "was koche ich heute"].map((text) => only(text))).toEqual([
             false,

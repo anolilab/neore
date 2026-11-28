@@ -58,8 +58,8 @@ interface Lexicon {
     numbers: Record<string, number>;
     /** Words of a question about what was (a month without a year is then the latest one). */
     past: string[];
-    /** A past form no list can hold: a regular `-ed` verb after `I`, a `ge…t` participle beside `habe`. */
-    pastForm: (word: string, before: string | undefined, words: ReadonlyArray<string>) => boolean;
+    /** A simple-past form no list can hold (a regular `-ed` verb after `I`), the word at `index` of the question. */
+    pastForm?: (index: number, words: ReadonlyArray<string>) => boolean;
     shifts: Record<string, Shift>;
     units: Record<string, Unit>;
     /** Words that mark the next number as a year (`in 2023`); fewer than `leads`, so `an essay of 2050 words` is no year. */
@@ -86,15 +86,24 @@ const ENGLISH: Lexicon = {
     leads: ["in", "on", "during", "for", "of", "since", "until", "by", "from", "before", "after"],
     months: monthsOf("january february march april may june july august september october november december"),
     numbers: { a: 1, eight: 8, five: 5, four: 4, nine: 9, one: 1, seven: 7, six: 6, ten: 10, three: 3, two: 2 },
-    past: ["did", "was", "were", "had", "went", "ago", "last", "happened", "lived", "bought", "saw", "met"],
-    // `I booked`, `we moved`; `I need` and `we feed` are not past.
-    pastForm: (word, before) => (before === "i" || before === "we") && word.length >= 4 && word.endsWith("ed") && !word.endsWith("eed"),
+    past: ["did", "was", "were", "had", "went", "ago", "last", "saw"],
+    // The simple past only: `I booked`, `where I lived`, `what happened`. A participle after have/has/had is the perfect
+    // (`what have I booked for December` asks of a booking ahead) and sets no tense; `I need` is no `-ed` verb.
+    pastForm: (index, words) => {
+        const [word, before, beforeThat] = [words[index]!, words[index - 1], words[index - 2]];
+
+        if ([before, beforeThat].some((auxiliary) => auxiliary !== undefined && ["had", "has", "have"].includes(auxiliary))) {
+            return false;
+        }
+
+        const regular = (before === "i" || before === "we") && word.length >= 4 && word.endsWith("ed") && !word.endsWith("eed");
+
+        return regular || ["bought", "happened", "lived", "met"].includes(word);
+    },
     shifts: { coming: 1, last: -1, next: 1, this: 0 },
     units: { month: "month", week: "week", year: "year" },
     yearLeads: ["in", "during", "since", "until"],
 };
-
-const GERMAN_FUTURE = ["werde", "wird", "werden", "plane", "planen", "geplant", "pläne", "plan", "vor", "bevorstehend", "ansteht", "kommenden", "nächsten"];
 
 const GERMAN: Lexicon = {
     agoAfter: [],
@@ -110,18 +119,14 @@ const GERMAN: Lexicon = {
         morgen: { blockedAfter: ["guten", "am", "jeden", "diesen", "den", "einen", "einem", "dem", "der", "vom", "heute", "gestern"], offset: 1 },
     },
     dayUnits: ["tag", "tage", "tagen"],
-    future: GERMAN_FUTURE,
+    future: ["werde", "wird", "werden", "plane", "planen", "geplant", "pläne", "plan", "vor", "bevorstehend", "ansteht", "kommenden", "nächsten"],
     leads: ["im", "in", "am", "seit", "bis", "für", "ab", "vom", "von", "zum", "anfang", "ende", "mitte", "jahr"],
     months: monthsOf("januar,jänner februar märz,maerz april mai juni juli august september oktober november dezember"),
     numbers: { acht: 8, drei: 3, ein: 1, einem: 1, einen: 1, fünf: 5, neun: 9, sechs: 6, sieben: 7, vier: 4, zehn: 10, zwei: 2 },
-    past: ["war", "waren", "warst", "hatte", "hatten", "gemacht", "gewesen", "letzten", "gestern", "passiert", "gekauft"],
-    // `habe … gekauft`; a future participle (`geplant`) stays future.
-    pastForm: (word, _before, words) =>
-        word.length >= 6 &&
-        word.startsWith("ge") &&
-        word.endsWith("t") &&
-        !GERMAN_FUTURE.includes(word) &&
-        words.some((other) => ["habe", "haben", "hast", "hat", "hatte"].includes(other)),
+    // The simple past (`war`, `hatte`), and the participles of what happened (`gemacht`, `gewesen`, `passiert`): spoken
+    // German asks of the past in the perfect. Any other participle beside `habe` sets no tense: `was habe ich im
+    // Dezember gebucht` asks of a booking ahead.
+    past: ["war", "waren", "warst", "hatte", "hatten", "gemacht", "gewesen", "letzten", "gestern", "passiert"],
     shifts: inflected([
         ["dies", 0],
         ["letzt", -1],
@@ -217,11 +222,21 @@ const phraseAt = (words: string[], at: number, lexicon: Lexicon, tense: Tense): 
         return { kind: "relative", shift, unit };
     }
 
-    // `next May`, `letzten Mai`; `this May` is left to the rest (`this may take long` is no month).
+    // `next May`, `letzten Mai`, `next May 3`; a year after it wins over the shift (`last May 2023`). `this May` is left
+    // to the rest (`this may take long` is no month).
     const shiftedMonth = shift === undefined || shift === 0 ? undefined : monthIndexOf(next, lexicon);
 
     if (shift !== undefined && shiftedMonth !== undefined) {
-        return { kind: "date", month: shiftedMonth, nearest: shift, tense };
+        const shiftedDay = dayNumberOf(after);
+        const shiftedYear = yearOf(shiftedDay === undefined ? after : words[at + 3]);
+
+        return {
+            kind: "date",
+            month: shiftedMonth,
+            tense,
+            ...(shiftedDay !== undefined && { day: shiftedDay }),
+            ...(shiftedYear === undefined ? { nearest: shift } : { year: shiftedYear }),
+        };
     }
 
     const count = countOf(next, lexicon);
@@ -270,7 +285,7 @@ const phraseAt = (words: string[], at: number, lexicon: Lexicon, tense: Tense): 
  * `was` is German `what`); `undefined` when it says neither or both.
  */
 const tenseOf = (words: string[], lexicon: Lexicon): Tense => {
-    const past = words.some((word, index) => lexicon.past.includes(word) || lexicon.pastForm(word, words[index - 1], words));
+    const past = words.some((word, index) => lexicon.past.includes(word) || lexicon.pastForm?.(index, words) === true);
     const future = words.some((word) => lexicon.future.includes(word));
 
     if (past === future) {
@@ -305,9 +320,10 @@ const LEXICON_WORDS = new Map(
     ]),
 );
 
-// A count of days is a time word too: `in 100 days`, as `countOf` reads it.
-const isKnown = (word: string): boolean =>
-    SMALL_NUMBER_RE.test(word) || DAY_NUMBER_RE.test(word) || YEAR_RE.test(word) || LEXICONS.some((lexicon) => LEXICON_WORDS.get(lexicon)!.has(word));
+const isNumber = (word: string): boolean => SMALL_NUMBER_RE.test(word) || DAY_NUMBER_RE.test(word) || YEAR_RE.test(word);
+
+/** The tokens after a phrase's first one that it may use: `3rd of December 2023`, `nächstes Jahr am 3. April`. */
+const PHRASE_SPAN = 4;
 
 /** The words that may join a month and a relative year: `in May last year`, `letztes Jahr im Mai`. */
 const MAX_YEAR_GAP = 4;
@@ -355,30 +371,38 @@ export const readTimePhrase = (text: string): TimePhrase | undefined => {
         return month?.kind === "date" ? { ...month, yearShift: phrase.shift } : phrase;
     };
 
-    const at = (read: (index: number) => TimePhrase | undefined): TimePhrase | undefined => {
+    const at = (read: (index: number) => TimePhrase | undefined): { phrase: TimePhrase; start: number } | undefined => {
         for (let index = 0; index < tokens.length; index += 1) {
             const phrase = read(index);
 
             if (phrase !== undefined) {
-                return phrase;
+                return { phrase, start: index };
             }
         }
 
         return undefined;
     };
 
-    const phrase =
+    const found =
         at((index) => isoAt(lowered, tokens, index)) ??
         at((index) => {
-            const found = phraseFrom(index);
+            const near = phraseFrom(index);
 
-            return found === undefined ? undefined : withNearYear(found, index);
+            return near === undefined ? undefined : withNearYear(near, index);
         });
 
-    // A question cut at `MAX_TEXT_LENGTH` may name a topic past the cut: it is never about the time alone.
-    const whole = text.length <= MAX_TEXT_LENGTH;
+    if (found === undefined) {
+        return undefined;
+    }
 
-    return phrase === undefined ? undefined : { ...phrase, onlyTime: whole && words.every((word) => isKnown(word)) };
+    // A question cut at `MAX_TEXT_LENGTH` may name a topic past the cut: it is never about the time alone. A number is a
+    // time word only inside the phrase (`in 100 days`); `42` in "what is on 42 tomorrow" is something else.
+    const whole = text.length <= MAX_TEXT_LENGTH;
+    const inPhrase = (index: number): boolean => index >= found.start && index <= found.start + PHRASE_SPAN;
+    const isTimeWord = (word: string, index: number): boolean =>
+        isNumber(word) ? inPhrase(index) : LEXICONS.some((lexicon) => LEXICON_WORDS.get(lexicon)!.has(word));
+
+    return { ...found.phrase, onlyTime: whole && words.every((word, index) => isTimeWord(word, index)) };
 };
 
 const pad = (value: number): string => String(value).padStart(2, "0");
