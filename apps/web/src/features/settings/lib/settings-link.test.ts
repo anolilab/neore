@@ -60,8 +60,8 @@ describe("settingsTabForPath", () => {
 });
 
 describe("settingsAnchorForPath", () => {
-    it("points the gateway's compression action at the row that summarises long chats, and other paths at nothing", () => {
-        expect(settingsAnchorForPath("/dashboard/settings/chat/compression")).toBe("thread-summaries");
+    it("points the gateway's compression action at the automatic compaction setting, and other paths at nothing", () => {
+        expect(settingsAnchorForPath("/dashboard/settings/chat/compression")).toBe("auto-compact-threshold");
         expect(settingsAnchorForPath("/dashboard/settings/chat/models")).toBeUndefined();
         expect(settingsAnchorForPath("/chat/compression")).toBeUndefined();
     });

@@ -60,7 +60,7 @@ export const adminPathFor = (pathname: string): string | undefined => {
 
 /** The row an old settings path points at inside its tab, for a path that names one setting rather than a page. */
 const ANCHOR_BY_SETTINGS_PATH: Record<string, string> = {
-    "chat/compression": "thread-summaries",
+    "chat/compression": "auto-compact-threshold",
 };
 
 /** The element id an old settings path points at in its tab, or `undefined`. */
