@@ -51,6 +51,7 @@ export const embedMemoryFacts = async (
     rules: ModelFilterRules,
     texts: ReadonlyArray<string>,
     logPrefix: string,
+    abortSignal?: AbortSignal,
 ): Promise<(number[] | null)[]> => {
     try {
         const { embeddingModelAllowed } = await import("../chat/lib/gateway-embedding-model");
@@ -58,6 +59,7 @@ export const embedMemoryFacts = async (
         if (texts.length > 0 && embeddingModelAllowed(rules)) {
             const { embedMany } = await import("../agent/client/search");
             const { embeddings } = await embedMany(ctx, {
+                abortSignal,
                 embeddingModel: await getMemoryEmbeddingModel(gatewayFetch(ctx), rules),
                 threadId: undefined,
                 userId,

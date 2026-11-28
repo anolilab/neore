@@ -307,8 +307,10 @@ describe(factEvidence, () => {
     });
 
     it("quotes no sentence that names a health condition, and keeps one that does not", () => {
-        expect.assertions(5);
+        expect.assertions(6);
 
+        // A zero-width character inside the word does not hide it.
+        expect(evidenceQuote("I have dia\u{200B}betes", "I have dia\u{200B}betes")).toBeUndefined();
         expect(evidenceQuote("I work as a teacher and was diagnosed with diabetes", "I work as a teacher and was diagnosed with diabetes")).toBeUndefined();
         expect(evidenceQuote("Ich bin schwanger", "Ich bin schwanger")).toBeUndefined();
         expect(["I have lupus", "I teach and have hypertension", "my arthritis is back", "I had anaemia"].map((text) => evidenceQuote(text, text))).toEqual([

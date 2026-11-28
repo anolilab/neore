@@ -210,6 +210,23 @@ describe("POST /chat with a clientMessageId", () => {
         expect(reused.json.error).toMatchObject({ code: "client_message_id_reused" });
     });
 
+    it("starts a new chat with the effort sent, and refuses one out of range before anything is saved", async () => {
+        const started = await postChat({ prompt: "hello", reasoningEffort: 75 });
+
+        expect(started.status).toBe(202);
+
+        const thread = await harness.run(async (ctx: any) => await ctx.db.get("threads", started.json.threadId));
+
+        expect(thread.reasoningEffort).toBe(75);
+
+        const before = await countMessages();
+        const refused = await postChat({ prompt: "hello", reasoningEffort: 101 });
+
+        expect(refused.status).toBeGreaterThanOrEqual(400);
+        expect(refused.status).toBeLessThan(500);
+        expect(await countMessages()).toBe(before);
+    });
+
     it("refuses a malformed clientMessageId before anything is saved", async () => {
         for (const clientMessageId of ["has:colon", "", "x".repeat(129)]) {
             const refused = await postChat({ clientMessageId, prompt: "hello" });

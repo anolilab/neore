@@ -16,6 +16,14 @@
  */
 import { PublicApiError } from "./errors";
 import { describeEvents, DEFAULT_MAX_EVENTS, EVENT_EXTENSION_ID, findEvent, MAX_EVENTS_LIMIT, parseEventArguments } from "./events-catalog";
+import {
+    EventsWebhookError,
+    parseSubscribeParams,
+    parseUnsubscribeParams,
+    type SubscribeRequest,
+    type SubscribeResult,
+    type UnsubscribeRequest,
+} from "./events-webhook";
 import { PUBLIC_API_PREFIX } from "./identity";
 import { IDEMPOTENCY_HEADER, parseIdempotencyKey } from "./idempotency";
 import { bodyJsonSchema, pathParameters, PUBLIC_API_VERSION, queryParameters } from "./openapi";
@@ -83,6 +91,10 @@ export interface PollResponse {
  */
 interface EventsDependencies {
     poll: (request: PollRequest) => Promise<PollResponse>;
+    /** `events/subscribe` (webhook delivery). Absent: the method answers -32601. Throws `EventsWebhookError` or `PublicApiError`. */
+    subscribe?: (request: SubscribeRequest) => Promise<SubscribeResult>;
+    /** `events/unsubscribe`. Absent: the method answers -32601. */
+    unsubscribe?: (request: UnsubscribeRequest) => Promise<void>;
 }
 
 export interface McpTool {
@@ -414,6 +426,11 @@ const eventsFailure = (id: RpcId, error: unknown): Response => {
         return rpcError(id, INTERNAL_ERROR, error.message, { data: { reason: error.code }, status: error.status });
     }
 
+    // The webhook refusals carry their own code and typed `data` (`events-webhook.ts`).
+    if (error instanceof EventsWebhookError) {
+        return rpcError(id, error.code, error.message, error.data === undefined ? {} : { data: error.data });
+    }
+
     throw error;
 };
 
@@ -535,11 +552,51 @@ export const serveMcp = async (rawBody: string, dependencies: McpDependencies): 
             }
         }
 
-        // The rest of the extension (push, webhook) is a later part. Refused here, so charged here.
+        // Every protocol call is charged before it runs, webhook delivery included. The rest of the extension (push,
+        // `events/stream`) is a later part, refused here.
         const refused = await chargeEvents(dependencies, id);
 
         if (refused) {
             return refused;
+        }
+
+        // Webhook delivery (part 2a). A dependency that is not wired leaves its method at -32601, as before.
+        if (method === "events/subscribe") {
+            if (events.subscribe === undefined) {
+                return rpcError(id, METHOD_NOT_FOUND, `Method not found: ${method}`, { status: 404 });
+            }
+
+            const subscription = parseSubscribeParams(params);
+
+            if (!subscription.ok) {
+                return rpcError(id, subscription.code, subscription.message, subscription.data === undefined ? {} : { data: subscription.data });
+            }
+
+            try {
+                return respond({ ...(await events.subscribe(subscription.value)) });
+            } catch (error) {
+                return eventsFailure(id, error);
+            }
+        }
+
+        if (method === "events/unsubscribe") {
+            if (events.unsubscribe === undefined) {
+                return rpcError(id, METHOD_NOT_FOUND, `Method not found: ${method}`, { status: 404 });
+            }
+
+            const unsubscription = parseUnsubscribeParams(params);
+
+            if (!unsubscription.ok) {
+                return rpcError(id, unsubscription.code, unsubscription.message, unsubscription.data === undefined ? {} : { data: unsubscription.data });
+            }
+
+            try {
+                await events.unsubscribe(unsubscription.value);
+
+                return respond({});
+            } catch (error) {
+                return eventsFailure(id, error);
+            }
         }
 
         return rpcError(id, METHOD_NOT_FOUND, `Method not found: ${method}`, { status: 404 });

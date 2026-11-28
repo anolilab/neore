@@ -37,6 +37,23 @@ const LEVEL: Record<Permission, number> = { admin: 4, comment: 2, read: 1, write
 /** A remote update is not pulled into the editor while the user typed this recently — their typing would be lost. */
 const LOCAL_EDIT_GRACE_MS = 5000;
 
+/** A page on its way. Below `lg` the tree is a drawer, and its toggle is the only way to the other pages until the page shows. */
+export const PageLoading: FC = () => {
+    const { t } = useLingui();
+
+    return (
+        <div className="flex min-w-0 flex-1 flex-col">
+            <div className="px-4 py-2 lg:hidden">
+                <PagesSidebarToggle />
+            </div>
+            <p aria-live="polite" className="text-muted-foreground flex min-w-0 flex-1 items-center justify-center gap-2 p-8 text-sm" role="status">
+                <Loader2 aria-hidden="true" className="size-4 animate-spin" />
+                {t`Loading page…`}
+            </p>
+        </div>
+    );
+};
+
 const PageView: FC<{ pageId: string }> = ({ pageId }) => {
     const { t } = useLingui();
     const crpc = useCRPC();
@@ -178,12 +195,7 @@ const PageView: FC<{ pageId: string }> = ({ pageId }) => {
     );
 
     if (isPending) {
-        return (
-            <p aria-live="polite" className="text-muted-foreground flex min-w-0 flex-1 items-center justify-center gap-2 p-8 text-sm" role="status">
-                <Loader2 aria-hidden="true" className="size-4 animate-spin" />
-                {t`Loading page…`}
-            </p>
-        );
+        return <PageLoading />;
     }
 
     if (error || !page) {

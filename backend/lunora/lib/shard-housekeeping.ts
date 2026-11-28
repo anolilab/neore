@@ -85,6 +85,9 @@ const shardSweeps = (): ReadonlyArray<Sweep> => [
     { name: "cleanupStaleWorkflowPresence", ref: internal.workflow.presence.cleanupStalePresence },
     { name: "reapLapsedClaims", ref: internal.lib.claim_once.reapLapsedClaims },
     { name: "purgeIdempotencyClaims", ref: internal.lib.claim_once.purgeExpiredClaims },
+    // Events webhook subscriptions past their granted expiry (`public-api/event-webhooks.ts`). The Events log's retention is
+    // drained in its own bounded loop (`pruneMcpEvents`), not here.
+    { name: "reapExpiredEventSubscriptions", ref: internal.public_api.event_webhooks.reapExpiredEventSubscriptions },
     // Rate-limit rows charged on this shard, past every limit's window (`lib/rate-limit-sweep.ts`).
     { name: "sweepExpiredRateLimits", ref: internal.lib.rate_limit_sweep.sweepExpiredRateLimits },
     { name: "deleteExpiredTemporaryChats", ref: internal.crons.deleteExpiredTemporaryChats },
@@ -634,6 +637,17 @@ export const runShardTick = internalMutation
             memoryCleanupAt = nextDueAt ?? undefined;
         });
 
+        // Expired Events webhook subscriptions (`public-api/event-webhooks.ts`): housekeeping no longer visits a dormant shard, so the
+        // tick reaps them here. A page that did not finish, or a failed reap, is armed for now.
+        let subscriptionsMore = false;
+        let subscriptionsNextWakeAt: number | undefined;
+        const subscriptionsChecked = await bestEffort("reapExpiredEventSubscriptionsOnTick", async () => {
+            ({ hasMore: subscriptionsMore, nextWakeAt: subscriptionsNextWakeAt } = await ctx.runMutation(
+                internal.public_api.event_webhooks.reapExpiredEventSubscriptions,
+                {},
+            ));
+        });
+
         const { now } = ctx;
         // The earliest export run due here. A read that fails must not stop the re-arming below: the shard is then armed for now, as
         // a reap that failed is.
@@ -683,13 +697,24 @@ export const runShardTick = internalMutation
             exportRunRead?.deleteAt,
             mergeCheckAt,
             memoryCleanupAt,
+            subscriptionsNextWakeAt,
             retentionLater,
             ...stuckChecks.map((row) => row?.stuckCheckAt),
         ].filter((at): at is number => at !== undefined);
 
         // The dispatch cleared this shard's due time; a reap, a merge check, a retention prune or an export-run read that failed recorded
         // no next time, so try again. So does an Events backlog the rounds above did not finish.
-        if (!reaped || !mergesChecked || !cleanupsChecked || !pruned || !triggersChecked || exportRunRead === undefined || eventsLeft) {
+        if (
+            !reaped ||
+            !mergesChecked ||
+            !cleanupsChecked ||
+            !subscriptionsChecked ||
+            subscriptionsMore ||
+            !pruned ||
+            !triggersChecked ||
+            exportRunRead === undefined ||
+            eventsLeft
+        ) {
             candidates.push(now);
         }
 

@@ -95,6 +95,7 @@ describe("parseWeChatMessage", () => {
     it("parses a text message", () => {
         expect(parseWeChatMessage(textXml("Hello"))).toEqual({
             chatId: "oUser",
+            direct: true,
             eventId: "1234567890123456",
             kind: "text",
             senderId: "oUser",

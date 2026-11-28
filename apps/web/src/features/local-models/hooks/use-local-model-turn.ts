@@ -69,6 +69,16 @@ interface LiveReply {
     threadId?: string;
 }
 
+/** The local model `model` runs on, or `undefined` when its turns go through the gateway. */
+export const useLocalModelTarget = (model: string): LocalModelTarget | undefined => {
+    const crpc = useCRPC();
+    const { isAnonymous } = useIsAnonymous();
+    // Only a `custom:` model can be local; every other chat skips the query.
+    const { data: providers } = useQuery(crpc.chat.custom_providers.listCustomProviders.queryOptions(isCustomModelId(model) && !isAnonymous ? {} : skipToken));
+
+    return useMemo(() => findLocalModelTarget(providers, model), [providers, model]);
+};
+
 /**
  * The browser path for `local-browser` models: stream from the user's own
  * Ollama / LM Studio, show the reply as it arrives, then persist the turn via
@@ -83,11 +93,8 @@ interface LiveReply {
 const useLocalModelTurn = (model: string, savedMessageIds: ReadonlySet<string>): LocalModelTurn => {
     const { i18n } = useLingui();
     const crpc = useCRPC();
-    const { isAnonymous } = useIsAnonymous();
-    // Only a `custom:` model can be local; every other chat skips the query.
-    const { data: providers } = useQuery(crpc.chat.custom_providers.listCustomProviders.queryOptions(isCustomModelId(model) && !isAnonymous ? {} : skipToken));
     const { mutateAsync: saveLocalTurn } = useMutation(crpc.chat.local_models.saveLocalTurn.mutationOptions());
-    const target = useMemo(() => findLocalModelTarget(providers, model), [providers, model]);
+    const target = useLocalModelTarget(model);
     const [live, setLive] = useState<LiveReply | null>(null);
     const abortRef = useRef<AbortController | null>(null);
     const lastSendIdRef = useRef(0);

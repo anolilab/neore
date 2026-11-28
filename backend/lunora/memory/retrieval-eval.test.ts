@@ -11,15 +11,22 @@ import { describe, expect, it } from "vitest";
 
 import {
     CANDIDATE_WINDOW_SIZE,
+    fuseSearchHits,
     isUsableOn,
-    keywordScoresFor,
+    KEYWORD_LOOKUP_LIMIT,
+    keywordLookupOf,
+    keywordLookupTerms,
+    lookupSearchesOf,
+    keywordSignalsFor,
     rankMemories,
     selectCandidateWindow,
+    topKeywordHits,
     topScopedHits,
     VECTOR_FETCH_K,
     vectorCutIsFull,
-    withVectorHits,
+    withSearchHits,
 } from "./retrieve-ranking";
+import { searchTokensOf } from "./search-terms";
 
 const DAY_MS = 86_400_000;
 
@@ -58,8 +65,8 @@ interface Fixture {
     queries: FixtureQuery[];
 }
 
-type Category = "abstain" | "multi" | "single" | "temporal" | "update";
-const CATEGORIES: Category[] = ["single", "multi", "temporal", "update", "abstain"];
+type Category = "abstain" | "exact" | "multi" | "single" | "temporal" | "update";
+const CATEGORIES: Category[] = ["single", "multi", "temporal", "update", "exact", "abstain"];
 
 const fixture = JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), "__fixtures__/retrieval-eval.json"), "utf8")) as Fixture;
 const { now, today } = fixture.meta;
@@ -74,8 +81,31 @@ const unitVector = (tags: Tags): number[] => {
 const cosine = (a: number[], b: number[]): number => a.reduce((sum, x, i) => sum + x * b[i]!, 0);
 
 /**
- * One query as retrieval runs it: the window, the vector hits (top K over all of the user's vectors), the ranking.
- * Without `vectors` no vector search ran (the model refused, the index failed): the window alone, ranked by keyword.
+ * What the search index answers one search with: every row holding each of its tokens (the last as a prefix), most
+ * occurrences first, then newest, cut to what a lookup reads.
+ */
+const indexSearch = <T extends { _creationTime: number; _id: string; memory: string }>(rows: T[], search: string): T[] => {
+    const asked = search.split(" ");
+    const occurrences = (tokens: string[], wanted: string, index: number): number =>
+        tokens.filter((token) => (index === asked.length - 1 ? token.startsWith(wanted) : token === wanted)).length;
+
+    return rows
+        .map((m) => {
+            const tokens = searchTokensOf(m.memory);
+            const counts = asked.map((wanted, index) => occurrences(tokens, wanted, index));
+
+            return { m, tf: counts.every((count) => count > 0) ? counts.reduce((sum, count) => sum + count, 0) : 0 };
+        })
+        .filter(({ tf }) => tf > 0)
+        .toSorted((a, b) => b.tf - a.tf || b.m._creationTime - a.m._creationTime || (a.m._id < b.m._id ? -1 : 1))
+        .slice(0, KEYWORD_LOOKUP_LIMIT)
+        .map(({ m }) => m);
+};
+
+/**
+ * One query as retrieval runs it: the window, the vector hits (top K over all of the user's vectors), the keyword hits
+ * (one search-index lookup per salient term), the ranking. Without `vectors` no vector search ran (the model refused,
+ * the index failed): the window and the keyword hits, ranked by keyword.
  */
 const run = (query: FixtureQuery, vectors = true): { ids: string[]; inWindow: Set<string> } => {
     const persona = fixture.personas.find((p) => p.id === query.persona)!;
@@ -116,16 +146,38 @@ const run = (query: FixtureQuery, vectors = true): { ids: string[]; inWindow: Se
     const vectorScores = new Map(scoped.map((h) => [h.id, h.cosine]));
 
     const window = selectCandidateWindow(active, { ...scope, limit: CANDIDATE_WINDOW_SIZE, today });
-    // Production adds the hits the window lacks, read by embedding id and kept only in scope and in effect.
-    const candidates = withVectorHits(
+
+    // The search index, as it answers each term's lookup: every row of the user (other bots', superseded and expired
+    // ones too) holding all of the term's tokens (the last as a prefix), most occurrences first, then newest, cut to what
+    // a lookup reads; the lookup then keeps the whole-token, usable, in-scope rows (`keywordLookupOf`, as production).
+    const lookups = keywordLookupTerms(query.text).map((term) => {
+        // What production asks the index for (`lookupSearchesOf`): one search per spelling, each read to the limit.
+        const pages = lookupSearchesOf(term).map((search) => indexSearch(rows, search));
+        const fetched = [...new Map(pages.flat().map((m) => [m._id, m])).values()];
+
+        return keywordLookupOf(
+            term,
+            fetched,
+            scope,
+            today,
+            pages.every((page) => page.length < KEYWORD_LOOKUP_LIMIT),
+        );
+    });
+
+    // Production adds the hits the window lacks (vector hits read by embedding id, best first, fused with the keyword
+    // hits), kept only in scope and in effect.
+    const candidates = withSearchHits(
         window,
-        active.filter((m) => vectorScores.has(m._id)),
+        fuseSearchHits(
+            scoped.map((h) => byId.get(h.id)!),
+            topKeywordHits(lookups, window.length),
+        ),
         { ...scope, today },
     );
 
     const ranked = rankMemories({
         candidates,
-        keywordScores: keywordScoresFor(candidates, query.text),
+        ...keywordSignalsFor(candidates, query.text, lookups),
         now,
         vectorScores,
         vectorSearched: vectorCutIsFull(scoped),
@@ -203,8 +255,11 @@ interface Floor {
 }
 const BASELINE: Record<"overall" | Category, Floor> & { overall: Required<Floor> & { abstainPrecision: number; abstainRate: number } } = {
     abstain: { offTopicRate: 1 },
+    exact: { inWindow: 1, ndcgAt8: 1, offTopicRate: 0.048, recallAt8: 1 },
     multi: { inWindow: 1, ndcgAt8: 0.726, offTopicRate: 0.771, recallAt8: 0.883 },
-    overall: { abstainPrecision: 1, abstainRate: 0.9, inWindow: 1, ndcgAt8: 0.771, offTopicRate: 0.853, recallAt8: 0.95 },
+    // Abstain rate 0.933: a bare number is no identifier, so "is parcel 52690 mine" is answered with the user's own
+    // parcel note (ends in 77314) instead of nothing.
+    overall: { abstainPrecision: 1, abstainRate: 0.933, inWindow: 1, ndcgAt8: 0.801, offTopicRate: 0.836, recallAt8: 0.957 },
     single: { inWindow: 1, ndcgAt8: 0.83, offTopicRate: 0.88, recallAt8: 0.94 },
     temporal: { inWindow: 1, ndcgAt8: 0.715, offTopicRate: 0.872, recallAt8: 1 },
     update: { inWindow: 1, ndcgAt8: 0.776, offTopicRate: 0.873, recallAt8: 1 },
@@ -228,7 +283,7 @@ describe("memory retrieval eval", () => {
 
     it("covers personas past the candidate window, every type and every category", () => {
         expect(fixture.personas).toHaveLength(5);
-        expect(fixture.queries).toHaveLength(150);
+        expect(fixture.queries).toHaveLength(180);
 
         for (const persona of fixture.personas) {
             const own = persona.memories.filter((m) => !m.botId && !m.supersededBy);
@@ -327,8 +382,11 @@ describe("memory retrieval eval", () => {
 
         const { abstainRate, recallAt8 } = summary(totals);
 
-        // Before relevance gated injection: Recall@8 0.165 and an abstain rate of 0. The keyword floor holds the first and moves the second.
-        expect(recallAt8!).toBeGreaterThanOrEqual(0.185 - TOLERANCE);
-        expect(abstainRate!).toBeGreaterThanOrEqual(0.55 - TOLERANCE);
+        // The keyword search still runs. Before it, with word overlap over the window alone: Recall@8 0.160, abstain rate 0.433.
+        expect(recallAt8!).toBeGreaterThanOrEqual(0.603 - TOLERANCE);
+        // 0.667: an identifier the memory lacks weighs in the share instead of zeroing it, so three questions naming a code
+        // nobody has get the sibling code's row through two or more shared words (`QZ-5508` → part, dishwasher;
+        // `WTU-40126` → serial, bike; `HIST-318` → evening, course, up). With vectors, all three still abstain.
+        expect(abstainRate!).toBeGreaterThanOrEqual(0.667 - TOLERANCE);
     });
 });

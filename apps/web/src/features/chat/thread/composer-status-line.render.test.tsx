@@ -11,7 +11,7 @@ import ComposerStatusLine from "./composer-status-line";
 const THREAD_ID = "k57abcdefghjkmnpqrstvwxyz0123456";
 
 const env = vi.hoisted(() => {
-    return { cachedPin: undefined as { maxRounds: number; text: string } | undefined, impersonating: false };
+    return { cachedPin: undefined as { maxRounds: number; text: string } | undefined, impersonating: false, local: false };
 });
 
 vi.mock("@lingui/react/macro", () => {
@@ -50,6 +50,12 @@ vi.mock("@/lib/lunora/crpc", () => {
             };
         },
     };
+});
+vi.mock("@/features/chat/core/hooks/use-current-model", () => {
+    return { default: () => "custom:ollama/llama" };
+});
+vi.mock("@/features/local-models/hooks/use-local-model-turn", () => {
+    return { useLocalModelTarget: () => (env.local ? { baseUrl: "http://localhost:11434", modelId: "llama" } : undefined) };
 });
 vi.mock("@/features/admin/hooks/use-is-impersonating", () => {
     return { useImpersonating: () => env.impersonating };
@@ -98,6 +104,7 @@ const renderLine = () => render(<ComposerStatusLine researchDepth={"standard" as
 beforeEach(() => {
     env.cachedPin = undefined;
     env.impersonating = false;
+    env.local = false;
     useGoalComposer.setState({ enabled: false });
     setPinOverride(THREAD_ID, undefined);
     useChatUIStore.setState({ composerAttachments: [], composerText: "" });
@@ -141,6 +148,14 @@ describe(ComposerStatusLine, () => {
         renderLine();
 
         expect(screen.getByText(GOAL)).toBeTruthy();
+    });
+
+    it("shows no goal for a local model, which runs one plain turn", () => {
+        env.cachedPin = { maxRounds: 3, text: "Ship it" };
+        env.local = true;
+        renderLine();
+
+        expect(screen.queryByText(GOAL)).toBeNull();
     });
 
     it("renders nothing with no goal, pinned or armed", () => {

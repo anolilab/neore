@@ -8,6 +8,7 @@ export default defineModule({
         "aiUserPreferences",
         "apikey",
         "deviceCode",
+        "eventWebhookHosts",
         "gatewayUsageDeductions",
         "invitation",
         "jwks",

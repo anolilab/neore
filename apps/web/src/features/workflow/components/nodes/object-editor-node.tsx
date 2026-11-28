@@ -87,7 +87,13 @@ const ObjectEditorNodeComponent = (props: NodeProps<Node<ObjectEditorNodeData>>)
                     <Label className="text-muted-foreground text-xs" htmlFor={`${id}-mode`}>
                         <Trans>Edit Mode</Trans>
                     </Label>
-                    <Select onValueChange={handleModeChange} value={data.mode}>
+                    <Select
+                        items={EDIT_MODES.map((option) => {
+                            return { label: i18n._(option.label), value: option.value };
+                        })}
+                        onValueChange={handleModeChange}
+                        value={data.mode}
+                    >
                         <SelectTrigger className="nodrag h-8 text-sm" id={`${id}-mode`}>
                             <SelectValue />
                         </SelectTrigger>

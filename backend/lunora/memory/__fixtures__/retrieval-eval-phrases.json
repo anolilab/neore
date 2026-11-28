@@ -348,5 +348,17 @@
         ["when is my wedding anniversary", 1],
         ["which airline miles card do I hold", 2],
         ["what is my favourite football team", 3]
+    ],
+    "exact": [
+        ["Ordered replacement part KX-2291 for the dishwasher", "did I already order KX-2291", "did I order part QZ-5508 for the dishwasher"],
+        ["The neighbour's cat is called Pumpernickel", "who is Pumpernickel", "who is Fitzwilliam"],
+        ["Bike frame serial number is WTU-38817", "whose bike has serial WTU-38817", "is WTU-40126 the serial of my bike"],
+        ["Drinks a smoky lapsang souchong every morning", "do I drink lapsang", "is rooibos my favourite"],
+        ["Accountant is a Ms Thorvaldsen in the old town", "what does Thorvaldsen do for me", "who is Vandersloot"],
+        ["Home router is the HR-7501 model", "which device is the HR-7501", "is the HR-9934 my router"],
+        ["Book club is reading Quillfeather next", "have I read Quillfeather", "who wrote Marrowgate"],
+        ["Grandmother grew up in the village of Kleinwaldau", "where is Kleinwaldau", "where is Oberhollenbach"],
+        ["Signed up for the evening course ECON-204", "when does ECON-204 meet", "did I sign up for the evening course HIST-318"],
+        ["Parcel tracking number ends in 77314", "which parcel ends in 77314", "is parcel 52690 mine"]
     ]
 }

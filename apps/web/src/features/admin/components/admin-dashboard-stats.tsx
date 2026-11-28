@@ -80,6 +80,7 @@ const AdminDashboardStats = () => {
 
     const growthRows = stats.userGrowth[growthFilter];
     const maxGrowth = Math.max(...growthRows.map((d: UserGrowthPoint) => d.count), 1);
+    const growthItems = { all: t`All Users`, regular: t`Regular`, anonymous: t`Anonymous` };
 
     return (
         <div className="flex flex-col gap-6">
@@ -137,14 +138,16 @@ const AdminDashboardStats = () => {
             {/* User Growth Chart (simplified) */}
             <AdminSection
                 action={
-                    <Select onValueChange={(v) => setGrowthFilter(v as typeof growthFilter)} value={growthFilter}>
+                    <Select items={growthItems} onValueChange={(v) => setGrowthFilter(v as typeof growthFilter)} value={growthFilter}>
                         <SelectTrigger aria-label={t`Filter by type`} className="w-[140px]">
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="all">{t`All Users`}</SelectItem>
-                            <SelectItem value="regular">{t`Regular`}</SelectItem>
-                            <SelectItem value="anonymous">{t`Anonymous`}</SelectItem>
+                            {Object.entries(growthItems).map(([value, label]) => (
+                                <SelectItem key={value} value={value}>
+                                    {label}
+                                </SelectItem>
+                            ))}
                         </SelectContent>
                     </Select>
                 }

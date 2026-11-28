@@ -39,6 +39,9 @@ const InviteMemberDialog = ({ classNames, onOpenChange, ...properties }: InviteM
 
     const roles = [...builtInRoles, ...(organization?.customRoles || [])];
     const availableRoles = roles.filter((role) => membership?.role === "owner" || role.role !== "owner");
+    const roleItems = availableRoles.map((role) => {
+        return { label: role.label, value: role.role };
+    });
 
     const formSchema = z.strictObject({
         email: emailSchema,
@@ -131,7 +134,7 @@ const InviteMemberDialog = ({ classNames, onOpenChange, ...properties }: InviteM
                                 <field.FormItem>
                                     <field.FormLabel className={classNames?.label}>{t`Role`}</field.FormLabel>
 
-                                    <Select onValueChange={(value) => field.handleChange(value ?? "")} value={field.state.value}>
+                                    <Select items={roleItems} onValueChange={(value) => field.handleChange(value ?? "")} value={field.state.value}>
                                         <field.FormControl>
                                             <SelectTrigger>
                                                 <SelectValue />

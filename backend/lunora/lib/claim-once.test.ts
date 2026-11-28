@@ -17,6 +17,7 @@ import {
     holdKey,
     holdTtlFrom,
     purgeExpiredClaims,
+    putClaimResult,
     reapLapsedClaims,
     recordClaimResult,
     releaseKey,
@@ -224,6 +225,43 @@ describe("holdClaim", () => {
         expect(await harness.run(async (ctx: any) => await ctx.db.query("idempotencyClaims").collect())).toEqual([
             expect.objectContaining({ claimedAt: other, expiresAt: NOW + TTL + 1 + TTL }),
         ]);
+    });
+});
+
+describe("putClaimResult", () => {
+    const put = async (claimedAt: number): Promise<boolean> =>
+        await harness.run(async (ctx: any) => await putClaimResult(ctx, "s", "a", { claimedAt, result: "done", ttlMs: 10 * TTL, userId: "u" }));
+    const claims = async () => await harness.run(async (ctx: any) => await ctx.db.query("idempotencyClaims").collect());
+
+    it("records the result on its own claim, lapsed or not, and holds it from claimedAt", async () => {
+        const claimedAt = await mutate(claimKeyFenced, { key: "a", scope: "s", ttlMs: TTL });
+
+        vi.setSystemTime(NOW + TTL + 1);
+        await expect(put(claimedAt)).resolves.toBe(true);
+        expect(await claims()).toEqual([expect.objectContaining({ claimedAt, expiresAt: NOW + 10 * TTL, result: "done" })]);
+    });
+
+    it("writes the claim again under claimedAt once its lapsed row was purged", async () => {
+        const claimedAt = await mutate(claimKeyFenced, { key: "a", scope: "s", ttlMs: TTL });
+
+        vi.setSystemTime(NOW + TTL + 1);
+        await mutate(purgeExpiredClaims, {});
+        await expect(put(claimedAt)).resolves.toBe(true);
+        expect(await claims()).toEqual([expect.objectContaining({ claimedAt, result: "done", userId: "u" })]);
+    });
+
+    it("writes nothing when a newer claim took the key after this one lapsed", async () => {
+        const claimedAt = await mutate(claimKeyFenced, { key: "a", scope: "s", ttlMs: TTL });
+
+        vi.setSystemTime(NOW + TTL + 1);
+
+        const newer = await mutate(claimKeyFenced, { key: "a", scope: "s", ttlMs: TTL });
+
+        await expect(put(claimedAt)).resolves.toBe(false);
+        const [row] = await claims();
+
+        expect(row).toMatchObject({ claimedAt: newer });
+        expect(row?.result).toBeUndefined();
     });
 });
 

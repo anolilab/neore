@@ -58,8 +58,8 @@ interface MemoryItemProps {
     relativeTime: (timestamp: number) => string;
 }
 
-/** Sources this list labels by who learned them; any other (an import) keeps its own label. */
-const LEARNED_SOURCES = new Set(["auto", "compressed", "reflection", undefined]);
+/** Sources this list labels by who learned them (a fact saved when the user asked in chat too); any other (an import) keeps its own label. */
+const LEARNED_SOURCES = new Set(["auto", "compressed", "reflection", "requested", undefined]);
 
 /**
  * Who the memory came from (the user, a bot, or a plain chat) and the date, as one translatable message per case, so a

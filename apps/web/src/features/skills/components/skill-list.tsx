@@ -418,7 +418,11 @@ const SkillList = ({ reloadKey = 0 }: SkillListProps) => {
                         </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
-                        <Select onValueChange={(value) => setSortBy(value as SortOption)} value={sortBy}>
+                        <Select
+                            items={{ alphabetical: t`Alphabetical`, mostUsed: t`Most Used`, recent: t`Recently Created` }}
+                            onValueChange={(value) => setSortBy(value as SortOption)}
+                            value={sortBy}
+                        >
                             <SelectTrigger aria-label={t`Sort skills`} className="w-40">
                                 <SelectValue />
                             </SelectTrigger>

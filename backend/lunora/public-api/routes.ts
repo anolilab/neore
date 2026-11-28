@@ -235,7 +235,7 @@ const collectBlockingReply = async (input: RouteInput, threadId: string | undefi
 
 const startChat = async (
     input: RouteInput,
-    request: { clientMessageId?: string; model?: string; prompt: string; stream?: boolean; threadId?: string },
+    request: { clientMessageId?: string; model?: string; prompt: string; reasoningEffort?: number; stream?: boolean; threadId?: string },
 ): Promise<RouteResult> => {
     const signingSecret = process.env.LLM_GATEWAY_SIGNING_SECRET;
 
@@ -252,6 +252,7 @@ const startChat = async (
             mode: "text",
             model: resolveChatModel(request.model),
             prompt: request.prompt,
+            ...(request.reasoningEffort !== undefined && { reasoningEffort: request.reasoningEffort }),
             ...(request.threadId && { threadId: request.threadId }),
         },
         signingSecret,

@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import SettingsCard from "@/components/settings/settings-card";
 import SettingsRow from "@/components/settings/settings-row";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
+import { useModalState } from "@/features/layout/hooks/use-ui-state";
 import SetupChecklist from "@/features/onboarding/components/setup-checklist";
 import { useCRPC } from "@/lib/lunora/crpc";
 import type { NativeDevicePlatform, NativeDeviceStatus, NativeHostReconnect, NativeHostSpec } from "@/lib/native/bridge";
@@ -85,6 +86,7 @@ export const StartAgents: FC<{ device: DeviceView; online: boolean }> = ({ devic
     const { t } = useLingui();
     const crpc = useCRPC();
     const navigate = useNavigate();
+    const { close: closeSettings } = useModalState("settings");
     const baseId = useId();
     const start = useMutation(crpc.acp.remote.startHostSession.mutationOptions());
     const offers = device.acpOffers ?? [];
@@ -161,9 +163,13 @@ export const StartAgents: FC<{ device: DeviceView; online: boolean }> = ({ devic
                                     {
                                         onError: (error) => toast.error(error.message),
                                         onSuccess: (result) => {
-                                            if (result.threadId !== undefined) {
-                                                void navigate({ params: { threadId: result.threadId }, to: "/chat/$threadId" });
+                                            if (result.threadId === undefined) {
+                                                return;
                                             }
+
+                                            // Shown in the settings modal, which would otherwise stay over the new chat.
+                                            closeSettings();
+                                            void navigate({ params: { threadId: result.threadId }, to: "/chat/$threadId" });
                                         },
                                     },
                                 );

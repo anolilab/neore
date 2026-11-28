@@ -83,7 +83,7 @@ export const isPublicIPv4 = (address: string): boolean => {
 /**
  * True for an IPv6 address in global unicast space (2000::/3), without the ranges that embed or stand for another address:
  * 6to4 (2002::/16), Teredo (2001:0::/32), benchmarking (2001:2::/48, refused with its whole /32) and documentation
- * (2001:db8::/32). Everything else, including mapped and
+ * (2001:db8::/32), and the non-routable ORCHID ranges (2001:10::/28, 2001:20::/28). Everything else, including mapped and
  * compatible forms, NAT64, link-local, unique-local, multicast and loopback, is refused. Text it cannot read is refused.
  */
 export const isPublicIPv6 = (address: string): boolean => {
@@ -106,6 +106,11 @@ export const isPublicIPv6 = (address: string): boolean => {
     }
 
     if (first === 0x3f_ff && second < 0x10_00) {
+        return false;
+    }
+
+    // ORCHID (2001:10::/28) and ORCHIDv2 (2001:20::/28): top twelve bits of the second group.
+    if (first === 0x20_01 && ((second & 0xff_f0) === 0x00_10 || (second & 0xff_f0) === 0x00_20)) {
         return false;
     }
 

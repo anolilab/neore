@@ -113,6 +113,13 @@ const ComposerImageSettings: FC<ComposerImageSettingsProps> = ({
 
     const triggerClass = "h-7 gap-1.5 border-border/50 px-2 text-xs";
 
+    const aspectRatioItems = availableAspectRatios.map((ratio) => {
+        return { label: typeof ratio.label === "string" ? ratio.label : i18n._(ratio.label), value: ratio.value };
+    });
+    const styleItems = STYLE_OPTIONS.map((option) => {
+        return { label: i18n._(option.label), value: option.value || "auto" };
+    });
+
     return (
         <div className={clsx("flex flex-wrap items-center gap-1", className)}>
             {/* ── Group 1: visual style ── */}
@@ -125,6 +132,7 @@ const ComposerImageSettings: FC<ComposerImageSettingsProps> = ({
                             <div className="inline-flex">
                                 <Select
                                     disabled={disabled}
+                                    items={aspectRatioItems}
                                     onValueChange={(value) => onSettingsChange({ aspectRatio: value as ImageSize })}
                                     value={settings.aspectRatio}
                                 >
@@ -160,6 +168,7 @@ const ComposerImageSettings: FC<ComposerImageSettingsProps> = ({
                         <div className="inline-flex">
                             <Select
                                 disabled={disabled}
+                                items={QUALITY_OPTIONS}
                                 onValueChange={(value) => onSettingsChange({ quality: value as "hd" | "standard" })}
                                 value={settings.quality || "standard"}
                             >
@@ -186,7 +195,12 @@ const ComposerImageSettings: FC<ComposerImageSettingsProps> = ({
                 <TooltipTrigger
                     render={
                         <div className="inline-flex">
-                            <Select disabled={disabled} onValueChange={(value) => onSettingsChange({ style: value || undefined })} value={settings.style || ""}>
+                            <Select
+                                disabled={disabled}
+                                items={styleItems}
+                                onValueChange={(value) => onSettingsChange({ style: value || undefined })}
+                                value={settings.style || ""}
+                            >
                                 <SelectTrigger className={triggerClass}>
                                     <Wand2 className="text-muted-foreground size-3 shrink-0" />
                                     <SelectValue placeholder={t`Auto`} />

@@ -691,4 +691,35 @@ describe("ThreadNode", () => {
             vi.unstubAllGlobals();
         }
     });
+
+    it.each([
+        ["offers pin and archive in the row menu on a touch screen, which has no hover strip", false, 1],
+        ["leaves them to the hover strip on a screen with hover", true, 0],
+    ])("%s", (_case, hover, count) => {
+        vi.stubGlobal(
+            "matchMedia",
+            vi.fn((query: string) => {
+                return { addEventListener: () => {}, matches: query === "(hover: hover)" && hover, removeEventListener: () => {} };
+            }),
+        );
+        vi.stubGlobal(
+            "ResizeObserver",
+            // A constructor mock must be a `function`, not an arrow.
+            // eslint-disable-next-line prefer-arrow-callback
+            vi.fn(function ResizeObserverStub() {
+                return { disconnect: vi.fn(), observe: vi.fn(), unobserve: vi.fn() };
+            }),
+        );
+        uiState.optionsMenuThreadId = "t1";
+
+        try {
+            render(<ThreadNode {...baseProps} />);
+
+            expect(screen.queryAllByRole("menuitem", { name: "Pin thread" })).toHaveLength(count);
+            expect(screen.queryAllByRole("menuitem", { name: "Archive thread" })).toHaveLength(count);
+        } finally {
+            uiState.optionsMenuThreadId = null;
+            vi.unstubAllGlobals();
+        }
+    });
 });

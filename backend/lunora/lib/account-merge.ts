@@ -147,9 +147,10 @@ const KEEP_NEW_USERS = new Set(["aiUserPreferences", "userSettings"]);
  * Tables whose rows are copied for the guest alone: another user's row on the guest's shard stays where it is, so the
  * clear takes only the guest's rows of these, even when the two shards are separate stores. A webhook is one row per user,
  * copied by its own rule (`copyMergedRunWebhooks`), so the account's own one is never doubled. The Events log and its
- * watermark are copied for the guest only too (`mcpEvents` keeps the guest's events; the watermark is not copied).
+ * watermark are copied for the guest only too (`mcpEvents` keeps the guest's events; the watermark is not copied). The owner's
+ * Events webhook hosts are the same: the account's own list, filtered to the guest's rows on a shared store.
  */
-const COPIED_FOR_GUEST_ONLY = new Set([...KEEP_NEW_USERS, "mcpEvents", "mcpEventWatermarks", "runWebhooks"]);
+const COPIED_FOR_GUEST_ONLY = new Set([...KEEP_NEW_USERS, "eventWebhookHosts", "mcpEvents", "mcpEventWatermarks", "runWebhooks"]);
 
 /** The claim scope of the store probe: a marker written on the new account's shard and looked for on the guest's. */
 export const MERGE_PROBE_SCOPE = "guest-merge-probe";
@@ -161,10 +162,12 @@ const MERGE_PROBE_TTL_MS = 60 * 60 * 1000;
 const NOT_MOVED = new Set(["cronRuns", "idempotencyClaims", "rateLimits"]);
 
 /**
- * Dropped with the guest's shard, never copied: a scan position into the guest's pull-request links, which the merge
- * re-inserts under new ids, so a carried cursor would point at nothing. The new account's sweep starts from its first link.
+ * Dropped with the guest's shard, never copied. A scan position into the guest's pull-request links, which the merge re-inserts
+ * under new ids, so a carried cursor would point at nothing; the new account's sweep starts from its first link. A subscription is
+ * keyed to the API key that made it, which the new account did not make, so a copy would be a live delivery it could not list
+ * or cancel with its own key. The guest's subscriptions end with the merge instead.
  */
-const NOT_COPIED = new Set(["pullRequestStateScans"]);
+const NOT_COPIED = new Set(["eventWebhookSubscriptions", "pullRequestStateScans"]);
 
 /**
  * The tables whose rows live on a user's shard — everything but `.global()` — sorted, but `threads` just before
@@ -389,6 +392,18 @@ export const listShardRowsPage = internalQuery
             const full = await readEvents(EVENT_COPY_PAGE_SIZE);
             const fits = withinClearBytes(full.page as unknown as Record<string, unknown>[]).length;
             const result = fits < full.page.length ? await readEvents(fits) : full;
+
+            return { continueCursor: result.isDone ? null : (result.continueCursor ?? null), isDone: result.isDone, page: result.page };
+        }
+
+        // Only the guest's own approvals: on a store two accounts share, the account's own list sits there too.
+        if (args.table === "eventWebhookHosts") {
+            const result = await ctx.db.eventWebhookHosts.findMany({
+                consistency: "primary",
+                cursor: args.cursor,
+                limit: MERGE_PAGE_SIZE,
+                where: { userId: args.from },
+            });
 
             return { continueCursor: result.isDone ? null : (result.continueCursor ?? null), isDone: result.isDone, page: result.page };
         }

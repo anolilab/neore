@@ -991,6 +991,32 @@ describe("the coding-agent composer", () => {
         expect((screen.getByLabelText("Message to the coding agent") as HTMLTextAreaElement).disabled).toBe(true);
     });
 
+    describe("a computer older than the backend still serves", () => {
+        const OUTDATED = "Neore on this computer is out of date, so the agent cannot use it. Update the app there to turn it back on.";
+        const mountOn = (devices: unknown) => {
+            mount({ ...session({ deviceId: "device-1" }), "devices.functions.listDevices": devices });
+        };
+
+        it("says so above the message box when the chat's computer reports it needs an update", async () => {
+            mountOn([{ _id: "device-1", name: "Laptop", updateRequired: true }]);
+
+            expect(await screen.findByText(OUTDATED)).toBeTruthy();
+        });
+
+        it.each([
+            ["is up to date", [{ _id: "device-1", name: "Laptop", updateRequired: false }]],
+            ["did not say", [{ _id: "device-1", name: "Laptop" }]],
+            ["is another computer than the chat's", [{ _id: "device-2", name: "Desk", updateRequired: true }]],
+            ["is not in the list", []],
+        ])("says nothing when the computer %s", async (_name, devices) => {
+            mountOn(devices);
+
+            expect(await screen.findByLabelText("Message to the coding agent")).toBeTruthy();
+            await waitFor(() => expect(harness.client?.isFetching()).toBe(0));
+            expect(screen.queryByText(OUTDATED)).toBeNull();
+        });
+    });
+
     it("offers Continue after a restart or a timeout, and sends it as a message", async () => {
         mount(session({ lastEndReason: "interrupted" }));
 

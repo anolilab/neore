@@ -124,7 +124,13 @@ const PayloadFiltersEditor: FC<{ filters: PayloadFilterRow[]; onChange: (filters
                         placeholder="action"
                         value={filter.path}
                     />
-                    <Select onValueChange={(value) => update(index, { op: value as FilterOp })} value={filter.op}>
+                    <Select
+                        items={(Object.keys(FILTER_OP_LABELS) as FilterOp[]).map((op) => {
+                            return { label: i18n._(FILTER_OP_LABELS[op]), value: op };
+                        })}
+                        onValueChange={(value) => update(index, { op: value as FilterOp })}
+                        value={filter.op}
+                    >
                         <SelectTrigger aria-label={t`Filter condition`} className="w-40 shrink-0">
                             <SelectValue />
                         </SelectTrigger>
@@ -248,7 +254,14 @@ export const WebhookTriggerFields: FC<WebhookTriggerFieldsProps> = ({ isExisting
         <>
             <div className="mt-3 space-y-1.5">
                 <Label htmlFor={sourceId}>{t`Source`}</Label>
-                <Select disabled={isExisting} onValueChange={changeSource} value={webhook.provider}>
+                <Select
+                    disabled={isExisting}
+                    items={SOURCE_CHOICES.map((source) => {
+                        return { label: t(PROVIDER_LABELS[source]), value: source };
+                    })}
+                    onValueChange={changeSource}
+                    value={webhook.provider}
+                >
                     <SelectTrigger id={sourceId}>
                         <SelectValue />
                     </SelectTrigger>
@@ -267,6 +280,9 @@ export const WebhookTriggerFields: FC<WebhookTriggerFieldsProps> = ({ isExisting
                         <Label htmlFor={schemeId}>{t`Signature`}</Label>
                         <Select
                             disabled={isExisting}
+                            items={CUSTOM_SCHEMES.map((scheme) => {
+                                return { label: t(SCHEME_LABELS[scheme]), value: scheme };
+                            })}
                             onValueChange={(value) => {
                                 if (isOneOf(CUSTOM_SCHEMES, value)) {
                                     onChange({ ...webhook, scheme: value });
@@ -297,6 +313,9 @@ export const WebhookTriggerFields: FC<WebhookTriggerFieldsProps> = ({ isExisting
                         <Label htmlFor={eventId}>{t`Event`}</Label>
                         <Select
                             disabled={isExisting}
+                            items={WEBHOOK_PRESET_LIST.filter((preset) => preset.provider === webhook.provider).map((preset) => {
+                                return { label: t(PRESET_EVENT_LABELS[preset.event]), value: preset.event };
+                            })}
                             onValueChange={(value) => {
                                 const next = WEBHOOK_PRESET_LIST.find((preset) => preset.provider === webhook.provider && preset.event === value);
 

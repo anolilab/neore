@@ -37,6 +37,12 @@ import { SIGNED_REQUEST_WINDOW_MS } from "../lib/crypto";
 import { httpScheduler } from "../lib/http-scheduler";
 import { checkRateLimit } from "../lib/rate-limiter";
 import { checkSenderPairing } from "./pairing";
+import {
+    isMemoryCommand,
+    MEMORY_COMMAND_DISCORD_MESSAGE_NOTICE,
+    MEMORY_COMMAND_OTHER_CHAT_NOTICE,
+    MEMORY_COMMAND_RATE_LIMITED_NOTICE,
+} from "./lib/memory-command";
 import type { InboundMessage } from "./lib/types";
 import { isFreshInbound, UNSUPPORTED_CONTENT_NOTICE } from "./lib/types";
 import { discordSignedAt, parseDiscordEvent, validateDiscordSignature } from "./platforms/discord";
@@ -116,6 +122,45 @@ export const resolveConnectionAndKeys = async <Key extends string>(
 };
 
 /**
+ * `/memory` from the paired contact: the digest only in the paired chat, and only when the platform says that chat is
+ * one-to-one (`direct`), so it never reaches a group; anywhere else a notice only. The action re-checks the pairing.
+ */
+const answerMemoryCommand = async (
+    context: HttpActionCtx,
+    connection: Doc<"messengerConnections">,
+    message: InboundMessage,
+    notice: NonNullable<AcceptOptions["delivery"]> & { inboundAt: number; platform: MessengerPlatform; platformChatId: string },
+    tier: "free" | "premium",
+): Promise<void> => {
+    const scheduler = httpScheduler(context);
+    const sendNotice = async (text: string): Promise<void> => {
+        await scheduler.runAfter(0, internal.messenger.respond.sendNotice, { ...notice, text, userId: connection.userId });
+    };
+
+    if (message.direct !== true || message.chatId !== connection.platformChatId) {
+        await sendNotice(message.directUnknown === true ? MEMORY_COMMAND_DISCORD_MESSAGE_NOTICE : MEMORY_COMMAND_OTHER_CHAT_NOTICE);
+
+        return;
+    }
+
+    // The digest reads what the download reads: it draws on the same per-user bucket.
+    const allowed = await checkRateLimit(context, `memory/export:${tier}`, { key: connection.userId, throws: false });
+
+    if (!allowed.ok) {
+        await sendNotice(MEMORY_COMMAND_RATE_LIMITED_NOTICE);
+
+        return;
+    }
+
+    await scheduler.runAfter(0, internal.messenger.respond.sendMemoryDigest, {
+        ...notice,
+        connectionId: connection._id,
+        platformUserId: message.senderId,
+        userId: connection.userId,
+    });
+};
+
+/**
  * Run a parsed message through the shared rules and, if it passes, persist it
  * and schedule the reply. Returns what happened, for logs and tests.
  */
@@ -124,7 +169,7 @@ export const acceptInbound = async (
     connection: Doc<"messengerConnections">,
     inbound: InboundMessage,
     { delivery, externalThreadId, maxAgeMs, platform }: AcceptOptions,
-): Promise<"accepted" | "duplicate" | "just_paired" | "rate_limited" | "stale" | "unpaired"> => {
+): Promise<"accepted" | "duplicate" | "just_paired" | "memory_command" | "rate_limited" | "stale" | "unpaired"> => {
     if (!isFreshInbound(inbound, maxAgeMs)) {
         return "stale";
     }
@@ -178,6 +223,18 @@ export const acceptInbound = async (
         return "rate_limited";
     }
 
+    if (message.kind === "text" && isMemoryCommand(message.text)) {
+        await answerMemoryCommand(
+            context,
+            connection,
+            message,
+            { ...delivery, inboundAt: message.timestampMs, platform, platformChatId: message.chatId },
+            tier,
+        );
+
+        return "memory_command";
+    }
+
     const { threadId } = await context.runMutation(internal.messenger.functions.findOrCreateMessengerThread, {
         externalThreadId: externalThreadId ?? `${platform}:${message.chatId}`,
         messengerConnectionId: connection._id,
@@ -224,7 +281,7 @@ export const acceptInbound = async (
 };
 
 const logOutcome = (platform: MessengerPlatform, outcome: Awaited<ReturnType<typeof acceptInbound>>): void => {
-    if (outcome !== "accepted" && outcome !== "just_paired") {
+    if (outcome !== "accepted" && outcome !== "just_paired" && outcome !== "memory_command") {
         console.warn(`[Messenger] ${platform} message not processed: ${outcome}`);
     }
 };

@@ -79,6 +79,10 @@ export const truncateUserMessage = (message: string, steeredFrom?: number, limit
     return prompt > 0 ? `${message.slice(0, prompt)}\n\n${steered}` : steered;
 };
 
+/** What a requested run gives the model of a typed prompt past the window: its start and its end, so a request typed last is read. */
+export const promptStartAndEnd = (typed: string, limit = EXTRACTION_USER_MESSAGE_CHARS): string =>
+    typed.length <= limit ? typed : `${typed.slice(0, limit / 2)}\n[…]\n${typed.slice(-limit / 2)}`;
+
 /**
  * How many characters of the prompt, from its start, {@link truncateUserMessage} keeps: words past them never reached
  * the model, so no memory can have come from them (`factEvidence`).
@@ -505,6 +509,8 @@ export type GateReason =
     | "classifier_failed"
     | "locked_thread"
     | "no_signal"
+    // The user asked for it to be remembered (`remember.ts`): no gate runs.
+    | "requested"
     | "strong_signal"
     | "temporary_thread"
     | "too_short"

@@ -137,3 +137,13 @@ export const deleteUserRecord = async (ctx: MutationCtx, userId: Id<"user">): Pr
         await ctx.db.delete("user", userId);
     }
 };
+
+/** Erases the account's approved hosts: account deletion (`gdpr/steps/deletion-steps.ts`) and the admin cleanup (`auth/hooks.ts`). */
+export const deleteEventWebhookHostsOf = async (ctx: Pick<MutationCtx, "db">, userId: string): Promise<void> => {
+    // From the primary: a replica that has not seen an approval would leave it behind the erasure.
+    const { page } = await ctx.db.eventWebhookHosts.findMany({ consistency: "primary", where: { userId } });
+
+    for (const row of page) {
+        await ctx.db.delete("eventWebhookHosts", row._id);
+    }
+};

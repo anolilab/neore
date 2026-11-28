@@ -288,6 +288,33 @@ export const recordClaimResult = async (ctx: ClaimCtx, scope: string, key: strin
 };
 
 /**
+ * Records `result` on the claim `claimedAt` and holds it `ttlMs` from `claimedAt`, lapsed or not: for work that finished and
+ * must be marked so even when its own claim ran out meanwhile. Compare and set: when another claim holds the key (it was
+ * taken again after this one lapsed), nothing is written and the answer is `false`, so a stale call never marks a newer
+ * one's work. With no row left (purged), the claim is written again under `claimedAt`.
+ */
+export const putClaimResult = async (
+    ctx: ClaimCtx,
+    scope: string,
+    key: string,
+    { claimedAt, result, ttlMs, userId }: { claimedAt: number; result: string; ttlMs: number; userId?: string },
+): Promise<boolean> => {
+    const existing = await findClaim(ctx, scope, key);
+
+    if (existing && existing.claimedAt !== claimedAt) {
+        return false;
+    }
+
+    const expiresAt = claimedAt + ttlMs;
+
+    await (existing
+        ? patchRow(ctx.db, "idempotencyClaims", existing, { expiresAt: Math.max(existing.expiresAt, expiresAt), result })
+        : ctx.db.insert("idempotencyClaims", { claimedAt, expiresAt, key, result, scope, ...(userId !== undefined && { userId }) }));
+
+    return true;
+};
+
+/**
  * Replaces the `result` of the claim `claimedAt` with `next` only while it still reads `expected`, in one conditional write,
  * so of two callers that read the same `result` exactly one moves it on. `next: null` lapses the claim instead: every read
  * ignores it from then on, and a fenced {@link releaseClaim} removes it. `false` when the claim is gone, lapsed, or its

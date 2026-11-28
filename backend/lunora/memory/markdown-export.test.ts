@@ -1,5 +1,5 @@
 /**
- * The memory download: only the caller's active rows, read a page per call up to the cap,
+ * The memory download and the messenger digest: only the caller's active rows, read a page per call up to the cap,
  * grouped and dated in the user's timezone (UTC when unset or unknown), bot memories labelled by scope.
  */
 import { lunoraTest } from "@lunora/testing";
@@ -7,8 +7,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import schema from "../schema";
 import type { BotLabel, ExportMemoryRow } from "./export-format";
-import { formatMemoryMarkdown, MEMORY_EXPORT_MAX_ROWS, MEMORY_EXPORT_SCAN_ROWS } from "./export-format";
-import { MEMORY_EXPORT_PAGE_ROWS, readBotLabels, readExportMemories, readMemoryExportPage, resolveMemoryBotLabels } from "./markdown-export";
+import { formatMemoryDigest, formatMemoryMarkdown, MEMORY_DIGEST_MAX_CHARS, MEMORY_EXPORT_MAX_ROWS, MEMORY_EXPORT_SCAN_ROWS } from "./export-format";
+import {
+    MEMORY_EXPORT_PAGE_ROWS,
+    readBotLabels,
+    readExportMemories,
+    readHiddenSourceThreads,
+    readMemoryExportPage,
+    resolveMemoryBotLabels,
+} from "./markdown-export";
 
 type Harness = ReturnType<typeof lunoraTest>;
 
@@ -31,6 +38,9 @@ const row = (fields: Partial<ExportMemoryRow> & { memory: string }): ExportMemor
 };
 
 const NO_BOTS = new Map<string, BotLabel>();
+
+/** The first half of an emoji with its second half cut off. */
+const LONE_HIGH_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])/u;
 
 describe("formatMemoryMarkdown", () => {
     it("lists pinned first, then each type in taxonomy order, with dates, source and scope on one line", () => {
@@ -127,6 +137,108 @@ describe("formatMemoryMarkdown", () => {
             "added by you",
             "imported from another assistant",
         ]);
+    });
+});
+
+describe("formatMemoryDigest", () => {
+    it("counts by type, lists pinned first and leaves out an unpinned fact past its end", () => {
+        const digest = formatMemoryDigest(
+            [
+                row({ importance: 9, memory: "Likes tea" }),
+                row({ memory: "Name is Ada", pinned: true, source: "manual", type: "identity" }),
+                row({ importance: 10, memory: "In Lisbon", type: "context", validUntil: "2026-03-05" }),
+                row({ botId: "bot-1", memory: "Prefers short answers", source: "compressed" }),
+            ],
+            { bots: new Map([["bot-1", { kind: "named", name: "Helper" }]]), now: NOW, timeZone: undefined, truncated: false },
+        );
+
+        expect(digest).toBe(
+            [
+                "4 memories (identity 1, preferences 2, context 1).",
+                "",
+                "📌 Name is Ada — added by you · all chats",
+                // Unscored reads as importance 50, above "Likes tea" at 9.
+                "• Prefers short answers — summarised from earlier memories · bot “Helper”",
+                "• Likes tea — learned in chat · all chats",
+                "",
+                "The full list, with dates: Settings → Personalization → Memory → Download memories.",
+            ].join("\n"),
+        );
+    });
+
+    it("stays under the message limit and keeps the pointer to the full list", () => {
+        const rows = Array.from({ length: 30 }, (_, index) => row({ memory: `${String(index)} ${"x".repeat(400)}` }));
+        const digest = formatMemoryDigest(rows, { bots: NO_BOTS, now: NOW, timeZone: "UTC", truncated: true });
+
+        expect(digest.length).toBeLessThanOrEqual(MEMORY_DIGEST_MAX_CHARS);
+        expect(digest.startsWith("More than 30 memories")).toBe(true);
+        expect(digest.endsWith("Download memories.")).toBe(true);
+        expect(digest).toContain("…");
+    });
+
+    it("ranks an unscored memory as importance 50", () => {
+        const digest = formatMemoryDigest([row({ importance: 30, lastConfirmedAt: LATE_EVENING + 1, memory: "low" }), row({ memory: "unscored" })], {
+            bots: NO_BOTS,
+            now: NOW,
+            timeZone: "UTC",
+            truncated: false,
+        });
+
+        expect(digest.indexOf("unscored")).toBeLessThan(digest.indexOf("low"));
+    });
+
+    it("cuts a long bot name and still lists the shorter entries on WeChat", () => {
+        const bots = new Map<string, BotLabel>([["long", { kind: "named", name: "B".repeat(500) }]]);
+        const rows = [
+            row({ botId: "long", importance: 90, memory: "first" }),
+            row({ importance: 80, memory: "x".repeat(400) }),
+            row({ importance: 79, memory: "y".repeat(400) }),
+            row({ importance: 70, memory: "short one" }),
+            row({ importance: 60, memory: "short two" }),
+        ];
+        const digest = formatMemoryDigest(rows, { bots, maxChars: 600, now: NOW, timeZone: "UTC", truncated: false });
+
+        expect(digest.length).toBeLessThanOrEqual(600);
+        expect(digest).toContain(`• first — learned in chat · bot “${"B".repeat(39)}…”`);
+        // The first long entry (cut to 200) fits; the second does not fit the room left, and the ones after it still do.
+        expect(digest).toContain("x".repeat(100));
+        expect(digest).not.toContain("y".repeat(100));
+        expect(digest).toContain("• short one");
+        expect(digest).toContain("• short two");
+    });
+
+    it("leaves out a memory whose source chat is hidden, and says so", () => {
+        const rows = [
+            row({ memory: "from a locked chat", sourceThreadId: "locked" }),
+            row({ memory: "from an open chat", sourceThreadId: "open" }),
+            row({ memory: "added by hand" }),
+        ];
+        const digest = formatMemoryDigest(rows, { bots: NO_BOTS, hiddenSources: new Set(["locked"]), now: NOW, timeZone: "UTC", truncated: false });
+
+        expect(digest).not.toContain("from a locked chat");
+        expect(digest).toContain("• from an open chat");
+        expect(digest).toContain("• added by hand");
+        expect(digest).toContain("Some memories from locked chats are hidden here.\nThe full list");
+        expect(formatMemoryDigest(rows, { bots: NO_BOTS, now: NOW, timeZone: "UTC", truncated: false })).not.toContain("hidden here");
+    });
+
+    it("never cuts through an emoji at the 200- or 40-character cap", () => {
+        // The emoji's two UTF-16 units straddle the cut: 198 and 38 characters before it, so the cut falls between them.
+        const bots = new Map<string, BotLabel>([["bot", { kind: "named", name: `${"b".repeat(38)}😀tail` }]]);
+        const digest = formatMemoryDigest([row({ botId: "bot", memory: `${"a".repeat(198)}😀tail` })], { bots, now: NOW, timeZone: "UTC", truncated: false });
+
+        expect(digest).toContain(`• ${"a".repeat(198)}… —`);
+        expect(digest).toContain(`bot “${"b".repeat(38)}…”`);
+        expect(digest).not.toMatch(LONE_HIGH_SURROGATE);
+    });
+
+    it("fits a smaller platform limit, never past the digest's own", () => {
+        const rows = Array.from({ length: 30 }, (_, index) => row({ memory: `${String(index)} ${"x".repeat(150)}` }));
+
+        expect(formatMemoryDigest(rows, { bots: NO_BOTS, maxChars: 600, now: NOW, timeZone: "UTC", truncated: false }).length).toBeLessThanOrEqual(600);
+        expect(formatMemoryDigest(rows, { bots: NO_BOTS, maxChars: 5000, now: NOW, timeZone: "UTC", truncated: false }).length).toBeLessThanOrEqual(
+            MEMORY_DIGEST_MAX_CHARS,
+        );
     });
 });
 
@@ -345,5 +457,27 @@ describe("resolveMemoryBotLabels", () => {
             "a — last confirmed 2026-03-01 · learned in chat · a bot",
         );
         await expect(readBotLabels(failing("INTERNAL"), "user-1", rows)).rejects.toThrow("read failed");
+    });
+});
+
+describe("readHiddenSourceThreads", () => {
+    it("hides a locked, trashed, missing or other person's chat, and keeps the owner's open one", async () => {
+        const hidden = await harness.run(async (ctx: any) => {
+            const thread = async (fields: Record<string, unknown>) =>
+                (await ctx.db.insert("threads", { createdAt: 1, status: "active", title: "t", updatedAt: 1, userId: "user-1", ...fields })) as string;
+            const open = await thread({});
+            const locked = await thread({ lockedAt: 2 });
+            const trashed = await thread({ deleted: true });
+            const theirs = await thread({ userId: "user-2" });
+            const gone = await thread({});
+
+            await ctx.db.delete("threads", gone);
+
+            const result: string[] = await ctx.runQuery(readHiddenSourceThreads, { threadIds: [open, locked, trashed, theirs, gone], userId: "user-1" });
+
+            return { expected: [locked, trashed, theirs, gone], result };
+        });
+
+        expect(hidden.result).toStrictEqual(hidden.expected);
     });
 });

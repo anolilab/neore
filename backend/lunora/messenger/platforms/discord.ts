@@ -28,8 +28,13 @@ interface DiscordAttachment {
     url?: string;
 }
 
+/** Discord's channel type of a one-to-one DM (a group DM is 3). */
+const DISCORD_DM_CHANNEL = 1;
+
 /** Discord Interaction payload (simplified) */
 interface DiscordInteraction {
+    /** The partial channel the interaction came from; `type` 1 is a one-to-one DM, 3 a group DM. */
+    channel?: { type?: number };
     channel_id?: string;
     data?: {
         name?: string;
@@ -163,6 +168,9 @@ export const parseDiscordEvent = (body: unknown, signedAtMs: number): { message:
             message: {
                 ...(attachments.length > 0 && { attachments }),
                 chatId: data.channel_id,
+                // A gateway message names no channel type, and a group DM has no `guild_id` either: never one-to-one.
+                direct: false,
+                directUnknown: true,
                 eventId: data.id,
                 kind: inboundKind(data.content, attachments),
                 senderId: data.author.id,
@@ -192,6 +200,7 @@ export const parseDiscordEvent = (body: unknown, signedAtMs: number): { message:
             message: {
                 ...(attachments.length > 0 && { attachments }),
                 chatId: payload.channel_id || "",
+                direct: payload.channel?.type === DISCORD_DM_CHANNEL,
                 eventId: payload.id,
                 kind: attachments.length > 0 ? "media" : "text",
                 senderId: user.id,
