@@ -12,7 +12,17 @@ import { join } from "node:path";
 import JSZip from "jszip";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
-import { assertZipDirectoryExact, chapterDocument, FRAME_POLICY, MAX_ASSETS_PER_CHAPTER, MAX_CHAPTER_CHARS, openEpub, safeStylesheet } from "./epub-book";
+import {
+    assertZipDirectoryExact,
+    chapterDocument,
+    FRAME_POLICY,
+    MAX_ASSETS_PER_CHAPTER,
+    MAX_CHAPTER_CHARS,
+    MAX_INDEXED_TAIL_SEGMENTS,
+    openEpub,
+    safeStylesheet,
+    spineTailIndex,
+} from "./epub-book";
 
 const PNG_PREFIX = /^data:image\/png;base64,/u;
 const PNG_DATA = /^data:image\/png;base64,iVBORw0KGgo=$/u;
@@ -169,6 +179,24 @@ describe("openEpub", () => {
         expect(opened.chapters[0]).toEqual({ id: "a", title: "Unique long path" });
         expect(opened.chapters[1]).toEqual({ id: "b" });
         opened.destroy();
+    });
+
+    it("indexes a bounded number of tails for a deeply nested spine path, and still matches by the whole path or a short tail", () => {
+        const folders = Array.from({ length: 2000 }, (_item, index) => `d${String(index)}`).join("/");
+        const deep = (name: string) => `${folders}/${name}.xhtml`;
+        const spine: { href: string; id: string; mediaType: string }[] = [];
+
+        for (let number = 0; number < 50; number += 1) {
+            spine.push({ href: deep(`c${String(number)}`), id: `i${String(number)}`, mediaType: "application/xhtml+xml" });
+        }
+
+        const index = spineTailIndex(spine as never);
+
+        // Each path adds at most the tails of its last segments and the whole path, however many segments it has: not 2,001 each.
+        expect(index.size).toBeLessThanOrEqual(spine.length * (MAX_INDEXED_TAIL_SEGMENTS + 1));
+        expect(index.get("c7.xhtml")).toEqual(new Set(["i7"]));
+        expect(index.get(spine[7]?.href ?? "")).toEqual(new Set(["i7"]));
+        expect(index.get(`d1999/c7.xhtml`)).toEqual(new Set(["i7"]));
     });
 
     it("puts a picture and a style sheet of the book into the chapter, as a data: address and as text, and makes no object URL", async () => {

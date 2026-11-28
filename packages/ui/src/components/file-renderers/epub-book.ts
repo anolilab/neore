@@ -64,26 +64,41 @@ const pathOf = (href: string): string => {
     return parts.join("/");
 };
 
+/** The most trailing segments of a spine path that are indexed as a tail of it (the whole path is always indexed too). A table of contents names a chapter by its file or a short folder path from its own folder: eight segments is far past any real one, and bounds what a long path can add. */
+export const MAX_INDEXED_TAIL_SEGMENTS = 8;
+
+/** Spine item ids by each tail of their paths: the last one to eight segments, and the whole path. At most nine entries a path, however many segments it has. */
+export const spineTailIndex = (spine: ReadonlyArray<SpineItem>): Map<string, Set<string>> => {
+    const byTail = new Map<string, Set<string>>();
+    const add = (tail: string, id: string): void => {
+        const ids = byTail.get(tail) ?? new Set<string>();
+
+        ids.add(id);
+        byTail.set(tail, ids);
+    };
+
+    for (const item of spine) {
+        const path = pathOf(item.href);
+        const parts = path.split("/");
+
+        for (let count = 1; count <= Math.min(parts.length, MAX_INDEXED_TAIL_SEGMENTS); count += 1) {
+            add(parts.slice(-count).join("/"), item.id);
+        }
+
+        add(path, item.id);
+    }
+
+    return byTail;
+};
+
 /**
  * The table of contents' labels by spine item. The spine spells a path from the book's root and the table of contents from its own folder,
  * so a label belongs to the spine item whose path ends with the label's whole path (not only its file name: two chapters in different
- * folders can share one). The spine is indexed ONCE by every tail of every item's path, so each entry is a lookup, not a scan of the spine.
- * A label that fits more than one item names none of them rather than the wrong one.
+ * folders can share one). The spine is indexed ONCE by the tails of every item's path (`spineTailIndex`), so each entry is a lookup, not a scan
+ * of the spine. A label that fits more than one item names none of them rather than the wrong one.
  */
 const titlesBySpineItem = (toc: EpubToc, spine: ReadonlyArray<SpineItem>): Map<string, string> => {
-    const byTail = new Map<string, Set<string>>();
-
-    for (const item of spine) {
-        const parts = pathOf(item.href).split("/");
-
-        for (let from = 0; from < parts.length; from += 1) {
-            const tail = parts.slice(from).join("/");
-            const ids = byTail.get(tail) ?? new Set<string>();
-
-            ids.add(item.id);
-            byTail.set(tail, ids);
-        }
-    }
+    const byTail = spineTailIndex(spine);
 
     // A title is set only by an entry whose path fits exactly one item. An entry that fits several sets none and takes none away: an item a
     // longer, unambiguous path already named keeps its title.
