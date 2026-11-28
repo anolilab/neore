@@ -459,8 +459,12 @@ pub fn parse_target(url: &str, headers: &str) -> Result<Target, String> {
         .values()
         .flat_map(|value| {
             credentials(value)
-                .chain(pairs(value, ';').map(|(_, cookie)| cookie))
-                .chain(pairs(value, ',').map(|(_, field)| field.trim_matches('"')))
+                // As written and unquoted, the way the length check reads them.
+                .chain(
+                    pairs(value, ';')
+                        .chain(pairs(value, ','))
+                        .flat_map(|(_, field)| [field, field.trim_matches('"')]),
+                )
         })
         .chain(
             query

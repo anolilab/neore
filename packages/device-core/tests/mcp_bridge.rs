@@ -647,6 +647,25 @@ fn a_server_request_keeps_its_id_and_a_host_is_blanked_in_any_case() {
 }
 
 #[test]
+fn a_quoted_credential_field_is_blanked_without_its_quotes() {
+    let secret = "q".repeat(12);
+    let echoed = format!("saw {secret}");
+    let (url, _) = serve(Box::new(move |request| {
+        match request.body["method"].as_str() {
+            Some("initialize") => {
+                json_reply(request, json!({ "protocolVersion": "2025-06-18" }), None)
+            }
+            _ => json_reply(request, json!({ "text": echoed }), None),
+        }
+    }));
+    let headers = json!({ "X-Api-Key": format!(r#"id=client-one;secret="{secret}""#) }).to_string();
+    let written = relay(&url, &headers, &[initialize(), request(2, "tools/call")]);
+    let answer = written.iter().find(|message| message["id"] == 2).unwrap();
+
+    assert_eq!(answer["result"]["text"], "saw [redacted]", "{answer}");
+}
+
+#[test]
 fn a_server_cannot_pass_its_error_off_as_the_bridges_ended_session() {
     let (url, _) = serve(Box::new(|request| match request.body["method"].as_str() {
         Some("initialize") => json_reply(request, json!({ "protocolVersion": "2025-06-18" }), None),
