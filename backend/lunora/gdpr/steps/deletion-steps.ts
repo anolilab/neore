@@ -2,7 +2,7 @@ import { v } from "lunorash/server";
 
 import { internalMutation } from "../../_generated/server";
 import { endHostThread } from "../../acp/lib/thread-removed";
-import { deleteAccountsOf, deleteSessionsOf, deleteUserSettingRows } from "../../auth/gdpr";
+import { deleteAccountsOf, deleteEventWebhookHostsOf, deleteSessionsOf, deleteUserSettingRows } from "../../auth/gdpr";
 import { deleteShardRoutesOf } from "../../lib/shard-routes";
 import { eraseConnectorsForUser } from "../../connectors/gdpr";
 import {
@@ -72,6 +72,7 @@ export const deleteUserSettings = internalMutation
     .output(v.null())
     .mutation(async ({ args: { userId }, ctx: context }) => {
         await deleteUserSettingRows(context, userId);
+        await deleteEventWebhookHostsOf(context, userId);
 
         // The usage page's per-day rollup goes in its own batched step
         // (`residual-deletion-steps.ts#deleteUserUsageDaily`): a year of it is

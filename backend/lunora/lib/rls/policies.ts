@@ -194,6 +194,8 @@ const OWNER_TABLES = [
     "evalDatasets",
     "evalResults",
     "evalRuns",
+    "eventWebhookHosts",
+    "eventWebhookSubscriptions",
     "feedback",
     "folders",
     "gatewayNotifications",

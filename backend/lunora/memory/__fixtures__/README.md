@@ -6,11 +6,13 @@ synthetic; there are no real people and nothing comes from a public benchmark.
 ## Files
 
 - `retrieval-eval-phrases.json` — the hand-written phrase bank: 16 hobby topics, each with six facts (one per aspect),
-  six questions that paraphrase them, an event phrase and five per-persona details; plus questions about topics nobody has.
+  six questions that paraphrase them, an event phrase and five per-persona details; plus questions about topics nobody has,
+  and ten facts holding an exact token (a part number, a serial, a name, a rare word) with a question naming it and one
+  naming a token nobody has.
 - `build-retrieval-eval.mjs` — combines the bank with a seeded random generator into personas, memories and queries.
   The script is deterministic: `node backend/lunora/memory/__fixtures__/build-retrieval-eval.mjs`, then
   `npx oxfmt backend/lunora/memory/__fixtures__`, rewrites `retrieval-eval.json` identically. The phrases and the
-  labelling rules are written by hand; the 1,143 memory rows and their ages, confidences and tags are generated. The
+  labelling rules are written by hand; the 1,183 memory rows and their ages, confidences and tags are generated. The
   ages and the confidence and importance ranges are assumed (older rows are more common; identity rows score higher
   than activity rows), not read from what extraction emits. Every row is created before it is last confirmed, and
   neither is after `today` (the script refuses to write one that is not, and the test checks it).
@@ -18,12 +20,12 @@ synthetic; there are no real people and nothing comes from a public benchmark.
 
 ## What is in it
 
-- 5 personas with 191 to 272 memories each (146 to 199 own active rows). Each has more than the 100 rows of the
+- 5 personas with 199 to 280 memories each (151 to 204 own active rows). Each has more than the 100 rows of the
   candidate window, so which rows reach scoring matters.
 - Types: identity, preference, context, activity, experience. Dated rows (`eventStart` in the past and ahead, `validUntil` in the past, today and
   ahead), older versions of a fact (replaced, expired, or still active but confirmed longer ago), pinned rows, rows of two bots (`bot-a` joins some chats, `bot-b` never does), expired rows,
   low-signal filler, and a few rows with no vector (`noVector`).
-- 150 queries (30 per persona), each labelled with the memory ids a good retrieval returns:
+- 180 queries (36 per persona), each labelled with the memory ids a good retrieval returns:
 
 | Category   | Queries | Label                                                           |
 | ---------- | ------- | --------------------------------------------------------------- |
@@ -31,7 +33,11 @@ synthetic; there are no real people and nothing comes from a public benchmark.
 | `multi`    | 30      | two facts of one topic, learned at different times              |
 | `temporal` | 30      | the event that happened in a named month (on or before `today`) |
 | `update`   | 20      | the newest statement; an older version also exists              |
-| `abstain`  | 20      | none: the topic was never mentioned                             |
+| `exact`    | 20      | the one fact holding the exact token the question names         |
+| `abstain`  | 30      | none: the topic was never mentioned, or the token is nobody's   |
+
+The `exact` rows are a second pass of the generator with its own seed, so the rows before them are as they were. Each is
+older than the window, embedded, and copied onto a superseded, an expired or a `bot-b` row that must never be the answer.
 
 ## Vectors without a model
 
@@ -40,7 +46,9 @@ expands and normalises, so cosine similarity is meaningful and stable.
 
 - dims 0-15: topic. 16-21: topics nobody has (for `abstain`). 22-27: aspect (who, likes, setup, recent, history, plan).
 - dim 28: a shared background weight, so unrelated texts are not at cosine 0, as with a real model.
-- dims 29-40: month (events and `temporal` queries). 41-63: two noise dims per row.
+- dims 29-40: month (events and `temporal` queries). 41-63: two noise dims per row. 64-73: one per `exact` fact.
+- An `exact` question embeds on a topic nobody has (16-21), so the vector search misses its fact by construction: the
+  category measures the keyword search, not how often a real embedding misses a token.
 
 The test simulates the vector step as production runs it: the top `VECTOR_FETCH_K` (90) of all of the user's vectors (other bots', expired
 and superseded rows included), then the superseded and expired ones dropped and the best `VECTOR_TOP_K` (30) of the chat's own scopes kept
@@ -48,6 +56,11 @@ and superseded rows included), then the superseded and expired ones dropped and 
 without a vector hit falls back to the keyword score, except an embedded row older than `VECTOR_SYNC_WINDOW_MS` when the 30 in-scope hits
 filled the cut (`vectorCutIsFull`): it was not among the nearest, so it has no relevance. The fixture ages are in days, so every row is older
 than the sync window. `now` and `today` come from `meta`, never the clock.
+
+The keyword search is simulated the same way: one lookup per salient term (`keywordLookupTerms`) over every row of the
+user, a token starting with the term, most occurrences first, then newest, cut to `KEYWORD_LOOKUP_LIMIT` (50); then the
+production filter (`keywordLookupOf`: whole tokens, usable, in scope, 20 kept) and the best `KEYWORD_TOP_K` (30) by BM25
+(`topKeywordHits`), fused with the vector hits by rank (`fuseSearchHits`).
 
 ## Metrics
 
@@ -57,11 +70,11 @@ hides console output of a passing run; print the table with
 `cd backend && npx vitest run lunora/memory/retrieval-eval.test.ts --silent=false`.
 
 - **Recall@8**: expected ids injected / expected ids. **NDCG@8**: binary gains over the injected order. Both over the
-  130 queries that have a label.
+  150 queries that have a label.
 - **Expected in window**: expected ids that are candidates at all (the window and the vector hits) / expected ids. It separates a row
   that never reaches scoring from a row the ranking loses.
 - **Off-topic rate**: injected rows not in the label / injected rows, over all 150 queries (so an `abstain` query that
-  injects anything counts fully).
+  injects anything counts fully). Over all 180.
 - **Abstain rate**: share of never-mentioned (`abstain`) queries that inject nothing = `abstain` queries with no injected
   row / `abstain` queries.
 - **Abstain precision**: of the queries that inject nothing, the share labelled `abstain`. Undefined while every query
@@ -71,18 +84,43 @@ hides console output of a passing run; print the table with
 
 `BASELINE` in the test holds the numbers of the current retrieval; the test fails when a metric is 0.02 worse than
 its number (the off-topic rate, overall and per category: 0.02 higher; expected in window, overall and per category: 0.02
-lower). Each cell is the retrieval before the candidate, relevance and weight changes → the current one.
+lower). Each cell is the retrieval before the keyword search (vector hits only, word overlap as the fallback) → the
+current one, both over this fixture.
 
 | Slice    | Recall@8      | NDCG@8        | Expected in window | Off-topic rate | Abstain rate  | Abstain precision |
 | -------- | ------------- | ------------- | ------------------ | -------------- | ------------- | ----------------- |
-| overall  | 0.600 → 0.950 | 0.431 → 0.771 | 0.638 → 1.000      | 0.917 → 0.853  | 0.000 → 0.900 | undefined → 1.000 |
-| single   | 0.740 → 0.940 | 0.543 → 0.830 | 0.780 → 1.000      | 0.907 → 0.880  |               |                   |
-| multi    | 0.733 → 0.883 | 0.559 → 0.726 | 0.833 → 1.000      | 0.817 → 0.771  |               |                   |
-| temporal | 0.033 → 1.000 | 0.033 → 0.715 | 0.033 → 1.000      | 0.996 → 0.872  |               |                   |
-| update   | 0.900 → 1.000 | 0.554 → 0.776 | 0.900 → 1.000      | 0.887 → 0.873  |               |                   |
-| abstain  |               |               |                    | 1.000 → 1.000  | 0.000 → 0.900 | undefined → 1.000 |
+| overall  | 0.823 → 0.957 | 0.668 → 0.796 | 0.947 → 1.000      | 0.853 → 0.836  | 0.867 → 0.933 | 0.605 → 1.000     |
+| single   | 0.940 → 0.940 | 0.830 → 0.822 | 1.000 → 1.000      | 0.880 → 0.880  |               |                   |
+| multi    | 0.883 → 0.883 | 0.726 → 0.725 | 1.000 → 1.000      | 0.771 → 0.771  |               |                   |
+| temporal | 1.000 → 1.000 | 0.715 → 0.715 | 1.000 → 1.000      | 0.872 → 0.872  |               |                   |
+| update   | 1.000 → 1.000 | 0.776 → 0.776 | 1.000 → 1.000      | 0.873 → 0.873  |               |                   |
+| exact    | 0.000 → 1.000 | 0.000 → 0.982 | 0.600 → 1.000      | 1.000 → 0.048  |               |                   |
+| abstain  |               |               |                    | 1.000 → 1.000  | 0.867 → 0.933 | 1.000 → 1.000     |
+
+With no vector search the keyword-only run reads Recall@8 0.160 → 0.603 and abstain rate 0.433 → 0.667. A number alone
+is no identifier, so "is parcel 52690 mine" is answered with the user's own parcel note (ends in 77314) rather than with
+nothing; that one query is the abstain rate's 0.967 → 0.933 (and 0.800 → 0.767 without vectors), and both floors record it. Without vectors three more fall to 0.667: an
+identifier the memory lacks now weighs in the share instead of zeroing it, so `QZ-5508`, `WTU-40126` and `HIST-318`
+reach the sibling code's row through two or more shared words (part, dishwasher; serial, bike; evening, course, up).
+With vectors all three still abstain. Single NDCG@8
+falls by 0.008 (two queries reorder) because a word the memory never had no longer dilutes the one it does: a row with
+no vector that shares one word of a question whose other words are in no memory scores in full. Its floor stays 0.830,
+within the 0.02 tolerance. Exact NDCG@8 is 0.982 because each term's BM25 factor is capped at 1 in the keyword share,
+so a short row no longer scores above its share: for "have I read Quillfeather" a recent row holding only `read` now
+ranks above the shorter Quillfeather row (both injected). On the
+150-query fixture before the `exact` rows, the earlier changes (newest-rows window, relevance gate, weights) took
+overall Recall@8 0.600 → 0.950 and NDCG@8 0.431 → 0.771.
 
 What moved them:
+
+- **Keywords find what vectors miss.** Each of the first six salient query terms is one lookup of the
+  `search_memory_text` FTS5 index (reading 50 rows, keeping 20 whole-token, usable, in-scope ones), so a row older than
+  the window that holds the query's code or name becomes a candidate. Relevance is the IDF-weighted share of every salient term
+  the memory holds at all, over whole tokens (`time` is not `timer`, which cost two abstain queries with prefix
+  matching). An identifier the memory lacks (`QZ-5508` when the user has `KX-2291`) counts in the share's denominator at
+  the highest IDF, and a row then needs two of the query's terms (or one of its identifiers) to count by keyword. A row holding the leading term and the rare term (that identifier, or the rarest looked-up word,
+  held by at most 2 of the user's rows) counts by keyword even when a full vector cut lacks it. The keyword floor is
+  0.15: at 0.2, multi Recall@8 reads 0.867. NDCG@8 of multi moves by 0.001.
 
 - **The window is the newest rows.** It used to be the first 100 rows of the index (type descending, then newest), so an
   `activity` row sorted last and only one of the `temporal` rows reached scoring. Now it is the newest 100 of each scope
@@ -92,14 +130,13 @@ What moved them:
   queries (0 of 20 before). In this fixture the relevant rows start at cosine 0.86 and the unrelated ones end at 0.40 (the
   background weight of dim 28): the abstain rate is 0.35 with the floor at 0.40, and 0.90 or more from 0.41 to 0.86. A relevant fact
   at cosine 0.40 is therefore under the floor, whatever its age. The score threshold is 0.3, since relevance is the floor now.
-- **Keywords count only where there is no vector.** A memory that has a vector the search did not return is not relevant by its
-  words (a question's common words overlap with any memory); one with no vector, or any memory when no vector search ran, is found
-  by keyword overlap from 0.2 of the search's words. The last test of the eval runs that path: Recall@8 0.185 (0.165 before),
-  abstain rate 0.55 (0 before); 0.35 would fall to 0.015 Recall@8, 0.1 would rise to 0.212 with an abstain rate of 0.40.
+- **Common words count only where there is no vector.** A memory that has a vector the search did not return is not relevant by
+  its words (a question's common words overlap with any memory), unless it holds the query's rare term; one with no vector, or any
+  memory when no vector search ran, is found by its keyword score. The last test of the eval runs that path (numbers above).
 - **Relevance leads the weights.** Recall@8 / NDCG@8 by semantic weight (the rest shared by confidence, importance and recency):
   0.45 (the old 0.18 / 0.12 / 0.25) 0.919 / 0.600; 0.55 0.938 / 0.660; 0.65 (0.12 / 0.08 / 0.15) 0.950 / 0.771; 0.75 0.954 / 0.879;
   0.85 0.958 / 0.911. The fixture's confidence, importance and ages are assumed, not read from extraction, so 0.65 is the middle.
 - **The off-topic rate barely moves, by construction.** A query has one or two labelled rows and injects up to 8; the rest are rows
   of the same topic (another aspect), which a label cannot tell from noise. It falls with the noise rows and `mean injected` (8.00 → 6.78).
-- **`search_memory` is not in the table.** It asks for cosine 0.35 (keyword 0.15), has no score threshold and returns up to 10; it is
+- **`search_memory` is not in the table.** It asks for cosine 0.35 (keyword 0.1), has no score threshold and returns up to 10; it is
   covered by `retrieve.test.ts` and `retrieve-ranking.test.ts`.

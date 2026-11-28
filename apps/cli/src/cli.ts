@@ -47,8 +47,8 @@ Chat
   models                              List models
 
 Threads
-  thread start [prompt] [-m MODEL] [--wait]
-  thread send <thread-id> [prompt] [-m MODEL] [--wait]
+  thread start [prompt] [-m MODEL] [--effort 0-100] [--wait]
+  thread send <thread-id> [prompt] [-m MODEL] [--effort 0-100] [--wait]
                                       The prompt is read from stdin when piped. Without
                                       --wait: print the thread id and exit; the run
                                       continues on the server. With --wait: block (up to 5

@@ -1,7 +1,7 @@
 /**
- * The user's own memories, read for the Markdown download in Memory settings (`./export-format.ts` writes it). Only
- * active rows: superseded history is in the account data export (`./gdpr.ts`). It works with memory off, so the user
- * can still see what is stored.
+ * The user's own memories, read for the Markdown download in Memory settings and the messenger `/memory` digest
+ * (`./export-format.ts` writes both). Only active rows: superseded history is in the account data export
+ * (`./gdpr.ts`). It works with memory off, so the user can still see what is stored.
  *
  * The newest {@link MEMORY_EXPORT_SCAN_ROWS} active rows (there is no pinned index), read a page per call and split in
  * memory: every pinned row among them, and the {@link MEMORY_EXPORT_MAX_ROWS} newest others. "Newest" is when a row was saved, not when
@@ -14,8 +14,17 @@ import { internal } from "../_generated/internal";
 import type { ActionCtx } from "../_generated/server";
 import { internalQuery } from "../_generated/server";
 import { authAction, rateLimit } from "../lib/crpc";
+import { isThreadLocked } from "../lib/thread-lock";
 import { botOwnerRows } from "./bot-owner";
-import { type BotLabel, exportDayOf, type ExportMemoryRow, formatMemoryMarkdown, MEMORY_EXPORT_MAX_ROWS, MEMORY_EXPORT_SCAN_ROWS } from "./export-format";
+import {
+    type BotLabel,
+    exportDayOf,
+    type ExportMemoryRow,
+    formatMemoryMarkdown,
+    MEMORY_DIGEST_SOURCE_CHECKS,
+    MEMORY_EXPORT_MAX_ROWS,
+    MEMORY_EXPORT_SCAN_ROWS,
+} from "./export-format";
 import { vImportApp } from "./import-logic";
 import { lastConfirmedOf, vMemoryType } from "./taxonomy";
 
@@ -23,11 +32,13 @@ const vExportRow = v.object({
     botId: v.optional(v.string()),
     eventEnd: v.optional(v.string()),
     eventStart: v.optional(v.string()),
+    importance: v.optional(v.number()),
     importedFrom: v.optional(vImportApp),
     lastConfirmedAt: v.number(),
     memory: v.string(),
     pinned: v.boolean(),
     source: v.optional(v.string()),
+    sourceThreadId: v.optional(v.string()),
     type: vMemoryType,
     validUntil: v.optional(v.string()),
 });
@@ -37,11 +48,14 @@ const toExportRow = (m: Doc<"memories">): ExportMemoryRow => {
         ...(m.botId !== undefined && { botId: m.botId as string }),
         ...(m.eventEnd !== undefined && { eventEnd: m.eventEnd }),
         ...(m.eventStart !== undefined && { eventStart: m.eventStart }),
+        ...(m.importance !== undefined && { importance: m.importance }),
         ...(m.importedFrom !== undefined && { importedFrom: m.importedFrom }),
         lastConfirmedAt: lastConfirmedOf(m),
         memory: m.memory,
         pinned: m.pinned === true,
         ...(m.source !== undefined && { source: m.source }),
+        // The chat `getMemorySource` links to: the evidence's, else the row's own.
+        ...((m.evidence?.threadId ?? m.threadId) !== undefined && { sourceThreadId: (m.evidence?.threadId ?? m.threadId) as string }),
         type: m.type,
         ...(m.validUntil !== undefined && { validUntil: m.validUntil }),
     };
@@ -66,6 +80,23 @@ export const readMemoryExportPage = internalQuery
             .paginate({ cursor: args.cursor, numItems: args.numItems });
 
         return { cursor: page.continueCursor, isDone: page.isDone, rows: page.page.map((m) => toExportRow(m)) };
+    });
+
+/**
+ * Which of these source chats the messenger digest must not quote from: locked, in the trash, or not a chat of the
+ * user's on this shard (deleted, or another person's shared chat). Bounded by the digest's own check count.
+ */
+export const readHiddenSourceThreads = internalQuery
+    .input({ threadIds: v.array(v.string()).check((ids) => ids.length <= MEMORY_DIGEST_SOURCE_CHECKS, { message: "too many threads" }), userId: v.string() })
+    .output(v.array(v.string()))
+    .query(async ({ args, ctx }) => {
+        const threads = await Promise.all(args.threadIds.map(async (id) => await ctx.db.get("threads", id as Id<"threads">)));
+
+        return args.threadIds.filter((_, index) => {
+            const thread = threads[index];
+
+            return thread === null || thread === undefined || thread.userId !== args.userId || thread.deleted === true || isThreadLocked(thread);
+        });
     });
 
 /** Bots read at once by `resolveMemoryBotLabels`, so a user with many bots never builds one oversized read. */

@@ -757,6 +757,8 @@ export const generateExportFile = internalAction
         // Eval datasets, cases, runs and results (`evals/gdpr.ts`). Optional for
         // the same in-flight-replay reason as `threadTags`.
         evals: v.optional(v.any()),
+        // The owner's Events webhook hosts and subscriptions, without their secrets (`public-api/gdpr.ts`). Optional for the same reason.
+        eventWebhooks: v.optional(v.any()),
         files: v.any(),
         // How many grant-revision pages the workflow stored under `browserPrefix` (`agent/export-pages.ts`), every one of them,
         // read here. Optional for the same in-flight-replay reason as `threadTags`: absent is no page.
@@ -1011,6 +1013,7 @@ export const generateExportFile = internalAction
             },
             devices: args.devices ?? { calls: [], devices: [] },
             evals: args.evals ?? { datasets: [] },
+            eventWebhooks: args.eventWebhooks ?? { hosts: [], subscriptions: [] },
             exportDate: new Date().toISOString(),
             exportVersion: "1.0",
             feedback: feedback.section,

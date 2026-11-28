@@ -76,6 +76,7 @@ describe("parseWhatsAppWebhook", () => {
         expect(parseWhatsAppWebhook(webhook({ text: { body: "Hello" }, type: "text" }), PHONE_ID)).toEqual([
             {
                 chatId: "4915112345678",
+                direct: true,
                 eventId: "wamid.ABC",
                 kind: "text",
                 senderId: "4915112345678",
