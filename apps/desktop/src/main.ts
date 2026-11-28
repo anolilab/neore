@@ -30,7 +30,7 @@ import { beginSignIn, completeSignIn, isFlowState, parseSignInCallback } from ".
 import { clampText, MAX_COMPOSE_CHARS, newChatUrl, parseDeepLink, SCHEME, siteOrigin } from "./site.js";
 import type { TerminalController } from "./terminal/index.js";
 import { registerTerminalIpc } from "./terminal/index.js";
-import { threadWindowUrl } from "./thread-window.js";
+import { pageWindowUrl, threadWindowUrl } from "./thread-window.js";
 import { classifyUrl, isDraftTarget, isLocalPage, isTrustedUrl } from "./trust.js";
 import { clearPendingUpdate, decideUpdateOutcome, PENDING_UPDATE_FILE, readPendingUpdate, writePendingUpdate } from "./update-notice.js";
 import { createDebouncer, DEFAULT_SIZE, readWindowState, restorableState, SAVE_DEBOUNCE_MS, WINDOW_STATE_FILE, writeWindowState } from "./window-state.js";
@@ -230,7 +230,7 @@ const guardNavigation = (event: { preventDefault: () => void }, url: string): bo
  * that claimed a call would return its result to a window that may close.
  */
 const siteCapabilities = (isMain: boolean): string[] => {
-    const capabilities = ["notifications", "compose", "sign-in", "thread-windows", "menu-commands"];
+    const capabilities = ["notifications", "compose", "sign-in", "thread-windows", "page-windows", "menu-commands"];
 
     if (VIBRANCY) {
         capabilities.push("vibrancy");
@@ -663,12 +663,18 @@ const openSiteWindow = (url: URL): BrowserWindow => {
 };
 
 /** The open window of each thread, by its URL. Asking again for a thread brings that window forward. */
-const threadWindows = new Map<string, BrowserWindow>();
+const windowsByUrl = new Map<string, BrowserWindow>();
 
-const openOrFocusThreadWindow = (url: URL): void => {
-    const open = threadWindows.get(url.href);
+/**
+ * `pageWindow`: a page navigates inside the app, so its window keeps its key after it moves to another page, and it
+ * counts only while it still shows this URL. A thread window may be redirected (a public thread opens at its token URL),
+ * so it keeps its key and is focused as before.
+ */
+const openOrFocusSiteWindow = (url: URL, pageWindow: boolean): void => {
+    const open = windowsByUrl.get(url.href);
+    const stillShows = !pageWindow || open?.webContents.getURL() === url.href;
 
-    if (open !== undefined && !open.isDestroyed()) {
+    if (stillShows && open !== undefined && !open.isDestroyed()) {
         bringForward(open);
 
         return;
@@ -676,11 +682,11 @@ const openOrFocusThreadWindow = (url: URL): void => {
 
     const win = openSiteWindow(url);
 
-    threadWindows.set(url.href, win);
+    windowsByUrl.set(url.href, win);
     win.on("closed", () => {
         // Only this window's own entry: a window opened after it may already hold the URL.
-        if (threadWindows.get(url.href) === win) {
-            threadWindows.delete(url.href);
+        if (windowsByUrl.get(url.href) === win) {
+            windowsByUrl.delete(url.href);
         }
     });
 };
@@ -1221,7 +1227,21 @@ const registerIpc = (): void => {
             throw new Error("open-thread-window: invalid thread id");
         }
 
-        openOrFocusThreadWindow(url);
+        openOrFocusSiteWindow(url, false);
+    });
+
+    ipcMain.handle(CHANNEL.openPageWindow, (event, pageId: unknown): void => {
+        if (!isTrusted(event)) {
+            throw new Error("open-page-window: untrusted sender");
+        }
+
+        const url = pageWindowUrl(origin, pageId);
+
+        if (url === undefined) {
+            throw new Error("open-page-window: invalid page id");
+        }
+
+        openOrFocusSiteWindow(url, true);
     });
 
     // Sent, not invoked: the page has nothing to wait for.

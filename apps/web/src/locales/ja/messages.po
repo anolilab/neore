@@ -334,7 +334,7 @@ msgid "{0, plural, one {# member} other {# members}}"
 msgstr "{0, plural, other {# 人のメンバー}}"
 
 #. placeholder {0}: forgotten.length
-#: src/features/chat/thread/tool-approval.tsx:209
+#: src/features/chat/thread/tool-approval.tsx:223
 msgid "{0, plural, one {# memory is waiting for the chat owner to confirm.} other {# memories are waiting for the chat owner to confirm.}}"
 msgstr "{0, plural, other {#件のメモリがチャットの所有者の確認を待っています。}}"
 
@@ -1067,11 +1067,11 @@ msgstr "{duration, plural, other {# 秒間思考しました}}"
 msgid "{edgeCount, plural, one {# edge} other {# edges}}"
 msgstr "{edgeCount, plural, other {# 本のエッジ}}"
 
-#: src/features/pages/components/page-view.tsx:477
+#: src/features/pages/components/page-view.tsx:484
 msgid "{editorNames} is editing this page."
 msgstr "{editorNames} がこのページを編集中です。"
 
-#: src/features/pages/components/page-view.tsx:476
+#: src/features/pages/components/page-view.tsx:483
 msgid "{editorNames} is editing this page. If you both change the same version, the second save is stopped and asked what to do."
 msgstr "{editorNames} がこのページを編集中です。同じバージョンを両方が変更した場合、2 番目の保存は停止され、どうするか確認されます。"
 
@@ -2886,7 +2886,7 @@ msgid "Add title text"
 msgstr "タイトルテキストを追加"
 
 #: src/features/pages/components/page-tree-item.tsx:152
-#: src/features/pages/components/page-view.tsx:418
+#: src/features/pages/components/page-view.tsx:425
 msgid "Add to favorites"
 msgstr "お気に入りに追加"
 
@@ -3604,7 +3604,7 @@ msgstr "すべてのフィルタールールをクリアしました"
 msgid "All Icons"
 msgstr "すべてのアイコン"
 
-#: src/features/download/components/download-page.tsx:101
+#: src/features/download/components/download-page.tsx:134
 msgid "All installers"
 msgstr "すべてのインストーラー"
 
@@ -3725,11 +3725,11 @@ msgstr "すべてのユースケース"
 msgid "All Users"
 msgstr "すべてのユーザー"
 
-#: src/features/chat/thread/tool-approval.tsx:231
+#: src/features/chat/thread/tool-approval.tsx:245
 msgid "Allow \"{tool}\" from {server}?"
 msgstr "{server} の「{tool}」を許可しますか？"
 
-#: src/features/chat/thread/tool-approval.tsx:231
+#: src/features/chat/thread/tool-approval.tsx:245
 msgid "Allow \"{tool}\"?"
 msgstr "「{tool}」を許可しますか？"
 
@@ -3801,7 +3801,7 @@ msgstr "アカウントをお持ちですか？"
 msgid "Already linked to this thread."
 msgstr "すでにこのスレッドにリンクされています。"
 
-#: src/features/pages/components/page-view.tsx:402
+#: src/features/pages/components/page-view.tsx:407
 msgid "Also viewing"
 msgstr "他の閲覧者"
 
@@ -7673,7 +7673,7 @@ msgstr "{agentLabel} からのコマンド"
 
 #: src/features/develop/components/review-panel.tsx:64
 #: src/features/pages/components/page-comments-panel.tsx:146
-#: src/features/pages/components/page-view.tsx:429
+#: src/features/pages/components/page-view.tsx:436
 #: src/features/workflow/components/nodes/comment-node.tsx:95
 #: src/features/workflow/types/index.ts:461
 #: src/features/workflow/types/index.ts:465
@@ -7717,7 +7717,7 @@ msgstr "ファイル全体 {0} にコメント"
 
 #: src/features/pages/components/page-comments-panel.tsx:135
 #: src/features/pages/components/page-comments-panel.tsx:137
-#: src/features/pages/components/page-view.tsx:439
+#: src/features/pages/components/page-view.tsx:446
 msgid "Comments"
 msgstr "コメント"
 
@@ -9407,11 +9407,11 @@ msgstr "参加者を削除できませんでした"
 msgid "Could not rename the device."
 msgstr "デバイス名を変更できませんでした。"
 
-#: src/features/pages/components/page-view.tsx:372
+#: src/features/pages/components/page-view.tsx:377
 msgid "Could not rename the page"
 msgstr "ページの名前を変更できませんでした"
 
-#: src/features/pages/components/page-view.tsx:283
+#: src/features/pages/components/page-view.tsx:288
 msgid "Could not restore this version"
 msgstr "このバージョンを復元できませんでした"
 
@@ -9461,8 +9461,8 @@ msgstr "メモリを保存できませんでした"
 msgid "Could not save the new order for {label}"
 msgstr "{label} の新しい順序を保存できませんでした"
 
-#: src/features/pages/components/page-view.tsx:160
-#: src/features/pages/components/page-view.tsx:248
+#: src/features/pages/components/page-view.tsx:165
+#: src/features/pages/components/page-view.tsx:253
 msgid "Could not save the page"
 msgstr "ページを保存できませんでした"
 
@@ -11275,7 +11275,7 @@ msgstr "テキストとレイアウトの精度が最も重要な、ロゴ、ア
 msgid "Designing a system or a change that spans several parts."
 msgstr "複数の部分にまたがるシステムや変更を設計します。"
 
-#: src/features/download/components/download-page.tsx:65
+#: src/features/download/components/download-page.tsx:69
 msgid "Desktop"
 msgstr "デスクトップ"
 
@@ -11744,7 +11744,7 @@ msgstr "ダウンロード"
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:82
 #: src/features/canvas/canvas-panel.tsx:811
 #: src/features/canvas/canvas-panel.tsx:828
-#: src/features/download/components/download-page.tsx:120
+#: src/features/download/components/download-page.tsx:153
 #: src/features/skills/components/bundle-export-dialog.tsx:227
 #: src/features/workflow/components/nodes/node-expand-modal.tsx:300
 #: src/features/workflow/components/nodes/node-expand-modal.tsx:303
@@ -11823,7 +11823,7 @@ msgid "Download file"
 msgstr "ファイルをダウンロード"
 
 #. placeholder {0}: PLATFORM_NAMES[primaryPlatform]
-#: src/features/download/components/download-page.tsx:89
+#: src/features/download/components/download-page.tsx:93
 msgid "Download for {0}"
 msgstr "{0} 向けにダウンロード"
 
@@ -11844,7 +11844,7 @@ msgstr "Markdown をダウンロード"
 msgid "Download memories (Markdown)"
 msgstr "メモリをダウンロード（Markdown）"
 
-#: src/features/download/components/download-page.tsx:68
+#: src/features/download/components/download-page.tsx:72
 msgid "Download Neore for desktop"
 msgstr "デスクトップ版 Neore をダウンロード"
 
@@ -11883,7 +11883,7 @@ msgstr "Wordドキュメントをダウンロード"
 msgid "Downloading..."
 msgstr "ダウンロードしています..."
 
-#: src/features/download/components/download-page.tsx:130
+#: src/features/download/components/download-page.tsx:163
 msgid "Downloads open the GitHub releases page. If no installers are listed there yet, the desktop release has not been published."
 msgstr "ダウンロードは GitHub のリリースページに移動します。そこにインストーラーがまだ表示されていない場合、デスクトップ版はまだ公開されていません。"
 
@@ -15751,7 +15751,7 @@ msgstr "フォレスト"
 msgid "forget"
 msgstr "忘れる"
 
-#: src/features/chat/thread/tool-approval.tsx:217
+#: src/features/chat/thread/tool-approval.tsx:231
 msgid "Forget these memories?"
 msgstr "これらのメモリを忘れますか？"
 
@@ -18594,9 +18594,17 @@ msgstr "コーディングエージェントをインストール"
 msgid "Install a coding agent in the Neore desktop app and approve it for a folder on a paired computer. The install happens in the desktop window, not here."
 msgstr "Neore デスクトップアプリでコーディングエージェントをインストールし、ペアリング済みのコンピューター上のフォルダーに対して承認します。インストールはここではなく、デスクトップのウィンドウで行われます。"
 
+#: src/features/download/components/download-page.tsx:121
+msgid "Install Neore as an app"
+msgstr "Neore をアプリとしてインストール"
+
 #: src/features/settings/connectors/messenger/messenger-setup-dialog.tsx:72
 msgid "Install the bot in Teams (via a Teams app manifest or the Developer Portal) and send it a message."
 msgstr "Teams にボットをインストールし（Teams アプリマニフェストまたは Developer Portal 経由）、メッセージを送信してください。"
+
+#: src/features/pages/components/page-install-button.tsx:30
+msgid "Install this page"
+msgstr "このページをインストール"
 
 #: src/features/skills/components/marketplace-skill-detail-dialog.tsx:219
 #: src/features/skills/components/skill-item.tsx:120
@@ -18944,7 +18952,7 @@ msgstr "存在しないか、お使いの {label} アカウントでは表示で
 msgid "It is on {hostLabel} now."
 msgstr "現在 {hostLabel} 上にあります。"
 
-#: src/features/pages/components/page-view.tsx:190
+#: src/features/pages/components/page-view.tsx:195
 msgid "It may have been deleted, or you no longer have access."
 msgstr "削除されたか、アクセス権がなくなった可能性があります。"
 
@@ -20307,7 +20315,7 @@ msgstr "オンボーディングを読み込んでいます"
 msgid "Loading output..."
 msgstr "出力を読み込んでいます..."
 
-#: src/features/pages/components/page-view.tsx:181
+#: src/features/pages/components/page-view.tsx:186
 msgid "Loading page…"
 msgstr "ページを読み込んでいます…"
 
@@ -21361,7 +21369,7 @@ msgstr "メモリ"
 msgid "Memories"
 msgstr "メモリ"
 
-#: src/features/chat/thread/tool-approval.tsx:202
+#: src/features/chat/thread/tool-approval.tsx:216
 msgid "Memories to forget"
 msgstr "忘れるメモリ"
 
@@ -22748,7 +22756,7 @@ msgstr "Neore はサーバーに接続できません。再接続を試み続け
 msgid "Neore Chat"
 msgstr "Neore Chat"
 
-#: src/routes/__root.tsx:607
+#: src/routes/__root.tsx:608
 msgid "Neore Chat is a modern AI chat application. Chat with the latest AI models, organise your conversations, and stay productive."
 msgstr "Neore Chat はモダンな AI チャットアプリケーションです。最新の AI モデルとチャットし、会話を整理して、生産性を高めましょう。"
 
@@ -22787,6 +22795,10 @@ msgstr "Neore Gateway は OpenAI (GPT-4o、o1、o3、DALL-E)、Google (Gemini 2.
 #: src/features/marketing/components/landing-page.tsx:257
 msgid "Neore includes 30+ models: GPT-4, Claude, Gemini, and DeepSeek for chat. FLUX, Imagen, Stable Diffusion, and Recraft for images. Runway, Luma, Kling, and Pika for video. Switch between any of them mid-conversation."
 msgstr "Neore には 30 以上のモデルが含まれています。チャットには GPT-4、Claude、Gemini、DeepSeek、画像には FLUX、Imagen、Stable Diffusion、Recraft、動画には Runway、Luma、Kling、Pika。会話の途中でいつでも切り替えられます。"
+
+#: src/features/download/components/download-page.tsx:105
+msgid "Neore is installed on this device."
+msgstr "Neore はこのデバイスにインストールされています。"
 
 #: src/features/develop/components/watched-repositories.tsx:146
 msgid "Neore keeps these up to date and tells you when someone asks for your review."
@@ -24851,6 +24863,7 @@ msgstr "全画面で開く"
 
 #: src/features/chat/thread-list/thread-node.tsx:805
 #: src/features/chat/thread-list/thread-node.tsx:818
+#: src/features/pages/components/page-window-button.tsx:23
 msgid "Open in new window"
 msgstr "新しいウィンドウで開く"
 
@@ -25507,6 +25520,10 @@ msgstr "またはリンクから取得"
 msgid "Or from a terminal:"
 msgstr "またはターミナルから："
 
+#: src/features/download/components/download-page.tsx:112
+msgid "Or install Neore in this browser. It then opens in its own window, like an app."
+msgstr "または、このブラウザに Neore をインストールできます。インストール後はアプリのように独立したウィンドウで開きます。"
+
 #: src/features/chat/thread/ask-user-prompt.tsx:269
 msgid "Or type your own answer…"
 msgstr "または自分で回答を入力…"
@@ -25805,7 +25822,7 @@ msgid "Page address"
 msgstr "ページのアドレス"
 
 #: src/features/pages/components/page-agent-dialog.tsx:90
-#: src/features/pages/components/page-view.tsx:435
+#: src/features/pages/components/page-view.tsx:442
 msgid "Page agent"
 msgstr "ページエージェント"
 
@@ -25822,11 +25839,11 @@ msgid "Page not available"
 msgstr "ページを利用できません"
 
 #: src/components/not-found.tsx:128
-#: src/features/pages/components/page-view.tsx:189
+#: src/features/pages/components/page-view.tsx:194
 msgid "Page not found"
 msgstr "ページが見つかりません"
 
-#: src/features/pages/components/page-view.tsx:487
+#: src/features/pages/components/page-view.tsx:494
 msgid "Page title"
 msgstr "ページのタイトル"
 
@@ -28978,7 +28995,7 @@ msgid "Remove filter (when focused)"
 msgstr "フィルターを削除 (フォーカス時)"
 
 #: src/features/pages/components/page-tree-item.tsx:152
-#: src/features/pages/components/page-view.tsx:418
+#: src/features/pages/components/page-view.tsx:425
 msgid "Remove from favorites"
 msgstr "お気に入りから削除"
 
@@ -31103,7 +31120,7 @@ msgstr "ロールを選択"
 msgid "Select row"
 msgstr "行を選択"
 
-#: src/features/pages/components/page-view.tsx:305
+#: src/features/pages/components/page-view.tsx:310
 msgid "Select some text to comment on"
 msgstr "コメントするテキストを選択してください"
 
@@ -31616,7 +31633,7 @@ msgstr "測定中のシャード: {0}。完了させるには、さらにシャ�
 msgid "Shards that could not be measured are left out of the totals: {0}."
 msgstr "測定できなかったシャードは合計から除外されています: {0}。"
 
-#: src/features/pages/components/page-view.tsx:459
+#: src/features/pages/components/page-view.tsx:466
 msgid "Share"
 msgstr "共有"
 
@@ -32304,7 +32321,7 @@ msgstr "CLIP レイヤーをスキップ (0 = なし、1〜2 = よりスタイ�
 msgid "Skip questions"
 msgstr "質問をスキップ"
 
-#: src/routes/__root.tsx:505
+#: src/routes/__root.tsx:506
 msgid "Skip to content"
 msgstr "コンテンツへスキップ"
 
@@ -35335,7 +35352,7 @@ msgstr "説明が途中で切れています。"
 msgid "The description of \"{name}\" must be at most {limit} characters on one line."
 msgstr "\"{name}\" の説明は 1 行で最大 {limit} 文字にしてください。"
 
-#: src/features/download/components/download-page.tsx:71
+#: src/features/download/components/download-page.tsx:75
 msgid "The desktop app runs on macOS, Windows and Linux. Installers are attached to a desktop release on GitHub, and they appear there once that release is published."
 msgstr "デスクトップアプリは macOS、Windows、Linux で動作します。インストーラーは GitHub のデスクトップリリースに添付され、そのリリースが公開されるとそこに表示されます。"
 
@@ -37173,6 +37190,10 @@ msgstr "（{0}）"
 msgid "To do"
 msgstr "未着手"
 
+#: src/features/download/components/download-page.tsx:128
+msgid "To install Neore on iPhone or iPad, tap Share in Safari, then Add to Home Screen."
+msgstr "iPhone や iPad に Neore をインストールするには、Safari で共有をタップし、「ホーム画面に追加」をタップします。"
+
 #: ../../packages/chat-ui/src/threads/thread-list.tsx:47
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:631
 #: src/features/pages/components/page-version-panel.tsx:56
@@ -38350,9 +38371,9 @@ msgid "Until a chat is paired, the bot answers only that it is private. Send /pa
 msgstr "チャットがペアリングされるまで、ボットは非公開であることのみ返信します。設定のコードを添えて /pair を送信し、連絡先をリンクしてください。"
 
 #: src/features/pages/components/page-tree-item.tsx:53
-#: src/features/pages/components/page-view.tsx:390
-#: src/features/pages/components/page-view.tsx:397
-#: src/features/pages/components/page-view.tsx:500
+#: src/features/pages/components/page-view.tsx:395
+#: src/features/pages/components/page-view.tsx:402
+#: src/features/pages/components/page-view.tsx:507
 #: src/features/pages/components/pages-sidebar.tsx:61
 #: src/features/pages/components/pages-sidebar.tsx:181
 #: src/features/pages/components/pages-sidebar.tsx:208
@@ -39261,7 +39282,7 @@ msgstr "バージョン {position} / {total}"
 #: src/features/canvas/canvas-panel.tsx:788
 #: src/features/pages/components/page-version-panel.tsx:81
 #: src/features/pages/components/page-version-panel.tsx:83
-#: src/features/pages/components/page-view.tsx:448
+#: src/features/pages/components/page-view.tsx:455
 msgid "Version history"
 msgstr "バージョン履歴"
 
@@ -40704,7 +40725,7 @@ msgstr "昨日"
 msgid "You"
 msgstr "あなた"
 
-#: src/features/pages/components/page-view.tsx:378
+#: src/features/pages/components/page-view.tsx:383
 msgid "You (another tab)"
 msgstr "あなた（別のタブ）"
 
@@ -40777,7 +40798,7 @@ msgstr "許可されている数のリポジトリを監視しています。"
 msgid "You can add {0} more skills on this plan. Untick some skills or upgrade."
 msgstr "このプランでは、あと {0} 個のスキルを追加できます。いくつかのスキルのチェックを外すか、アップグレードしてください。"
 
-#: src/features/pages/components/page-view.tsx:482
+#: src/features/pages/components/page-view.tsx:489
 msgid "You can comment on this page but not edit it."
 msgstr "このページにはコメントできますが、編集はできません。"
 
@@ -40797,7 +40818,7 @@ msgstr "分析、マーケティング、AI 機能など、さまざまな種類
 msgid "You can try again now!"
 msgstr "もう一度お試しいただけます！"
 
-#: src/features/pages/components/page-view.tsx:482
+#: src/features/pages/components/page-view.tsx:489
 msgid "You can view this page but not edit it."
 msgstr "このページは閲覧できますが、編集はできません。"
 
@@ -41050,7 +41071,7 @@ msgstr "ボットを読み込めませんでした。保存済みログインの
 msgid "Your browser blocked access to local network devices for this site. Allow \"Local network access\" in the site settings (the icon left of the address bar), then try again."
 msgstr "ブラウザーがこのサイトからローカルネットワーク上のデバイスへのアクセスをブロックしました。サイト設定（アドレスバー左のアイコン）で「ローカルネットワークへのアクセス」を許可してから、もう一度お試しください。"
 
-#: src/features/download/components/download-page.tsx:93
+#: src/features/download/components/download-page.tsx:97
 msgid "Your browser does not say which processor you have, so choose the matching installer below."
 msgstr "お使いのブラウザはプロセッサーの種類を示さないため、下から該当するインストーラーを選んでください。"
 

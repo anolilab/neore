@@ -334,7 +334,7 @@ msgid "{0, plural, one {# member} other {# members}}"
 msgstr "{0, plural, other {# 名成员}}"
 
 #. placeholder {0}: forgotten.length
-#: src/features/chat/thread/tool-approval.tsx:209
+#: src/features/chat/thread/tool-approval.tsx:223
 msgid "{0, plural, one {# memory is waiting for the chat owner to confirm.} other {# memories are waiting for the chat owner to confirm.}}"
 msgstr "{0, plural, other {# 条记忆正在等待聊天所有者确认。}}"
 
@@ -1067,11 +1067,11 @@ msgstr "{duration, plural, other {思考了 # 秒}}"
 msgid "{edgeCount, plural, one {# edge} other {# edges}}"
 msgstr "{edgeCount, plural, other {# 条连线}}"
 
-#: src/features/pages/components/page-view.tsx:477
+#: src/features/pages/components/page-view.tsx:484
 msgid "{editorNames} is editing this page."
 msgstr "{editorNames} 正在编辑此页面。"
 
-#: src/features/pages/components/page-view.tsx:476
+#: src/features/pages/components/page-view.tsx:483
 msgid "{editorNames} is editing this page. If you both change the same version, the second save is stopped and asked what to do."
 msgstr "{editorNames} 正在编辑此页面。如果你们修改了同一个版本，后保存的一方会被拦下并询问如何处理。"
 
@@ -2886,7 +2886,7 @@ msgid "Add title text"
 msgstr "添加标题文字"
 
 #: src/features/pages/components/page-tree-item.tsx:152
-#: src/features/pages/components/page-view.tsx:418
+#: src/features/pages/components/page-view.tsx:425
 msgid "Add to favorites"
 msgstr "添加到收藏"
 
@@ -3604,7 +3604,7 @@ msgstr "已清除所有筛选规则"
 msgid "All Icons"
 msgstr "所有图标"
 
-#: src/features/download/components/download-page.tsx:101
+#: src/features/download/components/download-page.tsx:134
 msgid "All installers"
 msgstr "所有安装包"
 
@@ -3725,11 +3725,11 @@ msgstr "全部使用场景"
 msgid "All Users"
 msgstr "所有用户"
 
-#: src/features/chat/thread/tool-approval.tsx:231
+#: src/features/chat/thread/tool-approval.tsx:245
 msgid "Allow \"{tool}\" from {server}?"
 msgstr "允许来自 {server} 的“{tool}”吗？"
 
-#: src/features/chat/thread/tool-approval.tsx:231
+#: src/features/chat/thread/tool-approval.tsx:245
 msgid "Allow \"{tool}\"?"
 msgstr "允许“{tool}”吗？"
 
@@ -3801,7 +3801,7 @@ msgstr "已有账号？"
 msgid "Already linked to this thread."
 msgstr "已关联到此对话。"
 
-#: src/features/pages/components/page-view.tsx:402
+#: src/features/pages/components/page-view.tsx:407
 msgid "Also viewing"
 msgstr "同时在看"
 
@@ -7673,7 +7673,7 @@ msgstr "来自 {agentLabel} 的命令"
 
 #: src/features/develop/components/review-panel.tsx:64
 #: src/features/pages/components/page-comments-panel.tsx:146
-#: src/features/pages/components/page-view.tsx:429
+#: src/features/pages/components/page-view.tsx:436
 #: src/features/workflow/components/nodes/comment-node.tsx:95
 #: src/features/workflow/types/index.ts:461
 #: src/features/workflow/types/index.ts:465
@@ -7717,7 +7717,7 @@ msgstr "评论整个文件 {0}"
 
 #: src/features/pages/components/page-comments-panel.tsx:135
 #: src/features/pages/components/page-comments-panel.tsx:137
-#: src/features/pages/components/page-view.tsx:439
+#: src/features/pages/components/page-view.tsx:446
 msgid "Comments"
 msgstr "评论"
 
@@ -9407,11 +9407,11 @@ msgstr "无法移除参与者"
 msgid "Could not rename the device."
 msgstr "无法重命名该设备。"
 
-#: src/features/pages/components/page-view.tsx:372
+#: src/features/pages/components/page-view.tsx:377
 msgid "Could not rename the page"
 msgstr "无法重命名页面"
 
-#: src/features/pages/components/page-view.tsx:283
+#: src/features/pages/components/page-view.tsx:288
 msgid "Could not restore this version"
 msgstr "无法恢复此版本"
 
@@ -9461,8 +9461,8 @@ msgstr "无法保存记忆"
 msgid "Could not save the new order for {label}"
 msgstr "无法保存{label}的新顺序"
 
-#: src/features/pages/components/page-view.tsx:160
-#: src/features/pages/components/page-view.tsx:248
+#: src/features/pages/components/page-view.tsx:165
+#: src/features/pages/components/page-view.tsx:253
 msgid "Could not save the page"
 msgstr "无法保存页面"
 
@@ -11275,7 +11275,7 @@ msgstr "制作 logo、图标和品牌素材、最注重文字与排版精度的�
 msgid "Designing a system or a change that spans several parts."
 msgstr "设计涉及多个部分的系统或更改。"
 
-#: src/features/download/components/download-page.tsx:65
+#: src/features/download/components/download-page.tsx:69
 msgid "Desktop"
 msgstr "桌面"
 
@@ -11744,7 +11744,7 @@ msgstr "下载"
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:82
 #: src/features/canvas/canvas-panel.tsx:811
 #: src/features/canvas/canvas-panel.tsx:828
-#: src/features/download/components/download-page.tsx:120
+#: src/features/download/components/download-page.tsx:153
 #: src/features/skills/components/bundle-export-dialog.tsx:227
 #: src/features/workflow/components/nodes/node-expand-modal.tsx:300
 #: src/features/workflow/components/nodes/node-expand-modal.tsx:303
@@ -11823,7 +11823,7 @@ msgid "Download file"
 msgstr "下载文件"
 
 #. placeholder {0}: PLATFORM_NAMES[primaryPlatform]
-#: src/features/download/components/download-page.tsx:89
+#: src/features/download/components/download-page.tsx:93
 msgid "Download for {0}"
 msgstr "下载 {0} 版"
 
@@ -11844,7 +11844,7 @@ msgstr "下载 Markdown"
 msgid "Download memories (Markdown)"
 msgstr "下载记忆（Markdown）"
 
-#: src/features/download/components/download-page.tsx:68
+#: src/features/download/components/download-page.tsx:72
 msgid "Download Neore for desktop"
 msgstr "下载 Neore 桌面版"
 
@@ -11883,7 +11883,7 @@ msgstr "下载 Word 文档"
 msgid "Downloading..."
 msgstr "正在下载..."
 
-#: src/features/download/components/download-page.tsx:130
+#: src/features/download/components/download-page.tsx:163
 msgid "Downloads open the GitHub releases page. If no installers are listed there yet, the desktop release has not been published."
 msgstr "下载会打开 GitHub 发布页面。如果页面上还没有安装包，说明桌面版尚未发布。"
 
@@ -15751,7 +15751,7 @@ msgstr "森林"
 msgid "forget"
 msgstr "忘记"
 
-#: src/features/chat/thread/tool-approval.tsx:217
+#: src/features/chat/thread/tool-approval.tsx:231
 msgid "Forget these memories?"
 msgstr "忘记这些记忆？"
 
@@ -18594,9 +18594,17 @@ msgstr "安装编码智能体"
 msgid "Install a coding agent in the Neore desktop app and approve it for a folder on a paired computer. The install happens in the desktop window, not here."
 msgstr "在 Neore 桌面应用中安装编码智能体，并为已配对电脑上的某个文件夹批准它。安装在桌面窗口中进行，而非此处。"
 
+#: src/features/download/components/download-page.tsx:121
+msgid "Install Neore as an app"
+msgstr "将 Neore 安装为应用"
+
 #: src/features/settings/connectors/messenger/messenger-setup-dialog.tsx:72
 msgid "Install the bot in Teams (via a Teams app manifest or the Developer Portal) and send it a message."
 msgstr "在 Teams 中安装机器人（通过 Teams 应用清单或开发者门户），并给它发送一条消息。"
+
+#: src/features/pages/components/page-install-button.tsx:30
+msgid "Install this page"
+msgstr "安装此页面"
 
 #: src/features/skills/components/marketplace-skill-detail-dialog.tsx:219
 #: src/features/skills/components/skill-item.tsx:120
@@ -18944,7 +18952,7 @@ msgstr "它不存在，或你的 {label} 账号看不到它。"
 msgid "It is on {hostLabel} now."
 msgstr "现已在 {hostLabel} 上。"
 
-#: src/features/pages/components/page-view.tsx:190
+#: src/features/pages/components/page-view.tsx:195
 msgid "It may have been deleted, or you no longer have access."
 msgstr "它可能已被删除，或者你已无权访问。"
 
@@ -20307,7 +20315,7 @@ msgstr "正在加载新手引导"
 msgid "Loading output..."
 msgstr "正在加载输出..."
 
-#: src/features/pages/components/page-view.tsx:181
+#: src/features/pages/components/page-view.tsx:186
 msgid "Loading page…"
 msgstr "正在加载页面…"
 
@@ -21361,7 +21369,7 @@ msgstr "记忆"
 msgid "Memories"
 msgstr "记忆"
 
-#: src/features/chat/thread/tool-approval.tsx:202
+#: src/features/chat/thread/tool-approval.tsx:216
 msgid "Memories to forget"
 msgstr "要忘记的记忆"
 
@@ -22748,7 +22756,7 @@ msgstr "Neore 无法连接服务器。它将继续尝试重新连接。"
 msgid "Neore Chat"
 msgstr "Neore Chat"
 
-#: src/routes/__root.tsx:607
+#: src/routes/__root.tsx:608
 msgid "Neore Chat is a modern AI chat application. Chat with the latest AI models, organise your conversations, and stay productive."
 msgstr "Neore Chat 是一款现代 AI 聊天应用。与最新的 AI 模型聊天，整理你的对话，保持高效。"
 
@@ -22787,6 +22795,10 @@ msgstr "Neore Gateway 支持 OpenAI（GPT-4o、o1、o3、DALL-E）、Google（Ge
 #: src/features/marketing/components/landing-page.tsx:257
 msgid "Neore includes 30+ models: GPT-4, Claude, Gemini, and DeepSeek for chat. FLUX, Imagen, Stable Diffusion, and Recraft for images. Runway, Luma, Kling, and Pika for video. Switch between any of them mid-conversation."
 msgstr "Neore 包含 30+ 个模型：聊天有 GPT-4、Claude、Gemini 和 DeepSeek；图像有 FLUX、Imagen、Stable Diffusion 和 Recraft；视频有 Runway、Luma、Kling 和 Pika。可在对话中随时切换。"
+
+#: src/features/download/components/download-page.tsx:105
+msgid "Neore is installed on this device."
+msgstr "Neore 已安装在此设备上。"
 
 #: src/features/develop/components/watched-repositories.tsx:146
 msgid "Neore keeps these up to date and tells you when someone asks for your review."
@@ -24851,6 +24863,7 @@ msgstr "全屏打开"
 
 #: src/features/chat/thread-list/thread-node.tsx:805
 #: src/features/chat/thread-list/thread-node.tsx:818
+#: src/features/pages/components/page-window-button.tsx:23
 msgid "Open in new window"
 msgstr "在新窗口中打开"
 
@@ -25507,6 +25520,10 @@ msgstr "或通过链接获取"
 msgid "Or from a terminal:"
 msgstr "或在终端中："
 
+#: src/features/download/components/download-page.tsx:112
+msgid "Or install Neore in this browser. It then opens in its own window, like an app."
+msgstr "也可以在此浏览器中安装 Neore。安装后它会像应用一样在独立窗口中打开。"
+
 #: src/features/chat/thread/ask-user-prompt.tsx:269
 msgid "Or type your own answer…"
 msgstr "或输入你自己的回答…"
@@ -25805,7 +25822,7 @@ msgid "Page address"
 msgstr "页面地址"
 
 #: src/features/pages/components/page-agent-dialog.tsx:90
-#: src/features/pages/components/page-view.tsx:435
+#: src/features/pages/components/page-view.tsx:442
 msgid "Page agent"
 msgstr "页面智能体"
 
@@ -25822,11 +25839,11 @@ msgid "Page not available"
 msgstr "页面不可用"
 
 #: src/components/not-found.tsx:128
-#: src/features/pages/components/page-view.tsx:189
+#: src/features/pages/components/page-view.tsx:194
 msgid "Page not found"
 msgstr "未找到页面"
 
-#: src/features/pages/components/page-view.tsx:487
+#: src/features/pages/components/page-view.tsx:494
 msgid "Page title"
 msgstr "页面标题"
 
@@ -28978,7 +28995,7 @@ msgid "Remove filter (when focused)"
 msgstr "移除筛选（聚焦时）"
 
 #: src/features/pages/components/page-tree-item.tsx:152
-#: src/features/pages/components/page-view.tsx:418
+#: src/features/pages/components/page-view.tsx:425
 msgid "Remove from favorites"
 msgstr "从收藏中移除"
 
@@ -31103,7 +31120,7 @@ msgstr "选择角色"
 msgid "Select row"
 msgstr "选择行"
 
-#: src/features/pages/components/page-view.tsx:305
+#: src/features/pages/components/page-view.tsx:310
 msgid "Select some text to comment on"
 msgstr "选择一些文本进行评论"
 
@@ -31616,7 +31633,7 @@ msgstr "仍在测量的分片：{0}。测量更多分片以完成。"
 msgid "Shards that could not be measured are left out of the totals: {0}."
 msgstr "无法测量的分片未计入合计：{0}。"
 
-#: src/features/pages/components/page-view.tsx:459
+#: src/features/pages/components/page-view.tsx:466
 msgid "Share"
 msgstr "分享"
 
@@ -32304,7 +32321,7 @@ msgstr "跳过 CLIP 层（0 = 不跳过，1-2 = 更风格化）"
 msgid "Skip questions"
 msgstr "跳过问题"
 
-#: src/routes/__root.tsx:505
+#: src/routes/__root.tsx:506
 msgid "Skip to content"
 msgstr "跳到内容"
 
@@ -35335,7 +35352,7 @@ msgstr "描述已被截断。"
 msgid "The description of \"{name}\" must be at most {limit} characters on one line."
 msgstr "\"{name}\" 的描述必须为一行，最多 {limit} 个字符。"
 
-#: src/features/download/components/download-page.tsx:71
+#: src/features/download/components/download-page.tsx:75
 msgid "The desktop app runs on macOS, Windows and Linux. Installers are attached to a desktop release on GitHub, and they appear there once that release is published."
 msgstr "桌面应用支持 macOS、Windows 和 Linux。安装包附在 GitHub 上的桌面版发布中，发布后会在那里显示。"
 
@@ -37173,6 +37190,10 @@ msgstr "到 {0}"
 msgid "To do"
 msgstr "待办"
 
+#: src/features/download/components/download-page.tsx:128
+msgid "To install Neore on iPhone or iPad, tap Share in Safari, then Add to Home Screen."
+msgstr "要在 iPhone 或 iPad 上安装 Neore，请在 Safari 中点按“分享”，然后点按“添加到主屏幕”。"
+
 #: ../../packages/chat-ui/src/threads/thread-list.tsx:47
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:631
 #: src/features/pages/components/page-version-panel.tsx:56
@@ -38350,9 +38371,9 @@ msgid "Until a chat is paired, the bot answers only that it is private. Send /pa
 msgstr "在聊天配对之前，机器人只会回复该聊天为私人聊天。请发送 /pair 并附上设置中的验证码，以关联你的联系人。"
 
 #: src/features/pages/components/page-tree-item.tsx:53
-#: src/features/pages/components/page-view.tsx:390
-#: src/features/pages/components/page-view.tsx:397
-#: src/features/pages/components/page-view.tsx:500
+#: src/features/pages/components/page-view.tsx:395
+#: src/features/pages/components/page-view.tsx:402
+#: src/features/pages/components/page-view.tsx:507
 #: src/features/pages/components/pages-sidebar.tsx:61
 #: src/features/pages/components/pages-sidebar.tsx:181
 #: src/features/pages/components/pages-sidebar.tsx:208
@@ -39261,7 +39282,7 @@ msgstr "第 {position}/{total} 个版本"
 #: src/features/canvas/canvas-panel.tsx:788
 #: src/features/pages/components/page-version-panel.tsx:81
 #: src/features/pages/components/page-version-panel.tsx:83
-#: src/features/pages/components/page-view.tsx:448
+#: src/features/pages/components/page-view.tsx:455
 msgid "Version history"
 msgstr "版本历史"
 
@@ -40704,7 +40725,7 @@ msgstr "昨天"
 msgid "You"
 msgstr "你"
 
-#: src/features/pages/components/page-view.tsx:378
+#: src/features/pages/components/page-view.tsx:383
 msgid "You (another tab)"
 msgstr "你（另一个标签页）"
 
@@ -40777,7 +40798,7 @@ msgstr "你监视的仓库数量已达上限。"
 msgid "You can add {0} more skills on this plan. Untick some skills or upgrade."
 msgstr "此套餐还可再添加 {0} 个技能。请取消勾选一些技能，或升级。"
 
-#: src/features/pages/components/page-view.tsx:482
+#: src/features/pages/components/page-view.tsx:489
 msgid "You can comment on this page but not edit it."
 msgstr "你可以评论此页面，但不能编辑。"
 
@@ -40797,7 +40818,7 @@ msgstr "你可以管理对不同类型数据处理的同意偏好，包括分析
 msgid "You can try again now!"
 msgstr "现在可以重试了！"
 
-#: src/features/pages/components/page-view.tsx:482
+#: src/features/pages/components/page-view.tsx:489
 msgid "You can view this page but not edit it."
 msgstr "你可以查看此页面，但不能编辑。"
 
@@ -41050,7 +41071,7 @@ msgstr "无法加载你的机器人。加载完成后才能保存对已保存登
 msgid "Your browser blocked access to local network devices for this site. Allow \"Local network access\" in the site settings (the icon left of the address bar), then try again."
 msgstr "你的浏览器阻止了此网站访问本地网络设备。请在网站设置（地址栏左侧的图标）中允许“本地网络访问”，然后重试。"
 
-#: src/features/download/components/download-page.tsx:93
+#: src/features/download/components/download-page.tsx:97
 msgid "Your browser does not say which processor you have, so choose the matching installer below."
 msgstr "你的浏览器无法识别处理器类型，请从下方选择对应的安装包。"
 

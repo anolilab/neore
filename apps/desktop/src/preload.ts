@@ -104,6 +104,8 @@ if (siteOrigin !== undefined && document.location.origin === siteOrigin) {
         onSystemAccentColor: capabilities.includes("system-accent")
             ? (handler: (hex: string | null) => void): () => void => listen(CHANNEL.systemAccentColor, handler)
             : undefined,
+        /** Opens a page in its own window. Exposed only with the `page-windows` capability. */
+        openPageWindow: (pageId: string): Promise<void> => ipcRenderer.invoke(CHANNEL.openPageWindow, pageId),
         /** Opens a thread in its own window. Exposed only with the `thread-windows` capability. */
         openThreadWindow: (threadId: string): Promise<void> => ipcRenderer.invoke(CHANNEL.openThreadWindow, threadId),
         /** Unread count for the dock / launcher badge; the main process clamps it to 0..999. */

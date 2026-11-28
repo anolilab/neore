@@ -55,3 +55,11 @@ export const detectPlatform = (userAgent: string, maxTouchPoints = 0): DetectedP
 
     return { platform: "other" };
 };
+
+/**
+ * True for iPhone, iPod and iPad, including iPadOS in desktop mode (a Mac UA with
+ * touch points). Those browsers never fire the install prompt, so the page shows
+ * the Add to Home Screen steps instead.
+ */
+export const isIosDevice = (userAgent: string, maxTouchPoints = 0): boolean =>
+    IPHONE_OR_IPAD_RE.test(userAgent) || (MAC_RE.test(userAgent) && maxTouchPoints > 1);

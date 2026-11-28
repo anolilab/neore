@@ -51,6 +51,7 @@ export const ROUTE_SECTIONS: ReadonlySet<string> = new Set([
     "models",
     "offline-shell",
     "p",
+    "page-manifest",
     "pages",
     "prompts",
     "skills",

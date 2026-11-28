@@ -334,7 +334,7 @@ msgid "{0, plural, one {# member} other {# members}}"
 msgstr "{0, plural, one {# membro} other {# membri}}"
 
 #. placeholder {0}: forgotten.length
-#: src/features/chat/thread/tool-approval.tsx:209
+#: src/features/chat/thread/tool-approval.tsx:223
 msgid "{0, plural, one {# memory is waiting for the chat owner to confirm.} other {# memories are waiting for the chat owner to confirm.}}"
 msgstr "{0, plural, one {# ricordo è in attesa della conferma del proprietario della chat.} other {# ricordi sono in attesa della conferma del proprietario della chat.}}"
 
@@ -1067,11 +1067,11 @@ msgstr "{duration, plural, one {Ha ragionato per # secondo} other {Ha ragionato 
 msgid "{edgeCount, plural, one {# edge} other {# edges}}"
 msgstr "{edgeCount, plural, one {# collegamento} other {# collegamenti}}"
 
-#: src/features/pages/components/page-view.tsx:477
+#: src/features/pages/components/page-view.tsx:484
 msgid "{editorNames} is editing this page."
 msgstr "{editorNames} sta modificando questa pagina."
 
-#: src/features/pages/components/page-view.tsx:476
+#: src/features/pages/components/page-view.tsx:483
 msgid "{editorNames} is editing this page. If you both change the same version, the second save is stopped and asked what to do."
 msgstr "{editorNames} sta modificando questa pagina. Se modificate entrambi la stessa versione, il secondo salvataggio viene bloccato e ti verrà chiesto cosa fare."
 
@@ -2886,7 +2886,7 @@ msgid "Add title text"
 msgstr "Aggiungi titolo"
 
 #: src/features/pages/components/page-tree-item.tsx:152
-#: src/features/pages/components/page-view.tsx:418
+#: src/features/pages/components/page-view.tsx:425
 msgid "Add to favorites"
 msgstr "Aggiungi ai preferiti"
 
@@ -3604,7 +3604,7 @@ msgstr "Tutte le regole di filtro sono state cancellate"
 msgid "All Icons"
 msgstr "Tutte le icone"
 
-#: src/features/download/components/download-page.tsx:101
+#: src/features/download/components/download-page.tsx:134
 msgid "All installers"
 msgstr "Tutti i programmi di installazione"
 
@@ -3725,11 +3725,11 @@ msgstr "Tutti i casi d’uso"
 msgid "All Users"
 msgstr "Tutti gli utenti"
 
-#: src/features/chat/thread/tool-approval.tsx:231
+#: src/features/chat/thread/tool-approval.tsx:245
 msgid "Allow \"{tool}\" from {server}?"
 msgstr "Consentire \"{tool}\" da {server}?"
 
-#: src/features/chat/thread/tool-approval.tsx:231
+#: src/features/chat/thread/tool-approval.tsx:245
 msgid "Allow \"{tool}\"?"
 msgstr "Consentire \"{tool}\"?"
 
@@ -3801,7 +3801,7 @@ msgstr "Hai già un account?"
 msgid "Already linked to this thread."
 msgstr "Già collegata a questo thread."
 
-#: src/features/pages/components/page-view.tsx:402
+#: src/features/pages/components/page-view.tsx:407
 msgid "Also viewing"
 msgstr "Stanno visualizzando anche"
 
@@ -7673,7 +7673,7 @@ msgstr "Comandi da {agentLabel}"
 
 #: src/features/develop/components/review-panel.tsx:64
 #: src/features/pages/components/page-comments-panel.tsx:146
-#: src/features/pages/components/page-view.tsx:429
+#: src/features/pages/components/page-view.tsx:436
 #: src/features/workflow/components/nodes/comment-node.tsx:95
 #: src/features/workflow/types/index.ts:461
 #: src/features/workflow/types/index.ts:465
@@ -7717,7 +7717,7 @@ msgstr "Commenta l’intero file {0}"
 
 #: src/features/pages/components/page-comments-panel.tsx:135
 #: src/features/pages/components/page-comments-panel.tsx:137
-#: src/features/pages/components/page-view.tsx:439
+#: src/features/pages/components/page-view.tsx:446
 msgid "Comments"
 msgstr "Commenti"
 
@@ -9407,11 +9407,11 @@ msgstr "Impossibile rimuovere il partecipante"
 msgid "Could not rename the device."
 msgstr "Impossibile rinominare il dispositivo."
 
-#: src/features/pages/components/page-view.tsx:372
+#: src/features/pages/components/page-view.tsx:377
 msgid "Could not rename the page"
 msgstr "Impossibile rinominare la pagina"
 
-#: src/features/pages/components/page-view.tsx:283
+#: src/features/pages/components/page-view.tsx:288
 msgid "Could not restore this version"
 msgstr "Impossibile ripristinare questa versione"
 
@@ -9461,8 +9461,8 @@ msgstr "Impossibile salvare le memorie"
 msgid "Could not save the new order for {label}"
 msgstr "Impossibile salvare il nuovo ordine per {label}"
 
-#: src/features/pages/components/page-view.tsx:160
-#: src/features/pages/components/page-view.tsx:248
+#: src/features/pages/components/page-view.tsx:165
+#: src/features/pages/components/page-view.tsx:253
 msgid "Could not save the page"
 msgstr "Impossibile salvare la pagina"
 
@@ -11275,7 +11275,7 @@ msgstr "Designer che creano loghi, icone e asset di brand in cui la precisione d
 msgid "Designing a system or a change that spans several parts."
 msgstr "Progettare un sistema o una modifica che coinvolge più parti."
 
-#: src/features/download/components/download-page.tsx:65
+#: src/features/download/components/download-page.tsx:69
 msgid "Desktop"
 msgstr "Desktop"
 
@@ -11744,7 +11744,7 @@ msgstr "scarica"
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:82
 #: src/features/canvas/canvas-panel.tsx:811
 #: src/features/canvas/canvas-panel.tsx:828
-#: src/features/download/components/download-page.tsx:120
+#: src/features/download/components/download-page.tsx:153
 #: src/features/skills/components/bundle-export-dialog.tsx:227
 #: src/features/workflow/components/nodes/node-expand-modal.tsx:300
 #: src/features/workflow/components/nodes/node-expand-modal.tsx:303
@@ -11823,7 +11823,7 @@ msgid "Download file"
 msgstr "Scarica file"
 
 #. placeholder {0}: PLATFORM_NAMES[primaryPlatform]
-#: src/features/download/components/download-page.tsx:89
+#: src/features/download/components/download-page.tsx:93
 msgid "Download for {0}"
 msgstr "Scarica per {0}"
 
@@ -11844,7 +11844,7 @@ msgstr "Scarica Markdown"
 msgid "Download memories (Markdown)"
 msgstr "Scarica i ricordi (Markdown)"
 
-#: src/features/download/components/download-page.tsx:68
+#: src/features/download/components/download-page.tsx:72
 msgid "Download Neore for desktop"
 msgstr "Scarica Neore per desktop"
 
@@ -11883,7 +11883,7 @@ msgstr "Scarica documento Word"
 msgid "Downloading..."
 msgstr "Download in corso..."
 
-#: src/features/download/components/download-page.tsx:130
+#: src/features/download/components/download-page.tsx:163
 msgid "Downloads open the GitHub releases page. If no installers are listed there yet, the desktop release has not been published."
 msgstr "I download aprono la pagina delle release su GitHub. Se lì non compaiono ancora programmi di installazione, la release desktop non è stata pubblicata."
 
@@ -15751,7 +15751,7 @@ msgstr "Foresta"
 msgid "forget"
 msgstr "dimentica"
 
-#: src/features/chat/thread/tool-approval.tsx:217
+#: src/features/chat/thread/tool-approval.tsx:231
 msgid "Forget these memories?"
 msgstr "Dimenticare questi ricordi?"
 
@@ -18594,9 +18594,17 @@ msgstr "Installa un agente di coding"
 msgid "Install a coding agent in the Neore desktop app and approve it for a folder on a paired computer. The install happens in the desktop window, not here."
 msgstr "Installa un agente di coding nell’app desktop di Neore e approvalo per una cartella su un computer abbinato. L’installazione avviene nella finestra desktop, non qui."
 
+#: src/features/download/components/download-page.tsx:121
+msgid "Install Neore as an app"
+msgstr "Installa Neore come app"
+
 #: src/features/settings/connectors/messenger/messenger-setup-dialog.tsx:72
 msgid "Install the bot in Teams (via a Teams app manifest or the Developer Portal) and send it a message."
 msgstr "Installa il bot in Teams (tramite un manifest dell'app Teams o il Developer Portal) e inviagli un messaggio."
+
+#: src/features/pages/components/page-install-button.tsx:30
+msgid "Install this page"
+msgstr "Installa questa pagina"
 
 #: src/features/skills/components/marketplace-skill-detail-dialog.tsx:219
 #: src/features/skills/components/skill-item.tsx:120
@@ -18944,7 +18952,7 @@ msgstr "Non esiste, oppure il tuo account {label} non può vederlo."
 msgid "It is on {hostLabel} now."
 msgstr "Ora è su {hostLabel}."
 
-#: src/features/pages/components/page-view.tsx:190
+#: src/features/pages/components/page-view.tsx:195
 msgid "It may have been deleted, or you no longer have access."
 msgstr "Potrebbe essere stata eliminata oppure non hai più accesso."
 
@@ -20307,7 +20315,7 @@ msgstr "Caricamento dell'onboarding"
 msgid "Loading output..."
 msgstr "Caricamento dell'output..."
 
-#: src/features/pages/components/page-view.tsx:181
+#: src/features/pages/components/page-view.tsx:186
 msgid "Loading page…"
 msgstr "Caricamento della pagina…"
 
@@ -21361,7 +21369,7 @@ msgstr "ricordi"
 msgid "Memories"
 msgstr "Ricordi"
 
-#: src/features/chat/thread/tool-approval.tsx:202
+#: src/features/chat/thread/tool-approval.tsx:216
 msgid "Memories to forget"
 msgstr "Ricordi da dimenticare"
 
@@ -22748,7 +22756,7 @@ msgstr "Neore non riesce a raggiungere il server. Continuerà a riprovare la ric
 msgid "Neore Chat"
 msgstr "Neore Chat"
 
-#: src/routes/__root.tsx:607
+#: src/routes/__root.tsx:608
 msgid "Neore Chat is a modern AI chat application. Chat with the latest AI models, organise your conversations, and stay productive."
 msgstr "Neore Chat è una moderna app di chat con IA. Chatta con i modelli di IA più recenti, organizza le tue conversazioni e resta produttivo."
 
@@ -22787,6 +22795,10 @@ msgstr "Neore Gateway supporta OpenAI (GPT-4o, o1, o3, DALL-E), Google (Gemini 2
 #: src/features/marketing/components/landing-page.tsx:257
 msgid "Neore includes 30+ models: GPT-4, Claude, Gemini, and DeepSeek for chat. FLUX, Imagen, Stable Diffusion, and Recraft for images. Runway, Luma, Kling, and Pika for video. Switch between any of them mid-conversation."
 msgstr "Neore include oltre 30 modelli: GPT-4, Claude, Gemini e DeepSeek per la chat. FLUX, Imagen, Stable Diffusion e Recraft per le immagini. Runway, Luma, Kling e Pika per i video. Passa dall’uno all’altro anche a metà conversazione."
+
+#: src/features/download/components/download-page.tsx:105
+msgid "Neore is installed on this device."
+msgstr "Neore è installato su questo dispositivo."
 
 #: src/features/develop/components/watched-repositories.tsx:146
 msgid "Neore keeps these up to date and tells you when someone asks for your review."
@@ -24851,6 +24863,7 @@ msgstr "Apri a schermo intero"
 
 #: src/features/chat/thread-list/thread-node.tsx:805
 #: src/features/chat/thread-list/thread-node.tsx:818
+#: src/features/pages/components/page-window-button.tsx:23
 msgid "Open in new window"
 msgstr "Apri in una nuova finestra"
 
@@ -25507,6 +25520,10 @@ msgstr "Oppure recupera da un link"
 msgid "Or from a terminal:"
 msgstr "Oppure da un terminale:"
 
+#: src/features/download/components/download-page.tsx:112
+msgid "Or install Neore in this browser. It then opens in its own window, like an app."
+msgstr "Oppure installa Neore in questo browser. Si apre poi in una finestra propria, come un'app."
+
 #: src/features/chat/thread/ask-user-prompt.tsx:269
 msgid "Or type your own answer…"
 msgstr "Oppure scrivi la tua risposta…"
@@ -25805,7 +25822,7 @@ msgid "Page address"
 msgstr "Indirizzo della pagina"
 
 #: src/features/pages/components/page-agent-dialog.tsx:90
-#: src/features/pages/components/page-view.tsx:435
+#: src/features/pages/components/page-view.tsx:442
 msgid "Page agent"
 msgstr "Agente della pagina"
 
@@ -25822,11 +25839,11 @@ msgid "Page not available"
 msgstr "Pagina non disponibile"
 
 #: src/components/not-found.tsx:128
-#: src/features/pages/components/page-view.tsx:189
+#: src/features/pages/components/page-view.tsx:194
 msgid "Page not found"
 msgstr "Pagina non trovata"
 
-#: src/features/pages/components/page-view.tsx:487
+#: src/features/pages/components/page-view.tsx:494
 msgid "Page title"
 msgstr "Titolo della pagina"
 
@@ -28978,7 +28995,7 @@ msgid "Remove filter (when focused)"
 msgstr "Rimuovi filtro (quando selezionato)"
 
 #: src/features/pages/components/page-tree-item.tsx:152
-#: src/features/pages/components/page-view.tsx:418
+#: src/features/pages/components/page-view.tsx:425
 msgid "Remove from favorites"
 msgstr "Rimuovi dai preferiti"
 
@@ -31103,7 +31120,7 @@ msgstr "Seleziona ruolo"
 msgid "Select row"
 msgstr "Seleziona riga"
 
-#: src/features/pages/components/page-view.tsx:305
+#: src/features/pages/components/page-view.tsx:310
 msgid "Select some text to comment on"
 msgstr "Seleziona del testo da commentare"
 
@@ -31616,7 +31633,7 @@ msgstr "Shard ancora in misurazione: {0}. Misura altri shard per completarli."
 msgid "Shards that could not be measured are left out of the totals: {0}."
 msgstr "Gli shard che non è stato possibile misurare sono esclusi dai totali: {0}."
 
-#: src/features/pages/components/page-view.tsx:459
+#: src/features/pages/components/page-view.tsx:466
 msgid "Share"
 msgstr "Condividi"
 
@@ -32304,7 +32321,7 @@ msgstr "Salta livelli CLIP (0 = nessuno, 1-2 = più stilizzato)"
 msgid "Skip questions"
 msgstr "Salta le domande"
 
-#: src/routes/__root.tsx:505
+#: src/routes/__root.tsx:506
 msgid "Skip to content"
 msgstr "Vai al contenuto"
 
@@ -35335,7 +35352,7 @@ msgstr "La descrizione è troncata."
 msgid "The description of \"{name}\" must be at most {limit} characters on one line."
 msgstr "La descrizione di \"{name}\" deve avere al massimo {limit} caratteri su una sola riga."
 
-#: src/features/download/components/download-page.tsx:71
+#: src/features/download/components/download-page.tsx:75
 msgid "The desktop app runs on macOS, Windows and Linux. Installers are attached to a desktop release on GitHub, and they appear there once that release is published."
 msgstr "L'app desktop funziona su macOS, Windows e Linux. I programmi di installazione sono allegati a una release desktop su GitHub e compaiono lì quando la release viene pubblicata."
 
@@ -37173,6 +37190,10 @@ msgstr "a {0}"
 msgid "To do"
 msgstr "Da fare"
 
+#: src/features/download/components/download-page.tsx:128
+msgid "To install Neore on iPhone or iPad, tap Share in Safari, then Add to Home Screen."
+msgstr "Per installare Neore su iPhone o iPad, tocca Condividi in Safari, poi Aggiungi alla schermata Home."
+
 #: ../../packages/chat-ui/src/threads/thread-list.tsx:47
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:631
 #: src/features/pages/components/page-version-panel.tsx:56
@@ -38350,9 +38371,9 @@ msgid "Until a chat is paired, the bot answers only that it is private. Send /pa
 msgstr "Finché una chat non viene abbinata, il bot risponde solo che è privato. Invia /pair con il codice delle impostazioni per collegare il tuo contatto."
 
 #: src/features/pages/components/page-tree-item.tsx:53
-#: src/features/pages/components/page-view.tsx:390
-#: src/features/pages/components/page-view.tsx:397
-#: src/features/pages/components/page-view.tsx:500
+#: src/features/pages/components/page-view.tsx:395
+#: src/features/pages/components/page-view.tsx:402
+#: src/features/pages/components/page-view.tsx:507
 #: src/features/pages/components/pages-sidebar.tsx:61
 #: src/features/pages/components/pages-sidebar.tsx:181
 #: src/features/pages/components/pages-sidebar.tsx:208
@@ -39261,7 +39282,7 @@ msgstr "Versione {position} di {total}"
 #: src/features/canvas/canvas-panel.tsx:788
 #: src/features/pages/components/page-version-panel.tsx:81
 #: src/features/pages/components/page-version-panel.tsx:83
-#: src/features/pages/components/page-view.tsx:448
+#: src/features/pages/components/page-view.tsx:455
 msgid "Version history"
 msgstr "Cronologia delle versioni"
 
@@ -40704,7 +40725,7 @@ msgstr "Ieri"
 msgid "You"
 msgstr "Tu"
 
-#: src/features/pages/components/page-view.tsx:378
+#: src/features/pages/components/page-view.tsx:383
 msgid "You (another tab)"
 msgstr "Tu (un'altra scheda)"
 
@@ -40777,7 +40798,7 @@ msgstr "Stai monitorando il numero massimo di repository consentito."
 msgid "You can add {0} more skills on this plan. Untick some skills or upgrade."
 msgstr "Puoi aggiungere altre {0} skill con questo piano. Deseleziona alcune skill oppure passa a un piano superiore."
 
-#: src/features/pages/components/page-view.tsx:482
+#: src/features/pages/components/page-view.tsx:489
 msgid "You can comment on this page but not edit it."
 msgstr "Puoi commentare questa pagina ma non modificarla."
 
@@ -40797,7 +40818,7 @@ msgstr "Puoi gestire le tue preferenze di consenso per i diversi tipi di trattam
 msgid "You can try again now!"
 msgstr "Ora puoi riprovare!"
 
-#: src/features/pages/components/page-view.tsx:482
+#: src/features/pages/components/page-view.tsx:489
 msgid "You can view this page but not edit it."
 msgstr "Puoi visualizzare questa pagina ma non modificarla."
 
@@ -41050,7 +41071,7 @@ msgstr "Impossibile caricare i tuoi bot. Le modifiche a un accesso salvato si po
 msgid "Your browser blocked access to local network devices for this site. Allow \"Local network access\" in the site settings (the icon left of the address bar), then try again."
 msgstr "Il tuo browser ha bloccato l'accesso ai dispositivi della rete locale per questo sito. Consenti \"Accesso alla rete locale\" nelle impostazioni del sito (l'icona a sinistra della barra degli indirizzi), poi riprova."
 
-#: src/features/download/components/download-page.tsx:93
+#: src/features/download/components/download-page.tsx:97
 msgid "Your browser does not say which processor you have, so choose the matching installer below."
 msgstr "Il browser non indica quale processore hai, quindi scegli il programma di installazione corrispondente qui sotto."
 
