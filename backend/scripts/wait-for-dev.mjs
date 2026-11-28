@@ -17,9 +17,11 @@ import { join, resolve } from "node:path";
 const BACKEND = resolve(import.meta.dirname, "..");
 const DEV_JSON = join(BACKEND, ".lunora/dev.json");
 const DEV_LOG = join(BACKEND, ".lunora/dev.log");
-const STATUS_URL = "http://localhost:8788/_lunora/status";
+const BACKEND_URL = process.env.VITE_LUNORA_URL || "http://localhost:8788";
+const STATUS_URL = `${BACKEND_URL}/_lunora/status`;
 const POLL_MS = 2000;
-const STALE_AFTER_MS = 30_000;
+// Cold starts run codegen before `lunora dev` records its pid (about 11 s cold), so a missing or dead record is only final after this.
+const STALE_AFTER_MS = 120_000;
 const TIMEOUT_MS = 300_000;
 
 const recordedPid = () => {

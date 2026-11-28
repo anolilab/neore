@@ -9,9 +9,24 @@ import { spawnSync } from "node:child_process";
 
 const HEAP_MB = 8192;
 
+// A heap limit the caller already set (CI sizes the e2e backend's) is kept; the default applies only when none is set.
+const inherited = process.env.NODE_OPTIONS ?? "";
+const nodeOptions = inherited.includes("--max-old-space-size") ? inherited : `${inherited} --max-old-space-size=${HEAP_MB}`.trim();
+
 const result = spawnSync("lunora", ["dev", ...process.argv.slice(2)], {
-    env: { ...process.env, NODE_OPTIONS: `--max-old-space-size=${HEAP_MB}` },
+    env: { ...process.env, NODE_OPTIONS: nodeOptions },
+    shell: process.platform === "win32",
     stdio: "inherit",
 });
+
+if (result.error) {
+    console.error(`Could not start lunora: ${result.error.message}`);
+    process.exit(1);
+}
+
+if (result.signal) {
+    console.error(`lunora dev was stopped by ${result.signal}.`);
+    process.exit(1);
+}
 
 process.exit(result.status ?? 1);

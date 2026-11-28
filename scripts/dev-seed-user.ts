@@ -17,12 +17,10 @@
  *     pnpm dev:seed-user
  */
 import { LUNORA_URL, TEST_USER } from "../apps/web/e2e/fixtures";
-import { ensureInvitedUser } from "../apps/web/e2e/seed";
+import { ensureInvitedUser, isLoopbackUrl } from "../apps/web/e2e/seed";
 
-const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
-
-if (!LOOPBACK_HOSTS.has(new URL(LUNORA_URL).hostname)) {
-    throw new Error(`Refusing to send the e2e seed token to ${new URL(LUNORA_URL).host}: only a loopback backend is seeded.`);
+if (!isLoopbackUrl(LUNORA_URL)) {
+    throw new Error(`Refusing to send the e2e seed token to ${LUNORA_URL}: only a loopback backend is seeded.`);
 }
 
 await ensureInvitedUser(TEST_USER);
