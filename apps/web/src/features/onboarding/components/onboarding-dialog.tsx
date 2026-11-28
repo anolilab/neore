@@ -23,6 +23,9 @@ import type { NeoreOnboardingPayload, OnboardingPath } from "../steps";
 import { ONBOARDING_FLOW_ID, ONBOARDING_PATH_STEPS, ONBOARDING_PERSISTENCE_KEY, onboardingSteps } from "../steps";
 import SetupChecklist from "./setup-checklist";
 
+/** How long Next on the first step waits for the Code check before it goes on without it. */
+const CODE_CHECK_WAIT_MS = 1500;
+
 const STEP_ICONS: Record<NeoreOnboardingPayload["icon"], React.ReactNode> = {
     "brain-circuit": <BrainCircuit aria-hidden="true" className="size-8" />,
     "file-text": <FileText aria-hidden="true" className="size-8" />,
@@ -241,7 +244,16 @@ const OnboardingContent = ({ codeEnabled, onComplete }: { codeEnabled: boolean |
     );
 
     // On the first step Next waits for the Code check: an early click would skip the choice it offers.
-    const waitsForCodeCheck = isFirstStep && codeEnabled === undefined;
+    // It waits a moment at most: a blocked flag script answers only after its retries give up, and nobody should wait on that.
+    const [codeCheckGaveUp, setCodeCheckGaveUp] = useState(false);
+
+    useEffect(() => {
+        const timer = setTimeout(setCodeCheckGaveUp, CODE_CHECK_WAIT_MS, true);
+
+        return () => clearTimeout(timer);
+    }, []);
+
+    const waitsForCodeCheck = isFirstStep && codeEnabled === undefined && !codeCheckGaveUp;
     const handleNext = useCallback(async () => {
         if (waitsForCodeCheck) {
             return;
