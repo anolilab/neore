@@ -75,6 +75,12 @@ fn scrub(text: &mut String, secrets: &[String]) {
     }
 }
 
+/// Longest first, so a whole value is replaced before a part of it.
+fn sort_longest_first(secrets: &mut Vec<String>) {
+    secrets.sort_by(|one, other| other.len().cmp(&one.len()).then_with(|| one.cmp(other)));
+    secrets.dedup();
+}
+
 /// Replaces every `secret` in the strings of `value`, object keys included (a tool's schema names its fields by them).
 fn redact(value: &mut Value, secrets: &[String]) {
     match value {
@@ -317,18 +323,29 @@ pub fn parse_target(url: &str, headers: &str) -> Result<Target, String> {
         ));
     }
 
-    // Each header's credential, each cookie's value, and each value in the address's query (`?key=…`), as written and
-    // decoded.
+    // Each header's credential, each cookie's value and each field of a compound one (`Digest …, response="…"`); each
+    // name and value in the address's query and each segment of its path (`/mcp/<key>`), as written and decoded.
+    let path: Vec<String> = uri.path().split('/').map(percent_decoded).collect();
     let mut secrets: Vec<String> = given
         .values()
-        .flat_map(|value| credentials(value).chain(pairs(value, ';').map(|(_, cookie)| cookie)))
-        .chain(query.iter().map(|(_, value)| value.as_str()))
-        .chain(pairs(raw_query, '&').map(|(_, value)| value))
+        .flat_map(|value| {
+            credentials(value)
+                .chain(pairs(value, ';').map(|(_, cookie)| cookie))
+                .chain(pairs(value, ',').map(|(_, field)| field.trim_matches('"')))
+        })
+        .chain(
+            query
+                .iter()
+                .flat_map(|(name, value)| [name.as_str(), value.as_str()]),
+        )
+        .chain(pairs(raw_query, '&').flat_map(|(name, value)| [name, value]))
+        .chain(path.iter().map(String::as_str))
+        .chain(uri.path().split('/'))
         .filter(|secret| secret.len() >= MIN_REDACTED_BYTES)
         .map(str::to_owned)
         .collect();
 
-    secrets.sort_by_key(|secret| std::cmp::Reverse(secret.len()));
+    sort_longest_first(&mut secrets);
 
     Ok(Target {
         url: url.to_owned(),
@@ -495,12 +512,29 @@ impl<W: Write> Bridge<W> {
             .and_then(|()| output.flush());
     }
 
-    /// Writes what the server said to the client. Its words can echo a header (a token in an error): that is blanked.
+    /// Writes what the server said to the client. Its words can echo a header (a token in an error) or the session id:
+    /// that is blanked.
     /// Nor may it claim the bridge's `SESSION_GONE`, which would make `mcp.rs` send a call it already ran once more.
     fn forward(&self, message: &Value) {
         let mut message = message.clone();
+        // The session id the server gave is sent on every request: it is one more secret.
+        let session = self.session.lock().unwrap().id.clone();
+        let session = session
+            .as_ref()
+            .and_then(|id| id.to_str().ok())
+            .filter(|id| id.len() >= MIN_REDACTED_BYTES);
+        let secrets = match session {
+            Some(id) => {
+                let mut secrets = self.target.secrets.clone();
 
-        redact(&mut message, &self.target.secrets);
+                secrets.push(id.to_owned());
+                sort_longest_first(&mut secrets);
+                secrets
+            }
+            None => self.target.secrets.clone(),
+        };
+
+        redact(&mut message, &secrets);
 
         if let Some(text) = message.pointer_mut("/error/message") {
             if text == SESSION_GONE {

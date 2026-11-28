@@ -501,15 +501,21 @@ fn a_cookie_or_a_key_in_the_address_the_server_echoes_does_not_reach_the_client(
         "t".repeat(12),
         "4".repeat(12),
     );
+    let (path, digest, session) = ("p".repeat(12), "d".repeat(12), "e".repeat(12));
     let echoed = format!("saw {key}-x, {sid} and {token}");
+    let more = format!("{path} {digest} {session}");
+    let opened = session.clone();
     let (url, _) = serve(Box::new(move |request| {
         match request.body["method"].as_str() {
-            Some("initialize") => {
-                json_reply(request, json!({ "protocolVersion": "2025-06-18" }), None)
-            }
+            Some("initialize") => json_reply(
+                request,
+                json!({ "protocolVersion": "2025-06-18" }),
+                Some(&opened),
+            ),
             _ => {
-                // The query value decoded, a token without the extra space, and a credential of digits as a number.
-                let result = json!({ "echoed": echoed, "pin": 444_444_444_444_u64, "code": 1.2345678e14, "count": 3, "near": 9_007_199_254_740_992_u64 });
+                // The query value decoded, a token without the extra space, and a credential of digits as a number;
+                // a path segment, a digest field and the session id.
+                let result = json!({ "echoed": echoed, "pin": 444_444_444_444_u64, "code": 1.2345678e14, "count": 3, "near": 9_007_199_254_740_992_u64, "more": more });
 
                 json_reply(request, result, None)
             }
@@ -521,10 +527,11 @@ fn a_cookie_or_a_key_in_the_address_the_server_echoes_does_not_reach_the_client(
         "X-Pin": pin,
         // Not the number above: one more than it, which a float cannot tell apart.
         "X-Id": "9007199254740993",
+        "Proxy-Authorization": format!(r#"Digest username="u", response="{digest}""#),
     })
     .to_string();
     let written = relay(
-        &format!("{url}?key={key}%2Dx&v=1&code=12345678e7"),
+        &format!("{url}/{path}?key={key}%2Dx&v=1&code=12345678e7"),
         &headers,
         &[initialize(), request(2, "tools/call")],
     );
@@ -532,7 +539,7 @@ fn a_cookie_or_a_key_in_the_address_the_server_echoes_does_not_reach_the_client(
 
     assert_eq!(
         answer["result"],
-        json!({ "echoed": "saw [redacted], [redacted] and [redacted]", "pin": "[redacted]", "code": "[redacted]", "count": 3, "near": 9_007_199_254_740_992_u64 }),
+        json!({ "echoed": "saw [redacted], [redacted] and [redacted]", "pin": "[redacted]", "code": "[redacted]", "count": 3, "near": 9_007_199_254_740_992_u64, "more": "[redacted] [redacted] [redacted]" }),
         "{answer}"
     );
 }
