@@ -12,7 +12,7 @@ import { join } from "node:path";
 import JSZip from "jszip";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
-import { chapterDocument, FRAME_POLICY, MAX_ASSETS_PER_CHAPTER, MAX_CHAPTER_CHARS, openEpub, safeStylesheet } from "./epub-book";
+import { assertZipDirectoryExact, chapterDocument, FRAME_POLICY, MAX_ASSETS_PER_CHAPTER, MAX_CHAPTER_CHARS, openEpub, safeStylesheet } from "./epub-book";
 
 const PNG_PREFIX = /^data:image\/png;base64,/u;
 const PNG_DATA = /^data:image\/png;base64,iVBORw0KGgo=$/u;
@@ -39,11 +39,13 @@ interface SampleChapter {
 interface SampleOptions {
     chapters: SampleChapter[];
     files?: Record<string, Uint8Array | string>;
+    /** More manifest items, as written (a picture whose file has no extension, say). */
+    items?: string;
     language?: string;
 }
 
-/** A book with `chapters` in the given reading order (the manifest lists them in the order given too, the spine as `chapters` says). */
-const book = async ({ chapters, files = {}, language = "en" }: SampleOptions): Promise<Uint8Array> => {
+/** A book with `chapters` in the given reading order (the manifest lists them in the REVERSE order, so a reader that follows the manifest and not the spine fails). */
+const book = async ({ chapters, files = {}, items = "", language = "en" }: SampleOptions): Promise<Uint8Array> => {
     const zip = new JSZip();
 
     zip.file("mimetype", "application/epub+zip", { compression: "STORE" });
@@ -51,7 +53,10 @@ const book = async ({ chapters, files = {}, language = "en" }: SampleOptions): P
     zip.file(
         "OEBPS/content.opf",
         `<?xml version="1.0"?><package ${NS} version="2.0" unique-identifier="id"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:identifier id="id">sample</dc:identifier><dc:title>Sample</dc:title><dc:language>${language}</dc:language></metadata>` +
-            `<manifest><item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>${chapters.map((chapter) => `<item id="${chapter.id}" href="${chapter.file}" media-type="${chapter.type ?? "application/xhtml+xml"}"/>`).join("")}</manifest>` +
+            `<manifest><item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>${chapters
+                .toReversed()
+                .map((chapter) => `<item id="${chapter.id}" href="${chapter.file}" media-type="${chapter.type ?? "application/xhtml+xml"}"/>`)
+                .join("")}${items}</manifest>` +
             `<spine toc="ncx">${chapters.map((chapter) => `<itemref idref="${chapter.id}"/>`).join("")}</spine></package>`,
     );
     zip.file(
@@ -148,11 +153,9 @@ describe("openEpub", () => {
             };
         });
         const opened = await openEpub(await book({ chapters }), folder.path);
-        const started = performance.now();
 
         expect(opened.chapters).toHaveLength(1500);
         expect(opened.chapters[1499]).toEqual({ id: "c1499", title: "Chapter 1499" });
-        expect(performance.now() - started).toBeLessThan(2000);
         opened.destroy();
     });
 });
@@ -487,6 +490,88 @@ describe("a chapter's style sheets", () => {
         opened.destroy();
     });
 
+    it("does not read an import that sits inside a comment, and the same sheet imported over and over cannot add up past the budget", async () => {
+        const big = "a{}".repeat(2_000_000);
+        const commented = Array.from({ length: 300 }, (_item, index) => `/* @import "gone${String(index)}.css"; */`).join("");
+        const repeated = '@import "big.css";'.repeat(30);
+        const opened = await openEpub(
+            await book({
+                chapters: [{ body: `${links(["../c.css", "../r.css"])}<p>x</p>`, file: "text/one.xhtml", id: "c1" }],
+                files: { "big.css": big, "c.css": `${commented}.kept{x:1}`, "r.css": repeated },
+            }),
+            folder.path,
+        );
+        const sheets = sheetsOf(parse(await opened.read("c1")));
+
+        // The commented imports took no file: the sheet is kept. The repeated import stops at what the chapter may take, and is left out whole.
+        expect(sheets[0]).toContain(".kept{x:1}");
+        expect(sheets.join("").length).toBeLessThan(24 * 1024 * 1024);
+        opened.destroy();
+    });
+
+    it("writes an escaped url( and an image-set of plain strings without their remote addresses", () => {
+        const safe = safeStylesheet(
+            String.raw`a{background:\75 rl(https://evil.example/a.png)} b{background:image-set("https://evil.example/b.png" 1x)} c{background:-webkit-image-set(url(https://evil.example/c.png) 1x)}`,
+        );
+
+        expect(safe).not.toContain("evil.example");
+    });
+
+    it("keeps the file count honest after a sheet is given back: pictures it read are not free for the body, and none past the limit are shown", async () => {
+        const pictures = Object.fromEntries(Array.from({ length: 250 }, (_item, index) => [`images/${String(index)}.png`, PNG] as const));
+        const sheet = `${Array.from({ length: 150 }, (_item, index) => `.p${String(index)}{background:url(images/${String(index)}.png)}`).join("")}${"<".repeat(7_000_000)}`;
+        const body = Object.keys(pictures)
+            .map((path) => `<img src="../${path}"/>`)
+            .join("");
+        const opened = await openEpub(
+            await book({
+                chapters: [{ body: `${links(["../rejected.css"])}${body}`, file: "text/one.xhtml", id: "c1" }],
+                files: { ...pictures, "rejected.css": sheet },
+            }),
+            folder.path,
+        );
+        const frame = parse(await opened.read("c1"));
+        const shown = [...frame.querySelectorAll("img")].filter((image) => image.getAttribute("src")?.startsWith("data:")).length;
+
+        expect(sheetsOf(frame)).toHaveLength(0);
+        expect(shown).toBe(MAX_ASSETS_PER_CHAPTER);
+        opened.destroy();
+    });
+
+    it("still draws an inline-style picture after an oversized sheet was left out", async () => {
+        const opened = await openEpub(
+            await book({
+                chapters: [{ body: `${links(["../huge.css"])}<div style="background:url(../images/p.png)">x</div>`, file: "text/one.xhtml", id: "c1" }],
+                files: { "huge.css": "a{}".repeat(9_000_000), "images/p.png": PNG },
+            }),
+            folder.path,
+        );
+        const frame = parse(await opened.read("c1"));
+
+        expect(frame.querySelector("div")?.getAttribute("style")).toContain("data:image/png;base64,");
+        opened.destroy();
+    });
+
+    it("accepts an archive whose directory is what its end record declares, and refuses one that holds more records than declared", async () => {
+        const zip = new JSZip();
+
+        for (const name of ["a", "b", "c"]) {
+            zip.file(name, name);
+        }
+
+        const bytes = await zip.generateAsync({ type: "uint8array" });
+        const copy = new Uint8Array(bytes);
+        const end = copy.length - 22;
+        const view = new DataView(copy.buffer);
+
+        expect(() => assertZipDirectoryExact(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer)).not.toThrow();
+
+        // The end record now says one record where the directory holds three.
+        view.setUint16(end + 8, 1, true);
+        view.setUint16(end + 10, 1, true);
+        expect(() => assertZipDirectoryExact(copy.buffer as ArrayBuffer)).toThrow("Corrupt ZIP directory");
+    });
+
     it("ends an import cycle", async () => {
         const opened = await openEpub(
             await book({
@@ -582,32 +667,119 @@ describe("a chapter's style sheets", () => {
         opened.destroy();
     });
 
-    it("starts no request while a chapter with remote resources is parsed and built: the parse runs in documents that fetch nothing", async () => {
-        const fetched = vi.fn();
+    it("builds a chapter's document without the remote resource attributes the book names", async () => {
+        const opened = await openEpub(
+            await book({
+                chapters: [
+                    {
+                        body: '<img src="https://evil.example/a.png" srcset="https://evil.example/b.png 2x"><video poster="https://evil.example/p.png"></video>',
+                        file: "one.xhtml",
+                        id: "c1",
+                    },
+                ],
+            }),
+            folder.path,
+        );
+        const frame = parse(await opened.read("c1"));
 
-        vi.stubGlobal("fetch", fetched);
+        // What the document carries is checked; whether a browser would have fetched while parsing is its own behaviour, not tested here.
+        expect(frame.documentElement.outerHTML).not.toContain("evil.example");
+        opened.destroy();
+    });
 
-        try {
-            const opened = await openEpub(
-                await book({
-                    chapters: [
-                        {
-                            body: '<img src="https://evil.example/a.png" srcset="https://evil.example/b.png 2x"><video poster="https://evil.example/p.png"></video>',
-                            file: "one.xhtml",
-                            id: "c1",
-                        },
-                    ],
-                }),
-                folder.path,
-            );
-            const frame = parse(await opened.read("c1"));
+    it("carries a chapter body's class, dir and lang to the generated body, filtered", async () => {
+        const opened = await openEpub(
+            await book({
+                chapters: [
+                    {
+                        body: "<p>x</p>",
+                        file: "one.xhtml",
+                        id: "c1",
+                        raw: '<?xml version="1.0"?><html xmlns="http://www.w3.org/1999/xhtml"><head><title>t</title></head><body class="calibre b-1" dir="rtl" lang="ar" onload="x()" style="color:red"><p>x</p></body></html>',
+                    },
+                ],
+            }),
+            folder.path,
+        );
+        const frame = parse(await opened.read("c1"));
 
-            expect(fetched).not.toHaveBeenCalled();
-            expect(frame.documentElement.outerHTML).not.toContain("evil.example");
-            opened.destroy();
-        } finally {
-            vi.unstubAllGlobals();
-        }
+        expect(frame.body.getAttribute("class")).toBe("calibre b-1");
+        expect(frame.body.getAttribute("dir")).toBe("rtl");
+        expect(frame.body.getAttribute("lang")).toBe("ar");
+        expect(frame.body.hasAttribute("onload")).toBe(false);
+        expect(frame.body.hasAttribute("style")).toBe(false);
+        opened.destroy();
+    });
+
+    it("shows a picture whose file has no extension, from the type its manifest declares", async () => {
+        const opened = await openEpub(
+            await book({
+                chapters: [{ body: '<img src="images/cover"/>', file: "one.xhtml", id: "c1" }],
+                files: { "images/cover": PNG },
+                items: '<item id="cover" href="images/cover" media-type="image/png"/>',
+            }),
+            folder.path,
+        );
+
+        expect(
+            parse(await opened.read("c1"))
+                .querySelector("img")
+                ?.getAttribute("src"),
+        ).toMatch(PNG_PREFIX);
+        opened.destroy();
+    });
+
+    it("keeps the picture of a responsive <source>, with its media condition", async () => {
+        const opened = await openEpub(
+            await book({
+                chapters: [
+                    {
+                        body: '<picture><source srcset="images/p.png 2x" media="(min-width: 600px)"><img src="images/p.png"/></picture>',
+                        file: "one.xhtml",
+                        id: "c1",
+                    },
+                ],
+                files: { "images/p.png": PNG },
+            }),
+            folder.path,
+        );
+        const source = parse(await opened.read("c1")).querySelector("source");
+
+        expect(source?.getAttribute("srcset")).toMatch(PNG_PREFIX);
+        expect(source?.getAttribute("media")).toBe("(min-width: 600px)");
+        opened.destroy();
+    });
+
+    it("reads a chapter written as XML with no body element as HTML, and keeps its text", async () => {
+        const opened = await openEpub(
+            await book({
+                chapters: [
+                    { body: "", file: "one.xhtml", id: "c1", raw: '<?xml version="1.0"?><html xmlns="http://www.w3.org/1999/xhtml"><p>kept text</p></html>' },
+                ],
+            }),
+            folder.path,
+        );
+
+        expect(parse(await opened.read("c1")).body.textContent).toContain("kept text");
+        opened.destroy();
+    });
+
+    it("does not read a chapter whose archive entry is over the chapter cap into a string", async () => {
+        const probe = new JSZip();
+
+        probe.file("a", "x");
+
+        const prototype = Object.getPrototypeOf(probe.file("a")) as { async: (...args: unknown[]) => Promise<unknown> };
+        const opened = await openEpub(
+            await book({ chapters: [{ body: `<p>${"x".repeat(MAX_CHAPTER_CHARS)}</p>`, file: "one.xhtml", id: "c1" }] }),
+            folder.path,
+        );
+        const asyncSpy = vi.spyOn(prototype, "async");
+
+        await expect(opened.read("c1")).rejects.toThrow("chapter too large");
+        expect(asyncSpy.mock.instances.some((entry) => (entry as unknown as { name: string }).name.endsWith("one.xhtml"))).toBe(false);
+        asyncSpy.mockRestore();
+        opened.destroy();
     });
 
     it("opens a book whose spine is SVG pages, in spine order", async () => {

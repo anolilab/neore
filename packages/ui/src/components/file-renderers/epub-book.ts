@@ -72,6 +72,8 @@ const titlesBySpineItem = (toc: EpubToc, spine: ReadonlyArray<SpineItem>): Map<s
 
     const titles = new Map<string, string>();
     const ambiguous = new Set<string>();
+    // A tail that fits several items is marked once, however many entries name it.
+    const marked = new Set<string>();
 
     const visit = (points: EpubToc): void => {
         for (const point of points) {
@@ -83,7 +85,9 @@ const titlesBySpineItem = (toc: EpubToc, spine: ReadonlyArray<SpineItem>): Map<s
                 if (id !== undefined && !titles.has(id)) {
                     titles.set(id, point.label);
                 }
-            } else if (fits !== undefined) {
+            } else if (fits !== undefined && !marked.has(pathOf(point.href))) {
+                marked.add(pathOf(point.href));
+
                 for (const id of fits) {
                     ambiguous.add(id);
                 }
@@ -102,6 +106,46 @@ const titlesBySpineItem = (toc: EpubToc, spine: ReadonlyArray<SpineItem>): Map<s
     }
 
     return titles;
+};
+
+const EOCD_SIGNATURE = 0x06_05_4b_50;
+const CENTRAL_SIGNATURE = 0x02_01_4b_50;
+
+/**
+ * Checks that the archive's central directory holds exactly the records its end record declares, and ends where the end record says. The
+ * guard before this one (`assertOfficeZipWithinLimits`) walks only the declared count, but the zip library reads records until the signature
+ * stops, so a directory with more records than declared would pass the guard and be opened in full. Throws on any mismatch; a well-formed
+ * archive passes.
+ */
+export const assertZipDirectoryExact = (buffer: ArrayBuffer): void => {
+    const view = new DataView(buffer);
+    let end = buffer.byteLength - 22;
+
+    while (end >= 0 && !(view.getUint32(end, true) === EOCD_SIGNATURE && view.getUint16(end + 20, true) === buffer.byteLength - end - 22)) {
+        end -= 1;
+    }
+
+    if (end < 0) {
+        throw new Error("Not a ZIP archive");
+    }
+
+    const declared = view.getUint16(end + 10, true);
+    const size = view.getUint32(end + 12, true);
+    const start = view.getUint32(end + 16, true);
+    let at = start;
+
+    for (let index = 0; index < declared; index += 1) {
+        if (at + 46 > buffer.byteLength || view.getUint32(at, true) !== CENTRAL_SIGNATURE) {
+            throw new Error("Corrupt ZIP directory");
+        }
+
+        at += 46 + view.getUint16(at + 28, true) + view.getUint16(at + 30, true) + view.getUint16(at + 32, true);
+    }
+
+    // No further record after the declared ones, and the directory is as long as the end record says.
+    if ((at + 4 <= buffer.byteLength && view.getUint32(at, true) === CENTRAL_SIGNATURE) || at - start !== size) {
+        throw new Error("Corrupt ZIP directory");
+    }
 };
 
 /** The most a chapter's inlined pictures, fonts and style sheets may add to its document, in characters. Past it the rest are left out. */
@@ -176,9 +220,17 @@ const directoryOf = (path: string): string => path.split("/").slice(0, -1).join(
 
 const extensionOf = (path: string): string => path.split(".").pop()?.toLowerCase() ?? "";
 
+/** The reader's budget, count and cache as they stood, so a sheet that is not kept gives back everything it took, what it cached included. */
+interface StagedBudget {
+    attributed: number;
+    files: number;
+    left: number;
+    pictureCharged: number;
+    seen: ReadonlyMap<string, { cost: number; url: string } | undefined>;
+}
+
 /** What a chapter's reads draw on: one budget for its styles and its markup, a count of distinct files, and a reader of the archive. */
 interface AssetReader {
-    budget: { files: number; left: number };
     /** Throws when the read was abandoned: asked after each completed read, before any more is parsed or built. */
     check: () => void;
     /** A file as a `data:` URL, or `undefined` when it is not in the archive, does not fit the budget or the count, or is not a kind that is inlined. */
@@ -189,14 +241,12 @@ interface AssetReader {
     mayRead: () => boolean;
     /** Whether a style sheet has been refused for size or count: the chapter then reads no further sheet. */
     refused: () => boolean;
-    restore: (state: { attributed: number; files: number; left: number; pictureCharged: number }) => void;
+    restore: (state: StagedBudget) => void;
     /** The size of a file as the archive's directory declares it, when it does; read before the file is, so one too big is never opened. */
     size: (path: string) => number | undefined;
     /** The budget and count as they stand: taken before a sheet is rewritten, given back with `restore` if the sheet is not kept. */
-    snapshot: () => { attributed: number; files: number; left: number; pictureCharged: number };
-    /** Charges a text that is to go into the document (a style sheet, after its addresses are rewritten) to the budget and the count; `false` when it does not fit. */
-    spend: (length: number) => boolean;
-    /** As `spend`, for a sheet whose `data:` pictures were already charged when they were read: only the rest of its text is charged now. */
+    snapshot: () => StagedBudget;
+    /** Charges a style sheet that is to go into the document, after its addresses are rewritten, to the budget and the count; `false` when it does not fit. A sheet whose `data:` pictures were already charged when they were read: only the rest of its text is charged now. */
     spendSheet: (length: number) => boolean;
     /** Takes one file from the chapter's count (an `@import` is a file); `false` when none is left. */
     takeFile: () => boolean;
@@ -204,7 +254,7 @@ interface AssetReader {
     text: (path: string) => Promise<string | undefined>;
 }
 
-const assetReader = (zip: JSZip, signal?: AbortSignal): AssetReader => {
+const assetReader = (zip: JSZip, declared: ReadonlyMap<string, string>, signal?: AbortSignal): AssetReader => {
     const budget = { files: MAX_ASSETS_PER_CHAPTER, left: MAX_INLINED_CHARS };
     let refusedSheet = false;
     // The cost of pictures already counted against a sheet: they are charged once, when read, not again as part of the sheet.
@@ -214,7 +264,6 @@ const assetReader = (zip: JSZip, signal?: AbortSignal): AssetReader => {
     const seen = new Map<string, { cost: number; url: string } | undefined>();
 
     return {
-        budget,
         check: () => signal?.throwIfAborted(),
         dataUrl: async (path) => {
             signal?.throwIfAborted();
@@ -233,12 +282,20 @@ const assetReader = (zip: JSZip, signal?: AbortSignal): AssetReader => {
                 return cached.url;
             }
 
-            const type = MEDIA_TYPES[extensionOf(path)];
+            // The type the book's manifest declares for a picture or font, else the one its extension says (a file with no extension is still a picture).
+            const declaredType = declared.get(path);
+            const type = declaredType?.startsWith("image/") || declaredType?.startsWith("font/") ? declaredType : MEDIA_TYPES[extensionOf(path)];
             const entry = type === undefined ? null : zip.file(path);
 
-            if (entry === null || type === undefined || budget.files <= 0 || budget.left <= 0) {
+            // Not there, or not a kind that is inlined: that stays so, and is remembered. A refusal for the budget or the count is not a fact
+            // about the file, so it is not remembered: a sheet that is given back leaves the file to be tried again.
+            if (entry === null || type === undefined) {
                 seen.set(path, undefined);
 
+                return undefined;
+            }
+
+            if (budget.files <= 0 || budget.left <= 0) {
                 return undefined;
             }
 
@@ -251,8 +308,6 @@ const assetReader = (zip: JSZip, signal?: AbortSignal): AssetReader => {
             const length = `data:${type};base64,`.length + Math.ceil(bytes.length / 3) * 4;
 
             if (length > budget.left) {
-                seen.set(path, undefined);
-
                 return undefined;
             }
 
@@ -273,22 +328,15 @@ const assetReader = (zip: JSZip, signal?: AbortSignal): AssetReader => {
             budget.left = state.left;
             pictureCharged = state.pictureCharged;
             attributed = state.attributed;
+            seen.clear();
+
+            for (const [path, entry] of state.seen) {
+                seen.set(path, entry);
+            }
         },
         size: (path) => (zip.file(path) as { _data?: { uncompressedSize?: number } } | null)?._data?.uncompressedSize,
         snapshot: () => {
-            return { attributed, files: budget.files, left: budget.left, pictureCharged };
-        },
-        spend: (length) => {
-            if (budget.files <= 0 || length > budget.left) {
-                refusedSheet = true;
-
-                return false;
-            }
-
-            budget.files -= 1;
-            budget.left -= length;
-
-            return true;
+            return { attributed, files: budget.files, left: budget.left, pictureCharged, seen: new Map(seen) };
         },
         spendSheet: (length) => {
             // The pictures a sheet carries were charged as they were read; only the rest of its text is charged now.
@@ -333,6 +381,9 @@ const CSS_URL = /url\(([^)]*)\)/giu;
 const CSS_QUOTE = /^["']|["']$/gu;
 const CSS_SCRIPTY = /expression\s*\(|-moz-binding\s*:|behaviou?r\s*:/giu;
 const LESS_THAN = /</gu;
+const CSS_ESCAPE = /\\([\da-f]{1,6})\s?/giu;
+const IMAGE_SET = /(?:-webkit-)?image-set\s*\((?:[^()]|\([^()]*\))*\)/giu;
+const SRC_FUNCTION = /(?<![\w-])src\s*\((?:[^()]|\([^()]*\))*\)/giu;
 
 const isDataUrl = (address: string): boolean => address.trim().replaceAll(CSS_QUOTE, "").trim().toLowerCase().startsWith("data:");
 
@@ -344,10 +395,21 @@ const dataOnly = (match: string, argument: string): string => (isDataUrl(argumen
  * can end the element or begin markup. An ordinary sheet is otherwise as it was.
  */
 export const safeStylesheet = (css: string): string => {
-    const withoutImports = css.replaceAll(CSS_IMPORT, "");
+    // An escaped letter is that letter to a CSS parser (`\75 rl(` is `url(`): they are written out first, so the patterns below see what it sees.
+    // Escapes that are not letters (a `\3c ` this function wrote, `\:` in a selector) are left as they are.
+    const plain = css.replaceAll(CSS_ESCAPE, (match, hex: string) => {
+        const code = Number.parseInt(hex, 16);
+
+        return ASCII_LETTER.test(String.fromCodePoint(code)) && code < 128 ? String.fromCodePoint(code) : match;
+    });
+    const withoutImports = plain.replaceAll(CSS_IMPORT, "");
     const dataUrlsOnly = withoutImports.replaceAll(CSS_URL, (match, argument: string) => dataOnly(match, argument));
 
-    return dataUrlsOnly.replaceAll(CSS_SCRIPTY, "blocked:").replaceAll(LESS_THAN, String.raw`\3c `);
+    return dataUrlsOnly
+        .replaceAll(CSS_SCRIPTY, "blocked:")
+        .replaceAll(IMAGE_SET, "none")
+        .replaceAll(SRC_FUNCTION, "none")
+        .replaceAll(LESS_THAN, String.raw`\3c `);
 };
 
 /** A style sheet's relative `url()`s replaced by the files they name, within the chapter's budget; the rest are left for `safeStylesheet` to empty. */
@@ -375,6 +437,8 @@ const inlineStylesheetUrls = async (css: string, directory: string, reader: Asse
 };
 
 const IMPORT_RULE = /@import\s+(?:url\(\s*)?(?:"([^"]*)"|'([^']*)'|([^\s;)]*))([^;{]*);?/giu;
+const ASCII_LETTER = /[a-z]/iu;
+const CSS_COMMENT = /\/\*[\s\S]*?\*\//gu;
 const CLOSING_PAREN = /^\s*\)/u;
 /** A media list that can be carried into an `@media` rule as it is: words, numbers, commas, parentheses, colons, comparison signs and spaces, nothing that opens or ends a rule or names a function. */
 const SAFE_MEDIA = /^[\w\s,():.<>=/-]+$/u;
@@ -387,7 +451,16 @@ const MAX_IMPORT_DEPTH = 4;
  * its own addresses read from its own folder. An import that does not resolve to a file of the archive, is already being read further up (a
  * cycle), is too deep, or does not fit the chapter's count and budget is dropped. What this returns is raw text: the caller cleans and charges it.
  */
-const expandImports = async (css: string, directory: string, reader: AssetReader, stack: ReadonlyArray<string>): Promise<string> => {
+const expandImports = async (
+    source: string,
+    directory: string,
+    reader: AssetReader,
+    stack: ReadonlyArray<string>,
+    shared?: { length: number },
+): Promise<string> => {
+    const produced = shared ?? { length: 0 };
+    // A comment is not a rule: an import inside one is inert, and must not take a file of the count.
+    const css = source.replaceAll(CSS_COMMENT, "");
     const rules = [...css.matchAll(IMPORT_RULE)];
     let out = "";
     let at = 0;
@@ -420,15 +493,19 @@ const expandImports = async (css: string, directory: string, reader: AssetReader
 
         const text = await reader.text(path);
 
-        if (text === undefined || !reader.fits(text.length + 3 * countLessThan(text))) {
+        // What this expansion has produced so far counts too: the same sheet imported over and over cannot add up to more than the chapter may take.
+        if (text === undefined || !reader.fits(produced.length + text.length + 3 * countLessThan(text))) {
             continue;
         }
 
-        const expanded = await expandImports(text, directoryOf(path), reader, [...stack, path]);
+        const expanded = await expandImports(text, directoryOf(path), reader, [...stack, path], produced);
 
         const inlined = await inlineStylesheetUrls(expanded, directoryOf(path), reader);
 
-        out += conditioned ? `@media ${media} { ${inlined} }` : inlined;
+        const piece = conditioned ? `@media ${media} { ${inlined} }` : inlined;
+
+        produced.length += piece.length;
+        out += piece;
     }
 
     return out + css.slice(at);
@@ -511,12 +588,39 @@ const neutralize = (root: Element): void => {
     }
 };
 
+const CLASS_NAMES = /^[\w\s-]{1,400}$/u;
+const DIRECTIONS: ReadonlySet<string> = new Set(["auto", "ltr", "rtl"]);
+
+const safeBodyAttributes = (attributes: Readonly<Record<string, string>>): Record<string, string> => {
+    const kept: Record<string, string> = {};
+    const { class: classNames, dir, lang } = attributes;
+
+    if (classNames !== undefined && CLASS_NAMES.test(classNames)) {
+        kept.class = classNames.trim();
+    }
+
+    if (dir !== undefined && DIRECTIONS.has(dir.trim().toLowerCase())) {
+        kept.dir = dir.trim().toLowerCase();
+    }
+
+    if (lang !== undefined && LANGUAGE.test(lang.trim())) {
+        kept.lang = lang.trim();
+    }
+
+    return kept;
+};
+
 /**
  * A chapter's markup as a whole document. The policy is the first element of the head, written before any of the chapter is; the markup is
  * then parsed by the browser's own parser in a document of its own that loads and runs nothing, neutralized (`neutralize`), and only then moved
  * into the document. The book's styles follow the policy as inert text (`safeStylesheet`).
  */
-export const chapterDocument = (markup: string, styles: ReadonlyArray<string>, language?: string): string => {
+export const chapterDocument = (
+    markup: string,
+    styles: ReadonlyArray<string>,
+    language?: string,
+    bodyAttributes: Readonly<Record<string, string>> = {},
+): string => {
     const frame = new DOMParser().parseFromString("<!doctype html><html><head></head><body></body></html>", "text/html");
 
     const make = (tag: string, attributes: Record<string, string> = {}, text?: string): HTMLElement => {
@@ -558,7 +662,17 @@ export const chapterDocument = (markup: string, styles: ReadonlyArray<string>, l
 
     neutralize(chapter.body);
 
-    for (const node of chapter.body.childNodes) {
+    // The chapter body's `class`, `dir` and `lang` (the rules of a book often select on them), filtered first: a class is names only, `dir` one
+    // of its three values, `lang` a language tag. Nothing else of the body element is carried.
+    const carried = Object.entries(safeBodyAttributes(bodyAttributes));
+
+    for (const [name, value] of carried) {
+        frame.body.setAttribute(name, value);
+    }
+
+    const nodes = [...chapter.body.childNodes];
+
+    for (const node of nodes) {
         frame.body.appendChild(frame.importNode(node, true));
     }
 
@@ -586,8 +700,17 @@ const parseChapter = (source: string): Document => {
     const html = new DOMParser().parseFromString("<!doctype html><html><head></head><body></body></html>", "text/html");
     const xml = new DOMParser().parseFromString(source, "application/xhtml+xml");
 
-    if (xml.querySelector("parsererror") !== null || xml.documentElement.localName !== "html") {
+    if (xml.querySelector("parsererror") !== null || xml.documentElement.localName !== "html" || xml.querySelector("body") === null) {
         return new DOMParser().parseFromString(source, "text/html");
+    }
+
+    // The body's own attributes: the ones carried on are filtered later (`safeBodyAttributes`).
+    for (const name of ["class", "dir", "lang"]) {
+        const value = xml.querySelector("body")?.getAttribute(name);
+
+        if (value !== null && value !== undefined) {
+            html.body.setAttribute(name, value);
+        }
     }
 
     for (const [from, to] of [
@@ -604,7 +727,12 @@ const parseChapter = (source: string): Document => {
     return html;
 };
 
-const readChapter = async (chapterPath: string, reader: AssetReader): Promise<{ markup: string; styles: string[] }> => {
+const readChapter = async (chapterPath: string, reader: AssetReader): Promise<{ body: Record<string, string>; markup: string; styles: string[] }> => {
+    // Refused from the archive's declared size before it is inflated: a chapter over the cap is never read into a string.
+    if ((reader.size(chapterPath) ?? 0) > MAX_CHAPTER_CHARS) {
+        throw new Error("chapter too large");
+    }
+
     const source = await reader.text(chapterPath);
 
     if (source === undefined) {
@@ -711,10 +839,21 @@ const readChapter = async (chapterPath: string, reader: AssetReader): Promise<{ 
     }
 
     // A picture an inline `style` names, and the first candidate of a `srcset` an `img` has no `src` beside.
+    // The candidates of a `<picture>`: each `source` keeps its `media` and `type`, and its first candidate becomes the one data address.
+    for (const candidate of parsed.body.querySelectorAll("source[srcset]")) {
+        const first = candidate.getAttribute("srcset")?.trim().split(SPLIT_CANDIDATE, 1)[0];
+        const path = first === undefined ? undefined : resolveInArchive(first, directory);
+        const url = path === undefined ? undefined : await reader.dataUrl(path);
+
+        if (url !== undefined) {
+            candidate.setAttribute("srcset", url);
+        }
+    }
+
     for (const element of parsed.body.querySelectorAll("[style], img[srcset]:not([src])")) {
         const style = element.getAttribute("style");
 
-        if (style !== null && style.includes("url(") && !reader.refused()) {
+        if (style !== null && style.includes("url(")) {
             element.setAttribute("style", await inlineStylesheetUrls(style, directory, reader));
         }
 
@@ -727,8 +866,12 @@ const readChapter = async (chapterPath: string, reader: AssetReader): Promise<{ 
         }
     }
 
+    const body = Object.fromEntries(
+        ["class", "dir", "lang"].flatMap((name) => (parsed.body.hasAttribute(name) ? [[name, parsed.body.getAttribute(name) ?? ""] as const] : [])),
+    );
+
     // eslint-disable-next-line unicorn/prefer-dom-node-html-methods -- `getHTML` is not in every engine this runs in (nor in jsdom)
-    return { markup: parsed.body.innerHTML, styles };
+    return { body, markup: parsed.body.innerHTML, styles };
 };
 
 /** Books opened so far: each gets a folder of its own for the parser, so two books never write over each other. */
@@ -740,6 +883,8 @@ export const openEpub = async (bytes: Uint8Array, resourceSaveDirectory?: string
     const book = await initEpubFile(bytes, resourceSaveDirectory ?? `./epub-${String(++opened.count)}`);
     const spine = book.getSpine().filter((item) => READABLE_TYPES.has(item.mediaType));
     const titles = titlesBySpineItem(book.getToc(), spine);
+    // Declared by the manifest, by path: `getManifest` lists each file once, whether or not the spine names it.
+    const mediaTypes = new Map(Object.values(book.getManifest()).map((item) => [pathOf(item.href), item.mediaType] as const));
     const pathById = new Map(spine.map((item) => [item.id, pathOf(item.href)]));
     const { language } = book.getMetadata();
     let isDestroyed = false;
@@ -769,10 +914,10 @@ export const openEpub = async (bytes: Uint8Array, resourceSaveDirectory?: string
                 throw new Error("unknown chapter");
             }
 
-            const reader = assetReader(zip, signal);
-            const { markup, styles } = await readChapter(chapterPath, reader);
+            const reader = assetReader(zip, mediaTypes, signal);
+            const { body, markup, styles } = await readChapter(chapterPath, reader);
 
-            return chapterDocument(markup, styles, language);
+            return chapterDocument(markup, styles, language, body);
         },
     };
 };

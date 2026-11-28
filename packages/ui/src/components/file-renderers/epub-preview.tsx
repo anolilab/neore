@@ -25,7 +25,7 @@ import type { FC } from "react";
 import { memo, useEffect, useState } from "react";
 
 import type { OpenedEpub } from "./epub-book";
-import { openEpub } from "./epub-book";
+import { assertZipDirectoryExact, openEpub } from "./epub-book";
 import GenericFileCard from "./generic-file-card";
 
 export interface EpubPreviewProps {
@@ -126,6 +126,8 @@ const fetchBook = async (url: string, maxBytes: number, signal: AbortSignal): Pr
     const buffer = await readCapped(response, maxBytes);
 
     try {
+        // The directory is what the end record says it is, before either parser walks it.
+        assertZipDirectoryExact(buffer);
         // The caller's cap, for what the archive expands to as well: the guard's own default is the office-file one.
         await assertOfficeZipWithinLimits(buffer, { maxBytes, maxEntries: OFFICE_ZIP_MAX_ENTRIES });
     } catch (error) {
@@ -151,7 +153,7 @@ const EpubPreview: FC<EpubPreviewProps> = memo(({ className, filename, maxBytes 
     const key = `${url}\n${String(maxBytes)}`;
     const [loaded, setLoaded] = useState<{ key: string; load: Load }>({ key, load: { status: "loading" } });
     const [shown, setShown] = useState<{ book: OpenedEpub; doc: string; failed?: boolean; id: string; key: string } | undefined>();
-    const [position, setPosition] = useState({ index: 0, key });
+    const [position, setPosition] = useState<{ book: OpenedEpub | undefined; index: number }>({ book: undefined, index: 0 });
 
     // Dropped when the file or cap changes: an earlier file's chapter and book are not kept reachable (adjusted while rendering, not in an effect).
     if (shown !== undefined && shown.key !== key) {
@@ -160,7 +162,9 @@ const EpubPreview: FC<EpubPreviewProps> = memo(({ className, filename, maxBytes 
 
     const isLive = loaded.key === key && !(loaded.load.status === "ready" && loaded.load.book.destroyed);
     const load: Load = isLive ? loaded.load : { status: "loading" };
-    const index = position.key === key ? position.index : 0;
+    const liveBook = load.status === "ready" ? load.book : undefined;
+    // The place belongs to the book it was made in, and never passes the end of this one: a one-chapter book is not at "chapter 3".
+    const index = liveBook !== undefined && position.book === liveBook ? Math.min(position.index, liveBook.chapters.length - 1) : 0;
 
     useEffect(() => {
         if (refused) {
@@ -287,7 +291,7 @@ const EpubPreview: FC<EpubPreviewProps> = memo(({ className, filename, maxBytes 
 
     const total = load.status === "ready" ? load.book.chapters.length : 0;
     const label = t`Chapter ${index + 1} of ${total}`;
-    const go = (to: number) => setPosition({ index: to, key });
+    const go = (to: number) => setPosition({ book: liveBook, index: to });
 
     return (
         <div className={cn("my-2 w-full max-w-2xl overflow-hidden rounded-lg border", className)}>
@@ -298,7 +302,7 @@ const EpubPreview: FC<EpubPreviewProps> = memo(({ className, filename, maxBytes 
                 </div>
                 <a
                     aria-label={filename ? t`Download ${filename}` : t`Download document`}
-                    className="hover:bg-accent rounded p-1"
+                    className="hover:bg-accent inline-flex min-h-11 min-w-11 items-center justify-center rounded"
                     download={filename}
                     href={url}
                     onClick={saveOnClick(url, filename, "book.epub")}
@@ -336,7 +340,7 @@ const EpubPreview: FC<EpubPreviewProps> = memo(({ className, filename, maxBytes 
                     <div className="bg-muted/50 flex items-center justify-between gap-2 border-t px-3 py-1.5">
                         <button
                             aria-label={t`Previous chapter`}
-                            className="hover:bg-accent rounded p-1 disabled:opacity-40"
+                            className="hover:bg-accent inline-flex min-h-11 min-w-11 items-center justify-center rounded disabled:opacity-40"
                             disabled={index <= 0}
                             onClick={() => go(index - 1)}
                             type="button"
@@ -348,7 +352,7 @@ const EpubPreview: FC<EpubPreviewProps> = memo(({ className, filename, maxBytes 
                         </span>
                         <button
                             aria-label={t`Next chapter`}
-                            className="hover:bg-accent rounded p-1 disabled:opacity-40"
+                            className="hover:bg-accent inline-flex min-h-11 min-w-11 items-center justify-center rounded disabled:opacity-40"
                             disabled={index >= total - 1}
                             onClick={() => go(index + 1)}
                             type="button"
