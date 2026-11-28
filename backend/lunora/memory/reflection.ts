@@ -255,14 +255,14 @@ const EXPIRY_WRITE_BATCH = 250;
 /** How long a failed expiry batch waits before it is written again. */
 const EXPIRY_RETRY_DELAY_MS = 5 * 60_000;
 
-const toReflectionRow = (m: Doc<"memories">, now: number) => {
+const toReflectionRow = (m: Doc<"memories">) => {
     return {
         confidence: m.confidence ?? 70,
         createdAt: m._creationTime,
         id: m._id as string,
         importance: m.importance ?? 50,
         lastConfirmedAt: lastConfirmedOf(m),
-        pinned: m.pinned === true || recentlyRestored(m, now),
+        pinned: m.pinned === true,
         text: m.memory,
         type: m.type,
         updatedAt: m.updatedAt ?? m._creationTime,
@@ -287,7 +287,9 @@ export const loadReflectionInputs = internalQuery
             .query("memories")
             .withIndex("by_userId_botId", (q) => q.eq("userId", userId).eq("botId", scopeBot))
             .take(REFLECTION_READ_CAP);
-        const memories = rows.filter((m) => !m.supersededBy).map((m) => toReflectionRow(m, now));
+        // A row the person brought back recently is not reflection's to plan at all: not merged, revised, decayed or promoted,
+        // and never a merge's survivor either (`RESTORED_PROTECTION_MS`).
+        const memories = rows.filter((m) => !m.supersededBy && !recentlyRestored(m, now)).map((m) => toReflectionRow(m));
 
         // "The day's threads": the ones that produced a memory in the last day.
         const since = now - DAY_MS;
@@ -326,7 +328,7 @@ export const loadExpiredMemoriesPage = internalQuery
 
         return {
             continueCursor: result.continueCursor,
-            expired: result.page.filter((m) => m.pinned !== true && !recentlyRestored(m, now) && isExpired(m, today)).map((m) => toReflectionRow(m, now)),
+            expired: result.page.filter((m) => m.pinned !== true && !recentlyRestored(m, now) && isExpired(m, today)).map((m) => toReflectionRow(m)),
             isDone: result.isDone,
         };
     });
@@ -400,7 +402,8 @@ export const applyReflectionOps = internalMutation
         const active = async (id: string): Promise<Doc<"memories"> | null> => {
             const row = await ctx.db.get("memories", id as Id<"memories">);
 
-            return row?.userId === userId && (row.botId as string | undefined) === botId && !row.supersededBy ? row : null;
+            // A row brought back after the plan read it is left as the person chose it: no op rewrites or retires it.
+            return row?.userId === userId && (row.botId as string | undefined) === botId && !row.supersededBy && !recentlyRestored(row, now) ? row : null;
         };
 
         // A merge applies whole or not at all: when its survivor was edited, or a row it absorbs was revised, deleted,

@@ -31,16 +31,21 @@ How a memory stops being current, and how the person brings it back (`backend/lu
   confidence below `BROUGHT_BACK_CONFIDENCE` (one decay step above the retirement line), drops a `validUntil` already
   past (bringing it back is the newest statement that it holds), redacts the text again, and re-embeds it through
   `reembedRewordedMemory`.
-- **Swap** (`replacesSuccessor`): a row retired as `revised` or `contradicted` lost to a newer version of the same
-  fact. Bringing it back says that version is wrong, so the successor is retired in the same write as
-  `brought_back_over`, pointing at the brought-back row. Only while the successor is the caller's own active, unpinned
-  row in the same scope; a pinned successor stays, and both are current. The list's `replacesCurrent` says which rows
-  swap, and the button reads "Bring back (replaces the current version)".
-- **Protect**: a merged, compressed, expired or decayed row's successor holds other facts too and stays active. Every
-  brought-back row is left alone for `RESTORED_PROTECTION_MS` (30 days, `reflection-logic.ts`): reflection reads it
-  as pinned (`recentlyRestored` in `toReflectionRow`), so it is neither decayed, expired, merged away, revised nor
-  promoted; the expiry pages skip it; compression reads it as pinned and leaves it out. Extraction still revises it
-  from a new statement of the person's own.
+- **Current version** (`currentSuccessor`): the list's "Now remembered as" and the swap both use the version current
+  now, `supersededBy` followed past rows retired since (A → B → C gives C, at most 20 links). A chain that ends at a
+  row retired by itself, leaves the caller's rows, loops or reaches a deleted row has none: no text, no swap.
+- **Swap** (`replacesSuccessor`): a row retired as `revised`, `contradicted` or `brought_back_over` lost to another
+  version of the same fact. Bringing it back says that version is wrong, so the current version is retired in the
+  same write as `brought_back_over`, pointing at the brought-back row; bringing that one back swaps them again, so
+  exactly one version is current after each step. Only while the current version is the caller's own active,
+  unpinned row in the same scope; a pinned one stays, and both are current. The list's `replacesCurrent` says which
+  rows swap, and the button reads "Bring back (replaces the current version)".
+- **Protect**: a merged, compressed, expired, decayed or duplicate row's successor holds other facts too and stays
+  active. Every brought-back row is left alone for `RESTORED_PROTECTION_MS` (30 days, `reflection-logic.ts`):
+  reflection does not read it at all (`loadReflectionInputs`), so it is neither decayed, expired, revised, promoted
+  nor merged, as survivor or absorbed; `applyReflectionOps` skips every op on it, so a run planned before the
+  bring-back cannot undo it; the expiry pages skip it; compression neither reads it nor, in `saveMemoryBatch`,
+  retires it. Extraction still revises it from a new statement of the person's own.
 - The settings list reads again from its first page after a bring-back or any other change on the page (the pages
   are remounted and the pages read before are dropped from the cache), so a row retired again shows, and no row is
   skipped or repeated. Focus goes to the section's visible toggle once the row's button is gone.

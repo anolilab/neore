@@ -91,8 +91,9 @@ export const DECAY_STEP = 15;
 export const RETIRE_BELOW_CONFIDENCE = 40;
 
 /**
- * A row the person brought back (`restoredAt`) is left alone this long, as a pinned one is: reflection neither decays,
- * expires, merges away, revises nor promotes it, and compression does not take it.
+ * A row the person brought back (`restoredAt`) is left alone this long: reflection does not plan it at all (no decay,
+ * expiry, merge, as survivor or absorbed, revision or promotion), an op planned before the bring-back skips it, and
+ * compression neither reads nor retires it.
  */
 export const RESTORED_PROTECTION_MS = 30 * DAY_MS;
 
@@ -116,7 +117,6 @@ export interface ReflectionMemory extends FactDates {
     id: string;
     importance: number;
     lastConfirmedAt: number;
-    /** Pinned by the person, or brought back by them recently ({@link recentlyRestored}): reflection leaves it alone either way. */
     pinned: boolean;
     text: string;
     threadId?: string;

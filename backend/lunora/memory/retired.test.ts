@@ -9,6 +9,7 @@ import type { Id } from "../_generated/dataModel";
 import { memoryLogger } from "../lib/logger";
 import schema from "../schema";
 import { getThreadMemoriesForCompression } from "./compress";
+import { saveMemoryBatch } from "./functions";
 import { applyReflectionOps, loadReflectionInputs } from "./reflection";
 import { planReflection, type ReflectionMemory, RESTORED_PROTECTION_MS, splitExpired } from "./reflection-logic";
 import { bringBackMemory, BROUGHT_BACK_CONFIDENCE, listRetiredMemories } from "./retired";
@@ -49,7 +50,7 @@ type RetiredPage = {
     isDone: boolean;
     page: { _id: string; memory: string; replacesCurrent: boolean; retiredReason?: string; successor?: string }[];
 };
-type Reason = "compressed" | "contradicted" | "decayed" | "expired" | "merged" | "revised";
+type Reason = "brought_back_over" | "compressed" | "contradicted" | "decayed" | "duplicate" | "expired" | "merged" | "revised";
 
 const run = <T>(body: (ctx: Ctx) => Promise<T>): Promise<T> => harness.run(body);
 const as = (userId: string) => harness.withIdentity({ userId } as never);
@@ -59,7 +60,7 @@ const reembedJobs = () => harness.scheduler.list().filter((job) => job.functionP
 const active = async (memory: string, userId = OWNER, pinned?: boolean): Promise<Id<"memories">> =>
     await run(async (ctx) => await ctx.db.insert("memories", { memory, pinned, type: "preference", updatedAt: 1, userId }));
 
-/** Whether a nightly reflection planned over the scope as it is read now would change `id` (survivor of a merge aside). */
+/** Whether a nightly reflection planned over the scope as it is read now would change `id`, as a merge's survivor too. */
 const reflectionTouches = async (id: Id<"memories">, now: number): Promise<boolean> => {
     const { memories } = (await run(async (ctx) => await ctx.runQuery(loadReflectionInputs as never, { now, userId: OWNER } as never))) as {
         memories: ReflectionMemory[];
@@ -71,7 +72,7 @@ const reflectionTouches = async (id: Id<"memories">, now: number): Promise<boole
         ...expire,
         ...plan.retire,
         ...plan.decay.map((entry) => entry.memoryId),
-        ...plan.merges.flatMap((merge) => merge.absorbedIds),
+        ...plan.merges.flatMap((merge) => [merge.survivorId, ...merge.absorbedIds]),
         ...plan.promotions.flatMap((promotion) => promotion.sourceIds),
         ...plan.contradictions.flatMap((pair) => [pair.olderId, pair.newerId]),
     ].includes(id);
@@ -177,8 +178,9 @@ describe("bringBackMemory", () => {
 
         const { page } = await list();
 
+        // The newer version can be brought back in turn, swapping the two again.
         expect(page).toMatchObject([
-            { _id: next, replacesCurrent: false, retiredReason: "brought_back_over", successor: "prefers tabs for indentation in code" },
+            { _id: next, replacesCurrent: true, retiredReason: "brought_back_over", successor: "prefers tabs for indentation in code" },
         ]);
         expect(await reflectionTouches(old, Date.now())).toBe(false);
     });
@@ -219,7 +221,7 @@ describe("bringBackMemory", () => {
         expect(await reflectionTouches(old, restoredAt + RESTORED_PROTECTION_MS)).toBe(true);
     });
 
-    it("keeps a restored memory out of the next compression of its chat", async () => {
+    it("keeps a restored memory out of the next compression of its chat, and out of one planned before it came back", async () => {
         const threadId = await run(async (ctx) => await ctx.db.insert("threads", { userId: OWNER } as never));
         const old = await retired("likes tea", 2000, { reason: "compressed" });
 
@@ -233,7 +235,109 @@ describe("bringBackMemory", () => {
             pinned?: boolean;
         }[];
 
-        expect(rows).toMatchObject([{ _id: old, pinned: true }]);
+        expect(rows).toStrictEqual([]);
+
+        // A compression that read the row before it came back saves its summary, but does not retire the row.
+        await run(
+            async (ctx) =>
+                await ctx.runMutation(
+                    saveMemoryBatch as never,
+                    { compressedFrom: [old], memories: [{ memory: "likes hot drinks", type: "preference", userId: OWNER }] } as never,
+                ),
+        );
+
+        const kept = await rowOf(old);
+
+        expect(kept?.supersededBy).toBeUndefined();
+    });
+
+    it("leaves a brought-back row alone when a reflection planned before the bring-back applies", async () => {
+        const old = await retired("runs on Mondays", 2000, { confidence: 30, reason: "decayed" });
+        const other = await active("runs on Mondays and Fridays");
+
+        await as(OWNER).mutation(bringBackMemory as never, { memoryId: old } as never);
+
+        const before = await rowOf(old);
+
+        // Ops planned while the row still read as it did: a decay, a merge into another row, and a retirement.
+        await run(
+            async (ctx) =>
+                await ctx.runMutation(
+                    applyReflectionOps as never,
+                    {
+                        ops: [
+                            { confidence: 10, kind: "patch", memoryId: old },
+                            { byMemoryId: other, kind: "supersede", memoryId: old, merge: true },
+                            { byMemoryId: old, kind: "supersede", memoryId: old },
+                            { confidence: 90, kind: "patch", lastConfirmedAt: 1, memory: "runs twice a week", memoryId: old, readText: "runs on Mondays" },
+                        ],
+                        userId: OWNER,
+                    } as never,
+                ),
+        );
+
+        const after = await rowOf(old);
+
+        expect(after).toStrictEqual(before);
+    });
+
+    it("keeps a merged memory and the row it was merged into as they are at the next reflection", async () => {
+        const survivor = await active("lives in Porto");
+        const old = await retired("lives in porto city", 2000, { by: survivor, reason: "merged" });
+
+        await as(OWNER).mutation(bringBackMemory as never, { memoryId: old } as never);
+
+        const kept = await rowOf(survivor);
+
+        expect(kept?.supersededBy).toBeUndefined();
+        expect(await reflectionTouches(old, Date.now())).toBe(false);
+        expect(await reflectionTouches(survivor, Date.now())).toBe(false);
+    });
+
+    it("swaps back and forth: exactly one version is current after each bring-back", async () => {
+        const first = await active("prefers tabs");
+        const second = await active("prefers spaces");
+
+        await run(async (ctx) => {
+            await ctx.db.patch("memories", first, { retiredAt: 1000, retiredReason: "revised", supersededBy: second });
+        });
+
+        const current = async (): Promise<string[]> => {
+            const rows = await Promise.all([first, second].map(async (id) => await rowOf(id)));
+
+            return rows.filter((row) => row?.supersededBy === undefined).map((row) => String(row?.memory));
+        };
+
+        await as(OWNER).mutation(bringBackMemory as never, { memoryId: first } as never);
+
+        expect(await current()).toStrictEqual(["prefers tabs"]);
+
+        await as(OWNER).mutation(bringBackMemory as never, { memoryId: second } as never);
+
+        expect(await current()).toStrictEqual(["prefers spaces"]);
+
+        const back = await rowOf(first);
+
+        expect(back).toMatchObject({ retiredReason: "brought_back_over", supersededBy: second });
+    });
+
+    it("follows the chain to the current version: A, revised to B, then to C, shows C, and bringing A back retires C", async () => {
+        const c = await active("lives in Lisbon");
+        const b = await retired("lives in Porto", 2000, { by: c, reason: "revised" });
+        const a = await retired("lives in Braga", 1000, { by: b, reason: "revised" });
+
+        const { page } = await list();
+        const [forB, forA] = page;
+
+        expect(forA).toMatchObject({ _id: a, replacesCurrent: true, successor: "lives in Lisbon" });
+        expect(forB).toMatchObject({ _id: b, replacesCurrent: true, successor: "lives in Lisbon" });
+
+        await as(OWNER).mutation(bringBackMemory as never, { memoryId: a } as never);
+
+        const [rowC, rowB] = await Promise.all([rowOf(c), rowOf(b)]);
+
+        expect(rowC).toMatchObject({ retiredReason: "brought_back_over", supersededBy: a });
+        expect(rowB?.supersededBy).toBe(c);
     });
 
     it("drops a past end date, so the next reflection does not expire it again", async () => {

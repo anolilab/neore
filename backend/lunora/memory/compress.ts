@@ -149,7 +149,10 @@ export const getThreadMemoriesForCompression = internalQuery
         return (
             memories
                 // Only the same scope compresses together: a bot's memories with that bot's, the user's with the user's.
-                .filter((m) => m.userId === args.userId && !m.supersededBy && (m.botId as string | undefined) === args.botId)
+                // A row the person brought back recently stays as they chose it (`RESTORED_PROTECTION_MS`).
+                .filter(
+                    (m) => m.userId === args.userId && !m.supersededBy && !recentlyRestored(m, Date.now()) && (m.botId as string | undefined) === args.botId,
+                )
                 .map((m) => {
                     return {
                         _id: m._id,
@@ -158,8 +161,7 @@ export const getThreadMemoriesForCompression = internalQuery
                         dated: hasFactDates(factDatesOf(m)),
                         importance: m.importance,
                         memory: m.memory,
-                        // A row the person brought back recently is kept as they chose it, as a pinned one is.
-                        pinned: m.pinned === true || recentlyRestored(m, Date.now()),
+                        pinned: m.pinned === true,
                         source: m.source,
                         type: m.type as string,
                         updatedAt: m.updatedAt,

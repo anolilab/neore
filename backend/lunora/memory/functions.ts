@@ -27,7 +27,7 @@ import {
 import { botOwnerRows } from "./bot-owner";
 import { type MemoryEvidence, newestEvidence, vMemoryEvidence } from "./evidence";
 import { logRedaction, redactMemoryText } from "./redact";
-import { DROPPED_DIGEST_SUMMARY, localDayOf } from "./reflection-logic";
+import { DROPPED_DIGEST_SUMMARY, localDayOf, recentlyRestored } from "./reflection-logic";
 import { byNewest, isUsableOn, KEYWORD_LOOKUP_LIMIT, keywordLookupOf, lookupSearchesOf, mergeScopeWindows, scopesOf } from "./retrieve-ranking";
 import type { MemoryRetiredReason } from "./retired";
 import { lastConfirmedOf, MEMORY_TYPES, type MemoryType, vMemoryType } from "./taxonomy";
@@ -1599,7 +1599,13 @@ export const saveMemoryBatch = internalMutation
         const compressedFrom = args.compressedFrom ?? [];
 
         for (const id of compressedFrom) {
-            await supersedeMemory(ctx, id, id, now, "compressed");
+            const original = await ctx.db.get("memories", id);
+
+            // Read again in this write: a row retired meanwhile keeps its reason, and one the person brought back since the
+            // compression read it stays as they chose it.
+            if (original && !original.supersededBy && !recentlyRestored(original, now)) {
+                await supersedeMemory(ctx, id, id, now, "compressed");
+            }
         }
 
         return memoryIds;

@@ -6,6 +6,7 @@
 import { LunoraError, v } from "lunorash/server";
 
 import type { Doc } from "../_generated/dataModel";
+import type { QueryCtx } from "../_generated/server";
 import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { patchRow } from "../lib/patch";
 import { MAX_LENGTH, paginationOptionsValidator } from "../lib/validators";
@@ -29,13 +30,59 @@ export const reflectionRetiredReason = (op: Extract<ReflectionOp, { kind: "super
     return op.merge === true ? "merged" : "contradicted";
 };
 
+/** Reasons that mean another version of the same fact took the row's place: bringing it back swaps the two. */
+const SWAP_REASONS: ReadonlySet<MemoryRetiredReason> = new Set(["brought_back_over", "contradicted", "revised"]);
+
+/** Links of a `supersededBy` chain one lookup follows to the version current now. */
+const SUCCESSOR_HOPS = 20;
+
 /**
- * Whether bringing `row` back retires `successor` in its place: only for a newer version of the same fact (a revision
- * or a contradiction), so the person keeps the one version they chose. The successor must still be their own active,
- * unpinned row in the same scope. A merge, a compression, an expiry or a decay keeps whatever else holds the fact.
+ * The version of `row`'s fact that is current now: its `supersededBy`, followed past rows retired since (A → B → C gives
+ * C), up to {@link SUCCESSOR_HOPS}. `null` when the chain ends at a row retired by itself, leaves the caller's rows,
+ * loops, is cut, or reaches a deleted row. `seen` memoizes the reads across one page.
+ */
+export const currentSuccessor = async (
+    ctx: Pick<QueryCtx, "db">,
+    row: Doc<"memories">,
+    userId: string,
+    seen: Map<string, Doc<"memories"> | null> = new Map(),
+): Promise<Doc<"memories"> | null> => {
+    const visited = new Set<string>([row._id as string]);
+    let next = row.supersededBy;
+
+    for (let hop = 0; hop < SUCCESSOR_HOPS && next && !visited.has(next as string); hop += 1) {
+        visited.add(next as string);
+
+        if (!seen.has(next as string)) {
+            seen.set(next as string, await ctx.db.get("memories", next));
+        }
+
+        const link = seen.get(next as string) ?? null;
+
+        if (link?.userId !== userId) {
+            return null;
+        }
+
+        if (!link.supersededBy) {
+            return link;
+        }
+
+        next = link.supersededBy;
+    }
+
+    return null;
+};
+
+/**
+ * Whether bringing `row` back retires `successor` (the version current now, {@link currentSuccessor}) in its place:
+ * only when another version of the same fact took its place (a revision, a contradiction, or the person bringing that
+ * other version back earlier), so the person keeps the one version they chose. The successor must be their own
+ * active, unpinned row in the same scope. A merge, a compression, an expiry, a decay or a duplicate keeps whatever
+ * else holds the fact.
  */
 export const replacesSuccessor = (row: Doc<"memories">, successor: Doc<"memories"> | null, userId: string): successor is Doc<"memories"> =>
-    (row.retiredReason === "revised" || row.retiredReason === "contradicted") &&
+    row.retiredReason !== undefined &&
+    SWAP_REASONS.has(row.retiredReason) &&
     successor !== null &&
     successor._id !== row._id &&
     successor.userId === userId &&
@@ -102,10 +149,15 @@ export const listRetiredMemories = authQuery
             .paginate({ ...options, numItems: Math.min(Math.max(1, options.numItems), RETIRED_PAGE_MAX) });
         const rows = result.page.filter((row) => row.supersededBy !== undefined && row.retiredAt !== undefined);
 
-        // One read per distinct successor and per distinct bot on the page; only the caller's own are named.
-        const successorIds = [...new Set(rows.flatMap((row) => (row.supersededBy && row.supersededBy !== row._id ? [row.supersededBy] : [])))];
-        const successors = await Promise.all(successorIds.map(async (id) => ctx.db.get("memories", id)));
-        const ownSuccessors = new Map(successors.flatMap((row) => (row?.userId === userId ? [[row._id as string, row] as const] : [])));
+        // Each row's current version, the chain followed past rows retired since; reads shared across the page.
+        const seen = new Map<string, Doc<"memories"> | null>();
+        const successors = new Map<string, Doc<"memories"> | null>();
+
+        for (const row of rows) {
+            successors.set(row._id as string, await currentSuccessor(ctx, row, userId, seen));
+        }
+
+        // One read per distinct bot on the page; only the caller's own are named.
         const botIds = [...new Set(rows.flatMap((row) => (row.botId ? [row.botId] : [])))];
         const bots = await Promise.all(botIds.map(async (id) => ctx.db.get("bots", id)));
         const botNames = new Map(bots.flatMap((bot) => (bot?.userId === userId ? [[bot._id as string, bot.name] as const] : [])));
@@ -114,14 +166,14 @@ export const listRetiredMemories = authQuery
             continueCursor: result.continueCursor,
             isDone: result.isDone,
             page: rows.map((row) => {
-                const successor = row.supersededBy ? ownSuccessors.get(row.supersededBy as string) : undefined;
+                const successor = successors.get(row._id as string) ?? null;
 
                 return {
                     _id: row._id as string,
                     botName: row.botId ? botNames.get(row.botId as string) : undefined,
                     fromBot: row.botId !== undefined,
                     memory: row.memory,
-                    replacesCurrent: replacesSuccessor(row, successor ?? null, userId),
+                    replacesCurrent: replacesSuccessor(row, successor, userId),
                     retiredAt: row.retiredAt ?? 0,
                     retiredReason: row.retiredReason ?? undefined,
                     successor: successor?.memory,
@@ -161,7 +213,7 @@ export const bringBackMemory = authMutation
 
         const { now } = ctx;
         const expired = isExpired(row, localDayOf(now, await userTimeZone(ctx, userId)));
-        const successor = row.supersededBy === row._id ? null : await ctx.db.get("memories", row.supersededBy);
+        const successor = await currentSuccessor(ctx, row, userId);
         const swap = replacesSuccessor(row, successor, userId);
 
         await patchRow(ctx.db, "memories", row, {
