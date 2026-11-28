@@ -44,6 +44,8 @@ const MAX_HEADER_VALUE_BYTES: usize = 8192;
 /// Requests relayed at once; more wait in their own thread, never in the reader, which a reply to the server (a ping's)
 /// must always get through. `mcp.rs` waits for each one, so more than one is rare.
 const MAX_IN_FLIGHT: usize = 8;
+/// Requests that may wait for a slot. Past that, a request is answered as busy at once.
+const MAX_WAITING: usize = 64;
 /// Headers the bridge sets itself, or that would change how a request is framed.
 const RESERVED_HEADERS: &[&str] = &[
     "accept",
@@ -74,8 +76,8 @@ pub struct Target {
 struct Secrets {
     /// Credentials, cookie and query values, path segments, the address: wherever they appear, longest first.
     anywhere: Vec<String>,
-    /// Too short to blank wherever they appear without garbling an answer (a host such as `nas`, a short session id):
-    /// blanked as whole words.
+    /// Too short to blank wherever they appear without garbling an answer (a host such as `nas`): blanked as whole
+    /// words.
     words: Vec<String>,
 }
 
@@ -651,14 +653,10 @@ impl<W: Write> Bridge<W> {
         let session = self.session.lock().unwrap().id.clone();
         let mut secrets = self.target.secrets.clone();
 
-        // A short one is blanked as a whole word, so it cannot garble the answer.
-        match session.as_ref().and_then(|id| id.to_str().ok()) {
-            Some(id) if id.len() >= MIN_REDACTED_BYTES => {
-                secrets.anywhere.push(id.to_owned());
-                sort_longest_first(&mut secrets.anywhere);
-            }
-            Some(id) => secrets.words.push(id.to_owned()),
-            None => {}
+        // Never short: `initialize` refuses one.
+        if let Some(id) = session.as_ref().and_then(|id| id.to_str().ok()) {
+            secrets.anywhere.push(id.to_owned());
+            sort_longest_first(&mut secrets.anywhere);
         }
 
         // The id is the server's to match its reply by (a ping), and a cursor goes back to it as it was (`mcp.rs` sends
@@ -739,7 +737,19 @@ impl<W: Write> Bridge<W> {
         // Taken before the answer is read: the server may ask something (a ping) on the stream first, and the reply to
         // it must carry the session.
         if is_initialize(message) {
-            self.session.lock().unwrap().id = session_id_of(&response);
+            let session = session_id_of(&response);
+
+            // A short one could not be blanked from what the server says without garbling it, wherever it appears.
+            if session
+                .as_ref()
+                .is_some_and(|id| id.len() < MIN_REDACTED_BYTES)
+            {
+                return Sent::Failed(format!(
+                    "the MCP server's session id is too short to keep out of the chat ({MIN_REDACTED_BYTES} characters at least)"
+                ));
+            }
+
+            self.session.lock().unwrap().id = session;
         }
 
         let content_type = response
@@ -938,7 +948,16 @@ pub fn run<W: Write + Send + 'static>(target: Target, mut input: impl BufRead, o
             continue;
         }
 
+        // A finished worker has nothing left to join.
         running.retain(|handle| !handle.is_finished());
+
+        if running.len() >= MAX_IN_FLIGHT + MAX_WAITING {
+            if let Some(id) = request_id(&message) {
+                bridge.write(&error_reply(id, "the bridge is busy with other calls"));
+            }
+
+            continue;
+        }
 
         let (bridge, slots) = (bridge.clone(), slots.clone());
 

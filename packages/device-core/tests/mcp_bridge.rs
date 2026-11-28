@@ -268,7 +268,7 @@ fn answers_are_relayed_and_the_session_rides_on_every_later_request() {
             Some("initialize") => json_reply(
                 request,
                 json!({ "protocolVersion": "2025-06-18" }),
-                Some("s-1"),
+                Some("session-1"),
             ),
             Some("notifications/initialized") => reply("202 Accepted", &[], ""),
             Some("tools/list") => {
@@ -319,7 +319,11 @@ fn answers_are_relayed_and_the_session_rides_on_every_later_request() {
     assert_eq!(seen[0].header("mcp-session-id"), None);
 
     for later in &seen[1..] {
-        assert_eq!(later.header("mcp-session-id"), Some("s-1"), "{later:?}");
+        assert_eq!(
+            later.header("mcp-session-id"),
+            Some("session-1"),
+            "{later:?}"
+        );
         assert_eq!(later.header("mcp-protocol-version"), Some("2025-06-18"));
         assert_eq!(
             Some(json!({ "Authorization": later.header("authorization") }).to_string()),
@@ -656,26 +660,32 @@ fn a_server_cannot_pass_its_error_off_as_the_bridges_ended_session() {
 }
 
 #[test]
-fn a_short_session_id_is_blanked_where_it_stands_as_a_word() {
-    let (url, _) = serve(Box::new(|request| match request.body["method"].as_str() {
-        Some("initialize") => json_reply(
+fn a_session_id_too_short_to_blank_is_refused() {
+    let (url, seen) = serve(Box::new(|request| {
+        json_reply(
             request,
             json!({ "protocolVersion": "2025-06-18" }),
             Some("ab1"),
-        ),
-        _ => json_reply(request, json!({ "text": "session ab1, not cab1e" }), None),
+        )
     }));
-    let written = relay(&url, "", &[initialize(), request(2, "tools/call")]);
-    let answer = written.iter().find(|message| message["id"] == 2).unwrap();
+    let written = relay(&url, "", &[initialize(), request(2, "tools/list")]);
 
-    assert_eq!(
-        answer["result"]["text"], "session [redacted], not cab1e",
-        "{answer}"
+    assert!(
+        written[0]["error"]["message"]
+            .as_str()
+            .is_some_and(|message| message.contains("session id is too short")),
+        "{written:?}"
     );
+    // Nothing runs on a session the bridge cannot protect: the call goes without it, and the server sees no `ab1`.
+    assert!(seen
+        .lock()
+        .unwrap()
+        .iter()
+        .all(|request| request.header("mcp-session-id").is_none()));
 }
 
 #[test]
-fn a_reply_to_the_server_gets_through_while_every_request_slot_is_busy() {
+fn a_reply_to_the_server_gets_through_while_every_request_slot_is_busy_and_a_burst_is_bounded() {
     use std::sync::atomic::AtomicUsize;
 
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
@@ -746,8 +756,8 @@ fn a_reply_to_the_server_gets_through_while_every_request_slot_is_busy() {
 
     writeln!(writer, "{}", initialize()).unwrap();
 
-    // Eight calls fill every slot, a ninth waits for one; only then comes the reply to the ping.
-    for id in 2..=10 {
+    // Eight calls fill every slot, 64 wait for one and the next is refused as busy; only then comes the reply to the ping.
+    for id in 2..=74 {
         writeln!(writer, "{}", request(id, "tools/call")).unwrap();
     }
 
@@ -776,6 +786,25 @@ fn a_reply_to_the_server_gets_through_while_every_request_slot_is_busy() {
         "a call waited out the reply: {}",
         written()
     );
+
+    // Eight calls held every slot and 64 waited for one; the next was answered as busy at once.
+    let answers: Vec<Value> = written()
+        .lines()
+        .map(|line| serde_json::from_str(line).unwrap())
+        .collect();
+    let busy = answers.iter().find(|answer| answer["id"] == 74).unwrap();
+
+    assert_eq!(
+        busy["error"]["message"],
+        "the bridge is busy with other calls"
+    );
+    assert_eq!(
+        answers
+            .iter()
+            .filter(|answer| answer["result"].is_object())
+            .count(),
+        1 + 72
+    );
 }
 
 #[test]
@@ -784,7 +813,7 @@ fn once_the_server_ended_the_session_every_call_is_answered_as_such_without_bein
         Some("initialize") => json_reply(
             request,
             json!({ "protocolVersion": "2025-06-18" }),
-            Some("s-1"),
+            Some("session-1"),
         ),
         _ => reply("404 Not Found", &[], ""),
     }));
@@ -835,7 +864,7 @@ fn a_ping_the_server_sends_before_it_answers_initialize_gets_its_reply_within_th
 
         let ping = json!({ "jsonrpc": "2.0", "id": "ping-1", "method": "ping" });
 
-        write!(opening, "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nMcp-Session-Id: s-1\r\nConnection: close\r\n\r\ndata: {ping}\n\n").unwrap();
+        write!(opening, "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nMcp-Session-Id: session-1\r\nConnection: close\r\n\r\ndata: {ping}\n\n").unwrap();
         opening.flush().unwrap();
         listener.set_nonblocking(true).unwrap();
 
@@ -849,7 +878,7 @@ fn a_ping_the_server_sends_before_it_answers_initialize_gets_its_reply_within_th
                         .unwrap();
 
                     let pong = read_request(&stream);
-                    let status = if pong.header("mcp-session-id") == Some("s-1") {
+                    let status = if pong.header("mcp-session-id") == Some("session-1") {
                         "202 Accepted"
                     } else {
                         "404 Not Found"
@@ -912,7 +941,7 @@ fn a_ping_the_server_sends_before_it_answers_initialize_gets_its_reply_within_th
         .expect("the reply to the ping never reached the server");
 
     assert_eq!(pong.body["id"], "ping-1");
-    assert_eq!(pong.header("mcp-session-id"), Some("s-1"));
+    assert_eq!(pong.header("mcp-session-id"), Some("session-1"));
     assert_eq!(written(2)[1]["id"], 1);
 
     drop(writer);
