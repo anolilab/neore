@@ -97,6 +97,9 @@ export const sendMessage = async (page: Page, text: string): Promise<void> => {
     const editor = composer(page);
 
     await expect(editor).toBeVisible({ timeout: 60_000 });
+    // A button that renders under a resting pointer (Goal, after a dialog closes) opens its tooltip over the editor, and a
+    // click that hits the tooltip never moves the pointer away: take the pointer off the composer first.
+    await page.mouse.move(0, 0);
     await editor.click();
     await editor.fill(text);
 
