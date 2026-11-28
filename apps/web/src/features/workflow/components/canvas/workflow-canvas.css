@@ -5,6 +5,7 @@
  * dark mode and centred text inside it. Both draw their own surface, so the wrapper stays bare.
  * Not in a Tailwind layer on purpose: the library's sheet is unlayered and would win over a utility.
  */
+/* eslint-disable-next-line css/use-layers -- React Flow's own sheet is unlayered, so a layered rule would lose to it. */
 .react-flow .react-flow__node.react-flow__node-output,
 .react-flow .react-flow__node.react-flow__node-group {
     --xy-node-background-color: transparent;
