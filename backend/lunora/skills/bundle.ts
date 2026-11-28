@@ -40,7 +40,7 @@ import type { BundleItem, SkillSource } from "./bundle-format";
 import { withPluginHeader } from "../plugins/export";
 import { heldInstall } from "../plugins/held-install";
 import { bodyHash } from "../plugins/logic";
-import { BUNDLE_LIMITS, buildBundleMarkdown, groupItemOf, parseBundleMarkdown, skillItemOf, triggerItemOf } from "./bundle-format";
+import { BUNDLE_LIMITS, buildBundleMarkdown, groupItemOf, isCustomModel, parseBundleMarkdown, skillItemOf, triggerItemOf } from "./bundle-format";
 import type { PlanEntry, PlanEnv } from "./bundle-plan";
 import { assertSelectionImportable, BundleImportError, mayRetryImport, planBundle, runBundleImport, skillLimitFor } from "./bundle-plan";
 import { isSelectableTextModel } from "@neore/ai/models";
@@ -486,13 +486,26 @@ export const exportBundle = authAction
 
         // A selection that is exactly one installed plugin's unedited children is exported as that plugin's own file, with each
         // item under the key its install gave it. The lookup runs first, because a plugin file's body carries the keys.
-        const plugin = await ctx.runQuery(internal.plugins.export.pluginForSelection, {
-            groupChatIds,
-            // The skills the file will hold, a group's participants included: a plugin group alone is still that plugin's content.
-            skillIds: [...skillSources.keys()],
-            triggerIds,
-            userId,
-        });
+        // A skill's custom model is left out of every file (another account has no such endpoint), so a selection that holds one is not
+        // the plugin's own content any more: it is exported as a plain bundle, never as that plugin at its version.
+        let dropsCustomModel = false;
+
+        for (const skill of skillSources.values()) {
+            if (skill.config?.preferredModel !== undefined && isCustomModel(skill.config.preferredModel)) {
+                dropsCustomModel = true;
+                break;
+            }
+        }
+
+        const plugin = dropsCustomModel
+            ? null
+            : await ctx.runQuery(internal.plugins.export.pluginForSelection, {
+                  groupChatIds,
+                  // The skills the file will hold, a group's participants included: a plugin group alone is still that plugin's content.
+                  skillIds: [...skillSources.keys()],
+                  triggerIds,
+                  userId,
+              });
         const keyById = new Map((plugin?.keys ?? []).map((child) => [child.id, child.key] as const));
         const keyed = <T extends BundleItem>(item: T, id: string): T => {
             const key = keyById.get(id);

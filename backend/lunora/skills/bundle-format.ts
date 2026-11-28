@@ -182,7 +182,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> => typeof va
 /** An icon an export keeps: short and not a URL or path. */
 const isPlainIcon = (icon: string | undefined): icon is string => !!icon && icon.length <= 64 && !NON_ICON_RE.test(icon);
 
-const isCustomModel = (model: string): boolean => model.startsWith("custom:") || parseCustomModelId(model) !== null;
+export const isCustomModel = (model: string): boolean => model.startsWith("custom:") || parseCustomModelId(model) !== null;
 
 // ─── Writing ─────────────────────────────────────────────────────────────────
 

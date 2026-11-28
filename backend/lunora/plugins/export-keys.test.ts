@@ -107,6 +107,41 @@ describe("exporting an installed plugin", () => {
         harness.close();
     });
 
+    it("exports a plain bundle when a skill's custom model would be left out of the file", async () => {
+        const body = buildBundleMarkdown({
+            description: "",
+            items: [{ key: "tuned", kind: "skill" as const, skill: { ...skill("tuned"), config: { preferredModel: "custom:my-endpoint" } } }],
+            name: "Tuned",
+        });
+        const contentHash = await bodyHash(body);
+        const markdown = withPluginHeader(body, { contentHash, slug: "tuned-plugin", version: "1.0.0" });
+
+        await harness
+            .withIdentity({ userId: OWNER } as never)
+            .action(procedureAt("plugins_install_action", "installPlugin"), { contentHash, markdown } as never);
+
+        const skillIds = await harness.run(async (context: any) => {
+            const { page } = await context.db.skills.findMany({ where: { slug: "tuned", userId: OWNER } });
+
+            return page.map((row: { _id: string; config?: { preferredModel?: string } }) => {
+                expect(row.config?.preferredModel).toBe("custom:my-endpoint");
+
+                return row._id;
+            });
+        });
+
+        expect(skillIds).toHaveLength(1);
+
+        const exported = (await harness.withIdentity({ userId: OWNER } as never).action(procedureAt("skills_bundle", "exportBundle"), {
+            groupChatIds: [],
+            name: "Tuned",
+            skillIds,
+            triggerIds: [],
+        } as never)) as { markdown: string };
+
+        expect(exported.markdown).not.toContain("plugin: tuned-plugin");
+    });
+
     it("writes the installed skills under their declared keys, and the file reads back with the same keys", async () => {
         const skillIds = await harness.run(async (context: any) => {
             const { page } = await context.db.skills.findMany({ where: { userId: OWNER } });
