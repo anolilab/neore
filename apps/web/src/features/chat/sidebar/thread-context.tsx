@@ -99,7 +99,8 @@ const ThreadContext: FC<{ thread: ThreadContextRecord; threadId: string }> = ({ 
                 <Row icon={Target} label={t`Goal`}>
                     <span className="line-clamp-2">{goal.text}</span>
                     <span className="text-muted-foreground block font-mono text-xs tabular-nums">
-                        {goal.round}/{goal.maxRounds}
+                        {/* `round` counts finished rounds: an active goal is on the next one, as the goal note says. */}
+                        {goal.status === "active" ? Math.min(goal.round + 1, goal.maxRounds) : goal.round}/{goal.maxRounds}
                     </span>
                 </Row>
             )}

@@ -49,8 +49,12 @@ vi.mock("@/components/model-picker/utilities", () => {
 vi.mock("@/features/chat/core/hooks/use-thread-usage", () => {
     return { default: () => undefined };
 });
+const goalState = vi.hoisted(() => {
+    return { goal: null as null | { maxRounds: number; round: number; status: string; text: string } };
+});
+
 vi.mock("@/features/chat/goal/use-thread-goal", () => {
-    return { useThreadGoal: () => null };
+    return { useThreadGoal: () => goalState.goal };
 });
 vi.mock("@/features/chat/thread/composer-permission-mode", () => {
     return { useShownPermissionMode: () => undefined };
@@ -69,6 +73,7 @@ const SESSION = { agentLabel: "Coding agent", deviceId: "d1", folderLabel: "~/wo
 const renderBox = () => render(<ThreadContext thread={{ runner: "host" }} threadId="t1" />);
 
 beforeEach(() => {
+    goalState.goal = null;
     answers.clear();
     answers.set("hostSession", { data: SESSION });
 });
@@ -129,5 +134,16 @@ describe(ThreadContext, () => {
 
         expect(screen.getByText("Pull requests")).toBeTruthy();
         expect(screen.getByText("linked pull requests")).toBeTruthy();
+    });
+
+    it.each([
+        ["an active goal on its first round", { round: 0, status: "active" }, "1/3"],
+        ["an active goal on its last round", { round: 3, status: "active" }, "3/3"],
+        ["a met goal, by the rounds it took", { round: 2, status: "met" }, "2/3"],
+    ])("shows %s", (_case, goal, shown) => {
+        goalState.goal = { maxRounds: 3, text: "Ship the pricing page", ...goal };
+        renderBox();
+
+        expect(screen.getByText(shown)).toBeTruthy();
     });
 });
