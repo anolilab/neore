@@ -47,11 +47,11 @@ const TranscriptionNodeComponent = (props: NodeProps<Node<TranscriptionNodeData>
         <BaseNode {...props} color={config.color} icon={<Mic className="size-4" />} inputs={config.handles.inputs} outputs={config.handles.outputs}>
             <div className="space-y-3">
                 <div className="space-y-1.5">
-                    <Label className="text-muted-foreground text-xs">
+                    <Label className="text-muted-foreground text-xs" htmlFor={`${id}-language`}>
                         <Trans>Language</Trans>
                     </Label>
                     <Select onValueChange={handleLanguageChange} value={data.language ?? "auto"}>
-                        <SelectTrigger className="nodrag h-8 text-sm">
+                        <SelectTrigger className="nodrag h-8 text-sm" id={`${id}-language`}>
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>

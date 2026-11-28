@@ -160,7 +160,7 @@ const WorkflowToolbar = () => {
 
     return (
         <div className="absolute top-1/2 left-4 z-10 -translate-y-1/2">
-            <div className="bg-background/95 flex flex-col gap-0.5 rounded-lg border p-1.5 shadow-lg backdrop-blur-sm">
+            <div className="surface-raised flex flex-col gap-0.5 rounded-xl p-1.5">
                 {/* Grouped base nodes */}
                 {grouped.map((group) => {
                     const config = NODE_CONFIGS[group.type];
@@ -201,7 +201,7 @@ const WorkflowToolbar = () => {
 
                             {/* Expanded children */}
                             {isExpanded && (
-                                <div className="mt-0.5 mb-1 ml-4 flex flex-col gap-0.5 border-l-2 pl-0.5" style={{ borderColor: `${config.color}40` }}>
+                                <div className="mt-0.5 mb-1 ml-4 flex flex-col gap-0.5 border-l pl-0.5" style={{ borderColor: `${config.color}40` }}>
                                     {group.children.map(({ icon, type }) => (
                                         <NodeButton icon={icon} indented key={type} onDragStart={onDragStart} type={type} />
                                     ))}
@@ -212,7 +212,7 @@ const WorkflowToolbar = () => {
                 })}
 
                 {/* Divider */}
-                <div className="border-border/60 my-1 border-t" />
+                <div className="border-border/50 my-1 border-t" />
 
                 {/* Standalone utility nodes */}
                 {standalone.map(({ icon, type }) => (

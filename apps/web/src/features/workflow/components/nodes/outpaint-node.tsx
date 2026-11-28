@@ -104,11 +104,11 @@ const OutpaintNodeComponent = (props: NodeProps<Node<OutpaintNodeData>>) => {
 
                 <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1.5">
-                        <Label className="text-muted-foreground text-xs">
+                        <Label className="text-muted-foreground text-xs" htmlFor={`${id}-direction`}>
                             <Trans>Direction</Trans>
                         </Label>
                         <Select onValueChange={handleDirectionChange} value={data.expandDirection ?? "all"}>
-                            <SelectTrigger className="nodrag h-8 text-sm">
+                            <SelectTrigger className="nodrag h-8 text-sm" id={`${id}-direction`}>
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -125,7 +125,15 @@ const OutpaintNodeComponent = (props: NodeProps<Node<OutpaintNodeData>>) => {
                         <Label className="text-muted-foreground text-xs">
                             <Trans>Expand: {expandPixels}px</Trans>
                         </Label>
-                        <Slider className="nodrag" max={1024} min={64} onValueChange={handlePixelsChange} step={64} value={[data.expandPixels ?? 256]} />
+                        <Slider
+                            className="nodrag"
+                            max={1024}
+                            min={64}
+                            onValueChange={handlePixelsChange}
+                            step={64}
+                            thumbLabel={t`Expand: ${expandPixels}px`}
+                            value={[data.expandPixels ?? 256]}
+                        />
                     </div>
                 </div>
 
