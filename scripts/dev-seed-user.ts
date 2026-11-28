@@ -7,14 +7,24 @@
  * the local database directly. Idempotent: an account that already signs in is
  * left alone.
  *
+ * The invitation call sends the e2e seed token, so the script refuses any
+ * backend whose host is not exactly a loopback name. The password is not printed;
+ * it is the fixture in `apps/web/e2e/fixtures.ts`.
+ *
  * Needs the backend running (`pnpm dev:backend`) and `E2E_SEED_TOKEN` in
  * `backend/.dev.vars` (written by `pnpm dev:setup`).
  *
  *     pnpm dev:seed-user
  */
-import { TEST_USER } from "../apps/web/e2e/fixtures";
+import { LUNORA_URL, TEST_USER } from "../apps/web/e2e/fixtures";
 import { ensureInvitedUser } from "../apps/web/e2e/seed";
+
+const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
+
+if (!LOOPBACK_HOSTS.has(new URL(LUNORA_URL).hostname)) {
+    throw new Error(`Refusing to send the e2e seed token to ${new URL(LUNORA_URL).host}: only a loopback backend is seeded.`);
+}
 
 await ensureInvitedUser(TEST_USER);
 
-console.log(`Dummy login ready: ${TEST_USER.email} / ${TEST_USER.password}`);
+console.log(`Dummy login ready for ${TEST_USER.email}. Its credentials are in the e2e fixtures, apps/web/e2e/fixtures.ts.`);
