@@ -42,6 +42,7 @@
         "dev:embeddings": "vis run dev --projects=embeddings",
         "dev:llm-gateway": "vis run dev --projects=llm-gateway",
         "dev:nsfw-checker": "vis run dev --projects=nsfw-checker",
+        "dev:seed-user": "tsx scripts/dev-seed-user.ts",
         "dev:setup": "node scripts/dev-setup.js",
         "dev:stack": "vis run dev --projects=@neore/web,@neore/backend,llm-gateway,embeddings",
         "env:generate-encryption": "node scripts/generate-encryption-key.js",
