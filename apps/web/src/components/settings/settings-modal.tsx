@@ -394,6 +394,8 @@ export const SettingsModal: FC = () => {
     );
 
     const handleClose = () => {
+        // Closed here, not by the URL: the URL change still on its way must not close a modal the gear opens meanwhile.
+        isOpenInUrl.current = false;
         close(); // Instant via Zustand — no navigation delay
         // Clean up URL params in the background
         // The registered router type is the widened `createTanstackRouter` return (see the
