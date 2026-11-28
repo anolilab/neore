@@ -23,12 +23,14 @@ type Unit = "month" | "week" | "year";
 type Tense = "future" | "past" | undefined;
 
 /** A time phrase before it is resolved against a day. */
-export type TimePhrase = (
-    | { day?: number; kind: "date"; month: number; tense: Tense; year?: number }
-    | { days: number; kind: "offset" }
-    | { kind: "relative"; shift: Shift; unit: Unit }
-    | { kind: "year"; year: number }
-) & { onlyTime?: boolean };
+export type TimePhrase =
+    /** `yearShift`: a relative year beside the month ("in May last year"), counted from today's year. */
+    (
+        | { day?: number; kind: "date"; month: number; tense: Tense; year?: number; yearShift?: Shift }
+        | { days: number; kind: "offset" }
+        | { kind: "relative"; shift: Shift; unit: Unit }
+        | { kind: "year"; year: number }
+    ) & { onlyTime?: boolean };
 
 interface Lexicon {
     /** Words after a number of days that count back (`3 days ago`). */
@@ -39,7 +41,10 @@ interface Lexicon {
     ahead: string[];
     /** Question and agenda words: a question of only these and time words asks about the time alone. */
     asking: string[];
-    /** A day word, and the words before it that make it something else (`guten Morgen` is no tomorrow). */
+    /**
+     * A day word, and the words before it that make it something else (`guten Morgen` is no tomorrow), right before it
+     * or with an adjective between (`am frühen Morgen`).
+     */
     days: Record<string, { blockedAfter?: string[]; offset: number }>;
     dayUnits: string[];
     /** Words of a question about what will be (a month without a year is then the next one). */
@@ -92,8 +97,8 @@ const GERMAN: Lexicon = {
     days: {
         gestern: { offset: -1 },
         heute: { offset: 0 },
-        // `heute Morgen` reads `heute` first; `guten Morgen`, `am Morgen`, `jeden Morgen` are mornings, not tomorrow.
-        morgen: { blockedAfter: ["guten", "am", "jeden", "diesen", "den", "einen", "dem"], offset: 1 },
+        // `heute Morgen` reads `heute` first; `guten Morgen`, `am (frühen) Morgen`, `jeden Morgen` are mornings, not tomorrow.
+        morgen: { blockedAfter: ["guten", "am", "jeden", "diesen", "den", "einen", "dem", "der", "vom", "heute", "gestern"], offset: 1 },
     },
     dayUnits: ["tag", "tage", "tagen"],
     future: ["werde", "wird", "werden", "plane", "planen", "geplant", "pläne", "plan", "vor", "bevorstehend", "ansteht", "kommenden", "nächsten"],
@@ -124,6 +129,8 @@ const TOKEN_RE = /[\p{L}\p{N}]+/gu;
 const YEAR_RE = /^(?:19|20|21)\d{2}$/u;
 const DAY_NUMBER_RE = /^(\d{1,2})(?:st|nd|rd|th)?$/u;
 const SMALL_NUMBER_RE = /^\d{1,3}$/u;
+/** A German adjective's ending before a noun: `frühen`, `späten`, `ganzen`. */
+const isAdjective = (word: string): boolean => word.length > 3 && ["en", "em", "er"].some((ending) => word.endsWith(ending));
 
 interface Token {
     end: number;
@@ -178,7 +185,10 @@ const phraseAt = (words: string[], at: number, lexicon: Lexicon, tense: Tense): 
     const [word, next, after] = [words[at]!, words[at + 1], words[at + 2]];
     const day = lexicon.days[word];
 
-    if (day !== undefined && !day.blockedAfter?.includes(words[at - 1] ?? "")) {
+    const [before, adjective] = [words[at - 2] ?? "", words[at - 1] ?? ""];
+    const blocked = day?.blockedAfter?.includes(adjective) === true || (isAdjective(adjective) && day?.blockedAfter?.includes(before) === true);
+
+    if (day !== undefined && !blocked) {
         return { days: day.offset, kind: "offset" };
     }
 
@@ -244,27 +254,35 @@ const tenseOf = (words: string[], lexicon: Lexicon): Tense => {
     return past ? "past" : "future";
 };
 
-const isKnown = (word: string): boolean =>
-    DAY_NUMBER_RE.test(word) ||
-    YEAR_RE.test(word) ||
-    LEXICONS.some((lexicon) =>
-        [
-            lexicon.agoAfter,
-            lexicon.agoBefore,
-            lexicon.ahead,
-            lexicon.asking,
-            lexicon.dayUnits,
-            lexicon.future,
-            lexicon.leads,
-            lexicon.past,
-            lexicon.yearLeads,
-            ...lexicon.months,
-            Object.keys(lexicon.days),
-            Object.keys(lexicon.numbers),
-            Object.keys(lexicon.shifts),
-            Object.keys(lexicon.units),
-        ].some((words) => words.includes(word)),
-    );
+/** Every word a lexicon knows. */
+const LEXICON_WORDS = new Map(
+    LEXICONS.map((lexicon) => [
+        lexicon,
+        new Set(
+            [
+                lexicon.agoAfter,
+                lexicon.agoBefore,
+                lexicon.ahead,
+                lexicon.asking,
+                lexicon.dayUnits,
+                lexicon.future,
+                lexicon.leads,
+                lexicon.past,
+                lexicon.yearLeads,
+                ...lexicon.months,
+                Object.keys(lexicon.days),
+                Object.keys(lexicon.numbers),
+                Object.keys(lexicon.shifts),
+                Object.keys(lexicon.units),
+            ].flat(),
+        ),
+    ]),
+);
+
+const isKnown = (word: string): boolean => DAY_NUMBER_RE.test(word) || YEAR_RE.test(word) || LEXICONS.some((lexicon) => LEXICON_WORDS.get(lexicon)!.has(word));
+
+/** The words that may join a month and a relative year: `in May last year`, `letztes Jahr im Mai`. */
+const MAX_YEAR_GAP = 4;
 
 /** The text's ISO date if it has one (the most exact a question can be), else its first time phrase in any language read. */
 export const readTimePhrase = (text: string): TimePhrase | undefined => {
@@ -272,7 +290,46 @@ export const readTimePhrase = (text: string): TimePhrase | undefined => {
     const lowered = text.slice(0, MAX_TEXT_LENGTH).normalize("NFC").toLowerCase();
     const tokens = tokensOf(lowered);
     const words = tokens.map(({ word }) => word);
-    const tenses = LEXICONS.map((lexicon) => tenseOf(words, lexicon));
+    // The language that knows most of the question's words reads first, and its own words give the tense: `am 3. April`
+    // is German in "was habe ich am 3. April gemacht", whose `was` is no English past. A tie keeps `LEXICONS` order.
+    const known = (lexicon: Lexicon): number => words.filter((word) => LEXICON_WORDS.get(lexicon)!.has(word)).length;
+    const ranked = LEXICONS.toSorted((a, b) => known(b) - known(a)).map((lexicon) => {
+        return { lexicon, tense: tenseOf(words, lexicon) };
+    });
+    const phraseFrom = (index: number): TimePhrase | undefined => ranked.map(({ lexicon, tense }) => phraseAt(words, index, lexicon, tense)).find(Boolean);
+    // A month without a year and a relative year near it are one time: `in May last year` is May of 2025.
+    const yearShiftNear = (from: number): Shift | undefined => {
+        for (let index = from + 1; index <= from + MAX_YEAR_GAP && index < tokens.length; index += 1) {
+            const near = phraseFrom(index);
+
+            if (near?.kind === "relative" && near.unit === "year") {
+                return near.shift;
+            }
+        }
+
+        return undefined;
+    };
+    const withNearYear = (phrase: TimePhrase, index: number): TimePhrase => {
+        if (phrase.kind === "date" && phrase.year === undefined) {
+            const yearShift = yearShiftNear(index);
+
+            return yearShift === undefined ? phrase : { ...phrase, yearShift };
+        }
+
+        if (phrase.kind !== "relative" || phrase.unit !== "year") {
+            return phrase;
+        }
+
+        for (let next = index + 1; next <= index + MAX_YEAR_GAP && next < tokens.length; next += 1) {
+            const month = phraseFrom(next);
+
+            if (month?.kind === "date" && month.year === undefined) {
+                return { ...month, yearShift: phrase.shift };
+            }
+        }
+
+        return phrase;
+    };
 
     const at = (read: (index: number) => TimePhrase | undefined): TimePhrase | undefined => {
         for (let index = 0; index < tokens.length; index += 1) {
@@ -288,7 +345,11 @@ export const readTimePhrase = (text: string): TimePhrase | undefined => {
 
     const phrase =
         at((index) => isoAt(lowered, tokens, index)) ??
-        at((index) => LEXICONS.map((lexicon, which) => phraseAt(words, index, lexicon, tenses[which])).find(Boolean));
+        at((index) => {
+            const found = phraseFrom(index);
+
+            return found === undefined ? undefined : withNearYear(found, index);
+        });
 
     return phrase === undefined ? undefined : { ...phrase, onlyTime: words.every((word) => isKnown(word)) };
 };
@@ -331,8 +392,8 @@ const spanOf = (phrase: TimePhrase, today: string): Span | undefined => {
     const [year, month, day] = today.split("-").map(Number) as [number, number, number];
 
     if (phrase.kind === "date") {
-        if (phrase.year !== undefined) {
-            return calendarSpan(phrase.year, phrase.month, phrase.day);
+        if (phrase.year !== undefined || phrase.yearShift !== undefined) {
+            return calendarSpan(phrase.year ?? year + phrase.yearShift!, phrase.month, phrase.day);
         }
 
         const current = calendarSpan(year, phrase.month, phrase.day);

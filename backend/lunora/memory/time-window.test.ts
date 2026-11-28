@@ -59,6 +59,16 @@ describe("timeWindowOf", () => {
         ["wohin bin ich im Mai 2023 gereist", ["2023-05-01", "2023-05-31"]],
         ["wo habe ich im Jahr 2023 gewohnt", ["2023-01-01", "2023-12-31"]],
         ["die Reise im März 2024", ["2024-03-01", "2024-03-31"]],
+        // A month with a relative year beside it, before or after
+        ["what did I do in May last year", ["2025-05-01", "2025-05-31"]],
+        ["plans for December next year", ["2027-12-01", "2027-12-31"]],
+        ["the trip in May this year", ["2026-05-01", "2026-05-31"]],
+        ["was war im Mai letzten Jahres", ["2025-05-01", "2025-05-31"]],
+        ["letztes Jahr im Mai", ["2025-05-01", "2025-05-31"]],
+        ["nächstes Jahr am 3. April", ["2027-04-03", "2027-04-03"]],
+        // `Morgen` the time of day is no tomorrow; `morgen` the adverb is
+        ["habe ich morgen frei", ["2026-11-28", "2026-11-28"]],
+        ["wir sehen uns morgen früh", ["2026-11-28", "2026-11-28"]],
     ])("reads %j", (text, expected) => {
         expect(windowOf(text)).toEqual(expected);
     });
@@ -69,6 +79,9 @@ describe("timeWindowOf", () => {
         "march to the beat",
         "guten Morgen, wie geht's",
         "was mache ich jeden Morgen",
+        "was habe ich am frühen Morgen gemacht",
+        "am Morgen laufe ich",
+        "den ganzen Morgen geregnet",
         "a 2023 vintage from the shop",
         "walked 15000 steps",
         "an essay of 2050 words",
@@ -109,6 +122,13 @@ describe("timeWindowOf", () => {
         expect(windowOf("what is on 31 February")).toBeUndefined();
         expect(windowOf("what did I do last month", "2028-03-15")).toEqual(["2028-02-01", "2028-02-29"]);
         expect(windowOf("what is due in 3 days", "2028-02-27")).toEqual(["2028-03-01", "2028-03-01"]);
+    });
+
+    it("reads a German day-first date with German tense words, whatever English shares its month name", () => {
+        // English `was` is a past cue, German `was` is "what": the German words decide.
+        expect(windowOf("was habe ich am 3. April gemacht", "2026-03-10")).toEqual(["2025-04-03", "2025-04-03"]);
+        expect(windowOf("was habe ich am 3. april vor", "2026-03-10")).toEqual(["2026-04-03", "2026-04-03"]);
+        expect(windowOf("what did I do on 3 April", "2026-03-10")).toEqual(["2025-04-03", "2025-04-03"]);
     });
 
     it("crosses into the next year from December", () => {
