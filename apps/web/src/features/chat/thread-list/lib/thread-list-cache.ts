@@ -104,6 +104,7 @@ export interface PersistedThreadList {
 const THREAD_FIELDS = [
     "_creationTime",
     "_id",
+    "autoModel",
     "category",
     "createdAt",
     "expiresAt",
@@ -159,6 +160,13 @@ const pickThread = (source: unknown): PersistedRecord | undefined => {
         delete picked.title;
     }
 
+    // The row names the agent's model after an agent switch; stored flat, since a stored row holds plain values only.
+    const agentModel = isRecord(source) && isRecord(source.activeAgent) ? source.activeAgent.model : undefined;
+
+    if (picked && typeof agentModel === "string") {
+        picked.activeAgentModel = agentModel;
+    }
+
     return picked;
 };
 
@@ -199,7 +207,13 @@ export const toThreadListData = (persisted: PersistedThreadList) => {
         tags: persisted.tags,
         temporaryThreads: { continueCursor: "", isDone: true, page: persisted.temporaryThreads },
         threadOrders: persisted.threadOrders,
-        threads: { continueCursor: "", isDone: true, page: persisted.threads },
+        threads: {
+            continueCursor: "",
+            isDone: true,
+            page: persisted.threads.map(({ activeAgentModel, ...row }): Record<string, unknown> =>
+                typeof activeAgentModel === "string" ? { ...row, activeAgent: { model: activeAgentModel } } : row,
+            ),
+        },
     };
 };
 
@@ -215,6 +229,8 @@ export const getThreadListStorage = (): Storage | undefined => {
 const FIELD_TYPES: Record<string, (value: unknown) => boolean> = {
     _creationTime: (value) => typeof value === "number",
     _id: (value) => typeof value === "string",
+    activeAgentModel: (value) => typeof value === "string",
+    autoModel: (value) => typeof value === "boolean",
     branchPoint: (value) => typeof value === "number",
     branchType: (value) => typeof value === "string",
     category: (value) => typeof value === "string",

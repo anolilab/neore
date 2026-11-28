@@ -59,7 +59,7 @@ const ChatSiteHeader: FC<{ threadId?: string }> = ({ threadId }) => {
     const { setThreadMetadata } = useThreadActions();
     const model = threadData?.model;
     // The panel shows this same thread (the page's own or the focused pane's), so its context box is the header's thread's.
-    const isContextShown = useThreadContextShown(model) && isValid;
+    const isContextShown = useThreadContextShown(validThreadId, model) && isValid;
     // Shown as it is: no copy of its own, so a rename from the list is what the header renders next time.
     const currentTitle = (isValid ? titleOnScreen(actualThreadId ?? "", threadData?.title) : threadData?.title) || title;
 

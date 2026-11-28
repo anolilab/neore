@@ -6,7 +6,7 @@ import { Plural, useLingui } from "@lingui/react/macro";
 import { DEFAULT_CHAT_MODEL } from "@neore/ai/constants";
 import type { Id } from "@neore/backend/dataModel";
 import { Button } from "@neore/ui/components/button";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQueries, useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { Loader2, Trash2, X } from "lucide-react";
@@ -20,6 +20,7 @@ import {
     useDeleteProject,
     useMoveThreadToProject,
     usePinProject,
+    useProjectList,
     useProjects,
     useUnpinProject,
     useUpdateProjectOrder,
@@ -581,10 +582,40 @@ const HierarchicalThreadList: FC<
         return map;
     }, [projects]);
 
-    // The rows' second line names a project by its title and a model only when it is not the one a new chat starts on.
+    // The rows' second line names a project by its title, and a model only when it is not one a new chat starts on.
     const { data: aiPreferences } = useQuery(crpc.auth.functions.getAIUserPreferences.queryOptions({}));
-    const defaultModel =
-        aiPreferences === undefined ? undefined : ((aiPreferences?.defaultModels as { textToText?: string } | undefined)?.textToText ?? DEFAULT_CHAT_MODEL);
+    const defaultModels = useMemo(() => {
+        if (aiPreferences === undefined) {
+            return undefined;
+        }
+
+        const saved = (aiPreferences?.defaultModels ?? {}) as Record<string, string | undefined>;
+
+        return new Set([DEFAULT_CHAT_MODEL, ...Object.values(saved).filter((model): model is string => typeof model === "string")]);
+    }, [aiPreferences]);
+    // The project list is one page; when it is cut, the few projects of rows beyond it are read by id, not left unnamed.
+    const { hasMore: projectListCut } = useProjectList();
+    const unlistedProjectIds = useMemo(() => {
+        if (!projectListCut) {
+            return [];
+        }
+
+        const ids = new Set<string>();
+        const rows = (threadsData?.page ?? []) as { projectId?: string }[];
+
+        for (const thread of rows) {
+            if (thread.projectId && !projectsMap.has(thread.projectId)) {
+                ids.add(thread.projectId);
+            }
+        }
+
+        return [...ids];
+    }, [projectListCut, projectsMap, threadsData]);
+    // Joined into one string, so the hints below change only when a title does, not on every render.
+    const unlistedTitlesKey = useQueries({
+        combine: (results) => results.map((query) => query.data?.title ?? "").join("\n"),
+        queries: unlistedProjectIds.map((projectId) => crpc.projects.functions.getProject.queryOptions({ projectId: projectId as Id<"projects"> })),
+    });
     const rowHints = useMemo(() => {
         const projectTitles = new Map<string, string>();
 
@@ -592,8 +623,18 @@ const HierarchicalThreadList: FC<
             projectTitles.set(projectId, project.title);
         }
 
-        return { defaultModel, projectTitles };
-    }, [defaultModel, projectsMap]);
+        const unlistedTitles = unlistedTitlesKey.split("\n");
+
+        unlistedProjectIds.forEach((projectId, index) => {
+            const title = unlistedTitles[index];
+
+            if (title) {
+                projectTitles.set(projectId, title);
+            }
+        });
+
+        return { defaultModels, projectTitles };
+    }, [defaultModels, projectsMap, unlistedProjectIds, unlistedTitlesKey]);
 
     const handleEditProject = useCallback(
         (projectId: string) => {

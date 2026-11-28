@@ -475,9 +475,11 @@ describe("ThreadNode", () => {
         const OTHER = "acme/deep-model-2";
 
         /** The row as the list renders it: the hints the list answered once, and the project section the row sits in. */
-        const renderIn = (node: object, { defaultModel = DEFAULT, group }: { defaultModel?: string | null; group?: string } = {}) =>
+        const renderIn = (node: object, { defaultModels = [DEFAULT], group }: { defaultModels?: string[] | null; group?: string } = {}) =>
             render(
-                <ThreadRowHintsContext value={{ defaultModel: defaultModel ?? undefined, projectTitles: new Map([["p1", "Q1 Launch"]]) }}>
+                <ThreadRowHintsContext
+                    value={{ defaultModels: defaultModels === null ? undefined : new Set(defaultModels), projectTitles: new Map([["p1", "Q1 Launch"]]) }}
+                >
                     <GroupProjectContext value={group}>
                         <ThreadNode {...baseProps} node={{ ...plain, ...node }} />
                     </GroupProjectContext>
@@ -497,8 +499,14 @@ describe("ThreadNode", () => {
             expect(screen.getByText("deep-model-2")).toBeTruthy();
         });
 
+        it("says nothing for an image chat on the user's image default, which is a default of its own kind", () => {
+            renderIn({ model: OTHER }, { defaultModels: [DEFAULT, OTHER] });
+
+            expect(screen.queryByText("deep-model-2")).toBeNull();
+        });
+
         it("names no model before the default is known, so none shows and goes", () => {
-            renderIn({ model: OTHER }, { defaultModel: null });
+            renderIn({ model: OTHER }, { defaultModels: null });
 
             expect(screen.queryByText("deep-model-2")).toBeNull();
         });

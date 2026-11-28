@@ -767,13 +767,13 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
     const isHostRun = node.runner === "host";
     // What tells this thread from the next: its project (unless the section already is that project) and its model (unless it is the
     // one a new chat starts on, which every other row would only repeat). A locked chat shows nothing about itself.
-    const { defaultModel, projectTitles } = useThreadRowHints();
+    const { defaultModels, projectTitles } = useThreadRowHints();
     const groupProjectId = useGroupProjectId();
     const projectName = !isLocked && node.projectId && node.projectId !== groupProjectId ? projectTitles.get(node.projectId) : undefined;
     // After an agent switch the agent's model is the one the thread runs on; a thread on your computer runs the coding agent's own.
     const runModel = node.activeAgent?.model ?? node.model;
     const isAutoModel = node.autoModel === true && node.activeAgent === undefined;
-    const hasOwnModel = !isLocked && !isHostRun && defaultModel !== undefined && (isAutoModel || (runModel !== undefined && runModel !== defaultModel));
+    const hasOwnModel = !isLocked && !isHostRun && defaultModels !== undefined && (isAutoModel || (runModel !== undefined && !defaultModels.has(runModel)));
     const cachedModelName = useCachedModelName(hasOwnModel && !isAutoModel ? runModel : undefined);
     let modelName: string | undefined;
 
