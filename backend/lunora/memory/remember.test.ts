@@ -634,6 +634,23 @@ describe(rememberFactFor, () => {
             expect(await memories()).toHaveLength(0);
         });
 
+        it("makes no embedding call when the claim ran out during the extraction call, and still saves the fact by text", async () => {
+            const ids = await setUp();
+
+            generateText.mockImplementationOnce(async () => {
+                // The extraction answers with less than the margin left on the chat's claim.
+                vi.setSystemTime(Date.now() + REMEMBER_DISPATCH_TTL_MS - REMEMBER_CALL_MARGIN_MS + 1000);
+
+                return {
+                    output: { facts: [{ asked: true, confidence: 90, importance: 70, memory: "User is vegan", quote: "I'm vegan", type: "preference" }] },
+                };
+            });
+
+            await expect(remember(ids)).resolves.toMatchObject({ facts: [{ asked: true, memory: "User is vegan", status: "saved" }], status: "saved" });
+            expect(embedMany).not.toHaveBeenCalled();
+            await expect(dispatchInFlight(ids.threadId)).resolves.toBe(false);
+        });
+
         it("aborts a provider call at what is left of the claim, less the margin, and lets the lock through", async () => {
             const ids = await setUp();
             const deadline = new AbortController();
@@ -684,6 +701,7 @@ describe(rememberFactFor, () => {
 
         await expect(remember(ids)).resolves.toMatchObject({ status: "saved" });
         expect(embedMany).toHaveBeenCalledTimes(1);
+        expect(embedMany).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ abortSignal: expect.any(AbortSignal) }));
         expect(lockDuringEmbedding).toMatchObject({ code: "CONFLICT" });
         await expect(dispatchInFlight(ids.threadId)).resolves.toBe(false);
         await expect(lockChat(ids.threadId)).resolves.toBeDefined();
@@ -864,6 +882,43 @@ describe(rememberFactFor, () => {
 
         expect(claim.claimedAt).toBe(newer);
         expect(claim.result).toBeUndefined();
+    });
+
+    it("releases the chat's dispatch claim before it gives the prompt back when the extraction throws", async () => {
+        const ids = await setUp();
+        const released: string[] = [];
+
+        await expect(
+            harness.action(async (ctx: any) => {
+                const throwing = Object.create(ctx, {
+                    runAction: {
+                        value: async () => {
+                            throw new Error("extraction failed");
+                        },
+                    },
+                    runMutation: {
+                        value: async (reference: unknown, args: Record<string, unknown>) => {
+                            // The dispatch release names the prompt and thread only; the prompt claim's release names its scope.
+                            if ("scope" in args && "claimedAt" in args) {
+                                released.push("prompt");
+                            } else if ("threadId" in args && !("claimedAt" in args)) {
+                                released.push("dispatch");
+                            }
+
+                            return await ctx.runMutation(reference, args);
+                        },
+                    },
+                });
+
+                return await rememberFactFor(throwing, {
+                    promptMessageId: ids.promptMessageId,
+                    replyKey: REPLY,
+                    threadId: ids.threadId as never,
+                    userId: USER,
+                });
+            }),
+        ).rejects.toThrow("extraction failed");
+        expect(released).toStrictEqual(["dispatch", "prompt"]);
     });
 
     it("returns the saved facts when marking the prompt handled fails", async () => {
