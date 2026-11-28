@@ -142,7 +142,13 @@ const ImageToVideoNode = (props: NodeProps<Node<ImageToVideoNodeData>>) => {
                 <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1.5">
                         <Label className="text-muted-foreground text-xs">FPS</Label>
-                        <Select onValueChange={handleFpsChange} value={String(data.fps ?? 24)}>
+                        <Select
+                            items={currentModelInfo.supportedFps.map((fps) => {
+                                return { label: <Trans>{fps} fps</Trans>, value: String(fps) };
+                            })}
+                            onValueChange={handleFpsChange}
+                            value={String(data.fps ?? 24)}
+                        >
                             <SelectTrigger className="nodrag h-8 text-sm">
                                 <SelectValue />
                             </SelectTrigger>

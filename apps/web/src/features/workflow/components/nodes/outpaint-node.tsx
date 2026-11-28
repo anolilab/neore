@@ -107,7 +107,13 @@ const OutpaintNodeComponent = (props: NodeProps<Node<OutpaintNodeData>>) => {
                         <Label className="text-muted-foreground text-xs">
                             <Trans>Direction</Trans>
                         </Label>
-                        <Select onValueChange={handleDirectionChange} value={data.expandDirection ?? "all"}>
+                        <Select
+                            items={EXPAND_DIRECTIONS.map((option) => {
+                                return { label: i18n._(option.label), value: option.value };
+                            })}
+                            onValueChange={handleDirectionChange}
+                            value={data.expandDirection ?? "all"}
+                        >
                             <SelectTrigger className="nodrag h-8 text-sm">
                                 <SelectValue />
                             </SelectTrigger>

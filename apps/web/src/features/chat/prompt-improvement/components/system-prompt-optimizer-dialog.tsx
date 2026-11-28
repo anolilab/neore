@@ -237,6 +237,9 @@ const SystemPromptOptimizerDialogBody: FC<SystemPromptOptimizerDialogBodyProps> 
                 <div className="space-y-2">
                     <Label htmlFor="system-prompt-style">{t`Optimization style`}</Label>
                     <Select<SystemOptimizerStyle>
+                        items={STYLE_OPTIONS.map((option) => {
+                            return { label: styleLabels.system[option].label, value: option };
+                        })}
                         onValueChange={(value) => {
                             if (value) {
                                 setStyle(value);

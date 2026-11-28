@@ -246,7 +246,11 @@ const UsageSettings: FC = () => {
                     <p className="text-muted-foreground text-sm">{t`Track your LLM token usage, cost, and set budget alerts`}</p>
                 </div>
 
-                <Select onValueChange={(v) => v && setDays(Number(v) as 7 | 30 | 90)} value={String(days)}>
+                <Select
+                    items={{ "30": t`Last 30 days`, "7": t`Last 7 days`, "90": t`Last 90 days` }}
+                    onValueChange={(v) => v && setDays(Number(v) as 7 | 30 | 90)}
+                    value={String(days)}
+                >
                     <SelectTrigger className="w-[130px]">
                         <SelectValue />
                     </SelectTrigger>
@@ -448,6 +452,9 @@ const UsageSettings: FC = () => {
                                         <div className="space-y-1.5">
                                             <Label htmlFor="alert-metric">{t`Metric`}</Label>
                                             <Select
+                                                items={(Object.entries(METRIC_LABELS) as [Metric, MessageDescriptor][]).map(([value, label]) => {
+                                                    return { label: i18n._(label), value };
+                                                })}
                                                 onValueChange={(v) =>
                                                     v &&
                                                     setFormData((f) => {
@@ -472,6 +479,9 @@ const UsageSettings: FC = () => {
                                         <div className="space-y-1.5">
                                             <Label htmlFor="alert-period">{t`Period`}</Label>
                                             <Select
+                                                items={(Object.entries(PERIOD_LABELS) as [Period, MessageDescriptor][]).map(([value, label]) => {
+                                                    return { label: i18n._(label), value };
+                                                })}
                                                 onValueChange={(v) =>
                                                     v &&
                                                     setFormData((f) => {
@@ -518,6 +528,9 @@ const UsageSettings: FC = () => {
                                         <div className="space-y-1.5">
                                             <Label htmlFor="alert-action">{t`Action`}</Label>
                                             <Select
+                                                items={(Object.entries(ACTION_LABELS) as [RuleAction, MessageDescriptor][]).map(([value, label]) => {
+                                                    return { label: i18n._(label), value };
+                                                })}
                                                 onValueChange={(v) =>
                                                     v &&
                                                     setFormData((f) => {

@@ -111,6 +111,12 @@ interface MediaGalleryViewProps {
  */
 const MediaGalleryView: FC<MediaGalleryViewProps> = ({ className, maxWidth = "65ch" }) => {
     const { i18n, t } = useLingui();
+    const qualityItems = QUALITY_OPTIONS.map((option) => {
+        return { label: typeof option.label === "string" ? option.label : i18n._(option.label), value: option.value };
+    });
+    const styleItems = STYLE_OPTIONS.map((option) => {
+        return { label: i18n._(option.label), value: option.value || "auto" };
+    });
     const models = useFeatureFlaggedModels();
     const modelsMap = useMemo(() => new Map(models.map((m) => [m.id, m])), [models]);
     const { messages } = useChatMessages();
@@ -483,6 +489,7 @@ const MediaGalleryView: FC<MediaGalleryViewProps> = ({ className, maxWidth = "65
                                         <Label className="text-sm font-medium">{t`Quality`}</Label>
                                         <Select
                                             disabled={isStreaming}
+                                            items={qualityItems}
                                             onValueChange={(value) => setImageSettings({ quality: value as "standard" | "hd" })}
                                             value={imageSettings.quality || "standard"}
                                         >
@@ -504,6 +511,7 @@ const MediaGalleryView: FC<MediaGalleryViewProps> = ({ className, maxWidth = "65
                                         <Label className="text-sm font-medium">{t`Style`}</Label>
                                         <Select
                                             disabled={isStreaming}
+                                            items={styleItems}
                                             onValueChange={(value) => setImageSettings({ style: value || undefined })}
                                             value={imageSettings.style || ""}
                                         >

@@ -10,10 +10,10 @@ import searchMemoryTool from "./search-memory";
 const FOUND = [{ category: "preference", confidence: 90, lastConfirmedAt: Date.UTC(2026, 10, 20, 23, 30), memory: "Likes tea", memoryId: "m1", score: 0.9 }];
 
 /** `wrapTools` attaches the agent's ctx to the tool object; `execute` reads it from there. */
-const run = (context: unknown) =>
+const run = (context: unknown, query = "what does the user drink") =>
     (searchMemoryTool as unknown as { execute: (input: unknown, options: unknown) => unknown }).execute.call(
         { ...searchMemoryTool, ctx: context },
-        { query: "what does the user drink" },
+        { query },
         {},
     );
 
@@ -36,6 +36,17 @@ describe("search_memory", () => {
         await expect(run(contextWith(async () => "Pacific/Auckland"))).resolves.toMatchObject({
             memories: [{ confirmedOn: "2026-11-21", memory: "Likes tea" }],
         });
+    });
+
+    it("reads the timezone once for a search naming a time, and hands it to the search", async () => {
+        const context = contextWith(async () => "Pacific/Auckland");
+
+        await run(context, "what did I drink last week");
+
+        expect(context.runQuery).toHaveBeenCalledTimes(1);
+        expect(context.runAction).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ timeZone: "Pacific/Auckland" }));
+        await run(context);
+        expect(context.runAction).toHaveBeenLastCalledWith(expect.anything(), expect.not.objectContaining({ timeZone: expect.anything() }));
     });
 
     it("still returns the found memories, dated in UTC, when the timezone read fails", async () => {

@@ -19,6 +19,8 @@ import { loadModelFilterRules } from "../chat/lib/model-filter-rules";
 import { isSearchIndexBuilding } from "../lib/search-index";
 import { gatewayFetch } from "../lib/services";
 import { getMemoryEmbeddingModel, MEMORY_EMBEDDING_MODEL_NAME } from "./dedup";
+import { localDayOf } from "./reflection-logic";
+import { withClaimDeadline } from "./remember-dispatch";
 import {
     CANDIDATE_WINDOW_SIZE,
     fuseSearchHits,
@@ -36,6 +38,8 @@ import {
     withSearchHits,
 } from "./retrieve-ranking";
 import type { RankedMemory } from "./retrieve-ranking";
+import { readTimePhrase, windowOf } from "./time-window";
+import type { TimeWindow } from "./time-window";
 
 // ============================================================================
 // Retrieval Types
@@ -51,13 +55,25 @@ export const retrieveRelevantMemories = internalAction
     .input({
         /** The bot the chat runs as: its memories join the user's own. Unset = the user's own only. */
         botId: v.optional(v.string()),
+        /**
+         * When the chat's dispatch claim the caller holds lapses (`forget.ts`): the embedding call ends before it, and is not
+         * made with no time left (`withClaimDeadline`), so the search is by keyword. Unset: no claim, no deadline.
+         */
+        dispatchExpiresAt: v.optional(v.number()),
         /** Most memories returned for a `search`: up to `SEARCH_MAX_RESULTS`. Unused for injection, which keeps its own cap. */
         limit: v.optional(v.number()),
         // The user's local day when the caller asked: part of the chat-side cache key, not read by the search.
         localDay: v.optional(v.string()),
+        /** A `search` ordered by relevance alone before its `limit`, not by `score` (`forget.ts`). */
+        orderByRelevance: v.optional(v.boolean()),
         /** The `search_memory` tool: a lower relevance floor, no score threshold, and `limit` rows instead of the injection cap. */
         search: v.optional(v.boolean()),
         searchText: v.string(),
+        /**
+         * The run's timezone, for a time the search names ("last week"); `null` = the user has none (UTC). Unset = the
+         * user's stored one, read only then.
+         */
+        timeZone: v.optional(v.union(v.string(), v.null())),
         userId: v.string(),
     })
     .output(
@@ -70,6 +86,7 @@ export const retrieveRelevantMemories = internalAction
                 lastConfirmedAt: v.number(),
                 memory: v.string(),
                 memoryId: v.string(),
+                relevance: v.number(),
                 score: v.number(),
                 validUntil: v.optional(v.string()),
             }),
@@ -143,19 +160,25 @@ export const retrieveRelevantMemories = internalAction
             const rules = await loadModelFilterRules(ctx, args.userId);
             const { embeddingModelAllowed } = await import("../chat/lib/gateway-embedding-model");
 
-            // Rules that refuse the embedding model leave keyword scoring alone: the gateway would refuse the call.
+            // Rules that refuse the embedding model leave keyword scoring alone: the gateway would refuse the call. So does a
+            // dispatch claim with no time left once the model is set up (`withClaimDeadline`).
             if (embeddingModelAllowed(rules)) {
                 const embeddingModel = await getMemoryEmbeddingModel(gatewayFetch(ctx), rules);
                 const { embedMany } = await import("../agent/client/search");
 
-                const { embeddings } = await embedMany(ctx, {
-                    embeddingModel,
-                    threadId: undefined,
-                    userId: args.userId,
-                    values: [args.searchText.slice(0, 2000)],
-                });
+                const embedded = await withClaimDeadline(
+                    args.dispatchExpiresAt,
+                    async (abortSignal) =>
+                        await embedMany(ctx, {
+                            abortSignal,
+                            embeddingModel,
+                            threadId: undefined,
+                            userId: args.userId,
+                            values: [args.searchText.slice(0, 2000)],
+                        }),
+                );
 
-                const queryVector = embeddings[0];
+                const queryVector = embedded?.embeddings[0];
 
                 if (queryVector && queryVector.length > 0) {
                     const dimension = queryVector.length;
@@ -206,7 +229,26 @@ export const retrieveRelevantMemories = internalAction
         const keywordHits = topKeywordHits(lookups, windowMemories.length);
         const candidates = withSearchHits(windowMemories, fuseSearchHits(hitMemories, keywordHits), scope);
 
-        // 5. Score each memory (vector hit, else keyword) and keep the ones to inject, or for a search the ones to return
+        // 5. The time the search asks about ("last week", "im Dezember"), as days of the user's timezone; UTC without one,
+        // or when it cannot be read.
+        const phrase = readTimePhrase(args.searchText);
+        let timeWindow: TimeWindow | undefined;
+
+        // Only a search naming a time reads the zone, and only when the caller passed none (`null` is "none stored").
+        if (phrase !== undefined) {
+            const timeZone =
+                args.timeZone === undefined
+                    ? await ctx.runQuery(internal.memory.functions.getUserTimeZone, { userId: args.userId }).catch((error: unknown) => {
+                          console.warn("[memory/retrieve] Timezone read failed, reading the asked time in UTC:", error);
+
+                          return null;
+                      })
+                    : args.timeZone;
+
+            timeWindow = windowOf(phrase, localDayOf(now, timeZone));
+        }
+
+        // 6. Score each memory (vector hit, else keyword) and keep the ones to inject, or for a search the ones to return
         return rankMemories({
             candidates,
             // The whole search text: only the lookups and the embedding are bounded.
@@ -215,9 +257,11 @@ export const retrieveRelevantMemories = internalAction
                 limit: Math.min(Math.max(Math.trunc(args.limit ?? SEARCH_MAX_RESULTS), 1), SEARCH_MAX_RESULTS),
                 minKeywordRelevance: SEARCH_MIN_KEYWORD_RELEVANCE,
                 minRelevance: SEARCH_MIN_RELEVANCE,
+                orderByRelevance: args.orderByRelevance === true,
                 threshold: SEARCH_THRESHOLD,
             }),
             now,
+            ...(timeWindow !== undefined && { timeWindow }),
             vectorScores: vectorScoreMap,
             vectorSearched,
         });

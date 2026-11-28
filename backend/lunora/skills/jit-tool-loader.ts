@@ -48,6 +48,7 @@ const TOOL_REGISTRY: ToolDescriptor[] = [
     { category: "knowledge", description: "Search user's memories", name: "searchMemory" },
     { category: "knowledge", description: "Search what the user typed in earlier chats", name: "searchPastChats" },
     { category: "knowledge", description: "Save a fact the user asked to be remembered", name: "remember" },
+    { category: "knowledge", description: "Delete a memory the user asked to be forgotten", name: "forget" },
     { category: "creation", description: "Create a text document artifact", name: "createDocument" },
     { category: "creation", description: "Update an existing document", name: "updateDocument" },
     { category: "creation", description: "Create a design canvas", name: "createDesign" },
