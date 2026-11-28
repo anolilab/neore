@@ -59,7 +59,7 @@ import {
     saveMemoryVectors,
     type SimilarMemoryResult,
 } from "./dedup";
-import { evidenceMatchEnd, type MemoryEvidence, typedEvidenceQuote } from "./evidence";
+import { evidenceMatchEnd, type MemoryEvidence, mentionsHealth, typedEvidenceQuote } from "./evidence";
 import { type RequestedRefusal, textKey, vRequestedRefusal } from "./functions";
 import { logRedaction, redactMemoryFacts, redactMemoryText, type RedactionCounts } from "./redact";
 import {
@@ -137,7 +137,7 @@ const extractedFactSchema = z.object({
 /** What one fact of a run became: a new row, a row it confirmed, or a row it reworded; `memory` is the row's text now. */
 export const vRunFact = v.object({ asked: v.boolean(), memory: v.string(), status: v.union(v.literal("saved"), v.literal("known"), v.literal("updated")) });
 
-/** Why an asked fact was not kept: nothing but a secret, about the user's health, or not backed by their typed words. */
+/** Why an asked fact was not kept: nothing but a secret, about the user's health, or its quote refused (not their typed words, or beside a secret). */
 export const vAskedRefusal = v.union(v.literal("secret"), v.literal("health"), v.literal("unbacked"));
 
 export type AskedRefusal = Infer<typeof vAskedRefusal>;
@@ -594,8 +594,9 @@ ${args.requested ? REQUESTED_RULE : "Extract NEW facts about the user not alread
                 dropped.quoteRefused += 1;
             }
 
+            // The quote check refuses health words in the user's own span, which is the claimed quote up to case and spacing.
             if (fact.asked === true) {
-                refusedAsked.push("unbacked");
+                refusedAsked.push(fact.quote !== undefined && mentionsHealth(fact.quote) ? "health" : "unbacked");
             }
 
             return false;

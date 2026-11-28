@@ -464,6 +464,19 @@ describe(rememberFactFor, () => {
         expect(rows.map((row) => row.memory)).toStrictEqual(["User works as a nurse"]);
     });
 
+    it("names a health word the quote check refused as health, not as unbacked, beside a saved fact", async () => {
+        answer([
+            { memory: "User sees a doctor weekly", quote: "I see a doctor weekly" },
+            { asked: false, memory: "User works as a teacher", quote: "I work as a teacher" },
+        ]);
+
+        await expect(remember(await setUp({ prompt: "Remember I see a doctor weekly. I work as a teacher." }))).resolves.toStrictEqual({
+            facts: [{ asked: false, memory: "User works as a teacher", status: "saved" }],
+            refused: ["health"],
+            status: "saved",
+        });
+    });
+
     it("refuses a fact the extractor marks as about the user's health, and keeps a job in the field", async () => {
         answer([{ memory: "User takes Prozac", quote: "I take Prozac", sensitive: true }]);
 

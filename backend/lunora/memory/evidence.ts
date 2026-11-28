@@ -124,7 +124,7 @@ const HEALTH_PATTERNS: ReadonlyArray<RegExp> = [
  * Whether the text names a health condition, a diagnosis or a treatment. Both readings, as `looksSecret` reads them: an
  * invisible character inside a word (`dia\u200Bbetes`) hides it until dropped.
  */
-const mentionsHealth = (text: string): boolean =>
+export const mentionsHealth = (text: string): boolean =>
     [text, text.replaceAll(INVISIBLE_RE, "")].some((reading) => HEALTH_PATTERNS.some((pattern) => pattern.test(reading.normalize("NFKC"))));
 
 // `%` stays inside a token: a percent-encoded token (`%2F`) is one token, not pieces too short to read as a key.

@@ -28,19 +28,18 @@ const NOTES: Record<RememberStatus, string> = {
 const REFUSED_NOTES: Record<AskedRefusal, string> = {
     health: "it was about their health, which memory never keeps",
     secret: "it was nothing but a secret, which memory never keeps",
-    unbacked: "it was not backed by their own typed words",
+    unbacked: "its words did not pass memory's quote check: not their own typed words as written, or next to a secret",
 };
 
 /** The note for an outcome, with each asked fact that was refused and why, and the refusal that stopped the request, if any. */
 const noteOf = (output: RememberResult): string => {
-    const refused = output.refused ?? [];
+    // Reasons only, not a count: the extractor can return one refused statement twice.
+    const reasons = [...new Set(output.refused)].map((reason) => REFUSED_NOTES[reason]);
     const parts = [NOTES[output.status]];
 
-    if (refused.length > 0) {
-        const reasons = [...new Set(refused)].map((reason) => REFUSED_NOTES[reason]);
-
+    if (reasons.length > 0) {
         parts.push(
-            `Not everything asked was saved: ${String(refused.length)} asked fact(s) were refused (${reasons.join("; ")}). Tell the user both what was saved and what was not.`,
+            `Not everything asked was saved: what was refused was refused because ${reasons.join("; or ")}. Tell the user both what was saved and what was not.`,
         );
     }
 
