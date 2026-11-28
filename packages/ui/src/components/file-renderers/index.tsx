@@ -1,4 +1,4 @@
-export { type FileRendererType, formatFileSize, getFileRendererType, isAudio, isDocx, isImage, isPdf, isVideo } from "./file-type-utilities";
+export { type FileRendererType, formatFileSize, getFileRendererType, isAudio, isDocx, isEpub, isImage, isPdf, isVideo } from "./file-type-utilities";
 export { default as GenericFileCard, type GenericFileCardProps } from "./generic-file-card";
 
 /**
@@ -10,6 +10,7 @@ export { default as GenericFileCard, type GenericFileCardProps } from "./generic
  * const VideoPlayer = lazy(() => import("@neore/ui/components/file-renderers/video-player"));
  * const AudioWaveformPlayer = lazy(() => import("@neore/ui/components/file-renderers/audio-waveform-player"));
  * const DocxPreview = lazy(() => import("@neore/ui/components/file-renderers/docx-preview"));
+ * const EpubPreview = lazy(() => import("@neore/ui/components/file-renderers/epub-preview"));
  * const JsonViewer = lazy(() => import("@neore/ui/components/file-renderers/json-viewer"));
  * const HexViewer = lazy(() => import("@neore/ui/components/file-renderers/hex-viewer"));
  * const PptxPreview = lazy(() => import("@neore/ui/components/file-renderers/pptx-preview"));

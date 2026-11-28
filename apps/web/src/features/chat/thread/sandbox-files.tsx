@@ -2,7 +2,7 @@
 
 import { useLingui } from "@lingui/react/macro";
 import type { SandboxOutputFile, SandboxOutputs, SkippedSandboxFile } from "@neore/chat-ui/types";
-import { formatFileSize, isDocx, isPdf } from "@neore/ui/components/file-renderers/file-type-utilities";
+import { formatFileSize, isDocx, isEpub, isPdf } from "@neore/ui/components/file-renderers/file-type-utilities";
 import { saveOnClick } from "@neore/ui/utils/save-from-url";
 import { DownloadIcon, EyeIcon, FileArchiveIcon, FileAudioIcon, FileIcon, FileImageIcon, FileSpreadsheetIcon, FileTextIcon, FileVideoIcon } from "lucide-react";
 import type { FC, ReactNode } from "react";
@@ -10,6 +10,7 @@ import { Component, lazy, Suspense, useEffect, useState } from "react";
 
 const PdfViewer = lazy(() => import("@neore/ui/components/file-renderers/pdf-viewer"));
 const DocxPreview = lazy(() => import("@neore/ui/components/file-renderers/docx-preview"));
+const EpubPreview = lazy(() => import("@neore/ui/components/file-renderers/epub-preview"));
 const PptxPreview = lazy(() =>
     import("@neore/ui/components/file-renderers/pptx-preview").then((m) => {
         return { default: m.PptxPreview };
@@ -70,7 +71,7 @@ const fileIcon = (mediaType: string): ReactNode => {
     return <FileIcon aria-hidden className={ICON_CLASS} />;
 };
 
-type OfficeKind = "docx" | "pdf" | "pptx" | "xlsx";
+type OfficeKind = "docx" | "epub" | "pdf" | "pptx" | "xlsx";
 
 const officeKindOf = ({ mediaType, name }: SandboxOutputFile): OfficeKind | undefined => {
     const extension = name.split(".").pop()?.toLowerCase();
@@ -81,6 +82,10 @@ const officeKindOf = ({ mediaType, name }: SandboxOutputFile): OfficeKind | unde
 
     if (isDocx(mediaType, name)) {
         return "docx";
+    }
+
+    if (isEpub(mediaType, name)) {
+        return "epub";
     }
 
     if (mediaType.includes("presentationml") || extension === "pptx") {
@@ -201,6 +206,7 @@ const OfficePreview: FC<{ file: SandboxOutputFile; kind: OfficeKind }> = ({ file
                 <Suspense fallback={<PreviewLoading />}>
                     {kind === "pdf" && <PdfViewer filename={file.name} url={file.url} />}
                     {kind === "docx" && <DocxPreview filename={file.name} url={file.url} />}
+                    {kind === "epub" && <EpubPreview filename={file.name} url={file.url} />}
                     {kind === "pptx" && <PptxFromUrl name={file.name} url={file.url} />}
                     {kind === "xlsx" && <XlsxRenderer fileName={file.name} source={file.url} />}
                 </Suspense>

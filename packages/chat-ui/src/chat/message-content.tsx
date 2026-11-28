@@ -59,6 +59,7 @@ type FileRenderer = ComponentType<{ filename?: string; mediaType?: string; url: 
 const FILE_RENDERERS: Record<Exclude<FileRendererType, "image">, FileRenderer> = {
     audio: lazy(() => import("@neore/ui/components/file-renderers/audio-waveform-player")),
     docx: lazy(() => import("@neore/ui/components/file-renderers/docx-preview")),
+    epub: lazy(() => import("@neore/ui/components/file-renderers/epub-preview")),
     generic: LazyGenericFileCard,
     jsonl: lazy(() => import("@neore/ui/components/file-renderers/jsonl-viewer")),
     mermaid: lazy(() => import("@neore/ui/components/file-renderers/mermaid-preview")),
