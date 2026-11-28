@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, userEvent, within } from "storybook/test";
+import { expect, userEvent, waitFor, within } from "storybook/test";
 
 import { ChatProvider } from "@/features/chat/core/context/chat-context";
 import { ASIDE_FIND_EVENT } from "@/features/keyboard/lib/aside-find-target";
@@ -61,6 +61,17 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
+/** Opens the find bar and returns its field once it has focus, as the bar gives it on opening: keys typed before land nowhere. */
+const openFind = async (canvas: ReturnType<typeof within>): Promise<HTMLElement> => {
+    globalThis.dispatchEvent(new CustomEvent(ASIDE_FIND_EVENT));
+
+    const input = await canvas.findByRole("textbox", { name: "Find in side questions" });
+
+    await waitFor(async () => await expect(input).toHaveFocus());
+
+    return input;
+};
+
 /** No side question yet: the field to ask one, and nothing to find. */
 export const Empty: Story = {
     loaders: [seed([])],
@@ -91,9 +102,8 @@ export const FindWithMatches: Story = {
         const canvas = within(canvasElement);
 
         await expect(await canvas.findByText("What is idempotent?")).toBeVisible();
-        globalThis.dispatchEvent(new CustomEvent(ASIDE_FIND_EVENT));
 
-        const input = await canvas.findByRole("textbox", { name: "Find in side questions" });
+        const input = await openFind(canvas);
 
         await userEvent.type(input, "idempotent");
         await expect(await canvas.findByText("1 of 3")).toBeVisible();
@@ -107,9 +117,8 @@ export const FindNoMatches: Story = {
         const canvas = within(canvasElement);
 
         await expect(await canvas.findByText("What is idempotent?")).toBeVisible();
-        globalThis.dispatchEvent(new CustomEvent(ASIDE_FIND_EVENT));
 
-        const input = await canvas.findByRole("textbox", { name: "Find in side questions" });
+        const input = await openFind(canvas);
 
         await userEvent.type(input, "zebra");
         await expect(await canvas.findByText("No matches")).toBeVisible();

@@ -4,7 +4,7 @@ import { useLingui } from "@lingui/react/macro";
 import { Input } from "@neore/ui/components/input";
 import { ChevronDownIcon, ChevronUpIcon, XIcon } from "lucide-react";
 import type { ChangeEvent, FC, FormEvent, KeyboardEvent } from "react";
-import { useCallback, useDeferredValue, useEffect, useRef, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import TooltipIconButton from "@/features/chat/components/tooltip-icon-button";
 import { clampIndex, MAX_FIND_QUERY_LENGTH, stepIndex } from "@/features/chat/thread/find/match";
@@ -27,6 +27,8 @@ const isImeKey = (event: globalThis.KeyboardEvent): boolean => event.isComposing
 const AsideFindBar: FC = () => {
     const { t } = useLingui();
     const [isOpen, setIsOpen] = useState(false);
+    // Bumped by every open, so the shortcut pressed again with the bar open focuses and selects the field again.
+    const [openRequest, setOpenRequest] = useState(0);
     const [query, setQuery] = useState("");
     // The step the reader asked for. It can name another hit once an earlier answer adds one, so the counter shows `position`.
     const [index, setIndex] = useState(0);
@@ -56,17 +58,24 @@ const AsideFindBar: FC = () => {
             }
 
             setIsOpen(true);
-            // The input mounts with the bar; focus it once it is there.
-            requestAnimationFrame(() => {
-                inputRef.current?.focus();
-                inputRef.current?.select();
-            });
+            setOpenRequest((count) => count + 1);
         };
 
         globalThis.addEventListener(ASIDE_FIND_EVENT, open);
 
         return () => globalThis.removeEventListener(ASIDE_FIND_EVENT, open);
     }, []);
+
+    // In the commit that mounts the field, not a frame later: a frame can come before that commit (the field is not there yet)
+    // or after the first keys (selecting them, so the next key replaces them).
+    useLayoutEffect(() => {
+        if (openRequest === 0) {
+            return;
+        }
+
+        inputRef.current?.focus();
+        inputRef.current?.select();
+    }, [openRequest]);
 
     const close = useCallback(() => {
         setIsOpen(false);

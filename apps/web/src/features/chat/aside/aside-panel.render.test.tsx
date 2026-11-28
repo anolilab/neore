@@ -270,6 +270,10 @@ describe("AsidePanel", () => {
         });
         const input = screen.getByRole("textbox", { name: "Find in side questions" });
 
+        // Focused as the bar opens, not a frame later: keys typed meanwhile would land nowhere, or be selected and replaced.
+        // eslint-disable-next-line testing-library/no-node-access -- focus placement is what this assertion checks
+        expect(document.activeElement).toBe(input);
+
         fireEvent.change(input, { target: { value: "idempotent" } });
         expect(screen.getByText("1 of 3")).toBeTruthy();
 
