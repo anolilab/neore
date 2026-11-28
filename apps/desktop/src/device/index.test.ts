@@ -4,7 +4,7 @@
  * relay, who may call the local window's commands, where events go, and what
  * happens to a prompt when its window closes.
  */
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -28,7 +28,7 @@ type IpcEvent = { sender: WebContents; senderFrame: Frame | null };
 
 const fake = vi.hoisted(() => {
     return {
-        appListeners: new Map<string, () => void>(),
+        appListeners: new Map<string, (() => void)[]>(),
         clipboardWrite: vi.fn(),
         coreEmit: undefined as undefined | ((json: string) => void),
         coreImpl: undefined as undefined | Record<string, ReturnType<typeof vi.fn>>,
@@ -91,7 +91,7 @@ vi.mock("electron", () => {
         app: {
             getPath: () => fake.userData,
             getVersion: () => "1.2.3",
-            on: (event: string, listener: () => void) => fake.appListeners.set(event, listener),
+            on: (event: string, listener: () => void) => fake.appListeners.set(event, [...(fake.appListeners.get(event) ?? []), listener]),
         },
         BrowserWindow,
         clipboard: { writeText: (text: string) => fake.clipboardWrite(text) },
@@ -308,7 +308,19 @@ beforeEach(() => {
     registerDeviceIpc(options);
 });
 
+/** Every listener the module instances registered for `event`, in order: a test that registers again adds a second instance. */
+const emitApp = (event: string): void => {
+    const listeners = fake.appListeners.get(event) ?? [];
+
+    for (const listener of listeners) {
+        listener();
+    }
+};
+
 afterEach(() => {
+    // Quit every module instance the test registered, so a host it left posting or writing cannot reach into the next test.
+    emitApp("will-quit");
+    vi.unstubAllGlobals();
     rmSync(fake.userData, { force: true, recursive: true });
 });
 
@@ -1335,7 +1347,7 @@ describe("when the addon cannot load", () => {
 
 describe("shutdown", () => {
     it("stops the core on quit", () => {
-        fake.appListeners.get("will-quit")?.();
+        emitApp("will-quit");
 
         expect(core.stop).toHaveBeenCalledTimes(1);
     });
@@ -1355,6 +1367,11 @@ describe("a restart that finds a running turn and a held message", () => {
                 return Response.json({ ended: false, next: 0, threadId: "thread-1" });
             }),
         );
+        // A folder of its own for the instance registered below: the one `beforeEach` registered would read the leftovers too.
+        const firstFolder = fake.userData;
+
+        fake.userData = mkdtempSync(path.join(tmpdir(), "neore-device-index-"));
+        rmSync(firstFolder, { force: true, recursive: true });
         // The last run died with turn t1 running, and with a message for session s2 (turn t2) received but not acted on.
         writeFileSync(path.join(fake.userData, "acp-host-turns.json"), JSON.stringify({ turns: [{ sessionId: "s1", threadId: "thread-1", turnId: "t1" }] }));
 
@@ -1380,7 +1397,12 @@ describe("a restart that finds a running turn and a held message", () => {
             expect(posts.find((post) => post.turnId === "t2")?.events).toEqual([{ kind: "turn_end", reason: "interrupted" }]);
         });
         expect(spawnAgent).not.toHaveBeenCalled();
-        vi.unstubAllGlobals();
+        // Both ended turns leave the record, so nothing is still being written when the next test starts.
+        const record = path.join(fake.userData, "acp-host-turns.json");
+
+        await vi.waitFor(() => {
+            expect(JSON.parse(readFileSync(record, "utf8"))).toEqual({ turns: [] });
+        });
     });
 });
 
@@ -1400,8 +1422,15 @@ describe("registry channels (the device window)", () => {
         vi.useFakeTimers();
 
         try {
+            // Registered again under the fake clock, so every timer the module sets is one the wait below can fire.
+            fake.handlers.clear();
+            fake.windows.length = 0;
+            registerDeviceIpc(options);
+            invoke(DEVICE_CHANNEL.openSettings, siteEvent());
             invoke(LOCAL_CHANNEL.acpView, localEvent());
-            await vi.advanceTimersByTimeAsync(7 * 24 * 60 * 60 * 1000);
+            // Up to the last timer it has set, however far off: a deferred read would come due here. A fixed span would
+            // instead fire the one-minute server reap once per minute of it.
+            await vi.runOnlyPendingTimersAsync();
 
             expect(registryFetch).not.toHaveBeenCalled();
             expect(core.acpInstall).not.toHaveBeenCalled();
