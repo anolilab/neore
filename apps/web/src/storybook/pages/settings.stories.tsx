@@ -128,6 +128,17 @@ export const SecurityGuest: Story = {
     },
 };
 
+/** A guest opening a tab the navigation hides from them (Teams needs an organization) by link: the upgrade gate, not the tab. */
+export const HiddenTeamsGuest: Story = {
+    args: openAt("auth-teams"),
+    parameters: { msw: { handlers: { authLists: authListHandlers() } }, persona: "guest" },
+    play: async () => {
+        const dialog = await settingsDialog();
+
+        await expect(await within(dialog).findByText(/requires an account/u, undefined, PAGE_WAIT)).toBeVisible();
+    },
+};
+
 /** The account tab: profile form cards, and the destructive delete-account card at the bottom. */
 export const Account: Story = {
     args: openAt("auth-account"),
