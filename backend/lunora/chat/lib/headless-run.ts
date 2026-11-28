@@ -226,7 +226,7 @@ export interface HeadlessRunOptions {
     /**
      * Omitted when continuing a thread: its latest message is the prompt. Saved as text the app wrote (`appWrittenTextPart`):
      * no person typed a task's instructions, a trigger's template, a brief or an eval case, so no prompt search lists it as
-     * theirs. `promptTyped` saves it as typed, only for words a person typed in the composer.
+     * theirs.
      */
     prompt?: string;
     /** The prompt is what a person typed into the thread (a message to a worker): saved as typed, not as the app's text. */
