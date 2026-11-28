@@ -488,9 +488,11 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
         close();
     };
 
+    // The palette closes first and hands focus back to where it was; the sheet opens a frame later and keeps that as the place to
+    // return to. Opened the other way round, the sheet would return focus to a palette item that is gone.
     const handleOpenKeyboardShortcuts = () => {
-        useThreadListUIStore.getState().setShowKeyboardHelp(true);
         close();
+        requestAnimationFrame(() => useThreadListUIStore.getState().setShowKeyboardHelp(true));
     };
 
     const handleNavigateToVault = () => {
