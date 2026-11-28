@@ -338,6 +338,11 @@ msgstr "{0, plural, other {# 件一致}}"
 msgid "{0, plural, one {# member} other {# members}}"
 msgstr "{0, plural, other {# 人のメンバー}}"
 
+#. placeholder {0}: forgotten.length
+#: src/features/chat/thread/tool-approval.tsx:221
+msgid "{0, plural, one {# memory is waiting for the chat owner to confirm.} other {# memories are waiting for the chat owner to confirm.}}"
+msgstr "{0, plural, other {#件のメモリがチャットの所有者の確認を待っています。}}"
+
 #. placeholder {0}: c.messages.length
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:369
 msgid "{0, plural, one {# message} other {# messages}}"
@@ -479,12 +484,12 @@ msgid "{0, plural, one {# user} other {# users}}"
 msgstr "{0, plural, other {# 人のユーザー}}"
 
 #. placeholder {0}: selectedModelIds!.length
-#: src/components/model-picker/model-picker-button.tsx:173
+#: src/components/model-picker/model-picker-button.tsx:177
 msgid "{0, plural, one {1 model} other {# models}}"
 msgstr "{0, plural, other {# 個のモデル}}"
 
 #. placeholder {0}: selectedModelIds!.length
-#: src/components/model-picker/model-picker-button.tsx:160
+#: src/components/model-picker/model-picker-button.tsx:163
 msgid "{0, plural, one {Comparing # model} other {Comparing # models}}"
 msgstr "{0, plural, other {# 個のモデルを比較中}}"
 
@@ -2695,7 +2700,7 @@ msgstr "添付ファイルを追加"
 msgid "Add background"
 msgstr "背景を追加"
 
-#: src/features/settings/components/chat/usage-settings.tsx:417
+#: src/features/settings/components/chat/usage-settings.tsx:421
 #~ msgid "Add budget alert"
 #~ msgstr "予算アラートを追加"
 
@@ -2807,8 +2812,8 @@ msgid "Add picked frame as image node"
 msgstr "選択したフレームを画像ノードとして追加"
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:147
-#: src/features/chat/thread-list/thread-list-dock.tsx:120
-#: src/features/chat/thread-list/thread-list-dock.tsx:130
+#: src/features/chat/thread-list/thread-list-dock.tsx:123
+#: src/features/chat/thread-list/thread-list-dock.tsx:133
 #: src/features/projects/components/add-project-dialog.tsx:695
 msgid "Add project"
 msgstr "プロジェクトを追加"
@@ -3748,11 +3753,11 @@ msgstr "すべてのユースケース"
 msgid "All Users"
 msgstr "すべてのユーザー"
 
-#: src/features/chat/thread/tool-approval.tsx:167
+#: src/features/chat/thread/tool-approval.tsx:243
 msgid "Allow \"{tool}\" from {server}?"
 msgstr "{server} の「{tool}」を許可しますか？"
 
-#: src/features/chat/thread/tool-approval.tsx:167
+#: src/features/chat/thread/tool-approval.tsx:243
 msgid "Allow \"{tool}\"?"
 msgstr "「{tool}」を許可しますか？"
 
@@ -3760,19 +3765,19 @@ msgstr "「{tool}」を許可しますか？"
 msgid "Allow \"delete_files\" from the drafts server?"
 msgstr "下書きサーバーの「delete_files」を許可しますか？"
 
-#: src/features/chat/thread/tool-approval.tsx:138
+#: src/features/chat/thread/tool-approval.tsx:157
 #~ msgid "Allow {tool} for 1 hour"
 #~ msgstr "{tool} を 1 時間許可"
 
-#: src/features/chat/thread/tool-approval.tsx:142
+#: src/features/chat/thread/tool-approval.tsx:161
 #~ msgid "Allow {tool} for today"
 #~ msgstr "{tool} を今日は許可"
 
-#: src/features/chat/thread/tool-approval.tsx:134
+#: src/features/chat/thread/tool-approval.tsx:153
 msgid "Allow for 1 hour"
 msgstr "1 時間許可"
 
-#: src/features/chat/thread/tool-approval.tsx:140
+#: src/features/chat/thread/tool-approval.tsx:159
 msgid "Allow for today"
 msgstr "今日は許可"
 
@@ -3835,12 +3840,12 @@ msgstr "他の閲覧者"
 msgid "Always"
 msgstr "常に"
 
-#: src/features/chat/thread/tool-approval.tsx:128
+#: src/features/chat/thread/tool-approval.tsx:146
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:35
 msgid "Always allow"
 msgstr "常に許可"
 
-#: src/features/chat/thread/tool-approval.tsx:126
+#: src/features/chat/thread/tool-approval.tsx:144
 msgid "Always allow {tool}"
 msgstr "{tool} を常に許可"
 
@@ -4331,14 +4336,14 @@ msgid "Approvals in Neore: a tool you set to Ask stops before it runs, and you d
 msgstr "Neore の承認: 「確認」に設定したツールは、実行前に停止します。表示された正確な入力内容を確認して、あなたが判断します。"
 
 #: src/features/auth/components/device-approval.tsx:242
-#: src/features/chat/thread/tool-approval.tsx:120
+#: src/features/chat/thread/tool-approval.tsx:137
 #: src/features/develop/components/review-panel.tsx:64
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:32
 #: src/features/tasks/components/task-detail-dialog.tsx:104
 msgid "Approve"
 msgstr "承認"
 
-#: src/features/chat/thread/tool-approval.tsx:118
+#: src/features/chat/thread/tool-approval.tsx:135
 msgid "Approve {tool} once"
 msgstr "{tool} を今回のみ承認"
 
@@ -4366,7 +4371,7 @@ msgstr "{name} のデスクトップアプリでリクエストを承認して�
 msgid "Approved"
 msgstr "承認済み"
 
-#: src/features/chat/thread/tool-approval.tsx:83
+#: src/features/chat/thread/tool-approval.tsx:98
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:23
 msgid "Approved — running tool"
 msgstr "承認済み — ツールを実行中"
@@ -5111,8 +5116,8 @@ msgstr "Azure OpenAI"
 msgid "Azure portal → your OpenAI resource → Keys and Endpoint. Encrypted at rest and never shown again."
 msgstr "Azure ポータル → OpenAI リソース → キーとエンドポイント。暗号化して保存され、再表示されることはありません。"
 
-#: src/features/code/components/code-shell.tsx:177
-#: src/features/onboarding/components/onboarding-dialog.tsx:486
+#: src/features/code/components/code-shell.tsx:192
+#: src/features/onboarding/components/onboarding-dialog.tsx:492
 #: src/features/pages/components/page-version-panel.tsx:88
 #: src/features/projects/components/add-project-dialog.tsx:692
 #: src/features/settings/components/personalization/memory-import-dialog.tsx:309
@@ -7450,11 +7455,11 @@ msgstr "コードハイライトのテーマを更新しました"
 msgid "Code is required"
 msgstr "コードは必須です"
 
-#: src/features/code/components/code-shell.tsx:140
+#: src/features/code/components/code-shell.tsx:143
 msgid "Code mode is not available for your account yet."
 msgstr "コードモードはまだお客様のアカウントでは利用できません。"
 
-#: src/features/code/components/code-shell.tsx:158
+#: src/features/code/components/code-shell.tsx:161
 msgid "Code navigation"
 msgstr "コードナビゲーション"
 
@@ -7526,7 +7531,7 @@ msgstr "コーディングエージェントの実行が完了しました"
 msgid "Coding agent run was not approved."
 msgstr "コーディングエージェントの実行は承認されませんでした。"
 
-#: src/features/code/components/code-shell.tsx:111
+#: src/features/code/components/code-shell.tsx:112
 msgid "Coding agent runs"
 msgstr "コーディングエージェントの実行"
 
@@ -7535,7 +7540,7 @@ msgstr "コーディングエージェントの実行"
 msgid "Coding agents you can start on {0}"
 msgstr "{0} で起動できるコーディングエージェント"
 
-#: src/features/code/components/code-shell.tsx:165
+#: src/features/code/components/code-shell.tsx:175
 #: src/features/onboarding/components/setup-checklist.tsx:303
 msgid "Coding setup"
 msgstr "コーディング環境のセットアップ"
@@ -8047,7 +8052,7 @@ msgstr "視覚入力に対する透明な思考を必要とする複雑な視覚
 msgid "Composer"
 msgstr "コンポーザー"
 
-#: src/features/chat/thread/composer-status-line.tsx:95
+#: src/features/chat/thread/composer-status-line.tsx:96
 msgid "Composer status"
 msgstr "入力欄の状態"
 
@@ -8231,7 +8236,7 @@ msgstr "お持ちのボットをメッセージングアプリに接続して、
 msgid "Connect a Git host"
 msgstr "Git ホストを接続"
 
-#: src/features/code/components/code-shell.tsx:98
+#: src/features/code/components/code-shell.tsx:99
 #: src/features/code/components/git-host-step.tsx:31
 msgid "Connect a Git host to review pull requests here."
 msgstr "ここでプルリクエストをレビューするには、Git ホストに接続してください。"
@@ -9555,7 +9560,7 @@ msgid "Could not send your answer."
 msgstr "回答を送信できませんでした。"
 
 #: src/features/chat/thread/ask-user-prompt.tsx:115
-#: src/features/chat/thread/tool-approval.tsx:72
+#: src/features/chat/thread/tool-approval.tsx:87
 msgid "Could not send your answer. Please try again."
 msgstr "回答を送信できませんでした。もう一度お試しください。"
 
@@ -11117,7 +11122,7 @@ msgstr "最大限の AI 性能と洗練された推論が最も重要となる�
 msgid "Denied"
 msgstr "拒否"
 
-#: src/features/chat/thread/tool-approval.tsx:81
+#: src/features/chat/thread/tool-approval.tsx:96
 msgid "Denied — continuing without it"
 msgstr "拒否されました — ツールなしで続行します"
 
@@ -11138,12 +11143,12 @@ msgid "Density updated"
 msgstr "密度を更新しました"
 
 #: src/features/auth/components/device-approval.tsx:233
-#: src/features/chat/thread/tool-approval.tsx:124
+#: src/features/chat/thread/tool-approval.tsx:141
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:34
 msgid "Deny"
 msgstr "拒否"
 
-#: src/features/chat/thread/tool-approval.tsx:122
+#: src/features/chat/thread/tool-approval.tsx:139
 msgid "Deny {tool}"
 msgstr "{tool} を拒否"
 
@@ -15825,6 +15830,10 @@ msgstr "フォレスト"
 msgid "forget"
 msgstr "忘れる"
 
+#: src/features/chat/thread/tool-approval.tsx:229
+msgid "Forget these memories?"
+msgstr "これらのメモリを忘れますか？"
+
 #: src/features/auth/components/auth/forms/two-factor-form.tsx:288
 msgid "Forgot authenticator"
 msgstr "認証アプリを使えない場合"
@@ -16746,7 +16755,7 @@ msgid "Go to slide {slideNumber}"
 msgstr "スライド {slideNumber} へ移動"
 
 #. placeholder {0}: index + 1
-#: src/features/onboarding/components/onboarding-dialog.tsx:454
+#: src/features/onboarding/components/onboarding-dialog.tsx:460
 msgid "Go to step {0}"
 msgstr "ステップ {0} へ移動"
 
@@ -16788,7 +16797,7 @@ msgid "Goal: {goalTitle}"
 msgstr "目標：{goalTitle}"
 
 #: src/features/chat/goal/composer-goal.tsx:66
-#: src/features/chat/thread/composer-status-line.tsx:111
+#: src/features/chat/thread/composer-status-line.tsx:112
 msgid "Goal: run until done"
 msgstr "目標: 完了するまで実行"
 
@@ -17679,7 +17688,7 @@ msgstr "横ストライプ"
 msgid "Host: {0}"
 msgstr "ホスト: {0}"
 
-#: src/features/code/components/code-shell.tsx:59
+#: src/features/code/components/code-shell.tsx:60
 msgid "Hosts"
 msgstr "ホスト"
 
@@ -19179,7 +19188,7 @@ msgstr "たった今"
 msgid "Just now"
 msgstr "たった今"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:383
+#: src/features/onboarding/components/onboarding-dialog.tsx:389
 msgid "Just start chatting"
 msgstr "さっそくチャットを始めましょう"
 
@@ -20388,8 +20397,8 @@ msgstr "ノードの詳細を読み込んでいます..."
 msgid "Loading older messages..."
 msgstr "古いメッセージを読み込んでいます..."
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:359
-#: src/features/onboarding/components/onboarding-dialog.tsx:362
+#: src/features/onboarding/components/onboarding-dialog.tsx:365
+#: src/features/onboarding/components/onboarding-dialog.tsx:368
 msgid "Loading onboarding"
 msgstr "オンボーディングを読み込んでいます"
 
@@ -21451,6 +21460,10 @@ msgstr "メモリ"
 msgid "Memories"
 msgstr "メモリ"
 
+#: src/features/chat/thread/tool-approval.tsx:214
+msgid "Memories to forget"
+msgstr "忘れるメモリ"
+
 #: src/features/chat/thread/memory-usage-action.tsx:42
 msgid "Memories used"
 msgstr "使用したメモリ"
@@ -22062,7 +22075,7 @@ msgstr "モデルタブ"
 msgid "Model: {0}"
 msgstr "モデル：{0}"
 
-#: src/components/model-picker/model-picker-button.tsx:180
+#: src/components/model-picker/model-picker-button.tsx:185
 msgid "Model: {singleLabel}"
 msgstr "モデル: {singleLabel}"
 
@@ -23161,8 +23174,8 @@ msgid "New thread"
 msgstr "新しいスレッド"
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:150
-#: src/features/chat/thread-list/thread-list-dock.tsx:136
-#: src/features/chat/thread-list/thread-list-dock.tsx:146
+#: src/features/chat/thread-list/thread-list-dock.tsx:139
+#: src/features/chat/thread-list/thread-list-dock.tsx:149
 msgid "New Thread"
 msgstr "新しいスレッド"
 
@@ -23198,7 +23211,7 @@ msgstr "ニュースレターのヒーロー画像"
 #: ../../packages/ui/src/components/pagination.tsx:52
 #: ../../packages/ui/src/components/spreadsheet/csv-renderer.tsx:342
 #: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:656
-#: src/features/onboarding/components/onboarding-dialog.tsx:508
+#: src/features/onboarding/components/onboarding-dialog.tsx:514
 msgid "Next"
 msgstr "次へ"
 
@@ -23731,7 +23744,7 @@ msgstr "ページが見つかりません。Notion から「Markdown & CSV」ま
 msgid "No pages yet."
 msgstr "ページはまだありません。"
 
-#: src/features/code/components/code-shell.tsx:62
+#: src/features/code/components/code-shell.tsx:63
 msgid "No paired computer yet."
 msgstr "ペアリング済みのコンピュータはまだありません。"
 
@@ -24444,7 +24457,7 @@ msgstr "上記のプロジェクトに属するチャットでのみ提供され
 msgid "Official"
 msgstr "公式"
 
-#: src/features/code/components/code-shell.tsx:82
+#: src/features/code/components/code-shell.tsx:83
 #: src/features/code/components/host-details.tsx:32
 #: src/features/devices/components/devices-settings.tsx:382
 #: src/routes/admin/gateway/index.tsx:37
@@ -24561,23 +24574,23 @@ msgstr "オンプレミス対応"
 msgid "Onboarding"
 msgstr "オンボーディング"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:327
+#: src/features/onboarding/components/onboarding-dialog.tsx:333
 msgid "Onboarding complete"
 msgstr "オンボーディングが完了しました"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:346
+#: src/features/onboarding/components/onboarding-dialog.tsx:352
 msgid "Onboarding complete. Redirecting to chat."
 msgstr "オンボーディングが完了しました。チャットに移動します。"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:346
+#: src/features/onboarding/components/onboarding-dialog.tsx:352
 msgid "Onboarding complete. Redirecting to Code."
 msgstr "オンボーディングが完了しました。コードに移動します。"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:401
+#: src/features/onboarding/components/onboarding-dialog.tsx:407
 msgid "Onboarding progress"
 msgstr "オンボーディングの進捗"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:450
+#: src/features/onboarding/components/onboarding-dialog.tsx:456
 msgid "Onboarding steps"
 msgstr "オンボーディングの手順"
 
@@ -24585,7 +24598,7 @@ msgstr "オンボーディングの手順"
 msgid "Onboarding will restart on your next visit to chat."
 msgstr "次回チャットを開いたときにオンボーディングが再開されます。"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:390
+#: src/features/onboarding/components/onboarding-dialog.tsx:396
 msgid "Onboarding wizard"
 msgstr "オンボーディングウィザード"
 
@@ -24685,7 +24698,7 @@ msgstr "ワンタイムパスワードが無効です"
 msgid "One-time password is required"
 msgstr "ワンタイムパスワードは必須です"
 
-#: src/features/code/components/code-shell.tsx:82
+#: src/features/code/components/code-shell.tsx:83
 #: src/features/code/components/host-details.tsx:32
 #: src/features/devices/components/devices-settings.tsx:382
 msgid "Online"
@@ -24906,7 +24919,7 @@ msgstr "ページとして開く"
 msgid "Open chat"
 msgstr "チャットを開く"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:383
+#: src/features/onboarding/components/onboarding-dialog.tsx:389
 msgid "Open Code"
 msgstr "コードを開く"
 
@@ -24918,7 +24931,7 @@ msgstr "コマンドパレットを開く"
 msgid "Open connectors"
 msgstr "コネクタを開く"
 
-#: src/features/code/components/code-shell.tsx:100
+#: src/features/code/components/code-shell.tsx:101
 #: src/features/code/components/git-host-step.tsx:51
 msgid "Open Connectors"
 msgstr "コネクタを開く"
@@ -25985,7 +25998,7 @@ msgstr "コンピューターをペアリング"
 msgid "Pair a computer in the Neore desktop app so agents can work on your files. You confirm the pairing on that computer, and the step is done once any computer is paired with your account."
 msgstr "エージェントがファイルを扱えるように、Neore デスクトップアプリでコンピューターをペアリングしてください。ペアリングはそのコンピューター上で確認します。アカウントに 1 台でもコンピューターがペアリングされると、この手順は完了です。"
 
-#: src/features/code/components/code-shell.tsx:64
+#: src/features/code/components/code-shell.tsx:65
 msgid "Pair one in Settings"
 msgstr "設定でペアリングしてください"
 
@@ -27930,7 +27943,7 @@ msgid "Pull request settings updated"
 msgstr "プルリクエストの設定を更新しました"
 
 #: src/features/chat/sidebar/thread-context.tsx:93
-#: src/features/code/components/code-shell.tsx:96
+#: src/features/code/components/code-shell.tsx:97
 #: src/features/develop/components/thread-pull-requests.tsx:375
 msgid "Pull requests"
 msgstr "プルリクエスト"
@@ -29388,7 +29401,7 @@ msgstr "返信の準備ができました"
 msgid "Reply tools are off by default. You switch them on per connection and choose which groups they may use."
 msgstr "返信ツールは既定でオフです。接続ごとにオンにし、使用してよいグループを選択します。"
 
-#: src/features/chat/thread/composer-status-line.tsx:99
+#: src/features/chat/thread/composer-status-line.tsx:100
 msgid "Replying"
 msgstr "返信中"
 
@@ -30310,7 +30323,7 @@ msgstr "1 回実行した後、自動的にオフになります。繰り返し�
 msgid "Runs when a webhook is received, on {0}. You get a new signing secret and URL for it."
 msgstr "{0} で、Webhook を受信したときに実行します。そのための新しい署名シークレットと URL が発行されます。"
 
-#: src/features/code/components/code-shell.tsx:113
+#: src/features/code/components/code-shell.tsx:114
 msgid "Runs you start from a chat appear here."
 msgstr "チャットから開始した実行がここに表示されます。"
 
@@ -30732,7 +30745,7 @@ msgstr "検索"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:241
 #: src/features/chat/signed-out/signed-out-chat.tsx:141
-#: src/features/chat/thread-list/thread-list-dock.tsx:95
+#: src/features/chat/thread-list/thread-list-dock.tsx:98
 #: src/features/chat/thread/thread-welcome-suggestions.tsx:93
 msgid "Search"
 msgstr "検索"
@@ -30830,11 +30843,11 @@ msgstr "メッセージの内容を検索"
 msgid "Search message content..."
 msgstr "メッセージの内容を検索..."
 
-#: src/features/chat/thread-list/thread-list-dock.tsx:53
+#: src/features/chat/thread-list/thread-list-dock.tsx:54
 msgid "Search messages"
 msgstr "メッセージを検索"
 
-#: src/features/chat/thread-list/thread-list-dock.tsx:57
+#: src/features/chat/thread-list/thread-list-dock.tsx:58
 msgid "Search messages ({focusSearchShortcut})"
 msgstr "メッセージを検索（{focusSearchShortcut}）"
 
@@ -30971,12 +30984,12 @@ msgid "Search thread titles..."
 msgstr "スレッドのタイトルを検索..."
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:134
-#: src/features/chat/thread-list/thread-list-dock.tsx:53
+#: src/features/chat/thread-list/thread-list-dock.tsx:54
 #: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:82
 msgid "Search threads"
 msgstr "スレッドを検索"
 
-#: src/features/chat/thread-list/thread-list-dock.tsx:57
+#: src/features/chat/thread-list/thread-list-dock.tsx:58
 msgid "Search threads ({focusSearchShortcut})"
 msgstr "スレッドを検索（{focusSearchShortcut}）"
 
@@ -31218,22 +31231,22 @@ msgid "Select mode"
 msgstr "選択モード"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker-button.tsx:211
-#: src/components/model-picker/model-picker-button.tsx:243
+#: src/components/model-picker/model-picker-button.tsx:254
 msgid "Select model"
 msgstr "モデルを選択"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker-button.tsx:173
-#: src/components/model-picker/model-picker-button.tsx:203
+#: src/components/model-picker/model-picker-button.tsx:214
 #: src/components/model-picker/model-picker-popup.tsx:42
 msgid "Select Model"
 msgstr "モデルを選択"
 
-#: src/features/prompts/components/prompt-model-selector.tsx:44
+#: src/features/prompts/components/prompt-model-selector.tsx:47
 msgid "Select model (optional)"
 msgstr "モデルを選択 (任意)"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker-button.tsx:124
-#: src/components/model-picker/model-picker-button.tsx:100
+#: src/components/model-picker/model-picker-button.tsx:103
 #: src/features/workflow/components/nodes/background-removal-node.tsx:66
 #: src/features/workflow/components/nodes/character-ref-node.tsx:147
 #: src/features/workflow/components/nodes/controlnet-node.tsx:139
@@ -32072,7 +32085,7 @@ msgstr "タイムスタンプを表示"
 msgid "Show up to {rowLimit} rows ({byteCount} bytes)"
 msgstr "最大 {rowLimit} 行を表示 ({byteCount} バイト)"
 
-#: src/features/chat/thread/tool-approval.tsx:111
+#: src/features/chat/thread/tool-approval.tsx:128
 msgid "Show what it will send"
 msgstr "送信内容を表示"
 
@@ -32470,7 +32483,7 @@ msgstr "スキルを読み込めませんでした。スキルなしで転送す
 msgid "Skills views"
 msgstr "スキルの表示"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:496
+#: src/features/onboarding/components/onboarding-dialog.tsx:502
 #: src/features/onboarding/components/setup-checklist.tsx:248
 msgid "Skip"
 msgstr "スキップ"
@@ -32487,7 +32500,7 @@ msgstr "質問をスキップ"
 msgid "Skip to content"
 msgstr "コンテンツへスキップ"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:491
+#: src/features/onboarding/components/onboarding-dialog.tsx:497
 msgid "Skip tour"
 msgstr "ツアーをスキップ"
 
@@ -33488,7 +33501,7 @@ msgid "Steering:"
 msgstr "ステアリング:"
 
 #. placeholder {0}: currentIndex + 1
-#: src/features/onboarding/components/onboarding-dialog.tsx:446
+#: src/features/onboarding/components/onboarding-dialog.tsx:452
 msgid "Step {0} of {totalSteps}: {title}"
 msgstr "ステップ {0} / {totalSteps}：{title}"
 
@@ -35377,7 +35390,7 @@ msgstr "ボットとそのコンピュータは削除されます。チャット
 msgid "The bot gets only the tools you allow. With none allowed, it gets no tools."
 msgstr "ボットは許可したツールのみを使います。何も許可しなければ、ツールは使えません。"
 
-#: src/features/chat/thread/composer-status-line.tsx:123
+#: src/features/chat/thread/composer-status-line.tsx:124
 msgid "The bot sets the model for this chat."
 msgstr "このチャットのモデルはボットが設定します。"
 
@@ -37631,7 +37644,7 @@ msgstr "{0} のツール"
 msgid "Tools run on their own settings; a quick check can clear low-risk calls"
 msgstr "ツールはそれぞれの設定で実行され、簡易チェックで低リスクの呼び出しを許可できます"
 
-#: src/features/chat/thread/composer-status-line.tsx:117
+#: src/features/chat/thread/composer-status-line.tsx:118
 msgid "Tools run without asking"
 msgstr "ツールは確認なしで実行されます"
 
@@ -40046,7 +40059,7 @@ msgstr "オーナーを待っています"
 msgid "Waiting for the owner to answer"
 msgstr "オーナーの回答を待っています"
 
-#: src/features/chat/thread/tool-approval.tsx:78
+#: src/features/chat/thread/tool-approval.tsx:93
 msgid "Waiting for the owner to approve"
 msgstr "オーナーの承認を待っています"
 
@@ -40072,7 +40085,7 @@ msgstr "{0} であなたの回答を待っています"
 
 #: src/features/chat/thread-list/thread-node.tsx:919
 #: src/features/chat/thread-list/thread-node.tsx:926
-#: src/features/chat/thread/tool-approval.tsx:78
+#: src/features/chat/thread/tool-approval.tsx:93
 #: src/features/home/components/home-page.tsx:119
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:20
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:60
@@ -40273,7 +40286,7 @@ msgid "Welcome back"
 msgstr "おかえりなさい"
 
 #: src/features/onboarding/components/onboarding-dialog.tsx:51
-#: src/features/onboarding/components/onboarding-dialog.tsx:388
+#: src/features/onboarding/components/onboarding-dialog.tsx:394
 msgid "Welcome to Neore"
 msgstr "Neore へようこそ"
 
@@ -41156,7 +41169,7 @@ msgstr "確認コードを生成するには、Google Authenticator や Authy �
 msgid "You're all caught up."
 msgstr "すべて確認済みです。"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:343
+#: src/features/onboarding/components/onboarding-dialog.tsx:349
 msgid "You're all set!"
 msgstr "準備が整いました！"
 

@@ -43,6 +43,7 @@ import messageWorkerTool from "./message-worker";
 import musicGenerationTool from "./music-generation";
 import peopleSearchTool from "./people-search";
 import redditSearchTool from "./reddit-search";
+import forgetTool from "./forget";
 import renderUITool from "./render-ui";
 import rememberTool from "./remember";
 import requestSecretTool from "./request-secret";
@@ -101,6 +102,7 @@ export { default as delegateToSubAgentTool } from "./delegate-to-sub-agent";
 export { default as fileOperationsTool } from "./file-operations";
 export type { FlightData } from "./flight-tracker";
 export { default as flightTrackerTool } from "./flight-tracker";
+export { default as forgetTool } from "./forget";
 export type { GitHubCodeResult, GitHubIssue, GitHubRepoInfo } from "./github-search";
 export { default as githubSearchTool } from "./github-search";
 export { default as imageEditingTool } from "./image-editing";
@@ -220,19 +222,21 @@ export enum ToolName {
 
     // Travel Tools
     FlightTracker = "flightTracker",
+    Forget = "forget",
+
     GithubSearch = "githubSearch",
 
     // Image Editing Tools
     ImageEditing = "imageEditing",
-
     // Image/Video/Music Generation Tools
     ImageGeneration = "imageGeneration",
     // Image/Video Search Tools
     ImageSearch = "imageSearch",
+
     // Knowledge Base Tools
     KnowledgeSearch = "knowledgeSearch",
-
     ListCurrencies = "listCurrencies",
+
     ListLanguages = "listLanguages",
 
     // Pull requests linked to the thread
@@ -240,20 +244,19 @@ export enum ToolName {
 
     // Sub-agent workers
     MessageWorker = "messageWorker",
-
     // Entertainment Tools
     MovieTvSearch = "movieTvSearch",
-    MusicGeneration = "musicGeneration",
 
+    MusicGeneration = "musicGeneration",
     NearbyPlacesSearch = "nearbyPlacesSearch",
+
     // People & Company Search Tools
     PeopleSearch = "peopleSearch",
-
     ReadFailingChecks = "readFailingChecks",
     ReadPullRequest = "readPullRequest",
-    RedditSearch = "redditSearch",
 
-    // Saving a fact the user asked to be remembered
+    RedditSearch = "redditSearch",
+    // Saving a fact the user asked to be remembered, and deleting one they asked to be forgotten
     Remember = "remember",
 
     // Generative UI Tools
@@ -368,6 +371,7 @@ export const getAllTools = () => {
         [ToolName.FileOperations]: fileOperationsTool,
         [ToolName.FindPlace]: findPlaceTool,
         [ToolName.FlightTracker]: flightTrackerTool,
+        [ToolName.Forget]: forgetTool,
         [ToolName.GithubSearch]: githubSearchTool,
         [ToolName.ImageEditing]: imageEditingTool,
         [ToolName.ImageGeneration]: imageGenerationTool,

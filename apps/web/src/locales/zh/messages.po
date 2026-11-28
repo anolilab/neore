@@ -338,6 +338,11 @@ msgstr "{0, plural, other {# 个匹配}}"
 msgid "{0, plural, one {# member} other {# members}}"
 msgstr "{0, plural, other {# 名成员}}"
 
+#. placeholder {0}: forgotten.length
+#: src/features/chat/thread/tool-approval.tsx:221
+msgid "{0, plural, one {# memory is waiting for the chat owner to confirm.} other {# memories are waiting for the chat owner to confirm.}}"
+msgstr "{0, plural, other {# 条记忆正在等待聊天所有者确认。}}"
+
 #. placeholder {0}: c.messages.length
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:369
 msgid "{0, plural, one {# message} other {# messages}}"
@@ -479,12 +484,12 @@ msgid "{0, plural, one {# user} other {# users}}"
 msgstr "{0, plural, other {# 位用户}}"
 
 #. placeholder {0}: selectedModelIds!.length
-#: src/components/model-picker/model-picker-button.tsx:173
+#: src/components/model-picker/model-picker-button.tsx:177
 msgid "{0, plural, one {1 model} other {# models}}"
 msgstr "{0, plural, other {# 个模型}}"
 
 #. placeholder {0}: selectedModelIds!.length
-#: src/components/model-picker/model-picker-button.tsx:160
+#: src/components/model-picker/model-picker-button.tsx:163
 msgid "{0, plural, one {Comparing # model} other {Comparing # models}}"
 msgstr "{0, plural, other {正在对比 # 个模型}}"
 
@@ -2695,7 +2700,7 @@ msgstr "添加附件"
 msgid "Add background"
 msgstr "添加背景"
 
-#: src/features/settings/components/chat/usage-settings.tsx:417
+#: src/features/settings/components/chat/usage-settings.tsx:421
 #~ msgid "Add budget alert"
 #~ msgstr "添加预算提醒"
 
@@ -2807,8 +2812,8 @@ msgid "Add picked frame as image node"
 msgstr "将选取的帧添加为图片节点"
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:147
-#: src/features/chat/thread-list/thread-list-dock.tsx:120
-#: src/features/chat/thread-list/thread-list-dock.tsx:130
+#: src/features/chat/thread-list/thread-list-dock.tsx:123
+#: src/features/chat/thread-list/thread-list-dock.tsx:133
 #: src/features/projects/components/add-project-dialog.tsx:695
 msgid "Add project"
 msgstr "添加项目"
@@ -3748,11 +3753,11 @@ msgstr "全部使用场景"
 msgid "All Users"
 msgstr "所有用户"
 
-#: src/features/chat/thread/tool-approval.tsx:167
+#: src/features/chat/thread/tool-approval.tsx:243
 msgid "Allow \"{tool}\" from {server}?"
 msgstr "允许来自 {server} 的“{tool}”吗？"
 
-#: src/features/chat/thread/tool-approval.tsx:167
+#: src/features/chat/thread/tool-approval.tsx:243
 msgid "Allow \"{tool}\"?"
 msgstr "允许“{tool}”吗？"
 
@@ -3760,19 +3765,19 @@ msgstr "允许“{tool}”吗？"
 msgid "Allow \"delete_files\" from the drafts server?"
 msgstr "允许草稿服务器的“delete_files”吗？"
 
-#: src/features/chat/thread/tool-approval.tsx:138
+#: src/features/chat/thread/tool-approval.tsx:157
 #~ msgid "Allow {tool} for 1 hour"
 #~ msgstr "允许 {tool} 1 小时"
 
-#: src/features/chat/thread/tool-approval.tsx:142
+#: src/features/chat/thread/tool-approval.tsx:161
 #~ msgid "Allow {tool} for today"
 #~ msgstr "允许 {tool} 今天"
 
-#: src/features/chat/thread/tool-approval.tsx:134
+#: src/features/chat/thread/tool-approval.tsx:153
 msgid "Allow for 1 hour"
 msgstr "允许 1 小时"
 
-#: src/features/chat/thread/tool-approval.tsx:140
+#: src/features/chat/thread/tool-approval.tsx:159
 msgid "Allow for today"
 msgstr "允许今天"
 
@@ -3835,12 +3840,12 @@ msgstr "同时在看"
 msgid "Always"
 msgstr "始终"
 
-#: src/features/chat/thread/tool-approval.tsx:128
+#: src/features/chat/thread/tool-approval.tsx:146
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:35
 msgid "Always allow"
 msgstr "始终允许"
 
-#: src/features/chat/thread/tool-approval.tsx:126
+#: src/features/chat/thread/tool-approval.tsx:144
 msgid "Always allow {tool}"
 msgstr "始终允许 {tool}"
 
@@ -4331,14 +4336,14 @@ msgid "Approvals in Neore: a tool you set to Ask stops before it runs, and you d
 msgstr "Neore 中的批准：设为“询问”的工具会在运行前暂停，由你结合确切的输入决定。"
 
 #: src/features/auth/components/device-approval.tsx:242
-#: src/features/chat/thread/tool-approval.tsx:120
+#: src/features/chat/thread/tool-approval.tsx:137
 #: src/features/develop/components/review-panel.tsx:64
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:32
 #: src/features/tasks/components/task-detail-dialog.tsx:104
 msgid "Approve"
 msgstr "批准"
 
-#: src/features/chat/thread/tool-approval.tsx:118
+#: src/features/chat/thread/tool-approval.tsx:135
 msgid "Approve {tool} once"
 msgstr "批准一次 {tool}"
 
@@ -4366,7 +4371,7 @@ msgstr "请在 {name} 上的桌面应用中批准此请求。"
 msgid "Approved"
 msgstr "已批准"
 
-#: src/features/chat/thread/tool-approval.tsx:83
+#: src/features/chat/thread/tool-approval.tsx:98
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:23
 msgid "Approved — running tool"
 msgstr "已批准——正在运行工具"
@@ -5111,8 +5116,8 @@ msgstr "Azure OpenAI"
 msgid "Azure portal → your OpenAI resource → Keys and Endpoint. Encrypted at rest and never shown again."
 msgstr "Azure 门户 → 你的 OpenAI 资源 → 密钥和终结点。加密存储，不会再次显示。"
 
-#: src/features/code/components/code-shell.tsx:177
-#: src/features/onboarding/components/onboarding-dialog.tsx:486
+#: src/features/code/components/code-shell.tsx:192
+#: src/features/onboarding/components/onboarding-dialog.tsx:492
 #: src/features/pages/components/page-version-panel.tsx:88
 #: src/features/projects/components/add-project-dialog.tsx:692
 #: src/features/settings/components/personalization/memory-import-dialog.tsx:309
@@ -7450,11 +7455,11 @@ msgstr "代码高亮主题已更新"
 msgid "Code is required"
 msgstr "代码为必填项"
 
-#: src/features/code/components/code-shell.tsx:140
+#: src/features/code/components/code-shell.tsx:143
 msgid "Code mode is not available for your account yet."
 msgstr "你的账号暂时无法使用代码模式。"
 
-#: src/features/code/components/code-shell.tsx:158
+#: src/features/code/components/code-shell.tsx:161
 msgid "Code navigation"
 msgstr "代码导航"
 
@@ -7526,7 +7531,7 @@ msgstr "编程智能体运行完成"
 msgid "Coding agent run was not approved."
 msgstr "编程智能体运行未获批准。"
 
-#: src/features/code/components/code-shell.tsx:111
+#: src/features/code/components/code-shell.tsx:112
 msgid "Coding agent runs"
 msgstr "编码智能体运行"
 
@@ -7535,7 +7540,7 @@ msgstr "编码智能体运行"
 msgid "Coding agents you can start on {0}"
 msgstr "可在 {0} 上启动的编码智能体"
 
-#: src/features/code/components/code-shell.tsx:165
+#: src/features/code/components/code-shell.tsx:175
 #: src/features/onboarding/components/setup-checklist.tsx:303
 msgid "Coding setup"
 msgstr "编码设置"
@@ -8047,7 +8052,7 @@ msgstr "需要对视觉输入进行透明思考的复杂视觉推理"
 msgid "Composer"
 msgstr "输入框"
 
-#: src/features/chat/thread/composer-status-line.tsx:95
+#: src/features/chat/thread/composer-status-line.tsx:96
 msgid "Composer status"
 msgstr "输入框状态"
 
@@ -8231,7 +8236,7 @@ msgstr "将你自己的机器人连接到消息应用，即可在手机上给智
 msgid "Connect a Git host"
 msgstr "连接 Git 托管平台"
 
-#: src/features/code/components/code-shell.tsx:98
+#: src/features/code/components/code-shell.tsx:99
 #: src/features/code/components/git-host-step.tsx:31
 msgid "Connect a Git host to review pull requests here."
 msgstr "连接 Git 托管服务，即可在此审查拉取请求。"
@@ -9555,7 +9560,7 @@ msgid "Could not send your answer."
 msgstr "无法发送你的回答。"
 
 #: src/features/chat/thread/ask-user-prompt.tsx:115
-#: src/features/chat/thread/tool-approval.tsx:72
+#: src/features/chat/thread/tool-approval.tsx:87
 msgid "Could not send your answer. Please try again."
 msgstr "无法发送你的答复，请重试。"
 
@@ -11117,7 +11122,7 @@ msgstr "最看重极致 AI 能力和精细推理的高要求任务"
 msgid "Denied"
 msgstr "已拒绝"
 
-#: src/features/chat/thread/tool-approval.tsx:81
+#: src/features/chat/thread/tool-approval.tsx:96
 msgid "Denied — continuing without it"
 msgstr "已拒绝——在不使用它的情况下继续"
 
@@ -11138,12 +11143,12 @@ msgid "Density updated"
 msgstr "密度已更新"
 
 #: src/features/auth/components/device-approval.tsx:233
-#: src/features/chat/thread/tool-approval.tsx:124
+#: src/features/chat/thread/tool-approval.tsx:141
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:34
 msgid "Deny"
 msgstr "拒绝"
 
-#: src/features/chat/thread/tool-approval.tsx:122
+#: src/features/chat/thread/tool-approval.tsx:139
 msgid "Deny {tool}"
 msgstr "拒绝 {tool}"
 
@@ -15825,6 +15830,10 @@ msgstr "森林"
 msgid "forget"
 msgstr "忘记"
 
+#: src/features/chat/thread/tool-approval.tsx:229
+msgid "Forget these memories?"
+msgstr "忘记这些记忆？"
+
 #: src/features/auth/components/auth/forms/two-factor-form.tsx:288
 msgid "Forgot authenticator"
 msgstr "忘记身份验证器"
@@ -16746,7 +16755,7 @@ msgid "Go to slide {slideNumber}"
 msgstr "转到第 {slideNumber} 张幻灯片"
 
 #. placeholder {0}: index + 1
-#: src/features/onboarding/components/onboarding-dialog.tsx:454
+#: src/features/onboarding/components/onboarding-dialog.tsx:460
 msgid "Go to step {0}"
 msgstr "前往第 {0} 步"
 
@@ -16788,7 +16797,7 @@ msgid "Goal: {goalTitle}"
 msgstr "目标：{goalTitle}"
 
 #: src/features/chat/goal/composer-goal.tsx:66
-#: src/features/chat/thread/composer-status-line.tsx:111
+#: src/features/chat/thread/composer-status-line.tsx:112
 msgid "Goal: run until done"
 msgstr "目标：运行直至完成"
 
@@ -17679,7 +17688,7 @@ msgstr "水平条纹"
 msgid "Host: {0}"
 msgstr "托管方：{0}"
 
-#: src/features/code/components/code-shell.tsx:59
+#: src/features/code/components/code-shell.tsx:60
 msgid "Hosts"
 msgstr "托管方"
 
@@ -19179,7 +19188,7 @@ msgstr "刚刚"
 msgid "Just now"
 msgstr "刚刚"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:383
+#: src/features/onboarding/components/onboarding-dialog.tsx:389
 msgid "Just start chatting"
 msgstr "直接开始聊天"
 
@@ -20388,8 +20397,8 @@ msgstr "正在加载节点详情..."
 msgid "Loading older messages..."
 msgstr "正在加载更早的消息..."
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:359
-#: src/features/onboarding/components/onboarding-dialog.tsx:362
+#: src/features/onboarding/components/onboarding-dialog.tsx:365
+#: src/features/onboarding/components/onboarding-dialog.tsx:368
 msgid "Loading onboarding"
 msgstr "正在加载新手引导"
 
@@ -21451,6 +21460,10 @@ msgstr "记忆"
 msgid "Memories"
 msgstr "记忆"
 
+#: src/features/chat/thread/tool-approval.tsx:214
+msgid "Memories to forget"
+msgstr "要忘记的记忆"
+
 #: src/features/chat/thread/memory-usage-action.tsx:42
 msgid "Memories used"
 msgstr "使用的记忆"
@@ -22062,7 +22075,7 @@ msgstr "模型标签页"
 msgid "Model: {0}"
 msgstr "模型：{0}"
 
-#: src/components/model-picker/model-picker-button.tsx:180
+#: src/components/model-picker/model-picker-button.tsx:185
 msgid "Model: {singleLabel}"
 msgstr "模型：{singleLabel}"
 
@@ -23161,8 +23174,8 @@ msgid "New thread"
 msgstr "新建对话"
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:150
-#: src/features/chat/thread-list/thread-list-dock.tsx:136
-#: src/features/chat/thread-list/thread-list-dock.tsx:146
+#: src/features/chat/thread-list/thread-list-dock.tsx:139
+#: src/features/chat/thread-list/thread-list-dock.tsx:149
 msgid "New Thread"
 msgstr "新建对话"
 
@@ -23198,7 +23211,7 @@ msgstr "新闻简报头图图像"
 #: ../../packages/ui/src/components/pagination.tsx:52
 #: ../../packages/ui/src/components/spreadsheet/csv-renderer.tsx:342
 #: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:656
-#: src/features/onboarding/components/onboarding-dialog.tsx:508
+#: src/features/onboarding/components/onboarding-dialog.tsx:514
 msgid "Next"
 msgstr "下一步"
 
@@ -23731,7 +23744,7 @@ msgstr "未找到页面。请从 Notion 以“Markdown & CSV”或“HTML”格�
 msgid "No pages yet."
 msgstr "还没有页面。"
 
-#: src/features/code/components/code-shell.tsx:62
+#: src/features/code/components/code-shell.tsx:63
 msgid "No paired computer yet."
 msgstr "还没有配对的电脑。"
 
@@ -24444,7 +24457,7 @@ msgstr "仅在属于上述项目的聊天中提供。从下一条消息起生效
 msgid "Official"
 msgstr "官方"
 
-#: src/features/code/components/code-shell.tsx:82
+#: src/features/code/components/code-shell.tsx:83
 #: src/features/code/components/host-details.tsx:32
 #: src/features/devices/components/devices-settings.tsx:382
 #: src/routes/admin/gateway/index.tsx:37
@@ -24561,23 +24574,23 @@ msgstr "本地部署选项"
 msgid "Onboarding"
 msgstr "新手引导"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:327
+#: src/features/onboarding/components/onboarding-dialog.tsx:333
 msgid "Onboarding complete"
 msgstr "新手引导已完成"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:346
+#: src/features/onboarding/components/onboarding-dialog.tsx:352
 msgid "Onboarding complete. Redirecting to chat."
 msgstr "新手引导已完成。正在跳转到聊天。"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:346
+#: src/features/onboarding/components/onboarding-dialog.tsx:352
 msgid "Onboarding complete. Redirecting to Code."
 msgstr "引导完成。正在跳转到“代码”。"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:401
+#: src/features/onboarding/components/onboarding-dialog.tsx:407
 msgid "Onboarding progress"
 msgstr "新手引导进度"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:450
+#: src/features/onboarding/components/onboarding-dialog.tsx:456
 msgid "Onboarding steps"
 msgstr "新手引导步骤"
 
@@ -24585,7 +24598,7 @@ msgstr "新手引导步骤"
 msgid "Onboarding will restart on your next visit to chat."
 msgstr "下次访问聊天时将重新开始新手引导。"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:390
+#: src/features/onboarding/components/onboarding-dialog.tsx:396
 msgid "Onboarding wizard"
 msgstr "新手引导向导"
 
@@ -24685,7 +24698,7 @@ msgstr "一次性密码无效"
 msgid "One-time password is required"
 msgstr "请输入一次性密码"
 
-#: src/features/code/components/code-shell.tsx:82
+#: src/features/code/components/code-shell.tsx:83
 #: src/features/code/components/host-details.tsx:32
 #: src/features/devices/components/devices-settings.tsx:382
 msgid "Online"
@@ -24906,7 +24919,7 @@ msgstr "作为页面打开"
 msgid "Open chat"
 msgstr "打开聊天"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:383
+#: src/features/onboarding/components/onboarding-dialog.tsx:389
 msgid "Open Code"
 msgstr "打开“代码”"
 
@@ -24918,7 +24931,7 @@ msgstr "打开命令面板"
 msgid "Open connectors"
 msgstr "打开连接器"
 
-#: src/features/code/components/code-shell.tsx:100
+#: src/features/code/components/code-shell.tsx:101
 #: src/features/code/components/git-host-step.tsx:51
 msgid "Open Connectors"
 msgstr "打开连接器"
@@ -25985,7 +25998,7 @@ msgstr "配对电脑"
 msgid "Pair a computer in the Neore desktop app so agents can work on your files. You confirm the pairing on that computer, and the step is done once any computer is paired with your account."
 msgstr "在 Neore 桌面应用中配对一台电脑，以便智能体处理你的文件。你需在该电脑上确认配对，只要有任一台电脑与你的账户配对，此步骤即完成。"
 
-#: src/features/code/components/code-shell.tsx:64
+#: src/features/code/components/code-shell.tsx:65
 msgid "Pair one in Settings"
 msgstr "在设置中配对一台"
 
@@ -27930,7 +27943,7 @@ msgid "Pull request settings updated"
 msgstr "拉取请求设置已更新"
 
 #: src/features/chat/sidebar/thread-context.tsx:93
-#: src/features/code/components/code-shell.tsx:96
+#: src/features/code/components/code-shell.tsx:97
 #: src/features/develop/components/thread-pull-requests.tsx:375
 msgid "Pull requests"
 msgstr "拉取请求"
@@ -29388,7 +29401,7 @@ msgstr "回复已就绪"
 msgid "Reply tools are off by default. You switch them on per connection and choose which groups they may use."
 msgstr "回复工具默认关闭。你可以按连接开启，并选择允许使用的工具组。"
 
-#: src/features/chat/thread/composer-status-line.tsx:99
+#: src/features/chat/thread/composer-status-line.tsx:100
 msgid "Replying"
 msgstr "正在回复"
 
@@ -30310,7 +30323,7 @@ msgstr "运行一次后自动关闭。如需重复的时间，请使用计划任
 msgid "Runs when a webhook is received, on {0}. You get a new signing secret and URL for it."
 msgstr "收到 webhook 时运行，使用 {0}。你会获得新的签名密钥和 URL。"
 
-#: src/features/code/components/code-shell.tsx:113
+#: src/features/code/components/code-shell.tsx:114
 msgid "Runs you start from a chat appear here."
 msgstr "你从聊天中启动的运行会显示在这里。"
 
@@ -30732,7 +30745,7 @@ msgstr "搜索"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:241
 #: src/features/chat/signed-out/signed-out-chat.tsx:141
-#: src/features/chat/thread-list/thread-list-dock.tsx:95
+#: src/features/chat/thread-list/thread-list-dock.tsx:98
 #: src/features/chat/thread/thread-welcome-suggestions.tsx:93
 msgid "Search"
 msgstr "搜索"
@@ -30830,11 +30843,11 @@ msgstr "搜索消息内容"
 msgid "Search message content..."
 msgstr "搜索消息内容..."
 
-#: src/features/chat/thread-list/thread-list-dock.tsx:53
+#: src/features/chat/thread-list/thread-list-dock.tsx:54
 msgid "Search messages"
 msgstr "搜索消息"
 
-#: src/features/chat/thread-list/thread-list-dock.tsx:57
+#: src/features/chat/thread-list/thread-list-dock.tsx:58
 msgid "Search messages ({focusSearchShortcut})"
 msgstr "搜索消息（{focusSearchShortcut}）"
 
@@ -30971,12 +30984,12 @@ msgid "Search thread titles..."
 msgstr "搜索对话标题..."
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:134
-#: src/features/chat/thread-list/thread-list-dock.tsx:53
+#: src/features/chat/thread-list/thread-list-dock.tsx:54
 #: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:82
 msgid "Search threads"
 msgstr "搜索对话"
 
-#: src/features/chat/thread-list/thread-list-dock.tsx:57
+#: src/features/chat/thread-list/thread-list-dock.tsx:58
 msgid "Search threads ({focusSearchShortcut})"
 msgstr "搜索对话（{focusSearchShortcut}）"
 
@@ -31218,22 +31231,22 @@ msgid "Select mode"
 msgstr "选择模式"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker-button.tsx:211
-#: src/components/model-picker/model-picker-button.tsx:243
+#: src/components/model-picker/model-picker-button.tsx:254
 msgid "Select model"
 msgstr "选择模型"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker-button.tsx:173
-#: src/components/model-picker/model-picker-button.tsx:203
+#: src/components/model-picker/model-picker-button.tsx:214
 #: src/components/model-picker/model-picker-popup.tsx:42
 msgid "Select Model"
 msgstr "选择模型"
 
-#: src/features/prompts/components/prompt-model-selector.tsx:44
+#: src/features/prompts/components/prompt-model-selector.tsx:47
 msgid "Select model (optional)"
 msgstr "选择模型（可选）"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker-button.tsx:124
-#: src/components/model-picker/model-picker-button.tsx:100
+#: src/components/model-picker/model-picker-button.tsx:103
 #: src/features/workflow/components/nodes/background-removal-node.tsx:66
 #: src/features/workflow/components/nodes/character-ref-node.tsx:147
 #: src/features/workflow/components/nodes/controlnet-node.tsx:139
@@ -32072,7 +32085,7 @@ msgstr "显示时间戳"
 msgid "Show up to {rowLimit} rows ({byteCount} bytes)"
 msgstr "最多显示 {rowLimit} 行（{byteCount} 字节）"
 
-#: src/features/chat/thread/tool-approval.tsx:111
+#: src/features/chat/thread/tool-approval.tsx:128
 msgid "Show what it will send"
 msgstr "显示将要发送的内容"
 
@@ -32470,7 +32483,7 @@ msgstr "无法加载技能。你仍可以不使用技能进行转发。"
 msgid "Skills views"
 msgstr "技能视图"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:496
+#: src/features/onboarding/components/onboarding-dialog.tsx:502
 #: src/features/onboarding/components/setup-checklist.tsx:248
 msgid "Skip"
 msgstr "跳过"
@@ -32487,7 +32500,7 @@ msgstr "跳过问题"
 msgid "Skip to content"
 msgstr "跳到内容"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:491
+#: src/features/onboarding/components/onboarding-dialog.tsx:497
 msgid "Skip tour"
 msgstr "跳过导览"
 
@@ -33488,7 +33501,7 @@ msgid "Steering:"
 msgstr "引导："
 
 #. placeholder {0}: currentIndex + 1
-#: src/features/onboarding/components/onboarding-dialog.tsx:446
+#: src/features/onboarding/components/onboarding-dialog.tsx:452
 msgid "Step {0} of {totalSteps}: {title}"
 msgstr "第 {0}/{totalSteps} 步：{title}"
 
@@ -35377,7 +35390,7 @@ msgstr "机器人及其电脑将被移除。它的聊天会保留，成为普通
 msgid "The bot gets only the tools you allow. With none allowed, it gets no tools."
 msgstr "机器人只获得你允许的工具。未允许任何工具时，它不会获得任何工具。"
 
-#: src/features/chat/thread/composer-status-line.tsx:123
+#: src/features/chat/thread/composer-status-line.tsx:124
 msgid "The bot sets the model for this chat."
 msgstr "机器人为此聊天设置模型。"
 
@@ -37631,7 +37644,7 @@ msgstr "{0} 的工具"
 msgid "Tools run on their own settings; a quick check can clear low-risk calls"
 msgstr "工具按各自的设置运行；快速检查可放行低风险调用"
 
-#: src/features/chat/thread/composer-status-line.tsx:117
+#: src/features/chat/thread/composer-status-line.tsx:118
 msgid "Tools run without asking"
 msgstr "工具无需询问即可运行"
 
@@ -40046,7 +40059,7 @@ msgstr "正在等待所有者"
 msgid "Waiting for the owner to answer"
 msgstr "正在等待所有者回答"
 
-#: src/features/chat/thread/tool-approval.tsx:78
+#: src/features/chat/thread/tool-approval.tsx:93
 msgid "Waiting for the owner to approve"
 msgstr "正在等待所有者批准"
 
@@ -40072,7 +40085,7 @@ msgstr "正在“{0}”中等待你的回答"
 
 #: src/features/chat/thread-list/thread-node.tsx:919
 #: src/features/chat/thread-list/thread-node.tsx:926
-#: src/features/chat/thread/tool-approval.tsx:78
+#: src/features/chat/thread/tool-approval.tsx:93
 #: src/features/home/components/home-page.tsx:119
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:20
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:60
@@ -40273,7 +40286,7 @@ msgid "Welcome back"
 msgstr "欢迎回来"
 
 #: src/features/onboarding/components/onboarding-dialog.tsx:51
-#: src/features/onboarding/components/onboarding-dialog.tsx:388
+#: src/features/onboarding/components/onboarding-dialog.tsx:394
 msgid "Welcome to Neore"
 msgstr "欢迎使用 Neore"
 
@@ -41156,7 +41169,7 @@ msgstr "你需要一个身份验证器应用（如 Google Authenticator 或 Auth
 msgid "You're all caught up."
 msgstr "你已处理完所有通知。"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:343
+#: src/features/onboarding/components/onboarding-dialog.tsx:349
 msgid "You're all set!"
 msgstr "一切就绪！"
 
