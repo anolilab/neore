@@ -158,6 +158,8 @@ export const StatusLineSearchFullAccess: Story = {
 
         await expect(status).toHaveTextContent("Web · Thorough");
         await expect(status).not.toHaveTextContent("Goal");
+        // The search suggestions fade in after the status line: axe reads them settled.
+        await settle(canvas);
     },
 };
 
