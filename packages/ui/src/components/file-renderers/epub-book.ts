@@ -374,7 +374,12 @@ const inlineStylesheetUrls = async (css: string, directory: string, reader: Asse
     });
 };
 
-const IMPORT_RULE = /@import\s+(?:url\(\s*)?(?:"([^"]*)"|'([^']*)'|([^\s;)]*))[^;{]*;?/giu;
+const IMPORT_RULE = /@import\s+(?:url\(\s*)?(?:"([^"]*)"|'([^']*)'|([^\s;)]*))([^;{]*);?/giu;
+const CLOSING_PAREN = /^\s*\)/u;
+/** A media list that can be carried into an `@media` rule as it is: words, numbers, commas, parentheses, colons, comparison signs and spaces, nothing that opens or ends a rule or names a function. */
+const SAFE_MEDIA = /^[\w\s,():.<>=/-]+$/u;
+const MEDIA_ALL = /^all$/iu;
+const UNSUPPORTED_CONDITION = /supports|layer|url|image-set/iu;
 const MAX_IMPORT_DEPTH = 4;
 
 /**
@@ -390,6 +395,15 @@ const expandImports = async (css: string, directory: string, reader: AssetReader
     for (const rule of rules) {
         out += css.slice(at, rule.index);
         at = rule.index + rule[0].length;
+
+        // The import's media list is kept: print-only or narrow-screen styles must not apply to every screen. `all` and an empty list are no
+        // condition; a list that cannot be carried over safely drops the import, as one that cannot be resolved is.
+        const media = (rule[4] ?? "").replace(CLOSING_PAREN, "").trim();
+        const conditioned = media !== "" && !MEDIA_ALL.test(media);
+
+        if (conditioned && (!SAFE_MEDIA.test(media) || UNSUPPORTED_CONDITION.test(media))) {
+            continue;
+        }
 
         const path = resolveInArchive((rule[1] ?? rule[2] ?? rule[3] ?? "").trim(), directory);
         const declared = path === undefined ? undefined : reader.size(path);
@@ -412,7 +426,9 @@ const expandImports = async (css: string, directory: string, reader: AssetReader
 
         const expanded = await expandImports(text, directoryOf(path), reader, [...stack, path]);
 
-        out += await inlineStylesheetUrls(expanded, directoryOf(path), reader);
+        const inlined = await inlineStylesheetUrls(expanded, directoryOf(path), reader);
+
+        out += conditioned ? `@media ${media} { ${inlined} }` : inlined;
     }
 
     return out + css.slice(at);

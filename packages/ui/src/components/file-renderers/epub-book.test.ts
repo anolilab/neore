@@ -457,6 +457,36 @@ describe("a chapter's style sheets", () => {
         opened.destroy();
     });
 
+    it("keeps an import's media condition: a print import stays out of screen styles, a conditioned one keeps its condition", async () => {
+        const opened = await openEpub(
+            await book({
+                chapters: [{ body: `${links(["../main.css"])}<p>x</p>`, file: "text/one.xhtml", id: "c1" }],
+                files: {
+                    "all.css": ".all{x:1}",
+                    "bad.css": ".bad{x:1}",
+                    "fn.css": ".fn{x:1}",
+                    "main.css": String.raw`@import "print.css" print; @import url(narrow.css) screen and (max-width: 600px); @import "all.css" all; @import "plain.css"; @import "bad.css" print, foo\bar; @import "fn.css" supports(display:grid);`,
+                    "narrow.css": ".narrow{x:1}",
+                    "plain.css": ".plain{x:1}",
+                    "print.css": ".print{x:1}",
+                },
+            }),
+            folder.path,
+        );
+        const sheet = sheetsOf(parse(await opened.read("c1"))).join("");
+
+        // The conditions travel with their text, so print rules sit inside `@media print` and are not in force on a screen.
+        expect(sheet).toContain("@media print { .print{x:1} }");
+        expect(sheet).toContain("@media screen and (max-width: 600px) { .narrow{x:1} }");
+        expect(sheet).toContain(".all{x:1}");
+        expect(sheet).not.toContain("@media all");
+        expect(sheet).toContain(".plain{x:1}");
+        // A list that cannot be carried over safely drops its import.
+        expect(sheet).not.toContain(".bad{x:1}");
+        expect(sheet).not.toContain(".fn{x:1}");
+        opened.destroy();
+    });
+
     it("ends an import cycle", async () => {
         const opened = await openEpub(
             await book({
