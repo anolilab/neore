@@ -333,6 +333,12 @@ const EpubPreview: FC<EpubPreviewProps> = memo(({ className, filename, maxBytes 
                         srcDoc={shown !== undefined && shown.book === book && shown.id === chapterId && shown.key === key ? shown.doc : undefined}
                         title={chapter?.title ?? label}
                     />
+                    {/* The chapter's document is still being read: say so, instead of an empty frame. */}
+                    {!(shown !== undefined && shown.book === book && shown.id === chapterId && shown.key === key) && (
+                        <p aria-live="polite" className="text-muted-foreground px-3 py-1 text-xs" role="status">
+                            {t`Loading preview…`}
+                        </p>
+                    )}
                     {shown?.failed === true && shown.book === book && shown.id === chapterId && shown.key === key && (
                         <p className="text-destructive px-3 py-1 text-xs" role="status">
                             {t`This preview could not be loaded.`}

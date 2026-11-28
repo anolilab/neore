@@ -663,3 +663,29 @@ describe("EpubPreview position when the person comes back to a book", () => {
         expect(view.container.textContent).not.toContain("Chapter 3 of 1");
     });
 });
+
+describe("EpubPreview while a chapter is read", () => {
+    it("says the chapter is loading, instead of showing an empty frame, until its document is ready", async () => {
+        answer(new Uint8Array([1]));
+
+        let release: () => void = () => undefined;
+
+        // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- the configured Node range (22.0) predates `Promise.withResolvers`
+        book.readGate = new Promise<void>((resolve) => {
+            release = resolve;
+        });
+        await mount();
+        expect(view.container.querySelector("[role=status]")?.textContent).toContain("Loading preview");
+        expect(frame().hasAttribute("srcdoc")).toBe(false);
+
+        release();
+        await act(async () => {
+            await Promise.resolve();
+        });
+        await act(async () => {
+            await Promise.resolve();
+        });
+        expect(frame().hasAttribute("srcdoc")).toBe(true);
+        expect(view.container.textContent).not.toContain("Loading preview");
+    });
+});

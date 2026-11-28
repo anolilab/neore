@@ -17,6 +17,7 @@ import { assertZipDirectoryExact, chapterDocument, FRAME_POLICY, MAX_ASSETS_PER_
 const PNG_PREFIX = /^data:image\/png;base64,/u;
 const PNG_DATA = /^data:image\/png;base64,iVBORw0KGgo=$/u;
 const CONDITIONED = /@media screen\s+and \(min-width: 40em\) \{ \.cond\{x:1\} \}/u;
+const REFRESH_ATTRIBUTE = /http-equiv=["']?refresh/iu;
 const TRACKER = /tracker\.example/u;
 const SCRIPTY = /expression\s*\(|behaviou?r\s*:|-moz-binding\s*:/iu;
 const NS = 'xmlns="http://www.idpf.org/2007/opf"';
@@ -34,6 +35,8 @@ interface SampleChapter {
     raw?: string;
     /** The name the file is stored under in the archive, when it is not the one the manifest writes. */
     stored?: string;
+    /** What the table of contents writes for this chapter, when it is not the manifest's path. */
+    tocHref?: string;
     type?: string;
 }
 
@@ -69,7 +72,7 @@ const book = async ({ chapters, files = {}, items = "", language = "en" }: Sampl
                 .filter((chapter) => chapter.label !== undefined)
                 .map(
                     (chapter, order) =>
-                        `<navPoint id="n${String(order)}" playOrder="${String(order + 1)}"><navLabel><text>${chapter.label}</text></navLabel><content src="${chapter.file}"/></navPoint>`,
+                        `<navPoint id="n${String(order)}" playOrder="${String(order + 1)}"><navLabel><text>${chapter.label}</text></navLabel><content src="${chapter.tocHref ?? chapter.file}"/></navPoint>`,
                 )
                 .join("")}</navMap></ncx>`,
     );
@@ -641,6 +644,27 @@ describe("a chapter's style sheets", () => {
         opened.destroy();
     });
 
+    it("reads an import path with an escaped quote, and a font whose quoted address holds a parenthesis", async () => {
+        const font = new Uint8Array(64).fill(1);
+        const opened = await openEpub(
+            await book({
+                chapters: [{ body: `${links(["../main.css"])}<p>x</p>`, file: "text/one.xhtml", id: "c1" }],
+                files: {
+                    'a"b.css': ".escaped{x:1}",
+                    "fonts/my)font.woff2": font,
+                    "main.css": String.raw`@import "a\"b.css"; @font-face{font-family:F;src:url("fonts/my)font.woff2")} .after{x:2}`,
+                },
+            }),
+            folder.path,
+        );
+        const sheet = sheetsOf(parse(await opened.read("c1"))).join("");
+
+        expect(sheet).toContain(".escaped{x:1}");
+        expect(sheet).toContain('url("data:font/woff2;base64,');
+        expect(sheet).toContain(".after{x:2}");
+        opened.destroy();
+    });
+
     it("leaves text that looks like an import inside a string as text", async () => {
         const opened = await openEpub(
             await book({
@@ -910,6 +934,86 @@ describe("a chapter's style sheets", () => {
 
         await expect(opened.read("c1")).rejects.toThrow("chapter too large");
         expect(asyncSpy.mock.instances.some((entry) => (entry as unknown as { name: string }).name.endsWith("one.xhtml"))).toBe(false);
+        asyncSpy.mockRestore();
+        opened.destroy();
+    });
+
+    it("keeps prefixed SVG artwork as artwork, in the SVG namespace", async () => {
+        const opened = await openEpub(
+            await book({
+                chapters: [
+                    {
+                        body: '<svg:svg xmlns:svg="http://www.w3.org/2000/svg" width="10" height="10"><svg:circle r="2"/></svg:svg>',
+                        file: "one.xhtml",
+                        id: "c1",
+                    },
+                ],
+            }),
+            folder.path,
+        );
+        const circle = parse(await opened.read("c1")).documentElement.querySelector(":scope svg circle");
+
+        expect(circle?.namespaceURI).toBe("http://www.w3.org/2000/svg");
+        opened.destroy();
+    });
+
+    it("refuses an archive that hides a second end record in the real one's comment", async () => {
+        const zip = new JSZip();
+
+        zip.file("a", "a");
+
+        const bytes = await zip.generateAsync({ type: "uint8array" });
+        const end = bytes.length - 22;
+        // The real record's comment is a fake end record (its own comment length is 0) followed by ten more bytes, so the fake does not reach the end.
+        const fake = new Uint8Array(22);
+
+        new DataView(fake.buffer).setUint32(0, 0x06_05_4b_50, true);
+
+        const forged = new Uint8Array(bytes.length + 32);
+
+        forged.set(bytes);
+        new DataView(forged.buffer).setUint16(end + 20, 32, true);
+        forged.set(fake, bytes.length);
+
+        expect(() => assertZipDirectoryExact(forged.buffer)).toThrow("Corrupt ZIP directory");
+    });
+
+    it("names a chapter from a table of contents that reaches it through a parent folder", async () => {
+        const opened = await openEpub(
+            await book({
+                chapters: [{ body: "<p>x</p>", file: "Text/ch.xhtml", id: "c1", label: "Reached through ..", tocHref: "../Text/ch.xhtml" }],
+            }),
+            folder.path,
+        );
+
+        expect(opened.chapters[0]).toEqual({ id: "c1", title: "Reached through .." });
+        opened.destroy();
+    });
+
+    it("leaves nothing a second reading of the document would turn into a live refresh, however the markup nests", async () => {
+        const hostile = '<form><math><mtext></form><form><mglyph><xmp></math><meta http-equiv="refresh" content="0;url=https://evil.example/">';
+        const text = chapterDocument(hostile, []);
+        const again = parse(text);
+
+        expect(again.querySelectorAll('meta[http-equiv="refresh"]')).toHaveLength(0);
+        expect(text).not.toMatch(REFRESH_ATTRIBUTE);
+        // And the document is as the next reading makes it: nothing more is left to change.
+        expect(`<!doctype html>${again.documentElement.outerHTML}`).toBe(text);
+    });
+
+    it("does not inflate a picture that cannot fit, however often the chapter names it", async () => {
+        const probe = new JSZip();
+
+        probe.file("a", "x");
+
+        const prototype = Object.getPrototypeOf(probe.file("a")) as { async: (...args: unknown[]) => Promise<unknown> };
+        const huge = new Uint8Array(20 * 1024 * 1024);
+        const body = '<img src="../images/huge.png"/>'.repeat(30);
+        const opened = await openEpub(await book({ chapters: [{ body, file: "text/one.xhtml", id: "c1" }], files: { "images/huge.png": huge } }), folder.path);
+        const asyncSpy = vi.spyOn(prototype, "async");
+
+        await opened.read("c1");
+        expect(asyncSpy.mock.instances.filter((entry) => (entry as unknown as { name: string }).name.endsWith("huge.png"))).toHaveLength(0);
         asyncSpy.mockRestore();
         opened.destroy();
     });

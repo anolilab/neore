@@ -41,12 +41,27 @@ const DOT_SLASH = /^\.\//u;
 const pathOf = (href: string): string => {
     const bare = (href.replace(EPUB_PREFIX, "").split("#", 1)[0] ?? "").replace(DOT_SLASH, "");
 
+    let decoded = bare;
+
     try {
         // A name written with escapes (`my%20chapter.xhtml`) is the file stored under its plain name.
-        return decodeURIComponent(bare);
+        decoded = decodeURIComponent(bare);
     } catch {
-        return bare;
+        // Kept as written.
     }
+
+    // `..` and `.` segments are resolved, so a table of contents in a subfolder that names `../Text/c.xhtml` names `Text/c.xhtml`.
+    const parts: string[] = [];
+
+    for (const part of decoded.split("/")) {
+        if (part === "..") {
+            parts.pop();
+        } else if (part !== "." && part !== "") {
+            parts.push(part);
+        }
+    }
+
+    return parts.join("/");
 };
 
 /**
@@ -110,12 +125,18 @@ export const assertZipDirectoryExact = (buffer: ArrayBuffer): void => {
     const view = new DataView(buffer);
     let end = buffer.byteLength - 22;
 
-    while (end >= 0 && !(view.getUint32(end, true) === EOCD_SIGNATURE && view.getUint16(end + 20, true) === buffer.byteLength - end - 22)) {
+    // The LAST end record in the file, as the zip library takes it (it does not look at the comment length): one hidden in the real record's
+    // comment, pointing at a directory nobody counted, is then the one examined, and its comment length does not reach the end of the file.
+    while (end >= 0 && view.getUint32(end, true) !== EOCD_SIGNATURE) {
         end -= 1;
     }
 
     if (end < 0) {
         throw new Error("Not a ZIP archive");
+    }
+
+    if (view.getUint16(end + 20, true) !== buffer.byteLength - end - 22) {
+        throw new Error("Corrupt ZIP directory");
     }
 
     const declared = view.getUint16(end + 10, true);
@@ -251,6 +272,8 @@ const assetReader = (zip: JSZip, declared: ReadonlyMap<string, string>, signal?:
     let attributed = 0;
     // What each file became, and what it costs each time it is written into the document.
     const seen = new Map<string, { cost: number; url: string } | undefined>();
+    // What a file turned out to cost when it did not fit: remembered, so a later reference does not inflate it again.
+    const tooBig = new Map<string, number>();
 
     return {
         check: () => signal?.throwIfAborted(),
@@ -288,6 +311,15 @@ const assetReader = (zip: JSZip, declared: ReadonlyMap<string, string>, signal?:
                 return undefined;
             }
 
+            // Judged from the size the archive declares BEFORE it is inflated, and from what an earlier try found, so a file that cannot fit is
+            // not inflated again for each reference to it.
+            const declaredSize = (entry as { _data?: { uncompressedSize?: number } })._data?.uncompressedSize;
+            const estimate = declaredSize === undefined ? 0 : `data:${type};base64,`.length + Math.ceil(declaredSize / 3) * 4;
+
+            if (estimate > budget.left || (tooBig.get(path) ?? 0) > budget.left) {
+                return undefined;
+            }
+
             budget.files -= 1;
 
             const bytes = await entry.async("uint8array");
@@ -297,6 +329,8 @@ const assetReader = (zip: JSZip, declared: ReadonlyMap<string, string>, signal?:
             const length = `data:${type};base64,`.length + Math.ceil(bytes.length / 3) * 4;
 
             if (length > budget.left) {
+                tooBig.set(path, length);
+
                 return undefined;
             }
 
@@ -365,7 +399,7 @@ const assetReader = (zip: JSZip, declared: ReadonlyMap<string, string>, signal?:
     };
 };
 
-const CSS_URL = /url\(([^)]*)\)/giu;
+const CSS_URL = /url\(("[^"]*"|'[^']*'|[^)]*)\)/giu;
 const CSS_QUOTE = /^["']|["']$/gu;
 const CSS_SCRIPTY = /expression\s*\(|-moz-binding\s*:|behaviou?r\s*:/giu;
 const LESS_THAN = /</gu;
@@ -446,7 +480,35 @@ const startsStatement = (code: string, index: number): boolean => {
     return at < 0 || ";{}".includes(code[at] ?? "");
 };
 const IMPORT_END = /[;{]/u;
-const IMPORT_RULE_STICKY = /@import\s+(?:url\(\s*)?(?:"([^"]*)"|'([^']*)'|([^\s;)]*))([^;{]*);?/iuy;
+const IMPORT_HEAD = /@import\s+(?:url\(\s*)?/iuy;
+const IMPORT_TARGET = /"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)'|([^\s;)]*)/suy;
+const IMPORT_TAIL = /([^;{]*);?/uy;
+
+/** The import rule that starts at `index` of `css`: the whole text of it, its path (one of the first three groups) and its media list (the fourth). */
+const matchImport = (css: string, index: number): { 0: string; 1?: string; 2?: string; 3?: string; 4?: string } | null => {
+    IMPORT_HEAD.lastIndex = index;
+
+    const head = IMPORT_HEAD.exec(css);
+
+    if (head === null) {
+        return null;
+    }
+
+    IMPORT_TARGET.lastIndex = index + head[0].length;
+
+    const target = IMPORT_TARGET.exec(css);
+
+    if (target === null) {
+        return null;
+    }
+
+    IMPORT_TAIL.lastIndex = IMPORT_TARGET.lastIndex;
+
+    const tail = IMPORT_TAIL.exec(css);
+
+    return { 0: `${head[0]}${target[0]}${tail?.[0] ?? ""}`, 1: target[1], 2: target[2], 3: target[3], 4: tail?.[1] ?? "" };
+};
+const PATH_ESCAPE = /\\([\s\S])/gu;
 
 /**
  * The CSS with each comment (outside any string) written as one space, so the words either side stay apart, and a second copy of the same
@@ -525,12 +587,10 @@ const expandImports = async (
             continue;
         }
 
-        IMPORT_RULE_STICKY.lastIndex = found.index;
-
-        const rule = IMPORT_RULE_STICKY.exec(css);
+        const rule = matchImport(css, found.index);
 
         if (rule !== null) {
-            rules.push({ ...rule, 0: rule[0], index: found.index });
+            rules.push({ ...rule, index: found.index });
             resume = found.index + rule[0].length;
         }
     }
@@ -551,7 +611,7 @@ const expandImports = async (
             continue;
         }
 
-        const path = resolveInArchive((rule[1] ?? rule[2] ?? rule[3] ?? "").trim(), directory);
+        const path = resolveInArchive((rule[1] ?? rule[2] ?? rule[3] ?? "").replaceAll(PATH_ESCAPE, "$1").trim(), directory);
         const declared = path === undefined ? undefined : reader.size(path);
 
         if (
@@ -788,8 +848,35 @@ export const chapterDocument = (
         frame.body.appendChild(frame.importNode(node, true));
     }
 
-    return `<!doctype html>${frame.documentElement.outerHTML}`;
+    return settle(`<!doctype html>${frame.documentElement.outerHTML}`);
 };
+
+/**
+ * The document as a browser will read it back. The frame parses this string again, and markup whose serialization parses differently the
+ * second time (nested forms, foreign content in raw text) could carry something past the cleaning done on the first parse. So the string is
+ * parsed as the frame will parse it, cleaned again, and serialized, until it no longer changes; a chapter that will not settle in a few rounds
+ * is refused.
+ */
+const settle = (serialized: string): string => {
+    let current = serialized;
+
+    for (let round = 0; round < MAX_SETTLE_ROUNDS; round += 1) {
+        const again = new DOMParser().parseFromString(current, "text/html");
+
+        neutralize(again.body);
+
+        const next = `<!doctype html>${again.documentElement.outerHTML}`;
+
+        if (next === current) {
+            return current;
+        }
+
+        current = next;
+    }
+
+    throw new Error("chapter could not be made safe");
+};
+const MAX_SETTLE_ROUNDS = 4;
 
 const countLessThan = (text: string): number => {
     let count = 0;
@@ -808,6 +895,39 @@ const countLessThan = (text: string): number => {
  * says, and moved into an HTML document (which serializes as HTML, where `<div/>` would open a div); one that is not well-formed XML is read
  * as HTML, as a browser would.
  */
+const SVG_NAMESPACE = "http://www.w3.org/2000/svg";
+const MATHML_NAMESPACE = "http://www.w3.org/1998/Math/MathML";
+
+/**
+ * A node of an XHTML chapter in the HTML document it is moved to. An SVG or MathML element written with a prefix (`<svg:svg>`) becomes the
+ * same element without one, so serializing it as HTML and reading it again gives artwork, not an unknown element named `svg:svg`. Attributes
+ * keep their names (`xlink:href`).
+ */
+const cloneIntoHtml = (node: Node, html: Document): Node => {
+    if (node.nodeType !== 1) {
+        return html.importNode(node, true);
+    }
+
+    const element = node as Element;
+    const space = element.namespaceURI;
+    const made =
+        space === SVG_NAMESPACE || space === MATHML_NAMESPACE ? html.createElementNS(space, element.localName) : (html.importNode(element, false) as Element);
+
+    if (made !== (element as Node)) {
+        for (const attribute of element.attributes) {
+            if (!made.hasAttribute(attribute.name)) {
+                made.setAttributeNS(attribute.namespaceURI, attribute.name, attribute.value);
+            }
+        }
+    }
+
+    for (const child of element.childNodes) {
+        made.appendChild(cloneIntoHtml(child, html));
+    }
+
+    return made;
+};
+
 const parseChapter = (source: string): Document => {
     const html = new DOMParser().parseFromString("<!doctype html><html><head></head><body></body></html>", "text/html");
     const xml = new DOMParser().parseFromString(source, "application/xhtml+xml");
@@ -832,7 +952,7 @@ const parseChapter = (source: string): Document => {
         const children = [...(from?.childNodes ?? [])];
 
         for (const node of children) {
-            to.appendChild(html.importNode(node, true));
+            to.appendChild(cloneIntoHtml(node, html));
         }
     }
 
