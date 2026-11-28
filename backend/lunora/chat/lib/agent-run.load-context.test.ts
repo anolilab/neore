@@ -132,10 +132,10 @@ describe(loadRunContext, () => {
             return runAction.mock.calls.some(([reference]) => reference === internal.memory.retrieve.retrieveRelevantMemories);
         };
 
-        // "guten Morgen" greets: its `Morgen` is no tomorrow.
-        expect(
-            await Promise.all(["tomorrow?", "appointments tomorrow?", "morgen?", "thanks again", "guten Morgen"].map(async (text) => await searched(text))),
-        ).toEqual([true, true, true, false, false]);
+        // "guten Morgen" greets: its `Morgen` is no tomorrow. "31 February" names a day that does not exist.
+        const prompts = ["tomorrow?", "appointments tomorrow?", "morgen?", "thanks again", "guten Morgen", "31 February"];
+
+        expect(await Promise.all(prompts.map(async (text) => await searched(text)))).toEqual([true, true, true, false, false, false]);
     });
 
     it("starts knowledge retrieval before the preferences and settings are read", async () => {

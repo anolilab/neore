@@ -359,6 +359,10 @@ describe("timeWindowOf", () => {
         ["was steht bis Mai an", [TODAY, "2027-05-31"]],
         ["since May last year", ["2025-05-01", TODAY]],
         ["until 3 December", [TODAY, "2026-12-03"]],
+        // A day after an article: `the 3rd of June` is the bound, never a day of its own.
+        ["what was before the 3rd of June", [OPEN_START, "2026-06-02"]],
+        ["was war vor dem 3. Juni", [OPEN_START, "2026-06-02"]],
+        ["was steht bis zum 3. Dezember an", [TODAY, "2026-12-03"]],
         // A year, and a time on the other side of today: never a span that ends before it starts.
         ["where did I live since 2023", ["2023-01-01", TODAY]],
         ["what did I do until May 2023", [OPEN_START, "2023-05-31"]],
@@ -388,6 +392,9 @@ describe("timeWindowOf", () => {
         // The year as for the whole month: November ends after today, so it is this year's.
         ["was habe ich Anfang November vor", ["2026-11-01", "2026-11-10"]],
         ["was steht bis Ende Mai an", [TODAY, "2027-05-31"]],
+        // `last` and `letzten` of a part are no past cue: the upcoming December's last week.
+        ["what do I have the last week of December", ["2026-12-25", "2026-12-31"]],
+        ["was habe ich in der letzten Woche im Dezember", ["2026-12-25", "2026-12-31"]],
     ])("reads part of a month in %j", (text, expected) => {
         expect(windowOf(text)).toEqual(expected);
     });

@@ -389,11 +389,14 @@ const phraseAt = (words: string[], at: number, lexicon: Lexicon, tense: Tense): 
 
 /**
  * Whether the question asks about what was or what will be, by the words of the language its phrase is in (English
- * `was` is German `what`); `undefined` when it says neither or both.
+ * `was` is German `what`); `undefined` when it says neither or both. The words at `skipped` give none: the `last` of
+ * "the last week of December" is part of the month, not a past.
  */
-const tenseOf = (words: string[], lexicon: Lexicon): Tense => {
-    const past = words.some((word, index) => lexicon.past.includes(word) || lexicon.pastForm?.(index, words) === true);
-    const future = words.some((word, index) => lexicon.future.includes(word) || lexicon.futureForm?.(index, words) === true);
+const tenseOf = (words: string[], lexicon: Lexicon, skipped: ReadonlySet<number>): Tense => {
+    const cue = (index: number, listed: string[], form: Lexicon["pastForm"]): boolean =>
+        !skipped.has(index) && (listed.includes(words[index]!) || form?.(index, words) === true);
+    const past = words.some((_word, index) => cue(index, lexicon.past, lexicon.pastForm));
+    const future = words.some((_word, index) => cue(index, lexicon.future, lexicon.futureForm));
 
     if (past === future) {
         return undefined;
@@ -453,6 +456,22 @@ const MAX_YEAR_GAP = 4;
 /** Most words a part of a month is named with (`last week of`). */
 const MAX_PART_WORDS = 3;
 
+/** Words before a time a range word reaches past: `before the 3rd of June`, `vor dem 3. Juni`, `bis zum 3. Juni`. */
+const BOUND_ARTICLES = new Set(["dem", "the", "zum"]);
+
+/** The tokens of every part of a month the text names before a month (`last week of December`, `Ende Mai`). */
+const partWordsOf = (words: string[]): Set<number> =>
+    new Set(
+        words.flatMap((_word, index) =>
+            LEXICONS.flatMap((lexicon) =>
+                Object.keys(lexicon.parts)
+                    .map((key) => key.split(" "))
+                    .filter((part) => part.every((word, at) => words[index + at] === word) && monthIndexOf(words[index + part.length], lexicon) !== undefined)
+                    .flatMap((part) => part.map((_part, at) => index + at)),
+            ),
+        ),
+    );
+
 /** A phrase read at a token, and where it starts. */
 interface Found {
     read: Read;
@@ -465,11 +484,12 @@ export const readTimePhrase = (text: string): TimePhrase | undefined => {
     const lowered = text.slice(0, MAX_TEXT_LENGTH).normalize("NFC").toLowerCase();
     const tokens = tokensOf(lowered);
     const words = tokens.map(({ word }) => word);
+    const partWords = partWordsOf(words);
     // The language that knows most of the question's words reads first, and its own words give the tense: `am 3. April`
     // is German in "was habe ich am 3. April gemacht", whose `was` is no English past. A tie keeps `LEXICONS` order.
     const known = (lexicon: Lexicon): number => words.filter((word) => LEXICON_WORDS.get(lexicon)!.has(word)).length;
     const ranked = LEXICONS.toSorted((a, b) => known(b) - known(a)).map((lexicon) => {
-        return { lexicon, tense: tenseOf(words, lexicon) };
+        return { lexicon, tense: tenseOf(words, lexicon, partWords) };
     });
     const phraseFrom = (index: number): Read | undefined => ranked.map(({ lexicon, tense }) => phraseAt(words, index, lexicon, tense)).find(Boolean);
     // The tokens hold no punctuation, so the text between two is read: a semicolon, `?`, `!` or a full stop parts them, a
@@ -620,12 +640,14 @@ export const readTimePhrase = (text: string): TimePhrase | undefined => {
         const bound = ranked.map(({ lexicon }) => entryOf(lexicon.bounds, words[index])).find(Boolean);
 
         if (bound !== undefined) {
-            // A year is read at its lead (`since 2023`); a month after the range word.
+            // A year is read at its lead (`since 2023`); a month or a day after the range word, past an article (`before
+            // the 3rd of June`).
             const own = phraseFrom(index);
-            const bounded = own?.phrase.kind === "year" ? own : readAt(index + 1);
+            const at = index + (BOUND_ARTICLES.has(words[index + 1] ?? "") ? 2 : 1);
+            const bounded = own?.phrase.kind === "year" ? own : readAt(at);
 
             if (bounded !== undefined && bounded.more === undefined && (bounded.phrase.kind === "date" || bounded.phrase.kind === "year")) {
-                return { phrase: { bound, kind: "bound", of: bounded.phrase }, size: (bounded === own ? 0 : 1) + bounded.size };
+                return { phrase: { bound, kind: "bound", of: bounded.phrase }, size: (bounded === own ? 0 : at - index) + bounded.size };
             }
         }
 

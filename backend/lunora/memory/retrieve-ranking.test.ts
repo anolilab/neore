@@ -548,6 +548,19 @@ describe("rankMemories", () => {
             expect(timed(demoted, at({ ended: 0.6 }), after)[0]!.score).toBeCloseTo(rank(demoted, at({ ended: 0.6 }))[0]!.score + TIME_WEIGHTS.ended, 10);
         });
 
+        it("finds nothing by its date alone for the days before a dated day, the day itself included", () => {
+            const rows = ["2026-06-02", "2026-06-03"].map((day) => candidate(day, { ...plain, eventStart: day }));
+            const window = timeWindowOf("what was before the 3rd of June", "2026-11-27")!;
+
+            expect(window.spans).toEqual([{ end: "2026-06-02", start: OPEN_START }]);
+            expect(timed(rows, [], window)).toEqual([]);
+            // The day before it is in the range and boosted; the day itself is not.
+            const ranked = timed(rows, at({ "2026-06-02": 0.6, "2026-06-03": 0.6 }), window);
+
+            expect(ranked.map((m) => m.memoryId)).toEqual(["2026-06-02", "2026-06-03"]);
+            expect(ranked[0]!.score).toBeCloseTo(ranked[1]!.score + TIME_WEIGHTS.event, 10);
+        });
+
         it("finds the appointments of part of a month, or between two ISO dates, by their date alone", () => {
             const rows = ["2026-12-03", "2026-12-12"].map((day) => candidate(day, { ...plain, eventStart: day }));
 
