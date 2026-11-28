@@ -69,11 +69,27 @@ pub struct Target {
     secrets: Vec<String>,
 }
 
+/// Replaces every `secret` in `text`, in any ASCII case: a host name has none, and a token in another case is as good
+/// as blanked. Lowercasing keeps every byte where it is, so the found places hold in `text` too.
 fn scrub(text: &mut String, secrets: &[String]) {
     for secret in secrets {
-        if text.contains(secret.as_str()) {
-            *text = text.replace(secret.as_str(), "[redacted]");
+        let (haystack, needle) = (text.to_ascii_lowercase(), secret.to_ascii_lowercase());
+
+        if !haystack.contains(&needle) {
+            continue;
         }
+
+        let mut scrubbed = String::with_capacity(text.len());
+        let mut from = 0;
+
+        for (at, _) in haystack.match_indices(&needle) {
+            scrubbed.push_str(&text[from..at]);
+            scrubbed.push_str("[redacted]");
+            from = at + needle.len();
+        }
+
+        scrubbed.push_str(&text[from..]);
+        *text = scrubbed;
     }
 }
 
@@ -342,7 +358,7 @@ pub fn parse_target(url: &str, headers: &str) -> Result<Target, String> {
     // name and value in the address's query and each segment of its path (`/mcp/<key>`), as written and decoded.
     let path: Vec<String> = uri.path().split('/').map(percent_decoded).collect();
     // The address itself: the cloud learns only the server's name.
-    let authority = [authority.as_str(), authority.host()];
+    let address = [authority.as_str(), authority.host()];
     let mut secrets: Vec<String> = given
         .values()
         .flat_map(|value| {
@@ -357,7 +373,7 @@ pub fn parse_target(url: &str, headers: &str) -> Result<Target, String> {
         )
         .chain(pairs(raw_query, '&').flat_map(|(name, value)| [name, value]))
         .chain(path.iter().map(String::as_str))
-        .chain(authority)
+        .chain(address)
         .chain(uri.path().split('/'))
         .filter(|secret| secret.len() >= MIN_REDACTED_BYTES)
         .map(str::to_owned)
@@ -552,7 +568,14 @@ impl<W: Write> Bridge<W> {
             None => self.target.secrets.clone(),
         };
 
+        // The id is the server's to match its reply by (a ping): it is never blanked.
+        let id = message.get("id").cloned();
+
         redact(&mut message, &secrets);
+
+        if let (Some(id), Some(object)) = (id, message.as_object_mut()) {
+            object.insert("id".to_owned(), id);
+        }
 
         if let Some(text) = message.pointer_mut("/error/message") {
             if text == SESSION_GONE {

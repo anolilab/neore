@@ -582,6 +582,39 @@ fn a_message_too_large_is_skipped_whole_and_the_next_one_still_goes_out() {
 }
 
 #[test]
+fn a_server_request_keeps_its_id_and_a_host_is_blanked_in_any_case() {
+    let (url, _) = serve(Box::new(|request| match request.body["method"].as_str() {
+        Some("initialize") => json_reply(request, json!({ "protocolVersion": "2025-06-18" }), None),
+        _ => {
+            let token = request
+                .header("authorization")
+                .unwrap_or_default()
+                .replace("Bearer ", "");
+            // A ping whose id is the token, then the answer, naming the host in another case.
+            let ping = json!({ "jsonrpc": "2.0", "id": token, "method": "ping" });
+            let answer = json!({ "jsonrpc": "2.0", "id": request.body["id"], "result": { "at": "LOCALHOST" } });
+
+            reply(
+                "200 OK",
+                &[("Content-Type", "text/event-stream")],
+                &format!("data: {ping}\n\ndata: {answer}\n\n"),
+            )
+        }
+    }));
+    let token = "t".repeat(12);
+    let localhost = url.replace("127.0.0.1", "LocalHost");
+    let written = relay(
+        &localhost,
+        &json!({ "Authorization": format!("Bearer {token}") }).to_string(),
+        &[initialize(), request(2, "tools/call")],
+    );
+
+    assert_eq!(written[1]["method"], "ping", "{written:?}");
+    assert_eq!(written[1]["id"], json!(token));
+    assert_eq!(written[2]["result"]["at"], "[redacted]", "{written:?}");
+}
+
+#[test]
 fn a_server_cannot_pass_its_error_off_as_the_bridges_ended_session() {
     let (url, _) = serve(Box::new(|request| match request.body["method"].as_str() {
         Some("initialize") => json_reply(request, json!({ "protocolVersion": "2025-06-18" }), None),
