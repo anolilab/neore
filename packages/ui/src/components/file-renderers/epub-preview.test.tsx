@@ -164,6 +164,14 @@ afterEach(async () => {
     vi.unstubAllGlobals();
 });
 
+const before = (text: string, container: HTMLElement): boolean => {
+    const notice = [...container.querySelectorAll("[role=status]")].find((element) => element.textContent?.includes(text));
+    const frameElement = container.querySelector("iframe");
+
+    // jsdom does not lay anything out: this checks the order in the document, which is what puts a notice above the frame on screen.
+    return notice !== undefined && frameElement !== null && (notice.compareDocumentPosition(frameElement) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+};
+
 describe("EpubPreview chapters", () => {
     it("shows the chapters one at a time in reading order, with previous and next", async () => {
         answer(new Uint8Array([1, 2, 3]));
@@ -338,6 +346,7 @@ describe("EpubPreview failures", () => {
             });
 
             expect(view.container.textContent).toContain("This preview could not be loaded.");
+            expect(before("This preview could not be loaded.", view.container)).toBe(true);
             expect(view.container.querySelector("iframe")).not.toBeNull();
             expect(book.destroyed).toBe(0);
 
@@ -678,6 +687,7 @@ describe("EpubPreview while a chapter is read", () => {
         const statuses = [...view.container.querySelectorAll("[role=status]")].map((element) => element.textContent);
 
         expect(statuses.some((text) => text?.includes("Loading preview"))).toBe(true);
+        expect(before("Loading preview", view.container)).toBe(true);
         expect(frame().hasAttribute("srcdoc")).toBe(false);
 
         release();

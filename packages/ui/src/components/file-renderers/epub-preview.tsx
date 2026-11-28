@@ -349,16 +349,7 @@ const EpubPreview: FC<EpubPreviewProps> = memo(({ className, filename, maxBytes 
                             <ChevronRight aria-hidden="true" className="size-4" />
                         </button>
                     </div>
-                    {/* An empty `sandbox` is the strictest one: no `allow-scripts`, no `allow-same-origin`. Never add either. */}
-                    <iframe
-                        // 26rem: with the header and the controls (each at least 44 px) it fits the 32rem box the sandbox panel puts a preview in.
-                        className="bg-background h-[26rem] w-full border-0"
-                        referrerPolicy="no-referrer"
-                        sandbox=""
-                        srcDoc={shown !== undefined && shown.book === book && shown.id === chapterId && shown.key === key ? shown.doc : undefined}
-                        title={chapter?.title ?? label}
-                    />
-                    {/* The chapter's document is still being read: say so, instead of an empty frame. */}
+                    {/* The notices sit with the controls, above the frame: below a frame of this height they would be cut off. */}
                     {!(shown !== undefined && shown.book === book && shown.id === chapterId && shown.key === key) && (
                         <p aria-live="polite" className="text-muted-foreground px-3 py-1 text-xs" role="status">
                             {t`Loading preview…`}
@@ -369,6 +360,15 @@ const EpubPreview: FC<EpubPreviewProps> = memo(({ className, filename, maxBytes 
                             {t`This preview could not be loaded.`}
                         </p>
                     )}
+                    {/* An empty `sandbox` is the strictest one: no `allow-scripts`, no `allow-same-origin`. Never add either. */}
+                    <iframe
+                        // 26rem: with the header and the controls (each at least 44 px) it fits the 32rem box the sandbox panel puts a preview in.
+                        className="bg-background h-[26rem] w-full border-0"
+                        referrerPolicy="no-referrer"
+                        sandbox=""
+                        srcDoc={shown !== undefined && shown.book === book && shown.id === chapterId && shown.key === key ? shown.doc : undefined}
+                        title={chapter?.title ?? label}
+                    />
                 </>
             )}
         </div>
