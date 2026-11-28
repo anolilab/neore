@@ -142,6 +142,14 @@ vi.mock("@/lib/lunora/crpc", async () => {
 
     return {
         useCRPC: () => node([]),
+        // The fork is an action; the composer tests do not run it.
+        useLunoraActionOptions: () => {
+            return {
+                mutationFn: async () => {
+                    return { started: true };
+                },
+            };
+        },
         useLunoraAuth: () => {
             return { isAuthenticated: true };
         },
@@ -1015,6 +1023,21 @@ describe("the coding-agent composer", () => {
             await waitFor(() => expect(harness.client?.isFetching()).toBe(0));
             expect(screen.queryByText(OUTDATED)).toBeNull();
         });
+    });
+
+    it("offers Fork here only when the agent said it forks sessions", async () => {
+        const forks = { groups: { sessions: { fork: { degradation: "none", supported: true } } }, reportedAt: 1, version: 1 };
+
+        mount(session({ capabilities: forks }));
+
+        expect(await screen.findByRole("button", { name: "Fork here" })).toBeTruthy();
+    });
+
+    it("offers no fork to an agent that did not say it forks sessions", async () => {
+        mount(session({ capabilities: { groups: {}, reportedAt: 0, version: 1 } }));
+
+        expect(await screen.findByLabelText("Message to the coding agent")).toBeTruthy();
+        expect(screen.queryByRole("button", { name: "Fork here" })).toBeNull();
     });
 
     it("offers Continue after a restart or a timeout, and sends it as a message", async () => {

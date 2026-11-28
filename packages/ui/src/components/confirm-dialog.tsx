@@ -14,6 +14,8 @@ import {
 
 interface ConfirmDialogProperties {
     cancelLabel?: string;
+    /** Keeps Confirm off without the busy state `loading` shows, so Cancel still works. */
+    confirmDisabled?: boolean;
     confirmLabel?: string;
     description?: string;
     loading?: boolean;
@@ -23,7 +25,17 @@ interface ConfirmDialogProperties {
     title: string;
 }
 
-const ConfirmDialog: React.FC<ConfirmDialogProperties> = ({ cancelLabel, confirmLabel, description, loading, onConfirm, onOpenChange, open, title }) => {
+const ConfirmDialog: React.FC<ConfirmDialogProperties> = ({
+    cancelLabel,
+    confirmDisabled,
+    confirmLabel,
+    description,
+    loading,
+    onConfirm,
+    onOpenChange,
+    open,
+    title,
+}) => {
     const { t } = useLingui();
     const resolvedCancelLabel = cancelLabel ?? t`Cancel`;
     const resolvedConfirmLabel = confirmLabel ?? t`Confirm`;
@@ -37,7 +49,7 @@ const ConfirmDialog: React.FC<ConfirmDialogProperties> = ({ cancelLabel, confirm
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                     <AlertDialogCancel disabled={loading}>{resolvedCancelLabel}</AlertDialogCancel>
-                    <AlertDialogAction aria-busy={loading} disabled={loading} onClick={onConfirm}>
+                    <AlertDialogAction aria-busy={loading} disabled={loading || confirmDisabled} onClick={onConfirm}>
                         {resolvedConfirmLabel}
                     </AlertDialogAction>
                 </AlertDialogFooter>

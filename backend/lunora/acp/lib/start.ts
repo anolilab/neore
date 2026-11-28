@@ -13,8 +13,20 @@ export const offerOf = (device: Pick<Doc<"devices">, "acpOffers"> | null, agentK
  * A switch is keyed by the thread it was clicked on as well: the client id is client-chosen and only unique per thread
  * (`claimKeyOf`), and two sessions with one id on a computer cannot be told apart.
  */
-export const webSessionId = async (userId: string, clientId: string, scope: { kind: "start" } | { kind: "switch"; threadId: string }): Promise<string> =>
-    scope.kind === "switch" ? `web-switch-${await sha256Hex(`${userId}:${scope.threadId}:${clientId}`)}` : `web-${await sha256Hex(`${userId}:${clientId}`)}`;
+export const webSessionId = async (
+    userId: string,
+    clientId: string,
+    scope: { kind: "fork"; threadId: string } | { kind: "start" } | { kind: "switch"; threadId: string },
+): Promise<string> => {
+    // A fork is keyed by the chat it forks and has a namespace of its own: no client id of an ordinary start can be one a fork replays.
+    if (scope.kind === "fork") {
+        return `web-fork-${await sha256Hex(`${userId}:${scope.threadId}:${clientId}`)}`;
+    }
+
+    return scope.kind === "switch"
+        ? `web-switch-${await sha256Hex(`${userId}:${scope.threadId}:${clientId}`)}`
+        : `web-${await sha256Hex(`${userId}:${clientId}`)}`;
+};
 
 /** What a person is told when their computer runs a Neore build older than this backend serves. */
 export const OUTDATED_NOTICE = "The Neore app on that computer is out of date. Update it, then try again.";

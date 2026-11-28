@@ -466,6 +466,12 @@
           "optional": true,
           "unique": false
         },
+        "awaitingForkResult": {
+          "kind": "boolean",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "capabilities": {
           "kind": "object",
           "nullable": false,
@@ -3076,6 +3082,12 @@
           "kind": "string",
           "nullable": false,
           "optional": false,
+          "unique": false
+        },
+        "forkFallbackAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
           "unique": false
         },
         "handoffSentAt": {

@@ -15773,6 +15773,14 @@ msgstr "¿Olvidaste tu contraseña?"
 msgid "Fork"
 msgstr "Bifurcar"
 
+#: src/features/chat/host/host-fork.tsx:92
+msgid "Fork here"
+msgstr "Bifurcar aquí"
+
+#: src/features/chat/host/host-fork.tsx:101
+msgid "Fork this chat?"
+msgstr "¿Bifurcar este chat?"
+
 #. placeholder {0}: skill.name
 #: src/features/skills/components/skill-item.tsx:148
 msgid "Fork {0} to edit a copy"
@@ -34987,6 +34995,14 @@ msgstr "Esa sugerencia ya no se puede añadir."
 msgid "That suggestion is gone."
 msgstr "Esa sugerencia ya no existe."
 
+#: src/features/chat/host/host-fork.tsx:65
+msgid "The chat was forked."
+msgstr "El chat se bifurcó."
+
+#: src/features/chat/host/host-fork.tsx:96
+msgid "The fork continues from this conversation in a new chat on the same computer and folder. Both chats work in that folder, so they can change the same files, and a git worktree there is shared too."
+msgstr "La bifurcación continúa esta conversación en un chat nuevo en el mismo equipo y la misma carpeta. Ambos chats trabajan en esa carpeta, así que pueden modificar los mismos archivos, y un worktree de git que haya allí también se comparte."
+
 #: src/features/develop/components/guide-tab.tsx:64
 msgid "The {requestNoun} changed while the guide was being written. Write it again."
 msgstr "El {requestNoun} cambió mientras se escribía la guía. Vuelve a escribirla."
@@ -36178,6 +36194,10 @@ msgstr "Pensando..."
 #: src/features/skills/components/skill-builder-dialog.tsx:182
 msgid "Thinking…"
 msgstr "Pensando…"
+
+#: src/features/chat/host/host-fork.tsx:52
+msgid "This fork is still being made. Try again in a moment."
+msgstr "Esta bifurcación aún se está creando. Inténtalo de nuevo en un momento."
 
 #: src/features/develop/components/merge-panel.tsx:81
 msgid "This {requestNoun} is still a draft."

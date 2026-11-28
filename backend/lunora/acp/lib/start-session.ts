@@ -13,6 +13,8 @@ export const openHostSession = async (
     ctx: MutationCtx,
     args: {
         device: Doc<"devices">;
+        /** The agent's own session id this session asks the computer to fork (a new session that continues it); the source is left as it is. */
+        forkSessionId?: string;
         hostSessionId: string;
         /** The agent's own session id this one asks the computer to load again (harness switch S4). */
         nativeSessionId?: string;
@@ -24,13 +26,15 @@ export const openHostSession = async (
     },
     now: number,
 ): Promise<AcpCallResult> => {
-    const { device, hostSessionId, nativeSessionId, offer, threadId, userId } = args;
+    const { device, forkSessionId, hostSessionId, nativeSessionId, offer, threadId, userId } = args;
     const taintedBy = mergeTaint(args.taintedBy);
 
     // lunora-advisor-exempt owner_field_from_args_not_auth -- a helper, not a procedure: `userId` is the owner each caller checked the device and thread against (`startHostSessionFor` takes `ctx.user.userId`)
     await ctx.db.insert("acpSessions", {
         agentKey: offer.agentKey,
         agentLabel: offer.agentLabel,
+        // A fork's session says in its first open whether the agent forked: turns wait for it (`sendToHostFor`).
+        ...(forkSessionId !== undefined && { awaitingForkResult: true }),
         createdAt: now,
         deviceId: device._id,
         folderId: offer.folderId,
@@ -53,6 +57,8 @@ export const openHostSession = async (
             input: {
                 agentKey: offer.agentKey,
                 folderId: offer.folderId,
+                // Not kept on the row: a fork opens under an id of its own, and the row's `nativeSessionId` is the id a load must come back as.
+                ...(forkSessionId !== undefined && { forkSessionId }),
                 ...(nativeSessionId !== undefined && { nativeSessionId }),
                 sessionId: hostSessionId,
                 threadId: threadId as string,

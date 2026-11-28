@@ -15773,6 +15773,14 @@ msgstr "Password dimenticata?"
 msgid "Fork"
 msgstr "Duplica"
 
+#: src/features/chat/host/host-fork.tsx:92
+msgid "Fork here"
+msgstr "Duplica qui"
+
+#: src/features/chat/host/host-fork.tsx:101
+msgid "Fork this chat?"
+msgstr "Duplicare questa chat?"
+
 #. placeholder {0}: skill.name
 #: src/features/skills/components/skill-item.tsx:148
 msgid "Fork {0} to edit a copy"
@@ -34987,6 +34995,14 @@ msgstr "Quel suggerimento non può più essere aggiunto."
 msgid "That suggestion is gone."
 msgstr "Quel suggerimento non esiste più."
 
+#: src/features/chat/host/host-fork.tsx:65
+msgid "The chat was forked."
+msgstr "La chat è stata duplicata."
+
+#: src/features/chat/host/host-fork.tsx:96
+msgid "The fork continues from this conversation in a new chat on the same computer and folder. Both chats work in that folder, so they can change the same files, and a git worktree there is shared too."
+msgstr "Il duplicato prosegue questa conversazione in una nuova chat sullo stesso computer e nella stessa cartella. Entrambe le chat lavorano in quella cartella, quindi possono modificare gli stessi file, e anche un worktree git presente è condiviso."
+
 #: src/features/develop/components/guide-tab.tsx:64
 msgid "The {requestNoun} changed while the guide was being written. Write it again."
 msgstr "La {requestNoun} è cambiata mentre la guida veniva scritta. Scrivila di nuovo."
@@ -36178,6 +36194,10 @@ msgstr "Sto pensando..."
 #: src/features/skills/components/skill-builder-dialog.tsx:182
 msgid "Thinking…"
 msgstr "Sto pensando…"
+
+#: src/features/chat/host/host-fork.tsx:52
+msgid "This fork is still being made. Try again in a moment."
+msgstr "Questo duplicato è ancora in creazione. Riprova tra un momento."
 
 #: src/features/develop/components/merge-panel.tsx:81
 msgid "This {requestNoun} is still a draft."
