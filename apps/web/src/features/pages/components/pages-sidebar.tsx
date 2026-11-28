@@ -9,7 +9,7 @@ import cn from "@neore/ui/utils/cn";
 import { skipToken, useMutation, useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
 import { FileText, Plus, Search, Star, Users } from "lucide-react";
-import type { FC } from "react";
+import type { Dispatch, FC, SetStateAction } from "react";
 import { useEffect, useId, useMemo, useState } from "react";
 
 import useDebouncedValue from "@/hooks/use-debounced-value";
@@ -36,15 +36,22 @@ const ancestorsOf = (pages: ReadonlyArray<FlatPage>, pageId: string | undefined)
     return result;
 };
 
-const PagesSidebar: FC<{ className?: string }> = ({ className }) => {
+/** The tree's search and open branches, held by the layout so the inline tree and the drawer show one view across a resize. */
+export interface PagesTreeView {
+    expanded: Set<string>;
+    query: string;
+    setExpanded: Dispatch<SetStateAction<Set<string>>>;
+    setQuery: (query: string) => void;
+}
+
+const PagesSidebar: FC<{ className?: string; view: PagesTreeView }> = ({ className, view }) => {
     const { t } = useLingui();
     const crpc = useCRPC();
     const navigate = useNavigate();
     const searchId = useId();
     const { pageId: activePageId } = useParams({ strict: false }) as { pageId?: string };
-    const [query, setQuery] = useState("");
+    const { expanded, query, setExpanded, setQuery } = view;
     const debouncedQuery = useDebouncedValue(query.trim(), SEARCH_DEBOUNCE_MS);
-    const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
     const [pendingDelete, setPendingDelete] = useState<FlatPage | null>(null);
 
     const { data: tree } = useQuery(crpc.pages.functions.listPageTree.queryOptions({}));
@@ -76,7 +83,7 @@ const PagesSidebar: FC<{ className?: string }> = ({ className }) => {
         if (ancestors.length > 0) {
             setExpanded((previous) => (ancestors.every((id) => previous.has(id)) ? previous : new Set([...previous, ...ancestors])));
         }
-    }, [owned, activePageId]);
+    }, [owned, activePageId, setExpanded]);
 
     const handleCreate = async (parentPageId?: string) => {
         try {

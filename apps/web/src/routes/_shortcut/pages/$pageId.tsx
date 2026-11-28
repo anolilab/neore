@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import PageView from "@/features/pages/components/page-view";
+import PageView, { PageLoading } from "@/features/pages/components/page-view";
 import { usePageShard } from "@/features/pages/hooks/use-page-shard";
 
 const PageRoute = () => {
@@ -9,7 +9,7 @@ const PageRoute = () => {
     const shardReady = usePageShard(pageId);
 
     if (!shardReady) {
-        return null;
+        return <PageLoading />;
     }
 
     // Keyed: every page gets a fresh editor, presence session and version bookkeeping.
