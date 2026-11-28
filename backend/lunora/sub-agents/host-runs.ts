@@ -82,9 +82,14 @@ export const sendHostRunTurn = async (ctx: MutationCtx, run: RunDoc, now: number
     }
 
     // A task the lead wrote is model output, shaped by whatever the lead's run read: mark it untrusted on every count,
-    // so the computer never offers "Always allow" for that turn. One the person typed (`clientId`) is theirs.
-    const taintedBy = run.clientId === undefined ? LEAD_TASK_TAINT : undefined;
-    const queued = await queueHostTurn(ctx, { session, taintedBy, text: promptOf(run), threadId: session.threadId, userId: run.userId }, now);
+    // so the computer never offers "Always allow" for that turn, and save it as the app's text, not the person's typing.
+    // One the person typed (`clientId`) is theirs.
+    const typed = run.clientId !== undefined;
+    const queued = await queueHostTurn(
+        ctx,
+        { appWritten: !typed, session, taintedBy: typed ? undefined : LEAD_TASK_TAINT, text: promptOf(run), threadId: session.threadId, userId: run.userId },
+        now,
+    );
 
     if ("error" in queued) {
         return { error: REFUSALS[queued.error], retry: queued.error === "busy" };

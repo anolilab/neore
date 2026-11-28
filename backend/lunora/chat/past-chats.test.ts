@@ -11,6 +11,7 @@ import { internalQuery } from "../lib/crpc";
 import schema from "../schema";
 import { typedTextColumn } from "../agent/shared";
 import { searchPastChats } from "./past-chats";
+import { appWrittenTextPart } from "./lib/attached-text";
 
 const registry = vi.hoisted(() => new Map<string, unknown>());
 
@@ -40,13 +41,17 @@ const NOW = Date.UTC(2026, 3, 1);
 type Hit = { sentAt: number; snippet: string; title: string };
 type Result = { hits: Hit[]; preparing?: true; truncated?: true; unavailable?: string };
 
-const insertPrompt = (context: any, fields: { createdAt?: number; order?: number; role?: string; text: string; threadId: string; userId?: string }) => {
+const insertPrompt = (
+    context: any,
+    fields: { content?: unknown; createdAt?: number; order?: number; role?: string; text: string; threadId: string; userId?: string },
+) => {
     const role = fields.role ?? "user";
-    const typedText = typedTextColumn({ content: fields.text, role } as never, fields.text);
+    const content = fields.content ?? fields.text;
+    const typedText = typedTextColumn({ content, role } as never, fields.text);
 
     return context.db.insert("messages", {
         createdAt: fields.createdAt ?? SENT_AT,
-        message: { content: fields.text, role },
+        message: { content, role },
         ...(typedText !== undefined && { typedText }),
         order: fields.order ?? 0,
         status: "success",
@@ -225,6 +230,13 @@ describe("searchPastChats", () => {
                     threadId: await insertUntaggedThread(context, "Branch of a task", task),
                 });
                 await insertPrompt(context, { createdAt: SENT_AT + 13, text: "Lisbon imported", threadId: await insertUntaggedThread(context, "Import") });
+                // A task run into one of the person's chats saves its instructions there as the app's text.
+                await insertPrompt(context, {
+                    content: [appWrittenTextPart("Lisbon from a task's instructions")],
+                    createdAt: SENT_AT + 14,
+                    text: "Lisbon from a task's instructions",
+                    threadId: await insertThread(context, { title: "Task run in a chat" }),
+                });
 
                 return here;
             });
@@ -372,6 +384,99 @@ describe("searchPastChats", () => {
             const { hits } = await searchIn(harness, { query: "Lisbon", threadId: current });
 
             expect(hits.map((hit) => hit.title).toSorted((a, b) => a.localeCompare(b))).toStrictEqual(["Branch behind a comparison", "Side chat"]);
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("still judges a direct copy behind chains that spend the shared read budget", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            const current = await harness.run(async (context: any) => {
+                await withMemory(context);
+
+                const here = await insertThread(context, { title: "Today" });
+                const plain = await insertThread(context, { title: "Plain" });
+
+                // Eight branches, each at the end of a chain of untagged copies deeper than the walk follows: each walk reads
+                // eight links and finds no source, the 64 reads of the whole search between them.
+                for (let chain = 0; chain < 8; chain += 1) {
+                    let parent: string | undefined;
+
+                    for (let level = 0; level < 9; level += 1) {
+                        parent = await insertUntaggedThread(context, `Deep ${String(chain)}.${String(level)}`, parent);
+                    }
+
+                    await insertPrompt(context, { createdAt: SENT_AT + chain, text: "Lisbon Lisbon Lisbon", threadId: parent! });
+                }
+
+                // Ranked after them: a branch of a typed chat, one read away from its source.
+                await insertPrompt(context, {
+                    createdAt: SENT_AT + 20,
+                    text: "Lisbon in a branch of a typed chat, with more words to rank it last",
+                    threadId: await insertUntaggedThread(context, "Direct branch", plain),
+                });
+
+                return here;
+            });
+
+            const { hits } = await searchIn(harness, { query: "Lisbon", threadId: current });
+
+            expect(hits.map((hit) => hit.title)).toStrictEqual(["Direct branch"]);
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("holds no read for copies it drops: this chat's copies and later branches of a listed chat leave a deep branch its reads", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            const current = await harness.run(async (context: any) => {
+                await withMemory(context);
+
+                const here = await insertThread(context, { title: "Today" });
+                const listed = await insertThread(context, { title: "Listed" });
+                const plain = await insertThread(context, { title: "Plain" });
+
+                await insertPrompt(context, { createdAt: SENT_AT, text: "Lisbon from today", threadId: here });
+                await insertPrompt(context, { createdAt: SENT_AT + 1, text: "Lisbon already listed", threadId: listed });
+
+                // Branches holding only copies: of this chat's prompt, and of a prompt another chat already lists.
+                for (let index = 0; index < 40; index += 1) {
+                    await insertPrompt(context, {
+                        createdAt: SENT_AT,
+                        text: "Lisbon from today",
+                        threadId: await insertUntaggedThread(context, `Copy ${String(index)}`, here),
+                    });
+                }
+
+                for (let index = 0; index < 22; index += 1) {
+                    await insertPrompt(context, {
+                        createdAt: SENT_AT + 1,
+                        text: "Lisbon already listed",
+                        threadId: await insertUntaggedThread(context, `Branch ${String(index)}`, listed),
+                    });
+                }
+
+                // Three untagged copies from a typed chat: three reads.
+                const first = await insertUntaggedThread(context, "Deep 1", plain);
+                const second = await insertUntaggedThread(context, "Deep 2", first);
+
+                await insertPrompt(context, {
+                    createdAt: SENT_AT + 2,
+                    text: "Lisbon deep down",
+                    threadId: await insertUntaggedThread(context, "Deep", second),
+                });
+
+                return here;
+            });
+
+            const { hits } = await searchIn(harness, { query: "Lisbon", threadId: current });
+
+            // The listed prompt comes once, from whichever of its copies ranks first; the deep branch is judged too.
+            expect(hits.map((hit) => hit.snippet).toSorted((a, b) => a.localeCompare(b))).toStrictEqual(["Lisbon already listed", "Lisbon deep down"]);
         } finally {
             harness.close();
         }

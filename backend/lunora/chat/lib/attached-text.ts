@@ -204,7 +204,7 @@ export interface TypedTextOptions {
 
 /**
  * What the person TYPED into a user message: its text without attached documents, a captured page, a guest's
- * note, an outside agent's text, the app's placeholders or a quoted block, each typed part kept as its own paragraph.
+ * note, an outside agent's text, a prompt the app wrote, the app's placeholders or a quoted block, each typed part kept as its own paragraph.
  * Typed words can come before an attachment in one text (messenger puts the caption and its attachment lines in one
  * part): they are kept, and the rest is dropped from the first label on. Messenger's own attachment lines end the typed
  * words only in its marked part (`messengerTextPart`) or with `options.messengerOrigin`.
@@ -237,7 +237,7 @@ export const typedTextOf = (message: MessageLike | undefined, options: TypedText
 };
 
 /**
- * Whether a prompt row cannot back a memory at all: an outside agent wrote part of it, or it carries a not-typed mark
+ * Whether a prompt row cannot back a memory at all: an outside agent or the app wrote part of it, or it carries a not-typed mark
  * (`lib/not-typed-text.ts`: a prompt link, the desktop shell, an extension's relay, an admin acting as the owner). Those words
  * reach the row as the owner's own without being typed by them. Read over the whole row, not per part: the extractor reads the
  * whole prompt, so a marked part beside a typed one could still supply a claim that the typed part's words then back. Both
@@ -245,11 +245,11 @@ export const typedTextOf = (message: MessageLike | undefined, options: TypedText
  * owner typed into the run count.
  */
 export const promptCannotBeQuoted = (message: MessageLike | undefined): boolean =>
-    messageCarriesOutsideAgentText(message) || hasNotTypedMarks(notTypedMarksOfMessage(message));
+    messageCarriesOutsideAgentText(message) || messageCarriesAppWrittenText(message) || hasNotTypedMarks(notTypedMarksOfMessage(message));
 
 /**
  * Whether one stored part of a user message may hold the person's typing: a text part that is no captured page, no
- * guest's note, no outside agent's text and no placeholder the app wrote. {@link typedTextOf}, the one reader of typed words,
+ * guest's note, no outside agent's text, no prompt the app wrote and no placeholder. {@link typedTextOf}, the one reader of typed words,
  * reads only these parts, and only up to an attachment label in them.
  */
 const isTypedPart = (part: ContentPart): part is ContentPart & { text: string } =>
@@ -258,6 +258,7 @@ const isTypedPart = (part: ContentPart): part is ContentPart & { text: string } 
     !hasPageMarker(part) &&
     !isGuestTextPart(part) &&
     !isOutsideAgentPart(part) &&
+    !isAppWrittenPart(part) &&
     !isPlaceholderPart(part);
 
 /**
@@ -282,4 +283,35 @@ export const messageCarriesOutsideAgentText = (message: MessageLike | undefined)
     }
 
     return (message.content as ReadonlyArray<ContentPart>).some((part) => isOutsideAgentPart(part));
+};
+
+type AppWrittenTextPart = { providerOptions: { neore: { appWritten: true } }; text: string; type: "text" };
+
+/**
+ * A prompt the app wrote and saves as a user row though no person typed it in the composer: a task's instructions, a
+ * trigger's rendered template, a sub-agent's or worker's brief, an eval case, a goal round's instruction and a pull request
+ * chat's opening message. Stored on the part (`providerOptions.neore.appWritten`), so `typedTextOf` leaves it out: the row
+ * has no `typedText`, no prompt search lists it, and no memory quotes it ({@link promptCannotBeQuoted}).
+ */
+export const appWrittenTextPart = (text: string): AppWrittenTextPart => {
+    return { providerOptions: { neore: { appWritten: true } }, text, type: "text" };
+};
+
+/** A user message holding only {@link appWrittenTextPart}, as a run's `prompt` (it is saved as given). */
+export const appWrittenPrompt = (text: string): [{ content: [AppWrittenTextPart]; role: "user" }] => [{ content: [appWrittenTextPart(text)], role: "user" }];
+
+/** Whether one stored part is text the app wrote (`appWrittenTextPart`). */
+const isAppWrittenPart = (part: ContentPart): boolean => {
+    const options = part.providerOptions as { neore?: { appWritten?: unknown } } | undefined;
+
+    return options?.neore?.appWritten === true;
+};
+
+/** Whether a stored user message carries text the app wrote (`appWrittenTextPart`). */
+const messageCarriesAppWrittenText = (message: MessageLike | undefined): boolean => {
+    if (message?.role !== "user" || !Array.isArray(message.content)) {
+        return false;
+    }
+
+    return (message.content as ReadonlyArray<ContentPart>).some((part) => isAppWrittenPart(part));
 };

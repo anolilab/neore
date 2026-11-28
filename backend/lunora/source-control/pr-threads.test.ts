@@ -112,7 +112,9 @@ describe("starting work on a pull request", () => {
 
         expect(messages).toHaveLength(1);
         expect(messages[0]).toMatchObject({ userId: A });
-        expect(messages[0].message).toMatchObject({ content: expect.stringContaining(URL), role: "user" });
+        expect(messages[0].message).toMatchObject({ content: [expect.objectContaining({ text: expect.stringContaining(URL) })], role: "user" });
+        // The app wrote the opener: it is no prompt the person typed, so no prompt search lists it.
+        expect(messages[0].typedText).toBeUndefined();
 
         // Audited like any other new thread.
         const history = await harness.run(async (ctx: any) => await ctx.db.query("documentHistory").collect());

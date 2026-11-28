@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { mappedReferences } from "../../../test/registered-api";
 import type { MockRunContext } from "../../../test/mock-run-context";
+import { appWrittenPrompt, typedTextOf } from "./attached-text";
 
 // A reference is read as its dispatch key, which the fake ctx below switches on.
 vi.mock("../../_generated/api", async (importOriginal) => mappedReferences(await importOriginal(), (reference) => reference.__lunoraRef));
@@ -32,7 +33,7 @@ const seen = vi.hoisted(() => {
         /** The owner has left the run's organization. */
         notMember: false,
         prepareSteps: [] as unknown[],
-        prompts: [] as (string | undefined)[],
+        prompts: [] as unknown[],
         providerOptions: [] as unknown[],
         /** The tools' own gates removed `instruction_read`. */
         removesInstructionRead: false,
@@ -68,7 +69,7 @@ vi.mock("./get-agent", () => {
             const instructions = getSystemPrompt(options.timezone, options.location, options.language, options.personalization);
             const thread = {
                 generateText: async (
-                    args: { prepareStep?: (options: { messages: unknown[] }) => unknown; prompt?: string; providerOptions?: unknown; system?: string },
+                    args: { prepareStep?: (options: { messages: unknown[] }) => unknown; prompt?: unknown; providerOptions?: unknown; system?: string },
                     callOptions?: unknown,
                 ) => {
                     seen.prepareSteps.push(args.prepareStep);
@@ -408,13 +409,55 @@ describe("runHeadlessAgent hidden characters", () => {
 
         await run("Summarise this\u{E0069}\u{E0067}\u{202E}", "Be brief\u{E0041}");
 
-        expect(seen.prompts.at(-1)).toBe("Summarise this");
+        expect(seen.prompts.at(-1)).toStrictEqual(appWrittenPrompt("Summarise this"));
         expect(seen.system.at(-1)).toContain("Be brief");
         expect(seen.system.at(-1)).not.toContain("\u{E0041}");
     });
 
     it("refuses a prompt that was only hidden characters", async () => {
         await expect(run("\u{E0069}\u{E0067}")).rejects.toThrow(EMPTY_AFTER_STRIPPING);
+    });
+});
+
+describe("runHeadlessAgent saved prompt", () => {
+    const run = (options: { goal?: { text: string }; promptTyped?: true }) =>
+        runHeadlessAgent(fakeCtx(), {
+            memory: false,
+            model: "test-model",
+            organizationId: null,
+            origin: "lead",
+            personalization: "none",
+            prompt: "Do the thing",
+            thread: { title: "t" },
+            tools: "none",
+            userId: "owner",
+            ...options,
+        });
+
+    beforeEach(() => {
+        seen.prompts = [];
+    });
+
+    // Saved as given (`saveInputMessages`): a task's instructions, a trigger's template, a brief and a goal's later round are
+    // nobody's typing, so the row they become has no typed words for a prompt search or a memory to read as the person's.
+    it("saves the prompt and each later goal round's instruction as the app's text", async () => {
+        seen.replies = ["interim answer", "final answer"];
+        seen.met = [false, true];
+
+        await run({ goal: { text: "Ship it" } });
+
+        expect(seen.prompts).toHaveLength(2);
+        expect(seen.prompts[0]).toStrictEqual(appWrittenPrompt("Do the thing"));
+
+        for (const prompt of seen.prompts) {
+            expect(typedTextOf((prompt as Parameters<typeof typedTextOf>[0][])[0])).toBe("");
+        }
+    });
+
+    it("saves as typed only a prompt the caller says a person typed", async () => {
+        await run({ promptTyped: true });
+
+        expect(seen.prompts).toStrictEqual(["Do the thing"]);
     });
 });
 

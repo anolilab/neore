@@ -131,6 +131,12 @@ Write`; without them the deploy fails, hence the switch.
   answers at once, so a deploy only pays one fan-out per migration. The admin token reaches the CLI only as `LUNORA_ADMIN_TOKEN` in the step's environment;
   the log shows ids and counts only, and production no error detail. A failed or unfinished
   migration fails the job. `backend/deploy-migrations.test.ts` pins it.
+- **Typed words on stored messages take two migrations, in order.** `backfill-message-typed-text` fills `typedText` on
+  user rows saved before the column; `clear-app-written-typed-text` then clears it on prompts the app wrote (tasks,
+  triggers, evals, sub-agent and worker briefs, goal rounds, pull request wakes and openers, the host guide), which new
+  writes save as `appWrittenTextPart`. Until both have run on a shard, the composer's prompt search there may list such a
+  prompt as the person's. Both are paged (32 rows a batch), resumable and idempotent; `deploy-migrations.test.ts` pins
+  the order.
 - **A `defineMigration` never reaches a `.global()` table.** It runs in each shard's Durable Object, so on a D1 table
   it fails on the root shard (staging: `shard "__root__" returned 500`) and stops every migration after it. The runner
   refuses one, reading the shard modes from `backend/lunora/.lunora-schema.json`, and a test fails first. Backfill a

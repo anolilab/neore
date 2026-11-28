@@ -15,6 +15,8 @@ export const PAST_CHAT_TITLE_MAX = 120;
 const SPACES_RE = /\s+/gu;
 // Whitespace or a line break at the end of a piece of text: a word boundary `oneLine` would trim away.
 const BREAK_AT_END_RE = /[\s\p{Cc}]$/u;
+// The invisible characters `oneLine` drops (`neutraliseMemoryText`): one after the last space leaves that space a boundary.
+const INVISIBLE_RE = /\p{Cf}/gu;
 // Characters the cut may end on without halving a word, read from the window's edge inwards.
 const WORD_EDGE = 24;
 
@@ -62,7 +64,7 @@ export const pastChatSnippet = (typed: string, terms: ReadonlyArray<string>): st
     const to = codePointBoundary(typed, Math.min(typed.length, found + 2 * max), "end");
     const before = typed.slice(from, found);
     // `oneLine` trims, so the space between the words before the match and the match is put back.
-    const head = `${oneLine(before)}${oneLine(before) !== "" && BREAK_AT_END_RE.test(before) ? " " : ""}`;
+    const head = `${oneLine(before)}${oneLine(before) !== "" && BREAK_AT_END_RE.test(before.replaceAll(INVISIBLE_RE, "")) ? " " : ""}`;
     const line = `${head}${oneLine(typed.slice(found, to))}`;
     const at = head.length;
     const cutBefore = from > 0;

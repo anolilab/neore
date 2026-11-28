@@ -595,7 +595,7 @@ describe("the end of a host turn", () => {
         expect(runs[0]).toMatchObject({ status: "succeeded" });
     });
 
-    it("signs a task the lead wrote as untrusted, so the computer never offers Always allow for that turn", async () => {
+    it("signs a task the lead wrote as untrusted, so the computer never offers Always allow for that turn, and saves it as no typing of the person's", async () => {
         const device = await pairedDevice();
         const receipt = await createHostWorker(device);
 
@@ -608,6 +608,11 @@ describe("the end of a host turn", () => {
 
         expect(calls).toHaveLength(2);
         expect(JSON.parse(last!.envelope as string).taintedBy).toEqual(expect.arrayContaining(["web", "knowledge", "mcp", "device", "files"]));
+
+        // The person's own task is saved as typed; the lead's brief has no typed words.
+        const prompts = (await table("messages", { threadId: receipt.workerId })).filter((row) => row.message?.role === "user");
+
+        expect(prompts.map((row) => row.typedText === undefined)).toStrictEqual([false, true]);
     });
 
     it("sends a lead's task after the worker's role instructions", async () => {

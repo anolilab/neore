@@ -13,7 +13,7 @@ import { currentSentPrompt, SENT_PROMPT_LINEAGE_READS, searchSentPrompts } from 
 import { typedTextColumn } from "../agent/shared";
 import { getMessagesByIdsUnfiltered, publicMessage } from "../agent/messages";
 import { patchMessage } from "../agent/table-writes";
-import { documentTextPart, guestTextPart, outsideAgentTextPart, typedTextOf } from "./lib/attached-text";
+import { appWrittenPrompt, appWrittenTextPart, documentTextPart, guestTextPart, outsideAgentTextPart, typedTextOf } from "./lib/attached-text";
 import { imagePromptPart } from "./lib/first-user-prompt";
 import { GOAL_CONTINUATION_AGENT } from "./goals/shared";
 
@@ -539,7 +539,7 @@ describe("searchSentPrompts", () => {
         }
     });
 
-    it("lists and searches only what was typed, never an attached document, a quoted line or the image request's placeholder", async () => {
+    it("lists and searches only what was typed, never an attached document, a quoted line, the image request's placeholder or a prompt the app wrote", async () => {
         const harness = lunoraTest(schema as never);
 
         try {
@@ -549,6 +549,9 @@ describe("searchSentPrompts", () => {
                 const quote = "> the deploy log says retry later\n\nwhy did the deploy fail";
                 const typed = (text: string, order: number, parts: unknown = text) =>
                     insertMessage(context, { content: parts, createdAt: order + 1, order, role: "user", text, threadId: thread, userId: OWNER });
+
+                // A task's instructions, a brief or a pull request chat's opener: saved as the person's row, typed by nobody.
+                await typed("summarise the weekly report", 5, [appWrittenTextPart("summarise the weekly report")]);
 
                 return {
                     imageAsked: await typed("Generate an image", 3, [imagePromptPart()]),
@@ -615,6 +618,31 @@ describe("searchSentPrompts", () => {
             expect(
                 typedTextColumn({ content: [guestTextPart("a guest wrote this", "note-1"), { text: "my words", type: "text" }], role: "user" } as never, ""),
             ).toBe("my words");
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("saves a headless run's prompt as the run's save path does, keeping the app's mark and no typed words", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            const { addMessagesHandler } = await import("../agent/messages");
+            const { getPromptArray } = await import("../agent/client/search");
+            const { serializeMessage } = await import("../agent/mapping");
+            const saved = await harness.run(async (context: any) => {
+                const thread = await insertThread(context, { title: "Task", userId: OWNER });
+                const [prompt] = getPromptArray(appWrittenPrompt("check the lighthouse rota"));
+                const { message } = await serializeMessage(context, prompt!);
+                const { messages } = await addMessagesHandler(context, { messages: [{ message }], threadId: thread, userId: OWNER } as never);
+
+                return context.db.get("messages", messages[0]!._id);
+            });
+
+            expect(saved?.text).toBe("check the lighthouse rota");
+            expect(saved?.typedText).toBeUndefined();
+            expect(saved?.message?.content).toStrictEqual([appWrittenTextPart("check the lighthouse rota")]);
+            expect(await search(harness, "lighthouse")).toEqual([]);
         } finally {
             harness.close();
         }

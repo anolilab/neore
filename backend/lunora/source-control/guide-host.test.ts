@@ -125,6 +125,11 @@ describe("beginHostGuide", () => {
 
         expect(calls.map((call) => call.toolName).toSorted((a, b) => a.localeCompare(b))).toEqual(["acp_send", "acp_start"]);
         expect(await rows("persistentStreams")).toHaveLength(1);
+        // The app built the prompt: the row it is saved as has no typed words for a prompt search to list.
+        const [prompt] = await rows("messages");
+
+        expect(prompt).toMatchObject({ message: { role: "user" } });
+        expect(prompt?.typedText).toBeUndefined();
     });
 
     it("signs the prompt's send as tainted, because it carries a pull request's own text", async () => {

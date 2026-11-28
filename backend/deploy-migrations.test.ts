@@ -114,6 +114,8 @@ describe("the post-deploy data migrations", () => {
         expect(ids.indexOf("drop-agent-option-fields")).toBeGreaterThan(-1);
         expect(ids.indexOf("session-options-to-session-state")).toBeGreaterThan(ids.indexOf("drop-agent-option-fields"));
         expect(ids).toContain("backfill-message-typed-text");
+        // It clears what the typed-text backfill filled on prompts the app wrote, so it runs after it.
+        expect(ids.indexOf("clear-app-written-typed-text")).toBeGreaterThan(ids.indexOf("backfill-message-typed-text"));
     });
 
     it("read every literal id, wherever it sits in the declaration, and refuse one that is not literal", () => {

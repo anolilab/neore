@@ -15,6 +15,8 @@ import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { addMessagesHandler } from "../agent/messages";
+import { PULL_REQUEST_OPENER } from "../chat/lib/app-written-prompts";
+import { appWrittenTextPart } from "../chat/lib/attached-text";
 import { insertThread } from "../agent/table-writes";
 import { isValidBranchName } from "../coding-agents/commands";
 import { callerRestrictsFull, ownerNewChatMode } from "../chat/lib/new-chat-mode";
@@ -201,10 +203,11 @@ export const startWorkOnPullRequest = authMutation
             });
         }
 
-        // The pull request is the thread's first turn: the agent that reads it knows what it is working on.
+        // The pull request is the thread's first turn: the agent that reads it knows what it is working on. The app wrote it,
+        // so it is no prompt the person typed.
         await addMessagesHandler(ctx, {
             fromUser: true,
-            messages: [{ message: { content: `Work on this pull request: ${url}`, role: "user" }, status: "success" }],
+            messages: [{ message: { content: [appWrittenTextPart(`${PULL_REQUEST_OPENER}${url}`)], role: "user" }, status: "success" }],
             threadId,
             userId,
         });

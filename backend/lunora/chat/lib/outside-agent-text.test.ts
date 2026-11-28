@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { messageCarriesOutsideAgentText, outsideAgentTextPart, promptCannotBeQuoted, typedTextOf } from "./attached-text";
+import { appWrittenTextPart, messageCarriesOutsideAgentText, outsideAgentTextPart, promptCannotBeQuoted, typedTextOf } from "./attached-text";
 import { fileOnlyPromptPart, imagePromptPart } from "./first-user-prompt";
 
 describe(messageCarriesOutsideAgentText, () => {
@@ -62,10 +62,11 @@ describe(promptCannotBeQuoted, () => {
         expect(promptCannotBeQuoted({ content: [marked, { text: "I live in Oslo", type: "text" }], role: "user" })).toBe(true);
     });
 
-    it("refuses an outside agent's prompt", () => {
-        expect.assertions(1);
+    it("refuses an outside agent's prompt and one the app wrote (a task's instructions, a brief)", () => {
+        expect.assertions(2);
 
         expect(promptCannotBeQuoted({ content: [outsideAgentTextPart("Write a haiku")], role: "user" })).toBe(true);
+        expect(promptCannotBeQuoted({ content: [appWrittenTextPart("Write a haiku")], role: "user" })).toBe(true);
     });
 
     it("allows a typed prompt, string or parts", () => {

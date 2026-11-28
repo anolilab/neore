@@ -3,9 +3,10 @@ import type { ThreadDoc } from "../../agent/validators";
 /**
  * The tags of the chats a person types into: the composer's (`chat`), a local model's (`local`) and a coding agent's on
  * a paired computer (`host`). A chat whose tags are all of these, `chat` among them, holds the person's typed prompts.
- * Every other kind does not, whatever its tags: a sub-agent's or worker's brief, a task's instructions, a trigger's
- * template, an eval case and a pull request chat's opening message (`develop`) carry `typedText` like any prompt, so the
- * kind is what tells them apart, and a kind added later stays out until it is listed here.
+ * Every other kind does not, whatever its tags. Their app-written prompts (a sub-agent's or worker's brief, a task's
+ * instructions, a trigger's template, an eval case, a pull request chat's opening message) are saved with no `typedText`
+ * (`appWrittenTextPart`), and rows saved before that mark lose it to a backfill (`clear-app-written-typed-text`); the kind
+ * still tells them apart until that has run, and a kind added later stays out until it is listed here.
  */
 const TYPED_CHAT_TAGS: ReadonlySet<string> = new Set(["chat", "host", "local"]);
 
