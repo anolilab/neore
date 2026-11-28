@@ -7,6 +7,7 @@ import type { FC, ReactNode } from "react";
 import { useEffect, useState } from "react";
 
 import SettingsLink from "@/components/settings/settings-link";
+import CodeSetup from "@/features/code/components/code-setup";
 import CodeWorkspace from "@/features/code/components/code-workspace";
 import { useCodeModeEnabled } from "@/features/code/hooks/use-code-mode-enabled";
 import { useCodeSetup } from "@/features/code/hooks/use-code-setup";
@@ -123,6 +124,7 @@ const CodeShell: FC = () => {
     // On a phone the list and the workspace take turns. Until the user picks, the list opens first only when it has a paired
     // host to pick; otherwise the workspace (the setup steps, or its loading state) comes first.
     const [listChoice, setListChoice] = useState<boolean | undefined>(undefined);
+    const [setupInList, setSetupInList] = useState(false);
     const now = useNow();
     const dispatch = useCodeLayoutStore((state) => state.dispatch);
     const activeTab = useCodeLayoutStore((state) => state.layout.panes[state.layout.activePane]?.active);
@@ -159,11 +161,13 @@ const CodeShell: FC = () => {
                 className={cn("bg-background border-border/50 w-full shrink-0 overflow-y-auto md:block md:w-72 md:border-r", listOpen ? "block" : "hidden")}
             >
                 {setup === "needed" && (
-                    // The list has no other way back to the steps on a phone when there is no host to open.
+                    // On a phone the steps open here in the list: the workspace may hold a host tab, and the steps show only in an
+                    // empty pane.
                     <div className="p-2 md:hidden">
-                        <Button className="min-h-11" onClick={() => setListChoice(false)} variant="outline">
+                        <Button aria-expanded={setupInList} className="min-h-11" onClick={() => setSetupInList((open) => !open)} variant="outline">
                             {t`Coding setup`}
                         </Button>
+                        {setupInList && <CodeSetup devices={devices ?? []} />}
                     </div>
                 )}
                 <HostsSection devices={devices} now={now} onSelect={openHost} selected={selectedId} />

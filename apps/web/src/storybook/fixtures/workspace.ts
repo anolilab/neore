@@ -211,7 +211,6 @@ type Devices = ReturnOf<typeof api.devices.functions.listDevices>;
 export const codeFixtures = (devices: Devices = [] as Devices, options: { gitConnected?: boolean } = {}): LunoraFixture[] => [
     lunora(api.devices.functions.listDevices, devices),
     lunora(api.source_control.functions.getDevelopHost, { connected: options.gitConnected ?? false, host: HOST } as never),
-    lunora(api.auth.setup_steps.setSetupStepSkipped, null),
 ];
 
 export const DEVICES = [

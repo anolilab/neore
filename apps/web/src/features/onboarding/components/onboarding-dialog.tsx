@@ -240,7 +240,13 @@ const OnboardingContent = ({ codeEnabled, onComplete }: { codeEnabled: boolean |
         [onComplete, next],
     );
 
+    // On the first step Next waits for the Code check: an early click would skip the choice it offers.
+    const waitsForCodeCheck = isFirstStep && codeEnabled === undefined;
     const handleNext = useCallback(async () => {
+        if (waitsForCodeCheck) {
+            return;
+        }
+
         setDirection(1);
 
         if (isLastStep) {
@@ -257,7 +263,7 @@ const OnboardingContent = ({ codeEnabled, onComplete }: { codeEnabled: boolean |
 
         // The coding path is not in the tour's chain of steps, so it is entered by name.
         await (isFirstStep && path === "code" ? goToStep("code") : next());
-    }, [isLastStep, isFirstStep, path, goToStep, next, finishOnboarding, currentStep?.id, currentIndex]);
+    }, [waitsForCodeCheck, isLastStep, isFirstStep, path, goToStep, next, finishOnboarding, currentStep?.id, currentIndex]);
 
     const handlePrevious = useCallback(async () => {
         setDirection(-1);
@@ -498,7 +504,7 @@ const OnboardingContent = ({ codeEnabled, onComplete }: { codeEnabled: boolean |
                                 )}
                             </div>
                             <Button
-                                disabled={loading.isEngineProcessing}
+                                disabled={loading.isEngineProcessing || waitsForCodeCheck}
                                 onClick={() => {
                                     void handleNext();
                                 }}

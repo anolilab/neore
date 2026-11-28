@@ -4,6 +4,8 @@ import { api } from "@neore/backend/api";
 import type { LunoraFixture } from "../lunora";
 import { lunora, onStoryReset } from "../lunora";
 import { getActivePersona } from "../session";
+import { toggleSkipped } from "@/features/onboarding/lib/setup-steps";
+
 import { OWNER, ownedBy } from "./owner";
 
 type Preferences = NonNullable<ReturnOf<typeof api.auth.functions.getAIUserPreferences>>;
@@ -80,6 +82,12 @@ export const userFixtures = (
         }),
         lunora(api.auth.functions.updateUserSettings, (patch) => {
             settingsRow = { ...settingsRow, ...(patch as Partial<Settings>) };
+        }),
+        // Kept in the settings row the reads serve, so a skipped step stays skipped after the refetch that follows.
+        lunora(api.auth.setup_steps.setSetupStepSkipped, ({ skipped, stepId }) => {
+            settingsRow = { ...settingsRow, setupStepsSkipped: toggleSkipped(settingsRow.setupStepsSkipped, stepId, skipped) };
+
+            return null;
         }),
     ];
 };
