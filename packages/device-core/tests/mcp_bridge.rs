@@ -768,16 +768,24 @@ fn a_reply_to_the_server_gets_through_while_every_request_slot_is_busy_and_a_bur
 
     writeln!(writer, "{}", initialize()).unwrap();
 
-    // Eight calls fill every slot, 64 wait for one and the next is refused as busy; only then comes the reply to the ping.
-    for id in 2..=74 {
+    let until = |seen: &dyn Fn(&str) -> bool| {
+        let deadline = Instant::now() + Duration::from_secs(10);
+
+        while !seen(&written()) && Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(20));
+        }
+    };
+
+    // The call that carries the ping first, so it holds a slot whatever order the others take.
+    writeln!(writer, "{}", request(2, "tools/call")).unwrap();
+    until(&|text| text.contains("ping-1"));
+
+    // Seven more fill the slots, 64 wait for one and the next is refused as busy; only then comes the reply to the ping.
+    for id in 3..=74 {
         writeln!(writer, "{}", request(id, "tools/call")).unwrap();
     }
 
-    let deadline = Instant::now() + Duration::from_secs(10);
-
-    while !written().contains("ping-1") && Instant::now() < deadline {
-        std::thread::sleep(Duration::from_millis(20));
-    }
+    until(&|text| text.contains("is busy with other calls"));
 
     writeln!(
         writer,
