@@ -214,6 +214,12 @@ fn only_an_http_or_https_address_without_credentials_and_valid_headers_are_taken
             "",
             "too short to keep out of the chat",
         ),
+        // `Basic bWFyaWU6YWJj`: marie:abc, a password too short.
+        (
+            "https://h/mcp",
+            &json!({ "Authorization": format!("Basic {}", "bWFyaWU6YWJj") }).to_string(),
+            "too short to keep out of the chat",
+        ),
         (
             "https://h/mcp",
             r#"{"X-ClientSecret":"abc"}"#,
@@ -503,7 +509,7 @@ fn a_cookie_or_a_key_in_the_address_the_server_echoes_does_not_reach_the_client(
     );
     let (path, digest, session) = ("p".repeat(12), "d".repeat(12), "e".repeat(12));
     let echoed = format!("saw {key}-x, {sid} and {token}");
-    let more = format!("{path} {digest} {session}");
+    let more = format!("{path} {digest} {session} hidden-passphrase");
     let opened = session.clone();
     let (url, _) = serve(Box::new(move |request| {
         match request.body["method"].as_str() {
@@ -530,6 +536,8 @@ fn a_cookie_or_a_key_in_the_address_the_server_echoes_does_not_reach_the_client(
         // Not the number above: one more than it, which a float cannot tell apart.
         "X-Id": "9007199254740993",
         "Proxy-Authorization": format!(r#"Digest username="u", response="{digest}""#),
+        // robot:hidden-passphrase, split so no credential-like literal sits in the source.
+        "X-Upstream-Auth": format!("Basic {}", ["cm9ib3Q6aGlk", "ZGVuLXBhc3NwaHJhc2U="].concat()),
     })
     .to_string();
     let written = relay(
@@ -541,7 +549,7 @@ fn a_cookie_or_a_key_in_the_address_the_server_echoes_does_not_reach_the_client(
 
     assert_eq!(
         answer["result"],
-        json!({ "echoed": "saw [redacted], [redacted] and [redacted]", "pin": "[redacted]", "code": "[redacted]", "count": 3, "near": 9_007_199_254_740_992_u64, "more": "[redacted] [redacted] [redacted]", "at": "http://[redacted]/x", "[redacted]": 1, "[redacted] (2)": 2 }),
+        json!({ "echoed": "saw [redacted], [redacted] and [redacted]", "pin": "[redacted]", "code": "[redacted]", "count": 3, "near": 9_007_199_254_740_992_u64, "more": "[redacted] [redacted] [redacted] [redacted]", "at": "http://[redacted]/x", "[redacted]": 1, "[redacted] (2)": 2 }),
         "{answer}"
     );
 }

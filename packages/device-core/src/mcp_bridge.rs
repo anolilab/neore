@@ -228,6 +228,42 @@ fn credentials(value: &str) -> impl Iterator<Item = &str> {
     .flatten()
 }
 
+/// The `user:password` a `Basic` credential carries, decoded, as the server reads it.
+fn basic_login(value: &str) -> Option<String> {
+    let (scheme, encoded) = value
+        .trim()
+        .split_once(|character: char| character.is_ascii_whitespace())?;
+
+    if !scheme.eq_ignore_ascii_case("basic") {
+        return None;
+    }
+
+    let mut bits = 0_u32;
+    let mut count = 0;
+    let mut decoded = Vec::new();
+
+    for byte in encoded.trim().bytes().take_while(|byte| *byte != b'=') {
+        let value = match byte {
+            b'A'..=b'Z' => byte - b'A',
+            b'a'..=b'z' => byte - b'a' + 26,
+            b'0'..=b'9' => byte - b'0' + 52,
+            b'+' => 62,
+            b'/' => 63,
+            _ => return None,
+        };
+
+        bits = (bits << 6) | u32::from(value);
+        count += 6;
+
+        if count >= 8 {
+            count -= 8;
+            decoded.push((bits >> count) as u8);
+        }
+    }
+
+    String::from_utf8(decoded).ok()
+}
+
 /// The `name=value` pairs of a cookie header or a query string, split on `separator`.
 fn pairs(text: &str, separator: char) -> impl Iterator<Item = (&str, &str)> {
     text.split(separator)
@@ -324,10 +360,17 @@ pub fn parse_target(url: &str, headers: &str) -> Result<Target, String> {
             .filter(|_| name == "cookie")
             .map(|(_, cookie)| cookie);
 
+        let login = basic_login(value);
+        let phrase = login
+            .as_deref()
+            .and_then(|login| login.split_once(':'))
+            .map(|(_, phrase)| phrase);
+
         // As written: the parsed name is lowercased, which hides `clientSecret`'s words.
         if holds_a_credential(written)
             && credentials(value)
                 .chain(cookies)
+                .chain(phrase)
                 .any(|secret| secret.len() < MIN_REDACTED_BYTES)
         {
             return Err(format!(
@@ -359,6 +402,11 @@ pub fn parse_target(url: &str, headers: &str) -> Result<Target, String> {
     let path: Vec<String> = uri.path().split('/').map(percent_decoded).collect();
     // The address itself: the cloud learns only the server's name.
     let address = [authority.as_str(), authority.host()];
+    // A `Basic` login decoded: the pair, the user and the password.
+    let logins: Vec<String> = given
+        .values()
+        .filter_map(|value| basic_login(value))
+        .collect();
     let mut secrets: Vec<String> = given
         .values()
         .flat_map(|value| {
@@ -375,6 +423,11 @@ pub fn parse_target(url: &str, headers: &str) -> Result<Target, String> {
         .chain(path.iter().map(String::as_str))
         .chain(address)
         .chain(uri.path().split('/'))
+        .chain(logins.iter().flat_map(|login| {
+            let (user, phrase) = login.split_once(':').unwrap_or((login, ""));
+
+            [login.as_str(), user, phrase]
+        }))
         .filter(|secret| secret.len() >= MIN_REDACTED_BYTES)
         .map(str::to_owned)
         .collect();
