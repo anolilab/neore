@@ -24,7 +24,7 @@ import {
     withSearchHits,
 } from "./retrieve-ranking";
 import type { RankCandidate } from "./retrieve-ranking";
-import { timeWindowOf } from "./time-window";
+import { OPEN_END, OPEN_START, timeWindowOf } from "./time-window";
 import type { TimeWindow } from "./time-window";
 import { MAX_SCORED_TERMS, salientTermsOf } from "./search-terms";
 
@@ -519,6 +519,45 @@ describe("rankMemories", () => {
             const appointments = ["2026-12-03", "2027-03-10"].map((day) => candidate(day, { ...plain, eventStart: day }));
 
             expect(idsOf(timed(appointments, [], dayOrYear))).toEqual(["2026-12-03"]);
+        });
+
+        it("boosts an event in a range open at one side, but never finds one by its date alone, nor demotes a fact for the open side", () => {
+            const rows = [candidate("event", { ...plain, eventStart: "2026-10-02" }), candidate("ended", { ...plain, validUntil: "2020-01-31" })];
+
+            for (const question of ["anything before December", "was ist vor Dezember"]) {
+                const window = timeWindowOf(question, "2026-11-27")!;
+
+                expect(window.onlyTime, question).toBe(true);
+                expect(window.spans, question).toEqual([{ end: "2026-11-30", start: OPEN_START }]);
+                // Open towards the past: as wide as a year, so the date alone finds nothing.
+                expect(timed(rows, [], window), question).toEqual([]);
+
+                const ranked = timed(rows, at({ ended: 0.6, event: 0.6 }), window);
+                const base = rank([rows[0]!], at({ event: 0.6 }))[0]!.score;
+
+                expect(ranked.find((m) => m.memoryId === "event")!.score, question).toBeCloseTo(base + TIME_WEIGHTS.event, 10);
+                // Nothing ends before a span open at its start.
+                expect(ranked.find((m) => m.memoryId === "ended")!.score, question).toBeCloseTo(rank([rows[1]!], at({ ended: 0.6 }))[0]!.score, 10);
+            }
+
+            // Open towards the future: a fact ending before it starts is demoted as for any span.
+            const after = timeWindowOf("anything after December", "2026-11-27")!;
+            const demoted = [candidate("ended", { ...plain, validUntil: "2026-12-15" })];
+
+            expect(after.spans).toEqual([{ end: OPEN_END, start: "2027-01-01" }]);
+            expect(timed(demoted, at({ ended: 0.6 }), after)[0]!.score).toBeCloseTo(rank(demoted, at({ ended: 0.6 }))[0]!.score + TIME_WEIGHTS.ended, 10);
+        });
+
+        it("finds the appointments of part of a month, or between two ISO dates, by their date alone", () => {
+            const rows = ["2026-12-03", "2026-12-12"].map((day) => candidate(day, { ...plain, eventStart: day }));
+
+            for (const question of [
+                "was steht Anfang Dezember an",
+                "what is on between 2026-12-01 and 2026-12-10",
+                "what is planned for the first week of December",
+            ]) {
+                expect(idsOf(timed(rows, [], timeWindowOf(question, "2026-11-27")!)), question).toEqual(["2026-12-03"]);
+            }
         });
 
         it("gives no holds bonus to a pinned fact past its end date", () => {

@@ -118,6 +118,26 @@ describe(loadRunContext, () => {
         expect(runAction).not.toHaveBeenCalledWith(internal.memory.retrieve.retrieveRelevantMemories, expect.anything());
     });
 
+    it("searches memories for a short prompt that names a time, never for a short one that names none", async () => {
+        const searched = async (promptText: string): Promise<boolean> => {
+            const prefs = deferred<{ memoryEnabled: boolean }>();
+            const settings = deferred<{ projectId?: string } | null>();
+            const { ctx, runAction } = makeCtx(prefs.promise, settings.promise);
+            const loading = loadRunContext(ctx, { ...args, promptText });
+
+            prefs.resolve({ memoryEnabled: true });
+            settings.resolve(null);
+            await loading;
+
+            return runAction.mock.calls.some(([reference]) => reference === internal.memory.retrieve.retrieveRelevantMemories);
+        };
+
+        // "guten Morgen" greets: its `Morgen` is no tomorrow.
+        expect(
+            await Promise.all(["tomorrow?", "appointments tomorrow?", "morgen?", "thanks again", "guten Morgen"].map(async (text) => await searched(text))),
+        ).toEqual([true, true, true, false, false]);
+    });
+
     it("starts knowledge retrieval before the preferences and settings are read", async () => {
         const prefs = deferred<{ memoryEnabled: boolean }>();
         const settings = deferred<{ projectId?: string } | null>();

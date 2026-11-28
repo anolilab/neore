@@ -26,7 +26,7 @@ synthetic; there are no real people and nothing comes from a public benchmark.
 - Types: identity, preference, context, activity, experience. Dated rows (`eventStart` in the past and ahead, `validUntil` in the past, today and
   ahead), older versions of a fact (replaced, expired, or still active but confirmed longer ago), pinned rows, rows of two bots (`bot-a` joins some chats, `bot-b` never does), expired rows,
   low-signal filler, and a few rows with no vector (`noVector`).
-- 180 queries (36 per persona) and 32 on `p6` (25 `dated`, 7 `abstain` that name a time), each labelled with the memory ids
+- 180 queries (36 per persona) and 43 on `p6` (25 `dated`, 7 `abstain` that name a time, 11 `datedPhrases`), each labelled with the memory ids
   a good retrieval returns:
 
 | Category          | Queries | Label                                                              |
@@ -39,6 +39,7 @@ synthetic; there are no real people and nothing comes from a public benchmark.
 | `abstain`         | 30      | none: the topic was never mentioned, or the token is nobody's      |
 | `dated`           | 25      | every event in the asked time, or the one row of its theme         |
 | `abstain` on `p6` | 7       | none: a time and a topic nobody mentioned ("the weather tomorrow") |
+| `datedPhrases`    | 11      | as `dated`, in phrasings read later (below)                        |
 
 The `dated` questions (a third pass, seed `dated`) name a time in English or German: tomorrow, today, yesterday,
 last / next week, next month, December, 3 December, in 3 days, 5 days ago, May 2023, 2023, an ISO day. Each carries the
@@ -49,6 +50,11 @@ before it. A question about a relative time alone ("what is coming up tomorrow")
 month dimension, as an embedding does not know which day tomorrow is; one that names a month ("what are my plans for
 December") carries that month's dimension (40 for December), as the events of that month do. Seven more name a time beside a topic nobody mentioned ("what is the weather like
 tomorrow", "was koche ich heute"), labelled `abstain` and reported as `datedAbstain`, apart from the 30 above.
+Eleven more, appended last so every earlier row and question draws the same numbers, are `dated` questions in
+phrasings the parser learned later, reported as `datedPhrases` so the 25 keep their numbers: short questions of a time
+alone ("tomorrow?", "Termine morgen?"), the days between two ISO dates, part of a month ("the first week of
+December", "Anfang" and "Mitte Dezember"), and a range open at its start ("where did I live until March 2021"). The
+eval ranks them; that a prompt under three words reaches retrieval at all is tested in `agent-run.load-context.test.ts`.
 
 The `exact` rows are a second pass of the generator with its own seed, so the rows before them are as they were. Each is
 older than the window, embedded, and copied onto a superseded, an expired or a `bot-b` row that must never be the answer.
@@ -134,6 +140,7 @@ overall Recall@8 0.600 → 0.950 and NDCG@8 0.431 → 0.771.
 | temporal     | 1.000 → 1.000 | 0.715 → 1.000 | 0.872 → 0.872  |               |
 | dated        | 0.687 → 1.000 | 0.589 → 0.956 | 0.817 → 0.699  |               |
 | datedAbstain |               |               | 1.000 → 1.000  | 0.857 → 0.857 |
+| datedPhrases | 0.727 → 1.000 | 0.588 → 0.993 | 0.821 → 0.750  |               |
 
 Every other category ranks byte for byte as without it: of the 180, only the 30 `temporal` questions and the two that
 say `today` name a time, and the two rank as before. A month's event now ranks first for "what did I do about coffee in

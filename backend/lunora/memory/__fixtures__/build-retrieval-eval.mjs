@@ -506,6 +506,35 @@ const ago = (days) => dayString(NOW - days * DAY);
 
         queries.push({ category: "abstain", expected: [], id: `${pid}-abstain-${queries.length}`, persona: pid, tags, text, window });
     }
+
+    // Phrasings read since the `dated` questions above, labelled as they are and reported as `datedPhrases`: a short
+    // question of a time alone, two ISO dates and the days between them, part of a month, and a range open at its
+    // start. Added last, so every row and question before them draws the same random numbers.
+    const PHRASES = [
+        ["tomorrow?", day("2026-11-28"), [undefined, 5]],
+        ["morgen?", day("2026-11-28"), [undefined, 5]],
+        ["appointments tomorrow?", day("2026-11-28"), ["appointments", 5]],
+        ["Termine morgen?", day("2026-11-28"), ["appointments", 5]],
+        ["what is on between 2026-12-03 and 2026-12-10", { end: "2026-12-10", start: "2026-12-03" }, [undefined, 5, 11]],
+        ["was steht zwischen 2026-12-03 und 2026-12-10 an", { end: "2026-12-10", start: "2026-12-03" }, [undefined, 5, 11]],
+        ["what is planned for the first week of December", { end: "2026-12-07", start: "2026-12-01" }, [undefined, 5, 11]],
+        ["was steht Anfang Dezember an", { end: "2026-12-10", start: "2026-12-01" }, [undefined, 5, 11]],
+        ["was steht Mitte Dezember an", { end: "2026-12-20", start: "2026-12-11" }, [undefined, 5, 11]],
+        ["where did I live until March 2021", { end: "2021-03-31", start: "0000-01-01" }, ["home", 4], ["bremen"]],
+        ["wo habe ich bis März 2021 gewohnt", { end: "2021-03-31", start: "0000-01-01" }, ["home", 4], ["bremen"]],
+    ];
+
+    for (const [text, window, [theme, aspect, month], ids] of PHRASES) {
+        const tags = noise({
+            ...(theme !== undefined && { [DATED0 + THEMES[theme]]: 1 }),
+            [ASPECT0 + aspect]: 0.6,
+            [COMMON]: 0.5,
+            ...(month !== undefined && { [MONTH0 + month]: 0.6 }),
+        });
+        const expected = ids?.map((name) => `${pid}-dated-${name}`) ?? memories.filter((m) => !m.botId && inWindow(m, window)).map((m) => m.id);
+
+        queries.push({ category: "dated", expected, id: `${pid}-phrase-${queries.length}`, persona: pid, tags, text, window });
+    }
 }
 
 const fixture = {

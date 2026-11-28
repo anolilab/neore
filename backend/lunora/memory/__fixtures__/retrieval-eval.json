@@ -16513,6 +16513,105 @@
             "tags": { "19": 1, "28": 0.5, "60": 0.3 },
             "text": "wie wird das Wetter morgen",
             "window": { "end": "2026-11-28", "start": "2026-11-28" }
+        },
+        {
+            "category": "dated",
+            "expected": ["p6-dated-dentist-tomorrow"],
+            "id": "p6-phrase-212",
+            "persona": "p6",
+            "tags": { "27": 0.6, "28": 0.5, "47": 0.3, "55": 0.3 },
+            "text": "tomorrow?",
+            "window": { "end": "2026-11-28", "start": "2026-11-28" }
+        },
+        {
+            "category": "dated",
+            "expected": ["p6-dated-dentist-tomorrow"],
+            "id": "p6-phrase-213",
+            "persona": "p6",
+            "tags": { "27": 0.6, "28": 0.5, "42": 0.3, "46": 0.3 },
+            "text": "morgen?",
+            "window": { "end": "2026-11-28", "start": "2026-11-28" }
+        },
+        {
+            "category": "dated",
+            "expected": ["p6-dated-dentist-tomorrow"],
+            "id": "p6-phrase-214",
+            "persona": "p6",
+            "tags": { "27": 0.6, "28": 0.5, "44": 0.3, "61": 0.3, "75": 1 },
+            "text": "appointments tomorrow?",
+            "window": { "end": "2026-11-28", "start": "2026-11-28" }
+        },
+        {
+            "category": "dated",
+            "expected": ["p6-dated-dentist-tomorrow"],
+            "id": "p6-phrase-215",
+            "persona": "p6",
+            "tags": { "27": 0.6, "28": 0.5, "50": 0.3, "63": 0.3, "75": 1 },
+            "text": "Termine morgen?",
+            "window": { "end": "2026-11-28", "start": "2026-11-28" }
+        },
+        {
+            "category": "dated",
+            "expected": ["p6-ev-hiking", "p6-dated-offsite"],
+            "id": "p6-phrase-216",
+            "persona": "p6",
+            "tags": { "27": 0.6, "28": 0.5, "40": 0.6, "43": 0.3, "53": 0.3 },
+            "text": "what is on between 2026-12-03 and 2026-12-10",
+            "window": { "end": "2026-12-10", "start": "2026-12-03" }
+        },
+        {
+            "category": "dated",
+            "expected": ["p6-ev-hiking", "p6-dated-offsite"],
+            "id": "p6-phrase-217",
+            "persona": "p6",
+            "tags": { "27": 0.6, "28": 0.5, "40": 0.6, "52": 0.3, "59": 0.3 },
+            "text": "was steht zwischen 2026-12-03 und 2026-12-10 an",
+            "window": { "end": "2026-12-10", "start": "2026-12-03" }
+        },
+        {
+            "category": "dated",
+            "expected": ["p6-ev-hiking", "p6-dated-offsite"],
+            "id": "p6-phrase-218",
+            "persona": "p6",
+            "tags": { "27": 0.6, "28": 0.5, "40": 0.6, "44": 0.3, "46": 0.3 },
+            "text": "what is planned for the first week of December",
+            "window": { "end": "2026-12-07", "start": "2026-12-01" }
+        },
+        {
+            "category": "dated",
+            "expected": ["p6-ev-hiking", "p6-dated-offsite"],
+            "id": "p6-phrase-219",
+            "persona": "p6",
+            "tags": { "27": 0.6, "28": 0.5, "40": 0.6, "43": 0.3, "63": 0.3 },
+            "text": "was steht Anfang Dezember an",
+            "window": { "end": "2026-12-10", "start": "2026-12-01" }
+        },
+        {
+            "category": "dated",
+            "expected": ["p6-dated-flight"],
+            "id": "p6-phrase-220",
+            "persona": "p6",
+            "tags": { "27": 0.6, "28": 0.5, "40": 0.6, "49": 0.3, "57": 0.3 },
+            "text": "was steht Mitte Dezember an",
+            "window": { "end": "2026-12-20", "start": "2026-12-11" }
+        },
+        {
+            "category": "dated",
+            "expected": ["p6-dated-bremen"],
+            "id": "p6-phrase-221",
+            "persona": "p6",
+            "tags": { "26": 0.6, "28": 0.5, "42": 0.3, "44": 0.3, "74": 1 },
+            "text": "where did I live until March 2021",
+            "window": { "end": "2021-03-31", "start": "0000-01-01" }
+        },
+        {
+            "category": "dated",
+            "expected": ["p6-dated-bremen"],
+            "id": "p6-phrase-222",
+            "persona": "p6",
+            "tags": { "26": 0.6, "28": 0.5, "55": 0.3, "62": 0.3, "74": 1 },
+            "text": "wo habe ich bis März 2021 gewohnt",
+            "window": { "end": "2021-03-31", "start": "0000-01-01" }
         }
     ]
 }

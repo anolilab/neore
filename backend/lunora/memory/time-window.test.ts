@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { localDayOf } from "./reflection-logic";
-import { timeWindowOf } from "./time-window";
+import { OPEN_END, OPEN_START, timeWindowOf } from "./time-window";
 
 /** A Friday. */
 const TODAY = "2026-11-27";
@@ -246,6 +246,9 @@ describe("timeWindowOf", () => {
         "set the limit for 2048 tokens",
         "the 1990s were fun",
         "what was my last ride like",
+        // A word that is a key of every object is no lexicon entry.
+        "the constructor of the class",
+        "der constructor der Klasse",
     ])("names no time in %j", (text) => {
         expect(windowOf(text)).toBeUndefined();
     });
@@ -267,6 +270,7 @@ describe("timeWindowOf", () => {
         expect(only("what am I going to do tomorrow")).toBe(true);
         expect(only("was mache ich morgen")).toBe(true);
         expect(only("was für Termine habe ich morgen")).toBe(true);
+        expect(only("was steht heute oder morgen an")).toBe(true);
         expect(only(`what is coming up tomorrow ${"and ".repeat(250)}about the weather`)).toBe(false);
         expect(["what is the weather like tomorrow", "draft an email saying I am away next week", "was koche ich heute"].map((text) => only(text))).toEqual([
             false,
@@ -310,5 +314,129 @@ describe("timeWindowOf", () => {
     it("prefers an ISO date to words", () => {
         expect(windowOf("yesterday, that is on 2026-11-26")).toEqual(["2026-11-26", "2026-11-26"]);
         expect(windowOf("tomorrow or on 2026-12-01")).toEqual(["2026-12-01", "2026-12-01"]);
+    });
+
+    it("reads every ISO date, and one span between two of them", () => {
+        expect(windowOf("what is on 2026-12-03 or 2026-12-05")).toEqual([
+            ["2026-12-03", "2026-12-03"],
+            ["2026-12-05", "2026-12-05"],
+        ]);
+        expect(windowOf("what is on between 2026-12-03 and 2026-12-10")).toEqual(["2026-12-03", "2026-12-10"]);
+        expect(windowOf("was steht zwischen 2026-12-03 und 2026-12-10 an")).toEqual(["2026-12-03", "2026-12-10"]);
+        // The two named the other way round are the same days.
+        expect(windowOf("between 2026-12-10 and 2026-12-03")).toEqual(["2026-12-03", "2026-12-10"]);
+        expect(timeWindowOf("what is on between 2026-12-03 and 2026-12-10", TODAY)?.onlyTime).toBe(true);
+        expect(timeWindowOf("was steht zwischen 2026-12-03 und 2026-12-10 an", TODAY)?.onlyTime).toBe(true);
+    });
+
+    it("reads an ISO date only of digits, its month 1 to 12", () => {
+        // Neither is a month of 2026: the word phrase after them is read.
+        expect(windowOf("what did the 2026-QA review find in May")).toEqual(["2026-05-01", "2026-05-31"]);
+        expect(windowOf("ticket 2026-13 is due in May")).toEqual(["2026-05-01", "2026-05-31"]);
+        expect(windowOf("the 2026-12-QA review in May")).toEqual(["2026-05-01", "2026-05-31"]);
+        expect(windowOf("the 2026-QA notes")).toBeUndefined();
+        expect(windowOf("the bills of 2026-10")).toEqual(["2026-10-01", "2026-10-31"]);
+    });
+
+    it.each([
+        // `before` and `after` read the month as `in` does, except that a past cue never moves `before` a month to last
+        // year: the days before this year's are past already.
+        ["anything before December", [OPEN_START, "2026-11-30"]],
+        ["what did I do before December", [OPEN_START, "2026-11-30"]],
+        ["what did I do before May", [OPEN_START, "2026-04-30"]],
+        ["what is planned before May", [OPEN_START, "2027-04-30"]],
+        ["anything after December", ["2027-01-01", OPEN_END]],
+        ["what did I do after May", ["2026-06-01", OPEN_END]],
+        ["what did I do after December", ["2026-01-01", OPEN_END]],
+        ["was ist vor Dezember", [OPEN_START, "2026-11-30"]],
+        ["was ist nach Dezember", ["2027-01-01", OPEN_END]],
+        // `since` reads back to the last such month, `until` ahead to the next: each runs to or from today.
+        ["anything since May", ["2026-05-01", TODAY]],
+        ["anything since December", ["2025-12-01", TODAY]],
+        ["anything until May", [TODAY, "2027-05-31"]],
+        ["anything until November", [TODAY, "2026-11-30"]],
+        ["was war seit Mai", ["2026-05-01", TODAY]],
+        ["was steht bis Mai an", [TODAY, "2027-05-31"]],
+        ["since May last year", ["2025-05-01", TODAY]],
+        ["until 3 December", [TODAY, "2026-12-03"]],
+        // A year, and a time on the other side of today: never a span that ends before it starts.
+        ["where did I live since 2023", ["2023-01-01", TODAY]],
+        ["what did I do until May 2023", [OPEN_START, "2023-05-31"]],
+        ["wo habe ich bis 2023 gewohnt", [OPEN_START, "2023-12-31"]],
+        ["since 2027", ["2027-01-01", OPEN_END]],
+    ])("reads %j as a range", (text, expected) => {
+        expect(windowOf(text)).toEqual(expected);
+    });
+
+    it("keeps a range word before a time it does not bound as it was", () => {
+        expect(windowOf("was habe ich vor drei Tagen gemacht")).toEqual(["2026-11-24", "2026-11-24"]);
+        expect(windowOf("what is on before tomorrow")).toEqual(["2026-11-28", "2026-11-28"]);
+        expect(windowOf("was steht bis morgen an")).toEqual(["2026-11-28", "2026-11-28"]);
+        expect(windowOf("what is on the day after tomorrow")).toEqual(["2026-11-29", "2026-11-29"]);
+    });
+
+    it.each([
+        ["what is planned for the last week of December", ["2026-12-25", "2026-12-31"]],
+        ["the first week of May", ["2026-05-01", "2026-05-07"]],
+        ["the last week in February 2028", ["2028-02-23", "2028-02-29"]],
+        ["the last week of December last year", ["2025-12-25", "2025-12-31"]],
+        ["was war in der letzten Woche im Dezember", ["2025-12-25", "2025-12-31"]],
+        ["was steht Anfang Dezember an", ["2026-12-01", "2026-12-10"]],
+        ["Mitte Juni", ["2026-06-11", "2026-06-20"]],
+        ["Ende Mai", ["2026-05-21", "2026-05-31"]],
+        ["Ende Februar 2028", ["2028-02-21", "2028-02-29"]],
+        // The year as for the whole month: November ends after today, so it is this year's.
+        ["was habe ich Anfang November vor", ["2026-11-01", "2026-11-10"]],
+        ["was steht bis Ende Mai an", [TODAY, "2027-05-31"]],
+    ])("reads part of a month in %j", (text, expected) => {
+        expect(windowOf(text)).toEqual(expected);
+    });
+
+    it("gives a group's year to a dated day in it, and parts a group at a semicolon or a sentence end", () => {
+        const may2024AndJune3 = [
+            ["2024-05-01", "2024-05-31"],
+            ["2024-06-03", "2024-06-03"],
+        ];
+
+        expect(windowOf("what did I do in May and June 3, 2024")).toEqual(may2024AndJune3);
+        expect(windowOf("what did I do in May and the 3rd of June 2024")).toEqual(may2024AndJune3);
+        expect(windowOf("was war im Mai und am 3. Juni 2024")).toEqual(may2024AndJune3);
+
+        const mayAndJune2024 = [
+            ["2026-05-01", "2026-05-31"],
+            ["2024-06-01", "2024-06-30"],
+        ];
+
+        for (const text of [
+            "what did I do in May; June 2024",
+            "what did I do in May. June 2024",
+            "what did I do in May? June 2024",
+            "was war im Mai; Juni 2024",
+        ]) {
+            expect(windowOf(text), text).toEqual(mayAndJune2024);
+        }
+
+        // A comma and `and` still join; a relative year does not reach a month across a sentence end.
+        expect(windowOf("what did I do in March, April and May 2024")).toHaveLength(3);
+        expect(windowOf("what did I do in May; last year was different")).toEqual([
+            ["2026-05-01", "2026-05-31"],
+            ["2025-01-01", "2025-12-31"],
+        ]);
+    });
+
+    it("reads a question of a range or part of a month alone as one about the time alone", () => {
+        const only = (text: string) => timeWindowOf(text, TODAY)?.onlyTime === true;
+
+        expect(
+            [
+                "anything before December",
+                "was ist nach Dezember",
+                "what is planned for the first week of December",
+                "was steht Anfang Dezember an",
+                "tomorrow?",
+                "appointments tomorrow?",
+                "Termine morgen?",
+            ].map((text) => only(text)),
+        ).toEqual([true, true, true, true, true, true, true]);
     });
 });
