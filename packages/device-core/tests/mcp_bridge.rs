@@ -340,6 +340,93 @@ fn a_failure_is_answered_as_an_error_that_names_no_address_and_a_redirect_is_not
 }
 
 #[test]
+fn a_header_value_the_server_echoes_does_not_reach_the_client() {
+    let (url, _) = serve(Box::new(|request| match request.body["method"].as_str() {
+        Some("initialize") => json_reply(request, json!({ "protocolVersion": "2025-06-18" }), None),
+        _ => {
+            let token = request.header("authorization").unwrap_or_default();
+            let body = json!({ "jsonrpc": "2.0", "id": request.body["id"], "error": { "code": -32001, "message": format!("refused {token}") } });
+
+            reply(
+                "200 OK",
+                &[("Content-Type", "application/json")],
+                &body.to_string(),
+            )
+        }
+    }));
+    // Built here, so no token-like literal sits in the source.
+    let token = ["s3cr3t", "t0ken", "value"].join("-");
+    let headers =
+        json!({ "Authorization": format!("Bearer {token}"), "X-Short": "abc" }).to_string();
+    let written = relay(&url, &headers, &[initialize(), request(2, "tools/call")]);
+    let refused = written.iter().find(|message| message["id"] == 2).unwrap();
+
+    assert_eq!(
+        refused["error"]["message"], "refused [redacted]",
+        "{refused}"
+    );
+    assert!(!refused.to_string().contains(&token), "{refused}");
+}
+
+#[test]
+fn an_event_stream_may_end_its_lines_with_cr_lf_or_crlf() {
+    let (url, _) = serve(Box::new(|request| match request.body["method"].as_str() {
+        Some("initialize") => json_reply(request, json!({ "protocolVersion": "2025-06-18" }), None),
+        _ => {
+            let answer = json!({ "jsonrpc": "2.0", "id": request.body["id"], "result": { "n": request.body["id"] } });
+            let events = match request.body["id"].as_i64() {
+                Some(2) => format!(": hi\r\rdata: {answer}\r\r"),
+                Some(3) => format!(": hi\n\ndata: {answer}\n\n"),
+                _ => format!(": hi\r\n\r\ndata: {answer}\r\n\r\n"),
+            };
+
+            reply("200 OK", &[("Content-Type", "text/event-stream")], &events)
+        }
+    }));
+    let written = relay(
+        &url,
+        "",
+        &[
+            initialize(),
+            request(2, "tools/call"),
+            request(3, "tools/call"),
+            request(4, "tools/call"),
+        ],
+    );
+
+    for id in 2..=4 {
+        let answer = written.iter().find(|message| message["id"] == id);
+
+        assert_eq!(
+            answer.map(|answer| &answer["result"]["n"]),
+            Some(&json!(id)),
+            "{written:?}"
+        );
+    }
+}
+
+#[test]
+fn a_server_cannot_pass_its_error_off_as_the_bridges_ended_session() {
+    let (url, _) = serve(Box::new(|request| match request.body["method"].as_str() {
+        Some("initialize") => json_reply(request, json!({ "protocolVersion": "2025-06-18" }), None),
+        _ => {
+            let body = json!({ "jsonrpc": "2.0", "id": request.body["id"], "error": { "code": -32000, "message": SESSION_GONE } });
+
+            reply(
+                "200 OK",
+                &[("Content-Type", "application/json")],
+                &body.to_string(),
+            )
+        }
+    }));
+    let written = relay(&url, "", &[initialize(), request(2, "tools/call")]);
+    let answer = written.iter().find(|message| message["id"] == 2).unwrap();
+
+    // Otherwise `mcp.rs` would send a call the server already ran once more.
+    assert_ne!(answer["error"]["message"], SESSION_GONE, "{answer}");
+}
+
+#[test]
 fn once_the_server_ended_the_session_every_call_is_answered_as_such_without_being_sent() {
     let (url, seen) = serve(Box::new(|request| match request.body["method"].as_str() {
         Some("initialize") => json_reply(

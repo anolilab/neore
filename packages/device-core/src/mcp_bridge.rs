@@ -52,11 +52,33 @@ const RESERVED_HEADERS: &[&str] = &[
     "transfer-encoding",
 ];
 
+/// A header value (or the credential after its scheme) shorter than this stays in what the server says: replacing it
+/// could garble an answer, and a secret is longer.
+const MIN_REDACTED_BYTES: usize = 8;
+
 /// Where the bridge sends, checked once at start.
 #[derive(Debug)]
 pub struct Target {
     url: String,
     headers: Vec<(HeaderName, HeaderValue)>,
+    /// The header values, longest first, that nothing the server says may carry on to the chat.
+    secrets: Vec<String>,
+}
+
+/// Replaces every `secret` in the strings of `value`.
+fn redact(value: &mut Value, secrets: &[String]) {
+    match value {
+        Value::String(text) => {
+            for secret in secrets {
+                if text.contains(secret.as_str()) {
+                    *text = text.replace(secret.as_str(), "[redacted]");
+                }
+            }
+        }
+        Value::Array(items) => items.iter_mut().for_each(|item| redact(item, secrets)),
+        Value::Object(fields) => fields.values_mut().for_each(|item| redact(item, secrets)),
+        _ => {}
+    }
 }
 
 /// Checks the address and headers. The errors name neither the address nor a header value.
@@ -99,7 +121,7 @@ pub fn parse_target(url: &str, headers: &str) -> Result<Target, String> {
 
     let mut parsed = Vec::with_capacity(given.len());
 
-    for (name, value) in given {
+    for (name, value) in &given {
         let name = HeaderName::from_bytes(name.as_bytes())
             .map_err(|_| "a header name is not valid".to_owned())?;
 
@@ -111,16 +133,32 @@ pub fn parse_target(url: &str, headers: &str) -> Result<Target, String> {
             return Err(format!("the value of {name} is too long"));
         }
 
-        let mut value = HeaderValue::from_str(&value)
+        let mut value = HeaderValue::from_str(value)
             .map_err(|_| format!("the value of {name} is not valid"))?;
 
         value.set_sensitive(true);
         parsed.push((name, value));
     }
 
+    let mut secrets: Vec<String> = given
+        .values()
+        .flat_map(|value| {
+            [
+                Some(value.as_str()),
+                value.split_once(' ').map(|(_, credential)| credential),
+            ]
+        })
+        .flatten()
+        .filter(|secret| secret.len() >= MIN_REDACTED_BYTES)
+        .map(str::to_owned)
+        .collect();
+
+    secrets.sort_by_key(|secret| std::cmp::Reverse(secret.len()));
+
     Ok(Target {
         url: url.to_owned(),
         headers: parsed,
+        secrets,
     })
 }
 
@@ -204,6 +242,40 @@ fn request_id(message: &Value) -> Option<&Value> {
     message.get("method").and(message.get("id"))
 }
 
+/// The next line of an event stream, which may end in CR, LF or CRLF. The LF after a CR is skipped when the next line
+/// is read, so a stream that pauses after the CR is not waited on.
+fn event_line(reader: &mut impl BufRead, after_cr: &mut bool) -> io::Result<Option<Vec<u8>>> {
+    let mut line = Vec::new();
+
+    loop {
+        let buffer = reader.fill_buf()?;
+
+        if buffer.is_empty() {
+            return Ok((!line.is_empty()).then_some(line));
+        }
+
+        if std::mem::take(after_cr) && buffer[0] == b'\n' {
+            reader.consume(1);
+            continue;
+        }
+
+        let Some(end) = buffer.iter().position(|byte| matches!(byte, b'\r' | b'\n')) else {
+            line.extend_from_slice(buffer);
+
+            let length = buffer.len();
+
+            reader.consume(length);
+            continue;
+        };
+
+        *after_cr = buffer[end] == b'\r';
+        line.extend_from_slice(&buffer[..end]);
+        reader.consume(end + 1);
+
+        return Ok(Some(line));
+    }
+}
+
 /// Whether `message` is the response to the request `id`. Anything else must not reach that request's caller.
 fn is_answer_to(message: &Value, id: &Value) -> bool {
     message.get("method").is_none() && message.get("id") == Some(id)
@@ -244,6 +316,22 @@ impl<W: Write> Bridge<W> {
         let _ = output
             .write_all(line.as_bytes())
             .and_then(|()| output.flush());
+    }
+
+    /// Writes what the server said to the client. Its words can echo a header (a token in an error): that is blanked.
+    /// Nor may it claim the bridge's `SESSION_GONE`, which would make `mcp.rs` send a call it already ran once more.
+    fn forward(&self, message: &Value) {
+        let mut message = message.clone();
+
+        redact(&mut message, &self.target.secrets);
+
+        if let Some(text) = message.pointer_mut("/error/message") {
+            if text == SESSION_GONE {
+                *text = format!("{SESSION_GONE} (as the server put it)").into();
+            }
+        }
+
+        self.write(&message);
     }
 
     fn post(
@@ -332,7 +420,7 @@ impl<W: Write> Bridge<W> {
 
         match serde_json::from_str::<Value>(&text) {
             Ok(reply) if is_answer_to(&reply, id) => {
-                self.write(&reply);
+                self.forward(&reply);
                 Ok(reply)
             }
             Ok(reply) if reply.is_object() => {
@@ -345,11 +433,12 @@ impl<W: Write> Bridge<W> {
     /// Reads an event stream up to the answer to `id`, then stops reading.
     fn read_events(&self, body: impl Read, id: &Value) -> Result<Value, String> {
         let mut data = String::new();
+        let (mut reader, mut after_cr) = (BufReader::new(body), false);
 
-        for line in BufReader::new(body).split(b'\n') {
-            let line = line.map_err(|error| read_failure(&error))?;
+        while let Some(line) =
+            event_line(&mut reader, &mut after_cr).map_err(|error| read_failure(&error))?
+        {
             let line = String::from_utf8_lossy(&line);
-            let line = line.strip_suffix('\r').unwrap_or(&line);
 
             if let Some(field) = line.strip_prefix("data:") {
                 if !data.is_empty() {
@@ -375,9 +464,9 @@ impl<W: Write> Bridge<W> {
 
             // The server's own requests and notifications go to the client; of the responses, only this request's.
             if message.get("method").is_some() {
-                self.write(&message);
+                self.forward(&message);
             } else if is_answer_to(&message, id) {
-                self.write(&message);
+                self.forward(&message);
                 return Ok(message);
             }
         }
