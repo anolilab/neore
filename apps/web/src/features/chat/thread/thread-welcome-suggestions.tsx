@@ -11,7 +11,7 @@ import { Tabs, TabsList, TabsTrigger } from "@neore/ui/components/tabs";
 import cn from "@neore/ui/utils/cn";
 import { BookOpen, CheckCircle2, FileText, Lightbulb, Search, Video } from "lucide-react";
 import type { FC } from "react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useOutsideClick } from "rooks";
 
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
@@ -26,6 +26,7 @@ const ThreadWelcomeSuggestions: FC<{ className?: string; opensBelow?: boolean }>
     const setComposerText = useChatUIStore((state) => state.setComposerText);
     const [activeTab, setActiveTab] = useState<string>("");
     const [isOpen, setIsOpen] = useState(false);
+    const listRef = useRef<HTMLDivElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
 
     const handleSuggestionClick = (prompt: string) => {
@@ -145,11 +146,22 @@ const ThreadWelcomeSuggestions: FC<{ className?: string; opensBelow?: boolean }>
 
     const suggestionHandlers = buildSuggestionHandlers();
 
+    // Below the centred composer the list opens over the page: on a short window it would run past the bottom, so it scrolls into
+    // view as it opens (and as another tab replaces it).
+    useEffect(() => {
+        if (isOpen && opensBelow) {
+            listRef.current?.scrollIntoView({ block: "nearest" });
+        }
+    }, [activeTab, isOpen, opensBelow]);
+
     return (
         <div className={cn("flex w-full flex-col", opensBelow && "relative", className)} ref={containerRef}>
             <Tabs className="flex flex-col gap-2" onValueChange={handleTabChange} value={activeTab}>
                 {isOpen && activeTab !== "" && (
-                    <div className={cn("surface-raised max-h-56 overflow-y-auto rounded-xl p-1", opensBelow && "absolute inset-x-0 top-full z-20")}>
+                    <div
+                        className={cn("surface-raised max-h-56 overflow-y-auto rounded-xl p-1", opensBelow && "absolute inset-x-0 top-full z-20")}
+                        ref={listRef}
+                    >
                         {Object.entries(categories).map(([key, category]) => {
                             if (key !== activeTab) {
                                 return undefined;
