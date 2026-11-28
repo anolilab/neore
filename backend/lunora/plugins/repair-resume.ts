@@ -51,6 +51,8 @@ export const beginRepair = internalMutation
             missing: v.array(v.object({ entryKey: v.string(), intentId: v.string(), kind: vPluginItemKind })),
             moreDropped: v.boolean(),
             outdated: v.boolean(),
+            /** Nothing is missing, but a group may still name a deleted skill: the lease is held for the remap. */
+            remapOwed: v.boolean(),
             status: v.union(v.literal("installed"), v.literal("needs-repair")),
             unresolved: v.array(v.string()),
         }),
@@ -91,6 +93,8 @@ export const beginRepairRows = async (
     moreDropped: boolean;
     /** A linked child holds other content than the file's entry: the finished install is partial until an update rewrites it. */
     outdated: boolean;
+    /** Nothing is missing, but a group may still name a deleted skill: the install is held (leased) for the remap. */
+    remapOwed: boolean;
     status: "installed" | "needs-repair";
     /** Children whose pending hash is not settled yet: the install may not finish while any remains. */
     unresolved: string[];
@@ -168,6 +172,34 @@ export const beginRepairRows = async (
     // content than the stored hash. A child it turned back into an intent is made by the next call, with the install's own file.
     const settledUpdate = install.status === "updating";
 
+    // A remap is owed and nothing is missing: take the lease like a create does, so the action's remap is fenced and no other repair runs.
+    if (result.remapOwed && missing.length === 0 && !result.moreDropped && !settledUpdate) {
+        const generation = current.generation + 1;
+
+        await patchInstallIf(
+            ctx,
+            install._id as Id<"pluginInstalls">,
+            current.generation,
+            { generation, leaseUntil: ctx.now + LEASE_MS, status: "installing", updatedAt: ctx.now },
+            STALE,
+            current.status,
+        );
+
+        return {
+            existing,
+            generation,
+            installId,
+            kept: result.kept,
+            linked: result.linked,
+            missing: [],
+            moreDropped: false,
+            outdated: result.outdated,
+            remapOwed: true,
+            status: "needs-repair",
+            unresolved,
+        };
+    }
+
     if (result.status === "installed" || missing.length === 0 || result.moreDropped || settledUpdate) {
         return {
             existing,
@@ -178,6 +210,7 @@ export const beginRepairRows = async (
             missing: [],
             moreDropped: result.moreDropped,
             outdated: result.outdated,
+            remapOwed: false,
             status: result.status,
             unresolved: settledUpdate ? result.missing : unresolved,
         };
@@ -205,6 +238,7 @@ export const beginRepairRows = async (
         missing,
         moreDropped: false,
         outdated: result.outdated,
+        remapOwed: false,
         status: "needs-repair",
         unresolved,
     };
@@ -485,6 +519,33 @@ export const repairPlugin = authAction
         };
 
         if (begun.missing.length === 0) {
+            // A remap is owed: the lease is held. The install stays `needs-repair` if the remap throws, so the next call does it again.
+            if (begun.remapOwed) {
+                try {
+                    const unmatchedGroups = await remapGroups(begun.generation, begun.installId);
+
+                    if (begun.unresolved.length > 0) {
+                        await ctx.runMutation(internal.plugins.install_steps.markNeedsRepair, { generation: begun.generation, installId: begun.installId });
+
+                        return { created: [], kept, status: "needs-repair", unmatchedGroups };
+                    }
+
+                    await ctx.runMutation(internal.plugins.repair_resume.finishRepair, {
+                        generation: begun.generation,
+                        installId: begun.installId,
+                        partial: begun.outdated || unmatchedGroups.length > 0,
+                    });
+
+                    return { created: [], kept, status: "installed", unmatchedGroups };
+                } catch (error) {
+                    await ctx
+                        .runMutation(internal.plugins.install_steps.markNeedsRepair, { generation: begun.generation, installId: begun.installId })
+                        .catch(() => undefined);
+
+                    throw error;
+                }
+            }
+
             const unmatchedGroups = await remapGroups(begun.generation, begun.installId);
 
             // An install already finished by `beginRepair` becomes partial while a group still names a gone skill.

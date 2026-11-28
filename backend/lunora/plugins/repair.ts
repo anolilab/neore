@@ -63,6 +63,8 @@ export interface RepairResult {
      * rewrite it: the install is marked partial, and running the update again finishes it. Only known when the file's hashes are given.
      */
     outdated: boolean;
+    /** Set when nothing is missing but a recreated skill's old id may still be named by a group: the install stays `needs-repair` until the remap ran. */
+    remapOwed?: true;
     status: "installed" | "needs-repair";
 }
 
@@ -369,6 +371,26 @@ export const repairRows = async (
     }
 
     const outdated = await anyOutdated(ctx, installId, entryHashes, missing);
+
+    // A recreated skill's link keeps its old id until the groups were pointed at the new one: finishing now would strand that remap,
+    // since an installed row is refused as not needing repair. Read again, as the loop above relinked rows.
+    const { page: linkedRows } = missing.length === 0 ? await ctx.db.pluginItems.findMany({ consistency: "primary", where: { installId } }) : { page: [] };
+    const remapOwed = linkedRows.some((row) => row.kind === "skill" && row.state === "created" && !!row.replacedItemId && row.replacedItemId !== row.itemId);
+
+    if (remapOwed) {
+        if (install.status === "installing") {
+            await patchInstallIf(
+                ctx,
+                install._id as Id<"pluginInstalls">,
+                install.generation,
+                { generation: install.generation + 1, status: "needs-repair", updatedAt: ctx.now },
+                STALE,
+                install.status,
+            );
+        }
+
+        return { kept, linked, missing, moreDropped: false, outdated, remapOwed: true, status: "needs-repair" };
+    }
 
     if (missing.length === 0) {
         // An update kept for repair holds its target version; finishing the repair makes it the installed one. The next generation

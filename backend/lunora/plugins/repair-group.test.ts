@@ -243,6 +243,45 @@ describe("repair of a plugin group chat whose skill was deleted", () => {
         expect(await installRow()).toMatchObject({ partial: false, status: "installed" });
     });
 
+    it("keeps the install repairable when the remap fails on a call that made nothing, and finishes it on the next", async () => {
+        const file = await breakSkills(["a"]);
+        const oldId = participantIds(await groupRow())[0];
+        const remap = registry.get("plugins_repair_resume:remapGroupParticipants") as { handler: (...args: unknown[]) => Promise<unknown> };
+        const original = remap.handler;
+        const spy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+        let calls = 0;
+
+        // The first call makes the skill and its remap fails; the second has nothing to make and its remap fails too.
+        remap.handler = async (...args: unknown[]) => {
+            calls += 1;
+
+            if (calls <= 2) {
+                throw new Error("interrupted");
+            }
+
+            return await original(...args);
+        };
+
+        try {
+            await expect(repair(file)).rejects.toThrow();
+            await expect(repair(file)).rejects.toThrow();
+            expect(calls).toBe(2);
+            expect(participantIds(await groupRow())).toContain(oldId);
+            expect(await installRow()).toMatchObject({ status: "needs-repair" });
+
+            await expect(repair(file)).resolves.toMatchObject({ created: [], status: "installed", unmatchedGroups: [] });
+        } finally {
+            remap.handler = original;
+            spy.mockRestore();
+        }
+
+        const fresh = await skillBySlug("a");
+
+        expect(participantIds(await groupRow())).toEqual(expect.arrayContaining([fresh._id]));
+        expect(participantIds(await groupRow())).not.toContain(oldId);
+        expect(await installRow()).toMatchObject({ partial: false, status: "installed" });
+    });
+
     it("leaves the install partial when a gone participant has no mapping", async () => {
         const file = await breakSkills([]);
         const group = await groupRow();
