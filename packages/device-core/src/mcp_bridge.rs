@@ -93,26 +93,33 @@ fn redact(value: &mut Value, secrets: &[String]) {
     }
 }
 
-/// Whether a header carries a credential by its name. Its secret must be long enough to blank out of what the server
-/// says (`MIN_REDACTED_BYTES`), or the header is refused.
-fn holds_a_credential(name: &HeaderName) -> bool {
-    let name = name.as_str();
+/// Whether a header or a query parameter carries a credential by its name. Its secret must be long enough to blank out
+/// of what the server says (`MIN_REDACTED_BYTES`), or the address or header is refused.
+fn holds_a_credential(name: &str) -> bool {
+    let name = name.to_ascii_lowercase();
 
-    matches!(name, "authorization" | "proxy-authorization" | "cookie")
-        || ["auth", "token", "key", "secret", "password"]
-            .iter()
-            .any(|word| name.contains(word))
+    matches!(
+        name.as_str(),
+        "authorization" | "proxy-authorization" | "cookie"
+    ) || ["auth", "token", "key", "secret", "password"]
+        .iter()
+        .any(|word| name.contains(word))
 }
 
-/// The parts of a header value that are blanked: the whole value, and the credential after its scheme
-/// (`Bearer <credential>`).
-fn secret_parts(value: &str) -> impl Iterator<Item = &str> {
+/// A header's credential: the whole value, and the part after its scheme (`Bearer <credential>`).
+fn credentials(value: &str) -> impl Iterator<Item = &str> {
     [
         Some(value),
         value.split_once(' ').map(|(_, credential)| credential),
     ]
     .into_iter()
     .flatten()
+}
+
+/// The `name=value` pairs of a cookie header or a query string, split on `separator`.
+fn pairs(text: &str, separator: char) -> impl Iterator<Item = (&str, &str)> {
+    text.split(separator)
+        .filter_map(|pair| pair.trim().split_once('='))
 }
 
 /// Checks the address and headers. The errors name neither the address nor a header value.
@@ -170,8 +177,8 @@ pub fn parse_target(url: &str, headers: &str) -> Result<Target, String> {
         let mut header = HeaderValue::from_str(value)
             .map_err(|_| format!("the value of {name} is not valid"))?;
 
-        if holds_a_credential(&name)
-            && secret_parts(value).any(|secret| secret.len() < MIN_REDACTED_BYTES)
+        if holds_a_credential(name.as_str())
+            && credentials(value).any(|secret| secret.len() < MIN_REDACTED_BYTES)
         {
             return Err(format!(
                 "the value of {name} is too short to keep out of the chat ({MIN_REDACTED_BYTES} characters at least)"
@@ -182,9 +189,21 @@ pub fn parse_target(url: &str, headers: &str) -> Result<Target, String> {
         parsed.push((name, header));
     }
 
+    let query = uri.query().unwrap_or_default();
+
+    if pairs(query, '&')
+        .any(|(name, value)| holds_a_credential(name) && value.len() < MIN_REDACTED_BYTES)
+    {
+        return Err(format!(
+            "a credential in the server address is too short to keep out of the chat ({MIN_REDACTED_BYTES} characters at least)"
+        ));
+    }
+
+    // Each header's credential, each cookie's value, and each value in the address's query (`?key=…`).
     let mut secrets: Vec<String> = given
         .values()
-        .flat_map(|value| secret_parts(value))
+        .flat_map(|value| credentials(value).chain(pairs(value, ';').map(|(_, cookie)| cookie)))
+        .chain(pairs(query, '&').map(|(_, value)| value))
         .filter(|secret| secret.len() >= MIN_REDACTED_BYTES)
         .map(str::to_owned)
         .collect();

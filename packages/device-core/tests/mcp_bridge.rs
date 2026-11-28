@@ -193,6 +193,11 @@ fn only_an_http_or_https_address_without_credentials_and_valid_headers_are_taken
             "too short to keep out of the chat",
         ),
         (
+            "https://h/mcp?api_key=abc",
+            "",
+            "too short to keep out of the chat",
+        ),
+        (
             "https://h/mcp",
             "{\"X-Token\":\"top-secret\\r\\nX-Evil: 1\"}",
             "value of x-token is not valid",
@@ -448,6 +453,40 @@ fn an_event_stream_may_end_its_lines_with_cr_lf_or_crlf() {
             "{written:?}"
         );
     }
+}
+
+#[test]
+fn a_cookie_or_a_key_in_the_address_the_server_echoes_does_not_reach_the_client() {
+    let (key, sid) = ("k".repeat(12), "s".repeat(12));
+    let echoed = format!("saw {key} and {sid}");
+    let (url, _) = serve(Box::new(move |request| {
+        match request.body["method"].as_str() {
+            Some("initialize") => {
+                json_reply(request, json!({ "protocolVersion": "2025-06-18" }), None)
+            }
+            _ => {
+                let body = json!({ "jsonrpc": "2.0", "id": request.body["id"], "error": { "code": -32001, "message": echoed } });
+
+                reply(
+                    "200 OK",
+                    &[("Content-Type", "application/json")],
+                    &body.to_string(),
+                )
+            }
+        }
+    }));
+    let headers = json!({ "Cookie": format!("lang=en-GB; sid={sid}") }).to_string();
+    let written = relay(
+        &format!("{url}?key={key}&v=1"),
+        &headers,
+        &[initialize(), request(2, "tools/call")],
+    );
+    let refused = written.iter().find(|message| message["id"] == 2).unwrap();
+
+    assert_eq!(
+        refused["error"]["message"], "saw [redacted] and [redacted]",
+        "{refused}"
+    );
 }
 
 #[test]

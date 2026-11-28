@@ -770,7 +770,9 @@ impl McpManager {
 
                     self.process_locked(&mut processes, config, policy)?
                 }
-                _ => return first,
+                // A call that waited on the same server meanwhile replaced it: this one goes to the replacement.
+                Some(_) => self.process_locked(&mut processes, config, policy)?,
+                None => return first,
             }
         };
         let mut guard = restarted.lock().unwrap();
@@ -1400,6 +1402,65 @@ sleep 1"#
             old_stopped_first.get(),
             "the old bridge ran beside the new one"
         );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_call_that_waited_on_a_bridge_whose_session_ended_goes_to_its_replacement() {
+        use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+
+        let root = temp_root("session-gone-two");
+        let starts = root.join("starts");
+        // The first copy answers every call with the session-gone error; any later copy answers with a result.
+        let script = r#"echo $$ >> 'STARTS'; n=$(wc -l < 'STARTS'); read l; echo '{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-06-18","capabilities":{},"serverInfo":{"name":"f","version":"1"}}}'; read l; while read l; do id=$(printf '%s' "$l" | sed 's/.*"id":\([0-9]*\).*/\1/'); if [ $n -eq 1 ]; then echo "{\"jsonrpc\":\"2.0\",\"id\":$id,\"error\":{\"code\":-32000,\"message\":\"GONE\"}}"; else echo "{\"jsonrpc\":\"2.0\",\"id\":$id,\"result\":{}}"; fi; done"#
+            .replace("STARTS", &starts.display().to_string())
+            .replace("GONE", SESSION_GONE);
+
+        std::fs::create_dir_all(&root).unwrap();
+
+        let config = McpServerConfig {
+            args: vec!["-c".into(), script],
+            ..idle_server("session-gone-two")
+        };
+        let manager = Arc::new(McpManager::new(root.to_path_buf()));
+        let (entered, calls) = (
+            Arc::new(AtomicBool::new(false)),
+            Arc::new(AtomicUsize::new(0)),
+        );
+        let call = |manager: Arc<McpManager>,
+                    config: McpServerConfig,
+                    entered: Arc<AtomicBool>,
+                    calls: Arc<AtomicUsize>| {
+            std::thread::spawn(move || {
+                manager.with(&config, None, |process| {
+                    // The first call holds the old copy, so the second waits on it.
+                    if calls.fetch_add(1, Ordering::SeqCst) == 0 {
+                        entered.store(true, Ordering::SeqCst);
+                        std::thread::sleep(Duration::from_millis(300));
+                    }
+
+                    process.request("tools/list", json!({}), Duration::from_secs(10))
+                })
+            })
+        };
+        let first = call(
+            manager.clone(),
+            config.clone(),
+            entered.clone(),
+            calls.clone(),
+        );
+
+        assert!(wait_until(|| entered.load(Ordering::SeqCst)));
+
+        let second = call(
+            manager.clone(),
+            config.clone(),
+            entered.clone(),
+            calls.clone(),
+        );
+
+        assert_eq!(first.join().unwrap(), Ok(json!({})));
+        assert_eq!(second.join().unwrap(), Ok(json!({})));
     }
 
     #[cfg(unix)]
