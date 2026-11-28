@@ -59,26 +59,24 @@ const ProjectHintChip: FC = () => {
     const label = shown ? t`File in ${shown.title}` : t`File in another project`;
 
     return (
-        <div className="flex px-2 pb-2">
-            <button
-                aria-pressed={isSelected}
-                className={cn(
-                    "flex max-w-xs cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1 text-left text-xs transition-colors outline-none",
-                    "border-border/50 bg-surface-row text-muted-foreground hover:bg-surface-row-hover hover:text-foreground",
-                    "focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-offset-1",
-                    isSelected && "border-primary/50 text-foreground",
-                )}
-                onClick={togglePick}
-                type="button"
-            >
-                {isSelected ? (
-                    <CheckIcon aria-hidden="true" className="size-3 shrink-0" />
-                ) : (
-                    <FolderIcon aria-hidden="true" className="size-3 shrink-0 opacity-60" />
-                )}
-                <span className="truncate">{label}</span>
-            </button>
-        </div>
+        <button
+            aria-pressed={isSelected}
+            className={cn(
+                "flex max-w-xs cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1 text-left text-xs transition-colors outline-none",
+                "border-border/50 bg-surface-row text-muted-foreground hover:bg-surface-row-hover hover:text-foreground",
+                "focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-offset-1",
+                isSelected && "border-primary/50 text-foreground",
+            )}
+            onClick={togglePick}
+            type="button"
+        >
+            {isSelected ? (
+                <CheckIcon aria-hidden="true" className="size-3 shrink-0" />
+            ) : (
+                <FolderIcon aria-hidden="true" className="size-3 shrink-0 opacity-60" />
+            )}
+            <span className="truncate">{label}</span>
+        </button>
     );
 };
 

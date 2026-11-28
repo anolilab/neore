@@ -29,6 +29,7 @@ import { useCRPC, useLunoraAuth } from "@/lib/lunora/crpc";
 
 import DiffCommentsDraft from "./diff-comments-draft";
 import { caretAfterRemoval } from "./host-caret";
+import HostContextRow from "./host-context-row";
 import { exceedsRawInputLimit } from "./host-input";
 import HostOptions from "./host-options";
 import type { HostQueueEffect, HostQueueEvent, HostQueueState } from "./host-queue";
@@ -1254,6 +1255,14 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
                     {sendLabel}
                 </Button>
             </div>
+            {/* Where the agent works, under the box; the controls above it are what changes the next message. */}
+            {session !== undefined && session !== null && (
+                <HostContextRow
+                    agentLabel={session.agentLabel}
+                    deviceName={devices ? (devices.find((device) => device._id === session.deviceId)?.name ?? null) : undefined}
+                    folderLabel={session.folderLabel}
+                />
+            )}
             {waitsForSetting && (
                 <p className="text-muted-foreground text-xs" role="status">
                     {t`Checking whether a message sent now interrupts the reply or waits behind it.`}

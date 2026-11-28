@@ -17,7 +17,11 @@ import { useOutsideClick } from "rooks";
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 import { markComposerDraft } from "@/features/chat/core/utils/draft-origin";
 
-const ThreadWelcomeSuggestions: FC<{ className?: string }> = ({ className }) => {
+/**
+ * `opensBelow`: the chips sit under the composer in a centred layout, so the picked category's list opens below them over what follows
+ * (an overlay, out of flow) instead of pushing the centred composer up.
+ */
+const ThreadWelcomeSuggestions: FC<{ className?: string; opensBelow?: boolean }> = ({ className, opensBelow = false }) => {
     const { t } = useLingui();
     const setComposerText = useChatUIStore((state) => state.setComposerText);
     const [activeTab, setActiveTab] = useState<string>("");
@@ -142,10 +146,10 @@ const ThreadWelcomeSuggestions: FC<{ className?: string }> = ({ className }) => 
     const suggestionHandlers = buildSuggestionHandlers();
 
     return (
-        <div className={cn("flex w-full flex-col", className)} ref={containerRef}>
+        <div className={cn("flex w-full flex-col", opensBelow && "relative", className)} ref={containerRef}>
             <Tabs className="flex flex-col gap-2" onValueChange={handleTabChange} value={activeTab}>
                 {isOpen && activeTab !== "" && (
-                    <div className="surface-raised max-h-56 overflow-y-auto rounded-xl p-1">
+                    <div className={cn("surface-raised max-h-56 overflow-y-auto rounded-xl p-1", opensBelow && "absolute inset-x-0 top-full z-20")}>
                         {Object.entries(categories).map(([key, category]) => {
                             if (key !== activeTab) {
                                 return undefined;

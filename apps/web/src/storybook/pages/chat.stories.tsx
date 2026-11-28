@@ -13,9 +13,9 @@ import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
 import { Route as ThreadRoute } from "@/routes/(chat)/chat/$threadId";
 import { Route as ChatIndexRoute } from "@/routes/(chat)/chat/index";
 import { Route as ChatLayoutRoute } from "@/routes/(chat)/route";
-import { ago, MINUTE } from "@/storybook/clock";
+import { ago, DAY, HOUR, MINUTE } from "@/storybook/clock";
 import type { ChatMessage } from "@/storybook/fixtures/chat";
-import { assistantMessage, chatFixtures, CONVERSATION, streamingBody, thread, THREAD_IDS, userMessage } from "@/storybook/fixtures/chat";
+import { assistantMessage, chatFixtures, CONVERSATION, pageOf, streamingBody, thread, THREAD_IDS, userMessage } from "@/storybook/fixtures/chat";
 import { gatewayModelsHandler } from "@/storybook/fixtures/models";
 import { shellFixtures } from "@/storybook/fixtures/shell";
 import { userFixtures } from "@/storybook/fixtures/user";
@@ -399,6 +399,98 @@ export const HostThreadHeader: Story = {
     },
 };
 
+const PROJECT_Q1 = { _creationTime: ago(20 * DAY), _id: "project_q1", createdAt: ago(20 * DAY), title: "Q1 Launch", updatedAt: ago(DAY), userId: "user-pro" };
+
+/** A chat on a paired computer: the composer names the computer, the folder and the coding agent in a row under the message box. */
+export const HostThreadComposer: Story = {
+    parameters: {
+        // The host composer's textarea carries `role="combobox"` (axe `aria-allowed-role`): it predates this story, as in `HostThreadHeader`.
+        // Axe checks the context row alone.
+        a11y: { context: { include: ['[aria-label="Context"]'] } },
+        msw: {
+            handlers: {
+                gateway: gatewayModelsHandler(),
+                lunora: lunoraHandlers(
+                    ...userFixtures(),
+                    ...shellFixtures(),
+                    ...chatFixtures({
+                        thread: thread({ _id: THREAD_IDS.main, runner: "host", title: "Refactor the billing worker" } as Parameters<typeof thread>[0]),
+                    }),
+                    lunora(api.acp.functions.getHostSession, {
+                        _id: "acp_session_1",
+                        agentKey: "claude-code",
+                        agentLabel: "Claude Code",
+                        createdAt: ago(HOUR),
+                        deviceId: "device_nova",
+                        agentState: {
+                            configOptions: [
+                                {
+                                    category: "model",
+                                    choices: [
+                                        { name: "Sonnet", value: "sonnet" },
+                                        { name: "Opus", value: "opus" },
+                                    ],
+                                    currentValue: "sonnet",
+                                    id: "model",
+                                    name: "Model",
+                                },
+                            ],
+                            usage: { size: 200_000, used: 48_000 },
+                        },
+                        folderLabel: "~/Projects/billing",
+                        status: "idle",
+                        threadId: THREAD_IDS.main,
+                    } as never),
+                    lunora(api.devices.functions.listDevices, [
+                        {
+                            _id: "device_nova",
+                            appVersion: "1.14.2",
+                            createdAt: ago(60 * DAY),
+                            lastSeenAt: ago(MINUTE),
+                            name: "nova",
+                            platform: "linux",
+                            toolNames: ["read_file", "write_file", "run_command"],
+                            updateRequired: false,
+                        },
+                    ] as never),
+                ),
+            },
+        },
+    },
+    play: async ({ canvas }) => {
+        const context = await canvas.findByRole("group", { name: "Context" }, STATE_WAIT);
+
+        await waitFor(() => expect(context).toHaveTextContent("nova"), STATE_WAIT);
+        await expect(context).toHaveTextContent("~/Projects/billing");
+        await expect(context).toHaveTextContent("Claude Code");
+        await lunoraIdle();
+    },
+};
+
+/** A chat filed in a project: a quiet chip under the composer names it. */
+export const ThreadInProject: Story = {
+    parameters: {
+        msw: {
+            handlers: {
+                gateway: gatewayModelsHandler(),
+                lunora: lunoraHandlers(
+                    ...userFixtures(),
+                    ...shellFixtures(),
+                    ...chatFixtures({ thread: thread({ _id: THREAD_IDS.main, projectId: "project_q1" } as Parameters<typeof thread>[0]) }),
+                    lunora(api.projects.functions.getProject, PROJECT_Q1 as never),
+                ),
+            },
+        },
+    },
+    play: async ({ canvas }) => {
+        // The sidebar names the project too, so the chip is read inside the composer's context group.
+        const context = await canvas.findByRole("group", { name: "Context" }, STATE_WAIT);
+
+        await expect(await within(context).findByText("Q1 Launch", undefined, STATE_WAIT)).toBeVisible();
+        await settle(canvas);
+    },
+};
+
 /** The command palette open: filters, the groups with their shortcuts and the footer legend. */
 export const CommandPaletteOpen: Story = {
     // The thread rows hold archive and delete buttons inside their option (axe `nested-interactive`): a palette row problem that predates this
@@ -442,6 +534,50 @@ export const NewChat: Story = {
             { path: "chat/", route: ChatIndexRoute },
         ],
         url: "/chat",
+    },
+};
+
+/** A fresh chat with a project picked: the choice sits under the box, in the context row. */
+export const NewChatInProject: Story = {
+    args: NewChat.args,
+    beforeEach: () => () => useModelStore.getState().setPendingSettings(undefined),
+    parameters: {
+        // With a project listed, the sidebar's project header (a draggable `role="button"` that holds its own buttons) trips axe
+        // `nested-interactive`: the sidebar's, tracked as #547. Axe checks the composer's own row.
+        a11y: { context: { include: ["button[aria-pressed]"] } },
+        msw: {
+            handlers: {
+                gateway: gatewayModelsHandler(),
+                lunora: lunoraHandlers(
+                    ...userFixtures(),
+                    ...shellFixtures(),
+                    ...chatFixtures(),
+                    lunora(api.projects.functions.listProjects, () => pageOf([PROJECT_Q1]) as never),
+                ),
+            },
+        },
+    },
+    play: async ({ canvas }) => {
+        // Picked once the page has set up its new chat: the page's own setup would otherwise clear a pick made before it.
+        await settle(canvas);
+        useModelStore.getState().setPendingSettings({ projectId: PROJECT_Q1._id } as never);
+        await expect(await canvas.findByRole("button", { name: "File in Q1 Launch", pressed: true }, STATE_WAIT)).toBeVisible();
+    },
+};
+
+/** A suggestion category opened under the centred composer: the list drops below the chips, over the page, and a pick fills the editor. */
+export const NewChatSuggestionsOpen: Story = {
+    args: NewChat.args,
+    play: async ({ canvas }) => {
+        await settle(canvas);
+        await userEvent.click(await canvas.findByRole("tab", { name: "Ideas" }, PAGE_WAIT));
+
+        const pick = await canvas.findByRole("button", { name: "Brainstorm creative marketing strategies for a new product" }, PAGE_WAIT);
+
+        await waitFor(() => expect(pick).toBeVisible());
+        await expect(pick.getBoundingClientRect().bottom).toBeLessThanOrEqual(window.innerHeight);
+        await userEvent.click(pick);
+        await waitFor(() => expect(canvas.getByRole("textbox", { name: "Message" })).toHaveTextContent("Brainstorm creative marketing strategies"));
     },
 };
 
