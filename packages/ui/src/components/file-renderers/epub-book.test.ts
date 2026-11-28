@@ -18,6 +18,11 @@ const PNG_PREFIX = /^data:image\/png;base64,/u;
 const PNG_DATA = /^data:image\/png;base64,iVBORw0KGgo=$/u;
 const CONDITIONED = /@media screen\s+and \(min-width: 40em\) \{ \.cond\{x:1\} \}/u;
 const REFRESH_ATTRIBUTE = /http-equiv=["']?refresh/iu;
+
+// Several tests build archives of tens of millions of characters (the budget is 24 million): a few seconds alone, and more on a runner that is
+// running another project's tests at the same time. The package's 30 seconds is not enough for them there.
+vi.setConfig({ testTimeout: 180_000 });
+
 const TRACKER = /tracker\.example/u;
 const SCRIPTY = /expression\s*\(|behaviou?r\s*:|-moz-binding\s*:/iu;
 const NS = 'xmlns="http://www.idpf.org/2007/opf"';
