@@ -52,6 +52,9 @@ import type { BranchNode, GroupType, HierarchicalThreadListProperties, MinimalTh
 import type { ThreadDateRange } from "./utilities";
 import { getGroupType, isDragBlocked, isGroupFullySelected, selectThreadIdsByDate } from "./utilities";
 
+/** The most projects beyond the project list's first page whose titles the list reads by id. */
+const MAX_UNLISTED_PROJECT_LOOKUPS = 20;
+
 // Lazy: a dialog opened on demand, with its icon picker and project panels.
 const ProjectFormDialog = lazy(() => import("@/features/projects/components/project-form-dialog"));
 
@@ -594,26 +597,32 @@ const HierarchicalThreadList: FC<
         return new Set([DEFAULT_CHAT_MODEL, ...Object.values(saved).filter((model): model is string => typeof model === "string")]);
     }, [aiPreferences]);
     // The project list is one page; when it is cut, the few projects of rows beyond it are read by id, not left unnamed.
+    // The project list is one page. When it is cut, the projects of the rows on screen (search results included) that the
+    // page lacks are read by id, a few at most: a long list of them would cost a request each to load the sidebar.
     const { hasMore: projectListCut } = useProjectList();
-    const unlistedProjectIds = useMemo(() => {
+    // A string first: the shown groups are rebuilt on every thread switch, and a new array each time would re-render every row.
+    const unlistedProjectIdsKey = useMemo(() => {
         if (!projectListCut) {
-            return [];
+            return "";
         }
 
         const ids = new Set<string>();
-        const rows = (threadsData?.page ?? []) as { projectId?: string }[];
-
-        for (const thread of rows) {
-            if (thread.projectId && !projectsMap.has(thread.projectId)) {
-                ids.add(thread.projectId);
+        const collect = (node: BranchNode) => {
+            if (node.projectId && !projectsMap.has(node.projectId)) {
+                ids.add(node.projectId);
             }
-        }
 
-        return [...ids];
-    }, [projectListCut, projectsMap, threadsData]);
-    // Joined into one string, so the hints below change only when a title does, not on every render.
+            node.children.forEach((child) => collect(child));
+        };
+
+        filteredGroups.forEach((group) => group.threads.forEach((thread) => collect(thread)));
+
+        return [...ids].slice(0, MAX_UNLISTED_PROJECT_LOOKUPS).join(",");
+    }, [filteredGroups, projectListCut, projectsMap]);
+    const unlistedProjectIds = useMemo(() => (unlistedProjectIdsKey ? unlistedProjectIdsKey.split(",") : []), [unlistedProjectIdsKey]);
+    // Serialised, so the hints below change only when a title does, not on every render; JSON keeps any title intact.
     const unlistedTitlesKey = useQueries({
-        combine: (results) => results.map((query) => query.data?.title ?? "").join("\n"),
+        combine: (results) => JSON.stringify(results.map((query) => query.data?.title ?? null)),
         queries: unlistedProjectIds.map((projectId) => crpc.projects.functions.getProject.queryOptions({ projectId: projectId as Id<"projects"> })),
     });
     const rowHints = useMemo(() => {
@@ -623,7 +632,7 @@ const HierarchicalThreadList: FC<
             projectTitles.set(projectId, project.title);
         }
 
-        const unlistedTitles = unlistedTitlesKey.split("\n");
+        const unlistedTitles = JSON.parse(unlistedTitlesKey) as (string | null)[];
 
         unlistedProjectIds.forEach((projectId, index) => {
             const title = unlistedTitles[index];
