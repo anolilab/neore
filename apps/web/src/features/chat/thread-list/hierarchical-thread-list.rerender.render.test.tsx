@@ -184,12 +184,14 @@ vi.mock("@/hooks/use-after-first-paint", () => {
 
 vi.mock("@/features/projects/hooks/use-projects", () => {
     const mutation = { mutateAsync: async () => {} };
+    // One array, as the real hook's memo gives: a fresh one per render would hand every row a new context value.
+    const noProjects: never[] = [];
 
     return {
         useDeleteProject: () => mutation,
         useMoveThreadToProject: () => mutation,
         usePinProject: () => mutation,
-        useProjects: () => [],
+        useProjects: () => noProjects,
         useUnpinProject: () => mutation,
         useUpdateProjectOrder: () => mutation,
     };

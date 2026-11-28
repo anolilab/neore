@@ -45,6 +45,10 @@ vi.mock("@tanstack/react-query", () => {
         useMutation: () => {
             return { mutateAsync: vi.fn() };
         },
+        // The rows read the AI preferences for their default model; nothing here depends on the answer.
+        useQuery: () => {
+            return { data: undefined };
+        },
     };
 });
 
@@ -56,6 +60,15 @@ vi.mock("@/lib/lunora/crpc", () => {
     return {
         useCRPC: () => {
             return {
+                auth: {
+                    functions: {
+                        getAIUserPreferences: {
+                            queryOptions: () => {
+                                return {};
+                            },
+                        },
+                    },
+                },
                 chat: {
                     functions: {
                         updateThreadOrder: {

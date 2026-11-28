@@ -236,6 +236,64 @@ export const CardStates: Story = {
     },
 };
 
+const MIXED_PROJECT = {
+    _creationTime: ago(20 * DAY),
+    _id: "project_launch",
+    createdAt: ago(20 * DAY),
+    title: "Launch",
+    updatedAt: ago(DAY),
+    userId: "user-pro",
+};
+
+/** One row of each kind: a chat on the default model, another model, Auto, a project chat, and computer threads. */
+const MIXED_THREADS = [
+    THREADS.main,
+    thread({ _id: "0193c1b2-7d1e-7a3c-9f00-000000000031", model: "openai/gpt-5", title: "Compare vendor quotes" }),
+    thread({ _id: "0193c1b2-7d1e-7a3c-9f00-000000000032", autoModel: true, title: "Draft the board update" } as never),
+    thread({ _id: "0193c1b2-7d1e-7a3c-9f00-000000000033", projectId: MIXED_PROJECT._id, title: "Pricing page copy" }),
+    thread({ _id: "0193c1b2-7d1e-7a3c-9f00-000000000034", projectId: MIXED_PROJECT._id, title: "Launch retro notes" }),
+    thread({
+        _id: "0193c1b2-7d1e-7a3c-9f00-000000000035",
+        awaitingInput: "approval",
+        lastReplyAt: ago(5 * MINUTE),
+        projectId: MIXED_PROJECT._id,
+        runner: "host",
+        title: "Refactor the billing worker",
+        updatedAt: ago(5 * MINUTE),
+    }),
+    thread({ _id: "0193c1b2-7d1e-7a3c-9f00-000000000036", runner: "host", title: "Fix the flaky deploy script" }),
+];
+
+/**
+ * The second line tells threads apart instead of repeating the model: a model only when it is not the default, a project where the
+ * section does not name it already (Needs you), "Runs on your computer" for a computer thread, and nothing for a plain chat.
+ */
+export const MixedRows: Story = {
+    parameters: {
+        // axe: "nested-interactive" on the project section's sortable wrapper (a role="button" holding the section's own controls).
+        // It is the section's, not the rows': no earlier story renders a project section. Sidebar a11y is tracked in #547.
+        a11y: { test: "todo" },
+        msw: {
+            handlers: {
+                lunora: lunoraHandlers(
+                    ...userFixtures(),
+                    ...shellFixtures(),
+                    ...chatFixtures({ threads: MIXED_THREADS }),
+                    lunora(api.projects.functions.listProjects, () => pageOf([MIXED_PROJECT]) as never),
+                ),
+            },
+        },
+    },
+    play: async ({ canvasElement }) => {
+        const root = await sidebar(canvasElement);
+
+        await expect(await root.findByText(/gpt-5/iu, undefined, PAGE_WAIT)).toBeInTheDocument();
+        await expect(root.getAllByText("Runs on your computer")).toHaveLength(2);
+        // The section header and the needs-you row name the project; the rows inside its own section do not.
+        await expect(root.getAllByText("Launch")).toHaveLength(2);
+    },
+};
+
 /** Thirty threads: past fifteen rows the list renders virtually, and the taller cards must still be measured right. */
 export const LongList: Story = {
     parameters: {
@@ -270,6 +328,64 @@ export const LongList: Story = {
 
         scroller?.scrollTo({ top: scroller.scrollHeight });
         await expect(await root.findByRole("link", { name: "Research note 30" }, PAGE_WAIT)).toBeInTheDocument();
+    },
+};
+
+/** One thread that needs attention and belongs to the project, twelve more in the project's section, and six outside it. */
+const LONG_PROJECT_THREADS = [
+    THREADS.main,
+    thread({
+        _id: "0193c1b2-7d1e-7a3c-9f00-000000000200",
+        awaitingInput: "approval",
+        lastReplyAt: ago(5 * MINUTE),
+        projectId: MIXED_PROJECT._id,
+        title: "Deploy the billing migration",
+        updatedAt: ago(5 * MINUTE),
+    }),
+    ...Array.from({ length: 12 }, (_, index) =>
+        thread({
+            _id: `0193c1b2-7d1e-7a3c-9f00-0000000002${String(index + 1).padStart(2, "0")}`,
+            lastReplyAt: ago((index + 2) * HOUR),
+            projectId: MIXED_PROJECT._id,
+            title: `Launch task ${String(index + 1)}`,
+            updatedAt: ago((index + 2) * HOUR),
+        }),
+    ),
+    ...Array.from({ length: 6 }, (_, index) =>
+        thread({
+            _id: `0193c1b2-7d1e-7a3c-9f00-0000000003${String(index + 1).padStart(2, "0")}`,
+            lastReplyAt: ago((index + 20) * HOUR),
+            title: `Research note ${String(index + 1)}`,
+            updatedAt: ago((index + 20) * HOUR),
+        }),
+    ),
+];
+
+/**
+ * A project section in the virtual list: past fifteen items its rows render apart from the section, and must still know it names
+ * the project, so none repeats it. The one row outside the section (Needs you) does name it.
+ */
+export const LongListWithProject: Story = {
+    parameters: {
+        // axe: "nested-interactive" on the project section's sortable wrapper, as in MixedRows. Sidebar a11y is tracked in #547.
+        a11y: { test: "todo" },
+        msw: {
+            handlers: {
+                lunora: lunoraHandlers(
+                    ...userFixtures(),
+                    ...shellFixtures(),
+                    ...chatFixtures({ threads: LONG_PROJECT_THREADS }),
+                    lunora(api.projects.functions.listProjects, () => pageOf([MIXED_PROJECT]) as never),
+                ),
+            },
+        },
+    },
+    play: async ({ canvasElement }) => {
+        const root = await sidebar(canvasElement);
+
+        await expect(await root.findByRole("link", { name: "Launch task 1" }, PAGE_WAIT)).toBeInTheDocument();
+        // The section's header and the needs-you row: none of the twelve rows inside the section says "Launch" again.
+        await expect(root.getAllByText("Launch")).toHaveLength(2);
     },
 };
 
@@ -322,8 +438,8 @@ export const DetailsPanel: Story = {
 };
 
 /** What the context box reads for a thread: a linked pull request, a goal two rounds in, its project and the tokens it used. */
-const contextFixtures = (options: { host?: boolean } = {}) => {
-    const current = { ...THREADS.main, projectId: "project_q1", ...(options.host && { runner: "host" }) };
+const contextFixtures = (options: { host?: boolean; summary?: string } = {}) => {
+    const current = { ...THREADS.main, projectId: "project_q1", ...(options.host && { runner: "host" }), ...(options.summary && { summary: options.summary }) };
 
     return [
         ...userFixtures(),
@@ -393,12 +509,28 @@ const contextFixtures = (options: { host?: boolean } = {}) => {
     ];
 };
 
-/** Opens the details panel and waits for the context box. */
-const openContext = async (canvasElement: HTMLElement) => {
+/**
+ * Puts the details panel open or closed. The app keeps its state between visits, so a story sets it rather than toggles it:
+ * a toggle would close a panel an earlier story left open.
+ */
+const setDetailsPanel = async (canvasElement: HTMLElement, open: boolean) => {
     const root = await sidebar(canvasElement);
     const toggles = await root.findAllByRole("button", { name: "Toggle Sidebar" }, PAGE_WAIT);
+    // The sidebar marks its state on its root; no role carries it.
+    const isOpen = () => canvasElement.querySelector<HTMLElement>(":scope [data-sidebar-right-wrapper] [data-state]")?.dataset["state"] === "expanded";
 
-    await userEvent.click(toggles.at(-1) as HTMLElement);
+    if (isOpen() !== open) {
+        await userEvent.click(toggles.at(-1) as HTMLElement);
+    }
+
+    await waitFor(() => expect(isOpen()).toBe(open));
+
+    return root;
+};
+
+/** Opens the details panel and waits for the context box. */
+const openContext = async (canvasElement: HTMLElement) => {
+    const root = await setDetailsPanel(canvasElement, true);
 
     return await root.findByRole("region", { name: "Context" }, PAGE_WAIT);
 };
@@ -409,10 +541,63 @@ export const ContextBox: Story = {
         msw: { handlers: { lunora: lunoraHandlers(...contextFixtures()) } },
     },
     play: async ({ canvasElement }) => {
+        const root = within(canvasElement);
         const box = within(await openContext(canvasElement));
 
         await expect(await box.findByText("Every track has an owner and a due date in the checklist", undefined, PAGE_WAIT)).toBeVisible();
         await expect(await box.findByText("Q1 Launch", undefined, PAGE_WAIT)).toBeVisible();
+        // The box lists the pull request, so the header leaves it out: it shows once on the page.
+        await expect(await box.findByText(/acme\/launch#412/u, undefined, PAGE_WAIT)).toBeVisible();
+        await expect(root.getAllByText(/acme\/launch#412/u)).toHaveLength(1);
+        // Nothing to read yet: the summary is one row with its action, and the settings follow under their own heading.
+        await expect(root.queryByText('No summary available. Click "Generate" to create one.')).toBeNull();
+        await expect(root.getByRole("button", { name: "Generate" })).toBeVisible();
+        await expect(root.getByRole("heading", { name: "Thread settings" })).toBeVisible();
+    },
+};
+
+/** A thread with a summary: the full block, with its action to write it again, above the settings. */
+export const ContextBoxWithSummary: Story = {
+    parameters: {
+        msw: {
+            handlers: {
+                lunora: lunoraHandlers(
+                    ...contextFixtures({
+                        summary: "A six-week launch plan: scope the checklist, build one track per engineer, then harden and roll out in stages.",
+                    }),
+                ),
+            },
+        },
+    },
+    play: async ({ canvasElement }) => {
+        const root = within(canvasElement);
+
+        await openContext(canvasElement);
+        await expect(await root.findByText(/A six-week launch plan/u, undefined, PAGE_WAIT)).toBeVisible();
+        await expect(root.getByRole("heading", { name: "Thread summary" })).toBeVisible();
+        await expect(root.getByRole("heading", { name: "Thread settings" })).toBeVisible();
+    },
+};
+
+/** The details panel closed: the context box is not there, so the header keeps the thread's pull requests and the Link entry. */
+export const PullRequestsInHeaderWhilePanelClosed: Story = {
+    parameters: {
+        msw: { handlers: { lunora: lunoraHandlers(...contextFixtures()) } },
+    },
+    play: async ({ canvasElement }) => {
+        await setDetailsPanel(canvasElement, false);
+
+        // The closed panel keeps its box in the page, so the header is looked at on its own: it is where the pull requests show now.
+        const header = await waitFor(() => {
+            const element = canvasElement.querySelector<HTMLElement>(":scope header");
+
+            expect(element).not.toBeNull();
+
+            return element as HTMLElement;
+        }, PAGE_WAIT);
+
+        await expect(await within(header).findByText(/acme\/launch#412/u, undefined, PAGE_WAIT)).toBeVisible();
+        await expect(within(header).getByRole("button", { name: "Link pull request" })).toBeInTheDocument();
     },
 };
 

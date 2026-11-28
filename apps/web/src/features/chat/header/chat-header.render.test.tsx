@@ -64,8 +64,17 @@ vi.mock("@/features/chat/sharing/thread-share-button", () => {
     return { default: () => null };
 });
 
+// Whether the details panel shows the thread's context box, which lists the linked pull requests itself.
+const panel = vi.hoisted(() => {
+    return { contextShown: false };
+});
+
+vi.mock("@/features/chat/sidebar/use-thread-context-shown", () => {
+    return { useThreadContextShown: () => panel.contextShown };
+});
+
 vi.mock("@/features/develop/components/thread-pull-requests", () => {
-    return { default: () => null };
+    return { default: () => <span data-testid="header-pull-requests" /> };
 });
 
 vi.mock("@/features/layout/components/site-header", () => {
@@ -86,6 +95,23 @@ vi.mock("./thread-download-button", () => {
 
 vi.mock("@/features/chat/image-gallery/thread-images-button", () => {
     return { default: () => null };
+});
+
+describe("ChatSiteHeader's linked pull requests", () => {
+    it("shows them while the context box is not on screen, so the Link entry stays reachable", () => {
+        panel.contextShown = false;
+        render(<ChatSiteHeader threadId="t1" />);
+
+        expect(screen.getByTestId("header-pull-requests")).toBeTruthy();
+    });
+
+    it("leaves them to the context box while it is on screen, so they show once", () => {
+        panel.contextShown = true;
+        render(<ChatSiteHeader threadId="t1" />);
+
+        expect(screen.queryByTestId("header-pull-requests")).toBeNull();
+        panel.contextShown = false;
+    });
 });
 
 describe("ChatSiteHeader after a rename from the list", () => {

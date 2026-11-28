@@ -145,6 +145,12 @@ vi.mock("@/lib/lunora/crpc", () => {
                 agent: entry,
                 auth: {
                     functions: {
+                        // Nor are the AI preferences the rows read for their default model.
+                        getAIUserPreferences: {
+                            queryOptions: () => {
+                                return { queryFn: async () => null, queryKey: ["aiUserPreferences"] };
+                            },
+                        },
                         // The user's settings are not part of these searches: the query answers nothing.
                         getUserSettings: {
                             queryOptions: () => {
