@@ -264,8 +264,14 @@ interface AssetReader {
     text: (path: string) => Promise<string | undefined>;
 }
 
-const assetReader = (zip: JSZip, declared: ReadonlyMap<string, string>, signal?: AbortSignal): AssetReader => {
-    const budget = { files: MAX_ASSETS_PER_CHAPTER, left: MAX_INLINED_CHARS };
+/** The room a chapter has for what it inlines; the defaults are the exported limits, a smaller one lets a test cross the same boundaries with small files. */
+export interface ChapterLimits {
+    files?: number;
+    inlinedChars?: number;
+}
+
+const assetReader = (zip: JSZip, declared: ReadonlyMap<string, string>, signal?: AbortSignal, limits: ChapterLimits = {}): AssetReader => {
+    const budget = { files: limits.files ?? MAX_ASSETS_PER_CHAPTER, left: limits.inlinedChars ?? MAX_INLINED_CHARS };
     let refusedSheet = false;
     // The cost of pictures already counted against a sheet: they are charged once, when read, not again as part of the sheet.
     let pictureCharged = 0;
@@ -594,6 +600,7 @@ const expandImports = async (
     shared?: { length: number },
 ): Promise<string> => {
     const produced = shared ?? { length: 0 };
+
     // A comment is not a rule, and neither is text inside a string: an `@import` in either is inert and must not take a file of the count.
     const { code, text: css } = scanCss(source);
     const rules: { 0: string; 1?: string; 2?: string; 3?: string; 4?: string; index: number }[] = [];
@@ -945,6 +952,9 @@ const cloneIntoHtml = (node: Node, html: Document): Node => {
     return made;
 };
 
+// A document-type declaration with an internal subset (`<!DOCTYPE x [ ... ]>`), or any `<!ENTITY`. The external form, as in an XHTML 1.1 chapter, has neither.
+const DECLARES_ENTITIES = /<!ENTITY|<!DOCTYPE[^>]*\[/iu;
+
 const parseChapter = (source: string): Document => {
     const html = new DOMParser().parseFromString("<!doctype html><html><head></head><body></body></html>", "text/html");
     const xml = new DOMParser().parseFromString(source, "application/xhtml+xml");
@@ -990,6 +1000,13 @@ const readChapter = async (chapterPath: string, reader: AssetReader): Promise<{ 
 
     if (source.length > MAX_CHAPTER_CHARS) {
         throw new Error("chapter too large");
+    }
+
+    // The chapter is parsed as XML first, and an XML parser expands the entities a document declares: a few lines of nested declarations
+    // become gigabytes of text, and the cap above counts the source, not what it expands to. A chapter has no use for a declaration of its
+    // own, so one with an internal subset or an entity is refused before it is parsed.
+    if (DECLARES_ENTITIES.test(source)) {
+        throw new Error("chapter declares entities");
     }
 
     const directory = directoryOf(chapterPath);
@@ -1127,7 +1144,7 @@ const readChapter = async (chapterPath: string, reader: AssetReader): Promise<{ 
 /** Books opened so far: each gets a folder of its own for the parser, so two books never write over each other. */
 const opened = { count: 0 };
 
-export const openEpub = async (bytes: Uint8Array, resourceSaveDirectory?: string): Promise<OpenedEpub> => {
+export const openEpub = async (bytes: Uint8Array, resourceSaveDirectory?: string, limits?: ChapterLimits): Promise<OpenedEpub> => {
     const [{ initEpubFile }, zip] = await Promise.all([import("@lingo-reader/epub-parser"), JSZip.loadAsync(bytes)]);
     // The parser reads the structure only; it is given a folder of its own (its default is shared by every book on the page).
     const book = await initEpubFile(bytes, resourceSaveDirectory ?? `./epub-${String(++opened.count)}`);
@@ -1164,7 +1181,7 @@ export const openEpub = async (bytes: Uint8Array, resourceSaveDirectory?: string
                 throw new Error("unknown chapter");
             }
 
-            const reader = assetReader(zip, mediaTypes, signal);
+            const reader = assetReader(zip, mediaTypes, signal, limits);
             const { body, markup, styles } = await readChapter(chapterPath, reader);
 
             return chapterDocument(markup, styles, language, body);
