@@ -389,6 +389,46 @@ describe("searchPastChats", () => {
         }
     });
 
+    it("still judges a direct copy behind chains that spend the shared read budget", async () => {
+        const harness = lunoraTest(schema as never);
+
+        try {
+            const current = await harness.run(async (context: any) => {
+                await withMemory(context);
+
+                const here = await insertThread(context, { title: "Today" });
+                const plain = await insertThread(context, { title: "Plain" });
+
+                // Eight branches, each at the end of a chain of untagged copies deeper than the walk follows: each walk reads
+                // eight links and finds no source, the 64 reads of the whole search between them.
+                for (let chain = 0; chain < 8; chain += 1) {
+                    let parent: string | undefined;
+
+                    for (let level = 0; level < 9; level += 1) {
+                        parent = await insertUntaggedThread(context, `Deep ${String(chain)}.${String(level)}`, parent);
+                    }
+
+                    await insertPrompt(context, { createdAt: SENT_AT + chain, text: "Lisbon Lisbon Lisbon", threadId: parent! });
+                }
+
+                // Ranked after them: a branch of a typed chat, one read away from its source.
+                await insertPrompt(context, {
+                    createdAt: SENT_AT + 20,
+                    text: "Lisbon in a branch of a typed chat, with more words to rank it last",
+                    threadId: await insertUntaggedThread(context, "Direct branch", plain),
+                });
+
+                return here;
+            });
+
+            const { hits } = await searchIn(harness, { query: "Lisbon", threadId: current });
+
+            expect(hits.map((hit) => hit.title)).toStrictEqual(["Direct branch"]);
+        } finally {
+            harness.close();
+        }
+    });
+
     it("does not call a full window cut short when it gave every hit asked for", async () => {
         const harness = lunoraTest(schema as never);
 

@@ -67,6 +67,8 @@ const vSendResult = v.union(
 );
 
 export interface SendToHostInput {
+    /** The app built the text (the pull-request guide's prompt): saved as no typing of the person's (`queueHostTurn`). */
+    appWritten?: boolean;
     /** The caller's verified active organization, unset in the personal space. A thread filed under one is capped by that one. */
     organizationId?: string;
     plan: "free" | "premium";
@@ -157,7 +159,7 @@ export const sendToHostFor = async (ctx: MutationCtx, args: SendToHostInput): Pr
     // The handoff is earlier conversation, sent ahead of the prompt: it is cleaned the same way.
     const pendingHandoff = await pendingHandoffOf(ctx, thread);
     const handoff = pendingHandoff === undefined ? undefined : stripHiddenText(pendingHandoff).text;
-    const queued = await queueHostTurn(ctx, { handoff, session, taintedBy: args.taintedBy, text, threadId, userId }, now);
+    const queued = await queueHostTurn(ctx, { appWritten: args.appWritten, handoff, session, taintedBy: args.taintedBy, text, threadId, userId }, now);
 
     if ("error" in queued) {
         const outcomes = { busy: "busy", ineligible: "session_ended", input_too_large: "too_large", offline: "offline", outdated: "outdated" } as const;

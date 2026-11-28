@@ -185,8 +185,10 @@ export const beginHostGuide = internalMutation
             throw new LunoraError("INTERNAL", "The guide's session did not start");
         }
 
-        // The prompt carries a pull request's title, body and paths: third-party text, so the turn is signed as tainted.
+        // The prompt carries a pull request's title, body and paths: third-party text, so the turn is signed as tainted. The
+        // app built it, so it is saved as no typing of the person's.
         const sent = await sendToHostFor(ctx, {
+            appWritten: true,
             organizationId: args.organizationId,
             plan: args.plan,
             requestId: ctx.newId(),

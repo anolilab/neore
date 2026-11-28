@@ -26,7 +26,10 @@ const PAST_CHAT_WINDOW_MAX = 400;
 const PAST_CHAT_LOOKUP_BATCH = 16;
 /** Parent links followed from an untagged chat to the chat it was copied from; a deeper chain is no source. */
 const PAST_CHAT_LINEAGE_DEPTH = 8;
-/** `threadRelationships` reads one search may make; past it an untagged chat is no source. */
+/**
+ * `threadRelationships` reads one search may make; past it an untagged chat is no source. Each untagged candidate still to be
+ * judged keeps one of them, so a deep chain spends only what the others leave.
+ */
 const PAST_CHAT_LINEAGE_READS = 64;
 
 const vPastChatHit = v.object({ sentAt: v.number(), snippet: v.string(), title: v.string() });
@@ -123,6 +126,19 @@ export const searchPastChats = internalQuery
         const threads = new Map<string, ThreadDoc | null>();
         const sources = new Map<string, boolean>();
         let lineageReads = 0;
+        // Untagged candidates of the current window not judged yet: a walk reads past its own chat's links only while one read
+        // stays for each of them, so chains ahead of a direct copy (one read from its source) cannot spend its read.
+        const unjudged = new Set<string>();
+
+        // A chat judged by itself, with no link read: a tagged or messenger chat by its kind, an import as no source.
+        const judgedWithoutLinks = (thread: ThreadDoc): "no" | "yes" | undefined => {
+            if ((thread.tags ?? []).length > 0 || thread.externalThreadId !== undefined || thread.messengerConnectionId !== undefined) {
+                return isTypedChatKind(thread) ? "yes" : "no";
+            }
+
+            // An imported conversation (`chat-import/`) holds words typed elsewhere, whatever it is linked to.
+            return thread.createdBy?.startsWith("import:") === true ? "no" : undefined;
+        };
 
         const threadOf = async (id: string): Promise<ThreadDoc | null> => {
             if (!threads.has(id)) {
@@ -135,25 +151,27 @@ export const searchPastChats = internalQuery
         // Whether a chat's prompts are the caller's typed words: a tagged chat by its kind; an untagged one (a branch or side
         // chat) as the chat it was copied from, and only while every chat on the way there is one the search may list
         // (`listsSentPrompts`): a branch made before its parent was locked, trashed or deleted holds that chat's prompts.
-        // An import and a link of another kind are no source. A walk cut short by the depth or the read budget is no
-        // source for this search, but is not remembered as one: another candidate may reach the same chat by a shorter way.
+        // An import and a link of another kind are no source. A walk cut short by the depth or the read budget (and the reads
+        // held back for the candidates still to judge) is no source for this search, but is not remembered as one: another
+        // candidate may reach the same chat by a shorter way.
         const walkSource = async (thread: ThreadDoc, depth: number): Promise<"no" | "unknown" | "yes"> => {
-            if ((thread.tags ?? []).length > 0 || thread.externalThreadId !== undefined || thread.messengerConnectionId !== undefined) {
-                return isTypedChatKind(thread) ? "yes" : "no";
-            }
-
-            // An imported conversation (`chat-import/`) holds words typed elsewhere, whatever it is linked to.
-            if (thread.createdBy?.startsWith("import:") === true) {
-                return "no";
-            }
-
-            const known = sources.get(thread._id);
+            const known = judgedWithoutLinks(thread);
 
             if (known !== undefined) {
-                return known ? "yes" : "no";
+                return known;
             }
 
-            if (depth >= PAST_CHAT_LINEAGE_DEPTH || lineageReads >= PAST_CHAT_LINEAGE_READS) {
+            const cached = sources.get(thread._id);
+
+            if (cached !== undefined) {
+                return cached ? "yes" : "no";
+            }
+
+            if (
+                depth >= PAST_CHAT_LINEAGE_DEPTH ||
+                lineageReads >= PAST_CHAT_LINEAGE_READS ||
+                (depth > 0 && lineageReads + unjudged.size >= PAST_CHAT_LINEAGE_READS)
+            ) {
                 return "unknown";
             }
 
@@ -186,11 +204,16 @@ export const searchPastChats = internalQuery
 
             if (verdict !== "unknown") {
                 sources.set(thread._id, verdict === "yes");
+                unjudged.delete(thread._id);
             }
 
             return verdict;
         };
-        const isTypedSource = async (thread: ThreadDoc): Promise<boolean> => (await walkSource(thread, 0)) === "yes";
+        const isTypedSource = async (thread: ThreadDoc): Promise<boolean> => {
+            unjudged.delete(thread._id);
+
+            return (await walkSource(thread, 0)) === "yes";
+        };
 
         const collect = async (window: number) => {
             const { filled, messages } = await context.runQuery(internal.agent.messages.typedTextSearch, { limit: window, text, userId });
@@ -222,17 +245,24 @@ export const searchPastChats = internalQuery
             }
 
             const hits: { sentAt: number; snippet: string; title: string }[] = [];
+            const listable = (thread: ThreadDoc | null): thread is ThreadDoc => listsSentPrompts(thread, userId) && inScope(thread);
+
+            unjudged.clear();
+
+            for (const { message } of elsewhere) {
+                const thread = threads.get(message.threadId) ?? null;
+
+                if (listable(thread) && judgedWithoutLinks(thread) === undefined && !sources.has(thread._id)) {
+                    unjudged.add(thread._id);
+                }
+            }
 
             for (const { message, typed: words } of elsewhere) {
                 const thread = threads.get(message.threadId) ?? null;
-
-                if (!listsSentPrompts(thread, userId) || !inScope(thread) || !(await isTypedSource(thread))) {
-                    continue;
-                }
-
                 const key = copyKey(message, words);
 
-                if (seen.has(key)) {
+                // A copy already listed (or of this chat's own prompt) is dropped before its chat is judged, so it reads nothing.
+                if (seen.has(key) || !listable(thread) || !(await isTypedSource(thread))) {
                     continue;
                 }
 

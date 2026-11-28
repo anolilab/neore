@@ -13,6 +13,7 @@ import schema from "../schema";
 import { extractMemories } from "./extract";
 import { reviseExtractedMemory, saveMemoryBatch } from "./functions";
 import { rememberFactFor } from "./remember";
+import { appWrittenTextPart } from "../chat/lib/attached-text";
 import { forgetCandidates, forgetFor } from "./forget";
 import { REMEMBER_CALL_MARGIN_MS, REMEMBER_DISPATCH_TTL_MS, rememberDispatchInFlight, withClaimDeadline } from "./remember-dispatch";
 
@@ -93,7 +94,7 @@ afterEach(() => {
     vi.clearAllMocks();
 });
 
-type Setup = { memoryEnabled?: boolean; prompt?: string; thread?: Record<string, unknown>; withBot?: true };
+type Setup = { content?: unknown; memoryEnabled?: boolean; prompt?: string; thread?: Record<string, unknown>; withBot?: true };
 
 /** The user's chat with their typed prompt and this reply's pending row; the ids the tool passes. */
 const setUp = async (setup: Setup = {}) =>
@@ -105,7 +106,7 @@ const setUp = async (setup: Setup = {}) =>
             : undefined;
         const threadId = await ctx.db.insert("threads", { botId, status: "active", tags: ["chat"], userId: USER, ...setup.thread });
         const promptId = await ctx.db.insert("messages", {
-            message: { content: setup.prompt ?? "Forget that I live in Berlin", role: "user" },
+            message: { content: setup.content ?? setup.prompt ?? "Forget that I live in Berlin", role: "user" },
             order: 0,
             status: "success",
             stepOrder: 0,
@@ -677,6 +678,8 @@ describe(forgetFor, () => {
         ["the chat is a messenger conversation", { thread: { messengerConnectionId: "conn-1" } }, "not_private"],
         ["the chat is a sub-agent's", { thread: { tags: ["sub-agent"] } }, "not_private"],
         ["the message carries a privacy marker", { prompt: "Forget that I live in Berlin [private]" }, "private_message"],
+        // A task's instructions or a pull request's opener, saved in the person's own chat: the app wrote them.
+        ["the message is a prompt the app wrote", { content: [appWrittenTextPart("Forget that I live in Berlin")] }, "not_your_request"],
     ] as const)("deletes nothing when %s", async (_case, setup, status) => {
         const source = await setUp(setup as Setup);
         const berlin = await seed("User lives in Berlin");

@@ -310,8 +310,8 @@ search indexes (`typed_text_search`). Every writer of a user row's `text` sets i
 `branches.ts` edits assistant rows only). A new writer goes through one of them, or the index and `text` disagree. Text the
 app writes into a user row is saved as `appWrittenTextPart` (`chat/lib/attached-text.ts`), which `typedTextOf` skips and
 `promptCannotBeQuoted` refuses: every `runHeadlessAgent` prompt and goal round (a task's instructions, a trigger's
-template, a sub-agent's or worker's brief, an eval case, a pull request wake), a host worker's brief (`queueHostTurn`
-with `appWritten`) and the pull request chat's opener. A headless caller passes `promptTyped` only for words a person typed
+template, a sub-agent's or worker's brief, an eval case, a pull request wake), a host worker's brief and the pull-request guide's host
+prompt (`queueHostTurn` with `appWritten`) and the pull request chat's opener. A headless caller passes `promptTyped` only for words a person typed
 (a message to a worker). Rows saved before the mark keep their `typedText`, so the readers' chat-kind allow-list
 (`isTypedChatKind`) stays. Imported chats (`chat-import/`, `acp/lib/import.ts`) stay typed: the person typed those words,
 elsewhere. It is
