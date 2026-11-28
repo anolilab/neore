@@ -78,7 +78,12 @@ const PaneView: FC<PaneViewProps> = ({ canClose, canSplit, hosts, index, loaded,
                         </Button>
                     </div>
                 )}
-                {setup === "needed" && <CodeSetup />}
+                {setup === "loading" && (
+                    <p className="text-muted-foreground flex flex-1 items-center justify-center p-6 text-sm" role="status">
+                        {t`Loading…`}
+                    </p>
+                )}
+                {setup === "needed" && <CodeSetup devices={[...hosts.values()]} />}
                 {setup === "ready" && <EmptyPane />}
             </section>
         );
@@ -247,7 +252,17 @@ const CodeWorkspace: FC<CodeWorkspaceProps> = ({ className, devices, now, setup 
                     </ResizablePanel>
                     <ResizableHandle aria-label={t`Resize panes`} withHandle />
                     <ResizablePanel id="pane-1" minSize="20%">
-                        <PaneView canClose canSplit={false} hosts={hosts} index={1} loaded={devices !== undefined} now={now} pane={visible[1]!} setup={setup} />
+                        <PaneView
+                            canClose
+                            canSplit={false}
+                            hosts={hosts}
+                            index={1}
+                            loaded={devices !== undefined}
+                            now={now}
+                            pane={visible[1]!}
+                            // One setup list on the page: with the first pane empty too, it is already there.
+                            setup={visible[0]!.tabs.length === 0 ? "ready" : setup}
+                        />
                     </ResizablePanel>
                 </ResizablePanelGroup>
             )}

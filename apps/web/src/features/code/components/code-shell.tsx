@@ -120,7 +120,8 @@ const RunsSection: FC = () => {
 const CodeShell: FC = () => {
     const { t } = useLingui();
     const enabled = useCodeModeEnabled();
-    // Until a choice is made the list opens first, unless the setup steps are waiting and there is no host: on a phone the steps are then the first thing to see.
+    // On a phone the list and the workspace take turns. Until the user picks, the list opens first only when it has a paired
+    // host to pick; otherwise the workspace (the setup steps, or its loading state) comes first.
     const [listChoice, setListChoice] = useState<boolean | undefined>(undefined);
     const now = useNow();
     const dispatch = useCodeLayoutStore((state) => state.dispatch);
@@ -142,8 +143,9 @@ const CodeShell: FC = () => {
         );
     }
 
-    // Hosts to pick from come first; the steps come first only when there is no host yet.
-    const listOpen = listChoice ?? !(setup === "needed" && (devices?.length ?? 0) === 0);
+    // A device still waiting for its pairing to be confirmed has never been seen, and is not a host to pick yet.
+    const hasPairedHost = devices?.some((device) => device.lastSeenAt !== undefined) === true;
+    const listOpen = listChoice ?? hasPairedHost;
     const selectedId = activeTab?.startsWith("host:") ? activeTab.slice("host:".length) : undefined;
     const openHost = (id: string) => {
         dispatch({ tabId: hostTabId(id), type: "open" });
@@ -156,6 +158,14 @@ const CodeShell: FC = () => {
                 aria-label={t`Code navigation`}
                 className={cn("bg-background border-border/50 w-full shrink-0 overflow-y-auto md:block md:w-72 md:border-r", listOpen ? "block" : "hidden")}
             >
+                {setup === "needed" && (
+                    // The list has no other way back to the steps on a phone when there is no host to open.
+                    <div className="p-2 md:hidden">
+                        <Button className="min-h-11" onClick={() => setListChoice(false)} variant="outline">
+                            {t`Coding setup`}
+                        </Button>
+                    </div>
+                )}
                 <HostsSection devices={devices} now={now} onSelect={openHost} selected={selectedId} />
                 <PullRequestsSection />
                 <RunsSection />

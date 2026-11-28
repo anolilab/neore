@@ -162,7 +162,8 @@ const PathPicker: React.FC<{ onChange: (path: OnboardingPath) => void; value: On
     );
 };
 
-const OnboardingContent = ({ codeEnabled, onComplete }: { codeEnabled: boolean; onComplete: () => void }) => {
+/** `codeEnabled` is `undefined` while the check runs. */
+const OnboardingContent = ({ codeEnabled, onComplete }: { codeEnabled: boolean | undefined; onComplete: () => void }) => {
     const { t } = useLingui();
     const { currentStep, goToStep, loading, next, previous, skip } = useOnboarding();
     const translations = useStepTranslations();
@@ -173,6 +174,13 @@ const OnboardingContent = ({ codeEnabled, onComplete }: { codeEnabled: boolean; 
     // The first step's choice decides which steps follow; the later steps belong to one path each.
     const [choice, setChoice] = useState<OnboardingPath>("chat");
     const path: OnboardingPath = currentStep?.id === "code" ? "code" : choice;
+
+    // A tour saved on the Code step, reopened once Code mode is no longer offered, starts over at the welcome step.
+    useEffect(() => {
+        if (codeEnabled === false && currentStep?.id === "code") {
+            void goToStep("welcome");
+        }
+    }, [codeEnabled, currentStep?.id, goToStep]);
     const pathSteps = onboardingSteps.filter((step) => ONBOARDING_PATH_STEPS[path].includes(String(step.id)));
     const currentIndex = Math.max(
         0,
@@ -244,7 +252,16 @@ const OnboardingContent = ({ codeEnabled, onComplete }: { codeEnabled: boolean; 
 
     const handlePrevious = useCallback(async () => {
         setDirection(-1);
-        await (currentStep?.id === "code" ? goToStep("welcome") : previous());
+
+        if (currentStep?.id === "code") {
+            // A tour restored on this step never saw the picker: going back keeps its Code choice, so Next returns here.
+            setChoice("code");
+            await goToStep("welcome");
+
+            return;
+        }
+
+        await previous();
     }, [currentStep?.id, goToStep, previous]);
 
     const handleSkip = useCallback(() => {
@@ -368,7 +385,15 @@ const OnboardingContent = ({ codeEnabled, onComplete }: { codeEnabled: boolean; 
         <Dialog open>
             <DialogPopup className={cn("w-full overflow-hidden", isCodeStep ? "max-w-xl" : "max-w-md")} showCloseButton={false}>
                 <DialogTitle className="sr-only">{t`Welcome to Neore`}</DialogTitle>
-                <div aria-label={t`Onboarding wizard`} className="flex flex-col" onKeyDown={handleKeyDown} ref={contentRef} role="region" tabIndex={-1}>
+                <div
+                    aria-label={t`Onboarding wizard`}
+                    // Capped to the screen and scrolling as a whole, so a short phone screen still reaches the actions at the bottom.
+                    className="flex max-h-[calc(100dvh-2rem)] flex-col overflow-y-auto"
+                    onKeyDown={handleKeyDown}
+                    ref={contentRef}
+                    role="region"
+                    tabIndex={-1}
+                >
                     {/* Progress bar */}
                     <div className="bg-muted h-1 w-full">
                         <div
@@ -404,7 +429,7 @@ const OnboardingContent = ({ codeEnabled, onComplete }: { codeEnabled: boolean; 
                                 </div>
                                 <h2 className="font-heading text-xl font-semibold">{title}</h2>
                                 <p className="text-muted-foreground max-w-sm text-sm leading-relaxed">{description}</p>
-                                {isFirstStep && codeEnabled && <PathPicker onChange={setChoice} value={choice} />}
+                                {isFirstStep && codeEnabled === true && <PathPicker onChange={setChoice} value={choice} />}
                                 {currentStep?.id === "start" && <TemplatePicker onSelectTemplate={(prompt: string) => finishOnboarding(prompt)} />}
                                 {isCodeStep && (
                                     <div className="max-h-[min(50vh,360px)] w-full overflow-y-auto text-left">
@@ -493,7 +518,7 @@ const OnboardingContent = ({ codeEnabled, onComplete }: { codeEnabled: boolean; 
 const OnboardingDialog = () => {
     const { onboardingCompleted, setOnboardingCompleted } = useUserPreferences();
     // The Code path is only offered where Code mode is: it ends on a page that is not there otherwise.
-    const codeEnabled = useCodeModeEnabled() === true;
+    const codeEnabled = useCodeModeEnabled();
     const { user } = useIsAnonymous();
 
     const handleFlowComplete = () => {

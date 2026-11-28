@@ -225,7 +225,7 @@ export const CodePartlySetUp: Story = {
     parameters: { msw: { handlers: handlers(...codeFixtures(DEVICES), ...userFixtures({ settings: { setupStepsSkipped: ["ssh"] } })) } },
     play: async ({ canvas }) => {
         // On a phone the host list comes first when a host exists, so the steps are in the page but behind it.
-        await expect(await canvas.findByText("Coding setup", undefined, PAGE_WAIT)).toBeInTheDocument();
+        await expect(await canvas.findByText("Coding setup", { ignore: "button, script, style" }, PAGE_WAIT)).toBeInTheDocument();
         await expect(await setupRow(canvas, "Pair a computer")).toHaveTextContent("Done");
         await expect(await setupRow(canvas, "Add an SSH server")).toHaveTextContent("Skipped");
     },
@@ -236,7 +236,7 @@ export const CodeNoComputer: Story = {
     args: CODE_ARGS,
     parameters: { msw: { handlers: handlers(...codeFixtures([])) } },
     play: async ({ canvas }) => {
-        await expect(await canvas.findByText("Coding setup", undefined, PAGE_WAIT)).toBeVisible();
+        await expect(await canvas.findByText("Coding setup", { ignore: "button, script, style" }, PAGE_WAIT)).toBeVisible();
         // The host answers after the steps do.
         await waitFor(async () => expect(await setupRow(canvas, "Connect a Git host")).toHaveTextContent("To do"), PAGE_WAIT);
         await expect(canvas.queryByText("Pick a host or a pull request")).toBeNull();

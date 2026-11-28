@@ -202,11 +202,16 @@ const SetupChecklist: FC<SetupChecklistProps> = ({ extra, serverFormShown, surfa
             );
         }
 
-        return surface === "code" ? (
-            <SettingsLink anchor={id === "pair" ? "devices-pairing" : undefined} className={className} tab="chat-devices">
+        // The server form is only in the desktop app on a paired computer; elsewhere the link would land on a tab without it.
+        if (surface !== "code" || (id === "ssh" && !serverFormShown)) {
+            return null;
+        }
+
+        return (
+            <SettingsLink anchor={id === "pair" ? "devices-pairing" : "devices-ssh"} className={className} tab="chat-devices">
                 {label}
             </SettingsLink>
-        ) : null;
+        );
     };
     const card = (
         <CardContent>
