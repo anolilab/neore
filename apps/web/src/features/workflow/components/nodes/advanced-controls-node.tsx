@@ -87,7 +87,8 @@ const AdvancedControlsNodeComponent = (props: NodeProps<Node<AdvancedControlsNod
 
     const generateRandomSeed = () => {
         const [entropy = 0] = crypto.getRandomValues(new Uint32Array(1));
-        const randomSeed = entropy % 2_147_483_647;
+        // The top 31 bits: an even spread over the non-negative 32-bit seeds, where a modulo would favour the low ones.
+        const randomSeed = entropy >>> 1;
 
         updateNode(id, { seed: randomSeed, useRandomSeed: false });
     };
