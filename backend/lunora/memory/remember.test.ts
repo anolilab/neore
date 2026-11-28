@@ -15,7 +15,7 @@ import { internal } from "../_generated/internal";
 import { runAfterOnShard } from "../lib/shard-scheduler";
 import { saveMemoryBatch } from "./functions";
 import { rememberFactFor, rememberResultOf } from "./remember";
-import { rememberDispatchInFlight } from "./remember-dispatch";
+import { REMEMBER_CALL_TIMEOUT_MS, REMEMBER_DISPATCH_TTL_MS, rememberDispatchInFlight } from "./remember-dispatch";
 
 const { generateText, getUtilityModel, registry } = vi.hoisted(() => {
     return {
@@ -176,13 +176,29 @@ beforeAll(async () => {
     registerModule(registry, "agent_thread_lock", await import("../agent/thread-lock"));
 });
 
+/** The owner locks the chat through the real mutation, as the lock button does. */
+const lockChat = async (threadId: string) =>
+    await harness.withIdentity({ userId: USER } as never).mutation(enableThreadLock as never, { passcode: "correct horse battery", threadId } as never);
+
+const dispatchInFlight = async (threadId: string) => await harness.run(async (ctx: any) => await rememberDispatchInFlight(ctx, threadId as never));
+
+// Locking a chat mints an unlock proof, which needs the signing secret.
+const previousSecret = process.env.STORAGE_SIGNING_SECRET;
+
 beforeEach(() => {
     harness = lunoraTest(schema as never);
+    process.env.STORAGE_SIGNING_SECRET = "test-unlock-secret";
 });
 
 afterEach(() => {
     harness.close();
     generateText.mockReset();
+
+    if (previousSecret === undefined) {
+        delete process.env.STORAGE_SIGNING_SECRET;
+    } else {
+        process.env.STORAGE_SIGNING_SECRET = previousSecret;
+    }
 });
 
 describe(rememberFactFor, () => {
@@ -550,38 +566,54 @@ describe(rememberFactFor, () => {
 
     it("makes a lock attempted while the model call is out wait, and lets it through once the call is answered", async () => {
         const ids = await setUp();
-        const inFlight = async () => await harness.run(async (ctx: any) => await rememberDispatchInFlight(ctx, ids.threadId as never));
-        // Locking a chat mints an unlock proof, which needs the signing secret.
-        const previousSecret = process.env.STORAGE_SIGNING_SECRET;
-        const lock = async () =>
-            await harness
-                .withIdentity({ userId: USER } as never)
-                .mutation(enableThreadLock as never, { passcode: "correct horse battery", threadId: ids.threadId } as never);
         let lockDuringCall: unknown;
 
-        process.env.STORAGE_SIGNING_SECRET = "test-unlock-secret";
+        // After the recheck, while the prompt is with the provider: the owner locks the chat, and the lock is refused.
+        generateText.mockImplementationOnce(async () => {
+            lockDuringCall = await lockChat(ids.threadId).catch((error: unknown) => error);
+
+            return {
+                output: { facts: [{ asked: true, confidence: 90, importance: 70, memory: "User is vegan", quote: "I'm vegan", type: "preference" }] },
+            };
+        });
+
+        await expect(remember(ids)).resolves.toMatchObject({ status: "saved" });
+        expect(lockDuringCall).toMatchObject({ code: "CONFLICT" });
+        await expect(dispatchInFlight(ids.threadId)).resolves.toBe(false);
+        await expect(lockChat(ids.threadId)).resolves.toBeDefined();
+    });
+
+    it("aborts a provider call that outlives its deadline before the chat's claim lapses, and lets the lock through", async () => {
+        const ids = await setUp();
+        const timeout = AbortSignal.timeout.bind(AbortSignal);
+        const deadlines: number[] = [];
+
+        // The deadline the call is given, run short here so the test does not wait it out.
+        const spy = vi.spyOn(AbortSignal, "timeout").mockImplementation((ms: number) => {
+            deadlines.push(ms);
+
+            return timeout(5);
+        });
+
+        // A provider that never answers: only the abort ends the call.
+        generateText.mockImplementationOnce(
+            async ({ abortSignal }: { abortSignal?: AbortSignal }) =>
+                await new Promise((_resolve, reject) => {
+                    abortSignal?.addEventListener("abort", () => reject(abortSignal.reason));
+                }),
+        );
 
         try {
-            // After the recheck, while the prompt is with the provider: the owner locks the chat, and the lock is refused.
-            generateText.mockImplementationOnce(async () => {
-                lockDuringCall = await lock().catch((error: unknown) => error);
-
-                return {
-                    output: { facts: [{ asked: true, confidence: 90, importance: 70, memory: "User is vegan", quote: "I'm vegan", type: "preference" }] },
-                };
-            });
-
-            await expect(remember(ids)).resolves.toMatchObject({ status: "saved" });
-            expect(lockDuringCall).toMatchObject({ code: "CONFLICT" });
-            await expect(inFlight()).resolves.toBe(false);
-            await expect(lock()).resolves.toBeDefined();
+            await expect(remember(ids)).resolves.toStrictEqual({ facts: [], status: "unavailable" });
         } finally {
-            if (previousSecret === undefined) {
-                delete process.env.STORAGE_SIGNING_SECRET;
-            } else {
-                process.env.STORAGE_SIGNING_SECRET = previousSecret;
-            }
+            spy.mockRestore();
         }
+
+        expect(deadlines).toStrictEqual([REMEMBER_CALL_TIMEOUT_MS]);
+        expect(REMEMBER_CALL_TIMEOUT_MS).toBeLessThan(REMEMBER_DISPATCH_TTL_MS);
+        await expect(dispatchInFlight(ids.threadId)).resolves.toBe(false);
+        await expect(lockChat(ids.threadId)).resolves.toBeDefined();
+        expect(await memories()).toHaveLength(0);
     });
 
     it("refuses a fact the extractor marks as about the user's health, and keeps a job in the field", async () => {

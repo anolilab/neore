@@ -9,8 +9,14 @@ import { claimFence, dropExpiredClaimsWithPrefix, hasClaimWithPrefix, releaseCla
 
 export const REMEMBER_DISPATCH_SCOPE = "memory-remember-dispatch";
 
-/** Longer than the extractor's call takes; a claim whose release never lands frees the chat by itself. */
+/** Longer than the extractor's call may take; a claim whose release never lands frees the chat by itself. */
 export const REMEMBER_DISPATCH_TTL_MS = 2 * 60 * 1000;
+
+/**
+ * The extractor's model call under a dispatch claim is aborted after this, well inside the claim's life: a slow gateway can
+ * never send the prompt after the claim lapsed and the chat was locked.
+ */
+export const REMEMBER_CALL_TIMEOUT_MS = 90 * 1000;
 
 const dispatchKey = (threadId: string, promptMessageId: string): string => `${threadId}:${promptMessageId}`;
 
