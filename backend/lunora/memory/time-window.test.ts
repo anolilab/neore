@@ -146,6 +146,29 @@ describe("timeWindowOf", () => {
                 ["2026-06-01", "2026-06-30"],
             ],
         ],
+        [
+            "what did I do in May and June in 2024",
+            [
+                ["2024-05-01", "2024-05-31"],
+                ["2024-06-01", "2024-06-30"],
+            ],
+        ],
+        [
+            "what did I do in May and June of 2024",
+            [
+                ["2024-05-01", "2024-05-31"],
+                ["2024-06-01", "2024-06-30"],
+            ],
+        ],
+        [
+            "was war im Mai und Juni im Jahr 2024",
+            [
+                ["2024-05-01", "2024-05-31"],
+                ["2024-06-01", "2024-06-30"],
+            ],
+        ],
+        ["what did I do in May of 2023", ["2023-05-01", "2023-05-31"]],
+        ["was war im Mai im Jahr 2023", ["2023-05-01", "2023-05-31"]],
         // `für den Morgen` is the morning of the day named
         ["Was ist für den Morgen am 3. Dezember geplant?", ["2026-12-03", "2026-12-03"]],
         // `going` is future only in `going to`; an `-ed` word after am/is/are is the passive
@@ -241,6 +264,8 @@ describe("timeWindowOf", () => {
         expect(only("what is on 42 tomorrow")).toBe(false);
         // Agenda nouns ask of the time alone.
         expect(only("what are my appointments tomorrow")).toBe(true);
+        expect(only("what am I going to do tomorrow")).toBe(true);
+        expect(only("was mache ich morgen")).toBe(true);
         expect(only("was für Termine habe ich morgen")).toBe(true);
         expect(only(`what is coming up tomorrow ${"and ".repeat(250)}about the weather`)).toBe(false);
         expect(["what is the weather like tomorrow", "draft an email saying I am away next week", "was koche ich heute"].map((text) => only(text))).toEqual([

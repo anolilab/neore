@@ -93,7 +93,7 @@ const ENGLISH: Lexicon = {
     agoAfter: ["ago"],
     agoBefore: [],
     ahead: ["in"],
-    asking: "what whats s is are am was were i me my do did does doing have has had on up at the a for to be there anything any and or happening happen scheduled schedule agenda appointment appointments meeting meetings event events".split(
+    asking: "what whats s is are am was were i me my do did does doing have has had on up at the a for to be there anything any and or happening happen going scheduled schedule agenda appointment appointments meeting meetings event events".split(
         " ",
     ),
     days: { today: { offset: 0 }, tomorrow: { offset: 1 }, tonight: { offset: 0 }, yesterday: { offset: -1 } },
@@ -385,6 +385,9 @@ const ADJECTIVE_ENDINGS = ["e", "em", "en", "er", "es"];
 /** Words that join months into one group: a year after the last is every month's ("May and June last year"). */
 const GROUP_WORDS = new Set(["and", "und"]);
 
+/** Words between a group of months and its year: `in 2024`, `of 2024`, `im Jahr 2024`. */
+const YEAR_JOINERS = new Set(["im", "in", "jahr", "of"]);
+
 /** Words that part two times: a relative year never joins a month across them ("in May or last year", "May and next year"). */
 const PARTING_WORDS = new Set(["and", "oder", "or", "und"]);
 
@@ -443,9 +446,17 @@ export const readTimePhrase = (text: string): TimePhrase | undefined => {
         const through = (near: { read: Read; start: number }): number => Math.max(size, near.start - index + near.read.size);
 
         if (phrase.kind === "date" && phrase.year === undefined) {
-            // A year after the last month of a group is every month's: "May and June last year", "Mai und Juni 2023".
+            // A year after the last month of a group is every month's: "May and June last year", "Mai und Juni 2023", also
+            // through `in`, `of` or `im Jahr` ("May and June in 2024", and for one month "May of 2023").
             const group = monthsAfter(index + size);
-            const explicit = group.months.length > 0 ? yearOf(words[group.end]) : undefined;
+            let yearAt = group.end;
+
+            while (yearAt < group.end + 2 && YEAR_JOINERS.has(words[yearAt] ?? "")) {
+                yearAt += 1;
+            }
+
+            // One month's bare year (`May 2023`) is the phrase's own; through a joiner it is read here.
+            const explicit = group.months.length > 0 || yearAt > group.end ? yearOf(words[yearAt]) : undefined;
             const lastMonth = group.months.length > 0 ? group.end - 1 : index;
             const near = explicit === undefined ? firstNear(lastMonth, isRelativeYear) : undefined;
             let years: { year?: number; yearShift?: Shift } = {};
@@ -453,7 +464,7 @@ export const readTimePhrase = (text: string): TimePhrase | undefined => {
 
             if (explicit !== undefined) {
                 years = { year: explicit };
-                end += 1;
+                end = yearAt + 1 - index;
             } else if (near?.read.phrase.kind === "relative") {
                 years = { yearShift: near.read.phrase.shift };
                 end = through(near);

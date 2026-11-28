@@ -24,6 +24,7 @@ import {
     withSearchHits,
 } from "./retrieve-ranking";
 import type { RankCandidate } from "./retrieve-ranking";
+import { timeWindowOf } from "./time-window";
 import type { TimeWindow } from "./time-window";
 import { MAX_SCORED_TERMS, salientTermsOf } from "./search-terms";
 
@@ -515,6 +516,20 @@ describe("rankMemories", () => {
 
             expect(ranked.find((m) => m.memoryId === "expired")!.score).toBeCloseTo(base, 10);
             expect(ranked.find((m) => m.memoryId === "current")!.score).toBeCloseTo(base + TIME_WEIGHTS.holds, 10);
+        });
+
+        it("finds tomorrow's appointment by its date for a question about tomorrow alone, in English and German", () => {
+            const rows = [candidate("dentist", { ...plain, eventStart: "2026-11-28" }), candidate("other", plain)];
+
+            for (const question of ["what am I going to do tomorrow", "was mache ich morgen"]) {
+                const window = timeWindowOf(question, "2026-11-27");
+
+                expect(window?.onlyTime, question).toBe(true);
+                expect(
+                    timed(rows, [], window!).map((m) => m.memoryId),
+                    question,
+                ).toEqual(["dentist"]);
+            }
         });
 
         it("caps the returned score at 1", () => {
