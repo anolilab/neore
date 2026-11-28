@@ -7,7 +7,7 @@ import { formatShortcutForDisplay } from "@neore/ui/utils/keyboard-shortcuts";
 import { useNavigate } from "@tanstack/react-router";
 import { FolderPlus, Search, SquarePen } from "lucide-react";
 import type { FC } from "react";
-import { memo, useState } from "react";
+import { memo, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 
 import CreateGroupChatButton from "@/features/chat/group/create-group-chat-button";
@@ -29,6 +29,7 @@ interface ThreadListDockProperties {
 const ThreadListDock: FC<ThreadListDockProperties> = memo(({ isSearchLoading = false }) => {
     const { t } = useLingui();
     const navigate = useNavigate();
+    const searchRowRef = useRef<HTMLDivElement>(null);
     const { keyboardShortcuts } = useKeyboardShortcuts();
     const focusSearchShortcut = formatShortcutForDisplay(keyboardShortcuts.focusSearch);
     // Compact, and only while it fits beside the label: a long chord stays in the tooltip.
@@ -65,7 +66,7 @@ const ThreadListDock: FC<ThreadListDockProperties> = memo(({ isSearchLoading = f
         <div className="flex w-full flex-col gap-2">
             <SectionBar />
             <TooltipProvider>
-                <div className="surface-raised flex items-center gap-0.5 rounded-[14px] p-1">
+                <div className="surface-raised flex items-center gap-0.5 rounded-[14px] p-1" ref={searchRowRef}>
                     {showSearch ? (
                         <SearchBar
                             isSearchLoading={isSearchLoading}
@@ -73,6 +74,8 @@ const ThreadListDock: FC<ThreadListDockProperties> = memo(({ isSearchLoading = f
                                 // A closed search filters nothing: the query goes too, or the section bar stays hidden behind it.
                                 setSearchQuery("");
                                 toggleShowSearch();
+                                // The close button leaves with the bar: the search toggle that takes its place gets the focus.
+                                requestAnimationFrame(() => searchRowRef.current?.querySelector<HTMLElement>("[data-search-toggle]")?.focus());
                             }}
                             onSearchQueryChange={setSearchQuery}
                             searchQuery={searchQuery}

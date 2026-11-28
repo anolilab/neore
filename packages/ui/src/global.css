@@ -292,13 +292,21 @@
     --shadow-complex: 0 10px 10px -5px #17171705, 0 6px 6px -3px #1717170a, 0 3px 3px -1.5px #1717170a, 0 1px 1px -0.5px #1717170a, 0 0 0 1px #17171705;
 }
 
-/* A raised surface: its fill, a hairline edge, a top highlight and a short drop. */
+/*
+ * A raised surface: its fill, a hairline edge, a top highlight and a short drop. Forced colours drop box-shadow, so
+ * the edge is an outline there; an outline takes no room, and a focus outline still wins over it.
+ */
 @utility surface-raised {
     background-color: var(--surface-panel);
     box-shadow:
         inset 0 1px 0 var(--surface-edge-top),
         inset 0 0 0 1px var(--surface-edge),
         var(--surface-drop);
+
+    @media (forced-colors: active) {
+        outline: 1px solid CanvasText;
+        outline-offset: -1px;
+    }
 }
 
 /* The raised surface's edge and drop alone, for an element that sets its own fill. */
@@ -307,6 +315,11 @@
         inset 0 1px 0 var(--surface-edge-top),
         inset 0 0 0 1px var(--surface-edge),
         var(--surface-drop);
+
+    @media (forced-colors: active) {
+        outline: 1px solid CanvasText;
+        outline-offset: -1px;
+    }
 }
 
 /* A pressed-in well for controls nested in a raised surface. */
