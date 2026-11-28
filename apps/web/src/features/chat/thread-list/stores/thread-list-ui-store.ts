@@ -213,7 +213,17 @@ const initialiseState: StateCreator<ThreadListUIStore> = (set) => {
         setSectionCounts: (counts) => set({ sectionCounts: counts }),
         // A selection made in one section would otherwise stay selected, unseen, in the next one, and bulk delete acts on all of it.
         // The shift-click anchor indexes the previous section's rows, so it goes with the selection.
-        setSectionFilter: (filter) => set({ lastSelectedIndex: -1, sectionFilter: sanitizeSectionFilter(filter), selectedThreadIds: new Set() }),
+        // The same sections again (a click on the one already shown) change nothing, so the selection stays.
+        setSectionFilter: (filter) =>
+            set((state) => {
+                const next = sanitizeSectionFilter(filter);
+
+                if (next.length === state.sectionFilter.length && next.every((key) => state.sectionFilter.includes(key))) {
+                    return {};
+                }
+
+                return { lastSelectedIndex: -1, sectionFilter: next, selectedThreadIds: new Set() };
+            }),
 
         setSelectedCategory: (category) => set({ selectedCategory: category }),
         setSelectedTagIds: (tagIds) => set({ selectedTagIds: tagIds }),
@@ -254,12 +264,16 @@ const initialiseState: StateCreator<ThreadListUIStore> = (set) => {
 };
 
 const persistedState = persist(subscribeWithSelector(initialiseState), {
-    // Nothing saved (none yet, or storage blocked) keeps the choice in memory: the bar rehydrates on every mount, and a reset
-    // to Active would drop the section picked earlier in this visit.
+    // The saved choice seeds the store once per page load. The bar rehydrates on every mount, and after the first time the
+    // choice in memory is the newer one (storage may be blocked, or refuse the write), so it stays. Nothing saved keeps it too.
     merge: (persisted, current) => {
         const saved = (persisted as { sectionFilter?: unknown } | undefined)?.sectionFilter;
 
-        return { ...current, sectionFilter: saved === undefined ? current.sectionFilter : sanitizeSectionFilter(saved) };
+        if (sectionFilterHydration.done || saved === undefined) {
+            return current;
+        }
+
+        return { ...current, sectionFilter: sanitizeSectionFilter(saved) };
     },
     name: "thread-list-sections",
     onRehydrateStorage: () => () => {

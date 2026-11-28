@@ -24,6 +24,20 @@ const { useThreadListUIStore } = await import("./stores/thread-list-ui-store");
 
 const counts = { active: 9, archived: 48, needsYou: 1, snoozed: 3, working: 1 };
 
+/** A fresh page load: new copies of the bar and its store, which has not read the saved choice yet. */
+const freshLoad = async () => {
+    vi.resetModules();
+
+    const bar = await import("./section-bar");
+    const store = await import("./stores/thread-list-ui-store");
+
+    act(() => {
+        store.useThreadListUIStore.getState().setSectionCounts(counts);
+    });
+
+    return { FreshBar: bar.default, freshStore: store.useThreadListUIStore };
+};
+
 const pressed = () =>
     screen
         .getAllByRole("button")
@@ -128,54 +142,75 @@ describe("SectionBar", () => {
         fireEvent.click(screen.getByRole("button", { name: "Snoozed, 3" }));
         unmount();
 
-        const saved = localStorage.getItem("thread-list-sections");
+        expect(localStorage.getItem("thread-list-sections")).toContain("snoozed");
 
-        expect(saved).toContain("snoozed");
+        // The next visit: a store that starts from its default and reads the saved choice once the bar is mounted.
+        const { FreshBar, freshStore } = await freshLoad();
 
-        // A new visit: the store starts from its default, and the saved choice is read once the bar is mounted.
-        localStorage.setItem("thread-list-sections", saved ?? "");
-        act(() => {
-            useThreadListUIStore.setState({ sectionFilter: ["active"] });
-        });
-        localStorage.setItem("thread-list-sections", saved ?? "");
-
-        render(<SectionBar />);
+        render(<FreshBar />);
         await act(async () => {
-            await useThreadListUIStore.persist.rehydrate();
+            await freshStore.persist.rehydrate();
         });
 
         expect(pressed()).toEqual(["Snoozed, 3"]);
     });
 
-    it("keeps the choice made this visit when storage is blocked and the bar mounts again", async () => {
-        const getItem = vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+    it("falls back to Active for a saved choice that names nothing known", async () => {
+        localStorage.setItem("thread-list-sections", JSON.stringify({ state: { sectionFilter: ["gone"] }, version: 1 }));
+
+        const { FreshBar, freshStore } = await freshLoad();
+
+        render(<FreshBar />);
+        await act(async () => {
+            await freshStore.persist.rehydrate();
+        });
+
+        expect(pressed()).toEqual(["Active, 9"]);
+    });
+
+    it.each([
+        ["storage is blocked", "getItem"],
+        ["storage refuses the write, leaving an older saved choice", "setItem"],
+    ] as const)("keeps the choice made this visit when the bar mounts again and %s", async (_case, refused) => {
+        localStorage.setItem("thread-list-sections", JSON.stringify({ state: { sectionFilter: ["archived"] }, version: 1 }));
+
+        const { FreshBar, freshStore } = await freshLoad();
+        const { unmount } = render(<FreshBar />);
+
+        await act(async () => {
+            await freshStore.persist.rehydrate();
+        });
+
+        const blocked = vi.spyOn(Storage.prototype, refused).mockImplementation(() => {
             throw new Error("blocked");
         });
 
         try {
-            const { unmount } = render(<SectionBar />);
-
             fireEvent.click(screen.getByRole("button", { name: "Snoozed, 3" }));
             unmount();
 
-            render(<SectionBar />);
+            render(<FreshBar />);
             await act(async () => {
-                await useThreadListUIStore.persist.rehydrate();
+                await freshStore.persist.rehydrate();
             });
 
             expect(pressed()).toEqual(["Snoozed, 3"]);
         } finally {
-            getItem.mockRestore();
+            blocked.mockRestore();
         }
     });
 
-    it("falls back to Active for a saved choice that names nothing known", async () => {
-        localStorage.setItem("thread-list-sections", JSON.stringify({ state: { sectionFilter: ["gone"] }, version: 1 }));
-        render(<SectionBar />);
-        await act(async () => {
-            await useThreadListUIStore.persist.rehydrate();
+    it("keeps the selection when the section already shown is clicked again", () => {
+        act(() => {
+            useThreadListUIStore.setState({ lastSelectedIndex: 2, selectedThreadIds: new Set(["t1"]) });
         });
+        render(<SectionBar />);
 
-        expect(pressed()).toEqual(["Active, 9"]);
+        fireEvent.click(screen.getByRole("button", { name: "Active, 9" }));
+
+        const { lastSelectedIndex, selectedThreadIds } = useThreadListUIStore.getState();
+
+        expect(lastSelectedIndex).toBe(2);
+        expect([...selectedThreadIds]).toEqual(["t1"]);
     });
 });
