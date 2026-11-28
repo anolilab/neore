@@ -999,6 +999,28 @@ describe("a chapter's style sheets", () => {
         opened.destroy();
     });
 
+    it("checks a chapter of many unterminated document-type declarations in linear time, and still refuses a real internal subset", async () => {
+        const unterminated = `<?xml version="1.0"?>${"<!DOCTYPE ".repeat(400_000)}<html xmlns="http://www.w3.org/1999/xhtml"><head><title>t</title></head><body><p>x</p></body></html>`;
+        const many = `${"<!DOCTYPE a>".repeat(200_000)}<!DOCTYPE html [<!ELEMENT p ANY>]><html></html>`;
+        const opened = await openEpub(
+            await book({
+                chapters: [
+                    { body: "", file: "one.xhtml", id: "c1", raw: unterminated },
+                    { body: "", file: "two.xhtml", id: "c2", raw: many },
+                ],
+            }),
+            folder.path,
+            LIMITS,
+        );
+        const started = performance.now();
+
+        // The unterminated one is left to the parser (it is not well-formed, so it is read as HTML); the other holds an internal subset after 200,000 plain ones.
+        await opened.read("c1");
+        await expect(opened.read("c2")).rejects.toThrow("chapter declares entities");
+        expect(performance.now() - started).toBeLessThan(1000);
+        opened.destroy();
+    });
+
     it("still reads a chapter with an external document-type declaration", async () => {
         const raw =
             '<?xml version="1.0"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "https://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><title>t</title></head><body><p>kept</p></body></html>';

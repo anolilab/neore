@@ -952,8 +952,40 @@ const cloneIntoHtml = (node: Node, html: Document): Node => {
     return made;
 };
 
-// A document-type declaration with an internal subset (`<!DOCTYPE x [ ... ]>`), or any `<!ENTITY`. The external form, as in an XHTML 1.1 chapter, has neither.
-const DECLARES_ENTITIES = /<!ENTITY|<!DOCTYPE[^>]*\[/iu;
+const ENTITY_DECLARATION = /<!ENTITY/iu;
+
+// A document-type declaration with an internal subset (`<!DOCTYPE x [ ... ]>`), or any `<!ENTITY`. The external form, as in an XHTML 1.1 chapter,
+// has neither. Not one regular expression with a lazy scan to the next `>`: a source of many `<!DOCTYPE` with no `>` would make each one scan to
+// the end. Here every declaration is searched from where the last one ended, so each character is looked at a bounded number of times.
+const declaresEntities = (source: string): boolean => {
+    if (ENTITY_DECLARATION.test(source)) {
+        return true;
+    }
+
+    const lower = source.toLowerCase();
+    let from = 0;
+
+    for (;;) {
+        const start = lower.indexOf("<!doctype", from);
+
+        if (start === -1) {
+            return false;
+        }
+
+        const end = lower.indexOf(">", start);
+
+        // No `>` after it means none after any later one: the declaration is not complete, and the parser decides what it is.
+        if (end === -1) {
+            return false;
+        }
+
+        if (lower.slice(start, end).includes("[")) {
+            return true;
+        }
+
+        from = end + 1;
+    }
+};
 
 const parseChapter = (source: string): Document => {
     const html = new DOMParser().parseFromString("<!doctype html><html><head></head><body></body></html>", "text/html");
@@ -1005,7 +1037,7 @@ const readChapter = async (chapterPath: string, reader: AssetReader): Promise<{ 
     // The chapter is parsed as XML first, and an XML parser expands the entities a document declares: a few lines of nested declarations
     // become gigabytes of text, and the cap above counts the source, not what it expands to. A chapter has no use for a declaration of its
     // own, so one with an internal subset or an entity is refused before it is parsed.
-    if (DECLARES_ENTITIES.test(source)) {
+    if (declaresEntities(source)) {
         throw new Error("chapter declares entities");
     }
 
