@@ -637,6 +637,20 @@ describe("a chapter's style sheets", () => {
         opened.destroy();
     });
 
+    it("removes a remote address written with escapes: in the function name, the scheme, a quoted string, and an image-set string", () => {
+        const safe = safeStylesheet(
+            [
+                String.raw`a{background:u\72l(https://evil.example/1.png)}`,
+                String.raw`a{background:url(https\3a //evil.example/2.png)}`,
+                String.raw`a{background:url("h\74tps://evil.example/3.png")}`,
+                String.raw`a{background:image-set("h\74tps://evil.example/4.png" 1x)}`,
+                String.raw`a{background:\69 mage-set("https://evil.example/5.png" 1x)}`,
+            ].join(""),
+        );
+
+        expect(safe).not.toContain("evil.example");
+    });
+
     it("writes an escaped url( and an image-set of plain strings without their remote addresses", () => {
         const safe = safeStylesheet(
             String.raw`a{background:\75 rl(https://evil.example/a.png)} b{background:image-set("https://evil.example/b.png" 1x)} c{background:-webkit-image-set(url(https://evil.example/c.png) 1x)}`,

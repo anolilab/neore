@@ -299,6 +299,30 @@ describe("EpubPreview size", () => {
         expect(view.container.textContent).toContain("Could not preview");
     });
 
+    it("shows no failure card once the same file loads on a retry, in the same component or after a remount", async () => {
+        book.guard = new Error("Not a ZIP archive");
+        answer(new Uint8Array(10));
+        await mount({ url: `${ORIGIN}/a.epub` });
+        expect(view.container.textContent).toContain("Could not preview");
+
+        // Away to another file and back, with the file now readable: the earlier failure is not shown again.
+        book.guard = undefined;
+        await mount({ url: `${ORIGIN}/b.epub` });
+        await mount({ url: `${ORIGIN}/a.epub` });
+        await act(async () => {
+            await Promise.resolve();
+        });
+        expect(view.container.textContent).not.toContain("Could not preview");
+        expect(view.container.querySelector("iframe")).not.toBeNull();
+
+        // Remounted: a fresh component starts from loading, not from the old failure.
+        await act(async () => {
+            view.root.render(<div />);
+        });
+        await mount({ url: `${ORIGIN}/a.epub` });
+        expect(view.container.textContent).not.toContain("Could not preview");
+    });
+
     it("stops reading a body that passes the cap without ever declaring a length", async () => {
         let pulled = 0;
         const stream = new ReadableStream<Uint8Array>({
