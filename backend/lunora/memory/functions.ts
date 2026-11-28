@@ -216,7 +216,8 @@ export const checkRequestedSource = async (
  * waits until the call is answered (`memory/remember-dispatch.ts`). The claim's `claimedAt` and `expiresAt`, or why the call must not leave.
  */
 export const beginRememberDispatch = internalMutation
-    .input({ requested: vRequestedSource })
+    // `request`: the remember request's own prompt claim (`claimedAt`), which keys its dispatch claim.
+    .input({ request: v.number(), requested: vRequestedSource })
     .output(v.union(v.object({ claimedAt: v.number(), expiresAt: v.number() }), v.object({ refused: vRequestedRefusal })))
     .mutation(async ({ args, ctx }) => {
         const check = await checkRequestedSource(ctx, args.requested, ctx.now);
@@ -225,21 +226,21 @@ export const beginRememberDispatch = internalMutation
             return { refused: check.refused };
         }
 
-        const claim = await takeRememberDispatch(ctx, args.requested.threadId, args.requested.promptMessageId);
+        const claim = await takeRememberDispatch(ctx, args.requested.threadId, args.requested.promptMessageId, args.request);
 
         // Held only by another call for this same prompt, which the prompt's own claim already refuses: it is that call's.
         return claim ?? { refused: "not_your_words" as const };
     });
 
 /**
- * The requested run's model calls are answered: its dispatch claim goes, and the chat may be locked. With no `claimedAt`
- * (the request's own `finally`, `remember.ts`), the claim this prompt holds: only its one request takes one.
+ * The requested run's model calls are answered: the request's dispatch claim goes, and the chat may be locked. Without a
+ * `claimedAt` (the request's own `finally`, `remember.ts`), whichever claim this request holds; never another request's.
  */
 export const endRememberDispatch = internalMutation
-    .input({ claimedAt: v.optional(v.number()), promptMessageId: v.string(), threadId: v.id("threads") })
+    .input({ claimedAt: v.optional(v.number()), promptMessageId: v.string(), request: v.number(), threadId: v.id("threads") })
     .output(v.null())
     .mutation(async ({ args, ctx }) => {
-        await dropRememberDispatch(ctx, args.threadId, args.promptMessageId, args.claimedAt);
+        await dropRememberDispatch(ctx, args);
 
         return null;
     });

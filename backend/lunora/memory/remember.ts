@@ -159,9 +159,12 @@ const markDone = async (ctx: ActionCtx, done: { claimedAt: number; promptMessage
     }
 };
 
-/** Releases the chat's dispatch claim of this prompt's run, whichever it holds; a claim never released lapses on its own. */
-const releaseDispatch = async (ctx: ActionCtx, { promptMessageId, threadId }: { promptMessageId: string; threadId: Id<"threads"> }): Promise<void> => {
-    await ctx.runMutation(internal.memory.functions.endRememberDispatch, { promptMessageId, threadId }).catch((error: unknown) => {
+/**
+ * Releases the chat's dispatch claim of this request's run (keyed by `request`, its prompt claim's `claimedAt`), never
+ * another request's; a claim never released lapses on its own.
+ */
+const releaseDispatch = async (ctx: ActionCtx, dispatch: { promptMessageId: string; request: number; threadId: Id<"threads"> }): Promise<void> => {
+    await ctx.runMutation(internal.memory.functions.endRememberDispatch, dispatch).catch((error: unknown) => {
         console.warn("[memory/remember] The chat's dispatch claim could not be released; it lapses on its own:", error);
     });
 };
@@ -204,6 +207,7 @@ export const rememberFactFor = async (ctx: ActionCtx, args: Omit<SourceArgs, "no
                 promptAt,
                 promptMessageId: args.promptMessageId,
                 quotablePrompt: typed,
+                rememberRequest: claimedAt,
                 replyKey: args.replyKey,
                 requested: true,
                 threadId: args.threadId,
@@ -211,9 +215,8 @@ export const rememberFactFor = async (ctx: ActionCtx, args: Omit<SourceArgs, "no
                 userMessage: raw,
             });
         } finally {
-            // Whatever ended the run, its dispatch claim goes first: the prompt's claim, given back below, would let another
-            // request take a dispatch claim of its own under the same key, which this unfenced release must never remove.
-            await releaseDispatch(ctx, args);
+            // Whatever ended the run, its dispatch claim goes first, before the prompt's claim is given back below.
+            await releaseDispatch(ctx, { promptMessageId: args.promptMessageId, request: claimedAt, threadId: args.threadId });
         }
     } catch (error) {
         await release(ctx, { ...claim, claimedAt });

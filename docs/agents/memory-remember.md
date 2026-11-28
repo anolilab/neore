@@ -41,14 +41,18 @@ Paths are relative to `backend/lunora/`.
 ## The chat's lock
 
 - `beginRememberDispatch` checks the source and takes a dispatch claim on the chat (`memory-remember-dispatch`, keyed
-  `<threadId>:<promptMessageId>`, `memory/remember-dispatch.ts`) in one transaction. `enableThreadLock` refuses while
-  one is held, as for titles and follow-ups.
+  `<threadId>:<promptMessageId>:<request>`, `memory/remember-dispatch.ts`) in one transaction. `request` is the remember
+  request's prompt claim (`claimedAt`), so a request's release never removes another's claim. `enableThreadLock`
+  refuses while one is held (by the thread prefix), as for titles and follow-ups.
 - The claim is held across every model call of the run: extraction, embedding and belief revision. It is released
   after the last of them, before the writes, and again in `rememberFactFor`'s `finally`, whatever ended the run.
 - Each call's deadline is what is left of the claim less `REMEMBER_CALL_MARGIN_MS` (`dispatchCallDeadline`), timed
   from the claim, never from the call. With none left the call is not made: no extraction is `unavailable`, no
   embedding leaves the fact to keyword dedup, and no revision saves the fact as new. The claim lapses in 3 minutes
   (`REMEMBER_DISPATCH_TTL_MS`).
+- The deadline's signal (`withDeadline`) is `AbortSignal.timeout` backed by a `setTimeout` that aborts a controller and
+  is cleared when the call ends, as the title dispatch does, so it fires even where the runtime does not run the timeout
+  signal's own timer.
 
 ## Saving and reporting
 

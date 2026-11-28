@@ -13,9 +13,16 @@ import { enableThreadLock } from "../agent/thread-lock";
 import { extractMemories } from "./extract";
 import { internal } from "../_generated/internal";
 import { runAfterOnShard } from "../lib/shard-scheduler";
-import { saveMemoryBatch } from "./functions";
+import { beginRememberDispatch, saveMemoryBatch } from "./functions";
 import { rememberFactFor, rememberResultOf } from "./remember";
-import { dispatchCallDeadline, REMEMBER_CALL_MARGIN_MS, REMEMBER_DISPATCH_TTL_MS, rememberDispatchInFlight, takeRememberDispatch } from "./remember-dispatch";
+import {
+    dispatchCallDeadline,
+    REMEMBER_CALL_MARGIN_MS,
+    REMEMBER_DISPATCH_TTL_MS,
+    rememberDispatchInFlight,
+    takeRememberDispatch,
+    withDeadline,
+} from "./remember-dispatch";
 
 const { embedMany, generateText, getUtilityModel, registry } = vi.hoisted(() => {
     return {
@@ -885,6 +892,37 @@ describe(rememberFactFor, () => {
         expect(claim.result).toBeUndefined();
     });
 
+    it("leaves a newer request's dispatch claim alone when an older request's run ends after its own lapsed", async () => {
+        const ids = await setUp();
+
+        generateText.mockImplementationOnce(async () => {
+            // Request A's dispatch claim lapses; request B checks the chat and takes one of its own.
+            await harness.run(async (ctx: any) => {
+                const rows: { _id: string; scope: string }[] = await ctx.db.query("idempotencyClaims").collect();
+
+                for (const row of rows) {
+                    if (row.scope === "memory-remember-dispatch") {
+                        await ctx.db.patch("idempotencyClaims", row._id, { expiresAt: 0 });
+                    }
+                }
+            });
+            await harness.action(
+                async (ctx: any) =>
+                    await ctx.runMutation(beginRememberDispatch, {
+                        request: 7,
+                        requested: { promptMessageId: ids.promptMessageId, replyKey: REPLY, threadId: ids.threadId, userId: USER },
+                    }),
+            );
+
+            return { output: { facts: [{ asked: true, confidence: 90, importance: 70, memory: "User is vegan", quote: "I'm vegan", type: "preference" }] } };
+        });
+
+        await expect(remember(ids)).resolves.toMatchObject({ status: "saved" });
+        // A's releases, after its last model call and in its `finally`, ran; B's claim still holds the lock off.
+        await expect(dispatchInFlight(ids.threadId)).resolves.toBe(true);
+        await expect(lockChat(ids.threadId)).rejects.toMatchObject({ code: "CONFLICT" });
+    });
+
     it("releases the chat's dispatch claim before it gives the prompt back when the extraction throws", async () => {
         const ids = await setUp();
         const released: string[] = [];
@@ -1129,6 +1167,40 @@ describe(dispatchCallDeadline, () => {
     it("leaves no call once less than the margin is left", () => {
         expect(dispatchCallDeadline(expiresAt, expiresAt - REMEMBER_CALL_MARGIN_MS + 1000)).toBeNull();
         expect(dispatchCallDeadline(expiresAt, expiresAt - REMEMBER_CALL_MARGIN_MS)).toBeNull();
+    });
+});
+
+describe(withDeadline, () => {
+    afterEach(() => {
+        vi.useRealTimers();
+        vi.restoreAllMocks();
+    });
+
+    it("aborts the call by its own timer even when the runtime never fires the timeout signal", async () => {
+        vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+        // A runtime whose timeout signal never fires.
+        vi.spyOn(AbortSignal, "timeout").mockImplementation(() => new AbortController().signal);
+
+        const call = withDeadline(
+            1000,
+            async (abortSignal) =>
+                await new Promise((_resolve, reject) => {
+                    abortSignal?.addEventListener("abort", () => reject(abortSignal.reason));
+                }),
+        );
+        const settled = expect(call).rejects.toMatchObject({ name: "TimeoutError" });
+
+        await vi.advanceTimersByTimeAsync(1000);
+        await settled;
+        expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it("clears its timer when the call answers first, and passes no signal without a deadline", async () => {
+        vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+
+        await expect(withDeadline(1000, async () => "answered")).resolves.toBe("answered");
+        expect(vi.getTimerCount()).toBe(0);
+        await expect(withDeadline(undefined, async (abortSignal) => abortSignal)).resolves.toBeUndefined();
     });
 });
 
