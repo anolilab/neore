@@ -250,7 +250,8 @@ fn holds_a_credential(name: &str) -> bool {
     })
 }
 
-/// A header's credential: the whole value, and the part after its scheme (`Bearer <credential>`, however spaced).
+/// A header's credential: the whole value, and the part after its scheme (`Bearer <credential>`, however spaced), each
+/// as written and unquoted (`"<token>"`).
 fn credentials(value: &str) -> impl Iterator<Item = &str> {
     [
         Some(value),
@@ -260,6 +261,7 @@ fn credentials(value: &str) -> impl Iterator<Item = &str> {
     ]
     .into_iter()
     .flatten()
+    .flat_map(|credential| [credential, credential.trim_matches('"')])
 }
 
 /// The `user:password` a `Basic` credential carries, decoded, as the server reads it.

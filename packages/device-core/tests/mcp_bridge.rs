@@ -665,7 +665,7 @@ fn a_token_with_a_non_ascii_letter_is_blanked_in_its_other_case() {
 #[test]
 fn a_quoted_credential_field_is_blanked_without_its_quotes() {
     let secret = "q".repeat(12);
-    let echoed = format!("saw {secret}");
+    let echoed = format!("saw {secret} and {}", "w".repeat(12));
     let (url, _) = serve(Box::new(move |request| {
         match request.body["method"].as_str() {
             Some("initialize") => {
@@ -674,11 +674,19 @@ fn a_quoted_credential_field_is_blanked_without_its_quotes() {
             _ => json_reply(request, json!({ "text": echoed }), None),
         }
     }));
-    let headers = json!({ "X-Api-Key": format!(r#"id=client-one;secret="{secret}""#) }).to_string();
+    let headers = json!({
+        "X-Api-Key": format!(r#"id=client-one;secret="{secret}""#),
+        // A whole value in quotes.
+        "X-Upstream-Token": format!(r#""{}""#, "w".repeat(12)),
+    })
+    .to_string();
     let written = relay(&url, &headers, &[initialize(), request(2, "tools/call")]);
     let answer = written.iter().find(|message| message["id"] == 2).unwrap();
 
-    assert_eq!(answer["result"]["text"], "saw [redacted]", "{answer}");
+    assert_eq!(
+        answer["result"]["text"], "saw [redacted] and [redacted]",
+        "{answer}"
+    );
 }
 
 #[test]
