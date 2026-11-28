@@ -1,4 +1,10 @@
-import { isLunoraId } from "@neore/client-runtime";
+const PAGE_ID_PATTERN = /^[\w-]{1,128}$/u;
+
+/**
+ * A page id is only ever a URL segment. Row ids are Lunora UUIDs, but an imported page keeps its source id, which need not
+ * be a UUID, so the check is the segment alphabet rather than a UUID shape. Anything else is refused, never echoed back.
+ */
+export const isPageId = (pageId: string): boolean => PAGE_ID_PATTERN.test(pageId);
 
 export interface PageManifest {
     background_color: string;
@@ -23,7 +29,7 @@ export const pageManifestHref = (pageId: string): string => `/page-manifest/${pa
  * no title, no user data, no session. Every page gets the same name, so the page's title stays private.
  */
 export const buildPageManifest = (pageId: string): PageManifest | undefined => {
-    if (!isLunoraId(pageId)) {
+    if (!isPageId(pageId)) {
         return undefined;
     }
 

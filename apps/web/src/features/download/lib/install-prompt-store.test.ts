@@ -48,13 +48,18 @@ describe("install-prompt-store", () => {
         vi.restoreAllMocks();
     });
 
-    it("captures a prompt that fires before any subscriber exists, and suppresses the mini-infobar", async () => {
+    it("suppresses the browser banner for a page, but not for the Neore app", async () => {
         const store = await loadStore();
 
-        const event = dispatchBeforeInstallPrompt(vi.fn().mockResolvedValue(undefined));
+        const appEvent = dispatchBeforeInstallPrompt(vi.fn().mockResolvedValue(undefined));
 
-        expect(event.defaultPrevented).toBe(true);
+        expect(appEvent.defaultPrevented).toBe(false);
         expect(store.getInstallPromptFor(APP)).not.toBeNull();
+
+        setManifestHref(PAGE);
+        const pageEvent = dispatchBeforeInstallPrompt(vi.fn().mockResolvedValue(undefined));
+
+        expect(pageEvent.defaultPrevented).toBe(true);
     });
 
     it("notifies subscribers when a prompt is captured, and stops after unsubscribe", async () => {
@@ -79,10 +84,11 @@ describe("install-prompt-store", () => {
         expect(store.getInstallPromptFor(PAGE)).toBeNull();
     });
 
-    it("keeps the newest prompt when the page swaps its manifest, and restores the app's on swap back", async () => {
+    it("keeps each manifest's prompt when the page swaps the link, so the app's offer survives a visit", async () => {
         const store = await loadStore();
 
-        dispatchBeforeInstallPrompt(vi.fn().mockResolvedValue(undefined));
+        const appEvent = dispatchBeforeInstallPrompt(vi.fn().mockResolvedValue(undefined));
+
         setManifestHref(PAGE);
         const pageEvent = dispatchBeforeInstallPrompt(vi.fn().mockResolvedValue(undefined));
 
@@ -90,10 +96,9 @@ describe("install-prompt-store", () => {
         expect(store.getInstallPromptFor(PAGE)).toBe(pageEvent);
 
         setManifestHref(APP);
-        dispatchBeforeInstallPrompt(vi.fn().mockResolvedValue(undefined));
 
         expect(store.getInstallPromptFor(PAGE)).toBeNull();
-        expect(store.getInstallPromptFor(APP)).not.toBeNull();
+        expect(store.getInstallPromptFor(APP)).toBe(appEvent);
     });
 
     it("offers nothing once the link has moved away from the manifest the prompt was captured under", async () => {
@@ -129,7 +134,22 @@ describe("install-prompt-store", () => {
         expect(store.getInstallPromptFor(APP)).not.toBeNull();
     });
 
-    it("records the installed manifest, clears the prompt, and leaves other manifests uninstalled", async () => {
+    it("attributes an accepted install to the manifest it was offered for, even if the link moved during the dialog", async () => {
+        const store = await loadStore();
+        // While the dialog is open the page navigates, then the browser reports the install.
+        const prompt = vi.fn(async () => {
+            setManifestHref(PAGE);
+            globalThis.dispatchEvent(new Event("appinstalled"));
+        });
+
+        dispatchBeforeInstallPrompt(prompt);
+        await store.installApp(APP);
+
+        expect(store.hasInstalledHref(APP)).toBe(true);
+        expect(store.hasInstalledHref(PAGE)).toBe(false);
+    });
+
+    it("records the installed manifest, clears its prompt, and leaves other manifests uninstalled", async () => {
         const store = await loadStore();
 
         setManifestHref(PAGE);

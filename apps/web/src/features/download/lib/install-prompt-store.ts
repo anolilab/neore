@@ -18,16 +18,20 @@ const currentManifestHref = (): string => document.querySelector(MANIFEST_LINK_S
 // mounts. The listeners therefore live here, attached when the module loads, not in a component that
 // might mount too late to see it.
 //
-// A prompt is kept with the manifest href it was offered for. A page swaps the link's href while it is
-// mounted, and the browser fires a new prompt for each swap, so the newest one replaces the last.
+// Prompts are kept per manifest href. A page swaps the link's href while it is mounted, so the browser
+// offers a prompt for each manifest it reads, and one manifest's offer must not replace another's: the
+// app's offer has to survive a visit to a page.
+//
+// `pendingInstallHref` is the manifest whose prompt the user accepted. `appinstalled` can arrive after the
+// link has moved on, so it is attributed to that manifest rather than to whatever the link points at now.
 //
 // `installedHrefs` records which manifest was installed. A page app and the Neore app have different
 // ids, so one installed must not hide the other's button.
 const state: {
-    deferredHref: string | null;
-    deferredPrompt: BeforeInstallPromptEvent | null;
     installedHrefs: Set<string>;
-} = { deferredHref: null, deferredPrompt: null, installedHrefs: new Set() };
+    pendingInstallHref: string | null;
+    prompts: Map<string, BeforeInstallPromptEvent>;
+} = { installedHrefs: new Set(), pendingInstallHref: null, prompts: new Map() };
 const listeners = new Set<() => void>();
 
 const notify = (): void => {
@@ -37,16 +41,24 @@ const notify = (): void => {
 };
 
 const handleBeforeInstallPrompt = (event: Event): void => {
-    event.preventDefault();
-    state.deferredPrompt = event as BeforeInstallPromptEvent;
-    state.deferredHref = currentManifestHref();
+    const href = currentManifestHref();
+
+    // A page is offered only by its in-app button, so the browser's own banner is suppressed for it. The Neore
+    // app keeps the browser's banner on every route; its in-app button on /download uses the same prompt.
+    if (href !== APP_MANIFEST_HREF) {
+        event.preventDefault();
+    }
+
+    state.prompts.set(href, event as BeforeInstallPromptEvent);
     notify();
 };
 
 const handleAppInstalled = (): void => {
-    state.installedHrefs.add(currentManifestHref());
-    state.deferredPrompt = null;
-    state.deferredHref = null;
+    const href = state.pendingInstallHref ?? currentManifestHref();
+
+    state.installedHrefs.add(href);
+    state.prompts.delete(href);
+    state.pendingInstallHref = null;
     notify();
 };
 
@@ -65,19 +77,21 @@ export const subscribeInstallPrompt = (listener: () => void): (() => void) => {
 };
 
 /**
- * The captured prompt, but only while it matches `manifestHref` three ways: it was captured under that href,
- * the document still points at it, and the caller asked for it. A prompt captured under a manifest the link
- * has since moved away from would install the wrong app.
+ * The prompt captured for `manifestHref`, but only while the document still points at that manifest. A prompt
+ * captured under a manifest the link has since moved away from would install the wrong app.
  */
-export const getInstallPromptFor = (manifestHref: string): BeforeInstallPromptEvent | null =>
-    state.deferredHref === manifestHref && currentManifestHref() === manifestHref ? state.deferredPrompt : null;
+export const getInstallPromptFor = (manifestHref: string): BeforeInstallPromptEvent | null => {
+    const event = state.prompts.get(manifestHref) ?? null;
+
+    return event !== null && currentManifestHref() === manifestHref ? event : null;
+};
 
 export const getServerInstallPrompt = (): null => null;
 
 export const hasInstalledHref = (manifestHref: string): boolean => state.installedHrefs.has(manifestHref);
 
 /**
- * Shows the browser's install dialog. A deferred prompt can be shown once, so it is cleared
+ * Shows the browser's install dialog. A deferred prompt can be shown once, so it is taken out of the store
  * before the call. A browser that refuses to show it is reported, not thrown into the click handler.
  */
 export const installApp = async (manifestHref: string): Promise<void> => {
@@ -87,8 +101,8 @@ export const installApp = async (manifestHref: string): Promise<void> => {
         return;
     }
 
-    state.deferredPrompt = null;
-    state.deferredHref = null;
+    state.prompts.delete(manifestHref);
+    state.pendingInstallHref = manifestHref;
     notify();
 
     try {

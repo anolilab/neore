@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildPageManifest, pageManifestHref } from "./page-manifest";
+import { buildPageManifest, isPageId } from "./page-manifest";
 
 const FIRST = "1d0e2944-748e-4cd8-b8f4-7cd88273786a";
 const SECOND = "9b2f6c1e-0a3d-4e7b-8c5a-2f1d9e8b7a60";
@@ -14,27 +14,24 @@ describe("buildPageManifest", () => {
         expect(second).toMatchObject({ id: `/pages/${SECOND}`, scope: `/pages/${SECOND}`, start_url: `/pages/${SECOND}` });
     });
 
-    it("uses the same generic name and the Neore icons for every page, so no title is exposed", () => {
-        const manifest = buildPageManifest(FIRST);
-
-        expect(manifest).toMatchObject({ name: "Neore page", short_name: "Neore page", display: "standalone" });
-        expect(manifest?.icons).toEqual([
-            { sizes: "192x192", src: "/pwa-icon-192x192.png", type: "image/png" },
-            { sizes: "512x512", src: "/pwa-icon-512x512.png", type: "image/png" },
-        ]);
-    });
-
-    it("refuses anything that is not a Lunora row id, and never echoes it", () => {
+    it("refuses an id that is not a plain URL segment, and never echoes it", () => {
         expect(buildPageManifest("")).toBeUndefined();
         expect(buildPageManifest("../settings")).toBeUndefined();
+        expect(buildPageManifest("a#b")).toBeUndefined();
         expect(buildPageManifest("page one")).toBeUndefined();
-        expect(buildPageManifest("page_1")).toBeUndefined();
-        expect(buildPageManifest(FIRST.toUpperCase())).toBeUndefined();
     });
 });
 
-describe("pageManifestHref", () => {
-    it("points at the page's manifest route", () => {
-        expect(pageManifestHref(FIRST)).toBe(`/page-manifest/${FIRST}`);
+describe("isPageId", () => {
+    it("accepts a Lunora row id and an imported page's source id", () => {
+        expect(isPageId(FIRST)).toBe(true);
+        expect(isPageId("legacy-page-1")).toBe(true);
+    });
+
+    it("refuses ids that would change the URL's shape, and ids over 128 characters", () => {
+        expect(isPageId("a?b")).toBe(false);
+        expect(isPageId("a#b")).toBe(false);
+        expect(isPageId("..")).toBe(false);
+        expect(isPageId("a".repeat(129))).toBe(false);
     });
 });

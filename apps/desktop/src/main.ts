@@ -668,7 +668,8 @@ const windowsByUrl = new Map<string, BrowserWindow>();
 const openOrFocusSiteWindow = (url: URL): void => {
     const open = windowsByUrl.get(url.href);
 
-    if (open !== undefined && !open.isDestroyed()) {
+    // A window keeps its key after it navigates away, so it counts only while it still shows this URL.
+    if (open !== undefined && !open.isDestroyed() && open.webContents.getURL() === url.href) {
         bringForward(open);
 
         return;
