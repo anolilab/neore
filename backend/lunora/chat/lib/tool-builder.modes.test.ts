@@ -49,6 +49,7 @@ vi.mock("../tools", () => {
         "readFailingChecks",
         "readPullRequest",
         "redditSearch",
+        "remember",
         "renderUI",
         "replyToReviewComment",
         "requestSecret",

@@ -1,4 +1,5 @@
 import { LunoraError } from "lunorash/server";
+import type { Infer } from "lunorash/server";
 import { v } from "lunorash/server";
 
 import { internal } from "../_generated/internal";
@@ -37,7 +38,13 @@ import { parentKeyOf } from "../lib/rls/scope";
 import { MAX_LENGTH } from "../lib/validators";
 import { MAX_KEYWORD_TERMS } from "../knowledge/hybrid";
 import { isSearchIndexBuilding } from "../lib/search-index";
-import { findLiveGrant } from "../agent/live-grant";
+import { findLiveGrant, threadSharedWithOthers } from "../agent/live-grant";
+import { messageCarriesGuestText, promptCannotBeQuoted } from "../chat/lib/attached-text";
+import type { typedTextOf } from "../chat/lib/attached-text";
+import { GOAL_CONTINUATION_AGENT } from "../chat/goals/shared";
+import { isTypedChatKind } from "../chat/lib/typed-chat-kind";
+import { claimRow, putClaimResult } from "../lib/claim-once";
+import { dropRememberDispatch, takeRememberDispatch } from "./remember-dispatch";
 
 /**
  * Whether the user turned memory on. OPT-IN: absent means off. Memory extraction reads every
@@ -52,6 +59,191 @@ export const readMemoryEnabled = async (ctx: Pick<QueryCtx, "db">, userId: strin
 
     return settings?.memoryEnabled === true;
 };
+
+/** Where a memory the user asked for comes from (`remember.ts`): the chat, its owner, the turn's prompt and its reply. */
+export const vRequestedSource = v.object({ promptMessageId: v.string(), replyKey: v.optional(v.string()), threadId: v.id("threads"), userId: v.string() });
+
+export type RequestedSource = Infer<typeof vRequestedSource>;
+
+/** Why a requested memory may not be written: memory is off, the chat is not the user's alone, or the prompt is not their fresh words. */
+export const vRequestedRefusal = v.union(v.literal("memory_off"), v.literal("not_private"), v.literal("not_your_words"));
+
+export type RequestedRefusal = Infer<typeof vRequestedRefusal>;
+
+/**
+ * The claim of a remember request, keyed on its prompt (`remember.ts`): one request per prompt, and the turn's later
+ * extraction leaves a prompt it holds to it (`extract.ts`).
+ */
+export const REMEMBER_SCOPE = "memory-remember";
+
+/** The `result` a remember request records on its claim once it wrote something or found nothing asked: the prompt is handled. */
+const REMEMBER_DONE = "done";
+
+/** Where a prompt's remember request stands: none (or given back), still running, or handled (`REMEMBER_DONE`). */
+export const rememberClaimState = internalQuery
+    .input({ promptMessageId: v.string() })
+    .output(v.union(v.literal("none"), v.literal("pending"), v.literal("done")))
+    .query(async ({ args, ctx }) => {
+        const row = await claimRow(ctx, REMEMBER_SCOPE, args.promptMessageId);
+
+        if (!row) {
+            return "none" as const;
+        }
+
+        return row.result === REMEMBER_DONE ? ("done" as const) : ("pending" as const);
+    });
+
+/** How long a handled request keeps its prompt: a day, longer than any reply's later extraction job waits. */
+const REMEMBER_DONE_TTL_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Marks the prompt handled and holds it for a day: rows were written, so the reply's extraction must skip the prompt even
+ * when the request's own claim lapsed meanwhile. `false` when a newer request took the prompt after it lapsed: that one's
+ * outcome stands, and this stale call marks nothing.
+ */
+export const markRememberDone = internalMutation
+    .input({ claimedAt: v.number(), promptMessageId: v.string(), userId: v.string() })
+    .output(v.boolean())
+    .mutation(
+        async ({ args, ctx }) =>
+            await putClaimResult(ctx, REMEMBER_SCOPE, args.promptMessageId, {
+                claimedAt: args.claimedAt,
+                result: REMEMBER_DONE,
+                ttlMs: REMEMBER_DONE_TTL_MS,
+                userId: args.userId,
+            }),
+    );
+
+/**
+ * Rows under a prompt the fresh-send check reads per page, and the pages it reads. Another run's reply lies before this
+ * one's rows, so it is found in the first page; past the cap the prompt counts as fresh (see `checkRequestedSource`).
+ */
+const PROMPT_REPLY_PAGE_ROWS = 50;
+const PROMPT_REPLY_PAGES = 2;
+
+/**
+ * Whether the rows under a prompt (its `order`, after it) leave it this reply's: none carries a reply other than this one.
+ * A row with another non-empty `replyId` is another run's reply, so the prompt was answered before: a regenerate, or a
+ * prompt a task or a sub-agent wrote. A row with none counts as this reply's (its pending row, an approval's or a denial's
+ * continuation and its later steps). A concurrent regenerate's pending row is accepted on purpose: both runs answer the
+ * same typed prompt, so remembering the user's own words there exposes nothing. An unknown reply is no answer.
+ */
+const isFreshPrompt = (rows: ReadonlyArray<{ replyId?: string }>, replyKey: string | undefined): boolean =>
+    replyKey !== undefined && rows.every((row) => ["", replyKey, undefined].includes(row.replyId));
+
+/**
+ * Whether a memory the user asked for may be written from this prompt now, with the thread and prompt when it may. Read
+ * before the extractor runs and again inside every write of the request (`saveMemoryBatch`, `reviseExtractedMemory`,
+ * `confirmMemories`), so a chat shared, locked or switched off, or a prompt answered by another run, meanwhile writes nothing.
+ * The chat must be the owner's alone: not shared (an expired grant does not count), public, a group, a messenger
+ * conversation, temporary, locked or being deleted, nor a chat an agent runs in (a sub-agent's or worker's, which carries
+ * none of its parent's privacy state, a task's, a trigger's). The prompt must be the owner's own typed, fresh words.
+ */
+export const checkRequestedSource = async (
+    ctx: Pick<QueryCtx, "db">,
+    source: RequestedSource,
+    now: number,
+): Promise<{ prompt: Doc<"messages">; thread: Doc<"threads"> } | { refused: RequestedRefusal }> => {
+    if (!(await readMemoryEnabled(ctx, source.userId))) {
+        return { refused: "memory_off" };
+    }
+
+    const thread = await ctx.db.get("threads", source.threadId);
+
+    if (
+        !thread ||
+        thread.userId !== source.userId ||
+        thread.deleted === true ||
+        thread.deletingAt !== undefined ||
+        thread.isPublic === true ||
+        thread.isTemporary === true ||
+        thread.groupChat !== undefined ||
+        thread.externalThreadId !== undefined ||
+        thread.messengerConnectionId !== undefined ||
+        isThreadLocked(thread) ||
+        // A tagged chat must be one a person types into (`isTypedChatKind`): a sub-agent's, worker's, task's, trigger's or eval's is not.
+        ((thread.tags ?? []).length > 0 && !isTypedChatKind(thread)) ||
+        (await threadSharedWithOthers(ctx, source.threadId, source.userId, now))
+    ) {
+        return { refused: "not_private" };
+    }
+
+    const promptId = ctx.db.normalizeId("messages", source.promptMessageId);
+    const prompt = promptId ? await ctx.db.get("messages", promptId) : null;
+    const stored = prompt?.message as Parameters<typeof typedTextOf>[0];
+
+    if (
+        !prompt ||
+        prompt.threadId !== source.threadId ||
+        prompt.tool ||
+        stored?.role !== "user" ||
+        (prompt.userId !== undefined && prompt.userId !== source.userId) ||
+        prompt.agentName === GOAL_CONTINUATION_AGENT ||
+        promptCannotBeQuoted(stored) ||
+        messageCarriesGuestText(stored)
+    ) {
+        return { refused: "not_your_words" };
+    }
+
+    // Page by page, stopping at the first row of another run: the reply's own rows never count against the prompt.
+    let cursor: string | null = null;
+
+    for (let page = 0; page < PROMPT_REPLY_PAGES; page += 1) {
+        const rows = await ctx.db
+            .query("messages")
+            .withIndex("by_threadId_order_stepOrder", (q) => q.eq("threadId", source.threadId).eq("order", prompt.order).gt("stepOrder", prompt.stepOrder))
+            .paginate({ cursor, numItems: PROMPT_REPLY_PAGE_ROWS });
+
+        if (!isFreshPrompt(rows.page, source.replyKey)) {
+            return { refused: "not_your_words" };
+        }
+
+        if (rows.isDone) {
+            return { prompt, thread };
+        }
+
+        cursor = rows.continueCursor;
+    }
+
+    // No other run's reply within the cap: fresh. This check attributes the prompt to this reply; it guards no privacy (the
+    // chat checks above do), so it fails open past the cap rather than read a long reply's rows into the transaction.
+    return { prompt, thread };
+};
+
+/**
+ * Lets a requested run's model call leave: checks the source again (`checkRequestedSource`) and takes the call's dispatch
+ * claim on the chat in the same transaction, so a chat locked or shared meanwhile sends the model nothing, and locking it
+ * waits until the call is answered (`memory/remember-dispatch.ts`). The claim's `claimedAt` and `expiresAt`, or why the call must not leave.
+ */
+export const beginRememberDispatch = internalMutation
+    // `request`: the remember request's own prompt claim (`claimedAt`), which keys its dispatch claim.
+    .input({ request: v.number(), requested: vRequestedSource })
+    .output(v.union(v.object({ claimedAt: v.number(), expiresAt: v.number() }), v.object({ refused: vRequestedRefusal })))
+    .mutation(async ({ args, ctx }) => {
+        const check = await checkRequestedSource(ctx, args.requested, ctx.now);
+
+        if ("refused" in check) {
+            return { refused: check.refused };
+        }
+
+        const claim = await takeRememberDispatch(ctx, args.requested.threadId, args.requested.promptMessageId, args.request);
+
+        // Held only by another call for this same prompt, which the prompt's own claim already refuses: it is that call's.
+        return claim ?? { refused: "not_your_words" as const };
+    });
+
+/**
+ * The requested run's model calls are answered: the request's dispatch claim goes, and the chat may be locked. Without a
+ * `claimedAt` (the request's own `finally`, `remember.ts`), whichever claim this request holds; never another request's.
+ */
+export const endRememberDispatch = internalMutation
+    .input({ claimedAt: v.optional(v.number()), promptMessageId: v.string(), request: v.number(), threadId: v.id("threads") })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        await dropRememberDispatch(ctx, args);
+
+        return null;
+    });
 
 /** Most memories one user-facing read looks at. */
 const MEMORY_READ_CAP = 2000;
@@ -1114,7 +1306,9 @@ const vMemoryInsertFields = {
     importance: v.optional(v.number()),
     importedFrom: v.optional(vImportApp),
     memory: v.string(),
-    source: v.optional(v.union(v.literal("auto"), v.literal("manual"), v.literal("compressed"), v.literal("reflection"), v.literal("imported"))),
+    source: v.optional(
+        v.union(v.literal("auto"), v.literal("manual"), v.literal("compressed"), v.literal("reflection"), v.literal("imported"), v.literal("requested")),
+    ),
     supersedes: v.optional(v.id("memories")),
     threadId: v.optional(v.id("threads")),
     type: v.union(v.literal("identity"), v.literal("preference"), v.literal("context"), v.literal("activity"), v.literal("experience")),
@@ -1131,7 +1325,7 @@ type MemoryInsert = {
     importance?: number;
     importedFrom?: ImportApp;
     memory: string;
-    source?: "auto" | "compressed" | "imported" | "manual" | "reflection";
+    source?: "auto" | "compressed" | "imported" | "manual" | "reflection" | "requested";
     supersedes?: Id<"memories">;
     threadId?: Id<"threads">;
     type: MemoryType;
@@ -1183,6 +1377,28 @@ export const saveMemory = internalMutation
     .output(v.union(v.id("memories"), v.null()))
     .mutation(async ({ args, ctx }) => insertMemory(ctx, args, ctx.now));
 
+/** Rows of the save's scope, newest first, a requested save reads for a row that already holds its text. */
+const KNOWN_TEXT_READ_ROWS = 2000;
+
+const WHITESPACE_RUN_RE = /\s+/gu;
+
+/** A memory's text as every same-text check compares it: trimmed, in lower case, each run of spaces one space. */
+export const textKey = (text: string): string => text.replaceAll(WHITESPACE_RUN_RE, " ").trim().toLowerCase();
+
+/**
+ * The active rows of one scope in effect on the save's day, newest first: a requested fact whose text one already holds
+ * (spaces and case aside) confirms it, whether a parallel save wrote it or a near match hid it from the action's dedup.
+ */
+const activeRowsOn = async (ctx: Pick<MutationCtx, "db">, userId: string, botId: string | undefined, today: string) => {
+    const { page } = await ctx.db.memories.findMany({
+        limit: KNOWN_TEXT_READ_ROWS,
+        orderBy: [{ _creationTime: "desc" }],
+        where: { botId: botId === undefined ? { isNull: true } : (botId as Id<"bots">), supersededBy: { isNull: true }, userId },
+    });
+
+    return page.filter((row) => row.pinned === true || !isExpired(row, today));
+};
+
 export const saveMemoryBatch = internalMutation
     .input({
         // Compression: the rows the saved facts replace. Checked and retired in this same write, so a row given dates
@@ -1199,15 +1415,33 @@ export const saveMemoryBatch = internalMutation
                 ),
             }),
         ),
+        // Facts the user asked to be remembered (`memory/remember.ts`): nothing is written unless the request may still be
+        // (`checkRequestedSource`), and a fact whose text an active row already holds confirms that row instead of adding one.
+        requested: v.optional(vRequestedSource),
     })
-    // One entry per memory, in order: `null` where the fact was nothing but a secret and was not saved.
-    .output(v.array(v.union(v.id("memories"), v.null())))
+    // One entry per memory, in order: `null` where the fact was nothing but a secret and was not saved, `known` where a
+    // requested fact confirmed the row that already held its text, `refused` (every entry) where the request may not be written.
+    .output(v.array(v.union(v.id("memories"), v.null(), v.object({ known: v.id("memories"), text: v.string() }), v.object({ refused: vRequestedRefusal }))))
     .mutation(async ({ args, ctx }) => {
         const { now } = ctx;
-        const memoryIds: (Id<"memories"> | null)[] = [];
+        const memoryIds: (Id<"memories"> | { known: Id<"memories">; text: string } | null)[] = [];
+        const owner = args.memories[0]?.userId;
+        // One read for the batch: a requested save is one prompt's facts, all of one scope.
+        let activeRows: Doc<"memories">[] | undefined;
+
+        if (args.requested !== undefined) {
+            const check = await checkRequestedSource(ctx, args.requested, now);
+
+            if ("refused" in check) {
+                return args.memories.map(() => check);
+            }
+
+            const { userId } = args.requested;
+
+            activeRows = await activeRowsOn(ctx, userId, args.memories[0]?.botId, localDayOf(now, await userTimeZone(ctx, userId)));
+        }
 
         if (args.compressedFrom !== undefined) {
-            const owner = args.memories[0]?.userId;
             const originals = await Promise.all(args.compressedFrom.map((id) => ctx.db.get("memories", id)));
             const stillCompressible = originals.every(
                 (row) => row && row.userId === owner && !row.supersededBy && row.pinned !== true && !hasFactDates(factDatesOf(row)),
@@ -1218,7 +1452,50 @@ export const saveMemoryBatch = internalMutation
             }
         }
 
+        // A row this batch retires is no match for a later fact of it.
+        const retire = (retired: Id<"memories"> | undefined) => {
+            activeRows = retired === undefined ? activeRows : activeRows?.filter((row) => row._id !== retired);
+        };
+
         for (const { evidenceFrom, supersedesBase, supersedesDates, ...mem } of args.memories) {
+            // A supersession applies only while its target still reads as the text, and holds the dates, the decision was
+            // made on, in the same scope, unpinned and active. Otherwise the new memory is saved beside it.
+            const target = mem.supersedes ? await ctx.db.get("memories", mem.supersedes) : null;
+            const supersedes =
+                target &&
+                supersedesBase !== undefined &&
+                target.userId === mem.userId &&
+                (target.botId ?? undefined) === (mem.botId ?? undefined) &&
+                !target.supersededBy &&
+                target.pinned !== true &&
+                target.memory === supersedesBase &&
+                (supersedesDates === undefined || sameFactDates(factDatesOf(target), normalizeFactDates(supersedesDates)))
+                    ? mem.supersedes
+                    : undefined;
+            // A requested save's fact that an active row already states, text and dates alike, is that row: it is confirmed,
+            // and what the fact was to supersede is retired in its favour. Other dates are another statement, saved as one.
+            const text = activeRows === undefined ? null : redactMemoryText(mem.memory);
+            const known =
+                text === null
+                    ? undefined
+                    : activeRows?.find((row) => textKey(row.memory) === textKey(text) && sameFactDates(factDatesOf(row), normalizeFactDates(mem)));
+
+            if (known) {
+                if (supersedes !== undefined && supersedes !== known._id) {
+                    await supersedeMemory(ctx, supersedes, known._id, now);
+                    retire(supersedes);
+                }
+
+                // A restatement brings its quote to a row that has none, as a confirmation does (`confirmMemories`).
+                await ctx.db.patch(
+                    "memories",
+                    known._id,
+                    withoutUndefined({ evidence: known.evidence === undefined ? mem.evidence : undefined, lastConfirmedAt: now }),
+                );
+                memoryIds.push({ known: known._id, text: known.memory });
+                continue;
+            }
+
             // `evidenceFrom` takes the newest quote the named rows hold now, not when the caller read them: a quote
             // the user cleared or a row they deleted meanwhile is not brought back.
             const sources = evidenceFrom
@@ -1240,22 +1517,20 @@ export const saveMemoryBatch = internalMutation
                   )
                 : mem.evidence;
 
-            // A supersession applies only while its target still reads as the text, and holds the dates, the decision was
-            // made on, in the same scope, unpinned and active. Otherwise the new memory is saved beside it.
-            const target = mem.supersedes ? await ctx.db.get("memories", mem.supersedes) : null;
-            const supersedes =
-                target &&
-                supersedesBase !== undefined &&
-                target.userId === mem.userId &&
-                (target.botId ?? undefined) === (mem.botId ?? undefined) &&
-                !target.supersededBy &&
-                target.pinned !== true &&
-                target.memory === supersedesBase &&
-                (supersedesDates === undefined || sameFactDates(factDatesOf(target), normalizeFactDates(supersedesDates)))
-                    ? mem.supersedes
-                    : undefined;
+            const inserted = await insertMemory(ctx, { ...mem, evidence, supersedes }, now);
 
-            memoryIds.push(await insertMemory(ctx, { ...mem, evidence, supersedes }, now));
+            memoryIds.push(inserted);
+
+            if (inserted !== null) {
+                retire(supersedes);
+            }
+
+            // A later fact of the same request with this text and dates is this row (`known` above), not a twin of it.
+            const insertedRow = activeRows !== undefined && inserted !== null ? await ctx.db.get("memories", inserted) : null;
+
+            if (insertedRow) {
+                activeRows?.push(insertedRow);
+            }
         }
 
         // The originals are retired by the same write. Each points at itself: `supersededBy` is its own id when compression retired it.
@@ -1595,10 +1870,18 @@ export const reviseExtractedMemory = internalMutation
         memoryId: v.id("memories"),
         // The row's dates as the revision was planned: a person's date edit made since then is not overwritten.
         observed: v.optional(v.object({ eventEnd: v.optional(v.string()), eventStart: v.optional(v.string()), validUntil: v.optional(v.string()) })),
+        // A request's revision: refused, not applied, unless the request may still be written (`checkRequestedSource`).
+        requested: v.optional(vRequestedSource),
         userId: v.string(),
     })
-    .output(v.boolean())
+    .output(v.union(v.boolean(), v.object({ refused: vRequestedRefusal })))
     .mutation(async ({ args, ctx }) => {
+        const check = args.requested && (await checkRequestedSource(ctx, args.requested, ctx.now));
+
+        if (check && "refused" in check) {
+            return check;
+        }
+
         const row = await ctx.db.get("memories", args.memoryId);
 
         if (!row || row.userId !== args.userId || (row.botId ?? undefined) !== (args.botId ?? undefined) || row.supersededBy || row.pinned === true) {
@@ -1692,11 +1975,19 @@ export const updateMemoryInternal = internalMutation
 export const confirmMemories = internalMutation
     .input({
         confirms: v.array(v.object({ base: v.string(), evidence: v.optional(vMemoryEvidence), memoryId: v.id("memories") })),
+        // A request's confirmations: nothing is confirmed unless the request may still be written (`checkRequestedSource`).
+        requested: v.optional(vRequestedSource),
         userId: v.string(),
     })
-    .output(v.array(v.number()))
+    .output(v.union(v.array(v.number()), v.object({ refused: vRequestedRefusal })))
     .mutation(async ({ args, ctx }) => {
         const { now } = ctx;
+        const check = args.requested && (await checkRequestedSource(ctx, args.requested, now));
+
+        if (check && "refused" in check) {
+            return check;
+        }
+
         // Indexes of the confirmations that did not apply: their row no longer reads as the text the fact matched.
         const unconfirmed: number[] = [];
 

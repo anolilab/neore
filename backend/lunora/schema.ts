@@ -1802,7 +1802,9 @@ export const schema = defineSchema({
         memory: v.string(),
         // Pinned by the user: nightly reflection never decays, retires or merges it away.
         pinned: v.optional(v.boolean()),
-        source: v.optional(v.union(v.literal("auto"), v.literal("manual"), v.literal("compressed"), v.literal("reflection"), v.literal("imported"))),
+        source: v.optional(
+            v.union(v.literal("auto"), v.literal("manual"), v.literal("compressed"), v.literal("reflection"), v.literal("imported"), v.literal("requested")),
+        ),
         supersededBy: v.optional(v.id("memories")),
         supersedes: v.optional(v.id("memories")),
         threadId: v.optional(v.id("threads")),
