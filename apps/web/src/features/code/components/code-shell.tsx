@@ -121,8 +121,7 @@ const RunsSection: FC = () => {
 const CodeShell: FC = () => {
     const { t } = useLingui();
     const enabled = useCodeModeEnabled();
-    // On a phone the list and the workspace take turns. Until the user picks, the list opens first only when it has a paired
-    // host to pick; otherwise the workspace (the setup steps, or its loading state) comes first.
+    // On a phone the list and the workspace take turns; the first view is settled below once setup has answered.
     const [listChoice, setListChoice] = useState<boolean | undefined>(undefined);
     const [setupInList, setSetupInList] = useState(false);
     const setupPanelId = useId();
@@ -148,7 +147,15 @@ const CodeShell: FC = () => {
 
     // A device still waiting for its pairing to be confirmed has never been seen, and is not a host to pick yet.
     const hasPairedHost = devices?.some((device) => device.lastSeenAt !== undefined) === true;
-    const listOpen = listChoice ?? hasPairedHost;
+    // The list comes first (hosts, pull requests, runs) unless setup steps are waiting and there is no host to pick yet.
+    const listFirst = setup !== "needed" || hasPairedHost;
+
+    // Settled once setup has answered: a computer paired, or a step skipped, while the user looks must not swap the view.
+    if (listChoice === undefined && setup !== "loading") {
+        setListChoice(listFirst);
+    }
+
+    const listOpen = listChoice ?? listFirst;
     const selectedId = activeTab?.startsWith("host:") ? activeTab.slice("host:".length) : undefined;
     const openHost = (id: string) => {
         dispatch({ tabId: hostTabId(id), type: "open" });
