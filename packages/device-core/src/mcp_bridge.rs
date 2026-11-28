@@ -17,7 +17,7 @@ use std::collections::BTreeMap;
 use std::io::{self, BufRead, BufReader, Read, Write};
 use std::process::ExitCode;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Condvar, Mutex};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
@@ -41,7 +41,8 @@ const MAX_MESSAGE_BYTES: usize = 4 * 1024 * 1024;
 const MAX_URL_BYTES: usize = 2048;
 const MAX_HEADERS: usize = 32;
 const MAX_HEADER_VALUE_BYTES: usize = 8192;
-/// Requests relayed at once. `mcp.rs` waits for each one, so more than one is rare.
+/// Requests relayed at once; more wait in their own thread, never in the reader, which a reply to the server (a ping's)
+/// must always get through. `mcp.rs` waits for each one, so more than one is rare.
 const MAX_IN_FLIGHT: usize = 8;
 /// Headers the bridge sets itself, or that would change how a request is framed.
 const RESERVED_HEADERS: &[&str] = &[
@@ -64,28 +65,54 @@ const MIN_REDACTED_BYTES: usize = 8;
 pub struct Target {
     url: String,
     headers: Vec<(HeaderName, HeaderValue)>,
-    /// The header credentials, cookie values and query values, longest first, that nothing the server says may carry
-    /// on to the chat.
-    secrets: Vec<String>,
+    /// What nothing the server says may carry on to the chat.
+    secrets: Secrets,
+}
+
+/// The secrets blanked from what the server says.
+#[derive(Clone, Debug, Default)]
+struct Secrets {
+    /// Credentials, cookie and query values, path segments, the address: wherever they appear, longest first.
+    anywhere: Vec<String>,
+    /// Too short to blank wherever they appear without garbling an answer (a host such as `nas`, a short session id):
+    /// blanked as whole words.
+    words: Vec<String>,
 }
 
 /// Replaces every `secret` in `text`, in any ASCII case: a host name has none, and a token in another case is as good
 /// as blanked. Lowercasing keeps every byte where it is, so the found places hold in `text` too.
-fn scrub(text: &mut String, secrets: &[String]) {
-    for secret in secrets {
+fn scrub(text: &mut String, secrets: &Secrets) {
+    let found = secrets
+        .anywhere
+        .iter()
+        .map(|secret| (secret, false))
+        .chain(secrets.words.iter().map(|word| (word, true)));
+
+    for (secret, whole_word) in found {
         let (haystack, needle) = (text.to_ascii_lowercase(), secret.to_ascii_lowercase());
 
-        if !haystack.contains(&needle) {
+        if needle.is_empty() || !haystack.contains(&needle) {
             continue;
         }
 
+        let bytes = haystack.as_bytes();
         let mut scrubbed = String::with_capacity(text.len());
         let mut from = 0;
 
         for (at, _) in haystack.match_indices(&needle) {
+            let end = at + needle.len();
+            let word_byte = |at: Option<&u8>| at.is_some_and(|byte| byte.is_ascii_alphanumeric());
+
+            if whole_word
+                && (word_byte(at.checked_sub(1).and_then(|before| bytes.get(before)))
+                    || word_byte(bytes.get(end)))
+            {
+                continue;
+            }
+
             scrubbed.push_str(&text[from..at]);
             scrubbed.push_str("[redacted]");
-            from = at + needle.len();
+            from = end;
         }
 
         scrubbed.push_str(&text[from..]);
@@ -100,7 +127,7 @@ fn sort_longest_first(secrets: &mut Vec<String>) {
 }
 
 /// Replaces every `secret` in the strings of `value`, object keys included (a tool's schema names its fields by them).
-fn redact(value: &mut Value, secrets: &[String]) {
+fn redact(value: &mut Value, secrets: &Secrets) {
     match value {
         Value::String(text) => scrub(text, secrets),
         // A credential of digits can come back as a number.
@@ -119,18 +146,22 @@ fn redact(value: &mut Value, secrets: &[String]) {
             let same_value = match integer {
                 Some(integer) => {
                     integer.unsigned_abs() >= 10_000_000
-                        && secrets.iter().any(|secret| match secret.parse::<i128>() {
-                            Ok(secret) => secret == integer,
-                            // A float spelling, exact only while the integer fits a float.
-                            Err(_) => {
-                                integer.unsigned_abs() < 1 << 53
-                                    && secret.parse::<f64>().ok() == Some(integer as f64)
-                            }
-                        })
+                        && secrets
+                            .anywhere
+                            .iter()
+                            .any(|secret| match secret.parse::<i128>() {
+                                Ok(secret) => secret == integer,
+                                // A float spelling, exact only while the integer fits a float.
+                                Err(_) => {
+                                    integer.unsigned_abs() < 1 << 53
+                                        && secret.parse::<f64>().ok() == Some(integer as f64)
+                                }
+                            })
                 }
                 None => number.as_f64().is_some_and(|number| {
                     number.abs() >= 1e7
                         && secrets
+                            .anywhere
                             .iter()
                             .any(|secret| secret.parse::<f64>().ok() == Some(number))
                 }),
@@ -145,6 +176,9 @@ fn redact(value: &mut Value, secrets: &[String]) {
         Value::Array(items) => items.iter_mut().for_each(|item| redact(item, secrets)),
         Value::Object(fields) => {
             let mut kept = serde_json::Map::new();
+            // The next suffix to try for each key, so many keys that blank alike do not each search from the start.
+            let mut next: std::collections::HashMap<String, usize> =
+                std::collections::HashMap::new();
 
             for (mut key, mut item) in std::mem::take(fields) {
                 scrub(&mut key, secrets);
@@ -153,12 +187,11 @@ fn redact(value: &mut Value, secrets: &[String]) {
                 // Two keys can blank to the same text: neither field is lost.
                 let mut unique = key.clone();
 
-                for count in 2.. {
-                    if !kept.contains_key(&unique) {
-                        break;
-                    }
+                while kept.contains_key(&unique) {
+                    let count = next.entry(key.clone()).or_insert(2);
 
                     unique = format!("{key} ({count})");
+                    *count += 1;
                 }
 
                 kept.insert(unique, item);
@@ -434,10 +467,21 @@ pub fn parse_target(url: &str, headers: &str) -> Result<Target, String> {
 
     sort_longest_first(&mut secrets);
 
+    // A short host (`nas`) is still the address: blanked where it stands as a word.
+    let host = authority.host().to_owned();
+    let words = if host.len() < MIN_REDACTED_BYTES {
+        vec![host]
+    } else {
+        Vec::new()
+    };
+
     Ok(Target {
         url: url.to_owned(),
         headers: parsed,
-        secrets,
+        secrets: Secrets {
+            anywhere: secrets,
+            words,
+        },
     })
 }
 
@@ -606,20 +650,17 @@ impl<W: Write> Bridge<W> {
         let mut message = message.clone();
         // The session id the server gave is sent on every request: it is one more secret.
         let session = self.session.lock().unwrap().id.clone();
-        let session = session
-            .as_ref()
-            .and_then(|id| id.to_str().ok())
-            .filter(|id| id.len() >= MIN_REDACTED_BYTES);
-        let secrets = match session {
-            Some(id) => {
-                let mut secrets = self.target.secrets.clone();
+        let mut secrets = self.target.secrets.clone();
 
-                secrets.push(id.to_owned());
-                sort_longest_first(&mut secrets);
-                secrets
+        // A short one is blanked as a whole word, so it cannot garble the answer.
+        match session.as_ref().and_then(|id| id.to_str().ok()) {
+            Some(id) if id.len() >= MIN_REDACTED_BYTES => {
+                secrets.anywhere.push(id.to_owned());
+                sort_longest_first(&mut secrets.anywhere);
             }
-            None => self.target.secrets.clone(),
-        };
+            Some(id) => secrets.words.push(id.to_owned()),
+            None => {}
+        }
 
         // The id is the server's to match its reply by (a ping): it is never blanked.
         let id = message.get("id").cloned();
@@ -832,6 +873,7 @@ pub fn run<W: Write + Send + 'static>(target: Target, mut input: impl BufRead, o
     });
     let mut running: Vec<JoinHandle<()>> = Vec::new();
     let mut opening: Option<JoinHandle<()>> = None;
+    let slots = Arc::new((Mutex::new(0_usize), Condvar::new()));
 
     loop {
         let mut line = Vec::new();
@@ -888,13 +930,18 @@ pub fn run<W: Write + Send + 'static>(target: Target, mut input: impl BufRead, o
 
         running.retain(|handle| !handle.is_finished());
 
-        if running.len() >= MAX_IN_FLIGHT {
-            let _ = running.remove(0).join();
-        }
+        let (bridge, slots) = (bridge.clone(), slots.clone());
 
-        let bridge = bridge.clone();
+        running.push(thread::spawn(move || {
+            let (taken, freed) = &*slots;
 
-        running.push(thread::spawn(move || bridge.relay(&message)));
+            *freed
+                .wait_while(taken.lock().unwrap(), |taken| *taken >= MAX_IN_FLIGHT)
+                .unwrap() += 1;
+            bridge.relay(&message);
+            *taken.lock().unwrap() -= 1;
+            freed.notify_one();
+        }));
     }
 
     opening
@@ -925,5 +972,20 @@ pub fn main() -> ExitCode {
             eprintln!("neore-host mcp-bridge: {error}");
             ExitCode::from(2)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_short_host_is_blanked_where_it_stands_as_a_word() {
+        let target = parse_target("http://nas/mcp", "").unwrap();
+        let mut said = json!({ "text": "on nas, not canvas" });
+
+        redact(&mut said, &target.secrets);
+
+        assert_eq!(said["text"], "on [redacted], not canvas");
     }
 }

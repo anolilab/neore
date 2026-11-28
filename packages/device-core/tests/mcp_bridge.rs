@@ -6,6 +6,7 @@
 
 use std::io::{BufRead, BufReader, Cursor, Read, Write};
 use std::net::{TcpListener, TcpStream};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -640,7 +641,134 @@ fn a_server_cannot_pass_its_error_off_as_the_bridges_ended_session() {
     let answer = written.iter().find(|message| message["id"] == 2).unwrap();
 
     // Otherwise `mcp.rs` would send a call the server already ran once more.
-    assert_ne!(answer["error"]["message"], SESSION_GONE, "{answer}");
+    assert_eq!(
+        answer["error"],
+        json!({ "code": -32000, "message": format!("{SESSION_GONE} (as the server put it)") }),
+        "{answer}"
+    );
+}
+
+#[test]
+fn a_short_session_id_is_blanked_where_it_stands_as_a_word() {
+    let (url, _) = serve(Box::new(|request| match request.body["method"].as_str() {
+        Some("initialize") => json_reply(
+            request,
+            json!({ "protocolVersion": "2025-06-18" }),
+            Some("ab1"),
+        ),
+        _ => json_reply(request, json!({ "text": "session ab1, not cab1e" }), None),
+    }));
+    let written = relay(&url, "", &[initialize(), request(2, "tools/call")]);
+    let answer = written.iter().find(|message| message["id"] == 2).unwrap();
+
+    assert_eq!(
+        answer["result"]["text"], "session [redacted], not cab1e",
+        "{answer}"
+    );
+}
+
+#[test]
+fn a_reply_to_the_server_gets_through_while_every_request_slot_is_busy() {
+    use std::sync::atomic::AtomicUsize;
+
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let url = format!("http://{}/mcp", listener.local_addr().unwrap());
+    let ponged = Arc::new(AtomicBool::new(false));
+    let late = Arc::new(AtomicUsize::new(0));
+
+    {
+        let (ponged, late) = (ponged.clone(), late.clone());
+
+        // Each call is answered only once the client replied to the ping the first one carries.
+        std::thread::spawn(move || {
+            for mut stream in listener.incoming().flatten() {
+                let (ponged, late) = (ponged.clone(), late.clone());
+
+                std::thread::spawn(move || {
+                    let request = read_request(&stream);
+                    let body = &request.body;
+
+                    if body["method"] == "initialize" {
+                        let _ = stream.write_all(
+                            json_reply(&request, json!({ "protocolVersion": "2025-06-18" }), None)
+                                .as_bytes(),
+                        );
+                        return;
+                    }
+
+                    if body.get("method").is_none() {
+                        ponged.store(true, Ordering::SeqCst);
+                        let _ = stream.write_all(reply("202 Accepted", &[], "").as_bytes());
+                        return;
+                    }
+
+                    let _ = write!(stream, "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nConnection: close\r\n\r\n");
+
+                    if body["id"] == 2 {
+                        let ping = json!({ "jsonrpc": "2.0", "id": "ping-1", "method": "ping" });
+
+                        let _ = write!(stream, "data: {ping}\n\n");
+                        let _ = stream.flush();
+                    }
+
+                    let deadline = Instant::now() + Duration::from_secs(5);
+
+                    while !ponged.load(Ordering::SeqCst) && Instant::now() < deadline {
+                        std::thread::sleep(Duration::from_millis(20));
+                    }
+
+                    if !ponged.load(Ordering::SeqCst) {
+                        late.fetch_add(1, Ordering::SeqCst);
+                    }
+
+                    let answer = json!({ "jsonrpc": "2.0", "id": body["id"], "result": {} });
+                    let _ = write!(stream, "data: {answer}\n\n");
+                });
+            }
+        });
+    }
+
+    let (reader, mut writer) = std::io::pipe().unwrap();
+    let output = Output::default();
+    let bridge = {
+        let (target, output) = (parse_target(&url, "").unwrap(), output.clone());
+
+        std::thread::spawn(move || run(target, BufReader::new(reader), output))
+    };
+    let written = || String::from_utf8(output.0.lock().unwrap().clone()).unwrap();
+
+    writeln!(writer, "{}", initialize()).unwrap();
+
+    // Eight calls fill every slot, a ninth waits for one; only then comes the reply to the ping.
+    for id in 2..=10 {
+        writeln!(writer, "{}", request(id, "tools/call")).unwrap();
+    }
+
+    let deadline = Instant::now() + Duration::from_secs(10);
+
+    while !written().contains("ping-1") && Instant::now() < deadline {
+        std::thread::sleep(Duration::from_millis(20));
+    }
+
+    writeln!(
+        writer,
+        "{}",
+        json!({ "jsonrpc": "2.0", "id": "ping-1", "result": {} })
+    )
+    .unwrap();
+    drop(writer);
+    bridge.join().unwrap();
+
+    assert!(
+        ponged.load(Ordering::SeqCst),
+        "the reply never reached the server"
+    );
+    assert_eq!(
+        late.load(Ordering::SeqCst),
+        0,
+        "a call waited out the reply: {}",
+        written()
+    );
 }
 
 #[test]

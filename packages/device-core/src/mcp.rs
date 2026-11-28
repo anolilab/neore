@@ -771,8 +771,9 @@ impl McpManager {
                     self.process_locked(&mut processes, config, policy)?
                 }
                 // A call that waited on the same server meanwhile replaced it: this one goes to the replacement, but
-                // only if it was started from the same settings. Never put back what an edit took away.
-                Some(current) => {
+                // only if the session ended (the server never ran it) and it was started from the same settings.
+                // Never put back what an edit took away, and never send again a call that may have run.
+                Some(current) if session_gone => {
                     let replacement = current.clone();
                     let same = {
                         let running = replacement.lock().unwrap_or_else(PoisonError::into_inner);
@@ -786,7 +787,7 @@ impl McpManager {
 
                     replacement
                 }
-                None => return first,
+                Some(_) | None => return first,
             }
         };
         let mut guard = restarted.lock().unwrap();
@@ -1536,6 +1537,42 @@ sleep 1"#
         let running = manager.processes.lock().unwrap()["session-gone-edited"].clone();
 
         assert_eq!(running.lock().unwrap().config, edited);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_call_that_failed_on_its_own_is_not_sent_again_to_a_server_another_call_started() {
+        use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+
+        let root = temp_root("failed-own");
+        let manager = Arc::new(McpManager::new(root.to_path_buf()));
+        let (entered, calls) = (
+            Arc::new(AtomicBool::new(false)),
+            Arc::new(AtomicUsize::new(0)),
+        );
+        // The call fails on its own and its server dies; meanwhile another call replaced the server.
+        let first = {
+            let (manager, entered, calls) = (manager.clone(), entered.clone(), calls.clone());
+
+            std::thread::spawn(move || {
+                manager.with(&idle_server("failed-own"), None, |process| {
+                    calls.fetch_add(1, Ordering::SeqCst);
+                    entered.store(true, Ordering::SeqCst);
+                    until_another_call_waits(&manager);
+                    process.kill();
+
+                    Err::<(), String>("the tool failed".into())
+                })
+            })
+        };
+
+        assert!(wait_until(|| entered.load(Ordering::SeqCst)));
+        assert_eq!(
+            manager.with(&idle_server("failed-own"), None, |_| Ok(())),
+            Ok(())
+        );
+        assert_eq!(first.join().unwrap(), Err("the tool failed".to_owned()));
+        assert_eq!(calls.load(Ordering::SeqCst), 1, "the failed call ran again");
     }
 
     #[cfg(unix)]
