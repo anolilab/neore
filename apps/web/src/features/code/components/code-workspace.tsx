@@ -67,12 +67,17 @@ const PaneView: FC<PaneViewProps> = ({ canClose, canSplit, hosts, index, loaded,
     const { t } = useLingui();
     const dispatch = useCodeLayoutStore((state) => state.dispatch);
     const focus = () => dispatch({ paneIndex: index, type: "focus" });
-    // Once shown, the steps stay while the pane is empty: skipping the last one must not pull the list (and the focused
+    // Once shown, the steps stay while the pane stays empty: skipping the last one must not pull the list (and the focused
     // button, its announcement and a failed save's message) out from under the user.
     const [setupShown, setSetupShown] = useState(false);
 
-    if (setup === "needed" && !setupShown) {
+    if (setup === "needed" && !setupShown && pane.tabs.length === 0) {
         setSetupShown(true);
+    }
+
+    // A tab opened ends that: once it closes again, a finished setup gives way to the host prompt.
+    if (setupShown && pane.tabs.length > 0) {
+        setSetupShown(false);
     }
 
     const showSetup = setup === "needed" || (setupShown && setup === "ready");
