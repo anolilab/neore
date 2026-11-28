@@ -59,6 +59,7 @@ import {
     planReflection,
     reflectionSourceIds,
     promotionToOp,
+    recentlyRestored,
     REFLECTION_LIMITS,
     REFLECTION_SYSTEM_PROMPT,
     type ContradictionCandidate,
@@ -254,14 +255,14 @@ const EXPIRY_WRITE_BATCH = 250;
 /** How long a failed expiry batch waits before it is written again. */
 const EXPIRY_RETRY_DELAY_MS = 5 * 60_000;
 
-const toReflectionRow = (m: Doc<"memories">) => {
+const toReflectionRow = (m: Doc<"memories">, now: number) => {
     return {
         confidence: m.confidence ?? 70,
         createdAt: m._creationTime,
         id: m._id as string,
         importance: m.importance ?? 50,
         lastConfirmedAt: lastConfirmedOf(m),
-        pinned: m.pinned === true,
+        pinned: m.pinned === true || recentlyRestored(m, now),
         text: m.memory,
         type: m.type,
         updatedAt: m.updatedAt ?? m._creationTime,
@@ -286,7 +287,7 @@ export const loadReflectionInputs = internalQuery
             .query("memories")
             .withIndex("by_userId_botId", (q) => q.eq("userId", userId).eq("botId", scopeBot))
             .take(REFLECTION_READ_CAP);
-        const memories = rows.filter((m) => !m.supersededBy).map((m) => toReflectionRow(m));
+        const memories = rows.filter((m) => !m.supersededBy).map((m) => toReflectionRow(m, now));
 
         // "The day's threads": the ones that produced a memory in the last day.
         const since = now - DAY_MS;
@@ -325,7 +326,7 @@ export const loadExpiredMemoriesPage = internalQuery
 
         return {
             continueCursor: result.continueCursor,
-            expired: result.page.filter((m) => m.pinned !== true && isExpired(m, today)).map((m) => toReflectionRow(m)),
+            expired: result.page.filter((m) => m.pinned !== true && !recentlyRestored(m, now) && isExpired(m, today)).map((m) => toReflectionRow(m, now)),
             isDone: result.isDone,
         };
     });
@@ -340,6 +341,7 @@ const vReflectionOp = v.union(
                 memory: v.object({ eventEnd: v.optional(v.string()), eventStart: v.optional(v.string()), validUntil: v.optional(v.string()) }),
             }),
         ),
+        duplicate: v.optional(v.literal(true)),
         expiredOn: v.optional(v.string()),
         kind: v.literal("supersede"),
         memoryId: v.string(),

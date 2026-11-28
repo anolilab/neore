@@ -1,7 +1,7 @@
 /**
- * Retired memories: rows that stopped being current (revised, merged, compressed, expired, decayed, contradicted) but
- * were kept as history. Memory settings lists them with the reason and lets the person bring one back. A deleted memory
- * is gone (`deleteMemoryRows`) and never listed here.
+ * Retired memories: rows that stopped being current (revised, merged, compressed, expired, decayed, contradicted, a
+ * duplicate of an older row, or replaced when the person brought back an earlier version) but were kept as history. Memory settings lists them with
+ * the reason and lets the person bring one back. A deleted memory is gone (`deleteMemoryRows`) and never listed here.
  */
 import { LunoraError, v } from "lunorash/server";
 
@@ -10,7 +10,7 @@ import { authMutation, authQuery, rateLimit } from "../lib/crpc";
 import { patchRow } from "../lib/patch";
 import { MAX_LENGTH, paginationOptionsValidator } from "../lib/validators";
 import { isExpired } from "./dates";
-import { reembedRewordedMemory, requireOwnMemory, userTimeZone } from "./functions";
+import { reembedRewordedMemory, requireOwnMemory, supersedeMemory, userTimeZone } from "./functions";
 import { logRedaction, redactMemoryText } from "./redact";
 import { DECAY_STEP, localDayOf, type ReflectionOp, RETIRE_BELOW_CONFIDENCE } from "./reflection-logic";
 
@@ -22,8 +22,26 @@ export const reflectionRetiredReason = (op: Extract<ReflectionOp, { kind: "super
         return op.expiredOn === undefined ? "decayed" : "expired";
     }
 
+    if (op.duplicate === true) {
+        return "duplicate";
+    }
+
     return op.merge === true ? "merged" : "contradicted";
 };
+
+/**
+ * Whether bringing `row` back retires `successor` in its place: only for a newer version of the same fact (a revision
+ * or a contradiction), so the person keeps the one version they chose. The successor must still be their own active,
+ * unpinned row in the same scope. A merge, a compression, an expiry or a decay keeps whatever else holds the fact.
+ */
+export const replacesSuccessor = (row: Doc<"memories">, successor: Doc<"memories"> | null, userId: string): successor is Doc<"memories"> =>
+    (row.retiredReason === "revised" || row.retiredReason === "contradicted") &&
+    successor !== null &&
+    successor._id !== row._id &&
+    successor.userId === userId &&
+    !successor.supersededBy &&
+    successor.pinned !== true &&
+    (successor.botId ?? undefined) === (row.botId ?? undefined);
 
 /** Rows one page of the retired list holds by default, and at most. */
 const RETIRED_PAGE = 25;
@@ -53,6 +71,8 @@ export const listRetiredMemories = authQuery
                     botName: v.optional(v.string()),
                     fromBot: v.boolean(),
                     memory: v.string(),
+                    // Bringing it back retires the current version it lost to (`replacesSuccessor`).
+                    replacesCurrent: v.boolean(),
                     retiredAt: v.number(),
                     retiredReason: v.optional(
                         v.union(
@@ -62,6 +82,8 @@ export const listRetiredMemories = authQuery
                             v.literal("expired"),
                             v.literal("decayed"),
                             v.literal("contradicted"),
+                            v.literal("brought_back_over"),
+                            v.literal("duplicate"),
                         ),
                     ),
                     successor: v.optional(v.string()),
@@ -83,7 +105,7 @@ export const listRetiredMemories = authQuery
         // One read per distinct successor and per distinct bot on the page; only the caller's own are named.
         const successorIds = [...new Set(rows.flatMap((row) => (row.supersededBy && row.supersededBy !== row._id ? [row.supersededBy] : [])))];
         const successors = await Promise.all(successorIds.map(async (id) => ctx.db.get("memories", id)));
-        const successorText = new Map(successors.flatMap((row) => (row?.userId === userId ? [[row._id as string, row.memory] as const] : [])));
+        const ownSuccessors = new Map(successors.flatMap((row) => (row?.userId === userId ? [[row._id as string, row] as const] : [])));
         const botIds = [...new Set(rows.flatMap((row) => (row.botId ? [row.botId] : [])))];
         const bots = await Promise.all(botIds.map(async (id) => ctx.db.get("bots", id)));
         const botNames = new Map(bots.flatMap((bot) => (bot?.userId === userId ? [[bot._id as string, bot.name] as const] : [])));
@@ -92,14 +114,17 @@ export const listRetiredMemories = authQuery
             continueCursor: result.continueCursor,
             isDone: result.isDone,
             page: rows.map((row) => {
+                const successor = row.supersededBy ? ownSuccessors.get(row.supersededBy as string) : undefined;
+
                 return {
                     _id: row._id as string,
                     botName: row.botId ? botNames.get(row.botId as string) : undefined,
                     fromBot: row.botId !== undefined,
                     memory: row.memory,
+                    replacesCurrent: replacesSuccessor(row, successor ?? null, userId),
                     retiredAt: row.retiredAt ?? 0,
                     retiredReason: row.retiredReason ?? undefined,
-                    successor: row.supersededBy ? successorText.get(row.supersededBy as string) : undefined,
+                    successor: successor?.memory,
                     type: row.type,
                 };
             }),
@@ -107,11 +132,13 @@ export const listRetiredMemories = authQuery
     });
 
 /**
- * Makes one of the caller's retired memories current again. The row is active from this write on, confirmed now (so
- * decay does not take it straight back), and re-embedded on the owner's shard (its vector went when it was retired).
- * A row past its end date loses that end date: bringing it back is the person's newest statement that it holds.
- * Whatever replaced it stays as it is: both are active, and dedup and reflection handle the pair later.
- * Works with memory off, as edit and delete do: it is the person's own data.
+ * Makes one of the caller's retired memories current again, and keeps it so. The row is active from this write on,
+ * confirmed now, stamped `restoredAt` (reflection and compression leave it alone for `RESTORED_PROTECTION_MS`), and
+ * re-embedded on the owner's shard (its vector went when it was retired). A row past its end date loses that end date:
+ * bringing it back is the person's newest statement that it holds.
+ * A revised or contradicted row swaps back: the newer version it lost to is retired in the same write
+ * (`brought_back_over`, `replacesSuccessor`). Whatever else replaced a row (a merge, a compression) stays active: it
+ * holds other facts too. Works with memory off, as edit and delete do: it is the person's own data.
  */
 export const bringBackMemory = authMutation
     .use(rateLimit("memory/update"))
@@ -134,9 +161,12 @@ export const bringBackMemory = authMutation
 
         const { now } = ctx;
         const expired = isExpired(row, localDayOf(now, await userTimeZone(ctx, userId)));
+        const successor = row.supersededBy === row._id ? null : await ctx.db.get("memories", row.supersededBy);
+        const swap = replacesSuccessor(row, successor, userId);
 
         await patchRow(ctx.db, "memories", row, {
             lastConfirmedAt: now,
+            restoredAt: now,
             retiredAt: undefined,
             retiredReason: undefined,
             supersededBy: undefined,
@@ -145,10 +175,15 @@ export const bringBackMemory = authMutation
             ...(row.confidence !== undefined && row.confidence < BROUGHT_BACK_CONFIDENCE && { confidence: BROUGHT_BACK_CONFIDENCE }),
             ...(expired && { validUntil: undefined }),
         });
+
+        if (swap) {
+            await supersedeMemory(ctx, successor._id, row._id, now, "brought_back_over");
+        }
+
         await reembedRewordedMemory(ctx, row._id, userId);
 
         logRedaction(ctx.log, "edit", { dropped: 0, redacted: text === row.memory ? 0 : 1 });
-        ctx.log.event("memory.bring_back", { expired, reason: row.retiredReason ?? "unknown" });
+        ctx.log.event("memory.bring_back", { expired, reason: row.retiredReason ?? "unknown", replaced: swap });
 
         return null;
     });

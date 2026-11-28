@@ -1805,9 +1805,23 @@ export const schema = defineSchema({
         // When and why the row stopped being a current memory (`memory/retired.ts`); set beside `supersededBy` by
         // `supersedeMemory`, cleared by a bring-back. A row retired before these columns has `retiredAt` from the
         // `backfill-memory-retired-at` migration and no reason.
+        // When the person last brought the row back from retirement: reflection and compression leave it alone for a while
+        // (`RESTORED_PROTECTION_MS`).
+        restoredAt: v.optional(v.number()),
         retiredAt: v.optional(v.number()),
         retiredReason: v.optional(
-            v.union(v.literal("revised"), v.literal("merged"), v.literal("compressed"), v.literal("expired"), v.literal("decayed"), v.literal("contradicted")),
+            v.union(
+                v.literal("revised"),
+                v.literal("merged"),
+                v.literal("compressed"),
+                v.literal("expired"),
+                v.literal("decayed"),
+                v.literal("contradicted"),
+                // The person brought back the earlier version this row had replaced.
+                v.literal("brought_back_over"),
+                // Reflection found it only restated an older row, which stands (a belief revision's IGNORE).
+                v.literal("duplicate"),
+            ),
         ),
         source: v.optional(
             v.union(v.literal("auto"), v.literal("manual"), v.literal("compressed"), v.literal("reflection"), v.literal("imported"), v.literal("requested")),

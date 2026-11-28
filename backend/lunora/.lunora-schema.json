@@ -11679,6 +11679,12 @@
           "optional": true,
           "unique": false
         },
+        "restoredAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "retiredAt": {
           "kind": "number",
           "nullable": false,
@@ -11691,6 +11697,13 @@
           "optional": true,
           "unique": false,
           "members": [
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"brought_back_over\""
+            },
             {
               "kind": "literal",
               "nullable": false,
@@ -11711,6 +11724,13 @@
               "optional": false,
               "unique": false,
               "literal": "\"decayed\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"duplicate\""
             },
             {
               "kind": "literal",

@@ -8,8 +8,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Id } from "../_generated/dataModel";
 import { memoryLogger } from "../lib/logger";
 import schema from "../schema";
-import { applyReflectionOps } from "./reflection";
-import { findContradictionCandidates } from "./reflection-logic";
+import { getThreadMemoriesForCompression } from "./compress";
+import { applyReflectionOps, loadReflectionInputs } from "./reflection";
+import { planReflection, type ReflectionMemory, RESTORED_PROTECTION_MS, splitExpired } from "./reflection-logic";
 import { bringBackMemory, BROUGHT_BACK_CONFIDENCE, listRetiredMemories } from "./retired";
 
 const { sessionFrom } = vi.hoisted(() => {
@@ -43,21 +44,44 @@ const OTHER = "other-user";
 let harness: ReturnType<typeof lunoraTest>;
 
 type Ctx = Parameters<Parameters<ReturnType<typeof lunoraTest>["run"]>[0]>[0];
-type RetiredPage = { continueCursor: string | null; isDone: boolean; page: { _id: string; memory: string; retiredReason?: string; successor?: string }[] };
+type RetiredPage = {
+    continueCursor: string | null;
+    isDone: boolean;
+    page: { _id: string; memory: string; replacesCurrent: boolean; retiredReason?: string; successor?: string }[];
+};
+type Reason = "compressed" | "contradicted" | "decayed" | "expired" | "merged" | "revised";
 
 const run = <T>(body: (ctx: Ctx) => Promise<T>): Promise<T> => harness.run(body);
 const as = (userId: string) => harness.withIdentity({ userId } as never);
 const rowOf = async (id: Id<"memories">) => await run(async (ctx) => await ctx.db.get("memories", id));
 const reembedJobs = () => harness.scheduler.list().filter((job) => job.functionPath?.includes("regenerateMemoryEmbedding") === true);
 
-const active = async (memory: string, userId = OWNER): Promise<Id<"memories">> =>
-    await run(async (ctx) => await ctx.db.insert("memories", { memory, type: "preference", updatedAt: 1, userId }));
+const active = async (memory: string, userId = OWNER, pinned?: boolean): Promise<Id<"memories">> =>
+    await run(async (ctx) => await ctx.db.insert("memories", { memory, pinned, type: "preference", updatedAt: 1, userId }));
+
+/** Whether a nightly reflection planned over the scope as it is read now would change `id` (survivor of a merge aside). */
+const reflectionTouches = async (id: Id<"memories">, now: number): Promise<boolean> => {
+    const { memories } = (await run(async (ctx) => await ctx.runQuery(loadReflectionInputs as never, { now, userId: OWNER } as never))) as {
+        memories: ReflectionMemory[];
+    };
+    const { expire, live } = splitExpired(memories, "2026-11-28");
+    const plan = planReflection(live, now);
+
+    return [
+        ...expire,
+        ...plan.retire,
+        ...plan.decay.map((entry) => entry.memoryId),
+        ...plan.merges.flatMap((merge) => merge.absorbedIds),
+        ...plan.promotions.flatMap((promotion) => promotion.sourceIds),
+        ...plan.contradictions.flatMap((pair) => [pair.olderId, pair.newerId]),
+    ].includes(id);
+};
 
 /** A row retired at `retiredAt`, by `by` (itself when omitted). */
 const retired = async (
     memory: string,
     retiredAt: number,
-    options: { by?: Id<"memories">; confidence?: number; reason?: "decayed" | "expired" | "revised"; userId?: string; validUntil?: string } = {},
+    options: { by?: Id<"memories">; confidence?: number; reason?: Reason; userId?: string; validUntil?: string } = {},
 ): Promise<Id<"memories">> =>
     await run(async (ctx) => {
         const id = await ctx.db.insert("memories", {
@@ -129,26 +153,87 @@ describe("listRetiredMemories", () => {
 });
 
 describe("bringBackMemory", () => {
-    it("makes a retired row current, confirmed now, and schedules its re-embed; the replacing row stays", async () => {
-        const next = await active("likes green tea");
-        const old = await retired("likes tea", 2000, { by: next, confidence: 20, reason: "decayed" });
+    it("swaps a revised memory back: the newer version is retired in the same write, and reflection leaves the pair alone", async () => {
+        const next = await active("prefers spaces for indentation in code");
+        const old = await retired("prefers tabs for indentation in code", 2000, { by: next, confidence: 20, reason: "revised" });
+
+        const offered = await list();
+
+        expect(offered.page[0]).toMatchObject({ replacesCurrent: true, successor: "prefers spaces for indentation in code" });
 
         await as(OWNER).mutation(bringBackMemory as never, { memoryId: old } as never);
 
         const row = await rowOf(old);
+        const successor = await rowOf(next);
 
         expect(row?.supersededBy).toBeUndefined();
         expect(row?.retiredAt).toBeUndefined();
         expect(row?.retiredReason).toBeUndefined();
+        expect(row?.restoredAt).toBeTypeOf("number");
         expect(row?.confidence).toBe(BROUGHT_BACK_CONFIDENCE);
         expect(row?.lastConfirmedAt).toBeGreaterThan(2000);
+        expect(successor).toMatchObject({ retiredReason: "brought_back_over", supersededBy: old });
+        expect(reembedJobs().map((job) => job.args)).toStrictEqual([{ memoryId: old, userId: OWNER }]);
+
+        const { page } = await list();
+
+        expect(page).toMatchObject([
+            { _id: next, replacesCurrent: false, retiredReason: "brought_back_over", successor: "prefers tabs for indentation in code" },
+        ]);
+        expect(await reflectionTouches(old, Date.now())).toBe(false);
+    });
+
+    it("keeps a pinned newer version active, and does not offer to replace it", async () => {
+        const next = await active("prefers spaces for indentation in code", OWNER, true);
+        const old = await retired("prefers tabs for indentation in code", 2000, { by: next, reason: "contradicted" });
+
+        const offered = await list();
+
+        expect(offered.page[0]?.replacesCurrent).toBe(false);
+
+        await as(OWNER).mutation(bringBackMemory as never, { memoryId: old } as never);
+
         const successor = await rowOf(next);
 
         expect(successor?.supersededBy).toBeUndefined();
-        expect(reembedJobs().map((job) => job.args)).toStrictEqual([{ memoryId: old, userId: OWNER }]);
-        const { page } = await list();
+        expect(await reflectionTouches(old, Date.now())).toBe(false);
+    });
 
-        expect(page).toHaveLength(0);
+    it("protects a compressed memory it brings back: the merged row stays, and reflection leaves the restored one alone for 30 days", async () => {
+        const merged = await active("likes hot drinks, tea and coffee");
+        const old = await retired("likes hot drinks, tea and coffee every day", 2000, { reason: "compressed" });
+
+        const offered = await list();
+
+        expect(offered.page[0]?.replacesCurrent).toBe(false);
+
+        await as(OWNER).mutation(bringBackMemory as never, { memoryId: old } as never);
+
+        const kept = await rowOf(merged);
+        const restored = await rowOf(old);
+        const restoredAt = typeof restored?.restoredAt === "number" ? restored.restoredAt : 0;
+
+        expect(kept?.supersededBy).toBeUndefined();
+        // A near-duplicate of the merged row: without the protection the next reflection would merge one into the other.
+        expect(await reflectionTouches(old, restoredAt + RESTORED_PROTECTION_MS - 1)).toBe(false);
+        expect(await reflectionTouches(old, restoredAt + RESTORED_PROTECTION_MS)).toBe(true);
+    });
+
+    it("keeps a restored memory out of the next compression of its chat", async () => {
+        const threadId = await run(async (ctx) => await ctx.db.insert("threads", { userId: OWNER } as never));
+        const old = await retired("likes tea", 2000, { reason: "compressed" });
+
+        await run(async (ctx) => {
+            await ctx.db.patch("memories", old, { source: "auto", threadId });
+        });
+        await as(OWNER).mutation(bringBackMemory as never, { memoryId: old } as never);
+
+        const rows = (await run(async (ctx) => await ctx.runQuery(getThreadMemoriesForCompression as never, { threadId, userId: OWNER } as never))) as {
+            _id: string;
+            pinned?: boolean;
+        }[];
+
+        expect(rows).toMatchObject([{ _id: old, pinned: true }]);
     });
 
     it("drops a past end date, so the next reflection does not expire it again", async () => {
@@ -171,19 +256,6 @@ describe("bringBackMemory", () => {
         const afterReflection = await rowOf(old);
 
         expect(afterReflection?.supersededBy).toBeUndefined();
-    });
-
-    it("leaves the row that replaced it the newer statement at the next reflection, however recently the old one came back", () => {
-        const memory = { confidence: 80, importance: 50, pinned: false, type: "preference" as const, updatedAt: 9000 };
-        const [pair] = findContradictionCandidates(
-            [
-                { ...memory, createdAt: 1000, id: "brought-back", lastConfirmedAt: 9000, text: "prefers tabs for indentation in code" },
-                { ...memory, createdAt: 2000, id: "successor", lastConfirmedAt: 3000, text: "prefers spaces for indentation in code" },
-            ],
-            { maxBeliefRevisions: 5 },
-        );
-
-        expect(pair).toMatchObject({ newerId: "successor", olderId: "brought-back" });
     });
 
     it("refuses another user's row, a deleted id and an active row", async () => {

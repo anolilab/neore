@@ -288,7 +288,7 @@ describe("contradictions", () => {
         expect(revisionToOps(pair, { action: "SUPERSEDE" }, NOW)).toEqual([{ byMemoryId: "n", kind: "supersede", memoryId: "o" }]);
         expect(revisionToOps(pair, { action: "ADD" }, NOW)).toEqual([]);
         expect(revisionToOps(pair, { action: "IGNORE" }, NOW)).toEqual([
-            { byMemoryId: "o", kind: "supersede", memoryId: "n" },
+            { byMemoryId: "o", duplicate: true, kind: "supersede", memoryId: "n" },
             { kind: "patch", lastConfirmedAt: NOW, memoryId: "o" },
         ]);
         expect(revisionToOps(pair, { action: "UPDATE", mergedMemory: "both" }, NOW)).toEqual([

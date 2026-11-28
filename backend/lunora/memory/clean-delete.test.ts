@@ -167,6 +167,7 @@ describe("a retired row loses its vector", () => {
         const sourceB = await seed("runs on Fridays");
         const lapsed = await seed("in Rome until 2020-01-01");
         const merged = await seed("lives in Porto, Portugal");
+        const restated = await seed("lives in Porto these days");
 
         await run(async (ctx) => {
             await ctx.db.patch("memories", lapsed.memoryId, { validUntil: "2020-01-01" });
@@ -182,6 +183,7 @@ describe("a retired row loses its vector", () => {
                             { byMemoryId: kept.memoryId, kind: "supersede", memoryId: absorbed.memoryId },
                             { byMemoryId: lapsed.memoryId, expiredOn: "2026-11-28", kind: "supersede", memoryId: lapsed.memoryId },
                             { byMemoryId: kept.memoryId, kind: "supersede", memoryId: merged.memoryId, merge: true },
+                            { byMemoryId: kept.memoryId, duplicate: true, kind: "supersede", memoryId: restated.memoryId },
                             {
                                 confidence: 80,
                                 importance: 50,
@@ -201,9 +203,9 @@ describe("a retired row loses its vector", () => {
             expect(await vectorExists(retired.embeddingId)).toBe(false);
         }
 
-        const rows = await Promise.all([expired, absorbed, lapsed, merged, sourceA].map(async ({ memoryId }) => await rowOf(memoryId)));
+        const rows = await Promise.all([expired, absorbed, lapsed, merged, restated, sourceA].map(async ({ memoryId }) => await rowOf(memoryId)));
 
-        expect(rows.map((row) => row?.retiredReason)).toStrictEqual(["decayed", "contradicted", "expired", "merged", "merged"]);
+        expect(rows.map((row) => row?.retiredReason)).toStrictEqual(["decayed", "contradicted", "expired", "merged", "duplicate", "merged"]);
 
         expect(await vectorExists(kept.embeddingId)).toBe(true);
     });

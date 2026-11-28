@@ -5705,9 +5705,13 @@ msgstr "Krótki opis tego promptu"
 msgid "Brightness"
 msgstr "Jasność"
 
-#: src/features/settings/components/personalization/retired-memories.tsx:77
+#: src/features/settings/components/personalization/retired-memories.tsx:59
 msgid "Bring back"
 msgstr "Przywróć"
+
+#: src/features/settings/components/personalization/retired-memories.tsx:59
+msgid "Bring back (replaces the current version)"
+msgstr "Przywróć (zastępuje bieżącą wersję)"
 
 #: ../../packages/ui/src/components/canvas-editor/fabric-canvas-editor.tsx:614
 msgid "Bring Forward"
@@ -5738,7 +5742,7 @@ msgstr "Użyj własnych tokenów botów do integracji z komunikatorami Telegram,
 msgid "Bring Your Own Keys (BYOK)"
 msgstr "Własne klucze (BYOK)"
 
-#: src/features/settings/components/personalization/retired-memories.tsx:77
+#: src/features/settings/components/personalization/retired-memories.tsx:81
 msgid "Bringing back…"
 msgstr "Przywracanie…"
 
@@ -7647,7 +7651,7 @@ msgstr "Kolumny"
 msgid "combine images"
 msgstr "łącz obrazy"
 
-#: src/features/settings/components/personalization/retired-memories.tsx:29
+#: src/features/settings/components/personalization/retired-memories.tsx:32
 msgid "Combined into a shorter summary"
 msgstr "Połączone w krótsze podsumowanie"
 
@@ -13972,7 +13976,7 @@ msgstr "Sprawdź fakty: czy cukier powoduje nadpobudliwość u dzieci?"
 msgid "Facts to save"
 msgstr "Fakty do zapisania"
 
-#: src/features/settings/components/personalization/retired-memories.tsx:31
+#: src/features/settings/components/personalization/retired-memories.tsx:34
 msgid "Faded after a long time without coming up"
 msgstr "Wyblakło po długim czasie bez wzmianki"
 
@@ -19735,7 +19739,7 @@ msgid "Learn more about MCP"
 msgstr "Dowiedz się więcej o MCP"
 
 #. placeholder {0}: memory.botName
-#: src/features/settings/components/personalization/retired-memories.tsx:62
+#: src/features/settings/components/personalization/retired-memories.tsx:66
 msgid "Learned by {0}"
 msgstr "Zapamiętane przez {0}"
 
@@ -20369,7 +20373,7 @@ msgstr "Wczytywanie projektów…"
 msgid "Loading repositories…"
 msgstr "Wczytywanie repozytoriów…"
 
-#: src/features/settings/components/personalization/retired-memories.tsx:109
+#: src/features/settings/components/personalization/retired-memories.tsx:114
 msgid "Loading retired memories…"
 msgstr "Wczytywanie wycofanych wspomnień…"
 
@@ -21386,7 +21390,7 @@ msgstr "wspomnienia"
 msgid "Memories"
 msgstr "Wspomnienia"
 
-#: src/features/settings/components/personalization/retired-memories.tsx:194
+#: src/features/settings/components/personalization/retired-memories.tsx:233
 msgid "Memories the AI stopped using, and why. Bring one back to use it again."
 msgstr "Wspomnienia, których AI już nie używa, i powód. Przywróć jedno, aby znów było używane."
 
@@ -21417,7 +21421,7 @@ msgstr "Pamięć"
 msgid "Memory — what the agent keeps across chats"
 msgstr "Pamięć — co agent zapamiętuje między czatami"
 
-#: src/features/settings/components/personalization/retired-memories.tsx:167
+#: src/features/settings/components/personalization/retired-memories.tsx:207
 msgid "Memory brought back."
 msgstr "Wspomnienie przywrócone."
 
@@ -21528,7 +21532,7 @@ msgstr "Scalone czaty pozostaną bez zmian"
 msgid "Merged chats will be archived"
 msgstr "Scalone czaty zostaną zarchiwizowane"
 
-#: src/features/settings/components/personalization/retired-memories.tsx:33
+#: src/features/settings/components/personalization/retired-memories.tsx:37
 msgid "Merged into a similar memory"
 msgstr "Scalone z podobnym wspomnieniem"
 
@@ -23805,7 +23809,7 @@ msgstr "Nie znaleziono wyników dla „{searchTerm}”"
 msgid "No results found."
 msgstr "Nie znaleziono wyników."
 
-#: src/features/settings/components/personalization/retired-memories.tsx:135
+#: src/features/settings/components/personalization/retired-memories.tsx:139
 msgid "No retired memories."
 msgstr "Brak wycofanych wspomnień."
 
@@ -24288,7 +24292,7 @@ msgid "Novel diffusion-based language model architecture"
 msgstr "Nowatorska architektura modelu językowego oparta na dyfuzji"
 
 #. placeholder {0}: memory.successor
-#: src/features/settings/components/personalization/retired-memories.tsx:64
+#: src/features/settings/components/personalization/retired-memories.tsx:68
 msgid "Now remembered as: {0}"
 msgstr "Teraz zapamiętane jako: {0}"
 
@@ -26131,7 +26135,7 @@ msgstr "Hasła nie są zgodne"
 msgid "Past cleanup runs and their results"
 msgstr "Poprzednie przebiegi czyszczenia i ich wyniki"
 
-#: src/features/settings/components/personalization/retired-memories.tsx:32
+#: src/features/settings/components/personalization/retired-memories.tsx:36
 msgid "Past its end date"
 msgstr "Minęła data końcowa"
 
@@ -29233,13 +29237,17 @@ msgstr "Powtarza się ({cronExpression} UTC)"
 msgid "Replace"
 msgstr "Zastąp"
 
-#: src/features/settings/components/personalization/retired-memories.tsx:34
+#: src/features/settings/components/personalization/retired-memories.tsx:38
 msgid "Replaced by a newer version"
 msgstr "Zastąpione nowszą wersją"
 
-#: src/features/settings/components/personalization/retired-memories.tsx:30
+#: src/features/settings/components/personalization/retired-memories.tsx:33
 msgid "Replaced by a newer, conflicting memory"
 msgstr "Zastąpione nowszym, sprzecznym wspomnieniem"
+
+#: src/features/settings/components/personalization/retired-memories.tsx:31
+msgid "Replaced when you brought back an earlier version"
+msgstr "Zastąpione, gdy przywrócono wcześniejszą wersję"
 
 #: src/features/settings/components/personalization/personalization-settings.tsx:388
 msgid "Replay Onboarding"
@@ -29653,16 +29661,15 @@ msgstr "Wznawianie ostatniego czatu"
 msgid "Retention period updated to {hours} hours"
 msgstr "Zmieniono okres przechowywania na {hours} godz."
 
-#: src/features/settings/components/personalization/retired-memories.tsx:37
+#: src/features/settings/components/personalization/retired-memories.tsx:41
 msgid "Retired (reason not recorded)"
 msgstr "Wycofane (powód nie został zapisany)"
 
-#: src/features/settings/components/personalization/retired-memories.tsx:176
-#: src/features/settings/components/personalization/retired-memories.tsx:186
+#: src/features/settings/components/personalization/retired-memories.tsx:225
 msgid "Retired memories"
 msgstr "Wycofane wspomnienia"
 
-#: src/features/settings/components/personalization/retired-memories.tsx:117
+#: src/features/settings/components/personalization/retired-memories.tsx:122
 msgid "Retired memories could not be loaded."
 msgstr "Nie udało się wczytać wycofanych wspomnień."
 
@@ -30279,6 +30286,10 @@ msgstr "Safari blokuje wywoływanie http://localhost z tej bezpiecznej strony. D
 #: src/features/local-models/components/local-setup-guide.tsx:148
 msgid "Safari is not supported: it blocks a secure page from calling http://localhost."
 msgstr "Safari nie jest obsługiwane: blokuje wywoływanie http://localhost z bezpiecznej strony."
+
+#: src/features/settings/components/personalization/retired-memories.tsx:35
+msgid "Same as an existing memory"
+msgstr "Takie samo jak istniejące wspomnienie"
 
 #: src/features/marketing/data/models-data.ts:368
 msgid "Same frontier architecture, optimized for speed"
@@ -31905,7 +31916,7 @@ msgid "Show less of the instructions for \"{title}\""
 msgstr "Pokaż mniej instrukcji zadania „{title}”"
 
 #: src/features/chat/pins/pin-item.tsx:214
-#: src/features/settings/components/personalization/retired-memories.tsx:138
+#: src/features/settings/components/personalization/retired-memories.tsx:142
 msgid "Show more"
 msgstr "Pokaż więcej"
 
@@ -36680,7 +36691,7 @@ msgstr "Ten login został zmieniony w innym miejscu. Odśwież stronę, aby go z
 msgid "This machine is not ready yet."
 msgstr "Ta maszyna nie jest jeszcze gotowa."
 
-#: src/features/settings/components/personalization/retired-memories.tsx:81
+#: src/features/settings/components/personalization/retired-memories.tsx:85
 msgid "This memory could not be brought back. Please try again in a moment."
 msgstr "Nie udało się przywrócić tego wspomnienia. Spróbuj ponownie za chwilę."
 
@@ -37842,7 +37853,7 @@ msgstr "Spróbuj zmienić wyszukiwane hasła."
 #: src/features/projects/components/repo-rule-file-import.tsx:183
 #: src/features/settings/components/chat/default-models-settings.tsx:455
 #: src/features/settings/components/personalization/memory-file-import.tsx:473
-#: src/features/settings/components/personalization/retired-memories.tsx:118
+#: src/features/settings/components/personalization/retired-memories.tsx:123
 #: src/features/tasks/components/task-form-dialog.tsx:459
 #: src/features/vault/components/site-logins.tsx:480
 #: src/features/vault/components/site-logins.tsx:612

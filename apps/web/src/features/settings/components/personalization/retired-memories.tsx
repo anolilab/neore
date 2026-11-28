@@ -2,20 +2,22 @@
 
 import { useLingui } from "@lingui/react/macro";
 import { Button } from "@neore/ui/components/button";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronDownIcon, RotateCcwIcon } from "lucide-react";
 import type { FC } from "react";
 import { useId, useRef, useState } from "react";
 
 import { useCRPC } from "@/lib/lunora/crpc";
 
-export type RetiredReason = "compressed" | "contradicted" | "decayed" | "expired" | "merged" | "revised";
+export type RetiredReason = "brought_back_over" | "compressed" | "contradicted" | "decayed" | "duplicate" | "expired" | "merged" | "revised";
 
 export interface RetiredMemoryData {
     _id: string;
     botName?: string;
     fromBot: boolean;
     memory: string;
+    /** Bringing it back retires the current version it lost to. */
+    replacesCurrent: boolean;
     retiredAt: number;
     /** Absent for a memory retired before reasons were kept. */
     retiredReason?: RetiredReason;
@@ -26,9 +28,11 @@ export interface RetiredMemoryData {
 const useReasonLabel = (): ((reason: RetiredReason | undefined) => string) => {
     const { t } = useLingui();
     const labels: Record<RetiredReason, string> = {
+        brought_back_over: t`Replaced when you brought back an earlier version`,
         compressed: t`Combined into a shorter summary`,
         contradicted: t`Replaced by a newer, conflicting memory`,
         decayed: t`Faded after a long time without coming up`,
+        duplicate: t`Same as an existing memory`,
         expired: t`Past its end date`,
         merged: t`Merged into a similar memory`,
         revised: t`Replaced by a newer version`,
@@ -39,7 +43,7 @@ const useReasonLabel = (): ((reason: RetiredReason | undefined) => string) => {
 
 interface RetiredRowProps {
     memory: RetiredMemoryData;
-    onBroughtBack: (memoryId: string) => void;
+    onBroughtBack: () => void;
 }
 
 const RetiredRow: FC<RetiredRowProps> = ({ memory, onBroughtBack }) => {
@@ -49,10 +53,10 @@ const RetiredRow: FC<RetiredRowProps> = ({ memory, onBroughtBack }) => {
     const reasonLabel = useReasonLabel();
     const { error, isPending, mutate } = useMutation({
         ...crpc.memory.retired.bringBackMemory.mutationOptions(),
-        onSuccess: () => {
-            onBroughtBack(memory._id);
-        },
+        onSuccess: onBroughtBack,
     });
+
+    const bringBackLabel = memory.replacesCurrent ? t`Bring back (replaces the current version)` : t`Bring back`;
 
     return (
         <li className="border-border space-y-1 rounded-md border p-3 text-sm">
@@ -74,7 +78,7 @@ const RetiredRow: FC<RetiredRowProps> = ({ memory, onBroughtBack }) => {
                 variant="outline"
             >
                 <RotateCcwIcon aria-hidden="true" className="mr-2 h-3 w-3" />
-                {isPending ? t`Bringing back…` : t`Bring back`}
+                {isPending ? t`Bringing back…` : bringBackLabel}
             </Button>
             {error && (
                 <p className="text-destructive text-xs" id={errorId} role="alert">
@@ -87,18 +91,19 @@ const RetiredRow: FC<RetiredRowProps> = ({ memory, onBroughtBack }) => {
 
 interface RetiredPageProps {
     cursor: string | null;
-    hidden: ReadonlySet<string>;
     isLast: boolean;
-    onBroughtBack: (memoryId: string) => void;
+    onBroughtBack: () => void;
     onLoadMore: (cursor: string) => void;
 }
 
+const PAGE_SIZE = 25;
+
 /** One page of the list; the last one offers the next. */
-const RetiredPage: FC<RetiredPageProps> = ({ cursor, hidden, isLast, onBroughtBack, onLoadMore }) => {
+const RetiredPage: FC<RetiredPageProps> = ({ cursor, isLast, onBroughtBack, onLoadMore }) => {
     const { t } = useLingui();
     const crpc = useCRPC();
     const { data, isError, isPending, refetch } = useQuery({
-        ...crpc.memory.retired.listRetiredMemories.queryOptions({ paginationOpts: { cursor, numItems: 25 } }, { live: false }),
+        ...crpc.memory.retired.listRetiredMemories.queryOptions({ paginationOpts: { cursor, numItems: PAGE_SIZE } }, { live: false }),
         // Mounted again after each change on the page (see `readCount`): a delete may have taken retired rows with it.
         refetchOnMount: "always",
     });
@@ -120,14 +125,13 @@ const RetiredPage: FC<RetiredPageProps> = ({ cursor, hidden, isLast, onBroughtBa
         );
     }
 
-    const rows = data.page.filter((row: RetiredMemoryData) => !hidden.has(row._id));
     const next = data.continueCursor;
 
     return (
         <>
-            {rows.length > 0 && (
+            {data.page.length > 0 && (
                 <ul className="space-y-2">
-                    {rows.map((row: RetiredMemoryData) => (
+                    {data.page.map((row: RetiredMemoryData) => (
                         <RetiredRow key={row._id} memory={row} onBroughtBack={onBroughtBack} />
                     ))}
                 </ul>
@@ -142,10 +146,46 @@ const RetiredPage: FC<RetiredPageProps> = ({ cursor, hidden, isLast, onBroughtBa
     );
 };
 
+interface RetiredPagesProps {
+    onBroughtBack: () => void;
+}
+
+/**
+ * The pages read so far, from the first. Mounted afresh (by its key) after every change, so paging starts over: a row
+ * that came back, or one retired since, never leaves a later page skipping or repeating rows.
+ */
+const RetiredPages: FC<RetiredPagesProps> = ({ onBroughtBack }) => {
+    const crpc = useCRPC();
+    const queryClient = useQueryClient();
+    const [cursors, setCursors] = useState<(string | null)[]>([null]);
+
+    const handleBroughtBack = (): void => {
+        // The pages read before the change are dropped, so the remount reads the list as it is now, not as it was.
+        for (const cursor of cursors) {
+            queryClient.removeQueries({
+                exact: true,
+                queryKey: crpc.memory.retired.listRetiredMemories.queryKey({ paginationOpts: { cursor, numItems: PAGE_SIZE } }),
+            });
+        }
+
+        onBroughtBack();
+    };
+
+    return cursors.map((cursor, index) => (
+        <RetiredPage
+            cursor={cursor}
+            isLast={index === cursors.length - 1}
+            key={cursor ?? "first"}
+            onBroughtBack={handleBroughtBack}
+            onLoadMore={(next: string) => setCursors((previous) => [...previous, next])}
+        />
+    ));
+};
+
 interface RetiredMemoriesProps {
     /** Called after a memory came back, so the list of current memories is read again. */
     onBroughtBack: () => void;
-    /** Moves on each change the page made (a delete, a clear, an import): the open list is read again. */
+    /** Moves on each change the page made (a delete, a clear, an import): the open list is read again from its first page. */
     readCount: number;
 }
 
@@ -156,30 +196,29 @@ interface RetiredMemoriesProps {
 const RetiredMemories: FC<RetiredMemoriesProps> = ({ onBroughtBack, readCount }) => {
     const { t } = useLingui();
     const regionId = useId();
-    const headingRef = useRef<HTMLHeadingElement>(null);
+    const toggleRef = useRef<HTMLButtonElement>(null);
     const [open, setOpen] = useState(false);
-    const [cursors, setCursors] = useState<(string | null)[]>([null]);
-    const [hidden, setHidden] = useState<ReadonlySet<string>>(() => new Set());
+    // Moved by each bring-back made here: the pages start over from the first.
+    const [broughtBack, setBroughtBack] = useState(0);
     const [announcement, setAnnouncement] = useState("");
 
-    const handleBroughtBack = (memoryId: string): void => {
-        setHidden((previous) => new Set([...previous, memoryId]));
+    const handleBroughtBack = (): void => {
+        setBroughtBack((count) => count + 1);
         setAnnouncement(t`Memory brought back.`);
-        // The row and its button are gone: focus goes to the section, not to the page's start.
-        headingRef.current?.focus();
+        // The row and its button are gone: focus goes to the section's own visible control, not to the page's start.
+        toggleRef.current?.focus();
         onBroughtBack();
     };
 
     return (
-        <section aria-labelledby={`${regionId}-heading`} className="space-y-2">
-            <h3 className="sr-only" id={`${regionId}-heading`} ref={headingRef} tabIndex={-1}>
-                {t`Retired memories`}
-            </h3>
+        <section aria-labelledby={`${regionId}-toggle`} className="space-y-2">
             <Button
                 aria-controls={regionId}
                 aria-expanded={open}
                 className="w-full justify-between"
+                id={`${regionId}-toggle`}
                 onClick={() => setOpen((previous) => !previous)}
+                ref={toggleRef}
                 size="sm"
                 variant="ghost"
             >
@@ -192,16 +231,7 @@ const RetiredMemories: FC<RetiredMemoriesProps> = ({ onBroughtBack, readCount })
             {open && (
                 <div className="max-h-96 space-y-2 overflow-y-auto" id={regionId}>
                     <p className="text-muted-foreground text-xs">{t`Memories the AI stopped using, and why. Bring one back to use it again.`}</p>
-                    {cursors.map((cursor, index) => (
-                        <RetiredPage
-                            cursor={cursor}
-                            hidden={hidden}
-                            isLast={index === cursors.length - 1}
-                            key={`${String(readCount)}:${cursor ?? "first"}`}
-                            onBroughtBack={handleBroughtBack}
-                            onLoadMore={(next: string) => setCursors((previous) => [...previous, next])}
-                        />
-                    ))}
+                    <RetiredPages key={`${String(readCount)}:${String(broughtBack)}`} onBroughtBack={handleBroughtBack} />
                 </div>
             )}
         </section>

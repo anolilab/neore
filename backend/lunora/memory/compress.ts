@@ -21,6 +21,7 @@ import { getUtilityModel } from "../lib/utility-model";
 import { logRedaction, redactMemoryFacts } from "./redact";
 import { MEMORY_TYPE_GUIDE, MEMORY_TYPES } from "./taxonomy";
 import { factDatesOf, hasFactDates } from "./dates";
+import { recentlyRestored } from "./reflection-logic";
 
 const COMPRESSION_SYSTEM_PROMPT = `You are a memory consolidation system. Given a list of related memories, synthesize them into a smaller set of high-quality, comprehensive facts.
 
@@ -157,7 +158,8 @@ export const getThreadMemoriesForCompression = internalQuery
                         dated: hasFactDates(factDatesOf(m)),
                         importance: m.importance,
                         memory: m.memory,
-                        pinned: m.pinned === true,
+                        // A row the person brought back recently is kept as they chose it, as a pinned one is.
+                        pinned: m.pinned === true || recentlyRestored(m, Date.now()),
                         source: m.source,
                         type: m.type as string,
                         updatedAt: m.updatedAt,
