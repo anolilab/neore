@@ -29,6 +29,9 @@ const TAB_BY_SETTINGS_PATH: Readonly<Record<string, SettingsTab>> = {
     "billing/limits": "auth-billing",
     "chat/model": "chat-models",
     "compliance/model-filters": "chat-model-filters",
+    // The gateway's error actions. There is no page of PII rules: Privacy & Data is the nearest.
+    "chat/compression": "app-customization",
+    "compliance/pii": "privacy",
     connectors: "connectors",
     "connectors/messenger": "connectors-messenger",
     privacy: "privacy",
@@ -53,6 +56,22 @@ export const adminPathFor = (pathname: string): string | undefined => {
     const rest = pathname.slice(prefix.length);
 
     return rest === "" || rest === "/" ? "/admin" : `/admin${rest}`;
+};
+
+/** The row an old settings path points at inside its tab, for a path that names one setting rather than a page. */
+const ANCHOR_BY_SETTINGS_PATH: Record<string, string> = {
+    "chat/compression": "auto-compact-threshold",
+};
+
+/** The element id an old settings path points at in its tab, or `undefined`. */
+export const settingsAnchorForPath = (pathname: string): string | undefined => {
+    let path = pathname;
+
+    while (path.endsWith("/")) {
+        path = path.slice(0, -1);
+    }
+
+    return path.startsWith(`${SETTINGS_PATH_PREFIX}/`) ? ANCHOR_BY_SETTINGS_PATH[path.slice(SETTINGS_PATH_PREFIX.length + 1)] : undefined;
 };
 
 /**
@@ -128,8 +147,8 @@ export const settingsLocation = (tab: SettingsTab, anchor?: string): { search: S
 const ANCHOR_WAIT_MS = 5000;
 
 /**
- * Scrolls to the element `id` inside the tab once it is there: the tab is lazy, so the element can arrive after the
- * modal opens. Calls `done` once it has scrolled, or after a few seconds without it. Returns a cancel.
+ * Scrolls to the element `id` inside the tab once it is there, and moves focus to it: the tab is lazy, so the element
+ * can arrive after the modal opens. Calls `done` once it has scrolled, or after a few seconds without it. Returns a cancel.
  */
 export const scrollToAnchorWhenRendered = (getRoot: () => HTMLElement | null, id: string, done: () => void): (() => void) => {
     const startedAt = performance.now();
@@ -140,6 +159,13 @@ export const scrollToAnchorWhenRendered = (getRoot: () => HTMLElement | null, id
 
         if (target) {
             target.scrollIntoView({ block: "start" });
+
+            // Anchors name a control (a switch, a select) or a whole card: a card takes focus without becoming a tab stop.
+            if (target.tabIndex < 0 && !target.hasAttribute("tabindex")) {
+                target.tabIndex = -1;
+            }
+
+            target.focus({ preventScroll: true });
             done();
 
             return;

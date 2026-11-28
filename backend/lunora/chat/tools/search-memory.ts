@@ -109,6 +109,8 @@ const searchMemoryTool = createTool<{ limit?: number; query: string }, { memorie
         limit: z.int().min(1).max(10).optional().meta({ description: "Maximum number of memories to return (default: 5)" }),
         query: z
             .string()
+            .min(1)
+            .max(2000)
             .meta({ description: "Natural language query describing what to search for, e.g. 'user programming preferences' or 'user current projects'" }),
     }),
     toModelOutput: (_context, { output }) => toonEncodeOutput(output),

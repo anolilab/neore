@@ -122,10 +122,22 @@ const AuditLogCard = () => {
             <div className="text-muted-foreground py-8 text-center text-sm">{t`No audit logs found`}</div>
         );
 
+    const actionItems = {
+        all: t`All Actions`,
+        "user.role.update": t`Role Updates`,
+        "user.ban": t`Bans`,
+        "user.unban": t`Unbans`,
+        "user.sessions.revoke": t`Session Revocations`,
+        "user.impersonate.start": t`Impersonation Start`,
+        "user.impersonate.stop": t`Impersonation Stop`,
+        "admin.grant": t`Admin Grants`,
+        "admin.revoke": t`Admin Revocations`,
+    };
+
     return (
         <AdminSection
             action={
-                <Select onValueChange={(value) => value && setActionFilter(value)} value={actionFilter}>
+                <Select items={actionItems} onValueChange={(value) => value && setActionFilter(value)} value={actionFilter}>
                     <SelectTrigger aria-label={t`Filter by action`} className="w-[180px]">
                         <SelectValue placeholder={t`Filter by action`} />
                     </SelectTrigger>

@@ -7,6 +7,8 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, onTestFinished, vi } from "vitest";
 
+import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
+
 import { DeviceRow, StartAgents } from "./devices-settings";
 
 // The unit-test transform does not compile Lingui macros (vi.mock is hoisted).
@@ -37,8 +39,8 @@ vi.mock("./device-scope", () => {
     return { default: () => null };
 });
 
-const { startCalls } = vi.hoisted(() => {
-    return { startCalls: [] as unknown[] };
+const { navigate, startCalls, startResult } = vi.hoisted(() => {
+    return { navigate: vi.fn(), startCalls: [] as unknown[], startResult: { current: { started: true } as { started: boolean; threadId?: string } } };
 });
 
 const { bridge } = vi.hoisted(() => {
@@ -59,7 +61,7 @@ vi.mock("@/lib/native/device-bridge", () => {
 });
 
 vi.mock("@tanstack/react-router", () => {
-    return { useNavigate: () => vi.fn() };
+    return { useNavigate: () => navigate };
 });
 
 vi.mock("@/lib/lunora/crpc", () => {
@@ -88,7 +90,7 @@ vi.mock("@/lib/lunora/crpc", () => {
                                     mutationFn: vi.fn(async (input: unknown) => {
                                         startCalls.push(input);
 
-                                        return { started: true };
+                                        return startResult.current;
                                     }),
                                 };
                             },
@@ -132,6 +134,20 @@ describe("<StartAgents>", () => {
 
         expect(button.disabled).toBe(false);
         expect(button.getAttribute("aria-describedby")).toBeNull();
+    });
+
+    it("closes the settings modal it sits in when the agent's chat opens", async () => {
+        startResult.current = { started: true, threadId: "t1" };
+        onTestFinished(() => {
+            startResult.current = { started: true };
+        });
+        useUIStateStore.getState().openModal("settings");
+        renderStart(false);
+
+        await userEvent.click(screen.getByRole("button", { name: "Start Claude in app" }));
+
+        await waitFor(() => expect(navigate).toHaveBeenCalledWith({ params: { threadId: "t1" }, to: "/chat/$threadId" }));
+        expect(useUIStateStore.getState().modals.settings?.isOpen).toBe(false);
     });
 });
 

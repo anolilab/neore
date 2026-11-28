@@ -24,6 +24,7 @@ import SettingsCard from "@/components/settings/settings-card";
 import SettingsRow from "@/components/settings/settings-row";
 import ChangedByAdminMark from "@/features/admin/components/changed-by-admin-mark";
 import { useImpersonating } from "@/features/admin/hooks/use-is-impersonating";
+import { useModalState } from "@/features/layout/hooks/use-ui-state";
 import PromptModelSelector from "@/features/prompts/components/prompt-model-selector";
 import { BotToolSelectionFields, useToolCatalog } from "@/features/settings/components/chat/bot-tool-selection";
 import { useCRPC } from "@/lib/lunora/crpc";
@@ -167,6 +168,7 @@ const BotsSettings = () => {
     const { t } = useLingui();
     const crpc = useCRPC();
     const navigate = useNavigate();
+    const { close: closeSettings } = useModalState("settings");
     const queryClient = useQueryClient();
     const nameId = useId();
     const descriptionId = useId();
@@ -250,6 +252,8 @@ const BotsSettings = () => {
         try {
             const threadId = await chatMutation.mutateAsync({ botId: bot._id, model: bot.model, title: bot.name });
 
+            // This tab lives in the settings modal, which a gear-opened session keeps over the new chat otherwise.
+            closeSettings();
             await navigate({ params: { threadId }, to: "/chat/$threadId" });
         } catch {
             toast.error(t`Could not start a chat with this bot.`);

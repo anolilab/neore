@@ -9321,6 +9321,142 @@
       "relations": {},
       "shardMode": "shardBy:userId"
     },
+    "eventWebhookHosts": {
+      "commitOrdered": false,
+      "fields": {
+        "createdAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "host": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "userId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        }
+      },
+      "indexes": {
+        "by_userId_host": {
+          "fields": [
+            "userId",
+            "host"
+          ],
+          "unique": false
+        }
+      },
+      "memory": false,
+      "relations": {},
+      "shardMode": "shardBy:userId"
+    },
+    "eventWebhookSubscriptions": {
+      "commitOrdered": false,
+      "fields": {
+        "argumentsKey": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "createdAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "expiresAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "id": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "keyHash": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "minTimestamp": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "name": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "principal": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "scanSeq": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "secretCiphertext": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "updatedAt": {
+          "kind": "number",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "url": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        },
+        "userId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": false,
+          "unique": false
+        }
+      },
+      "indexes": {
+        "by_expiresAt": {
+          "fields": [
+            "expiresAt"
+          ],
+          "unique": false
+        },
+        "by_userId_keyHash": {
+          "fields": [
+            "userId",
+            "keyHash"
+          ],
+          "unique": false
+        }
+      },
+      "memory": false,
+      "relations": {},
+      "shardMode": "shardBy:userId"
+    },
     "feedback": {
       "commitOrdered": false,
       "fields": {
@@ -11582,6 +11718,13 @@
               "optional": false,
               "unique": false,
               "literal": "\"reflection\""
+            },
+            {
+              "kind": "literal",
+              "nullable": false,
+              "optional": false,
+              "unique": false,
+              "literal": "\"requested\""
             }
           ]
         },

@@ -45,6 +45,8 @@ interface SlackEventPayload {
     event?: {
         bot_id?: string; // Present if message is from a bot
         channel?: string;
+        /** `im` for a direct message; `channel`, `group` or `mpim` otherwise. */
+        channel_type?: string;
         files?: SlackFile[];
         subtype?: string; // "bot_message", "message_changed", etc.
         text?: string;
@@ -136,6 +138,7 @@ export const parseSlackEvent = (body: unknown): { challenge: string } | { messag
         message: {
             ...(attachments.length > 0 && { attachments }),
             chatId: event.channel,
+            direct: event.channel_type === "im",
             eventId: `${event.channel}:${eventTs}`,
             kind: inboundKind(event.text, attachments),
             senderId: event.user,

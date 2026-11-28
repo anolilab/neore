@@ -6,7 +6,7 @@
 import { basename, extname } from "node:path";
 
 import type { Flags, ParsedCommand } from "./args";
-import { limitFlag, requireArgument, UsageError } from "./args";
+import { effortFlag, limitFlag, requireArgument, UsageError } from "./args";
 import { ApiError, hintFor, NeoreClient, stripTrailingSlashes } from "./client";
 import { deleteConfig, insecurePermissions, readConfig, resolveCredentials, writeConfig } from "./config";
 import { assertSecureBaseUrl, formatUserCode, pollForKey, REQUEST_TIMEOUT_MS, requestDeviceCode, revokeIssuedKey } from "./device-login";
@@ -195,7 +195,7 @@ const CONTROL_CHARACTERS = /\p{Cc}+/gu;
 const oneLine = (text: string): string => text.replaceAll(CONTROL_CHARACTERS, " ").trim();
 
 /** The flags `thread start|send` use. Every flag is shared, so any other one would be dropped while a billed run starts. */
-const THREAD_FLAGS: ReadonlySet<string> = new Set(["api-key", "api-url", "help", "json", "model", "wait"]);
+const THREAD_FLAGS: ReadonlySet<string> = new Set(["api-key", "api-url", "effort", "help", "json", "model", "wait"]);
 
 /** Refuses a flag `thread start|send` would drop; checked before stdin is read, so an open pipe cannot hold it back. */
 const refuseUnusedFlags = (flags: Flags): void => {
@@ -206,13 +206,19 @@ const refuseUnusedFlags = (flags: Flags): void => {
     }
 
     if (unused.length > 0) {
-        throw new UsageError(`\`thread\` has no ${unused.map((flag) => `--${flag}`).join(", ")}. It takes -m, --wait and --json; --wait waits for the reply.`);
+        throw new UsageError(
+            `\`thread\` has no ${unused.map((flag) => `--${flag}`).join(", ")}. It takes -m, --effort, --wait and --json; --wait waits for the reply.`,
+        );
     }
+
+    // A bad value is refused here too, so it never waits on stdin.
+    effortFlag(flags);
 };
 
 const postThread = async (context: Context, flags: Flags, threadId: string | undefined, prompt: string): Promise<number> => {
+    const reasoningEffort = effortFlag(flags);
     const client = await clientFor(context, flags);
-    const body = { model: flags.model, prompt, ...(threadId && { threadId }) };
+    const body = { model: flags.model, prompt, ...(reasoningEffort !== undefined && { reasoningEffort }), ...(threadId && { threadId }) };
 
     if (!flags.wait) {
         const started = await withReadLaterHint(

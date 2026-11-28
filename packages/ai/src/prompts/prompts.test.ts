@@ -304,6 +304,13 @@ describe("Prompt System Tests", () => {
             expect(prompt).toContain("TOOL USAGE PRINCIPLES");
         });
 
+        it("points remember at the message that started the reply, and a request sent mid-reply to a new message", () => {
+            const prompt = getSystemPrompt();
+
+            expect(prompt).toContain("remember something in the message that started this reply");
+            expect(prompt).toContain("ask them to send the request as a new message");
+        });
+
         it("should always include agent loop framework", () => {
             const prompt = getSystemPrompt();
 

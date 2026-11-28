@@ -44,6 +44,7 @@ import musicGenerationTool from "./music-generation";
 import peopleSearchTool from "./people-search";
 import redditSearchTool from "./reddit-search";
 import renderUITool from "./render-ui";
+import rememberTool from "./remember";
 import requestSecretTool from "./request-secret";
 import retrieveTool from "./retrieve";
 import { saveSecretAsProviderKeyTool, setMcpServerSecretTool } from "./use-secret";
@@ -125,6 +126,7 @@ export {
 } from "./pull-request";
 export type { RedditPost } from "./reddit-search";
 export { default as redditSearchTool } from "./reddit-search";
+export { default as rememberTool } from "./remember";
 export type { RenderUIOutput } from "./render-ui";
 export { default as renderUITool } from "./render-ui";
 export type { RequestSecretInput, RequestSecretOutput } from "./request-secret";
@@ -250,6 +252,9 @@ export enum ToolName {
     ReadFailingChecks = "readFailingChecks",
     ReadPullRequest = "readPullRequest",
     RedditSearch = "redditSearch",
+
+    // Saving a fact the user asked to be remembered
+    Remember = "remember",
 
     // Generative UI Tools
     RenderUI = "renderUI",
@@ -379,6 +384,7 @@ export const getAllTools = () => {
         [ToolName.ReadFailingChecks]: readFailingChecksTool,
         [ToolName.ReadPullRequest]: readPullRequestTool,
         [ToolName.RedditSearch]: redditSearchTool,
+        [ToolName.Remember]: rememberTool,
         [ToolName.RenderUI]: renderUITool,
         [ToolName.ReplyToReviewComment]: replyToReviewCommentTool,
         [ToolName.RequestSecret]: requestSecretTool,

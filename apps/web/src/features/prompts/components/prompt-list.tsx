@@ -514,7 +514,11 @@ const PromptList = ({ onUsePrompt }: PromptListProps) => {
                             />
                         </div>
                         <div className="flex items-center gap-2">
-                            <Select onValueChange={(v) => setSortBy(v as SortOption)} value={sortBy}>
+                            <Select
+                                items={{ alphabetical: t`A-Z`, mostUsed: t`Most Used`, recent: t`Recent`, recentlyUsed: t`Recently Used` }}
+                                onValueChange={(v) => setSortBy(v as SortOption)}
+                                value={sortBy}
+                            >
                                 <SelectTrigger aria-label={t`Sort by`} className="w-40">
                                     <SelectValue />
                                 </SelectTrigger>

@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, userEvent, within } from "storybook/test";
+import { expect, userEvent, waitFor, within } from "storybook/test";
 
 import { ChatProvider } from "@/features/chat/core/context/chat-context";
 import { ASIDE_FIND_EVENT } from "@/features/keyboard/lib/aside-find-target";
@@ -95,6 +95,9 @@ export const FindWithMatches: Story = {
 
         const input = await canvas.findByRole("textbox", { name: "Find in side questions" });
 
+        // The bar focuses and selects its input once it has rendered; typing before that would be selected and replaced.
+        await waitFor(() => expect(input).toHaveFocus());
+
         await userEvent.type(input, "idempotent");
         await expect(await canvas.findByText("1 of 3")).toBeVisible();
     },
@@ -110,6 +113,9 @@ export const FindNoMatches: Story = {
         globalThis.dispatchEvent(new CustomEvent(ASIDE_FIND_EVENT));
 
         const input = await canvas.findByRole("textbox", { name: "Find in side questions" });
+
+        // The bar focuses and selects its input once it has rendered; typing before that would be selected and replaced.
+        await waitFor(() => expect(input).toHaveFocus());
 
         await userEvent.type(input, "zebra");
         await expect(await canvas.findByText("No matches")).toBeVisible();

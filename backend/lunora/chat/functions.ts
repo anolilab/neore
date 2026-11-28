@@ -8,6 +8,7 @@ import { FOLLOWUP_DISPATCH_TTL_MS, FOLLOWUP_PATH_LIMIT, followupModelRows, reply
 import { withoutSearchVectors } from "../agent/thread-search-plan";
 import { callOnShard } from "../lib/cross-shard";
 import { runAfterWithRetry } from "../lib/shard-scheduler";
+import { isSearchIndexBuilding } from "../lib/search-index";
 import { signDocsForDisplay } from "../agent/display-media";
 import {
     DEFAULT_FOLLOWUP_SUGGESTIONS_MODEL,
@@ -1296,49 +1297,7 @@ export const getThreadsWithTemporaryFilter = internalQuery
         teamId: v.optional(v.string()), // Filter by team within organization
         userId: v.string(),
     })
-    .output(
-        v.object({
-            continueCursor: v.union(v.string(), v.null()),
-            isDone: v.boolean(),
-            page: v.array(
-                v.object({
-                    _creationTime: v.number(),
-                    _id: v.string(),
-                    botId: v.optional(v.string()),
-                    createdAt: v.optional(v.number()),
-                    createdBy: v.optional(v.string()),
-                    customSystemPrompt: v.optional(v.string()),
-                    deleted: v.optional(v.boolean()),
-                    deletedAt: v.optional(v.number()),
-                    dictationLanguage: v.optional(v.string()),
-                    enabledFeatures: v.optional(v.array(v.string())),
-                    isPublic: v.optional(v.boolean()),
-                    isTemporary: v.optional(v.boolean()),
-                    language: v.optional(v.string()),
-                    lastUserMessageAt: v.optional(v.number()),
-                    lockedAt: v.optional(v.number()),
-                    mode: v.optional(v.string()),
-                    model: v.optional(v.string()),
-                    multiChat: v.optional(v.boolean()),
-                    order: v.optional(v.number()),
-                    organizationId: v.optional(v.string()),
-                    permissionMode: v.optional(v.union(v.literal("supervised"), v.literal("auto"), v.literal("full"))),
-                    pinnedAt: v.optional(v.number()),
-                    projectId: v.optional(v.string()),
-                    publicAccessToken: v.optional(v.string()),
-                    reasoningEffort: v.optional(v.number()),
-                    statelessMode: v.optional(v.boolean()),
-                    status: v.string(),
-                    summary: v.optional(v.string()),
-                    tags: v.optional(v.array(v.string())),
-                    teamId: v.optional(v.string()),
-                    title: v.optional(v.string()),
-                    updatedAt: v.optional(v.number()),
-                    userId: v.optional(v.string()),
-                }),
-            ),
-        }),
-    )
+    .output(paginatedOf(vThreadDoc))
     .query(async ({ args, ctx: context }) => {
         // Pass excludeTemporary directly — listThreadsByUserId now filters
         // isTemporary in its JS filter, eliminating the second runQuery call
@@ -3112,38 +3071,7 @@ export const unpinThread = authMutation
 
 export const getPinnedThreads = authQuery
     .input({})
-    .output(
-        v.array(
-            v.object({
-                _creationTime: v.number(),
-                _id: v.string(),
-                botId: v.optional(v.string()),
-                createdAt: v.optional(v.number()),
-                createdBy: v.optional(v.string()),
-                customSystemPrompt: v.optional(v.string()),
-                deleted: v.optional(v.boolean()),
-                deletedAt: v.optional(v.number()),
-                enabledFeatures: v.optional(v.array(v.string())),
-                isPublic: v.optional(v.boolean()),
-                lastUserMessageAt: v.optional(v.number()),
-                lockedAt: v.optional(v.number()),
-                model: v.optional(v.string()),
-                order: v.optional(v.number()),
-                permissionMode: v.optional(v.union(v.literal("supervised"), v.literal("auto"), v.literal("full"))),
-                pinnedAt: v.optional(v.number()),
-                projectId: v.optional(v.string()),
-                publicAccessToken: v.optional(v.string()),
-                reasoningEffort: v.optional(v.number()),
-                statelessMode: v.optional(v.boolean()),
-                status: v.string(),
-                summary: v.optional(v.string()),
-                tags: v.optional(v.array(v.string())),
-                title: v.optional(v.string()),
-                updatedAt: v.optional(v.number()),
-                userId: v.optional(v.string()),
-            }),
-        ),
-    )
+    .output(v.array(vThreadDoc))
     .query(async ({ ctx: context }) => {
         const { userId } = context.user;
 
@@ -3192,36 +3120,7 @@ export const updateThreadOrder = authMutation
 
 export const getThreadOrders = authQuery
     .input({})
-    .output(
-        v.array(
-            v.object({
-                _creationTime: v.number(),
-                _id: v.string(),
-                botId: v.optional(v.string()),
-                createdAt: v.optional(v.number()),
-                createdBy: v.optional(v.string()),
-                customSystemPrompt: v.optional(v.string()),
-                deleted: v.optional(v.boolean()),
-                deletedAt: v.optional(v.number()),
-                enabledFeatures: v.optional(v.array(v.string())),
-                isPublic: v.optional(v.boolean()),
-                model: v.optional(v.string()),
-                order: v.optional(v.number()),
-                permissionMode: v.optional(v.union(v.literal("supervised"), v.literal("auto"), v.literal("full"))),
-                pinnedAt: v.optional(v.number()),
-                projectId: v.optional(v.string()),
-                publicAccessToken: v.optional(v.string()),
-                reasoningEffort: v.optional(v.number()),
-                statelessMode: v.optional(v.boolean()),
-                status: v.string(),
-                summary: v.optional(v.string()),
-                tags: v.optional(v.array(v.string())),
-                title: v.optional(v.string()),
-                updatedAt: v.optional(v.number()),
-                userId: v.optional(v.string()),
-            }),
-        ),
-    )
+    .output(v.array(vThreadDoc))
     .query(async ({ ctx: context }) => {
         const { userId } = context.user;
 
@@ -3557,9 +3456,6 @@ export const sentPromptOf = (message: TypedPromptRow): { draftFrom: DraftFrom | 
  */
 export const listsSentPrompts = (thread: ThreadDoc | null, userId: string): thread is ThreadDoc =>
     thread !== null && thread.userId === userId && !thread.deleted && thread.deletingAt === undefined && !isThreadLocked(thread) && thread.isTemporary !== true;
-
-/** Lunora's answer for a search index whose backfill has not yet covered the table (`SEARCH_INDEX_BUILDING`, 503). */
-export const isSearchIndexBuilding = (error: unknown): boolean => error instanceof LunoraError && error.code === "SEARCH_INDEX_BUILDING";
 
 /**
  * The caller's own sent prompts that match `searchQuery`, newest first, at most 50. It reads the typed-words index

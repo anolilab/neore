@@ -107,7 +107,13 @@ const ControlNetNodeComponent = (props: NodeProps<Node<ControlNetNodeData>>) => 
                     <Label className="text-muted-foreground text-xs" htmlFor={`${id}-control-type`}>
                         <Trans>Control Type</Trans>
                     </Label>
-                    <Select onValueChange={handleControlTypeChange} value={data.controlType}>
+                    <Select
+                        items={CONTROL_TYPES.map((option) => {
+                            return { label: i18n._(option.label), value: option.value };
+                        })}
+                        onValueChange={handleControlTypeChange}
+                        value={data.controlType}
+                    >
                         <SelectTrigger className="nodrag h-8 text-sm" id={`${id}-control-type`}>
                             <SelectValue />
                         </SelectTrigger>
@@ -141,7 +147,7 @@ const ControlNetNodeComponent = (props: NodeProps<Node<ControlNetNodeData>>) => 
                         <Label className="text-muted-foreground text-xs" htmlFor={`${id}-preprocessor`}>
                             <Trans>Preprocessor</Trans>
                         </Label>
-                        <Select onValueChange={handlePreprocessorChange} value={data.preprocessor ?? defaultPreprocessor}>
+                        <Select items={preprocessorModels} onValueChange={handlePreprocessorChange} value={data.preprocessor ?? defaultPreprocessor}>
                             <SelectTrigger className="nodrag h-8 text-sm" id={`${id}-preprocessor`}>
                                 <SelectValue placeholder={t`Auto-detect`} />
                             </SelectTrigger>

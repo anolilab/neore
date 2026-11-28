@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { parseCommand, UsageError } from "./args";
+import { effortFlag, parseCommand, UsageError } from "./args";
 import { run } from "./cli";
 import type { StreamEvent } from "./client";
 import { ApiError, errorFromResponse, EXIT, exitCodeFor, NeoreClient, parseNdjson, retryDelayMs } from "./client";
@@ -71,6 +71,25 @@ describe("argument parsing", () => {
         expect(() => parseCommand(["--wait"])).toThrow(UsageError);
         expect(() => parseCommand(["chat", "hi", "--wait"])).toThrow("`chat` has no --wait: use --no-stream");
         expect(() => parseCommand(["tasks", "run", "t1", "--wait"])).toThrow("`neore tasks status <id>`");
+    });
+
+    it("takes --effort on thread start and send only", () => {
+        expect(parseCommand(["thread", "send", "t1", "hi", "--effort", "50"]).flags.effort).toBe("50");
+        expect(parseCommand(["thread", "start", "hi", "--effort", "0", "--wait"]).flags).toEqual({ effort: "0", wait: true });
+        expect(() => parseCommand(["chat", "hi", "--effort", "50"])).toThrow("`chat` has no --effort");
+        expect(() => parseCommand(["threads", "ls", "--effort", "50"])).toThrow(UsageError);
+        expect(parseCommand(["chat", "--help", "--effort", "50"]).flags.help).toBe(true);
+    });
+
+    it("reads --effort as an integer from 0 to 100, and nothing when it is absent", () => {
+        expect(effortFlag({})).toBeUndefined();
+        expect(effortFlag({ effort: "0" })).toBe(0);
+        expect(effortFlag({ effort: "75" })).toBe(75);
+        expect(effortFlag({ effort: "100" })).toBe(100);
+
+        for (const bad of ["", " ", "-1", "101", "2.5", "high", "1e2", "NaN"]) {
+            expect(() => effortFlag({ effort: bad }), bad).toThrow("--effort must be an integer between 0 and 100.");
+        }
     });
 
     it("exits 2 on a usage error and 0 on --version", async () => {
@@ -630,5 +649,45 @@ describe("chat end to end against a fake API", () => {
             expect(await run(["login", "--api-url", "https://api.test"], context)).toBe(EXIT.ok);
             expect(await readConfig(join(directory, "config.json"))).toEqual({ apiKey: "nk_piped", apiUrl: "https://api.test" });
         });
+    });
+});
+
+describe("thread send --effort", () => {
+    const send = async (argv: string[]) => {
+        const bodies: Record<string, unknown>[] = [];
+        const io = ioFor();
+        const context = {
+            fetch: async (_url: string, init: RequestInit) => {
+                bodies.push(JSON.parse(String(init.body)) as Record<string, unknown>);
+
+                return Response.json({ messageId: "m1", threadId: "t1" }, { headers: { "content-type": "application/json" }, status: 202 });
+            },
+            io,
+            stdinIsTTY: true,
+        } as unknown as Context;
+        const code = await run(["thread", "send", "t1", "hello", "--api-key", "nk_1", "--api-url", "https://x", ...argv], context);
+
+        return { bodies, code, io };
+    };
+
+    it("passes the effort in the chat request, as a number", async () => {
+        const { bodies, code } = await send(["--effort", "75"]);
+
+        expect(code).toBe(EXIT.ok);
+        expect(bodies).toHaveLength(1);
+        expect(bodies[0]).toMatchObject({ prompt: "hello", reasoningEffort: 75, threadId: "t1" });
+    });
+
+    it("sends none when the flag is absent", async () => {
+        const { bodies } = await send([]);
+
+        expect(bodies[0]).not.toHaveProperty("reasoningEffort");
+    });
+
+    it("refuses a bad value before any request is made", async () => {
+        const { bodies, code } = await send(["--effort", "150"]);
+
+        expect(code).toBe(EXIT.usage);
+        expect(bodies).toHaveLength(0);
     });
 });

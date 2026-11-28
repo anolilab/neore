@@ -547,8 +547,50 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
 
     // The row's less-used actions, in the options menu. Each keeps the name its own button had. Their dialogs are rendered by the row,
     // not here: the menu's content unmounts when it closes, and a dialog opened from it would go with it.
+    // A touch screen has no hover strip, so its quick actions come first in the row's menu there.
+    const touchQuickActions = !canHover && (
+        <>
+            {node.status !== "archived" && (
+                <DropdownMenuItem disabled={isPinning} onClick={() => (node.isPinned ? handleUnpinThread(node.threadId) : handlePinThread(node.threadId))}>
+                    {node.isPinned ? <PinOff aria-hidden="true" /> : <Pin aria-hidden="true" />}
+                    {i18n._(getPinTooltip(isPinning, node.isPinned))}
+                </DropdownMenuItem>
+            )}
+            {isRootThread && (node.lastReplyAt !== undefined || snoozedUntil !== undefined) && (
+                <DropdownMenuSub>
+                    <DropdownMenuSubTrigger>
+                        <AlarmClock aria-hidden="true" />
+                        {t`Snooze thread`}
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent>
+                        <DropdownMenuItem onClick={() => snooze(node.threadId, "hour", node.snoozedUntil)}>{t`Snooze 1 hour`}</DropdownMenuItem>
+                        <DropdownMenuItem
+                            onClick={() => snooze(node.threadId, "tomorrow", node.snoozedUntil)}
+                        >{t`Snooze until tomorrow 09:00`}</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => snooze(node.threadId, "nextWeek", node.snoozedUntil)}>{t`Snooze until next week`}</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setSnoozeThreadId(node.threadId)}>{t`Snooze until…`}</DropdownMenuItem>
+                        {isSnoozed(snoozedUntil, clock) && (
+                            <DropdownMenuItem onClick={() => unsnooze(node.threadId, node.snoozedUntil)}>{t`Unsnooze`}</DropdownMenuItem>
+                        )}
+                    </DropdownMenuSubContent>
+                </DropdownMenuSub>
+            )}
+            {!isImpersonating && (
+                <DropdownMenuItem
+                    disabled={isArchiving}
+                    onClick={() => updateThread(node.threadId, node.model || "gemini-1.5-flash", node.status === "archived" ? "active" : "archived")}
+                >
+                    <ArchiveIcon aria-hidden="true" />
+                    {i18n._(getArchiveTooltip(isArchiving, node.status))}
+                </DropdownMenuItem>
+            )}
+            <DropdownMenuSeparator />
+        </>
+    );
+
     const rowMenuItems = (
         <>
+            {touchQuickActions}
             <DropdownMenuItem
                 aria-label={named(isBranching ? t`Creating branch...` : t`Create branch`)}
                 disabled={isBranching}
@@ -864,7 +906,10 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
                                 ) : (
                                     // The title is the row's keyboard target: the row itself holds no role, so the link is what Tab reaches.
                                     <Link
-                                        className={cn("truncate rounded-sm focus-visible:outline-none", isUnread && "font-medium")}
+                                        className={cn(
+                                            "focus-visible:ring-ring truncate rounded-sm focus-visible:ring-2 focus-visible:outline-none",
+                                            isUnread && "font-medium",
+                                        )}
                                         params={{ threadId: node.threadId }}
                                         search={{}}
                                         to="/chat/$threadId"
@@ -1008,7 +1053,8 @@ const ThreadNode: FC<ThreadNodeProperties> = ({
             )}
 
             {/* The quick actions. Faded out, not removed, so an open menu keeps its anchor and focus has somewhere to return. */}
-            <div className="bg-surface-row-hover absolute top-[calc(var(--density-row-py)-3px)] right-2 flex items-center gap-0.5 rounded-lg p-0.5 opacity-0 transition-opacity group-hover/action-item:opacity-100 focus-within:opacity-100 has-[[data-popup-open]]:opacity-100">
+            {/* Invisible, it takes no taps: on a touch screen it never shows, and its buttons would sit over the row's own controls. */}
+            <div className="bg-surface-row-hover pointer-events-none absolute top-[calc(var(--density-row-py)-3px)] right-2 flex items-center gap-0.5 rounded-lg p-0.5 opacity-0 transition-opacity group-hover/action-item:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100 has-[[data-popup-open]]:pointer-events-auto has-[[data-popup-open]]:opacity-100 [@media(hover:hover)]:group-hover/action-item:pointer-events-auto">
                 {renderStopButton("contents [@media(hover:none)]:hidden")}
 
                 {node.status !== "archived" && (

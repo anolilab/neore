@@ -48,14 +48,14 @@ so. `--device` and `--key` cannot be combined.
 `neore --help` is the reference. Every command takes `--json` (NDJSON for
 streams).
 
-| Area      | Commands                                                                                                                             |
-| --------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| Account   | `login`, `logout`, `whoami`, `doctor`                                                                                                |
-| Chat      | `chat [prompt]` (no prompt opens an interactive session), `models`                                                                   |
-| Threads   | `thread start <prompt> [--wait]`, `thread send <id> <prompt> [--wait]`, `threads ls`, `threads show <id>`, `threads rm <id> [--yes]` |
-| Skills    | `skills ls`, `skills run <slug> [input]`                                                                                             |
-| Tasks     | `tasks ls`, `tasks create`, `tasks run <id>`, `tasks status <id>`                                                                    |
-| Knowledge | `kb upload <file>`, `kb ls`, `kb search <query>`                                                                                     |
+| Area      | Commands                                                                                                                                                       |
+| --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Account   | `login`, `logout`, `whoami`, `doctor`                                                                                                                          |
+| Chat      | `chat [prompt]` (no prompt opens an interactive session), `models`                                                                                             |
+| Threads   | `thread start <prompt> [--effort N] [--wait]`, `thread send <id> <prompt> [--effort N] [--wait]`, `threads ls`, `threads show <id>`, `threads rm <id> [--yes]` |
+| Skills    | `skills ls`, `skills run <slug> [input]`                                                                                                                       |
+| Tasks     | `tasks ls`, `tasks create`, `tasks run <id>`, `tasks status <id>`                                                                                              |
+| Knowledge | `kb upload <file>`, `kb ls`, `kb search <query>`                                                                                                               |
 
 Exit codes: 0 ok, 1 error, 2 usage, 3 auth or missing scope, 4 not found,
 5 rate or daily limit, 6 network. `thread start` and `thread send` keep 1 for a

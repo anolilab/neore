@@ -181,6 +181,13 @@ const EventTriggerFields: FC<EventTriggerFieldsProps> = ({ event, onChange }) =>
         ),
     );
     const choices = threads?.page ?? [];
+    // A thread the list no longer holds keeps a row of its own, so the trigger names it instead of its id.
+    const threadItems = [
+        ...(event.threadId !== "" && choices.every((thread) => thread._id !== event.threadId) ? [{ label: t`Selected thread`, value: event.threadId }] : []),
+        ...choices.map((thread) => {
+            return { label: thread.title || t`Untitled`, value: thread._id };
+        }),
+    ];
     const set = (patch: Partial<EventFormState>) => onChange({ ...event, ...patch });
     const [minTime] = useState(() => toLocalInput(Date.now() + 60_000));
 
@@ -268,7 +275,7 @@ const EventTriggerFields: FC<EventTriggerFieldsProps> = ({ event, onChange }) =>
             {event.kind === "thread" && (
                 <div className="space-y-1.5">
                     <Label htmlFor={ids.thread}>{t`Thread`}</Label>
-                    <Select onValueChange={(value) => set({ threadId: value ?? "" })} value={event.threadId}>
+                    <Select items={threadItems} onValueChange={(value) => set({ threadId: value ?? "" })} value={event.threadId}>
                         <SelectTrigger id={ids.thread}>
                             <SelectValue placeholder={t`Pick a thread`} />
                         </SelectTrigger>
