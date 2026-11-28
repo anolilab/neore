@@ -74,6 +74,11 @@ vi.mock("@/features/chat/aside/aside-panel", () => {
     return { default: () => null };
 });
 
+// The context box reads its own queries; the tabs are what these tests are about.
+vi.mock("./thread-context", () => {
+    return { default: () => null };
+});
+
 vi.mock("@/features/chat/pins/pins-sidebar-tab", () => {
     return { default: () => <p>pins tab</p> };
 });
