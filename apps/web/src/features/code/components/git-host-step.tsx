@@ -12,6 +12,7 @@ import SetupStepRow from "@/features/onboarding/components/setup-step-row";
  */
 const GitHostStep: FC<{ withAction?: boolean }> = ({ withAction = true }) => {
     const { t } = useLingui();
+    const title = t`Connect a Git host`;
     const host = useDevelopHost();
     // A failed read wins over what the cache still holds: the query does not retry by itself, so the row offers it.
     const failed = host.isError;
@@ -27,12 +28,13 @@ const GitHostStep: FC<{ withAction?: boolean }> = ({ withAction = true }) => {
     }
 
     return (
-        <SetupStepRow
-            description={t`Connect a Git host to review pull requests here.`}
-            done={connected}
-            statusLabel={statusLabel}
-            title={t`Connect a Git host`}
-        >
+        <SetupStepRow description={t`Connect a Git host to review pull requests here.`} done={connected} statusLabel={statusLabel} title={title}>
+            {failed && (
+                // Said once as it fails, like the other steps' changes: a user already on the page would not see the row change.
+                <span className="sr-only" role="alert">
+                    {t`${title} could not be checked.`}
+                </span>
+            )}
             {failed && (
                 <Button
                     disabled={host.isFetching}

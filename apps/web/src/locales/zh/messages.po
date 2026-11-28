@@ -1637,6 +1637,10 @@ msgstr "{success, plural, other {已关联 # 个拉取请求。}}"
 msgid "{text} (gave up after {attempts} attempts)"
 msgstr "{text}（尝试 {attempts} 次后放弃）"
 
+#: src/features/code/components/git-host-step.tsx:35
+msgid "{title} could not be checked."
+msgstr "{title}：无法检查。"
+
 #: src/features/onboarding/components/setup-checklist.tsx:153
 msgid "{title} is done."
 msgstr "{title} 已完成。"
@@ -1926,7 +1930,7 @@ msgstr "30 天"
 msgid "30+ AI models for chat, images, video, documents, and code. One workspace, one subscription — free to start."
 msgstr "30+ 个 AI 模型，支持聊天、图像、视频、文档和代码。一个工作区，一份订阅——免费开始。"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:46
+#: src/features/onboarding/components/onboarding-dialog.tsx:50
 msgid "30+ Models, One Thread"
 msgstr "30+ 个模型，一个对话"
 
@@ -5117,7 +5121,7 @@ msgid "Azure portal → your OpenAI resource → Keys and Endpoint. Encrypted at
 msgstr "Azure 门户 → 你的 OpenAI 资源 → 密钥和终结点。加密存储，不会再次显示。"
 
 #: src/features/code/components/code-shell.tsx:192
-#: src/features/onboarding/components/onboarding-dialog.tsx:492
+#: src/features/onboarding/components/onboarding-dialog.tsx:498
 #: src/features/pages/components/page-version-panel.tsx:88
 #: src/features/projects/components/add-project-dialog.tsx:692
 #: src/features/settings/components/personalization/memory-import-dialog.tsx:309
@@ -5137,7 +5141,7 @@ msgstr "返回编辑器"
 msgid "Back to Gallery"
 msgstr "返回图库"
 
-#: src/components/settings/settings-modal.tsx:704
+#: src/components/settings/settings-modal.tsx:705
 msgid "Back to settings sections"
 msgstr "返回设置分区"
 
@@ -5598,7 +5602,7 @@ msgstr "正文"
 
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:382
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:386
-#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:297
+#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:307
 #: ../../packages/ui/src/components/tiptap-editor.tsx:192
 msgid "Bold"
 msgstr "粗体"
@@ -5908,7 +5912,7 @@ msgstr "专为<0>真实工作流</0>打造。"
 msgid "Built for expert developers and complex systems"
 msgstr "专为资深开发者和复杂系统打造"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:41
+#: src/features/onboarding/components/onboarding-dialog.tsx:45
 msgid "Built-in Canvas Editor"
 msgstr "内置画布编辑器"
 
@@ -5940,7 +5944,7 @@ msgstr "保加利亚语（保加利亚）"
 #~ msgid "Bulk actions"
 #~ msgstr "批量操作"
 
-#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:320
+#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:330
 #: ../../packages/ui/src/components/tiptap-editor.tsx:222
 msgid "Bulleted list"
 msgstr "项目符号列表"
@@ -6604,7 +6608,7 @@ msgstr "聊天"
 #: src/features/layout/components/sidebar-shortcut.tsx:79
 #: src/features/layout/components/workspace-switch.tsx:47
 #: src/features/layout/lib/dashboard-page-names.ts:20
-#: src/features/onboarding/components/onboarding-dialog.tsx:131
+#: src/features/onboarding/components/onboarding-dialog.tsx:135
 #: src/features/settings/components/account/account-settings.tsx:355
 #: src/features/settings/components/chat/bots-settings.tsx:524
 #: src/features/settings/lib/settings-keywords.ts:33
@@ -6812,7 +6816,7 @@ msgstr "勾选的集成会在保存后提供设置。在你确认之前不会建
 msgid "Checked: {0}"
 msgstr "已检查：{0}"
 
-#: src/features/code/components/git-host-step.tsx:26
+#: src/features/code/components/git-host-step.tsx:27
 #: src/features/onboarding/components/setup-checklist.tsx:176
 msgid "Checking"
 msgstr "检查中"
@@ -7409,7 +7413,7 @@ msgid "Cloudflare Workers AI models run wherever Cloudflare has capacity, so any
 msgstr "Cloudflare Workers AI 模型在 Cloudflare 有可用容量的任何地方运行，因此设置任何区域规则都会隐藏它们。"
 
 #: ../../packages/chat-ui/src/chat/document-artifact.tsx:40
-#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:309
+#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:319
 #: ../../packages/ui/src/components/tiptap-editor.tsx:204
 #: src/features/auth/components/device-code-parts.tsx:46
 #: src/features/auth/components/device-code-parts.tsx:80
@@ -7418,7 +7422,7 @@ msgstr "Cloudflare Workers AI 模型在 Cloudflare 有可用容量的任何地�
 #: src/features/chat/thread/composer-search-mode.tsx:57
 #: src/features/code/components/code-workspace.tsx:246
 #: src/features/layout/components/workspace-switch.tsx:48
-#: src/features/onboarding/components/onboarding-dialog.tsx:137
+#: src/features/onboarding/components/onboarding-dialog.tsx:141
 #: src/features/workflow/components/nodes/code-node.tsx:60
 #: src/features/workflow/types/index.ts:451
 #: src/features/workflow/types/index.ts:455
@@ -7427,7 +7431,7 @@ msgid "Code"
 msgstr "代码"
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:168
-#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:333
+#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:343
 msgid "Code block"
 msgstr "代码块"
 
@@ -7891,11 +7895,11 @@ msgstr "先对比，再决定"
 msgid "Compare concepts across FLUX, Runway, and Stable Diffusion. Pick the best style, not the only option."
 msgstr "在 FLUX、Runway 和 Stable Diffusion 之间对比创意。选择最佳风格，而不是唯一选项。"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:80
+#: src/features/onboarding/components/onboarding-dialog.tsx:84
 msgid "Compare how different AI models explain quantum computing to a beginner."
 msgstr "比较不同 AI 模型如何向初学者解释量子计算。"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:79
+#: src/features/onboarding/components/onboarding-dialog.tsx:83
 msgid "Compare models"
 msgstr "比较模型"
 
@@ -8144,7 +8148,7 @@ msgstr "为此对话配置变量值。使用提示词时，这些值将替换 {V
 msgid "Configure Variables"
 msgstr "配置变量"
 
-#: src/components/settings/settings-modal.tsx:621
+#: src/components/settings/settings-modal.tsx:622
 msgid "Configure your application settings"
 msgstr "配置你的应用设置"
 
@@ -8230,9 +8234,9 @@ msgstr "连接 {label}，即可在此查看需要你审查的内容。"
 msgid "Connect a bot you own to a messaging app and message your agent from your phone. Messages from the app have their own pairing and rate-limit checks, then land in the same chat history as your web chats."
 msgstr "将你自己的机器人连接到消息应用，即可在手机上给智能体发消息。来自应用的消息有各自的配对和频率限制检查，随后进入与网页聊天相同的聊天记录。"
 
-#: src/features/code/components/git-host-step.tsx:34
-#: src/features/code/components/git-host-step.tsx:46
-#: src/features/code/components/git-host-step.tsx:52
+#: src/features/code/components/git-host-step.tsx:15
+#: src/features/code/components/git-host-step.tsx:48
+#: src/features/code/components/git-host-step.tsx:54
 msgid "Connect a Git host"
 msgstr "连接 Git 托管平台"
 
@@ -9145,7 +9149,7 @@ msgstr "无法更改权限模式，请重试。"
 msgid "Could not change where this device is offered."
 msgstr "无法更改此设备的可用范围。"
 
-#: src/features/code/components/git-host-step.tsx:22
+#: src/features/code/components/git-host-step.tsx:23
 #: src/features/onboarding/components/setup-checklist.tsx:176
 msgid "Could not check"
 msgstr "无法检查"
@@ -9822,7 +9826,7 @@ msgstr "创建群聊"
 msgid "Create guest link"
 msgstr "创建访客链接"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:43
+#: src/features/onboarding/components/onboarding-dialog.tsx:47
 msgid "Create Images and Videos"
 msgstr "创建图像和视频"
 
@@ -11714,7 +11718,7 @@ msgstr "要添加更多行吗？"
 #: ../../packages/chat-ui/src/chat/message-content.tsx:320
 #: ../../packages/ui/src/components/file-renderers/docx-preview.tsx:115
 #: ../../packages/ui/src/components/file-renderers/epub-preview.tsx:308
-#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:182
+#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:184
 msgid "Document"
 msgstr "文档"
 
@@ -11767,7 +11771,7 @@ msgstr "在此项目中不使用你的默认指令"
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:120
 #: src/features/chat/thread/host-activity.tsx:78
 #: src/features/chat/thread/host-activity.tsx:133
-#: src/features/code/components/git-host-step.tsx:24
+#: src/features/code/components/git-host-step.tsx:25
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:184
 #: src/features/devices/components/devices-settings.tsx:454
 #: src/features/onboarding/components/setup-checklist.tsx:150
@@ -16358,7 +16362,7 @@ msgstr "为一部短纪录片生成分镜"
 msgid "Generate a video from a text description"
 msgstr "根据文字描述生成视频"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:74
+#: src/features/onboarding/components/onboarding-dialog.tsx:78
 msgid "Generate an image"
 msgstr "生成图像"
 
@@ -16370,7 +16374,7 @@ msgstr "根据文本提示词生成图像"
 msgid "Generate an image from a text prompt and upscale it to 4x"
 msgstr "根据文本提示词生成图像并放大 4 倍"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:75
+#: src/features/onboarding/components/onboarding-dialog.tsx:79
 msgid "Generate an image of a cozy reading nook with warm lighting and plants."
 msgstr "生成一张温馨阅读角的图像，带有暖色灯光和绿植。"
 
@@ -16399,7 +16403,7 @@ msgstr "生成图像"
 msgid "Generate Image"
 msgstr "生成图像"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:42
+#: src/features/onboarding/components/onboarding-dialog.tsx:46
 msgid "Generate images and videos with leading image and video models, all from the same chat."
 msgstr "使用领先的图像和视频模型生成图像和视频，全部在同一个聊天中完成。"
 
@@ -16755,7 +16759,7 @@ msgid "Go to slide {slideNumber}"
 msgstr "转到第 {slideNumber} 张幻灯片"
 
 #. placeholder {0}: index + 1
-#: src/features/onboarding/components/onboarding-dialog.tsx:460
+#: src/features/onboarding/components/onboarding-dialog.tsx:466
 msgid "Go to step {0}"
 msgstr "前往第 {0} 步"
 
@@ -17312,7 +17316,7 @@ msgstr "请求头（可选）"
 
 #: ../../packages/ui/src/components/canvas-editor/canvas-element-palette.tsx:185
 #: ../../packages/ui/src/components/canvas-editor/canvas-element-palette.tsx:185
-#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:313
+#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:323
 #: ../../packages/ui/src/components/tiptap-editor.tsx:216
 msgid "Heading"
 msgstr "标题"
@@ -17349,7 +17353,7 @@ msgstr "你好，{0}！今天想做点什么？"
 msgid "Help"
 msgstr "帮助"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:70
+#: src/features/onboarding/components/onboarding-dialog.tsx:74
 msgid "Help me write a professional email to introduce myself to a new team."
 msgstr "帮我写一封专业的邮件，向新团队介绍自己。"
 
@@ -17365,7 +17369,7 @@ msgstr "分享一些关于你的信息，帮助 AI 更好地了解你。这些�
 msgid "Here is a summary, with the open items first."
 msgstr "以下是摘要，未完成事项列在前面。"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:44
+#: src/features/onboarding/components/onboarding-dialog.tsx:48
 msgid "Here is what coding agents need. Skip any step and finish it later on the Code page."
 msgstr "以下是编码智能体所需的内容。可以跳过任意步骤，稍后在“代码”页面完成。"
 
@@ -17612,7 +17616,7 @@ msgstr "更高的推理强度可能带来更周到的回复，但耗时更长。
 msgid "Highest quality output from Black Forest Labs"
 msgstr "来自 Black Forest Labs 的最高品质输出"
 
-#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:353
+#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:363
 #: ../../packages/ui/src/components/tiptap-editor.tsx:210
 msgid "Highlight"
 msgstr "高亮"
@@ -17675,7 +17679,7 @@ msgstr "洪都拉斯"
 msgid "Hong Kong"
 msgstr "香港"
 
-#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:336
+#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:346
 msgid "Horizontal rule"
 msgstr "水平分隔线"
 
@@ -17723,7 +17727,7 @@ msgstr "将鼠标悬停在某一天上，或聚焦图表后使用方向键。"
 msgid "How can I help you today?"
 msgstr "今天有什么可以帮你？"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:142
+#: src/features/onboarding/components/onboarding-dialog.tsx:146
 msgid "How do you want to start?"
 msgstr "你想如何开始？"
 
@@ -17931,7 +17935,7 @@ msgstr "插画"
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:107
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:109
 #: ../../packages/ui/src/components/canvas-editor/canvas-element-palette.tsx:330
-#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:343
+#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:353
 #: src/components/model-picker/model-picker.tsx:1261
 #: src/features/chat/image-gallery/thread-image-gallery.tsx:80
 #: src/features/chat/sidebar/usage-card.tsx:129
@@ -19076,7 +19080,7 @@ msgstr "意大利语"
 msgid "Italian (Switzerland)"
 msgstr "意大利语（瑞士）"
 
-#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:300
+#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:310
 #: ../../packages/ui/src/components/tiptap-editor.tsx:195
 msgid "Italic"
 msgstr "斜体"
@@ -19188,7 +19192,7 @@ msgstr "刚刚"
 msgid "Just now"
 msgstr "刚刚"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:389
+#: src/features/onboarding/components/onboarding-dialog.tsx:395
 msgid "Just start chatting"
 msgstr "直接开始聊天"
 
@@ -20080,7 +20084,7 @@ msgstr "{0} 的行"
 msgid "Lines that are not valid JSON"
 msgstr "不是有效 JSON 的行"
 
-#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:340
+#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:350
 #: src/features/auth/components/settings/providers/provider-cell.tsx:117
 #: src/features/develop/components/thread-pull-requests.tsx:419
 msgid "Link"
@@ -20337,7 +20341,7 @@ msgstr "正在加载文档…"
 msgid "Loading editor..."
 msgstr "正在加载编辑器..."
 
-#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:280
+#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:290
 #: src/features/canvas/canvas-panel.tsx:133
 #: src/features/pages/components/page-editor.tsx:40
 msgid "Loading editor…"
@@ -20397,8 +20401,8 @@ msgstr "正在加载节点详情..."
 msgid "Loading older messages..."
 msgstr "正在加载更早的消息..."
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:365
-#: src/features/onboarding/components/onboarding-dialog.tsx:368
+#: src/features/onboarding/components/onboarding-dialog.tsx:371
+#: src/features/onboarding/components/onboarding-dialog.tsx:374
 msgid "Loading onboarding"
 msgstr "正在加载新手引导"
 
@@ -23211,7 +23215,7 @@ msgstr "新闻简报头图图像"
 #: ../../packages/ui/src/components/pagination.tsx:52
 #: ../../packages/ui/src/components/spreadsheet/csv-renderer.tsx:342
 #: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:656
-#: src/features/onboarding/components/onboarding-dialog.tsx:514
+#: src/features/onboarding/components/onboarding-dialog.tsx:520
 msgid "Next"
 msgstr "下一步"
 
@@ -24394,7 +24398,7 @@ msgstr "图片数量"
 msgid "Number of messages"
 msgstr "消息数量"
 
-#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:323
+#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:333
 #: ../../packages/ui/src/components/tiptap-editor.tsx:225
 msgid "Numbered list"
 msgstr "编号列表"
@@ -24574,23 +24578,23 @@ msgstr "本地部署选项"
 msgid "Onboarding"
 msgstr "新手引导"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:333
+#: src/features/onboarding/components/onboarding-dialog.tsx:339
 msgid "Onboarding complete"
 msgstr "新手引导已完成"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:352
+#: src/features/onboarding/components/onboarding-dialog.tsx:358
 msgid "Onboarding complete. Redirecting to chat."
 msgstr "新手引导已完成。正在跳转到聊天。"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:352
+#: src/features/onboarding/components/onboarding-dialog.tsx:358
 msgid "Onboarding complete. Redirecting to Code."
 msgstr "引导完成。正在跳转到“代码”。"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:407
+#: src/features/onboarding/components/onboarding-dialog.tsx:413
 msgid "Onboarding progress"
 msgstr "新手引导进度"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:456
+#: src/features/onboarding/components/onboarding-dialog.tsx:462
 msgid "Onboarding steps"
 msgstr "新手引导步骤"
 
@@ -24598,7 +24602,7 @@ msgstr "新手引导步骤"
 msgid "Onboarding will restart on your next visit to chat."
 msgstr "下次访问聊天时将重新开始新手引导。"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:396
+#: src/features/onboarding/components/onboarding-dialog.tsx:402
 msgid "Onboarding wizard"
 msgstr "新手引导向导"
 
@@ -24678,7 +24682,7 @@ msgstr "一份订阅。<0>所有模型。</0>"
 msgid "One workspace for 30+ AI models. Chat, generate images, create videos, write documents, and run code — one account, one price."
 msgstr "一个工作区，30+ 个 AI 模型。聊天、生成图像、创作视频、撰写文档、运行代码——一个账号，一个价格。"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:48
+#: src/features/onboarding/components/onboarding-dialog.tsx:52
 msgid "One workspace for chat, images, video, documents, and code. 30+ AI models, one subscription."
 msgstr "一个工作区，搞定聊天、图像、视频、文档和代码。30+ 个 AI 模型，一份订阅。"
 
@@ -24919,7 +24923,7 @@ msgstr "作为页面打开"
 msgid "Open chat"
 msgstr "打开聊天"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:389
+#: src/features/onboarding/components/onboarding-dialog.tsx:395
 msgid "Open Code"
 msgstr "打开“代码”"
 
@@ -24932,7 +24936,7 @@ msgid "Open connectors"
 msgstr "打开连接器"
 
 #: src/features/code/components/code-shell.tsx:101
-#: src/features/code/components/git-host-step.tsx:51
+#: src/features/code/components/git-host-step.tsx:53
 msgid "Open Connectors"
 msgstr "打开连接器"
 
@@ -26550,7 +26554,7 @@ msgstr "选择技能"
 msgid "Pick a skill to evaluate."
 msgstr "选择要评测的技能。"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:49
+#: src/features/onboarding/components/onboarding-dialog.tsx:53
 msgid "Pick a starting point or jump straight into chat."
 msgstr "选择一个起点，或直接开始聊天。"
 
@@ -28092,7 +28096,7 @@ msgstr "来自字节跳动 Seedance 1.5 系列的快速、实惠的日常视频�
 msgid "Quick, affordable video generation using Alibaba's Wan model at a fast, lower-quality tier"
 msgstr "使用阿里巴巴 Wan 模型快速、低质量级别的实惠视频生成"
 
-#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:330
+#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:340
 #: ../../packages/ui/src/components/tiptap-editor.tsx:231
 msgid "Quote"
 msgstr "引用"
@@ -28669,7 +28673,7 @@ msgid "Redirecting to the thread..."
 msgstr "正在跳转到对话..."
 
 #: ../../packages/ui/src/components/canvas-editor/fabric-canvas-editor.tsx:607
-#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:293
+#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:303
 #: ../../packages/ui/src/components/tiptap-editor.tsx:186
 #: src/features/canvas/canvas-panel.tsx:239
 #: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:37
@@ -29517,7 +29521,7 @@ msgstr "研究"
 msgid "Research"
 msgstr "研究"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:84
+#: src/features/onboarding/components/onboarding-dialog.tsx:88
 msgid "Research a topic"
 msgstr "研究一个主题"
 
@@ -29525,7 +29529,7 @@ msgstr "研究一个主题"
 msgid "Research a topic in depth..."
 msgstr "深入研究一个主题..."
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:85
+#: src/features/onboarding/components/onboarding-dialog.tsx:89
 msgid "Research the latest developments in renewable energy storage technology."
 msgstr "研究可再生能源储能技术的最新进展。"
 
@@ -29781,7 +29785,7 @@ msgstr "重试"
 #: src/features/chat/thread/chat-error.tsx:64
 #: src/features/chat/thread/request-secret-prompt.tsx:475
 #: src/features/chat/translation/message-translation.tsx:88
-#: src/features/code/components/git-host-step.tsx:45
+#: src/features/code/components/git-host-step.tsx:47
 #: src/features/devices/components/devices-settings.tsx:308
 #: src/features/local-models/components/ollama-model-manager.tsx:188
 #: src/features/onboarding/components/setup-checklist.tsx:285
@@ -31724,11 +31728,11 @@ msgstr "设置新的自动化智能体执行"
 msgid "Set up a webhook"
 msgstr "设置 webhook"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:45
+#: src/features/onboarding/components/onboarding-dialog.tsx:49
 msgid "Set up coding"
 msgstr "设置编程"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:134
+#: src/features/onboarding/components/onboarding-dialog.tsx:138
 msgid "Set up coding agents on your computers."
 msgstr "在你的电脑上设置编码智能体。"
 
@@ -31741,9 +31745,9 @@ msgid "Set up triggers to automate tasks on a schedule, via webhooks, or in resp
 msgstr "设置触发器，按计划、通过 Webhook 或响应事件来自动执行任务。"
 
 #: ../../packages/chat-ui/src/org-switcher/org-switcher.tsx:260
-#: src/components/settings/settings-modal.tsx:497
-#: src/components/settings/settings-modal.tsx:619
-#: src/components/settings/settings-modal.tsx:717
+#: src/components/settings/settings-modal.tsx:498
+#: src/components/settings/settings-modal.tsx:620
+#: src/components/settings/settings-modal.tsx:718
 #: src/features/layout/components/mobile-section-nav.tsx:59
 #: src/features/layout/lib/dashboard-page-names.ts:38
 msgid "Settings"
@@ -32483,7 +32487,7 @@ msgstr "无法加载技能。你仍可以不使用技能进行转发。"
 msgid "Skills views"
 msgstr "技能视图"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:502
+#: src/features/onboarding/components/onboarding-dialog.tsx:508
 #: src/features/onboarding/components/setup-checklist.tsx:248
 msgid "Skip"
 msgstr "跳过"
@@ -32500,7 +32504,7 @@ msgstr "跳过问题"
 msgid "Skip to content"
 msgstr "跳到内容"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:497
+#: src/features/onboarding/components/onboarding-dialog.tsx:503
 msgid "Skip tour"
 msgstr "跳过导览"
 
@@ -33353,7 +33357,7 @@ msgstr "开始试运行"
 msgid "Start writing..."
 msgstr "开始写作..."
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:50
+#: src/features/onboarding/components/onboarding-dialog.tsx:54
 msgid "Start Your First Chat"
 msgstr "开始你的第一次聊天"
 
@@ -33501,7 +33505,7 @@ msgid "Steering:"
 msgstr "引导："
 
 #. placeholder {0}: currentIndex + 1
-#: src/features/onboarding/components/onboarding-dialog.tsx:452
+#: src/features/onboarding/components/onboarding-dialog.tsx:458
 msgid "Step {0} of {totalSteps}: {title}"
 msgstr "第 {0}/{totalSteps} 步：{title}"
 
@@ -33694,7 +33698,7 @@ msgstr "流式输出中..."
 msgid "Strength"
 msgstr "强度"
 
-#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:306
+#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:316
 #: ../../packages/ui/src/components/tiptap-editor.tsx:201
 msgid "Strikethrough"
 msgstr "删除线"
@@ -34450,7 +34454,7 @@ msgstr "按 Tab 键移到缩放按钮，然后用加号和减号缩放，0 重�
 #: ../../packages/ui/src/components/chat-markdown.tsx:116
 #: ../../packages/ui/src/components/file-renderers/delimited-text-preview.tsx:50
 #: ../../packages/ui/src/components/file-renderers/delimited-text-preview.tsx:67
-#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:346
+#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:356
 #: ../../packages/ui/src/lib/tiptap-table-bubble.tsx:71
 msgid "Table"
 msgstr "表格"
@@ -34523,7 +34527,7 @@ msgstr "模拟登录期间无法接管控制。"
 msgid "Taking screenshot..."
 msgstr "正在截图..."
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:128
+#: src/features/onboarding/components/onboarding-dialog.tsx:132
 msgid "Talk to any model and make images and documents."
 msgstr "与任意模型对话，并创建图像和文档。"
 
@@ -34604,7 +34608,7 @@ msgstr "任务完成"
 msgid "Task for the coding agent"
 msgstr "编程智能体的任务"
 
-#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:326
+#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:336
 #: ../../packages/ui/src/components/tiptap-editor.tsx:228
 msgid "Task list"
 msgstr "任务列表"
@@ -34941,11 +34945,11 @@ msgid "Text & chat"
 msgstr "文本与聊天"
 
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:394
-#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:316
+#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:326
 msgid "Text alignment"
 msgstr "文本对齐"
 
-#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:350
+#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:360
 #: ../../packages/ui/src/components/tiptap-editor.tsx:207
 msgid "Text color"
 msgstr "文字颜色"
@@ -37388,7 +37392,7 @@ msgid "to {0}"
 msgstr "到 {0}"
 
 #: src/features/chat/thread/host-activity.tsx:81
-#: src/features/code/components/git-host-step.tsx:19
+#: src/features/code/components/git-host-step.tsx:20
 #: src/features/onboarding/components/setup-checklist.tsx:150
 #: src/features/tasks/components/task-status.tsx:21
 msgid "To do"
@@ -38350,13 +38354,13 @@ msgstr "不变"
 msgid "Under the Hood"
 msgstr "技术内幕"
 
-#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:303
+#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:313
 #: ../../packages/ui/src/components/tiptap-editor.tsx:198
 msgid "Underline"
 msgstr "下划线"
 
 #: ../../packages/ui/src/components/canvas-editor/fabric-canvas-editor.tsx:604
-#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:290
+#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:300
 #: ../../packages/ui/src/components/tiptap-editor.tsx:183
 #: src/components/model-picker/model-picker.tsx:858
 #: src/features/canvas/canvas-panel.tsx:245
@@ -39068,7 +39072,7 @@ msgstr "从 MCP 客户端使用"
 msgid "Use lowercase letters, numbers and single hyphens only"
 msgstr "只能使用小写字母、数字和单个连字符"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:47
+#: src/features/onboarding/components/onboarding-dialog.tsx:51
 msgid "Use models from many providers in a single conversation. Switch models mid-thread to compare answers."
 msgstr "在一次对话中使用多家提供商的模型。可在对话中途切换模型来比较回答。"
 
@@ -40285,8 +40289,8 @@ msgstr "粗细"
 msgid "Welcome back"
 msgstr "欢迎回来"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:51
-#: src/features/onboarding/components/onboarding-dialog.tsx:394
+#: src/features/onboarding/components/onboarding-dialog.tsx:55
+#: src/features/onboarding/components/onboarding-dialog.tsx:400
 msgid "Welcome to Neore"
 msgstr "欢迎使用 Neore"
 
@@ -40776,7 +40780,7 @@ msgstr "重新撰写"
 msgid "Write long-form content alongside chat"
 msgstr "在聊天旁撰写长篇内容"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:40
+#: src/features/onboarding/components/onboarding-dialog.tsx:44
 msgid "Write long-form content in a side-by-side canvas editor. Go from chat to finished document without switching tools."
 msgstr "在并排的画布编辑器中撰写长篇内容。从聊天到成稿，无需切换工具。"
 
@@ -40784,7 +40788,7 @@ msgstr "在并排的画布编辑器中撰写长篇内容。从聊天到成稿，
 msgid "Write some code for me..."
 msgstr "帮我写点代码..."
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:69
+#: src/features/onboarding/components/onboarding-dialog.tsx:73
 msgid "Write something"
 msgstr "写点东西"
 
@@ -40796,7 +40800,7 @@ msgstr "撰写指南"
 msgid "Write the task for the agent before you start the fix."
 msgstr "开始修复前，请先填写给编码代理的任务。"
 
-#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:163
+#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:165
 msgid "Write, or type '/' for commands…"
 msgstr "开始写作，或输入“/”调用命令…"
 
@@ -41169,7 +41173,7 @@ msgstr "你需要一个身份验证器应用（如 Google Authenticator 或 Auth
 msgid "You're all caught up."
 msgstr "你已处理完所有通知。"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:349
+#: src/features/onboarding/components/onboarding-dialog.tsx:355
 msgid "You're all set!"
 msgstr "一切就绪！"
 

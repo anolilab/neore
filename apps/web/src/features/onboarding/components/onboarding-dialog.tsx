@@ -17,6 +17,7 @@ import { useUserPreferences } from "@/features/layout/hooks/use-ui-state";
 import { handOffLandingMessage } from "@/features/marketing/stores/landing-store";
 import { trackEvent } from "@/lib/analytics";
 
+import { useGaveUpAfter } from "../hooks/use-gave-up-after";
 import useOnboardingPlugins from "../hooks/use-onboarding-plugins";
 import { shouldShowOnboarding } from "../should-show-onboarding";
 import type { NeoreOnboardingPayload, OnboardingPath } from "../steps";
@@ -245,14 +246,7 @@ const OnboardingContent = ({ codeEnabled, onComplete }: { codeEnabled: boolean |
 
     // On the first step Next waits for the Code check: an early click would skip the choice it offers.
     // It waits a moment at most: a blocked flag script answers only after its retries give up, and nobody should wait on that.
-    const [codeCheckGaveUp, setCodeCheckGaveUp] = useState(false);
-
-    useEffect(() => {
-        const timer = setTimeout(setCodeCheckGaveUp, CODE_CHECK_WAIT_MS, true);
-
-        return () => clearTimeout(timer);
-    }, []);
-
+    const codeCheckGaveUp = useGaveUpAfter(CODE_CHECK_WAIT_MS);
     const waitsForCodeCheck = isFirstStep && codeEnabled === undefined && !codeCheckGaveUp;
     const handleNext = useCallback(async () => {
         if (waitsForCodeCheck) {
