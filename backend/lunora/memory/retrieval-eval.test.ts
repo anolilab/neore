@@ -70,13 +70,23 @@ interface Fixture {
 }
 
 type Category = "abstain" | "dated" | "exact" | "multi" | "single" | "temporal" | "update";
-/** A category, or `datedAbstain`: the sixth persona's questions that name a time but ask about something nobody mentioned. */
-type Slice = Category | "datedAbstain";
+/**
+ * A category, `datedAbstain` (the sixth persona's questions that name a time but ask about something nobody mentioned)
+ * or `datedPhrases` (its `dated` questions in phrasings added later: a short question, two ISO dates, part of a month, a
+ * range), reported apart so the first 25 `dated` questions keep their numbers.
+ */
+type Slice = Category | "datedAbstain" | "datedPhrases";
 const CATEGORIES: Category[] = ["single", "multi", "temporal", "update", "exact", "abstain", "dated"];
-const SLICES: Slice[] = [...CATEGORIES, "datedAbstain"];
+const SLICES: Slice[] = [...CATEGORIES, "datedAbstain", "datedPhrases"];
 /** The 180 queries of the first five personas; the sixth's (`dated`, `datedAbstain`) are reported on their own, never in `overall`. */
 const isOverall = (query: FixtureQuery): boolean => query.persona !== "p6";
-const sliceOf = (query: FixtureQuery): Slice => (query.persona === "p6" && query.category === "abstain" ? "datedAbstain" : query.category);
+const sliceOf = (query: FixtureQuery): Slice => {
+    if (query.persona === "p6" && query.category === "abstain") {
+        return "datedAbstain";
+    }
+
+    return query.id.startsWith("p6-phrase-") ? "datedPhrases" : query.category;
+};
 
 const fixture = JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), "__fixtures__/retrieval-eval.json"), "utf8")) as Fixture;
 const { now, today } = fixture.meta;
@@ -264,9 +274,12 @@ interface Floor {
     offTopicRate: number;
     recallAt8?: number;
 }
-const BASELINE: Record<"overall" | Category, Floor> & { overall: Required<Floor> & { abstainPrecision: number; abstainRate: number } } = {
+const BASELINE: Record<"datedPhrases" | "overall" | Category, Floor> & { overall: Required<Floor> & { abstainPrecision: number; abstainRate: number } } = {
     abstain: { offTopicRate: 1 },
     dated: { inWindow: 1, ndcgAt8: 0.956, offTopicRate: 0.699, recallAt8: 1 },
+    // Recall@8 0.727 without the asked time. The eval ranks, so it skips no short question: that `tomorrow?` reaches
+    // retrieval at all is `agent-run.load-context.test.ts`.
+    datedPhrases: { inWindow: 1, ndcgAt8: 0.993, offTopicRate: 0.75, recallAt8: 1 },
     exact: { inWindow: 1, ndcgAt8: 1, offTopicRate: 0.048, recallAt8: 1 },
     multi: { inWindow: 1, ndcgAt8: 0.726, offTopicRate: 0.771, recallAt8: 0.883 },
     // Abstain rate 0.933: a bare number is no identifier, so "is parcel 52690 mine" is answered with the user's own
@@ -458,6 +471,8 @@ describe("memory retrieval eval", () => {
         // only has to do no worse than the run without it, so a better run without it never fails the eval.
         expect(results.dated!.recallAt8!).toBeGreaterThanOrEqual(before.dated!.recallAt8!);
         expect(results.dated!.ndcgAt8!).toBeGreaterThanOrEqual(before.dated!.ndcgAt8!);
+        expect(results.datedPhrases!.recallAt8!).toBeGreaterThanOrEqual(before.datedPhrases!.recallAt8!);
+        expect(results.datedPhrases!.ndcgAt8!).toBeGreaterThanOrEqual(before.datedPhrases!.ndcgAt8!);
     });
 
     it("still finds a memory by its words when no vector search ran", () => {

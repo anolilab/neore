@@ -77,6 +77,7 @@ import { EXTRACTION_USER_MESSAGE_CHARS } from "../../memory/gate";
 import type { ReplySkill } from "../../usage/activity-logic";
 import { type DispatchOrigin, stopWhenRequested } from "../../sub-agents/logic";
 import { localDayOf, resolveTimeZone } from "../../memory/reflection-logic";
+import { timeWindowOf } from "../../memory/time-window";
 import { writeLoopStopNotice } from "../loop-stop";
 import { type LoopFinding, type RepeatedCallGuard, repeatedCallGuard } from "./repeated-call-guard";
 import { INSTRUCTION_READ_TOOL, renderInstructionList, type RunInstruction } from "../../projects/rule-files";
@@ -467,8 +468,10 @@ const retrieveMemories = async (
     timeZone?: string | null,
 ): Promise<{ memories: RetrievedMemory[]; refs: RetrievedMemoryRef[] }> => {
     // A prompt of two words or fewer ("thanks", "ok", "yes") has nothing to match
-    // a memory against, so it skips the embedding and the vector search.
-    if (countSearchWords(searchText) < MIN_MEMORY_SEARCH_WORDS) {
+    // a memory against, so it skips the embedding and the vector search. One naming
+    // a day that exists ("tomorrow?", not "31 February") is searched: an appointment
+    // is found by its date alone.
+    if (countSearchWords(searchText) < MIN_MEMORY_SEARCH_WORDS && timeWindowOf(searchText, localDayOf(Date.now(), timeZone)) === undefined) {
         return { memories: [], refs: [] };
     }
 
