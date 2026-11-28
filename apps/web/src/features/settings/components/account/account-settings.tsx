@@ -188,6 +188,7 @@ const AccountSettings: FC = () => {
                     <SettingsRow
                         control={
                             <Select
+                                items={{ ltr: t`Left to Right (LTR)`, rtl: t`Right to Left (RTL)` }}
                                 onValueChange={(value) => {
                                     setDirection(value as typeof direction);
                                     toast.success(value === "rtl" ? t`Text direction set to RTL` : t`Text direction set to LTR`);
@@ -215,6 +216,12 @@ const AccountSettings: FC = () => {
                     <SettingsRow
                         control={
                             <Select
+                                items={{
+                                    button: t`Click button to send`,
+                                    enter: t`Press Enter to send`,
+                                    modEnter: t`Press Ctrl/Cmd+Enter to send`,
+                                    shiftEnter: t`Press Shift+Enter to send`,
+                                }}
                                 onValueChange={(value) => {
                                     setSendBehavior(value as typeof sendBehavior);
                                     toast.success(t`Send behavior updated`);
@@ -320,6 +327,7 @@ const AccountSettings: FC = () => {
                     <SettingsRow
                         control={
                             <Select
+                                items={commonTimezones}
                                 onValueChange={(value) => {
                                     handleUpdateSetting("timezone", value, t`Timezone updated`);
                                 }}

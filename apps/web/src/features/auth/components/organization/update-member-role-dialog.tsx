@@ -109,7 +109,13 @@ const UpdateMemberRoleDialog = ({ classNames, member, onOpenChange, ...propertie
                 <div className="grid gap-6 py-4">
                     <MemberCell className={classNames?.cell} hideActions member={member} />
 
-                    <Select onValueChange={(value) => setSelectedRole(value ?? "")} value={selectedRole}>
+                    <Select
+                        items={availableRoles.map((role) => {
+                            return { label: role.label, value: role.role };
+                        })}
+                        onValueChange={(value) => setSelectedRole(value ?? "")}
+                        value={selectedRole}
+                    >
                         <SelectTrigger className="w-full">
                             <SelectValue placeholder={t`Select role`} />
                         </SelectTrigger>

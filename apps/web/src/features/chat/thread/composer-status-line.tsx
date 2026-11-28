@@ -9,10 +9,12 @@ import type { FC, ReactNode } from "react";
 
 import { useImpersonating } from "@/features/admin/hooks/use-is-impersonating";
 import { useChatIsStreaming, useChatThread } from "@/features/chat/core/context/chat-context";
+import useCurrentModel from "@/features/chat/core/hooks/use-current-model";
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 import type { ResearchDepth, SearchMode } from "@/features/chat/core/stores/model-store";
 import { getValidThreadId } from "@/features/chat/core/utils/thread-id";
 import { useGoalComposer, usePinOverride } from "@/features/chat/goal/goal-store";
+import { useLocalModelTarget } from "@/features/local-models/hooks/use-local-model-turn";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 import { useBotThread } from "./composer-model-selector";
@@ -68,6 +70,8 @@ const ComposerStatusLine: FC<ComposerStatusLineProps> = ({ researchDepth, search
     const { sseStreamState } = useChatIsStreaming();
     const goalOn = useGoalComposer((state) => state.enabled);
     const pinned = usePinnedGoalShown();
+    // A local model runs one plain turn: the send drops an armed goal and never applies a pinned one.
+    const isLocal = useLocalModelTarget(useCurrentModel()) !== undefined;
     const attachmentsOnly = useChatUIStore((state) => state.composerText.trim() === "" && state.composerAttachments.length > 0);
     const permission = useShownPermissionMode();
     const { isBotThread } = useBotThread();
@@ -78,7 +82,7 @@ const ComposerStatusLine: FC<ComposerStatusLineProps> = ({ researchDepth, search
     const searching = textMode && searchMode !== "chat";
     // A send with attachments and no text carries no goal (`goalForMessage`), so the chip leaves then; an empty draft keeps it,
     // since the goal is what the next message will run.
-    const goal = textMode && (goalOn || pinned) && !attachmentsOnly;
+    const goal = textMode && (goalOn || pinned) && !attachmentsOnly && !isLocal;
     const fullAccess = textMode && permission === "full";
 
     if (!replying && !searching && !goal && !fullAccess && !isBotThread) {

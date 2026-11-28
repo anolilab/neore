@@ -89,7 +89,7 @@ describe("extractMemories with an empty quotable prompt", () => {
         loadModelFilterRules.mockResolvedValue({});
         generateText.mockResolvedValue({ output: { facts: [], remember: true } });
 
-        await expect(runWith({})).resolves.toBeUndefined();
+        await expect(runWith({})).resolves.toStrictEqual({ asked: false, facts: [], refused: 0, refusedAsked: [] });
 
         expect(loadModelFilterRules).not.toHaveBeenCalled();
         expect(generateText).not.toHaveBeenCalled();
@@ -191,7 +191,7 @@ describe("extractMemories when the model filter rules cannot be read", () => {
                         userMessage: MESSAGE,
                     }),
             ),
-        ).resolves.toBeUndefined();
+        ).resolves.toStrictEqual({ asked: false, facts: [], refused: 0, refusedAsked: [] });
 
         expect(loadModelFilterRules).toHaveBeenCalled();
         expect(generateText).not.toHaveBeenCalled();

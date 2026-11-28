@@ -186,6 +186,7 @@ const SystemPromptPresetSettings: FC = () => {
             <SettingsRow
                 control={
                     <Select<string>
+                        items={[{ label: t`Any model`, value: ANY_MODEL_VALUE }]}
                         onValueChange={(value) =>
                             setFormData((current) => {
                                 return {

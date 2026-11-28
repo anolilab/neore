@@ -29,6 +29,7 @@ import type { ApiKeyIdentity } from "./identity";
 import { extractApiKey, MCP_PATH, readApiKeyIdentity } from "./identity";
 import { POLL_INTERVAL_MS } from "./events-catalog";
 import { decodeEventCursor, encodeEventCursor } from "./events-cursor";
+import { subscribeWebhook, unsubscribeWebhook } from "./events-webhook-subscribe";
 import { buildMcpTools, serveMcp, toolRequest } from "./mcp";
 import { buildOpenApiDocument, renderDocsHtml } from "./openapi";
 import type { RouteDefinition, RouteResult } from "./routes";
@@ -286,6 +287,16 @@ const handleMcp = async (routes: ReadonlyArray<RouteDefinition>, c: Context<Luno
                         nextPollMs: outcome.hasMore ? 0 : POLL_INTERVAL_MS,
                         truncated: outcome.truncated,
                     };
+                },
+                // Webhook delivery (part 2a): the same read scope as poll. The owner's host list and the store are checked in the call.
+                subscribe: async (subscription) => {
+                    assertScopes(identity, { scopes: [["threads", "read"]] });
+
+                    return await subscribeWebhook(c.var.lunora, identity, subscription);
+                },
+                unsubscribe: async (subscription) => {
+                    assertScopes(identity, { scopes: [["threads", "read"]] });
+                    await unsubscribeWebhook(c.var.lunora, identity, subscription);
                 },
             },
             request,

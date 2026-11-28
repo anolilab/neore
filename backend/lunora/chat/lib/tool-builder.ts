@@ -52,6 +52,7 @@ import {
     nearbyPlacesSearchTool,
     peopleSearchTool,
     redditSearchTool,
+    rememberTool,
     renderUITool,
     requestSecretTool,
     retrieveTool,
@@ -135,7 +136,7 @@ export const SEARCH_MODES: SearchModeInfo[] = [
 // Document tools are available in all search modes
 const DOCUMENT_TOOLS = [ToolName.CreateDocument, ToolName.UpdateDocument, ToolName.RenderUI];
 // Memory search is available in all modes for progressive disclosure
-const MEMORY_TOOLS = [ToolName.SearchMemory, ToolName.SearchPastChats];
+const MEMORY_TOOLS = [ToolName.SearchMemory, ToolName.SearchPastChats, ToolName.Remember];
 // Knowledge base search is available in all modes
 const KNOWLEDGE_TOOLS = [ToolName.KnowledgeSearch];
 
@@ -414,6 +415,9 @@ const ALL_TOOLS: Record<ToolName, unknown> = {
     [ToolName.ReadPullRequest]: readPullRequestTool,
     [ToolName.RedditSearch]: redditSearchTool,
 
+    // Saving a fact the user asked to be remembered
+    [ToolName.Remember]: rememberTool,
+
     // Generative UI Tools
     [ToolName.RenderUI]: renderUITool,
     [ToolName.ReplyToReviewComment]: replyToReviewCommentTool,
@@ -507,7 +511,7 @@ const TOOLS_BY_CATEGORY = {
     interaction: [ToolName.AskUser, ToolName.RequestSecret, ToolName.SaveSecretAsProviderKey, ToolName.SetMcpServerSecret],
     knowledge: [ToolName.KnowledgeSearch],
     location: [ToolName.FindPlace, ToolName.NearbyPlacesSearch, ToolName.Weather],
-    memory: [ToolName.SearchMemory, ToolName.SearchPastChats],
+    memory: [ToolName.SearchMemory, ToolName.SearchPastChats, ToolName.Remember],
     pullRequest: [
         ToolName.ReadPullRequest,
         ToolName.ReadFailingChecks,

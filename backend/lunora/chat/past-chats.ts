@@ -8,10 +8,12 @@ import type { ThreadDoc, TypedPromptRow } from "../agent/validators";
 import { threadSharedWithOthers } from "../agent/live-grant";
 import { isDeviceEligibleThread } from "../devices/internal";
 import { MAX_LENGTH } from "../lib/validators";
+import { isSearchIndexBuilding } from "../lib/search-index";
 import { readMemoryEnabled } from "../memory/functions";
-import { isSearchIndexBuilding, listsSentPrompts, sentPromptOf } from "./functions";
+import { listsSentPrompts, sentPromptOf } from "./functions";
 import { PAST_CHAT_RESULTS_DEFAULT, PAST_CHAT_RESULTS_MAX, pastChatSnippet, pastChatTitle } from "./lib/past-chat-snippet";
 import { capSearchTerms, matchesQueryTerms, queryTerms } from "./lib/search-terms";
+import { isTypedChatKind } from "./lib/typed-chat-kind";
 
 /**
  * Index hits read before the filters, then once more with the wider window when too few survived: the current chat's
@@ -32,14 +34,6 @@ const vPastChatHit = v.object({ sentAt: v.number(), snippet: v.string(), title: 
 /** Chats a sub-agent or a worker runs in (`sub-agents/`): what they post goes to the chat that started them, not here. */
 const CHILD_RUN_TAGS: ReadonlySet<string> = new Set(["sub-agent", "worker"]);
 /**
- * The tags of the chats a person types into: the composer's (`chat`), a local model's (`local`) and a coding agent's on
- * a paired computer (`host`). A chat whose tags are all of these, `chat` among them, is a source. Every other kind is
- * not, whatever its tags: a sub-agent's or worker's brief, a task's instructions, a trigger's template, an eval case and
- * a pull request chat's opening message (`develop`) carry `typedText` like any prompt, so the kind is what tells them
- * apart, and a kind added later stays out until it is listed here.
- */
-const TYPED_CHAT_TAGS: ReadonlySet<string> = new Set(["chat", "host", "local"]);
-/**
  * Links only the server writes when it copies a chat's rows into a new one: a branch (`branchThread`) and a side chat
  * (`side-chat.ts`). A link the owner can write (`createThreadRelationshipPublic`: a comparison) proves no copy, so it
  * makes no chat a source; a comparison chat is tagged and needs no link.
@@ -47,18 +41,6 @@ const TYPED_CHAT_TAGS: ReadonlySet<string> = new Set(["chat", "host", "local"]);
 const COPY_LINKS: ReadonlySet<string | undefined> = new Set(["branch", "side"]);
 /** A chat's links read to find a copy link; a chat with more is judged on these. */
 const PAST_CHAT_LINKS_READ = 8;
-
-/** Whether a tagged chat is one a person types into ({@link TYPED_CHAT_TAGS}); a messenger chat never is. */
-const isTypedChatKind = (thread: ThreadDoc): boolean => {
-    const tags = thread.tags ?? [];
-
-    return (
-        thread.externalThreadId === undefined &&
-        thread.messengerConnectionId === undefined &&
-        tags.includes("chat") &&
-        tags.every((tag) => TYPED_CHAT_TAGS.has(tag))
-    );
-};
 
 /**
  * Why a search did not run: memory is off for the user (the same kind of recall, so it follows that setting), the chat it
@@ -74,7 +56,7 @@ const vPastChatUnavailable = v.union(v.literal("background_run"), v.literal("mem
  * through `typedTextSearch`, which drops every locked chat (no proof is passed), and keeps only prompts the composer's
  * search would list (`listsSentPrompts`: the caller's own chat, not trashed, deleted, locked or temporary;
  * `sentPromptOf`: a typed user row, no goal round), with no not-typed mark (a prompt link, an extension's relay, an admin
- * acting as the owner), and never the chat it answers in. Only chats a person types into are read ({@link TYPED_CHAT_TAGS},
+ * acting as the owner), and never the chat it answers in. Only chats a person types into are read (`isTypedChatKind`,
  * and their branches and side chats): a messenger, sub-agent, worker, task, trigger, eval or pull request chat is not. A bot chat reads that bot's chats and the user's chats with no
  * bot, as memory reads the bot's notes and the user's own; a chat with no bot (or one whose bot is gone) reads only chats
  * with no bot. A hit holds every word of the query (the last one also as the start of a longer word), as the index matches. Branch copies (the same words

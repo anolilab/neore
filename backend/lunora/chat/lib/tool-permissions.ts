@@ -31,7 +31,7 @@ import type { ToolSet } from "ai";
 import type { LowRiskCheck } from "./low-risk-approval";
 import { lowRiskIneligibleReason } from "./low-risk-approval";
 import type { ToolPermissionGrants } from "./tool-permission-grants";
-import { BUILTIN_TOOLS_NEEDING_A_PERSON } from "./person-tools";
+import { BUILTIN_TOOLS_NEEDING_A_PERSON, BUILTIN_TOOLS_NOT_HEADLESS } from "./person-tools";
 import type { ThreadPermissionMode } from "./thread-permission-mode";
 import { BUILTIN_TOOLS_READ_ONLY } from "./thread-permission-mode";
 import { grantExpiryFor } from "./tool-permission-grants";
@@ -347,7 +347,7 @@ export const resolveToolPermissionWithGrant = (
         return { mode: "off" };
     }
 
-    if (builtinName !== undefined && BUILTIN_TOOLS_NEEDING_A_PERSON.has(builtinName)) {
+    if (builtinName !== undefined && (BUILTIN_TOOLS_NEEDING_A_PERSON.has(builtinName) || BUILTIN_TOOLS_NOT_HEADLESS.has(builtinName))) {
         return { mode: "off" };
     }
 

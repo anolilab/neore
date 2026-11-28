@@ -229,6 +229,12 @@ const TriggerForm: FC<TriggerFormProps> = ({ formData, inline = false, isPending
             <SettingsRow
                 control={
                     <Select
+                        items={[
+                            { label: t`No bot`, value: NO_BOT },
+                            ...bots.map((bot) => {
+                                return { label: bot.name, value: bot._id };
+                            }),
+                        ]}
                         onValueChange={(value) => onChange(withBotOptions({ ...formData, botComputer: false, botId: value === NO_BOT ? "" : (value ?? "") }))}
                         value={formData.botId || NO_BOT}
                     >

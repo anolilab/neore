@@ -6,7 +6,9 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { PublicApiError } from "./errors";
+import { bytesToBase64 } from "../lib/crypto";
 import { EVENT_EXTENSION_ID } from "./events-catalog";
+import { EventsWebhookError } from "./events-webhook";
 import type { McpDependencies, PollRequest, PollResponse } from "./mcp";
 import { serveMcp } from "./mcp";
 
@@ -109,7 +111,16 @@ describe("negotiation", () => {
         expect(status).toBe(200);
     });
 
-    it("answers the parts that are not in this one (push, webhook) with -32601 even when negotiated", async () => {
+    it("answers webhook methods with -32601 when the endpoint wires no webhook dependency", async () => {
+        const { body } = await serve(
+            modern("events/subscribe", { _meta: OFFER, name: "run.completed" }, "run.completed"),
+            pollingWith(async () => pollBody),
+        );
+
+        expect(body["error"].code).toBe(-32_601);
+    });
+
+    it("answers push (events/stream) with -32601 even when negotiated", async () => {
         const { body } = await serve(
             modern("events/stream", { _meta: OFFER, name: "run.completed" }, "run.completed"),
             pollingWith(async () => pollBody),
@@ -242,6 +253,79 @@ describe("an Events notification's read allowance", () => {
 
         expect(response.status).toBe(202);
         expect(await response.text()).toBe("");
+    });
+});
+
+describe("events/subscribe and events/unsubscribe", () => {
+    const SECRET = `whsec_${bytesToBase64(new Uint8Array(24).fill(7))}`;
+    const subscribeParams = {
+        _meta: OFFER,
+        delivery: { mode: "webhook", secret: SECRET, url: "https://hooks.example.com/neore" },
+        name: "run.completed",
+    };
+    const granted = { cursor: "cursor-2", id: "sub_0123456789abcdef", refreshBefore: "2026-11-24T00:00:00.000Z", truncated: false };
+
+    it("answers the granted subscription with resultType complete", async () => {
+        const subscribe = vi.fn(async () => granted);
+        const { body } = await serve(modern("events/subscribe", subscribeParams, "run.completed"), { poll: vi.fn(), subscribe });
+
+        expect(subscribe).toHaveBeenCalledWith(
+            expect.objectContaining({ cursor: null, host: "hooks.example.com", name: "run.completed", url: "https://hooks.example.com/neore" }),
+        );
+        expect(body["result"]).toStrictEqual({ ...granted, resultType: "complete" });
+    });
+
+    it("refuses a secret that is not whsec_ base64 with InvalidParams, before the subscription is made", async () => {
+        const subscribe = vi.fn(async () => granted);
+        const params = { ...subscribeParams, delivery: { ...subscribeParams.delivery, secret: "not-a-secret" } };
+        const { body } = await serve(modern("events/subscribe", params, "run.completed"), { poll: vi.fn(), subscribe });
+
+        expect(body["error"].code).toBe(-32_602);
+        expect(subscribe).not.toHaveBeenCalled();
+    });
+
+    it("answers an unknown event with NotFound, and a non-https callback with InvalidParams", async () => {
+        const subscribe = vi.fn(async () => granted);
+        const unknown = await serve(modern("events/subscribe", { ...subscribeParams, name: "nope" }, "nope"), { poll: vi.fn(), subscribe });
+        const plain = await serve(
+            // eslint-disable-next-line unicorn/prefer-https -- a plain-http callback is the case under test
+            modern("events/subscribe", { ...subscribeParams, delivery: { ...subscribeParams.delivery, url: "http://hooks.example.com/x" } }, "run.completed"),
+            { poll: vi.fn(), subscribe },
+        );
+
+        expect(unknown.body["error"]).toMatchObject({ code: -32_023, data: { kind: "event" } });
+        expect(plain.body["error"].code).toBe(-32_602);
+        expect(subscribe).not.toHaveBeenCalled();
+    });
+
+    it("carries a refusal's code and typed data into the JSON-RPC error", async () => {
+        const subscribe = vi.fn(async () => {
+            throw new EventsWebhookError(-32_024, "The callback host is not on this account's approved list.", { reason: "host_not_approved" });
+        });
+        const { body } = await serve(modern("events/subscribe", subscribeParams, "run.completed"), { poll: vi.fn(), subscribe });
+
+        expect(body["error"]).toStrictEqual({
+            code: -32_024,
+            data: { reason: "host_not_approved" },
+            message: "The callback host is not on this account's approved list.",
+        });
+    });
+
+    it("answers unsubscribe with an empty complete result, and NotFound when no subscription matches", async () => {
+        const unsubscribe = vi.fn(async () => undefined);
+        const params = { _meta: OFFER, delivery: { url: "https://hooks.example.com/neore" }, name: "run.completed" };
+        const ok = await serve(modern("events/unsubscribe", params, "run.completed"), { poll: vi.fn(), unsubscribe });
+
+        expect(ok.body["result"]).toStrictEqual({ resultType: "complete" });
+
+        const missing = await serve(modern("events/unsubscribe", params, "run.completed"), {
+            poll: vi.fn(),
+            unsubscribe: vi.fn(async () => {
+                throw new EventsWebhookError(-32_023, "No subscription matches this key.", { kind: "subscription" });
+            }),
+        });
+
+        expect(missing.body["error"]).toMatchObject({ code: -32_023, data: { kind: "subscription" } });
     });
 });
 

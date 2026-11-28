@@ -13,6 +13,11 @@ import { startImageSelection } from "../../utils/workflow-image";
 import MentionPromptField from "../mention-prompt-field";
 import BaseNode from "./base-node";
 
+const MODE_ITEMS = {
+    input: <Trans>Input (URL)</Trans>,
+    generate: <Trans>Generate</Trans>,
+};
+
 const ImageNodeComponent = (props: NodeProps<Node<ImageNodeData>>) => {
     const { data, id } = props;
     const updateNode = useWorkflowStore((state) => state.updateNode);
@@ -44,17 +49,16 @@ const ImageNodeComponent = (props: NodeProps<Node<ImageNodeData>>) => {
                     <Label className="text-muted-foreground text-xs" htmlFor={`${id}-mode`}>
                         <Trans>Mode</Trans>
                     </Label>
-                    <Select onValueChange={handleModeChange} value={data.mode}>
+                    <Select items={MODE_ITEMS} onValueChange={handleModeChange} value={data.mode}>
                         <SelectTrigger className="nodrag h-8 text-sm" id={`${id}-mode`}>
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="input">
-                                <Trans>Input (URL)</Trans>
-                            </SelectItem>
-                            <SelectItem value="generate">
-                                <Trans>Generate</Trans>
-                            </SelectItem>
+                            {Object.entries(MODE_ITEMS).map(([value, label]) => (
+                                <SelectItem key={value} value={value}>
+                                    {label}
+                                </SelectItem>
+                            ))}
                         </SelectContent>
                     </Select>
                 </div>

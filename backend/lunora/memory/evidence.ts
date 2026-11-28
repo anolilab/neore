@@ -120,8 +120,12 @@ const HEALTH_PATTERNS: ReadonlyArray<RegExp> = [
     /\bincinta\b|\bchoroba|\bw ci[ąa][żz]y/iu,
 ];
 
-/** Whether the text names a health condition, a diagnosis or a treatment. */
-const mentionsHealth = (text: string): boolean => HEALTH_PATTERNS.some((pattern) => pattern.test(text.normalize("NFKC")));
+/**
+ * Whether the text names a health condition, a diagnosis or a treatment. Both readings, as `looksSecret` reads them: an
+ * invisible character inside a word (`dia\u200Bbetes`) hides it until dropped.
+ */
+export const mentionsHealth = (text: string): boolean =>
+    [text, text.replaceAll(INVISIBLE_RE, "")].some((reading) => HEALTH_PATTERNS.some((pattern) => pattern.test(reading.normalize("NFKC"))));
 
 // `%` stays inside a token: a percent-encoded token (`%2F`) is one token, not pieces too short to read as a key.
 const TOKEN_SPLIT_RE = /[^\w+/=%-]+/u;

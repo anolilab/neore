@@ -1,4 +1,4 @@
-import { anchorFromHash, settingsLinkSearch, settingsTabForPath } from "@/features/settings/lib/settings-link";
+import { anchorFromHash, settingsAnchorForPath, settingsLinkSearch, settingsTabForPath } from "@/features/settings/lib/settings-link";
 
 type SearchUpdater = (previous: Record<string, unknown>) => Record<string, unknown>;
 
@@ -14,7 +14,7 @@ const linkTarget = (link: string): { search?: Record<string, string> | SearchUpd
     const settingsTab = settingsTabForPath(url.pathname);
 
     if (settingsTab) {
-        return { search: settingsLinkSearch(settingsTab, anchorFromHash(url.hash)), to: "." };
+        return { search: settingsLinkSearch(settingsTab, anchorFromHash(url.hash) ?? settingsAnchorForPath(url.pathname)), to: "." };
     }
 
     const search: Record<string, string> = {};

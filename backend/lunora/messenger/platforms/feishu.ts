@@ -74,7 +74,8 @@ export const validateFeishuSignature = async (headers: Headers, rawBody: string,
 interface FeishuEnvelope {
     challenge?: string;
     event?: {
-        message?: { chat_id?: string; content?: string; create_time?: string; message_id?: string; message_type?: string };
+        /** `chat_type`: `p2p` for a one-to-one chat, `group` otherwise. */
+        message?: { chat_id?: string; chat_type?: string; content?: string; create_time?: string; message_id?: string; message_type?: string };
         sender?: { sender_id?: { open_id?: string }; sender_type?: string };
     };
     header?: { create_time?: string; event_id?: string; event_type?: string; token?: string };
@@ -164,6 +165,7 @@ export const parseFeishuEnvelope = (decrypted: unknown, verificationToken: strin
         message: {
             ...(attachments.length > 0 && { attachments }),
             chatId: message.chat_id,
+            direct: message.chat_type === "p2p",
             eventId: envelope.header.event_id ?? message.message_id ?? "",
             kind: inboundKind(text, attachments),
             senderId,

@@ -59,6 +59,10 @@ const AspectRatioPreview: FC<{ ratio: string }> = ({ ratio }) => {
 const ComposerVideoSettings: FC<ComposerVideoSettingsProps> = ({ className, disabled, onSettingsChange, settings }) => {
     const { i18n, t } = useLingui();
 
+    const aspectRatioItems = ASPECT_RATIOS.map((ratio) => {
+        return { label: typeof ratio.label === "string" ? ratio.label : i18n._(ratio.label), value: ratio.value };
+    });
+
     const formatDuration = (seconds: number): string => {
         if (seconds < 60) {
             return `${seconds}s`;
@@ -81,6 +85,7 @@ const ComposerVideoSettings: FC<ComposerVideoSettingsProps> = ({ className, disa
                         <div className="inline-flex">
                             <Select
                                 disabled={disabled}
+                                items={aspectRatioItems}
                                 onValueChange={(value) => onSettingsChange({ aspectRatio: value ?? undefined })}
                                 value={settings.aspectRatio}
                             >

@@ -56,6 +56,7 @@ describe("parseLineWebhook", () => {
         expect(parseLineWebhook({ events: [event()] })).toEqual([
             {
                 chatId: "U4af4980629",
+                direct: true,
                 eventId: "01FZ74A0TDDPYRVKNK77XKC3ZR",
                 kind: "text",
                 replyToken: "38ef843bde154d9b91c21320ffd17a0f", // secret-scanner:allow LINE sample reply token
@@ -66,11 +67,12 @@ describe("parseLineWebhook", () => {
         ]);
     });
 
-    it("replies into the group, not the sender, for group messages", () => {
+    it("replies into the group, not the sender, for group messages, and marks it not one-to-one", () => {
         const [message] = parseLineWebhook({ events: [event({ source: { groupId: "Cgroup", type: "group", userId: "U1" } })] });
 
         expect(message?.chatId).toBe("Cgroup");
         expect(message?.senderId).toBe("U1");
+        expect(message?.direct).toBe(false);
     });
 
     it("reads audio as a voice note, marks video unsupported, and skips non-message and standby events", () => {

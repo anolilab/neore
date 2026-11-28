@@ -7,3 +7,9 @@
  * every sign-in with a saved login.
  */
 export const BUILTIN_TOOLS_NEEDING_A_PERSON: ReadonlySet<string> = new Set(["askUser", "mergePullRequest", "requestSecret", "signInWithSavedLogin"]);
+
+/**
+ * Built-ins a run nobody is at never has, though a person may still allow them for an hour or a day: `remember` saves only
+ * what the user typed in the message they just sent, which a run nobody is at has none of.
+ */
+export const BUILTIN_TOOLS_NOT_HEADLESS: ReadonlySet<string> = new Set(["remember"]);

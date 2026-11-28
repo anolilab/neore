@@ -136,6 +136,7 @@ export const parseTelegramUpdate = (body: unknown): InboundMessage | null => {
     return {
         ...(attachments.length > 0 && { attachments }),
         chatId,
+        direct: message.chat.type === "private",
         eventId: `${chatId}:${String(message.message_id)}`,
         kind: inboundKind(text, attachments),
         senderId: String(message.from.id),

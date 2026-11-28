@@ -146,6 +146,8 @@ const FeedbackAdminPage = () => {
 
     const nextCursor = data && !data.isDone ? data.continueCursor : null;
 
+    const kindItems = { all: t`All kinds`, idea: t`Ideas`, problem: t`Problems`, other: t`Other` };
+
     return (
         <div className="flex flex-col gap-3">
             <AdminSection
@@ -155,15 +157,16 @@ const FeedbackAdminPage = () => {
                             <RefreshCw aria-hidden="true" className={isFetching ? "size-4 animate-spin" : "size-4"} />
                             {t`Refresh`}
                         </Button>
-                        <Select onValueChange={(value) => value && changeKind(value)} value={kind}>
+                        <Select items={kindItems} onValueChange={(value) => value && changeKind(value)} value={kind}>
                             <SelectTrigger aria-label={t`Filter by kind`} className="w-[180px]">
                                 <SelectValue placeholder={t`Filter by kind`} />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="all">{t`All kinds`}</SelectItem>
-                                <SelectItem value="idea">{t`Ideas`}</SelectItem>
-                                <SelectItem value="problem">{t`Problems`}</SelectItem>
-                                <SelectItem value="other">{t`Other`}</SelectItem>
+                                {Object.entries(kindItems).map(([value, label]) => (
+                                    <SelectItem key={value} value={value}>
+                                        {label}
+                                    </SelectItem>
+                                ))}
                             </SelectContent>
                         </Select>
                     </div>

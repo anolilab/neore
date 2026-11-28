@@ -24,6 +24,7 @@ import { scheduleFileLinkBackfill } from "./file-link-backfill";
 import { deleteThreadSummaries } from "./thread-summaries";
 import { fileAttachInFlight, fileAttachInThread } from "./file-attach-claim";
 import { followupDispatchInFlight } from "./followup-suggestions";
+import { rememberDispatchInFlight } from "../memory/remember-dispatch";
 import { wakeLeaseHeld } from "../source-control/pr-watch-wake-lease";
 import { clearRecordedTitleAnswers, titleDispatchInFlight } from "./thread-title";
 import { passcodeHashOf, readPasscodeRow, type PasscodeRow, unlockSecret } from "./thread-passcode";
@@ -125,6 +126,12 @@ export const enableThreadLock = authMutation
         // (`agent/followup-suggestions.ts`). The request is answered within seconds.
         if (await followupDispatchInFlight(context, threadId)) {
             throw new LunoraError("CONFLICT", "A suggestion is being generated for this chat. Try again in a moment.");
+        }
+
+        // A remember request's extractor call for this chat is being sent: the lock waits for it, so no prompt of a locked chat reaches
+        // the extractor (`memory/remember-dispatch.ts`). The call is answered within seconds.
+        if (await rememberDispatchInFlight(context, threadId)) {
+            throw new LunoraError("CONFLICT", "A memory is being saved from this chat. Try again in a moment.");
         }
 
         // A pull request watch's wake turn is claimed for this chat: the lock waits for it, so no message of a locked chat reaches a

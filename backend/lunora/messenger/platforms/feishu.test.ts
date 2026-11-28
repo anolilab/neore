@@ -97,7 +97,7 @@ describe("parseFeishuEnvelope", () => {
     it("parses a text message and strips @-mention placeholders", () => {
         expect(parseFeishuEnvelope(messageEvent(), TOKEN)).toEqual({
             kind: "message",
-            message: { chatId: "oc_chat", eventId: "evt_1", kind: "text", senderId: "ou_sender", text: "hello there", timestampMs: NOW },
+            message: { chatId: "oc_chat", direct: true, eventId: "evt_1", kind: "text", senderId: "ou_sender", text: "hello there", timestampMs: NOW },
         });
     });
 

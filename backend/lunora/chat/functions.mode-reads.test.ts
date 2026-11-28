@@ -1,8 +1,8 @@
 /**
  * A thread that holds a permission mode is answered whole by every read that returns a thread row: the output check refuses a row
- * with a field the validator does not declare. One read per validator shape: the hand-listed ones (`getPinnedThreads`,
- * `getThreadOrders`, `getThreadsWithTemporaryFilter`), the shared document validator (`getThreads`, `getThread`; the
- * composite and sharing reads spread those same fields).
+ * with a field the validator does not declare. The list reads (`getThreads`, `getThreadsWithTemporaryFilter`, `getPinnedThreads`,
+ * `getThreadOrders`) and `getThread` all declare the shared document validator (the composite and sharing reads spread those same
+ * fields), so a column the schema gains is declared once.
  */
 import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -75,7 +75,7 @@ describe("a thread that holds a permission mode", () => {
     const as = () => harness.withIdentity({ userId: OWNER });
     const page = { paginationOpts: { cursor: null, numItems: 25 } };
 
-    it("is answered by the pinned, ordered and temporary-filter reads, which list their fields by hand", async () => {
+    it("is answered by the pinned, ordered and temporary-filter reads", async () => {
         const pinned: any[] = (await as().query(getPinnedThreads as never, {} as never)) as never;
         const ordered: any[] = (await as().query(getThreadOrders as never, {} as never)) as never;
         const filtered: any = await as().run(
@@ -85,6 +85,44 @@ describe("a thread that holds a permission mode", () => {
         expect(pinned.map((thread) => [thread._id, thread.permissionMode])).toStrictEqual([[threadId, "supervised"]]);
         expect(ordered.map((thread) => [thread._id, thread.permissionMode])).toStrictEqual([[threadId, "supervised"]]);
         expect(filtered.page.map((thread: any) => [thread._id, thread.permissionMode])).toStrictEqual([[threadId, "supervised"]]);
+    });
+
+    // The sidebar orders by `lastReplyAt`, marks unread from `lastViewedAt` and groups by `category`; `followupDispatch` is the suggestion
+    // dispatch's lease, which a list drops. A hand-listed validator lacked all four and failed the live subscription's seed.
+    it("keeps the fields the thread list reads and drops the suggestion leases, in every read that returns thread rows", async () => {
+        const replied = await harness.run(
+            async (context: any) =>
+                await context.db.insert("threads", {
+                    category: "coding",
+                    followupDispatch: { claimedAt: 1, expiresAt: 2, requestId: "request-1" },
+                    followupRevoke: { claimedAt: 1, expiresAt: 2 },
+                    lastReplyAt: 30,
+                    lastViewedAt: 20,
+                    model: "m",
+                    order: 2,
+                    pinnedAt: 2,
+                    status: "active",
+                    title: "replied",
+                    updatedAt: 3,
+                    userId: OWNER,
+                }),
+        );
+        const withClientFields = { category: "coding", lastReplyAt: 30, lastViewedAt: 20 };
+        const rowOf = (rows: any[]) => rows.find((thread) => thread._id === replied);
+
+        const list: any = await as().query(getThreads as never, { excludeTemporary: true, ...page } as never);
+        const filtered: any = await as().run(
+            async (context: any) => await context.runQuery(getThreadsWithTemporaryFilter as never, { excludeTemporary: true, ...page, userId: OWNER } as never),
+        );
+        const pinned: any[] = (await as().query(getPinnedThreads as never, {} as never)) as never;
+        const ordered: any[] = (await as().query(getThreadOrders as never, {} as never)) as never;
+        const one: any = await as().query(getThread as never, { threadId: replied } as never);
+
+        for (const row of [rowOf(list.page), rowOf(filtered.page), rowOf(pinned), rowOf(ordered), one]) {
+            expect(row).toMatchObject(withClientFields);
+            expect(row).not.toHaveProperty("followupDispatch");
+            expect(row).not.toHaveProperty("followupRevoke");
+        }
     });
 
     it("is answered by the list, and the single read, which share the document validator", async () => {
