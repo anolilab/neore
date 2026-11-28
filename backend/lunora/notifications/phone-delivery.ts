@@ -129,6 +129,16 @@ export const recordPushDeliveries = internalMutation
 /** The phone's action set for a tool approval: approve and deny, answered on the phone through the chat's own approval path. */
 export const TOOL_APPROVAL_CATEGORY = "tool_approval";
 
+/**
+ * The action set for a tool whose approval is only read in the chat: deny alone. `forget` names memories the lock screen
+ * does not show, so the alert offers no Approve, and a tap opens the chat, whose card lists them. An app that has not
+ * registered this category shows no actions at all.
+ */
+export const TOOL_DENY_ONLY_CATEGORY = "tool_approval_deny_only";
+
+/** Tools whose approval the phone's alert never offers to approve. */
+const APPROVED_IN_THE_CHAT: ReadonlySet<string> = new Set(["forget"]);
+
 /** Longest tool name a lock screen shows; a longer one is cut. */
 const APPROVAL_TITLE_MAX = 100;
 
@@ -163,7 +173,7 @@ export const phoneMessage = (
     if (message.approval) {
         return {
             body: message.approval.teammate,
-            categoryId: TOOL_APPROVAL_CATEGORY,
+            categoryId: message.approval.tool !== null && APPROVED_IN_THE_CHAT.has(message.approval.tool) ? TOOL_DENY_ONLY_CATEGORY : TOOL_APPROVAL_CATEGORY,
             data,
             priority: message.urgency,
             sound: "default",

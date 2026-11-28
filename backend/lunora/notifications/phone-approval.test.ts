@@ -6,7 +6,7 @@ import { lunoraTest } from "@lunora/testing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import schema from "../schema";
-import { phoneMessage, TOOL_APPROVAL_CATEGORY } from "./phone-delivery";
+import { phoneMessage, TOOL_APPROVAL_CATEGORY, TOOL_DENY_ONLY_CATEGORY } from "./phone-delivery";
 import { approvalPushNames } from "./phone-content";
 
 type Harness = ReturnType<typeof lunoraTest>;
@@ -111,6 +111,11 @@ describe("the approval alert on a phone", () => {
 
         expect(sent.data).toStrictEqual({ approvalId: APPROVAL_ID, notificationId: "n1", threadId: "t1" });
         expect(JSON.stringify(sent)).not.toContain("do not show");
+    });
+
+    it("offers no inline Approve for a forget, whose memories only the chat's card shows", () => {
+        expect(message({ approvalId: APPROVAL_ID, teammate: "Ada", tool: "forget" }).categoryId).toBe(TOOL_DENY_ONLY_CATEGORY);
+        expect(message({ approvalId: APPROVAL_ID, teammate: "Ada", tool: null }).categoryId).toBe(TOOL_APPROVAL_CATEGORY);
     });
 
     it("leaves a plain notification as it was, with no action set", () => {

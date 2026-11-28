@@ -338,6 +338,11 @@ msgstr "{0, plural, one {# dopasowanie} few {# dopasowania} many {# dopasowań} 
 msgid "{0, plural, one {# member} other {# members}}"
 msgstr "{0, plural, one {# członek} few {# członków} many {# członków} other {# członka}}"
 
+#. placeholder {0}: forgotten.length
+#: src/features/chat/thread/tool-approval.tsx:221
+msgid "{0, plural, one {# memory is waiting for the chat owner to confirm.} other {# memories are waiting for the chat owner to confirm.}}"
+msgstr "{0, plural, one {# wspomnienie czeka na potwierdzenie właściciela czatu.} few {# wspomnienia czekają na potwierdzenie właściciela czatu.} many {# wspomnień czeka na potwierdzenie właściciela czatu.} other {# wspomnienia czeka na potwierdzenie właściciela czatu.}}"
+
 #. placeholder {0}: c.messages.length
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:369
 msgid "{0, plural, one {# message} other {# messages}}"
@@ -2695,7 +2700,7 @@ msgstr "Dodaj załącznik"
 msgid "Add background"
 msgstr "Dodaj tło"
 
-#: src/features/settings/components/chat/usage-settings.tsx:417
+#: src/features/settings/components/chat/usage-settings.tsx:421
 #~ msgid "Add budget alert"
 #~ msgstr "Dodaj alert budżetowy"
 
@@ -2807,8 +2812,8 @@ msgid "Add picked frame as image node"
 msgstr "Dodaj wybraną klatkę jako węzeł obrazu"
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:147
-#: src/features/chat/thread-list/thread-list-dock.tsx:120
-#: src/features/chat/thread-list/thread-list-dock.tsx:130
+#: src/features/chat/thread-list/thread-list-dock.tsx:123
+#: src/features/chat/thread-list/thread-list-dock.tsx:133
 #: src/features/projects/components/add-project-dialog.tsx:695
 msgid "Add project"
 msgstr "Dodaj projekt"
@@ -3748,11 +3753,11 @@ msgstr "Wszystkie przypadki użycia"
 msgid "All Users"
 msgstr "Wszyscy użytkownicy"
 
-#: src/features/chat/thread/tool-approval.tsx:167
+#: src/features/chat/thread/tool-approval.tsx:243
 msgid "Allow \"{tool}\" from {server}?"
 msgstr "Zezwolić na „{tool}” z {server}?"
 
-#: src/features/chat/thread/tool-approval.tsx:167
+#: src/features/chat/thread/tool-approval.tsx:243
 msgid "Allow \"{tool}\"?"
 msgstr "Zezwolić na „{tool}”?"
 
@@ -3760,19 +3765,19 @@ msgstr "Zezwolić na „{tool}”?"
 msgid "Allow \"delete_files\" from the drafts server?"
 msgstr "Zezwolić na „delete_files” z serwera szkiców?"
 
-#: src/features/chat/thread/tool-approval.tsx:138
+#: src/features/chat/thread/tool-approval.tsx:157
 #~ msgid "Allow {tool} for 1 hour"
 #~ msgstr "Zezwól na {tool} na 1 godzinę"
 
-#: src/features/chat/thread/tool-approval.tsx:142
+#: src/features/chat/thread/tool-approval.tsx:161
 #~ msgid "Allow {tool} for today"
 #~ msgstr "Zezwól na {tool} na dziś"
 
-#: src/features/chat/thread/tool-approval.tsx:134
+#: src/features/chat/thread/tool-approval.tsx:153
 msgid "Allow for 1 hour"
 msgstr "Zezwól na 1 godzinę"
 
-#: src/features/chat/thread/tool-approval.tsx:140
+#: src/features/chat/thread/tool-approval.tsx:159
 msgid "Allow for today"
 msgstr "Zezwól na dziś"
 
@@ -3835,12 +3840,12 @@ msgstr "Oglądają też"
 msgid "Always"
 msgstr "Zawsze"
 
-#: src/features/chat/thread/tool-approval.tsx:128
+#: src/features/chat/thread/tool-approval.tsx:146
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:35
 msgid "Always allow"
 msgstr "Zawsze zezwalaj"
 
-#: src/features/chat/thread/tool-approval.tsx:126
+#: src/features/chat/thread/tool-approval.tsx:144
 msgid "Always allow {tool}"
 msgstr "Zawsze zezwalaj na {tool}"
 
@@ -4331,14 +4336,14 @@ msgid "Approvals in Neore: a tool you set to Ask stops before it runs, and you d
 msgstr "Zatwierdzenia w Neore: narzędzie ustawione na Pytaj zatrzymuje się przed uruchomieniem, a Ty decydujesz, mając przed sobą dokładne dane wejściowe."
 
 #: src/features/auth/components/device-approval.tsx:242
-#: src/features/chat/thread/tool-approval.tsx:120
+#: src/features/chat/thread/tool-approval.tsx:137
 #: src/features/develop/components/review-panel.tsx:64
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:32
 #: src/features/tasks/components/task-detail-dialog.tsx:104
 msgid "Approve"
 msgstr "Zatwierdź"
 
-#: src/features/chat/thread/tool-approval.tsx:118
+#: src/features/chat/thread/tool-approval.tsx:135
 msgid "Approve {tool} once"
 msgstr "Zatwierdź {tool} jednorazowo"
 
@@ -4366,7 +4371,7 @@ msgstr "Zatwierdź żądanie w aplikacji desktopowej na {name}."
 msgid "Approved"
 msgstr "Zatwierdzono"
 
-#: src/features/chat/thread/tool-approval.tsx:83
+#: src/features/chat/thread/tool-approval.tsx:98
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:23
 msgid "Approved — running tool"
 msgstr "Zatwierdzono — uruchamianie narzędzia"
@@ -8043,7 +8048,7 @@ msgstr "Złożone wnioskowanie wizualne wymagające przejrzystego myślenia nad 
 msgid "Composer"
 msgstr "Kompozytor"
 
-#: src/features/chat/thread/composer-status-line.tsx:95
+#: src/features/chat/thread/composer-status-line.tsx:96
 msgid "Composer status"
 msgstr "Stan pola wiadomości"
 
@@ -9543,7 +9548,7 @@ msgid "Could not send your answer."
 msgstr "Nie udało się wysłać odpowiedzi."
 
 #: src/features/chat/thread/ask-user-prompt.tsx:115
-#: src/features/chat/thread/tool-approval.tsx:72
+#: src/features/chat/thread/tool-approval.tsx:87
 msgid "Could not send your answer. Please try again."
 msgstr "Nie udało się wysłać twojej odpowiedzi. Spróbuj ponownie."
 
@@ -11105,7 +11110,7 @@ msgstr "Wymagające zadania, w których najważniejsze są maksymalne możliwoś
 msgid "Denied"
 msgstr "Odrzucono"
 
-#: src/features/chat/thread/tool-approval.tsx:81
+#: src/features/chat/thread/tool-approval.tsx:96
 msgid "Denied — continuing without it"
 msgstr "Odrzucono — kontynuacja bez niego"
 
@@ -11126,12 +11131,12 @@ msgid "Density updated"
 msgstr "Zaktualizowano gęstość"
 
 #: src/features/auth/components/device-approval.tsx:233
-#: src/features/chat/thread/tool-approval.tsx:124
+#: src/features/chat/thread/tool-approval.tsx:141
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:34
 msgid "Deny"
 msgstr "Odrzuć"
 
-#: src/features/chat/thread/tool-approval.tsx:122
+#: src/features/chat/thread/tool-approval.tsx:139
 msgid "Deny {tool}"
 msgstr "Odrzuć {tool}"
 
@@ -15812,6 +15817,10 @@ msgstr "Leśny"
 msgid "forget"
 msgstr "zapomnij"
 
+#: src/features/chat/thread/tool-approval.tsx:229
+msgid "Forget these memories?"
+msgstr "Zapomnieć te wspomnienia?"
+
 #: src/features/auth/components/auth/forms/two-factor-form.tsx:288
 msgid "Forgot authenticator"
 msgstr "Nie mam aplikacji uwierzytelniającej"
@@ -16771,7 +16780,7 @@ msgid "Goal: {goalTitle}"
 msgstr "Cel: {goalTitle}"
 
 #: src/features/chat/goal/composer-goal.tsx:66
-#: src/features/chat/thread/composer-status-line.tsx:111
+#: src/features/chat/thread/composer-status-line.tsx:112
 msgid "Goal: run until done"
 msgstr "Cel: działaj do skutku"
 
@@ -21425,6 +21434,10 @@ msgstr "wspomnienia"
 msgid "Memories"
 msgstr "Wspomnienia"
 
+#: src/features/chat/thread/tool-approval.tsx:214
+msgid "Memories to forget"
+msgstr "Wspomnienia do zapomnienia"
+
 #: src/features/chat/thread/memory-usage-action.tsx:42
 msgid "Memories used"
 msgstr "Użyte wspomnienia"
@@ -23135,8 +23148,8 @@ msgid "New thread"
 msgstr "Nowy wątek"
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:150
-#: src/features/chat/thread-list/thread-list-dock.tsx:136
-#: src/features/chat/thread-list/thread-list-dock.tsx:146
+#: src/features/chat/thread-list/thread-list-dock.tsx:139
+#: src/features/chat/thread-list/thread-list-dock.tsx:149
 msgid "New Thread"
 msgstr "Nowy wątek"
 
@@ -29353,7 +29366,7 @@ msgstr "Odpowiedź gotowa"
 msgid "Reply tools are off by default. You switch them on per connection and choose which groups they may use."
 msgstr "Narzędzia odpowiedzi są domyślnie wyłączone. Włączasz je dla każdego połączenia i wybierasz, z jakich grup mogą korzystać."
 
-#: src/features/chat/thread/composer-status-line.tsx:99
+#: src/features/chat/thread/composer-status-line.tsx:100
 msgid "Replying"
 msgstr "Odpowiada"
 
@@ -30696,7 +30709,7 @@ msgstr "szukaj"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:241
 #: src/features/chat/signed-out/signed-out-chat.tsx:141
-#: src/features/chat/thread-list/thread-list-dock.tsx:95
+#: src/features/chat/thread-list/thread-list-dock.tsx:98
 #: src/features/chat/thread/thread-welcome-suggestions.tsx:93
 msgid "Search"
 msgstr "Szukaj"
@@ -30794,11 +30807,11 @@ msgstr "Szukaj w treści wiadomości"
 msgid "Search message content..."
 msgstr "Szukaj w treści wiadomości..."
 
-#: src/features/chat/thread-list/thread-list-dock.tsx:53
+#: src/features/chat/thread-list/thread-list-dock.tsx:54
 msgid "Search messages"
 msgstr "Szukaj wiadomości"
 
-#: src/features/chat/thread-list/thread-list-dock.tsx:57
+#: src/features/chat/thread-list/thread-list-dock.tsx:58
 msgid "Search messages ({focusSearchShortcut})"
 msgstr "Szukaj wiadomości ({focusSearchShortcut})"
 
@@ -30935,12 +30948,12 @@ msgid "Search thread titles..."
 msgstr "Szukaj w tytułach wątków..."
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:134
-#: src/features/chat/thread-list/thread-list-dock.tsx:53
+#: src/features/chat/thread-list/thread-list-dock.tsx:54
 #: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:82
 msgid "Search threads"
 msgstr "Szukaj wątków"
 
-#: src/features/chat/thread-list/thread-list-dock.tsx:57
+#: src/features/chat/thread-list/thread-list-dock.tsx:58
 msgid "Search threads ({focusSearchShortcut})"
 msgstr "Szukaj wątków ({focusSearchShortcut})"
 
@@ -32024,7 +32037,7 @@ msgstr "Pokazuj znaczniki czasu"
 msgid "Show up to {rowLimit} rows ({byteCount} bytes)"
 msgstr "Pokaż do {rowLimit} wierszy ({byteCount} bajtów)"
 
-#: src/features/chat/thread/tool-approval.tsx:111
+#: src/features/chat/thread/tool-approval.tsx:128
 msgid "Show what it will send"
 msgstr "Pokaż, co zostanie wysłane"
 
@@ -35325,7 +35338,7 @@ msgstr "Bot i jego komputer zostaną usunięte. Jego czaty pozostaną jako zwyk�
 msgid "The bot gets only the tools you allow. With none allowed, it gets no tools."
 msgstr "Bot dostaje tylko narzędzia, na które pozwolisz. Bez żadnego dozwolonego nie dostaje żadnych narzędzi."
 
-#: src/features/chat/thread/composer-status-line.tsx:123
+#: src/features/chat/thread/composer-status-line.tsx:124
 msgid "The bot sets the model for this chat."
 msgstr "Bot ustawia model dla tego czatu."
 
@@ -37578,7 +37591,7 @@ msgstr "Narzędzia dla {0}"
 msgid "Tools run on their own settings; a quick check can clear low-risk calls"
 msgstr "Narzędzia działają według własnych ustawień; szybkie sprawdzenie może zwolnić wywołania niskiego ryzyka"
 
-#: src/features/chat/thread/composer-status-line.tsx:117
+#: src/features/chat/thread/composer-status-line.tsx:118
 msgid "Tools run without asking"
 msgstr "Narzędzia działają bez pytania"
 
@@ -39989,7 +40002,7 @@ msgstr "Oczekiwanie na właściciela"
 msgid "Waiting for the owner to answer"
 msgstr "Oczekiwanie na odpowiedź właściciela"
 
-#: src/features/chat/thread/tool-approval.tsx:78
+#: src/features/chat/thread/tool-approval.tsx:93
 msgid "Waiting for the owner to approve"
 msgstr "Oczekiwanie na zatwierdzenie przez właściciela"
 
@@ -40015,7 +40028,7 @@ msgstr "Czeka na twoją odpowiedź w: {0}"
 
 #: src/features/chat/thread-list/thread-node.tsx:919
 #: src/features/chat/thread-list/thread-node.tsx:926
-#: src/features/chat/thread/tool-approval.tsx:78
+#: src/features/chat/thread/tool-approval.tsx:93
 #: src/features/home/components/home-page.tsx:119
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:20
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:60
