@@ -172,35 +172,8 @@ export const beginRepairRows = async (
     // content than the stored hash. A child it turned back into an intent is made by the next call, with the install's own file.
     const settledUpdate = install.status === "updating";
 
-    // A remap is owed and nothing is missing: take the lease like a create does, so the action's remap is fenced and no other repair runs.
-    if (result.remapOwed && missing.length === 0 && !result.moreDropped && !settledUpdate) {
-        const generation = current.generation + 1;
-
-        await patchInstallIf(
-            ctx,
-            install._id as Id<"pluginInstalls">,
-            current.generation,
-            { generation, leaseUntil: ctx.now + LEASE_MS, status: "installing", updatedAt: ctx.now },
-            STALE,
-            current.status,
-        );
-
-        return {
-            existing,
-            generation,
-            installId,
-            kept: result.kept,
-            linked: result.linked,
-            missing: [],
-            moreDropped: false,
-            outdated: result.outdated,
-            remapOwed: true,
-            status: "needs-repair",
-            unresolved,
-        };
-    }
-
-    if (result.status === "installed" || missing.length === 0 || result.moreDropped || settledUpdate) {
+    // With nothing missing but a remap owed, the call goes on to the takeover: the action's remap runs under its lease.
+    if (result.status === "installed" || (missing.length === 0 && !result.remapOwed) || result.moreDropped || settledUpdate) {
         return {
             existing,
             generation: current.generation,
@@ -238,7 +211,7 @@ export const beginRepairRows = async (
         missing,
         moreDropped: false,
         outdated: result.outdated,
-        remapOwed: false,
+        remapOwed: result.remapOwed === true,
         status: "needs-repair",
         unresolved,
     };
