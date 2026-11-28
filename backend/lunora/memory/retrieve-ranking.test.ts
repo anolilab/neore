@@ -488,6 +488,19 @@ describe("rankMemories", () => {
             const days = ["2026-12-03", "2026-12-04", "2026-12-05"].map((day) => candidate(day, { ...plain, eventStart: day }));
 
             expect(idsOf(timed(days, [], twoDays))).toEqual(["2026-12-03", "2026-12-05"]);
+
+            // "what is on 3 December or in 2027": the day is narrow, so its appointment is found by its date; the year is not.
+            const dayOrYear = {
+                onlyTime: true,
+                spans: [
+                    { end: "2026-12-03", start: "2026-12-03" },
+                    { end: "2027-12-31", start: "2027-01-01" },
+                ],
+                today: "2026-11-27",
+            };
+            const appointments = ["2026-12-03", "2027-03-10"].map((day) => candidate(day, { ...plain, eventStart: day }));
+
+            expect(idsOf(timed(appointments, [], dayOrYear))).toEqual(["2026-12-03"]);
         });
 
         it("gives no holds bonus to a pinned fact past its end date", () => {

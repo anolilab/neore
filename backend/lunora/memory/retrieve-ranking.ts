@@ -563,13 +563,19 @@ export const DATE_RELEVANCE_MAX_EVENT_DAYS = 7;
 
 const overlaps = (start: string, end: string, span: Span): boolean => start <= span.end && end >= span.start;
 
-/** The time signal of a memory for a window: its weight, and whether it is a short event the window's date decides. */
+/**
+ * The time signal of a memory for a window: its weight, and whether it is a short event in a span narrow enough for its
+ * date to decide (each span on its own: "3 December or in 2027" still finds the appointment on the 3rd).
+ */
 const timeSignalOf = (m: RankCandidate, window: TimeWindow): { dated: boolean; signal: number } => {
     const { eventStart } = m;
     const eventEnd = m.eventEnd ?? eventStart;
 
     if (eventStart && eventEnd && window.spans.some((span) => overlaps(eventStart, eventEnd, span))) {
-        return { dated: windowDays({ end: eventEnd, start: eventStart }) <= DATE_RELEVANCE_MAX_EVENT_DAYS, signal: TIME_WEIGHTS.event };
+        const short = windowDays({ end: eventEnd, start: eventStart }) <= DATE_RELEVANCE_MAX_EVENT_DAYS;
+        const narrow = window.spans.some((span) => windowDays(span) <= DATE_RELEVANCE_MAX_DAYS && overlaps(eventStart, eventEnd, span));
+
+        return { dated: short && narrow, signal: TIME_WEIGHTS.event };
     }
 
     const { validUntil } = m;
@@ -602,9 +608,9 @@ const timeSignalOf = (m: RankCandidate, window: TimeWindow): { dated: boolean; s
  * or under the score threshold, a candidate is left out; the rest is sorted best first and cut to `limit`. `now` is
  * when scoring happens (recency counts from it).
  *
- * With a `timeWindow`, each candidate adds its time signal (`timeSignalOf`), and, for a question about the time alone
- * whose spans are each at most `DATE_RELEVANCE_MAX_DAYS`, an event of at most `DATE_RELEVANCE_MAX_EVENT_DAYS` in one of
- * them is relevant by its date. The demotion only reorders: the threshold reads the score without it. The returned
+ * With a `timeWindow`, each candidate adds its time signal (`timeSignalOf`), and, for a question about the time alone,
+ * an event of at most `DATE_RELEVANCE_MAX_EVENT_DAYS` in one of its spans of at most `DATE_RELEVANCE_MAX_DAYS` is
+ * relevant by its date. The demotion only reorders: the threshold reads the score without it. The returned
  * score is capped at 1 (the "memories used" view shows it as a share). Without a window nothing changes.
  */
 export const rankMemories = (input: {
@@ -638,7 +644,7 @@ export const rankMemories = (input: {
         vectorScores,
         vectorSearched = false,
     } = input;
-    const dateDecides = timeWindow?.onlyTime === true && timeWindow.spans.every((span) => windowDays(span) <= DATE_RELEVANCE_MAX_DAYS);
+    const dateDecides = timeWindow?.onlyTime === true;
 
     return (
         candidates

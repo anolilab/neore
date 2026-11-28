@@ -402,9 +402,10 @@ describe("memory retrieval eval", () => {
                 record(overallWithout, query, off.ids, off.inWindow);
             }
 
-            // A question naming a time and a topic nobody mentioned that abstained without the step still abstains.
-            if (sliceOf(query) === "datedAbstain" && off.ids.length === 0) {
-                expect(run(query).ids, query.text).toEqual([]);
+            // A question naming a time and a topic nobody mentioned never injects more with the step than without it, so one
+            // that abstained without it still abstains.
+            if (sliceOf(query) === "datedAbstain") {
+                expect(run(query).ids.length, query.text).toBeLessThanOrEqual(off.ids.length);
             }
 
             if (window === undefined) {

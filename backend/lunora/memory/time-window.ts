@@ -135,11 +135,11 @@ const GERMAN: Lexicon = {
     days: {
         gestern: { offset: -1 },
         heute: { offset: 0 },
-        // `am Morgen`, `heute Morgen`, `jeden Morgen`, `am frühen Morgen`, `den ganzen Morgen` are mornings; `mit der
-        // Schwester morgen` is tomorrow. `guten Morgen` greets, and `gestern Morgen` is yesterday's.
+        // `am Morgen`, `heute Morgen`, `jeden Morgen`, `für den Morgen`, `am frühen Morgen`, `den ganzen Morgen` are
+        // mornings; `mit der Schwester morgen` is tomorrow. `guten Morgen` greets, and `gestern Morgen` is yesterday's.
         morgen: {
             adjectives: ["früh", "spät", "ganz", "gleich", "selb", "nächst", "jed"],
-            blockedAfter: ["am", "heute", "gestern", "jeden", "guten"],
+            blockedAfter: ["am", "heute", "gestern", "jeden", "guten", "den", "dem", "der"],
             offset: 1,
         },
         übermorgen: { offset: 2 },
@@ -376,8 +376,8 @@ const LEXICON_WORDS = new Map(
 
 const isNumber = (word: string): boolean => SMALL_NUMBER_RE.test(word) || DAY_NUMBER_RE.test(word) || YEAR_RE.test(word);
 
-/** Words that part two times: a relative year never joins a month across them. */
-const ALTERNATIVES = new Set(["oder", "or"]);
+/** Words that part two times: a relative year never joins a month across them ("in May or last year", "May and next year"). */
+const PARTING_WORDS = new Set(["and", "oder", "or", "und"]);
 
 /** The words that may join a month and a relative year: `in May last year`, `letztes Jahr im Mai`. */
 const MAX_YEAR_GAP = 4;
@@ -396,9 +396,9 @@ export const readTimePhrase = (text: string): TimePhrase | undefined => {
     });
     const phraseFrom = (index: number): Read | undefined => ranked.map(({ lexicon, tense }) => phraseAt(words, index, lexicon, tense)).find(Boolean);
     // A month without a year and a relative year near it are one time: `in May last year` is May of 2025.
-    // Never across `or`: "in May or last year" names two times.
+    // Never across `or` or `and`: "in May or last year" names two times.
     const firstNear = (from: number, wanted: (near: TimePhrase) => boolean): { read: Read; start: number } | undefined => {
-        for (let index = from + 1; index <= from + MAX_YEAR_GAP && index < tokens.length && !ALTERNATIVES.has(words[index]!); index += 1) {
+        for (let index = from + 1; index <= from + MAX_YEAR_GAP && index < tokens.length && !PARTING_WORDS.has(words[index]!); index += 1) {
             const near = phraseFrom(index);
 
             if (near !== undefined && wanted(near.phrase)) {

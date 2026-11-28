@@ -102,6 +102,22 @@ describe("timeWindowOf", () => {
                 ["2025-01-01", "2025-12-31"],
             ],
         ],
+        [
+            "what is planned for May and next year",
+            [
+                ["2027-05-01", "2027-05-31"],
+                ["2027-01-01", "2027-12-31"],
+            ],
+        ],
+        [
+            "was steht im Mai und nächstes Jahr an",
+            [
+                ["2027-05-01", "2027-05-31"],
+                ["2027-01-01", "2027-12-31"],
+            ],
+        ],
+        // `für den Morgen` is the morning of the day named
+        ["Was ist für den Morgen am 3. Dezember geplant?", ["2026-12-03", "2026-12-03"]],
         // `going` is future only in `going to`; an `-ed` word after am/is/are is the passive
         ["what was going on in May", ["2026-05-01", "2026-05-31"]],
         ["what was going on in December", ["2025-12-01", "2025-12-31"]],
