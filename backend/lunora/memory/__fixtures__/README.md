@@ -45,8 +45,9 @@ last / next week, next month, December, 3 December, in 3 days, 5 days ago, May 2
 `window` it asks about, written in the generator; the expected rows are computed from it, never from the parser, and
 the eval checks the parser reads the same window. Their rows are events (ahead and past, of the asked time and of
 others), periods (`Lived in Leipzig`, 2021 to 2024), and facts with an end date that holds through the window or ends
-before it. A question about a time alone ("what is coming up tomorrow") embeds on an aspect only, as an embedding does
-not know which day tomorrow is. Seven more name a time beside a topic nobody mentioned ("what is the weather like
+before it. A question about a relative time alone ("what is coming up tomorrow") embeds on an aspect only, with no
+month dimension, as an embedding does not know which day tomorrow is; one that names a month ("what are my plans for
+December") carries that month's dimension (40 for December), as the events of that month do. Seven more name a time beside a topic nobody mentioned ("what is the weather like
 tomorrow", "was koche ich heute"), labelled `abstain` and reported as `datedAbstain`, apart from the 30 above.
 
 The `exact` rows are a second pass of the generator with its own seed, so the rows before them are as they were. Each is
@@ -54,7 +55,7 @@ older than the window, embedded, and copied onto a superseded, an expired or a `
 
 ## Vectors without a model
 
-No embedding model is called. Each memory and each query carries `tags`: sparse weights over 64 dimensions that the test
+No embedding model is called. Each memory and each query carries `tags`: sparse weights over 80 dimensions that the test
 expands and normalises, so cosine similarity is meaningful and stable.
 
 - dims 0-15: topic. 16-21: topics nobody has (for `abstain`). 22-27: aspect (who, likes, setup, recent, history, plan).

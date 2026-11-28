@@ -107,7 +107,7 @@ const GERMAN: Lexicon = {
         gestern: { offset: -1 },
         heute: { offset: 0 },
         // `heute Morgen` reads `heute` first; `guten Morgen`, `am (frühen) Morgen`, `jeden Morgen` are mornings, not tomorrow.
-        morgen: { blockedAfter: ["guten", "am", "jeden", "diesen", "den", "einen", "dem", "der", "vom", "heute", "gestern"], offset: 1 },
+        morgen: { blockedAfter: ["guten", "am", "jeden", "diesen", "den", "einen", "einem", "dem", "der", "vom", "heute", "gestern"], offset: 1 },
     },
     dayUnits: ["tag", "tage", "tagen"],
     future: GERMAN_FUTURE,
@@ -305,7 +305,9 @@ const LEXICON_WORDS = new Map(
     ]),
 );
 
-const isKnown = (word: string): boolean => DAY_NUMBER_RE.test(word) || YEAR_RE.test(word) || LEXICONS.some((lexicon) => LEXICON_WORDS.get(lexicon)!.has(word));
+// A count of days is a time word too: `in 100 days`, as `countOf` reads it.
+const isKnown = (word: string): boolean =>
+    SMALL_NUMBER_RE.test(word) || DAY_NUMBER_RE.test(word) || YEAR_RE.test(word) || LEXICONS.some((lexicon) => LEXICON_WORDS.get(lexicon)!.has(word));
 
 /** The words that may join a month and a relative year: `in May last year`, `letztes Jahr im Mai`. */
 const MAX_YEAR_GAP = 4;
@@ -324,37 +326,33 @@ export const readTimePhrase = (text: string): TimePhrase | undefined => {
     });
     const phraseFrom = (index: number): TimePhrase | undefined => ranked.map(({ lexicon, tense }) => phraseAt(words, index, lexicon, tense)).find(Boolean);
     // A month without a year and a relative year near it are one time: `in May last year` is May of 2025.
-    const yearShiftNear = (from: number): Shift | undefined => {
+    const firstNear = (from: number, wanted: (near: TimePhrase) => boolean): TimePhrase | undefined => {
         for (let index = from + 1; index <= from + MAX_YEAR_GAP && index < tokens.length; index += 1) {
             const near = phraseFrom(index);
 
-            if (near?.kind === "relative" && near.unit === "year") {
-                return near.shift;
+            if (near !== undefined && wanted(near)) {
+                return near;
             }
         }
 
         return undefined;
     };
+    const isRelativeYear = (near: TimePhrase): boolean => near.kind === "relative" && near.unit === "year";
+    const isYearlessMonth = (near: TimePhrase): boolean => near.kind === "date" && near.year === undefined;
     const withNearYear = (phrase: TimePhrase, index: number): TimePhrase => {
         if (phrase.kind === "date" && phrase.year === undefined) {
-            const yearShift = yearShiftNear(index);
+            const near = firstNear(index, isRelativeYear);
 
-            return yearShift === undefined ? phrase : { ...phrase, yearShift };
+            return near?.kind === "relative" ? { ...phrase, yearShift: near.shift } : phrase;
         }
 
         if (phrase.kind !== "relative" || phrase.unit !== "year") {
             return phrase;
         }
 
-        for (let next = index + 1; next <= index + MAX_YEAR_GAP && next < tokens.length; next += 1) {
-            const month = phraseFrom(next);
+        const month = firstNear(index, isYearlessMonth);
 
-            if (month?.kind === "date" && month.year === undefined) {
-                return { ...month, yearShift: phrase.shift };
-            }
-        }
-
-        return phrase;
+        return month?.kind === "date" ? { ...month, yearShift: phrase.shift } : phrase;
     };
 
     const at = (read: (index: number) => TimePhrase | undefined): TimePhrase | undefined => {
@@ -377,7 +375,10 @@ export const readTimePhrase = (text: string): TimePhrase | undefined => {
             return found === undefined ? undefined : withNearYear(found, index);
         });
 
-    return phrase === undefined ? undefined : { ...phrase, onlyTime: words.every((word) => isKnown(word)) };
+    // A question cut at `MAX_TEXT_LENGTH` may name a topic past the cut: it is never about the time alone.
+    const whole = text.length <= MAX_TEXT_LENGTH;
+
+    return phrase === undefined ? undefined : { ...phrase, onlyTime: whole && words.every((word) => isKnown(word)) };
 };
 
 const pad = (value: number): string => String(value).padStart(2, "0");

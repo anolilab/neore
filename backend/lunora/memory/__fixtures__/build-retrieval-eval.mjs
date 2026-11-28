@@ -370,8 +370,18 @@ const ago = (days) => dayString(NOW - days * DAY);
 
         return o;
     };
+    // A copied event after the fixture's day is worded as planned, so a question about what is ahead is not answered by
+    // a row that says it already happened. The first persona keeps its rows as they are.
+    const PLANNED = { "p1-ev-hiking": "On 4 December 2026 the user leads a group walk to the lake circuit" };
     const memories = source.memories.map((m) => {
-        return { ...m, id: m.id.replace(/^p1-/u, `${pid}-`), ...(m.supersededBy && { supersededBy: m.supersededBy.replace(/^p1-/u, `${pid}-`) }) };
+        if (m.eventStart > dayString(NOW) && PLANNED[m.id] === undefined) throw new Error(`no planned wording for ${m.id}`);
+
+        return {
+            ...m,
+            id: m.id.replace(/^p1-/u, `${pid}-`),
+            ...(m.supersededBy && { supersededBy: m.supersededBy.replace(/^p1-/u, `${pid}-`) }),
+            ...(PLANNED[m.id] && { text: PLANNED[m.id] }),
+        };
     });
     const dims = (theme, aspect, eventStart) => {
         const topic = typeof theme === "number" ? theme : DATED0 + THEMES[theme];

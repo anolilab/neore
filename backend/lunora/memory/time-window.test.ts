@@ -100,6 +100,7 @@ describe("timeWindowOf", () => {
         "was habe ich am frühen Morgen gemacht",
         "am Morgen laufe ich",
         "den ganzen Morgen geregnet",
+        "was mache ich an einem frühen Morgen",
         "a 2023 vintage from the shop",
         "walked 15000 steps",
         "an essay of 2050 words",
@@ -118,6 +119,9 @@ describe("timeWindowOf", () => {
                 only(text),
             ),
         ).toEqual([true, true, true, true]);
+        // A count of days is a time word; a question cut past the scanned length may name its topic after the cut.
+        expect(only("what is coming up in 100 days")).toBe(true);
+        expect(only(`what is coming up tomorrow ${"and ".repeat(250)}about the weather`)).toBe(false);
         expect(["what is the weather like tomorrow", "draft an email saying I am away next week", "was koche ich heute"].map((text) => only(text))).toEqual([
             false,
             false,

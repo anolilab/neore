@@ -389,6 +389,7 @@ describe("memory retrieval eval", () => {
 
     it("reads the asked time: dated and temporal questions gain, a question naming no time ranks as without it", () => {
         const without = new Map(SLICES.map((c) => [c, empty()]));
+        const overallWithout = empty();
         const named: string[] = [];
 
         for (const query of fixture.queries) {
@@ -396,6 +397,15 @@ describe("memory retrieval eval", () => {
             const window = timeWindowOf(query.text, today);
 
             record(without.get(sliceOf(query))!, query, off.ids, off.inWindow);
+
+            if (isOverall(query)) {
+                record(overallWithout, query, off.ids, off.inWindow);
+            }
+
+            // A question naming a time and a topic nobody mentioned that abstained without the step still abstains.
+            if (sliceOf(query) === "datedAbstain" && off.ids.length === 0) {
+                expect(run(query).ids, query.text).toEqual([]);
+            }
 
             if (window === undefined) {
                 expect(run(query).ranked, query.id).toEqual(off.ranked);
@@ -415,12 +425,15 @@ describe("memory retrieval eval", () => {
             }
         }
 
-        const before = Object.fromEntries(SLICES.map((c) => [c, summary(without.get(c)!)]));
+        const before = { overall: summary(overallWithout), ...Object.fromEntries(SLICES.map((c) => [c, summary(without.get(c)!)])) } as Record<
+            string,
+            ReturnType<typeof summary>
+        >;
 
         // eslint-disable-next-line no-console
         console.table(
             Object.fromEntries(
-                SLICES.map((c) => [
+                ["overall", ...SLICES].map((c) => [
                     c,
                     {
                         "abstain rate": `${before[c]!.abstainRate?.toFixed(3) ?? "-"} → ${results[c]!.abstainRate?.toFixed(3) ?? "-"}`,
@@ -437,11 +450,10 @@ describe("memory retrieval eval", () => {
             "what did I rehearse today",
         ]);
         expect(named).toHaveLength(32);
-        // Measured 0.687 → 1.000 and 0.589 → 0.956 on this fixture.
-        expect(results.dated!.recallAt8! - before.dated!.recallAt8!).toBeGreaterThanOrEqual(0.2);
-        expect(results.dated!.ndcgAt8! - before.dated!.ndcgAt8!).toBeGreaterThanOrEqual(0.2);
-        // A question naming a time and a topic nobody mentioned injects no more than without the step: 0.857 both ways.
-        expect(results.datedAbstain!.abstainRate!).toBeGreaterThanOrEqual(before.datedAbstain!.abstainRate!);
+        // Measured 0.687 → 1.000 and 0.589 → 0.956 on this fixture. The `dated` floors gate the numbers; here the step
+        // only has to do no worse than the run without it, so a better run without it never fails the eval.
+        expect(results.dated!.recallAt8!).toBeGreaterThanOrEqual(before.dated!.recallAt8!);
+        expect(results.dated!.ndcgAt8!).toBeGreaterThanOrEqual(before.dated!.ndcgAt8!);
     });
 
     it("still finds a memory by its words when no vector search ran", () => {

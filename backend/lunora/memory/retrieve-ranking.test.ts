@@ -24,6 +24,7 @@ import {
     withSearchHits,
 } from "./retrieve-ranking";
 import type { RankCandidate } from "./retrieve-ranking";
+import type { TimeWindow } from "./time-window";
 import { MAX_SCORED_TERMS, salientTermsOf } from "./search-terms";
 
 const DAY = 86_400_000;
@@ -429,7 +430,7 @@ describe("rankMemories", () => {
 
     describe("the asked time", () => {
         const week = { end: "2026-12-06", onlyTime: true, start: "2026-11-30", today: "2026-11-27" };
-        const timed = (candidates: RankCandidate[], vectorScores: [string, number][], timeWindow = week) =>
+        const timed = (candidates: RankCandidate[], vectorScores: [string, number][], timeWindow: TimeWindow = week) =>
             rankMemories({ candidates, ...keywordSignalsFor(candidates, "zzz"), now: NOW, timeWindow, vectorScores: new Map(vectorScores) });
         const plain = { confidence: 70, importance: 50, lastConfirmedAt: NOW - 60 * DAY };
 

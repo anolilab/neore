@@ -540,8 +540,8 @@ const keywordRelevanceOf = (keyword: number, floor: number, { counts, rare }: { 
 
 /**
  * What the time a question asks about (`time-window.ts`) adds to a memory's score: an event in the window, a fact that
- * holds through it (its end date is in or after the window and not before today, the window reaching today or later), or a fact that ended before the
- * window starts (a pinned one past its date, or one ending before an asked time ahead). Bounded: the most it moves a
+ * holds through it (its end date is in or after the window and not before today, the window reaching today or later),
+ * or a fact that ended before the window starts (a pinned one past its date, or one ending before an asked time ahead). Bounded: the most it moves a
  * score is `event`, so it reorders rows of one topic and never outweighs relevance.
  */
 export const TIME_WEIGHTS = { ended: -0.1, event: 0.2, holds: 0.05 };
