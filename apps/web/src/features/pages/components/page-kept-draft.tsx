@@ -16,8 +16,8 @@ const PageKeptDraft: FC<{ markdown: string; onDismiss: () => void }> = ({ markdo
 
     return (
         <section aria-labelledby={id} className="flex h-full flex-col">
-            <div className="flex items-center justify-between gap-2 border-b px-3 py-2">
-                <h2 className="text-sm font-semibold" id={id}>
+            <div className="border-border/50 flex min-h-[49px] items-center justify-between gap-2 border-b px-3 py-2">
+                <h2 className="text-[15px] font-semibold" id={id}>
                     {t`Your unsaved version`}
                 </h2>
                 <div className="flex gap-1">
