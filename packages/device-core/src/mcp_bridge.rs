@@ -81,11 +81,12 @@ fn redact(value: &mut Value, secrets: &[String]) {
         Value::String(text) => scrub(text, secrets),
         // A credential of digits can come back as a number.
         Value::Number(number) => {
-            let mut text = number.to_string();
+            let written = number.to_string();
+            let mut text = written.clone();
 
             scrub(&mut text, secrets);
 
-            if text != number.to_string() {
+            if text != written {
                 *value = Value::String(text);
             }
         }

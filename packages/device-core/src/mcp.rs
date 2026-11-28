@@ -1418,6 +1418,15 @@ sleep 1"#
         );
     }
 
+    /// A server like the bridge: its first copy (counted in `starts`) answers every call with the session-gone error,
+    /// any later copy answers with a result.
+    #[cfg(unix)]
+    fn gone_once_script(starts: &Path) -> String {
+        r#"echo $$ >> 'STARTS'; n=$(wc -l < 'STARTS'); read l; echo '{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-06-18","capabilities":{},"serverInfo":{"name":"f","version":"1"}}}'; read l; while read l; do id=$(printf '%s' "$l" | sed 's/.*"id":\([0-9]*\).*/\1/'); if [ $n -eq 1 ]; then echo "{\"jsonrpc\":\"2.0\",\"id\":$id,\"error\":{\"code\":-32000,\"message\":\"GONE\"}}"; else echo "{\"jsonrpc\":\"2.0\",\"id\":$id,\"result\":{}}"; fi; done"#
+        .replace("STARTS", &starts.display().to_string())
+        .replace("GONE", SESSION_GONE)
+    }
+
     #[cfg(unix)]
     #[test]
     fn a_call_that_waited_on_a_bridge_whose_session_ended_goes_to_its_replacement() {
@@ -1425,10 +1434,7 @@ sleep 1"#
 
         let root = temp_root("session-gone-two");
         let starts = root.join("starts");
-        // The first copy answers every call with the session-gone error; any later copy answers with a result.
-        let script = r#"echo $$ >> 'STARTS'; n=$(wc -l < 'STARTS'); read l; echo '{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-06-18","capabilities":{},"serverInfo":{"name":"f","version":"1"}}}'; read l; while read l; do id=$(printf '%s' "$l" | sed 's/.*"id":\([0-9]*\).*/\1/'); if [ $n -eq 1 ]; then echo "{\"jsonrpc\":\"2.0\",\"id\":$id,\"error\":{\"code\":-32000,\"message\":\"GONE\"}}"; else echo "{\"jsonrpc\":\"2.0\",\"id\":$id,\"result\":{}}"; fi; done"#
-            .replace("STARTS", &starts.display().to_string())
-            .replace("GONE", SESSION_GONE);
+        let script = gone_once_script(&starts);
 
         std::fs::create_dir_all(&root).unwrap();
 
@@ -1478,10 +1484,7 @@ sleep 1"#
 
         let root = temp_root("session-gone-edited");
         let starts = root.join("starts");
-        // As in the test above: the first copy answers with the session-gone error, a later one with a result.
-        let script = r#"echo $$ >> 'STARTS'; n=$(wc -l < 'STARTS'); read l; echo '{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-06-18","capabilities":{},"serverInfo":{"name":"f","version":"1"}}}'; read l; while read l; do id=$(printf '%s' "$l" | sed 's/.*"id":\([0-9]*\).*/\1/'); if [ $n -eq 1 ]; then echo "{\"jsonrpc\":\"2.0\",\"id\":$id,\"error\":{\"code\":-32000,\"message\":\"GONE\"}}"; else echo "{\"jsonrpc\":\"2.0\",\"id\":$id,\"result\":{}}"; fi; done"#
-            .replace("STARTS", &starts.display().to_string())
-            .replace("GONE", SESSION_GONE);
+        let script = gone_once_script(&starts);
 
         std::fs::create_dir_all(&root).unwrap();
 
