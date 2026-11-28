@@ -620,6 +620,9 @@ ${args.requested ? REQUESTED_RULE : "Extract NEW facts about the user not alread
         // `health`: a fact the extractor marked as about the user's health (`sensitive`), in any language, whoever asked.
         const dropped = { health: 0, noQuote: 0, quoteRefused: 0 };
         const refusedAsked: AskedRefusal[] = Array.from({ length: secretsAsked }, () => "secret" as const);
+        // An asked statement whose own quote failed: refused only if no copy of it survives (a twin the extractor returned
+        // unasked, with a quote that holds), which then carries the request instead.
+        const unbackedAsked: string[] = [];
 
         extractedFacts = extractedFacts.filter((fact) => {
             if (fact.sensitive === true) {
@@ -644,11 +647,23 @@ ${args.requested ? REQUESTED_RULE : "Extract NEW facts about the user not alread
 
             // The quote check refuses health words in the user's own span, which is the claimed quote up to case and spacing.
             if (fact.asked === true) {
-                refusedAsked.push(fact.quote !== undefined && mentionsHealth(fact.quote) ? "health" : "unbacked");
+                if (fact.quote !== undefined && mentionsHealth(fact.quote)) {
+                    refusedAsked.push("health");
+                } else {
+                    unbackedAsked.push(statementKey(fact));
+                }
             }
 
             return false;
         });
+
+        const survivingKeys = new Set(extractedFacts.map((fact) => statementKey(fact)));
+
+        for (const key of unbackedAsked) {
+            if (!survivingKeys.has(key)) {
+                refusedAsked.push("unbacked");
+            }
+        }
 
         const refused = secretsAsked + dropped.health + dropped.noQuote + dropped.quoteRefused;
 
@@ -660,8 +675,9 @@ ${args.requested ? REQUESTED_RULE : "Extract NEW facts about the user not alread
             return { asked: true, facts: [], refused, refusedAsked };
         }
 
-        // The extractor can return one statement twice, asked once: the copy kept below carries the request either way.
-        const askedKeys = new Set(extractedFacts.flatMap((fact) => (fact.asked === true ? [statementKey(fact)] : [])));
+        // The extractor can return one statement twice, asked once: the copy kept below carries the request either way, the
+        // asked copy's quote having failed or not.
+        const askedKeys = new Set([...unbackedAsked, ...extractedFacts.flatMap((fact) => (fact.asked === true ? [statementKey(fact)] : []))]);
 
         extractedFacts = extractedFacts.map((fact) => (askedKeys.has(statementKey(fact)) ? { ...fact, asked: true } : fact));
 

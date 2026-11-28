@@ -58,7 +58,10 @@ Paths are relative to `backend/lunora/`.
 
 - `saveMemoryBatch` confirms a row holding the same text and dates, retiring what the fact was to supersede. The
   batch's own inserts join, and its retired rows leave, what later facts match.
-- A fact returned twice (same `textKey` and dates, the save's own comparison) is asked if either copy is.
+- A fact returned twice (same `textKey` and dates, the save's own comparison) is asked if either copy is, even when the
+  asked copy's own quote failed and only its unasked twin's holds; that asked copy is then not reported refused.
+- The tool takes an hour or today allow like any built-in; a headless run never has it (`BUILTIN_TOOLS_NOT_HEADLESS`,
+  `chat/lib/person-tools.ts`).
 - Extraction drops a fact the extractor marks `sensitive` (health, diagnosis, treatment, medication), in any mode and
   language. A quote main's quote check refuses for a health word is reported as `health`.
 - When something was written, each asked fact refused (secret, health, unbacked) is still reported by its reason only

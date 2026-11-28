@@ -3,6 +3,8 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
+import { isGrantableKey } from "../lib/tool-permission-grants";
+import { applyToolPermissions, resolveToolPermission, toolPermissionKey } from "../lib/tool-permissions";
 import rememberTool from "./remember";
 
 /** `wrapTools` attaches the agent's ctx to the tool object; `execute` reads it from there. */
@@ -70,5 +72,26 @@ describe("remember", () => {
         expect(encoded).toContain("User works as a nurse");
         expect(encoded).toContain("about their health");
         expect(encoded).toContain("Tell the user both what was saved and what was not");
+    });
+});
+
+describe("remember's permissions", () => {
+    const NOW = Date.UTC(2026, 10, 28, 12, 0, 0);
+    const remember = { key: toolPermissionKey("builtin", "remember"), source: "builtin" as const };
+    const tools = { remember: rememberTool } as never;
+
+    it("takes an hour or today allow: a grant lifts its ask to auto until the grant ends", () => {
+        const grants = { [remember.key]: NOW + 60_000 };
+
+        expect(isGrantableKey(remember.key)).toBe(true);
+        expect(resolveToolPermission(remember, { [remember.key]: "ask" }, { now: NOW, timedGrants: grants })).toBe("auto");
+        expect(resolveToolPermission(remember, { [remember.key]: "ask" }, { now: NOW + 60_000, timedGrants: grants })).toBe("ask");
+    });
+
+    it("is removed from a run nobody is at, even when set to Auto", () => {
+        const { removed, tools: kept } = applyToolPermissions(tools, () => undefined, { [remember.key]: "auto" }, { headless: true });
+
+        expect(removed).toContain("remember");
+        expect(Object.keys(kept)).not.toContain("remember");
     });
 });

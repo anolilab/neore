@@ -489,6 +489,19 @@ describe(rememberFactFor, () => {
         expect(await memories()).toHaveLength(1);
     });
 
+    it("saves an asked statement whose own quote failed as requested, through its backed unasked twin, and refuses nothing", async () => {
+        answer([
+            { memory: "User is vegan", quote: "I have been vegan for years" },
+            { asked: false, memory: "User is vegan", quote: "I'm vegan" },
+        ]);
+
+        await expect(remember(await setUp())).resolves.toStrictEqual({ facts: [{ asked: true, memory: "User is vegan", status: "saved" }], status: "saved" });
+
+        const rows = await memories();
+
+        expect(rows.map((row) => row.source)).toStrictEqual(["requested"]);
+    });
+
     it("saves a fact the extractor returned twice, asked only the second time, as asked", async () => {
         answer([
             { asked: false, memory: "User is vegan", quote: "I'm vegan" },
