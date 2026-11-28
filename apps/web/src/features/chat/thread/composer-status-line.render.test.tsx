@@ -11,7 +11,7 @@ import ComposerStatusLine from "./composer-status-line";
 const THREAD_ID = "k57abcdefghjkmnpqrstvwxyz0123456";
 
 const env = vi.hoisted(() => {
-    return { cachedPin: undefined as { maxRounds: number; text: string } | undefined, impersonating: false, local: false };
+    return { cachedPin: undefined as { maxRounds: number; text: string } | undefined, impersonating: false, local: false, permission: "supervised" };
 });
 
 vi.mock("@lingui/react/macro", () => {
@@ -81,7 +81,7 @@ vi.mock("./composer-model-selector", () => {
     };
 });
 vi.mock("./composer-permission-mode", () => {
-    return { useShownPermissionMode: () => "supervised" };
+    return { useShownPermissionMode: () => env.permission };
 });
 vi.mock("./composer-research-depth", () => {
     return {
@@ -105,6 +105,7 @@ beforeEach(() => {
     env.cachedPin = undefined;
     env.impersonating = false;
     env.local = false;
+    env.permission = "supervised";
     useGoalComposer.setState({ enabled: false });
     setPinOverride(THREAD_ID, undefined);
     useChatUIStore.setState({ composerAttachments: [], composerText: "" });
@@ -156,6 +157,14 @@ describe(ComposerStatusLine, () => {
         renderLine();
 
         expect(screen.queryByText(GOAL)).toBeNull();
+    });
+
+    it("shows neither web search nor full access for a local model, which runs neither", () => {
+        env.local = true;
+        env.permission = "full";
+        const { container } = render(<ComposerStatusLine researchDepth={"standard" as never} searchMode="web" textMode />);
+
+        expect(container.textContent).toBe("");
     });
 
     it("renders nothing with no goal, pinned or armed", () => {

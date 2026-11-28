@@ -69,4 +69,16 @@ describe("SearchBar", () => {
 
         expect(screen.queryByRole("button", { name: "Clear search" })).toBeNull();
     });
+
+    it("puts the focus back in the field it cleared, since the clear button leaves with the query", () => {
+        render(<SearchBar {...baseProps} />);
+
+        const clear = screen.getByRole("button", { name: "Clear search" });
+
+        clear.focus();
+        fireEvent.click(clear);
+
+        // eslint-disable-next-line testing-library/no-node-access -- focus placement is what this test asserts
+        expect(document.activeElement).toBe(screen.getByRole("textbox"));
+    });
 });

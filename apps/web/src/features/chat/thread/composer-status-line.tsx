@@ -63,7 +63,8 @@ const ComposerStatusLine: FC<ComposerStatusLineProps> = ({ researchDepth, search
     const { sseStreamState } = useChatIsStreaming();
     const goalOn = useGoalComposer((state) => state.enabled);
     const pinned = usePinnedGoalShown();
-    // A local model runs one plain turn: the send drops an armed goal and never applies a pinned one.
+    // A local model runs one plain turn: no gateway, so no web search, and no tools, so no permission mode; the send drops an
+    // armed goal and never applies a pinned one. None of those chips shows for it.
     const isLocal = useLocalModelTarget(useCurrentModel()) !== undefined;
     const attachmentsOnly = useChatUIStore((state) => state.composerText.trim() === "" && state.composerAttachments.length > 0);
     const permission = useShownPermissionMode();
@@ -72,11 +73,11 @@ const ComposerStatusLine: FC<ComposerStatusLineProps> = ({ researchDepth, search
     const depthLabels = useResearchDepthLabels();
 
     const replying = Boolean(sseStreamState);
-    const searching = textMode && searchMode !== "chat";
+    const searching = textMode && searchMode !== "chat" && !isLocal;
     // A send with attachments and no text carries no goal (`goalForMessage`), so the chip leaves then; an empty draft keeps it,
     // since the goal is what the next message will run.
     const goal = textMode && (goalOn || pinned) && !attachmentsOnly && !isLocal;
-    const fullAccess = textMode && permission === "full";
+    const fullAccess = textMode && permission === "full" && !isLocal;
 
     if (!replying && !searching && !goal && !fullAccess && !isBotThread) {
         return null;
