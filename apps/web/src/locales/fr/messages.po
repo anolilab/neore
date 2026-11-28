@@ -420,7 +420,7 @@ msgstr "{0, plural, one {# vérification requise ou inconnue est encore en cours
 
 #. placeholder {0}: readings.compactable.largeToolRows
 #. placeholder {1}: formatBytes(readings.compactable.largeToolBytes, locale)
-#: src/features/admin/components/admin-shard-footprint-row.tsx:185
+#: src/features/admin/components/admin-shard-footprint-row.tsx:190
 msgid "{0, plural, one {# result} other {# results}}, {1}"
 msgstr "{0, plural, one {# résultat} other {# résultats}}, {1}"
 
@@ -458,8 +458,8 @@ msgstr "{0, plural, one {# fil} other {# fils}}"
 #. placeholder {0}: readings.pinned.threads
 #. placeholder {1}: formatBytes(readings.other.approxBytes, locale)
 #. placeholder {1}: formatBytes(readings.pinned.approxBytes, locale)
-#: src/features/admin/components/admin-shard-footprint-row.tsx:191
-#: src/features/admin/components/admin-shard-footprint-row.tsx:197
+#: src/features/admin/components/admin-shard-footprint-row.tsx:196
+#: src/features/admin/components/admin-shard-footprint-row.tsx:202
 msgid "{0, plural, one {# thread} other {# threads}}, {1}"
 msgstr "{0, plural, one {# conversation} other {# conversations}}, {1}"
 
@@ -474,7 +474,7 @@ msgid "{0, plural, one {# tool found} other {# tools found}}"
 msgstr "{0, plural, one {# outil trouvé} other {# outils trouvés}}"
 
 #. placeholder {0}: day.count
-#: src/features/admin/components/admin-dashboard-stats.tsx:200
+#: src/features/admin/components/admin-dashboard-stats.tsx:167
 msgid "{0, plural, one {# user} other {# users}}"
 msgstr "{0, plural, one {# utilisateur} other {# utilisateurs}}"
 
@@ -617,9 +617,9 @@ msgstr "{0} en-têtes personnalisés"
 
 #. placeholder {0}: formatNumber(row.sinceDays, locale)
 #. placeholder {0}: formatNumber(window, locale)
-#: src/features/admin/components/admin-provider-cache-row.tsx:80
-#: src/features/admin/components/admin-shard-footprint-row.tsx:150
-#: src/features/admin/components/admin-shard-footprint-row.tsx:170
+#: src/features/admin/components/admin-provider-cache-row.tsx:77
+#: src/features/admin/components/admin-shard-footprint-row.tsx:151
+#: src/features/admin/components/admin-shard-footprint-row.tsx:173
 msgid "{0} days"
 msgstr "{0} jours"
 
@@ -639,8 +639,8 @@ msgstr "{0} écoulées"
 #. placeholder {1}: log.deletedCount
 #. placeholder {2}: lastResult.durationMs
 #. placeholder {2}: log.durationMs
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:234
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:338
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:247
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:356
 msgid "{0} eligible · {1} deleted · {2}ms"
 msgstr "{0} éligibles · {1} supprimés · {2} ms"
 
@@ -1865,7 +1865,7 @@ msgstr "21:9 (ultra-large)"
 msgid "235B parameter Mixture-of-Experts architecture"
 msgstr "Architecture Mixture-of-Experts de 235 milliards de paramètres"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:80
+#: src/features/admin/components/admin-provider-cache-row.tsx:77
 #: src/features/admin/components/ban-user-dialog.tsx:29
 msgid "24 hours"
 msgstr "24 heures"
@@ -1974,7 +1974,7 @@ msgstr "7 jours"
 msgid "7 Days"
 msgstr "7 jours"
 
-#: src/routes/admin/gateway/index.tsx:375
+#: src/routes/admin/gateway/index.tsx:338
 msgid "7-Day Cost Trend"
 msgstr "Tendance des coûts sur 7 jours"
 
@@ -2406,7 +2406,7 @@ msgstr "Couleur d’accentuation"
 msgid "Accent color updated"
 msgstr "Couleur d’accentuation mise à jour"
 
-#: src/features/auth/components/organization/accept-invitation-card.tsx:192
+#: src/features/auth/components/organization/accept-invitation-card.tsx:189
 #: src/features/auth/components/organization/user-invitations-card.tsx:116
 #: src/features/tasks/components/task-suggestions.tsx:297
 msgid "Accept"
@@ -2416,7 +2416,7 @@ msgstr "Accepter"
 msgid "Accept \"{title}\""
 msgstr "Accepter « {title} »"
 
-#: src/features/auth/components/organization/accept-invitation-card.tsx:157
+#: src/features/auth/components/organization/accept-invitation-card.tsx:156
 msgid "Accept Invitation"
 msgstr "Accepter l’invitation"
 
@@ -2483,7 +2483,7 @@ msgstr "La qualité Veo 3.1 avec audio, plus rapide et à un prix plus accessibl
 msgid "Account"
 msgstr "Compte"
 
-#: src/features/auth/components/auth/convert-anonymous-account.tsx:117
+#: src/features/auth/components/auth/convert-anonymous-account.tsx:116
 msgid "Account converted successfully! Please check your email to verify your account."
 msgstr "Compte converti avec succès ! Veuillez consulter vos e-mails pour vérifier votre compte."
 
@@ -2566,7 +2566,7 @@ msgstr "Sessions actives ({0})"
 msgid "Active Threads"
 msgstr "Conversations actives"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:159
+#: src/features/admin/components/admin-shard-footprint-row.tsx:162
 msgid "Active threads, by days since their last activity. Threads waiting on a person are included."
 msgstr "Conversations actives, par jours depuis leur dernière activité. Celles qui attendent une personne sont incluses."
 
@@ -3035,7 +3035,7 @@ msgid "Adjust"
 msgstr "Ajuster"
 
 #: src/features/admin/components/user-cell.tsx:82
-#: src/features/auth/components/organization/accept-invitation-card.tsx:146
+#: src/features/auth/components/organization/accept-invitation-card.tsx:145
 #: src/features/auth/components/organization/invitation-cell.tsx:36
 #: src/features/auth/components/organization/invite-member-dialog.tsx:36
 #: src/features/auth/components/organization/member-cell.tsx:40
@@ -3050,7 +3050,7 @@ msgstr "Ajuster"
 #: src/features/layout/lib/dashboard-page-names.ts:12
 #: src/routes/admin/route.tsx:57
 #: src/routes/admin/route.tsx:77
-#: src/routes/admin/route.tsx:88
+#: src/routes/admin/route.tsx:98
 msgid "Admin"
 msgstr "Admin"
 
@@ -3058,7 +3058,7 @@ msgstr "Admin"
 msgid "Admin Granted"
 msgstr "Admin accordé"
 
-#: src/features/admin/components/audit-log-card.tsx:146
+#: src/features/admin/components/audit-log-card.tsx:140
 msgid "Admin Grants"
 msgstr "Droits admin accordés"
 
@@ -3066,7 +3066,7 @@ msgstr "Droits admin accordés"
 msgid "Admin privileges have been removed"
 msgstr "Les privilèges d’administrateur ont été retirés"
 
-#: src/features/admin/components/audit-log-card.tsx:147
+#: src/features/admin/components/audit-log-card.tsx:141
 msgid "Admin Revocations"
 msgstr "Droits admin révoqués"
 
@@ -3074,7 +3074,7 @@ msgstr "Droits admin révoqués"
 msgid "Admin Revoked"
 msgstr "Admin révoqué"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:146
+#: src/features/admin/components/admin-dashboard-stats.tsx:115
 msgid "Administrators"
 msgstr "Administrateurs"
 
@@ -3558,11 +3558,11 @@ msgstr "Tous ({0})"
 msgid "All {provider} models enabled"
 msgstr "Tous les modèles {provider} activés"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:123
+#: src/features/admin/components/admin-dashboard-stats.tsx:91
 msgid "All accounts"
 msgstr "Tous les comptes"
 
-#: src/features/admin/components/audit-log-card.tsx:139
+#: src/features/admin/components/audit-log-card.tsx:133
 msgid "All Actions"
 msgstr "Toutes les actions"
 
@@ -3621,7 +3621,7 @@ msgstr "Toutes les icônes"
 msgid "All installers"
 msgstr "Tous les programmes d'installation"
 
-#: src/features/admin/components/feedback-admin-page.tsx:168
+#: src/features/admin/components/feedback-admin-page.tsx:163
 msgid "All kinds"
 msgstr "Tous les types"
 
@@ -3676,7 +3676,7 @@ msgstr "Tous les prompts"
 #. placeholder {0}: formatNumber(data.all.requests, locale)
 #. placeholder {1}: formatNumber(data.all.promptTokens, locale)
 #. placeholder {2}: shareText(data.all, locale)
-#: src/features/admin/components/admin-provider-cache-row.tsx:111
+#: src/features/admin/components/admin-provider-cache-row.tsx:112
 msgid "All provider traffic in the window, caching or not. Requests: {0}. Prompt tokens: {1}. Served from cache: {2}."
 msgstr "Tout le trafic des fournisseurs sur la période, avec ou sans cache. Requêtes : {0}. Tokens de prompt : {1}. Servi depuis le cache : {2}."
 
@@ -3714,7 +3714,7 @@ msgstr "Tous les rôles"
 msgid "All Servers"
 msgstr "Tous les serveurs"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:234
+#: src/features/admin/components/admin-shard-footprint-row.tsx:244
 msgid "All shards measured."
 msgstr "Tous les shards ont été mesurés."
 
@@ -3734,7 +3734,7 @@ msgstr "Tous les types"
 msgid "All use cases"
 msgstr "Tous les cas d’usage"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:180
+#: src/features/admin/components/admin-dashboard-stats.tsx:145
 msgid "All Users"
 msgstr "Tous les utilisateurs"
 
@@ -3806,7 +3806,7 @@ msgstr "Alloy (neutre)"
 msgid "Alphabetical"
 msgstr "Alphabétique"
 
-#: src/features/auth/components/auth/auth-card.tsx:439
+#: src/features/auth/components/auth/auth-card.tsx:438
 msgid "Already have an account?"
 msgstr "Vous avez déjà un compte ?"
 
@@ -4017,18 +4017,18 @@ msgstr "Annuel"
 msgid "Annual billing"
 msgstr "Facturation annuelle"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:182
-#: src/features/admin/components/admin-dashboard-stats.tsx:250
+#: src/features/admin/components/admin-dashboard-stats.tsx:147
+#: src/features/admin/components/admin-dashboard-stats.tsx:212
 #: src/features/admin/components/user-cell.tsx:76
 #: src/features/admin/components/users-management-card.tsx:143
 msgid "Anonymous"
 msgstr "Anonyme"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:139
+#: src/features/admin/components/admin-dashboard-stats.tsx:108
 msgid "Anonymous Users"
 msgstr "Utilisateurs anonymes"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:106
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:103
 msgid "Anonymous users inactive for this many days become eligible for deletion."
 msgstr "Les utilisateurs anonymes inactifs depuis ce nombre de jours deviennent éligibles à la suppression."
 
@@ -4141,7 +4141,7 @@ msgstr "Toute autre tâche autonome."
 msgid "Any string you choose; enter the same value as the webhook Verify token in the Meta app"
 msgstr "Une chaîne de votre choix ; saisissez la même valeur que le « Verify token » du webhook dans l’application Meta"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:150
+#: src/features/admin/components/admin-shard-footprint-row.tsx:151
 msgid "Any time"
 msgstr "Toute durée"
 
@@ -4371,9 +4371,9 @@ msgstr "Approuvé automatiquement — risque faible"
 msgid "Approving…"
 msgstr "Approbation…"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:133
-#: src/features/admin/components/admin-shard-footprint-row.tsx:144
-#: src/features/admin/components/admin-shard-footprint-row.tsx:164
+#: src/features/admin/components/admin-shard-footprint-row.tsx:132
+#: src/features/admin/components/admin-shard-footprint-row.tsx:145
+#: src/features/admin/components/admin-shard-footprint-row.tsx:167
 msgid "Approximate size"
 msgstr "Taille approximative"
 
@@ -4475,7 +4475,7 @@ msgstr "Archivées"
 msgid "Archived chats stay searchable, and you can restore them from the archive."
 msgstr "Les chats archivés restent consultables, et vous pouvez les restaurer depuis les archives."
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:141
+#: src/features/admin/components/admin-shard-footprint-row.tsx:142
 msgid "Archived for at least"
 msgstr "Archivées depuis au moins"
 
@@ -4483,7 +4483,7 @@ msgstr "Archivées depuis au moins"
 msgid "Archived Threads"
 msgstr "Conversations archivées"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:138
+#: src/features/admin/components/admin-shard-footprint-row.tsx:139
 msgid "Archived threads, by how long ago they were archived. Pinned threads are counted apart: they are never deleted."
 msgstr "Conversations archivées, selon l’ancienneté de leur archivage. Les conversations épinglées sont comptées à part : elles ne sont jamais supprimées."
 
@@ -4832,7 +4832,7 @@ msgstr "Forme d’onde audio inactive"
 msgid "audio-video"
 msgstr "audio-vidéo"
 
-#: src/features/admin/components/audit-log-card.tsx:130
+#: src/features/admin/components/audit-log-card.tsx:146
 #: src/features/layout/lib/dashboard-page-names.ts:18
 #: src/routes/admin/route.tsx:35
 #: src/routes/admin/route.tsx:58
@@ -4851,7 +4851,7 @@ msgstr "Autriche"
 msgid "Auth"
 msgstr "Authentification"
 
-#: src/features/auth/components/auth/auth-card.tsx:392
+#: src/features/auth/components/auth/auth-card.tsx:391
 #: src/features/settings/components/chat/native-providers-settings.tsx:571
 msgid "Authentication"
 msgstr "Authentification"
@@ -5001,7 +5001,7 @@ msgstr "Activer automatiquement les modules selon la complexité de la tâche"
 msgid "Automatically include relevant images and videos alongside text responses when using search modes."
 msgstr "Inclut automatiquement des images et vidéos pertinentes avec les réponses textuelles en mode recherche."
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:149
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:169
 msgid "Automatically run cleanup based on configuration"
 msgstr "Exécuter automatiquement le nettoyage selon la configuration"
 
@@ -5226,7 +5226,7 @@ msgstr "Bannir {userName} de la plateforme. Il ne pourra plus se connecter jusqu
 
 #: src/features/admin/components/ban-user-dialog.tsx:111
 #: src/features/admin/components/ban-user-dialog.tsx:150
-#: src/features/admin/components/user-cell.tsx:142
+#: src/features/admin/components/user-cell.tsx:145
 msgid "Ban User"
 msgstr "Bannir l’utilisateur"
 
@@ -5238,11 +5238,11 @@ msgstr "Bangladesh"
 msgid "Banned"
 msgstr "Banni"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:154
+#: src/features/admin/components/admin-dashboard-stats.tsx:122
 msgid "Banned Users"
 msgstr "Utilisateurs bannis"
 
-#: src/features/admin/components/audit-log-card.tsx:141
+#: src/features/admin/components/audit-log-card.tsx:135
 msgid "Bans"
 msgstr "Bannissements"
 
@@ -5275,12 +5275,12 @@ msgstr "Basique"
 msgid "batch generation"
 msgstr "génération par lots"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:111
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:134
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:121
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:150
 msgid "Batch size"
 msgstr "Taille de lot"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:54
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:56
 msgid "Batch size must be between 1 and 1000"
 msgstr "La taille de lot doit être comprise entre 1 et 1000"
 
@@ -5952,25 +5952,25 @@ msgstr "par <0>{0}</0>"
 msgid "by a collaborator"
 msgstr "par un collaborateur"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:115
+#: src/features/admin/components/admin-provider-cache-row.tsx:118
 msgid "By day, newest first."
 msgstr "Par jour, les plus récents d’abord."
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:137
+#: src/features/admin/components/admin-provider-cache-row.tsx:142
 msgid "By hour"
 msgstr "Par heure"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:139
+#: src/features/admin/components/admin-provider-cache-row.tsx:144
 msgid "By hour, oldest first. A drop that starts at one hour across models points at a change in what is sent."
 msgstr "Par heure, les plus anciennes d’abord. Une baisse qui commence à la même heure pour tous les modèles indique un changement dans ce qui est envoyé."
 
 #. placeholder {0}: formatNumber(models.length, locale)
 #. placeholder {1}: formatNumber(data.pairs, locale)
-#: src/features/admin/components/admin-provider-cache-row.tsx:174
+#: src/features/admin/components/admin-provider-cache-row.tsx:181
 msgid "By model, most prompt tokens first: the top {0} of {1} provider and model pairs."
 msgstr "Par modèle, les plus gros consommateurs de tokens de prompt d’abord : les {0} premiers sur {1} paires fournisseur et modèle."
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:175
+#: src/features/admin/components/admin-provider-cache-row.tsx:182
 msgid "By model, most prompt tokens first."
 msgstr "Par modèle, les plus gros consommateurs de tokens de prompt d’abord."
 
@@ -5978,7 +5978,7 @@ msgstr "Par modèle, les plus gros consommateurs de tokens de prompt d’abord."
 msgid "by you"
 msgstr "par vous"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:342
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:360
 msgid "By:"
 msgstr "Par :"
 
@@ -6137,8 +6137,8 @@ msgstr "Canada"
 #: ../../packages/ui/src/components/media-preview-dialog.tsx:257
 #: src/components/delete-confirmation-dialog.tsx:59
 #: src/components/settings/session-freshness-dialog.tsx:113
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:121
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:282
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:128
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:296
 #: src/features/admin/components/ban-user-dialog.tsx:95
 #: src/features/admin/components/ban-user-dialog.tsx:146
 #: src/features/admin/components/impersonate-user-dialog.tsx:79
@@ -7046,7 +7046,7 @@ msgstr "Rendu de qualité cinéma avec des mouvements améliorés par rapport à
 msgid "Circle"
 msgstr "Cercle"
 
-#: src/routes/admin/gateway/index.tsx:329
+#: src/routes/admin/gateway/index.tsx:307
 msgid "Circuit breaker status from the last 5 minutes"
 msgstr "État des disjoncteurs sur les 5 dernières minutes"
 
@@ -7095,7 +7095,7 @@ msgstr "Diapositive de titre épurée"
 msgid "Cleanup"
 msgstr "Nettoyage"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:231
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:245
 msgid "Cleanup complete"
 msgstr "Nettoyage terminé"
 
@@ -7103,7 +7103,7 @@ msgstr "Nettoyage terminé"
 msgid "Cleanup Configuration"
 msgstr "Configuration du nettoyage"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:184
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:203
 msgid "Cleanup failed"
 msgstr "Échec du nettoyage"
 
@@ -8098,7 +8098,7 @@ msgstr "Configurer les paramètres de l’équipe"
 msgid "Configure the billing contact and available AI models"
 msgstr "Configurez le contact de facturation et les modèles d’IA disponibles"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:81
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:80
 msgid "Configure thresholds and batch limits for anonymous user cleanup"
 msgstr "Configurez les seuils et les limites de lot pour le nettoyage des utilisateurs anonymes"
 
@@ -8141,7 +8141,7 @@ msgstr "Confirmer avant de supprimer un chat"
 msgid "Confirm before unpinning a chat"
 msgstr "Confirmer avant de désépingler un chat"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:273
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:287
 msgid "Confirm cleanup"
 msgstr "Confirmer le nettoyage"
 
@@ -8154,7 +8154,7 @@ msgstr "Confirmer le nouveau mot de passe"
 msgid "Confirm password"
 msgstr "Confirmer le mot de passe"
 
-#: src/features/auth/components/auth/convert-anonymous-account.tsx:222
+#: src/features/auth/components/auth/convert-anonymous-account.tsx:221
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:580
 #: src/features/auth/components/settings/security/change-password-card.tsx:342
 #: src/features/auth/components/settings/security/change-password-card.tsx:358
@@ -8167,7 +8167,7 @@ msgstr "Confirmer le mot de passe"
 msgid "Confirm password is required"
 msgstr "La confirmation du mot de passe est obligatoire"
 
-#: src/features/auth/components/auth/convert-anonymous-account.tsx:231
+#: src/features/auth/components/auth/convert-anonymous-account.tsx:230
 msgid "Confirm your password"
 msgstr "Confirmez votre mot de passe"
 
@@ -8617,7 +8617,7 @@ msgstr "Continuer dans le même fil"
 msgid "Continue where you left off."
 msgstr "Reprenez là où vous vous étiez arrêté."
 
-#: src/features/auth/components/auth/forms/two-factor-form.tsx:388
+#: src/features/auth/components/auth/forms/two-factor-form.tsx:391
 msgid "Continue with authenticator"
 msgstr "Continuer avec l’application d’authentification"
 
@@ -8741,7 +8741,7 @@ msgstr "Échec de la conversion"
 msgid "Convert"
 msgstr "Convertir"
 
-#: src/features/auth/components/auth/convert-anonymous-account.tsx:244
+#: src/features/auth/components/auth/convert-anonymous-account.tsx:243
 msgid "Convert Account"
 msgstr "Convertir le compte"
 
@@ -8757,7 +8757,7 @@ msgstr "Convertir le texte en parole"
 msgid "Convert to attachment for better readability?"
 msgstr "Convertir en pièce jointe pour une meilleure lisibilité ?"
 
-#: src/features/auth/components/auth/convert-anonymous-account.tsx:153
+#: src/features/auth/components/auth/convert-anonymous-account.tsx:152
 msgid "Convert to Full Account"
 msgstr "Convertir en compte complet"
 
@@ -9703,7 +9703,7 @@ msgstr "Créez un nouveau prompt à utiliser comme prompt système."
 msgid "Create a new team to organize members within your organization"
 msgstr "Créez une nouvelle équipe pour organiser les membres de votre organisation"
 
-#: src/features/auth/components/auth/convert-anonymous-account.tsx:155
+#: src/features/auth/components/auth/convert-anonymous-account.tsx:154
 msgid "Create a permanent account to save your data and access it from any device."
 msgstr "Créez un compte permanent pour enregistrer vos données et y accéder depuis n’importe quel appareil."
 
@@ -10106,7 +10106,7 @@ msgstr "Niveau actuel :"
 msgid "Current-generation photorealistic image generation with improved detail and better prompt following"
 msgstr "Génération d’images photoréalistes de génération actuelle, avec plus de détails et un meilleur respect du prompt"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:152
+#: src/features/admin/components/admin-dashboard-stats.tsx:119
 msgid "Currently restricted"
 msgstr "Actuellement restreints"
 
@@ -10292,7 +10292,7 @@ msgstr "Tendance des coûts quotidiens"
 msgid "Daily inbox summary"
 msgstr "Résumé quotidien de la boîte de réception"
 
-#: src/routes/admin/gateway/index.tsx:378
+#: src/routes/admin/gateway/index.tsx:338
 msgid "Daily LLM spend and request volume"
 msgstr "Dépenses LLM et volume de requêtes quotidiens"
 
@@ -10397,7 +10397,7 @@ msgstr "Date"
 msgid "Date and time"
 msgstr "Date et heure"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:118
+#: src/features/admin/components/admin-provider-cache-row.tsx:121
 #: src/features/settings/components/chat/usage-settings.tsx:97
 msgid "Day"
 msgstr "Jour"
@@ -10410,7 +10410,7 @@ msgstr "Le {monthDay} de chaque mois à {time} UTC"
 msgid "Day {monthDay} of the months that have one, at {time} UTC"
 msgstr "Le {monthDay} des mois qui ont ce jour, à {time} UTC"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:131
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:138
 msgid "days"
 msgstr "jours"
 
@@ -10752,7 +10752,7 @@ msgid "Delete {0}"
 msgstr "Supprimer {0}"
 
 #. placeholder {0}: preview?.eligibleCount ?? 0
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:285
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:299
 msgid "Delete {0} users"
 msgstr "Supprimer {0} utilisateurs"
 
@@ -11030,7 +11030,7 @@ msgstr "Supprime 3 fichiers dans /drafts"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:77
 #: src/components/delete-confirmation-dialog.tsx:68
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:285
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:299
 #: src/features/chat/thread-list/thread-node.tsx:658
 #: src/features/chat/thread-list/thread-node.tsx:664
 msgid "Deleting..."
@@ -11712,7 +11712,7 @@ msgstr "Ne se répète pas"
 msgid "Dominican Republic"
 msgstr "République dominicaine"
 
-#: src/features/auth/components/auth/auth-card.tsx:435
+#: src/features/auth/components/auth/auth-card.tsx:434
 msgid "Don't have an account?"
 msgstr "Vous n’avez pas de compte ?"
 
@@ -12007,15 +12007,15 @@ msgstr "Déposez vos documents et fichiers ici. <0/>25 fichiers maximum à la fo
 msgid "Drop-in replacement for the OpenAI SDK. Change one line and access every provider."
 msgstr "Remplacement direct du SDK OpenAI. Changez une ligne et accédez à tous les fournisseurs."
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:329
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:347
 msgid "Dry run"
 msgstr "Simulation"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:244
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:257
 msgid "Dry run (preview only — no deletions)"
 msgstr "Simulation (aperçu uniquement — aucune suppression)"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:231
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:245
 msgid "Dry run complete"
 msgstr "Simulation terminée"
 
@@ -12255,7 +12255,7 @@ msgstr "Détection des contours"
 msgid "Edge-guided generation"
 msgstr "Génération guidée par les contours"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:141
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:154
 #: src/features/canvas/canvas-panel.tsx:787
 #: src/features/chat/host/host-composer.tsx:1060
 #: src/features/chat/thread-list/group-header.tsx:178
@@ -12625,7 +12625,7 @@ msgstr "Citation élégante avec attribution"
 msgid "ELF executable"
 msgstr "Exécutable ELF"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:215
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:232
 msgid "Eligible anonymous users"
 msgstr "Utilisateurs anonymes éligibles"
 
@@ -12634,7 +12634,7 @@ msgid "email"
 msgstr "e-mail"
 
 #: ../../packages/chat-ui/src/auth/login-form.tsx:60
-#: src/features/auth/components/auth/convert-anonymous-account.tsx:178
+#: src/features/auth/components/auth/convert-anonymous-account.tsx:177
 #: src/features/auth/components/auth/forms/email-otp-form.tsx:232
 #: src/features/auth/components/auth/forms/forgot-password-form.tsx:107
 #: src/features/auth/components/auth/forms/magic-link-form.tsx:124
@@ -12654,7 +12654,7 @@ msgstr "Adresse e-mail"
 msgid "Email banner"
 msgstr "Bannière d’e-mail"
 
-#: src/features/auth/components/auth/auth-card.tsx:337
+#: src/features/auth/components/auth/auth-card.tsx:336
 msgid "Email Code"
 msgstr "Code par e-mail"
 
@@ -13102,7 +13102,7 @@ msgstr "Saisissez vos instructions personnalisées..."
 msgid "Enter your custom system prompt here. This will be used for every message."
 msgstr "Saisissez ici votre prompt système personnalisé. Il sera utilisé pour chaque message."
 
-#: src/features/auth/components/auth/convert-anonymous-account.tsx:188
+#: src/features/auth/components/auth/convert-anonymous-account.tsx:187
 #: src/features/auth/components/auth/forms/forgot-password-form.tsx:118
 #: src/features/auth/components/auth/forms/magic-link-form.tsx:135
 #: src/features/auth/components/auth/forms/sign-in-form.tsx:102
@@ -13115,7 +13115,7 @@ msgstr "Saisissez votre e-mail"
 msgid "Enter your email address"
 msgstr "Saisissez votre adresse e-mail"
 
-#: src/features/auth/components/auth/auth-card.tsx:366
+#: src/features/auth/components/auth/auth-card.tsx:365
 msgid "Enter your email below to login to your account"
 msgstr "Saisissez votre e-mail ci-dessous pour vous connecter à votre compte"
 
@@ -13123,15 +13123,15 @@ msgstr "Saisissez votre e-mail ci-dessous pour vous connecter à votre compte"
 msgid "Enter your email or username"
 msgstr "Saisissez votre e-mail ou votre nom d’utilisateur"
 
-#: src/features/auth/components/auth/auth-card.tsx:336
+#: src/features/auth/components/auth/auth-card.tsx:335
 msgid "Enter your email to receive a code"
 msgstr "Saisissez votre e-mail pour recevoir un code"
 
-#: src/features/auth/components/auth/auth-card.tsx:348
+#: src/features/auth/components/auth/auth-card.tsx:347
 msgid "Enter your email to receive a magic link"
 msgstr "Saisissez votre e-mail pour recevoir un lien magique"
 
-#: src/features/auth/components/auth/auth-card.tsx:342
+#: src/features/auth/components/auth/auth-card.tsx:341
 msgid "Enter your email to reset your password"
 msgstr "Saisissez votre e-mail pour réinitialiser votre mot de passe"
 
@@ -13139,7 +13139,7 @@ msgstr "Saisissez votre e-mail pour réinitialiser votre mot de passe"
 msgid "Enter your full name or display name"
 msgstr "Saisissez votre nom complet ou votre nom d’affichage"
 
-#: src/features/auth/components/auth/auth-card.tsx:379
+#: src/features/auth/components/auth/auth-card.tsx:378
 msgid "Enter your information to create an account"
 msgstr "Saisissez vos informations pour créer un compte"
 
@@ -13156,7 +13156,7 @@ msgstr "Saisissez votre nom"
 msgid "Enter your new email address below"
 msgstr "Saisissez votre nouvelle adresse e-mail ci-dessous"
 
-#: src/features/auth/components/auth/auth-card.tsx:360
+#: src/features/auth/components/auth/auth-card.tsx:359
 msgid "Enter your new password below"
 msgstr "Saisissez votre nouveau mot de passe ci-dessous"
 
@@ -13164,7 +13164,7 @@ msgstr "Saisissez votre nouveau mot de passe ci-dessous"
 msgid "Enter your nickname"
 msgstr "Saisissez votre surnom"
 
-#: src/features/auth/components/auth/convert-anonymous-account.tsx:210
+#: src/features/auth/components/auth/convert-anonymous-account.tsx:209
 #: src/features/auth/components/auth/forms/sign-in-form.tsx:378
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:566
 #: src/features/auth/components/settings/two-factor/two-factor-password-dialog.tsx:157
@@ -13569,11 +13569,11 @@ msgstr "Détails et clarté d’une netteté exceptionnelle"
 msgid "Excluded tools"
 msgstr "Outils exclus"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:329
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:347
 msgid "Execute"
 msgstr "Exécuter"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:196
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:215
 msgid "Execute cleanup"
 msgstr "Exécuter le nettoyage"
 
@@ -14347,7 +14347,7 @@ msgstr "Impossible d’installer la compétence"
 msgid "Failed to link account"
 msgstr "Impossible d’associer le compte"
 
-#: src/routes/admin/gateway/index.tsx:244
+#: src/routes/admin/gateway/index.tsx:243
 msgid "Failed to load analytics. Ensure the LLM Gateway is running and reachable."
 msgstr "Impossible de charger les statistiques. Vérifiez que le LLM Gateway est en cours d’exécution et accessible."
 
@@ -14516,7 +14516,7 @@ msgstr "Impossible d’enregistrer la clé API {toolId}"
 msgid "Failed to save collection"
 msgstr "Impossible d’enregistrer la collection"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:64
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:66
 msgid "Failed to save configuration"
 msgstr "Impossible d’enregistrer la configuration"
 
@@ -14656,7 +14656,7 @@ msgstr "Impossible de mettre à jour les modèles de secours"
 msgid "Failed to update browser click settings"
 msgstr "Échec de la mise à jour des paramètres de clic du navigateur"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:73
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:75
 msgid "Failed to update configuration"
 msgstr "Impossible de mettre à jour la configuration"
 
@@ -15184,7 +15184,7 @@ msgid "Feed image"
 msgstr "Image de fil d’actualité"
 
 #: src/features/admin/components/feedback-admin-page.tsx:139
-#: src/features/admin/components/feedback-admin-page.tsx:154
+#: src/features/admin/components/feedback-admin-page.tsx:172
 #: src/routes/admin/route.tsx:40
 #: src/routes/admin/route.tsx:60
 msgid "Feedback"
@@ -15194,7 +15194,7 @@ msgstr "Retours"
 msgid "Feedback could not be loaded."
 msgstr "Les retours n’ont pas pu être chargés."
 
-#: src/features/admin/components/feedback-admin-page.tsx:181
+#: src/features/admin/components/feedback-admin-page.tsx:177
 msgid "Feedback pages"
 msgstr "Pages de retours"
 
@@ -15391,12 +15391,13 @@ msgstr "Cinéastes et vidéastes créant des images fixes cinématographiques gu
 msgid "Filmmakers creating cinematic videos with a strong focus on visual narrative and storytelling quality"
 msgstr "Cinéastes créant des vidéos cinématographiques en mettant l’accent sur la narration visuelle"
 
-#: src/features/admin/components/audit-log-card.tsx:136
+#: src/features/admin/components/audit-log-card.tsx:129
+#: src/features/admin/components/audit-log-card.tsx:130
 msgid "Filter by action"
 msgstr "Filtrer par action"
 
-#: src/features/admin/components/feedback-admin-page.tsx:164
-#: src/features/admin/components/feedback-admin-page.tsx:165
+#: src/features/admin/components/feedback-admin-page.tsx:159
+#: src/features/admin/components/feedback-admin-page.tsx:160
 msgid "Filter by kind"
 msgstr "Filtrer par type"
 
@@ -15408,6 +15409,7 @@ msgstr "Filtrer par mode"
 msgid "Filter by provider"
 msgstr "Filtrer par fournisseur"
 
+#: src/features/admin/components/users-management-card.tsx:126
 #: src/features/admin/components/users-management-card.tsx:127
 msgid "Filter by role"
 msgstr "Filtrer par rôle"
@@ -15420,6 +15422,8 @@ msgstr "Filtrer par rôle"
 #~ msgid "Filter by tag ({activeCount} selected)"
 #~ msgstr "Filtrer par tag ({activeCount} sélectionnés)"
 
+#: src/features/admin/components/admin-dashboard-stats.tsx:141
+#: src/features/admin/components/users-management-card.tsx:137
 #: src/features/admin/components/users-management-card.tsx:138
 msgid "Filter by type"
 msgstr "Filtrer par type"
@@ -15780,13 +15784,13 @@ msgstr "Forêt"
 msgid "forget"
 msgstr "oublier"
 
-#: src/features/auth/components/auth/forms/two-factor-form.tsx:285
+#: src/features/auth/components/auth/forms/two-factor-form.tsx:288
 msgid "Forgot authenticator"
 msgstr "Application d’authentification oubliée"
 
-#: src/features/auth/components/auth/auth-card.tsx:343
+#: src/features/auth/components/auth/auth-card.tsx:342
 #: src/features/auth/components/auth/forms/forgot-password-form.tsx:134
-#: src/routes/auth/forgot-password.tsx:17
+#: src/routes/auth/forgot-password.tsx:13
 msgid "Forgot Password"
 msgstr "Mot de passe oublié"
 
@@ -16212,7 +16216,7 @@ msgstr "Gamma"
 msgid "Gateway"
 msgstr "Passerelle"
 
-#: src/routes/admin/gateway.tsx:26
+#: src/routes/admin/gateway.tsx:27
 msgid "Gateway sections"
 msgstr "Sections de la passerelle"
 
@@ -16600,7 +16604,7 @@ msgid "Go"
 msgstr "Ouvrir"
 
 #: ../../packages/chat-ui/src/chat/chat-view.tsx:96
-#: src/features/auth/components/auth/auth-card.tsx:497
+#: src/features/auth/components/auth/auth-card.tsx:496
 msgid "Go back"
 msgstr "Retour"
 
@@ -17120,7 +17124,7 @@ msgstr "Invité"
 msgid "Guest Account"
 msgstr "Compte invité"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:137
+#: src/features/admin/components/admin-dashboard-stats.tsx:105
 msgid "Guest accounts"
 msgstr "Comptes invités"
 
@@ -17643,7 +17647,7 @@ msgstr "Hébergeurs"
 msgid "hotkey"
 msgstr "raccourci clavier"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:142
+#: src/features/admin/components/admin-provider-cache-row.tsx:147
 #: src/features/settings/components/chat/usage-settings.tsx:98
 msgid "Hour"
 msgstr "Heure"
@@ -17809,7 +17813,7 @@ msgstr "De l’idée au résultat final, dans une seule conversation"
 msgid "Ideal for simple classification and extraction"
 msgstr "Idéal pour la classification et l’extraction simples"
 
-#: src/features/admin/components/feedback-admin-page.tsx:169
+#: src/features/admin/components/feedback-admin-page.tsx:164
 #: src/features/chat/thread/thread-welcome-suggestions.tsx:71
 msgid "Ideas"
 msgstr "Idées"
@@ -17828,7 +17832,7 @@ msgstr "Identité"
 msgid "Idle"
 msgstr "Inactif"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:162
+#: src/features/admin/components/admin-shard-footprint-row.tsx:165
 msgid "Idle for at least"
 msgstr "Inactives depuis au moins"
 
@@ -18068,7 +18072,7 @@ msgstr "img2img"
 msgid "Img2Img"
 msgstr "Img2Img"
 
-#: src/features/admin/components/user-cell.tsx:128
+#: src/features/admin/components/user-cell.tsx:131
 msgid "Impersonate"
 msgstr "Usurper l’identité"
 
@@ -18080,7 +18084,7 @@ msgstr "Usurper l’identité de l’utilisateur"
 msgid "Impersonated"
 msgstr "Identité usurpée"
 
-#: src/features/admin/components/audit-log-card.tsx:144
+#: src/features/admin/components/audit-log-card.tsx:138
 msgid "Impersonation Start"
 msgstr "Début d’usurpation d’identité"
 
@@ -18092,7 +18096,7 @@ msgstr "Emprunt d’identité démarré"
 msgid "Impersonation started. Click \"Stop Impersonating\" in the header to return to your account."
 msgstr "Usurpation d’identité démarrée. Cliquez sur « Arrêter l’usurpation » dans l’en-tête pour revenir à votre compte."
 
-#: src/features/admin/components/audit-log-card.tsx:145
+#: src/features/admin/components/audit-log-card.tsx:139
 msgid "Impersonation Stop"
 msgstr "Fin d’usurpation d’identité"
 
@@ -18431,15 +18435,15 @@ msgid "Inactive chats will be archived after {days} days"
 msgstr "Les chats inactifs seront archivés après {days} jours"
 
 #. placeholder {0}: preview.thresholdDays
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:217
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:231
 msgid "Inactive for more than {0} days"
 msgstr "Inactifs depuis plus de {0} jours"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:129
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:141
 msgid "Inactivity threshold"
 msgstr "Seuil d’inactivité"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:96
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:105
 msgid "Inactivity threshold (days)"
 msgstr "Seuil d’inactivité (jours)"
 
@@ -18764,7 +18768,7 @@ msgstr "JSON non valide"
 msgid "Invalid OAuth callback"
 msgstr "Callback OAuth non valide"
 
-#: src/features/auth/components/auth/convert-anonymous-account.tsx:77
+#: src/features/auth/components/auth/convert-anonymous-account.tsx:76
 #: src/features/auth/components/auth/forms/reset-password-form.tsx:57
 #: src/features/auth/components/auth/forms/reset-password-form.tsx:83
 #: src/features/auth/components/auth/forms/sign-in-form.tsx:150
@@ -18805,7 +18809,7 @@ msgstr "Code de vérification non valide"
 msgid "Invert"
 msgstr "Inverser"
 
-#: src/features/auth/components/organization/accept-invitation-card.tsx:101
+#: src/features/auth/components/organization/accept-invitation-card.tsx:100
 #: src/features/auth/components/organization/user-invitations-card.tsx:64
 msgid "Invitation accepted"
 msgstr "Invitation acceptée"
@@ -18814,17 +18818,17 @@ msgstr "Invitation acceptée"
 msgid "Invitation cancelled"
 msgstr "Invitation annulée"
 
-#: src/features/auth/components/organization/accept-invitation-card.tsx:77
+#: src/features/auth/components/organization/accept-invitation-card.tsx:76
 msgid "Invitation expired"
 msgstr "Invitation expirée"
 
-#: src/features/auth/components/organization/accept-invitation-card.tsx:66
-#: src/features/auth/components/organization/accept-invitation-card.tsx:77
-#: src/features/auth/components/organization/accept-invitation-card.tsx:220
+#: src/features/auth/components/organization/accept-invitation-card.tsx:65
+#: src/features/auth/components/organization/accept-invitation-card.tsx:76
+#: src/features/auth/components/organization/accept-invitation-card.tsx:217
 msgid "Invitation not found"
 msgstr "Invitation introuvable"
 
-#: src/features/auth/components/organization/accept-invitation-card.tsx:129
+#: src/features/auth/components/organization/accept-invitation-card.tsx:128
 #: src/features/auth/components/organization/user-invitations-card.tsx:89
 msgid "Invitation rejected"
 msgstr "Invitation refusée"
@@ -19692,7 +19696,7 @@ msgstr "Le dernier Sonnet avec un raisonnement transparent pour les tâches anal
 msgid "Latest updated Sonnet model from Anthropic"
 msgstr "Le dernier modèle Sonnet mis à jour d’Anthropic"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:216
+#: src/features/admin/components/admin-dashboard-stats.tsx:180
 msgid "Latest users who joined the platform"
 msgstr "Derniers utilisateurs inscrits sur la plateforme"
 
@@ -20150,7 +20154,7 @@ msgstr "LLaMA, Mixtral, Gemma — l’inférence la plus rapide"
 msgid "llm"
 msgstr "llm"
 
-#: src/routes/admin/gateway.tsx:19
+#: src/routes/admin/gateway.tsx:20
 msgid "LLM Gateway"
 msgstr "LLM Gateway"
 
@@ -20498,7 +20502,7 @@ msgid "Loading..."
 msgstr "Chargement..."
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:366
-#: src/features/admin/components/admin-provider-cache-row.tsx:85
+#: src/features/admin/components/admin-provider-cache-row.tsx:82
 #: src/features/auth/components/device-approval.tsx:349
 #: src/features/chat/thread/memory-usage-action.tsx:46
 #: src/features/chat/thread/request-secret-prompt.tsx:478
@@ -20863,7 +20867,7 @@ msgstr "Macro téléobjectif, cadrage serré"
 msgid "Madrid"
 msgstr "Madrid"
 
-#: src/features/auth/components/auth/auth-card.tsx:349
+#: src/features/auth/components/auth/auth-card.tsx:348
 msgid "Magic Link"
 msgstr "Lien magique"
 
@@ -20891,7 +20895,7 @@ msgstr "Améliorations majeures du raisonnement et du suivi des instructions"
 msgid "Make {name} the default repository"
 msgstr "Définir {name} comme dépôt par défaut"
 
-#: src/features/admin/components/user-cell.tsx:115
+#: src/features/admin/components/user-cell.tsx:118
 msgid "Make Admin"
 msgstr "Nommer administrateur"
 
@@ -21190,7 +21194,7 @@ msgstr "Profondeur maximale, ultra-net"
 msgid "Maximum detail and sharpness"
 msgstr "Détail et netteté maximum"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:113
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:119
 msgid "Maximum number of users to delete per cleanup run."
 msgstr "Nombre maximal d’utilisateurs à supprimer par exécution du nettoyage."
 
@@ -21254,11 +21258,11 @@ msgstr "Serveurs MCP"
 msgid "MCP tools"
 msgstr "Outils MCP"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:228
+#: src/features/admin/components/admin-shard-footprint-row.tsx:238
 msgid "Measure more shards"
 msgstr "Mesurer davantage de shards"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:224
+#: src/features/admin/components/admin-shard-footprint-row.tsx:234
 msgid "Measuring…"
 msgstr "Mesure…"
 
@@ -21328,7 +21332,7 @@ msgstr "Génération vidéo de qualité moyenne avec les dernières amélioratio
 msgid "Melbourne"
 msgstr "Melbourne"
 
-#: src/features/auth/components/organization/accept-invitation-card.tsx:147
+#: src/features/auth/components/organization/accept-invitation-card.tsx:146
 #: src/features/auth/components/organization/invitation-cell.tsx:37
 #: src/features/auth/components/organization/invite-member-dialog.tsx:37
 #: src/features/auth/components/organization/member-cell.tsx:41
@@ -21534,12 +21538,12 @@ msgstr "Branches de messages"
 msgid "Message input"
 msgstr "Saisie du message"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:129
-#: src/features/admin/components/admin-shard-footprint-row.tsx:143
+#: src/features/admin/components/admin-shard-footprint-row.tsx:128
+#: src/features/admin/components/admin-shard-footprint-row.tsx:144
 msgid "Message rows"
 msgstr "Lignes de messages"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:201
+#: src/features/admin/components/admin-shard-footprint-row.tsx:206
 msgid "Message rows of the largest threads"
 msgstr "Lignes de messages des plus grandes conversations"
 
@@ -21900,7 +21904,7 @@ msgstr "Mode {0}, sur {1}. Rien ne démarre à sa création."
 msgid "Mode:"
 msgstr "Mode :"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:179
+#: src/features/admin/components/admin-provider-cache-row.tsx:186
 #: src/features/chat/host/host-options.tsx:146
 #: src/features/chat/sidebar/thread-context.tsx:109
 #: src/features/evals/components/model-comparison.tsx:110
@@ -21931,7 +21935,7 @@ msgstr "Modèle"
 msgid "Model already blocked"
 msgstr "Modèle déjà bloqué"
 
-#: src/routes/admin/gateway/index.tsx:351
+#: src/routes/admin/gateway/index.tsx:323
 msgid "Model Breakdown"
 msgstr "Répartition par modèle"
 
@@ -23076,7 +23080,7 @@ msgstr "Nouvelle conversation temporaire"
 msgid "New temporary thread"
 msgstr "Nouvelle conversation temporaire"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:160
+#: src/features/admin/components/admin-dashboard-stats.tsx:127
 msgid "New this week"
 msgstr "Nouveaux cette semaine"
 
@@ -23094,7 +23098,7 @@ msgstr "Nouvelle conversation"
 msgid "New Trigger"
 msgstr "Nouveau déclencheur"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:173
+#: src/features/admin/components/admin-dashboard-stats.tsx:151
 msgid "New user registrations per day"
 msgstr "Nouvelles inscriptions par jour"
 
@@ -23102,7 +23106,7 @@ msgstr "Nouvelles inscriptions par jour"
 msgid "New Workflow"
 msgstr "Nouveau workflow"
 
-#: src/features/admin/components/feedback-admin-page.tsx:184
+#: src/features/admin/components/feedback-admin-page.tsx:180
 msgid "Newer"
 msgstr "Plus récents"
 
@@ -23319,7 +23323,7 @@ msgstr "Aucune discussion pour l'instant. Commencez-en une ci-dessus."
 msgid "No checks have run for this commit."
 msgstr "Aucune vérification n’a été exécutée pour ce commit."
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:351
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:369
 msgid "No cleanup runs yet"
 msgstr "Aucun nettoyage exécuté pour l’instant"
 
@@ -23607,7 +23611,7 @@ msgstr "Aucun modèle trouvé."
 msgid "No models installed yet."
 msgstr "Aucun modèle installé pour l’instant."
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:246
+#: src/features/admin/components/admin-dashboard-stats.tsx:208
 #: src/features/admin/components/feedback-admin-page.tsx:49
 #: src/features/admin/components/user-cell.tsx:72
 msgid "No name"
@@ -24270,7 +24274,7 @@ msgstr "Architecture inédite de modèle de langage basée sur la diffusion"
 msgid "now"
 msgstr "maintenant"
 
-#: src/features/admin/components/nsfw-review-page.tsx:16
+#: src/features/admin/components/nsfw-review-page.tsx:18
 msgid "NSFW Content Review"
 msgstr "Modération du contenu NSFW"
 
@@ -24279,7 +24283,7 @@ msgstr "Modération du contenu NSFW"
 msgid "NSFW Review"
 msgstr "Modération NSFW"
 
-#: src/features/admin/components/nsfw-review-page.tsx:21
+#: src/features/admin/components/nsfw-review-page.tsx:23
 msgid "NSFW review backend is not yet implemented. This page will display flagged images for moderation once the backend functions are available."
 msgstr "Le backend de modération NSFW n’est pas encore implémenté. Cette page affichera les images signalées à modérer dès que les fonctions backend seront disponibles."
 
@@ -24417,7 +24421,7 @@ msgid "old lines {text}"
 msgstr "anciennes lignes {text}"
 
 #: ../../packages/chat-ui/src/threads/thread-list.tsx:45
-#: src/features/admin/components/feedback-admin-page.tsx:196
+#: src/features/admin/components/feedback-admin-page.tsx:192
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:642
 msgid "Older"
 msgstr "Plus anciennes"
@@ -24895,7 +24899,7 @@ msgstr "Rouvrir"
 msgid "Open links"
 msgstr "Ouvrir les liens"
 
-#: src/features/admin/components/user-cell.tsx:102
+#: src/features/admin/components/user-cell.tsx:104
 msgid "Open menu"
 msgstr "Ouvrir le menu"
 
@@ -25519,7 +25523,7 @@ msgstr "ou cliquez pour parcourir"
 msgid "Or connect a Text node to provide the prompt"
 msgstr "Ou connectez un nœud Texte pour fournir le prompt"
 
-#: src/features/auth/components/auth/auth-card.tsx:219
+#: src/features/auth/components/auth/auth-card.tsx:218
 msgid "or continue with"
 msgstr "ou continuer avec"
 
@@ -25646,7 +25650,7 @@ msgstr "Prompt système d’origine"
 
 #: ../../packages/ui/src/components/icon-picker.tsx:171
 #: src/features/admin/components/feedback-admin-page.tsx:24
-#: src/features/admin/components/feedback-admin-page.tsx:171
+#: src/features/admin/components/feedback-admin-page.tsx:166
 #: src/features/feedback/components/send-feedback-dialog.tsx:30
 #: src/features/settings/components/chat/models-settings.tsx:515
 msgid "Other"
@@ -25800,7 +25804,7 @@ msgstr "Remplacez les fournisseurs de recherche et d’extraction par défaut pa
 msgid "Overwrite with mine"
 msgstr "Écraser avec ma version"
 
-#: src/features/auth/components/organization/accept-invitation-card.tsx:145
+#: src/features/auth/components/organization/accept-invitation-card.tsx:144
 #: src/features/auth/components/organization/invitation-cell.tsx:35
 #: src/features/auth/components/organization/invite-member-dialog.tsx:35
 #: src/features/auth/components/organization/member-cell.tsx:39
@@ -26049,7 +26053,7 @@ msgid "Passkeys allow you to sign in securely using your device's biometric auth
 msgstr "Les clés d’accès vous permettent de vous connecter en toute sécurité grâce à l’authentification biométrique de votre appareil ou à une clé de sécurité."
 
 #: ../../packages/chat-ui/src/auth/login-form.tsx:84
-#: src/features/auth/components/auth/convert-anonymous-account.tsx:201
+#: src/features/auth/components/auth/convert-anonymous-account.tsx:200
 #: src/features/auth/components/auth/forms/sign-in-form.tsx:359
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:554
 #: src/features/auth/components/settings/two-factor/two-factor-password-dialog.tsx:147
@@ -26061,14 +26065,14 @@ msgstr "Mot de passe"
 msgid "Password changed successfully"
 msgstr "Mot de passe modifié avec succès"
 
-#: src/features/auth/components/auth/convert-anonymous-account.tsx:60
+#: src/features/auth/components/auth/convert-anonymous-account.tsx:59
 #: src/features/auth/components/auth/forms/sign-in-form.tsx:133
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:105
 #: src/features/auth/components/settings/two-factor/two-factor-password-dialog.tsx:42
 msgid "Password is required"
 msgstr "Le mot de passe est obligatoire"
 
-#: src/features/auth/components/auth/convert-anonymous-account.tsx:71
+#: src/features/auth/components/auth/convert-anonymous-account.tsx:70
 #: src/features/auth/components/auth/forms/reset-password-form.tsx:51
 #: src/features/auth/components/auth/forms/reset-password-form.tsx:77
 #: src/features/auth/components/auth/forms/sign-in-form.tsx:144
@@ -26080,7 +26084,7 @@ msgstr "Le mot de passe est obligatoire"
 msgid "Password is too long"
 msgstr "Le mot de passe est trop long"
 
-#: src/features/auth/components/auth/convert-anonymous-account.tsx:65
+#: src/features/auth/components/auth/convert-anonymous-account.tsx:64
 #: src/features/auth/components/auth/forms/reset-password-form.tsx:45
 #: src/features/auth/components/auth/forms/reset-password-form.tsx:71
 #: src/features/auth/components/auth/forms/sign-in-form.tsx:138
@@ -26104,14 +26108,14 @@ msgstr "Mot de passe réinitialisé avec succès"
 msgid "Password set"
 msgstr "Mot de passe défini"
 
-#: src/features/auth/components/auth/convert-anonymous-account.tsx:84
+#: src/features/auth/components/auth/convert-anonymous-account.tsx:83
 #: src/features/auth/components/auth/forms/reset-password-form.tsx:91
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:237
 #: src/features/auth/components/settings/security/change-password-card.tsx:135
 msgid "Passwords do not match"
 msgstr "Les mots de passe ne correspondent pas"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:358
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:373
 msgid "Past cleanup runs and their results"
 msgstr "Nettoyages passés et leurs résultats"
 
@@ -26302,6 +26306,7 @@ msgstr "Relecteur performance"
 
 #: src/features/settings/components/chat/usage-settings.tsx:248
 #: src/features/settings/components/chat/usage-settings.tsx:460
+#: src/routes/admin/gateway/index.tsx:226
 msgid "Period"
 msgstr "Période"
 
@@ -26570,7 +26575,7 @@ msgstr "Image épinglée"
 msgid "Pinned project"
 msgstr "Projet épinglé"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:189
+#: src/features/admin/components/admin-shard-footprint-row.tsx:194
 msgid "Pinned threads"
 msgstr "Conversations épinglées"
 
@@ -26636,7 +26641,7 @@ msgstr "Lire"
 msgid "Play a short sound when a reply finishes. Applies to this browser only."
 msgstr "Jouer un bref son lorsqu'une réponse est terminée. S'applique à ce navigateur uniquement."
 
-#: src/features/auth/components/auth/auth-card.tsx:391
+#: src/features/auth/components/auth/auth-card.tsx:390
 msgid "Please authenticate to continue"
 msgstr "Veuillez vous authentifier pour continuer"
 
@@ -26644,11 +26649,11 @@ msgstr "Veuillez vous authentifier pour continuer"
 msgid "Please check your email and click the verification link"
 msgstr "Veuillez consulter vos e-mails et cliquer sur le lien de vérification"
 
-#: src/features/auth/components/auth/convert-anonymous-account.tsx:53
+#: src/features/auth/components/auth/convert-anonymous-account.tsx:52
 msgid "Please confirm your password"
 msgstr "Veuillez confirmer votre mot de passe"
 
-#: src/features/auth/components/auth/auth-card.tsx:354
+#: src/features/auth/components/auth/auth-card.tsx:353
 msgid "Please enter a backup code to access your account"
 msgstr "Veuillez saisir un code de secours pour accéder à votre compte"
 
@@ -26656,7 +26661,7 @@ msgstr "Veuillez saisir un code de secours pour accéder à votre compte"
 msgid "Please enter an email address"
 msgstr "Veuillez saisir une adresse e-mail"
 
-#: src/features/auth/components/auth/auth-card.tsx:385
+#: src/features/auth/components/auth/auth-card.tsx:384
 msgid "Please enter your one-time password to continue"
 msgstr "Veuillez saisir votre mot de passe à usage unique pour continuer"
 
@@ -27086,7 +27091,7 @@ msgstr "Aperçu"
 msgid "Preview {name}"
 msgstr "Aperçu de {name}"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:204
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:221
 msgid "Preview & Execute"
 msgstr "Aperçu et exécution"
 
@@ -27102,7 +27107,7 @@ msgstr "Accès en avant-première au modèle le plus avancé de Qwen"
 msgid "Preview execution order (dry run)"
 msgstr "Prévisualiser l’ordre d’exécution (simulation)"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:205
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:221
 msgid "Preview how many users will be removed, then execute cleanup."
 msgstr "Prévisualisez le nombre d’utilisateurs qui seront supprimés, puis exécutez le nettoyage."
 
@@ -27301,7 +27306,7 @@ msgstr "Les modèles Pro nécessitent un forfait Pro. Avec un forfait gratuit, l
 msgid "Problem"
 msgstr "Problème"
 
-#: src/features/admin/components/feedback-admin-page.tsx:170
+#: src/features/admin/components/feedback-admin-page.tsx:165
 msgid "Problems"
 msgstr "Problèmes"
 
@@ -27635,10 +27640,10 @@ msgstr "La recherche de prompts est encore en préparation. Réessayez dans un i
 msgid "Prompt to run on all models..."
 msgstr "Prompt à exécuter sur tous les modèles..."
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:101
-#: src/features/admin/components/admin-provider-cache-row.tsx:120
-#: src/features/admin/components/admin-provider-cache-row.tsx:144
-#: src/features/admin/components/admin-provider-cache-row.tsx:182
+#: src/features/admin/components/admin-provider-cache-row.tsx:102
+#: src/features/admin/components/admin-provider-cache-row.tsx:123
+#: src/features/admin/components/admin-provider-cache-row.tsx:149
+#: src/features/admin/components/admin-provider-cache-row.tsx:189
 msgid "Prompt tokens"
 msgstr "Tokens de prompt"
 
@@ -27707,7 +27712,7 @@ msgid "Proven reliability from previous generation"
 msgstr "Fiabilité éprouvée de la génération précédente"
 
 #: src/components/model-picker/model-picker.tsx:283
-#: src/features/admin/components/admin-provider-cache-row.tsx:180
+#: src/features/admin/components/admin-provider-cache-row.tsx:187
 #: src/features/settings/components/chat/native-providers-settings.tsx:467
 #: src/routes/admin/gateway/index.tsx:86
 msgid "Provider"
@@ -27725,7 +27730,7 @@ msgstr "Comptes de fournisseurs"
 msgid "Provider added — its models are now in the model picker"
 msgstr "Fournisseur ajouté — ses modèles figurent désormais dans le sélecteur de modèles"
 
-#: src/routes/admin/gateway/index.tsx:326
+#: src/routes/admin/gateway/index.tsx:307
 msgid "Provider Health"
 msgstr "État des fournisseurs"
 
@@ -27899,7 +27904,7 @@ msgstr "Place un prompt dans la zone de saisie pour rebaser la branche de ce for
 msgid "Quality"
 msgstr "Qualité"
 
-#: src/routes/admin/gateway/index.tsx:305
+#: src/routes/admin/gateway/index.tsx:290
 msgid "Query complexity tiers assigned by the routing engine"
 msgstr "Niveaux de complexité des requêtes attribués par le moteur de routage"
 
@@ -28458,7 +28463,7 @@ msgstr "Discussions récentes"
 msgid "Recent messages"
 msgstr "Messages récents"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:215
+#: src/features/admin/components/admin-dashboard-stats.tsx:180
 msgid "Recent Registrations"
 msgstr "Inscriptions récentes"
 
@@ -28516,7 +28521,7 @@ msgstr "Enregistrement de la saisie vocale"
 msgid "Recover account"
 msgstr "Récupérer le compte"
 
-#: src/features/auth/components/auth/auth-card.tsx:355
+#: src/features/auth/components/auth/auth-card.tsx:354
 msgid "Recover Account"
 msgstr "Récupérer le compte"
 
@@ -28676,8 +28681,8 @@ msgstr "GPT-5 affiné avec un meilleur suivi des instructions"
 msgid "Refining the draft…"
 msgstr "Affinage du brouillon…"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:221
-#: src/features/admin/components/feedback-admin-page.tsx:161
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:236
+#: src/features/admin/components/feedback-admin-page.tsx:156
 msgid "Refresh"
 msgstr "Actualiser"
 
@@ -28722,7 +28727,7 @@ msgstr "Restrictions régionales"
 msgid "Register it with Telegram's setWebhook, passing your webhook secret as secret_token."
 msgstr "Enregistrez-la avec setWebhook de Telegram, en passant votre secret de webhook comme secret_token."
 
-#: src/features/auth/components/auth/auth-card.tsx:373
+#: src/features/auth/components/auth/auth-card.tsx:372
 msgid "Registration is by invitation only. Open the link from your invitation, or sign in if you already have an account."
 msgstr "L’inscription se fait uniquement sur invitation. Ouvrez le lien de votre invitation, ou connectez-vous si vous avez déjà un compte."
 
@@ -28730,16 +28735,16 @@ msgstr "L’inscription se fait uniquement sur invitation. Ouvrez le lien de vot
 msgid "Regressed"
 msgstr "En régression"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:181
+#: src/features/admin/components/admin-dashboard-stats.tsx:146
 msgid "Regular"
 msgstr "Standard"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:132
+#: src/features/admin/components/admin-dashboard-stats.tsx:101
 #: src/features/admin/components/users-management-card.tsx:142
 msgid "Regular Users"
 msgstr "Utilisateurs standard"
 
-#: src/features/auth/components/organization/accept-invitation-card.tsx:186
+#: src/features/auth/components/organization/accept-invitation-card.tsx:183
 #: src/features/auth/components/organization/user-invitations-card.tsx:121
 #: src/features/prompts/components/prompt-optimize-dialog.tsx:201
 #: src/features/tasks/components/task-detail-dialog.tsx:112
@@ -28946,7 +28951,7 @@ msgid "Remove {shown}"
 msgstr "Retirer {shown}"
 
 #: src/features/admin/components/update-user-role-dialog.tsx:64
-#: src/features/admin/components/user-cell.tsx:110
+#: src/features/admin/components/user-cell.tsx:113
 msgid "Remove Admin"
 msgstr "Retirer les droits admin"
 
@@ -29332,7 +29337,7 @@ msgstr "Délai de la requête dépassé"
 msgid "Request validation, content filtering, and HMAC-SHA256 authentication on every request."
 msgstr "Validation des requêtes, filtrage du contenu et authentification HMAC-SHA256 à chaque requête."
 
-#: src/routes/admin/gateway/index.tsx:354
+#: src/routes/admin/gateway/index.tsx:323
 msgid "Request volume, cost, and error count per model"
 msgstr "Volume de requêtes, coût et nombre d’erreurs par modèle"
 
@@ -29349,10 +29354,10 @@ msgstr "Demande en cours..."
 msgid "Requesting…"
 msgstr "Demande en cours…"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:105
-#: src/features/admin/components/admin-provider-cache-row.tsx:119
-#: src/features/admin/components/admin-provider-cache-row.tsx:143
-#: src/features/admin/components/admin-provider-cache-row.tsx:181
+#: src/features/admin/components/admin-provider-cache-row.tsx:106
+#: src/features/admin/components/admin-provider-cache-row.tsx:122
+#: src/features/admin/components/admin-provider-cache-row.tsx:148
+#: src/features/admin/components/admin-provider-cache-row.tsx:188
 #: src/features/settings/components/chat/usage-settings.tsx:283
 #: src/features/settings/components/chat/usage-settings.tsx:325
 #: src/routes/admin/gateway/index.tsx:89
@@ -29417,7 +29422,7 @@ msgstr "Recherchez, codez, créez et connectez — sans quitter la conversation.
 msgid "Researchers and early adopters exploring Google's most advanced next-generation AI"
 msgstr "Chercheurs et adopteurs précoces qui explorent l’IA nouvelle génération la plus avancée de Google"
 
-#: src/features/auth/components/auth/forms/two-factor-form.tsx:357
+#: src/features/auth/components/auth/forms/two-factor-form.tsx:360
 msgid "Resend code"
 msgstr "Renvoyer le code"
 
@@ -29456,7 +29461,7 @@ msgstr "Rétablir les modèles par défaut ?"
 msgid "Reset password"
 msgstr "Réinitialiser le mot de passe"
 
-#: src/features/auth/components/auth/auth-card.tsx:361
+#: src/features/auth/components/auth/auth-card.tsx:360
 #: src/routes/auth/reset-password.tsx:13
 msgid "Reset Password"
 msgstr "Réinitialiser le mot de passe"
@@ -29749,7 +29754,7 @@ msgstr "Vérifier"
 msgid "Review and add"
 msgstr "Vérifier et ajouter"
 
-#: src/features/admin/components/nsfw-review-page.tsx:18
+#: src/features/admin/components/nsfw-review-page.tsx:14
 msgid "Review and moderate flagged content across chat and vault."
 msgstr "Examinez et modérez les contenus signalés dans le chat et le coffre-fort."
 
@@ -29904,7 +29909,7 @@ msgstr "Le rôle est identique"
 msgid "Role Updated"
 msgstr "Rôle mis à jour"
 
-#: src/features/admin/components/audit-log-card.tsx:140
+#: src/features/admin/components/audit-log-card.tsx:134
 msgid "Role Updates"
 msgstr "Changements de rôle"
 
@@ -30007,7 +30012,7 @@ msgstr "Routines dans Neore : donnez à l’agent une tâche et une fréquence d
 msgid "Routines that run while you are away"
 msgstr "Des routines qui s’exécutent pendant votre absence"
 
-#: src/routes/admin/gateway/index.tsx:302
+#: src/routes/admin/gateway/index.tsx:291
 msgid "Routing Tier Distribution"
 msgstr "Répartition des niveaux de routage"
 
@@ -30069,7 +30074,7 @@ msgstr "Exécuter en tant que bot (facultatif)"
 msgid "Run code in a sandboxed environment with shell access, file operations, and persistent sessions."
 msgstr "Exécutez du code dans un environnement isolé avec accès au shell, opérations sur les fichiers et sessions persistantes."
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:191
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:210
 msgid "Run dry run"
 msgstr "Lancer une simulation"
 
@@ -30082,7 +30087,7 @@ msgstr "Exécution du {0}"
 msgid "Run history"
 msgstr "Historique des exécutions"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:357
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:373
 #: src/features/workflow/components/canvas/execution-history-panel.tsx:214
 msgid "Run History"
 msgstr "Historique des exécutions"
@@ -30151,7 +30156,7 @@ msgid "Running on {device}…"
 msgstr "En cours sur {device}…"
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:241
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:258
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:272
 #: src/features/workflow/components/canvas/workflow-controls.tsx:622
 #: src/features/workflow/components/nodes/base-node.tsx:263
 msgid "Running..."
@@ -30285,7 +30290,7 @@ msgid "Saudi Arabia"
 msgstr "Arabie saoudite"
 
 #: ../../packages/ui/src/components/inline-edit.tsx:119
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:118
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:125
 #: src/features/auth/components/organization/billing-settings-card.tsx:133
 #: src/features/auth/components/organization/billing-settings-card.tsx:280
 #: src/features/auth/components/organization/organization-name-card.tsx:100
@@ -30548,11 +30553,11 @@ msgstr "Planification ou webhook"
 msgid "Scheduled"
 msgstr "Prévu"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:148
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:170
 msgid "Scheduled cleanup"
 msgstr "Nettoyage planifié"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:342
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:360
 msgid "Scheduled job"
 msgstr "Tâche planifiée"
 
@@ -31381,7 +31386,7 @@ msgstr "Envoyer à l’agent"
 msgid "Send to the owner"
 msgstr "Envoyer au propriétaire"
 
-#: src/features/auth/components/auth/forms/two-factor-form.tsx:373
+#: src/features/auth/components/auth/forms/two-factor-form.tsx:376
 msgid "Send verification code"
 msgstr "Envoyer le code de vérification"
 
@@ -31481,10 +31486,10 @@ msgstr "Serbe (Serbie)"
 msgid "Serif"
 msgstr "Serif"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:97
-#: src/features/admin/components/admin-provider-cache-row.tsx:121
-#: src/features/admin/components/admin-provider-cache-row.tsx:145
-#: src/features/admin/components/admin-provider-cache-row.tsx:183
+#: src/features/admin/components/admin-provider-cache-row.tsx:98
+#: src/features/admin/components/admin-provider-cache-row.tsx:124
+#: src/features/admin/components/admin-provider-cache-row.tsx:150
+#: src/features/admin/components/admin-provider-cache-row.tsx:190
 msgid "Served from cache"
 msgstr "Servi depuis le cache"
 
@@ -31537,7 +31542,7 @@ msgstr "serveurs"
 msgid "Servers over SSH"
 msgstr "Serveurs via SSH"
 
-#: src/features/admin/components/audit-log-card.tsx:143
+#: src/features/admin/components/audit-log-card.tsx:137
 msgid "Session Revocations"
 msgstr "Révocations de sessions"
 
@@ -31658,17 +31663,17 @@ msgstr "Formes"
 msgid "Shard footprint"
 msgstr "Empreinte des shards"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:121
+#: src/features/admin/components/admin-shard-footprint-row.tsx:120
 msgid "Shards"
 msgstr "Shards"
 
 #. placeholder {0}: formatNumber(page.data.pendingShards, i18n.locale)
-#: src/features/admin/components/admin-shard-footprint-row.tsx:215
+#: src/features/admin/components/admin-shard-footprint-row.tsx:222
 msgid "Shards still being measured: {0}. Measure more shards to finish them."
 msgstr "Shards encore en cours de mesure : {0}. Mesurez davantage de shards pour les terminer."
 
 #. placeholder {0}: formatNumber(totals.abandonedShards, i18n.locale)
-#: src/features/admin/components/admin-shard-footprint-row.tsx:219
+#: src/features/admin/components/admin-shard-footprint-row.tsx:228
 msgid "Shards that could not be measured are left out of the totals: {0}."
 msgstr "Les shards qui n’ont pas pu être mesurés sont exclus des totaux : {0}."
 
@@ -32018,7 +32023,7 @@ msgstr "Barre latérale droite"
 #: ../../packages/chat-ui/src/auth/login-form.tsx:43
 #: src/components/not-found.tsx:12
 #: src/components/settings/settings-modal.tsx:164
-#: src/features/auth/components/auth/auth-card.tsx:493
+#: src/features/auth/components/auth/auth-card.tsx:492
 #: src/features/auth/components/auth/forms/sign-in-form.tsx:415
 #: src/features/auth/components/device-approval.tsx:363
 #: src/features/layout/components/nav-user.tsx:251
@@ -32120,7 +32125,7 @@ msgstr "Se connecter avec un mot de passe"
 
 #: src/features/auth/components/settings/account/account-cell.tsx:140
 #: src/features/auth/components/settings/account/delete-account-dialog.tsx:153
-#: src/routes/auth/sign-out.tsx:23
+#: src/routes/auth/sign-out.tsx:19
 msgid "Sign Out"
 msgstr "Se déconnecter"
 
@@ -32129,13 +32134,13 @@ msgstr "Se déconnecter"
 msgid "Sign out of {0}"
 msgstr "Se déconnecter de {0}"
 
-#: src/features/auth/components/auth/auth-card.tsx:493
+#: src/features/auth/components/auth/auth-card.tsx:492
 #: src/features/marketing/components/landing-page.tsx:332
 #: src/features/marketing/components/landing-page.tsx:350
 msgid "Sign up"
 msgstr "S’inscrire"
 
-#: src/features/auth/components/auth/auth-card.tsx:380
+#: src/features/auth/components/auth/auth-card.tsx:379
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:678
 #: src/routes/auth/sign-up.tsx:26
 msgid "Sign Up"
@@ -32171,7 +32176,7 @@ msgstr "Demande de connexion"
 msgid "Sign-out failed. Please try again."
 msgstr "Échec de la déconnexion. Veuillez réessayer."
 
-#: src/features/auth/components/auth/auth-card.tsx:374
+#: src/features/auth/components/auth/auth-card.tsx:373
 msgid "Sign-up needs an invitation"
 msgstr "L’inscription nécessite une invitation"
 
@@ -32272,7 +32277,7 @@ msgstr "limite de taille atteinte"
 msgid "Size of the text in chat messages. The sidebar and the rest of the app keep their size."
 msgstr "Taille du texte dans les messages du chat. La barre latérale et le reste de l’application gardent leur taille."
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:207
+#: src/features/admin/components/admin-shard-footprint-row.tsx:212
 msgid "Sizes of the largest shards"
 msgstr "Tailles des plus grands shards"
 
@@ -32514,7 +32519,7 @@ msgstr "Le routage intelligent classe automatiquement chaque requête par comple
 msgid "Smart routing decisions, model usage, and provider health"
 msgstr "Décisions de routage intelligent, utilisation des modèles et état des fournisseurs"
 
-#: src/routes/admin/gateway.tsx:22
+#: src/routes/admin/gateway.tsx:23
 msgid "Smart routing, model usage, and provider health"
 msgstr "Routage intelligent, utilisation des modèles et état des fournisseurs"
 
@@ -33518,7 +33523,7 @@ msgstr "Arrêté."
 msgid "Stopping…"
 msgstr "Arrêt en cours…"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:110
+#: src/features/admin/components/admin-shard-footprint-row.tsx:107
 msgid "Stored conversation data across user shards: threads, message rows and an estimate of their size, by thread group and age. Counts only; no thread or shard is listed."
 msgstr "Données de conversation stockées sur les shards utilisateurs : conversations, lignes de messages et estimation de leur taille, par groupe et par ancienneté. Chiffres uniquement ; aucune conversation ni aucun shard n’est listé."
 
@@ -35881,12 +35886,12 @@ msgstr "Le prompt n'a pas pu être vérifié. Réessayez."
 msgid "The provider bills you directly for these requests. Where we know the model's price, the usual platform fee for your own keys is charged in credits."
 msgstr "Le fournisseur vous facture directement ces requêtes. Lorsque nous connaissons le prix du modèle, les frais de plateforme habituels pour vos propres clés sont prélevés en crédits."
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:91
+#: src/features/admin/components/admin-provider-cache-row.tsx:90
 msgid "The provider cache readings could not be loaded."
 msgstr "Impossible de charger les relevés du cache des fournisseurs."
 
 #. placeholder {0}: formatDateTime(readings.dataUpdatedAt, locale, { dateStyle: "short", timeStyle: "short", timeZone })
-#: src/features/admin/components/admin-provider-cache-row.tsx:92
+#: src/features/admin/components/admin-provider-cache-row.tsx:91
 msgid "The provider cache readings could not be refreshed. The figures below are from {0}."
 msgstr "Impossible d’actualiser les relevés du cache des fournisseurs. Les chiffres ci-dessous datent du {0}."
 
@@ -35999,11 +36004,11 @@ msgstr "La recherche a échoué. Réessayez."
 msgid "The server lists no models yet — pull or load one first"
 msgstr "Le serveur ne liste encore aucun modèle — téléchargez-en ou chargez-en un d’abord"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:116
+#: src/features/admin/components/admin-shard-footprint-row.tsx:113
 msgid "The shard footprint could not be measured."
 msgstr "L’empreinte des shards n’a pas pu être mesurée."
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:62
+#: src/features/admin/components/admin-provider-cache-row.tsx:59
 msgid "The share of prompt tokens providers served from their own cache. Days and hours count the provider and model pairs that cached in the last 30 days; the model table lists the top 50 models by prompt tokens. Only chat calls count, and answers from the gateway's response cache are left out. Days and hours are in {timeZone}."
 msgstr "La part des tokens de prompt que les fournisseurs ont servie depuis leur propre cache. Les jours et les heures comptent les paires fournisseur et modèle qui ont utilisé le cache au cours des 30 derniers jours ; le tableau des modèles liste les 50 modèles ayant le plus de tokens de prompt. Seuls les appels de discussion comptent, et les réponses issues du cache de réponses de la passerelle ne sont pas comptées. Jours et heures en {timeZone}."
 
@@ -36959,7 +36964,7 @@ msgid "This will create a new version with this content"
 msgstr "Cela créera une nouvelle version avec ce contenu"
 
 #. placeholder {0}: preview?.eligibleCount ?? 0
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:276
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:290
 msgid "This will permanently delete {0} anonymous user accounts and all their data. This action cannot be undone."
 msgstr "Cela supprimera définitivement {0} comptes d’utilisateurs anonymes et toutes leurs données. Cette action est irréversible."
 
@@ -37122,9 +37127,9 @@ msgid "Thread will auto-delete in {0}"
 msgstr "La conversation sera supprimée automatiquement dans {0}"
 
 #: src/components/command-palette.tsx:938
-#: src/features/admin/components/admin-shard-footprint-row.tsx:125
-#: src/features/admin/components/admin-shard-footprint-row.tsx:142
-#: src/features/admin/components/admin-shard-footprint-row.tsx:163
+#: src/features/admin/components/admin-shard-footprint-row.tsx:124
+#: src/features/admin/components/admin-shard-footprint-row.tsx:143
+#: src/features/admin/components/admin-shard-footprint-row.tsx:166
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:35
 #: src/features/chat/thread-list/thread-list-filter-menu.tsx:107
 msgid "Threads"
@@ -37147,7 +37152,7 @@ msgstr "Trois étapes pour utiliser des agents de codage sur vos propres machine
 msgid "Threshold"
 msgstr "Seuil"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:48
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:50
 msgid "Threshold must be between 1 and 365 days"
 msgstr "Le seuil doit être compris entre 1 et 365 jours"
 
@@ -37449,7 +37454,7 @@ msgstr "appel d’outils"
 msgid "Tool Calling"
 msgstr "Appel d’outils"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:179
+#: src/features/admin/components/admin-shard-footprint-row.tsx:184
 msgid "Tool output's share of the stored size"
 msgstr "Part des sorties d’outils dans la taille stockée"
 
@@ -37463,7 +37468,7 @@ msgid "Tool Provider Keys"
 msgstr "Clés des fournisseurs d’outils"
 
 #. placeholder {0}: formatNumber(COMPACT_AFTER_DAYS, locale)
-#: src/features/admin/components/admin-shard-footprint-row.tsx:183
+#: src/features/admin/components/admin-shard-footprint-row.tsx:188
 msgid "Tool results of 64 KB or more, in threads idle at least {0} days"
 msgstr "Résultats d’outils de 64 Ko ou plus, dans les conversations inactives depuis au moins {0} jours"
 
@@ -37565,7 +37570,7 @@ msgstr "Coût total"
 msgid "Total Cost"
 msgstr "Coût total"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:125
+#: src/features/admin/components/admin-dashboard-stats.tsx:94
 msgid "Total Users"
 msgstr "Total des utilisateurs"
 
@@ -37577,7 +37582,7 @@ msgstr "Totaux de toutes les réponses de ce fil, y compris les alternatives ré
 msgid "Totals per model"
 msgstr "Totaux par modèle"
 
-#: src/features/admin/components/audit-log-card.tsx:131
+#: src/features/admin/components/audit-log-card.tsx:145
 msgid "Track all admin actions for accountability"
 msgstr "Suivez toutes les actions d’administration pour en garantir la traçabilité"
 
@@ -37709,7 +37714,7 @@ msgstr "Raisonnement transparent sur des entrées visuelles"
 msgid "Transparent thinking for legal, financial, and technical tasks"
 msgstr "Réflexion transparente pour les tâches juridiques, financières et techniques"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:195
+#: src/features/admin/components/admin-shard-footprint-row.tsx:200
 msgid "Trashed, temporary, being deleted or orphaned"
 msgstr "Dans la corbeille, temporaires, en cours de suppression ou orphelines"
 
@@ -37803,7 +37808,7 @@ msgstr "Vrai"
 msgid "Trust for auto-approval"
 msgstr "Confiance pour l’approbation automatique"
 
-#: src/features/auth/components/auth/forms/two-factor-form.tsx:328
+#: src/features/auth/components/auth/forms/two-factor-form.tsx:331
 msgid "Trust this device"
 msgstr "Faire confiance à cet appareil"
 
@@ -37967,11 +37972,11 @@ msgstr "Deux participants argumentent pour et contre sur plusieurs tours, puis u
 msgid "Two ways to connect"
 msgstr "Deux façons de se connecter"
 
-#: src/features/auth/components/auth/forms/two-factor-form.tsx:341
+#: src/features/auth/components/auth/forms/two-factor-form.tsx:344
 msgid "Two-factor authentication"
 msgstr "Authentification à deux facteurs"
 
-#: src/features/auth/components/auth/auth-card.tsx:386
+#: src/features/auth/components/auth/auth-card.tsx:385
 #: src/features/auth/components/settings/two-factor/two-factor-card.tsx:50
 #: src/features/auth/components/settings/two-factor/two-factor-password-dialog.tsx:126
 #: src/routes/auth/two-factor/index.tsx:13
@@ -38159,11 +38164,11 @@ msgstr "Indisponible"
 
 #: src/features/admin/components/ban-user-dialog.tsx:89
 #: src/features/admin/components/ban-user-dialog.tsx:99
-#: src/features/admin/components/user-cell.tsx:137
+#: src/features/admin/components/user-cell.tsx:140
 msgid "Unban User"
 msgstr "Débannir l’utilisateur"
 
-#: src/features/admin/components/audit-log-card.tsx:142
+#: src/features/admin/components/audit-log-card.tsx:136
 msgid "Unbans"
 msgstr "Débannissements"
 
@@ -38989,7 +38994,7 @@ msgstr "Accès de l’utilisateur supprimé"
 msgid "User Banned"
 msgstr "Utilisateur banni"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:172
+#: src/features/admin/components/admin-dashboard-stats.tsx:152
 msgid "User Growth (Last 7 Days)"
 msgstr "Croissance des utilisateurs (7 derniers jours)"
 
@@ -39070,7 +39075,7 @@ msgstr "Nom d’utilisateur : @{platformUsername}"
 msgid "Users"
 msgstr "Utilisateurs"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:136
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:147
 msgid "users / run"
 msgstr "utilisateurs / exécution"
 
@@ -39596,7 +39601,7 @@ msgstr "Voir la politique de confidentialité"
 msgid "View pull request"
 msgstr "Voir la pull request"
 
-#: src/features/admin/components/user-cell.tsx:122
+#: src/features/admin/components/user-cell.tsx:125
 msgid "View Sessions"
 msgstr "Voir les sessions"
 
@@ -40109,7 +40114,7 @@ msgstr "En semaine à 09:00 UTC"
 msgid "Weekdays at 8 AM"
 msgstr "En semaine à 8 h"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:162
+#: src/features/admin/components/admin-dashboard-stats.tsx:130
 msgid "Weekly Growth"
 msgstr "Croissance hebdomadaire"
 
@@ -40117,7 +40122,7 @@ msgstr "Croissance hebdomadaire"
 msgid "Weight"
 msgstr "Graisse"
 
-#: src/features/auth/components/auth/auth-card.tsx:367
+#: src/features/auth/components/auth/auth-card.tsx:366
 msgid "Welcome back"
 msgstr "Bon retour parmi nous"
 
@@ -40265,7 +40270,7 @@ msgstr "Ce qu’il faut envoyer, et comment distinguer une bonne réponse d’un
 msgid "What to watch"
 msgstr "Quoi surveiller"
 
-#: src/features/admin/components/feedback-admin-page.tsx:155
+#: src/features/admin/components/feedback-admin-page.tsx:171
 msgid "What users sent from the app, newest first"
 msgstr "Ce que les utilisateurs ont envoyé depuis l’app, les plus récents d’abord"
 
@@ -40467,7 +40472,7 @@ msgstr "Largeur"
 msgid "Will be saved as your {provider} API key"
 msgstr "Sera enregistré comme votre clé API {provider}"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:67
+#: src/features/admin/components/admin-provider-cache-row.tsx:64
 msgid "Window"
 msgstr "Période"
 
@@ -40475,11 +40480,11 @@ msgstr "Période"
 msgid "Windows"
 msgstr "Windows"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:144
+#: src/features/admin/components/admin-dashboard-stats.tsx:112
 msgid "With admin privileges"
 msgstr "Avec privilèges d’administrateur"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:130
+#: src/features/admin/components/admin-dashboard-stats.tsx:98
 msgid "With email/password"
 msgstr "Avec e-mail/mot de passe"
 
@@ -41021,7 +41026,7 @@ msgstr "Vous utilisez un compte invité."
 msgid "You've been invited to join a thread. Click the button below to accept."
 msgstr "Vous avez été invité à rejoindre une conversation. Cliquez sur le bouton ci-dessous pour accepter."
 
-#: src/features/auth/components/organization/accept-invitation-card.tsx:160
+#: src/features/auth/components/organization/accept-invitation-card.tsx:158
 msgid "You've been invited to join an organization"
 msgstr "Vous avez été invité à rejoindre une organisation"
 
@@ -41178,7 +41183,7 @@ msgstr "Vos connecteurs et outils MCP réglés sur « Auto »"
 msgid "Your conversations stay private"
 msgstr "Vos conversations restent privées"
 
-#: src/features/auth/components/auth/convert-anonymous-account.tsx:162
+#: src/features/auth/components/auth/convert-anonymous-account.tsx:161
 msgid "Your current anonymous session will be converted to a permanent account."
 msgstr "Votre session anonyme actuelle sera convertie en compte permanent."
 

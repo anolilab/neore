@@ -3,7 +3,6 @@
 import { useLingui } from "@lingui/react/macro";
 import { Badge } from "@neore/ui/components/badge";
 import { Button } from "@neore/ui/components/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@neore/ui/components/card";
 import { Checkbox } from "@neore/ui/components/checkbox";
 import { Input } from "@neore/ui/components/input";
 import { Label } from "@neore/ui/components/label";
@@ -16,9 +15,12 @@ import { useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, CheckCircle, Clock, Play, RefreshCw, Search, Trash2 } from "lucide-react";
 import { useState } from "react";
 
+import SettingsCard from "@/components/settings/settings-card";
+import SettingsRow from "@/components/settings/settings-row";
 import { showError } from "@/lib/toast";
 
 import { useCleanupConfig, useCleanupLogs, useExecuteCleanup, usePreviewCleanup, useUpdateCleanupConfig } from "../hooks/use-admin";
+import { AdminRows, AdminSection } from "./admin-section";
 
 // =============================================================================
 // Config Panel
@@ -75,26 +77,21 @@ const CleanupConfigPanel = () => {
     };
 
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle>{t`Cleanup Configuration`}</CardTitle>
-                <CardDescription>{t`Configure thresholds and batch limits for anonymous user cleanup`}</CardDescription>
-            </CardHeader>
-
-            <CardContent className="space-y-6">
-                {isPending ? (
-                    <div className="space-y-3">
-                        <Skeleton className="h-10 w-full" />
-                        <Skeleton className="h-10 w-full" />
-                        <Skeleton className="h-10 w-32" />
-                    </div>
-                ) : (
-                    <>
-                        {editing ? (
-                            <div className="space-y-4">
-                                <div className="space-y-1.5">
-                                    <Label htmlFor="threshold-days">{t`Inactivity threshold (days)`}</Label>
+        <SettingsCard description={t`Configure thresholds and batch limits for anonymous user cleanup`} title={t`Cleanup Configuration`}>
+            {isPending ? (
+                <div className="space-y-3 py-3">
+                    <Skeleton className="h-10 w-full" />
+                    <Skeleton className="h-10 w-full" />
+                    <Skeleton className="h-10 w-32" />
+                </div>
+            ) : (
+                <>
+                    {editing ? (
+                        <>
+                            <SettingsRow
+                                control={
                                     <Input
+                                        className="w-28"
                                         id="threshold-days"
                                         max={365}
                                         min={1}
@@ -102,58 +99,80 @@ const CleanupConfigPanel = () => {
                                         type="number"
                                         value={thresholdDays}
                                     />
-                                    <p className="text-muted-foreground text-xs">
-                                        {t`Anonymous users inactive for this many days become eligible for deletion.`}
-                                    </p>
-                                </div>
-
-                                <div className="space-y-1.5">
-                                    <Label htmlFor="batch-size">{t`Batch size`}</Label>
-                                    <Input id="batch-size" max={1000} min={1} onChange={(e) => setBatchSize(e.target.value)} type="number" value={batchSize} />
-                                    <p className="text-muted-foreground text-xs">{t`Maximum number of users to delete per cleanup run.`}</p>
-                                </div>
-
-                                <div className="flex gap-2">
-                                    <Button disabled={updateConfig.isPending} onClick={handleSave} size="sm">
-                                        {t`Save`}
-                                    </Button>
-                                    <Button disabled={updateConfig.isPending} onClick={() => setEditing(false)} size="sm" variant="outline">
-                                        {t`Cancel`}
-                                    </Button>
-                                </div>
+                                }
+                                description={t`Anonymous users inactive for this many days become eligible for deletion.`}
+                                htmlFor="threshold-days"
+                                title={t`Inactivity threshold (days)`}
+                            />
+                            <SettingsRow
+                                control={
+                                    <Input
+                                        className="w-28"
+                                        id="batch-size"
+                                        max={1000}
+                                        min={1}
+                                        onChange={(e) => setBatchSize(e.target.value)}
+                                        type="number"
+                                        value={batchSize}
+                                    />
+                                }
+                                description={t`Maximum number of users to delete per cleanup run.`}
+                                htmlFor="batch-size"
+                                title={t`Batch size`}
+                            />
+                            <div className="border-border/50 flex gap-2 border-t py-3">
+                                <Button disabled={updateConfig.isPending} onClick={handleSave} size="sm">
+                                    {t`Save`}
+                                </Button>
+                                <Button disabled={updateConfig.isPending} onClick={() => setEditing(false)} size="sm" variant="outline">
+                                    {t`Cancel`}
+                                </Button>
                             </div>
-                        ) : (
-                            <div className="space-y-4">
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="rounded-lg border p-3">
-                                        <p className="text-muted-foreground text-xs">{t`Inactivity threshold`}</p>
-                                        <p className="text-2xl font-bold">{config?.thresholdDays ?? 30}</p>
-                                        <p className="text-muted-foreground text-xs">{t`days`}</p>
-                                    </div>
-                                    <div className="rounded-lg border p-3">
-                                        <p className="text-muted-foreground text-xs">{t`Batch size`}</p>
-                                        <p className="text-2xl font-bold">{config?.batchSize ?? 100}</p>
-                                        <p className="text-muted-foreground text-xs">{t`users / run`}</p>
-                                    </div>
-                                </div>
-
+                        </>
+                    ) : (
+                        <>
+                            <SettingsRow
+                                control={
+                                    <p className="text-sm tabular-nums">
+                                        <span className="text-lg font-semibold">{config?.thresholdDays ?? 30}</span>{" "}
+                                        <span className="text-muted-foreground">{t`days`}</span>
+                                    </p>
+                                }
+                                title={t`Inactivity threshold`}
+                            />
+                            <SettingsRow
+                                control={
+                                    <p className="text-sm tabular-nums">
+                                        <span className="text-lg font-semibold">{config?.batchSize ?? 100}</span>{" "}
+                                        <span className="text-muted-foreground">{t`users / run`}</span>
+                                    </p>
+                                }
+                                title={t`Batch size`}
+                            />
+                            <div className="border-border/50 border-t py-3">
                                 <Button onClick={handleEdit} size="sm" variant="outline">
                                     {t`Edit`}
                                 </Button>
                             </div>
-                        )}
+                        </>
+                    )}
 
-                        <div className="flex items-center justify-between border-t pt-4">
-                            <div>
-                                <p className="text-sm font-medium">{t`Scheduled cleanup`}</p>
-                                <p className="text-muted-foreground text-xs">{t`Automatically run cleanup based on configuration`}</p>
-                            </div>
-                            <Switch checked={config?.isEnabled ?? false} disabled={updateConfig.isPending} onCheckedChange={handleToggleEnabled} />
-                        </div>
-                    </>
-                )}
-            </CardContent>
-        </Card>
+                    <SettingsRow
+                        control={
+                            <Switch
+                                aria-labelledby="scheduled-cleanup-title"
+                                checked={config?.isEnabled ?? false}
+                                disabled={updateConfig.isPending}
+                                onCheckedChange={handleToggleEnabled}
+                            />
+                        }
+                        description={t`Automatically run cleanup based on configuration`}
+                        title={t`Scheduled cleanup`}
+                        titleId="scheduled-cleanup-title"
+                    />
+                </>
+            )}
+        </SettingsCard>
     );
 };
 
@@ -199,53 +218,48 @@ const CleanupExecutePanel = () => {
 
     return (
         <>
-            <Card>
-                <CardHeader>
-                    <CardTitle>{t`Preview & Execute`}</CardTitle>
-                    <CardDescription>{t`Preview how many users will be removed, then execute cleanup.`}</CardDescription>
-                </CardHeader>
+            <SettingsCard description={t`Preview how many users will be removed, then execute cleanup.`} title={t`Preview & Execute`}>
+                {/* Eligible count */}
+                <SettingsRow
+                    control={
+                        previewPending ? (
+                            <Skeleton className="h-8 w-16" />
+                        ) : (
+                            <p className="text-3xl font-semibold tabular-nums">{preview?.eligibleCount ?? 0}</p>
+                        )
+                    }
+                    description={preview ? t`Inactive for more than ${preview.thresholdDays} days` : undefined}
+                    title={t`Eligible anonymous users`}
+                >
+                    <Button disabled={previewPending} onClick={() => refetch()} size="sm" variant="outline">
+                        <RefreshCw className="mr-1 size-4" />
+                        {t`Refresh`}
+                    </Button>
+                </SettingsRow>
 
-                <CardContent className="space-y-6">
-                    {/* Eligible count */}
-                    <div className="flex items-center gap-4 rounded-lg border p-4">
-                        <div className="bg-muted flex size-12 items-center justify-center rounded-full">
-                            <Search className="text-muted-foreground size-6" />
+                {/* Last result */}
+                {lastResult && (
+                    <div className="border-border/50 flex items-start gap-3 border-t py-3">
+                        <CheckCircle aria-hidden="true" className="text-success mt-0.5 size-4 shrink-0" />
+                        <div className="text-sm">
+                            <p className="font-medium">{lastResult.deletedCount > 0 ? t`Cleanup complete` : t`Dry run complete`}</p>
+                            <p className="text-muted-foreground text-xs">
+                                {t`${lastResult.eligibleCount} eligible · ${lastResult.deletedCount} deleted · ${lastResult.durationMs}ms`}
+                            </p>
                         </div>
-                        <div className="flex-1">
-                            <p className="text-muted-foreground text-sm">{t`Eligible anonymous users`}</p>
-                            {previewPending ? <Skeleton className="mt-1 h-8 w-16" /> : <p className="text-3xl font-bold">{preview?.eligibleCount ?? 0}</p>}
-                            {preview && <p className="text-muted-foreground text-xs">{t`Inactive for more than ${preview.thresholdDays} days`}</p>}
-                        </div>
-                        <Button disabled={previewPending} onClick={() => refetch()} size="sm" variant="outline">
-                            <RefreshCw className="mr-1 size-4" />
-                            {t`Refresh`}
-                        </Button>
                     </div>
+                )}
 
-                    {/* Last result */}
-                    {lastResult && (
-                        <div className="flex items-start gap-3 rounded-lg border border-green-200 bg-green-50 p-3 dark:border-green-900 dark:bg-green-950">
-                            <CheckCircle className="mt-0.5 size-5 shrink-0 text-green-600 dark:text-green-400" />
-                            <div className="text-sm">
-                                <p className="font-medium text-green-800 dark:text-green-200">
-                                    {lastResult.deletedCount > 0 ? t`Cleanup complete` : t`Dry run complete`}
-                                </p>
-                                <p className="text-green-700 dark:text-green-300">
-                                    {t`${lastResult.eligibleCount} eligible · ${lastResult.deletedCount} deleted · ${lastResult.durationMs}ms`}
-                                </p>
-                            </div>
-                        </div>
-                    )}
+                {/* Options */}
+                <div className="border-border/50 flex items-center gap-2 border-t py-3">
+                    <Checkbox checked={dryRun} id="dry-run" onCheckedChange={(checked) => setDryRun(checked === true)} />
+                    <Label className="cursor-pointer" htmlFor="dry-run">
+                        {t`Dry run (preview only — no deletions)`}
+                    </Label>
+                </div>
 
-                    {/* Options */}
-                    <div className="flex items-center gap-2">
-                        <Checkbox checked={dryRun} id="dry-run" onCheckedChange={(checked) => setDryRun(checked === true)} />
-                        <Label className="cursor-pointer" htmlFor="dry-run">
-                            {t`Dry run (preview only — no deletions)`}
-                        </Label>
-                    </div>
-
-                    {/* Execute button */}
+                {/* Execute button */}
+                <div className="border-border/50 border-t py-3">
                     <Button
                         className="w-full"
                         disabled={executeCleanup.isPending || previewPending || (preview?.eligibleCount ?? 0) === 0}
@@ -261,8 +275,8 @@ const CleanupExecutePanel = () => {
                             idleExecuteLabel
                         )}
                     </Button>
-                </CardContent>
-            </Card>
+                </div>
+            </SettingsCard>
 
             {/* Confirmation dialog */}
             <Dialog onOpenChange={setShowConfirm} open={showConfirm}>
@@ -304,7 +318,7 @@ const CleanupLogsPanel = () => {
 
     const logsBody =
         data?.logs && data.logs.length > 0 ? (
-            <div className="space-y-3">
+            <AdminRows>
                 {data.logs.map(
                     (log: {
                         _id: string;
@@ -318,9 +332,13 @@ const CleanupLogsPanel = () => {
                         const date = isMounted ? formatDateTime(log.runAt, i18n.locale) : "";
 
                         return (
-                            <div className="flex items-start gap-3 border-b pb-3 last:border-0" key={log._id}>
-                                <div className="bg-muted flex size-8 shrink-0 items-center justify-center rounded-full">
-                                    {log.mode === "dry_run" ? <Search className="size-4 text-blue-500" /> : <Trash2 className="text-destructive size-4" />}
+                            <div className="flex items-start gap-3 py-3" key={log._id}>
+                                <div className="surface-well flex size-8 shrink-0 items-center justify-center rounded-lg">
+                                    {log.mode === "dry_run" ? (
+                                        <Search aria-hidden="true" className="text-info size-4" />
+                                    ) : (
+                                        <Trash2 aria-hidden="true" className="text-destructive size-4" />
+                                    )}
                                 </div>
 
                                 <div className="min-w-0 flex-1">
@@ -328,8 +346,8 @@ const CleanupLogsPanel = () => {
                                         <Badge variant={log.mode === "dry_run" ? "outline" : "destructive"}>
                                             {log.mode === "dry_run" ? t`Dry run` : t`Execute`}
                                         </Badge>
-                                        <span className="text-muted-foreground flex items-center gap-1 text-xs">
-                                            <Clock className="size-3" />
+                                        <span className="text-muted-foreground flex items-center gap-1 font-mono text-xs">
+                                            <Clock aria-hidden="true" className="size-3" />
                                             {date}
                                         </span>
                                     </div>
@@ -346,36 +364,29 @@ const CleanupLogsPanel = () => {
                         );
                     },
                 )}
-            </div>
+            </AdminRows>
         ) : (
-            <div className="text-muted-foreground py-8 text-center">{t`No cleanup runs yet`}</div>
+            <div className="text-muted-foreground py-8 text-center text-sm">{t`No cleanup runs yet`}</div>
         );
 
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle>{t`Run History`}</CardTitle>
-                <CardDescription>{t`Past cleanup runs and their results`}</CardDescription>
-            </CardHeader>
-
-            <CardContent>
-                {isPending ? (
-                    <div className="space-y-3">
-                        {[1, 2, 3].map((i) => (
-                            <div className="flex items-center gap-3" key={i}>
-                                <Skeleton className="size-8 rounded-full" />
-                                <div className="flex-1 space-y-2">
-                                    <Skeleton className="h-4 w-48" />
-                                    <Skeleton className="h-3 w-32" />
-                                </div>
+        <AdminSection description={t`Past cleanup runs and their results`} title={t`Run History`}>
+            {isPending ? (
+                <AdminRows>
+                    {[1, 2, 3].map((i) => (
+                        <div className="flex items-center gap-3 py-3" key={i}>
+                            <Skeleton className="size-8 rounded-lg" />
+                            <div className="flex-1 space-y-2">
+                                <Skeleton className="h-4 w-48" />
+                                <Skeleton className="h-3 w-32" />
                             </div>
-                        ))}
-                    </div>
-                ) : (
-                    logsBody
-                )}
-            </CardContent>
-        </Card>
+                        </div>
+                    ))}
+                </AdminRows>
+            ) : (
+                logsBody
+            )}
+        </AdminSection>
     );
 };
 
@@ -384,8 +395,8 @@ const CleanupLogsPanel = () => {
 // =============================================================================
 
 const AdminCleanupDashboard = () => (
-    <div className="space-y-6">
-        <div className="grid gap-6 lg:grid-cols-2">
+    <div className="flex flex-col gap-6">
+        <div className="grid items-start gap-6 2xl:grid-cols-2">
             <CleanupConfigPanel />
             <CleanupExecutePanel />
         </div>

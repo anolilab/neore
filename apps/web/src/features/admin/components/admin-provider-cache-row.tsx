@@ -1,7 +1,6 @@
 "use client";
 
 import { useLingui } from "@lingui/react/macro";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@neore/ui/components/card";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@neore/ui/components/table";
 import { ToggleGroup, ToggleGroupItem } from "@neore/ui/components/toggle-group";
 import useIsHydrated from "@neore/ui/hooks/use-hydrated";
@@ -13,6 +12,7 @@ import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
 import { useProviderCacheReadings } from "../hooks/use-admin";
 import type { CacheCounts } from "../lib/provider-cache";
 import { browserTimeZone, byDay, byHour, cachedShare, resolveTimeZone, sumCounts } from "../lib/provider-cache";
+import { AdminBlock, AdminSection } from "./admin-section";
 
 type WindowDays = 1 | 7 | 30;
 
@@ -55,14 +55,11 @@ const AdminProviderCacheRow = () => {
     const countText = (value: number | undefined): string => (value === undefined ? NO_READING : formatNumber(value, locale));
 
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle>{t`Provider prompt cache`}</CardTitle>
-                <CardDescription>
-                    {t`The share of prompt tokens providers served from their own cache. Days and hours count the provider and model pairs that cached in the last 30 days; the model table lists the top 50 models by prompt tokens. Only chat calls count, and answers from the gateway's response cache are left out. Days and hours are in ${timeZone}.`}
-                </CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-4">
+        <AdminSection
+            description={t`The share of prompt tokens providers served from their own cache. Days and hours count the provider and model pairs that cached in the last 30 days; the model table lists the top 50 models by prompt tokens. Only chat calls count, and answers from the gateway's response cache are left out. Days and hours are in ${timeZone}.`}
+            title={t`Provider prompt cache`}
+        >
+            <AdminBlock className="flex flex-wrap items-center gap-x-4 gap-y-2">
                 <ToggleGroup
                     aria-label={t`Window`}
                     onValueChange={(value: ReadonlyArray<string> | undefined) => {
@@ -84,33 +81,39 @@ const AdminProviderCacheRow = () => {
                 <p aria-live="polite" className="text-muted-foreground text-sm" role="status">
                     {readings.isFetching ? t`Loading…` : null}
                 </p>
-                {readings.isError ? (
+            </AdminBlock>
+            {readings.isError ? (
+                <AdminBlock>
                     <p className="text-destructive text-sm" role="alert">
                         {/* A failed refresh keeps the last readings on screen: say they are older, and from when. */}
                         {data === undefined
                             ? t`The provider cache readings could not be loaded.`
                             : t`The provider cache readings could not be refreshed. The figures below are from ${formatDateTime(readings.dataUpdatedAt, locale, { dateStyle: "short", timeStyle: "short", timeZone })}.`}
                     </p>
-                ) : null}
+                </AdminBlock>
+            ) : null}
+            <AdminBlock>
                 <dl className="grid grid-cols-2 gap-4 md:grid-cols-3">
                     <div>
-                        <dt className="text-muted-foreground text-sm">{t`Served from cache`}</dt>
-                        <dd className="text-2xl font-semibold">{shareText(total, locale)}</dd>
+                        <dt className="text-muted-foreground font-mono text-xs">{t`Served from cache`}</dt>
+                        <dd className="mt-1 text-2xl font-semibold tabular-nums">{shareText(total, locale)}</dd>
                     </div>
                     <div>
-                        <dt className="text-muted-foreground text-sm">{t`Prompt tokens`}</dt>
-                        <dd className="text-2xl font-semibold">{countText(total?.promptTokens)}</dd>
+                        <dt className="text-muted-foreground font-mono text-xs">{t`Prompt tokens`}</dt>
+                        <dd className="mt-1 text-2xl font-semibold tabular-nums">{countText(total?.promptTokens)}</dd>
                     </div>
                     <div>
-                        <dt className="text-muted-foreground text-sm">{t`Requests`}</dt>
-                        <dd className="text-2xl font-semibold">{countText(total?.requests)}</dd>
+                        <dt className="text-muted-foreground font-mono text-xs">{t`Requests`}</dt>
+                        <dd className="mt-1 text-2xl font-semibold tabular-nums">{countText(total?.requests)}</dd>
                     </div>
                 </dl>
                 {data === undefined ? null : (
-                    <p className="text-muted-foreground text-sm">
+                    <p className="text-muted-foreground mt-3 text-xs">
                         {t`All provider traffic in the window, caching or not. Requests: ${formatNumber(data.all.requests, locale)}. Prompt tokens: ${formatNumber(data.all.promptTokens, locale)}. Served from cache: ${shareText(data.all, locale)}.`}
                     </p>
                 )}
+            </AdminBlock>
+            <AdminBlock className="px-2">
                 <Table>
                     <TableCaption>{t`By day, newest first.`}</TableCaption>
                     <TableHeader>
@@ -133,8 +136,10 @@ const AdminProviderCacheRow = () => {
                         ))}
                     </TableBody>
                 </Table>
+            </AdminBlock>
+            <AdminBlock className="px-2">
                 <details>
-                    <summary className="cursor-pointer text-sm font-medium">{t`By hour`}</summary>
+                    <summary className="cursor-pointer px-2 text-sm font-medium">{t`By hour`}</summary>
                     <Table>
                         <TableCaption>{t`By hour, oldest first. A drop that starts at one hour across models points at a change in what is sent.`}</TableCaption>
                         <TableHeader>
@@ -168,6 +173,8 @@ const AdminProviderCacheRow = () => {
                         </TableBody>
                     </Table>
                 </details>
+            </AdminBlock>
+            <AdminBlock className="px-2">
                 <Table>
                     <TableCaption>
                         {data !== undefined && data.pairs > models.length
@@ -195,8 +202,8 @@ const AdminProviderCacheRow = () => {
                         ))}
                     </TableBody>
                 </Table>
-            </CardContent>
-        </Card>
+            </AdminBlock>
+        </AdminSection>
     );
 };
 

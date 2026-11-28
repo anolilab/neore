@@ -420,7 +420,7 @@ msgstr "{0, plural, other {# 件の必須または不明なチェックがまだ
 
 #. placeholder {0}: readings.compactable.largeToolRows
 #. placeholder {1}: formatBytes(readings.compactable.largeToolBytes, locale)
-#: src/features/admin/components/admin-shard-footprint-row.tsx:185
+#: src/features/admin/components/admin-shard-footprint-row.tsx:190
 msgid "{0, plural, one {# result} other {# results}}, {1}"
 msgstr "{0, plural, other {# 件の結果}}、{1}"
 
@@ -458,8 +458,8 @@ msgstr "{0, plural, other {# 件のスレッド}}"
 #. placeholder {0}: readings.pinned.threads
 #. placeholder {1}: formatBytes(readings.other.approxBytes, locale)
 #. placeholder {1}: formatBytes(readings.pinned.approxBytes, locale)
-#: src/features/admin/components/admin-shard-footprint-row.tsx:191
-#: src/features/admin/components/admin-shard-footprint-row.tsx:197
+#: src/features/admin/components/admin-shard-footprint-row.tsx:196
+#: src/features/admin/components/admin-shard-footprint-row.tsx:202
 msgid "{0, plural, one {# thread} other {# threads}}, {1}"
 msgstr "{0, plural, other {# 件のスレッド}}、{1}"
 
@@ -474,7 +474,7 @@ msgid "{0, plural, one {# tool found} other {# tools found}}"
 msgstr "{0, plural, other {# 個のツールが見つかりました}}"
 
 #. placeholder {0}: day.count
-#: src/features/admin/components/admin-dashboard-stats.tsx:200
+#: src/features/admin/components/admin-dashboard-stats.tsx:167
 msgid "{0, plural, one {# user} other {# users}}"
 msgstr "{0, plural, other {# 人のユーザー}}"
 
@@ -617,9 +617,9 @@ msgstr "カスタムヘッダー {0} 件"
 
 #. placeholder {0}: formatNumber(row.sinceDays, locale)
 #. placeholder {0}: formatNumber(window, locale)
-#: src/features/admin/components/admin-provider-cache-row.tsx:80
-#: src/features/admin/components/admin-shard-footprint-row.tsx:150
-#: src/features/admin/components/admin-shard-footprint-row.tsx:170
+#: src/features/admin/components/admin-provider-cache-row.tsx:77
+#: src/features/admin/components/admin-shard-footprint-row.tsx:151
+#: src/features/admin/components/admin-shard-footprint-row.tsx:173
 msgid "{0} days"
 msgstr "{0} 日"
 
@@ -639,8 +639,8 @@ msgstr "経過 {0}"
 #. placeholder {1}: log.deletedCount
 #. placeholder {2}: lastResult.durationMs
 #. placeholder {2}: log.durationMs
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:234
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:338
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:247
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:356
 msgid "{0} eligible · {1} deleted · {2}ms"
 msgstr "対象 {0} 件 · 削除 {1} 件 · {2}ms"
 
@@ -1865,7 +1865,7 @@ msgstr "21:9（ウルトラワイド）"
 msgid "235B parameter Mixture-of-Experts architecture"
 msgstr "235B パラメータの Mixture-of-Experts アーキテクチャ"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:80
+#: src/features/admin/components/admin-provider-cache-row.tsx:77
 #: src/features/admin/components/ban-user-dialog.tsx:29
 msgid "24 hours"
 msgstr "24 時間"
@@ -1974,7 +1974,7 @@ msgstr "7 日"
 msgid "7 Days"
 msgstr "7 日"
 
-#: src/routes/admin/gateway/index.tsx:375
+#: src/routes/admin/gateway/index.tsx:338
 msgid "7-Day Cost Trend"
 msgstr "7 日間のコスト推移"
 
@@ -2406,7 +2406,7 @@ msgstr "アクセントカラー"
 msgid "Accent color updated"
 msgstr "アクセントカラーを更新しました"
 
-#: src/features/auth/components/organization/accept-invitation-card.tsx:192
+#: src/features/auth/components/organization/accept-invitation-card.tsx:189
 #: src/features/auth/components/organization/user-invitations-card.tsx:116
 #: src/features/tasks/components/task-suggestions.tsx:297
 msgid "Accept"
@@ -2416,7 +2416,7 @@ msgstr "承諾"
 msgid "Accept \"{title}\""
 msgstr "「{title}」を承諾"
 
-#: src/features/auth/components/organization/accept-invitation-card.tsx:157
+#: src/features/auth/components/organization/accept-invitation-card.tsx:156
 msgid "Accept Invitation"
 msgstr "招待を承諾"
 
@@ -2483,7 +2483,7 @@ msgstr "Veo 3.1 の品質と音声を、より高速かつ手頃な価格で"
 msgid "Account"
 msgstr "アカウント"
 
-#: src/features/auth/components/auth/convert-anonymous-account.tsx:117
+#: src/features/auth/components/auth/convert-anonymous-account.tsx:116
 msgid "Account converted successfully! Please check your email to verify your account."
 msgstr "アカウントの変換が完了しました！メールを確認してアカウントを認証してください。"
 
@@ -2566,7 +2566,7 @@ msgstr "アクティブなセッション（{0}）"
 msgid "Active Threads"
 msgstr "アクティブなスレッド"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:159
+#: src/features/admin/components/admin-shard-footprint-row.tsx:162
 msgid "Active threads, by days since their last activity. Threads waiting on a person are included."
 msgstr "アクティブなスレッド（最後のアクティビティからの日数別）。人の対応を待っているスレッドも含みます。"
 
@@ -3035,7 +3035,7 @@ msgid "Adjust"
 msgstr "調整"
 
 #: src/features/admin/components/user-cell.tsx:82
-#: src/features/auth/components/organization/accept-invitation-card.tsx:146
+#: src/features/auth/components/organization/accept-invitation-card.tsx:145
 #: src/features/auth/components/organization/invitation-cell.tsx:36
 #: src/features/auth/components/organization/invite-member-dialog.tsx:36
 #: src/features/auth/components/organization/member-cell.tsx:40
@@ -3050,7 +3050,7 @@ msgstr "調整"
 #: src/features/layout/lib/dashboard-page-names.ts:12
 #: src/routes/admin/route.tsx:57
 #: src/routes/admin/route.tsx:77
-#: src/routes/admin/route.tsx:88
+#: src/routes/admin/route.tsx:98
 msgid "Admin"
 msgstr "管理者"
 
@@ -3058,7 +3058,7 @@ msgstr "管理者"
 msgid "Admin Granted"
 msgstr "管理者権限を付与"
 
-#: src/features/admin/components/audit-log-card.tsx:146
+#: src/features/admin/components/audit-log-card.tsx:140
 msgid "Admin Grants"
 msgstr "管理者権限の付与"
 
@@ -3066,7 +3066,7 @@ msgstr "管理者権限の付与"
 msgid "Admin privileges have been removed"
 msgstr "管理者権限が削除されました"
 
-#: src/features/admin/components/audit-log-card.tsx:147
+#: src/features/admin/components/audit-log-card.tsx:141
 msgid "Admin Revocations"
 msgstr "管理者権限の取り消し"
 
@@ -3074,7 +3074,7 @@ msgstr "管理者権限の取り消し"
 msgid "Admin Revoked"
 msgstr "管理者権限を取り消し"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:146
+#: src/features/admin/components/admin-dashboard-stats.tsx:115
 msgid "Administrators"
 msgstr "管理者"
 
@@ -3558,11 +3558,11 @@ msgstr "すべて（{0}）"
 msgid "All {provider} models enabled"
 msgstr "{provider} のすべてのモデルを有効にしました"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:123
+#: src/features/admin/components/admin-dashboard-stats.tsx:91
 msgid "All accounts"
 msgstr "すべてのアカウント"
 
-#: src/features/admin/components/audit-log-card.tsx:139
+#: src/features/admin/components/audit-log-card.tsx:133
 msgid "All Actions"
 msgstr "すべての操作"
 
@@ -3621,7 +3621,7 @@ msgstr "すべてのアイコン"
 msgid "All installers"
 msgstr "すべてのインストーラー"
 
-#: src/features/admin/components/feedback-admin-page.tsx:168
+#: src/features/admin/components/feedback-admin-page.tsx:163
 msgid "All kinds"
 msgstr "すべての種類"
 
@@ -3676,7 +3676,7 @@ msgstr "すべてのプロンプト"
 #. placeholder {0}: formatNumber(data.all.requests, locale)
 #. placeholder {1}: formatNumber(data.all.promptTokens, locale)
 #. placeholder {2}: shareText(data.all, locale)
-#: src/features/admin/components/admin-provider-cache-row.tsx:111
+#: src/features/admin/components/admin-provider-cache-row.tsx:112
 msgid "All provider traffic in the window, caching or not. Requests: {0}. Prompt tokens: {1}. Served from cache: {2}."
 msgstr "期間内のすべてのプロバイダートラフィック（キャッシュの有無を問わず）。リクエスト：{0}。プロンプトトークン：{1}。キャッシュから提供：{2}。"
 
@@ -3714,7 +3714,7 @@ msgstr "すべてのロール"
 msgid "All Servers"
 msgstr "すべてのサーバー"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:234
+#: src/features/admin/components/admin-shard-footprint-row.tsx:244
 msgid "All shards measured."
 msgstr "すべてのシャードの測定が完了しました。"
 
@@ -3734,7 +3734,7 @@ msgstr "すべての種類"
 msgid "All use cases"
 msgstr "すべてのユースケース"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:180
+#: src/features/admin/components/admin-dashboard-stats.tsx:145
 msgid "All Users"
 msgstr "すべてのユーザー"
 
@@ -3806,7 +3806,7 @@ msgstr "Alloy（ニュートラル）"
 msgid "Alphabetical"
 msgstr "アルファベット順"
 
-#: src/features/auth/components/auth/auth-card.tsx:439
+#: src/features/auth/components/auth/auth-card.tsx:438
 msgid "Already have an account?"
 msgstr "アカウントをお持ちですか？"
 
@@ -4017,18 +4017,18 @@ msgstr "年間"
 msgid "Annual billing"
 msgstr "年払い"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:182
-#: src/features/admin/components/admin-dashboard-stats.tsx:250
+#: src/features/admin/components/admin-dashboard-stats.tsx:147
+#: src/features/admin/components/admin-dashboard-stats.tsx:212
 #: src/features/admin/components/user-cell.tsx:76
 #: src/features/admin/components/users-management-card.tsx:143
 msgid "Anonymous"
 msgstr "匿名"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:139
+#: src/features/admin/components/admin-dashboard-stats.tsx:108
 msgid "Anonymous Users"
 msgstr "匿名ユーザー"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:106
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:103
 msgid "Anonymous users inactive for this many days become eligible for deletion."
 msgstr "この日数の間アクティブでない匿名ユーザーは削除の対象になります。"
 
@@ -4141,7 +4141,7 @@ msgstr "その他の独立したタスク。"
 msgid "Any string you choose; enter the same value as the webhook Verify token in the Meta app"
 msgstr "任意の文字列を指定し、Meta アプリの Webhook Verify token にも同じ値を入力してください"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:150
+#: src/features/admin/components/admin-shard-footprint-row.tsx:151
 msgid "Any time"
 msgstr "期間を問わず"
 
@@ -4371,9 +4371,9 @@ msgstr "自動承認済み — 低リスク"
 msgid "Approving…"
 msgstr "承認しています…"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:133
-#: src/features/admin/components/admin-shard-footprint-row.tsx:144
-#: src/features/admin/components/admin-shard-footprint-row.tsx:164
+#: src/features/admin/components/admin-shard-footprint-row.tsx:132
+#: src/features/admin/components/admin-shard-footprint-row.tsx:145
+#: src/features/admin/components/admin-shard-footprint-row.tsx:167
 msgid "Approximate size"
 msgstr "おおよそのサイズ"
 
@@ -4475,7 +4475,7 @@ msgstr "アーカイブ済み"
 msgid "Archived chats stay searchable, and you can restore them from the archive."
 msgstr "アーカイブしたチャットも検索でき、アーカイブから元に戻せます。"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:141
+#: src/features/admin/components/admin-shard-footprint-row.tsx:142
 msgid "Archived for at least"
 msgstr "アーカイブ後の経過期間（以上）"
 
@@ -4483,7 +4483,7 @@ msgstr "アーカイブ後の経過期間（以上）"
 msgid "Archived Threads"
 msgstr "アーカイブ済みのスレッド"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:138
+#: src/features/admin/components/admin-shard-footprint-row.tsx:139
 msgid "Archived threads, by how long ago they were archived. Pinned threads are counted apart: they are never deleted."
 msgstr "アーカイブ済みのスレッド（アーカイブしてからの期間別）。ピン留めしたスレッドは削除されないため、別に数えます。"
 
@@ -4832,7 +4832,7 @@ msgstr "音声波形（待機中）"
 msgid "audio-video"
 msgstr "音声・動画"
 
-#: src/features/admin/components/audit-log-card.tsx:130
+#: src/features/admin/components/audit-log-card.tsx:146
 #: src/features/layout/lib/dashboard-page-names.ts:18
 #: src/routes/admin/route.tsx:35
 #: src/routes/admin/route.tsx:58
@@ -4851,7 +4851,7 @@ msgstr "オーストリア"
 msgid "Auth"
 msgstr "認証"
 
-#: src/features/auth/components/auth/auth-card.tsx:392
+#: src/features/auth/components/auth/auth-card.tsx:391
 #: src/features/settings/components/chat/native-providers-settings.tsx:571
 msgid "Authentication"
 msgstr "認証"
@@ -5001,7 +5001,7 @@ msgstr "タスクの複雑さに応じてモジュールを自動的に有効化
 msgid "Automatically include relevant images and videos alongside text responses when using search modes."
 msgstr "検索モードの使用時に、テキストの応答と一緒に関連する画像や動画を自動的に含めます。"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:149
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:169
 msgid "Automatically run cleanup based on configuration"
 msgstr "設定に基づいてクリーンアップを自動実行"
 
@@ -5226,7 +5226,7 @@ msgstr "{userName} のプラットフォームへのアクセスを停止しま�
 
 #: src/features/admin/components/ban-user-dialog.tsx:111
 #: src/features/admin/components/ban-user-dialog.tsx:150
-#: src/features/admin/components/user-cell.tsx:142
+#: src/features/admin/components/user-cell.tsx:145
 msgid "Ban User"
 msgstr "ユーザーを利用停止"
 
@@ -5238,11 +5238,11 @@ msgstr "バングラデシュ"
 msgid "Banned"
 msgstr "利用停止中"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:154
+#: src/features/admin/components/admin-dashboard-stats.tsx:122
 msgid "Banned Users"
 msgstr "利用停止中のユーザー"
 
-#: src/features/admin/components/audit-log-card.tsx:141
+#: src/features/admin/components/audit-log-card.tsx:135
 msgid "Bans"
 msgstr "利用停止"
 
@@ -5275,12 +5275,12 @@ msgstr "ベーシック"
 msgid "batch generation"
 msgstr "一括生成"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:111
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:134
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:121
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:150
 msgid "Batch size"
 msgstr "バッチサイズ"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:54
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:56
 msgid "Batch size must be between 1 and 1000"
 msgstr "バッチサイズは 1 〜 1000 の範囲で指定してください"
 
@@ -5952,25 +5952,25 @@ msgstr "提供元：<0>{0}</0>"
 msgid "by a collaborator"
 msgstr "共同編集者による編集"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:115
+#: src/features/admin/components/admin-provider-cache-row.tsx:118
 msgid "By day, newest first."
 msgstr "日別（新しい順）。"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:137
+#: src/features/admin/components/admin-provider-cache-row.tsx:142
 msgid "By hour"
 msgstr "時間別"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:139
+#: src/features/admin/components/admin-provider-cache-row.tsx:144
 msgid "By hour, oldest first. A drop that starts at one hour across models points at a change in what is sent."
 msgstr "時間別（古い順）。複数のモデルで同じ時刻から下がっている場合は、送信内容が変わったことを示しています。"
 
 #. placeholder {0}: formatNumber(models.length, locale)
 #. placeholder {1}: formatNumber(data.pairs, locale)
-#: src/features/admin/components/admin-provider-cache-row.tsx:174
+#: src/features/admin/components/admin-provider-cache-row.tsx:181
 msgid "By model, most prompt tokens first: the top {0} of {1} provider and model pairs."
 msgstr "モデル別（プロンプトトークンの多い順）：プロバイダーとモデルの組み合わせ {1} 件のうち上位 {0} 件。"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:175
+#: src/features/admin/components/admin-provider-cache-row.tsx:182
 msgid "By model, most prompt tokens first."
 msgstr "モデル別（プロンプトトークンの多い順）。"
 
@@ -5978,7 +5978,7 @@ msgstr "モデル別（プロンプトトークンの多い順）。"
 msgid "by you"
 msgstr "自分による編集"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:342
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:360
 msgid "By:"
 msgstr "作成者："
 
@@ -6137,8 +6137,8 @@ msgstr "カナダ"
 #: ../../packages/ui/src/components/media-preview-dialog.tsx:257
 #: src/components/delete-confirmation-dialog.tsx:59
 #: src/components/settings/session-freshness-dialog.tsx:113
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:121
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:282
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:128
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:296
 #: src/features/admin/components/ban-user-dialog.tsx:95
 #: src/features/admin/components/ban-user-dialog.tsx:146
 #: src/features/admin/components/impersonate-user-dialog.tsx:79
@@ -7046,7 +7046,7 @@ msgstr "Ray 2 より動きが向上した、シネマ品質の出力"
 msgid "Circle"
 msgstr "円"
 
-#: src/routes/admin/gateway/index.tsx:329
+#: src/routes/admin/gateway/index.tsx:307
 msgid "Circuit breaker status from the last 5 minutes"
 msgstr "直近 5 分間のサーキットブレーカーの状態"
 
@@ -7095,7 +7095,7 @@ msgstr "すっきりしたタイトルスライド"
 msgid "Cleanup"
 msgstr "クリーンアップ"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:231
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:245
 msgid "Cleanup complete"
 msgstr "クリーンアップが完了しました"
 
@@ -7103,7 +7103,7 @@ msgstr "クリーンアップが完了しました"
 msgid "Cleanup Configuration"
 msgstr "クリーンアップ設定"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:184
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:203
 msgid "Cleanup failed"
 msgstr "クリーンアップに失敗しました"
 
@@ -8098,7 +8098,7 @@ msgstr "チーム設定を構成"
 msgid "Configure the billing contact and available AI models"
 msgstr "請求先の連絡先と利用可能な AI モデルを設定します"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:81
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:80
 msgid "Configure thresholds and batch limits for anonymous user cleanup"
 msgstr "匿名ユーザーのクリーンアップのしきい値とバッチ上限を設定します"
 
@@ -8141,7 +8141,7 @@ msgstr "チャットを削除する前に確認"
 msgid "Confirm before unpinning a chat"
 msgstr "チャットのピン留めを解除する前に確認"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:273
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:287
 msgid "Confirm cleanup"
 msgstr "クリーンアップを確認"
 
@@ -8154,7 +8154,7 @@ msgstr "新しいパスワード（確認）"
 msgid "Confirm password"
 msgstr "パスワード（確認）"
 
-#: src/features/auth/components/auth/convert-anonymous-account.tsx:222
+#: src/features/auth/components/auth/convert-anonymous-account.tsx:221
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:580
 #: src/features/auth/components/settings/security/change-password-card.tsx:342
 #: src/features/auth/components/settings/security/change-password-card.tsx:358
@@ -8167,7 +8167,7 @@ msgstr "パスワード（確認）"
 msgid "Confirm password is required"
 msgstr "確認用パスワードは必須です"
 
-#: src/features/auth/components/auth/convert-anonymous-account.tsx:231
+#: src/features/auth/components/auth/convert-anonymous-account.tsx:230
 msgid "Confirm your password"
 msgstr "パスワードを再入力してください"
 
@@ -8617,7 +8617,7 @@ msgstr "同じスレッドで続ける"
 msgid "Continue where you left off."
 msgstr "前回の続きから再開します。"
 
-#: src/features/auth/components/auth/forms/two-factor-form.tsx:388
+#: src/features/auth/components/auth/forms/two-factor-form.tsx:391
 msgid "Continue with authenticator"
 msgstr "認証アプリで続行"
 
@@ -8741,7 +8741,7 @@ msgstr "変換に失敗しました"
 msgid "Convert"
 msgstr "変換"
 
-#: src/features/auth/components/auth/convert-anonymous-account.tsx:244
+#: src/features/auth/components/auth/convert-anonymous-account.tsx:243
 msgid "Convert Account"
 msgstr "アカウントを変換"
 
@@ -8757,7 +8757,7 @@ msgstr "テキストを音声に変換"
 msgid "Convert to attachment for better readability?"
 msgstr "読みやすくするために添付ファイルに変換しますか？"
 
-#: src/features/auth/components/auth/convert-anonymous-account.tsx:153
+#: src/features/auth/components/auth/convert-anonymous-account.tsx:152
 msgid "Convert to Full Account"
 msgstr "正式なアカウントに変換"
 
@@ -9703,7 +9703,7 @@ msgstr "システムプロンプトとして使う新しいプロンプトを作
 msgid "Create a new team to organize members within your organization"
 msgstr "組織内のメンバーを整理する新しいチームを作成します"
 
-#: src/features/auth/components/auth/convert-anonymous-account.tsx:155
+#: src/features/auth/components/auth/convert-anonymous-account.tsx:154
 msgid "Create a permanent account to save your data and access it from any device."
 msgstr "永続的なアカウントを作成して、データを保存し、どのデバイスからでもアクセスできるようにしましょう。"
 
@@ -10106,7 +10106,7 @@ msgstr "現在のプラン："
 msgid "Current-generation photorealistic image generation with improved detail and better prompt following"
 msgstr "ディテールとプロンプト追従性が向上した、現行世代のフォトリアルな画像生成"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:152
+#: src/features/admin/components/admin-dashboard-stats.tsx:119
 msgid "Currently restricted"
 msgstr "現在制限中"
 
@@ -10292,7 +10292,7 @@ msgstr "日別コストの推移"
 msgid "Daily inbox summary"
 msgstr "毎日の受信トレイの要約"
 
-#: src/routes/admin/gateway/index.tsx:378
+#: src/routes/admin/gateway/index.tsx:338
 msgid "Daily LLM spend and request volume"
 msgstr "1 日あたりの LLM 支出とリクエスト数"
 
@@ -10397,7 +10397,7 @@ msgstr "日付"
 msgid "Date and time"
 msgstr "日付と時刻"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:118
+#: src/features/admin/components/admin-provider-cache-row.tsx:121
 #: src/features/settings/components/chat/usage-settings.tsx:97
 msgid "Day"
 msgstr "日"
@@ -10410,7 +10410,7 @@ msgstr "毎月{monthDay}日 {time} UTC"
 msgid "Day {monthDay} of the months that have one, at {time} UTC"
 msgstr "その日がある月の{monthDay}日 {time} UTC"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:131
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:138
 msgid "days"
 msgstr "日"
 
@@ -10752,7 +10752,7 @@ msgid "Delete {0}"
 msgstr "{0} を削除"
 
 #. placeholder {0}: preview?.eligibleCount ?? 0
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:285
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:299
 msgid "Delete {0} users"
 msgstr "{0} 人のユーザーを削除"
 
@@ -11030,7 +11030,7 @@ msgstr "/drafts 内の 3 件のファイルを削除します"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:77
 #: src/components/delete-confirmation-dialog.tsx:68
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:285
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:299
 #: src/features/chat/thread-list/thread-node.tsx:658
 #: src/features/chat/thread-list/thread-node.tsx:664
 msgid "Deleting..."
@@ -11712,7 +11712,7 @@ msgstr "繰り返さない"
 msgid "Dominican Republic"
 msgstr "ドミニカ共和国"
 
-#: src/features/auth/components/auth/auth-card.tsx:435
+#: src/features/auth/components/auth/auth-card.tsx:434
 msgid "Don't have an account?"
 msgstr "アカウントをお持ちでないですか？"
 
@@ -12007,15 +12007,15 @@ msgstr "ここにドキュメントやファイルをドロップしてくださ
 msgid "Drop-in replacement for the OpenAI SDK. Change one line and access every provider."
 msgstr "OpenAI SDK のドロップイン代替。1 行変えるだけで、すべてのプロバイダーにアクセスできます。"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:329
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:347
 msgid "Dry run"
 msgstr "ドライラン"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:244
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:257
 msgid "Dry run (preview only — no deletions)"
 msgstr "ドライラン（プレビューのみ — 削除は行いません）"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:231
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:245
 msgid "Dry run complete"
 msgstr "ドライランが完了しました"
 
@@ -12255,7 +12255,7 @@ msgstr "エッジ検出"
 msgid "Edge-guided generation"
 msgstr "エッジに沿った生成"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:141
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:154
 #: src/features/canvas/canvas-panel.tsx:787
 #: src/features/chat/host/host-composer.tsx:1060
 #: src/features/chat/thread-list/group-header.tsx:178
@@ -12625,7 +12625,7 @@ msgstr "出典付きのエレガントな引用"
 msgid "ELF executable"
 msgstr "ELF 実行ファイル"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:215
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:232
 msgid "Eligible anonymous users"
 msgstr "対象となる匿名ユーザー"
 
@@ -12634,7 +12634,7 @@ msgid "email"
 msgstr "メール"
 
 #: ../../packages/chat-ui/src/auth/login-form.tsx:60
-#: src/features/auth/components/auth/convert-anonymous-account.tsx:178
+#: src/features/auth/components/auth/convert-anonymous-account.tsx:177
 #: src/features/auth/components/auth/forms/email-otp-form.tsx:232
 #: src/features/auth/components/auth/forms/forgot-password-form.tsx:107
 #: src/features/auth/components/auth/forms/magic-link-form.tsx:124
@@ -12654,7 +12654,7 @@ msgstr "メールアドレス"
 msgid "Email banner"
 msgstr "メールバナー"
 
-#: src/features/auth/components/auth/auth-card.tsx:337
+#: src/features/auth/components/auth/auth-card.tsx:336
 msgid "Email Code"
 msgstr "メールコード"
 
@@ -13102,7 +13102,7 @@ msgstr "カスタム指示を入力..."
 msgid "Enter your custom system prompt here. This will be used for every message."
 msgstr "カスタムシステムプロンプトをここに入力してください。すべてのメッセージで使用されます。"
 
-#: src/features/auth/components/auth/convert-anonymous-account.tsx:188
+#: src/features/auth/components/auth/convert-anonymous-account.tsx:187
 #: src/features/auth/components/auth/forms/forgot-password-form.tsx:118
 #: src/features/auth/components/auth/forms/magic-link-form.tsx:135
 #: src/features/auth/components/auth/forms/sign-in-form.tsx:102
@@ -13115,7 +13115,7 @@ msgstr "メールアドレスを入力"
 msgid "Enter your email address"
 msgstr "メールアドレスを入力してください"
 
-#: src/features/auth/components/auth/auth-card.tsx:366
+#: src/features/auth/components/auth/auth-card.tsx:365
 msgid "Enter your email below to login to your account"
 msgstr "アカウントにサインインするには、下にメールアドレスを入力してください"
 
@@ -13123,15 +13123,15 @@ msgstr "アカウントにサインインするには、下にメールアドレ
 msgid "Enter your email or username"
 msgstr "メールアドレスまたはユーザー名を入力"
 
-#: src/features/auth/components/auth/auth-card.tsx:336
+#: src/features/auth/components/auth/auth-card.tsx:335
 msgid "Enter your email to receive a code"
 msgstr "コードを受け取るメールアドレスを入力してください"
 
-#: src/features/auth/components/auth/auth-card.tsx:348
+#: src/features/auth/components/auth/auth-card.tsx:347
 msgid "Enter your email to receive a magic link"
 msgstr "マジックリンクを受け取るメールアドレスを入力してください"
 
-#: src/features/auth/components/auth/auth-card.tsx:342
+#: src/features/auth/components/auth/auth-card.tsx:341
 msgid "Enter your email to reset your password"
 msgstr "パスワードをリセットするにはメールアドレスを入力してください"
 
@@ -13139,7 +13139,7 @@ msgstr "パスワードをリセットするにはメールアドレスを入力
 msgid "Enter your full name or display name"
 msgstr "氏名または表示名を入力"
 
-#: src/features/auth/components/auth/auth-card.tsx:379
+#: src/features/auth/components/auth/auth-card.tsx:378
 msgid "Enter your information to create an account"
 msgstr "アカウントを作成するには情報を入力してください"
 
@@ -13156,7 +13156,7 @@ msgstr "名前を入力"
 msgid "Enter your new email address below"
 msgstr "新しいメールアドレスを下に入力してください"
 
-#: src/features/auth/components/auth/auth-card.tsx:360
+#: src/features/auth/components/auth/auth-card.tsx:359
 msgid "Enter your new password below"
 msgstr "新しいパスワードを下に入力してください"
 
@@ -13164,7 +13164,7 @@ msgstr "新しいパスワードを下に入力してください"
 msgid "Enter your nickname"
 msgstr "ニックネームを入力"
 
-#: src/features/auth/components/auth/convert-anonymous-account.tsx:210
+#: src/features/auth/components/auth/convert-anonymous-account.tsx:209
 #: src/features/auth/components/auth/forms/sign-in-form.tsx:378
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:566
 #: src/features/auth/components/settings/two-factor/two-factor-password-dialog.tsx:157
@@ -13569,11 +13569,11 @@ msgstr "非常にシャープなディテールと鮮明さ"
 msgid "Excluded tools"
 msgstr "除外するツール"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:329
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:347
 msgid "Execute"
 msgstr "実行"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:196
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:215
 msgid "Execute cleanup"
 msgstr "クリーンアップを実行"
 
@@ -14347,7 +14347,7 @@ msgstr "スキルをインストールできませんでした"
 msgid "Failed to link account"
 msgstr "アカウントをリンクできませんでした"
 
-#: src/routes/admin/gateway/index.tsx:244
+#: src/routes/admin/gateway/index.tsx:243
 msgid "Failed to load analytics. Ensure the LLM Gateway is running and reachable."
 msgstr "アナリティクスを読み込めませんでした。LLM Gateway が起動していて到達可能であることを確認してください。"
 
@@ -14516,7 +14516,7 @@ msgstr "{toolId} の API キーを保存できませんでした"
 msgid "Failed to save collection"
 msgstr "コレクションを保存できませんでした"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:64
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:66
 msgid "Failed to save configuration"
 msgstr "設定を保存できませんでした"
 
@@ -14656,7 +14656,7 @@ msgstr "バックアップモデルを更新できませんでした"
 msgid "Failed to update browser click settings"
 msgstr "ブラウザのクリック設定を更新できませんでした"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:73
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:75
 msgid "Failed to update configuration"
 msgstr "設定を更新できませんでした"
 
@@ -15184,7 +15184,7 @@ msgid "Feed image"
 msgstr "フィード画像"
 
 #: src/features/admin/components/feedback-admin-page.tsx:139
-#: src/features/admin/components/feedback-admin-page.tsx:154
+#: src/features/admin/components/feedback-admin-page.tsx:172
 #: src/routes/admin/route.tsx:40
 #: src/routes/admin/route.tsx:60
 msgid "Feedback"
@@ -15194,7 +15194,7 @@ msgstr "フィードバック"
 msgid "Feedback could not be loaded."
 msgstr "フィードバックを読み込めませんでした。"
 
-#: src/features/admin/components/feedback-admin-page.tsx:181
+#: src/features/admin/components/feedback-admin-page.tsx:177
 msgid "Feedback pages"
 msgstr "フィードバックのページ"
 
@@ -15391,12 +15391,13 @@ msgstr "参照画像をもとにシネマティックなスチルを作成する
 msgid "Filmmakers creating cinematic videos with a strong focus on visual narrative and storytelling quality"
 msgstr "映像による物語とストーリーテリングの質を重視したシネマティックな動画を作る映画制作者"
 
-#: src/features/admin/components/audit-log-card.tsx:136
+#: src/features/admin/components/audit-log-card.tsx:129
+#: src/features/admin/components/audit-log-card.tsx:130
 msgid "Filter by action"
 msgstr "操作で絞り込み"
 
-#: src/features/admin/components/feedback-admin-page.tsx:164
-#: src/features/admin/components/feedback-admin-page.tsx:165
+#: src/features/admin/components/feedback-admin-page.tsx:159
+#: src/features/admin/components/feedback-admin-page.tsx:160
 msgid "Filter by kind"
 msgstr "種類で絞り込む"
 
@@ -15408,6 +15409,7 @@ msgstr "モードで絞り込み"
 msgid "Filter by provider"
 msgstr "プロバイダーで絞り込み"
 
+#: src/features/admin/components/users-management-card.tsx:126
 #: src/features/admin/components/users-management-card.tsx:127
 msgid "Filter by role"
 msgstr "ロールで絞り込み"
@@ -15420,6 +15422,8 @@ msgstr "ロールで絞り込み"
 #~ msgid "Filter by tag ({activeCount} selected)"
 #~ msgstr "タグで絞り込み（{activeCount} 件選択中）"
 
+#: src/features/admin/components/admin-dashboard-stats.tsx:141
+#: src/features/admin/components/users-management-card.tsx:137
 #: src/features/admin/components/users-management-card.tsx:138
 msgid "Filter by type"
 msgstr "種類で絞り込み"
@@ -15780,13 +15784,13 @@ msgstr "フォレスト"
 msgid "forget"
 msgstr "忘れる"
 
-#: src/features/auth/components/auth/forms/two-factor-form.tsx:285
+#: src/features/auth/components/auth/forms/two-factor-form.tsx:288
 msgid "Forgot authenticator"
 msgstr "認証アプリを使えない場合"
 
-#: src/features/auth/components/auth/auth-card.tsx:343
+#: src/features/auth/components/auth/auth-card.tsx:342
 #: src/features/auth/components/auth/forms/forgot-password-form.tsx:134
-#: src/routes/auth/forgot-password.tsx:17
+#: src/routes/auth/forgot-password.tsx:13
 msgid "Forgot Password"
 msgstr "パスワードを忘れた場合"
 
@@ -16212,7 +16216,7 @@ msgstr "ガンマ"
 msgid "Gateway"
 msgstr "ゲートウェイ"
 
-#: src/routes/admin/gateway.tsx:26
+#: src/routes/admin/gateway.tsx:27
 msgid "Gateway sections"
 msgstr "ゲートウェイのセクション"
 
@@ -16600,7 +16604,7 @@ msgid "Go"
 msgstr "移動"
 
 #: ../../packages/chat-ui/src/chat/chat-view.tsx:96
-#: src/features/auth/components/auth/auth-card.tsx:497
+#: src/features/auth/components/auth/auth-card.tsx:496
 msgid "Go back"
 msgstr "戻る"
 
@@ -17120,7 +17124,7 @@ msgstr "ゲスト"
 msgid "Guest Account"
 msgstr "ゲストアカウント"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:137
+#: src/features/admin/components/admin-dashboard-stats.tsx:105
 msgid "Guest accounts"
 msgstr "ゲストアカウント"
 
@@ -17643,7 +17647,7 @@ msgstr "ホスト"
 msgid "hotkey"
 msgstr "ホットキー"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:142
+#: src/features/admin/components/admin-provider-cache-row.tsx:147
 #: src/features/settings/components/chat/usage-settings.tsx:98
 msgid "Hour"
 msgstr "時間"
@@ -17809,7 +17813,7 @@ msgstr "アイデアから完成まで、1 つのスレッドで"
 msgid "Ideal for simple classification and extraction"
 msgstr "シンプルな分類や抽出に最適"
 
-#: src/features/admin/components/feedback-admin-page.tsx:169
+#: src/features/admin/components/feedback-admin-page.tsx:164
 #: src/features/chat/thread/thread-welcome-suggestions.tsx:71
 msgid "Ideas"
 msgstr "アイデア"
@@ -17828,7 +17832,7 @@ msgstr "アイデンティティ"
 msgid "Idle"
 msgstr "待機中"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:162
+#: src/features/admin/components/admin-shard-footprint-row.tsx:165
 msgid "Idle for at least"
 msgstr "非アクティブの期間（以上）"
 
@@ -18068,7 +18072,7 @@ msgstr "img2img"
 msgid "Img2Img"
 msgstr "Img2Img"
 
-#: src/features/admin/components/user-cell.tsx:128
+#: src/features/admin/components/user-cell.tsx:131
 msgid "Impersonate"
 msgstr "なりすまし"
 
@@ -18080,7 +18084,7 @@ msgstr "ユーザーになりすます"
 msgid "Impersonated"
 msgstr "なりすまし中"
 
-#: src/features/admin/components/audit-log-card.tsx:144
+#: src/features/admin/components/audit-log-card.tsx:138
 msgid "Impersonation Start"
 msgstr "なりすまし開始"
 
@@ -18092,7 +18096,7 @@ msgstr "なりすましを開始"
 msgid "Impersonation started. Click \"Stop Impersonating\" in the header to return to your account."
 msgstr "なりすましを開始しました。ヘッダーの「なりすましを終了」をクリックすると自分のアカウントに戻ります。"
 
-#: src/features/admin/components/audit-log-card.tsx:145
+#: src/features/admin/components/audit-log-card.tsx:139
 msgid "Impersonation Stop"
 msgstr "なりすまし終了"
 
@@ -18431,15 +18435,15 @@ msgid "Inactive chats will be archived after {days} days"
 msgstr "非アクティブなチャットは {days} 日後にアーカイブされます"
 
 #. placeholder {0}: preview.thresholdDays
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:217
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:231
 msgid "Inactive for more than {0} days"
 msgstr "{0} 日以上アクティブでない"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:129
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:141
 msgid "Inactivity threshold"
 msgstr "非アクティブのしきい値"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:96
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:105
 msgid "Inactivity threshold (days)"
 msgstr "非アクティブのしきい値（日）"
 
@@ -18764,7 +18768,7 @@ msgstr "無効な JSON"
 msgid "Invalid OAuth callback"
 msgstr "無効な OAuth コールバックです"
 
-#: src/features/auth/components/auth/convert-anonymous-account.tsx:77
+#: src/features/auth/components/auth/convert-anonymous-account.tsx:76
 #: src/features/auth/components/auth/forms/reset-password-form.tsx:57
 #: src/features/auth/components/auth/forms/reset-password-form.tsx:83
 #: src/features/auth/components/auth/forms/sign-in-form.tsx:150
@@ -18805,7 +18809,7 @@ msgstr "確認コードが無効です"
 msgid "Invert"
 msgstr "反転"
 
-#: src/features/auth/components/organization/accept-invitation-card.tsx:101
+#: src/features/auth/components/organization/accept-invitation-card.tsx:100
 #: src/features/auth/components/organization/user-invitations-card.tsx:64
 msgid "Invitation accepted"
 msgstr "招待を承諾しました"
@@ -18814,17 +18818,17 @@ msgstr "招待を承諾しました"
 msgid "Invitation cancelled"
 msgstr "招待を取り消しました"
 
-#: src/features/auth/components/organization/accept-invitation-card.tsx:77
+#: src/features/auth/components/organization/accept-invitation-card.tsx:76
 msgid "Invitation expired"
 msgstr "招待の有効期限が切れています"
 
-#: src/features/auth/components/organization/accept-invitation-card.tsx:66
-#: src/features/auth/components/organization/accept-invitation-card.tsx:77
-#: src/features/auth/components/organization/accept-invitation-card.tsx:220
+#: src/features/auth/components/organization/accept-invitation-card.tsx:65
+#: src/features/auth/components/organization/accept-invitation-card.tsx:76
+#: src/features/auth/components/organization/accept-invitation-card.tsx:217
 msgid "Invitation not found"
 msgstr "招待が見つかりません"
 
-#: src/features/auth/components/organization/accept-invitation-card.tsx:129
+#: src/features/auth/components/organization/accept-invitation-card.tsx:128
 #: src/features/auth/components/organization/user-invitations-card.tsx:89
 msgid "Invitation rejected"
 msgstr "招待を拒否しました"
@@ -19692,7 +19696,7 @@ msgstr "複雑な分析タスク向けに透明な推論を備えた最新の So
 msgid "Latest updated Sonnet model from Anthropic"
 msgstr "Anthropic の最新アップデート版 Sonnet モデル"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:216
+#: src/features/admin/components/admin-dashboard-stats.tsx:180
 msgid "Latest users who joined the platform"
 msgstr "最近プラットフォームに参加したユーザー"
 
@@ -20150,7 +20154,7 @@ msgstr "LLaMA、Mixtral、Gemma — 最速の推論"
 msgid "llm"
 msgstr "llm"
 
-#: src/routes/admin/gateway.tsx:19
+#: src/routes/admin/gateway.tsx:20
 msgid "LLM Gateway"
 msgstr "LLM Gateway"
 
@@ -20498,7 +20502,7 @@ msgid "Loading..."
 msgstr "読み込んでいます..."
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:366
-#: src/features/admin/components/admin-provider-cache-row.tsx:85
+#: src/features/admin/components/admin-provider-cache-row.tsx:82
 #: src/features/auth/components/device-approval.tsx:349
 #: src/features/chat/thread/memory-usage-action.tsx:46
 #: src/features/chat/thread/request-secret-prompt.tsx:478
@@ -20863,7 +20867,7 @@ msgstr "マクロ望遠、タイトなフレーミング"
 msgid "Madrid"
 msgstr "マドリード"
 
-#: src/features/auth/components/auth/auth-card.tsx:349
+#: src/features/auth/components/auth/auth-card.tsx:348
 msgid "Magic Link"
 msgstr "マジックリンク"
 
@@ -20891,7 +20895,7 @@ msgstr "推論と指示追従が大幅に向上"
 msgid "Make {name} the default repository"
 msgstr "{name} をデフォルトのリポジトリにする"
 
-#: src/features/admin/components/user-cell.tsx:115
+#: src/features/admin/components/user-cell.tsx:118
 msgid "Make Admin"
 msgstr "管理者にする"
 
@@ -21190,7 +21194,7 @@ msgstr "最大の被写界深度、くっきりシャープ"
 msgid "Maximum detail and sharpness"
 msgstr "最高のディテールとシャープさ"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:113
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:119
 msgid "Maximum number of users to delete per cleanup run."
 msgstr "1 回のクリーンアップで削除するユーザーの最大数です。"
 
@@ -21254,11 +21258,11 @@ msgstr "MCP サーバー"
 msgid "MCP tools"
 msgstr "MCP ツール"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:228
+#: src/features/admin/components/admin-shard-footprint-row.tsx:238
 msgid "Measure more shards"
 msgstr "さらに多くのシャードを測定"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:224
+#: src/features/admin/components/admin-shard-footprint-row.tsx:234
 msgid "Measuring…"
 msgstr "測定しています…"
 
@@ -21328,7 +21332,7 @@ msgstr "Alibaba の最新 Wan の改良による汎用ミディアム品質の�
 msgid "Melbourne"
 msgstr "メルボルン"
 
-#: src/features/auth/components/organization/accept-invitation-card.tsx:147
+#: src/features/auth/components/organization/accept-invitation-card.tsx:146
 #: src/features/auth/components/organization/invitation-cell.tsx:37
 #: src/features/auth/components/organization/invite-member-dialog.tsx:37
 #: src/features/auth/components/organization/member-cell.tsx:41
@@ -21534,12 +21538,12 @@ msgstr "メッセージのブランチ"
 msgid "Message input"
 msgstr "メッセージ入力"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:129
-#: src/features/admin/components/admin-shard-footprint-row.tsx:143
+#: src/features/admin/components/admin-shard-footprint-row.tsx:128
+#: src/features/admin/components/admin-shard-footprint-row.tsx:144
 msgid "Message rows"
 msgstr "メッセージ行"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:201
+#: src/features/admin/components/admin-shard-footprint-row.tsx:206
 msgid "Message rows of the largest threads"
 msgstr "最大のスレッドのメッセージ行"
 
@@ -21900,7 +21904,7 @@ msgstr "モード {0}、{1} 上。作成しても何も開始されません。"
 msgid "Mode:"
 msgstr "モード:"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:179
+#: src/features/admin/components/admin-provider-cache-row.tsx:186
 #: src/features/chat/host/host-options.tsx:146
 #: src/features/chat/sidebar/thread-context.tsx:109
 #: src/features/evals/components/model-comparison.tsx:110
@@ -21931,7 +21935,7 @@ msgstr "モデル"
 msgid "Model already blocked"
 msgstr "このモデルは既にブロックされています"
 
-#: src/routes/admin/gateway/index.tsx:351
+#: src/routes/admin/gateway/index.tsx:323
 msgid "Model Breakdown"
 msgstr "モデル別内訳"
 
@@ -23076,7 +23080,7 @@ msgstr "新しい一時チャット"
 msgid "New temporary thread"
 msgstr "新しい一時スレッド"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:160
+#: src/features/admin/components/admin-dashboard-stats.tsx:127
 msgid "New this week"
 msgstr "今週の新着"
 
@@ -23094,7 +23098,7 @@ msgstr "新しいスレッド"
 msgid "New Trigger"
 msgstr "新しいトリガー"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:173
+#: src/features/admin/components/admin-dashboard-stats.tsx:151
 msgid "New user registrations per day"
 msgstr "1 日あたりの新規ユーザー登録数"
 
@@ -23102,7 +23106,7 @@ msgstr "1 日あたりの新規ユーザー登録数"
 msgid "New Workflow"
 msgstr "新しいワークフロー"
 
-#: src/features/admin/components/feedback-admin-page.tsx:184
+#: src/features/admin/components/feedback-admin-page.tsx:180
 msgid "Newer"
 msgstr "それ以降"
 
@@ -23319,7 +23323,7 @@ msgstr "まだチャットはありません。上から始めましょう。"
 msgid "No checks have run for this commit."
 msgstr "このコミットに対して実行されたチェックはありません。"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:351
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:369
 msgid "No cleanup runs yet"
 msgstr "クリーンアップの実行履歴はまだありません"
 
@@ -23607,7 +23611,7 @@ msgstr "モデルが見つかりません。"
 msgid "No models installed yet."
 msgstr "インストール済みのモデルはまだありません。"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:246
+#: src/features/admin/components/admin-dashboard-stats.tsx:208
 #: src/features/admin/components/feedback-admin-page.tsx:49
 #: src/features/admin/components/user-cell.tsx:72
 msgid "No name"
@@ -24270,7 +24274,7 @@ msgstr "拡散ベースの新しい言語モデルアーキテクチャ"
 msgid "now"
 msgstr "今"
 
-#: src/features/admin/components/nsfw-review-page.tsx:16
+#: src/features/admin/components/nsfw-review-page.tsx:18
 msgid "NSFW Content Review"
 msgstr "NSFW コンテンツのレビュー"
 
@@ -24279,7 +24283,7 @@ msgstr "NSFW コンテンツのレビュー"
 msgid "NSFW Review"
 msgstr "NSFW レビュー"
 
-#: src/features/admin/components/nsfw-review-page.tsx:21
+#: src/features/admin/components/nsfw-review-page.tsx:23
 msgid "NSFW review backend is not yet implemented. This page will display flagged images for moderation once the backend functions are available."
 msgstr "NSFW レビューのバックエンドはまだ実装されていません。バックエンドの機能が利用可能になると、このページにモデレーション対象の画像が表示されます。"
 
@@ -24417,7 +24421,7 @@ msgid "old lines {text}"
 msgstr "旧 {text} 行目"
 
 #: ../../packages/chat-ui/src/threads/thread-list.tsx:45
-#: src/features/admin/components/feedback-admin-page.tsx:196
+#: src/features/admin/components/feedback-admin-page.tsx:192
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:642
 msgid "Older"
 msgstr "それ以前"
@@ -24895,7 +24899,7 @@ msgstr "もう一度開く"
 msgid "Open links"
 msgstr "リンクを開く"
 
-#: src/features/admin/components/user-cell.tsx:102
+#: src/features/admin/components/user-cell.tsx:104
 msgid "Open menu"
 msgstr "メニューを開く"
 
@@ -25519,7 +25523,7 @@ msgstr "またはクリックして参照"
 msgid "Or connect a Text node to provide the prompt"
 msgstr "または Text ノードを接続してプロンプトを指定"
 
-#: src/features/auth/components/auth/auth-card.tsx:219
+#: src/features/auth/components/auth/auth-card.tsx:218
 msgid "or continue with"
 msgstr "または次で続行"
 
@@ -25646,7 +25650,7 @@ msgstr "元のシステムプロンプト"
 
 #: ../../packages/ui/src/components/icon-picker.tsx:171
 #: src/features/admin/components/feedback-admin-page.tsx:24
-#: src/features/admin/components/feedback-admin-page.tsx:171
+#: src/features/admin/components/feedback-admin-page.tsx:166
 #: src/features/feedback/components/send-feedback-dialog.tsx:30
 #: src/features/settings/components/chat/models-settings.tsx:515
 msgid "Other"
@@ -25800,7 +25804,7 @@ msgstr "Web 検索と URL のコンテンツ抽出について、既定の検索
 msgid "Overwrite with mine"
 msgstr "自分の内容で上書き"
 
-#: src/features/auth/components/organization/accept-invitation-card.tsx:145
+#: src/features/auth/components/organization/accept-invitation-card.tsx:144
 #: src/features/auth/components/organization/invitation-cell.tsx:35
 #: src/features/auth/components/organization/invite-member-dialog.tsx:35
 #: src/features/auth/components/organization/member-cell.tsx:39
@@ -26049,7 +26053,7 @@ msgid "Passkeys allow you to sign in securely using your device's biometric auth
 msgstr "パスキーを使うと、デバイスの生体認証やセキュリティキーで安全にサインインできます。"
 
 #: ../../packages/chat-ui/src/auth/login-form.tsx:84
-#: src/features/auth/components/auth/convert-anonymous-account.tsx:201
+#: src/features/auth/components/auth/convert-anonymous-account.tsx:200
 #: src/features/auth/components/auth/forms/sign-in-form.tsx:359
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:554
 #: src/features/auth/components/settings/two-factor/two-factor-password-dialog.tsx:147
@@ -26061,14 +26065,14 @@ msgstr "パスワード"
 msgid "Password changed successfully"
 msgstr "パスワードを変更しました"
 
-#: src/features/auth/components/auth/convert-anonymous-account.tsx:60
+#: src/features/auth/components/auth/convert-anonymous-account.tsx:59
 #: src/features/auth/components/auth/forms/sign-in-form.tsx:133
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:105
 #: src/features/auth/components/settings/two-factor/two-factor-password-dialog.tsx:42
 msgid "Password is required"
 msgstr "パスワードは必須です"
 
-#: src/features/auth/components/auth/convert-anonymous-account.tsx:71
+#: src/features/auth/components/auth/convert-anonymous-account.tsx:70
 #: src/features/auth/components/auth/forms/reset-password-form.tsx:51
 #: src/features/auth/components/auth/forms/reset-password-form.tsx:77
 #: src/features/auth/components/auth/forms/sign-in-form.tsx:144
@@ -26080,7 +26084,7 @@ msgstr "パスワードは必須です"
 msgid "Password is too long"
 msgstr "パスワードが長すぎます"
 
-#: src/features/auth/components/auth/convert-anonymous-account.tsx:65
+#: src/features/auth/components/auth/convert-anonymous-account.tsx:64
 #: src/features/auth/components/auth/forms/reset-password-form.tsx:45
 #: src/features/auth/components/auth/forms/reset-password-form.tsx:71
 #: src/features/auth/components/auth/forms/sign-in-form.tsx:138
@@ -26104,14 +26108,14 @@ msgstr "パスワードをリセットしました"
 msgid "Password set"
 msgstr "パスワード設定済み"
 
-#: src/features/auth/components/auth/convert-anonymous-account.tsx:84
+#: src/features/auth/components/auth/convert-anonymous-account.tsx:83
 #: src/features/auth/components/auth/forms/reset-password-form.tsx:91
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:237
 #: src/features/auth/components/settings/security/change-password-card.tsx:135
 msgid "Passwords do not match"
 msgstr "パスワードが一致しません"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:358
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:373
 msgid "Past cleanup runs and their results"
 msgstr "過去のクリーンアップの実行とその結果"
 
@@ -26302,6 +26306,7 @@ msgstr "パフォーマンスレビュアー"
 
 #: src/features/settings/components/chat/usage-settings.tsx:248
 #: src/features/settings/components/chat/usage-settings.tsx:460
+#: src/routes/admin/gateway/index.tsx:226
 msgid "Period"
 msgstr "期間"
 
@@ -26570,7 +26575,7 @@ msgstr "ピン留めした画像"
 msgid "Pinned project"
 msgstr "ピン留めしたプロジェクト"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:189
+#: src/features/admin/components/admin-shard-footprint-row.tsx:194
 msgid "Pinned threads"
 msgstr "ピン留めしたスレッド"
 
@@ -26636,7 +26641,7 @@ msgstr "再生"
 msgid "Play a short sound when a reply finishes. Applies to this browser only."
 msgstr "返信が完了したら短い音を鳴らします。このブラウザーのみに適用されます。"
 
-#: src/features/auth/components/auth/auth-card.tsx:391
+#: src/features/auth/components/auth/auth-card.tsx:390
 msgid "Please authenticate to continue"
 msgstr "続行するには認証してください"
 
@@ -26644,11 +26649,11 @@ msgstr "続行するには認証してください"
 msgid "Please check your email and click the verification link"
 msgstr "メールを確認し、認証リンクをクリックしてください"
 
-#: src/features/auth/components/auth/convert-anonymous-account.tsx:53
+#: src/features/auth/components/auth/convert-anonymous-account.tsx:52
 msgid "Please confirm your password"
 msgstr "パスワードを確認してください"
 
-#: src/features/auth/components/auth/auth-card.tsx:354
+#: src/features/auth/components/auth/auth-card.tsx:353
 msgid "Please enter a backup code to access your account"
 msgstr "アカウントにアクセスするにはバックアップコードを入力してください"
 
@@ -26656,7 +26661,7 @@ msgstr "アカウントにアクセスするにはバックアップコードを
 msgid "Please enter an email address"
 msgstr "メールアドレスを入力してください"
 
-#: src/features/auth/components/auth/auth-card.tsx:385
+#: src/features/auth/components/auth/auth-card.tsx:384
 msgid "Please enter your one-time password to continue"
 msgstr "続行するにはワンタイムパスワードを入力してください"
 
@@ -27086,7 +27091,7 @@ msgstr "プレビュー"
 msgid "Preview {name}"
 msgstr "{name} のプレビュー"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:204
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:221
 msgid "Preview & Execute"
 msgstr "プレビューと実行"
 
@@ -27102,7 +27107,7 @@ msgstr "Qwen の最も高度なモデルをプレビューで利用"
 msgid "Preview execution order (dry run)"
 msgstr "実行順序をプレビュー (ドライラン)"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:205
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:221
 msgid "Preview how many users will be removed, then execute cleanup."
 msgstr "削除されるユーザー数をプレビューしてから、クリーンアップを実行します。"
 
@@ -27301,7 +27306,7 @@ msgstr "Pro モデルには Pro プランが必要です。無料プランでは
 msgid "Problem"
 msgstr "問題"
 
-#: src/features/admin/components/feedback-admin-page.tsx:170
+#: src/features/admin/components/feedback-admin-page.tsx:165
 msgid "Problems"
 msgstr "問題"
 
@@ -27635,10 +27640,10 @@ msgstr "プロンプト検索はまだ準備中です。しばらくしてから
 msgid "Prompt to run on all models..."
 msgstr "すべてのモデルで実行するプロンプト..."
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:101
-#: src/features/admin/components/admin-provider-cache-row.tsx:120
-#: src/features/admin/components/admin-provider-cache-row.tsx:144
-#: src/features/admin/components/admin-provider-cache-row.tsx:182
+#: src/features/admin/components/admin-provider-cache-row.tsx:102
+#: src/features/admin/components/admin-provider-cache-row.tsx:123
+#: src/features/admin/components/admin-provider-cache-row.tsx:149
+#: src/features/admin/components/admin-provider-cache-row.tsx:189
 msgid "Prompt tokens"
 msgstr "プロンプトトークン"
 
@@ -27707,7 +27712,7 @@ msgid "Proven reliability from previous generation"
 msgstr "前世代で実証された信頼性"
 
 #: src/components/model-picker/model-picker.tsx:283
-#: src/features/admin/components/admin-provider-cache-row.tsx:180
+#: src/features/admin/components/admin-provider-cache-row.tsx:187
 #: src/features/settings/components/chat/native-providers-settings.tsx:467
 #: src/routes/admin/gateway/index.tsx:86
 msgid "Provider"
@@ -27725,7 +27730,7 @@ msgstr "プロバイダーアカウント"
 msgid "Provider added — its models are now in the model picker"
 msgstr "プロバイダーを追加しました。モデルがモデル選択に表示されます"
 
-#: src/routes/admin/gateway/index.tsx:326
+#: src/routes/admin/gateway/index.tsx:307
 msgid "Provider Health"
 msgstr "プロバイダーのヘルス"
 
@@ -27899,7 +27904,7 @@ msgstr "このフォークのブランチをローカルのコピーで {base} �
 msgid "Quality"
 msgstr "品質"
 
-#: src/routes/admin/gateway/index.tsx:305
+#: src/routes/admin/gateway/index.tsx:290
 msgid "Query complexity tiers assigned by the routing engine"
 msgstr "ルーティングエンジンが割り当てたクエリの複雑度ティア"
 
@@ -28458,7 +28463,7 @@ msgstr "最近のチャット"
 msgid "Recent messages"
 msgstr "最近のメッセージ"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:215
+#: src/features/admin/components/admin-dashboard-stats.tsx:180
 msgid "Recent Registrations"
 msgstr "最近の登録"
 
@@ -28516,7 +28521,7 @@ msgstr "音声入力を録音しています"
 msgid "Recover account"
 msgstr "アカウントを復旧"
 
-#: src/features/auth/components/auth/auth-card.tsx:355
+#: src/features/auth/components/auth/auth-card.tsx:354
 msgid "Recover Account"
 msgstr "アカウントを復旧"
 
@@ -28676,8 +28681,8 @@ msgstr "指示追従性が向上した改良版 GPT-5"
 msgid "Refining the draft…"
 msgstr "下書きを改善しています…"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:221
-#: src/features/admin/components/feedback-admin-page.tsx:161
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:236
+#: src/features/admin/components/feedback-admin-page.tsx:156
 msgid "Refresh"
 msgstr "更新"
 
@@ -28722,7 +28727,7 @@ msgstr "リージョンの制限"
 msgid "Register it with Telegram's setWebhook, passing your webhook secret as secret_token."
 msgstr "Telegram の setWebhook で登録し、Webhook シークレットを secret_token として渡してください。"
 
-#: src/features/auth/components/auth/auth-card.tsx:373
+#: src/features/auth/components/auth/auth-card.tsx:372
 msgid "Registration is by invitation only. Open the link from your invitation, or sign in if you already have an account."
 msgstr "登録は招待制です。招待のリンクを開くか、アカウントをお持ちの場合はサインインしてください。"
 
@@ -28730,16 +28735,16 @@ msgstr "登録は招待制です。招待のリンクを開くか、アカウン
 msgid "Regressed"
 msgstr "悪化"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:181
+#: src/features/admin/components/admin-dashboard-stats.tsx:146
 msgid "Regular"
 msgstr "一般"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:132
+#: src/features/admin/components/admin-dashboard-stats.tsx:101
 #: src/features/admin/components/users-management-card.tsx:142
 msgid "Regular Users"
 msgstr "一般ユーザー"
 
-#: src/features/auth/components/organization/accept-invitation-card.tsx:186
+#: src/features/auth/components/organization/accept-invitation-card.tsx:183
 #: src/features/auth/components/organization/user-invitations-card.tsx:121
 #: src/features/prompts/components/prompt-optimize-dialog.tsx:201
 #: src/features/tasks/components/task-detail-dialog.tsx:112
@@ -28946,7 +28951,7 @@ msgid "Remove {shown}"
 msgstr "{shown} を削除"
 
 #: src/features/admin/components/update-user-role-dialog.tsx:64
-#: src/features/admin/components/user-cell.tsx:110
+#: src/features/admin/components/user-cell.tsx:113
 msgid "Remove Admin"
 msgstr "管理者を解除"
 
@@ -29332,7 +29337,7 @@ msgstr "リクエストがタイムアウトしました"
 msgid "Request validation, content filtering, and HMAC-SHA256 authentication on every request."
 msgstr "すべてのリクエストでリクエスト検証、コンテンツフィルタリング、HMAC-SHA256 認証を実施します。"
 
-#: src/routes/admin/gateway/index.tsx:354
+#: src/routes/admin/gateway/index.tsx:323
 msgid "Request volume, cost, and error count per model"
 msgstr "モデルごとのリクエスト量、コスト、エラー数"
 
@@ -29349,10 +29354,10 @@ msgstr "リクエストしています..."
 msgid "Requesting…"
 msgstr "リクエスト中…"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:105
-#: src/features/admin/components/admin-provider-cache-row.tsx:119
-#: src/features/admin/components/admin-provider-cache-row.tsx:143
-#: src/features/admin/components/admin-provider-cache-row.tsx:181
+#: src/features/admin/components/admin-provider-cache-row.tsx:106
+#: src/features/admin/components/admin-provider-cache-row.tsx:122
+#: src/features/admin/components/admin-provider-cache-row.tsx:148
+#: src/features/admin/components/admin-provider-cache-row.tsx:188
 #: src/features/settings/components/chat/usage-settings.tsx:283
 #: src/features/settings/components/chat/usage-settings.tsx:325
 #: src/routes/admin/gateway/index.tsx:89
@@ -29417,7 +29422,7 @@ msgstr "リサーチ、コーディング、創作、連携 — 会話から離�
 msgid "Researchers and early adopters exploring Google's most advanced next-generation AI"
 msgstr "Google の最先端の次世代 AI を探求する研究者やアーリーアダプター"
 
-#: src/features/auth/components/auth/forms/two-factor-form.tsx:357
+#: src/features/auth/components/auth/forms/two-factor-form.tsx:360
 msgid "Resend code"
 msgstr "コードを再送信"
 
@@ -29456,7 +29461,7 @@ msgstr "モデルをデフォルトにリセットしますか？"
 msgid "Reset password"
 msgstr "パスワードをリセット"
 
-#: src/features/auth/components/auth/auth-card.tsx:361
+#: src/features/auth/components/auth/auth-card.tsx:360
 #: src/routes/auth/reset-password.tsx:13
 msgid "Reset Password"
 msgstr "パスワードをリセット"
@@ -29749,7 +29754,7 @@ msgstr "レビュー"
 msgid "Review and add"
 msgstr "確認して追加"
 
-#: src/features/admin/components/nsfw-review-page.tsx:18
+#: src/features/admin/components/nsfw-review-page.tsx:14
 msgid "Review and moderate flagged content across chat and vault."
 msgstr "チャットとボールト全体で、フラグが付いたコンテンツを確認・モデレートします。"
 
@@ -29904,7 +29909,7 @@ msgstr "ロールが同じです"
 msgid "Role Updated"
 msgstr "ロールを更新しました"
 
-#: src/features/admin/components/audit-log-card.tsx:140
+#: src/features/admin/components/audit-log-card.tsx:134
 msgid "Role Updates"
 msgstr "ロールの更新"
 
@@ -30007,7 +30012,7 @@ msgstr "Neore のルーチン: エージェントにタスクと繰り返しの�
 msgid "Routines that run while you are away"
 msgstr "離席中に実行されるルーチン"
 
-#: src/routes/admin/gateway/index.tsx:302
+#: src/routes/admin/gateway/index.tsx:291
 msgid "Routing Tier Distribution"
 msgstr "ルーティングティアの分布"
 
@@ -30069,7 +30074,7 @@ msgstr "ボットとして実行（任意）"
 msgid "Run code in a sandboxed environment with shell access, file operations, and persistent sessions."
 msgstr "シェルアクセス、ファイル操作、永続セッションを備えたサンドボックス環境でコードを実行します。"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:191
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:210
 msgid "Run dry run"
 msgstr "ドライランを実行"
 
@@ -30082,7 +30087,7 @@ msgstr "{0} の実行"
 msgid "Run history"
 msgstr "実行履歴"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:357
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:373
 #: src/features/workflow/components/canvas/execution-history-panel.tsx:214
 msgid "Run History"
 msgstr "実行履歴"
@@ -30151,7 +30156,7 @@ msgid "Running on {device}…"
 msgstr "{device} で実行中…"
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:241
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:258
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:272
 #: src/features/workflow/components/canvas/workflow-controls.tsx:622
 #: src/features/workflow/components/nodes/base-node.tsx:263
 msgid "Running..."
@@ -30285,7 +30290,7 @@ msgid "Saudi Arabia"
 msgstr "サウジアラビア"
 
 #: ../../packages/ui/src/components/inline-edit.tsx:119
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:118
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:125
 #: src/features/auth/components/organization/billing-settings-card.tsx:133
 #: src/features/auth/components/organization/billing-settings-card.tsx:280
 #: src/features/auth/components/organization/organization-name-card.tsx:100
@@ -30548,11 +30553,11 @@ msgstr "スケジュールまたは Webhook"
 msgid "Scheduled"
 msgstr "定刻"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:148
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:170
 msgid "Scheduled cleanup"
 msgstr "定期クリーンアップ"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:342
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:360
 msgid "Scheduled job"
 msgstr "スケジュールされたジョブ"
 
@@ -31381,7 +31386,7 @@ msgstr "エージェントに送信"
 msgid "Send to the owner"
 msgstr "オーナーに送信"
 
-#: src/features/auth/components/auth/forms/two-factor-form.tsx:373
+#: src/features/auth/components/auth/forms/two-factor-form.tsx:376
 msgid "Send verification code"
 msgstr "確認コードを送信"
 
@@ -31481,10 +31486,10 @@ msgstr "セルビア語（セルビア）"
 msgid "Serif"
 msgstr "セリフ"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:97
-#: src/features/admin/components/admin-provider-cache-row.tsx:121
-#: src/features/admin/components/admin-provider-cache-row.tsx:145
-#: src/features/admin/components/admin-provider-cache-row.tsx:183
+#: src/features/admin/components/admin-provider-cache-row.tsx:98
+#: src/features/admin/components/admin-provider-cache-row.tsx:124
+#: src/features/admin/components/admin-provider-cache-row.tsx:150
+#: src/features/admin/components/admin-provider-cache-row.tsx:190
 msgid "Served from cache"
 msgstr "キャッシュから提供"
 
@@ -31537,7 +31542,7 @@ msgstr "サーバー"
 msgid "Servers over SSH"
 msgstr "SSH 経由のサーバー"
 
-#: src/features/admin/components/audit-log-card.tsx:143
+#: src/features/admin/components/audit-log-card.tsx:137
 msgid "Session Revocations"
 msgstr "セッションの取り消し"
 
@@ -31658,17 +31663,17 @@ msgstr "図形"
 msgid "Shard footprint"
 msgstr "シャードの使用量"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:121
+#: src/features/admin/components/admin-shard-footprint-row.tsx:120
 msgid "Shards"
 msgstr "シャード"
 
 #. placeholder {0}: formatNumber(page.data.pendingShards, i18n.locale)
-#: src/features/admin/components/admin-shard-footprint-row.tsx:215
+#: src/features/admin/components/admin-shard-footprint-row.tsx:222
 msgid "Shards still being measured: {0}. Measure more shards to finish them."
 msgstr "測定中のシャード: {0}。完了させるには、さらにシャードを測定してください。"
 
 #. placeholder {0}: formatNumber(totals.abandonedShards, i18n.locale)
-#: src/features/admin/components/admin-shard-footprint-row.tsx:219
+#: src/features/admin/components/admin-shard-footprint-row.tsx:228
 msgid "Shards that could not be measured are left out of the totals: {0}."
 msgstr "測定できなかったシャードは合計から除外されています: {0}。"
 
@@ -32018,7 +32023,7 @@ msgstr "サイドバーを右に"
 #: ../../packages/chat-ui/src/auth/login-form.tsx:43
 #: src/components/not-found.tsx:12
 #: src/components/settings/settings-modal.tsx:164
-#: src/features/auth/components/auth/auth-card.tsx:493
+#: src/features/auth/components/auth/auth-card.tsx:492
 #: src/features/auth/components/auth/forms/sign-in-form.tsx:415
 #: src/features/auth/components/device-approval.tsx:363
 #: src/features/layout/components/nav-user.tsx:251
@@ -32120,7 +32125,7 @@ msgstr "パスワードでサインイン"
 
 #: src/features/auth/components/settings/account/account-cell.tsx:140
 #: src/features/auth/components/settings/account/delete-account-dialog.tsx:153
-#: src/routes/auth/sign-out.tsx:23
+#: src/routes/auth/sign-out.tsx:19
 msgid "Sign Out"
 msgstr "サインアウト"
 
@@ -32129,13 +32134,13 @@ msgstr "サインアウト"
 msgid "Sign out of {0}"
 msgstr "{0} からサインアウト"
 
-#: src/features/auth/components/auth/auth-card.tsx:493
+#: src/features/auth/components/auth/auth-card.tsx:492
 #: src/features/marketing/components/landing-page.tsx:332
 #: src/features/marketing/components/landing-page.tsx:350
 msgid "Sign up"
 msgstr "サインアップ"
 
-#: src/features/auth/components/auth/auth-card.tsx:380
+#: src/features/auth/components/auth/auth-card.tsx:379
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:678
 #: src/routes/auth/sign-up.tsx:26
 msgid "Sign Up"
@@ -32171,7 +32176,7 @@ msgstr "サインインのリクエスト"
 msgid "Sign-out failed. Please try again."
 msgstr "サインアウトに失敗しました。もう一度お試しください。"
 
-#: src/features/auth/components/auth/auth-card.tsx:374
+#: src/features/auth/components/auth/auth-card.tsx:373
 msgid "Sign-up needs an invitation"
 msgstr "登録には招待が必要です"
 
@@ -32272,7 +32277,7 @@ msgstr "サイズ上限に達しました"
 msgid "Size of the text in chat messages. The sidebar and the rest of the app keep their size."
 msgstr "チャットメッセージの文字サイズです。サイドバーとアプリのその他の部分のサイズは変わりません。"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:207
+#: src/features/admin/components/admin-shard-footprint-row.tsx:212
 msgid "Sizes of the largest shards"
 msgstr "最大のシャードのサイズ"
 
@@ -32514,7 +32519,7 @@ msgstr "スマートルーティングは各クエリを複雑度 (Simple、Stan
 msgid "Smart routing decisions, model usage, and provider health"
 msgstr "スマートルーティングの判断、モデルの使用状況、プロバイダーのヘルス"
 
-#: src/routes/admin/gateway.tsx:22
+#: src/routes/admin/gateway.tsx:23
 msgid "Smart routing, model usage, and provider health"
 msgstr "スマートルーティング、モデルの使用量、プロバイダーの状態"
 
@@ -33518,7 +33523,7 @@ msgstr "停止しました。"
 msgid "Stopping…"
 msgstr "停止中…"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:110
+#: src/features/admin/components/admin-shard-footprint-row.tsx:107
 msgid "Stored conversation data across user shards: threads, message rows and an estimate of their size, by thread group and age. Counts only; no thread or shard is listed."
 msgstr "ユーザーシャード全体に保存された会話データ: スレッド、メッセージ行、およびそのサイズの推定値を、スレッドのグループと経過期間別に示します。件数のみで、スレッドやシャードは一覧表示されません。"
 
@@ -35881,12 +35886,12 @@ msgstr "プロンプトを確認できませんでした。もう一度お試し
 msgid "The provider bills you directly for these requests. Where we know the model's price, the usual platform fee for your own keys is charged in credits."
 msgstr "これらのリクエストはプロバイダーから直接請求されます。モデルの価格がわかる場合は、独自キー利用時の通常のプラットフォーム手数料がクレジットで請求されます。"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:91
+#: src/features/admin/components/admin-provider-cache-row.tsx:90
 msgid "The provider cache readings could not be loaded."
 msgstr "プロバイダーのキャッシュ計測値を読み込めませんでした。"
 
 #. placeholder {0}: formatDateTime(readings.dataUpdatedAt, locale, { dateStyle: "short", timeStyle: "short", timeZone })
-#: src/features/admin/components/admin-provider-cache-row.tsx:92
+#: src/features/admin/components/admin-provider-cache-row.tsx:91
 msgid "The provider cache readings could not be refreshed. The figures below are from {0}."
 msgstr "プロバイダーのキャッシュ計測値を更新できませんでした。以下の数値は {0} 時点のものです。"
 
@@ -35999,11 +36004,11 @@ msgstr "検索に失敗しました。もう一度お試しください。"
 msgid "The server lists no models yet — pull or load one first"
 msgstr "サーバーにはまだモデルがありません — 先にモデルを取得または読み込んでください"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:116
+#: src/features/admin/components/admin-shard-footprint-row.tsx:113
 msgid "The shard footprint could not be measured."
 msgstr "シャードの使用量を測定できませんでした。"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:62
+#: src/features/admin/components/admin-provider-cache-row.tsx:59
 msgid "The share of prompt tokens providers served from their own cache. Days and hours count the provider and model pairs that cached in the last 30 days; the model table lists the top 50 models by prompt tokens. Only chat calls count, and answers from the gateway's response cache are left out. Days and hours are in {timeZone}."
 msgstr "プロバイダーが自社のキャッシュから提供したプロンプトトークンの割合です。日別と時間別は、過去 30 日間にキャッシュを使ったプロバイダーとモデルの組み合わせを集計します。モデル表には、プロンプトトークンの多い上位 50 モデルを表示します。対象はチャットの呼び出しのみで、ゲートウェイのレスポンスキャッシュからの応答は含みません。日付と時刻は {timeZone} です。"
 
@@ -36959,7 +36964,7 @@ msgid "This will create a new version with this content"
 msgstr "この内容で新しいバージョンが作成されます"
 
 #. placeholder {0}: preview?.eligibleCount ?? 0
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:276
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:290
 msgid "This will permanently delete {0} anonymous user accounts and all their data. This action cannot be undone."
 msgstr "{0} 件の匿名ユーザーアカウントとそのすべてのデータが完全に削除されます。この操作は元に戻せません。"
 
@@ -37122,9 +37127,9 @@ msgid "Thread will auto-delete in {0}"
 msgstr "スレッドは {0} 後に自動削除されます"
 
 #: src/components/command-palette.tsx:938
-#: src/features/admin/components/admin-shard-footprint-row.tsx:125
-#: src/features/admin/components/admin-shard-footprint-row.tsx:142
-#: src/features/admin/components/admin-shard-footprint-row.tsx:163
+#: src/features/admin/components/admin-shard-footprint-row.tsx:124
+#: src/features/admin/components/admin-shard-footprint-row.tsx:143
+#: src/features/admin/components/admin-shard-footprint-row.tsx:166
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:35
 #: src/features/chat/thread-list/thread-list-filter-menu.tsx:107
 msgid "Threads"
@@ -37147,7 +37152,7 @@ msgstr "ご自身のコンピューターでコーディングエージェント
 msgid "Threshold"
 msgstr "しきい値"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:48
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:50
 msgid "Threshold must be between 1 and 365 days"
 msgstr "しきい値は 1〜365 日の範囲で指定してください"
 
@@ -37449,7 +37454,7 @@ msgstr "ツール呼び出し"
 msgid "Tool Calling"
 msgstr "ツール呼び出し"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:179
+#: src/features/admin/components/admin-shard-footprint-row.tsx:184
 msgid "Tool output's share of the stored size"
 msgstr "保存サイズに占めるツール出力の割合"
 
@@ -37463,7 +37468,7 @@ msgid "Tool Provider Keys"
 msgstr "ツールプロバイダーキー"
 
 #. placeholder {0}: formatNumber(COMPACT_AFTER_DAYS, locale)
-#: src/features/admin/components/admin-shard-footprint-row.tsx:183
+#: src/features/admin/components/admin-shard-footprint-row.tsx:188
 msgid "Tool results of 64 KB or more, in threads idle at least {0} days"
 msgstr "{0} 日以上非アクティブなスレッド内の 64 KB 以上のツール結果"
 
@@ -37565,7 +37570,7 @@ msgstr "合計コスト"
 msgid "Total Cost"
 msgstr "合計コスト"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:125
+#: src/features/admin/components/admin-dashboard-stats.tsx:94
 msgid "Total Users"
 msgstr "ユーザー総数"
 
@@ -37577,7 +37582,7 @@ msgstr "再生成された別案を含む、このスレッド内のすべての
 msgid "Totals per model"
 msgstr "モデルごとの合計"
 
-#: src/features/admin/components/audit-log-card.tsx:131
+#: src/features/admin/components/audit-log-card.tsx:145
 msgid "Track all admin actions for accountability"
 msgstr "説明責任のため、すべての管理者の操作を記録します"
 
@@ -37709,7 +37714,7 @@ msgstr "視覚入力に対する透明な推論"
 msgid "Transparent thinking for legal, financial, and technical tasks"
 msgstr "法務、財務、技術タスクのための透明な思考"
 
-#: src/features/admin/components/admin-shard-footprint-row.tsx:195
+#: src/features/admin/components/admin-shard-footprint-row.tsx:200
 msgid "Trashed, temporary, being deleted or orphaned"
 msgstr "ゴミ箱内、一時的、削除中、または孤立"
 
@@ -37803,7 +37808,7 @@ msgstr "True"
 msgid "Trust for auto-approval"
 msgstr "自動承認を信頼する"
 
-#: src/features/auth/components/auth/forms/two-factor-form.tsx:328
+#: src/features/auth/components/auth/forms/two-factor-form.tsx:331
 msgid "Trust this device"
 msgstr "このデバイスを信頼する"
 
@@ -37967,11 +37972,11 @@ msgstr "2人の参加者が数ラウンドにわたって賛否を論じ、そ�
 msgid "Two ways to connect"
 msgstr "2 つの接続方法"
 
-#: src/features/auth/components/auth/forms/two-factor-form.tsx:341
+#: src/features/auth/components/auth/forms/two-factor-form.tsx:344
 msgid "Two-factor authentication"
 msgstr "二要素認証"
 
-#: src/features/auth/components/auth/auth-card.tsx:386
+#: src/features/auth/components/auth/auth-card.tsx:385
 #: src/features/auth/components/settings/two-factor/two-factor-card.tsx:50
 #: src/features/auth/components/settings/two-factor/two-factor-password-dialog.tsx:126
 #: src/routes/auth/two-factor/index.tsx:13
@@ -38159,11 +38164,11 @@ msgstr "利用不可"
 
 #: src/features/admin/components/ban-user-dialog.tsx:89
 #: src/features/admin/components/ban-user-dialog.tsx:99
-#: src/features/admin/components/user-cell.tsx:137
+#: src/features/admin/components/user-cell.tsx:140
 msgid "Unban User"
 msgstr "利用停止を解除"
 
-#: src/features/admin/components/audit-log-card.tsx:142
+#: src/features/admin/components/audit-log-card.tsx:136
 msgid "Unbans"
 msgstr "利用停止の解除"
 
@@ -38989,7 +38994,7 @@ msgstr "ユーザーのアクセスを削除しました"
 msgid "User Banned"
 msgstr "ユーザーを禁止しました"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:172
+#: src/features/admin/components/admin-dashboard-stats.tsx:152
 msgid "User Growth (Last 7 Days)"
 msgstr "ユーザーの増加（過去 7 日間）"
 
@@ -39070,7 +39075,7 @@ msgstr "ユーザー名: @{platformUsername}"
 msgid "Users"
 msgstr "ユーザー"
 
-#: src/features/admin/components/admin-cleanup-dashboard.tsx:136
+#: src/features/admin/components/admin-cleanup-dashboard.tsx:147
 msgid "users / run"
 msgstr "ユーザー / 回"
 
@@ -39596,7 +39601,7 @@ msgstr "プライバシーポリシーを表示"
 msgid "View pull request"
 msgstr "プルリクエストを表示"
 
-#: src/features/admin/components/user-cell.tsx:122
+#: src/features/admin/components/user-cell.tsx:125
 msgid "View Sessions"
 msgstr "セッションを表示"
 
@@ -40109,7 +40114,7 @@ msgstr "平日 09:00 UTC"
 msgid "Weekdays at 8 AM"
 msgstr "平日の午前 8 時"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:162
+#: src/features/admin/components/admin-dashboard-stats.tsx:130
 msgid "Weekly Growth"
 msgstr "週間の増加"
 
@@ -40117,7 +40122,7 @@ msgstr "週間の増加"
 msgid "Weight"
 msgstr "太さ"
 
-#: src/features/auth/components/auth/auth-card.tsx:367
+#: src/features/auth/components/auth/auth-card.tsx:366
 msgid "Welcome back"
 msgstr "おかえりなさい"
 
@@ -40265,7 +40270,7 @@ msgstr "何を送るか、そして良い回答と悪い回答をどう見分け
 msgid "What to watch"
 msgstr "監視する対象"
 
-#: src/features/admin/components/feedback-admin-page.tsx:155
+#: src/features/admin/components/feedback-admin-page.tsx:171
 msgid "What users sent from the app, newest first"
 msgstr "ユーザーがアプリから送信した内容（新しい順）"
 
@@ -40467,7 +40472,7 @@ msgstr "幅"
 msgid "Will be saved as your {provider} API key"
 msgstr "{provider} の API キーとして保存されます"
 
-#: src/features/admin/components/admin-provider-cache-row.tsx:67
+#: src/features/admin/components/admin-provider-cache-row.tsx:64
 msgid "Window"
 msgstr "期間"
 
@@ -40475,11 +40480,11 @@ msgstr "期間"
 msgid "Windows"
 msgstr "Windows"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:144
+#: src/features/admin/components/admin-dashboard-stats.tsx:112
 msgid "With admin privileges"
 msgstr "管理者権限あり"
 
-#: src/features/admin/components/admin-dashboard-stats.tsx:130
+#: src/features/admin/components/admin-dashboard-stats.tsx:98
 msgid "With email/password"
 msgstr "メールアドレス/パスワード"
 
@@ -41021,7 +41026,7 @@ msgstr "ゲストアカウントを使用しています。"
 msgid "You've been invited to join a thread. Click the button below to accept."
 msgstr "スレッドへの参加に招待されました。下のボタンをクリックして承諾してください。"
 
-#: src/features/auth/components/organization/accept-invitation-card.tsx:160
+#: src/features/auth/components/organization/accept-invitation-card.tsx:158
 msgid "You've been invited to join an organization"
 msgstr "組織への招待が届いています"
 
@@ -41178,7 +41183,7 @@ msgstr "「自動」に設定したコネクタと MCP ツール"
 msgid "Your conversations stay private"
 msgstr "会話は非公開のまま"
 
-#: src/features/auth/components/auth/convert-anonymous-account.tsx:162
+#: src/features/auth/components/auth/convert-anonymous-account.tsx:161
 msgid "Your current anonymous session will be converted to a permanent account."
 msgstr "現在の匿名セッションは永続的なアカウントに変換されます。"
 
