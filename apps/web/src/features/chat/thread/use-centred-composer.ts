@@ -6,7 +6,8 @@ import { useSyncExternalStore } from "react";
  * Where an empty chat centres its composer under the greeting: the app's `md` width with a fine pointer. A phone, and a tablet held
  * with a touch screen, keep it at the bottom, where the keyboard decides. The thread's classes spell the same split (`md:pointer-fine:`).
  */
-const CENTRED_QUERY = "(min-width: 768px) and (pointer: fine)";
+// The same `md` breakpoint as the layout's `md:pointer-fine:` classes, in rem: a browser with a larger default font size moves both.
+const CENTRED_QUERY = "(min-width: 48rem) and (pointer: fine)";
 
 const subscribe = (notify: () => void): (() => void) => {
     const media = globalThis.matchMedia?.(CENTRED_QUERY);

@@ -755,7 +755,9 @@ const Composer: FC<ComposerProps> = ({
                     }
                     compact={compact}
                     // Where the chat is filed, under the panel. Not in a comparison fan-out, which files nothing.
-                    context={composerMode === "text" && !minimal && !onSubmitOverride ? <ComposerContext busy={isStreaming || isSubmitting} /> : undefined}
+                    context={
+                        !minimal && !onSubmitOverride ? <ComposerContext busy={isStreaming || isSubmitting} textMode={composerMode === "text"} /> : undefined
+                    }
                     mode={composerMode}
                     modeSettings={
                         composerMode === "text" ? null : (

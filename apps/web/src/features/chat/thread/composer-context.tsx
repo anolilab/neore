@@ -34,13 +34,14 @@ const ThreadProjectChip: FC<{ projectId: Id<"projects"> }> = ({ projectId }) => 
 /**
  * What sits under the composer panel in a chat: where the chat is filed. A new chat offers the project its draft matches (a
  * choice); a chat that exists shows the project it is in. In a chat with neither, the row renders nothing and the panel hides it.
- * `busy` holds the new-chat choice back while the first message goes out.
+ * `busy` holds the new-chat choice back while the first message goes out. The choice is a text chat's, as it was before this row;
+ * the project of a chat that exists shows in every mode (image, video, audio too).
  */
-const ComposerContext: FC<{ busy: boolean }> = ({ busy }) => {
+const ComposerContext: FC<{ busy: boolean; textMode: boolean }> = ({ busy, textMode }) => {
     const { isNewThread, thread } = useChatThread();
 
     if (isNewThread) {
-        return busy ? null : <ComposerProjectHint />;
+        return busy || !textMode ? null : <ComposerProjectHint />;
     }
 
     return thread?.projectId ? <ThreadProjectChip projectId={thread.projectId as Id<"projects">} /> : null;

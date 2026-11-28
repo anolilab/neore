@@ -50,13 +50,13 @@ beforeEach(() => {
 
 describe("composer context", () => {
     it("offers the project choice on a new chat", () => {
-        render(<ComposerContext busy={false} />);
+        render(<ComposerContext busy={false} textMode />);
 
         expect(screen.getByRole("button", { name: "File in Billing" })).toBeTruthy();
     });
 
     it("holds the choice back while the first message goes out", () => {
-        const { container } = render(<ComposerContext busy />);
+        const { container } = render(<ComposerContext busy textMode />);
 
         expect(container.textContent).toBe("");
     });
@@ -66,7 +66,7 @@ describe("composer context", () => {
         state.thread = { projectId: "p-billing" };
         state.project = { title: "Billing" };
 
-        render(<ComposerContext busy={false} />);
+        render(<ComposerContext busy={false} textMode />);
 
         expect(screen.getByRole("group", { name: "Context" }).textContent).toContain("Billing");
         expect(screen.getByText("Project").className).toContain("sr-only");
@@ -77,7 +77,23 @@ describe("composer context", () => {
         state.isNewThread = false;
         state.thread = {};
 
-        const { container } = render(<ComposerContext busy={false} />);
+        const { container } = render(<ComposerContext busy={false} textMode />);
+
+        expect(container.textContent).toBe("");
+    });
+
+    it("shows the project of an image, video or audio chat too", () => {
+        state.isNewThread = false;
+        state.thread = { projectId: "p-billing" };
+        state.project = { title: "Billing" };
+
+        render(<ComposerContext busy={false} textMode={false} />);
+
+        expect(screen.getByRole("group", { name: "Context" }).textContent).toContain("Billing");
+    });
+
+    it("offers no project choice on a new image, video or audio chat, as before this row", () => {
+        const { container } = render(<ComposerContext busy={false} textMode={false} />);
 
         expect(container.textContent).toBe("");
     });
@@ -86,7 +102,7 @@ describe("composer context", () => {
         state.isNewThread = false;
         state.thread = { projectId: "p-billing" };
 
-        const { container } = render(<ComposerContext busy={false} />);
+        const { container } = render(<ComposerContext busy={false} textMode />);
 
         expect(container.textContent).toBe("");
     });
