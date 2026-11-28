@@ -177,8 +177,14 @@ pub fn parse_target(url: &str, headers: &str) -> Result<Target, String> {
         let mut header = HeaderValue::from_str(value)
             .map_err(|_| format!("the value of {name} is not valid"))?;
 
+        let cookies = pairs(value, ';')
+            .filter(|_| name == "cookie")
+            .map(|(_, cookie)| cookie);
+
         if holds_a_credential(name.as_str())
-            && credentials(value).any(|secret| secret.len() < MIN_REDACTED_BYTES)
+            && credentials(value)
+                .chain(cookies)
+                .any(|secret| secret.len() < MIN_REDACTED_BYTES)
         {
             return Err(format!(
                 "the value of {name} is too short to keep out of the chat ({MIN_REDACTED_BYTES} characters at least)"
