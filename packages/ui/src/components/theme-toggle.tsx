@@ -7,7 +7,8 @@ import { Button } from "./button";
 
 const ModeToggle = ({ className }: { className?: string }) => {
     const { t } = useLingui();
-    const { setTheme, theme } = useTheme();
+    // The theme on screen, not the stored choice: with "system" stored, the stored value says nothing about what is shown.
+    const { resolvedTheme: theme, setTheme } = useTheme();
 
     const toggleTheme = () => {
         setTheme(theme === "dark" ? "light" : "dark");
