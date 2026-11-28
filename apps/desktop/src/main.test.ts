@@ -870,8 +870,8 @@ describe("look and application menu", () => {
 
         const win = fake().windows.at(-1) as FakeWindow;
 
-        expect(mainWindow().options).toMatchObject({ backgroundColor: "#212121", show: false });
-        expect(win.options).toMatchObject({ backgroundColor: "#212121", show: false });
+        expect(mainWindow().options).toMatchObject({ backgroundColor: "#0e0f11", show: false });
+        expect(win.options).toMatchObject({ backgroundColor: "#0e0f11", show: false });
         expect(win.shown).toBe(false);
         (win.handlers.get("ready-to-show") as unknown as () => void)();
         expect(win.shown).toBe(true);
@@ -1646,7 +1646,7 @@ describe("main window reveal and saved state", () => {
         const { win } = await restart("linux");
 
         expect(win.options).not.toHaveProperty("vibrancy");
-        expect(win.options).toMatchObject({ backgroundColor: "#212121" });
+        expect(win.options).toMatchObject({ backgroundColor: "#0e0f11" });
         expect(capabilitiesOf(win)).not.toContain("vibrancy");
     });
 
@@ -1661,7 +1661,7 @@ describe("main window reveal and saved state", () => {
 
             const { win } = await restart("linux", undefined, { dark: true });
 
-            expect(win.options).toMatchObject({ backgroundColor: "#212121" });
+            expect(win.options).toMatchObject({ backgroundColor: "#0e0f11" });
         });
 
         it("keeps the theme a loaded site page shows for the next window, and asks no other page", async () => {
@@ -1671,7 +1671,7 @@ describe("main window reveal and saved state", () => {
             const finished = (): void => guardOf(win, "did-finish-load")?.({ preventDefault: () => {} }, "");
             const appearanceFile = path.join(userData, APPEARANCE_FILE);
 
-            expect(win.options).toMatchObject({ backgroundColor: "#f2f2f2" });
+            expect(win.options).toMatchObject({ backgroundColor: "#f0efeb" });
 
             win.webContents.loadURL("data:text/html,recovery");
             finished();
@@ -1686,7 +1686,7 @@ describe("main window reveal and saved state", () => {
             await vi.waitFor(() => expect(JSON.parse(readFileSync(appearanceFile, "utf8"))).toStrictEqual({ dark: true }));
 
             fake().ipc.get("neore:open-thread-window")?.(topFrameOf(win, `${SITE}/chat`), "thread-theme");
-            expect(fake().windows.at(-1)?.options).toMatchObject({ backgroundColor: "#212121" });
+            expect(fake().windows.at(-1)?.options).toMatchObject({ backgroundColor: "#0e0f11" });
         });
 
         it("follows a theme toggle without a reload, until the window leaves the site, loads another page or is destroyed", async () => {

@@ -254,7 +254,7 @@ const ThreadShareButton: React.FC<ThreadShareButtonProperties> = ({ classes, thr
         <Popover>
             <PopoverTrigger
                 render={
-                    <Button className={cn(classes?.button, "text-white")} size="icon" variant="ghost">
+                    <Button className={cn("text-muted-foreground hover:text-foreground", classes?.button)} size="icon" variant="ghost">
                         <Share2 className={cn(classes?.icon, "h-4 w-4")} />
                         <span className="sr-only">{t`Share Thread`}</span>
                     </Button>

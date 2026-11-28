@@ -247,7 +247,7 @@ const ProjectFormDialog = ({ editingProject, onClose, open }: ProjectFormDialogP
                         </DialogHeader>
                         <DialogPanel className="min-h-0 flex-1 space-y-6">
                             <div className="space-y-6">
-                                <div className="space-y-4">
+                                <div className="divide-border/50 divide-y *:py-3 *:first:pt-0 *:last:pb-0">
                                     <form.AppField name="title">
                                         {(field) => (
                                             <field.FormItem required>
@@ -287,7 +287,7 @@ const ProjectFormDialog = ({ editingProject, onClose, open }: ProjectFormDialogP
                                     </form.AppField>
                                 </div>
 
-                                <div className="bg-muted/30 space-y-4 rounded-lg border p-4">
+                                <div className="border-border/50 space-y-4 border-t pt-5">
                                     <div className="space-y-1">
                                         <Label className="text-sm font-medium">{t`Appearance`}</Label>
                                         <p className="text-muted-foreground text-xs">{t`Customize the visual appearance of this project.`}</p>
@@ -307,6 +307,7 @@ const ProjectFormDialog = ({ editingProject, onClose, open }: ProjectFormDialogP
                                                             value={field.state.value as `#${string}` | undefined}
                                                         >
                                                             <Button
+                                                                aria-labelledby="project-color-label"
                                                                 className="border-input size-10"
                                                                 style={{
                                                                     backgroundColor: field.state.value,
@@ -315,7 +316,11 @@ const ProjectFormDialog = ({ editingProject, onClose, open }: ProjectFormDialogP
                                                                 type="button"
                                                                 variant="outline"
                                                             >
-                                                                {!field.state.value && <span className="text-muted-foreground text-xs">×</span>}
+                                                                {!field.state.value && (
+                                                                    <span aria-hidden="true" className="text-muted-foreground text-xs">
+                                                                        ×
+                                                                    </span>
+                                                                )}
                                                             </Button>
                                                         </ColorPicker>
                                                         {field.state.value && (
@@ -399,7 +404,7 @@ const ProjectFormDialog = ({ editingProject, onClose, open }: ProjectFormDialogP
                                 )}
                             </div>
 
-                            <div className="bg-muted/30 space-y-4 rounded-lg border p-4">
+                            <div className="border-border/50 space-y-4 border-t pt-5">
                                 <div className="space-y-1">
                                     <Label className="text-sm font-medium">{t`Default AI Settings`}</Label>
                                     <p className="text-muted-foreground text-xs">
@@ -469,7 +474,7 @@ const ProjectFormDialog = ({ editingProject, onClose, open }: ProjectFormDialogP
                             {/* Keyed: a draft typed for one project never stays for the next one edited. */}
                             {editingProject && <ProjectRepositories key={editingProject._id} projectId={editingProject._id} />}
                         </DialogPanel>
-                        <DialogFooter>
+                        <DialogFooter className="border-border/50 border-t" variant="bare">
                             <Button onClick={requestClose} type="button" variant="outline">
                                 {t`Cancel`}
                             </Button>

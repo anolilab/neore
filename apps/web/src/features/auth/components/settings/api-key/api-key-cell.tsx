@@ -63,14 +63,16 @@ const APIKeyCell = ({ apiKey, className, classNames, refetch }: APIKeyCellProper
 
     return (
         <>
-            <Card className={cn("flex-row items-center gap-3 truncate px-4 py-3", className, classNames?.cell)}>
-                <KeyRoundIcon aria-hidden="true" className={cn("size-4 flex-shrink-0", classNames?.icon)} />
+            <Card className={cn("surface-row-card rounded-none flex-row items-center gap-3 truncate px-0 py-3", className, classNames?.cell)}>
+                <span aria-hidden="true" className="surface-well grid size-[30px] shrink-0 place-items-center rounded-lg">
+                    <KeyRoundIcon className={cn("text-muted-foreground size-4", classNames?.icon)} />
+                </span>
 
                 <div className="flex flex-col truncate">
                     <div className="flex items-center gap-2">
-                        <span className="truncate text-sm font-semibold">{apiKey.name}</span>
+                        <span className="truncate text-sm font-medium">{apiKey.name}</span>
 
-                        <span className="text-muted-foreground flex-1 truncate text-sm">
+                        <span className="text-muted-foreground flex-1 truncate text-xs">
                             {apiKey.start}
                             ******
                         </span>

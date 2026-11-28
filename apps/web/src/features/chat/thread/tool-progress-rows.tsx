@@ -51,7 +51,7 @@ const ToolProgressRow: FC<{ entry: ToolProgressEntry }> = memo(({ entry }) => {
     const { serverName, toolName } = entry;
 
     return (
-        <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-900/50" data-testid="tool-progress-row">
+        <div className="surface-raised mb-4 rounded-xl" data-testid="tool-progress-row">
             <div className="flex items-center gap-2 p-3 pb-2 text-sm font-medium text-gray-800 dark:text-gray-200">
                 <Loader2 aria-hidden="true" className="size-4 shrink-0 animate-spin motion-reduce:animate-none" />
                 <span className="font-mono">{toolName}</span>

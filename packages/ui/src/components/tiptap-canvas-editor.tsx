@@ -16,7 +16,7 @@ import type { Editor, JSONContent } from "@tiptap/react";
 import { EditorContent, useEditor } from "@tiptap/react";
 import type * as React from "react";
 import type { ReactNode } from "react";
-import { useEffect, useImperativeHandle, useMemo, useRef } from "react";
+import { useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef } from "react";
 import { RichTextProvider } from "reactjs-tiptap-editor";
 import { Blockquote, RichTextBlockquote } from "reactjs-tiptap-editor/blockquote";
 import { Bold, RichTextBold } from "reactjs-tiptap-editor/bold";
@@ -155,6 +155,8 @@ export const TiptapCanvasEditor = ({
 }: TiptapCanvasEditorProps) => {
     const { t } = useLingui();
     const debounceRef = useRef<ReturnType<typeof setTimeout>>(null);
+    // The save the debounce is waiting to run, so an unmount can run it at once instead of dropping the edit.
+    const pendingSaveRef = useRef<(() => void) | null>(null);
     // Read once, when the editor is created: `useEditor` does not re-apply extensions.
     const placeholderExtension = useMemo(
         () =>
@@ -202,7 +204,9 @@ export const TiptapCanvasEditor = ({
                 clearTimeout(debounceRef.current);
             }
 
-            debounceRef.current = setTimeout(() => {
+            const save = () => {
+                pendingSaveRef.current = null;
+
                 const html = e.getHTML();
                 const markdown = htmlToMarkdown(html);
                 const json = e.getJSON();
@@ -213,7 +217,10 @@ export const TiptapCanvasEditor = ({
 
                 onSave(markdown, json, commit);
                 transactionCountRef.current = 0;
-            }, autoSaveDelay);
+            };
+
+            pendingSaveRef.current = save;
+            debounceRef.current = setTimeout(save, autoSaveDelay);
         },
     });
 
@@ -238,12 +245,15 @@ export const TiptapCanvasEditor = ({
         editor?.setEditable(editable);
     }, [editor, editable]);
 
-    // Cleanup debounce on unmount
-    useEffect(
+    // On unmount (another page opened, say) an edit still waiting for the debounce is saved now, not dropped. A layout effect: its
+    // cleanup runs before the editor is destroyed, so the edit can still be read.
+    useLayoutEffect(
         () => () => {
             if (debounceRef.current) {
                 clearTimeout(debounceRef.current);
             }
+
+            pendingSaveRef.current?.();
         },
         [],
     );

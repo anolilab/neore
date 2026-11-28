@@ -13,19 +13,20 @@
 
 import { useLingui } from "@lingui/react/macro";
 import { api } from "@neore/backend/api";
-import { Alert, AlertDescription } from "@neore/ui/components/alert";
 import { Badge } from "@neore/ui/components/badge";
 import { Button } from "@neore/ui/components/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@neore/ui/components/card";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@neore/ui/components/collapsible";
 import { Heading, HeadingSection } from "@neore/ui/components/heading";
 import { Label } from "@neore/ui/components/label";
 import { Switch } from "@neore/ui/components/switch";
 import { ToggleGroup, ToggleGroupItem } from "@neore/ui/components/toggle-group";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Info } from "lucide-react";
+import { ChevronRight, Info } from "lucide-react";
 import type { FC } from "react";
 import { useEffect, useId, useState } from "react";
 
+import SettingsCard from "@/components/settings/settings-card";
+import SettingsRow from "@/components/settings/settings-row";
 import { useAction, useCRPC } from "@/lib/lunora/crpc";
 import { showError } from "@/lib/toast";
 
@@ -63,55 +64,60 @@ const ToolRow: FC<ToolRowProps> = ({ hasGrant, isSaving, onChange, override, too
     const modeLabels: Record<Mode, string> = { ask: t`Ask`, auto: t`Auto`, off: t`Off` };
 
     return (
-        <li className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-mono text-sm" id={nameId}>
-                        {tool.name}
-                    </span>
+        <SettingsRow
+            control={
+                <>
+                    <ToggleGroup
+                        aria-labelledby={nameId}
+                        disabled={isSaving}
+                        onValueChange={(value) => {
+                            // Clicking the pressed mode clears the group's value; with an allow running it is still a choice.
+                            const next = value?.[0] ?? (hasGrant ? effective : undefined);
+
+                            if (isMode(next) && (next !== effective || hasGrant)) {
+                                // Choosing the default again resets rather than pinning it as a custom setting.
+                                onChange(tool.key, override === undefined && next === tool.defaultMode ? null : next);
+                            }
+                        }}
+                        size="sm"
+                        value={[effective]}
+                        variant="outline"
+                    >
+                        {MODES.map((mode) => (
+                            <ToggleGroupItem aria-label={t`${modeLabels[mode]} for ${tool.name}`} key={mode} value={mode}>
+                                {modeLabels[mode]}
+                            </ToggleGroupItem>
+                        ))}
+                    </ToggleGroup>
+                    {override && (
+                        <Button
+                            aria-label={t`Reset ${tool.name} to default`}
+                            disabled={isSaving}
+                            onClick={() => onChange(tool.key, null)}
+                            size="sm"
+                            variant="ghost"
+                        >
+                            {t`Reset`}
+                        </Button>
+                    )}
+                </>
+            }
+            description={
+                <>
+                    {tool.description && <span className="line-clamp-2 block">{tool.description}</span>}
+                    <span className="block">{override ? t`Custom setting (default: ${modeLabels[tool.defaultMode]})` : t`Default`}</span>
+                </>
+            }
+            title={
+                <span className="flex flex-wrap items-center gap-2">
+                    <span className="font-mono">{tool.name}</span>
                     {tool.readOnly && <Badge variant="secondary">{t`read-only`}</Badge>}
                     {tool.destructive && <Badge variant="destructive">{t`destructive`}</Badge>}
                     {!tool.available && <Badge variant="outline">{t`not configured`}</Badge>}
-                </div>
-                {tool.description && <p className="text-muted-foreground mt-0.5 line-clamp-2 text-xs">{tool.description}</p>}
-                <p className="text-muted-foreground mt-0.5 text-xs">{override ? t`Custom setting (default: ${modeLabels[tool.defaultMode]})` : t`Default`}</p>
-            </div>
-            <div className="flex items-center gap-2">
-                <ToggleGroup
-                    aria-labelledby={nameId}
-                    disabled={isSaving}
-                    onValueChange={(value) => {
-                        // Clicking the pressed mode clears the group's value; with an allow running it is still a choice.
-                        const next = value?.[0] ?? (hasGrant ? effective : undefined);
-
-                        if (isMode(next) && (next !== effective || hasGrant)) {
-                            // Choosing the default again resets rather than pinning it as a custom setting.
-                            onChange(tool.key, override === undefined && next === tool.defaultMode ? null : next);
-                        }
-                    }}
-                    size="sm"
-                    value={[effective]}
-                    variant="outline"
-                >
-                    {MODES.map((mode) => (
-                        <ToggleGroupItem aria-label={t`${modeLabels[mode]} for ${tool.name}`} key={mode} value={mode}>
-                            {modeLabels[mode]}
-                        </ToggleGroupItem>
-                    ))}
-                </ToggleGroup>
-                {override && (
-                    <Button
-                        aria-label={t`Reset ${tool.name} to default`}
-                        disabled={isSaving}
-                        onClick={() => onChange(tool.key, null)}
-                        size="sm"
-                        variant="ghost"
-                    >
-                        {t`Reset`}
-                    </Button>
-                )}
-            </div>
-        </li>
+                </span>
+            }
+            titleId={nameId}
+        />
     );
 };
 
@@ -130,32 +136,24 @@ const ToolGroup: FC<ToolGroupProps> = ({ description, error, grants, isSaving, o
     const { t } = useLingui();
 
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle>{title}</CardTitle>
-                {description && <CardDescription>{description}</CardDescription>}
-            </CardHeader>
-            <CardContent>
-                {error && (
-                    <p className="text-destructive text-sm" role="alert">
-                        {t`Could not load tools: ${error}`}
-                    </p>
-                )}
-                {!error && tools.length === 0 && <p className="text-muted-foreground text-sm">{t`No tools.`}</p>}
-                <ul className="divide-y">
-                    {tools.map((tool) => (
-                        <ToolRow
-                            hasGrant={grants[tool.key] !== undefined}
-                            isSaving={isSaving}
-                            key={tool.key}
-                            onChange={onChange}
-                            override={overrides[tool.key]}
-                            tool={tool}
-                        />
-                    ))}
-                </ul>
-            </CardContent>
-        </Card>
+        <SettingsCard description={description} title={title}>
+            {error && (
+                <p className="text-destructive py-3 text-sm" role="alert">
+                    {t`Could not load tools: ${error}`}
+                </p>
+            )}
+            {!error && tools.length === 0 && <p className="text-muted-foreground py-3 text-sm">{t`No tools.`}</p>}
+            {tools.map((tool) => (
+                <ToolRow
+                    hasGrant={grants[tool.key] !== undefined}
+                    isSaving={isSaving}
+                    key={tool.key}
+                    onChange={onChange}
+                    override={overrides[tool.key]}
+                    tool={tool}
+                />
+            ))}
+        </SettingsCard>
     );
 };
 
@@ -193,20 +191,17 @@ const TimedAllows: FC<TimedAllowsProps> = ({ grants, isRevoking, onRevoke }) => 
     }
 
     return (
-        <section aria-label={t`Allowed for a limited time`} className="space-y-2">
-            <Heading className="text-lg font-semibold" fallbackLevel={3}>{t`Allowed for a limited time`}</Heading>
-            <p className="text-muted-foreground text-sm">{t`These tools run without asking until the time shown. Revoke one to be asked again from your next message.`}</p>
-            <ul className="divide-y rounded-lg border px-4">
-                {active.map(([key, expiresAt]) => {
-                    const { server, tool } = describeGrantKey(key);
-                    const until = i18n.date(new Date(expiresAt), { dateStyle: "short", timeStyle: "short" });
+        <SettingsCard
+            description={t`These tools run without asking until the time shown. Revoke one to be asked again from your next message.`}
+            title={t`Allowed for a limited time`}
+        >
+            {active.map(([key, expiresAt]) => {
+                const { server, tool } = describeGrantKey(key);
+                const until = i18n.date(new Date(expiresAt), { dateStyle: "short", timeStyle: "short" });
 
-                    return (
-                        <li className="flex items-center justify-between gap-2 py-3" key={key}>
-                            <div className="min-w-0 flex-1">
-                                <p className="truncate text-sm font-medium">{tool}</p>
-                                <p className="text-muted-foreground truncate text-xs">{server ? t`${server} · until ${until}` : t`Until ${until}`}</p>
-                            </div>
+                return (
+                    <SettingsRow
+                        control={
                             <Button
                                 aria-label={server ? t`Revoke the allow for ${tool} on ${server}` : t`Revoke the allow for ${tool}`}
                                 disabled={isRevoking}
@@ -216,11 +211,14 @@ const TimedAllows: FC<TimedAllowsProps> = ({ grants, isRevoking, onRevoke }) => 
                             >
                                 {t`Revoke`}
                             </Button>
-                        </li>
-                    );
-                })}
-            </ul>
-        </section>
+                        }
+                        description={server ? t`${server} · until ${until}` : t`Until ${until}`}
+                        key={key}
+                        title={tool}
+                    />
+                );
+            })}
+        </SettingsCard>
     );
 };
 
@@ -237,30 +235,34 @@ const QuickCheckSetting: FC<QuickCheckProps> = ({ checked, isSaving, onChange })
     const detailsId = useId();
 
     return (
-        <Card>
-            <CardHeader>
-                <div className="flex items-start justify-between gap-4">
-                    <div className="space-y-1">
-                        <CardTitle>
-                            <Label htmlFor={switchId}>{t`Let a quick check approve low-risk calls`}</Label>
-                        </CardTitle>
-                        <CardDescription id={detailsId}>
-                            {t`Before a connected tool set to Ask pauses the chat, a short model check reads the call. It only looks at tools from MCP servers and connectors you have marked as trusted, and only those whose name starts with a read verb such as get, list, search or fetch, and never after the chat has read your knowledge base, memories, project context, a tool result, an attached file, document or web page, or while any skill is enabled. If it judges the call low risk, the call runs and the chat notes that it was approved automatically, with the reason. Everything else still asks you. Off by default.`}
-                        </CardDescription>
-                    </div>
-                    <Switch aria-describedby={detailsId} checked={checked} disabled={isSaving} id={switchId} onCheckedChange={onChange} />
-                </div>
-            </CardHeader>
-            <CardContent>
-                <ul className="text-muted-foreground list-disc space-y-1 pl-5 text-sm">
-                    <li>{t`Covers only tools from MCP servers and connectors you trust for auto-approval (a switch on each server in your MCP settings and on each connector), left at their default Ask, in chats only you can write to. A trusted server's tool descriptions reach the model and can influence what is approved, so trust only servers you would let act for you. Changing a server's address ends its trust.`}</li>
-                    <li>{t`Never covers a tool you set to Ask yourself, built-in tools, device tools, questions to you, sub-agents or coding agents, or anything that sends, publishes, pays or deletes.`}</li>
-                    <li>{t`Never covers a call after the chat has read web pages, attached files, documents or pages, knowledge or other tool results: those can carry hidden instructions.`}</li>
-                    <li>{t`Never covers a call while any skill is enabled or invoked. Skills can come from the marketplace, an organization or an import, and there is no reliable way to tell yours apart, so switch your skills off to use the quick check.`}</li>
-                    <li>{t`Each check is one small model call on your account and is rate-limited. If it fails or runs out of time, you are asked as usual.`}</li>
-                </ul>
-            </CardContent>
-        </Card>
+        <SettingsCard
+            description={
+                <span
+                    id={detailsId}
+                >{t`Before a connected tool set to Ask pauses the chat, a short model check reads the call. Everything it does not clear still asks you. Off by default.`}</span>
+            }
+            title={<Label className="text-[15px] font-semibold" htmlFor={switchId}>{t`Let a quick check approve low-risk calls`}</Label>}
+        >
+            <div className="flex items-start justify-between gap-4 py-3">
+                <Collapsible className="min-w-0 flex-1">
+                    <CollapsibleTrigger className="text-muted-foreground hover:text-foreground group flex items-center gap-1 text-xs transition-colors">
+                        <ChevronRight aria-hidden="true" className="size-3 transition-transform group-data-[panel-open]:rotate-90" />
+                        {t`Details`}
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="space-y-2 pt-2">
+                        <p className="text-muted-foreground text-xs leading-normal">{t`Before a connected tool set to Ask pauses the chat, a short model check reads the call. It only looks at tools from MCP servers and connectors you have marked as trusted, and only those whose name starts with a read verb such as get, list, search or fetch, and never after the chat has read your knowledge base, memories, project context, a tool result, an attached file, document or web page, or while any skill is enabled. If it judges the call low risk, the call runs and the chat notes that it was approved automatically, with the reason. Everything else still asks you. Off by default.`}</p>
+                        <ul className="text-muted-foreground list-disc space-y-1 pl-5 text-xs">
+                            <li>{t`Covers only tools from MCP servers and connectors you trust for auto-approval (a switch on each server in your MCP settings and on each connector), left at their default Ask, in chats only you can write to. A trusted server's tool descriptions reach the model and can influence what is approved, so trust only servers you would let act for you. Changing a server's address ends its trust.`}</li>
+                            <li>{t`Never covers a tool you set to Ask yourself, built-in tools, device tools, questions to you, sub-agents or coding agents, or anything that sends, publishes, pays or deletes.`}</li>
+                            <li>{t`Never covers a call after the chat has read web pages, attached files, documents or pages, knowledge or other tool results: those can carry hidden instructions.`}</li>
+                            <li>{t`Never covers a call while any skill is enabled or invoked. Skills can come from the marketplace, an organization or an import, and there is no reliable way to tell yours apart, so switch your skills off to use the quick check.`}</li>
+                            <li>{t`Each check is one small model call on your account and is rate-limited. If it fails or runs out of time, you are asked as usual.`}</li>
+                        </ul>
+                    </CollapsibleContent>
+                </Collapsible>
+                <Switch aria-describedby={detailsId} checked={checked} disabled={isSaving} id={switchId} onCheckedChange={onChange} />
+            </div>
+        </SettingsCard>
     );
 };
 
@@ -351,18 +353,11 @@ const ToolPermissionsSettings: FC = () => {
     }
 
     return (
-        <div className="space-y-6">
-            <div>
-                <Heading className="text-2xl font-bold tracking-tight">{t`Tool Permissions`}</Heading>
-                <p className="text-muted-foreground">{t`Choose which tools the assistant may use on its own, which need your approval, and which are off.`}</p>
-            </div>
-
-            <Alert>
-                <Info aria-hidden="true" className="h-4 w-4" />
-                <AlertDescription>
-                    {t`Auto: runs without asking. Ask: pauses for your Approve / Deny. Off: the assistant never sees the tool. Automations (triggers, messenger bots, workflows) cannot ask, so "Ask" tools are unavailable there. MCP tools default to Ask unless the server marks them read-only.`}
-                </AlertDescription>
-            </Alert>
+        <div className="space-y-8">
+            <p className="text-muted-foreground flex items-start gap-1.5 px-1 text-xs leading-normal">
+                <Info aria-hidden="true" className="mt-0.5 size-3 shrink-0" />
+                <span>{t`Auto: runs without asking. Ask: pauses for your Approve / Deny. Off: the assistant never sees the tool. Automations (triggers, messenger bots, workflows) cannot ask, so "Ask" tools are unavailable there. MCP tools default to Ask unless the server marks them read-only.`}</span>
+            </p>
 
             <NewChatPermissionModeSetting />
 
@@ -371,8 +366,8 @@ const ToolPermissionsSettings: FC = () => {
             <TimedAllows grants={settings?.grants ?? {}} isRevoking={isRevoking} onRevoke={handleRevoke} />
 
             <HeadingSection>
-                <section aria-label={t`Built-in tools`} className="space-y-4">
-                    <Heading className="text-lg font-semibold" fallbackLevel={3}>{t`Built-in tools`}</Heading>
+                <section aria-label={t`Built-in tools`} className="space-y-8">
+                    <Heading className="px-1 text-base font-semibold" fallbackLevel={3}>{t`Built-in tools`}</Heading>
                     <HeadingSection>
                         {[...builtInByCategory].map(([category, tools]) => (
                             <ToolGroup
@@ -388,15 +383,17 @@ const ToolPermissionsSettings: FC = () => {
                     </HeadingSection>
                 </section>
 
-                <section aria-label={t`MCP tools`} className="space-y-4">
-                    <Heading className="text-lg font-semibold" fallbackLevel={3}>{t`MCP tools`}</Heading>
+                <section aria-label={t`MCP tools`} className="space-y-8">
+                    <Heading className="px-1 text-base font-semibold" fallbackLevel={3}>{t`MCP tools`}</Heading>
                     <HeadingSection>
                         {isMcpLoading && (
-                            <p className="text-muted-foreground text-sm" role="status">
+                            <p className="text-muted-foreground px-1 text-sm" role="status">
                                 {t`Connecting to your MCP servers...`}
                             </p>
                         )}
-                        {!isMcpLoading && (mcpData?.servers.length ?? 0) === 0 && <p className="text-muted-foreground text-sm">{t`No enabled MCP servers.`}</p>}
+                        {!isMcpLoading && (mcpData?.servers.length ?? 0) === 0 && (
+                            <p className="text-muted-foreground px-1 text-sm">{t`No enabled MCP servers.`}</p>
+                        )}
                         {mcpData?.servers.map((server) => (
                             <ToolGroup
                                 description={t`MCP server`}

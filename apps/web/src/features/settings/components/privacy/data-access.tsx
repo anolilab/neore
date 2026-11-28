@@ -28,18 +28,19 @@ const DataAccess: FC = () => {
                         {dataSummary.profile && (
                             <div className="space-y-2">
                                 <Heading className="text-sm font-medium" fallbackLevel={4}>{t`Profile Information`}</Heading>
-                                <div className="bg-muted space-y-1 rounded-lg p-4 text-sm">
-                                    <p>
-                                        <span className="font-medium">{t`Email:`}</span> {dataSummary.profile.email}
+                                <div className="divide-border/50 divide-y text-sm">
+                                    <p className="flex justify-between gap-4 py-2">
+                                        <span className="text-muted-foreground">{t`Email:`}</span> {dataSummary.profile.email}
                                     </p>
-                                    <p>
-                                        <span className="font-medium">{t`Name:`}</span> {dataSummary.profile.name || t`Not set`}
+                                    <p className="flex justify-between gap-4 py-2">
+                                        <span className="text-muted-foreground">{t`Name:`}</span> {dataSummary.profile.name || t`Not set`}
                                     </p>
-                                    <p>
-                                        <span className="font-medium">{t`Account Created:`}</span> {formatDate(dataSummary.profile.createdAt, i18n.locale)}
+                                    <p className="flex justify-between gap-4 py-2">
+                                        <span className="text-muted-foreground">{t`Account Created:`}</span>{" "}
+                                        {formatDate(dataSummary.profile.createdAt, i18n.locale)}
                                     </p>
-                                    <p>
-                                        <span className="font-medium">{t`Email Verified:`}</span> {dataSummary.profile.emailVerified ? t`Yes` : t`No`}
+                                    <p className="flex justify-between gap-4 py-2">
+                                        <span className="text-muted-foreground">{t`Email Verified:`}</span> {dataSummary.profile.emailVerified ? t`Yes` : t`No`}
                                     </p>
                                 </div>
                             </div>
@@ -47,19 +48,19 @@ const DataAccess: FC = () => {
 
                         <div className="space-y-2">
                             <Heading className="text-sm font-medium" fallbackLevel={4}>{t`Data Summary`}</Heading>
-                            <div className="bg-muted space-y-1 rounded-lg p-4 text-sm">
-                                <p>
-                                    <span className="font-medium">{t`Files:`}</span> {dataSummary.dataSummary.files}
+                            <div className="divide-border/50 divide-y text-sm">
+                                <p className="flex justify-between gap-4 py-2">
+                                    <span className="text-muted-foreground">{t`Files:`}</span> {dataSummary.dataSummary.files}
                                 </p>
-                                <p>
-                                    <span className="font-medium">{t`Prompts:`}</span> {dataSummary.dataSummary.prompts}
+                                <p className="flex justify-between gap-4 py-2">
+                                    <span className="text-muted-foreground">{t`Prompts:`}</span> {dataSummary.dataSummary.prompts}
                                 </p>
-                                <p>
-                                    <span className="font-medium">{t`Settings:`}</span>{" "}
+                                <p className="flex justify-between gap-4 py-2">
+                                    <span className="text-muted-foreground">{t`Settings:`}</span>{" "}
                                     {dataSummary.dataSummary.hasSettings ? t`Configured` : t`Not configured`}
                                 </p>
-                                <p>
-                                    <span className="font-medium">{t`GDPR Requests:`}</span> {dataSummary.dataSummary.gdprRequests}
+                                <p className="flex justify-between gap-4 py-2">
+                                    <span className="text-muted-foreground">{t`GDPR Requests:`}</span> {dataSummary.dataSummary.gdprRequests}
                                 </p>
                             </div>
                         </div>

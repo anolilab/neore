@@ -117,11 +117,11 @@ const VideoNodeComponent = (props: NodeProps<Node<VideoNodeData>>) => {
         <BaseNode {...props} color={config.color} icon={<Video className="size-4" />} inputs={config.handles.inputs} outputs={config.handles.outputs}>
             <div className="space-y-3">
                 <div className="space-y-1.5">
-                    <Label className="text-muted-foreground text-xs">
+                    <Label className="text-muted-foreground text-xs" htmlFor={`${id}-mode`}>
                         <Trans>Mode</Trans>
                     </Label>
                     <Select items={MODE_ITEMS} onValueChange={handleModeChange} value={data.mode}>
-                        <SelectTrigger className="nodrag h-8 text-sm">
+                        <SelectTrigger className="nodrag h-8 text-sm" id={`${id}-mode`}>
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -178,7 +178,7 @@ const VideoNodeComponent = (props: NodeProps<Node<VideoNodeData>>) => {
 
                     {!isImageToVideo && (
                         <div className="space-y-1.5">
-                            <Label className="text-muted-foreground text-xs">
+                            <Label className="text-muted-foreground text-xs" htmlFor={`${id}-aspect-ratio`}>
                                 <Trans>Aspect Ratio</Trans>
                             </Label>
                             <Select
@@ -188,7 +188,7 @@ const VideoNodeComponent = (props: NodeProps<Node<VideoNodeData>>) => {
                                 onValueChange={handleAspectRatioChange}
                                 value={data.aspectRatio ?? "16:9"}
                             >
-                                <SelectTrigger className="nodrag h-8 text-sm">
+                                <SelectTrigger className="nodrag h-8 text-sm" id={`${id}-aspect-ratio`}>
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -212,6 +212,7 @@ const VideoNodeComponent = (props: NodeProps<Node<VideoNodeData>>) => {
                             min={1}
                             onValueChange={handleDurationChange}
                             step={1}
+                            thumbLabel={t`Duration: ${duration}s`}
                             value={[data.duration ?? 5]}
                         />
                     </div>
@@ -227,6 +228,7 @@ const VideoNodeComponent = (props: NodeProps<Node<VideoNodeData>>) => {
                                 min={0}
                                 onValueChange={handleMotionStrengthChange}
                                 step={0.1}
+                                thumbLabel={t`Motion: ${motionPercent}%`}
                                 value={[data.motionStrength ?? 0.5]}
                             />
                         </div>
@@ -235,7 +237,9 @@ const VideoNodeComponent = (props: NodeProps<Node<VideoNodeData>>) => {
 
                 <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1.5">
-                        <Label className="text-muted-foreground text-xs">FPS</Label>
+                        <Label className="text-muted-foreground text-xs" htmlFor={`${id}-fps`}>
+                            FPS
+                        </Label>
                         <Select
                             items={currentModelInfo.supportedFps.map((fps) => {
                                 return { label: <Trans>{fps} fps</Trans>, value: String(fps) };
@@ -243,7 +247,7 @@ const VideoNodeComponent = (props: NodeProps<Node<VideoNodeData>>) => {
                             onValueChange={handleFpsChange}
                             value={String(data.fps ?? 24)}
                         >
-                            <SelectTrigger className="nodrag h-8 text-sm">
+                            <SelectTrigger className="nodrag h-8 text-sm" id={`${id}-fps`}>
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent>

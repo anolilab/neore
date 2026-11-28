@@ -10,7 +10,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@neore/ui/components/po
 import MOBILE_BREAKPOINT_QUERY from "@neore/ui/utils/breakpoints";
 import cn from "@neore/ui/utils/cn";
 import { ChevronsUpDown } from "lucide-react";
-import type { FC } from "react";
+import type { ComponentProps, FC } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useMediaMatch } from "rooks";
 
@@ -43,6 +43,8 @@ interface ModelPickerButtonProps {
     /** When provided (≥2 ids), renders the multi-model comparison trigger */
     selectedModelIds?: string[];
     size?: "default" | "xs" | "sm" | "lg" | "icon" | "icon-xs" | "icon-sm" | "icon-lg";
+    /** What a form field gives its control (`FormControl`): the id its label targets and its description and error state. */
+    triggerProps?: Pick<ComponentProps<"button">, "aria-describedby" | "aria-invalid" | "id">;
     variant?: "default" | "outline" | "secondary" | "ghost" | "destructive" | "link";
 }
 
@@ -92,6 +94,7 @@ const ModelPickerButton: FC<ModelPickerButtonProps> = ({
     placeholder,
     selectedModelIds,
     size = "default",
+    triggerProps,
     variant = "outline",
 }) => {
     const { t } = useLingui();
@@ -166,6 +169,7 @@ const ModelPickerButton: FC<ModelPickerButtonProps> = ({
             disabled={disabled}
             size={size}
             variant={variant}
+            {...triggerProps}
         >
             <div className="flex min-w-0 flex-1 items-center gap-2">
                 <MultiModelChips modelIds={selectedModelIds!} models={featureFlaggedModels} />
@@ -177,7 +181,14 @@ const ModelPickerButton: FC<ModelPickerButtonProps> = ({
         </Button>
     ) : (
         // Single model trigger (default). A combobox is not named by its content, so the label repeats it.
-        <Button aria-label={t`Model: ${singleLabel}`} className={cn("justify-between", className)} disabled={disabled} size={size} variant={variant}>
+        <Button
+            aria-label={t`Model: ${singleLabel}`}
+            className={cn("justify-between", className)}
+            disabled={disabled}
+            size={size}
+            variant={variant}
+            {...triggerProps}
+        >
             <div className="flex min-w-0 flex-1 items-center gap-2">
                 {model && (
                     <ProviderIcon
@@ -240,7 +251,7 @@ const ModelPickerButton: FC<ModelPickerButtonProps> = ({
     return (
         <Popover onOpenChange={setOpen} open={open}>
             <PopoverTrigger render={triggerButton} />
-            <PopoverContent align="start" className="max-h-125 w-145 gap-0 overflow-hidden p-0" sideOffset={4}>
+            <PopoverContent align="start" aria-label={t`Select model`} className="max-h-125 w-145 gap-0 overflow-hidden p-0" sideOffset={4}>
                 {modelPickerContent}
             </PopoverContent>
         </Popover>

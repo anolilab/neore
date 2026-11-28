@@ -94,7 +94,7 @@ const PinnedGoal: FC<PinnedGoalProps> = ({ disabled, threadId }) => {
                         pinned ? (
                             <Button
                                 aria-label={t`Change the pinned goal: ${pinned.text}`}
-                                className="bg-primary/10 text-primary-text border-primary/30 hover:bg-primary/20 h-7 max-w-48 gap-1 px-2"
+                                className="bg-surface-row-active text-foreground h-7 max-w-48 gap-1 px-2"
                                 disabled={disabled}
                                 variant="outline"
                             >
@@ -104,12 +104,12 @@ const PinnedGoal: FC<PinnedGoalProps> = ({ disabled, threadId }) => {
                         ) : (
                             <Button
                                 aria-label={t`Pin goal`}
-                                className="bg-sidebar border-border dark:border-sidebar-border/15 hover:bg-accent/50 dark:hover:bg-sidebar-accent/30 text-foreground h-7 gap-1 px-2 dark:text-white"
+                                className="bg-surface-row border-border/50 hover:bg-surface-row-hover text-foreground h-7 gap-1 px-2"
                                 disabled={disabled}
                                 variant="outline"
                             >
                                 <Pin aria-hidden="true" className="size-3 shrink-0" />
-                                <span className="hidden text-neutral-700 sm:inline dark:text-neutral-200">{t`Pin goal`}</span>
+                                <span className="@max-[36rem]/strip:sr-only">{t`Pin goal`}</span>
                             </Button>
                         )
                     }

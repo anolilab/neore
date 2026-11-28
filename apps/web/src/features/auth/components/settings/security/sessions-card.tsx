@@ -4,7 +4,6 @@ import { useLingui } from "@lingui/react/macro";
 import { CardContent } from "@neore/ui/components/card";
 import { Skeleton } from "@neore/ui/components/skeleton";
 import cn from "@neore/ui/utils/cn";
-import clsx from "clsx";
 import { UAParser } from "my-ua-parser";
 
 import type { SettingsCardClassNames } from "@/components/settings/settings-card";
@@ -74,16 +73,10 @@ const SessionsCard = ({ className, classNames }: SessionsCardProperties) => {
     };
 
     return (
-        <SettingsCard
-            className={clsx(className, "pb-6")}
-            classNames={classNames}
-            description={t`Manage your active sessions`}
-            isPending={isPending}
-            title={t`Sessions`}
-        >
-            <CardContent className={cn("grid gap-4", classNames?.content)}>
+        <SettingsCard className={className} classNames={classNames} description={t`Manage your active sessions`} isPending={isPending} title={t`Sessions`}>
+            <CardContent className={cn("grid gap-0", classNames?.content)}>
                 {isPending ? (
-                    <div className={cn("flex items-center justify-between rounded-lg border p-4", classNames?.content)}>
+                    <div className={cn("flex items-center justify-between", classNames?.content)}>
                         <div className="flex items-center gap-3">
                             <Skeleton className={cn("h-10 w-10 rounded-lg", classNames?.skeleton)} />
                             <div className="flex flex-col gap-2">

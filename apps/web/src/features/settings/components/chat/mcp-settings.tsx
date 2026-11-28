@@ -2,17 +2,14 @@
 
 import { useLingui } from "@lingui/react/macro";
 import { api } from "@neore/backend/api";
-import { Button } from "@neore/ui/components/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@neore/ui/components/card";
 import ConfirmDialog from "@neore/ui/components/confirm-dialog";
-import { Separator } from "@neore/ui/components/separator";
-import MCPIcon from "@neore/ui/icons/mcp";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertCircle, ExternalLink, Plus } from "lucide-react";
+import { ExternalLink, Plus } from "lucide-react";
 import type { FC } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
+import SettingsCard from "@/components/settings/settings-card";
 import { useAction, useCRPC, useLunoraActionOptions } from "@/lib/lunora/crpc";
 
 import { consumeMcpInstallRequests } from "./mcp/pending-install";
@@ -397,78 +394,59 @@ const MCPSettings: FC = () => {
     // ── Render ─────────────────────────────────────────────────────────────
 
     return (
-        <div className="space-y-6">
-            <Card>
-                <CardHeader className="pb-2">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <MCPIcon aria-hidden="true" className="size-5" />
-                            <div>
-                                <CardTitle className="text-muted-foreground text-[10px] font-semibold tracking-widest uppercase">{t`MCP Servers`}</CardTitle>
-                                <CardDescription className="text-muted-foreground mt-1 text-xs">
-                                    {t`Connect to Model Context Protocol servers to extend AI capabilities with external tools.`}
-                                </CardDescription>
-                            </div>
-                        </div>
-                        {!isAdding && (
-                            <Button onClick={() => setIsAdding(true)} size="sm" variant="outline">
-                                <Plus aria-hidden="true" className="mr-2 size-4" />
-                                {t`Add Server`}
-                            </Button>
-                        )}
-                    </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    {/* Info banner */}
-                    <div className="flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800 dark:border-blue-800 dark:bg-blue-950/50 dark:text-blue-300">
-                        <AlertCircle aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
-                        <div>
-                            <p>
-                                {t`MCP servers provide additional tools that the AI can use during conversations. Tools from connected servers are automatically available when chatting.`}
-                            </p>
-                            <a
-                                className="mt-1 inline-flex items-center gap-1 text-blue-600 underline dark:text-blue-400"
-                                href="https://modelcontextprotocol.io/introduction"
-                                rel="noopener noreferrer"
-                                target="_blank"
-                            >
-                                {t`Learn more about MCP`}
-                                <ExternalLink aria-hidden="true" className="size-3" />
-                            </a>
-                        </div>
-                    </div>
-
-                    {isAdding && (
+        <div className="space-y-8">
+            <SettingsCard
+                action={isAdding ? undefined : () => setIsAdding(true)}
+                actionLabel={
+                    isAdding ? undefined : (
                         <>
-                            <MCPServerForm
-                                formData={formData}
-                                isEditing={editingIndex !== null}
-                                isTesting={testConnectionMutation.isPending}
-                                onCancel={resetForm}
-                                onSave={handleSave}
-                                onTest={() => handleTestConnection()}
-                                setFormData={setFormData}
-                                testResult={serverStatuses[serverKey({ name: formData.name || "test", url: formData.url })]}
-                            />
-                            <Separator />
+                            <Plus aria-hidden="true" className="mr-2 size-4" />
+                            {t`Add Server`}
                         </>
-                    )}
+                    )
+                }
+                description={t`Connect to Model Context Protocol servers to extend AI capabilities with external tools.`}
+                title={t`MCP Servers`}
+            >
+                <div className="border-border/50 py-3 not-first:border-t">
+                    <a
+                        className="text-primary-text inline-flex items-center gap-1 text-xs underline"
+                        href="https://modelcontextprotocol.io/introduction"
+                        rel="noopener noreferrer"
+                        target="_blank"
+                    >
+                        {t`Learn more about MCP`}
+                        <ExternalLink aria-hidden="true" className="size-3" />
+                    </a>
+                </div>
 
-                    <MCPServerList
-                        editingIndex={editingIndex}
-                        onDelete={handleDelete}
-                        onEdit={handleEdit}
-                        onSignIn={handleSignIn}
-                        onSignOut={handleSignOut}
-                        onTest={handleTestExistingServer}
-                        onToggle={handleToggle}
-                        servers={servers}
-                        signingIn={isStartingSignIn ? signInVariables?.serverName : undefined}
-                        signIns={signInsByName}
-                        statuses={serverStatuses}
+                {isAdding && (
+                    <MCPServerForm
+                        formData={formData}
+                        isEditing={editingIndex !== null}
+                        isTesting={testConnectionMutation.isPending}
+                        onCancel={resetForm}
+                        onSave={handleSave}
+                        onTest={() => handleTestConnection()}
+                        setFormData={setFormData}
+                        testResult={serverStatuses[serverKey({ name: formData.name || "test", url: formData.url })]}
                     />
-                </CardContent>
-            </Card>
+                )}
+
+                <MCPServerList
+                    editingIndex={editingIndex}
+                    onDelete={handleDelete}
+                    onEdit={handleEdit}
+                    onSignIn={handleSignIn}
+                    onSignOut={handleSignOut}
+                    onTest={handleTestExistingServer}
+                    onToggle={handleToggle}
+                    servers={servers}
+                    signingIn={isStartingSignIn ? signInVariables?.serverName : undefined}
+                    signIns={signInsByName}
+                    statuses={serverStatuses}
+                />
+            </SettingsCard>
 
             <MCPServerCatalog configuredUrls={configuredUrls} disabled={isAdding} onInstall={handleInstall} />
 

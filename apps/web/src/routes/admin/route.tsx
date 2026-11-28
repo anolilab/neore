@@ -15,6 +15,7 @@ import AppSidebar from "@/features/layout/components/app-sidebar";
 import DashboardSidebarProvider from "@/features/layout/components/dashboard-sidebar-provider";
 import NavItems from "@/features/layout/components/nav-items";
 import SiteHeader from "@/features/layout/components/site-header";
+import { settingsLocation } from "@/features/settings/lib/settings-link";
 import { requireSession } from "@/lib/auth/route-guard";
 
 /** Descriptors, not strings: module scope — the component translates them (`i18n._`). */
@@ -64,27 +65,37 @@ const ADMIN_SEGMENT_NAMES: Record<string, MessageDescriptor> = {
 };
 
 const sidebarHeader = (
-    <div className="flex items-center gap-2 px-4 py-2">
-        <div className="dark:bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg">
-            <MessageSquare className="size-4" />
+    <div className="flex items-center gap-2.5 px-2 py-1">
+        <div className="surface-well text-foreground flex aspect-square size-8 items-center justify-center rounded-lg">
+            <MessageSquare aria-hidden="true" className="size-4" />
         </div>
         <div className="grid flex-1 text-left text-sm leading-tight">
-            <span className="truncate font-semibold">
+            <span className="truncate font-medium">
                 <Trans>AI Chat</Trans>
             </span>
-            <span className="truncate text-xs">
+            <span className="text-muted-foreground truncate font-mono text-xs">
                 <Trans>Admin</Trans>
             </span>
         </div>
     </div>
 );
 
+/**
+ * The rows look like the settings modal's navigation: flat, the open page in a soft well (a pressed-in fill in light, a
+ * lifted row in dark), no edge or shadow.
+ */
+const NAV_CLASSES = {
+    button: "h-8 gap-2.5 rounded-lg px-2 text-sm",
+    buttonActive: "bg-surface-well dark:bg-surface-row-active text-foreground shadow-none!",
+    group: "px-2",
+};
+
 const RouteComponent = () => {
     const { i18n } = useLingui();
     const adminNavItems = ADMIN_NAV_ITEMS.map((item) => {
         return { ...item, name: i18n._(item.name) };
     });
-    const sidebarContent = <NavItems classes={{ group: "pl-2" }} colorMode="light" items={adminNavItems} label={i18n._(msg`Admin`)} />;
+    const sidebarContent = <NavItems classes={NAV_CLASSES} colorMode="light" items={adminNavItems} label={i18n._(msg`Admin`)} />;
     const location = useLocation();
     const { pathname } = location;
 
@@ -113,27 +124,25 @@ const RouteComponent = () => {
                     } as React.CSSProperties
                 }
             >
-                <div className="flex h-dvh w-full">
+                {/* The inset's margins sit inside the viewport height; clip them so the page does not scroll. */}
+                <div className="flex h-dvh w-full overflow-hidden">
                     <AppSidebar content={sidebarContent} header={sidebarHeader} name="overlay" />
-                    <SidebarInset className="dark:bg-sidebar-foreground bg-white md:peer-data-[variant=inset]:m-1">
+                    <SidebarInset className="bg-surface-main">
                         <SiteHeader themeToggle={<ModeToggle className="text-foreground" />} trigger={<SidebarTrigger className="ml-2" name="left" />}>
                             <Breadcrumb>
-                                <BreadcrumbList>
+                                <BreadcrumbList className="gap-1 text-sm">
                                     {breadcrumbItems.map((item, index) => (
                                         <Fragment key={item.href}>
                                             <BreadcrumbItem>
                                                 {item.isLast ? (
-                                                    <BreadcrumbPage className="text-foreground font-medium">{item.label}</BreadcrumbPage>
+                                                    <BreadcrumbPage className="font-medium">{item.label}</BreadcrumbPage>
                                                 ) : (
-                                                    <BreadcrumbLink
-                                                        className="hover:text-muted-foreground hover:dark:text-muted-foreground text-sm text-black capitalize transition-colors dark:text-white"
-                                                        href={item.href}
-                                                    >
-                                                        {item.label}
-                                                    </BreadcrumbLink>
+                                                    <BreadcrumbLink href={item.href}>{item.label}</BreadcrumbLink>
                                                 )}
                                             </BreadcrumbItem>
-                                            {index < breadcrumbItems.length - 1 && <BreadcrumbSeparator className="text-muted-foreground mx-2" />}
+                                            {index < breadcrumbItems.length - 1 && (
+                                                <BreadcrumbSeparator className="text-muted-foreground/60 mx-0.5 [&>svg]:size-3" />
+                                            )}
                                         </Fragment>
                                     ))}
                                 </BreadcrumbList>
@@ -159,7 +168,7 @@ export const Route = createFileRoute("/admin")({
         const result = await context.lunoraClient.query(api.auth.admin.isCurrentUserAdmin, {});
 
         if (!result?.isAdmin) {
-            throw redirect({ to: "/dashboard/settings/auth/account" });
+            throw redirect(settingsLocation("auth-account"));
         }
     },
     component: RouteComponent,

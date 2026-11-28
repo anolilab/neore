@@ -14,6 +14,7 @@ import { useActiveOrganization, useHasPermission, useListOrganizations } from "@
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 
 import { getLocalizedError } from "../../lib/utilities";
+import SettingsFieldRow, { hideCardHeader } from "../settings/settings-field-row";
 
 const OrganizationNameForm = ({ className, classNames, ...properties }: SettingsCardProperties) => {
     const { authClient, toast } = useAuth();
@@ -98,40 +99,44 @@ const OrganizationNameForm = ({ className, classNames, ...properties }: Settings
                 <SettingsCard
                     actionLabel={t`Save`}
                     className={className}
-                    classNames={classNames}
-                    description={t`Change your organization's display name`}
+                    classNames={hideCardHeader(classNames)}
                     disabled={!hasPermission?.success}
-                    instructions={t`This is how your organization appears to members`}
                     isPending={isPending}
-                    title={t`Organization Name`}
                     {...properties}
                 >
                     <CardContent className={classNames?.content}>
-                        {isPending ? (
-                            <Skeleton className={cn("h-9 w-full", classNames?.skeleton)} />
-                        ) : (
-                            <form.AppField name="name">
-                                {(field) => (
-                                    <field.FormItem>
-                                        <field.FormControl>
-                                            <Input
-                                                autoComplete="organization"
-                                                className={classNames?.input}
-                                                disabled={isSubmitting || !hasPermission?.success}
-                                                onBlur={field.handleBlur}
-                                                onChange={(e) => {
-                                                    field.handleChange(e.target.value);
-                                                }}
-                                                placeholder={t`Enter organization name`}
-                                                value={field.state.value}
-                                            />
-                                        </field.FormControl>
+                        <SettingsFieldRow
+                            description={t`Change your organization's display name`}
+                            instructions={t`This is how your organization appears to members`}
+                            title={t`Organization Name`}
+                        >
+                            {isPending ? (
+                                <Skeleton className={cn("h-9 w-full", classNames?.skeleton)} />
+                            ) : (
+                                <form.AppField name="name">
+                                    {(field) => (
+                                        <field.FormItem>
+                                            <field.FormControl>
+                                                <Input
+                                                    aria-label={t`Organization Name`}
+                                                    autoComplete="organization"
+                                                    className={classNames?.input}
+                                                    disabled={isSubmitting || !hasPermission?.success}
+                                                    onBlur={field.handleBlur}
+                                                    onChange={(e) => {
+                                                        field.handleChange(e.target.value);
+                                                    }}
+                                                    placeholder={t`Enter organization name`}
+                                                    value={field.state.value}
+                                                />
+                                            </field.FormControl>
 
-                                        <field.FormMessage className={classNames?.error} />
-                                    </field.FormItem>
-                                )}
-                            </form.AppField>
-                        )}
+                                            <field.FormMessage className={classNames?.error} />
+                                        </field.FormItem>
+                                    )}
+                                </form.AppField>
+                            )}
+                        </SettingsFieldRow>
                     </CardContent>
                 </SettingsCard>
             </form>
@@ -147,18 +152,15 @@ const OrganizationNameCard = ({ className, classNames, ...properties }: Settings
 
     if (!activeOrganization) {
         return (
-            <SettingsCard
-                actionLabel={t`Save`}
-                className={className}
-                classNames={classNames}
-                description={t`Change your organization's display name`}
-                instructions={t`This is how your organization appears to members`}
-                isPending
-                title={t`Organization Name`}
-                {...properties}
-            >
+            <SettingsCard actionLabel={t`Save`} className={className} classNames={hideCardHeader(classNames)} isPending {...properties}>
                 <CardContent className={classNames?.content}>
-                    <Skeleton className={cn("h-9 w-full", classNames?.skeleton)} />
+                    <SettingsFieldRow
+                        description={t`Change your organization's display name`}
+                        instructions={t`This is how your organization appears to members`}
+                        title={t`Organization Name`}
+                    >
+                        <Skeleton className={cn("h-9 w-full", classNames?.skeleton)} />
+                    </SettingsFieldRow>
                 </CardContent>
             </SettingsCard>
         );

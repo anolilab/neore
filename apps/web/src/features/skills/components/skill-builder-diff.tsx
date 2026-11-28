@@ -43,8 +43,8 @@ const SkillBuilderDiff = ({ diff }: { diff: FieldDiff[] }) => {
     return (
         <ul aria-label={t`Changes from the last refinement`} className="space-y-3">
             {diff.map((entry) => (
-                <li className="rounded-md border text-xs" key={entry.field}>
-                    <p className="bg-muted/50 border-b px-3 py-1.5 font-medium">{fieldLabels[entry.field] ?? entry.field}</p>
+                <li className="border-border/50 rounded-lg border text-xs" key={entry.field}>
+                    <p className="border-border/50 border-b px-3 py-1.5 font-medium">{fieldLabels[entry.field] ?? entry.field}</p>
                     <div className="max-h-60 overflow-auto font-mono">
                         {(
                             entry.lines ?? [

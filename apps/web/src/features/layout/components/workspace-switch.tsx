@@ -10,7 +10,7 @@ import type { WorkspaceMode } from "@/features/layout/lib/workspace-memory";
 import { rememberWorkspaceRoute, workspaceOf, workspaceTarget } from "@/features/layout/lib/workspace-memory";
 
 const ITEM =
-    "inline-flex h-6 items-center gap-1.5 rounded-md px-2.5 text-sm font-medium whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-ring/50";
+    "inline-flex h-[26px] items-center gap-1.5 rounded-[7px] px-2.5 text-[12.5px] font-medium whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-ring/50";
 
 const ROOT_LINKS = { chat: "/chat", code: "/code" } as const satisfies Record<WorkspaceMode, string>;
 
@@ -49,14 +49,14 @@ const WorkspaceSwitch: FC = () => {
     ];
 
     return (
-        <nav aria-label={t`Workspace`} className="bg-muted text-muted-foreground inline-flex h-8 items-center rounded-lg p-1">
+        <nav aria-label={t`Workspace`} className="surface-well text-muted-foreground inline-flex items-center gap-0.5 rounded-[9px] p-0.5">
             {items.map(({ icon: Icon, label, mode }) => {
                 const isActive = active === mode;
 
                 return (
                     <Link
                         aria-current={isActive ? "page" : undefined}
-                        className={cn(ITEM, isActive ? "bg-background text-foreground shadow-sm" : "hover:text-foreground")}
+                        className={cn(ITEM, isActive ? "bg-surface-row-active surface-edge text-foreground" : "hover:text-foreground")}
                         key={mode}
                         // Server and first client render both link to the root; the remembered page is read on click.
                         onClick={(event) => {

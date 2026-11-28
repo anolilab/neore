@@ -2,7 +2,8 @@
 
 import { useLingui } from "@lingui/react/macro";
 import { Alert, AlertDescription, AlertTitle } from "@neore/ui/components/alert";
-import { Link } from "@tanstack/react-router";
+
+import SettingsLink from "@/components/settings/settings-link";
 
 export type ReadFailureStatus = "forbidden" | "host_error" | "needs_reconnect" | "not_connected" | "not_found" | "rate_limited";
 
@@ -31,9 +32,9 @@ const FailureNotice = ({ label, status }: { label: string; status: ReadFailureSt
                 {needsConnection && (
                     <>
                         {" "}
-                        <Link className="text-primary-text font-medium underline" to="/dashboard/settings/connectors">
+                        <SettingsLink className="text-primary-text font-medium underline" tab="connectors">
                             {t`Open connectors`}
-                        </Link>
+                        </SettingsLink>
                     </>
                 )}
             </AlertDescription>

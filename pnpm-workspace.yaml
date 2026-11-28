@@ -227,7 +227,6 @@ catalogs:
     react-pdf: 11.1.0
     wavesurfer.js: 8.1.0
   forms:
-    emblor: ^1.4.8
     react-day-picker: 10.0.2
     react-dropzone: 20.2.1
     react-number-format: 5.4.5

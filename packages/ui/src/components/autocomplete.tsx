@@ -84,7 +84,7 @@ const AutocompletePopup = ({
         <AutocompletePrimitive.Positioner className="z-50 select-none" data-slot="autocomplete-positioner" sideOffset={sideOffset}>
             <span
                 className={cn(
-                    "bg-popover relative flex max-h-full origin-(--transform-origin) rounded-lg border bg-clip-padding transition-[scale,opacity] before:pointer-events-none before:absolute before:inset-0 before:rounded-[calc(var(--radius-lg)-1px)] before:shadow-lg has-data-starting-style:scale-98 has-data-starting-style:opacity-0 dark:not-in-data-[slot=group]:bg-clip-border",
+                    "bg-popover relative flex max-h-full origin-(--transform-origin) rounded-xl surface-edge bg-clip-padding transition-[scale,opacity] has-data-starting-style:scale-98 has-data-starting-style:opacity-0 dark:not-in-data-[slot=group]:bg-clip-border",
                     className,
                 )}
             >
@@ -103,7 +103,7 @@ const AutocompletePopup = ({
 const AutocompleteItem = ({ children, className, ...props }: AutocompletePrimitive.Item.Props) => (
     <AutocompletePrimitive.Item
         className={cn(
-            "data-highlighted:bg-accent data-highlighted:text-accent-foreground flex min-h-8 cursor-default items-center rounded-sm px-2 py-1 text-base outline-none select-none data-disabled:pointer-events-none data-disabled:opacity-64 sm:min-h-7 sm:text-sm",
+            "data-highlighted:bg-accent data-highlighted:text-accent-foreground flex min-h-8 cursor-default items-center rounded-[7px] px-2 py-1 text-base outline-none select-none data-disabled:pointer-events-none data-disabled:opacity-64 sm:min-h-7 sm:text-sm",
             className,
         )}
         data-slot="autocomplete-item"

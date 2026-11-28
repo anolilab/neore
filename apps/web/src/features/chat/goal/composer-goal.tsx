@@ -66,16 +66,15 @@ const ComposerGoal: FC<ComposerGoalProps> = ({ disabled, threadId }) => {
                             aria-label={t`Goal: run until done`}
                             aria-pressed={enabled}
                             className={clsx(
-                                "bg-sidebar border-border dark:border-sidebar-border/15 hover:bg-accent/50 dark:hover:bg-sidebar-accent/30 text-foreground h-7 gap-1 px-2 dark:text-white",
-                                enabled &&
-                                    "bg-primary/10 text-primary-text border-primary/30 dark:text-primary-text hover:bg-primary/20 hover:border-primary/40",
+                                "bg-transparent hover:bg-surface-row-hover dark:hover:bg-surface-row-hover rounded-lg text-muted-foreground hover:text-foreground h-7 gap-1 px-2",
+                                enabled && "bg-surface-row-active text-foreground",
                             )}
                             disabled={disabled}
                             onClick={() => setEnabled(!enabled)}
-                            variant="outline"
+                            variant="ghost"
                         >
                             <Target aria-hidden="true" className="size-3 shrink-0" />
-                            <span className="hidden text-neutral-700 sm:inline dark:text-neutral-200">{t`Goal`}</span>
+                            <span className="@max-[32rem]/strip:sr-only">{t`Goal`}</span>
                         </Button>
                     }
                 />
@@ -88,13 +87,7 @@ const ComposerGoal: FC<ComposerGoalProps> = ({ disabled, threadId }) => {
                 <Tooltip>
                     <TooltipTrigger
                         render={
-                            <Button
-                                aria-label={t`Review rounds: ${maxRounds}. Change`}
-                                className="bg-primary/10 text-primary-text border-primary/30 h-7 px-2"
-                                disabled={disabled}
-                                onClick={cycleRounds}
-                                variant="outline"
-                            >
+                            <Button className="bg-surface-row-active text-foreground h-7 px-2" disabled={disabled} onClick={cycleRounds} variant="ghost">
                                 {t`${maxRounds} rounds`}
                             </Button>
                         }

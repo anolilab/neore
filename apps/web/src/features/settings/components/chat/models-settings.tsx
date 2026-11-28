@@ -7,12 +7,11 @@ import type { GatewayModel, ModelFilterCapability } from "@neore/ai/models";
 import { ProviderIcon } from "@neore/ui/components/ai-elements/provider-icon";
 import { Badge } from "@neore/ui/components/badge";
 import { Button } from "@neore/ui/components/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@neore/ui/components/card";
+import { Card } from "@neore/ui/components/card";
 import ConfirmDialog from "@neore/ui/components/confirm-dialog";
 import { Heading } from "@neore/ui/components/heading";
 import { Input } from "@neore/ui/components/input";
 import { Label } from "@neore/ui/components/label";
-import { Separator } from "@neore/ui/components/separator";
 import { Switch } from "@neore/ui/components/switch";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import clsx from "clsx";
@@ -21,6 +20,8 @@ import type { FC } from "react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
+import SettingsCardHeader from "@/components/settings/settings-card-header";
+import SettingsRow from "@/components/settings/settings-row";
 import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
 import { useCRPC } from "@/lib/lunora/crpc";
 
@@ -360,163 +361,156 @@ const ModelsSettings: FC = () => {
     return (
         <div className="space-y-6">
             <FavoriteModelsSettings />
-            <Card>
-                <CardHeader className="pb-2">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <CardTitle className="text-muted-foreground text-[10px] font-semibold tracking-widest uppercase">{t`Models`}</CardTitle>
-                            <CardDescription className="text-muted-foreground mt-1 text-xs">
+            <Card className="w-full text-start" variant="plain">
+                <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+                    <SettingsCardHeader
+                        className="min-w-0 flex-1 basis-64 px-1"
+                        description={
+                            <>
                                 {t`Enable or disable models to control which ones appear in the model selector.`} {enabledCount} / {models.length}
-                            </CardDescription>
-                        </div>
-                        <div className="flex gap-2">
-                            <Button onClick={enableAll} size="sm" variant="outline">
-                                {t`Enable All`}
-                            </Button>
-                            <Button onClick={disableAll} size="sm" variant="outline">
-                                {t`Disable All`}
-                            </Button>
-                            <Button onClick={() => setConfirmResetOpen(true)} size="sm" variant="outline">
-                                <RotateCcw aria-hidden="true" className="mr-2 size-4" />
-                                {t`Reset to Defaults`}
-                            </Button>
-                        </div>
+                            </>
+                        }
+                        title={t`Models`}
+                    />
+                    <div className="flex flex-wrap gap-2">
+                        <Button onClick={enableAll} size="sm" variant="outline">
+                            {t`Enable All`}
+                        </Button>
+                        <Button onClick={disableAll} size="sm" variant="outline">
+                            {t`Disable All`}
+                        </Button>
+                        <Button onClick={() => setConfirmResetOpen(true)} size="sm" variant="outline">
+                            <RotateCcw aria-hidden="true" className="mr-2 size-4" />
+                            {t`Reset to Defaults`}
+                        </Button>
                     </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    {/* Search and Filters */}
-                    <div className="space-y-3">
-                        <div className="relative">
-                            <Search aria-hidden="true" className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
-                            <Input
-                                className="pl-9"
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                placeholder={t`Search models by name, ID, or provider...`}
-                                value={searchQuery}
-                            />
-                        </div>
+                </div>
 
-                        <div className="flex flex-wrap items-center gap-2">
-                            <Button
-                                className="h-8 text-xs"
-                                onClick={() => setShowFilters(!showFilters)}
-                                size="sm"
-                                variant={showFilters ? "default" : "outline"}
-                            >
-                                <Filter aria-hidden="true" className="mr-1.5 size-3" />
-                                {t`Filters`}
-                                {activeFilters.size > 0 && <Badge className="ml-1.5 h-4 px-1 text-[10px]">{activeFilters.size}</Badge>}
-                            </Button>
+                {/* Search and Filters */}
+                <div className="space-y-3">
+                    <div className="relative">
+                        <Search aria-hidden="true" className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
+                        <Input
+                            className="pl-9"
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            placeholder={t`Search models by name, ID, or provider...`}
+                            value={searchQuery}
+                        />
+                    </div>
 
-                            {providers.length > 0 && (
-                                <div className="flex items-center gap-1">
-                                    <Label className="text-muted-foreground text-xs" htmlFor="models-provider-filter">
-                                        {t`Provider:`}
-                                    </Label>
-                                    <select
-                                        className="border-input bg-background h-8 rounded-md border px-2 text-xs"
-                                        id="models-provider-filter"
-                                        onChange={(e) => setSelectedProvider(e.target.value || null)}
-                                        value={selectedProvider || ""}
-                                    >
-                                        <option value="">{t`All`}</option>
-                                        {providers.map((provider) => (
-                                            <option key={provider} value={provider}>
-                                                {provider}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                            )}
+                    <div className="flex flex-wrap items-center gap-2">
+                        <Button className="h-8 text-xs" onClick={() => setShowFilters(!showFilters)} size="sm" variant={showFilters ? "default" : "outline"}>
+                            <Filter aria-hidden="true" className="mr-1.5 size-3" />
+                            {t`Filters`}
+                            {activeFilters.size > 0 && <Badge className="ml-1.5 h-4 px-1 text-[10px]">{activeFilters.size}</Badge>}
+                        </Button>
 
-                            {modes.length > 0 && (
-                                <div className="flex items-center gap-1">
-                                    <Label className="text-muted-foreground text-xs" htmlFor="models-mode-filter">
-                                        {t`Mode:`}
-                                    </Label>
-                                    <select
-                                        className="border-input bg-background h-8 rounded-md border px-2 text-xs"
-                                        id="models-mode-filter"
-                                        onChange={(e) => setSelectedMode(e.target.value || null)}
-                                        value={selectedMode || ""}
-                                    >
-                                        <option value="">{t`All`}</option>
-                                        {modes.map((mode) => (
-                                            <option key={mode} value={mode}>
-                                                {filterValueLabel(mode)}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                            )}
-
-                            {states.length > 0 && (
-                                <div className="flex items-center gap-1">
-                                    <Label className="text-muted-foreground text-xs" htmlFor="models-state-filter">
-                                        {t`State:`}
-                                    </Label>
-                                    <select
-                                        className="border-input bg-background h-8 rounded-md border px-2 text-xs"
-                                        id="models-state-filter"
-                                        onChange={(e) => setSelectedState(e.target.value || null)}
-                                        value={selectedState || ""}
-                                    >
-                                        <option value="">{t`All`}</option>
-                                        {states.map((state) => (
-                                            <option key={state} value={state}>
-                                                {filterValueLabel(state)}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                            )}
-
-                            {hasActiveFilters && (
-                                <Button className="h-8 text-xs" onClick={clearFilters} size="sm" variant="ghost">
-                                    <X aria-hidden="true" className="mr-1.5 size-3" />
-                                    {t`Clear`}
-                                </Button>
-                            )}
-                        </div>
-
-                        {/* Filters Panel */}
-                        {showFilters && (
-                            <div className="bg-muted/30 rounded-lg border p-3">
-                                <div className="text-muted-foreground mb-2 text-xs font-medium">{t`Capabilities`}</div>
-                                <div className="flex flex-wrap gap-1.5">
-                                    {FILTER_CAPABILITIES.map((filter) => {
-                                        const isActive = activeFilters.has(filter.key);
-
-                                        return (
-                                            <Button
-                                                className={clsx(
-                                                    "h-6 px-2 text-[11px]",
-                                                    isActive ? "bg-primary text-primary-foreground" : "bg-background hover:bg-accent",
-                                                )}
-                                                key={filter.key}
-                                                onClick={() => toggleFilter(filter.key)}
-                                                size="sm"
-                                                variant={isActive ? "default" : "outline"}
-                                            >
-                                                {i18n._(filter.label)}
-                                            </Button>
-                                        );
-                                    })}
-                                </div>
+                        {providers.length > 0 && (
+                            <div className="flex items-center gap-1.5">
+                                <Label className="text-muted-foreground text-xs" htmlFor="models-provider-filter">
+                                    {t`Provider:`}
+                                </Label>
+                                <select
+                                    className="border-input bg-background h-8 max-w-40 rounded-md border px-2 text-xs"
+                                    id="models-provider-filter"
+                                    onChange={(e) => setSelectedProvider(e.target.value || null)}
+                                    value={selectedProvider || ""}
+                                >
+                                    <option value="">{t`All`}</option>
+                                    {providers.map((provider) => (
+                                        <option key={provider} value={provider}>
+                                            {provider}
+                                        </option>
+                                    ))}
+                                </select>
                             </div>
+                        )}
+
+                        {modes.length > 0 && (
+                            <div className="flex items-center gap-1.5">
+                                <Label className="text-muted-foreground text-xs" htmlFor="models-mode-filter">
+                                    {t`Mode:`}
+                                </Label>
+                                <select
+                                    className="border-input bg-background h-8 max-w-40 rounded-md border px-2 text-xs"
+                                    id="models-mode-filter"
+                                    onChange={(e) => setSelectedMode(e.target.value || null)}
+                                    value={selectedMode || ""}
+                                >
+                                    <option value="">{t`All`}</option>
+                                    {modes.map((mode) => (
+                                        <option key={mode} value={mode}>
+                                            {filterValueLabel(mode)}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
+
+                        {states.length > 0 && (
+                            <div className="flex items-center gap-1.5">
+                                <Label className="text-muted-foreground text-xs" htmlFor="models-state-filter">
+                                    {t`State:`}
+                                </Label>
+                                <select
+                                    className="border-input bg-background h-8 max-w-40 rounded-md border px-2 text-xs"
+                                    id="models-state-filter"
+                                    onChange={(e) => setSelectedState(e.target.value || null)}
+                                    value={selectedState || ""}
+                                >
+                                    <option value="">{t`All`}</option>
+                                    {states.map((state) => (
+                                        <option key={state} value={state}>
+                                            {filterValueLabel(state)}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
+
+                        {hasActiveFilters && (
+                            <Button className="h-8 text-xs" onClick={clearFilters} size="sm" variant="ghost">
+                                <X aria-hidden="true" className="mr-1.5 size-3" />
+                                {t`Clear`}
+                            </Button>
                         )}
                     </div>
 
-                    <Separator />
+                    {/* Filters Panel */}
+                    {showFilters && (
+                        <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="text-muted-foreground me-1 text-xs font-medium">{t`Capabilities`}</span>
+                            {FILTER_CAPABILITIES.map((filter) => {
+                                const isActive = activeFilters.has(filter.key);
 
-                    {/* Models List */}
-                    {filteredModels.length === 0 ? (
-                        <div className="text-muted-foreground py-8 text-center text-sm">{t`No models found matching your filters.`}</div>
-                    ) : (
-                        <div className="space-y-6">
-                            {Array.from(groupedModels.entries(), ([provider, providerModels]) => (
-                                <div className="space-y-3" key={provider}>
-                                    <div className="flex items-center justify-between">
+                                return (
+                                    <Button
+                                        className={clsx(
+                                            "h-6 px-2 text-[11px]",
+                                            isActive ? "bg-primary text-primary-foreground" : "bg-background hover:bg-accent",
+                                        )}
+                                        key={filter.key}
+                                        onClick={() => toggleFilter(filter.key)}
+                                        size="sm"
+                                        variant={isActive ? "default" : "outline"}
+                                    >
+                                        {i18n._(filter.label)}
+                                    </Button>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+
+                <div className="surface-raised overflow-hidden rounded-xl" data-slot="settings-card-body">
+                    <div className="px-4 py-1">
+                        {/* Models List */}
+                        {filteredModels.length === 0 ? (
+                            <div className="text-muted-foreground py-6 text-center text-sm">{t`No models found matching your filters.`}</div>
+                        ) : (
+                            Array.from(groupedModels.entries(), ([provider, providerModels]) => (
+                                <div className="border-border/50 not-first:border-t" key={provider}>
+                                    <div className="flex items-center justify-between pt-3">
                                         <Heading className="text-sm font-semibold" fallbackLevel={3}>
                                             {provider === OTHER_PROVIDER ? t`Other` : provider}
                                         </Heading>
@@ -524,20 +518,34 @@ const ModelsSettings: FC = () => {
                                             {t`Enable All`}
                                         </Button>
                                     </div>
-                                    <div className="space-y-2">
-                                        {providerModels.map((model) => {
-                                            const isEnabled = currentEnabledState[model.id] ?? false;
-                                            const isOverridden = modelOverrides[model.id] !== undefined;
+                                    {providerModels.map((model) => {
+                                        const isEnabled = currentEnabledState[model.id] ?? false;
+                                        const isOverridden = modelOverrides[model.id] !== undefined;
+                                        const switchId = `models-enabled-${model.id}`;
 
-                                            return (
-                                                <div
-                                                    className={clsx(
-                                                        "flex items-center justify-between rounded-lg border p-3 transition-colors",
-                                                        isOverridden && "bg-muted/50",
-                                                    )}
-                                                    key={model.id}
-                                                >
-                                                    <div className="flex min-w-0 flex-1 items-center gap-3">
+                                        return (
+                                            <SettingsRow
+                                                control={
+                                                    <Switch checked={isEnabled} id={switchId} onCheckedChange={(checked) => toggleModel(model.id, checked)} />
+                                                }
+                                                description={
+                                                    <>
+                                                        {model.name && model.name !== model.id && <span className="block truncate font-mono">{model.id}</span>}
+                                                        {model.filterCapabilities && model.filterCapabilities.length > 0 && (
+                                                            <span className="mt-1 flex flex-wrap gap-1">
+                                                                {model.filterCapabilities.map((cap) => (
+                                                                    <Badge className="px-1 py-0 text-[10px]" key={cap} variant="outline">
+                                                                        {capabilityLabel(cap)}
+                                                                    </Badge>
+                                                                ))}
+                                                            </span>
+                                                        )}
+                                                    </>
+                                                }
+                                                htmlFor={switchId}
+                                                key={model.id}
+                                                title={
+                                                    <span className="inline-flex flex-wrap items-center gap-2">
                                                         {model.displayProvider && (
                                                             <ProviderIcon
                                                                 className="size-3"
@@ -545,73 +553,34 @@ const ModelsSettings: FC = () => {
                                                                 providerIcon={model.displayProvider}
                                                             />
                                                         )}
-                                                        <div className="min-w-0 flex-1">
-                                                            <div className="flex items-center gap-2">
-                                                                <span className="text-leftfont-medium flex-1 truncate">{model.name ?? model.id}</span>
-                                                                {model.isPremium && (
-                                                                    <Badge
-                                                                        className={clsx(
-                                                                            "bg-purple-500/10 text-purple-600 dark:text-purple-400",
-                                                                            "px-1.5 py-0.5 text-[10px]",
-                                                                        )}
-                                                                    >
-                                                                        {t`Pro`}
-                                                                    </Badge>
-                                                                )}
-                                                                {model.isNew && (
-                                                                    <Badge
-                                                                        className={clsx(
-                                                                            "bg-green-500/10 text-green-600 dark:text-green-400",
-                                                                            "px-1.5 py-0.5 text-[10px]",
-                                                                        )}
-                                                                    >
-                                                                        {t`New`}
-                                                                    </Badge>
-                                                                )}
-                                                                {!model.isPremium && (
-                                                                    <Badge
-                                                                        className={clsx(
-                                                                            "bg-blue-500/10 text-blue-600 dark:text-blue-400",
-                                                                            "px-1.5 py-0.5 text-[10px]",
-                                                                        )}
-                                                                    >
-                                                                        {t`Free`}
-                                                                    </Badge>
-                                                                )}
-                                                                {isOverridden && (
-                                                                    <Badge
-                                                                        className={clsx(
-                                                                            "bg-orange-500/10 text-orange-600 dark:text-orange-400",
-                                                                            "px-1.5 py-0.5 text-[10px]",
-                                                                        )}
-                                                                        title={isEnabled ? t`Overridden: Enabled` : t`Overridden: Disabled`}
-                                                                    >
-                                                                        {t`Overridden`}
-                                                                    </Badge>
-                                                                )}
-                                                            </div>
-                                                            {model.name && <p className="text-muted-foreground text-xs">{model.name}</p>}
-                                                            {model.filterCapabilities && model.filterCapabilities.length > 0 && (
-                                                                <div className="mt-1 flex flex-wrap gap-1">
-                                                                    {model.filterCapabilities.map((cap) => (
-                                                                        <Badge className="px-1 py-0 text-[10px]" key={cap} variant="outline">
-                                                                            {capabilityLabel(cap)}
-                                                                        </Badge>
-                                                                    ))}
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                    <Switch checked={isEnabled} onCheckedChange={(checked) => toggleModel(model.id, checked)} />
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
+                                                        <span>{model.name ?? model.id}</span>
+                                                        {model.isPremium && (
+                                                            <Badge className="bg-purple-500/10 px-1.5 py-0.5 text-[10px] text-purple-600 dark:text-purple-400">{t`Pro`}</Badge>
+                                                        )}
+                                                        {model.isNew && (
+                                                            <Badge className="bg-green-500/10 px-1.5 py-0.5 text-[10px] text-green-600 dark:text-green-400">{t`New`}</Badge>
+                                                        )}
+                                                        {!model.isPremium && (
+                                                            <Badge className="bg-blue-500/10 px-1.5 py-0.5 text-[10px] text-blue-600 dark:text-blue-400">{t`Free`}</Badge>
+                                                        )}
+                                                        {isOverridden && (
+                                                            <Badge
+                                                                className="bg-orange-500/10 px-1.5 py-0.5 text-[10px] text-orange-600 dark:text-orange-400"
+                                                                title={isEnabled ? t`Overridden: Enabled` : t`Overridden: Disabled`}
+                                                            >
+                                                                {t`Overridden`}
+                                                            </Badge>
+                                                        )}
+                                                    </span>
+                                                }
+                                            />
+                                        );
+                                    })}
                                 </div>
-                            ))}
-                        </div>
-                    )}
-                </CardContent>
+                            ))
+                        )}
+                    </div>
+                </div>
             </Card>
             <ConfirmDialog
                 confirmLabel={t`Reset`}

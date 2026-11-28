@@ -57,7 +57,7 @@ const useKindLabel = (): ((kind: "group" | "skill" | "trigger") => string) => {
 };
 
 const List: FC<{ items: string[]; label: string; tone?: "warning" }> = ({ items, label, tone }) => (
-    <p className={tone === "warning" ? "text-xs text-amber-600 dark:text-amber-400" : "text-muted-foreground text-xs"}>
+    <p className={tone === "warning" ? "text-warning-foreground text-xs" : "text-muted-foreground text-xs"}>
         <span className="font-medium">{label}</span> {items.join(", ")}
     </p>
 );
@@ -82,7 +82,12 @@ const FullText: FC<{ label: string; text: string }> = ({ label, text }) => {
             <p className="text-xs font-medium">{label}</p>
             <div id={textId}>
                 {expanded ? (
-                    <textarea aria-label={label} className="bg-muted h-64 w-full resize-y rounded p-2 text-xs whitespace-pre-wrap" readOnly value={text} />
+                    <textarea
+                        aria-label={label}
+                        className="surface-well h-64 w-full resize-y rounded-lg p-2 text-xs whitespace-pre-wrap"
+                        readOnly
+                        value={text}
+                    />
                 ) : (
                     <div className="text-muted-foreground line-clamp-3 text-xs whitespace-pre-wrap">{text}</div>
                 )}
@@ -169,7 +174,7 @@ const EntryDetails: FC<{ entry: BundleReviewEntry; problemsId: string }> = ({ en
                 </div>
             )}
             {entry.warnings.map((warning) => (
-                <p className="text-xs text-amber-600 dark:text-amber-400" key={warning}>
+                <p className="text-warning-foreground text-xs" key={warning}>
                     {warning}
                 </p>
             ))}
@@ -190,11 +195,11 @@ const WebhookSecret: FC<{ secret: string; title: string }> = ({ secret, title })
     };
 
     return (
-        <div className="space-y-1 rounded-md border border-amber-500/50 p-3">
+        <div className="border-warning/40 space-y-1 rounded-lg border p-3">
             <p className="text-sm font-medium">{t`Webhook secret for "${title}"`}</p>
             <p className="text-muted-foreground text-xs">{t`Copy this secret now and store it with your webhook sender. It will not be shown again.`}</p>
             <div className="flex items-center gap-2">
-                <code className="bg-muted min-w-0 flex-1 truncate rounded px-2 py-1 font-mono text-xs select-all">{secret}</code>
+                <code className="surface-well min-w-0 flex-1 truncate rounded px-2 py-1 font-mono text-xs select-all">{secret}</code>
                 <Button
                     onClick={() => {
                         void handleCopy();
@@ -223,7 +228,7 @@ const ImportResult: FC<{ done: Imported; onClose: () => void }> = ({ done, onClo
                 <DialogTitle>{t`Bundle imported`}</DialogTitle>
                 <DialogDescription>{t`${done.items.length} items were created. Skills, schedules and webhooks are switched off; turn each one on when you are ready.`}</DialogDescription>
             </DialogHeader>
-            <DialogPanel className="space-y-3">
+            <DialogPanel className="divide-border/50 divide-y *:py-3 *:first:pt-0 *:last:pb-0 *:empty:border-0 *:empty:p-0">
                 <ul className="space-y-1 text-sm">
                     {done.items.map((item) => (
                         <li key={item.key}>
@@ -236,14 +241,14 @@ const ImportResult: FC<{ done: Imported; onClose: () => void }> = ({ done, onClo
                     <WebhookSecret key={item.key} secret={item.webhookSecret!} title={item.title} />
                 ))}
                 {done.warnings.length > 0 && (
-                    <ul className="space-y-0.5 text-xs text-amber-600 dark:text-amber-400">
+                    <ul className="text-warning-foreground space-y-0.5 text-xs">
                         {done.warnings.map((warning) => (
                             <li key={warning}>{warning}</li>
                         ))}
                     </ul>
                 )}
             </DialogPanel>
-            <DialogFooter>
+            <DialogFooter className="border-border/50 border-t" variant="bare">
                 <Button onClick={onClose} type="button">
                     {t`Done`}
                 </Button>
@@ -352,7 +357,7 @@ const BundleImportDialogBody: FC<Omit<BundleImportDialogProps, "open">> = ({ onB
                 <DialogTitle>{t`Import a bundle`}</DialogTitle>
                 <DialogDescription>{t`Upload a bundle file (.md). You will see everything in it and choose what to import; nothing is created until you confirm.`}</DialogDescription>
             </DialogHeader>
-            <DialogPanel className="space-y-4">
+            <DialogPanel className="divide-border/50 divide-y *:py-3 *:first:pt-0 *:last:pb-0 *:empty:border-0 *:empty:p-0">
                 <div className="flex items-center gap-2">
                     <Button disabled={isReading || isImporting} onClick={() => fileInput.current?.click()} type="button" variant="outline">
                         {isReading ? (
@@ -392,14 +397,14 @@ const BundleImportDialogBody: FC<Omit<BundleImportDialogProps, "open">> = ({ onB
                             {review.description && <p className="text-muted-foreground text-xs">{review.description}</p>}
                         </div>
                         {entries.length === 0 && <p className="text-muted-foreground text-sm">{t`This bundle has no items.`}</p>}
-                        <ul className="space-y-3">
+                        <ul className="border-border/50 divide-border/50 divide-y rounded-lg border">
                             {entries.map((entry) => {
                                 const inputId = `${headingId}-${entry.key}`;
                                 const problemsId = `${inputId}-problems`;
                                 const blocked = entry.problems.length > 0;
 
                                 return (
-                                    <li className="flex items-start gap-2 rounded-md border p-3" key={entry.key}>
+                                    <li className="flex items-start gap-2 px-3 py-3" key={entry.key}>
                                         <Checkbox
                                             aria-describedby={blocked ? problemsId : undefined}
                                             checked={selected.has(entry.key)}
@@ -427,7 +432,7 @@ const BundleImportDialogBody: FC<Omit<BundleImportDialogProps, "open">> = ({ onB
                     </section>
                 )}
             </DialogPanel>
-            <DialogFooter>
+            <DialogFooter className="border-border/50 border-t" variant="bare">
                 <Button disabled={isImporting} onClick={onClose} type="button" variant="outline">
                     {t`Cancel`}
                 </Button>

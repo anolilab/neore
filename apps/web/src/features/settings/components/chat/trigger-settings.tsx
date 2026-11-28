@@ -9,13 +9,11 @@ import type { WebhookSignatureScheme } from "@neore/backend/triggers/presets";
 import { MAX_PAYLOAD_LENGTH, MAX_RENDERED_PROMPT_LENGTH, MAX_RENDERED_VALUE_LENGTH } from "@neore/backend/triggers/webhook-template";
 import { Badge } from "@neore/ui/components/badge";
 import { Button } from "@neore/ui/components/button";
-import { Card, CardContent, CardDescription, CardHeader, CardHeading, CardTitle } from "@neore/ui/components/card";
+import { CardHeading } from "@neore/ui/components/card";
 import ConfirmDialog from "@neore/ui/components/confirm-dialog";
-import { Heading, HeadingSection } from "@neore/ui/components/heading";
+import { Heading } from "@neore/ui/components/heading";
 import { Input } from "@neore/ui/components/input";
-import { Label } from "@neore/ui/components/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@neore/ui/components/select";
-import { Separator } from "@neore/ui/components/separator";
 import { Switch } from "@neore/ui/components/switch";
 import { Textarea } from "@neore/ui/components/textarea";
 import { formatDateTime } from "@neore/ui/utils/locale-format";
@@ -45,6 +43,8 @@ import type { FC } from "react";
 import { useCallback, useId, useState } from "react";
 import { toast } from "sonner";
 
+import SettingsCard from "@/components/settings/settings-card";
+import SettingsRow from "@/components/settings/settings-row";
 import { useShownWebhookSecrets } from "@/features/settings/hooks/use-shown-webhook-secrets";
 import type { FilterOp } from "@/features/settings/lib/trigger-filters";
 import env from "@/lib/env";
@@ -190,6 +190,8 @@ const EXECUTION_STATUS_LABELS: Partial<Record<string, MessageDescriptor>> = {
 
 interface TriggerFormProps {
     formData: TriggerFormData;
+    /** Drawn as a row of the box it is in (an edit in the trigger list), not as a box of its own. */
+    inline?: boolean;
     /** An existing trigger keeps its type and the scheme its secret was issued for. */
     isExisting?: boolean;
     isPending: boolean;
@@ -199,7 +201,7 @@ interface TriggerFormProps {
     title: string;
 }
 
-const TriggerForm: FC<TriggerFormProps> = ({ formData, isPending, onCancel, onChange, onSubmit, isExisting = false, title }) => {
+const TriggerForm: FC<TriggerFormProps> = ({ formData, inline = false, isPending, onCancel, onChange, onSubmit, isExisting = false, title }) => {
     // Generated ids: the create and edit forms can be open together, and fixed ids would make their labels ambiguous.
     const botPickerId = useId();
     const botComputerId = useId();
@@ -211,29 +213,21 @@ const TriggerForm: FC<TriggerFormProps> = ({ formData, isPending, onCancel, onCh
     const fieldLimit = i18n.number(MAX_RENDERED_VALUE_LENGTH);
     const promptLimit = i18n.number(MAX_RENDERED_PROMPT_LENGTH);
 
-    return (
-        <Card>
-            <CardHeader>
-                <CardTitle>{title}</CardTitle>
-                <CardDescription>{t`Set up a new automated agent execution`}</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-                {/* Name */}
-                <div className="space-y-1.5">
-                    <Label htmlFor="trigger-name">{t`Name`}</Label>
-                    <Input
-                        id="trigger-name"
-                        maxLength={100}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => onChange({ ...formData, name: e.target.value })}
-                        placeholder={t`Daily inbox summary`}
-                        value={formData.name}
-                    />
-                </div>
+    const fields = (
+        <>
+            <SettingsRow htmlFor="trigger-name" title={t`Name`}>
+                <Input
+                    id="trigger-name"
+                    maxLength={100}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => onChange({ ...formData, name: e.target.value })}
+                    placeholder={t`Daily inbox summary`}
+                    value={formData.name}
+                />
+            </SettingsRow>
 
-                {/* Description */}
-                {/* Bot: a routine that names a bot runs on the bot's model and instructions */}
-                <div className="space-y-1.5">
-                    <Label htmlFor={botPickerId}>{t`Run as bot (optional)`}</Label>
+            {/* Bot: a routine that names a bot runs on the bot's model and instructions */}
+            <SettingsRow
+                control={
                     <Select
                         items={[
                             { label: t`No bot`, value: NO_BOT },
@@ -256,160 +250,172 @@ const TriggerForm: FC<TriggerFormProps> = ({ formData, isPending, onCancel, onCh
                             ))}
                         </SelectContent>
                     </Select>
-                </div>
-                {formData.type === "schedule" && bots.some((bot) => bot._id === formData.botId && bot.computerEnabled) && (
-                    <div className="flex items-center justify-between gap-4">
-                        <div>
-                            <Label htmlFor={botComputerId}>{t`Let the bot use its computer`}</Label>
-                            <p className="text-muted-foreground text-xs">
-                                {t`Scheduled runs can run shell commands and edit files on the bot's computer, unless you turn those tools off in your tool settings.`}
-                            </p>
-                        </div>
+                }
+                htmlFor={botPickerId}
+                title={t`Run as bot (optional)`}
+            />
+            {formData.type === "schedule" && bots.some((bot) => bot._id === formData.botId && bot.computerEnabled) && (
+                <SettingsRow
+                    control={
                         <Switch
                             checked={formData.botComputer}
                             id={botComputerId}
                             onCheckedChange={(checked: boolean) => onChange({ ...formData, botComputer: checked })}
                         />
-                    </div>
-                )}
-                {formData.type === "schedule" && bots.some((bot) => bot._id === formData.botId) && (
-                    <div className="flex items-center justify-between gap-4">
-                        <div>
-                            <Label htmlFor={quietId}>{t`Only post when there is something to report`}</Label>
-                            <p className="text-muted-foreground text-xs">
-                                {t`Skips a run when your workspace has had no new activity since the routine last posted. A skipped run creates no chat and sends no notification.`}
-                            </p>
-                        </div>
+                    }
+                    description={t`Scheduled runs can run shell commands and edit files on the bot's computer, unless you turn those tools off in your tool settings.`}
+                    htmlFor={botComputerId}
+                    title={t`Let the bot use its computer`}
+                />
+            )}
+            {formData.type === "schedule" && bots.some((bot) => bot._id === formData.botId) && (
+                <SettingsRow
+                    control={
                         <Switch
                             checked={formData.quietWhenEmpty}
                             id={quietId}
                             onCheckedChange={(checked: boolean) => onChange({ ...formData, quietWhenEmpty: checked })}
                         />
-                    </div>
-                )}
+                    }
+                    description={t`Skips a run when your workspace has had no new activity since the routine last posted. A skipped run creates no chat and sends no notification.`}
+                    htmlFor={quietId}
+                    title={t`Only post when there is something to report`}
+                />
+            )}
 
-                <div className="space-y-1.5">
-                    <Label htmlFor="trigger-desc">{t`Description (optional)`}</Label>
-                    <Input
-                        id="trigger-desc"
-                        maxLength={500}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => onChange({ ...formData, description: e.target.value })}
-                        placeholder={t`Summarize my email inbox every morning`}
-                        value={formData.description}
-                    />
-                </div>
+            <SettingsRow htmlFor="trigger-desc" title={t`Description (optional)`}>
+                <Input
+                    id="trigger-desc"
+                    maxLength={500}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => onChange({ ...formData, description: e.target.value })}
+                    placeholder={t`Summarize my email inbox every morning`}
+                    value={formData.description}
+                />
+            </SettingsRow>
 
-                <Separator />
+            {/* Type */}
+            <SettingsRow title={t`Trigger Type`}>
+                <TriggerTypePicker disabled={isExisting} onSelect={(type) => onChange(withBotOptions({ ...formData, type }))} value={formData.type} />
+            </SettingsRow>
 
-                {/* Type */}
-                <div className="space-y-1.5">
-                    <Label>{t`Trigger Type`}</Label>
-                    <TriggerTypePicker disabled={isExisting} onSelect={(type) => onChange(withBotOptions({ ...formData, type }))} value={formData.type} />
-                </div>
-
-                {/* Schedule config */}
-                {formData.type === "schedule" && (
-                    <div className="space-y-3">
-                        <div className="space-y-1.5">
-                            <Label htmlFor="trigger-cron">{t`Cron Expression`}</Label>
-                            <Input
-                                id="trigger-cron"
-                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => onChange({ ...formData, cronExpression: e.target.value })}
-                                placeholder="0 8 * * *"
-                                value={formData.cronExpression}
-                            />
-                            <div aria-label={t`Cron presets`} className="flex flex-wrap gap-1.5 pt-1" role="group">
-                                {CRON_PRESETS.map((preset) => (
-                                    <button
-                                        className="text-muted-foreground hover:text-foreground rounded border px-2 py-0.5 text-[11px] transition-colors"
-                                        key={preset.expression}
-                                        onClick={() => onChange({ ...formData, cronExpression: preset.expression })}
-                                        type="button"
-                                    >
-                                        {i18n._(preset.label)}
-                                    </button>
-                                ))}
-                            </div>
+            {/* Schedule config */}
+            {formData.type === "schedule" && (
+                <>
+                    <SettingsRow htmlFor="trigger-cron" title={t`Cron Expression`}>
+                        <Input
+                            id="trigger-cron"
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => onChange({ ...formData, cronExpression: e.target.value })}
+                            placeholder="0 8 * * *"
+                            value={formData.cronExpression}
+                        />
+                        <div aria-label={t`Cron presets`} className="flex flex-wrap gap-1.5 pt-2" role="group">
+                            {CRON_PRESETS.map((preset) => (
+                                <button
+                                    className="text-muted-foreground hover:text-foreground rounded border px-2 py-0.5 text-[11px] transition-colors"
+                                    key={preset.expression}
+                                    onClick={() => onChange({ ...formData, cronExpression: preset.expression })}
+                                    type="button"
+                                >
+                                    {i18n._(preset.label)}
+                                </button>
+                            ))}
                         </div>
-                        <div className="space-y-1.5">
-                            <Label htmlFor="trigger-tz">{t`Timezone`}</Label>
-                            <Input
-                                id="trigger-tz"
-                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => onChange({ ...formData, timezone: e.target.value })}
-                                placeholder="America/New_York"
-                                value={formData.timezone}
-                            />
-                        </div>
-                    </div>
-                )}
+                    </SettingsRow>
+                    <SettingsRow htmlFor="trigger-tz" title={t`Timezone`}>
+                        <Input
+                            id="trigger-tz"
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => onChange({ ...formData, timezone: e.target.value })}
+                            placeholder="America/New_York"
+                            value={formData.timezone}
+                        />
+                    </SettingsRow>
+                </>
+            )}
 
-                {/* Webhook info */}
+            {/* Webhook info */}
+            {formData.type === "webhook" && (
+                <div className="border-border/50 py-3 text-sm not-first:border-t">
+                    <p className="text-muted-foreground">
+                        <Trans>
+                            A unique webhook URL and secret will be generated when you create this trigger. Use the URL as the target for external services
+                            (Zapier, n8n, your own code, etc.).
+                        </Trans>
+                    </p>
+                    <WebhookTriggerFields isExisting={isExisting} onChange={(webhook) => onChange({ ...formData, webhook })} webhook={formData.webhook} />
+                </div>
+            )}
+
+            {/* Event config */}
+            {formData.type === "event" && (
+                <div className="border-border/50 py-3 not-first:border-t">
+                    <EventTriggerFields event={formData.event} onChange={(event) => onChange({ ...formData, event })} />
+                </div>
+            )}
+
+            {/* Agent config */}
+            <SettingsRow htmlFor="trigger-prompt" title={t`System Prompt (optional)`}>
+                <Textarea
+                    id="trigger-prompt"
+                    onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => onChange({ ...formData, systemPrompt: e.target.value })}
+                    placeholder={t`You are a helpful assistant that summarizes emails...`}
+                    rows={3}
+                    value={formData.systemPrompt}
+                />
+            </SettingsRow>
+
+            <SettingsRow htmlFor="trigger-input" title={t`Input Template`}>
+                <Textarea
+                    aria-describedby={formData.type === "webhook" ? "trigger-input-hint" : undefined}
+                    id="trigger-input"
+                    onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => onChange({ ...formData, inputTemplate: e.target.value })}
+                    placeholder={t`Summarize my inbox and highlight urgent items. Use ${PAYLOAD_TOKEN} for webhook data.`}
+                    rows={2}
+                    value={formData.inputTemplate}
+                />
                 {formData.type === "webhook" && (
-                    <div className="bg-muted rounded-lg p-3 text-sm">
-                        <p className="text-muted-foreground">
-                            <Trans>
-                                A unique webhook URL and secret will be generated when you create this trigger. Use the URL as the target for external services
-                                (Zapier, n8n, your own code, etc.).
-                            </Trans>
-                        </p>
-                        <WebhookTriggerFields isExisting={isExisting} onChange={(webhook) => onChange({ ...formData, webhook })} webhook={formData.webhook} />
-                    </div>
+                    <p className="text-muted-foreground mt-1.5 text-xs" id="trigger-input-hint">
+                        {t`Placeholders: ${PAYLOAD_TOKEN} inserts the whole body, framed as raw text. ${WEBHOOK_BODY_TOKEN} inserts a JSON field, ${WEBHOOK_HEADER_TOKEN} a header and ${WEBHOOK_QUERY_TOKEN} a query parameter, each as quoted data. Headers and the query are not signed, and a credential-looking name is never read. With every value at its longest (${bodyLimit} characters for the body, ${fieldLimit} for a field), a template must fit in ${promptLimit} characters.`}
+                    </p>
                 )}
+            </SettingsRow>
 
-                {/* Event config */}
-                {formData.type === "event" && <EventTriggerFields event={formData.event} onChange={(event) => onChange({ ...formData, event })} />}
+            {/* Actions */}
+            <div className="border-border/50 flex justify-end gap-2 py-3 not-first:border-t">
+                <Button onClick={onCancel} variant="outline">
+                    {t`Cancel`}
+                </Button>
+                <Button
+                    disabled={
+                        isPending ||
+                        !formData.name.trim() ||
+                        (formData.type === "event" && eventIsIncomplete(formData.event)) ||
+                        (formData.type === "webhook" && webhookHasIncompleteFilters(formData.webhook))
+                    }
+                    onClick={onSubmit}
+                >
+                    {isPending && <Loader2 aria-hidden="true" className="mr-1.5 size-4 animate-spin" />}
+                    {title}
+                </Button>
+            </div>
+        </>
+    );
 
-                <Separator />
+    if (inline) {
+        return (
+            <div className="border-border/50 py-3 not-first:border-t">
+                <Heading className="text-sm font-medium" fallbackLevel={4}>
+                    {title}
+                </Heading>
+                <p className="text-muted-foreground text-xs">{t`Set up a new automated agent execution`}</p>
+                {fields}
+            </div>
+        );
+    }
 
-                {/* Agent config */}
-                <div className="space-y-1.5">
-                    <Label htmlFor="trigger-prompt">{t`System Prompt (optional)`}</Label>
-                    <Textarea
-                        id="trigger-prompt"
-                        onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => onChange({ ...formData, systemPrompt: e.target.value })}
-                        placeholder={t`You are a helpful assistant that summarizes emails...`}
-                        rows={3}
-                        value={formData.systemPrompt}
-                    />
-                </div>
-
-                <div className="space-y-1.5">
-                    <Label htmlFor="trigger-input">{t`Input Template`}</Label>
-                    <Textarea
-                        aria-describedby={formData.type === "webhook" ? "trigger-input-hint" : undefined}
-                        id="trigger-input"
-                        onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => onChange({ ...formData, inputTemplate: e.target.value })}
-                        placeholder={t`Summarize my inbox and highlight urgent items. Use ${PAYLOAD_TOKEN} for webhook data.`}
-                        rows={2}
-                        value={formData.inputTemplate}
-                    />
-                    {formData.type === "webhook" && (
-                        <p className="text-muted-foreground text-xs" id="trigger-input-hint">
-                            {t`Placeholders: ${PAYLOAD_TOKEN} inserts the whole body, framed as raw text. ${WEBHOOK_BODY_TOKEN} inserts a JSON field, ${WEBHOOK_HEADER_TOKEN} a header and ${WEBHOOK_QUERY_TOKEN} a query parameter, each as quoted data. Headers and the query are not signed, and a credential-looking name is never read. With every value at its longest (${bodyLimit} characters for the body, ${fieldLimit} for a field), a template must fit in ${promptLimit} characters.`}
-                        </p>
-                    )}
-                </div>
-
-                {/* Actions */}
-                <div className="flex justify-end gap-2 pt-2">
-                    <Button onClick={onCancel} variant="outline">
-                        {t`Cancel`}
-                    </Button>
-                    <Button
-                        disabled={
-                            isPending ||
-                            !formData.name.trim() ||
-                            (formData.type === "event" && eventIsIncomplete(formData.event)) ||
-                            (formData.type === "webhook" && webhookHasIncompleteFilters(formData.webhook))
-                        }
-                        onClick={onSubmit}
-                    >
-                        {isPending && <Loader2 aria-hidden="true" className="mr-1.5 size-4 animate-spin" />}
-                        {title}
-                    </Button>
-                </div>
-            </CardContent>
-        </Card>
+    return (
+        <SettingsCard description={t`Set up a new automated agent execution`} title={title}>
+            {fields}
+        </SettingsCard>
     );
 };
 
@@ -732,69 +738,63 @@ const TriggerSettings: FC = () => {
     }
 
     return (
-        <div className="space-y-6">
-            {/* Header */}
-            <div className="flex items-start justify-between">
-                <div>
-                    <Heading className="text-2xl font-bold tracking-tight">{t`Triggers`}</Heading>
-                    <p className="text-muted-foreground">{t`Automate agent execution on schedules, webhooks or events`}</p>
-                </div>
-                <Button disabled={showCreateForm} onClick={() => setShowCreateForm(true)} size="sm">
-                    <Plus aria-hidden="true" className="mr-1.5 size-4" />
-                    {t`New Trigger`}
-                </Button>
-            </div>
+        <div className="space-y-8">
+            {/* Create Form */}
+            {showCreateForm && (
+                <TriggerForm
+                    formData={formData}
+                    isPending={createMutation.isPending}
+                    onCancel={() => {
+                        setShowCreateForm(false);
+                        setFormData(EMPTY_FORM);
+                    }}
+                    onChange={setFormData}
+                    onSubmit={handleCreate}
+                    title={t`Create Trigger`}
+                />
+            )}
 
-            <HeadingSection>
-                {/* Create Form */}
-                {showCreateForm && (
-                    <TriggerForm
-                        formData={formData}
-                        isPending={createMutation.isPending}
-                        onCancel={() => {
-                            setShowCreateForm(false);
-                            setFormData(EMPTY_FORM);
-                        }}
-                        onChange={setFormData}
-                        onSubmit={handleCreate}
-                        title={t`Create Trigger`}
-                    />
-                )}
+            {shownWebhookSecrets.map((shown) => (
+                <SettingsCard
+                    description={t`Copy this secret now and store it with your webhook sender. It will not be shown again.`}
+                    key={shown.id}
+                    title={t`Webhook secret for "${shown.name}"`}
+                >
+                    <div className="flex items-center gap-2 py-3">
+                        <code className="bg-muted min-w-0 flex-1 truncate rounded px-2 py-1 font-mono text-xs select-all">{shown.secret}</code>
+                        <Button
+                            onClick={() => {
+                                void handleCopyWebhookSecret(shown.secret);
+                            }}
+                            size="sm"
+                            variant="outline"
+                        >
+                            <Copy aria-hidden="true" className="mr-1.5 size-3" />
+                            {t`Copy`}
+                        </Button>
+                        <Button aria-label={t`Dismiss webhook secret`} onClick={() => dismissWebhookSecret(shown.id)} size="sm" variant="ghost">
+                            <X aria-hidden="true" className="size-4" />
+                        </Button>
+                    </div>
+                </SettingsCard>
+            ))}
 
-                {shownWebhookSecrets.map((shown) => (
-                    <Card className="border-amber-500/50" key={shown.id}>
-                        <CardContent className="space-y-2 p-4">
-                            <div className="flex items-start justify-between gap-3">
-                                <div>
-                                    <CardHeading className="font-medium">{t`Webhook secret for "${shown.name}"`}</CardHeading>
-                                    <p className="text-muted-foreground text-sm">
-                                        {t`Copy this secret now and store it with your webhook sender. It will not be shown again.`}
-                                    </p>
-                                </div>
-                                <Button aria-label={t`Dismiss webhook secret`} onClick={() => dismissWebhookSecret(shown.id)} size="sm" variant="ghost">
-                                    <X aria-hidden="true" className="size-4" />
-                                </Button>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <code className="bg-muted min-w-0 flex-1 truncate rounded px-2 py-1 font-mono text-xs select-all">{shown.secret}</code>
-                                <Button
-                                    onClick={() => {
-                                        void handleCopyWebhookSecret(shown.secret);
-                                    }}
-                                    size="sm"
-                                    variant="outline"
-                                >
-                                    <Copy aria-hidden="true" className="mr-1.5 size-3" />
-                                    {t`Copy`}
-                                </Button>
-                            </div>
-                        </CardContent>
-                    </Card>
-                ))}
-
-                {/* Trigger List */}
+            {/* Trigger List */}
+            <SettingsCard
+                action={showCreateForm ? undefined : () => setShowCreateForm(true)}
+                actionLabel={
+                    showCreateForm ? undefined : (
+                        <>
+                            <Plus aria-hidden="true" className="mr-1.5 size-4" />
+                            {t`New Trigger`}
+                        </>
+                    )
+                }
+                description={t`Automate agent execution on schedules, webhooks or events`}
+                title={t`Triggers`}
+            >
                 {triggers && triggers.length > 0 ? (
-                    <div className="space-y-3">
+                    <>
                         {(
                             triggers.map((trigger) => {
                                 return { ...trigger, _id: trigger._id as Id<"triggers"> };
@@ -806,6 +806,7 @@ const TriggerSettings: FC = () => {
                                 return (
                                     <TriggerForm
                                         formData={editFormData}
+                                        inline
                                         isExisting
                                         isPending={updateMutation.isPending}
                                         key={trigger._id}
@@ -822,273 +823,264 @@ const TriggerSettings: FC = () => {
                             const lastRunAt = trigger.lastTriggeredAt ? formatDateTime(trigger.lastTriggeredAt, i18n.locale) : null;
 
                             return (
-                                <Card key={trigger._id}>
-                                    <CardContent className="p-4">
-                                        <div className="flex items-start justify-between gap-3">
-                                            <div className="min-w-0 flex-1">
-                                                <div className="flex items-center gap-2">
-                                                    <CardHeading className="truncate font-medium">{trigger.name}</CardHeading>
-                                                    <TriggerTypeBadge type={trigger.type} />
-                                                    {trigger.enabled ? (
-                                                        <Badge variant="default">{t`Active`}</Badge>
-                                                    ) : (
-                                                        <Badge variant="secondary">{t`Disabled`}</Badge>
-                                                    )}
-                                                </div>
-                                                {trigger.description && <p className="text-muted-foreground mt-0.5 text-sm">{trigger.description}</p>}
+                                <div className="border-border/50 @container/settings-row py-3 not-first:border-t" key={trigger._id}>
+                                    <div className="flex flex-col gap-3 @lg/settings-row:grid @lg/settings-row:grid-cols-[minmax(0,1fr)_auto] @lg/settings-row:items-start @lg/settings-row:gap-8">
+                                        <div className="min-w-0">
+                                            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                                <CardHeading className="min-w-0 font-medium break-words">{trigger.name}</CardHeading>
+                                                <TriggerTypeBadge type={trigger.type} />
+                                                {trigger.enabled ? (
+                                                    <Badge variant="default">{t`Active`}</Badge>
+                                                ) : (
+                                                    <Badge variant="secondary">{t`Disabled`}</Badge>
+                                                )}
+                                            </div>
+                                            {trigger.description && <p className="text-muted-foreground mt-0.5 text-sm">{trigger.description}</p>}
 
-                                                <div className="text-muted-foreground mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
-                                                    {trigger.cronExpression && (
-                                                        <span className="flex items-center gap-1">
-                                                            <Clock aria-hidden="true" className="size-3" />
-                                                            {trigger.cronExpression}
-                                                            {trigger.timezone && ` (${trigger.timezone})`}
-                                                        </span>
-                                                    )}
-                                                    {trigger.eventSource && (
-                                                        <span className="flex items-center gap-1">
-                                                            <Zap aria-hidden="true" className="size-3" />
-                                                            {describeEventSource(trigger.eventSource)}
-                                                        </span>
-                                                    )}
-                                                    {trigger.eventStatus?.checkedAt ? (
-                                                        <span
-                                                            suppressHydrationWarning
-                                                        >{t`Checked: ${formatDateTime(trigger.eventStatus.checkedAt, i18n.locale)}`}</span>
-                                                    ) : null}
-                                                    <span>
-                                                        <Trans>Runs: {runCount}</Trans>
+                                            <div className="text-muted-foreground mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+                                                {trigger.cronExpression && (
+                                                    <span className="flex items-center gap-1">
+                                                        <Clock aria-hidden="true" className="size-3" />
+                                                        {trigger.cronExpression}
+                                                        {trigger.timezone && ` (${trigger.timezone})`}
                                                     </span>
-                                                    {lastRunAt && (
-                                                        <span suppressHydrationWarning>
-                                                            <Trans>Last: {lastRunAt}</Trans>
-                                                        </span>
-                                                    )}
-                                                </div>
-
-                                                {/* Webhook URL display */}
-                                                {trigger.type === "webhook" && (
-                                                    <div className="mt-2 flex items-center gap-1.5">
-                                                        <code className="bg-muted truncate rounded px-1.5 py-0.5 text-[11px]">
-                                                            {env.VITE_LUNORA_URL}/triggers/webhook/{trigger._id}
-                                                        </code>
-                                                        <button
-                                                            aria-label={t`Copy webhook URL`}
-                                                            className="text-muted-foreground hover:text-foreground shrink-0 transition-colors"
-                                                            onClick={() => handleCopyWebhookUrl(trigger._id)}
-                                                            type="button"
-                                                        >
-                                                            <Copy className="size-3" />
-                                                        </button>
-                                                    </div>
                                                 )}
-                                                {trigger.type === "webhook" && trigger.webhookPreviousSecretExpiresAt !== null && (
-                                                    <p className="text-muted-foreground mt-1 text-xs">
-                                                        {t`The previous secret is still accepted until ${formatDateTime(trigger.webhookPreviousSecretExpiresAt, i18n.locale)}.`}
-                                                    </p>
+                                                {trigger.eventSource && (
+                                                    <span className="flex items-center gap-1">
+                                                        <Zap aria-hidden="true" className="size-3" />
+                                                        {describeEventSource(trigger.eventSource)}
+                                                    </span>
                                                 )}
-                                                {trigger.type === "webhook" && (
-                                                    <div className="text-xs">
-                                                        <WebhookSigningInstructions scheme={trigger.webhookSignatureScheme ?? "timestamped"} />
-                                                    </div>
-                                                )}
-
-                                                {trigger.lastError && (
-                                                    <div className="mt-2 flex items-start gap-1.5 text-xs text-red-600 dark:text-red-400">
-                                                        <AlertTriangle aria-hidden="true" className="mt-0.5 size-3 shrink-0" />
-                                                        <span className="line-clamp-2">{trigger.lastError}</span>
-                                                    </div>
+                                                {trigger.eventStatus?.checkedAt ? (
+                                                    <span
+                                                        suppressHydrationWarning
+                                                    >{t`Checked: ${formatDateTime(trigger.eventStatus.checkedAt, i18n.locale)}`}</span>
+                                                ) : null}
+                                                <span>
+                                                    <Trans>Runs: {runCount}</Trans>
+                                                </span>
+                                                {lastRunAt && (
+                                                    <span suppressHydrationWarning>
+                                                        <Trans>Last: {lastRunAt}</Trans>
+                                                    </span>
                                                 )}
                                             </div>
 
-                                            <div className="flex shrink-0 items-center gap-1">
-                                                {/* Test run */}
-                                                <Button
-                                                    aria-label={t`Test run trigger`}
-                                                    disabled={testRunning === trigger._id}
-                                                    onClick={() => {
-                                                        void handleTestRun(trigger._id);
-                                                    }}
-                                                    size="sm"
-                                                    variant="ghost"
-                                                >
-                                                    {testRunning === trigger._id ? (
-                                                        <Loader2 aria-hidden="true" className="size-4 animate-spin" />
-                                                    ) : (
-                                                        <Play aria-hidden="true" className="size-4" />
-                                                    )}
-                                                </Button>
-
-                                                {/* Edit */}
-                                                <Button aria-label={t`Edit trigger`} onClick={() => startEditing(trigger)} size="sm" variant="ghost">
-                                                    <Pencil aria-hidden="true" className="size-4" />
-                                                </Button>
-
-                                                {/* Enable/disable */}
-                                                <Switch
-                                                    aria-label={trigger.enabled ? t`Disable trigger` : t`Enable trigger`}
-                                                    checked={trigger.enabled}
-                                                    disabled={enableMutation.isPending}
-                                                    onCheckedChange={(checked: boolean) => handleToggleEnabled(trigger._id, checked)}
-                                                    size="sm"
-                                                />
-
-                                                {/* Rotate the webhook secret */}
-                                                {trigger.type === "webhook" && (
-                                                    <Button
-                                                        aria-label={t`Rotate webhook secret`}
-                                                        onClick={() => setRotatingTrigger(trigger)}
-                                                        size="sm"
-                                                        variant="ghost"
+                                            {/* Webhook URL display */}
+                                            {trigger.type === "webhook" && (
+                                                <div className="mt-2 flex min-w-0 items-center gap-1.5">
+                                                    <code
+                                                        className="bg-muted min-w-0 truncate rounded px-1.5 py-0.5 text-[11px]"
+                                                        title={`${env.VITE_LUNORA_URL}/triggers/webhook/${trigger._id}`}
                                                     >
-                                                        <KeyRound aria-hidden="true" className="size-4" />
-                                                    </Button>
-                                                )}
+                                                        {env.VITE_LUNORA_URL}/triggers/webhook/{trigger._id}
+                                                    </code>
+                                                    <button
+                                                        aria-label={t`Copy webhook URL`}
+                                                        className="text-muted-foreground hover:text-foreground shrink-0 transition-colors"
+                                                        onClick={() => handleCopyWebhookUrl(trigger._id)}
+                                                        type="button"
+                                                    >
+                                                        <Copy className="size-3" />
+                                                    </button>
+                                                </div>
+                                            )}
+                                            {trigger.type === "webhook" && trigger.webhookPreviousSecretExpiresAt !== null && (
+                                                <p className="text-muted-foreground mt-1 text-xs">
+                                                    {t`The previous secret is still accepted until ${formatDateTime(trigger.webhookPreviousSecretExpiresAt, i18n.locale)}.`}
+                                                </p>
+                                            )}
+                                            {trigger.type === "webhook" && (
+                                                <div className="text-xs">
+                                                    <WebhookSigningInstructions scheme={trigger.webhookSignatureScheme ?? "timestamped"} />
+                                                </div>
+                                            )}
 
-                                                {/* Delete */}
-                                                <Button
-                                                    aria-label={t`Delete trigger`}
-                                                    disabled={deleteMutation.isPending}
-                                                    onClick={() => setDeletingTrigger(trigger)}
-                                                    size="sm"
-                                                    variant="ghost"
-                                                >
-                                                    <Trash2 aria-hidden="true" className="size-4 text-red-500" />
-                                                </Button>
-                                            </div>
+                                            {trigger.lastError && (
+                                                <div className="mt-2 flex items-start gap-1.5 text-xs text-red-600 dark:text-red-400">
+                                                    <AlertTriangle aria-hidden="true" className="mt-0.5 size-3 shrink-0" />
+                                                    <span className="line-clamp-2">{trigger.lastError}</span>
+                                                </div>
+                                            )}
                                         </div>
 
-                                        {/* Expandable execution history */}
-                                        <button
-                                            className="text-muted-foreground hover:text-foreground mt-3 flex w-full items-center gap-1 border-t pt-3 text-xs transition-colors"
-                                            onClick={() => setExpandedTriggerId(isExpanded ? null : trigger._id)}
-                                            type="button"
-                                        >
-                                            {isExpanded ? (
-                                                <ChevronDown aria-hidden="true" className="size-3" />
-                                            ) : (
-                                                <ChevronRight aria-hidden="true" className="size-3" />
-                                            )}
-                                            {t`Execution History`}
-                                        </button>
+                                        <div className="flex flex-wrap items-center gap-1">
+                                            {/* Test run */}
+                                            <Button
+                                                aria-label={t`Test run trigger`}
+                                                disabled={testRunning === trigger._id}
+                                                onClick={() => {
+                                                    void handleTestRun(trigger._id);
+                                                }}
+                                                size="sm"
+                                                variant="ghost"
+                                            >
+                                                {testRunning === trigger._id ? (
+                                                    <Loader2 aria-hidden="true" className="size-4 animate-spin" />
+                                                ) : (
+                                                    <Play aria-hidden="true" className="size-4" />
+                                                )}
+                                            </Button>
 
-                                        {isExpanded && (
-                                            <div className="mt-2 space-y-1.5">
-                                                {executionsLoading && (
-                                                    <div className="flex items-center gap-2 py-2">
-                                                        <Loader2 className="text-muted-foreground size-3 animate-spin" />
-                                                        <span className="text-muted-foreground text-xs">{t`Loading...`}</span>
-                                                    </div>
-                                                )}
-                                                {!executionsLoading &&
-                                                    executions &&
-                                                    executions.length > 0 &&
-                                                    executions.map((exec: TriggerExecutionRow) => (
-                                                        <div className="bg-muted/50 space-y-1.5 rounded-md px-3 py-2 text-xs" key={exec._id}>
-                                                            <div className="flex items-center justify-between">
-                                                                <div className="flex items-center gap-2">
-                                                                    <ExecutionStatusIcon status={exec.status} />
-                                                                    <span className="capitalize">{executionStatusLabel(exec.status)}</span>
-                                                                    <span className="text-muted-foreground" suppressHydrationWarning>
-                                                                        {formatDateTime(exec.startedAt, i18n.locale)}
-                                                                    </span>
-                                                                    {exec.completedAt && (
-                                                                        <span className="text-muted-foreground">
-                                                                            ({Math.round((exec.completedAt - exec.startedAt) / 1000)}s)
-                                                                        </span>
-                                                                    )}
-                                                                </div>
-                                                                <div className="flex items-center gap-2">
-                                                                    {exec.error && (
-                                                                        <span
-                                                                            className={`max-w-[200px] truncate ${exec.status === "filtered" ? "text-muted-foreground" : "text-red-500"}`}
-                                                                            title={exec.error}
-                                                                        >
-                                                                            {exec.error}
-                                                                        </span>
-                                                                    )}
-                                                                    {exec.threadId && (
-                                                                        <a
-                                                                            className="text-primary-text flex items-center gap-0.5 hover:underline"
-                                                                            href={`/chat/${exec.threadId}`}
-                                                                        >
-                                                                            <ExternalLink aria-hidden="true" className="size-3" />
-                                                                            {t`Thread`}
-                                                                        </a>
-                                                                    )}
-                                                                </div>
-                                                            </div>
-                                                            {exec.prompt && (
-                                                                <details className="text-muted-foreground">
-                                                                    <summary className="flex min-h-11 min-w-11 cursor-pointer items-center hover:underline">{t`Prompt`}</summary>
-                                                                    <pre className="mt-1 max-h-48 overflow-auto font-mono text-[11px] break-words whitespace-pre-wrap">
-                                                                        {exec.prompt}
-                                                                    </pre>
-                                                                </details>
-                                                            )}
-                                                        </div>
-                                                    ))}
-                                                {!executionsLoading && !(executions && executions.length > 0) && (
-                                                    <p className="text-muted-foreground py-2 text-xs">{t`No executions yet`}</p>
-                                                )}
-                                            </div>
+                                            {/* Edit */}
+                                            <Button aria-label={t`Edit trigger`} onClick={() => startEditing(trigger)} size="sm" variant="ghost">
+                                                <Pencil aria-hidden="true" className="size-4" />
+                                            </Button>
+
+                                            {/* Enable/disable */}
+                                            <Switch
+                                                aria-label={trigger.enabled ? t`Disable trigger` : t`Enable trigger`}
+                                                checked={trigger.enabled}
+                                                disabled={enableMutation.isPending}
+                                                onCheckedChange={(checked: boolean) => handleToggleEnabled(trigger._id, checked)}
+                                                size="sm"
+                                            />
+
+                                            {/* Rotate the webhook secret */}
+                                            {trigger.type === "webhook" && (
+                                                <Button
+                                                    aria-label={t`Rotate webhook secret`}
+                                                    onClick={() => setRotatingTrigger(trigger)}
+                                                    size="sm"
+                                                    variant="ghost"
+                                                >
+                                                    <KeyRound aria-hidden="true" className="size-4" />
+                                                </Button>
+                                            )}
+
+                                            {/* Delete */}
+                                            <Button
+                                                aria-label={t`Delete trigger`}
+                                                disabled={deleteMutation.isPending}
+                                                onClick={() => setDeletingTrigger(trigger)}
+                                                size="sm"
+                                                variant="ghost"
+                                            >
+                                                <Trash2 aria-hidden="true" className="size-4 text-red-500" />
+                                            </Button>
+                                        </div>
+                                    </div>
+
+                                    {/* Expandable execution history */}
+                                    <button
+                                        className="text-muted-foreground hover:text-foreground mt-3 flex w-full items-center gap-1 border-t pt-3 text-xs transition-colors"
+                                        onClick={() => setExpandedTriggerId(isExpanded ? null : trigger._id)}
+                                        type="button"
+                                    >
+                                        {isExpanded ? (
+                                            <ChevronDown aria-hidden="true" className="size-3" />
+                                        ) : (
+                                            <ChevronRight aria-hidden="true" className="size-3" />
                                         )}
-                                    </CardContent>
-                                </Card>
+                                        {t`Execution History`}
+                                    </button>
+
+                                    {isExpanded && (
+                                        <div className="mt-2 space-y-1.5">
+                                            {executionsLoading && (
+                                                <div className="flex items-center gap-2 py-2">
+                                                    <Loader2 className="text-muted-foreground size-3 animate-spin" />
+                                                    <span className="text-muted-foreground text-xs">{t`Loading...`}</span>
+                                                </div>
+                                            )}
+                                            {!executionsLoading &&
+                                                executions &&
+                                                executions.length > 0 &&
+                                                executions.map((exec: TriggerExecutionRow) => (
+                                                    <div className="bg-muted/50 space-y-1.5 rounded-md px-3 py-2 text-xs" key={exec._id}>
+                                                        <div className="flex items-center justify-between">
+                                                            <div className="flex items-center gap-2">
+                                                                <ExecutionStatusIcon status={exec.status} />
+                                                                <span className="capitalize">{executionStatusLabel(exec.status)}</span>
+                                                                <span className="text-muted-foreground" suppressHydrationWarning>
+                                                                    {formatDateTime(exec.startedAt, i18n.locale)}
+                                                                </span>
+                                                                {exec.completedAt && (
+                                                                    <span className="text-muted-foreground">
+                                                                        ({Math.round((exec.completedAt - exec.startedAt) / 1000)}s)
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            <div className="flex items-center gap-2">
+                                                                {exec.error && (
+                                                                    <span
+                                                                        className={`max-w-[200px] truncate ${exec.status === "filtered" ? "text-muted-foreground" : "text-red-500"}`}
+                                                                        title={exec.error}
+                                                                    >
+                                                                        {exec.error}
+                                                                    </span>
+                                                                )}
+                                                                {exec.threadId && (
+                                                                    <a
+                                                                        className="text-primary-text flex items-center gap-0.5 hover:underline"
+                                                                        href={`/chat/${exec.threadId}`}
+                                                                    >
+                                                                        <ExternalLink aria-hidden="true" className="size-3" />
+                                                                        {t`Thread`}
+                                                                    </a>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                        {exec.prompt && (
+                                                            <details className="text-muted-foreground">
+                                                                <summary className="flex min-h-11 min-w-11 cursor-pointer items-center hover:underline">{t`Prompt`}</summary>
+                                                                <pre className="mt-1 max-h-48 overflow-auto font-mono text-[11px] break-words whitespace-pre-wrap">
+                                                                    {exec.prompt}
+                                                                </pre>
+                                                            </details>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            {!executionsLoading && !(executions && executions.length > 0) && (
+                                                <p className="text-muted-foreground py-2 text-xs">{t`No executions yet`}</p>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
                             );
                         })}
-                    </div>
+                    </>
                 ) : (
                     !showCreateForm && (
-                        <Card>
-                            <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-                                <Zap aria-hidden="true" className="text-muted-foreground mb-3 size-10 opacity-40" />
-                                <CardHeading className="text-lg font-medium">{t`No triggers yet`}</CardHeading>
-                                <p className="text-muted-foreground mt-1 max-w-sm text-sm">
-                                    {t`Create your first trigger to automate agent execution on a schedule or via webhooks.`}
-                                </p>
-                                <Button className="mt-4" onClick={() => setShowCreateForm(true)} size="sm">
-                                    <Plus aria-hidden="true" className="mr-1.5 size-4" />
-                                    {t`Create Trigger`}
-                                </Button>
-                            </CardContent>
-                        </Card>
+                        <div className="flex flex-col items-center justify-center py-8 text-center">
+                            <Zap aria-hidden="true" className="text-muted-foreground mb-3 size-8 opacity-40" />
+                            <CardHeading className="text-sm font-medium">{t`No triggers yet`}</CardHeading>
+                            <p className="text-muted-foreground mt-1 max-w-sm text-xs">
+                                {t`Create your first trigger to automate agent execution on a schedule or via webhooks.`}
+                            </p>
+                        </div>
                     )
                 )}
+            </SettingsCard>
 
-                {/* Info card */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="text-base">{t`How Triggers Work`}</CardTitle>
-                    </CardHeader>
-                    <CardContent className="text-muted-foreground space-y-3 text-sm">
-                        <div className="flex items-start gap-2">
-                            <Calendar aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
-                            <div>
-                                <Trans>
-                                    <span className="text-foreground font-medium">Schedule</span> — Run on a cron schedule (e.g., daily at 8 AM). Uses standard
-                                    5-field cron expressions.
-                                </Trans>
-                            </div>
-                        </div>
-                        <div className="flex items-start gap-2">
-                            <Globe aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
-                            <div>
-                                <Trans>
-                                    <span className="text-foreground font-medium">Webhook</span> — Receive HTTP POST requests from external services (Stripe,
-                                    GitHub, Zapier). Requests are signed with a timestamped HMAC and replays are rejected.
-                                </Trans>
-                            </div>
-                        </div>
-                        <p className="border-t pt-3 text-xs">
+            <SettingsCard title={t`How Triggers Work`}>
+                <div className="text-muted-foreground space-y-3 py-3 text-sm">
+                    <div className="flex items-start gap-2">
+                        <Calendar aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+                        <div>
                             <Trans>
-                                Each trigger creates a new thread and runs your agent with up to 25 iterations (Deep Work mode). Results are visible in your
-                                thread list.
+                                <span className="text-foreground font-medium">Schedule</span> — Run on a cron schedule (e.g., daily at 8 AM). Uses standard
+                                5-field cron expressions.
                             </Trans>
-                        </p>
-                    </CardContent>
-                </Card>
-            </HeadingSection>
+                        </div>
+                    </div>
+                    <div className="flex items-start gap-2">
+                        <Globe aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+                        <div>
+                            <Trans>
+                                <span className="text-foreground font-medium">Webhook</span> — Receive HTTP POST requests from external services (Stripe,
+                                GitHub, Zapier). Requests are signed with a timestamped HMAC and replays are rejected.
+                            </Trans>
+                        </div>
+                    </div>
+                    <p className="border-t pt-3 text-xs">
+                        <Trans>
+                            Each trigger creates a new thread and runs your agent with up to 25 iterations (Deep Work mode). Results are visible in your thread
+                            list.
+                        </Trans>
+                    </p>
+                </div>
+            </SettingsCard>
 
             <RotateWebhookSecretDialog
                 loading={rotateMutation.isPending}

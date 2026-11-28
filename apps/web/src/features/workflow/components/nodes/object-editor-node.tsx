@@ -84,7 +84,7 @@ const ObjectEditorNodeComponent = (props: NodeProps<Node<ObjectEditorNodeData>>)
         <BaseNode {...props} color={config.color} icon={<PenTool className="size-4" />} inputs={config.handles.inputs} outputs={config.handles.outputs}>
             <div className="space-y-3">
                 <div className="space-y-1.5">
-                    <Label className="text-muted-foreground text-xs">
+                    <Label className="text-muted-foreground text-xs" htmlFor={`${id}-mode`}>
                         <Trans>Edit Mode</Trans>
                     </Label>
                     <Select
@@ -94,7 +94,7 @@ const ObjectEditorNodeComponent = (props: NodeProps<Node<ObjectEditorNodeData>>)
                         onValueChange={handleModeChange}
                         value={data.mode}
                     >
-                        <SelectTrigger className="nodrag h-8 text-sm">
+                        <SelectTrigger className="nodrag h-8 text-sm" id={`${id}-mode`}>
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>

@@ -104,7 +104,7 @@ const ControlNetNodeComponent = (props: NodeProps<Node<ControlNetNodeData>>) => 
             <div className="space-y-3">
                 {/* Control Type */}
                 <div className="space-y-1.5">
-                    <Label className="text-muted-foreground text-xs">
+                    <Label className="text-muted-foreground text-xs" htmlFor={`${id}-control-type`}>
                         <Trans>Control Type</Trans>
                     </Label>
                     <Select
@@ -114,7 +114,7 @@ const ControlNetNodeComponent = (props: NodeProps<Node<ControlNetNodeData>>) => 
                         onValueChange={handleControlTypeChange}
                         value={data.controlType}
                     >
-                        <SelectTrigger className="nodrag h-8 text-sm">
+                        <SelectTrigger className="nodrag h-8 text-sm" id={`${id}-control-type`}>
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -144,11 +144,11 @@ const ControlNetNodeComponent = (props: NodeProps<Node<ControlNetNodeData>>) => 
                 {/* Preprocessor Model */}
                 {preprocessorModels.length > 0 && (
                     <div className="space-y-1.5">
-                        <Label className="text-muted-foreground text-xs">
+                        <Label className="text-muted-foreground text-xs" htmlFor={`${id}-preprocessor`}>
                             <Trans>Preprocessor</Trans>
                         </Label>
                         <Select items={preprocessorModels} onValueChange={handlePreprocessorChange} value={data.preprocessor ?? defaultPreprocessor}>
-                            <SelectTrigger className="nodrag h-8 text-sm">
+                            <SelectTrigger className="nodrag h-8 text-sm" id={`${id}-preprocessor`}>
                                 <SelectValue placeholder={t`Auto-detect`} />
                             </SelectTrigger>
                             <SelectContent>
@@ -189,7 +189,15 @@ const ControlNetNodeComponent = (props: NodeProps<Node<ControlNetNodeData>>) => 
                         </Label>
                         <span className="text-muted-foreground text-xs">{((data.strength ?? 0.8) * 100).toFixed(0)}%</span>
                     </div>
-                    <Slider className="nodrag" max={1} min={0} onValueChange={handleStrengthChange} step={0.05} value={[data.strength ?? 0.8]} />
+                    <Slider
+                        className="nodrag"
+                        max={1}
+                        min={0}
+                        onValueChange={handleStrengthChange}
+                        step={0.05}
+                        thumbLabel={t`Control Strength`}
+                        value={[data.strength ?? 0.8]}
+                    />
                 </div>
 
                 {/* Control Timing */}
@@ -205,7 +213,15 @@ const ControlNetNodeComponent = (props: NodeProps<Node<ControlNetNodeData>>) => 
                                 </span>
                                 <span className="text-muted-foreground text-[10px]">{((data.startPercent ?? 0) * 100).toFixed(0)}%</span>
                             </div>
-                            <Slider className="nodrag" max={1} min={0} onValueChange={handleStartPercentChange} step={0.05} value={[data.startPercent ?? 0]} />
+                            <Slider
+                                className="nodrag"
+                                max={1}
+                                min={0}
+                                onValueChange={handleStartPercentChange}
+                                step={0.05}
+                                thumbLabel={t`Start`}
+                                value={[data.startPercent ?? 0]}
+                            />
                         </div>
                         <div className="space-y-1">
                             <div className="flex justify-between">
@@ -214,7 +230,15 @@ const ControlNetNodeComponent = (props: NodeProps<Node<ControlNetNodeData>>) => 
                                 </span>
                                 <span className="text-muted-foreground text-[10px]">{((data.endPercent ?? 1) * 100).toFixed(0)}%</span>
                             </div>
-                            <Slider className="nodrag" max={1} min={0} onValueChange={handleEndPercentChange} step={0.05} value={[data.endPercent ?? 1]} />
+                            <Slider
+                                className="nodrag"
+                                max={1}
+                                min={0}
+                                onValueChange={handleEndPercentChange}
+                                step={0.05}
+                                thumbLabel={t`End`}
+                                value={[data.endPercent ?? 1]}
+                            />
                         </div>
                     </div>
                     <p className="text-muted-foreground text-[10px]">

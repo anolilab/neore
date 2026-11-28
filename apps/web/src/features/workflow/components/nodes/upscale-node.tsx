@@ -94,11 +94,11 @@ const UpscaleNodeComponent = (props: NodeProps<Node<UpscaleNodeData>>) => {
                 </div>
 
                 <div className="space-y-1.5">
-                    <Label className="text-muted-foreground text-xs">
+                    <Label className="text-muted-foreground text-xs" htmlFor={`${id}-scale`}>
                         <Trans>Scale Factor</Trans>
                     </Label>
                     <Select items={scaleOptions} onValueChange={handleScaleChange} value={String(data.scale ?? 2)}>
-                        <SelectTrigger className="nodrag h-8 text-sm">
+                        <SelectTrigger className="nodrag h-8 text-sm" id={`${id}-scale`}>
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -113,26 +113,21 @@ const UpscaleNodeComponent = (props: NodeProps<Node<UpscaleNodeData>>) => {
 
                 {currentModel.supportsFaceEnhance && (
                     <div className="flex items-center justify-between">
-                        <Label className="text-muted-foreground text-xs">
+                        <Label className="text-muted-foreground text-xs" htmlFor={`${id}-enhance-faces`}>
                             <Trans>Enhance Faces</Trans>
                         </Label>
-                        <Switch
-                            aria-label={t`Enhance Faces`}
-                            checked={data.enhanceFace ?? false}
-                            className="nodrag"
-                            onCheckedChange={handleEnhanceFaceChange}
-                        />
+                        <Switch checked={data.enhanceFace ?? false} className="nodrag" id={`${id}-enhance-faces`} onCheckedChange={handleEnhanceFaceChange} />
                     </div>
                 )}
 
                 <div className="flex items-center justify-between">
-                    <Label className="text-muted-foreground text-xs">
+                    <Label className="text-muted-foreground text-xs" htmlFor={`${id}-enhance-details`}>
                         <Trans>Enhance Details</Trans>
                     </Label>
                     <Switch
-                        aria-label={t`Enhance Details`}
                         checked={data.enhanceDetails ?? true}
                         className="nodrag"
+                        id={`${id}-enhance-details`}
                         onCheckedChange={handleEnhanceDetailsChange}
                     />
                 </div>

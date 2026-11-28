@@ -86,8 +86,8 @@ const AdvancedControlsNodeComponent = (props: NodeProps<Node<AdvancedControlsNod
     };
 
     const generateRandomSeed = () => {
-        const [entropy = 0] = crypto.getRandomValues(new Uint32Array(1));
-        const randomSeed = entropy % 2_147_483_647;
+        // A seed only varies the output: drawn as every other seed in the app is, 0 to 2,147,483,646.
+        const randomSeed = Math.floor(Math.random() * 2_147_483_647);
 
         updateNode(id, { seed: randomSeed, useRandomSeed: false });
     };
@@ -109,7 +109,15 @@ const AdvancedControlsNodeComponent = (props: NodeProps<Node<AdvancedControlsNod
                         </Label>
                         <span className="text-muted-foreground text-xs">{data.cfgScale ?? 7}</span>
                     </div>
-                    <Slider className="nodrag" max={20} min={1} onValueChange={handleConfigScaleChange} step={0.5} value={[data.cfgScale ?? 7]} />
+                    <Slider
+                        className="nodrag"
+                        max={20}
+                        min={1}
+                        onValueChange={handleConfigScaleChange}
+                        step={0.5}
+                        thumbLabel={t`CFG Scale`}
+                        value={[data.cfgScale ?? 7]}
+                    />
                     <p className="text-muted-foreground text-[10px]">
                         <Trans>Higher = more prompt adherence, Lower = more creativity</Trans>
                     </p>
@@ -117,11 +125,11 @@ const AdvancedControlsNodeComponent = (props: NodeProps<Node<AdvancedControlsNod
 
                 {/* Sampler */}
                 <div className="space-y-1.5">
-                    <Label className="text-muted-foreground text-xs">
+                    <Label className="text-muted-foreground text-xs" htmlFor={`${id}-sampler`}>
                         <Trans>Sampler</Trans>
                     </Label>
                     <Select items={SAMPLERS} onValueChange={handleSamplerChange} value={data.sampler ?? "euler_a"}>
-                        <SelectTrigger className="nodrag h-8 text-sm">
+                        <SelectTrigger className="nodrag h-8 text-sm" id={`${id}-sampler`}>
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -139,11 +147,11 @@ const AdvancedControlsNodeComponent = (props: NodeProps<Node<AdvancedControlsNod
 
                 {/* Scheduler */}
                 <div className="space-y-1.5">
-                    <Label className="text-muted-foreground text-xs">
+                    <Label className="text-muted-foreground text-xs" htmlFor={`${id}-scheduler`}>
                         <Trans>Scheduler</Trans>
                     </Label>
                     <Select items={SCHEDULERS} onValueChange={handleSchedulerChange} value={data.scheduler ?? "normal"}>
-                        <SelectTrigger className="nodrag h-8 text-sm">
+                        <SelectTrigger className="nodrag h-8 text-sm" id={`${id}-scheduler`}>
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -167,7 +175,7 @@ const AdvancedControlsNodeComponent = (props: NodeProps<Node<AdvancedControlsNod
                         </Label>
                         <span className="text-muted-foreground text-xs">{data.steps ?? 30}</span>
                     </div>
-                    <Slider className="nodrag" max={150} min={10} onValueChange={handleStepsChange} step={5} value={[data.steps ?? 30]} />
+                    <Slider className="nodrag" max={150} min={10} onValueChange={handleStepsChange} step={5} thumbLabel={t`Steps`} value={[data.steps ?? 30]} />
                     <p className="text-muted-foreground text-[10px]">
                         <Trans>More steps = higher quality, longer generation</Trans>
                     </p>
@@ -176,7 +184,7 @@ const AdvancedControlsNodeComponent = (props: NodeProps<Node<AdvancedControlsNod
                 {/* Seed */}
                 <div className="space-y-1.5">
                     <div className="flex items-center justify-between">
-                        <Label className="text-muted-foreground text-xs">
+                        <Label className="text-muted-foreground text-xs" htmlFor={`${id}-seed`}>
                             <Trans>Seed</Trans>
                         </Label>
                         <div className="flex items-center gap-2">
@@ -195,6 +203,7 @@ const AdvancedControlsNodeComponent = (props: NodeProps<Node<AdvancedControlsNod
                         <div className="flex gap-1.5">
                             <Input
                                 className="nodrag h-8 flex-1 text-sm"
+                                id={`${id}-seed`}
                                 onChange={handleSeedChange}
                                 placeholder={t`Enter seed...`}
                                 type="number"
@@ -225,7 +234,15 @@ const AdvancedControlsNodeComponent = (props: NodeProps<Node<AdvancedControlsNod
                         </Label>
                         <span className="text-muted-foreground text-xs">{data.clipSkip ?? 0}</span>
                     </div>
-                    <Slider className="nodrag" max={2} min={0} onValueChange={handleClipSkipChange} step={1} value={[data.clipSkip ?? 0]} />
+                    <Slider
+                        className="nodrag"
+                        max={2}
+                        min={0}
+                        onValueChange={handleClipSkipChange}
+                        step={1}
+                        thumbLabel={t`CLIP Skip`}
+                        value={[data.clipSkip ?? 0]}
+                    />
                     <p className="text-muted-foreground text-[10px]">
                         <Trans>Skip CLIP layers (0 = none, 1-2 = more stylized)</Trans>
                     </p>

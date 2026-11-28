@@ -76,7 +76,7 @@ const DatasetFormBody = ({ editing, onClose, onSubmit }: Omit<DatasetFormDialogP
                 }}
             >
                 <DialogPanel>
-                    <div className="space-y-4">
+                    <div className="divide-border/50 divide-y *:py-3 *:first:pt-0 *:last:pb-0">
                         <div className="space-y-2">
                             <Label htmlFor={`${baseId}-name`}>{t`Name`}</Label>
                             <Input
@@ -163,7 +163,7 @@ const DatasetFormBody = ({ editing, onClose, onSubmit }: Omit<DatasetFormDialogP
                         </div>
                     </div>
                 </DialogPanel>
-                <DialogFooter>
+                <DialogFooter className="border-border/50 border-t" variant="bare">
                     <Button onClick={onClose} type="button" variant="outline">
                         {t`Cancel`}
                     </Button>

@@ -6,6 +6,8 @@ import { Link, useRouter } from "@tanstack/react-router";
 import type { LucideIcon } from "lucide-react";
 import { useCallback } from "react";
 
+import SettingsLink from "@/components/settings/settings-link";
+import type { SettingsTab } from "@/features/settings/lib/settings-navigation";
 import { createLunoraQueryOptions, useLunora } from "@/lib/lunora/crpc";
 import type { FileRouteTypes } from "@/routeTree.gen";
 
@@ -18,21 +20,19 @@ const colorModeClasses = {
         iconActive: "text-white",
         label: "text-white/90",
     },
+    // On the app's canvas, in either theme: rows like the thread list's, the current page lifted as a raised row.
     light: {
-        button: "text-gray-700 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-800",
-        buttonActive: "bg-gray-200 text-gray-900 dark:bg-gray-700 dark:text-white",
+        button: "h-9 rounded-[10px] text-muted-foreground hover:bg-surface-row-hover hover:text-foreground",
+        buttonActive: "bg-surface-row-active text-foreground surface-edge",
         group: "group-data-[collapsible=icon]:hidden",
-        icon: "text-gray-600 dark:text-gray-400",
-        iconActive: "text-gray-900 dark:text-white",
-        label: "text-gray-700 dark:text-gray-300",
+        icon: "text-muted-foreground",
+        iconActive: "text-foreground",
+        label: "self-stretch font-mono text-xs text-muted-foreground",
     },
 };
 
-export type NavItem = {
-    icon: LucideIcon;
-    name: string;
-    url: string;
-};
+/** A page link, or a settings tab that opens in the settings modal over the current page. */
+export type NavItem = { icon: LucideIcon; name: string } & ({ settingsTab: SettingsTab; url?: never } | { settingsTab?: never; url: string });
 
 export type ColorMode = "light" | "dark";
 
@@ -91,26 +91,37 @@ const NavItems = ({
                         <SidebarMenuButton
                             className={cn(classes.button, classNames?.button)}
                             name={item.name}
-                            onMouseEnter={() => handleMouseEnter(item.url)}
+                            onMouseEnter={() => {
+                                if (item.url) {
+                                    handleMouseEnter(item.url);
+                                }
+                            }}
                             render={
-                                <Link
-                                    activeOptions={{
-                                        // Match exact path for main routes, and include sub-paths for settings
-                                        exact: !item.url.includes("/settings"),
-                                    }}
-                                    activeProps={{
-                                        className: cn(classes.buttonActive, classNames?.buttonActive),
-                                    }}
-                                    from="/dashboard"
-                                    to={item.url}
-                                >
-                                    {({ isActive }) => (
-                                        <>
-                                            <item.icon className={cn(isActive ? classes.iconActive : classes.icon, classNames?.icon)} />
-                                            <span>{item.name}</span>
-                                        </>
-                                    )}
-                                </Link>
+                                item.settingsTab ? (
+                                    <SettingsLink tab={item.settingsTab}>
+                                        <item.icon className={cn(classes.icon, classNames?.icon)} />
+                                        <span>{item.name}</span>
+                                    </SettingsLink>
+                                ) : (
+                                    <Link
+                                        activeOptions={{
+                                            // Match exact path for main routes, and include sub-paths for settings
+                                            exact: !item.url.includes("/settings"),
+                                        }}
+                                        activeProps={{
+                                            className: cn(classes.buttonActive, classNames?.buttonActive),
+                                        }}
+                                        from="/dashboard"
+                                        to={item.url}
+                                    >
+                                        {({ isActive }) => (
+                                            <>
+                                                <item.icon className={cn(isActive ? classes.iconActive : classes.icon, classNames?.icon)} />
+                                                <span>{item.name}</span>
+                                            </>
+                                        )}
+                                    </Link>
+                                )
                             }
                         />
                     </SidebarMenuItem>

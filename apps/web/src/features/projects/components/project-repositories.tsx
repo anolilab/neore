@@ -271,13 +271,7 @@ const ProjectRepositories: FC<{ projectId: string }> = ({ projectId }) => {
     const describedBy = (field: string) => (error?.field === field ? errorId : undefined);
 
     return (
-        <section
-            aria-busy={loading}
-            aria-labelledby={labelId}
-            className="bg-muted/30 space-y-3 rounded-lg border p-4 outline-none"
-            ref={sectionRef}
-            tabIndex={-1}
-        >
+        <section aria-busy={loading} aria-labelledby={labelId} className="border-border/50 space-y-3 border-t pt-5 outline-none" ref={sectionRef} tabIndex={-1}>
             <div className="space-y-1">
                 <Label className="text-sm font-medium" id={labelId}>{t`Repositories`}</Label>
                 <p className="text-muted-foreground text-xs">{t`Coding-agent runs in this project offer these repositories, with the default preselected.`}</p>

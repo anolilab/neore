@@ -103,19 +103,22 @@ const SkillBuilderReview = ({
     const hasExternal = recommendations.mcpServers.length > 0 || recommendations.connectors.length > 0 || !recommendations.mcpRegistryAvailable;
 
     return (
-        <div className="space-y-6">
+        <div className="divide-border/50 divide-y *:py-3 *:first:pt-0 *:last:pb-0">
             {recommendations.marketplaceSkills.length > 0 && (
                 <Section title={t`Existing skills that may already fit`}>
-                    <ul className="space-y-2">
+                    <ul className="border-border/50 divide-border/50 divide-y rounded-lg border">
                         {recommendations.marketplaceSkills.map(({ reason, skill }) => (
-                            <li className="flex items-start justify-between gap-3 rounded-md border p-3" key={skill._id}>
+                            <li className="flex items-start justify-between gap-3 px-3 py-3" key={skill._id}>
                                 <div className="grid gap-0.5">
-                                    <span className="text-sm font-medium">{skill.name}</span>
+                                    <span className="text-sm font-medium" id={`marketplace-skill-${skill._id}`}>
+                                        {skill.name}
+                                    </span>
                                     <span className="text-muted-foreground line-clamp-2 text-xs">{skill.description}</span>
                                     <span className="text-muted-foreground text-xs">{reason}</span>
                                 </div>
                                 <Button
-                                    aria-label={t`Use ${skill.name} instead`}
+                                    // Named by its own text, as a speech-input user reads it; the skill's name comes as its description.
+                                    aria-describedby={`marketplace-skill-${skill._id}`}
                                     onClick={() => onUseMarketplaceSkill(skill._id)}
                                     size="sm"
                                     type="button"

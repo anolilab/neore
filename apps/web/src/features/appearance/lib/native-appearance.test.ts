@@ -36,8 +36,8 @@ const AA_NON_TEXT = 3;
 const SURFACES = {
     contrastDark: ["#000000"],
     contrastLight: ["#ffffff"],
-    dark: ["#212121"],
-    light: ["#f2f2f2", "#ffffff"],
+    dark: ["#0e0f11", "#16181b"],
+    light: ["#f0efeb", "#fffefc"],
 } as const;
 
 const HEX = /^#[\da-f]{6}$/;

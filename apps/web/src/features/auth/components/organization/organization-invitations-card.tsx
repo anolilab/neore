@@ -35,7 +35,7 @@ const OrganizationInvitationsCard = ({ className, classNames, ...properties }: S
             title={t`Pending Invitations`}
             {...properties}
         >
-            <CardContent className={cn("grid gap-4", classNames?.content)}>
+            <CardContent className={cn("grid gap-1.5", classNames?.content)}>
                 {pendingInvitations.map((invitation) => (
                     <InvitationCell classNames={classNames} invitation={invitation} key={invitation.id} />
                 ))}

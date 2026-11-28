@@ -7,8 +7,10 @@ const PagesIndex = () => {
 
     return (
         <div className="text-muted-foreground flex flex-1 flex-col items-center justify-center gap-2 p-8 text-center text-sm">
-            <FileText aria-hidden="true" className="size-8" />
-            <h1 className="text-foreground text-lg font-semibold">{t`Pages`}</h1>
+            <div aria-hidden="true" className="surface-well flex size-12 items-center justify-center rounded-xl">
+                <FileText className="size-6" />
+            </div>
+            <h1 className="text-foreground text-[15px] font-semibold">{t`Pages`}</h1>
             <p>{t`Pick a page on the left, or create one with the + button.`}</p>
         </div>
     );

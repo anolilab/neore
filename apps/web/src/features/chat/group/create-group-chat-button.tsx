@@ -30,7 +30,16 @@ import { SpeakerAvatar } from "./speaker-label";
 const MIN_PARTICIPANTS = 2;
 const MAX_PARTICIPANTS = 8;
 
-const CreateGroupChatButton: FC<{ className?: string }> = ({ className }) => {
+interface CreateGroupChatButtonProperties {
+    className?: string;
+    /** Shows the dialog without its own button, for a caller that opens it from elsewhere (a menu item). */
+    hideTrigger?: boolean;
+    /** With `open`, the caller owns whether the dialog shows. */
+    onOpenChange?: (open: boolean) => void;
+    open?: boolean;
+}
+
+const CreateGroupChatButton: FC<CreateGroupChatButtonProperties> = ({ className, hideTrigger = false, onOpenChange, open: controlledOpen }) => {
     const { i18n, t } = useLingui();
     const crpc = useCRPC();
     const navigate = useNavigate();
@@ -39,7 +48,12 @@ const CreateGroupChatButton: FC<{ className?: string }> = ({ className }) => {
     const modeLabelId = useId();
     const participantsLabelId = useId();
     const templatesLabelId = useId();
-    const [open, setOpen] = useState(false);
+    const [ownOpen, setOwnOpen] = useState(false);
+    const open = controlledOpen ?? ownOpen;
+    const setOpen = (next: boolean) => {
+        setOwnOpen(next);
+        onOpenChange?.(next);
+    };
     const [title, setTitle] = useState("");
     const [mode, setMode] = useState<GroupChatMode>("supervisor");
     const [selected, setSelected] = useState<string[]>([]);
@@ -108,18 +122,20 @@ const CreateGroupChatButton: FC<{ className?: string }> = ({ className }) => {
 
     return (
         <>
-            <TooltipProvider>
-                <Tooltip>
-                    <TooltipTrigger
-                        render={
-                            <Button aria-label={t`New group chat`} className={className} onClick={() => setOpen(true)} size="sm" variant="ghost">
-                                <UsersIcon aria-hidden="true" className="h-5 w-5" />
-                            </Button>
-                        }
-                    />
-                    <TooltipContent>{t`New group chat`}</TooltipContent>
-                </Tooltip>
-            </TooltipProvider>
+            {!hideTrigger && (
+                <TooltipProvider>
+                    <Tooltip>
+                        <TooltipTrigger
+                            render={
+                                <Button aria-label={t`New group chat`} className={className} onClick={() => setOpen(true)} size="sm" variant="ghost">
+                                    <UsersIcon aria-hidden="true" className="h-5 w-5" />
+                                </Button>
+                            }
+                        />
+                        <TooltipContent>{t`New group chat`}</TooltipContent>
+                    </Tooltip>
+                </TooltipProvider>
+            )}
 
             <Dialog onOpenChange={setOpen} open={open}>
                 <DialogContent className="sm:max-w-lg">
@@ -142,7 +158,7 @@ const CreateGroupChatButton: FC<{ className?: string }> = ({ className }) => {
                                             <li key={template.id}>
                                                 <button
                                                     aria-busy={isStarting}
-                                                    className="hover:bg-muted focus-visible:ring-ring flex w-full flex-col items-start rounded-md border p-2.5 text-left text-sm focus-visible:ring-2 focus-visible:outline-none disabled:opacity-50"
+                                                    className="border-border/50 bg-surface-row hover:bg-surface-row-hover focus-visible:ring-ring flex w-full flex-col items-start rounded-lg border p-2.5 text-left text-sm focus-visible:ring-2 focus-visible:outline-none disabled:opacity-50"
                                                     disabled={isPending}
                                                     onClick={() => startFromTemplate(template)}
                                                     type="button"

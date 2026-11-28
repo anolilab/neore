@@ -264,7 +264,7 @@ const ThreadList: FC = () => {
     return (
         <DateBoundariesProvider>
             <ThreadListDropZone>
-                <div className="text-brand-black dark:text-brand-white flex flex-col items-stretch gap-1.5">
+                <div className="text-foreground flex flex-col items-stretch gap-1.5 px-3">
                     <HierarchicalThreadList
                         collapsedGroups={collapsedGroups}
                         collapsedProjects={collapsedProjects}

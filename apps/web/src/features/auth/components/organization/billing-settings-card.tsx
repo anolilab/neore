@@ -8,17 +8,17 @@ import { Button } from "@neore/ui/components/button";
 import { CardContent } from "@neore/ui/components/card";
 import { useAppForm } from "@neore/ui/components/form";
 import { Input } from "@neore/ui/components/input";
-import { Label } from "@neore/ui/components/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@neore/ui/components/select";
 import { Skeleton } from "@neore/ui/components/skeleton";
 import cn from "@neore/ui/utils/cn";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { X } from "lucide-react";
-import { useCallback, useState } from "react";
+import { useCallback, useId, useState } from "react";
 import * as z from "zod";
 
 import type { SettingsCardProperties } from "@/components/settings/settings-card";
 import SettingsCard from "@/components/settings/settings-card";
+import SettingsRow from "@/components/settings/settings-row";
 import { useActiveOrganization } from "@/features/auth/hooks/organization-management";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import useBillingOptions from "@/features/billing/hooks/use-billing-options";
@@ -50,6 +50,8 @@ interface BillingSettingsEditorProperties extends SettingsCardProperties {
 const BillingSettingsEditor = ({ billingInfo, className, classNames, ...properties }: BillingSettingsEditorProperties) => {
     const { toast } = useAuth();
     const { t } = useLingui();
+    const billingEmailId = useId();
+    const allowedModelsId = useId();
     const crpc = useCRPC();
     const queryClient = useQueryClient();
 
@@ -136,87 +138,98 @@ const BillingSettingsEditor = ({ billingInfo, className, classNames, ...properti
                     title={t`Billing Settings`}
                     {...properties}
                 >
-                    <CardContent className={cn("space-y-4", classNames?.content)}>
-                        {/* Tier and credits: read-only, managed by the platform's billing system */}
-                        <div className="text-muted-foreground space-y-1 text-sm">
-                            <div>
-                                {t`Current tier:`} <strong>{billingInfo.baseTier}</strong>
-                            </div>
-                            <div>
-                                {t`Credits per user:`} <strong>{billingInfo.creditsPerUser}</strong>
-                            </div>
-                            <p className="text-xs">{t`Your plan and credit allowance follow your subscription.`}</p>
-                            {billingInfo.creemSubscriptionId ? (
-                                <Button
-                                    disabled={checkoutPending}
-                                    onClick={() => {
-                                        void openPortal("organization");
-                                    }}
-                                    size="sm"
-                                    type="button"
-                                    variant="outline"
-                                >
-                                    {t`Manage Team subscription`}
-                                </Button>
-                            ) : (
-                                <div className="flex flex-wrap items-center gap-2">
+                    {/* Tier and credits: read-only, managed by the platform's billing system */}
+                    <SettingsRow
+                        control={
+                            <>
+                                <strong className="text-sm">{billingInfo.baseTier}</strong>
+                                {billingInfo.creemSubscriptionId ? (
                                     <Button
                                         disabled={checkoutPending}
                                         onClick={() => {
-                                            void startCheckout("team");
+                                            void openPortal("organization");
                                         }}
                                         size="sm"
                                         type="button"
+                                        variant="outline"
                                     >
-                                        {yearly.team ? t`Upgrade organization to Team, monthly` : t`Upgrade organization to Team`}
+                                        {t`Manage Team subscription`}
                                     </Button>
-                                    {yearly.team ? (
+                                ) : (
+                                    <>
                                         <Button
                                             disabled={checkoutPending}
                                             onClick={() => {
-                                                void startCheckout("team", "year");
+                                                void startCheckout("team");
                                             }}
                                             size="sm"
                                             type="button"
-                                            variant="outline"
                                         >
-                                            {t`Pay yearly`}
+                                            {yearly.team ? t`Upgrade organization to Team, monthly` : t`Upgrade organization to Team`}
                                         </Button>
-                                    ) : null}
-                                </div>
-                            )}
-                        </div>
+                                        {yearly.team ? (
+                                            <Button
+                                                disabled={checkoutPending}
+                                                onClick={() => {
+                                                    void startCheckout("team", "year");
+                                                }}
+                                                size="sm"
+                                                type="button"
+                                                variant="outline"
+                                            >
+                                                {t`Pay yearly`}
+                                            </Button>
+                                        ) : null}
+                                    </>
+                                )}
+                            </>
+                        }
+                        description={t`Your plan and credit allowance follow your subscription.`}
+                        title={t`Current tier:`}
+                    />
 
-                        {/* Billing Email */}
-                        <form.AppField name="billingEmail">
-                            {(field) => (
-                                <field.FormItem>
-                                    <field.FormLabel>{t`Billing Email`}</field.FormLabel>
-                                    {/* `render` puts the id on the input itself; the default wrapper <div> would leave the label pointing at a non-control. */}
-                                    <field.FormControl
-                                        render={
-                                            <Input
-                                                className={classNames?.input}
-                                                disabled={isSubmitting}
-                                                onBlur={field.handleBlur}
-                                                onChange={(e) => field.handleChange(e.target.value)}
-                                                placeholder={t`Enter billing email`}
-                                                type="email"
-                                                value={field.state.value}
+                    <SettingsRow control={<strong className="text-sm">{billingInfo.creditsPerUser}</strong>} title={t`Credits per user:`} />
+
+                    {/* Billing Email */}
+                    <form.AppField name="billingEmail">
+                        {(field) => (
+                            // A titled row under the card's own heading; its title labels the input, so the settings search can focus it.
+                            <SettingsRow
+                                control={
+                                    <div className="w-full @lg/settings-row:w-72">
+                                        <field.FormItem>
+                                            {/* `render` puts the id on the input itself; the default wrapper <div> would leave the label pointing at a non-control. */}
+                                            <field.FormControl
+                                                id={billingEmailId}
+                                                render={
+                                                    <Input
+                                                        className={classNames?.input}
+                                                        disabled={isSubmitting}
+                                                        onBlur={field.handleBlur}
+                                                        onChange={(e) => field.handleChange(e.target.value)}
+                                                        placeholder={t`Enter billing email`}
+                                                        type="email"
+                                                        value={field.state.value}
+                                                    />
+                                                }
                                             />
-                                        }
-                                    />
-                                    <field.FormMessage className={classNames?.error} />
-                                </field.FormItem>
-                            )}
-                        </form.AppField>
+                                            <field.FormMessage className={classNames?.error} />
+                                        </field.FormItem>
+                                    </div>
+                                }
+                                htmlFor={billingEmailId}
+                                title={t`Billing Email`}
+                            />
+                        )}
+                    </form.AppField>
 
-                        {/* Allowed Models */}
+                    {/* Allowed Models */}
+                    <SettingsRow
+                        description={t`Select which AI models organization members can use. Leave empty for enterprise to allow all models.`}
+                        htmlFor={allowedModelsId}
+                        title={t`Allowed AI Models`}
+                    >
                         <div className="space-y-2">
-                            <Label>{t`Allowed AI Models`}</Label>
-                            <p className="text-muted-foreground text-xs">
-                                {t`Select which AI models organization members can use. Leave empty for enterprise to allow all models.`}
-                            </p>
                             <div className="flex flex-wrap gap-2">
                                 {selectedModels.map((model) => (
                                     <Badge className="gap-1" key={model} variant="secondary">
@@ -242,7 +255,7 @@ const BillingSettingsEditor = ({ billingInfo, className, classNames, ...properti
                                 }}
                                 value=""
                             >
-                                <SelectTrigger className={classNames?.input}>
+                                <SelectTrigger className={classNames?.input} id={allowedModelsId}>
                                     <SelectValue placeholder={t`Add a model...`} />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -254,7 +267,7 @@ const BillingSettingsEditor = ({ billingInfo, className, classNames, ...properti
                                 </SelectContent>
                             </Select>
                         </div>
-                    </CardContent>
+                    </SettingsRow>
                 </SettingsCard>
             </form>
         </form.AppForm>
@@ -337,13 +350,9 @@ const BillingSettingsForm = ({ className, classNames, ...properties }: SettingsC
                 title={t`Billing Settings`}
                 {...properties}
             >
-                <CardContent className={cn("space-y-4", classNames?.content)}>
-                    <div className="text-muted-foreground text-sm">
-                        {t`Current tier:`} <strong>{billingInfo.baseTier}</strong>
-                    </div>
-                    <div className="text-muted-foreground text-sm">
-                        {t`Credits per user:`} <strong>{billingInfo.creditsPerUser}</strong>
-                    </div>
+                <CardContent className={classNames?.content}>
+                    <SettingsRow control={<strong className="text-sm">{billingInfo.baseTier}</strong>} title={t`Current tier:`} />
+                    <SettingsRow control={<strong className="text-sm">{billingInfo.creditsPerUser}</strong>} title={t`Credits per user:`} />
                 </CardContent>
             </SettingsCard>
         );

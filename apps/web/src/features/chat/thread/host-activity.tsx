@@ -86,7 +86,7 @@ export const HostPlan: FC<{ entries: HostPlanEntry[] }> = memo(({ entries }) => 
     const current = entries.find((entry) => entry.status === "in_progress");
 
     return (
-        <section aria-label={t`The agent's plan`} className="mb-4 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900/50">
+        <section aria-label={t`The agent's plan`} className="surface-raised mb-4 rounded-xl p-3">
             <h3 className="mb-2 text-xs font-medium text-gray-700 dark:text-gray-300">{t`Plan`}</h3>
             {/* Only the progress is spoken, so a change is announced without reading the whole list again. */}
             <span className="sr-only" role="status">
@@ -207,7 +207,7 @@ const HostToolCall: FC<{ tool: HostToolRow }> = memo(({ tool }) => {
     const exitText = exitTextOf(tool);
 
     return (
-        <li className="rounded-md border border-gray-200 bg-white p-2 dark:border-gray-700 dark:bg-gray-950/40" data-status={status} ref={rowRef} tabIndex={-1}>
+        <li className="surface-well rounded-lg p-2" data-status={status} ref={rowRef} tabIndex={-1}>
             <div className="flex items-center gap-2 text-sm">
                 <span className="min-w-0 flex-1 font-mono break-all text-gray-800 dark:text-gray-200">{title}</span>
                 <span className="text-muted-foreground shrink-0 text-xs">{statusText(status)}</span>

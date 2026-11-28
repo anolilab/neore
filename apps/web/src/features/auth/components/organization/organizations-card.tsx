@@ -43,7 +43,7 @@ const OrganizationsCard = ({ className, classNames, ...properties }: SettingsCar
                 {...properties}
             >
                 {organizations && organizations?.length > 0 && (
-                    <CardContent className={cn("grid gap-4", classNames?.content)}>
+                    <CardContent className={cn("grid gap-1.5", classNames?.content)}>
                         {organizations?.map((organization) => (
                             <OrganizationCell classNames={classNames} key={organization.id} organization={organization} />
                         ))}

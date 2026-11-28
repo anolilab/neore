@@ -60,24 +60,25 @@
     --brand-charcoal: #212121; /* Deep Charcoal */
     --brand-obsidian: #191919; /* Obsidian Black */
     --brand-black: #000000; /* Absolute Black */
+    --brand-ink: #0e0f11; /* Night Ink: the dark canvas, a near-black with a cool cast */
 
     /* ── Design tokens ─────────────────────────────────────── */
     --radius: 0.625rem;
-    --background: var(--brand-frost);
+    --background: #f0efeb;
     --foreground: var(--brand-obsidian);
-    --card: var(--brand-white);
+    --card: #fffefc;
     --card-foreground: var(--brand-obsidian);
-    --popover: var(--brand-white);
+    --popover: #fffefc;
     --popover-foreground: var(--brand-obsidian);
     --primary: var(--brand-lime);
     --primary-foreground: var(--brand-obsidian);
     /* The accent as TEXT or an icon on the page. The lime is a fill: as text on white it is ~1.2:1. */
     --primary-text: #3f6212;
-    --secondary: var(--brand-frost);
+    --secondary: #ebe9e4;
     --secondary-foreground: var(--brand-obsidian);
-    --muted: var(--brand-frost);
+    --muted: #ebe9e4;
     --muted-foreground: var(--brand-graphite);
-    --accent: var(--brand-frost);
+    --accent: #ebe9e4;
     --accent-foreground: var(--brand-obsidian);
     /* Red. At L 0.5 the text is 4.8:1 even on its own 10% tint (AA is 4.5:1); the earlier 0.55 was 4.1:1 there. */
     --destructive: oklch(0.5 0.22 25);
@@ -90,11 +91,11 @@
     --chart-3: oklch(0.627 0.194 149.214);
     --chart-4: oklch(0.527 0.154 150.069);
     --chart-5: oklch(0.448 0.119 151.328);
-    --sidebar: var(--brand-white);
+    --sidebar: #f0efeb;
     --sidebar-foreground: var(--brand-graphite);
     --sidebar-primary: var(--brand-obsidian);
     --sidebar-primary-foreground: var(--brand-white);
-    --sidebar-accent: var(--brand-frost);
+    --sidebar-accent: #ebe9e4;
     --sidebar-accent-foreground: var(--brand-obsidian);
     --sidebar-border: var(--brand-silver);
     --sidebar-ring: var(--brand-graphite);
@@ -106,6 +107,31 @@
     --success-foreground: var(--color-emerald-700);
     --warning: oklch(0.7 0.18 65);
     --warning-foreground: var(--color-amber-700);
+
+    /*
+     * ── Surfaces ──────────────────────────────────────────────
+     * Depth comes in three steps: the canvas, a raised surface (a fill one step off the canvas, a hairline edge,
+     * a top highlight and a short drop) and a pressed-in well for controls nested inside a raised surface
+     * (segmented controls, search fields, code blocks). `surface-raised`, `surface-well` and `surface-edge` below
+     * apply them; the tokens are here so a component can pick one part.
+     */
+    --surface-main: #fffefc; /* the inset panel the page content sits in */
+    --surface-panel: #fffefc;
+    --surface-row: #f8f7f4; /* thread cards: a hair off the canvas */
+    --surface-row-hover: #fffefc;
+    --surface-row-active: #fffefc;
+    --surface-rail: #e8e7e2;
+    --surface-well: #e7e5df;
+    /* Code sits on white in light mode: the highlighter's light theme is tuned for white (its red is 4.5:1 there, not on grey). */
+    --surface-code: #fffefc;
+    --surface-well-shadow: inset 0 1px 2px rgb(0 0 0 / 0.06), inset 0 0 0 1px rgb(0 0 0 / 0.05);
+    --surface-edge: rgb(40 32 16 / 0.09);
+    --surface-edge-top: rgb(255 255 255 / 0.9);
+    --surface-drop: 0 1px 1px rgb(0 0 0 / 0.04), 0 6px 16px -10px rgb(0 0 0 / 0.14);
+    /* The open thread's card: the accent fading from its top-left corner. */
+    --surface-glow: radial-gradient(90% 140% at 0% 0%, color-mix(in oklab, var(--primary) 22%, transparent), transparent 70%);
+    /* Text and icons for "needs you": 5:1 on white and on the row surface. */
+    --attention: #a15c00;
 }
 
 /* An accent preset's light primary is already dark enough to read as text (`accent-presets.ts`). */
@@ -129,38 +155,39 @@
 }
 
 .dark {
-    --background: var(--brand-charcoal);
+    --background: var(--brand-ink);
     --foreground: var(--brand-frost);
-    --card: var(--brand-charcoal);
+    --card: #16181b;
     --card-foreground: var(--brand-frost);
-    --popover: var(--brand-charcoal);
+    --popover: #1a1c20;
     --popover-foreground: var(--brand-frost);
     --primary: var(--brand-lime);
     --primary-foreground: var(--brand-obsidian);
     --primary-text: var(--primary);
-    --secondary: var(--brand-iron);
+    --secondary: #23262b;
     --secondary-foreground: var(--brand-frost);
-    --muted: var(--brand-iron);
+    --muted: #23262b;
     --muted-foreground: var(--brand-steel);
-    --accent: var(--brand-iron);
+    --accent: #23262b;
     --accent-foreground: var(--brand-frost);
     /* Red for dark mode. At L 0.78 it is about 5:1 on its 10% tint (the earlier 0.65 was 3.5:1). */
     --destructive: oklch(0.78 0.17 25);
-    --border: oklch(1 0 0 / 6%);
+    --border: rgb(214 224 255 / 8%);
     --input: oklch(1 0 0 / 30%);
-    --ring: #8c8c8c; /* 4.8:1 on --brand-charcoal; graphite was 2.7:1, under WCAG 1.4.11's 3:1. Mirrored in apps/web accent-presets.ts */
+    --ring: #8c8c8c; /* 5.9:1 on --brand-ink, 4.8:1 on the old charcoal; graphite was 2.7:1, under WCAG 1.4.11's 3:1. Mirrored in apps/web accent-presets.ts */
     --chart-1: oklch(0.871 0.15 154.449);
     --chart-2: oklch(0.723 0.219 149.579);
     --chart-3: oklch(0.627 0.194 149.214);
     --chart-4: oklch(0.527 0.154 150.069);
     --chart-5: oklch(0.448 0.119 151.328);
-    --sidebar: var(--brand-charcoal);
-    --sidebar-foreground: var(--brand-obsidian);
+    --sidebar: var(--brand-ink);
+    /* Used as a surface in dark mode (`dark:bg-sidebar-foreground`): the inset main panel. */
+    --sidebar-foreground: #121316;
     --sidebar-primary: var(--brand-frost);
-    --sidebar-primary-foreground: var(--brand-charcoal);
-    --sidebar-accent: var(--brand-iron);
+    --sidebar-primary-foreground: var(--brand-ink);
+    --sidebar-accent: #23262b;
     --sidebar-accent-foreground: var(--brand-frost);
-    --sidebar-border: oklch(1 0 0 / 5%);
+    --sidebar-border: rgb(214 224 255 / 7%);
     --sidebar-ring: oklch(0.5 0 0);
 
     --destructive-foreground: var(--color-red-400);
@@ -170,6 +197,21 @@
     --success-foreground: var(--color-emerald-400);
     --warning: oklch(0.75 0.16 65);
     --warning-foreground: var(--color-amber-400);
+
+    --surface-main: #121316;
+    --surface-panel: #16181b;
+    --surface-row: #121316;
+    --surface-row-hover: #17191c;
+    --surface-row-active: #1d2024;
+    --surface-rail: #0b0c0d;
+    --surface-well: #08090a;
+    --surface-code: var(--surface-well);
+    --surface-well-shadow: inset 0 1px 1px rgb(0 0 0 / 0.3), inset 0 0 0 1px rgb(255 255 255 / 0.03);
+    --surface-edge: rgb(214 224 255 / 0.075);
+    --surface-edge-top: rgb(255 255 255 / 0.035);
+    --surface-drop: 0 1px 1px rgb(0 0 0 / 0.3), 0 8px 20px -12px rgb(0 0 0 / 0.7);
+    --surface-glow: radial-gradient(90% 140% at 0% 0%, color-mix(in oklab, var(--primary) 8%, transparent), transparent 70%);
+    --attention: #f5b84a;
 }
 
 @theme inline {
@@ -213,6 +255,16 @@
     --color-sidebar-border: var(--sidebar-border);
     --color-sidebar-ring: var(--sidebar-ring);
     --color-site-header-background: var(--site-header-background);
+    --color-surface-main: var(--surface-main);
+    --color-surface-panel: var(--surface-panel);
+    --color-surface-row: var(--surface-row);
+    --color-surface-row-hover: var(--surface-row-hover);
+    --color-surface-row-active: var(--surface-row-active);
+    --color-surface-rail: var(--surface-rail);
+    --color-surface-well: var(--surface-well);
+    --color-surface-edge: var(--surface-edge);
+    --color-attention: var(--attention);
+    --color-brand-ink: var(--brand-ink);
     --color-site-header-border: var(--site-header-border);
 
     --color-destructive-foreground: var(--destructive-foreground);
@@ -238,6 +290,65 @@
     --color-brand-black: var(--brand-black);
 
     --shadow-complex: 0 10px 10px -5px #17171705, 0 6px 6px -3px #1717170a, 0 3px 3px -1.5px #1717170a, 0 1px 1px -0.5px #1717170a, 0 0 0 1px #17171705;
+}
+
+/*
+ * A raised surface: its fill, a hairline edge, a top highlight and a short drop. Forced colours drop box-shadow, so
+ * the edge is an outline there; an outline takes no room, and a focus outline still wins over it.
+ */
+@utility surface-raised {
+    background-color: var(--surface-panel);
+    box-shadow:
+        inset 0 1px 0 var(--surface-edge-top),
+        inset 0 0 0 1px var(--surface-edge),
+        var(--surface-drop);
+
+    @media (forced-colors: active) {
+        outline: 1px solid CanvasText;
+        outline-offset: -1px;
+    }
+}
+
+/* The raised surface's edge and drop alone, for an element that sets its own fill. */
+@utility surface-edge {
+    box-shadow:
+        inset 0 1px 0 var(--surface-edge-top),
+        inset 0 0 0 1px var(--surface-edge),
+        var(--surface-drop);
+
+    @media (forced-colors: active) {
+        outline: 1px solid CanvasText;
+        outline-offset: -1px;
+    }
+}
+
+/* A pressed-in well for controls nested in a raised surface. */
+@utility surface-well {
+    background-color: var(--surface-well);
+    box-shadow: var(--surface-well-shadow);
+}
+
+/*
+ * A soft list row inside a card (the thread-list look): the row fill and a faint edge, no drop. Pair it with
+ * `bg-surface-row` so the Card's own `bg-card` is merged away; the box-shadow here replaces `surface-edge`.
+ */
+/* A row in a list of rows inside one box (settings): flat, split from the row above by a hairline. */
+@utility surface-row-card {
+    background-color: transparent;
+    border-radius: 0;
+    /* Important: the Card's `surface-edge` is a sibling utility and would otherwise win on source order. */
+    box-shadow: none !important;
+
+    &:not(:first-child) {
+        /* As light as a settings row's hairline. */
+        border-top: 1px solid color-mix(in srgb, var(--border) 50%, transparent);
+    }
+}
+
+/* An icon laid over an Input (a search field's magnifier) sits before it in the markup; the Input's wrapper is positioned
+   and painted, so it would cover the icon. */
+svg:has(~ [data-slot="input-control"]) {
+    z-index: 1;
 }
 
 @layer base {
@@ -351,6 +462,37 @@
 
 html.dark [data-streamdown="code-block-body"] pre {
     color: var(--shiki-dark, var(--sdm-fg, inherit));
+}
+
+/* Surface language: the code block's frame is a raised card and its body a well, so the highlighter's own background is not painted. */
+[data-streamdown="code-block"] {
+    border-color: transparent;
+    border-radius: 12px;
+    background-color: var(--surface-panel);
+    box-shadow:
+        inset 0 1px 0 var(--surface-edge-top),
+        inset 0 0 0 1px var(--surface-edge),
+        var(--surface-drop);
+}
+
+[data-streamdown="code-block-body"] {
+    border-color: transparent;
+    border-radius: 9px;
+    background-color: var(--surface-code);
+    box-shadow: var(--surface-well-shadow);
+}
+
+[data-streamdown="code-block-body"] pre {
+    /* The highlighter sets its background inline, so the well behind it has to win. */
+    background-color: transparent !important;
+    /* The markdown prose spacing gives every pre a block margin; inside the well it would only pad the well. */
+    margin: 0 !important;
+    padding: 12px 14px;
+}
+
+/* The well is the padding: the body's own padding would stack on the pre's. */
+[data-streamdown="code-block-body"]:has(> pre) {
+    padding: 0;
 }
 
 /*

@@ -13,11 +13,11 @@ interface GalleryCardProps {
 }
 
 const CATEGORY_COLORS: Record<GalleryCategory, string> = {
-    audio: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300",
-    automation: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300",
-    image: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300",
-    text: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
-    video: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300",
+    audio: "bg-success/15 text-success-foreground",
+    automation: "bg-warning/15 text-foreground",
+    image: "bg-primary/15 text-primary-text",
+    text: "bg-info/15 text-info-foreground",
+    video: "bg-destructive/15 text-destructive",
 };
 
 /** Display names for the gallery categories. */
@@ -45,17 +45,17 @@ const GalleryCard = ({ onClick, workflow }: GalleryCardProps) => {
     const categoryColor = workflow.galleryCategory ? CATEGORY_COLORS[workflow.galleryCategory] : CATEGORY_COLORS.automation;
 
     return (
-        <Card className="hover:border-primary/50 group relative cursor-pointer transition-colors" onClick={() => onClick?.(workflow)}>
+        <Card className="hover:bg-muted/40 group relative cursor-pointer transition-colors" onClick={() => onClick?.(workflow)}>
             {workflow.galleryFeatured && (
                 <div className="absolute top-2 right-2">
-                    <Sparkles className="size-4 text-amber-500" />
+                    <Sparkles aria-hidden="true" className="text-warning size-4" />
                 </div>
             )}
 
             <CardHeader className="pb-2">
                 <CardTitle className="flex items-center gap-2">
                     <div
-                        className="flex size-8 shrink-0 items-center justify-center rounded"
+                        className="flex size-8 shrink-0 items-center justify-center rounded-lg"
                         style={{
                             backgroundColor: workflow.color ? `${workflow.color}20` : "var(--muted)",
                             color: workflow.color ?? "var(--muted-foreground)",

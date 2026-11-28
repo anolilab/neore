@@ -100,7 +100,7 @@ const PasskeysCard = ({ className, classNames }: PasskeysCardProperties) => {
                         title={t`Passkeys`}
                     >
                         {passkeys && passkeys.length > 0 && (
-                            <CardContent className={cn("grid gap-4", classNames?.content)}>
+                            <CardContent className={cn("grid gap-1.5", classNames?.content)}>
                                 {passkeys?.map((passkey) => (
                                     <PasskeyCell classNames={classNames} key={passkey.id} passkey={passkey} />
                                 ))}

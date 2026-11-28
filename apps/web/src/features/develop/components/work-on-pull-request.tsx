@@ -52,7 +52,7 @@ const WorkOnPullRequest = ({
     };
 
     return (
-        <section aria-labelledby={titleId} className="space-y-3 rounded-md border p-3">
+        <section aria-labelledby={titleId} className="surface-raised space-y-3 rounded-xl p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
                 <h3 className="text-sm font-semibold" id={titleId}>
                     {t`Threads working on this ${requestNoun}`}

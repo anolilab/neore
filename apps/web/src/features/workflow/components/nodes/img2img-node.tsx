@@ -81,7 +81,15 @@ const Img2ImgNodeComponent = (props: NodeProps<Node<Img2ImgNodeData>>) => {
                         </Label>
                         <span className="text-muted-foreground text-xs">{((data.strength ?? 0.75) * 100).toFixed(0)}%</span>
                     </div>
-                    <Slider className="nodrag" max={1} min={0} onValueChange={handleStrengthChange} step={0.05} value={[data.strength ?? 0.75]} />
+                    <Slider
+                        className="nodrag"
+                        max={1}
+                        min={0}
+                        onValueChange={handleStrengthChange}
+                        step={0.05}
+                        thumbLabel={t`Strength`}
+                        value={[data.strength ?? 0.75]}
+                    />
                     <p className="text-muted-foreground text-xs">
                         <Trans>Lower = subtle changes, Higher = major transformation</Trans>
                     </p>

@@ -10,6 +10,7 @@ import * as z from "zod";
 
 import type { SettingsCardClassNames } from "@/components/settings/settings-card";
 import SettingsCard from "@/components/settings/settings-card";
+import SettingsRow from "@/components/settings/settings-row";
 import Captcha from "@/features/auth/components/captcha/captcha";
 import { useListAccounts } from "@/features/auth/hooks/account-management";
 import { useSession } from "@/features/auth/hooks/session-user-management";
@@ -254,96 +255,108 @@ const ChangePasswordCardContent = ({
                     isPending={isPending}
                     title={t`Change Password`}
                 >
-                    <CardContent className={cn("grid gap-6", classNames?.content)}>
+                    <CardContent className={classNames?.content}>
                         {isPending || !accounts ? (
                             <>
-                                <div className="flex flex-col gap-1.5">
-                                    <Skeleton className={cn("h-4 w-32", classNames?.skeleton)} />
-                                    <Skeleton className={cn("h-9 w-full", classNames?.skeleton)} />
-                                </div>
-                                <div className="flex flex-col gap-1.5">
-                                    <Skeleton className={cn("h-4 w-32", classNames?.skeleton)} />
-                                    <Skeleton className={cn("h-9 w-full", classNames?.skeleton)} />
-                                </div>
+                                <SettingsRow
+                                    control={<Skeleton className={cn("h-9 w-full @lg/settings-row:w-72", classNames?.skeleton)} />}
+                                    title={<Skeleton className={cn("h-4 w-32", classNames?.skeleton)} />}
+                                />
+                                <SettingsRow
+                                    control={<Skeleton className={cn("h-9 w-full @lg/settings-row:w-72", classNames?.skeleton)} />}
+                                    title={<Skeleton className={cn("h-4 w-32", classNames?.skeleton)} />}
+                                />
 
                                 {confirmPasswordEnabled && (
-                                    <div className="flex flex-col gap-1.5">
-                                        <Skeleton className={cn("h-4 w-32", classNames?.skeleton)} />
-                                        <Skeleton className={cn("h-9 w-full", classNames?.skeleton)} />
-                                    </div>
+                                    <SettingsRow
+                                        control={<Skeleton className={cn("h-9 w-full @lg/settings-row:w-72", classNames?.skeleton)} />}
+                                        title={<Skeleton className={cn("h-4 w-32", classNames?.skeleton)} />}
+                                    />
                                 )}
                             </>
                         ) : (
                             <>
                                 <form.AppField name="currentPassword">
                                     {(field) => (
-                                        <field.FormItem>
-                                            <field.FormLabel className={classNames?.label}>{t`Current Password`}</field.FormLabel>
+                                        <SettingsRow
+                                            control={
+                                                <field.FormItem className="w-full @lg/settings-row:w-72">
+                                                    <field.FormControl>
+                                                        <PasswordInput
+                                                            aria-label={t`Current Password`}
+                                                            autoComplete="current-password"
+                                                            className={classNames?.input}
+                                                            onBlur={field.handleBlur}
+                                                            onChange={(e) => {
+                                                                field.handleChange(e.target.value);
+                                                            }}
+                                                            placeholder={t`Enter current password`}
+                                                            value={field.state.value}
+                                                        />
+                                                    </field.FormControl>
 
-                                            <field.FormControl>
-                                                <PasswordInput
-                                                    autoComplete="current-password"
-                                                    className={classNames?.input}
-                                                    onBlur={field.handleBlur}
-                                                    onChange={(e) => {
-                                                        field.handleChange(e.target.value);
-                                                    }}
-                                                    placeholder={t`Enter current password`}
-                                                    value={field.state.value}
-                                                />
-                                            </field.FormControl>
-
-                                            <field.FormMessage className={classNames?.error} />
-                                        </field.FormItem>
+                                                    <field.FormMessage className={classNames?.error} />
+                                                </field.FormItem>
+                                            }
+                                            title={t`Current Password`}
+                                        />
                                     )}
                                 </form.AppField>
 
                                 <form.AppField name="newPassword">
                                     {(field) => (
-                                        <field.FormItem>
-                                            <field.FormLabel className={classNames?.label}>{t`New Password`}</field.FormLabel>
+                                        <SettingsRow
+                                            control={
+                                                <field.FormItem className="w-full @lg/settings-row:w-72">
+                                                    <field.FormControl>
+                                                        <PasswordInput
+                                                            aria-label={t`New Password`}
+                                                            autoComplete="new-password"
+                                                            className={classNames?.input}
+                                                            enableToggle
+                                                            onBlur={field.handleBlur}
+                                                            onChange={(e) => {
+                                                                field.handleChange(e.target.value);
+                                                            }}
+                                                            placeholder={t`Enter new password`}
+                                                            value={field.state.value}
+                                                        />
+                                                    </field.FormControl>
 
-                                            <field.FormControl>
-                                                <PasswordInput
-                                                    autoComplete="new-password"
-                                                    className={classNames?.input}
-                                                    enableToggle
-                                                    onBlur={field.handleBlur}
-                                                    onChange={(e) => {
-                                                        field.handleChange(e.target.value);
-                                                    }}
-                                                    placeholder={t`Enter new password`}
-                                                    value={field.state.value}
-                                                />
-                                            </field.FormControl>
-
-                                            <field.FormMessage className={classNames?.error} />
-                                        </field.FormItem>
+                                                    <field.FormMessage className={classNames?.error} />
+                                                </field.FormItem>
+                                            }
+                                            title={t`New Password`}
+                                        />
                                     )}
                                 </form.AppField>
 
                                 {confirmPasswordEnabled && (
                                     <form.AppField name="confirmPassword">
                                         {(field) => (
-                                            <field.FormItem>
-                                                <field.FormLabel className={classNames?.label}>{t`Confirm Password`}</field.FormLabel>
+                                            <SettingsRow
+                                                control={
+                                                    <field.FormItem className="w-full @lg/settings-row:w-72">
+                                                        <field.FormControl>
+                                                            <PasswordInput
+                                                                aria-label={t`Confirm Password`}
+                                                                autoComplete="new-password"
+                                                                className={classNames?.input}
+                                                                enableToggle
+                                                                onBlur={field.handleBlur}
+                                                                onChange={(e) => {
+                                                                    field.handleChange(e.target.value);
+                                                                }}
+                                                                placeholder={t`Confirm new password`}
+                                                                value={field.state.value}
+                                                            />
+                                                        </field.FormControl>
 
-                                                <field.FormControl>
-                                                    <PasswordInput
-                                                        autoComplete="new-password"
-                                                        className={classNames?.input}
-                                                        enableToggle
-                                                        onBlur={field.handleBlur}
-                                                        onChange={(e) => {
-                                                            field.handleChange(e.target.value);
-                                                        }}
-                                                        placeholder={t`Confirm new password`}
-                                                        value={field.state.value}
-                                                    />
-                                                </field.FormControl>
-
-                                                <field.FormMessage className={classNames?.error} />
-                                            </field.FormItem>
+                                                        <field.FormMessage className={classNames?.error} />
+                                                    </field.FormItem>
+                                                }
+                                                title={t`Confirm Password`}
+                                            />
                                         )}
                                     </form.AppField>
                                 )}

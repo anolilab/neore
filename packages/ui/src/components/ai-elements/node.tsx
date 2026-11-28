@@ -21,7 +21,7 @@ export const Node = ({ className, handles, ...props }: NodeProps) => (
 export type NodeHeaderProps = ComponentProps<typeof CardHeader>;
 
 export const NodeHeader = ({ className, ...props }: NodeHeaderProps) => (
-    <CardHeader className={cn("bg-secondary gap-0.5 rounded-t-md border-b p-3!", className)} {...props} />
+    <CardHeader className={cn("border-border/50 gap-0.5 border-b p-3!", className)} {...props} />
 );
 
 export type NodeTitleProps = ComponentProps<typeof CardTitle>;
@@ -42,6 +42,4 @@ export const NodeContent = ({ className, ...props }: NodeContentProps) => <CardC
 
 export type NodeFooterProps = ComponentProps<typeof CardFooter>;
 
-export const NodeFooter = ({ className, ...props }: NodeFooterProps) => (
-    <CardFooter className={cn("bg-secondary rounded-b-md border-t p-3!", className)} {...props} />
-);
+export const NodeFooter = ({ className, ...props }: NodeFooterProps) => <CardFooter className={cn("border-border/50 border-t p-3!", className)} {...props} />;

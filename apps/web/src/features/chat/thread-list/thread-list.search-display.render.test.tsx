@@ -271,7 +271,7 @@ vi.mock("@/features/chat/tags/thread-tag-chips", () => {
 });
 
 vi.mock("@/features/chat/tags/thread-tags-menu", () => {
-    return { default: () => null };
+    return { ThreadTagsMenuItems: () => null, default: () => null };
 });
 
 vi.mock("@/features/projects/components/move-to-project-dialog", () => {

@@ -66,7 +66,7 @@ const InvitationCell = ({ className, classNames, invitation }: InvitationCellPro
     };
 
     return (
-        <Card className={cn("flex-row items-center p-4", className, classNames?.cell)}>
+        <Card className={cn("surface-row-card rounded-none flex-row items-center gap-3 px-0 py-3", className, classNames?.cell)}>
             <div className="flex flex-1 items-center gap-2">
                 <Avatar className="my-0.5 h-8 w-8 rounded-lg">
                     <AvatarFallback className="rounded-lg" name={invitation.email || undefined}>
@@ -75,7 +75,7 @@ const InvitationCell = ({ className, classNames, invitation }: InvitationCellPro
                 </Avatar>
 
                 <div className="grid flex-1 text-left leading-tight">
-                    <span className="truncate text-sm font-semibold">{invitation.email}</span>
+                    <span className="truncate text-sm font-medium">{invitation.email}</span>
 
                     <span className="text-muted-foreground truncate text-xs">
                         {t`Expires`} {formatDate(invitation.expiresAt, i18n.locale)}
@@ -83,12 +83,13 @@ const InvitationCell = ({ className, classNames, invitation }: InvitationCellPro
                 </div>
             </div>
 
-            <span className="truncate text-sm opacity-70">{role?.label}</span>
+            <span className="text-muted-foreground truncate text-xs">{role?.label}</span>
 
             <DropdownMenu>
                 <DropdownMenuTrigger
                     render={
                         <Button
+                            aria-label={t`More actions`}
                             className={cn("relative ms-auto", classNames?.button, classNames?.outlineButton)}
                             disabled={isLoading}
                             size="icon"

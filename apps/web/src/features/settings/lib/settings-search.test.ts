@@ -128,7 +128,8 @@ describe("settings search", () => {
         const { index } = searchIn("en");
 
         expect(foundTabs(index, "api keys")).toEqual(["chat-api-keys", "auth-api-keys"]);
-        expect(foundTabs(index, "models")).toEqual(["chat-default-models", "chat-models"]);
+        // Model Restrictions lists "Blocked Models" as one of its rows.
+        expect(foundTabs(index, "models")).toEqual(["chat-default-models", "chat-models", "chat-model-filters"]);
     });
 
     it("finds a tab through the keywords and labels of its settings, under that tab's group", () => {

@@ -47,10 +47,10 @@ const MoveToProjectDialog: FC<MoveToProjectDialogProps> = ({ currentProjectId, o
                     <DialogDescription>{t`Select a project to move this chat to, or remove it from its current project.`}</DialogDescription>
                 </DialogHeader>
                 <DialogPanel>
-                    <div className="space-y-2">
+                    <div className="space-y-1">
                         {currentProjectId && (
                             <button
-                                className="hover:bg-accent flex w-full items-center gap-2 rounded-md border p-3 text-left transition-colors"
+                                className="hover:bg-surface-row-hover flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors"
                                 onClick={() => handleMoveToProject(undefined)}
                                 type="button"
                             >
@@ -65,7 +65,7 @@ const MoveToProjectDialog: FC<MoveToProjectDialogProps> = ({ currentProjectId, o
 
                                 return (
                                     <button
-                                        className="hover:bg-accent flex w-full items-center gap-2 rounded-md border p-3 text-left transition-colors disabled:opacity-50"
+                                        className="hover:bg-surface-row-hover flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors disabled:opacity-50"
                                         disabled={isCurrentProject}
                                         key={project._id}
                                         // `listProjects` types `_id` as a bare `v.string()` (see
@@ -90,7 +90,7 @@ const MoveToProjectDialog: FC<MoveToProjectDialogProps> = ({ currentProjectId, o
                         )}
                     </div>
                 </DialogPanel>
-                <DialogFooter>
+                <DialogFooter className="border-border/50 border-t" variant="bare">
                     <Button onClick={onClose} type="button" variant="outline">
                         {t`Cancel`}
                     </Button>

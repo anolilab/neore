@@ -10,7 +10,6 @@ import { Button } from "@neore/ui/components/button";
 import ConfirmDialog from "@neore/ui/components/confirm-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogPanel, DialogTitle } from "@neore/ui/components/dialog";
 import { Input } from "@neore/ui/components/input";
-import { Label } from "@neore/ui/components/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@neore/ui/components/select";
 import { Switch } from "@neore/ui/components/switch";
 import { Textarea } from "@neore/ui/components/textarea";
@@ -21,8 +20,11 @@ import type { FC, FormEvent } from "react";
 import { useId, useRef, useState } from "react";
 import { toast } from "sonner";
 
+import SettingsCard from "@/components/settings/settings-card";
+import SettingsRow from "@/components/settings/settings-row";
 import ChangedByAdminMark from "@/features/admin/components/changed-by-admin-mark";
 import { useImpersonating } from "@/features/admin/hooks/use-is-impersonating";
+import { useModalState } from "@/features/layout/hooks/use-ui-state";
 import PromptModelSelector from "@/features/prompts/components/prompt-model-selector";
 import { BotToolSelectionFields, useToolCatalog } from "@/features/settings/components/chat/bot-tool-selection";
 import { useCRPC } from "@/lib/lunora/crpc";
@@ -166,6 +168,7 @@ const BotsSettings = () => {
     const { t } = useLingui();
     const crpc = useCRPC();
     const navigate = useNavigate();
+    const { close: closeSettings } = useModalState("settings");
     const queryClient = useQueryClient();
     const nameId = useId();
     const descriptionId = useId();
@@ -249,6 +252,8 @@ const BotsSettings = () => {
         try {
             const threadId = await chatMutation.mutateAsync({ botId: bot._id, model: bot.model, title: bot.name });
 
+            // This tab lives in the settings modal, which a gear-opened session keeps over the new chat otherwise.
+            closeSettings();
             await navigate({ params: { threadId }, to: "/chat/$threadId" });
         } catch {
             toast.error(t`Could not start a chat with this bot.`);
@@ -371,98 +376,102 @@ const BotsSettings = () => {
 
     return (
         <section className="space-y-8">
-            <form className="space-y-4" onSubmit={handleCreate}>
-                <h2 className="text-lg font-semibold">{t`New bot`}</h2>
-                <div className="space-y-2">
-                    <Label htmlFor={nameId}>{t`Name`}</Label>
-                    <Input
-                        disabled={creating}
-                        id={nameId}
-                        maxLength={120}
-                        onChange={(event) => setDraft({ ...draft, name: event.target.value })}
-                        value={draft.name}
+            <form onSubmit={handleCreate}>
+                <SettingsCard actionLabel={creating ? t`Creating bot…` : t`Create bot`} disabled={!canCreate} isSubmitting={creating} title={t`New bot`}>
+                    <SettingsRow htmlFor={nameId} title={t`Name`}>
+                        <Input
+                            disabled={creating}
+                            id={nameId}
+                            maxLength={120}
+                            onChange={(event) => setDraft({ ...draft, name: event.target.value })}
+                            value={draft.name}
+                        />
+                    </SettingsRow>
+                    <SettingsRow htmlFor={descriptionId} title={t`Description`}>
+                        <Input
+                            disabled={creating}
+                            id={descriptionId}
+                            maxLength={500}
+                            onChange={(event) => setDraft({ ...draft, description: event.target.value })}
+                            value={draft.description}
+                        />
+                    </SettingsRow>
+                    <SettingsRow htmlFor={instructionsId} title={t`Instructions`}>
+                        <Textarea
+                            disabled={creating}
+                            id={instructionsId}
+                            maxLength={20_000}
+                            onChange={(event) => setDraft({ ...draft, instructions: event.target.value })}
+                            value={draft.instructions}
+                        />
+                    </SettingsRow>
+                    <SettingsRow
+                        control={
+                            <div aria-labelledby={modelLabelId} role="group">
+                                <PromptModelSelector
+                                    disabled={creating}
+                                    onChange={(model) => setDraft({ ...draft, model: model ?? DEFAULT_CHAT_MODEL })}
+                                    value={draft.model}
+                                />
+                            </div>
+                        }
+                        title={t`Model`}
+                        titleId={modelLabelId}
                     />
-                </div>
-                <div className="space-y-2">
-                    <Label htmlFor={descriptionId}>{t`Description`}</Label>
-                    <Input
-                        disabled={creating}
-                        id={descriptionId}
-                        maxLength={500}
-                        onChange={(event) => setDraft({ ...draft, description: event.target.value })}
-                        value={draft.description}
+                    <SettingsRow
+                        control={
+                            <PermissionModeSelect
+                                aria-describedby={modeDescriptionId}
+                                disabled={impersonating || creating}
+                                id={modeId}
+                                onChange={(permissionMode) => setDraft({ ...draft, permissionMode })}
+                                value={draft.permissionMode}
+                            />
+                        }
+                        description={t`The mode each new chat with this bot starts in. You can still change it per chat. Scheduled runs use it only when it asks more.`}
+                        descriptionId={modeDescriptionId}
+                        htmlFor={modeId}
+                        title={t`Permission mode`}
                     />
-                </div>
-                <div className="space-y-2">
-                    <Label htmlFor={instructionsId}>{t`Instructions`}</Label>
-                    <Textarea
-                        disabled={creating}
-                        id={instructionsId}
-                        maxLength={20_000}
-                        onChange={(event) => setDraft({ ...draft, instructions: event.target.value })}
-                        value={draft.instructions}
-                    />
-                </div>
-                <div aria-labelledby={modelLabelId} className="space-y-2" role="group">
-                    <Label id={modelLabelId}>{t`Model`}</Label>
-                    <PromptModelSelector
-                        disabled={creating}
-                        onChange={(model) => setDraft({ ...draft, model: model ?? DEFAULT_CHAT_MODEL })}
-                        value={draft.model}
-                    />
-                </div>
-                <div className="space-y-2">
-                    <Label htmlFor={modeId}>{t`Permission mode`}</Label>
-                    <p className="text-muted-foreground text-xs" id={modeDescriptionId}>
-                        {t`The mode each new chat with this bot starts in. You can still change it per chat. Scheduled runs use it only when it asks more.`}
-                    </p>
-                    <PermissionModeSelect
-                        aria-describedby={modeDescriptionId}
-                        disabled={impersonating || creating}
-                        id={modeId}
-                        onChange={(permissionMode) => setDraft({ ...draft, permissionMode })}
-                        value={draft.permissionMode}
-                    />
-                </div>
-                <BotToolSelectionFields
-                    catalog={toolCatalog}
-                    disabled={impersonating || creating}
-                    key={createdCount}
-                    onChange={(toolSelection) => setDraft({ ...draft, toolSelection })}
-                    onPendingChange={setCreateToolsPending}
-                    value={draft.toolSelection}
-                />
-                <div className="flex items-center justify-between gap-4">
-                    <div>
-                        <Label htmlFor={computerId}>{t`Computer`}</Label>
-                        <p className="text-muted-foreground text-xs">{t`A sandbox the bot keeps between chats. Paused when idle, not billed while paused.`}</p>
+                    <div className="border-border/50 py-3 not-first:border-t">
+                        <BotToolSelectionFields
+                            catalog={toolCatalog}
+                            disabled={impersonating || creating}
+                            key={createdCount}
+                            onChange={(toolSelection) => setDraft({ ...draft, toolSelection })}
+                            onPendingChange={setCreateToolsPending}
+                            value={draft.toolSelection}
+                        />
                     </div>
-                    <Switch
-                        checked={draft.computerEnabled}
-                        disabled={creating}
-                        id={computerId}
-                        onCheckedChange={(checked: boolean) => setDraft({ ...draft, computerEnabled: checked })}
+                    <SettingsRow
+                        control={
+                            <Switch
+                                checked={draft.computerEnabled}
+                                disabled={creating}
+                                id={computerId}
+                                onCheckedChange={(checked: boolean) => setDraft({ ...draft, computerEnabled: checked })}
+                            />
+                        }
+                        description={t`A sandbox the bot keeps between chats. Paused when idle, not billed while paused.`}
+                        htmlFor={computerId}
+                        title={t`Computer`}
                     />
-                </div>
-                <Button disabled={!canCreate || creating} type="submit">
-                    {creating ? t`Creating bot…` : t`Create bot`}
-                </Button>
+                </SettingsCard>
                 <p className="sr-only" role="status">
                     {creating && t`Creating bot…`}
                 </p>
             </form>
 
-            <div className="space-y-3">
-                <h2 className="text-lg font-semibold">{t`Your bots`}</h2>
+            <SettingsCard title={t`Your bots`}>
                 {isLoading && (
-                    <p className="text-muted-foreground text-sm" role="status">
+                    <p className="text-muted-foreground py-3 text-sm" role="status">
                         {t`Loading…`}
                     </p>
                 )}
-                {!isLoading && bots.length === 0 && <p className="text-muted-foreground text-sm">{t`No bots yet.`}</p>}
-                <ul className="divide-border divide-y">
+                {!isLoading && bots.length === 0 && <p className="text-muted-foreground py-3 text-sm">{t`No bots yet.`}</p>}
+                <ul>
                     {bots.map((bot) => (
-                        <li className="flex flex-wrap items-center justify-between gap-4 py-3" key={bot._id}>
+                        <li className="border-border/50 flex flex-wrap items-center justify-between gap-4 py-3 not-first:border-t" key={bot._id}>
                             <div className="min-w-0">
                                 {/* A marked bot's name is shown whole, as its instructions below: the owner sees all they keep. */}
                                 <p className={bot.instructionsByImpersonator ? "font-medium break-words" : "truncate font-medium"}>{bot.name}</p>
@@ -527,7 +536,7 @@ const BotsSettings = () => {
                         </li>
                     ))}
                 </ul>
-            </div>
+            </SettingsCard>
 
             <Dialog
                 onOpenChange={(open: boolean) => {

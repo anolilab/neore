@@ -1139,7 +1139,7 @@ const HostComposerForThread: FC<{ className?: string; threadId: string }> = ({ c
                     {menuOpen && (
                         <ul
                             aria-label={t`Commands from ${agentLabel}`}
-                            className="bg-popover absolute bottom-full left-0 z-10 mb-1 max-h-64 w-full max-w-md overflow-auto rounded-lg border p-1 text-sm shadow-md"
+                            className="bg-popover surface-edge absolute bottom-full left-0 z-10 mb-1 max-h-64 w-full max-w-md overflow-auto rounded-xl p-1 text-sm"
                             id={listId}
                             ref={list}
                             role="listbox"

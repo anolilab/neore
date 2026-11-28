@@ -1,12 +1,17 @@
 import { expect, test } from "@playwright/test";
 
-import { isInviteOnly } from "./chat-helpers";
+import { dismissOverlays, isInviteOnly } from "./chat-helpers";
 import { AUTH_PATHS, PROTECTED_PATHS, PUBLIC_PATHS } from "./fixtures";
 
 const SIGN_IN_URL_RE = /\/auth\/sign-in/;
 const ADMIN_URL_RE = /\/admin$/;
 
 test.describe("Auth route navigation", () => {
+    // The sign-in panel is centred, and the cookie banner and the dev-only devtools card can sit over its links.
+    test.beforeEach(async ({ page }) => {
+        await dismissOverlays(page);
+    });
+
     // Registration is invite-only in this suite: sign-up is offered only on an invitation link (`?invite=`),
     // which the links between the two pages carry along. The token is checked only when the form is submitted.
     test("moves between sign-in and sign-up in both directions on an invitation link", async ({ page }) => {
@@ -51,10 +56,12 @@ test.describe("Protected routes while signed out", () => {
         await expect(page).toHaveURL(new RegExp(String.raw`${AUTH_PATHS.signIn}(\?.*)?$`));
     });
 
-    test("sends /dashboard/settings to sign-in", async ({ page }) => {
+    // An old settings URL is redirected to the chat with the settings modal open, but only after the session check.
+    test("sends an old settings page URL to sign-in instead of opening the settings modal", async ({ page }) => {
         await page.goto(PROTECTED_PATHS.settings);
 
         await expect(page).toHaveURL(SIGN_IN_URL_RE);
+        await expect(page.getByRole("dialog", { name: "Settings" })).toHaveCount(0);
     });
 
     test("does not leak the admin area", async ({ page }) => {

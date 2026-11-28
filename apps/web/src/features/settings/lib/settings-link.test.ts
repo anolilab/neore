@@ -1,0 +1,183 @@
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import {
+    adminPathFor,
+    anchorFromHash,
+    scrollToAnchorWhenRendered,
+    settingsAnchorForPath,
+    settingsLinkSearch,
+    settingsLocation,
+    settingsTabForPath,
+} from "./settings-link";
+
+describe("settingsTabForPath", () => {
+    it.each([
+        ["/dashboard/settings/app/customization", "app-customization"],
+        ["/dashboard/settings/app/keyboard-shortcuts", "app-keyboard"],
+        ["/dashboard/settings/app/personalization", "chat-personalization"],
+        ["/dashboard/settings/auth/account", "auth-account"],
+        ["/dashboard/settings/auth/api-keys", "auth-api-keys"],
+        ["/dashboard/settings/auth/members", "auth-members"],
+        ["/dashboard/settings/auth/organization", "auth-organization"],
+        ["/dashboard/settings/auth/organizations", "auth-organizations"],
+        ["/dashboard/settings/auth/security", "auth-security"],
+        ["/dashboard/settings/auth/teams", "auth-teams"],
+        ["/dashboard/settings/chat/agent", "chat-agent"],
+        ["/dashboard/settings/chat/bots", "chat-bots"],
+        ["/dashboard/settings/chat/devices", "chat-devices"],
+        ["/dashboard/settings/chat/knowledge", "chat-knowledge"],
+        ["/dashboard/settings/chat/mcp", "chat-mcp"],
+        ["/dashboard/settings/chat/model-filters", "chat-model-filters"],
+        ["/dashboard/settings/chat/models", "chat-models"],
+        ["/dashboard/settings/chat/triggers", "chat-triggers"],
+        ["/dashboard/settings/chat/usage", "chat-usage"],
+        ["/dashboard/settings/connectors", "connectors"],
+        ["/dashboard/settings/connectors/", "connectors"],
+        ["/dashboard/settings/connectors/messenger", "connectors-messenger"],
+        ["/dashboard/settings/privacy", "privacy"],
+        ["/dashboard/settings/api-keys", "chat-api-keys"],
+        ["/dashboard/settings/billing/limits", "auth-billing"],
+        ["/dashboard/settings/chat/model", "chat-models"],
+        ["/dashboard/settings/compliance/model-filters", "chat-model-filters"],
+        ["/dashboard/settings/chat/compression", "app-customization"],
+        ["/dashboard/settings/compliance/pii", "privacy"],
+    ])("maps %s to the %s tab", (path, tab) => {
+        expect(settingsTabForPath(path)).toBe(tab);
+    });
+
+    it("opens the first tab for the bare settings path and for a settings page that no longer exists", () => {
+        expect(settingsTabForPath("/dashboard/settings")).toBe("app-customization");
+        expect(settingsTabForPath("/dashboard/settings/chat/constructor")).toBe("app-customization");
+    });
+
+    it("leaves the pages that stay pages alone: the OAuth callback and admin", () => {
+        expect(settingsTabForPath("/dashboard/settings/connectors/callback")).toBeUndefined();
+        expect(settingsTabForPath("/dashboard/settings/admin")).toBeUndefined();
+        expect(settingsTabForPath("/dashboard/settings/admin/users")).toBeUndefined();
+    });
+
+    it("opens the first tab for a made-up path under the callback, which has no page of its own", () => {
+        expect(settingsTabForPath("/dashboard/settings/connectors/callback/foo")).toBe("app-customization");
+    });
+
+    it("is not fooled by a path that only starts with the same letters, or by other pages", () => {
+        expect(settingsTabForPath("/dashboard/settingsx")).toBeUndefined();
+        expect(settingsTabForPath("/dashboard")).toBeUndefined();
+        expect(settingsTabForPath("/chat/abc")).toBeUndefined();
+    });
+});
+
+describe("settingsAnchorForPath", () => {
+    it("points the gateway's compression action at the automatic compaction setting, and other paths at nothing", () => {
+        expect(settingsAnchorForPath("/dashboard/settings/chat/compression")).toBe("auto-compact-threshold");
+        expect(settingsAnchorForPath("/dashboard/settings/chat/models")).toBeUndefined();
+        expect(settingsAnchorForPath("/chat/compression")).toBeUndefined();
+    });
+});
+
+describe("anchorFromHash", () => {
+    it.each([
+        ["#voice-mode", "voice-mode"],
+        ["voice-mode", "voice-mode"],
+        ["#voice-mode%2Dvoice", "voice-mode-voice"],
+        ["#bad%E0%A4", "bad%E0%A4"],
+        ["#", undefined],
+        ["", undefined],
+    ])("reads %j as the element id %j", (hash, anchor) => {
+        expect(anchorFromHash(hash)).toBe(anchor);
+    });
+});
+
+describe("settingsLinkSearch", () => {
+    it("adds the modal's keys and keeps the page's own search", () => {
+        expect(settingsLinkSearch("chat-mcp")({ project: "p1" })).toEqual({ project: "p1", settings: true, settingsTab: "chat-mcp" });
+    });
+
+    it("drops an anchor an earlier settings link left in the search", () => {
+        expect(settingsLinkSearch("chat-mcp")({ settings: true, settingsAnchor: "daily-brief", settingsTab: "auth-account" })).toEqual({
+            settings: true,
+            settingsTab: "chat-mcp",
+        });
+    });
+
+    it("carries an anchor only when one is given", () => {
+        expect(settingsLinkSearch("auth-account", "daily-brief")({})).toEqual({ settings: true, settingsAnchor: "daily-brief", settingsTab: "auth-account" });
+    });
+});
+
+describe("settingsLocation", () => {
+    it("opens the modal over the chat when there is no page to stay on", () => {
+        expect(settingsLocation("connectors")).toEqual({ search: { settings: true, settingsTab: "connectors" }, to: "/chat" });
+    });
+});
+
+describe("adminPathFor", () => {
+    it("sends the old admin settings paths to the admin pages", () => {
+        expect(adminPathFor("/dashboard/settings/admin")).toBe("/admin");
+        expect(adminPathFor("/dashboard/settings/admin/")).toBe("/admin");
+        expect(adminPathFor("/dashboard/settings/admin/users")).toBe("/admin/users");
+        expect(adminPathFor("/dashboard/settings/admin/audit-log")).toBe("/admin/audit-log");
+    });
+
+    it("leaves every other path alone", () => {
+        expect(adminPathFor("/dashboard/settings/administrator")).toBeUndefined();
+        expect(adminPathFor("/dashboard/settings/auth/account")).toBeUndefined();
+    });
+});
+
+describe(scrollToAnchorWhenRendered, () => {
+    afterEach(() => {
+        vi.useRealTimers();
+        document.body.replaceChildren();
+    });
+
+    const mount = (html: string): HTMLElement => {
+        const root = document.createElement("div");
+
+        root.innerHTML = html;
+        document.body.insertAdjacentElement("beforeend", root);
+
+        for (const element of root.querySelectorAll<HTMLElement>("*")) {
+            element.scrollIntoView = vi.fn();
+        }
+
+        return root;
+    };
+
+    it("moves focus to the control the link names", () => {
+        vi.useFakeTimers();
+        const root = mount('<label for="daily-brief">Daily brief</label><button id="daily-brief" role="switch"></button>');
+        const done = vi.fn();
+
+        scrollToAnchorWhenRendered(() => root, "daily-brief", done);
+        vi.advanceTimersToNextFrame();
+
+        expect(document.activeElement?.id).toBe("daily-brief");
+        expect(root.querySelector("#daily-brief")?.hasAttribute("tabindex")).toBe(false);
+        expect(done).toHaveBeenCalledTimes(1);
+    });
+
+    it("focuses the row of a disabled control the link names, which cannot take focus itself", () => {
+        vi.useFakeTimers();
+        const root = mount(
+            '<section><div id="row"><label for="push-notifications">Push notifications</label><button disabled id="push-notifications" role="switch"></button></div></section>',
+        );
+
+        scrollToAnchorWhenRendered(() => root, "push-notifications", vi.fn());
+        vi.advanceTimersToNextFrame();
+
+        expect(document.activeElement?.id).toBe("row");
+        expect(root.querySelector<HTMLElement>("#row")?.tabIndex).toBe(-1);
+    });
+
+    it("focuses a card the link names without making it a tab stop", () => {
+        vi.useFakeTimers();
+        const root = mount('<section id="devices-ssh"><h3>Servers over SSH</h3><button>Add</button></section>');
+
+        scrollToAnchorWhenRendered(() => root, "devices-ssh", vi.fn());
+        vi.advanceTimersToNextFrame();
+
+        expect(document.activeElement?.id).toBe("devices-ssh");
+        expect(root.querySelector<HTMLElement>("#devices-ssh")?.tabIndex).toBe(-1);
+    });
+});

@@ -4,7 +4,7 @@ import { Authenticated } from "@lunora/react";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@neore/ui/components/breadcrumb";
 import { ScrollArea } from "@neore/ui/components/scroll-area";
 import { SidebarInset } from "@neore/ui/components/sidebar";
-import { createFileRoute, Outlet, useLocation } from "@tanstack/react-router";
+import { createFileRoute, Outlet, redirect, useLocation } from "@tanstack/react-router";
 import {
     Bot,
     Brain,
@@ -35,9 +35,9 @@ import AppSidebar from "@/features/layout/components/app-sidebar";
 import DashboardSidebarProvider from "@/features/layout/components/dashboard-sidebar-provider";
 import type { NavItem } from "@/features/layout/components/nav-items";
 import NavItems from "@/features/layout/components/nav-items";
-import SettingsPageOutline from "@/features/layout/components/settings-page-outline";
 import SiteHeader from "@/features/layout/components/site-header";
 import { breadcrumbLabel, DASHBOARD_PAGE_NAMES } from "@/features/layout/lib/dashboard-page-names";
+import { adminPathFor, anchorFromHash, settingsAnchorForPath, settingsLocation, settingsTabForPath } from "@/features/settings/lib/settings-link";
 import { requireSession } from "@/lib/auth/route-guard";
 
 /** The page names, as descriptors: this runs outside a component, so the caller translates them (`i18n._`). */
@@ -54,17 +54,17 @@ const getNavigationItems = (
                   {
                       icon: LayoutDashboard,
                       name: translate(DASHBOARD_PAGE_NAMES.adminDashboard),
-                      url: "/dashboard/settings/admin",
+                      url: "/admin",
                   },
                   {
                       icon: Users,
                       name: translate(DASHBOARD_PAGE_NAMES.users),
-                      url: "/dashboard/settings/admin/users",
+                      url: "/admin/users",
                   },
                   {
                       icon: ClipboardList,
                       name: translate(DASHBOARD_PAGE_NAMES.auditLog),
-                      url: "/dashboard/settings/admin/audit-log",
+                      url: "/admin/audit-log",
                   },
               ]
             : [],
@@ -77,93 +77,93 @@ const getNavigationItems = (
             {
                 icon: Settings,
                 name: translate(DASHBOARD_PAGE_NAMES.customization),
-                url: "/dashboard/settings/app/customization",
+                settingsTab: "app-customization" as const,
             },
             {
                 icon: UserCog,
                 name: translate(DASHBOARD_PAGE_NAMES.personalization),
-                url: "/dashboard/settings/app/personalization",
+                settingsTab: "chat-personalization" as const,
             },
             {
                 icon: Keyboard,
                 name: translate(DASHBOARD_PAGE_NAMES.keyboardShortcuts),
-                url: "/dashboard/settings/app/keyboard-shortcuts",
+                settingsTab: "app-keyboard" as const,
             },
         ],
         auth: [
             {
                 icon: User,
                 name: translate(DASHBOARD_PAGE_NAMES.account),
-                url: "/dashboard/settings/auth/account",
+                settingsTab: "auth-account" as const,
             },
             {
                 icon: Shield,
                 name: translate(DASHBOARD_PAGE_NAMES.security),
-                url: "/dashboard/settings/auth/security",
+                settingsTab: "auth-security" as const,
             },
             apiKey && {
                 icon: Key,
                 name: translate(DASHBOARD_PAGE_NAMES.apiKeys),
-                url: "/dashboard/settings/auth/api-keys",
+                settingsTab: "auth-api-keys" as const,
             },
             organization && {
                 icon: Building,
                 name: translate(DASHBOARD_PAGE_NAMES.organizations),
-                url: "/dashboard/settings/auth/organizations",
+                settingsTab: "auth-organizations" as const,
             },
             activeOrganization && {
                 icon: Building,
                 name: translate(DASHBOARD_PAGE_NAMES.organization),
-                url: "/dashboard/settings/auth/organization",
+                settingsTab: "auth-organization" as const,
             },
             activeOrganization && {
                 icon: Users,
                 name: translate(DASHBOARD_PAGE_NAMES.members),
-                url: "/dashboard/settings/auth/members",
+                settingsTab: "auth-members" as const,
             },
             activeOrganization && {
                 icon: UsersRound,
                 name: translate(DASHBOARD_PAGE_NAMES.teams),
-                url: "/dashboard/settings/auth/teams",
+                settingsTab: "auth-teams" as const,
             },
         ].filter(Boolean) as NavItem[],
         chat: [
             {
                 icon: Brain,
                 name: translate(DASHBOARD_PAGE_NAMES.models),
-                url: "/dashboard/settings/chat/models",
+                settingsTab: "chat-models" as const,
             },
             {
                 icon: Filter,
                 name: translate(DASHBOARD_PAGE_NAMES.modelRestrictions),
-                url: "/dashboard/settings/chat/model-filters",
+                settingsTab: "chat-model-filters" as const,
             },
             {
                 icon: Bot,
                 name: translate(DASHBOARD_PAGE_NAMES.agent),
-                url: "/dashboard/settings/chat/agent",
+                settingsTab: "chat-agent" as const,
             },
             {
                 icon: Sparkles,
                 name: translate(DASHBOARD_PAGE_NAMES.bots),
-                url: "/dashboard/settings/chat/bots",
+                settingsTab: "chat-bots" as const,
             },
             {
                 icon: MessageCircle,
                 name: translate(DASHBOARD_PAGE_NAMES.messenger),
-                url: "/dashboard/settings/connectors/messenger",
+                settingsTab: "connectors-messenger" as const,
             },
             {
                 icon: Laptop,
                 name: translate(DASHBOARD_PAGE_NAMES.devices),
-                url: "/dashboard/settings/chat/devices",
+                settingsTab: "chat-devices" as const,
             },
         ],
         privacy: [
             {
                 icon: Lock,
                 name: translate(DASHBOARD_PAGE_NAMES.privacyAndData),
-                url: "/dashboard/settings/privacy",
+                settingsTab: "privacy" as const,
             },
         ],
     };
@@ -198,12 +198,12 @@ const RouteComponent = () => {
     const sidebarContent = (
         <>
             {isAdmin && navigationItems.admin.length > 0 && (
-                <NavItems classes={{ group: "pl-2" }} colorMode="light" items={navigationItems.admin} label={i18n._(DASHBOARD_PAGE_NAMES.admin)} />
+                <NavItems classes={{ group: "px-2" }} colorMode="light" items={navigationItems.admin} label={i18n._(DASHBOARD_PAGE_NAMES.admin)} />
             )}
-            <NavItems classes={{ group: "pl-2" }} colorMode="light" items={navigationItems.app} label={i18n._(DASHBOARD_PAGE_NAMES.app)} />
-            <NavItems classes={{ group: "pl-2" }} colorMode="light" items={navigationItems.chat} label={i18n._(DASHBOARD_PAGE_NAMES.chat)} />
-            <NavItems classes={{ group: "pl-2" }} colorMode="light" items={navigationItems.auth} label={i18n._(DASHBOARD_PAGE_NAMES.auth)} />
-            <NavItems classes={{ group: "pl-2" }} colorMode="light" items={navigationItems.privacy} label={i18n._(DASHBOARD_PAGE_NAMES.privacy)} />
+            <NavItems classes={{ group: "px-2" }} colorMode="light" items={navigationItems.app} label={i18n._(DASHBOARD_PAGE_NAMES.app)} />
+            <NavItems classes={{ group: "px-2" }} colorMode="light" items={navigationItems.chat} label={i18n._(DASHBOARD_PAGE_NAMES.chat)} />
+            <NavItems classes={{ group: "px-2" }} colorMode="light" items={navigationItems.auth} label={i18n._(DASHBOARD_PAGE_NAMES.auth)} />
+            <NavItems classes={{ group: "px-2" }} colorMode="light" items={navigationItems.privacy} label={i18n._(DASHBOARD_PAGE_NAMES.privacy)} />
         </>
     );
 
@@ -221,25 +221,22 @@ const RouteComponent = () => {
                 {/* The inset's margins sit inside the viewport height; clip them so the page does not scroll. */}
                 <div className="flex h-dvh w-full overflow-hidden">
                     <AppSidebar content={sidebarContent} name="overlay" />
-                    <SidebarInset className="dark:bg-sidebar-foreground bg-white md:peer-data-[variant=inset]:m-1">
+                    <SidebarInset className="bg-surface-main">
                         <SiteHeader>
                             <Breadcrumb>
-                                <BreadcrumbList>
+                                <BreadcrumbList className="gap-1 text-sm">
                                     {breadcrumbItems.map((item, index) => (
                                         <Fragment key={item.href}>
                                             <BreadcrumbItem>
                                                 {item.isLast ? (
-                                                    <BreadcrumbPage className="text-foreground font-medium">{item.label}</BreadcrumbPage>
+                                                    <BreadcrumbPage className="font-medium">{item.label}</BreadcrumbPage>
                                                 ) : (
-                                                    <BreadcrumbLink
-                                                        className="hover:text-muted-foreground hover:dark:text-muted-foreground text-sm text-black transition-colors dark:text-white"
-                                                        href={item.href}
-                                                    >
-                                                        {item.label}
-                                                    </BreadcrumbLink>
+                                                    <BreadcrumbLink href={item.href}>{item.label}</BreadcrumbLink>
                                                 )}
                                             </BreadcrumbItem>
-                                            {index < breadcrumbItems.length - 1 && <BreadcrumbSeparator className="text-muted-foreground mx-2" />}
+                                            {index < breadcrumbItems.length - 1 && (
+                                                <BreadcrumbSeparator className="text-muted-foreground/60 mx-0.5 [&>svg]:size-3" />
+                                            )}
                                         </Fragment>
                                     ))}
                                 </BreadcrumbList>
@@ -247,9 +244,7 @@ const RouteComponent = () => {
                         </SiteHeader>
 
                         <ScrollArea className="h-full w-full overflow-hidden p-4">
-                            <SettingsPageOutline pathname={pathname}>
-                                <Outlet />
-                            </SettingsPageOutline>
+                            <Outlet />
                         </ScrollArea>
                     </SidebarInset>
                 </div>
@@ -261,6 +256,21 @@ const RouteComponent = () => {
 export const Route = createFileRoute("/dashboard")({
     beforeLoad: ({ context, location }) => {
         requireSession(context, location);
+
+        // Settings are a modal now. An old settings URL (a bookmark, an email, a notification) opens it over the chat.
+        const settingsTab = settingsTabForPath(location.pathname);
+
+        if (settingsTab) {
+            // The router's hash may carry its "#" and be percent-encoded; the modal looks the anchor up as an element id.
+            throw redirect(settingsLocation(settingsTab, anchorFromHash(location.hash) ?? settingsAnchorForPath(location.pathname)));
+        }
+
+        // Admin moved to its own pages.
+        const adminPath = adminPathFor(location.pathname);
+
+        if (adminPath) {
+            throw redirect({ href: adminPath });
+        }
     },
     component: RouteComponent,
 });

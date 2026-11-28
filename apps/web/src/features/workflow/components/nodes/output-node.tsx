@@ -5,7 +5,7 @@ import { Label } from "@ui/components/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@ui/components/select";
 import type { Node, NodeProps } from "@xyflow/react";
 import { Monitor } from "lucide-react";
-import { memo } from "react";
+import { memo, useId } from "react";
 
 import { useWorkflowStore } from "../../stores/workflow-store";
 import type { OutputNodeData } from "../../types";
@@ -20,6 +20,7 @@ const OUTPUT_TYPES = [
 ] as const satisfies ReadonlyArray<{ label: MessageDescriptor; value: OutputNodeData["outputType"] }>;
 
 const OutputNodeComponent = (props: NodeProps<Node<OutputNodeData>>) => {
+    const selectId = useId();
     const { data, id } = props;
     const updateNode = useWorkflowStore((state) => state.updateNode);
     const execution = useWorkflowStore((state) => state.execution);
@@ -75,7 +76,7 @@ const OutputNodeComponent = (props: NodeProps<Node<OutputNodeData>>) => {
         >
             <div className="space-y-3">
                 <div className="space-y-1.5">
-                    <Label className="text-muted-foreground text-xs">
+                    <Label className="text-muted-foreground text-xs" htmlFor={selectId}>
                         <Trans>Output Type</Trans>
                     </Label>
                     <Select
@@ -85,7 +86,7 @@ const OutputNodeComponent = (props: NodeProps<Node<OutputNodeData>>) => {
                         onValueChange={handleOutputTypeChange}
                         value={data.outputType}
                     >
-                        <SelectTrigger className="nodrag h-8 text-sm">
+                        <SelectTrigger className="nodrag h-8 text-sm" id={selectId}>
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>

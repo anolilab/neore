@@ -7,7 +7,7 @@ import EvalsPage from "@/features/evals/components/evals-page";
 export const Route = createFileRoute("/_shortcut/evals")({
     component: () => (
         <RouteErrorBoundary routeName="/evals">
-            <ScrollArea className="h-full w-full p-4">
+            <ScrollArea className="h-full w-full p-4 md:p-6">
                 <EvalsPage />
             </ScrollArea>
         </RouteErrorBoundary>

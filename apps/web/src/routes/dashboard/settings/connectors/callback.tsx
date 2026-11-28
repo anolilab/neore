@@ -5,6 +5,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
+import { settingsLocation } from "@/features/settings/lib/settings-link";
 import { useLunoraActionOptions } from "@/lib/lunora/crpc";
 
 /**
@@ -30,7 +31,7 @@ const OAuthCallback = () => {
         started.current = true;
 
         const finish = async (): Promise<void> => {
-            const backToConnectors = async () => await navigate({ replace: true, to: "/dashboard/settings/connectors" });
+            const backToConnectors = async () => await navigate({ replace: true, ...settingsLocation("connectors") });
 
             if (searchParams.error) {
                 // The provider's own text; shown, never interpreted.
@@ -65,7 +66,7 @@ const OAuthCallback = () => {
 
                 // A sign-in to one of the user's own MCP servers returns to that list.
                 if (kind === "mcp") {
-                    await navigate({ replace: true, to: "/dashboard/settings/chat/mcp" });
+                    await navigate({ replace: true, ...settingsLocation("chat-mcp") });
 
                     return;
                 }

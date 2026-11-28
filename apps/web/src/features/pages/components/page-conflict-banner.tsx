@@ -19,10 +19,7 @@ const PageConflictBanner: FC<PageConflictBannerProps> = ({ onOverwrite, onReload
     const { t } = useLingui();
 
     return (
-        <div
-            className="flex flex-wrap items-center gap-2 border-b border-red-200 bg-red-50 px-4 py-2 text-sm text-red-900 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200"
-            role="alert"
-        >
+        <div className="border-destructive/25 bg-destructive/10 flex flex-wrap items-center gap-2 border-b px-4 py-2 text-sm" role="alert">
             <p className="min-w-0 flex-1">
                 <span className="font-medium">{t`This page changed while you were editing.`}</span> {t`Your latest changes are not saved yet.`}
             </p>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useLingui } from "@lingui/react/macro";
+import { Badge } from "@neore/ui/components/badge";
 import { Button } from "@neore/ui/components/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@neore/ui/components/responsive-dropdown-menu";
 import cn from "@neore/ui/utils/cn";
@@ -68,18 +69,18 @@ const SessionCell = ({ classNames, onRevokeSession, session }: SessionCellProper
     };
 
     return (
-        <div className={cn("flex items-center justify-between rounded-lg border p-4", classNames?.content)}>
+        <div className={cn("flex items-center justify-between gap-3", classNames?.content)}>
             <div className="flex items-center gap-3">
-                <div className="bg-muted flex h-10 w-10 items-center justify-center rounded-lg">
-                    <DeviceIcon className="h-5 w-5" deviceType={session.deviceType} />
+                <div className="surface-well flex size-[30px] shrink-0 items-center justify-center rounded-lg">
+                    <DeviceIcon className="text-muted-foreground size-4" deviceType={session.deviceType} />
                 </div>
 
                 <div className="flex flex-col">
                     <div className="flex items-center gap-2">
-                        <span className="font-medium">{session.deviceName || session.browser || t`Unknown Device`}</span>
-                        {session.isCurrent && <span className="rounded-full bg-green-100 px-2 py-1 text-xs text-green-800">{t`Current`}</span>}
+                        <span className="text-sm font-medium">{session.deviceName || session.browser || t`Unknown Device`}</span>
+                        {session.isCurrent && <Badge variant="secondary">{t`Current`}</Badge>}
                     </div>
-                    <div className="text-muted-foreground text-sm">
+                    <div className="text-muted-foreground text-xs">
                         {session.os && `${session.os} • `}
                         {session.location && `${session.location} • `}
                         {t`Last active ${lastActiveDate}`}

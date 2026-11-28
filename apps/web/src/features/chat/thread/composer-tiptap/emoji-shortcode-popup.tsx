@@ -57,15 +57,7 @@ const EmojiShortcodePopup: FC<EmojiShortcodePopupProps> = ({ editorRect, listbox
         >
             <div
                 aria-label={t`Emoji suggestions`}
-                className={clsx(
-                    "overflow-y-auto rounded-lg border p-1",
-                    "bg-popover text-popover-foreground",
-                    "dark:bg-[oklch(0.205_0_0)] dark:text-[oklch(0.985_0_0)]",
-                    "border-border dark:border-white/10",
-                    "shadow-md dark:shadow-xl dark:shadow-black/50",
-                    "ring-foreground/10 ring-1 dark:ring-white/10",
-                    POPUP_ENTER_MOTION,
-                )}
+                className={clsx("bg-popover text-popover-foreground surface-edge overflow-y-auto rounded-xl p-1", POPUP_ENTER_MOTION)}
                 id={listboxId}
                 role="listbox"
                 style={{ maxHeight: `${Math.max(editorRect.top - GAP_PX, 0)}px`, width: editorRect.width }}

@@ -41,13 +41,14 @@ const AppSidebar: FC<
                 rail={<SidebarRail className="in-data-[side=left]:left-[calc(var(--sidebar-width)+4.1rem)]" name="left" side="left" />}
                 variant="inset"
             >
-                <div className="relative z-10 flex w-(--sidebar-width) flex-col rounded-l-xl">
-                    {header && <SidebarHeader>{header}</SidebarHeader>}
-                    <SidebarContent>
+                <div className="bg-sidebar relative z-10 flex w-(--sidebar-width) flex-col rounded-l-xl">
+                    {header && <SidebarHeader className="px-3 pt-3 pb-0 empty:hidden">{header}</SidebarHeader>}
+                    {/* Room above the first group when there is no switcher above it. */}
+                    <SidebarContent className="pt-2">
                         {isMobile && <MobileSectionNav />}
                         {content}
                     </SidebarContent>
-                    <SidebarFooter>
+                    <SidebarFooter className="items-stretch gap-2 p-3">
                         {footer}
                         {isAnonymous ? (
                             <>

@@ -16,7 +16,6 @@ import {
 } from "@neore/ui/components/alert-dialog";
 import { Badge } from "@neore/ui/components/badge";
 import { Button } from "@neore/ui/components/button";
-import { CardContent } from "@neore/ui/components/card";
 import { formatFileSize } from "@neore/ui/components/file-renderers/file-type-utilities";
 import { skipToken, useMutation, useQuery } from "@tanstack/react-query";
 import { BookOpenIcon, FileTextIcon, GlobeIcon, Loader2Icon, Trash2Icon, UploadIcon } from "lucide-react";
@@ -26,6 +25,7 @@ import { useDropzone } from "react-dropzone";
 import { toast } from "sonner";
 
 import SettingsCard from "@/components/settings/settings-card";
+import SettingsRow from "@/components/settings/settings-row";
 import { useAuthActiveOrganization } from "@/features/auth/hooks/use-auth-session";
 import type { CollectionScope, CollectionView } from "@/features/knowledge/components/collection-picker";
 import { CollectionPicker, MoveToCollection } from "@/features/knowledge/components/collection-picker";
@@ -278,50 +278,53 @@ const KnowledgeBaseSettings: FC = () => {
             description={t`Upload documents to your knowledge base and group them into collections. The AI searches them for relevant context and cites the passages it used.`}
             title={t`Knowledge Base`}
         >
-            <CardContent className="space-y-4">
-                <CollectionPicker
-                    collections={collections}
-                    counts={files}
-                    onCreate={() => setDialog("create")}
-                    onDelete={handleDeleteCollection}
-                    onEdit={() => setDialog("edit")}
-                    onScopeChange={setScope}
-                    scope={scope}
-                />
+            <CollectionPicker
+                collections={collections}
+                counts={files}
+                onCreate={() => setDialog("create")}
+                onDelete={handleDeleteCollection}
+                onEdit={() => setDialog("edit")}
+                onScopeChange={setScope}
+                scope={scope}
+            />
 
-                {readOnly ? (
-                    <p className="text-muted-foreground bg-muted/50 rounded-md p-3 text-xs">{t`This collection is shared with you by a member of your organization. You can attach it to chats and projects; only its owner can change its files.`}</p>
-                ) : (
-                    <>
-                        {/* Upload zone */}
-                        <div
-                            {...getRootProps()}
-                            className={`cursor-pointer rounded-lg border-2 border-dashed p-6 text-center transition-colors ${
-                                isDragActive ? "border-primary bg-primary/5" : "border-muted-foreground/25 hover:border-muted-foreground/50"
-                            } ${isUploading ? "pointer-events-none opacity-50" : ""}`}
-                        >
-                            <input {...getInputProps()} />
-                            {isUploading ? (
-                                <div className="flex flex-col items-center gap-2">
-                                    <Loader2Icon aria-hidden="true" className="text-muted-foreground h-8 w-8 animate-spin" />
-                                    <p className="text-muted-foreground text-sm">{t`Uploading...`}</p>
-                                </div>
-                            ) : (
-                                <div className="flex flex-col items-center gap-2">
-                                    <UploadIcon aria-hidden="true" className="text-muted-foreground h-8 w-8" />
-                                    <p className="text-sm">{isDragActive ? t`Drop files here...` : t`Drag & drop files here, or click to browse`}</p>
-                                    <p className="text-muted-foreground text-xs">{t`PDF, DOCX, TXT, MD, CSV, JSON, XLS, XLSX — max 5MB`}</p>
-                                </div>
-                            )}
-                        </div>
+            {readOnly ? (
+                <div className="border-border/50 border-t py-3">
+                    <p className="text-muted-foreground text-xs">{t`This collection is shared with you by a member of your organization. You can attach it to chats and projects; only its owner can change its files.`}</p>
+                </div>
+            ) : (
+                <SettingsRow
+                    control={<KnowledgeImportActions collectionId={ownSelected} onChange={refreshAll} />}
+                    description={t`PDF, DOCX, TXT, MD, CSV, JSON, XLS, XLSX — max 5MB`}
+                    title={t`Add documents`}
+                >
+                    {/* Upload zone */}
+                    <div
+                        {...getRootProps()}
+                        className={`cursor-pointer rounded-lg border border-dashed px-4 py-5 text-center transition-colors ${
+                            isDragActive ? "border-primary bg-primary/5" : "border-border hover:border-muted-foreground/50"
+                        } ${isUploading ? "pointer-events-none opacity-50" : ""}`}
+                    >
+                        <input {...getInputProps()} />
+                        {isUploading ? (
+                            <p className="text-muted-foreground flex items-center justify-center gap-2 text-sm">
+                                <Loader2Icon aria-hidden="true" className="size-4 animate-spin" />
+                                {t`Uploading...`}
+                            </p>
+                        ) : (
+                            <p className="text-muted-foreground flex items-center justify-center gap-2 text-sm">
+                                <UploadIcon aria-hidden="true" className="size-4 shrink-0" />
+                                {isDragActive ? t`Drop files here...` : t`Drag & drop files here, or click to browse`}
+                            </p>
+                        )}
+                    </div>
+                </SettingsRow>
+            )}
 
-                        <KnowledgeImportActions collectionId={ownSelected} onChange={refreshAll} />
-                    </>
-                )}
-
+            <div className="border-border/50 border-t py-3">
                 {/* Stats */}
                 {totalCount > 0 && (
-                    <div className="flex items-center gap-2">
+                    <div className="mb-1 flex items-center gap-2">
                         <BookOpenIcon aria-hidden="true" className="text-muted-foreground h-4 w-4" />
                         <span className="text-muted-foreground text-xs">{t`${indexedCount} of ${totalCount} files indexed`}</span>
                     </div>
@@ -329,9 +332,9 @@ const KnowledgeBaseSettings: FC = () => {
 
                 {/* File list */}
                 {visibleFiles && visibleFiles.length > 0 ? (
-                    <ul className="max-h-80 space-y-2 overflow-y-auto" style={{ contentVisibility: "auto" }}>
+                    <ul className="max-h-80 overflow-y-auto" style={{ contentVisibility: "auto" }}>
                         {visibleFiles.map((file) => (
-                            <li className="bg-muted/50 group flex items-start gap-2 rounded-md p-2" key={file._id as string}>
+                            <li className="not-first:border-border/50 flex items-start gap-2 py-3 not-first:border-t" key={file._id as string}>
                                 {file.sourceUrl ? (
                                     <GlobeIcon aria-hidden="true" className="text-muted-foreground mt-0.5 h-4 w-4 shrink-0" />
                                 ) : (
@@ -346,7 +349,7 @@ const KnowledgeBaseSettings: FC = () => {
                                             {file.status}
                                         </Badge>
                                     </div>
-                                    <div className="text-muted-foreground mt-0.5 flex items-center gap-2 text-[10px]">
+                                    <div className="text-muted-foreground mt-0.5 flex flex-wrap items-center gap-x-2 text-xs">
                                         {file.sourceUrl ? <span className="truncate">{file.sourceUrl}</span> : <span>{formatFileSize(file.size)}</span>}
                                         {file.relativePath && file.relativePath !== file.name && <span className="truncate">{file.relativePath}</span>}
                                         {file.chunkCount != null && <span>{t`${file.chunkCount} chunks`}</span>}
@@ -356,7 +359,7 @@ const KnowledgeBaseSettings: FC = () => {
                                             </span>
                                         )}
                                     </div>
-                                    {file.error && <p className="text-destructive mt-0.5 text-[10px]">{file.error}</p>}
+                                    {file.error && <p className="text-destructive mt-0.5 text-xs">{file.error}</p>}
                                 </div>
                                 {!readOnly && (
                                     <>
@@ -368,7 +371,7 @@ const KnowledgeBaseSettings: FC = () => {
                                         />
                                         <Button
                                             aria-label={t`Remove file`}
-                                            className="h-6 w-6 shrink-0 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100"
+                                            className="h-6 w-6 shrink-0"
                                             disabled={isBusy}
                                             onClick={() => removeFile({ fileId: file._id })}
                                             size="icon"
@@ -387,17 +390,19 @@ const KnowledgeBaseSettings: FC = () => {
                     </ul>
                 ) : (
                     !isUploading && (
-                        <div className="text-muted-foreground py-2 text-center text-sm">
+                        <div className="text-muted-foreground py-2 text-sm">
                             {scope === "all" ? t`No files in your knowledge base yet. Upload documents above to get started.` : t`No files here yet.`}
                         </div>
                     )
                 )}
+            </div>
 
-                {/* Clear all */}
-                {!readOnly && visibleFiles && visibleFiles.length > 0 && (
+            {/* Clear all */}
+            {!readOnly && visibleFiles && visibleFiles.length > 0 && (
+                <div className="border-border/50 flex justify-end border-t py-3">
                     <AlertDialog>
                         {/* Base UI composes via `render`, not Radix's `asChild`. */}
-                        <AlertDialogTrigger render={<Button className="w-full" disabled={isBusy} variant="destructive" />}>
+                        <AlertDialogTrigger render={<Button disabled={isBusy} size="sm" variant="destructive" />}>
                             {isRemovingAll ? (
                                 <Loader2Icon aria-hidden="true" className="mr-2 h-4 w-4 animate-spin" />
                             ) : (
@@ -418,8 +423,8 @@ const KnowledgeBaseSettings: FC = () => {
                             </AlertDialogFooter>
                         </AlertDialogContent>
                     </AlertDialog>
-                )}
-            </CardContent>
+                </div>
+            )}
 
             {dialog && (
                 <Suspense fallback={null}>

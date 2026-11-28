@@ -178,7 +178,7 @@ const MemoryImportDialog: FC<MemoryImportDialogProps> = ({ memoryEnabled, onEnab
             }}
             open={open}
         >
-            <DialogTrigger render={<Button className="w-full" variant="outline" />}>
+            <DialogTrigger render={<Button size="sm" variant="outline" />}>
                 <DownloadIcon aria-hidden="true" className="mr-2 h-4 w-4" />
                 {t`Bring in what another AI knows about you`}
             </DialogTrigger>

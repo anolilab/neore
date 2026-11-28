@@ -460,7 +460,7 @@ const SiteLoginsForm = ({ userId }: { userId: string }) => {
     return (
         <section aria-labelledby={headingId} className="space-y-6">
             <div className="space-y-1">
-                <h2 className="text-lg font-semibold" id={headingId}>{t`Site logins`}</h2>
+                <h2 className="text-[15px] font-semibold" id={headingId}>{t`Site logins`}</h2>
                 <p className="text-muted-foreground text-sm">
                     {t`Logins saved for the agent's browser. Signing in with them comes in a later update: the server will type the password into the site, and the AI never sees it.`}
                 </p>
@@ -487,7 +487,7 @@ const SiteLoginsForm = ({ userId }: { userId: string }) => {
             )}
 
             {logins.length > 0 && (
-                <ul className="divide-border divide-y rounded-md border">
+                <ul className="surface-raised divide-border/50 divide-y overflow-hidden rounded-xl">
                     {logins.map((login) => {
                         const teammates = login.teammateIds.map((id) => botName.get(id)).filter((name): name is string => name !== undefined);
                         // Until this user's bots load, a login naming bots cannot be called owner-only.
@@ -500,7 +500,7 @@ const SiteLoginsForm = ({ userId }: { userId: string }) => {
                         }
 
                         return (
-                            <li className="flex items-center gap-3 p-3" key={login.id}>
+                            <li className="flex items-center gap-3 px-4 py-3" key={login.id}>
                                 <KeyRound aria-hidden="true" className="text-muted-foreground size-4 shrink-0" />
                                 <div className="min-w-0 flex-1">
                                     <p className="truncate text-sm font-medium">{login.label ? `${login.label} · ${login.site}` : login.site}</p>
@@ -538,7 +538,7 @@ const SiteLoginsForm = ({ userId }: { userId: string }) => {
             )}
 
             {!loginsFailed && canWrite && (
-                <form className="grid max-w-xl gap-4" onSubmit={handleSave}>
+                <form className="surface-raised grid max-w-xl gap-4 rounded-xl p-4" onSubmit={handleSave}>
                     <h3 className="text-base font-medium">{isEditing ? t`Edit login` : t`New login`}</h3>
                     <div className="space-y-2">
                         <Label htmlFor={siteId}>{t`Site`}</Label>

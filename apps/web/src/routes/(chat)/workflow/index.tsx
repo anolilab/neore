@@ -34,11 +34,11 @@ const WorkflowListPage = () => {
     return (
         <RouteErrorBoundary routeName={route}>
             <ScrollArea className="h-full">
-                <div className="container mx-auto py-8">
-                    <div className="mb-8 flex items-center justify-between">
+                <div className="mx-auto w-full max-w-7xl space-y-6 p-4 md:p-6">
+                    <div className="flex flex-wrap items-center justify-between gap-4">
                         <div>
-                            <h1 className="text-2xl font-bold">{t`Workflows`}</h1>
-                            <p className="text-muted-foreground">{t`Build and automate AI workflows visually`}</p>
+                            <h1 className="text-xl font-semibold tracking-tight">{t`Workflows`}</h1>
+                            <p className="text-muted-foreground text-sm">{t`Build and automate AI workflows visually`}</p>
                         </div>
                         <div className="flex items-center gap-2">
                             <Link to="/workflow/gallery">
@@ -55,26 +55,26 @@ const WorkflowListPage = () => {
                     </div>
 
                     {workflows.length === 0 ? (
-                        <Card className="border-dashed">
-                            <CardContent className="flex flex-col items-center justify-center py-12">
-                                <Workflow className="text-muted-foreground mb-4 size-12" />
-                                <h3 className="mb-2 text-lg font-medium">{t`No workflows yet`}</h3>
-                                <p className="text-muted-foreground mb-4 text-center">{t`Create your first workflow to automate AI tasks visually.`}</p>
-                                <Button disabled={createWorkflow.isPending} onClick={handleCreateWorkflow}>
-                                    <Plus className="mr-2 size-4" />
-                                    {t`Create Workflow`}
-                                </Button>
-                            </CardContent>
-                        </Card>
+                        <div className="surface-raised flex flex-col items-center justify-center rounded-xl px-6 py-16 text-center">
+                            <div aria-hidden="true" className="surface-well text-muted-foreground mb-4 flex size-12 items-center justify-center rounded-xl">
+                                <Workflow className="size-6" />
+                            </div>
+                            <h2 className="mb-1 text-[15px] font-semibold">{t`No workflows yet`}</h2>
+                            <p className="text-muted-foreground mb-4 max-w-sm text-sm text-pretty">{t`Create your first workflow to automate AI tasks visually.`}</p>
+                            <Button disabled={createWorkflow.isPending} onClick={handleCreateWorkflow}>
+                                <Plus className="mr-2 size-4" />
+                                {t`Create Workflow`}
+                            </Button>
+                        </div>
                     ) : (
                         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                             {workflows.map((workflow: any) => (
                                 <Link key={workflow._id} params={{ workflowId: workflow._id }} to="/workflow/$workflowId">
-                                    <Card className="hover:border-primary/50 cursor-pointer transition-colors">
+                                    <Card className="hover:bg-muted/40 cursor-pointer transition-colors">
                                         <CardHeader>
                                             <CardTitle className="flex items-center gap-2">
                                                 <div
-                                                    className="flex size-8 items-center justify-center rounded"
+                                                    className="flex size-8 items-center justify-center rounded-lg"
                                                     style={{
                                                         backgroundColor: workflow.color ? `${workflow.color}20` : "var(--muted)",
                                                         color: workflow.color ?? "var(--muted-foreground)",

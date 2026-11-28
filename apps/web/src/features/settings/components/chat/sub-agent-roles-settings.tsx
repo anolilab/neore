@@ -8,9 +8,7 @@ import { isSelectableTextModel, MODEL_LOOKUP } from "@neore/ai/models";
 import type { Id } from "@neore/backend/dataModel";
 import { Alert, AlertDescription } from "@neore/ui/components/alert";
 import { Button } from "@neore/ui/components/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@neore/ui/components/card";
-import { Heading } from "@neore/ui/components/heading";
-import { Label } from "@neore/ui/components/label";
+import { HeadingSection } from "@neore/ui/components/heading";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@neore/ui/components/select";
 import { Textarea } from "@neore/ui/components/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@neore/ui/components/toggle-group";
@@ -20,6 +18,8 @@ import { Info } from "lucide-react";
 import type { FC } from "react";
 import { useEffect, useId, useRef, useState } from "react";
 
+import SettingsCard from "@/components/settings/settings-card";
+import SettingsRow from "@/components/settings/settings-row";
 import useIsAnonymous from "@/features/auth/hooks/use-is-anonymous";
 import { ReasoningEffortSelector } from "@/features/chat/model-settings/reasoning-effort-selector";
 import { ModelSelect } from "@/features/settings/components/chat/default-models-settings";
@@ -247,30 +247,8 @@ const RoleCard: FC<RoleCardProps> = ({ inherited, isProject, models, modelsKnown
     }
 
     return (
-        <Card>
-            <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
-                <div className="space-y-1">
-                    <CardTitle className="text-base">{roleLabel}</CardTitle>
-                    <CardDescription>{i18n._(ROLE_DESCRIPTIONS[name])}</CardDescription>
-                </div>
-                {isProject && Object.keys(own).length > 0 && !readOnly && (
-                    <Button
-                        aria-label={t`Reset ${roleLabel} to your default`}
-                        onClick={() => {
-                            clearTimeout(effortTimer.current);
-                            effortTimer.current = undefined;
-                            setDraft("");
-                            setOwn({});
-                            send();
-                        }}
-                        size="sm"
-                        variant="ghost"
-                    >
-                        {t`Reset`}
-                    </Button>
-                )}
-            </CardHeader>
-            <CardContent className="space-y-4">
+        <SettingsCard description={i18n._(ROLE_DESCRIPTIONS[name])} title={roleLabel}>
+            <div className="border-border/50 py-3 not-first:border-t">
                 <ModelSelect
                     description={modelDescription}
                     disabled={readOnly}
@@ -281,19 +259,11 @@ const RoleCard: FC<RoleCardProps> = ({ inherited, isProject, models, modelsKnown
                     onChange={(_field, modelId) => save({ model: modelId ?? undefined })}
                     value={own.model}
                 />
+            </div>
 
-                {effectiveModelId && (
-                    <div className="flex items-start justify-between gap-4">
-                        <div className="min-w-0 flex-1 space-y-0.5">
-                            <Label className="text-sm font-medium" id={modeLabelId}>
-                                {t`When to delegate`}
-                            </Label>
-                            <p className="text-muted-foreground text-xs">
-                                {effectiveMode === "always"
-                                    ? t`All real ${roleLabel.toLowerCase()} work goes to this model, even quick work.`
-                                    : t`Bigger pieces go to this model; quick questions stay in the chat.`}
-                            </p>
-                        </div>
+            {effectiveModelId && (
+                <SettingsRow
+                    control={
                         <ToggleGroup
                             aria-labelledby={modeLabelId}
                             disabled={readOnly}
@@ -311,17 +281,25 @@ const RoleCard: FC<RoleCardProps> = ({ inherited, isProject, models, modelsKnown
                             <ToggleGroupItem value="prefer">{t`Prefer`}</ToggleGroupItem>
                             <ToggleGroupItem value="always">{t`Always`}</ToggleGroupItem>
                         </ToggleGroup>
-                    </div>
-                )}
+                    }
+                    description={
+                        effectiveMode === "always"
+                            ? t`All real ${roleLabel.toLowerCase()} work goes to this model, even quick work.`
+                            : t`Bigger pieces go to this model; quick questions stay in the chat.`
+                    }
+                    title={t`When to delegate`}
+                    titleId={modeLabelId}
+                />
+            )}
 
-                {effectiveModel && !readOnly && (
+            {effectiveModel && !readOnly && (
+                <div className="border-border/50 py-3 not-first:border-t">
                     <ReasoningEffortSelector model={effectiveModel} onChange={changeEffort} value={own.reasoningEffort ?? inherited?.reasoningEffort} />
-                )}
+                </div>
+            )}
 
+            <SettingsRow htmlFor={instructionsId} title={t`Extra instructions`}>
                 <div className="space-y-1.5">
-                    <Label className="text-sm font-medium" htmlFor={instructionsId}>
-                        {t`Extra instructions`}
-                    </Label>
                     <Textarea
                         disabled={readOnly}
                         id={instructionsId}
@@ -354,8 +332,27 @@ const RoleCard: FC<RoleCardProps> = ({ inherited, isProject, models, modelsKnown
                         </Button>
                     )}
                 </div>
-            </CardContent>
-        </Card>
+            </SettingsRow>
+
+            {isProject && Object.keys(own).length > 0 && !readOnly && (
+                <div className="border-border/50 flex justify-end py-3 not-first:border-t">
+                    <Button
+                        aria-label={t`Reset ${roleLabel} to your default`}
+                        onClick={() => {
+                            clearTimeout(effortTimer.current);
+                            effortTimer.current = undefined;
+                            setDraft("");
+                            setOwn({});
+                            send();
+                        }}
+                        size="sm"
+                        variant="ghost"
+                    >
+                        {t`Reset`}
+                    </Button>
+                </div>
+            )}
+        </SettingsCard>
     );
 };
 
@@ -423,63 +420,58 @@ const SubAgentRolesSettings: FC = () => {
     };
 
     return (
-        <div className="space-y-6">
-            <div>
-                <Heading className="text-2xl font-bold tracking-tight">{t`Sub-agent roles`}</Heading>
-                <p className="text-muted-foreground">
-                    {t`Choose a model for each kind of work the assistant hands to a sub-agent. A role with a model is offered to the assistant; one without stays off.`}
-                </p>
-            </div>
+        <div className="space-y-8">
+            <p className="text-muted-foreground flex items-start gap-1.5 px-1 text-xs leading-normal">
+                <Info aria-hidden="true" className="mt-0.5 size-3 shrink-0" />
+                <span>{t`"Always" is guidance to the assistant, not a hard rule. Ask it to do something itself and it will. Chats keep the model you picked for them; only sub-agents use these models.`}</span>
+            </p>
 
-            <Alert>
-                <Info aria-hidden="true" className="h-4 w-4" />
-                <AlertDescription>
-                    {t`"Always" is guidance to the assistant, not a hard rule. Ask it to do something itself and it will. Chats keep the model you picked for them; only sub-agents use these models.`}
-                </AlertDescription>
-            </Alert>
+            <SettingsCard
+                description={t`Choose a model for each kind of work the assistant hands to a sub-agent. A role with a model is offered to the assistant; one without stays off.`}
+                title={t`Sub-agent roles`}
+            >
+                <SubAgentOpenPlaceSettings />
 
-            <SubAgentOpenPlaceSettings />
+                <SettingsRow
+                    control={
+                        <Select<string> onValueChange={(next) => setScope(next ?? ALL_CHATS)} value={scope}>
+                            <SelectTrigger aria-labelledby={scopeLabelId} className="w-56 shrink-0">
+                                <SelectValue>{projectId ? (projects.find((item) => item._id === projectId)?.title ?? t`Project`) : t`All chats`}</SelectValue>
+                            </SelectTrigger>
+                            <SelectContent align="end" className="max-h-64">
+                                <SelectItem value={ALL_CHATS}>{t`All chats`}</SelectItem>
+                                {projects.map((item) => (
+                                    <SelectItem key={item._id} value={item._id}>
+                                        {item.title}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    }
+                    description={
+                        projectId ? t`This project's chats. Anything it does not set uses your default.` : t`Every chat, unless its project sets the role.`
+                    }
+                    title={t`Applies to`}
+                    titleId={scopeLabelId}
+                />
 
-            <div className="flex items-start justify-between gap-4">
-                <div className="min-w-0 flex-1 space-y-0.5">
-                    <Label className="text-sm font-medium" id={scopeLabelId}>
-                        {t`Applies to`}
-                    </Label>
-                    <p className="text-muted-foreground text-xs">
-                        {projectId ? t`This project's chats. Anything it does not set uses your default.` : t`Every chat, unless its project sets the role.`}
+                {projectList.hasMore && (
+                    <div className="border-border/50 flex justify-end py-3 not-first:border-t">
+                        <Button disabled={projectList.isLoadingMore} onClick={projectList.loadMore} size="sm" variant="ghost">
+                            {projectList.isLoadingMore ? t`Loading projects…` : t`Show more projects`}
+                        </Button>
+                    </div>
+                )}
+
+                {project && !project.editable && (
+                    <p className="text-muted-foreground border-border/50 py-3 text-sm not-first:border-t" role="status">
+                        {t`Only the project's owner can change its roles.`}
                     </p>
-                </div>
-                <Select<string> onValueChange={(next) => setScope(next ?? ALL_CHATS)} value={scope}>
-                    <SelectTrigger aria-labelledby={scopeLabelId} className="w-56 shrink-0">
-                        <SelectValue>{projectId ? (projects.find((item) => item._id === projectId)?.title ?? t`Project`) : t`All chats`}</SelectValue>
-                    </SelectTrigger>
-                    <SelectContent align="end" className="max-h-64">
-                        <SelectItem value={ALL_CHATS}>{t`All chats`}</SelectItem>
-                        {projects.map((item) => (
-                            <SelectItem key={item._id} value={item._id}>
-                                {item.title}
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-            </div>
-
-            {projectList.hasMore && (
-                <div className="flex justify-end">
-                    <Button disabled={projectList.isLoadingMore} onClick={projectList.loadMore} size="sm" variant="ghost">
-                        {projectList.isLoadingMore ? t`Loading projects…` : t`Show more projects`}
-                    </Button>
-                </div>
-            )}
-
-            {project && !project.editable && (
-                <p className="text-muted-foreground text-sm" role="status">
-                    {t`Only the project's owner can change its roles.`}
-                </p>
-            )}
+                )}
+            </SettingsCard>
 
             {rolesQuery.isPending && (
-                <p className="text-muted-foreground text-sm" role="status">
+                <p className="text-muted-foreground px-1 text-sm" role="status">
                     {t`Loading roles…`}
                 </p>
             )}
@@ -497,7 +489,7 @@ const SubAgentRolesSettings: FC = () => {
             )}
 
             {rolesQuery.isSuccess && (
-                <div className="space-y-4">
+                <HeadingSection>
                     {ROLE_NAMES.map((name) => (
                         <RoleCard
                             inherited={projectId ? user[name] : undefined}
@@ -513,7 +505,7 @@ const SubAgentRolesSettings: FC = () => {
                             value={projectId ? project?.roles[name] : user[name]}
                         />
                     ))}
-                </div>
+                </HeadingSection>
             )}
         </div>
     );

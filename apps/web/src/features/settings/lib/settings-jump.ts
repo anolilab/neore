@@ -5,7 +5,7 @@ const ROW_TITLE_SELECTOR = 'label, legend, h1, h2, h3, h4, h5, h6, [role="headin
 
 const CARD_SELECTOR = '[data-slot="card"]';
 const CARD_TITLE_SELECTOR = '[data-slot="card-title"]';
-const FIELD_SELECTOR = '[data-slot="field"]';
+const FIELD_SELECTOR = '[data-slot="field"], [data-slot="settings-row"]';
 
 export const HIGHLIGHT_DURATION_MS = 2000;
 /** How long a jump waits for a lazy tab to render its row before giving up. */

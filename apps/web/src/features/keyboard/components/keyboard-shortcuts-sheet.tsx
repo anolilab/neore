@@ -3,9 +3,9 @@ import { Input } from "@neore/ui/components/input";
 import { Kbd, KbdGroup } from "@neore/ui/components/kbd";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogPanel, DialogTitle } from "@neore/ui/components/responsive-dialog";
 import { getPlatformModifierForEvents } from "@neore/ui/utils/keyboard-shortcuts";
-import { Link } from "@tanstack/react-router";
 import { useEffect, useId, useState } from "react";
 
+import SettingsLink from "@/components/settings/settings-link";
 import { useThreadListUIStore } from "@/features/chat/thread-list/stores/thread-list-ui-store";
 import type { KeyboardShortcuts } from "@/features/layout/stores/ui-state-store";
 import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
@@ -137,13 +137,9 @@ const KeyboardShortcutsSheet = ({ shortcuts }: { shortcuts: Partial<KeyboardShor
                     <DialogTitle>{t`Keyboard shortcuts`}</DialogTitle>
                     <DialogDescription>
                         {t`The keys you have set now.`}{" "}
-                        <Link
-                            className="text-primary-text underline-offset-4 hover:underline"
-                            onClick={() => setOpen(false)}
-                            to="/dashboard/settings/app/keyboard-shortcuts"
-                        >
+                        <SettingsLink className="text-primary-text underline-offset-4 hover:underline" onClick={() => setOpen(false)} tab="app-keyboard">
                             {t`Customize`}
-                        </Link>
+                        </SettingsLink>
                     </DialogDescription>
                 </DialogHeader>
                 <DialogPanel>

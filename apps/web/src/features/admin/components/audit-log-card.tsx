@@ -4,7 +4,6 @@ import type { MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
 import { Badge } from "@neore/ui/components/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@neore/ui/components/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@neore/ui/components/select";
 import { Skeleton } from "@neore/ui/components/skeleton";
 import { formatDateTime } from "@neore/ui/utils/locale-format";
@@ -13,6 +12,7 @@ import { useState } from "react";
 
 import type { AuditLogAction } from "../hooks/use-admin";
 import { useAuditLogs } from "../hooks/use-admin";
+import { AdminRows, AdminSection } from "./admin-section";
 
 type AuditAction =
     | "user.role.update"
@@ -36,14 +36,14 @@ const ACTION_LABELS: Record<AuditAction, MessageDescriptor> = {
 };
 
 const ACTION_ICONS: Record<AuditAction, React.ReactNode> = {
-    "admin.grant": <Shield className="size-4 text-green-500" />,
-    "admin.revoke": <ShieldOff className="size-4 text-orange-500" />,
-    "user.ban": <Ban className="size-4 text-red-500" />,
-    "user.impersonate.start": <UserCheck className="size-4 text-blue-500" />,
-    "user.impersonate.stop": <UserX className="size-4 text-blue-500" />,
-    "user.role.update": <User className="size-4 text-purple-500" />,
-    "user.sessions.revoke": <Key className="size-4 text-yellow-500" />,
-    "user.unban": <Unlock className="size-4 text-green-500" />,
+    "admin.grant": <Shield aria-hidden="true" className="text-success size-4" />,
+    "admin.revoke": <ShieldOff aria-hidden="true" className="text-attention size-4" />,
+    "user.ban": <Ban aria-hidden="true" className="text-destructive size-4" />,
+    "user.impersonate.start": <UserCheck aria-hidden="true" className="text-info size-4" />,
+    "user.impersonate.stop": <UserX aria-hidden="true" className="text-info size-4" />,
+    "user.role.update": <User aria-hidden="true" className="text-muted-foreground size-4" />,
+    "user.sessions.revoke": <Key aria-hidden="true" className="text-attention size-4" />,
+    "user.unban": <Unlock aria-hidden="true" className="text-success size-4" />,
 };
 
 const ACTION_VARIANTS: Record<AuditAction, "default" | "secondary" | "destructive" | "outline"> = {
@@ -72,7 +72,7 @@ const AuditLogCard = () => {
 
     const logsBody =
         data?.logs && data.logs.length > 0 ? (
-            <div className="space-y-3">
+            <AdminRows>
                 {data.logs.map((log) => {
                     const action = log.action as AuditAction;
                     const timestamp = formatDateTime(log.timestamp, i18n.locale);
@@ -85,8 +85,8 @@ const AuditLogCard = () => {
                     }
 
                     return (
-                        <div className="flex items-start gap-3 border-b pb-3 last:border-0" key={log._id}>
-                            <div className="bg-muted flex size-8 items-center justify-center rounded-full">{ACTION_ICONS[action]}</div>
+                        <div className="flex items-start gap-3 py-3" key={log._id}>
+                            <div className="surface-well flex size-8 shrink-0 items-center justify-center rounded-lg">{ACTION_ICONS[action]}</div>
 
                             <div className="min-w-0 flex-1">
                                 <div className="flex flex-wrap items-center gap-2">
@@ -117,9 +117,9 @@ const AuditLogCard = () => {
                         </div>
                     );
                 })}
-            </div>
+            </AdminRows>
         ) : (
-            <div className="text-muted-foreground py-8 text-center">{t`No audit logs found`}</div>
+            <div className="text-muted-foreground py-8 text-center text-sm">{t`No audit logs found`}</div>
         );
 
     const actionItems = {
@@ -135,47 +135,44 @@ const AuditLogCard = () => {
     };
 
     return (
-        <Card>
-            <CardHeader>
-                <div className="flex items-center justify-between">
-                    <div>
-                        <CardTitle>{t`Audit Log`}</CardTitle>
-                        <CardDescription>{t`Track all admin actions for accountability`}</CardDescription>
-                    </div>
-
-                    <Select items={actionItems} onValueChange={(value) => value && setActionFilter(value)} value={actionFilter}>
-                        <SelectTrigger className="w-[180px]">
-                            <SelectValue placeholder={t`Filter by action`} />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {Object.entries(actionItems).map(([value, label]) => (
-                                <SelectItem key={value} value={value}>
-                                    {label}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </div>
-            </CardHeader>
-
-            <CardContent>
-                {isPending ? (
-                    <div className="space-y-3">
-                        {[1, 2, 3, 4, 5].map((i) => (
-                            <div className="flex items-center gap-3" key={i}>
-                                <Skeleton className="size-8 rounded-full" />
-                                <div className="flex-1 space-y-2">
-                                    <Skeleton className="h-4 w-48" />
-                                    <Skeleton className="h-3 w-32" />
-                                </div>
+        <AdminSection
+            action={
+                <Select items={actionItems} onValueChange={(value) => value && setActionFilter(value)} value={actionFilter}>
+                    <SelectTrigger aria-label={t`Filter by action`} className="w-[180px]">
+                        <SelectValue placeholder={t`Filter by action`} />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">{t`All Actions`}</SelectItem>
+                        <SelectItem value="user.role.update">{t`Role Updates`}</SelectItem>
+                        <SelectItem value="user.ban">{t`Bans`}</SelectItem>
+                        <SelectItem value="user.unban">{t`Unbans`}</SelectItem>
+                        <SelectItem value="user.sessions.revoke">{t`Session Revocations`}</SelectItem>
+                        <SelectItem value="user.impersonate.start">{t`Impersonation Start`}</SelectItem>
+                        <SelectItem value="user.impersonate.stop">{t`Impersonation Stop`}</SelectItem>
+                        <SelectItem value="admin.grant">{t`Admin Grants`}</SelectItem>
+                        <SelectItem value="admin.revoke">{t`Admin Revocations`}</SelectItem>
+                    </SelectContent>
+                </Select>
+            }
+            description={t`Track all admin actions for accountability`}
+            title={t`Audit Log`}
+        >
+            {isPending ? (
+                <AdminRows>
+                    {[1, 2, 3, 4, 5].map((i) => (
+                        <div className="flex items-center gap-3 py-3" key={i}>
+                            <Skeleton className="size-8 rounded-lg" />
+                            <div className="flex-1 space-y-2">
+                                <Skeleton className="h-4 w-48" />
+                                <Skeleton className="h-3 w-32" />
                             </div>
-                        ))}
-                    </div>
-                ) : (
-                    logsBody
-                )}
-            </CardContent>
-        </Card>
+                        </div>
+                    ))}
+                </AdminRows>
+            ) : (
+                logsBody
+            )}
+        </AdminSection>
     );
 };
 

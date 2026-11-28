@@ -34,7 +34,7 @@ export type SettingsCardClassNames = {
     title?: string;
 };
 
-export interface SettingsCardProperties extends Omit<ComponentProps<typeof Card>, "title"> {
+export interface SettingsCardProperties extends Omit<ComponentProps<typeof Card>, "title" | "variant"> {
     action?: () => Promise<unknown> | unknown;
     actionLabel?: ReactNode;
     children?: ReactNode;
@@ -67,24 +67,33 @@ const SettingsCard = ({
     ...properties
 }: SettingsCardProperties) => {
     const displayTitle = header || title;
+    const hasFooter = Boolean(actionLabel || action);
 
     return (
-        <Card className={cn("w-full pb-0 text-start", variant === "destructive" && "border-destructive/40", className, classNames?.base)} {...properties}>
-            <SettingsCardHeader classNames={classNames} description={description} isPending={isPending} title={displayTitle} />
+        // A section: its heading above one box of rows, split by hairlines (`styles.css`), the action last.
+        <Card className={cn("w-full text-start", className, classNames?.base)} variant="plain" {...properties}>
+            <SettingsCardHeader className="px-1" classNames={classNames} description={description} isPending={isPending} title={displayTitle} />
 
-            {children && <div className="dark:bg-sidebar-foreground m-1 rounded-lg bg-white py-4 shadow-md">{children}</div>}
+            {(children || hasFooter) && (
+                <div
+                    className={cn("surface-raised overflow-hidden rounded-xl", variant === "destructive" && "ring-destructive/40 ring-1")}
+                    data-slot="settings-card-body"
+                >
+                    {children && <div className="px-4 py-1 [&>[data-slot=card-content]]:px-0">{children}</div>}
 
-            {(actionLabel || action) && (
-                <SettingsCardFooter
-                    action={action}
-                    actionLabel={actionLabel}
-                    classNames={classNames}
-                    disabled={disabled}
-                    instructions={instructions}
-                    isPending={isPending}
-                    isSubmitting={isSubmitting}
-                    variant={variant}
-                />
+                    {hasFooter && (
+                        <SettingsCardFooter
+                            action={action}
+                            actionLabel={actionLabel}
+                            classNames={classNames}
+                            disabled={disabled}
+                            instructions={instructions}
+                            isPending={isPending}
+                            isSubmitting={isSubmitting}
+                            variant={variant}
+                        />
+                    )}
+                </div>
             )}
         </Card>
     );

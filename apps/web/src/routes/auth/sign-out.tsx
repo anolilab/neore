@@ -10,11 +10,7 @@ import { seo } from "@/lib/seo";
  * and reloads; without this route those navigations landed on a 404 and the
  * browser kept a session the server had already deleted.
  */
-const RouteComponent = () => (
-    <div className="flex min-h-[calc(100vh-10rem)] flex-col items-center justify-center p-2 md:p-6">
-        <AuthCard view="SIGN_OUT" />
-    </div>
-);
+const RouteComponent = () => <AuthCard view="SIGN_OUT" />;
 
 export const Route = createFileRoute("/auth/sign-out")({
     component: RouteComponent,

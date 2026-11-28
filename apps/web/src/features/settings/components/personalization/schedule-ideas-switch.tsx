@@ -2,10 +2,10 @@
 
 import { useLingui } from "@lingui/react/macro";
 import { Switch } from "@neore/ui/components/switch";
-import { CalendarClockIcon } from "lucide-react";
 import type { FC } from "react";
 import { toast } from "sonner";
 
+import SettingsRow from "@/components/settings/settings-row";
 import { useUpdateUserSettings, useUserSettings } from "@/features/auth/hooks/use-user-settings";
 
 interface ScheduleIdeasSwitchProps {
@@ -43,19 +43,20 @@ const ScheduleIdeasSwitch: FC<ScheduleIdeasSwitchProps> = ({ memoryEnabled }) =>
     };
 
     return (
-        <div className="space-y-1">
-            <div className="flex items-center justify-between">
-                <label className="flex items-center gap-2 text-sm font-medium" htmlFor="schedule-ideas-switch">
-                    <CalendarClockIcon aria-hidden="true" className="text-muted-foreground h-4 w-4" />
-                    {t`Suggest scheduled tasks`}
-                </label>
+        <SettingsRow
+            control={
                 <Switch aria-describedby="schedule-ideas-description" checked={enabled} disabled={disabled} id="schedule-ideas-switch" onCheckedChange={save} />
-            </div>
-            <p className="text-muted-foreground text-xs" id="schedule-ideas-description">
-                {t`Once a day, suggest recurring tasks based only on your own recent messages. Nothing is created until you accept a suggestion. Turning this off deletes the suggestions waiting for you.`}
-                {!memoryEnabled && <> {t`No ideas are made while memory is off.`}</>}
-            </p>
-        </div>
+            }
+            description={
+                <>
+                    {t`Once a day, suggest recurring tasks based only on your own recent messages. Nothing is created until you accept a suggestion. Turning this off deletes the suggestions waiting for you.`}
+                    {!memoryEnabled && <> {t`No ideas are made while memory is off.`}</>}
+                </>
+            }
+            descriptionId="schedule-ideas-description"
+            htmlFor="schedule-ideas-switch"
+            title={t`Suggest scheduled tasks`}
+        />
     );
 };
 

@@ -159,3 +159,17 @@ describe("SignedOutChat header", () => {
         expect(screen.getAllByRole("button", { name: "Toggle Sidebar" })).toHaveLength(1);
     });
 });
+
+describe("SignedOutChat sidebar", () => {
+    afterEach(() => {
+        useLoginPromptStore.getState().setOpen(false);
+    });
+
+    it.each(["Search threads", "Search filters", "Add project", "New Thread"])("keeps the %s control in the dock, and it asks to sign in", (name) => {
+        render(<SignedOutChat />);
+
+        fireEvent.click(screen.getByRole("button", { name }));
+
+        expect(useLoginPromptStore.getState().isOpen).toBe(true);
+    });
+});

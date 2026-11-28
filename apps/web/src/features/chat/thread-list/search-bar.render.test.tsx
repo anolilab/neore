@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 
 /**
- * The thread search input and its clear button have no visible text, so each
+ * The thread search input, its clear button and its close button have no visible text, so each
  * needs an accessible name of its own; the placeholder is only a hint.
  */
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@lingui/react/macro", () => {
@@ -18,30 +18,12 @@ vi.mock("@lingui/react/macro", () => {
     };
 });
 
-vi.mock("@/features/chat/tags/thread-category-filter", () => {
-    return { default: () => null };
-});
-
-vi.mock("@/features/chat/tags/thread-tag-filter", () => {
-    return { default: () => null };
-});
-
-vi.mock("./stores/thread-list-ui-store", () => {
-    return {
-        selectSelectedTagIds: (state: unknown) => state,
-        selectSetSelectedTagIds: () => {},
-        selectSetShowManageTagsDialog: () => {},
-        useThreadListUIStore: () => [],
-    };
-});
-
 const { default: SearchBar } = await import("./search-bar");
 
 const baseProps = {
     isSearchLoading: false,
+    onClose: () => {},
     onSearchQueryChange: () => {},
-    onSearchTypeChange: () => {},
-    onSelectedCategoryChange: () => {},
     searchQuery: "report",
     searchType: "threads" as const,
 };
@@ -58,5 +40,45 @@ describe("SearchBar", () => {
         render(<SearchBar {...baseProps} searchType="messages" />);
 
         expect(screen.getByRole("textbox", { name: "Search message content" })).toBeTruthy();
+    });
+
+    it("keeps the search toggle hook on the button that closes the search, and the input hook on the input", () => {
+        const onClose = vi.fn();
+
+        render(<SearchBar {...baseProps} onClose={onClose} />);
+
+        const close = screen.getByRole("button", { name: "Close search" });
+
+        expect(Object.hasOwn(close.dataset, "searchToggle")).toBe(true);
+        expect(Object.hasOwn(screen.getByRole("textbox").dataset, "searchInput")).toBe(true);
+
+        fireEvent.click(close);
+
+        expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it("shows the clear button only once something is typed, and clears through the change handler", () => {
+        const onSearchQueryChange = vi.fn();
+        const { rerender } = render(<SearchBar {...baseProps} onSearchQueryChange={onSearchQueryChange} />);
+
+        fireEvent.click(screen.getByRole("button", { name: "Clear search" }));
+
+        expect(onSearchQueryChange).toHaveBeenCalledWith("");
+
+        rerender(<SearchBar {...baseProps} searchQuery="" />);
+
+        expect(screen.queryByRole("button", { name: "Clear search" })).toBeNull();
+    });
+
+    it("puts the focus back in the field it cleared, since the clear button leaves with the query", () => {
+        render(<SearchBar {...baseProps} />);
+
+        const clear = screen.getByRole("button", { name: "Clear search" });
+
+        clear.focus();
+        fireEvent.click(clear);
+
+        // eslint-disable-next-line testing-library/no-node-access -- focus placement is what this test asserts
+        expect(document.activeElement).toBe(screen.getByRole("textbox"));
     });
 });

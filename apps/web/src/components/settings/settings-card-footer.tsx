@@ -33,9 +33,8 @@ const SettingsCardFooter = ({
 }: SettingsCardFooterProperties) => (
     <CardFooter
         className={cn(
-            "flex flex-col justify-between gap-4 rounded-b-lg md:flex-row",
-            (actionLabel || instructions) && "border-t py-4!",
-            variant === "destructive" ? "border-destructive/30 bg-destructive/15" : "bg-muted/50",
+            // The box's last row: a hairline above it when rows come first (`styles.css`), none when it is the only row.
+            "flex flex-col justify-between gap-3 px-4 py-3 md:flex-row md:items-center",
             className,
             classNames?.footer,
         )}
@@ -49,9 +48,7 @@ const SettingsCardFooter = ({
         ) : (
             <>
                 {instructions && (
-                    <CardDescription className={cn("text-muted-foreground text-center text-xs md:text-start md:text-sm", classNames?.instructions)}>
-                        {instructions}
-                    </CardDescription>
+                    <CardDescription className={cn("text-muted-foreground text-start text-sm", classNames?.instructions)}>{instructions}</CardDescription>
                 )}
 
                 {actionLabel && (

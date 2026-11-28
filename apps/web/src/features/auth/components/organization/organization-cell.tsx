@@ -69,13 +69,14 @@ const OrganizationCell = ({ className, classNames, organization }: OrganizationC
 
     return (
         <>
-            <Card className={cn("flex-row p-4", className, classNames?.cell)}>
+            <Card className={cn("surface-row-card rounded-none flex-row items-center gap-3 px-0 py-3", className, classNames?.cell)}>
                 <OrganizationView organization={organization} />
 
                 <DropdownMenu>
                     <DropdownMenuTrigger
                         render={
                             <Button
+                                aria-label={t`More actions`}
                                 className={cn("relative ms-auto", classNames?.button, classNames?.outlineButton)}
                                 disabled={isManagingOrganization}
                                 size="icon"

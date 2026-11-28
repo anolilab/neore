@@ -5,11 +5,13 @@ import { queryOptions, useQuery } from "@tanstack/react-query";
 
 import env from "@/lib/env";
 
+import { GATEWAY_MODELS_QUERY_KEY } from "./gateway-models-key";
+
 // Module-level so the empty case keeps a stable identity for consumers that
 // put the result in an effect/query dependency.
 const EMPTY_MODELS: GatewayModel[] = [];
 
-interface GatewayModelsResponse {
+export interface GatewayModelsResponse {
     data: GatewayModel[];
     object: "list";
     version: string;
@@ -36,7 +38,7 @@ async function fetchGatewayModels(): Promise<GatewayModelsResponse> {
 const gatewayModelsQuery = queryOptions({
     gcTime: 30 * 60 * 1000, // 30 minutes
     queryFn: fetchGatewayModels,
-    queryKey: ["gateway-models"],
+    queryKey: GATEWAY_MODELS_QUERY_KEY,
     refetchOnWindowFocus: false,
     retry: 1,
     staleTime: 5 * 60 * 1000, // 5 minutes

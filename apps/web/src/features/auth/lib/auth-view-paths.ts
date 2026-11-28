@@ -20,13 +20,6 @@ const authViewPaths = {
 };
 
 /**
- * The organization list in the dashboard, where the org pages send a user who
- * has no active organization. Not `${basePath}/${SETTINGS}`: this app has no
- * `/auth/settings` route, so that redirect landed on a 404.
- */
-export const ORGANIZATIONS_SETTINGS_PATH = "/dashboard/settings/auth/organizations";
-
-/**
  * The query string for a link to another auth view: the current page's, plus `redirectTo` when the form was given
  * one. The sign-in prompt over a chat passes the chat's URL, so the forgot-password, magic-link and email-code
  * pages it links to still come back to that chat (`use-success-transition.ts` reads `redirectTo` from the search).

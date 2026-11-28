@@ -191,7 +191,7 @@ const SkillFormDialogBody = ({ canShareWithOrganization, editingSkill, isOwner =
                     }}
                 >
                     <DialogPanel className="max-h-[65vh] min-h-0 flex-1 overflow-y-auto">
-                        <div className="space-y-5">
+                        <div className="divide-border/50 divide-y *:py-3 *:first:pt-0 *:last:pb-0">
                             {!editingSkill && <SkillGeneratePanel onDraft={applyDraft} />}
 
                             <div className="grid gap-4 sm:grid-cols-2">
@@ -485,7 +485,7 @@ const SkillFormDialogBody = ({ canShareWithOrganization, editingSkill, isOwner =
                                             ).map((option) => (
                                                 // eslint-disable-next-line jsx-a11y/label-has-associated-control -- the label wraps the Base UI radio, which renders the control
                                                 <label
-                                                    className="flex cursor-pointer items-start gap-3 rounded-md border p-3 has-[[data-disabled]]:opacity-60"
+                                                    className="hover:bg-surface-row-hover has-[[aria-checked=true]]:bg-surface-row-active flex cursor-pointer items-start gap-3 rounded-lg px-3 py-2.5 has-[[data-disabled]]:opacity-60"
                                                     key={option.value}
                                                 >
                                                     <RadioGroupItem disabled={option.disabled} value={option.value} />
@@ -501,7 +501,7 @@ const SkillFormDialogBody = ({ canShareWithOrganization, editingSkill, isOwner =
                             </form.AppField>
                         </div>
                     </DialogPanel>
-                    <DialogFooter>
+                    <DialogFooter className="border-border/50 border-t" variant="bare">
                         <Button onClick={onClose} type="button" variant="outline">
                             {t`Cancel`}
                         </Button>

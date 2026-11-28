@@ -1,20 +1,23 @@
+import type { ReturnOf } from "@lunora/react";
 import { api } from "@neore/backend/api";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { onlineManager } from "@tanstack/react-query";
 import { expect, userEvent, waitFor } from "storybook/test";
 
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
+import { useModelStore } from "@/features/chat/core/stores/model-store";
+import { useGoalComposer } from "@/features/chat/goal/goal-store";
 import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
 import { Route as ThreadRoute } from "@/routes/(chat)/chat/$threadId";
 import { Route as ChatIndexRoute } from "@/routes/(chat)/chat/index";
 import { Route as ChatLayoutRoute } from "@/routes/(chat)/route";
 import { ago, MINUTE } from "@/storybook/clock";
 import type { ChatMessage } from "@/storybook/fixtures/chat";
-import { assistantMessage, chatFixtures, CONVERSATION, streamingBody, THREAD_IDS, userMessage } from "@/storybook/fixtures/chat";
+import { assistantMessage, chatFixtures, CONVERSATION, streamingBody, thread, THREAD_IDS, userMessage } from "@/storybook/fixtures/chat";
 import { gatewayModelsHandler } from "@/storybook/fixtures/models";
 import { shellFixtures } from "@/storybook/fixtures/shell";
 import { userFixtures } from "@/storybook/fixtures/user";
-import { lunoraError, lunoraHandlers, lunoraIdle } from "@/storybook/lunora";
+import { lunora, lunoraError, lunoraHandlers, lunoraIdle } from "@/storybook/lunora";
 import { StoryPage } from "@/storybook/page";
 
 // Page data arrives after the route loads; under a loaded machine that can outlast the 1 s default of `find*`.
@@ -96,6 +99,89 @@ export const RoutePromptWrittenAgain: Story = {
     ],
     play: async ({ canvas }) => {
         await waitFor(() => expect(canvas.getByRole("textbox", { name: "Message" })).toHaveTextContent(ROUTE_PROMPT), PAGE_WAIT);
+        await settle(canvas);
+    },
+};
+
+/**
+ * Web search with research depth, a goal armed for the next message and tools that run without asking: the composer's status
+ * line names each of them, and the settings strip stays on one row.
+ */
+export const StatusLineArmed: Story = {
+    beforeEach: () => {
+        useModelStore.getState().setSearchMode("web");
+        useModelStore.getState().setResearchDepth("thorough");
+        useGoalComposer.getState().setEnabled(true);
+
+        return () => {
+            useModelStore.getState().setSearchMode("chat");
+            useModelStore.getState().setResearchDepth("balanced");
+            useGoalComposer.getState().setEnabled(false);
+        };
+    },
+    parameters: {
+        msw: {
+            handlers: {
+                gateway: gatewayModelsHandler(),
+                lunora: lunoraHandlers(
+                    ...userFixtures(),
+                    ...shellFixtures(),
+                    ...chatFixtures(),
+                    lunora(api.chat.thread_state.getEffectivePermissionMode, "full"),
+                ),
+            },
+        },
+    },
+    play: async ({ canvas }) => {
+        const status = await canvas.findByRole("group", { name: "Composer status" }, PAGE_WAIT);
+
+        await expect(status).toHaveTextContent("Web · Thorough");
+        await expect(status).toHaveTextContent("Goal: run until done");
+        await expect(await canvas.findByText("Tools run without asking", undefined, STATE_WAIT)).toBeInTheDocument();
+    },
+};
+
+/** Web search with depth and full access, no goal: the busiest strip that is not wrapped by a goal's own pills. */
+export const StatusLineSearchFullAccess: Story = {
+    beforeEach: () => {
+        useModelStore.getState().setSearchMode("web");
+        useModelStore.getState().setResearchDepth("thorough");
+
+        return () => {
+            useModelStore.getState().setSearchMode("chat");
+            useModelStore.getState().setResearchDepth("balanced");
+        };
+    },
+    parameters: StatusLineArmed.parameters,
+    play: async ({ canvas }) => {
+        const status = await canvas.findByRole("group", { name: "Composer status" }, PAGE_WAIT);
+
+        await expect(status).toHaveTextContent("Web · Thorough");
+        await expect(status).not.toHaveTextContent("Goal");
+        // The search suggestions fade in after the status line: axe reads them settled.
+        await settle(canvas);
+    },
+};
+
+/** A bot's thread: the bot sets the model, said once in the status line, and the picker is locked. */
+export const BotThread: Story = {
+    parameters: {
+        msw: {
+            handlers: {
+                gateway: gatewayModelsHandler(),
+                lunora: lunoraHandlers(
+                    ...userFixtures(),
+                    ...shellFixtures(),
+                    ...chatFixtures({ thread: thread({ _id: THREAD_IDS.main, botId: "bot_weekly", title: "Weekly numbers" } as Parameters<typeof thread>[0]) }),
+                    lunora(api.bots.functions.listBots, [
+                        { _id: "bot_weekly", model: "anthropic/claude-sonnet-4.5", name: "Weekly Bot" },
+                    ] as unknown as ReturnOf<typeof api.bots.functions.listBots>),
+                ),
+            },
+        },
+    },
+    play: async ({ canvas }) => {
+        await expect(await canvas.findByText("The bot sets the model for this chat.", undefined, PAGE_WAIT)).toBeInTheDocument();
     },
 };
 

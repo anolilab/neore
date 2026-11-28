@@ -1,10 +1,10 @@
 "use client";
 
 import { useLingui } from "@lingui/react/macro";
-import { Label } from "@neore/ui/components/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@neore/ui/components/select";
 import type { FC } from "react";
 
+import SettingsRow from "@/components/settings/settings-row";
 import type { ChatOpenPlace } from "@/features/chat/split/chat-open-place";
 import { readChatOpenPlace } from "@/features/chat/split/chat-open-place";
 import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
@@ -23,32 +23,30 @@ const SubAgentOpenPlaceSettings: FC = () => {
     };
 
     return (
-        <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0 flex-1 space-y-0.5">
-                <Label className="text-sm font-medium" htmlFor="sub-agent-open-place">
-                    {t`Where a sub-agent or side chat opens`}
-                </Label>
-                <p className="text-muted-foreground text-xs" id="sub-agent-open-place-description">
-                    {t`Hold Ctrl, Cmd or the middle mouse button to open it in the other place. The side panel needs Split View, turned on in Account settings.`}
-                </p>
-            </div>
-            <Select<ChatOpenPlace>
-                onValueChange={(next) => {
-                    if (next === "main" || next === "side") {
-                        setUserPreferences({ subAgentOpenPlace: next });
-                    }
-                }}
-                value={place}
-            >
-                <SelectTrigger aria-describedby="sub-agent-open-place-description" className="w-44 shrink-0" id="sub-agent-open-place">
-                    <SelectValue>{(value: ChatOpenPlace | null) => labels[value ?? "side"]}</SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem value="side">{labels.side}</SelectItem>
-                    <SelectItem value="main">{labels.main}</SelectItem>
-                </SelectContent>
-            </Select>
-        </div>
+        <SettingsRow
+            control={
+                <Select<ChatOpenPlace>
+                    onValueChange={(next) => {
+                        if (next === "main" || next === "side") {
+                            setUserPreferences({ subAgentOpenPlace: next });
+                        }
+                    }}
+                    value={place}
+                >
+                    <SelectTrigger aria-describedby="sub-agent-open-place-description" className="w-44 shrink-0" id="sub-agent-open-place">
+                        <SelectValue>{(value: ChatOpenPlace | null) => labels[value ?? "side"]}</SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="side">{labels.side}</SelectItem>
+                        <SelectItem value="main">{labels.main}</SelectItem>
+                    </SelectContent>
+                </Select>
+            }
+            description={t`Hold Ctrl, Cmd or the middle mouse button to open it in the other place. The side panel needs Split View, turned on in Account settings.`}
+            descriptionId="sub-agent-open-place-description"
+            htmlFor="sub-agent-open-place"
+            title={t`Where a sub-agent or side chat opens`}
+        />
     );
 };
 

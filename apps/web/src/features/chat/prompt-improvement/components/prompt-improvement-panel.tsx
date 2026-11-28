@@ -174,7 +174,7 @@ const PromptImprovementPanel: FC<PromptImprovementPanelProps> = ({ className }) 
             {isOpen && (
                 <motion.div
                     animate={{ height: "auto", opacity: 1 }}
-                    className={cn("bg-sidebar mx-auto w-full overflow-hidden rounded-t-lg", className)}
+                    className={cn("surface-raised mx-auto w-full overflow-hidden rounded-t-xl", className)}
                     exit={{ height: 0, opacity: 0 }}
                     initial={{ height: 0, opacity: 0 }}
                     transition={{
@@ -230,9 +230,7 @@ const PromptImprovementPanel: FC<PromptImprovementPanelProps> = ({ className }) 
                                         <Label className="text-sm" htmlFor="improvement-instructions">
                                             {t`What would you like to improve? (optional)`}
                                         </Label>
-                                        <span className="text-muted-foreground/70 text-[10px] tracking-widest uppercase">
-                                            {t`Style: ${styleLabels.user[style].label}`}
-                                        </span>
+                                        <span className="text-muted-foreground font-mono text-xs">{t`Style: ${styleLabels.user[style].label}`}</span>
                                     </div>
                                     <div className="relative z-10">
                                         <Textarea
@@ -351,12 +349,10 @@ const PromptImprovementPanel: FC<PromptImprovementPanelProps> = ({ className }) 
                             {hasImproved && (
                                 <motion.div animate={{ opacity: 1 }} exit={{ opacity: 0 }} initial={{ opacity: 0 }} transition={{ duration: 0.2 }}>
                                     <Separator className="dark:opacity-25" />
-                                    <div className="bg-card dark:bg-sidebar px-4 py-2">
+                                    <div className="px-4 py-2">
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-center gap-3">
-                                                <span className="text-muted-foreground/60 dark:text-muted-foreground/50 font-mono text-[10px] tracking-widest uppercase">
-                                                    {t`Prompt improved`}
-                                                </span>
+                                                <span className="text-muted-foreground font-mono text-xs">{t`Prompt improved`}</span>
                                             </div>
                                         </div>
                                     </div>

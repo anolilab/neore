@@ -28,7 +28,7 @@ const ShortcutLayout = () => {
             <KeyboardShortcutsManager onShortcut={handleShortcut}>
                 <div className="flex h-dvh w-full">
                     <SidebarShortcut userDropdown />
-                    <SidebarInset className="dark:bg-brand-obsidian md:ring-sidebar-border md:m-1 md:rounded-xl md:ring-1">
+                    <SidebarInset className="bg-surface-main surface-edge overflow-hidden md:m-2 md:rounded-2xl">
                         <Outlet />
                     </SidebarInset>
                 </div>

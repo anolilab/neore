@@ -107,6 +107,11 @@ vi.mock("@tanstack/react-router", () => {
     };
 });
 
+// The row reads the model name from the cached gateway catalog; these tests have none.
+vi.mock("@/hooks/use-cached-model-name", () => {
+    return { default: (): undefined => undefined };
+});
+
 vi.mock("@tanstack/react-query", () => {
     return {
         // Queries answer with nothing: the rows under test read their data from the props and the stores, not from these.
@@ -230,14 +235,23 @@ const nestedGroups: ThreadGroup[] = [
 
 /** Which thread groups the list gets: the flat five, or the parent with its branch. */
 const groupsInUse = vi.hoisted(() => {
-    return { nested: false };
+    return { nested: false, unloaded: false };
 });
 
 vi.mock("./hooks/use-thread-groups", () => {
     const flat = { isPlaceholderData: false, threadGroups: groups, threadsData: {} };
     const nested = { isPlaceholderData: false, threadGroups: nestedGroups, threadsData: {} };
+    const unloaded = { isPlaceholderData: false, threadGroups: [], threadsData: undefined };
 
-    return { default: () => (groupsInUse.nested ? nested : flat) };
+    return {
+        default: () => {
+            if (groupsInUse.unloaded) {
+                return unloaded;
+            }
+
+            return groupsInUse.nested ? nested : flat;
+        },
+    };
 });
 
 // The real handlers close over the open thread (deleting it moves the route): new functions each time it changes.
@@ -295,7 +309,7 @@ vi.mock("@/features/chat/tags/thread-tag-chips", () => {
 });
 
 vi.mock("@/features/chat/tags/thread-tags-menu", () => {
-    return { default: () => null };
+    return { ThreadTagsMenuItems: () => null, default: () => null };
 });
 
 vi.mock("@/features/projects/components/move-to-project-dialog", () => {
@@ -318,6 +332,7 @@ vi.mock("./snooze-until-dialog", () => {
     return { default: () => null };
 });
 
+const { useThreadListUIStore } = await import("./stores/thread-list-ui-store");
 const { default: HierarchicalThreadList } = await import("./hierarchical-thread-list");
 
 const loadingStates: LoadingStates = {
@@ -376,6 +391,7 @@ beforeEach(() => {
         },
     );
     groupsInUse.nested = false;
+    groupsInUse.unloaded = false;
     route.set(`/chat/${first}`);
     pullRequestCounts.set(new Map());
 });
@@ -386,6 +402,63 @@ afterEach(() => {
 });
 
 describe("the sidebar thread list", () => {
+    it("drops a selected thread the list no longer shows, so bulk delete never takes it", () => {
+        const setSelectedThreadIds = vi.fn();
+
+        render(
+            <HierarchicalThreadList
+                {...listProps}
+                currentThreadId={first}
+                selectedThreadIds={new Set([first, "hidden-thread"])}
+                setSelectedThreadIds={setSelectedThreadIds}
+            />,
+        );
+
+        const update = setSelectedThreadIds.mock.calls[0]?.[0] as (previous: Set<string>) => Set<string>;
+
+        expect([...update(new Set([first, "hidden-thread"]))]).toStrictEqual([first]);
+    });
+
+    it("shows no section counts while no list is loaded, not the last list's", () => {
+        useThreadListUIStore.setState({ sectionCounts: { active: 4, archived: 1, needsYou: 2, snoozed: 0, working: 1 } });
+        groupsInUse.unloaded = true;
+
+        render(<HierarchicalThreadList {...listProps} currentThreadId={first} />);
+
+        expect(useThreadListUIStore.getState().sectionCounts).toStrictEqual({ active: 0, archived: 0, needsYou: 0, snoozed: 0, working: 0 });
+    });
+
+    it("keeps a selection gathered across searches while searching", () => {
+        const setSelectedThreadIds = vi.fn();
+
+        render(
+            <HierarchicalThreadList
+                {...listProps}
+                currentThreadId={first}
+                searchQuery="plan"
+                selectedThreadIds={new Set([first, "hidden-thread"])}
+                setSelectedThreadIds={setSelectedThreadIds}
+            />,
+        );
+
+        expect(setSelectedThreadIds).not.toHaveBeenCalled();
+    });
+
+    it("leaves a selection of shown threads as it is", () => {
+        const setSelectedThreadIds = vi.fn();
+
+        render(
+            <HierarchicalThreadList
+                {...listProps}
+                currentThreadId={first}
+                selectedThreadIds={new Set([first, second])}
+                setSelectedThreadIds={setSelectedThreadIds}
+            />,
+        );
+
+        expect(setSelectedThreadIds).not.toHaveBeenCalled();
+    });
+
     it("re-renders only the row it leaves and the row it opens on a thread switch", () => {
         const { rerender } = render(<HierarchicalThreadList {...listProps} currentThreadId={first} />);
 
@@ -411,7 +484,7 @@ describe("the sidebar thread list", () => {
     it("highlights the row the arrow keys select, by its thread, and no other", () => {
         const { container } = render(<HierarchicalThreadList {...listProps} currentThreadId={first} />);
         // eslint-disable-next-line testing-library/no-container, testing-library/no-node-access -- the highlight is only a class
-        const highlighted = () => [...container.querySelectorAll<HTMLElement>("[data-thread-id]")].filter((row) => row.className.includes("ring-white/50"));
+        const highlighted = () => [...container.querySelectorAll<HTMLElement>("[data-thread-id]")].filter((row) => row.classList.contains("ring-2"));
 
         fireEvent.keyDown(document.body, { key: "ArrowDown" });
         fireEvent.keyDown(document.body, { key: "ArrowDown" });
@@ -447,9 +520,9 @@ describe("the sidebar thread list", () => {
             }, nestedIds);
 
             expect(updatedRows).toStrictEqual([childId, plainId]);
-            expect(classesOf(container, childId)).toContain("bg-white/20");
-            expect(classesOf(container, parentId)).not.toContain("bg-white/20");
-            expect(classesOf(container, plainId)).not.toContain("bg-white/20");
+            expect(classesOf(container, childId)).toContain("bg-surface-row-active");
+            expect(classesOf(container, parentId)).not.toContain("bg-surface-row-active");
+            expect(classesOf(container, plainId)).not.toContain("bg-surface-row-active");
         });
 
         it("moves the arrow keys' highlight from the parent onto its branch, re-rendering only those two rows", () => {
@@ -459,8 +532,8 @@ describe("the sidebar thread list", () => {
             fireEvent.keyDown(document.body, { key: "ArrowDown" });
 
             expect(rowsUpdatedBy(() => fireEvent.keyDown(document.body, { key: "ArrowDown" }), nestedIds)).toStrictEqual([parentId, childId]);
-            expect(classesOf(container, childId)).toContain("ring-white/50");
-            expect(classesOf(container, parentId)).not.toContain("ring-white/50");
+            expect(classesOf(container, childId)).toContain("ring-2");
+            expect(classesOf(container, parentId)).not.toContain("ring-2");
         });
     });
 });

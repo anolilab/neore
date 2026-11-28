@@ -64,7 +64,7 @@ const CaseFields = ({ rag, setValues, showErrors, values }: CaseFieldsProps) => 
         );
 
     return (
-        <div className="space-y-4">
+        <div className="divide-border/50 divide-y *:py-3 *:first:pt-0 *:last:pb-0">
             <div className="space-y-2">
                 <Label htmlFor={`${baseId}-input`}>{t`Input`}</Label>
                 <Textarea

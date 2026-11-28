@@ -80,8 +80,26 @@ export const SETTINGS_KEYWORDS: Record<SettingsTab, ReadonlyArray<SettingsKeywor
         { keywords: [msg`edit video`, msg`restyle`, msg`transform`], label: msg`Video to video`, section: msg`Video` },
         { keywords: [msg`mix`, msg`images and video`, msg`references`], label: msg`Mixed to video`, section: msg`Video` },
     ],
+    "chat-bots": [
+        { keywords: [], label: msg`New bot` },
+        { keywords: [], label: msg`Your bots` },
+    ],
+    // "Servers over SSH" is left out: its card shows only on a paired desktop, and the search cannot tell, so it would lead nowhere.
+    "chat-devices": [{ keywords: [], label: msg`Device activity` }],
     "chat-knowledge": [],
     "chat-mcp": [{ keywords: [msg`catalog`, msg`browse`, msg`install`, msg`connectors`, msg`integrations`], label: msg`MCP Registry` }],
+    "chat-model-filters": [
+        { keywords: [], label: msg`Region Restrictions` },
+        { keywords: [], label: msg`Allowed Regions`, section: msg`Region Restrictions` },
+        { keywords: [], label: msg`Blocked Regions`, section: msg`Region Restrictions` },
+        { keywords: [], label: msg`Provider Restrictions` },
+        { keywords: [], label: msg`Allowed Providers`, section: msg`Provider Restrictions` },
+        { keywords: [], label: msg`Blocked Providers`, section: msg`Provider Restrictions` },
+        { keywords: [], label: msg`Blocked Models` },
+        { keywords: [], label: msg`Hidden in Model Picker` },
+        { keywords: [], label: msg`Zero Data Retention (ZDR)`, section: msg`Privacy` },
+        { keywords: [], label: msg`Deny Data Collection`, section: msg`Privacy` },
+    ],
     "chat-models": [{ keywords: [msg`pinned`, msg`starred`, msg`picker`], label: msg`Favorite models` }],
     "chat-personalization": [
         { keywords: [msg`name`, msg`call me`], label: msg`Nickname`, section: msg`About You` },
@@ -102,6 +120,14 @@ export const SETTINGS_KEYWORDS: Record<SettingsTab, ReadonlyArray<SettingsKeywor
         { keywords: [msg`permissions`, msg`ask`, msg`auto`, msg`off`, msg`approval`], label: msg`Built-in tools` },
         { keywords: [msg`permissions`, msg`servers`, msg`approval`], label: msg`MCP tools` },
     ],
+    "chat-triggers": [{ keywords: [], label: msg`How Triggers Work` }],
+    "chat-usage": [
+        { keywords: [], label: msg`Cost by Model` },
+        { keywords: [], label: msg`Daily Cost Trend` },
+        { keywords: [], label: msg`Budget Alerts` },
+    ],
+    connectors: [],
+    "connectors-messenger": [{ keywords: [], label: msg`Messenger Integration` }],
     privacy: [
         { keywords: [msg`download`, msg`gdpr`, msg`backup`, msg`my data`], label: msg`Data Export` },
         { keywords: [msg`chatgpt`, msg`claude`, msg`gemini`, msg`migrate`, msg`upload`], label: msg`Import Conversations` },

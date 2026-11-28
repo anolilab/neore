@@ -1,11 +1,10 @@
 import { useLingui } from "@lingui/react/macro";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@neore/ui/components/card";
 import { Skeleton } from "@neore/ui/components/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@neore/ui/components/table";
 import { skipToken, useQuery } from "@tanstack/react-query";
-import { Sparkles } from "lucide-react";
 import type { FC } from "react";
 
+import SettingsCard from "@/components/settings/settings-card";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 import { BACKFILL_REFETCH_MS, useRefetchAfterBackfill } from "../../hooks/use-usage-backfill";
@@ -64,15 +63,8 @@ const UsageSkillBreakdown: FC<UsageSkillBreakdownProps> = ({ backfilling, days }
     const totalCost = skills.reduce((sum, skill) => sum + skill.costMicrodollars, 0);
 
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base">
-                    <Sparkles aria-hidden="true" className="size-4" />
-                    {t`Usage by skill`}
-                </CardTitle>
-                <CardDescription>{t`Replies, tokens and spend per skill or agent for the selected period`}</CardDescription>
-            </CardHeader>
-            <CardContent>
+        <SettingsCard description={t`Replies, tokens and spend per skill or agent for the selected period`} title={t`Usage by skill`}>
+            <div className="py-3">
                 {isPending && (
                     <div className="space-y-2">
                         {[1, 2, 3].map((index) => (
@@ -127,8 +119,8 @@ const UsageSkillBreakdown: FC<UsageSkillBreakdownProps> = ({ backfilling, days }
                     </Table>
                 )}
                 {data?.truncated && <p className="text-muted-foreground mt-2 text-xs">{t`Only the most recent days of this period are included.`}</p>}
-            </CardContent>
-        </Card>
+            </div>
+        </SettingsCard>
     );
 };
 

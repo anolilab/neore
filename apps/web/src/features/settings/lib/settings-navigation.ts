@@ -7,10 +7,15 @@ import {
     Brain,
     Building,
     Cable,
+    ChartColumn,
     CreditCard,
+    Filter,
     Key,
     Keyboard,
+    Laptop,
     Lock,
+    MessageCircle,
+    Plug,
     Settings,
     Shield,
     ShieldCheck,
@@ -18,6 +23,8 @@ import {
     User,
     UserCog,
     Users,
+    UsersRound,
+    Zap,
 } from "lucide-react";
 
 export const SETTINGS_TABS = [
@@ -33,6 +40,13 @@ export const SETTINGS_TABS = [
     "chat-sub-agent-roles",
     "chat-api-keys",
     "chat-system-prompts",
+    "chat-model-filters",
+    "chat-bots",
+    "chat-triggers",
+    "chat-devices",
+    "chat-usage",
+    "connectors",
+    "connectors-messenger",
     "auth-account",
     "auth-security",
     "auth-api-keys",
@@ -45,6 +59,8 @@ export const SETTINGS_TABS = [
 ] as const;
 
 export type SettingsTab = (typeof SETTINGS_TABS)[number];
+
+export const isSettingsTab = (value: unknown): value is SettingsTab => (SETTINGS_TABS as ReadonlyArray<unknown>).includes(value);
 
 /** What the signed-in session must offer for a tab to be listed. */
 export type SettingsNavCondition = "activeOrganization" | "apiKey" | "organization";
@@ -91,13 +107,25 @@ export const SETTINGS_NAVIGATION: ReadonlyArray<SettingsNavGroupDefinition> = [
             { icon: BookOpen, label: msg`Knowledge Base`, requiresAuth: true, tab: "chat-knowledge" },
             { icon: Brain, label: msg`Default Models`, tab: "chat-default-models" },
             { icon: Brain, label: msg`Models`, tab: "chat-models" },
+            { icon: Filter, label: msg`Model Restrictions`, requiresAuth: true, tab: "chat-model-filters" },
             { icon: Bot, label: msg`Agent`, requiresAuth: true, tab: "chat-agent" },
+            { icon: Sparkles, label: msg`Bots`, requiresAuth: true, tab: "chat-bots" },
+            { icon: Zap, label: msg`Triggers`, requiresAuth: true, tab: "chat-triggers" },
             { icon: Cable, label: msg`MCP Servers`, requiresAuth: true, tab: "chat-mcp" },
             { icon: ShieldCheck, label: msg`Tool Permissions`, requiresAuth: true, tab: "chat-tools" },
             { icon: Users, label: msg`Sub-agent roles`, requiresAuth: true, tab: "chat-sub-agent-roles" },
             { icon: Key, label: msg`API Keys`, requiresAuth: true, tab: "chat-api-keys" },
+            { icon: Laptop, label: msg`Devices`, requiresAuth: true, tab: "chat-devices" },
+            { icon: ChartColumn, label: msg`Usage`, requiresAuth: true, tab: "chat-usage" },
         ],
         label: msg`Chat`,
+    },
+    {
+        items: [
+            { icon: Plug, label: msg`Connectors`, requiresAuth: true, tab: "connectors" },
+            { icon: MessageCircle, label: msg`Messenger`, requiresAuth: true, tab: "connectors-messenger" },
+        ],
+        label: msg`Connectors`,
     },
     {
         items: [
@@ -109,6 +137,7 @@ export const SETTINGS_NAVIGATION: ReadonlyArray<SettingsNavGroupDefinition> = [
             { icon: CreditCard, label: msg`Billing`, requiresAuth: true, tab: "auth-billing" },
             { icon: Building, label: msg`Organization`, requiresAuth: true, tab: "auth-organization", when: "activeOrganization" },
             { icon: Users, label: msg`Members`, requiresAuth: true, tab: "auth-members", when: "activeOrganization" },
+            { icon: UsersRound, label: msg`Teams`, requiresAuth: true, tab: "auth-teams", when: "activeOrganization" },
         ],
         label: msg`Account`,
     },

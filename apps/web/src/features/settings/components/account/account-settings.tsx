@@ -3,7 +3,6 @@
 import { useLingui } from "@lingui/react/macro";
 import { CardContent } from "@neore/ui/components/card";
 import { Input } from "@neore/ui/components/input";
-import { Label } from "@neore/ui/components/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@neore/ui/components/select";
 import { Slider } from "@neore/ui/components/slider";
 import { Switch } from "@neore/ui/components/switch";
@@ -12,6 +11,7 @@ import { useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import SettingsCard from "@/components/settings/settings-card";
+import SettingsRow from "@/components/settings/settings-row";
 import AppearanceControls from "@/features/appearance/components/appearance-controls";
 import useIsAnonymous from "@/features/auth/hooks/use-is-anonymous";
 import { useUpdateUserSettings, useUserSettings } from "@/features/auth/hooks/use-user-settings";
@@ -164,144 +164,143 @@ const AccountSettings: FC = () => {
         <div className="space-y-6">
             <SettingsCard description={t`Control how your personal information is displayed in the UI.`} title={t`Privacy`}>
                 <CardContent className="space-y-4">
-                    <div className="flex items-center justify-between">
-                        <div className="space-y-0.5">
-                            <Label className="text-base font-medium" htmlFor="hide-personal-info">
-                                {t`Hide Personal Information`}
-                            </Label>
-                            <p className="text-muted-foreground text-sm">{t`Hides your name and email from the UI.`}</p>
-                        </div>
-                        <Switch
-                            checked={hidePersonalInfo}
-                            id="hide-personal-info"
-                            onCheckedChange={(checked) => {
-                                setHidePersonalInfo(checked);
-                                toast.success(checked ? t`Personal information is now hidden` : t`Personal information is now visible`);
-                            }}
-                        />
-                    </div>
+                    <SettingsRow
+                        control={
+                            <Switch
+                                checked={hidePersonalInfo}
+                                id="hide-personal-info"
+                                onCheckedChange={(checked) => {
+                                    setHidePersonalInfo(checked);
+                                    toast.success(checked ? t`Personal information is now hidden` : t`Personal information is now visible`);
+                                }}
+                            />
+                        }
+                        description={t`Hides your name and email from the UI.`}
+                        htmlFor="hide-personal-info"
+                        title={t`Hide Personal Information`}
+                    />
                 </CardContent>
             </SettingsCard>
 
             <SettingsCard description={t`Customize the appearance of the application.`} title={t`Appearance`}>
                 <CardContent className="space-y-4">
                     <AppearanceControls />
-                    <div className="space-y-2">
-                        <Label className="text-base font-medium" htmlFor="direction">
-                            {t`Text Direction`}
-                        </Label>
-                        <p className="text-muted-foreground text-sm">{t`Set the text direction for the application. RTL is used for languages like Arabic, Hebrew, and Persian.`}</p>
-                        <Select
-                            items={{ ltr: t`Left to Right (LTR)`, rtl: t`Right to Left (RTL)` }}
-                            onValueChange={(value) => {
-                                setDirection(value as typeof direction);
-                                toast.success(value === "rtl" ? t`Text direction set to RTL` : t`Text direction set to LTR`);
-                            }}
-                            value={direction}
-                        >
-                            <SelectTrigger id="direction">
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="ltr">{t`Left to Right (LTR)`}</SelectItem>
-                                <SelectItem value="rtl">{t`Right to Left (RTL)`}</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
+                    <SettingsRow
+                        control={
+                            <Select
+                                items={{ ltr: t`Left to Right (LTR)`, rtl: t`Right to Left (RTL)` }}
+                                onValueChange={(value) => {
+                                    setDirection(value as typeof direction);
+                                    toast.success(value === "rtl" ? t`Text direction set to RTL` : t`Text direction set to LTR`);
+                                }}
+                                value={direction}
+                            >
+                                <SelectTrigger id="direction">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="ltr">{t`Left to Right (LTR)`}</SelectItem>
+                                    <SelectItem value="rtl">{t`Right to Left (RTL)`}</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        }
+                        description={t`Set the text direction for the application. RTL is used for languages like Arabic, Hebrew, and Persian.`}
+                        htmlFor="direction"
+                        title={t`Text Direction`}
+                    />
                 </CardContent>
             </SettingsCard>
 
             <SettingsCard description={t`Configure how the application behaves.`} title={t`Behavior`}>
                 <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                        <Label className="text-base font-medium" htmlFor="send-behavior">
-                            {t`Send Message Behavior`}
-                        </Label>
-                        <p className="text-muted-foreground text-sm">{t`Choose how to send messages in the chat. Cmd/Ctrl+Enter always sends.`}</p>
-                        <Select
-                            items={{
-                                button: t`Click button to send`,
-                                enter: t`Press Enter to send`,
-                                modEnter: t`Press Ctrl/Cmd+Enter to send`,
-                                shiftEnter: t`Press Shift+Enter to send`,
-                            }}
-                            onValueChange={(value) => {
-                                setSendBehavior(value as typeof sendBehavior);
-                                toast.success(t`Send behavior updated`);
-                            }}
-                            value={sendBehavior}
-                        >
-                            <SelectTrigger id="send-behavior">
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="enter">{t`Press Enter to send`}</SelectItem>
-                                <SelectItem value="shiftEnter">{t`Press Shift+Enter to send`}</SelectItem>
-                                <SelectItem value="modEnter">{t`Press Ctrl/Cmd+Enter to send`}</SelectItem>
-                                <SelectItem value="button">{t`Click button to send`}</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
+                    <SettingsRow
+                        control={
+                            <Select
+                                items={{
+                                    button: t`Click button to send`,
+                                    enter: t`Press Enter to send`,
+                                    modEnter: t`Press Ctrl/Cmd+Enter to send`,
+                                    shiftEnter: t`Press Shift+Enter to send`,
+                                }}
+                                onValueChange={(value) => {
+                                    setSendBehavior(value as typeof sendBehavior);
+                                    toast.success(t`Send behavior updated`);
+                                }}
+                                value={sendBehavior}
+                            >
+                                <SelectTrigger id="send-behavior">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="enter">{t`Press Enter to send`}</SelectItem>
+                                    <SelectItem value="shiftEnter">{t`Press Shift+Enter to send`}</SelectItem>
+                                    <SelectItem value="modEnter">{t`Press Ctrl/Cmd+Enter to send`}</SelectItem>
+                                    <SelectItem value="button">{t`Click button to send`}</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        }
+                        description={t`Choose how to send messages in the chat. Cmd/Ctrl+Enter always sends.`}
+                        htmlFor="send-behavior"
+                        title={t`Send Message Behavior`}
+                    />
                 </CardContent>
             </SettingsCard>
 
             <SettingsCard description={t`Configure language preferences and location settings.`} title={t`Language & Localization`}>
                 <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                        <Label className="text-base font-medium" htmlFor="language">
-                            {t`Default AI Response Language`}
-                        </Label>
-                        <p className="text-muted-foreground text-sm">{t`Default language for AI responses in new threads (BCP 47 code).`}</p>
-                        <Select
-                            onValueChange={(value) => {
-                                handleUpdateSetting("language", value, t`Default language updated`);
-                            }}
-                            value={currentLanguage}
-                        >
-                            <SelectTrigger id="language">
-                                <SelectValue placeholder={t`Select language`}>
-                                    {(value: string | null) => (value ? (languageMap.get(value) ?? value) : null)}
-                                </SelectValue>
-                            </SelectTrigger>
-                            <SelectContent>
-                                {languages.map((lang) => (
-                                    <SelectItem key={lang.value} value={lang.value}>
-                                        {lang.label}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
-                    <div className="space-y-2">
-                        <Label className="text-base font-medium" htmlFor="dictation-language">
-                            {t`Default Dictation Language`}
-                        </Label>
-                        <p className="text-muted-foreground text-sm">{t`Default dictation language for new threads (BCP 47 code).`}</p>
-                        <Select
-                            onValueChange={(value) => {
-                                handleUpdateSetting("dictationLanguage", value, t`Dictation language updated`);
-                            }}
-                            value={currentDictationLanguage}
-                        >
-                            <SelectTrigger id="dictation-language">
-                                <SelectValue placeholder={t`Select dictation language`}>
-                                    {(value: string | null) => (value ? (languageMap.get(value) ?? value) : null)}
-                                </SelectValue>
-                            </SelectTrigger>
-                            <SelectContent>
-                                {languages.map((lang) => (
-                                    <SelectItem key={lang.value} value={lang.value}>
-                                        {lang.label}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
-                    <div className="space-y-2">
-                        <Label className="text-base font-medium" htmlFor="location">
-                            {t`Location`}
-                        </Label>
-                        <p className="text-muted-foreground text-sm">{t`Your location (e.g., "New York, USA", "Berlin, Germany").`}</p>
+                    <SettingsRow
+                        control={
+                            <Select
+                                onValueChange={(value) => {
+                                    handleUpdateSetting("language", value, t`Default language updated`);
+                                }}
+                                value={currentLanguage}
+                            >
+                                <SelectTrigger id="language">
+                                    <SelectValue placeholder={t`Select language`}>
+                                        {(value: string | null) => (value ? (languageMap.get(value) ?? value) : null)}
+                                    </SelectValue>
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {languages.map((lang) => (
+                                        <SelectItem key={lang.value} value={lang.value}>
+                                            {lang.label}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        }
+                        description={t`Default language for AI responses in new threads (BCP 47 code).`}
+                        htmlFor="language"
+                        title={t`Default AI Response Language`}
+                    />
+                    <SettingsRow
+                        control={
+                            <Select
+                                onValueChange={(value) => {
+                                    handleUpdateSetting("dictationLanguage", value, t`Dictation language updated`);
+                                }}
+                                value={currentDictationLanguage}
+                            >
+                                <SelectTrigger id="dictation-language">
+                                    <SelectValue placeholder={t`Select dictation language`}>
+                                        {(value: string | null) => (value ? (languageMap.get(value) ?? value) : null)}
+                                    </SelectValue>
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {languages.map((lang) => (
+                                        <SelectItem key={lang.value} value={lang.value}>
+                                            {lang.label}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        }
+                        description={t`Default dictation language for new threads (BCP 47 code).`}
+                        htmlFor="dictation-language"
+                        title={t`Default Dictation Language`}
+                    />
+                    <SettingsRow description={t`Your location (e.g., "New York, USA", "Berlin, Germany").`} htmlFor="location" title={t`Location`}>
                         <Input
                             defaultValue={currentLocation || ""}
                             id="location"
@@ -324,347 +323,324 @@ const AccountSettings: FC = () => {
                             placeholder={t`Enter your location`}
                             type="text"
                         />
-                    </div>
-                    <div className="space-y-2">
-                        <Label className="text-base font-medium" htmlFor="timezone">
-                            {t`Timezone`}
-                        </Label>
-                        <p className="text-muted-foreground text-sm">{t`Your timezone (IANA timezone identifier).`}</p>
-                        <Select
-                            items={commonTimezones}
-                            onValueChange={(value) => {
-                                handleUpdateSetting("timezone", value, t`Timezone updated`);
-                            }}
-                            value={currentTimezone || browserTimezone}
-                        >
-                            <SelectTrigger id="timezone">
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {commonTimezones.map((tz) => (
-                                    <SelectItem key={tz.value} value={tz.value}>
-                                        {tz.label}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
+                    </SettingsRow>
+                    <SettingsRow
+                        control={
+                            <Select
+                                items={commonTimezones}
+                                onValueChange={(value) => {
+                                    handleUpdateSetting("timezone", value, t`Timezone updated`);
+                                }}
+                                value={currentTimezone || browserTimezone}
+                            >
+                                <SelectTrigger id="timezone">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {commonTimezones.map((tz) => (
+                                        <SelectItem key={tz.value} value={tz.value}>
+                                            {tz.label}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        }
+                        description={t`Your timezone (IANA timezone identifier).`}
+                        htmlFor="timezone"
+                        title={t`Timezone`}
+                    />
                 </CardContent>
             </SettingsCard>
 
             <SettingsCard description={t`Configure chat behavior and preferences.`} title={t`Chat`}>
                 <CardContent className="space-y-4">
-                    <div className="flex items-center justify-between">
-                        <div className="space-y-0.5">
-                            <Label className="text-base font-medium" htmlFor="enable-followup-suggestions">
-                                {t`Enable Follow-up Suggestions`}
-                            </Label>
-                            <p className="text-muted-foreground text-sm">{t`Show follow-up suggestions after assistant messages.`}</p>
-                        </div>
-                        <Switch
-                            checked={isEnableFollowupSuggestions}
-                            id="enable-followup-suggestions"
-                            onCheckedChange={(checked) => {
-                                handleUpdateSetting(
-                                    "enableFollowupSuggestions",
-                                    checked,
-                                    checked ? t`Follow-up suggestions enabled` : t`Follow-up suggestions disabled`,
-                                );
-                            }}
-                        />
-                    </div>
-                    <div className="flex items-center justify-between">
-                        <div className="space-y-0.5">
-                            <Label className="text-base font-medium" htmlFor="thread-summaries">
-                                {t`Summarise long chats`}
-                            </Label>
-                            <p className="text-muted-foreground text-sm" id="thread-summaries-description">
-                                {t`Off by default. While a long chat sits idle, condense its older messages into notes so the assistant keeps them in mind. Uses a small amount of credits. Turning it off deletes the summaries already made.`}
-                            </p>
-                        </div>
-                        <Switch
-                            aria-describedby="thread-summaries-description"
-                            checked={isThreadSummariesEnabled}
-                            id="thread-summaries"
-                            onCheckedChange={(checked) => {
-                                handleUpdateSetting(
-                                    "threadSummariesEnabled",
-                                    checked,
-                                    checked ? t`Long chats will be summarised` : t`Long chats will no longer be summarised`,
-                                );
-                            }}
-                        />
-                    </div>
-                    <div className="flex items-center justify-between gap-4">
-                        <div className="space-y-0.5">
-                            <Label className="text-base font-medium" htmlFor="auto-compact-threshold">
-                                {t`Compact full chats automatically`}
-                            </Label>
-                            <p className="text-muted-foreground text-sm" id="auto-compact-description">
-                                {t`Off by default. When a chat's context fills this much of the model's window, older messages are condensed for the model before it replies. Your chat itself is never changed. You can also type /compact at any time.`}
-                            </p>
-                        </div>
-                        <Select
-                            onValueChange={(value) => {
-                                const percent = Number(value);
-
-                                handleUpdateSetting(
-                                    "autoCompactThreshold",
-                                    percent,
-                                    percent === 0
-                                        ? t`Chats will not be compacted automatically`
-                                        : t`Chats will be compacted at ${percentFormat.format(percent / 100)} of the context window`,
-                                    true,
-                                );
-                            }}
-                            value={String(autoCompactThreshold)}
-                        >
-                            <SelectTrigger aria-describedby="auto-compact-description" className="w-28 shrink-0" id="auto-compact-threshold">
-                                <SelectValue>
-                                    {(value: string | null) => {
-                                        const percent = Number(value);
-
-                                        return percent === 0 ? t`Off` : percentFormat.format(percent / 100);
-                                    }}
-                                </SelectValue>
-                            </SelectTrigger>
-                            <SelectContent>
-                                {AUTO_COMPACT_PERCENTS.map((percent) => (
-                                    <SelectItem key={percent} value={String(percent)}>
-                                        {percent === 0 ? t`Off` : percentFormat.format(percent / 100)}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
-                    <div className="flex items-center justify-between">
-                        <div className="space-y-0.5">
-                            <Label className="text-base font-medium" htmlFor="auto-read-replies">
-                                {t`Auto-read replies`}
-                            </Label>
-                            <p className="text-muted-foreground text-sm">{t`Read every assistant reply aloud when it finishes, using your browser's voice.`}</p>
-                        </div>
-                        <Switch
-                            checked={isAutoReadReplies}
-                            id="auto-read-replies"
-                            onCheckedChange={(checked) => {
-                                handleUpdateSetting(
-                                    "autoReadReplies",
-                                    checked,
-                                    checked ? t`Replies will be read aloud` : t`Replies will no longer be read aloud`,
-                                );
-                            }}
-                        />
-                    </div>
-                    {!isAnonymous && SPEECH_VOICES.length > 0 && (
-                        <div className="space-y-2">
-                            <Label className="text-base font-medium" htmlFor="voice-mode-voice">
-                                {t`Hands-free voice`}
-                            </Label>
-                            <p className="text-muted-foreground text-sm" id="voice-mode-voice-description">
-                                {t`The voice hands-free mode reads replies in. A skill with its own voice uses that instead. Spoken replies count against a daily allowance; after it, your browser's voice takes over.`}
-                            </p>
+                    <SettingsRow
+                        control={
+                            <Switch
+                                checked={isEnableFollowupSuggestions}
+                                id="enable-followup-suggestions"
+                                onCheckedChange={(checked) => {
+                                    handleUpdateSetting(
+                                        "enableFollowupSuggestions",
+                                        checked,
+                                        checked ? t`Follow-up suggestions enabled` : t`Follow-up suggestions disabled`,
+                                    );
+                                }}
+                            />
+                        }
+                        description={t`Show follow-up suggestions after assistant messages.`}
+                        htmlFor="enable-followup-suggestions"
+                        title={t`Enable Follow-up Suggestions`}
+                    />
+                    <SettingsRow
+                        control={
+                            <Switch
+                                aria-describedby="thread-summaries-description"
+                                checked={isThreadSummariesEnabled}
+                                id="thread-summaries"
+                                onCheckedChange={(checked) => {
+                                    handleUpdateSetting(
+                                        "threadSummariesEnabled",
+                                        checked,
+                                        checked ? t`Long chats will be summarised` : t`Long chats will no longer be summarised`,
+                                    );
+                                }}
+                            />
+                        }
+                        description={t`Off by default. While a long chat sits idle, condense its older messages into notes so the assistant keeps them in mind. Uses a small amount of credits. Turning it off deletes the summaries already made.`}
+                        descriptionId="thread-summaries-description"
+                        htmlFor="thread-summaries"
+                        title={t`Summarise long chats`}
+                    />
+                    <SettingsRow
+                        control={
                             <Select
                                 onValueChange={(value) => {
-                                    if (typeof value !== "string") {
-                                        return;
-                                    }
+                                    const percent = Number(value);
 
-                                    handleUpdateSetting("voiceModeVoice", value, t`Hands-free voice updated`);
+                                    handleUpdateSetting(
+                                        "autoCompactThreshold",
+                                        percent,
+                                        percent === 0
+                                            ? t`Chats will not be compacted automatically`
+                                            : t`Chats will be compacted at ${percentFormat.format(percent / 100)} of the context window`,
+                                        true,
+                                    );
                                 }}
-                                value={currentSpeechVoice}
+                                value={String(autoCompactThreshold)}
                             >
-                                <SelectTrigger aria-describedby="voice-mode-voice-description" id="voice-mode-voice">
-                                    <SelectValue placeholder={t`Select a voice`}>
-                                        {(value: string | null) => (value ? speechVoiceLabel(value) : null)}
+                                <SelectTrigger aria-describedby="auto-compact-description" className="w-28 shrink-0" id="auto-compact-threshold">
+                                    <SelectValue>
+                                        {(value: string | null) => {
+                                            const percent = Number(value);
+
+                                            return percent === 0 ? t`Off` : percentFormat.format(percent / 100);
+                                        }}
                                     </SelectValue>
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {SPEECH_VOICES.map((voice) => (
-                                        <SelectItem key={voice} value={voice}>
-                                            {speechVoiceLabel(voice)}
+                                    {AUTO_COMPACT_PERCENTS.map((percent) => (
+                                        <SelectItem key={percent} value={String(percent)}>
+                                            {percent === 0 ? t`Off` : percentFormat.format(percent / 100)}
                                         </SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
-                        </div>
+                        }
+                        description={t`Off by default. When a chat's context fills this much of the model's window, older messages are condensed for the model before it replies. Your chat itself is never changed. You can also type /compact at any time.`}
+                        descriptionId="auto-compact-description"
+                        htmlFor="auto-compact-threshold"
+                        title={t`Compact full chats automatically`}
+                    />
+                    <SettingsRow
+                        control={
+                            <Switch
+                                checked={isAutoReadReplies}
+                                id="auto-read-replies"
+                                onCheckedChange={(checked) => {
+                                    handleUpdateSetting(
+                                        "autoReadReplies",
+                                        checked,
+                                        checked ? t`Replies will be read aloud` : t`Replies will no longer be read aloud`,
+                                    );
+                                }}
+                            />
+                        }
+                        description={t`Read every assistant reply aloud when it finishes, using your browser's voice.`}
+                        htmlFor="auto-read-replies"
+                        title={t`Auto-read replies`}
+                    />
+                    {!isAnonymous && SPEECH_VOICES.length > 0 && (
+                        <SettingsRow
+                            control={
+                                <Select
+                                    onValueChange={(value) => {
+                                        if (typeof value !== "string") {
+                                            return;
+                                        }
+
+                                        handleUpdateSetting("voiceModeVoice", value, t`Hands-free voice updated`);
+                                    }}
+                                    value={currentSpeechVoice}
+                                >
+                                    <SelectTrigger aria-describedby="voice-mode-voice-description" id="voice-mode-voice">
+                                        <SelectValue placeholder={t`Select a voice`}>
+                                            {(value: string | null) => (value ? speechVoiceLabel(value) : null)}
+                                        </SelectValue>
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {SPEECH_VOICES.map((voice) => (
+                                            <SelectItem key={voice} value={voice}>
+                                                {speechVoiceLabel(voice)}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            }
+                            description={t`The voice hands-free mode reads replies in. A skill with its own voice uses that instead. Spoken replies count against a daily allowance; after it, your browser's voice takes over.`}
+                            descriptionId="voice-mode-voice-description"
+                            htmlFor="voice-mode-voice"
+                            title={t`Hands-free voice`}
+                        />
                     )}
-                    <div className="flex items-center justify-between">
-                        <div className="space-y-0.5">
-                            <Label className="text-base font-medium" htmlFor="composer-autocomplete">
-                                {t`Autocomplete while typing`}
-                            </Label>
-                            <p className="text-muted-foreground text-sm" id="composer-autocomplete-description">
-                                {t`Suggests how to finish your message as grey text; press Right Arrow at the end of the line to accept or Esc to dismiss. Your draft is sent to an AI model to make the suggestion.`}
-                            </p>
-                        </div>
-                        <Switch
-                            aria-describedby="composer-autocomplete-description"
-                            checked={isComposerAutocompleteEnabled}
-                            id="composer-autocomplete"
-                            onCheckedChange={(checked) => {
-                                handleUpdateSetting("composerAutocompleteEnabled", checked, checked ? t`Autocomplete enabled` : t`Autocomplete disabled`);
-                            }}
-                        />
-                    </div>
-                    <div className="flex items-center justify-between">
-                        <div className="space-y-0.5">
-                            <Label className="text-base font-medium" htmlFor="composer-vim-mode">
-                                {t`Vim keys in the composer`}
-                            </Label>
-                            <p className="text-muted-foreground text-sm" id="composer-vim-mode-description">
-                                {t`Press Escape to leave typing mode, then edit with h j k l, w b, 0 $, i a I A, o O, x, dd, D and u. Enter still sends. Off by default.`}
-                            </p>
-                        </div>
-                        <Switch
-                            aria-describedby="composer-vim-mode-description"
-                            checked={isComposerVimMode}
-                            id="composer-vim-mode"
-                            onCheckedChange={(checked) => {
-                                handleUpdateSetting("composerVimMode", checked, checked ? t`Vim keys enabled` : t`Vim keys disabled`);
-                            }}
-                        />
-                    </div>
-                    <div className="flex items-center justify-between">
-                        <div className="space-y-0.5">
-                            <Label className="text-base font-medium" htmlFor="resume-last-chat">
-                                {t`Resume your latest chat`}
-                            </Label>
-                            <p className="text-muted-foreground text-sm" id="resume-last-chat-description">
-                                {t`Opening the assistant without a conversation takes you to your most recent one instead of a blank chat.`}
-                            </p>
-                        </div>
-                        <Switch
-                            aria-describedby="resume-last-chat-description"
-                            checked={isResumeLastChat}
-                            id="resume-last-chat"
-                            onCheckedChange={(checked) => {
-                                // The confirmation waits for the save: a failed save must not read as saved.
-                                handleUpdateSetting("resumeLastChat", checked, checked ? t`Resuming your latest chat` : t`Opening a blank chat`);
-                            }}
-                        />
-                    </div>
-                    <div className="flex items-center justify-between">
-                        <div className="space-y-0.5">
-                            <Label className="text-base font-medium" htmlFor="resume-interrupted-runs">
-                                {t`Continue interrupted replies`}
-                            </Label>
-                            <p className="text-muted-foreground text-sm" id="resume-interrupted-runs-description">
-                                {t`When a reply is cut off by an update or an outage, it continues from its last finished step, up to 3 times. A reply interrupted while a tool was running is never continued.`}
-                            </p>
-                        </div>
-                        <Switch
-                            aria-describedby="resume-interrupted-runs-description"
-                            checked={isResumeInterruptedRuns}
-                            id="resume-interrupted-runs"
-                            onCheckedChange={(checked) => {
-                                handleUpdateSetting(
-                                    "resumeInterruptedRuns",
-                                    checked,
-                                    checked ? t`Interrupted replies will continue` : t`Interrupted replies will stop`,
-                                );
-                            }}
-                        />
-                    </div>
-                    <div className="flex items-center justify-between">
-                        <div className="space-y-0.5">
-                            <Label className="text-base font-medium" htmlFor="resume-after-usage-limit">
-                                {t`Resume after a usage limit`}
-                            </Label>
-                            <p className="text-muted-foreground text-sm" id="resume-after-usage-limit-description">
-                                {t`When a reply pauses because a usage limit was reached, it resumes by itself once the limit resets. Off: it waits until you resume it.`}
-                            </p>
-                        </div>
-                        <Switch
-                            aria-describedby="resume-after-usage-limit-description"
-                            checked={isResumeAfterUsageLimit}
-                            id="resume-after-usage-limit"
-                            onCheckedChange={(checked) => {
-                                handleUpdateSetting(
-                                    "resumeAfterUsageLimit",
-                                    checked,
-                                    checked ? t`Paused replies will resume when the limit resets` : t`Paused replies will wait for you to resume them`,
-                                    // Ordered with the settings queue: a quick second toggle cannot be overwritten by the first write landing last.
-                                    true,
-                                );
-                            }}
-                        />
-                    </div>
-                    <div className="flex items-center justify-between">
-                        <div className="space-y-0.5">
-                            <Label className="text-base font-medium" htmlFor="snooze-until-usage-limit-reset">
-                                {t`Snooze chats until the limit resets`}
-                            </Label>
-                            <p className="text-muted-foreground text-sm" id="snooze-until-usage-limit-reset-description">
-                                {t`When a reply pauses because a usage limit was reached and the provider says when it resets, its chat leaves your active list until then.`}
-                            </p>
-                        </div>
-                        <Switch
-                            aria-describedby="snooze-until-usage-limit-reset-description"
-                            checked={isSnoozeUntilUsageLimitReset}
-                            id="snooze-until-usage-limit-reset"
-                            onCheckedChange={(checked) => {
-                                handleUpdateSetting(
-                                    "snoozeUntilUsageLimitReset",
-                                    checked,
-                                    checked ? t`Chats paused by a usage limit will be snoozed` : t`Chats paused by a usage limit will not be snoozed`,
-                                    // Ordered with the settings queue, as the resume switch above.
-                                    true,
-                                );
-                            }}
-                        />
-                    </div>
-                    <div className="flex items-center justify-between">
-                        <div className="space-y-0.5">
-                            <Label className="text-base font-medium" htmlFor="host-follow-up-steer">
-                                {t`Send during a coding agent's turn`}
-                            </Label>
-                            <p className="text-muted-foreground text-sm" id="host-follow-up-steer-description">
-                                {t`Off: a message you send while a coding agent is working waits in the queue and goes after the turn. On: it interrupts the turn and goes next.`}
-                            </p>
-                        </div>
-                        <Switch
-                            aria-describedby="host-follow-up-steer-description"
-                            checked={isHostFollowUpSteer}
-                            id="host-follow-up-steer"
-                            onCheckedChange={(checked) => {
-                                handleUpdateSetting(
-                                    "hostFollowUpSteer",
-                                    checked,
-                                    checked ? t`Messages will interrupt the agent's turn` : t`Messages will wait for the agent's turn to end`,
-                                );
-                            }}
-                        />
-                    </div>
-                    <div className="flex items-center justify-between">
-                        <div className="space-y-0.5">
-                            <Label className="text-base font-medium" htmlFor="follow-up-steer">
-                                {t`Send while a reply is writing`}
-                            </Label>
-                            <p className="text-muted-foreground text-sm" id="follow-up-steer-description">
-                                {t`Off: a message you send while a reply is streaming waits in the queue and goes after it. On: it joins the reply at its next step.`}
-                            </p>
-                        </div>
-                        <Switch
-                            aria-describedby="follow-up-steer-description"
-                            checked={isFollowUpSteer}
-                            id="follow-up-steer"
-                            onCheckedChange={(checked) => {
-                                handleUpdateSetting(
-                                    "followUpSteer",
-                                    checked,
-                                    checked ? t`Messages will join the reply as it writes` : t`Messages will wait for the reply to finish`,
-                                );
-                            }}
-                        />
-                    </div>
-                    <div className="space-y-2">
-                        <Label className="text-base font-medium" htmlFor="temporary-chat-retention">
-                            {t`Temporary Chat Retention (hours)`}
-                        </Label>
-                        <p className="text-muted-foreground text-sm">
-                            {t`How long temporary chats are kept before being automatically deleted. Default: 24 hours.`}
-                        </p>
+                    <SettingsRow
+                        control={
+                            <Switch
+                                aria-describedby="composer-autocomplete-description"
+                                checked={isComposerAutocompleteEnabled}
+                                id="composer-autocomplete"
+                                onCheckedChange={(checked) => {
+                                    handleUpdateSetting("composerAutocompleteEnabled", checked, checked ? t`Autocomplete enabled` : t`Autocomplete disabled`);
+                                }}
+                            />
+                        }
+                        description={t`Suggests how to finish your message as grey text; press Right Arrow at the end of the line to accept or Esc to dismiss. Your draft is sent to an AI model to make the suggestion.`}
+                        descriptionId="composer-autocomplete-description"
+                        htmlFor="composer-autocomplete"
+                        title={t`Autocomplete while typing`}
+                    />
+                    <SettingsRow
+                        control={
+                            <Switch
+                                aria-describedby="composer-vim-mode-description"
+                                checked={isComposerVimMode}
+                                id="composer-vim-mode"
+                                onCheckedChange={(checked) => {
+                                    handleUpdateSetting("composerVimMode", checked, checked ? t`Vim keys enabled` : t`Vim keys disabled`);
+                                }}
+                            />
+                        }
+                        description={t`Press Escape to leave typing mode, then edit with h j k l, w b, 0 $, i a I A, o O, x, dd, D and u. Enter still sends. Off by default.`}
+                        descriptionId="composer-vim-mode-description"
+                        htmlFor="composer-vim-mode"
+                        title={t`Vim keys in the composer`}
+                    />
+                    <SettingsRow
+                        control={
+                            <Switch
+                                aria-describedby="resume-last-chat-description"
+                                checked={isResumeLastChat}
+                                id="resume-last-chat"
+                                onCheckedChange={(checked) => {
+                                    // The confirmation waits for the save: a failed save must not read as saved.
+                                    handleUpdateSetting("resumeLastChat", checked, checked ? t`Resuming your latest chat` : t`Opening a blank chat`);
+                                }}
+                            />
+                        }
+                        description={t`Opening the assistant without a conversation takes you to your most recent one instead of a blank chat.`}
+                        descriptionId="resume-last-chat-description"
+                        htmlFor="resume-last-chat"
+                        title={t`Resume your latest chat`}
+                    />
+                    <SettingsRow
+                        control={
+                            <Switch
+                                aria-describedby="resume-interrupted-runs-description"
+                                checked={isResumeInterruptedRuns}
+                                id="resume-interrupted-runs"
+                                onCheckedChange={(checked) => {
+                                    handleUpdateSetting(
+                                        "resumeInterruptedRuns",
+                                        checked,
+                                        checked ? t`Interrupted replies will continue` : t`Interrupted replies will stop`,
+                                    );
+                                }}
+                            />
+                        }
+                        description={t`When a reply is cut off by an update or an outage, it continues from its last finished step, up to 3 times. A reply interrupted while a tool was running is never continued.`}
+                        descriptionId="resume-interrupted-runs-description"
+                        htmlFor="resume-interrupted-runs"
+                        title={t`Continue interrupted replies`}
+                    />
+                    <SettingsRow
+                        control={
+                            <Switch
+                                aria-describedby="resume-after-usage-limit-description"
+                                checked={isResumeAfterUsageLimit}
+                                id="resume-after-usage-limit"
+                                onCheckedChange={(checked) => {
+                                    handleUpdateSetting(
+                                        "resumeAfterUsageLimit",
+                                        checked,
+                                        checked ? t`Paused replies will resume when the limit resets` : t`Paused replies will wait for you to resume them`,
+                                        // Ordered with the settings queue: a quick second toggle cannot be overwritten by the first write landing last.
+                                        true,
+                                    );
+                                }}
+                            />
+                        }
+                        description={t`When a reply pauses because a usage limit was reached, it resumes by itself once the limit resets. Off: it waits until you resume it.`}
+                        descriptionId="resume-after-usage-limit-description"
+                        htmlFor="resume-after-usage-limit"
+                        title={t`Resume after a usage limit`}
+                    />
+                    <SettingsRow
+                        control={
+                            <Switch
+                                aria-describedby="snooze-until-usage-limit-reset-description"
+                                checked={isSnoozeUntilUsageLimitReset}
+                                id="snooze-until-usage-limit-reset"
+                                onCheckedChange={(checked) => {
+                                    handleUpdateSetting(
+                                        "snoozeUntilUsageLimitReset",
+                                        checked,
+                                        checked ? t`Chats paused by a usage limit will be snoozed` : t`Chats paused by a usage limit will not be snoozed`,
+                                        // Ordered with the settings queue, as the resume switch above.
+                                        true,
+                                    );
+                                }}
+                            />
+                        }
+                        description={t`When a reply pauses because a usage limit was reached and the provider says when it resets, its chat leaves your active list until then.`}
+                        descriptionId="snooze-until-usage-limit-reset-description"
+                        htmlFor="snooze-until-usage-limit-reset"
+                        title={t`Snooze chats until the limit resets`}
+                    />
+                    <SettingsRow
+                        control={
+                            <Switch
+                                aria-describedby="host-follow-up-steer-description"
+                                checked={isHostFollowUpSteer}
+                                id="host-follow-up-steer"
+                                onCheckedChange={(checked) => {
+                                    handleUpdateSetting(
+                                        "hostFollowUpSteer",
+                                        checked,
+                                        checked ? t`Messages will interrupt the agent's turn` : t`Messages will wait for the agent's turn to end`,
+                                    );
+                                }}
+                            />
+                        }
+                        description={t`Off: a message you send while a coding agent is working waits in the queue and goes after the turn. On: it interrupts the turn and goes next.`}
+                        descriptionId="host-follow-up-steer-description"
+                        htmlFor="host-follow-up-steer"
+                        title={t`Send during a coding agent's turn`}
+                    />
+                    <SettingsRow
+                        control={
+                            <Switch
+                                aria-describedby="follow-up-steer-description"
+                                checked={isFollowUpSteer}
+                                id="follow-up-steer"
+                                onCheckedChange={(checked) => {
+                                    handleUpdateSetting(
+                                        "followUpSteer",
+                                        checked,
+                                        checked ? t`Messages will join the reply as it writes` : t`Messages will wait for the reply to finish`,
+                                    );
+                                }}
+                            />
+                        }
+                        description={t`Off: a message you send while a reply is streaming waits in the queue and goes after it. On: it joins the reply at its next step.`}
+                        descriptionId="follow-up-steer-description"
+                        htmlFor="follow-up-steer"
+                        title={t`Send while a reply is writing`}
+                    />
+                    <SettingsRow
+                        description={t`How long temporary chats are kept before being automatically deleted. Default: 24 hours.`}
+                        htmlFor="temporary-chat-retention"
+                        title={t`Temporary Chat Retention (hours)`}
+                    >
                         <div className="flex items-center gap-4">
                             <Slider
                                 className="flex-1"
@@ -678,6 +654,8 @@ const AccountSettings: FC = () => {
                                     toast.success(t`Retention period updated to ${hours} hours`);
                                 }}
                                 step={1}
+                                // The row's title labels the number field; the slider beside it needs its own name.
+                                thumbLabel={t`Temporary Chat Retention (hours)`}
                                 value={[retentionHours]}
                             />
                             <Input
@@ -708,7 +686,7 @@ const AccountSettings: FC = () => {
                             />
                         </div>
                         <p className="text-muted-foreground text-xs">{t`Range: 1 hour to 7 days (168 hours)`}</p>
-                    </div>
+                    </SettingsRow>
                     <ChatLifecycleControls />
                     <ChatActionConfirmControls />
                 </CardContent>
@@ -716,58 +694,53 @@ const AccountSettings: FC = () => {
 
             <SettingsCard description={t`Configure UI preferences and display options.`} title={t`UI Preferences`}>
                 <CardContent className="space-y-4">
-                    <div className="flex items-center justify-between">
-                        <div className="space-y-0.5">
-                            <Label className="text-base font-medium" htmlFor="show-timestamps">
-                                {t`Show Timestamps`}
-                            </Label>
-                            <p className="text-muted-foreground text-sm">{t`Display timestamps on messages.`}</p>
-                        </div>
-                        <Switch
-                            checked={showTimestamps}
-                            id="show-timestamps"
-                            onCheckedChange={(checked) => {
-                                setShowTimestamps(checked);
-                                toast.success(checked ? t`Timestamps enabled` : t`Timestamps disabled`);
-                            }}
-                        />
-                    </div>
-                    <div className="flex items-center justify-between">
-                        <div className="space-y-0.5">
-                            <Label className="text-base font-medium" htmlFor="sound-effects">
-                                {t`Sound Effects`}
-                            </Label>
-                            <p className="text-muted-foreground text-sm">{t`Play a short sound when a reply finishes. Applies to this browser only.`}</p>
-                        </div>
-                        <Switch
-                            checked={soundEffects}
-                            id="sound-effects"
-                            onCheckedChange={(checked) => {
-                                setSoundEffects(checked);
-                                toast.success(checked ? t`Sound effects enabled` : t`Sound effects disabled`);
-                            }}
-                        />
-                    </div>
-                    <div className="flex items-center justify-between">
-                        <div className="space-y-0.5">
-                            <Label className="text-base font-medium" htmlFor="split-view">
-                                {t`Split View`}
-                            </Label>
-                            <p
-                                className="text-muted-foreground text-sm"
-                                id="split-view-description"
-                            >{t`Open up to three chats side by side. Applies to this browser only.`}</p>
-                        </div>
-                        <Switch
-                            aria-describedby="split-view-description"
-                            checked={splitViewEnabled}
-                            id="split-view"
-                            onCheckedChange={(checked) => {
-                                setSplitViewEnabled(checked);
-                                toast.success(checked ? t`Split view enabled` : t`Split view disabled`);
-                            }}
-                        />
-                    </div>
+                    <SettingsRow
+                        control={
+                            <Switch
+                                checked={showTimestamps}
+                                id="show-timestamps"
+                                onCheckedChange={(checked) => {
+                                    setShowTimestamps(checked);
+                                    toast.success(checked ? t`Timestamps enabled` : t`Timestamps disabled`);
+                                }}
+                            />
+                        }
+                        description={t`Display timestamps on messages.`}
+                        htmlFor="show-timestamps"
+                        title={t`Show Timestamps`}
+                    />
+                    <SettingsRow
+                        control={
+                            <Switch
+                                checked={soundEffects}
+                                id="sound-effects"
+                                onCheckedChange={(checked) => {
+                                    setSoundEffects(checked);
+                                    toast.success(checked ? t`Sound effects enabled` : t`Sound effects disabled`);
+                                }}
+                            />
+                        }
+                        description={t`Play a short sound when a reply finishes. Applies to this browser only.`}
+                        htmlFor="sound-effects"
+                        title={t`Sound Effects`}
+                    />
+                    <SettingsRow
+                        control={
+                            <Switch
+                                aria-describedby="split-view-description"
+                                checked={splitViewEnabled}
+                                id="split-view"
+                                onCheckedChange={(checked) => {
+                                    setSplitViewEnabled(checked);
+                                    toast.success(checked ? t`Split view enabled` : t`Split view disabled`);
+                                }}
+                            />
+                        }
+                        description={t`Open up to three chats side by side. Applies to this browser only.`}
+                        descriptionId="split-view-description"
+                        htmlFor="split-view"
+                        title={t`Split View`}
+                    />
                 </CardContent>
             </SettingsCard>
 

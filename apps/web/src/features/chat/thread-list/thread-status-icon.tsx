@@ -22,8 +22,8 @@ const NEEDS_YOU_BLINK = {
     question: '[[data-status-tick="0"]_&]:opacity-45',
 } as const;
 
-/** Amber that holds 3:1 (icon) and 4.5:1 (text) on the light and the dark sidebar surfaces. */
-export const NEEDS_YOU_TEXT_CLASS = "text-amber-800 dark:text-amber-400";
+/** The attention token: it holds 3:1 (icon) and 4.5:1 (text) on the sidebar canvas and on the card surfaces in both modes. */
+export const NEEDS_YOU_TEXT_CLASS = "text-attention";
 
 const RunningDots: FC = () => {
     useStatusBeat(true);

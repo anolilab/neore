@@ -97,7 +97,7 @@ const AccountCell = ({ className, classNames, deviceSession, deviceSessions, ref
     const isCurrentSession = deviceSession.session.id === sessionData?.session.id;
 
     return (
-        <Card className={cn("flex-row p-4", className, classNames?.cell)}>
+        <Card className={cn("surface-row-card rounded-none flex-row items-center gap-3 px-0 py-3", className, classNames?.cell)}>
             <UserView user={deviceSession.user} />
 
             <DropdownMenu>

@@ -8,7 +8,7 @@ import { ToggleGroup, ToggleGroupItem } from "@ui/components/toggle-group";
 import cn from "@ui/utils/cn";
 import type { Node, NodeProps } from "@xyflow/react";
 import { Type } from "lucide-react";
-import { memo, useMemo, useRef } from "react";
+import { memo, useId, useMemo, useRef } from "react";
 
 import { useWorkflowStore } from "../../stores/workflow-store";
 import type { TextNodeData } from "../../types";
@@ -30,6 +30,7 @@ const MODE_ITEMS = {
 };
 
 const TextNodeComponent = (props: NodeProps<Node<TextNodeData>>) => {
+    const selectId = useId();
     const { data, id } = props;
     const updateNode = useWorkflowStore((state) => state.updateNode);
     const config = NODE_CONFIGS.text;
@@ -124,11 +125,11 @@ const TextNodeComponent = (props: NodeProps<Node<TextNodeData>>) => {
         <BaseNode {...props} color={config.color} icon={<Type className="size-4" />} inputs={config.handles.inputs} outputs={config.handles.outputs}>
             <div className="space-y-3">
                 <div className="space-y-1.5">
-                    <Label className="text-muted-foreground text-xs">
+                    <Label className="text-muted-foreground text-xs" htmlFor={selectId}>
                         <Trans>Mode</Trans>
                     </Label>
                     <Select items={MODE_ITEMS} onValueChange={handleModeChange} value={data.mode}>
-                        <SelectTrigger className="nodrag h-8 text-sm">
+                        <SelectTrigger className="nodrag h-8 text-sm" id={selectId}>
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>

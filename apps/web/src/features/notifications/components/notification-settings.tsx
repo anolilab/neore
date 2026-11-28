@@ -2,7 +2,6 @@
 
 import { useLingui } from "@lingui/react/macro";
 import { CardContent } from "@neore/ui/components/card";
-import { Label } from "@neore/ui/components/label";
 import { Switch } from "@neore/ui/components/switch";
 import { skipToken, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { FC } from "react";
@@ -10,6 +9,7 @@ import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import SettingsCard from "@/components/settings/settings-card";
+import SettingsRow from "@/components/settings/settings-row";
 import { useUserSettings } from "@/features/auth/hooks/use-user-settings";
 import { useCRPC } from "@/lib/lunora/crpc";
 
@@ -250,111 +250,99 @@ const NotificationSettings: FC = () => {
     return (
         <SettingsCard description={t`Choose how Neore tells you about finished work and things that need you.`} title={t`Notifications`}>
             <CardContent className="space-y-4">
-                <div className="flex items-center justify-between gap-4">
-                    <div className="space-y-0.5">
-                        <Label className="text-base font-medium" htmlFor="push-notifications">
-                            {t`Push notifications on this browser`}
-                        </Label>
-                        <p className="text-muted-foreground text-sm" id="push-notifications-hint">
-                            {pushHint}
-                        </p>
-                    </div>
-                    <Switch
-                        aria-describedby="push-notifications-hint"
-                        checked={pushAvailable && subscribed}
-                        disabled={!pushAvailable || busy}
-                        id="push-notifications"
-                        onCheckedChange={(checked) => {
-                            // `togglePush` reports its own failures.
-                            togglePush(checked).catch(() => {});
-                        }}
-                    />
-                </div>
-                <div className="flex items-center justify-between gap-4">
-                    <div className="space-y-0.5">
-                        <Label className="text-base font-medium" htmlFor="daily-brief">
-                            {t`Daily Brief`}
-                        </Label>
-                        <p className="text-muted-foreground text-sm" id="daily-brief-hint">
-                            {t`A short summary each morning of what finished, what is running and what needs you. It counts toward your daily usage.`}
-                        </p>
-                    </div>
-                    <Switch
-                        aria-describedby="daily-brief-hint"
-                        checked={dailyBrief.checked}
-                        disabled={dailyBrief.disabled}
-                        id="daily-brief"
-                        onCheckedChange={dailyBrief.onCheckedChange}
-                    />
-                </div>
-                <div className="flex items-center justify-between gap-4">
-                    <div className="space-y-0.5">
-                        <Label className="text-base font-medium" htmlFor="task-email">
-                            {t`Email when a task finishes`}
-                        </Label>
-                        <p className="text-muted-foreground text-sm" id="task-email-hint">
-                            {t`Get an email with a link to the result when a task or trigger run finishes with one.`}
-                        </p>
-                    </div>
-                    <Switch
-                        aria-describedby="task-email-hint"
-                        checked={taskEmail.checked}
-                        disabled={taskEmail.disabled}
-                        id="task-email"
-                        onCheckedChange={taskEmail.onCheckedChange}
-                    />
-                </div>
-                <div className="flex items-center justify-between gap-4">
-                    <div className="space-y-0.5">
-                        <Label className="text-base font-medium" htmlFor="chat-finished-toast">
-                            {t`Chat finished`}
-                        </Label>
-                        <p className="text-muted-foreground text-sm" id="chat-finished-toast-hint">
-                            {t`Show a message in the app when a chat reply finishes.`}
-                        </p>
-                    </div>
-                    <Switch
-                        aria-describedby="chat-finished-toast-hint"
-                        checked={chatToastsLoaded && chatFinishedToast.checked}
-                        disabled={chatFinishedToast.disabled || !chatToastsLoaded}
-                        id="chat-finished-toast"
-                        onCheckedChange={chatFinishedToast.onCheckedChange}
-                    />
-                </div>
-                <div className="flex items-center justify-between gap-4">
-                    <div className="space-y-0.5">
-                        <Label className="text-base font-medium" htmlFor="chat-failed-toast">
-                            {t`Chat failed`}
-                        </Label>
-                        <p className="text-muted-foreground text-sm" id="chat-failed-toast-hint">
-                            {t`Show a message in the app when a chat reply fails.`}
-                        </p>
-                    </div>
-                    <Switch
-                        aria-describedby="chat-failed-toast-hint"
-                        checked={chatToastsLoaded && chatFailedToast.checked}
-                        disabled={chatFailedToast.disabled || !chatToastsLoaded}
-                        id="chat-failed-toast"
-                        onCheckedChange={chatFailedToast.onCheckedChange}
-                    />
-                </div>
-                <div className="flex items-center justify-between gap-4">
-                    <div className="space-y-0.5">
-                        <Label className="text-base font-medium" htmlFor="chat-input-toast">
-                            {t`Chat needs your input or approval`}
-                        </Label>
-                        <p className="text-muted-foreground text-sm" id="chat-input-toast-hint">
-                            {t`Show a message in the app when a chat waits for your answer or your approval.`}
-                        </p>
-                    </div>
-                    <Switch
-                        aria-describedby="chat-input-toast-hint"
-                        checked={chatToastsLoaded && chatInputToast.checked}
-                        disabled={chatInputToast.disabled || !chatToastsLoaded}
-                        id="chat-input-toast"
-                        onCheckedChange={chatInputToast.onCheckedChange}
-                    />
-                </div>
+                <SettingsRow
+                    control={
+                        <Switch
+                            aria-describedby="push-notifications-hint"
+                            checked={pushAvailable && subscribed}
+                            disabled={!pushAvailable || busy}
+                            id="push-notifications"
+                            onCheckedChange={(checked) => {
+                                // `togglePush` reports its own failures.
+                                togglePush(checked).catch(() => {});
+                            }}
+                        />
+                    }
+                    description={pushHint}
+                    descriptionId="push-notifications-hint"
+                    htmlFor="push-notifications"
+                    title={t`Push notifications on this browser`}
+                />
+                <SettingsRow
+                    control={
+                        <Switch
+                            aria-describedby="daily-brief-hint"
+                            checked={dailyBrief.checked}
+                            disabled={dailyBrief.disabled}
+                            id="daily-brief"
+                            onCheckedChange={dailyBrief.onCheckedChange}
+                        />
+                    }
+                    description={t`A short summary each morning of what finished, what is running and what needs you. It counts toward your daily usage.`}
+                    descriptionId="daily-brief-hint"
+                    htmlFor="daily-brief"
+                    title={t`Daily Brief`}
+                />
+                <SettingsRow
+                    control={
+                        <Switch
+                            aria-describedby="task-email-hint"
+                            checked={taskEmail.checked}
+                            disabled={taskEmail.disabled}
+                            id="task-email"
+                            onCheckedChange={taskEmail.onCheckedChange}
+                        />
+                    }
+                    description={t`Get an email with a link to the result when a task or trigger run finishes with one.`}
+                    descriptionId="task-email-hint"
+                    htmlFor="task-email"
+                    title={t`Email when a task finishes`}
+                />
+                <SettingsRow
+                    control={
+                        <Switch
+                            aria-describedby="chat-finished-toast-hint"
+                            checked={chatToastsLoaded && chatFinishedToast.checked}
+                            disabled={chatFinishedToast.disabled || !chatToastsLoaded}
+                            id="chat-finished-toast"
+                            onCheckedChange={chatFinishedToast.onCheckedChange}
+                        />
+                    }
+                    description={t`Show a message in the app when a chat reply finishes.`}
+                    descriptionId="chat-finished-toast-hint"
+                    htmlFor="chat-finished-toast"
+                    title={t`Chat finished`}
+                />
+                <SettingsRow
+                    control={
+                        <Switch
+                            aria-describedby="chat-failed-toast-hint"
+                            checked={chatToastsLoaded && chatFailedToast.checked}
+                            disabled={chatFailedToast.disabled || !chatToastsLoaded}
+                            id="chat-failed-toast"
+                            onCheckedChange={chatFailedToast.onCheckedChange}
+                        />
+                    }
+                    description={t`Show a message in the app when a chat reply fails.`}
+                    descriptionId="chat-failed-toast-hint"
+                    htmlFor="chat-failed-toast"
+                    title={t`Chat failed`}
+                />
+                <SettingsRow
+                    control={
+                        <Switch
+                            aria-describedby="chat-input-toast-hint"
+                            checked={chatToastsLoaded && chatInputToast.checked}
+                            disabled={chatInputToast.disabled || !chatToastsLoaded}
+                            id="chat-input-toast"
+                            onCheckedChange={chatInputToast.onCheckedChange}
+                        />
+                    }
+                    description={t`Show a message in the app when a chat waits for your answer or your approval.`}
+                    descriptionId="chat-input-toast-hint"
+                    htmlFor="chat-input-toast"
+                    title={t`Chat needs your input or approval`}
+                />
             </CardContent>
         </SettingsCard>
     );

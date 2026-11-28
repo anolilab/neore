@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@ui/components/select";
 import { Textarea } from "@ui/components/textarea";
 import { Globe, Lock, X } from "lucide-react";
-import { memo, useCallback, useState } from "react";
+import { memo, useCallback, useId, useState } from "react";
 
 import type { GalleryCategory } from "../../hooks/use-gallery";
 import { usePublishWorkflow, useUnpublishWorkflow, useUpdateGalleryMeta } from "../../hooks/use-gallery";
@@ -44,6 +44,7 @@ const PublishDialogComponent = ({
 }: PublishDialogProps) => {
     const { i18n, t } = useLingui();
     const [open, setOpen] = useState(false);
+    const categoryId = useId();
     const [category, setCategory] = useState<GalleryCategory>(currentCategory ?? "image");
     const [tags, setTags] = useState<string[]>(currentTags);
     const [tagInput, setTagInput] = useState("");
@@ -170,8 +171,8 @@ const PublishDialogComponent = ({
                     </DialogDescription>
                 </DialogHeader>
 
-                <div className="space-y-4 py-2">
-                    <div className="space-y-2">
+                <div className="border-border/50 divide-border/50 divide-y rounded-xl border">
+                    <div className="space-y-2 p-3">
                         <Label>
                             <Trans>Description</Trans>
                         </Label>
@@ -184,8 +185,8 @@ const PublishDialogComponent = ({
                         />
                     </div>
 
-                    <div className="space-y-2">
-                        <Label>
+                    <div className="space-y-2 p-3">
+                        <Label htmlFor={categoryId}>
                             <Trans>Category</Trans>
                         </Label>
                         <Select
@@ -195,7 +196,7 @@ const PublishDialogComponent = ({
                             onValueChange={(v) => setCategory(v as GalleryCategory)}
                             value={category}
                         >
-                            <SelectTrigger>
+                            <SelectTrigger id={categoryId}>
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -208,7 +209,7 @@ const PublishDialogComponent = ({
                         </Select>
                     </div>
 
-                    <div className="space-y-2">
+                    <div className="space-y-2 p-3">
                         <Label htmlFor="publish-tag-input">
                             <Trans>Tags (up to 10)</Trans>
                         </Label>

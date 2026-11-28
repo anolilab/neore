@@ -41,7 +41,7 @@ const runOnMiddleClick = (event: MouseEvent, action: () => void): void => {
 
 const EmptyPane: FC = () => (
     <div className="flex flex-1 flex-col items-center justify-center gap-1 p-6 text-center">
-        <h2 className="text-lg font-semibold">
+        <h2 className="text-[15px] font-semibold">
             <Trans>Pick a host or a pull request</Trans>
         </h2>
         <p className="text-muted-foreground text-sm">
@@ -69,7 +69,7 @@ const PaneView: FC<PaneViewProps> = ({ canClose, canSplit, hosts, index, loaded,
         return (
             <section aria-label={t`Pane ${index + 1}`} className="flex h-full min-w-0 flex-col" onFocusCapture={focus} onPointerDownCapture={focus}>
                 {canClose && (
-                    <div className="border-border flex justify-end border-b p-1">
+                    <div className="border-border/50 flex justify-end border-b p-1">
                         <Button aria-label={t`Close pane`} onClick={() => dispatch({ paneIndex: index, type: "closePane" })} size="icon-sm" variant="ghost">
                             <XIcon aria-hidden="true" />
                         </Button>
@@ -98,7 +98,7 @@ const PaneView: FC<PaneViewProps> = ({ canClose, canSplit, hosts, index, loaded,
                 onValueChange={(value) => typeof value === "string" && dispatch({ paneIndex: index, tabId: value, type: "activate" })}
                 value={pane.active ?? null}
             >
-                <div className="border-border flex items-center border-b">
+                <div className="border-border/50 flex items-center border-b">
                     <TabsList aria-label={t`Open tabs`} className="min-w-0 flex-1 justify-start overflow-x-auto rounded-none bg-transparent p-0" variant="line">
                         {pane.tabs.map((tabId) => (
                             <div

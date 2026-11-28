@@ -47,15 +47,16 @@ const MemberCell = ({ className, classNames, hideActions, member }: MemberCellPr
 
     return (
         <>
-            <Card className={cn("flex-row items-center p-4", className, classNames?.cell)}>
+            <Card className={cn("surface-row-card rounded-none flex-row items-center gap-3 px-0 py-3", className, classNames?.cell)}>
                 <UserView className="flex-1" user={member.user} />
-                <span className="text-sm opacity-70">{role?.label}</span>
+                <span className="text-muted-foreground text-xs">{role?.label}</span>
 
                 {(member.role !== "owner" || myRole === "owner") && !hideActions && (
                     <DropdownMenu>
                         <DropdownMenuTrigger
                             render={
                                 <Button
+                                    aria-label={t`More actions`}
                                     className={cn("relative ms-auto", classNames?.button, classNames?.outlineButton)}
                                     size="icon"
                                     type="button"

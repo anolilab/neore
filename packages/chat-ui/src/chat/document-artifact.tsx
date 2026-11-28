@@ -81,9 +81,9 @@ const DocumentArtifact: FC<DocumentArtifactProps> = memo(
         return (
             <button
                 className={cn(
-                    "group my-2 flex w-full max-w-sm flex-col rounded-lg border text-left transition-colors",
-                    "hover:bg-accent hover:border-accent-foreground/20",
-                    isActive && "border-primary/50 bg-primary/5",
+                    "surface-edge bg-surface-panel group my-2 flex w-full max-w-sm flex-col rounded-xl text-left transition-colors",
+                    "hover:bg-surface-row-hover",
+                    isActive && "bg-surface-row-active bg-(image:--surface-glow)",
                     className,
                 )}
                 onClick={handleClick}
@@ -93,7 +93,7 @@ const DocumentArtifact: FC<DocumentArtifactProps> = memo(
             >
                 {/* Header row */}
                 <div className="flex items-center gap-3 p-3">
-                    <div className="bg-muted flex size-10 shrink-0 items-center justify-center rounded-md">
+                    <div className="surface-well flex size-10 shrink-0 items-center justify-center rounded-lg">
                         <Icon aria-hidden="true" className="text-muted-foreground size-5" />
                     </div>
                     <div className="min-w-0 flex-1">

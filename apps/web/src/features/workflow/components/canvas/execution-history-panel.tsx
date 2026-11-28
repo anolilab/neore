@@ -112,10 +112,10 @@ const ExecutionRow = ({ execution }: { execution: ExecutionRecord }) => {
     const config = getStatusConfig(execution.status);
 
     return (
-        <div className="border-b last:border-b-0">
+        <div className="border-border/50 border-b last:border-b-0">
             <button
                 aria-expanded={expanded}
-                className="hover:bg-muted/50 flex w-full items-center gap-2 px-3 py-2.5 text-left transition-colors"
+                className="hover:bg-surface-row-hover flex w-full items-center gap-2 px-3 py-2.5 text-left transition-colors"
                 onClick={() => setExpanded((v) => !v)}
                 type="button"
             >
@@ -133,22 +133,22 @@ const ExecutionRow = ({ execution }: { execution: ExecutionRecord }) => {
             </button>
 
             {expanded && (
-                <div className="bg-muted/30 border-t px-3 py-2">
+                <div className="border-border/50 border-t px-3 py-2">
                     {execution.error && (
-                        <div className="text-destructive mb-2 rounded bg-red-500/10 p-2 text-[11px]" role="alert">
+                        <div className="text-destructive mb-2 rounded-lg bg-red-500/10 p-2 text-xs" role="alert">
                             {execution.error}
                         </div>
                     )}
                     {Array.isArray(nodeExecutions) && nodeExecutions.length > 0 && (
                         <div className="space-y-1">
-                            <p className="text-muted-foreground mb-1.5 text-[10px] font-medium tracking-wide uppercase">
+                            <p className="text-muted-foreground mb-1.5 font-mono text-xs">
                                 <Trans>Node Results</Trans>
                             </p>
                             {(nodeExecutions as NodeExecutionRecord[]).map((ne) => {
                                 const nodeConfig = getStatusConfig(ne.status);
 
                                 return (
-                                    <div className="flex items-center gap-2 rounded px-2 py-1 text-[11px]" key={ne._id}>
+                                    <div className="flex items-center gap-2 rounded-lg px-2 py-1 text-xs" key={ne._id}>
                                         <span className={nodeConfig.color}>{nodeConfig.icon}</span>
                                         <span className="min-w-0 flex-1 truncate font-medium">{ne.nodeId}</span>
                                         <span className="text-muted-foreground">{ne.nodeType}</span>
@@ -204,15 +204,15 @@ const ExecutionHistoryPanel = ({ onClose }: ExecutionHistoryPanelProps) => {
     return (
         <div
             aria-label={t`Execution history`}
-            className="bg-background/95 absolute top-4 right-4 z-10 flex h-[calc(100%-32px)] w-[320px] translate-x-[calc(-100%-8px)] flex-col rounded-lg border shadow-lg backdrop-blur-sm"
+            className="surface-raised absolute top-4 right-4 z-10 flex h-[calc(100%-32px)] w-[320px] translate-x-[calc(-100%-8px)] flex-col overflow-hidden rounded-xl"
             role="region"
         >
             {/* Header */}
-            <div className="flex items-center gap-2 border-b px-3 py-2.5">
+            <div className="border-border/50 flex items-center gap-2 border-b px-3 py-2.5">
                 <History aria-hidden="true" className="text-muted-foreground size-4" />
-                <h3 className="flex-1 text-sm font-medium">
+                <h2 className="flex-1 text-sm font-medium">
                     <Trans>Run History</Trans>
-                </h3>
+                </h2>
                 <span className="text-muted-foreground text-xs">
                     <Plural one="# run" other="# runs" value={executions.length} />
                 </span>
@@ -230,8 +230,10 @@ const ExecutionHistoryPanel = ({ onClose }: ExecutionHistoryPanelProps) => {
                     </div>
                 )}
                 {!isLoading && executions.length === 0 && (
-                    <div className="text-muted-foreground flex flex-col items-center gap-2 py-8 text-center text-sm">
-                        <History aria-hidden="true" className="size-8 opacity-40" />
+                    <div className="text-muted-foreground flex flex-col items-center gap-2 px-6 py-10 text-center text-sm">
+                        <div aria-hidden="true" className="surface-well mb-1 flex size-10 items-center justify-center rounded-xl">
+                            <History className="size-5" />
+                        </div>
                         <p>
                             <Trans>No executions yet</Trans>
                         </p>

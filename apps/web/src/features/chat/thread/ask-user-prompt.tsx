@@ -204,7 +204,7 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
     const unreadFiles = output?.answered ? (output.unreadFiles ?? []) : [];
 
     return (
-        <div aria-labelledby={headingId} className="bg-muted/40 mb-4 rounded-lg border p-3 outline-none" ref={groupRef} role="group" tabIndex={-1}>
+        <div aria-labelledby={headingId} className="surface-raised mb-4 rounded-xl p-3 outline-none" ref={groupRef} role="group" tabIndex={-1}>
             <div className="flex items-start gap-2">
                 <MessageCircleQuestion aria-hidden="true" className="text-primary-text mt-0.5 size-4 shrink-0" />
                 <div className="min-w-0 flex-1">
@@ -218,7 +218,7 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
             </div>
 
             {answerText !== undefined && (
-                <p className="bg-background mt-2 rounded-md border px-3 py-2 text-sm whitespace-pre-wrap">
+                <p className="surface-well mt-2 rounded-lg px-3 py-2 text-sm whitespace-pre-wrap">
                     <span className="sr-only">{t`Your answer:`} </span>
                     {answerText}
                 </p>
@@ -281,7 +281,7 @@ const AskUserPrompt: FC<{ part: ToolPart }> = ({ part }) => {
                     {files.length > 0 && (
                         <ul aria-label={t`Attached files`} className="flex flex-wrap gap-2">
                             {files.map((file) => (
-                                <li className="bg-background flex items-center gap-1 rounded-md border px-2 py-1 text-xs" key={file.fileId}>
+                                <li className="surface-well flex items-center gap-1 rounded-lg px-2 py-1 text-xs" key={file.fileId}>
                                     <span className="max-w-40 truncate">{file.name}</span>
                                     <button
                                         aria-label={t`Remove ${file.name}`}

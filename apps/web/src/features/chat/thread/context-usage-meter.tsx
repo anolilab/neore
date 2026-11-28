@@ -106,7 +106,7 @@ const ContextUsageMeter: FC<ContextUsageMeterProps> = ({ className, contextWindo
                             </svg>
                         </div>
                         {/* Token count text */}
-                        <span className="tabular-nums">
+                        <span className="tabular-nums @max-[36rem]/strip:hidden">
                             {formatTokenCount(usedTokens, i18n.locale)}/{formatTokenCount(contextWindow, i18n.locale)}
                         </span>
                     </button>

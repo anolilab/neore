@@ -285,13 +285,13 @@ const DesignPresetSelector: FC<DesignPresetSelectorProps> = ({ className, onSele
                     <div className="grid grid-cols-2 gap-3">
                         {TEMPLATES.map((template) => (
                             <button
-                                className="hover:border-primary flex flex-col gap-2 rounded-lg border p-3 text-left transition-colors"
+                                className="surface-raised hover:ring-primary/60 flex flex-col gap-2 rounded-xl p-3 text-left transition-colors hover:ring-1"
                                 key={template.id}
                                 onClick={() => onSelectTemplate(template.id)}
                                 type="button"
                             >
                                 <div
-                                    className="bg-muted/50 w-full rounded"
+                                    className="bg-surface-well w-full rounded"
                                     style={{
                                         aspectRatio: `${template.width}/${template.height}`,
                                         maxHeight: 100,

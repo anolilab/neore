@@ -23,7 +23,9 @@ export type PageLevel = { component?: RouteComponent; route?: AnyRoute } & ({ id
 interface StoryPageProps {
     /** Outermost first: the layout routes, then the page. */
     levels: ReadonlyArray<PageLevel>;
-    /** The URL the page opens on, e.g. `/dashboard/settings/chat/model-filters`. */
+    /** Mounted next to the page, as `routes/__root.tsx` mounts its overlays (the settings modal). */
+    overlay?: RouteComponent;
+    /** The URL the page opens on, e.g. `/chat?settings=true&settingsTab=chat-usage`. */
     url: string;
 }
 
@@ -56,7 +58,7 @@ const PageRoot = () => (
  * auth state), so their loaders run against the MSW fixtures too. `beforeLoad` is left out: the
  * guards read the server session and redirect, and a story names the page it wants.
  */
-export const StoryPage = ({ levels, url }: StoryPageProps) => {
+export const StoryPage = ({ levels, overlay: Overlay, url }: StoryPageProps) => {
     const queryClient = useQueryClient();
     const lunoraClient = useLunora();
     const { i18n } = useLingui();
@@ -65,7 +67,16 @@ export const StoryPage = ({ levels, url }: StoryPageProps) => {
         const isAuthenticated = sessionFor(getActivePersona()) !== null;
         // The banner as `routes/__root.tsx` mounts it, above every layout. Pages only: its status region would be one more
         // `role="status"` in every component story.
-        const rootRoute = createRootRouteWithContext<Record<string, unknown>>()({ component: PageRoot });
+        const rootRoute = createRootRouteWithContext<Record<string, unknown>>()({
+            component: Overlay
+                ? () => (
+                      <>
+                          <PageRoot />
+                          <Overlay />
+                      </>
+                  )
+                : PageRoot,
+        });
         let parent: AnyRoute = rootRoute;
         const chain: AnyRoute[] = [];
 
@@ -96,7 +107,7 @@ export const StoryPage = ({ levels, url }: StoryPageProps) => {
             history: createMemoryHistory({ initialEntries: [url] }),
             routeTree: first ? rootRoute.addChildren([first]) : rootRoute,
         });
-    }, [i18n, levels, lunoraClient, queryClient, url]);
+    }, [i18n, levels, lunoraClient, Overlay, queryClient, url]);
 
     return <RouterProvider router={router} />;
 };

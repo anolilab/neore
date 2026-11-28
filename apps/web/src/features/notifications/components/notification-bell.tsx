@@ -79,8 +79,8 @@ const NotificationBell: FC<{ className?: string }> = ({ className }) => {
                         <button
                             aria-label={label}
                             className={cn(
-                                "group text-brand-black dark:text-brand-white hover:bg-sidebar-accent/50 relative flex size-10 items-center justify-center rounded-md transition-colors duration-150",
-                                open && "bg-sidebar-accent text-sidebar-accent-foreground",
+                                "group text-muted-foreground hover:bg-surface-row-hover hover:text-foreground relative flex size-10 items-center justify-center rounded-[10px] transition-colors duration-150",
+                                open && "bg-surface-row-active surface-edge text-foreground",
                                 className,
                             )}
                             type="button"
@@ -98,7 +98,7 @@ const NotificationBell: FC<{ className?: string }> = ({ className }) => {
                     )}
                 </PopoverTrigger>
                 <PopoverContent align="end" className="w-[22rem] p-0" side="right" sideOffset={8}>
-                    <div className="flex items-center justify-between gap-2 border-b px-3 py-2">
+                    <div className="border-border/50 flex items-center justify-between gap-2 border-b px-3 py-2">
                         <PopoverTitle className="text-sm font-semibold">{t`Notifications`}</PopoverTitle>
                         <Button
                             disabled={unreadCount === 0 || markAllReadPending}
@@ -124,7 +124,7 @@ const NotificationBell: FC<{ className?: string }> = ({ className }) => {
                             }}
                         />
                     </ScrollArea>
-                    <div className="border-t px-3 py-2 text-right">
+                    <div className="border-border/50 border-t px-3 py-2 text-right">
                         <Link className="text-primary-text text-xs font-medium hover:underline" onClick={() => setOpen(false)} to="/dashboard">
                             {t`Open home`}
                         </Link>

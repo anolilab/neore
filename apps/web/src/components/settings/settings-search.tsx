@@ -136,16 +136,16 @@ export const SettingsSearchField: FC<
     };
 
     return (
-        <div className="px-2 pb-2">
+        <div className="px-3 pt-3 pb-4">
             <div className="relative">
-                <Search aria-hidden className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
+                <Search aria-hidden className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 z-10 size-4 -translate-y-1/2" />
                 <Input
                     aria-activedescendant={isExpanded ? activeOptionId : undefined}
                     aria-autocomplete="list"
                     aria-controls={isExpanded ? listboxId : undefined}
                     aria-expanded={isExpanded}
                     aria-label={t`Search settings`}
-                    className="pl-9"
+                    className="pr-9 pl-9"
                     onChange={(event) => setQuery(event.target.value)}
                     onKeyDown={handleKeyDown}
                     placeholder={t`Search settings...`}
@@ -154,6 +154,15 @@ export const SettingsSearchField: FC<
                     type="search"
                     value={query}
                 />
+                {/* "/" focuses the field from anywhere in the dialog (`settings-modal.tsx`). */}
+                {query === "" && (
+                    <kbd
+                        aria-hidden="true"
+                        className="text-muted-foreground surface-edge pointer-events-none absolute top-1/2 right-2.5 z-10 grid size-5 -translate-y-1/2 place-items-center rounded-md font-mono text-[11px]"
+                    >
+                        /
+                    </kbd>
+                )}
             </div>
             <span aria-label={t`Search results`} aria-live="polite" className="sr-only" role="status">
                 {status}

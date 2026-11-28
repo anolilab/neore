@@ -4,7 +4,6 @@ import { useLingui } from "@lingui/react/macro";
 import type { GatewayModel } from "@neore/ai/models";
 import { ProviderIcon } from "@neore/ui/components/ai-elements/provider-icon";
 import { Button } from "@neore/ui/components/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@neore/ui/components/card";
 import { Input } from "@neore/ui/components/input";
 import { Sortable, SortableContent, SortableItem, SortableItemHandle, SortableOverlay } from "@neore/ui/components/ui/sortable";
 import { GripVertical } from "lucide-react";
@@ -12,6 +11,7 @@ import type { FC } from "react";
 import { useMemo, useState } from "react";
 
 import { getModelLabel } from "@/components/model-picker/utilities";
+import SettingsCard from "@/components/settings/settings-card";
 import useFavoriteModels from "@/features/chat/core/hooks/use-favorite-models";
 import useModelNicknames from "@/features/chat/core/hooks/use-model-nicknames";
 import useCustomModels from "@/features/settings/hooks/use-custom-models";
@@ -19,6 +19,9 @@ import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
 
 // Matches `MAX_MODEL_NICKNAME_LENGTH` in `backend/lunora/auth/lib/model-nicknames.ts`.
 const NICKNAME_MAX_LENGTH = 60;
+
+/** A flat row of a list in a settings box: a hairline above all but the first. */
+const ROW_CLASS = "not-first:border-border/50 flex items-center gap-2 py-2 not-first:border-t";
 
 interface NicknameFieldProps {
     model: GatewayModel;
@@ -113,85 +116,75 @@ const FavoriteModelsSettings: FC = () => {
     const visibleIds = favorites.map((model) => model.id);
 
     return (
-        <Card>
-            <CardHeader className="pb-2">
-                <CardTitle className="text-muted-foreground text-[10px] font-semibold tracking-widest uppercase">{t`Favorite models`}</CardTitle>
-                <CardDescription className="text-muted-foreground mt-1 text-xs">
-                    {t`Order the models you starred in the model picker and give them your own names. A nickname shows in the picker, the composer and on replies.`}
-                </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-                {favorites.length === 0 ? (
-                    <p className="text-muted-foreground text-xs">{t`Star a model in the model picker and it shows up here.`}</p>
-                ) : (
-                    <Sortable
-                        onMove={({ activeIndex, overIndex }) => {
-                            const moved = visibleIds[activeIndex];
-                            const target = visibleIds[overIndex];
+        <SettingsCard
+            description={t`Order the models you starred in the model picker and give them your own names. A nickname shows in the picker, the composer and on replies.`}
+            title={t`Favorite models`}
+        >
+            {favorites.length === 0 ? (
+                <p className="text-muted-foreground py-3 text-sm">{t`Star a model in the model picker and it shows up here.`}</p>
+            ) : (
+                <Sortable
+                    onMove={({ activeIndex, overIndex }) => {
+                        const moved = visibleIds[activeIndex];
+                        const target = visibleIds[overIndex];
 
-                            if (moved && target) {
-                                reorderFavorites(moved, target);
-                            }
-                        }}
-                        value={visibleIds}
-                    >
-                        <SortableContent render={<ul className="space-y-1" />}>
-                            {favorites.map((model) => (
-                                <SortableItem
-                                    className="bg-background flex items-center gap-2 rounded-md border px-2 py-1.5"
-                                    key={model.id}
-                                    render={<li />}
-                                    value={model.id}
-                                >
-                                    <SortableItemHandle
-                                        render={
-                                            <Button
-                                                aria-label={t`Reorder ${getModelLabel(model, nicknames)}`}
-                                                className="size-8 shrink-0"
-                                                size="icon"
-                                                variant="ghost"
-                                            >
-                                                <GripVertical aria-hidden="true" />
-                                            </Button>
-                                        }
-                                    />
-                                    <ModelName model={model} nickname={nicknames[model.id]} />
-                                    <NicknameField model={model} nickname={nicknames[model.id]} onCommit={setNickname} />
-                                </SortableItem>
-                            ))}
-                        </SortableContent>
-                        <SortableOverlay>
-                            <div className="bg-primary/10 h-11 rounded-md" />
-                        </SortableOverlay>
-                    </Sortable>
-                )}
+                        if (moved && target) {
+                            reorderFavorites(moved, target);
+                        }
+                    }}
+                    value={visibleIds}
+                >
+                    <SortableContent render={<ul />}>
+                        {favorites.map((model) => (
+                            <SortableItem className={ROW_CLASS} key={model.id} render={<li />} value={model.id}>
+                                <SortableItemHandle
+                                    render={
+                                        <Button
+                                            aria-label={t`Reorder ${getModelLabel(model, nicknames)}`}
+                                            className="size-8 shrink-0"
+                                            size="icon"
+                                            variant="ghost"
+                                        >
+                                            <GripVertical aria-hidden="true" />
+                                        </Button>
+                                    }
+                                />
+                                <ModelName model={model} nickname={nicknames[model.id]} />
+                                <NicknameField model={model} nickname={nicknames[model.id]} onCommit={setNickname} />
+                            </SortableItem>
+                        ))}
+                    </SortableContent>
+                    <SortableOverlay>
+                        <div className="bg-primary/10 h-11 rounded-md" />
+                    </SortableOverlay>
+                </Sortable>
+            )}
 
-                {nicknamedOthers.length > 0 || retiredNicknames.length > 0 ? (
-                    <div className="space-y-1">
-                        <p className="text-muted-foreground text-xs font-medium">{t`Other models with a nickname`}</p>
-                        <ul className="space-y-1">
-                            {nicknamedOthers.map((model) => (
-                                <li className="bg-background flex items-center gap-2 rounded-md border px-2 py-1.5" key={model.id}>
-                                    <ModelName model={model} nickname={nicknames[model.id]} />
-                                    <NicknameField model={model} nickname={nicknames[model.id]} onCommit={setNickname} />
-                                </li>
-                            ))}
-                            {retiredNicknames.map(([id, nickname]) => (
-                                <li className="bg-background flex items-center gap-2 rounded-md border px-2 py-1.5" key={id}>
-                                    <div className="min-w-0 flex-1">
-                                        <p className="truncate text-sm font-medium">{nickname}</p>
-                                        <p className="text-muted-foreground truncate font-mono text-xs">{id}</p>
-                                    </div>
-                                    <Button aria-label={t`Remove nickname for ${id}`} onClick={() => setNickname(id, "")} size="sm" variant="ghost">
-                                        {t`Remove`}
-                                    </Button>
-                                </li>
-                            ))}
-                        </ul>
-                    </div>
-                ) : null}
-            </CardContent>
-        </Card>
+            {nicknamedOthers.length > 0 || retiredNicknames.length > 0 ? (
+                <div className="border-border/50 border-t py-3">
+                    <p className="text-muted-foreground text-xs font-medium">{t`Other models with a nickname`}</p>
+                    <ul>
+                        {nicknamedOthers.map((model) => (
+                            <li className={ROW_CLASS} key={model.id}>
+                                <ModelName model={model} nickname={nicknames[model.id]} />
+                                <NicknameField model={model} nickname={nicknames[model.id]} onCommit={setNickname} />
+                            </li>
+                        ))}
+                        {retiredNicknames.map(([id, nickname]) => (
+                            <li className={ROW_CLASS} key={id}>
+                                <div className="min-w-0 flex-1">
+                                    <p className="truncate text-sm font-medium">{nickname}</p>
+                                    <p className="text-muted-foreground truncate font-mono text-xs">{id}</p>
+                                </div>
+                                <Button aria-label={t`Remove nickname for ${id}`} onClick={() => setNickname(id, "")} size="sm" variant="ghost">
+                                    {t`Remove`}
+                                </Button>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            ) : null}
+        </SettingsCard>
     );
 };
 

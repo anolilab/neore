@@ -96,10 +96,14 @@ const ProviderCell = ({ account, className, classNames, linkDisabled = false, ot
     };
 
     return (
-        <Card className={cn("flex-row items-center gap-3 px-4 py-3", className, classNames?.cell)}>
-            {provider.icon && <provider.icon className={cn("size-4", classNames?.icon)} />}
+        <Card className={cn("surface-row-card rounded-none flex-row items-center gap-3 px-0 py-3", className, classNames?.cell)}>
+            {provider.icon && (
+                <span aria-hidden="true" className="surface-well grid size-[30px] shrink-0 place-items-center rounded-lg">
+                    <provider.icon className={cn("size-4", classNames?.icon)} />
+                </span>
+            )}
 
-            <span className="text-sm">{provider.name}</span>
+            <span className="text-sm font-medium">{provider.name}</span>
 
             <Button
                 className={cn("relative ms-auto", classNames?.button)}

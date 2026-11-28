@@ -28,7 +28,7 @@ export interface BaseNodeProps extends ReactFlowNodeProps<ReactFlowNode<Workflow
 const statusColors: Record<NodeExecutionStatus, string> = {
     completed: "border-green-500",
     failed: "border-red-500",
-    idle: "border-border",
+    idle: "border-border/50",
     pending: "border-yellow-500/50",
     running: "border-blue-500 animate-pulse",
     skipped: "border-gray-400",
@@ -169,9 +169,9 @@ const BaseNode = ({ children, color, data, footer, icon, id, inputs = 1, nodeTyp
 
             <Node
                 className={cn(
-                    "relative min-w-[280px] transition-all duration-200",
+                    "relative min-w-[280px] rounded-xl transition-all duration-200",
                     statusColors[nodeStatus],
-                    isSelected && "ring-primary ring-2 ring-offset-2",
+                    isSelected && "outline-primary outline-2 outline-offset-2",
                     isLockedByOther && "opacity-75",
                 )}
                 handles={{ source: false, target: false }}

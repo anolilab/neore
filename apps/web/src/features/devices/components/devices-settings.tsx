@@ -2,7 +2,6 @@ import { useLingui } from "@lingui/react/macro";
 import type { Id } from "@neore/backend/dataModel";
 import { Badge } from "@neore/ui/components/badge";
 import { Button } from "@neore/ui/components/button";
-import { CardContent } from "@neore/ui/components/card";
 import ConfirmDialog from "@neore/ui/components/confirm-dialog";
 import { Input } from "@neore/ui/components/input";
 import { Label } from "@neore/ui/components/label";
@@ -14,7 +13,9 @@ import { useEffect, useId, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import SettingsCard from "@/components/settings/settings-card";
+import SettingsRow from "@/components/settings/settings-row";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
+import { useModalState } from "@/features/layout/hooks/use-ui-state";
 import SetupChecklist from "@/features/onboarding/components/setup-checklist";
 import { useCRPC } from "@/lib/lunora/crpc";
 import type { NativeDevicePlatform, NativeDeviceStatus, NativeHostReconnect, NativeHostSpec } from "@/lib/native/bridge";
@@ -85,6 +86,7 @@ export const StartAgents: FC<{ device: DeviceView; online: boolean }> = ({ devic
     const { t } = useLingui();
     const crpc = useCRPC();
     const navigate = useNavigate();
+    const { close: closeSettings } = useModalState("settings");
     const baseId = useId();
     const start = useMutation(crpc.acp.remote.startHostSession.mutationOptions());
     const offers = device.acpOffers ?? [];
@@ -161,9 +163,13 @@ export const StartAgents: FC<{ device: DeviceView; online: boolean }> = ({ devic
                                     {
                                         onError: (error) => toast.error(error.message),
                                         onSuccess: (result) => {
-                                            if (result.threadId !== undefined) {
-                                                void navigate({ params: { threadId: result.threadId }, to: "/chat/$threadId" });
+                                            if (result.threadId === undefined) {
+                                                return;
                                             }
+
+                                            // Shown in the settings modal, which would otherwise stay over the new chat.
+                                            closeSettings();
+                                            void navigate({ params: { threadId: result.threadId }, to: "/chat/$threadId" });
                                         },
                                     },
                                 );
@@ -329,72 +335,75 @@ export const DeviceRow: FC<{
     };
 
     return (
-        <li className="flex flex-wrap items-center gap-3 border-b py-3 last:border-b-0">
-            <div className="min-w-0 flex-1 space-y-1">
-                <Label className="sr-only" htmlFor={nameId}>{t`Device name`}</Label>
-                <Input
-                    className="max-w-xs"
-                    id={nameId}
-                    maxLength={80}
-                    onBlur={() => {
-                        const next = name.trim();
+        <li className="border-border/50 @container/device-row flex flex-col gap-3 py-3 not-first:border-t">
+            {/* The row decides from its own width: the actions drop under the name and the tool list until there is room beside them. */}
+            <div className="flex flex-col gap-3 @3xl/device-row:grid @3xl/device-row:grid-cols-[minmax(0,1fr)_auto] @3xl/device-row:items-center @3xl/device-row:gap-8">
+                <div className="min-w-0 space-y-1">
+                    <Label className="sr-only" htmlFor={nameId}>{t`Device name`}</Label>
+                    <Input
+                        className="max-w-xs"
+                        id={nameId}
+                        maxLength={80}
+                        onBlur={() => {
+                            const next = name.trim();
 
-                        if (next && next !== device.name) {
-                            rename.mutate(
-                                { deviceId: device._id as Id<"devices">, name: next },
-                                { onError: () => toast.error(t`Could not rename the device.`) },
-                            );
-                        }
-                    }}
-                    onChange={(event) => setName(event.target.value)}
-                    value={name}
-                />
-                <p className="text-muted-foreground text-xs">
-                    {device.toolNames.length > 0 ? t`${device.toolNames.length} tools: ${device.toolNames.join(", ")}` : t`No tools shared yet`}
-                </p>
-                {/* A server over SSH runs the host software, not the desktop app, so it has no app version to report. */}
-                {device.transport !== "ssh" && (
-                    <p className="text-muted-foreground text-xs text-pretty tabular-nums">
-                        {device.appVersion === undefined ? t`Neore version not reported` : t`Neore ${device.appVersion}`}
+                            if (next && next !== device.name) {
+                                rename.mutate(
+                                    { deviceId: device._id as Id<"devices">, name: next },
+                                    { onError: () => toast.error(t`Could not rename the device.`) },
+                                );
+                            }
+                        }}
+                        onChange={(event) => setName(event.target.value)}
+                        value={name}
+                    />
+                    <p className="text-muted-foreground text-xs break-words">
+                        {device.toolNames.length > 0 ? t`${device.toolNames.length} tools: ${device.toolNames.join(", ")}` : t`No tools shared yet`}
                     </p>
-                )}
-                {/* Always in the accessibility tree, so the first failure is announced too. `ph-no-capture`: ssh text can carry anything. */}
-                <p className="ph-no-capture text-destructive text-xs" id={errorId} role="status">
-                    {failure === undefined ? null : failureText(failure)}
-                </p>
-                {device.updateRequired === true && (
-                    <p className="text-destructive text-xs" id={updateNoticeId(device._id)} role="status">
-                        {t`Neore on this computer is out of date, so the agent cannot use it. Update the app there to turn it back on.`}
+                    {/* A server over SSH runs the host software, not the desktop app, so it has no app version to report. */}
+                    {device.transport !== "ssh" && (
+                        <p className="text-muted-foreground text-xs text-pretty tabular-nums">
+                            {device.appVersion === undefined ? t`Neore version not reported` : t`Neore ${device.appVersion}`}
+                        </p>
+                    )}
+                    {/* Always in the accessibility tree, so the first failure is announced too. `ph-no-capture`: ssh text can carry anything. */}
+                    <p className="ph-no-capture text-destructive text-xs" id={errorId} role="status">
+                        {failure === undefined ? null : failureText(failure)}
                     </p>
-                )}
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-                {isThisComputer && <Badge variant="outline">{t`This computer`}</Badge>}
-                {device.transport === "ssh" && <Badge variant="outline">{t`Server over SSH`}</Badge>}
-                <Badge variant={online ? "default" : "secondary"}>{online ? t`Online` : t`Offline`}</Badge>
-                {reconnect?.phase === "gaveUp" && <Badge variant="destructive">{t`Connection lost`}</Badge>}
-                {(reconnect?.phase === "waiting" || reconnect?.phase === "connecting") && <Badge variant="secondary">{t`Reconnecting`}</Badge>}
-                {connected !== undefined && (
-                    <Button
-                        aria-describedby={failure === undefined ? undefined : errorId}
-                        onClick={() => connection(() => (stoppable ? disconnectNativeHost(device._id) : connectNativeHost(device._id)))}
-                        size="sm"
-                        variant="outline"
-                    >
-                        {buttonLabel}
+                    {device.updateRequired === true && (
+                        <p className="text-destructive text-xs" id={updateNoticeId(device._id)} role="status">
+                            {t`Neore on this computer is out of date, so the agent cannot use it. Update the app there to turn it back on.`}
+                        </p>
+                    )}
+                </div>
+                <div className="flex min-w-0 flex-wrap items-center gap-2 @3xl/device-row:justify-end">
+                    {isThisComputer && <Badge variant="outline">{t`This computer`}</Badge>}
+                    {device.transport === "ssh" && <Badge variant="outline">{t`Server over SSH`}</Badge>}
+                    <Badge variant={online ? "default" : "secondary"}>{online ? t`Online` : t`Offline`}</Badge>
+                    {reconnect?.phase === "gaveUp" && <Badge variant="destructive">{t`Connection lost`}</Badge>}
+                    {(reconnect?.phase === "waiting" || reconnect?.phase === "connecting") && <Badge variant="secondary">{t`Reconnecting`}</Badge>}
+                    {connected !== undefined && (
+                        <Button
+                            aria-describedby={failure === undefined ? undefined : errorId}
+                            onClick={() => connection(() => (stoppable ? disconnectNativeHost(device._id) : connectNativeHost(device._id)))}
+                            size="sm"
+                            variant="outline"
+                        >
+                            {buttonLabel}
+                        </Button>
+                    )}
+                    {reconnect?.phase === "gaveUp" && (
+                        <Button onClick={() => connection(() => disconnectNativeHost(device._id))} size="sm" variant="outline">
+                            {t`Dismiss`}
+                        </Button>
+                    )}
+                    <Button aria-label={t`Copy diagnostics for ${device.name}`} onClick={copyDiagnostics} size="sm" variant="outline">
+                        {t`Copy diagnostics`}
                     </Button>
-                )}
-                {reconnect?.phase === "gaveUp" && (
-                    <Button onClick={() => connection(() => disconnectNativeHost(device._id))} size="sm" variant="outline">
-                        {t`Dismiss`}
+                    <Button onClick={() => setConfirming(true)} size="sm" variant="outline">
+                        {t`Remove`}
                     </Button>
-                )}
-                <Button aria-label={t`Copy diagnostics for ${device.name}`} onClick={copyDiagnostics} size="sm" variant="outline">
-                    {t`Copy diagnostics`}
-                </Button>
-                <Button onClick={() => setConfirming(true)} size="sm" variant="outline">
-                    {t`Remove`}
-                </Button>
+                </div>
             </div>
             <StartAgents device={device} online={online} />
             <DeviceScope deviceId={device._id} projectIds={device.projectIds} />
@@ -437,7 +446,7 @@ const DeviceActivity: FC = () => {
     const { data: calls } = useQuery(crpc.devices.functions.listDeviceCalls.queryOptions({ limit: 30 }));
 
     if (!calls || calls.length === 0) {
-        return <p className="text-muted-foreground text-sm">{t`Nothing has run on a device yet.`}</p>;
+        return <p className="text-muted-foreground py-3 text-sm">{t`Nothing has run on a device yet.`}</p>;
     }
 
     const statusLabel: Record<string, string> = {
@@ -450,9 +459,9 @@ const DeviceActivity: FC = () => {
     };
 
     return (
-        <ul className="space-y-2">
+        <ul>
             {calls.map((call) => (
-                <li className="rounded-md border p-2 text-sm" key={call._id}>
+                <li className="border-border/50 py-3 text-sm not-first:border-t" key={call._id}>
                     <details>
                         <summary className="flex cursor-pointer flex-wrap items-center gap-2">
                             <span className="font-mono">{call.toolName}</span>
@@ -645,15 +654,12 @@ const DevicesSettings: FC = () => {
                 id="devices-pairing"
                 title={t`Devices`}
             >
-                <CardContent className="space-y-4">
-                    {native === undefined && (
-                        <p className="text-muted-foreground text-sm">{t`Open Neore in the desktop app to pair this computer. Devices you paired before are listed below.`}</p>
-                    )}
-                    {native !== undefined && pairedHere === undefined && (
-                        <div className="flex flex-wrap items-center gap-3">
-                            <p className="text-sm">
-                                {native.deviceId ? t`This computer is paired with another account.` : t`This computer is not paired yet.`}
-                            </p>
+                {native === undefined && (
+                    <SettingsRow title={t`Open Neore in the desktop app to pair this computer. Devices you paired before are listed below.`} />
+                )}
+                {native !== undefined && pairedHere === undefined && (
+                    <SettingsRow
+                        control={
                             <Button
                                 aria-busy={pairing}
                                 disabled={pairing || session?.user?.isAnonymous === true}
@@ -661,43 +667,48 @@ const DevicesSettings: FC = () => {
                                     // `pairThisComputer` reports its own failures.
                                     pairThisComputer().catch(() => {});
                                 }}
+                                size="sm"
                             >
                                 {t`Use this computer for agent tools`}
                             </Button>
-                        </div>
-                    )}
-                    {pairedHere !== undefined && (
-                        <div className="flex flex-wrap items-center gap-3">
-                            <p className="text-sm">{t`This computer is paired as “${pairedHere.name}”.`}</p>
+                        }
+                        title={native.deviceId ? t`This computer is paired with another account.` : t`This computer is not paired yet.`}
+                    />
+                )}
+                {pairedHere !== undefined && (
+                    <SettingsRow
+                        control={
                             <Button
                                 onClick={() => {
                                     openNativeDeviceSettings().catch(() => {});
                                 }}
+                                size="sm"
                                 variant="outline"
                             >
                                 {t`Shared folders and local servers…`}
                             </Button>
-                        </div>
-                    )}
-                    {devices && devices.length > 0 ? (
-                        <ul aria-label={t`Paired devices`}>
-                            {devices.map((device) => (
-                                <DeviceRow
-                                    connected={native?.hosts?.find((host) => host.deviceId === device._id)?.connected}
-                                    device={device}
-                                    isThisComputer={device._id === native?.deviceId}
-                                    key={device._id}
-                                    now={now}
-                                    onConnectionChange={refreshNative}
-                                    reconnect={native?.hosts?.find((host) => host.deviceId === device._id)?.reconnect}
-                                    viaName={devices.find((other) => other._id === device.viaDeviceId)?.name}
-                                />
-                            ))}
-                        </ul>
-                    ) : (
-                        <p className="text-muted-foreground text-sm">{t`No devices paired.`}</p>
-                    )}
-                </CardContent>
+                        }
+                        title={t`This computer is paired as “${pairedHere.name}”.`}
+                    />
+                )}
+                {devices && devices.length > 0 ? (
+                    <ul aria-label={t`Paired devices`} className="border-border/50 border-t">
+                        {devices.map((device) => (
+                            <DeviceRow
+                                connected={native?.hosts?.find((host) => host.deviceId === device._id)?.connected}
+                                device={device}
+                                isThisComputer={device._id === native?.deviceId}
+                                key={device._id}
+                                now={now}
+                                onConnectionChange={refreshNative}
+                                reconnect={native?.hosts?.find((host) => host.deviceId === device._id)?.reconnect}
+                                viaName={devices.find((other) => other._id === device.viaDeviceId)?.name}
+                            />
+                        ))}
+                    </ul>
+                ) : (
+                    <p className="text-muted-foreground border-border/50 border-t py-3 text-sm">{t`No devices paired.`}</p>
+                )}
             </SettingsCard>
             {pairedHere !== undefined && native?.deviceId && (
                 <SettingsCard
@@ -705,15 +716,13 @@ const DevicesSettings: FC = () => {
                     id="devices-ssh"
                     title={t`Servers over SSH`}
                 >
-                    <CardContent>
+                    <div className="py-3">
                         <AddServer desktopId={native.deviceId} onAdded={refreshNative} />
-                    </CardContent>
+                    </div>
                 </SettingsCard>
             )}
             <SettingsCard description={t`What the agent asked your devices to do in the last 30 days.`} title={t`Device activity`}>
-                <CardContent>
-                    <DeviceActivity />
-                </CardContent>
+                <DeviceActivity />
             </SettingsCard>
         </div>
     );

@@ -3,23 +3,21 @@
 import { useLingui } from "@lingui/react/macro";
 import { Avatar, AvatarFallback, AvatarImage } from "@neore/ui/components/avatar";
 import { Button } from "@neore/ui/components/button";
-import { Card } from "@neore/ui/components/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@neore/ui/components/responsive-dropdown-menu";
-import cn from "@neore/ui/utils/cn";
 import { Trash2Icon, UploadCloudIcon } from "lucide-react";
-import type { ComponentProps } from "react";
 import { useRef, useState } from "react";
 
-import type { SettingsCardClassNames } from "@/components/settings/settings-card";
-import SettingsCardFooter from "@/components/settings/settings-card-footer";
-import SettingsCardHeader from "@/components/settings/settings-card-header";
+import type { SettingsCardClassNames, SettingsCardProperties } from "@/components/settings/settings-card";
+import SettingsCard from "@/components/settings/settings-card";
+import SettingsRow from "@/components/settings/settings-row";
 import { useSession } from "@/features/auth/hooks/session-user-management";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 
 import { fileToBase64, resizeAndCropImage } from "../../../lib/image-utilities";
 import { getLocalizedError } from "../../../lib/utilities";
+import { hideCardHeader } from "../settings-field-row";
 
-export interface UpdateAvatarCardProperties extends ComponentProps<typeof Card> {
+export interface UpdateAvatarCardProperties extends SettingsCardProperties {
     className?: string;
     classNames?: SettingsCardClassNames;
 }
@@ -92,70 +90,65 @@ const UpdateAvatarCard = ({ className, classNames, ...properties }: UpdateAvatar
     const openFileDialog = () => fileInputReference.current?.click();
 
     return (
-        <Card className={cn("w-full pb-0 text-start", className, classNames?.base)} {...properties}>
-            <input
-                accept="image/*"
-                disabled={loading}
-                hidden
-                onChange={(e) => {
-                    const file = e.target.files?.item(0);
+        <SettingsCard className={className} classNames={hideCardHeader(classNames)} isPending={isPending} {...properties}>
+            <SettingsRow
+                control={
+                    <>
+                        <input
+                            accept="image/*"
+                            disabled={loading}
+                            hidden
+                            onChange={(e) => {
+                                const file = e.target.files?.item(0);
 
-                    if (file) {
-                        handleAvatarChange(file);
-                    }
+                                if (file) {
+                                    handleAvatarChange(file);
+                                }
 
-                    e.target.value = "";
-                }}
-                ref={fileInputReference}
-                type="file"
+                                e.target.value = "";
+                            }}
+                            ref={fileInputReference}
+                            type="file"
+                        />
+
+                        <DropdownMenu>
+                            <DropdownMenuTrigger
+                                render={
+                                    <Button className="size-fit rounded-full" size="icon" variant="ghost">
+                                        <Avatar className="size-20 text-2xl">
+                                            {sessionData?.user.image && <AvatarImage alt={sessionData?.user.name || t`User`} src={sessionData.user.image} />}
+                                            <AvatarFallback className="rounded-lg" name={sessionData?.user.name || sessionData?.user.email || undefined}>
+                                                {sessionData?.user.name?.charAt(0)?.toUpperCase() || "U"}
+                                            </AvatarFallback>
+                                        </Avatar>
+                                    </Button>
+                                }
+                            />
+
+                            <DropdownMenuContent align="end">
+                                <DropdownMenuItem disabled={loading} onClick={openFileDialog}>
+                                    <UploadCloudIcon />
+                                    {t`Upload Avatar`}
+                                </DropdownMenuItem>
+                                {sessionData?.user.image && (
+                                    <DropdownMenuItem disabled={loading} onClick={handleDeleteAvatar} variant="destructive">
+                                        <Trash2Icon />
+                                        {t`Delete Avatar`}
+                                    </DropdownMenuItem>
+                                )}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    </>
+                }
+                description={
+                    <>
+                        {t`Upload a profile picture for your account`}
+                        <span className="mt-1 block">{t`Click the avatar to upload a new image or delete the current one`}</span>
+                    </>
+                }
+                title={t`Avatar`}
             />
-
-            <div className="flex justify-between">
-                <SettingsCardHeader
-                    className="grow self-start"
-                    classNames={classNames}
-                    description={t`Upload a profile picture for your account`}
-                    isPending={isPending}
-                    title={t`Avatar`}
-                />
-
-                <DropdownMenu>
-                    <DropdownMenuTrigger
-                        render={
-                            <Button className="me-6 size-fit rounded-full" size="icon" variant="ghost">
-                                <Avatar className="size-20 text-2xl">
-                                    {sessionData?.user.image && <AvatarImage alt={sessionData?.user.name || t`User`} src={sessionData.user.image} />}
-                                    <AvatarFallback className="rounded-lg" name={sessionData?.user.name || sessionData?.user.email || undefined}>
-                                        {sessionData?.user.name?.charAt(0)?.toUpperCase() || "U"}
-                                    </AvatarFallback>
-                                </Avatar>
-                            </Button>
-                        }
-                    />
-
-                    <DropdownMenuContent align="end">
-                        <DropdownMenuItem disabled={loading} onClick={openFileDialog}>
-                            <UploadCloudIcon />
-                            {t`Upload Avatar`}
-                        </DropdownMenuItem>
-                        {sessionData?.user.image && (
-                            <DropdownMenuItem disabled={loading} onClick={handleDeleteAvatar} variant="destructive">
-                                <Trash2Icon />
-                                {t`Delete Avatar`}
-                            </DropdownMenuItem>
-                        )}
-                    </DropdownMenuContent>
-                </DropdownMenu>
-            </div>
-
-            <SettingsCardFooter
-                className="!py-5"
-                classNames={classNames}
-                instructions={t`Click the avatar to upload a new image or delete the current one`}
-                isPending={isPending}
-                isSubmitting={loading}
-            />
-        </Card>
+        </SettingsCard>
     );
 };
 

@@ -182,7 +182,7 @@ const DefaultUserMessage: FC<UserMessageRendererProps> = ({ actionBar, children,
             <Trans>Your message:</Trans>{" "}
         </span>
         {/* Attachments would go here */}
-        <MessageContentWrapper className="message-text col-start-2 row-start-2 rounded-3xl px-5 py-(--density-bubble-py) wrap-break-word">
+        <MessageContentWrapper className="message-text group-[.is-user]:bg-surface-panel group-[.is-user]:surface-raised col-start-2 row-start-2 rounded-3xl px-5 py-(--density-bubble-py) wrap-break-word group-[.is-user]:rounded-[14px] group-[.is-user]:px-3.5 group-[.is-user]:py-2.5">
             {children}
         </MessageContentWrapper>
         {!isPending && actionBar}
@@ -211,7 +211,8 @@ const DefaultAssistantMessage: FC<AssistantMessageRendererProps> = ({ actionBar,
             </span>
             <MessageContentWrapper
                 className={cn(
-                    "message-text col-span-2 col-start-2 row-start-1 text-[length:var(--assistant-body-size)] leading-(--assistant-body-leading) wrap-break-word",
+                    // Full width, not the content wrapper's fit-to-content: cards in a reply (tool approvals, tool calls) span the column.
+                    "message-text col-span-2 col-start-2 row-start-1 w-full text-[length:var(--assistant-body-size)] leading-(--assistant-body-leading) wrap-break-word",
                     hasRateLimitError ? "text-destructive dark:text-red-400" : "text-foreground dark:text-white",
                 )}
             >

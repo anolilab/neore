@@ -215,7 +215,7 @@ const SystemPromptOptimizerDialogBody: FC<SystemPromptOptimizerDialogBodyProps> 
                 )}
 
                 {seedState === "stale-edits" && (
-                    <div className="bg-muted/50 flex items-center gap-2 rounded-md border px-3 py-2 text-sm" role="status">
+                    <div className="surface-well flex items-center gap-2 rounded-lg px-3 py-2 text-sm" role="status">
                         <AlertCircle aria-hidden="true" className="h-4 w-4 shrink-0" />
                         <span className="flex-1">{t`This thread's system prompt changed while you were editing.`}</span>
                         <Button disabled={isOptimizing} onClick={loadNewPrompt} size="sm" type="button" variant="outline">
@@ -368,7 +368,7 @@ const SystemPromptOptimizerDialogBody: FC<SystemPromptOptimizerDialogBodyProps> 
                 )}
 
                 {saveAsPresetOpen && optimizedHistory.length > 0 && (
-                    <div className="bg-muted/50 space-y-2 rounded-md border p-3">
+                    <div className="surface-well space-y-2 rounded-lg p-3">
                         <Label className="text-xs" htmlFor="save-as-preset-name">
                             {t`Preset name`}
                         </Label>

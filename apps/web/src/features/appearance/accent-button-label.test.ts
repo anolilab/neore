@@ -61,7 +61,7 @@ const MACOS_ACCENTS = ["#007aff", "#953d96", "#f74f9e", "#e0383e", "#f7821b", "#
 /** `--background` and `--card` per mode, plain and high contrast: what a translucent hover blends with. */
 const SURFACES = {
     high: { dark: ["#000000"], light: ["#ffffff"] },
-    normal: { dark: ["#212121"], light: ["#f2f2f2", "#ffffff"] },
+    normal: { dark: ["#0e0f11", "#16181b"], light: ["#f2f2f2", "#ffffff"] },
 } as const;
 
 const RGB = /^rgba?\((?<r>[\d.]+), (?<g>[\d.]+), (?<b>[\d.]+)(?:, (?<alpha>[\d.]+))?\)$/u;

@@ -36,7 +36,7 @@ const AccountsCard = ({ className, classNames }: AccountsCardProperties) => {
             title={t`Accounts`}
         >
             {(deviceSessions?.length ?? 0) > 0 && (
-                <CardContent className={cn("grid gap-4", classNames?.content)}>
+                <CardContent className={cn("grid gap-1.5", classNames?.content)}>
                     {deviceSessions?.map((deviceSession) => (
                         <AccountCell
                             classNames={classNames}

@@ -102,9 +102,9 @@ const UsageCard: FC = () => {
 
     return (
         <HoverCard>
-            <HoverCardTrigger className="group relative flex cursor-help flex-col items-center overflow-hidden rounded-lg border">
+            <HoverCardTrigger className="group border-surface-edge relative flex cursor-help flex-col items-center overflow-hidden rounded-lg border">
                 <div className="z-1 flex w-10 flex-col items-center gap-2.5 rounded-xl px-1.5 py-3 transition-colors">
-                    <span className="text-brand-black dark:text-brand-white text-[11px] tracking-tight tabular-nums">{overallPercentage}%</span>
+                    <span className="text-foreground text-[11px] tracking-tight tabular-nums">{overallPercentage}%</span>
                     <div className="relative h-12 w-1.5 overflow-hidden rounded-full">
                         <div
                             className={clsx("absolute bottom-0 w-full rounded-full transition-all duration-700 ease-out", getOverallColor(overallPercentage))}
@@ -114,7 +114,7 @@ const UsageCard: FC = () => {
                             }}
                         />
                     </div>
-                    <span className="text-brand-black dark:text-brand-white text-[7px] leading-none font-medium tracking-widest uppercase">{t`Usage`}</span>
+                    <span className="text-foreground text-[7px] leading-none font-medium tracking-widest uppercase">{t`Usage`}</span>
                 </div>
                 <div
                     className={clsx(

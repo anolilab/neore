@@ -95,7 +95,7 @@ const UsersManagementCard = ({
 
     const usersBody =
         data?.page && data.page.length > 0 ? (
-            <div className="divide-y">
+            <div className="divide-border/50 divide-y py-0!">
                 {data.page.map((user) => (
                     <UserCell classNames={classNames} hideActions={hideActions} key={user._id} onUserUpdated={handleUserUpdated} user={user as UserData} />
                 ))}
@@ -126,7 +126,7 @@ const UsersManagementCard = ({
                     </div>
 
                     <Select items={roleItems} onValueChange={(v) => setRoleFilter(v as typeof roleFilter)} value={roleFilter}>
-                        <SelectTrigger className="w-full sm:w-[150px]">
+                        <SelectTrigger aria-label={t`Filter by role`} className="w-full sm:w-[150px]">
                             <SelectValue placeholder={t`Filter by role`} />
                         </SelectTrigger>
                         <SelectContent>
@@ -139,7 +139,7 @@ const UsersManagementCard = ({
                     </Select>
 
                     <Select items={userTypeItems} onValueChange={(v) => setUserTypeFilter(v as typeof userTypeFilter)} value={userTypeFilter}>
-                        <SelectTrigger className="w-full sm:w-[150px]">
+                        <SelectTrigger aria-label={t`Filter by type`} className="w-full sm:w-[150px]">
                             <SelectValue placeholder={t`Filter by type`} />
                         </SelectTrigger>
                         <SelectContent>

@@ -110,7 +110,12 @@ test.describe("Group chat (mock model)", () => {
 
         const dialog = page.getByRole("dialog", { name: "New group chat" });
 
-        await clickUntilVisible(page.getByRole("button", { name: "New group chat" }).first(), dialog);
+        // The sidebar's search filters menu holds New group chat.
+        const newGroupChat = page.getByRole("menuitem", { name: "New group chat" });
+
+        await clickUntilVisible(page.getByRole("button", { name: "Search filters" }).first(), newGroupChat);
+        await newGroupChat.click();
+        await expect(dialog).toBeVisible();
 
         await dialog.getByRole("checkbox", { name: new RegExp(first) }).click();
         await dialog.getByRole("checkbox", { name: new RegExp(second) }).click();

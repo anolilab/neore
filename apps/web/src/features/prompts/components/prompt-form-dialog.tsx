@@ -10,10 +10,8 @@ import { Label } from "@neore/ui/components/label";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogPanel, DialogTitle } from "@neore/ui/components/responsive-dialog";
 import { Textarea } from "@neore/ui/components/textarea";
 import { useQuery } from "@tanstack/react-query";
-import type { Tag } from "emblor";
-import { TagInput } from "emblor";
 import { ChevronDown } from "lucide-react";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 
 import { EFFORT_LABEL_MESSAGES, ReasoningEffortSelector } from "@/features/chat/model-settings/reasoning-effort-selector";
 import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
@@ -23,6 +21,8 @@ import validatePromptSettings from "../lib/prompt-validation";
 import type { PromptVariable } from "../lib/prompt-variables";
 import { syncVariablesWithContent } from "../lib/prompt-variables";
 import PromptModelSelector from "./prompt-model-selector";
+import type { PromptTag } from "./prompt-tags-field";
+import PromptTagsField from "./prompt-tags-field";
 import VariableDefinitions from "./variable-definitions";
 import VariableInsertion from "./variable-insertion";
 
@@ -58,7 +58,7 @@ interface FormValues {
     model?: string;
     name: string;
     reasoningEffort?: number;
-    tags: Tag[];
+    tags: PromptTag[];
     variables: PromptVariable[];
 }
 
@@ -87,7 +87,6 @@ type PromptFormDialogBodyProps = Omit<PromptFormDialogProps, "open">;
 const PromptFormDialogBody = ({ editingPrompt, onClose, onSubmit }: PromptFormDialogBodyProps) => {
     const { i18n, t } = useLingui();
     const models = useFeatureFlaggedModels();
-    const [activeTagIndex, setActiveTagIndex] = useState<number | null>(null);
     const [variablesOpen, setVariablesOpen] = useState(false);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -98,20 +97,6 @@ const PromptFormDialogBody = ({ editingPrompt, onClose, onSubmit }: PromptFormDi
         queryFn: () => getPromptTags({}),
         queryKey: ["prompts", "getPromptTags"],
     });
-
-    // Convert existing tags to Tag[] format for autocomplete
-    const autocompleteOptions: Tag[] = useMemo(() => {
-        if (!existingTags) {
-            return [];
-        }
-
-        return existingTags.map((tag) => {
-            return {
-                id: tag,
-                text: tag,
-            };
-        });
-    }, [existingTags]);
 
     const form = useAppForm({
         defaultValues: getDefaultValues(editingPrompt),
@@ -239,8 +224,8 @@ const PromptFormDialogBody = ({ editingPrompt, onClose, onSubmit }: PromptFormDi
                             {editingPrompt ? t`Update your prompt details below.` : t`Create a new prompt to use as a system prompt.`}
                         </DialogDescription>
                     </DialogHeader>
-                    <DialogPanel className="max-h-[60vh] min-h-0 flex-1 overflow-y-scroll">
-                        <div className="space-y-4">
+                    <DialogPanel className="divide-border/50 max-h-[60vh] min-h-0 flex-1 divide-y overflow-y-scroll *:py-3 *:first:pt-0 *:last:pb-0">
+                        <div className="divide-border/50 divide-y *:py-3 *:first:pt-0 *:last:pb-0">
                             <form.AppField name="name">
                                 {(field) => (
                                     <field.FormItem required>
@@ -284,28 +269,7 @@ const PromptFormDialogBody = ({ editingPrompt, onClose, onSubmit }: PromptFormDi
                                     <field.FormItem>
                                         <field.FormLabel>{t`Tags`}</field.FormLabel>
                                         <field.FormControl>
-                                            <TagInput
-                                                activeTagIndex={activeTagIndex}
-                                                addOnPaste
-                                                autocompleteOptions={autocompleteOptions}
-                                                enableAutocomplete
-                                                id="tags"
-                                                placeholder={t`Add a tag`}
-                                                restrictTagsToAutocompleteOptions={false}
-                                                setActiveTagIndex={setActiveTagIndex}
-                                                setTags={field.handleChange}
-                                                styleClasses={{
-                                                    inlineTagsContainer:
-                                                        "border-input rounded-lg bg-background shadow-sm shadow-black/5 transition-shadow focus-within:border-ring focus-within:outline-none focus-within:ring-[3px] focus-within:ring-ring/20 p-1 gap-1",
-                                                    input: "w-full min-w-[80px] focus-visible:outline-none shadow-none px-2 h-7",
-                                                    tag: {
-                                                        body: "h-7 relative bg-background border border-input hover:bg-background rounded-md font-medium text-xs ps-2 pe-7 flex",
-                                                        closeButton:
-                                                            "absolute -inset-y-px -end-px p-0 rounded-e-lg flex size-7 transition-colors outline-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring/70 text-muted-foreground/80 hover:text-foreground",
-                                                    },
-                                                }}
-                                                tags={field.state.value}
-                                            />
+                                            <PromptTagsField onChange={field.handleChange} options={existingTags ?? []} value={field.state.value} />
                                         </field.FormControl>
                                         <field.FormMessage />
                                     </field.FormItem>
@@ -372,7 +336,7 @@ const PromptFormDialogBody = ({ editingPrompt, onClose, onSubmit }: PromptFormDi
 
                         <div className="space-y-4">
                             {/* Chat Settings Section */}
-                            <div className="space-y-4 rounded-lg border p-4">
+                            <div className="space-y-4">
                                 <div className="space-y-1">
                                     <Label>{t`Chat Settings (Optional)`}</Label>
                                     <p className="text-muted-foreground text-xs">
@@ -444,7 +408,7 @@ const PromptFormDialogBody = ({ editingPrompt, onClose, onSubmit }: PromptFormDi
                                         const effortLabel = effortMessage ? i18n._(effortMessage) : t`Custom`;
 
                                         return (
-                                            <div className="bg-muted rounded-md p-3 text-sm">
+                                            <div className="surface-well rounded-lg p-3 text-sm">
                                                 <p className="font-medium">{t`This prompt will configure:`}</p>
                                                 <ul className="mt-1 list-disc space-y-1 pl-5">
                                                     {model && <li>{t`Model: ${selectedModel?.name || model}`}</li>}
@@ -496,7 +460,7 @@ const PromptFormDialogBody = ({ editingPrompt, onClose, onSubmit }: PromptFormDi
                             }}
                         </form.Subscribe>
                     </DialogPanel>
-                    <DialogFooter>
+                    <DialogFooter className="border-border/50 border-t" variant="bare">
                         <Button onClick={onClose} type="button" variant="outline">
                             {t`Cancel`}
                         </Button>

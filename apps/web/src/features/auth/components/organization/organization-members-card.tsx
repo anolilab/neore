@@ -8,9 +8,9 @@ import { useEffect, useState } from "react";
 
 import type { SettingsCardProperties } from "@/components/settings/settings-card";
 import SettingsCard from "@/components/settings/settings-card";
+import { useOpenSettings } from "@/components/settings/settings-link";
 import { useActiveOrganization, useHasPermission } from "@/features/auth/hooks/organization-management";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
-import { ORGANIZATIONS_SETTINGS_PATH } from "@/features/auth/lib/auth-view-paths";
 
 import InviteMemberDialog from "./invite-member-dialog";
 import MemberCell from "./member-cell";
@@ -64,7 +64,7 @@ const OrganizationMembersContent = ({ className, classNames, ...properties }: Se
                 {...properties}
             >
                 {!isPending && members && members.length > 0 && (
-                    <CardContent className={cn("grid gap-4", classNames?.content)}>
+                    <CardContent className={cn("grid gap-1.5", classNames?.content)}>
                         {members
                             .toSorted((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
                             .map((member) => (
@@ -80,7 +80,8 @@ const OrganizationMembersContent = ({ className, classNames, ...properties }: Se
 };
 
 const OrganizationMembersCard = ({ className, classNames, ...properties }: SettingsCardProperties) => {
-    const { authClient, replace } = useAuth();
+    const { authClient } = useAuth();
+    const openSettings = useOpenSettings();
     const { t } = useLingui();
 
     const { data: activeOrganization, isFetching: organizationFetching, isSuccess: organizationLoaded } = useActiveOrganization(authClient);
@@ -94,8 +95,10 @@ const OrganizationMembersCard = ({ className, classNames, ...properties }: Setti
         }
 
         // No organization to show: send the user to the list, where one is created or chosen.
-        if (!activeOrganization) replace(ORGANIZATIONS_SETTINGS_PATH);
-    }, [activeOrganization, organizationLoaded, organizationFetching, replace]);
+        if (!activeOrganization) {
+            openSettings("auth-organizations", { replace: true });
+        }
+    }, [activeOrganization, organizationLoaded, organizationFetching, openSettings]);
 
     if (!activeOrganization) {
         return (

@@ -6,21 +6,20 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import { api } from "@neore/backend/api";
 import { Badge } from "@neore/ui/components/badge";
 import { Button } from "@neore/ui/components/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@neore/ui/components/card";
 import { Heading, HeadingSection } from "@neore/ui/components/heading";
 import { Input } from "@neore/ui/components/input";
 import { Label } from "@neore/ui/components/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@neore/ui/components/select";
-import { Separator } from "@neore/ui/components/separator";
 import { Skeleton } from "@neore/ui/components/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@neore/ui/components/table";
 import { formatDateTime, formatNumber } from "@neore/ui/utils/locale-format";
 import { useQuery } from "@tanstack/react-query";
-import { Activity, AlertCircle, Bell, BellOff, ChevronDown, ChevronRight, DollarSign, Loader2, Plus, Trash2, TrendingUp, Zap } from "lucide-react";
+import { Activity, AlertCircle, Bell, BellOff, ChevronDown, ChevronRight, DollarSign, Loader2, Trash2, TrendingUp, Zap } from "lucide-react";
 import type { FC } from "react";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { toast } from "sonner";
 
+import SettingsCard from "@/components/settings/settings-card";
 import { useAction } from "@/lib/lunora/crpc";
 
 import { useUsageBackfill } from "../../hooks/use-usage-backfill";
@@ -130,15 +129,13 @@ interface OverviewCardProps {
 }
 
 const OverviewCard: FC<OverviewCardProps> = ({ icon, label, value }) => (
-    <Card>
-        <CardContent className="pt-4">
-            <div className="text-muted-foreground flex items-center gap-1.5 text-xs">
-                {icon}
-                {label}
-            </div>
-            <div className="mt-1 text-2xl font-semibold">{value === null ? <Skeleton className="h-7 w-24" /> : value}</div>
-        </CardContent>
-    </Card>
+    <div className="px-4 py-4 first:ps-0 md:first:ps-0">
+        <div className="text-muted-foreground flex items-center gap-1.5 text-xs">
+            {icon}
+            {label}
+        </div>
+        <div className="mt-1 text-2xl font-semibold">{value === null ? <Skeleton className="h-7 w-24" /> : value}</div>
+    </div>
 );
 
 // ── Main Component ────────────────────────────────────────────────────────────
@@ -146,6 +143,8 @@ const OverviewCard: FC<OverviewCardProps> = ({ icon, label, value }) => (
 const UsageSettings: FC = () => {
     const { i18n, t } = useLingui();
     const [days, setDays] = useState<7 | 30 | 90>(30);
+    const periodLabelId = useId();
+    const periodTriggerId = useId();
     const { backfilling } = useUsageBackfill();
     const [showCreateForm, setShowCreateForm] = useState(false);
     const [formData, setFormData] = useState(EMPTY_FORM);
@@ -239,20 +238,31 @@ const UsageSettings: FC = () => {
 
     return (
         <div className="space-y-6">
-            {/* Header */}
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-3 px-1">
                 <div>
-                    <Heading className="text-xl font-semibold">{t`Usage & Cost`}</Heading>
+                    <Heading className="text-[15px] font-semibold">{t`Usage & Cost`}</Heading>
                     <p className="text-muted-foreground text-sm">{t`Track your LLM token usage, cost, and set budget alerts`}</p>
                 </div>
 
+                <span className="sr-only" id={periodLabelId}>
+                    {t`Period`}
+                </span>
                 <Select
                     items={{ "30": t`Last 30 days`, "7": t`Last 7 days`, "90": t`Last 90 days` }}
                     onValueChange={(v) => v && setDays(Number(v) as 7 | 30 | 90)}
                     value={String(days)}
                 >
-                    <SelectTrigger className="w-[130px]">
-                        <SelectValue />
+                    {/* Named "Period" plus the shown value, so the name holds the visible text even before the value renders. */}
+                    <SelectTrigger aria-labelledby={`${periodLabelId} ${periodTriggerId}`} className="w-[150px]" id={periodTriggerId}>
+                        <SelectValue>
+                            {(value: string | null) => {
+                                if (value === "7") {
+                                    return t`Last 7 days`;
+                                }
+
+                                return value === "90" ? t`Last 90 days` : t`Last 30 days`;
+                            }}
+                        </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                         <SelectItem value="7">{t`Last 7 days`}</SelectItem>
@@ -263,47 +273,44 @@ const UsageSettings: FC = () => {
             </div>
 
             <HeadingSection>
-                {usageError && (
-                    <Card className="border-destructive">
-                        <CardContent className="pt-4">
-                            <p className="text-destructive text-sm">{t`Failed to load usage data. Ensure the LLM Gateway is running and reachable.`}</p>
-                        </CardContent>
-                    </Card>
-                )}
+                <SettingsCard>
+                    {usageError && (
+                        <p className="text-destructive py-3 text-sm" role="alert">
+                            {t`Failed to load usage data. Ensure the LLM Gateway is running and reachable.`}
+                        </p>
+                    )}
 
-                {/* Overview stats */}
-                <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-                    <OverviewCard icon={<TrendingUp aria-hidden="true" className="size-4" />} label={t`Requests`} value={usagePending ? null : totalRequests} />
-                    <OverviewCard
-                        icon={<DollarSign aria-hidden="true" className="size-4" />}
-                        label={t`Total Cost`}
-                        value={usagePending ? null : formatCost(usage?.totalCostMicrodollars ?? 0)}
-                    />
-                    <OverviewCard
-                        icon={<Activity aria-hidden="true" className="size-4" />}
-                        label={t`Prompt Tokens`}
-                        value={usagePending ? null : formatTokens(usage?.totalPromptTokens ?? 0)}
-                    />
-                    <OverviewCard
-                        icon={<Zap aria-hidden="true" className="size-4" />}
-                        label={t`Completion Tokens`}
-                        value={usagePending ? null : formatTokens(usage?.totalCompletionTokens ?? 0)}
-                    />
-                </div>
+                    {/* Overview stats */}
+                    <div className="divide-border/50 grid grid-cols-2 gap-y-px md:grid-cols-4 md:divide-x">
+                        <OverviewCard
+                            icon={<TrendingUp aria-hidden="true" className="size-4" />}
+                            label={t`Requests`}
+                            value={usagePending ? null : totalRequests}
+                        />
+                        <OverviewCard
+                            icon={<DollarSign aria-hidden="true" className="size-4" />}
+                            label={t`Total Cost`}
+                            value={usagePending ? null : formatCost(usage?.totalCostMicrodollars ?? 0)}
+                        />
+                        <OverviewCard
+                            icon={<Activity aria-hidden="true" className="size-4" />}
+                            label={t`Prompt Tokens`}
+                            value={usagePending ? null : formatTokens(usage?.totalPromptTokens ?? 0)}
+                        />
+                        <OverviewCard
+                            icon={<Zap aria-hidden="true" className="size-4" />}
+                            label={t`Completion Tokens`}
+                            value={usagePending ? null : formatTokens(usage?.totalCompletionTokens ?? 0)}
+                        />
+                    </div>
+                </SettingsCard>
 
                 {/* Activity heatmap (last 53 weeks, independent of the period selector) */}
                 <UsageActivityHeatmap backfilling={backfilling} />
 
                 {/* Model breakdown */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2 text-base">
-                            <TrendingUp aria-hidden="true" className="size-4" />
-                            {t`Cost by Model`}
-                        </CardTitle>
-                        <CardDescription>{t`Token usage and cost breakdown per model for the selected period`}</CardDescription>
-                    </CardHeader>
-                    <CardContent>
+                <SettingsCard description={t`Token usage and cost breakdown per model for the selected period`} title={t`Cost by Model`}>
+                    <div className="py-3">
                         {usagePending && (
                             <div className="space-y-2">
                                 {[1, 2, 3].map((i) => (
@@ -336,8 +343,8 @@ const UsageSettings: FC = () => {
                                 </TableBody>
                             </Table>
                         )}
-                    </CardContent>
-                </Card>
+                    </div>
+                </SettingsCard>
 
                 {/* Skill / agent breakdown */}
                 <UsageSkillBreakdown backfilling={backfilling} days={days} />
@@ -346,34 +353,24 @@ const UsageSettings: FC = () => {
                 <UsageProjectBreakdown backfilling={backfilling} days={days} />
 
                 {/* Daily cost trend */}
-                <Card>
-                    <CardHeader>
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <CardTitle className="flex items-center gap-2 text-base">
-                                    <DollarSign aria-hidden="true" className="size-4" />
-                                    {t`Daily Cost Trend`}
-                                </CardTitle>
-                                <CardDescription>{t`Daily spend and request volume`}</CardDescription>
-                            </div>
-                            <Button
-                                aria-expanded={showDailyBreakdown}
-                                aria-label={showDailyBreakdown ? t`Collapse daily trend` : t`Expand daily trend`}
-                                onClick={() => setShowDailyBreakdown((v) => !v)}
-                                size="sm"
-                                variant="ghost"
-                            >
-                                {showDailyBreakdown ? (
-                                    <ChevronDown aria-hidden="true" className="size-4" />
-                                ) : (
-                                    <ChevronRight aria-hidden="true" className="size-4" />
-                                )}
-                            </Button>
-                        </div>
-                    </CardHeader>
-
+                <SettingsCard description={t`Daily spend and request volume`} title={t`Daily Cost Trend`}>
+                    <div className="flex justify-end pt-3">
+                        <Button
+                            aria-expanded={showDailyBreakdown}
+                            aria-label={showDailyBreakdown ? t`Collapse daily trend` : t`Expand daily trend`}
+                            onClick={() => setShowDailyBreakdown((v) => !v)}
+                            size="sm"
+                            variant="ghost"
+                        >
+                            {showDailyBreakdown ? (
+                                <ChevronDown aria-hidden="true" className="size-4" />
+                            ) : (
+                                <ChevronRight aria-hidden="true" className="size-4" />
+                            )}
+                        </Button>
+                    </div>
                     {showDailyBreakdown && (
-                        <CardContent>
+                        <div className="py-3">
                             {usagePending && (
                                 <div className="flex gap-1">
                                     {[1, 2, 3, 4, 5, 6, 7].map((i) => (
@@ -405,288 +402,273 @@ const UsageSettings: FC = () => {
                             {!usagePending && !usage?.dailyBreakdown.length && (
                                 <p className="text-muted-foreground py-4 text-center text-sm">{t`No daily data for this period.`}</p>
                             )}
-                        </CardContent>
+                        </div>
                     )}
-                </Card>
-
-                <Separator />
+                </SettingsCard>
 
                 {/* Budget Alerts */}
-                <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <Heading className="font-medium" fallbackLevel={3}>{t`Budget Alerts`}</Heading>
-                            <p className="text-muted-foreground text-sm">{t`Get notified or block requests when usage thresholds are reached`}</p>
-                        </div>
-                        <Button aria-label={t`Add budget alert`} onClick={() => setShowCreateForm((v) => !v)} size="sm" variant="outline">
-                            <Plus aria-hidden="true" className="mr-1.5 size-3.5" />
-                            {t`Add Alert`}
-                        </Button>
-                    </div>
-
-                    <HeadingSection>
-                        {/* Create form */}
-                        {showCreateForm && (
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle className="text-base">{t`New Budget Alert`}</CardTitle>
-                                    <CardDescription>{t`Trigger a notification or block when a usage metric exceeds a threshold`}</CardDescription>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                    <div className="space-y-1.5">
-                                        <Label htmlFor="alert-name">{t`Name`}</Label>
-                                        <Input
-                                            id="alert-name"
-                                            maxLength={80}
-                                            onChange={(e) =>
-                                                setFormData((f) => {
-                                                    return { ...f, name: e.target.value };
-                                                })
-                                            }
-                                            placeholder={t`e.g. Monthly $10 limit`}
-                                            value={formData.name}
-                                        />
-                                    </div>
-
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="space-y-1.5">
-                                            <Label htmlFor="alert-metric">{t`Metric`}</Label>
-                                            <Select
-                                                items={(Object.entries(METRIC_LABELS) as [Metric, MessageDescriptor][]).map(([value, label]) => {
-                                                    return { label: i18n._(label), value };
-                                                })}
-                                                onValueChange={(v) =>
-                                                    v &&
-                                                    setFormData((f) => {
-                                                        return { ...f, metric: v as Metric };
-                                                    })
-                                                }
-                                                value={formData.metric}
-                                            >
-                                                <SelectTrigger id="alert-metric">
-                                                    <SelectValue />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    {(Object.entries(METRIC_LABELS) as [Metric, MessageDescriptor][]).map(([value, label]) => (
-                                                        <SelectItem key={value} value={value}>
-                                                            {i18n._(label)}
-                                                        </SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
-
-                                        <div className="space-y-1.5">
-                                            <Label htmlFor="alert-period">{t`Period`}</Label>
-                                            <Select
-                                                items={(Object.entries(PERIOD_LABELS) as [Period, MessageDescriptor][]).map(([value, label]) => {
-                                                    return { label: i18n._(label), value };
-                                                })}
-                                                onValueChange={(v) =>
-                                                    v &&
-                                                    setFormData((f) => {
-                                                        return { ...f, period: v as Period };
-                                                    })
-                                                }
-                                                value={formData.period}
-                                            >
-                                                <SelectTrigger id="alert-period">
-                                                    <SelectValue />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    {(Object.entries(PERIOD_LABELS) as [Period, MessageDescriptor][]).map(([value, label]) => (
-                                                        <SelectItem key={value} value={value}>
-                                                            {i18n._(label)}
-                                                        </SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
-                                    </div>
-
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="space-y-1.5">
-                                            <Label htmlFor="alert-threshold">
-                                                {t`Threshold`}
-                                                {(formData.metric === "daily_cost" || formData.metric === "monthly_cost") && (
-                                                    <span className="text-muted-foreground ml-1 text-xs">{t`(microdollars; 1,000,000 = $1)`}</span>
-                                                )}
-                                            </Label>
-                                            <Input
-                                                id="alert-threshold"
-                                                min={1}
-                                                onChange={(e) =>
-                                                    setFormData((f) => {
-                                                        return { ...f, threshold: Number(e.target.value) || 0 };
-                                                    })
-                                                }
-                                                type="number"
-                                                value={formData.threshold}
-                                            />
-                                        </div>
-
-                                        <div className="space-y-1.5">
-                                            <Label htmlFor="alert-action">{t`Action`}</Label>
-                                            <Select
-                                                items={(Object.entries(ACTION_LABELS) as [RuleAction, MessageDescriptor][]).map(([value, label]) => {
-                                                    return { label: i18n._(label), value };
-                                                })}
-                                                onValueChange={(v) =>
-                                                    v &&
-                                                    setFormData((f) => {
-                                                        return { ...f, action: v as RuleAction };
-                                                    })
-                                                }
-                                                value={formData.action}
-                                            >
-                                                <SelectTrigger id="alert-action">
-                                                    <SelectValue />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    {(Object.entries(ACTION_LABELS) as [RuleAction, MessageDescriptor][]).map(([value, label]) => (
-                                                        <SelectItem key={value} value={value}>
-                                                            {i18n._(label)}
-                                                        </SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
-                                    </div>
-
-                                    <div className="space-y-1.5">
-                                        <Label htmlFor="alert-model-filter">
-                                            {t`Model filter`}
-                                            <span className="text-muted-foreground ml-1 text-xs">{t`(optional)`}</span>
-                                        </Label>
-                                        <Input
-                                            id="alert-model-filter"
-                                            onChange={(e) =>
-                                                setFormData((f) => {
-                                                    return { ...f, modelFilter: e.target.value };
-                                                })
-                                            }
-                                            placeholder={t`e.g. claude-opus-4 (leave blank for all models)`}
-                                            value={formData.modelFilter}
-                                        />
-                                    </div>
-
-                                    <div className="flex gap-2">
-                                        <Button
-                                            aria-label={t`Save budget alert`}
-                                            disabled={creatingRule || !formData.name.trim()}
-                                            onClick={() => {
-                                                void handleCreateRule();
-                                            }}
-                                            size="sm"
-                                        >
-                                            {creatingRule && <Loader2 aria-hidden="true" className="mr-1.5 size-3.5 animate-spin" />}
-                                            {t`Save Alert`}
-                                        </Button>
-                                        <Button
-                                            aria-label={t`Cancel`}
-                                            onClick={() => {
-                                                setShowCreateForm(false);
-                                                setFormData(EMPTY_FORM);
-                                            }}
-                                            size="sm"
-                                            variant="outline"
-                                        >
-                                            {t`Cancel`}
-                                        </Button>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        )}
-
-                        {/* Rules list */}
-                        {rulesPending && (
-                            <div className="space-y-2">
-                                {[1, 2].map((i) => (
-                                    <Skeleton className="h-16 w-full" key={i} />
-                                ))}
+                <SettingsCard
+                    action={() => setShowCreateForm((v) => !v)}
+                    actionLabel={t`Add Alert`}
+                    description={t`Get notified or block requests when usage thresholds are reached`}
+                    title={t`Budget Alerts`}
+                >
+                    {/* Create form */}
+                    {showCreateForm && (
+                        <div className="space-y-4 py-3">
+                            <div>
+                                <Heading className="text-sm font-medium" fallbackLevel={3}>{t`New Budget Alert`}</Heading>
+                                <p className="text-muted-foreground text-xs">{t`Trigger a notification or block when a usage metric exceeds a threshold`}</p>
                             </div>
-                        )}
-                        {!rulesPending && rules !== undefined && rules.length > 0 && (
-                            <div className="space-y-2">
-                                {rules.map((rule: NotificationRule) => {
-                                    const metricLabel = i18n._(METRIC_LABELS[rule.metric]);
-                                    const threshold =
-                                        rule.metric === "daily_cost" || rule.metric === "monthly_cost"
-                                            ? formatCost(rule.threshold)
-                                            : formatNumber(rule.threshold, i18n.locale);
-                                    const { modelFilter, name: ruleName } = rule;
-                                    const lastTriggeredAt = rule.lastTriggeredAt ? formatDateTime(rule.lastTriggeredAt, i18n.locale) : null;
-                                    let ruleSummary: string;
-
-                                    switch (rule.period) {
-                                        case "day": {
-                                            ruleSummary = t`${metricLabel} > ${threshold} per day`;
-                                            break;
-                                        }
-                                        case "hour": {
-                                            ruleSummary = t`${metricLabel} > ${threshold} per hour`;
-                                            break;
-                                        }
-                                        default: {
-                                            ruleSummary = t`${metricLabel} > ${threshold} per month`;
-                                        }
+                            <div className="space-y-1.5">
+                                <Label htmlFor="alert-name">{t`Name`}</Label>
+                                <Input
+                                    id="alert-name"
+                                    maxLength={80}
+                                    onChange={(e) =>
+                                        setFormData((f) => {
+                                            return { ...f, name: e.target.value };
+                                        })
                                     }
-
-                                    return (
-                                        <Card key={rule.id}>
-                                            <CardContent className="flex items-start justify-between gap-4 pt-4">
-                                                <div className="flex items-start gap-3">
-                                                    <Bell aria-hidden="true" className="text-muted-foreground mt-0.5 size-4 shrink-0" />
-                                                    <div>
-                                                        <div className="flex flex-wrap items-center gap-2">
-                                                            <span className="text-sm font-medium">{rule.name}</span>
-                                                            <Badge variant={ACTION_VARIANTS[rule.action]}>{i18n._(ACTION_LABELS[rule.action])}</Badge>
-                                                        </div>
-                                                        <p className="text-muted-foreground mt-0.5 text-xs">
-                                                            {ruleSummary}
-                                                            {modelFilter && t` · model: ${modelFilter}`}
-                                                        </p>
-                                                        {lastTriggeredAt && (
-                                                            <p className="text-muted-foreground mt-0.5 text-xs">
-                                                                <AlertCircle aria-hidden="true" className="mr-1 inline size-3" />
-                                                                <Trans>Last triggered: {lastTriggeredAt}</Trans>
-                                                            </p>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                                <Button
-                                                    aria-label={t`Delete alert "${ruleName}"`}
-                                                    className="shrink-0"
-                                                    disabled={deletingRuleId === rule.id}
-                                                    onClick={() => {
-                                                        void handleDeleteRule(rule.id);
-                                                    }}
-                                                    size="icon"
-                                                    variant="ghost"
-                                                >
-                                                    {deletingRuleId === rule.id ? (
-                                                        <Loader2 aria-hidden="true" className="size-4 animate-spin" />
-                                                    ) : (
-                                                        <Trash2 aria-hidden="true" className="size-4" />
-                                                    )}
-                                                </Button>
-                                            </CardContent>
-                                        </Card>
-                                    );
-                                })}
+                                    placeholder={t`e.g. Monthly $10 limit`}
+                                    value={formData.name}
+                                />
                             </div>
-                        )}
-                        {!rulesPending && !rules?.length && (
-                            <Card>
-                                <CardContent className="py-8 text-center">
-                                    <BellOff aria-hidden="true" className="text-muted-foreground mx-auto mb-3 size-8" />
-                                    <p className="text-muted-foreground text-sm">{t`No budget alerts configured.`}</p>
-                                    <p className="text-muted-foreground mt-1 text-xs">{t`Add an alert above to be notified when your usage crosses a threshold.`}</p>
-                                </CardContent>
-                            </Card>
-                        )}
-                    </HeadingSection>
-                </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="alert-metric">{t`Metric`}</Label>
+                                    <Select
+                                        items={(Object.entries(METRIC_LABELS) as [Metric, MessageDescriptor][]).map(([value, label]) => {
+                                            return { label: i18n._(label), value };
+                                        })}
+                                        onValueChange={(v) =>
+                                            v &&
+                                            setFormData((f) => {
+                                                return { ...f, metric: v as Metric };
+                                            })
+                                        }
+                                        value={formData.metric}
+                                    >
+                                        <SelectTrigger id="alert-metric">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {(Object.entries(METRIC_LABELS) as [Metric, MessageDescriptor][]).map(([value, label]) => (
+                                                <SelectItem key={value} value={value}>
+                                                    {i18n._(label)}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="alert-period">{t`Period`}</Label>
+                                    <Select
+                                        items={(Object.entries(PERIOD_LABELS) as [Period, MessageDescriptor][]).map(([value, label]) => {
+                                            return { label: i18n._(label), value };
+                                        })}
+                                        onValueChange={(v) =>
+                                            v &&
+                                            setFormData((f) => {
+                                                return { ...f, period: v as Period };
+                                            })
+                                        }
+                                        value={formData.period}
+                                    >
+                                        <SelectTrigger id="alert-period">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {(Object.entries(PERIOD_LABELS) as [Period, MessageDescriptor][]).map(([value, label]) => (
+                                                <SelectItem key={value} value={value}>
+                                                    {i18n._(label)}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="alert-threshold">
+                                        {t`Threshold`}
+                                        {(formData.metric === "daily_cost" || formData.metric === "monthly_cost") && (
+                                            <span className="text-muted-foreground ml-1 text-xs">{t`(microdollars; 1,000,000 = $1)`}</span>
+                                        )}
+                                    </Label>
+                                    <Input
+                                        id="alert-threshold"
+                                        min={1}
+                                        onChange={(e) =>
+                                            setFormData((f) => {
+                                                return { ...f, threshold: Number(e.target.value) || 0 };
+                                            })
+                                        }
+                                        type="number"
+                                        value={formData.threshold}
+                                    />
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="alert-action">{t`Action`}</Label>
+                                    <Select
+                                        items={(Object.entries(ACTION_LABELS) as [RuleAction, MessageDescriptor][]).map(([value, label]) => {
+                                            return { label: i18n._(label), value };
+                                        })}
+                                        onValueChange={(v) =>
+                                            v &&
+                                            setFormData((f) => {
+                                                return { ...f, action: v as RuleAction };
+                                            })
+                                        }
+                                        value={formData.action}
+                                    >
+                                        <SelectTrigger id="alert-action">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {(Object.entries(ACTION_LABELS) as [RuleAction, MessageDescriptor][]).map(([value, label]) => (
+                                                <SelectItem key={value} value={value}>
+                                                    {i18n._(label)}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
+
+                            <div className="space-y-1.5">
+                                <Label htmlFor="alert-model-filter">
+                                    {t`Model filter`}
+                                    <span className="text-muted-foreground ml-1 text-xs">{t`(optional)`}</span>
+                                </Label>
+                                <Input
+                                    id="alert-model-filter"
+                                    onChange={(e) =>
+                                        setFormData((f) => {
+                                            return { ...f, modelFilter: e.target.value };
+                                        })
+                                    }
+                                    placeholder={t`e.g. claude-opus-4 (leave blank for all models)`}
+                                    value={formData.modelFilter}
+                                />
+                            </div>
+
+                            <div className="flex gap-2">
+                                <Button
+                                    aria-label={t`Save budget alert`}
+                                    disabled={creatingRule || !formData.name.trim()}
+                                    onClick={() => {
+                                        void handleCreateRule();
+                                    }}
+                                    size="sm"
+                                >
+                                    {creatingRule && <Loader2 aria-hidden="true" className="mr-1.5 size-3.5 animate-spin" />}
+                                    {t`Save Alert`}
+                                </Button>
+                                <Button
+                                    aria-label={t`Cancel`}
+                                    onClick={() => {
+                                        setShowCreateForm(false);
+                                        setFormData(EMPTY_FORM);
+                                    }}
+                                    size="sm"
+                                    variant="outline"
+                                >
+                                    {t`Cancel`}
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Rules list */}
+                    {rulesPending && (
+                        <div className="space-y-2 py-3">
+                            {[1, 2].map((i) => (
+                                <Skeleton className="h-16 w-full" key={i} />
+                            ))}
+                        </div>
+                    )}
+                    {!rulesPending && rules !== undefined && rules.length > 0 && (
+                        <div>
+                            {rules.map((rule: NotificationRule) => {
+                                const metricLabel = i18n._(METRIC_LABELS[rule.metric]);
+                                const threshold =
+                                    rule.metric === "daily_cost" || rule.metric === "monthly_cost"
+                                        ? formatCost(rule.threshold)
+                                        : formatNumber(rule.threshold, i18n.locale);
+                                const { modelFilter, name: ruleName } = rule;
+                                const lastTriggeredAt = rule.lastTriggeredAt ? formatDateTime(rule.lastTriggeredAt, i18n.locale) : null;
+                                let ruleSummary: string;
+
+                                switch (rule.period) {
+                                    case "day": {
+                                        ruleSummary = t`${metricLabel} > ${threshold} per day`;
+                                        break;
+                                    }
+                                    case "hour": {
+                                        ruleSummary = t`${metricLabel} > ${threshold} per hour`;
+                                        break;
+                                    }
+                                    default: {
+                                        ruleSummary = t`${metricLabel} > ${threshold} per month`;
+                                    }
+                                }
+
+                                return (
+                                    <div className="border-border/50 flex items-start justify-between gap-4 py-3 not-first:border-t" key={rule.id}>
+                                        <div className="flex items-start gap-3">
+                                            <Bell aria-hidden="true" className="text-muted-foreground mt-0.5 size-4 shrink-0" />
+                                            <div>
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <span className="text-sm font-medium">{rule.name}</span>
+                                                    <Badge variant={ACTION_VARIANTS[rule.action]}>{i18n._(ACTION_LABELS[rule.action])}</Badge>
+                                                </div>
+                                                <p className="text-muted-foreground mt-0.5 text-xs">
+                                                    {ruleSummary}
+                                                    {modelFilter && t` · model: ${modelFilter}`}
+                                                </p>
+                                                {lastTriggeredAt && (
+                                                    <p className="text-muted-foreground mt-0.5 text-xs">
+                                                        <AlertCircle aria-hidden="true" className="mr-1 inline size-3" />
+                                                        <Trans>Last triggered: {lastTriggeredAt}</Trans>
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        <Button
+                                            aria-label={t`Delete alert "${ruleName}"`}
+                                            className="shrink-0"
+                                            disabled={deletingRuleId === rule.id}
+                                            onClick={() => {
+                                                void handleDeleteRule(rule.id);
+                                            }}
+                                            size="icon"
+                                            variant="ghost"
+                                        >
+                                            {deletingRuleId === rule.id ? (
+                                                <Loader2 aria-hidden="true" className="size-4 animate-spin" />
+                                            ) : (
+                                                <Trash2 aria-hidden="true" className="size-4" />
+                                            )}
+                                        </Button>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                    {!rulesPending && !rules?.length && (
+                        <div className="py-6 text-center">
+                            <BellOff aria-hidden="true" className="text-muted-foreground mx-auto mb-3 size-8" />
+                            <p className="text-muted-foreground text-sm">{t`No budget alerts configured.`}</p>
+                            <p className="text-muted-foreground mt-1 text-xs">{t`Add an alert above to be notified when your usage crosses a threshold.`}</p>
+                        </div>
+                    )}
+                </SettingsCard>
             </HeadingSection>
         </div>
     );

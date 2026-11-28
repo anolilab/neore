@@ -282,7 +282,7 @@ const CanvasContent: FC<{
             if (isStreaming || editMode === "preview") {
                 return (
                     <div className="h-full overflow-auto">
-                        <pre className="bg-muted/50 min-h-full p-4">
+                        <pre className="bg-surface-well min-h-full p-4">
                             <code className={`language-${document.language ?? "plaintext"}`}>{document.content ?? ""}</code>
                         </pre>
                     </div>
@@ -733,13 +733,17 @@ const CanvasPanel: FC<CanvasPanelProps> = memo(({ className }) => {
         <div
             aria-labelledby={isFullscreen ? titleId : undefined}
             aria-modal={isFullscreen ? "true" : undefined}
-            className={cn("bg-background flex h-full flex-col border-l", isFullscreen && "fixed inset-0 z-50 border-l-0 outline-none", className)}
+            className={cn(
+                "bg-surface-main border-border/50 flex h-full flex-col border-l",
+                isFullscreen && "fixed inset-0 z-50 border-l-0 outline-none",
+                className,
+            )}
             ref={panelRef}
             role={isFullscreen ? "dialog" : undefined}
             tabIndex={isFullscreen ? -1 : undefined}
         >
             {/* Header */}
-            <div className="flex items-center justify-between border-b px-4 py-3">
+            <div className="border-border/50 flex items-center justify-between border-b px-4 py-3">
                 <div className="flex items-center gap-2 overflow-hidden">
                     <div className="flex flex-col gap-0.5 overflow-hidden">
                         <div className="flex items-center gap-1.5">
@@ -760,7 +764,7 @@ const CanvasPanel: FC<CanvasPanelProps> = memo(({ className }) => {
                 </div>
                 <div className="flex items-center gap-1">
                     {canPreviewCode && (
-                        <div aria-label={t`Code view`} className="bg-muted mr-1 flex rounded-md p-0.5" role="group">
+                        <div aria-label={t`Code view`} className="surface-well mr-1 flex rounded-lg p-0.5" role="group">
                             <Button
                                 aria-pressed={codeView === "code"}
                                 onClick={() => setCodeView("code")}

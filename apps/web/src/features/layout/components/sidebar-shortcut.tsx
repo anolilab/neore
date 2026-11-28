@@ -176,6 +176,10 @@ export const useNavLinks = () => {
 
 // ---------------------------------------------------------------------------
 
+const RAIL_ITEM = "group relative flex size-10 items-center justify-center rounded-[10px] transition-colors duration-150";
+const RAIL_ITEM_IDLE = "text-muted-foreground hover:bg-surface-row-hover hover:text-foreground";
+const RAIL_ITEM_CURRENT = "bg-surface-row-active surface-edge text-foreground";
+
 interface SidebarShortcutProps {
     /**
      * When true, clicking the user avatar opens the full user dropdown menu
@@ -190,6 +194,7 @@ interface SidebarShortcutProps {
 
 const SidebarShortcut: FC<SidebarShortcutProps> = ({ userDropdown = false }) => {
     const location = useLocation();
+    const isAdminActive = location.pathname.startsWith("/admin");
     const { t } = useLingui();
     const { isAnonymous } = useIsAnonymous();
     const { hidePersonalInfo } = useUserPreferences();
@@ -217,11 +222,7 @@ const SidebarShortcut: FC<SidebarShortcutProps> = ({ userDropdown = false }) => 
     const userTrigger = userDropdown ? (
         <NavUser
             trigger={
-                <button
-                    aria-label={t`Open user menu`}
-                    className="hover:bg-sidebar-accent/50 flex size-10 items-center justify-center rounded-md transition-colors duration-150"
-                    type="button"
-                >
+                <button aria-label={t`Open user menu`} className={cn(RAIL_ITEM, RAIL_ITEM_IDLE)} type="button">
                     {avatarElement}
                 </button>
             }
@@ -231,10 +232,10 @@ const SidebarShortcut: FC<SidebarShortcutProps> = ({ userDropdown = false }) => 
     );
 
     return (
-        <div className="z-20 hidden h-dvh w-16 shrink-0 py-1 pl-1 md:block" id="sidebar-shortcut">
-            <div className="bg-sidebar dark:bg-brand-obsidian ring-sidebar-border flex h-full flex-col items-center rounded-lg ring-1">
+        <div className="z-20 hidden h-dvh w-16 shrink-0 md:block" id="sidebar-shortcut">
+            <div className="bg-surface-rail text-foreground flex h-full flex-col items-center shadow-[inset_-1px_0_0_var(--surface-edge)]">
                 <Neore
-                    className="fill-brand-black dark:fill-brand-white mt-3 mb-4 size-7 opacity-90 transition-opacity hover:opacity-70"
+                    className="fill-foreground mt-3.5 mb-4 size-7 opacity-90 transition-opacity hover:opacity-70"
                     title={t`Neore - AI Text & Video & Audio & Image & Documents Generation Platform`}
                 />
 
@@ -246,46 +247,33 @@ const SidebarShortcut: FC<SidebarShortcutProps> = ({ userDropdown = false }) => 
 
                         return (
                             <Link
+                                aria-current={isActive ? "page" : undefined}
                                 aria-label={t(labelKey)}
-                                className={cn(
-                                    "group relative flex size-10 items-center justify-center rounded-md transition-colors duration-150",
-                                    isActive
-                                        ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                                        : "text-brand-black dark:text-brand-white hover:bg-sidebar-accent/50",
-                                )}
+                                className={cn(RAIL_ITEM, isActive ? RAIL_ITEM_CURRENT : RAIL_ITEM_IDLE)}
                                 key={to}
                                 to={to}
                             >
-                                <Icon className="text-brand-black dark:text-brand-white size-5" strokeWidth={1.5} />
+                                <Icon className="size-5" strokeWidth={1.5} />
                             </Link>
                         );
                     })}
                 </div>
 
-                <div className="mt-auto mb-2 flex flex-col items-center gap-1">
+                <div className="mt-auto mb-3 flex flex-col items-center gap-1">
                     {isAdmin && (
                         <Link
+                            aria-current={isAdminActive ? "page" : undefined}
                             aria-label={t`Admin`}
-                            className={cn(
-                                "group relative flex size-10 items-center justify-center rounded-md transition-colors duration-150",
-                                location.pathname.startsWith("/admin")
-                                    ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                                    : "text-brand-black dark:text-brand-white hover:bg-sidebar-accent/50",
-                            )}
+                            className={cn(RAIL_ITEM, isAdminActive ? RAIL_ITEM_CURRENT : RAIL_ITEM_IDLE)}
                             to="/admin"
                         >
-                            <ShieldCheck className="text-brand-black dark:text-brand-white size-5" strokeWidth={1.5} />
+                            <ShieldCheck className="size-5" strokeWidth={1.5} />
                         </Link>
                     )}
                     {!isAnonymous && <NotificationBell />}
                     <button
                         aria-label={t`Open Settings`}
-                        className={cn(
-                            "group relative flex size-10 items-center justify-center rounded-md transition-colors duration-150",
-                            isSettingsOpen
-                                ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                                : "text-brand-black dark:text-brand-white hover:bg-sidebar-accent/50",
-                        )}
+                        className={cn(RAIL_ITEM, isSettingsOpen ? RAIL_ITEM_CURRENT : RAIL_ITEM_IDLE)}
                         onClick={(e) => {
                             e.currentTarget.blur();
                             openSettingsModal();
@@ -296,10 +284,7 @@ const SidebarShortcut: FC<SidebarShortcutProps> = ({ userDropdown = false }) => 
                         <Cog className="size-5" strokeWidth={1.5} />
                     </button>
                     <HoverCard>
-                        <HoverCardTrigger
-                            className="text-brand-black dark:text-brand-white hover:bg-sidebar-accent/50 group relative flex size-10 items-center justify-center rounded-md transition-colors duration-150"
-                            render={<button aria-label={t`Help`} type="button" />}
-                        >
+                        <HoverCardTrigger className={cn(RAIL_ITEM, RAIL_ITEM_IDLE)} render={<button aria-label={t`Help`} type="button" />}>
                             <HelpCircle className="size-5" strokeWidth={1.5} />
                             {unreadCount > 0 && <span className="bg-destructive absolute top-1 right-1 flex size-2 rounded-full" />}
                         </HoverCardTrigger>
@@ -324,12 +309,8 @@ const SidebarShortcut: FC<SidebarShortcutProps> = ({ userDropdown = false }) => 
                     {isAnonymous ? (
                         <NavUser
                             trigger={
-                                <button
-                                    aria-label={t`Open user menu`}
-                                    className="hover:bg-sidebar-accent/50 flex size-10 items-center justify-center rounded-md transition-colors duration-150"
-                                    type="button"
-                                >
-                                    <UserRound className="text-brand-black dark:text-brand-white size-5" strokeWidth={1.5} />
+                                <button aria-label={t`Open user menu`} className={cn(RAIL_ITEM, RAIL_ITEM_IDLE)} type="button">
+                                    <UserRound className="size-5" strokeWidth={1.5} />
                                 </button>
                             }
                         />

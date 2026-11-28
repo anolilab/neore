@@ -17,6 +17,8 @@ import useCredentialChangeBlock from "@/features/auth/hooks/use-credential-chang
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import emailSchema from "@/features/auth/validators/email-schema";
 
+import SettingsFieldRow, { hideCardHeader } from "../settings-field-row";
+
 const ChangeEmailCard = ({ className, classNames, ...properties }: SettingsCardProperties) => {
     const { authClient, emailVerification, toast } = useAuth();
     const { t } = useLingui();
@@ -134,41 +136,45 @@ const ChangeEmailCard = ({ className, classNames, ...properties }: SettingsCardP
                     <SettingsCard
                         actionLabel={t`Save`}
                         className={className}
-                        classNames={classNames}
-                        description={t`Update your account email address`}
+                        classNames={hideCardHeader(classNames)}
                         disabled={credentialBlock.blocked}
-                        instructions={credentialBlock.reason ?? t`Enter your new email address below`}
                         isPending={isPending}
-                        title={t`Email Address`}
                         {...properties}
                     >
                         <CardContent className={classNames?.content}>
-                            {isPending ? (
-                                <Skeleton className={cn("h-9 w-full", classNames?.skeleton)} />
-                            ) : (
-                                <form.AppField name="email">
-                                    {(field) => (
-                                        <field.FormItem>
-                                            <field.FormControl>
-                                                <Input
-                                                    autoComplete="email"
-                                                    className={classNames?.input}
-                                                    disabled={isSubmitting}
-                                                    onBlur={field.handleBlur}
-                                                    onChange={(e) => {
-                                                        field.handleChange(e.target.value);
-                                                    }}
-                                                    placeholder={t`Enter your email address`}
-                                                    type="email"
-                                                    value={field.state.value}
-                                                />
-                                            </field.FormControl>
+                            <SettingsFieldRow
+                                description={t`Update your account email address`}
+                                instructions={credentialBlock.reason ?? t`Enter your new email address below`}
+                                title={t`Email Address`}
+                            >
+                                {isPending ? (
+                                    <Skeleton className={cn("h-9 w-full", classNames?.skeleton)} />
+                                ) : (
+                                    <form.AppField name="email">
+                                        {(field) => (
+                                            <field.FormItem>
+                                                <field.FormControl>
+                                                    <Input
+                                                        aria-label={t`Email Address`}
+                                                        autoComplete="email"
+                                                        className={classNames?.input}
+                                                        disabled={isSubmitting}
+                                                        onBlur={field.handleBlur}
+                                                        onChange={(e) => {
+                                                            field.handleChange(e.target.value);
+                                                        }}
+                                                        placeholder={t`Enter your email address`}
+                                                        type="email"
+                                                        value={field.state.value}
+                                                    />
+                                                </field.FormControl>
 
-                                            <field.FormMessage className={classNames?.error} />
-                                        </field.FormItem>
-                                    )}
-                                </form.AppField>
-                            )}
+                                                <field.FormMessage className={classNames?.error} />
+                                            </field.FormItem>
+                                        )}
+                                    </form.AppField>
+                                )}
+                            </SettingsFieldRow>
                         </CardContent>
                     </SettingsCard>
                 </form>

@@ -9,6 +9,7 @@ import { Badge } from "@neore/ui/components/badge";
 import { Button } from "@neore/ui/components/button";
 import ConfirmDialog from "@neore/ui/components/confirm-dialog";
 import { Skeleton } from "@neore/ui/components/skeleton";
+import cn from "@neore/ui/utils/cn";
 import { useState } from "react";
 
 import { safeExternalUrl } from "../lib/format";
@@ -53,7 +54,7 @@ const ChecksTab = ({
     const [feedback, setFeedback] = useState<{ kind: "error" | "success"; text: string } | null>(null);
 
     if (checks.isPending) {
-        return <Skeleton aria-label={t`Loading checks`} className="h-24 w-full" role="status" />;
+        return <Skeleton aria-label={t`Loading checks`} className="h-24 w-full rounded-xl" role="status" />;
     }
 
     if (checks.isError) {
@@ -131,58 +132,62 @@ const ChecksTab = ({
 
     return (
         <div className="space-y-3">
-            <p
-                className={rollup.state === "failing" ? "text-destructive text-sm font-medium" : "text-sm font-medium"}
-                role={rollup.state === "failing" ? "alert" : "status"}
-            >
-                {rollup.state === "passing" && !rollup.complete ? t`No failures in the checks shown.` : summaries[rollup.state]}
-                {knowsRequired && rollup.optionalFailing > 0 && (
-                    <span className="text-muted-foreground font-normal">
-                        {" "}
-                        {plural(rollup.optionalFailing, { one: "# optional check failed.", other: "# optional checks failed." })}
-                    </span>
-                )}
-            </p>
             {(total > list.length || !rollup.complete) && (
-                <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm" role="note">
+                <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm" role="note">
                     {t`Showing ${list.length} of ${plural(total, { one: "# check", other: "# checks" })}.`}
                 </p>
             )}
-            <ul className="rounded-md border">
-                {list.map((check, index) => {
-                    const href = safeExternalUrl(check.url);
-                    const checkId = check.id;
+            <div className="surface-raised overflow-hidden rounded-xl">
+                <p
+                    className={cn("border-border/50 border-b px-4 py-3 text-sm font-medium", rollup.state === "failing" && "text-destructive")}
+                    role={rollup.state === "failing" ? "alert" : "status"}
+                >
+                    {rollup.state === "passing" && !rollup.complete ? t`No failures in the checks shown.` : summaries[rollup.state]}
+                    {knowsRequired && rollup.optionalFailing > 0 && (
+                        <span className="text-muted-foreground font-normal">
+                            {" "}
+                            {plural(rollup.optionalFailing, { one: "# optional check failed.", other: "# optional checks failed." })}
+                        </span>
+                    )}
+                </p>
+                <ul>
+                    {list.map((check, index) => {
+                        const href = safeExternalUrl(check.url);
+                        const checkId = check.id;
 
-                    return (
-                        // A check name is not unique across runs and statuses, so the position keeps the key stable.
-
-                        // eslint-disable-next-line react-x/no-array-index-key
-                        <li className="flex items-center gap-3 border-b px-3 py-2 text-sm last:border-b-0" key={`${check.name}-${index}`}>
-                            <Badge variant={VARIANT[check.state]}>{labels[check.state]}</Badge>
-                            {href ? (
-                                <a className="min-w-0 flex-1 truncate hover:underline" href={href} rel="noopener noreferrer" target="_blank">
-                                    {check.name}
-                                </a>
-                            ) : (
-                                <span className="min-w-0 flex-1 truncate">{check.name}</span>
-                            )}
-                            {knowsRequired && check.required === true && <Badge variant="outline">{t`Required`}</Badge>}
-                            {knowsRequired && check.required === false && <Badge variant="secondary">{t`Optional`}</Badge>}
-                            {canRerun && checkId !== null && (
-                                <Button
-                                    aria-label={t`Re-run ${check.name}`}
-                                    disabled={actions.rerun.isPending || check.state === "pending"}
-                                    onClick={() => setTarget({ id: checkId, name: check.name })}
-                                    size="sm"
-                                    variant="ghost"
-                                >
-                                    {t`Re-run`}
-                                </Button>
-                            )}
-                        </li>
-                    );
-                })}
-            </ul>
+                        return (
+                            // A check name is not unique across runs and statuses, so the position keeps the key stable.
+                            <li
+                                className="border-border/50 flex items-center gap-3 border-b px-4 py-2.5 text-sm last:border-b-0"
+                                // eslint-disable-next-line react-x/no-array-index-key
+                                key={`${check.name}-${index}`}
+                            >
+                                <Badge variant={VARIANT[check.state]}>{labels[check.state]}</Badge>
+                                {href ? (
+                                    <a className="min-w-0 flex-1 truncate hover:underline" href={href} rel="noopener noreferrer" target="_blank">
+                                        {check.name}
+                                    </a>
+                                ) : (
+                                    <span className="min-w-0 flex-1 truncate">{check.name}</span>
+                                )}
+                                {knowsRequired && check.required === true && <Badge variant="outline">{t`Required`}</Badge>}
+                                {knowsRequired && check.required === false && <Badge variant="secondary">{t`Optional`}</Badge>}
+                                {canRerun && checkId !== null && (
+                                    <Button
+                                        aria-label={t`Re-run ${check.name}`}
+                                        disabled={actions.rerun.isPending || check.state === "pending"}
+                                        onClick={() => setTarget({ id: checkId, name: check.name })}
+                                        size="sm"
+                                        variant="ghost"
+                                    >
+                                        {t`Re-run`}
+                                    </Button>
+                                )}
+                            </li>
+                        );
+                    })}
+                </ul>
+            </div>
             <div aria-live="polite" role="status">
                 {feedback?.kind === "success" && <p className="text-sm">{feedback.text}</p>}
             </div>

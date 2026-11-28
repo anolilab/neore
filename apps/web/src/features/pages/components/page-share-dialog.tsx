@@ -2,8 +2,8 @@
 
 import { useLingui } from "@lingui/react/macro";
 import { Button } from "@neore/ui/components/button";
+import { HeadingLevelProvider } from "@neore/ui/components/heading";
 import { Input } from "@neore/ui/components/input";
-import { Label } from "@neore/ui/components/label";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogPanel, DialogTitle } from "@neore/ui/components/responsive-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@neore/ui/components/select";
 import { Switch } from "@neore/ui/components/switch";
@@ -12,6 +12,8 @@ import { Copy, Trash2 } from "lucide-react";
 import type { FC } from "react";
 import { useId, useState } from "react";
 
+import SettingsCard from "@/components/settings/settings-card";
+import SettingsRow from "@/components/settings/settings-row";
 import { useCRPC } from "@/lib/lunora/crpc";
 import { showError, showSuccess } from "@/lib/toast";
 
@@ -54,123 +56,52 @@ const PageShareDialogBody: FC<{ pageId: string }> = ({ pageId }) => {
 
     return (
         <DialogPanel className="space-y-6">
-            <section aria-labelledby={`${baseId}-public`} className="space-y-2">
-                <div className="flex items-center justify-between gap-4">
-                    <div>
-                        <h3 className="text-sm font-medium" id={`${baseId}-public`}>
-                            {t`Public link`}
-                        </h3>
-                        <p className="text-muted-foreground text-xs">{t`Anyone with the link can read this page. Comments are never shown. Turning it off revokes the link.`}</p>
-                    </div>
-                    <Switch
-                        aria-labelledby={`${baseId}-public`}
-                        checked={sharing?.isPublic ?? false}
-                        disabled={!sharing || setPublic.isPending}
-                        onCheckedChange={(checked) => setPublic.mutate({ isPublic: checked, pageId: pageId as never }, { onError })}
-                    />
-                </div>
-                {publicLink && (
-                    <div className="flex gap-2">
-                        <Input aria-label={t`Public link`} readOnly value={publicLink} />
-                        <Button
-                            aria-label={t`Copy public link`}
-                            onClick={() => {
-                                void copy(publicLink, t`Link copied`);
-                            }}
-                            size="icon"
-                            variant="outline"
+            <HeadingLevelProvider level={3}>
+                {/* No card title: its row's heading is the dialog's next level down, not two. */}
+                <HeadingLevelProvider level={2}>
+                    <SettingsCard>
+                        <SettingsRow
+                            control={
+                                <Switch
+                                    aria-labelledby={`${baseId}-public`}
+                                    checked={sharing?.isPublic ?? false}
+                                    disabled={!sharing || setPublic.isPending}
+                                    onCheckedChange={(checked) => setPublic.mutate({ isPublic: checked, pageId: pageId as never }, { onError })}
+                                />
+                            }
+                            description={t`Anyone with the link can read this page. Comments are never shown. Turning it off revokes the link.`}
+                            title={t`Public link`}
+                            titleId={`${baseId}-public`}
                         >
-                            <Copy aria-hidden="true" />
-                        </Button>
-                    </div>
-                )}
-            </section>
+                            {publicLink && (
+                                <div className="flex gap-2">
+                                    <Input aria-label={t`Public link`} readOnly value={publicLink} />
+                                    <Button
+                                        aria-label={t`Copy public link`}
+                                        onClick={() => {
+                                            void copy(publicLink, t`Link copied`);
+                                        }}
+                                        size="icon"
+                                        variant="outline"
+                                    >
+                                        <Copy aria-hidden="true" />
+                                    </Button>
+                                </div>
+                            )}
+                        </SettingsRow>
+                    </SettingsCard>
+                </HeadingLevelProvider>
 
-            <section aria-labelledby={`${baseId}-invite`} className="space-y-2">
-                <h3 className="text-sm font-medium" id={`${baseId}-invite`}>
-                    {t`Invite by link`}
-                </h3>
-                <p className="text-muted-foreground text-xs">{t`Creates a single-use link, valid for 7 days. Whoever opens it signed in gets access.`}</p>
-                <div className="flex items-end gap-2">
-                    <div className="flex-1 space-y-1">
-                        <Label id={`${baseId}-permission`}>{t`Access`}</Label>
-                        <Select
-                            items={permissionItems}
-                            onValueChange={(value) => setInvitePermission((value ?? "comment") as Permission)}
-                            value={invitePermission}
-                        >
-                            <SelectTrigger aria-labelledby={`${baseId}-permission`}>
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {permissionItems.map((item) => (
-                                    <SelectItem key={item.value} value={item.value}>
-                                        {item.label}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
-                    <Button
-                        aria-busy={createInvite.isPending}
-                        disabled={createInvite.isPending}
-                        onClick={() =>
-                            createInvite.mutate(
-                                { expiresInDays: 7, pageId: pageId as never, permission: invitePermission },
-                                { onError, onSuccess: ({ token }) => setInviteLink(`${origin}/pages/invite/${token}`) },
-                            )
-                        }
-                    >
-                        {t`Create link`}
-                    </Button>
-                </div>
-                {inviteLink && (
-                    <div className="space-y-1">
-                        <div className="flex gap-2">
-                            <Input aria-label={t`Invite link`} readOnly value={inviteLink} />
-                            <Button
-                                aria-label={t`Copy invite link`}
-                                onClick={() => {
-                                    void copy(inviteLink, t`Link copied`);
-                                }}
-                                size="icon"
-                                variant="outline"
-                            >
-                                <Copy aria-hidden="true" />
-                            </Button>
-                        </div>
-                        <p className="text-muted-foreground text-xs">{t`Copy it now — it is not shown again.`}</p>
-                    </div>
-                )}
-            </section>
-
-            <section aria-labelledby={`${baseId}-people`} className="space-y-2">
-                <h3 className="text-sm font-medium" id={`${baseId}-people`}>
-                    {t`People with access`}
-                </h3>
-                {sharing && sharing.grants.length === 0 && <p className="text-muted-foreground text-xs">{t`Only you.`}</p>}
-                <ul className="space-y-2">
-                    {sharing?.grants.map((grant) => {
-                        const name = grant.name ?? grant.email ?? t`Unknown user`;
-
-                        return (
-                            <li className="flex items-center gap-2" key={grant.userId}>
-                                <span className="min-w-0 flex-1">
-                                    <span className="block truncate text-sm">{name}</span>
-                                    {grant.email && grant.name && <span className="text-muted-foreground block truncate text-xs">{grant.email}</span>}
-                                </span>
+                <SettingsCard description={t`Creates a single-use link, valid for 7 days. Whoever opens it signed in gets access.`} title={t`Invite by link`}>
+                    <SettingsRow
+                        control={
+                            <>
                                 <Select
                                     items={permissionItems}
-                                    onValueChange={(value) =>
-                                        value &&
-                                        updateGrant.mutate(
-                                            { pageId: pageId as never, permission: value as Permission, targetUserId: grant.userId },
-                                            { onError },
-                                        )
-                                    }
-                                    value={grant.permission}
+                                    onValueChange={(value) => setInvitePermission((value ?? "comment") as Permission)}
+                                    value={invitePermission}
                                 >
-                                    <SelectTrigger aria-label={t`Access for ${name}`} className="w-36">
+                                    <SelectTrigger aria-labelledby={`${baseId}-permission`}>
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -182,26 +113,105 @@ const PageShareDialogBody: FC<{ pageId: string }> = ({ pageId }) => {
                                     </SelectContent>
                                 </Select>
                                 <Button
-                                    aria-label={t`Remove ${name}`}
-                                    onClick={() => removeGrant.mutate({ pageId: pageId as never, targetUserId: grant.userId }, { onError })}
-                                    size="icon"
-                                    variant="ghost"
+                                    aria-busy={createInvite.isPending}
+                                    disabled={createInvite.isPending}
+                                    onClick={() =>
+                                        createInvite.mutate(
+                                            { expiresInDays: 7, pageId: pageId as never, permission: invitePermission },
+                                            { onError, onSuccess: ({ token }) => setInviteLink(`${origin}/pages/invite/${token}`) },
+                                        )
+                                    }
                                 >
-                                    <Trash2 aria-hidden="true" />
+                                    {t`Create link`}
                                 </Button>
-                            </li>
-                        );
-                    })}
-                </ul>
+                            </>
+                        }
+                        title={t`Access`}
+                        titleId={`${baseId}-permission`}
+                    >
+                        {inviteLink && (
+                            <div className="space-y-1">
+                                <div className="flex gap-2">
+                                    <Input aria-label={t`Invite link`} readOnly value={inviteLink} />
+                                    <Button
+                                        aria-label={t`Copy invite link`}
+                                        onClick={() => {
+                                            void copy(inviteLink, t`Link copied`);
+                                        }}
+                                        size="icon"
+                                        variant="outline"
+                                    >
+                                        <Copy aria-hidden="true" />
+                                    </Button>
+                                </div>
+                                <p className="text-muted-foreground text-xs">{t`Copy it now — it is not shown again.`}</p>
+                            </div>
+                        )}
+                    </SettingsRow>
+                </SettingsCard>
+
+                <SettingsCard title={t`People with access`}>
+                    {sharing && sharing.grants.length === 0 && <p className="text-muted-foreground py-3 text-xs">{t`Only you.`}</p>}
+                    <ul className="py-3">
+                        {sharing?.grants.map((grant) => {
+                            const name = grant.name ?? grant.email ?? t`Unknown user`;
+
+                            return (
+                                <li
+                                    className="not-first:border-border/50 flex items-center gap-2 not-first:border-t not-first:pt-3 not-last:pb-3"
+                                    key={grant.userId}
+                                >
+                                    <span className="min-w-0 flex-1">
+                                        <span className="block truncate text-sm font-medium">{name}</span>
+                                        {grant.email && grant.name && <span className="text-muted-foreground block truncate text-xs">{grant.email}</span>}
+                                    </span>
+                                    <Select
+                                        items={permissionItems}
+                                        onValueChange={(value) =>
+                                            value &&
+                                            updateGrant.mutate(
+                                                { pageId: pageId as never, permission: value as Permission, targetUserId: grant.userId },
+                                                { onError },
+                                            )
+                                        }
+                                        value={grant.permission}
+                                    >
+                                        <SelectTrigger aria-label={t`Access for ${name}`} className="w-36">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {permissionItems.map((item) => (
+                                                <SelectItem key={item.value} value={item.value}>
+                                                    {item.label}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    <Button
+                                        aria-label={t`Remove ${name}`}
+                                        onClick={() => removeGrant.mutate({ pageId: pageId as never, targetUserId: grant.userId }, { onError })}
+                                        size="icon"
+                                        variant="ghost"
+                                    >
+                                        <Trash2 aria-hidden="true" />
+                                    </Button>
+                                </li>
+                            );
+                        })}
+                    </ul>
+                </SettingsCard>
+
                 {(sharing?.invites.length ?? 0) > 0 && (
-                    <>
-                        <h4 className="text-muted-foreground pt-2 text-xs font-medium">{t`Open invite links`}</h4>
-                        <ul className="space-y-1">
+                    <SettingsCard title={t`Open invite links`}>
+                        <ul className="py-3">
                             {sharing?.invites.map((invite) => {
                                 const expired = invite.expiresAt < openedAt;
 
                                 return (
-                                    <li className="flex items-center justify-between gap-2 text-xs" key={invite._id}>
+                                    <li
+                                        className="not-first:border-border/50 flex items-center justify-between gap-2 text-xs not-first:border-t not-first:pt-3 not-last:pb-3"
+                                        key={invite._id}
+                                    >
                                         <span className={expired ? "text-muted-foreground line-through" : undefined}>
                                             {labels[invite.permission]} · {expired ? t`expired` : t`until ${dateFormat.format(invite.expiresAt)}`}
                                         </span>
@@ -212,9 +222,9 @@ const PageShareDialogBody: FC<{ pageId: string }> = ({ pageId }) => {
                                 );
                             })}
                         </ul>
-                    </>
+                    </SettingsCard>
                 )}
-            </section>
+            </HeadingLevelProvider>
         </DialogPanel>
     );
 };
@@ -225,7 +235,7 @@ const PageShareDialog: FC<{ onClose: () => void; open: boolean; pageId: string }
     return (
         <Dialog onOpenChange={(nextOpen) => !nextOpen && onClose()} open={open}>
             {open && (
-                <DialogContent className="max-w-lg">
+                <DialogContent className="max-w-2xl">
                     <DialogHeader>
                         <DialogTitle>{t`Share page`}</DialogTitle>
                         <DialogDescription>{t`Give people access to this page, or publish a read-only link.`}</DialogDescription>

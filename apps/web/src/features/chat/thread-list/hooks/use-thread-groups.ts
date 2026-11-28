@@ -494,6 +494,17 @@ const useThreadGroups = (
         const olderThreads: BranchNode[] = [];
         const archivedThreads: BranchNode[] = [];
 
+        // Temporary chats keep their own group; an archived one goes to the archive like any other.
+        const activeTemporaryThreads: BranchNode[] = [];
+
+        for (const thread of temporaryThreadsList) {
+            if (thread.status === "archived") {
+                archivedThreads.push(thread);
+            } else {
+                activeTemporaryThreads.push(thread);
+            }
+        }
+
         // Group stateless threads separately (excluding archived)
         for (const thread of statelessThreads) {
             if (thread.status === "archived") {
@@ -602,8 +613,16 @@ const useThreadGroups = (
             const projectId = project._id;
             const projectThreads = threadsByProject.map.get(projectId) || [];
 
-            // Filter out archived threads from project groups
-            const activeProjectThreads = projectThreads.filter((candidate) => candidate.status !== "archived" && !derivedIds.has(candidate.threadId));
+            // Archived project chats go to the archived list, as the held copies above do; the derived sections took theirs already.
+            const activeProjectThreads: BranchNode[] = [];
+
+            for (const candidate of projectThreads) {
+                if (candidate.status === "archived") {
+                    archivedThreads.push(candidate);
+                } else if (!derivedIds.has(candidate.threadId)) {
+                    activeProjectThreads.push(candidate);
+                }
+            }
 
             // Check if this specific project group is collapsed
             const isCollapsed = collapsedProjects.has(projectId);
@@ -625,7 +644,7 @@ const useThreadGroups = (
             threads: BranchNode[];
             title: string;
         }[] = [
-            { groupType: "temporary", threads: temporaryThreadsList, title: t`Temporary` },
+            { groupType: "temporary", threads: activeTemporaryThreads, title: t`Temporary` },
             { groupType: "pinned", threads: pinnedThreadsList, title: t`Pinned` },
             { groupType: "stateless", threads: statelessThreadsList, title: t`Stateless` },
             { groupType: "today", threads: todayThreads, title: t`Today` },

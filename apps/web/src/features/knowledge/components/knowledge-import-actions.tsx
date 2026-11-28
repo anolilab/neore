@@ -58,8 +58,8 @@ const KnowledgeImportActions: FC<KnowledgeImportActionsProps> = ({ collectionId,
     };
 
     return (
-        <div className="space-y-2">
-            <div className="flex flex-wrap gap-2">
+        <div className="w-full space-y-2 @lg/settings-row:w-80">
+            <div className="flex flex-wrap gap-2 @lg/settings-row:justify-end">
                 <Button disabled={busy} onClick={() => folderInput.current?.click()} size="sm" type="button" variant="outline">
                     <FolderUpIcon aria-hidden="true" className="mr-1.5 h-3.5 w-3.5" />
                     {t`Upload folder`}

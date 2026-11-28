@@ -185,7 +185,7 @@ const ReviewDiff = ({
                                 ))}
                                 {draftsByLine.get(key)?.map((comment) => draftCard(comment))}
                                 {composing === key && (
-                                    <div className="bg-background text-foreground sticky left-0 my-1 max-w-3xl rounded-md border p-3 font-sans text-sm whitespace-normal">
+                                    <div className="surface-raised text-foreground sticky left-0 mx-3 my-2 max-w-3xl rounded-xl p-3 font-sans text-sm whitespace-normal">
                                         <CommentComposer
                                             label={t`Comment on line ${target.line}`}
                                             onCancel={() => setComposing(null)}
@@ -209,13 +209,13 @@ const ReviewDiff = ({
             })}
             {looseDrafts.length > 0 && (
                 <div className="font-sans text-sm">
-                    <p className="text-muted-foreground px-3 pt-2 text-xs">{t`Your comments on lines this diff does not show`}</p>
+                    <p className="text-muted-foreground px-4 pt-3 font-mono text-xs">{t`Your comments on lines this diff does not show`}</p>
                     {looseDrafts.map((comment) => draftCard(comment))}
                 </div>
             )}
             {loose.length > 0 && (
                 <div className="font-sans text-sm">
-                    <p className="text-muted-foreground px-3 pt-2 text-xs">{t`Conversations on lines this diff no longer shows`}</p>
+                    <p className="text-muted-foreground px-4 pt-3 font-mono text-xs">{t`Conversations on lines this diff no longer shows`}</p>
                     {loose.map((thread) => (
                         <ReviewThread address={address} capabilities={capabilities} hostLabel={hostLabel} key={thread.id} thread={thread} />
                     ))}

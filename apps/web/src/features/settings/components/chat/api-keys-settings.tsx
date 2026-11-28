@@ -5,17 +5,15 @@ import { msg } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
 import { Badge } from "@neore/ui/components/badge";
 import { Button } from "@neore/ui/components/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@neore/ui/components/card";
-import { Heading, HeadingSection } from "@neore/ui/components/heading";
 import { Input } from "@neore/ui/components/input";
-import { Label } from "@neore/ui/components/label";
-import { Separator } from "@neore/ui/components/separator";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { CheckCircle, Eye, EyeOff, KeyRound, Trash2 } from "lucide-react";
 import type { FC } from "react";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import SettingsCard from "@/components/settings/settings-card";
+import SettingsRow from "@/components/settings/settings-row";
 import { trackEvent } from "@/lib/analytics";
 import { useCRPC } from "@/lib/lunora/crpc";
 
@@ -369,26 +367,9 @@ const ProviderKeyRow: FC<ProviderKeyRowProps> = ({ createdAt, def, isSet, last4,
     };
 
     return (
-        <div className="space-y-3">
-            <div className="flex items-start justify-between gap-4">
-                <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                        <Label className="text-sm font-medium">{name}</Label>
-                        {isSet && (
-                            <Badge className="gap-1 text-xs" variant="secondary">
-                                <CheckCircle aria-hidden="true" className="h-3 w-3 text-green-500" />
-                                {t`Configured`}
-                            </Badge>
-                        )}
-                        {isSet && (lastRotatedAt || createdAt) && (
-                            <span className="text-muted-foreground text-xs">
-                                {lastRotatedAt && lastRotatedAt !== createdAt ? t`rotated ${age(lastRotatedAt)}` : t`added ${age(createdAt)}`}
-                            </span>
-                        )}
-                    </div>
-                    <p className="text-muted-foreground mt-0.5 text-xs">{i18n._(def.description)}</p>
-                </div>
-                <div className="flex shrink-0 items-center gap-2">
+        <SettingsRow
+            control={
+                <>
                     {isSet && !showInput && (
                         <>
                             <span className="text-muted-foreground font-mono text-sm">{last4 ? `••••${last4}` : "••••••••"}</span>
@@ -408,9 +389,26 @@ const ProviderKeyRow: FC<ProviderKeyRowProps> = ({ createdAt, def, isSet, last4,
                             {t`Add Key`}
                         </Button>
                     )}
-                </div>
-            </div>
-
+                </>
+            }
+            description={i18n._(def.description)}
+            title={
+                <span className="flex flex-wrap items-center gap-2">
+                    {name}
+                    {isSet && (
+                        <Badge className="gap-1 text-xs" variant="secondary">
+                            <CheckCircle aria-hidden="true" className="h-3 w-3 text-green-500" />
+                            {t`Configured`}
+                        </Badge>
+                    )}
+                    {isSet && (lastRotatedAt || createdAt) && (
+                        <span className="text-muted-foreground text-xs font-normal">
+                            {lastRotatedAt && lastRotatedAt !== createdAt ? t`rotated ${age(lastRotatedAt)}` : t`added ${age(createdAt)}`}
+                        </span>
+                    )}
+                </span>
+            }
+        >
             {showInput && (
                 <div className="flex items-center gap-2">
                     <div className="relative flex-1">
@@ -448,7 +446,7 @@ const ProviderKeyRow: FC<ProviderKeyRowProps> = ({ createdAt, def, isSet, last4,
                     </Button>
                 </div>
             )}
-        </div>
+        </SettingsRow>
     );
 };
 
@@ -549,92 +547,66 @@ const APIKeysSettings: FC = () => {
     };
 
     return (
-        <div className="space-y-6">
-            <div>
-                <Heading className="text-2xl font-bold tracking-tight">{t`API Keys`}</Heading>
-                <p className="text-muted-foreground">{t`Bring your own API keys to use your own accounts and rate limits.`}</p>
-            </div>
-
-            <HeadingSection>
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="text-base">{t`AI Provider Keys`}</CardTitle>
-                        <CardDescription>
-                            {t`Override the default AI provider with your own API key. Your key will be used for all requests on models from that provider.`}
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-6">
-                        {AI_PROVIDERS.map((provider, index) => (
-                            <div key={provider.id}>
-                                {index > 0 && <Separator className="mb-6" />}
-                                <ProviderKeyRow
-                                    createdAt={providerApiKeys[provider.id]?.createdAt}
-                                    def={provider}
-                                    isSet={isAIKeySet(provider.id)}
-                                    last4={providerApiKeys[provider.id]?.last4}
-                                    lastRotatedAt={providerApiKeys[provider.id]?.lastRotatedAt}
-                                    onClear={() => handleClearAIKey(provider.id)}
-                                    onSave={(key) => handleSaveAIKey(provider.id, key)}
-                                />
-                            </div>
-                        ))}
-                    </CardContent>
-                </Card>
+        <div className="space-y-8">
+            <>
+                <SettingsCard
+                    description={t`Override the default AI provider with your own API key. Your key will be used for all requests on models from that provider.`}
+                    title={t`AI Provider Keys`}
+                >
+                    {AI_PROVIDERS.map((provider) => (
+                        <ProviderKeyRow
+                            createdAt={providerApiKeys[provider.id]?.createdAt}
+                            def={provider}
+                            isSet={isAIKeySet(provider.id)}
+                            key={provider.id}
+                            last4={providerApiKeys[provider.id]?.last4}
+                            lastRotatedAt={providerApiKeys[provider.id]?.lastRotatedAt}
+                            onClear={() => handleClearAIKey(provider.id)}
+                            onSave={(key) => handleSaveAIKey(provider.id, key)}
+                        />
+                    ))}
+                </SettingsCard>
 
                 <NativeProvidersSettings />
 
                 <CustomProvidersSettings />
 
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="text-base">{t`Tool Provider Keys`}</CardTitle>
-                        <CardDescription>
-                            {t`Override the default search and retrieval providers with your own API keys for web search and URL content extraction.`}
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-6">
-                        {TOOL_PROVIDERS.map((provider, index) => (
-                            <div key={provider.id}>
-                                {index > 0 && <Separator className="mb-6" />}
-                                <ProviderKeyRow
-                                    createdAt={generalProviders[provider.id]?.createdAt}
-                                    def={provider}
-                                    isSet={isToolKeySet(provider.id)}
-                                    last4={generalProviders[provider.id]?.last4}
-                                    lastRotatedAt={generalProviders[provider.id]?.lastRotatedAt}
-                                    onClear={() => handleClearToolKey(provider.id)}
-                                    onSave={(key) => handleSaveToolKey(provider.id, key)}
-                                />
-                            </div>
-                        ))}
-                    </CardContent>
-                </Card>
+                <SettingsCard
+                    description={t`Override the default search and retrieval providers with your own API keys for web search and URL content extraction.`}
+                    title={t`Tool Provider Keys`}
+                >
+                    {TOOL_PROVIDERS.map((provider) => (
+                        <ProviderKeyRow
+                            createdAt={generalProviders[provider.id]?.createdAt}
+                            def={provider}
+                            isSet={isToolKeySet(provider.id)}
+                            key={provider.id}
+                            last4={generalProviders[provider.id]?.last4}
+                            lastRotatedAt={generalProviders[provider.id]?.lastRotatedAt}
+                            onClear={() => handleClearToolKey(provider.id)}
+                            onSave={(key) => handleSaveToolKey(provider.id, key)}
+                        />
+                    ))}
+                </SettingsCard>
 
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="text-base">{t`Messenger Bot Keys`}</CardTitle>
-                        <CardDescription>
-                            {t`Bring your own bot tokens for Telegram, Slack, Discord, WhatsApp, LINE, Feishu/Lark, Microsoft Teams and WeChat messenger integration. Your bot tokens are used to receive and send messages on your behalf.`}
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-6">
-                        {MESSENGER_KEYS.map((keyDef, index) => (
-                            <div key={keyDef.id}>
-                                {index > 0 && <Separator className="mb-6" />}
-                                <ProviderKeyRow
-                                    createdAt={messengerKeys[keyDef.id]?.createdAt}
-                                    def={keyDef}
-                                    isSet={isMessengerKeySet(keyDef.id)}
-                                    last4={messengerKeys[keyDef.id]?.last4}
-                                    lastRotatedAt={messengerKeys[keyDef.id]?.lastRotatedAt}
-                                    onClear={() => handleClearMessengerKey(keyDef.id)}
-                                    onSave={(key) => handleSaveMessengerKey(keyDef.id, key)}
-                                />
-                            </div>
-                        ))}
-                    </CardContent>
-                </Card>
-            </HeadingSection>
+                <SettingsCard
+                    description={t`Bring your own bot tokens for Telegram, Slack, Discord, WhatsApp, LINE, Feishu/Lark, Microsoft Teams and WeChat messenger integration. Your bot tokens are used to receive and send messages on your behalf.`}
+                    title={t`Messenger Bot Keys`}
+                >
+                    {MESSENGER_KEYS.map((keyDef) => (
+                        <ProviderKeyRow
+                            createdAt={messengerKeys[keyDef.id]?.createdAt}
+                            def={keyDef}
+                            isSet={isMessengerKeySet(keyDef.id)}
+                            key={keyDef.id}
+                            last4={messengerKeys[keyDef.id]?.last4}
+                            lastRotatedAt={messengerKeys[keyDef.id]?.lastRotatedAt}
+                            onClear={() => handleClearMessengerKey(keyDef.id)}
+                            onSave={(key) => handleSaveMessengerKey(keyDef.id, key)}
+                        />
+                    ))}
+                </SettingsCard>
+            </>
 
             <p className="text-muted-foreground text-xs">
                 {t`Keys are encrypted at rest using AES-256-GCM with HKDF-derived per-purpose keys. They are never exposed to the client after being saved. All key operations are audit-logged and rate-limited.`}

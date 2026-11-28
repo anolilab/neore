@@ -115,14 +115,14 @@ const DataExport: FC<DataExportProps> = ({ exportStatus, isLoading }) => {
                 )}
 
                 {isCompleted && exportStatus?.expiresAt && (
-                    <div className="bg-muted rounded-lg p-4 text-sm">
+                    <div className="text-sm">
                         <p className="font-medium">{t`Export ready!`}</p>
                         <p className="text-muted-foreground mt-1">{t`Expires on ${formatDate(exportStatus.expiresAt, i18n.locale)}`}</p>
                     </div>
                 )}
 
                 {isFailed && (
-                    <div className="bg-destructive/10 text-destructive rounded-lg p-4 text-sm">
+                    <div className="text-destructive text-sm">
                         <p className="font-medium">{t`Export failed`}</p>
                         {exportStatus?.errorMessage && <p className="mt-1">{exportStatus.errorMessage}</p>}
                         {canExport && (
@@ -134,13 +134,13 @@ const DataExport: FC<DataExportProps> = ({ exportStatus, isLoading }) => {
                 )}
 
                 {isCancelled && (
-                    <div className="bg-muted rounded-lg p-4 text-sm">
+                    <div className="text-sm">
                         <p className="text-muted-foreground">{t`Previous export was cancelled`}</p>
                     </div>
                 )}
 
                 {isCompleted && !hasFile && (
-                    <div className="bg-destructive/10 text-destructive rounded-lg p-4 text-sm">
+                    <div className="text-destructive text-sm">
                         <p className="font-medium">{t`Export incomplete`}</p>
                         <p className="mt-1">{t`The export file was not generated. Please request a new export.`}</p>
                     </div>

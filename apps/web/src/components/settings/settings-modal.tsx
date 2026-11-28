@@ -21,8 +21,10 @@ import { hasNoAccount } from "@/features/auth/lib/account-state";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import { useModalState } from "@/features/layout/hooks/use-ui-state";
 import { jumpToSettingsRow } from "@/features/settings/lib/settings-jump";
+import { scrollToAnchorWhenRendered } from "@/features/settings/lib/settings-link";
 import type { SettingsTab } from "@/features/settings/lib/settings-navigation";
-import { resolveSettingsNavigation } from "@/features/settings/lib/settings-navigation";
+import { isSettingsTab, resolveSettingsNavigation, SETTINGS_NAVIGATION } from "@/features/settings/lib/settings-navigation";
+import { useSettingsRequest } from "@/features/settings/lib/settings-request";
 import type { SettingsSearchEntry } from "@/features/settings/lib/settings-search";
 import { ErrorUtilities } from "@/lib/errors";
 import { useCRPC } from "@/lib/lunora/crpc";
@@ -51,33 +53,13 @@ const PersonalizationSettings = lazy(() => import("@/features/settings/component
 const KnowledgeBaseSettings = lazy(() => import("@/features/settings/components/knowledge/knowledge-base-settings"));
 const ProviderAPIKeysSettings = lazy(() => import("@/features/settings/components/chat/api-keys-settings"));
 const SystemPromptPresetSettings = lazy(() => import("@/features/settings/components/chat/system-prompt-preset-settings"));
-
-// Preload all tab chunks in parallel so switching tabs is instant.
-// Call on settings button hover so chunks are ready before the modal opens.
-// Vite deduplicates — safe to call multiple times.
-export const preloadSettingsTabs = () => {
-    import("@/features/auth/components/settings/account-settings-cards");
-    import("@/features/auth/components/settings/security-settings-cards");
-    import("@/features/auth/components/settings/api-key/api-keys-card");
-    import("@/features/auth/components/organization/organizations-card");
-    import("@/features/auth/components/organization/organization-settings-cards");
-    import("@/features/auth/components/organization/organization-members-card");
-    import("@/features/auth/components/organization/organization-invitations-card");
-    import("@/features/auth/components/team/teams-card");
-    import("@/features/auth/components/organization/billing-settings-card");
-    import("@/features/billing/components/personal-plan-card");
-    import("@/features/settings/components/account/account-settings");
-    import("@/features/settings/components/chat/agent-settings");
-    import("@/features/settings/components/chat/mcp-settings");
-    import("@/features/settings/components/chat/tool-permissions-settings");
-    import("@/features/settings/components/chat/default-models-settings");
-    import("@/features/settings/components/chat/models-settings");
-    import("@/features/settings/components/privacy/privacy-settings");
-    import("@/features/settings/components/keyboard/keyboard-shortcuts-settings");
-    import("@/features/settings/components/personalization/personalization-settings");
-    import("@/features/settings/components/knowledge/knowledge-base-settings");
-    import("@/features/settings/components/chat/api-keys-settings");
-};
+const ModelFilterSettings = lazy(() => import("@/features/settings/components/chat/model-filter-settings"));
+const BotsSettings = lazy(() => import("@/features/settings/components/chat/bots-settings"));
+const TriggerSettings = lazy(() => import("@/features/settings/components/chat/trigger-settings"));
+const DevicesSettings = lazy(() => import("@/features/devices/components/devices-settings"));
+const UsageSettings = lazy(() => import("@/features/settings/components/chat/usage-settings"));
+const ConnectorsPage = lazy(() => import("@/features/settings/connectors/connectors-page"));
+const MessengerPage = lazy(() => import("@/features/settings/connectors/messenger/messenger-page"));
 
 // Per-tab preload map — each nav item hover triggers only its own chunk.
 const preloadTab: Record<string, () => void> = {
@@ -107,11 +89,27 @@ const preloadTab: Record<string, () => void> = {
     "chat-sub-agent-roles": () => import("@/features/settings/components/chat/sub-agent-roles-settings"),
     "chat-personalization": () => import("@/features/settings/components/personalization/personalization-settings"),
     "chat-system-prompts": () => import("@/features/settings/components/chat/system-prompt-preset-settings"),
+    "chat-bots": () => import("@/features/settings/components/chat/bots-settings"),
+    "chat-devices": () => import("@/features/devices/components/devices-settings"),
+    "chat-model-filters": () => import("@/features/settings/components/chat/model-filter-settings"),
+    "chat-triggers": () => import("@/features/settings/components/chat/trigger-settings"),
+    "chat-usage": () => import("@/features/settings/components/chat/usage-settings"),
+    connectors: () => import("@/features/settings/connectors/connectors-page"),
+    "connectors-messenger": () => import("@/features/settings/connectors/messenger/messenger-page"),
     privacy: () => import("@/features/settings/components/privacy/privacy-settings"),
 };
 
+// Preload all tab chunks in parallel so switching tabs is instant.
+// Call on settings button hover so chunks are ready before the modal opens.
+// Vite deduplicates — safe to call multiple times.
+export const preloadSettingsTabs = () => {
+    for (const load of Object.values(preloadTab)) {
+        load();
+    }
+};
+
 // Search params the settings modal owns and strips on close.
-const MODAL_SEARCH_KEYS = new Set(["settings", "settingsTab"]);
+const MODAL_SEARCH_KEYS = new Set(["settings", "settingsAnchor", "settingsTab"]);
 
 const SettingsLoadingFallback: FC = () => (
     <div className="flex h-64 items-center justify-center">
@@ -170,17 +168,23 @@ const AnonymousUpgradeGate: FC<{ label: string }> = ({ label }) => {
     );
 };
 
+/** The tabs a guest may use but a visitor with no session may not: there is no account behind them to show. */
+const SESSION_TABS: ReadonlyArray<SettingsTab> = ["auth-account", "auth-security"];
+
 export const SettingsModal: FC = () => {
-    const { t } = useLingui();
+    const { i18n, t } = useLingui();
     const navigate = useNavigate();
-    const search = useSearch({ strict: false }) as { settings?: boolean; settingsTab?: SettingsTab };
+    const search = useSearch({ strict: false }) as { settings?: boolean; settingsAnchor?: string; settingsTab?: string };
     const queryClient = useQueryClient();
     const crpc = useCRPC();
     const { apiKey, organization } = useAuth();
     const { data: activeOrganization } = useAuthActiveOrganization();
     // A guest, or signed out (the chat is reachable signed out under invite-only), locks the account tabs. A session
     // read still pending or failed is unknown, not signed out, so it locks nothing.
-    const isAnonymous = hasNoAccount(useAuthSession());
+    const session = useAuthSession();
+    const isAnonymous = hasNoAccount(session);
+    // A guest has an account to manage (its sessions, deleting its data); signed out there is none, so those tabs lock too.
+    const isSignedOut = isAnonymous && !session.data?.user;
 
     const { close, isOpen, open } = useModalState("settings");
     // Once opened, stay mounted so the Dialog's Activity component can
@@ -189,33 +193,65 @@ export const SettingsModal: FC = () => {
 
     // Local tab state for instant switching — URL is updated in the background
     // for deep-link/back-button support only.
-    const [currentTab, setCurrentTab] = useState<SettingsTab>((search.settingsTab as SettingsTab) || "app-customization");
+    const [currentTab, setCurrentTab] = useState<SettingsTab>(isSettingsTab(search.settingsTab) ? search.settingsTab : "app-customization");
     // Incrementing this resets the error boundary for the current tab (retry).
     // Changing currentTab also resets it via the ScrollArea key below.
     const [tabRetryKey, setTabRetryKey] = useState(0);
     // Below md the sidebar and the tab content do not fit side by side, so the modal shows one at a time.
     const [mobileView, setMobileView] = useState<"detail" | "list">("list");
+    // The element id a link asked for (`#daily-brief`), scrolled to once its lazy tab has rendered it.
+    const [pendingAnchor, setPendingAnchor] = useState<string | null>(null);
     const backButtonRef = useRef<HTMLButtonElement>(null);
     const navRef = useRef<HTMLElement>(null);
 
-    // Sync from URL on first mount so deep-linked ?settings=true still works.
-    // `currentTab` already seeds itself from `search.settingsTab` above.
-    const openIfDeepLinked = useEffectEvent(() => {
-        if (search.settings !== true) {
-            return;
-        }
-
-        // A link to a section shows that section on a phone, not the list; the closed-modal reset below runs first.
-        if (search.settingsTab) {
+    // The URL opens it: a deep link on load, and a settings link anywhere (`settingsLinkSearch`), which keeps the page
+    // and only sets these keys. A later link to another tab switches to it.
+    const openFromUrl = useEffectEvent((tab: string | undefined, anchor: string | undefined) => {
+        if (isSettingsTab(tab)) {
+            setCurrentTab(tab);
+            // A link to a section shows that section on a phone, not the list; the closed-modal reset below runs first.
             setMobileView("detail");
         }
 
+        setPendingAnchor(anchor ?? null);
         open();
     });
+    const closeFromUrl = useEffectEvent(() => {
+        if (isOpen) {
+            close();
+        }
+    });
+    // Whether the URL is what opened it: Back past that link closes it, while one the gear opened never set the key.
+    const isOpenInUrl = useRef(false);
 
     useEffect(() => {
-        openIfDeepLinked();
-    }, []);
+        if (search.settings === true) {
+            isOpenInUrl.current = true;
+            openFromUrl(search.settingsTab, search.settingsAnchor);
+
+            return;
+        }
+
+        if (isOpenInUrl.current) {
+            isOpenInUrl.current = false;
+            closeFromUrl();
+        }
+    }, [search.settings, search.settingsTab, search.settingsAnchor]);
+
+    // A link to the tab the URL already names leaves the search as it was, so the effect above does not run: the link's
+    // own request switches the tab then (`settings-request.ts`).
+    const requestId = useSettingsRequest((state) => state.request?.id);
+    // A request made before this modal mounted (a link clicked, the modal closed, the page left) is not one for it.
+    const handledRequestId = useRef(requestId);
+
+    useEffect(() => {
+        const { request } = useSettingsRequest.getState();
+
+        if (request && request.id !== handledRequestId.current) {
+            handledRequestId.current = request.id;
+            openFromUrl(request.tab, request.anchor);
+        }
+    }, [requestId]);
 
     // Latch the first open during render: React documents adjusting state directly
     // in the render pass instead of in an effect, which avoids the extra pass.
@@ -238,6 +274,49 @@ export const SettingsModal: FC = () => {
     // Where the last pick led, for the live region: the field is empty after a pick, so nothing else tells a screen reader it worked.
     const [announcement, setAnnouncement] = useState("");
 
+    // The current tab stays in view in the list: a link can open one far down (Account, Privacy).
+    useEffect(() => {
+        if (!isOpen) {
+            return undefined;
+        }
+
+        // The dialog renders its list after this commit, so the scroll waits a frame for it.
+        const frame = requestAnimationFrame(() => {
+            navRef.current?.querySelector<HTMLElement>('[aria-current="true"]')?.scrollIntoView({ block: "nearest" });
+        });
+
+        return () => cancelAnimationFrame(frame);
+    }, [isOpen, currentTab]);
+
+    // "/" jumps to the search, as the hint in the field says; typed into a field it is just a slash.
+    useEffect(() => {
+        if (!isOpen) {
+            return undefined;
+        }
+
+        const onKeyDown = (event: KeyboardEvent) => {
+            const field = searchInputRef.current;
+
+            // Shift stays allowed: on some layouts "/" is Shift+7. A key that is part of an IME composition is not a slash yet.
+            if (event.key !== "/" || event.isComposing || event.metaKey || event.ctrlKey || event.altKey || !field || field.offsetParent === null) {
+                return;
+            }
+
+            const target = event.target as HTMLElement | null;
+
+            if (target?.closest("input, textarea, select, [contenteditable='true']")) {
+                return;
+            }
+
+            event.preventDefault();
+            field.focus();
+        };
+
+        document.addEventListener("keydown", onKeyDown);
+
+        return () => document.removeEventListener("keydown", onKeyDown);
+    }, [isOpen]);
+
     // Runs after the destination tab's commit; the tab may still be loading its chunk, which the jump waits for.
     // Moves focus to the row's own control when it has one; a row without one leaves focus in the search field.
     useEffect(() => {
@@ -249,14 +328,27 @@ export const SettingsModal: FC = () => {
         return jumpToSettingsRow(tabContentRef.current, pendingJump.label, (control) => control?.focus({ preventScroll: true }));
     }, [isOpen, pendingJump]);
 
+    useEffect(() => {
+        if (!isOpen || !pendingAnchor) {
+            return undefined;
+        }
+
+        return scrollToAnchorWhenRendered(
+            () => tabContentRef.current,
+            pendingAnchor,
+            () => setPendingAnchor(null),
+        );
+    }, [isOpen, pendingAnchor, currentTab]);
+
     // The modal stays mounted, so a query left in the field would greet the next opening.
     // Cleared on any close, including ones that bypass `handleClose`.
-    if (!isOpen && (searchQuery !== "" || announcement !== "" || pendingJump !== null || mobileView !== "list")) {
+    if (!isOpen && (searchQuery !== "" || announcement !== "" || pendingJump !== null || pendingAnchor !== null || mobileView !== "list")) {
         setMobileView("list");
         setSearchQuery("");
         setAnnouncement("");
         // A jump that was cancelled by closing must not replay when the dialog opens again.
         setPendingJump(null);
+        setPendingAnchor(null);
     }
 
     // Compute query options at render time — queryOptions() calls hooks internally
@@ -302,6 +394,8 @@ export const SettingsModal: FC = () => {
     );
 
     const handleClose = () => {
+        // Closed here, not by the URL: the URL change still on its way must not close a modal the gear opens meanwhile.
+        isOpenInUrl.current = false;
         close(); // Instant via Zustand — no navigation delay
         // Clean up URL params in the background
         // The registered router type is the widened `createTanstackRouter` return (see the
@@ -312,7 +406,8 @@ export const SettingsModal: FC = () => {
         const stripModalSearchParams = (previous: Record<string, unknown>): Record<string, unknown> =>
             Object.fromEntries(Object.entries(previous).filter(([key]) => !MODAL_SEARCH_KEYS.has(key)));
 
-        navigate({ search: stripModalSearchParams as unknown as SearchUpdater });
+        // Replaced, not pushed: Back from here must go to the page before the settings link, not to the link again.
+        navigate({ replace: true, search: stripModalSearchParams as unknown as SearchUpdater });
     };
 
     // The control that switched the view is hidden by it, so on a phone focus moves to the view that appeared. Never on desktop, never on close.
@@ -354,9 +449,10 @@ export const SettingsModal: FC = () => {
             return new Set();
         }
 
-        const locked = new Set<SettingsTab>();
+        const locked = new Set<SettingsTab>(isSignedOut ? SESSION_TABS : []);
 
-        for (const group of navigationGroups) {
+        // Every tab that needs an account, not only the ones the navigation shows: a link can open a hidden one (Teams, say).
+        for (const group of SETTINGS_NAVIGATION) {
             for (const item of group.items) {
                 if (item.requiresAuth) {
                     locked.add(item.tab);
@@ -365,7 +461,7 @@ export const SettingsModal: FC = () => {
         }
 
         return locked;
-    }, [isAnonymous, navigationGroups]);
+    }, [isAnonymous, isSignedOut]);
 
     // Loads a tab's chunk and data ahead of opening it; a tab the navigation locks for a guest loads nothing.
     const previewTab = (tab: SettingsTab) => {
@@ -395,16 +491,11 @@ export const SettingsModal: FC = () => {
         return null;
     }
 
+    // From every tab, not only the listed ones: a link can open a tab whose nav entry is hidden (API keys without the plugin).
     const getTabTitle = (): string => {
-        for (const group of navigationGroups) {
-            const item = group.items.find((i) => i.tab === currentTab);
+        const item = SETTINGS_NAVIGATION.flatMap((group) => group.items).find((i) => i.tab === currentTab);
 
-            if (item) {
-                return item.label;
-            }
-        }
-
-        return t`Settings`;
+        return item ? i18n._(item.label) : t`Settings`;
     };
 
     const renderContent = (): ReactNode => {
@@ -459,14 +550,23 @@ export const SettingsModal: FC = () => {
             case "chat-api-keys": {
                 return <ProviderAPIKeysSettings />;
             }
+            case "chat-bots": {
+                return <BotsSettings />;
+            }
             case "chat-default-models": {
                 return <DefaultModelsSettings />;
+            }
+            case "chat-devices": {
+                return <DevicesSettings />;
             }
             case "chat-knowledge": {
                 return <KnowledgeBaseSettings />;
             }
             case "chat-mcp": {
                 return <MCPSettings />;
+            }
+            case "chat-model-filters": {
+                return <ModelFilterSettings />;
             }
             case "chat-models": {
                 return <ModelsSettings />;
@@ -483,6 +583,18 @@ export const SettingsModal: FC = () => {
             case "chat-tools": {
                 return <ToolPermissionsSettings />;
             }
+            case "chat-triggers": {
+                return <TriggerSettings />;
+            }
+            case "chat-usage": {
+                return <UsageSettings />;
+            }
+            case "connectors": {
+                return <ConnectorsPage />;
+            }
+            case "connectors-messenger": {
+                return <MessengerPage />;
+            }
             case "privacy": {
                 return <PrivacySettings />;
             }
@@ -496,15 +608,15 @@ export const SettingsModal: FC = () => {
         <Dialog onOpenChange={(nextOpen) => !nextOpen && handleClose()} open={isOpen}>
             <DialogContent
                 bottomStickOnMobile={false}
-                className="-m-4 flex h-dvh max-h-none w-[calc(100%+2rem)] max-w-none flex-row gap-0 overflow-hidden rounded-none border-0 p-0 md:m-0 md:h-[min(672px,calc(100dvh-82px))] md:max-h-[95%] md:w-[95vw] md:max-w-6xl md:rounded-md md:border"
+                className="-m-4 flex h-dvh max-h-none w-[calc(100%+2rem)] max-w-none flex-row gap-0 overflow-hidden rounded-none border-0 p-0 md:m-0 md:h-[calc(100dvh-4rem)] md:max-h-none md:w-[95vw] md:max-w-6xl md:rounded-2xl md:border"
                 showCloseButton
             >
                 {/* Sidebar */}
-                <div className={cn("bg-sidebar h-full w-full shrink-0 flex-col border-r md:flex md:w-64", mobileView === "detail" ? "hidden" : "flex")}>
-                    <DialogHeader className="px-4 pt-4 in-[[data-slot=dialog-popup]:has([data-slot=dialog-panel])]:pb-8">
-                        {/* TODO: ADD LOGO */}
+                <div className={cn("bg-sidebar h-full w-full shrink-0 flex-col border-r md:flex md:w-60", mobileView === "detail" ? "hidden" : "flex")}>
+                    {/* The dialog's name. On a phone the list is a screen of its own, so it shows there; from md the content header says it. */}
+                    <DialogHeader className="px-4 pt-4 pb-1 md:sr-only">
                         <DialogTitle className="flex h-6 items-center gap-2">
-                            <Settings className="size-4" />
+                            <Settings aria-hidden="true" className="size-4" />
                             {t`Settings`}
                         </DialogTitle>
                         <DialogDescription className="sr-only">{t`Configure your application settings`}</DialogDescription>
@@ -539,28 +651,25 @@ export const SettingsModal: FC = () => {
                             setActive={settingsSearch.setActive}
                         />
                         {!settingsSearch.isSearching && (
-                            <nav className="flex flex-col gap-1 p-2" ref={navRef}>
-                                {navigationGroups.map((group) => (
-                                    <div className="mb-2" key={group.label}>
-                                        <div className="text-muted-foreground mb-1 px-3 text-xs font-medium tracking-wider uppercase">{group.label}</div>
+                            <nav className="flex flex-col px-3 pb-3" ref={navRef}>
+                                {navigationGroups.map((group, index) => (
+                                    <div className={cn("flex flex-col gap-px", index > 0 && "mt-4")} key={group.label}>
+                                        <div className="text-muted-foreground mb-1 px-2 font-mono text-xs">{group.label}</div>
                                         {group.items.map((item) => {
                                             const Icon = item.icon;
                                             const isActive = currentTab === item.tab;
-                                            const isLocked = isAnonymous && item.requiresAuth;
+                                            const isLocked = lockedTabs.has(item.tab);
 
-                                            let stateClassName = "text-muted-foreground web:hover:bg-muted hover:text-foreground";
-
-                                            if (isActive) {
-                                                stateClassName = "bg-primary text-primary-foreground";
-                                            } else if (isLocked) {
-                                                stateClassName = "text-muted-foreground/40 web:hover:bg-muted hover:text-muted-foreground";
-                                            }
+                                            // The light nav is white like the row-active fill, so light uses the pressed-in well instead.
+                                            const stateClassName = isActive
+                                                ? "bg-surface-well dark:bg-surface-row-active text-foreground"
+                                                : "text-muted-foreground web:hover:bg-surface-row-hover hover:text-foreground";
 
                                             return (
                                                 <button
                                                     aria-current={isActive ? "true" : undefined}
                                                     className={cn(
-                                                        "flex w-full items-center gap-2 rounded-md px-3 py-3 text-sm transition-colors md:py-2",
+                                                        "flex w-full items-center gap-2.5 rounded-lg px-2 py-2.5 text-sm transition-colors md:h-8 md:py-0",
                                                         stateClassName,
                                                     )}
                                                     key={item.tab}
@@ -575,9 +684,10 @@ export const SettingsModal: FC = () => {
                                                     }}
                                                     type="button"
                                                 >
-                                                    <Icon className="h-4 w-4" />
+                                                    <Icon aria-hidden="true" className="size-4" />
                                                     <span className="flex-1 text-left">{item.label}</span>
-                                                    {isLocked && <Lock className="h-3 w-3 shrink-0 opacity-50" />}
+                                                    {/* The lock marks it; the label stays readable, since it still opens the tab's sign-in prompt. */}
+                                                    {isLocked && <Lock aria-hidden="true" className="h-3 w-3 shrink-0" />}
                                                 </button>
                                             );
                                         })}
@@ -590,7 +700,7 @@ export const SettingsModal: FC = () => {
 
                 {/* Content */}
                 <div className={cn("min-w-0 flex-1 flex-col md:flex", mobileView === "detail" ? "flex" : "hidden")}>
-                    <div className="flex items-center gap-2 border-b px-4 py-2 max-md:pe-14">
+                    <div className="flex h-12 shrink-0 items-center gap-2 border-b px-4 pe-14">
                         <Button
                             aria-label={t`Back to settings sections`}
                             className="-ms-2 shrink-0 md:hidden"
@@ -604,10 +714,14 @@ export const SettingsModal: FC = () => {
                         >
                             <ArrowLeft aria-hidden="true" />
                         </Button>
-                        <h2 className="font-heading h-7 min-w-0 truncate text-xl">{getTabTitle()}</h2>
+                        <p aria-hidden="true" className="text-muted-foreground hidden shrink-0 text-sm md:block">
+                            {t`Settings`}
+                            <span className="text-muted-foreground/60 px-2">/</span>
+                        </p>
+                        <h2 className="min-w-0 truncate text-sm font-medium">{getTabTitle()}</h2>
                     </div>
                     <ScrollArea className="flex-1" key={`${currentTab}-${tabRetryKey}`}>
-                        <DialogPanel className="px-4 in-[[data-slot=dialog-popup]:has([data-slot=dialog-header])]:pt-6 md:px-6">
+                        <DialogPanel className="mx-auto w-full max-w-3xl px-4 py-6 md:px-8 md:py-8">
                             <ErrorBoundary
                                 fallback={(error) => <SettingsTabError error={error} onRetry={() => setTabRetryKey((k) => k + 1)} />}
                                 showToast={false}

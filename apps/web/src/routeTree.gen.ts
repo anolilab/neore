@@ -73,32 +73,11 @@ import { Route as AdminGatewayIndexRouteImport } from './routes/admin/gateway/in
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as AuthTwoFactorIndexRouteImport } from './routes/auth/two-factor/index'
 import { Route as AuthTwoFactorOtpRouteImport } from './routes/auth/two-factor/otp'
-import { Route as DashboardSettingsPrivacyRouteImport } from './routes/dashboard/settings/privacy'
+import { Route as DashboardSettingsSplatRouteImport } from './routes/dashboard/settings/$'
 import { Route as chatWorkflowSharedTokenRouteImport } from './routes/(chat)/workflow/shared/$token'
 import { Route as ShortcutPagesInviteTokenRouteImport } from './routes/_shortcut/pages/invite.$token'
 import { Route as AuthAcceptInvitationInvitationIdIndexRouteImport } from './routes/auth/accept-invitation/$invitationId/index'
-import { Route as DashboardSettingsAppCustomizationRouteImport } from './routes/dashboard/settings/app/customization'
-import { Route as DashboardSettingsAppKeyboardShortcutsRouteImport } from './routes/dashboard/settings/app/keyboard-shortcuts'
-import { Route as DashboardSettingsAppPersonalizationRouteImport } from './routes/dashboard/settings/app/personalization'
-import { Route as DashboardSettingsAuthAccountRouteImport } from './routes/dashboard/settings/auth/account'
-import { Route as DashboardSettingsAuthApiKeysRouteImport } from './routes/dashboard/settings/auth/api-keys'
-import { Route as DashboardSettingsAuthMembersRouteImport } from './routes/dashboard/settings/auth/members'
-import { Route as DashboardSettingsAuthOrganizationRouteImport } from './routes/dashboard/settings/auth/organization'
-import { Route as DashboardSettingsAuthOrganizationsRouteImport } from './routes/dashboard/settings/auth/organizations'
-import { Route as DashboardSettingsAuthSecurityRouteImport } from './routes/dashboard/settings/auth/security'
-import { Route as DashboardSettingsAuthTeamsRouteImport } from './routes/dashboard/settings/auth/teams'
-import { Route as DashboardSettingsChatAgentRouteImport } from './routes/dashboard/settings/chat/agent'
-import { Route as DashboardSettingsChatBotsRouteImport } from './routes/dashboard/settings/chat/bots'
-import { Route as DashboardSettingsChatDevicesRouteImport } from './routes/dashboard/settings/chat/devices'
-import { Route as DashboardSettingsChatKnowledgeRouteImport } from './routes/dashboard/settings/chat/knowledge'
-import { Route as DashboardSettingsChatMcpRouteImport } from './routes/dashboard/settings/chat/mcp'
-import { Route as DashboardSettingsChatModelFiltersRouteImport } from './routes/dashboard/settings/chat/model-filters'
-import { Route as DashboardSettingsChatModelsRouteImport } from './routes/dashboard/settings/chat/models'
-import { Route as DashboardSettingsChatTriggersRouteImport } from './routes/dashboard/settings/chat/triggers'
-import { Route as DashboardSettingsChatUsageRouteImport } from './routes/dashboard/settings/chat/usage'
-import { Route as DashboardSettingsConnectorsIndexRouteImport } from './routes/dashboard/settings/connectors/index'
 import { Route as DashboardSettingsConnectorsCallbackRouteImport } from './routes/dashboard/settings/connectors/callback'
-import { Route as DashboardSettingsConnectorsMessengerRouteImport } from './routes/dashboard/settings/connectors/messenger'
 
 const chatRouteRoute = chatRouteRouteImport.update({
   id: '/(chat)',
@@ -419,12 +398,11 @@ const AuthTwoFactorOtpRoute = AuthTwoFactorOtpRouteImport.update({
   path: '/two-factor/otp',
   getParentRoute: () => AuthRouteRoute,
 } as any)
-const DashboardSettingsPrivacyRoute =
-  DashboardSettingsPrivacyRouteImport.update({
-    id: '/settings/privacy',
-    path: '/settings/privacy',
-    getParentRoute: () => DashboardRouteRoute,
-  } as any)
+const DashboardSettingsSplatRoute = DashboardSettingsSplatRouteImport.update({
+  id: '/settings/$',
+  path: '/settings/$',
+  getParentRoute: () => DashboardRouteRoute,
+} as any)
 const chatWorkflowSharedTokenRoute = chatWorkflowSharedTokenRouteImport.update({
   id: '/shared/$token',
   path: '/shared/$token',
@@ -442,136 +420,10 @@ const AuthAcceptInvitationInvitationIdIndexRoute =
     path: '/accept-invitation/$invitationId/',
     getParentRoute: () => AuthRouteRoute,
   } as any)
-const DashboardSettingsAppCustomizationRoute =
-  DashboardSettingsAppCustomizationRouteImport.update({
-    id: '/settings/app/customization',
-    path: '/settings/app/customization',
-    getParentRoute: () => DashboardRouteRoute,
-  } as any)
-const DashboardSettingsAppKeyboardShortcutsRoute =
-  DashboardSettingsAppKeyboardShortcutsRouteImport.update({
-    id: '/settings/app/keyboard-shortcuts',
-    path: '/settings/app/keyboard-shortcuts',
-    getParentRoute: () => DashboardRouteRoute,
-  } as any)
-const DashboardSettingsAppPersonalizationRoute =
-  DashboardSettingsAppPersonalizationRouteImport.update({
-    id: '/settings/app/personalization',
-    path: '/settings/app/personalization',
-    getParentRoute: () => DashboardRouteRoute,
-  } as any)
-const DashboardSettingsAuthAccountRoute =
-  DashboardSettingsAuthAccountRouteImport.update({
-    id: '/settings/auth/account',
-    path: '/settings/auth/account',
-    getParentRoute: () => DashboardRouteRoute,
-  } as any)
-const DashboardSettingsAuthApiKeysRoute =
-  DashboardSettingsAuthApiKeysRouteImport.update({
-    id: '/settings/auth/api-keys',
-    path: '/settings/auth/api-keys',
-    getParentRoute: () => DashboardRouteRoute,
-  } as any)
-const DashboardSettingsAuthMembersRoute =
-  DashboardSettingsAuthMembersRouteImport.update({
-    id: '/settings/auth/members',
-    path: '/settings/auth/members',
-    getParentRoute: () => DashboardRouteRoute,
-  } as any)
-const DashboardSettingsAuthOrganizationRoute =
-  DashboardSettingsAuthOrganizationRouteImport.update({
-    id: '/settings/auth/organization',
-    path: '/settings/auth/organization',
-    getParentRoute: () => DashboardRouteRoute,
-  } as any)
-const DashboardSettingsAuthOrganizationsRoute =
-  DashboardSettingsAuthOrganizationsRouteImport.update({
-    id: '/settings/auth/organizations',
-    path: '/settings/auth/organizations',
-    getParentRoute: () => DashboardRouteRoute,
-  } as any)
-const DashboardSettingsAuthSecurityRoute =
-  DashboardSettingsAuthSecurityRouteImport.update({
-    id: '/settings/auth/security',
-    path: '/settings/auth/security',
-    getParentRoute: () => DashboardRouteRoute,
-  } as any)
-const DashboardSettingsAuthTeamsRoute =
-  DashboardSettingsAuthTeamsRouteImport.update({
-    id: '/settings/auth/teams',
-    path: '/settings/auth/teams',
-    getParentRoute: () => DashboardRouteRoute,
-  } as any)
-const DashboardSettingsChatAgentRoute =
-  DashboardSettingsChatAgentRouteImport.update({
-    id: '/settings/chat/agent',
-    path: '/settings/chat/agent',
-    getParentRoute: () => DashboardRouteRoute,
-  } as any)
-const DashboardSettingsChatBotsRoute =
-  DashboardSettingsChatBotsRouteImport.update({
-    id: '/settings/chat/bots',
-    path: '/settings/chat/bots',
-    getParentRoute: () => DashboardRouteRoute,
-  } as any)
-const DashboardSettingsChatDevicesRoute =
-  DashboardSettingsChatDevicesRouteImport.update({
-    id: '/settings/chat/devices',
-    path: '/settings/chat/devices',
-    getParentRoute: () => DashboardRouteRoute,
-  } as any)
-const DashboardSettingsChatKnowledgeRoute =
-  DashboardSettingsChatKnowledgeRouteImport.update({
-    id: '/settings/chat/knowledge',
-    path: '/settings/chat/knowledge',
-    getParentRoute: () => DashboardRouteRoute,
-  } as any)
-const DashboardSettingsChatMcpRoute =
-  DashboardSettingsChatMcpRouteImport.update({
-    id: '/settings/chat/mcp',
-    path: '/settings/chat/mcp',
-    getParentRoute: () => DashboardRouteRoute,
-  } as any)
-const DashboardSettingsChatModelFiltersRoute =
-  DashboardSettingsChatModelFiltersRouteImport.update({
-    id: '/settings/chat/model-filters',
-    path: '/settings/chat/model-filters',
-    getParentRoute: () => DashboardRouteRoute,
-  } as any)
-const DashboardSettingsChatModelsRoute =
-  DashboardSettingsChatModelsRouteImport.update({
-    id: '/settings/chat/models',
-    path: '/settings/chat/models',
-    getParentRoute: () => DashboardRouteRoute,
-  } as any)
-const DashboardSettingsChatTriggersRoute =
-  DashboardSettingsChatTriggersRouteImport.update({
-    id: '/settings/chat/triggers',
-    path: '/settings/chat/triggers',
-    getParentRoute: () => DashboardRouteRoute,
-  } as any)
-const DashboardSettingsChatUsageRoute =
-  DashboardSettingsChatUsageRouteImport.update({
-    id: '/settings/chat/usage',
-    path: '/settings/chat/usage',
-    getParentRoute: () => DashboardRouteRoute,
-  } as any)
-const DashboardSettingsConnectorsIndexRoute =
-  DashboardSettingsConnectorsIndexRouteImport.update({
-    id: '/settings/connectors/',
-    path: '/settings/connectors/',
-    getParentRoute: () => DashboardRouteRoute,
-  } as any)
 const DashboardSettingsConnectorsCallbackRoute =
   DashboardSettingsConnectorsCallbackRouteImport.update({
     id: '/settings/connectors/callback',
     path: '/settings/connectors/callback',
-    getParentRoute: () => DashboardRouteRoute,
-  } as any)
-const DashboardSettingsConnectorsMessengerRoute =
-  DashboardSettingsConnectorsMessengerRouteImport.update({
-    id: '/settings/connectors/messenger',
-    path: '/settings/connectors/messenger',
     getParentRoute: () => DashboardRouteRoute,
   } as any)
 
@@ -628,7 +480,7 @@ export interface FileRoutesByFullPath {
   '/pages/$pageId': typeof ShortcutPagesPageIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/auth/two-factor/otp': typeof AuthTwoFactorOtpRoute
-  '/dashboard/settings/privacy': typeof DashboardSettingsPrivacyRoute
+  '/dashboard/settings/$': typeof DashboardSettingsSplatRoute
   '/chat/': typeof chatChatIndexRoute
   '/workflow/': typeof chatWorkflowIndexRoute
   '/gateway/': typeof publicGatewayIndexRoute
@@ -641,29 +493,8 @@ export interface FileRoutesByFullPath {
   '/auth/two-factor/': typeof AuthTwoFactorIndexRoute
   '/workflow/shared/$token': typeof chatWorkflowSharedTokenRoute
   '/pages/invite/$token': typeof ShortcutPagesInviteTokenRoute
-  '/dashboard/settings/app/customization': typeof DashboardSettingsAppCustomizationRoute
-  '/dashboard/settings/app/keyboard-shortcuts': typeof DashboardSettingsAppKeyboardShortcutsRoute
-  '/dashboard/settings/app/personalization': typeof DashboardSettingsAppPersonalizationRoute
-  '/dashboard/settings/auth/account': typeof DashboardSettingsAuthAccountRoute
-  '/dashboard/settings/auth/api-keys': typeof DashboardSettingsAuthApiKeysRoute
-  '/dashboard/settings/auth/members': typeof DashboardSettingsAuthMembersRoute
-  '/dashboard/settings/auth/organization': typeof DashboardSettingsAuthOrganizationRoute
-  '/dashboard/settings/auth/organizations': typeof DashboardSettingsAuthOrganizationsRoute
-  '/dashboard/settings/auth/security': typeof DashboardSettingsAuthSecurityRoute
-  '/dashboard/settings/auth/teams': typeof DashboardSettingsAuthTeamsRoute
-  '/dashboard/settings/chat/agent': typeof DashboardSettingsChatAgentRoute
-  '/dashboard/settings/chat/bots': typeof DashboardSettingsChatBotsRoute
-  '/dashboard/settings/chat/devices': typeof DashboardSettingsChatDevicesRoute
-  '/dashboard/settings/chat/knowledge': typeof DashboardSettingsChatKnowledgeRoute
-  '/dashboard/settings/chat/mcp': typeof DashboardSettingsChatMcpRoute
-  '/dashboard/settings/chat/model-filters': typeof DashboardSettingsChatModelFiltersRoute
-  '/dashboard/settings/chat/models': typeof DashboardSettingsChatModelsRoute
-  '/dashboard/settings/chat/triggers': typeof DashboardSettingsChatTriggersRoute
-  '/dashboard/settings/chat/usage': typeof DashboardSettingsChatUsageRoute
   '/dashboard/settings/connectors/callback': typeof DashboardSettingsConnectorsCallbackRoute
-  '/dashboard/settings/connectors/messenger': typeof DashboardSettingsConnectorsMessengerRoute
   '/auth/accept-invitation/$invitationId/': typeof AuthAcceptInvitationInvitationIdIndexRoute
-  '/dashboard/settings/connectors/': typeof DashboardSettingsConnectorsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof publicIndexRoute
@@ -712,7 +543,7 @@ export interface FileRoutesByTo {
   '/pages/$pageId': typeof ShortcutPagesPageIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/auth/two-factor/otp': typeof AuthTwoFactorOtpRoute
-  '/dashboard/settings/privacy': typeof DashboardSettingsPrivacyRoute
+  '/dashboard/settings/$': typeof DashboardSettingsSplatRoute
   '/chat': typeof chatChatIndexRoute
   '/workflow': typeof chatWorkflowIndexRoute
   '/gateway': typeof publicGatewayIndexRoute
@@ -725,29 +556,8 @@ export interface FileRoutesByTo {
   '/auth/two-factor': typeof AuthTwoFactorIndexRoute
   '/workflow/shared/$token': typeof chatWorkflowSharedTokenRoute
   '/pages/invite/$token': typeof ShortcutPagesInviteTokenRoute
-  '/dashboard/settings/app/customization': typeof DashboardSettingsAppCustomizationRoute
-  '/dashboard/settings/app/keyboard-shortcuts': typeof DashboardSettingsAppKeyboardShortcutsRoute
-  '/dashboard/settings/app/personalization': typeof DashboardSettingsAppPersonalizationRoute
-  '/dashboard/settings/auth/account': typeof DashboardSettingsAuthAccountRoute
-  '/dashboard/settings/auth/api-keys': typeof DashboardSettingsAuthApiKeysRoute
-  '/dashboard/settings/auth/members': typeof DashboardSettingsAuthMembersRoute
-  '/dashboard/settings/auth/organization': typeof DashboardSettingsAuthOrganizationRoute
-  '/dashboard/settings/auth/organizations': typeof DashboardSettingsAuthOrganizationsRoute
-  '/dashboard/settings/auth/security': typeof DashboardSettingsAuthSecurityRoute
-  '/dashboard/settings/auth/teams': typeof DashboardSettingsAuthTeamsRoute
-  '/dashboard/settings/chat/agent': typeof DashboardSettingsChatAgentRoute
-  '/dashboard/settings/chat/bots': typeof DashboardSettingsChatBotsRoute
-  '/dashboard/settings/chat/devices': typeof DashboardSettingsChatDevicesRoute
-  '/dashboard/settings/chat/knowledge': typeof DashboardSettingsChatKnowledgeRoute
-  '/dashboard/settings/chat/mcp': typeof DashboardSettingsChatMcpRoute
-  '/dashboard/settings/chat/model-filters': typeof DashboardSettingsChatModelFiltersRoute
-  '/dashboard/settings/chat/models': typeof DashboardSettingsChatModelsRoute
-  '/dashboard/settings/chat/triggers': typeof DashboardSettingsChatTriggersRoute
-  '/dashboard/settings/chat/usage': typeof DashboardSettingsChatUsageRoute
   '/dashboard/settings/connectors/callback': typeof DashboardSettingsConnectorsCallbackRoute
-  '/dashboard/settings/connectors/messenger': typeof DashboardSettingsConnectorsMessengerRoute
   '/auth/accept-invitation/$invitationId': typeof AuthAcceptInvitationInvitationIdIndexRoute
-  '/dashboard/settings/connectors': typeof DashboardSettingsConnectorsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -805,7 +615,7 @@ export interface FileRoutesById {
   '/_shortcut/pages/$pageId': typeof ShortcutPagesPageIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/auth/two-factor/otp': typeof AuthTwoFactorOtpRoute
-  '/dashboard/settings/privacy': typeof DashboardSettingsPrivacyRoute
+  '/dashboard/settings/$': typeof DashboardSettingsSplatRoute
   '/(chat)/chat/': typeof chatChatIndexRoute
   '/(chat)/workflow/': typeof chatWorkflowIndexRoute
   '/(public)/gateway/': typeof publicGatewayIndexRoute
@@ -818,29 +628,8 @@ export interface FileRoutesById {
   '/auth/two-factor/': typeof AuthTwoFactorIndexRoute
   '/(chat)/workflow/shared/$token': typeof chatWorkflowSharedTokenRoute
   '/_shortcut/pages/invite/$token': typeof ShortcutPagesInviteTokenRoute
-  '/dashboard/settings/app/customization': typeof DashboardSettingsAppCustomizationRoute
-  '/dashboard/settings/app/keyboard-shortcuts': typeof DashboardSettingsAppKeyboardShortcutsRoute
-  '/dashboard/settings/app/personalization': typeof DashboardSettingsAppPersonalizationRoute
-  '/dashboard/settings/auth/account': typeof DashboardSettingsAuthAccountRoute
-  '/dashboard/settings/auth/api-keys': typeof DashboardSettingsAuthApiKeysRoute
-  '/dashboard/settings/auth/members': typeof DashboardSettingsAuthMembersRoute
-  '/dashboard/settings/auth/organization': typeof DashboardSettingsAuthOrganizationRoute
-  '/dashboard/settings/auth/organizations': typeof DashboardSettingsAuthOrganizationsRoute
-  '/dashboard/settings/auth/security': typeof DashboardSettingsAuthSecurityRoute
-  '/dashboard/settings/auth/teams': typeof DashboardSettingsAuthTeamsRoute
-  '/dashboard/settings/chat/agent': typeof DashboardSettingsChatAgentRoute
-  '/dashboard/settings/chat/bots': typeof DashboardSettingsChatBotsRoute
-  '/dashboard/settings/chat/devices': typeof DashboardSettingsChatDevicesRoute
-  '/dashboard/settings/chat/knowledge': typeof DashboardSettingsChatKnowledgeRoute
-  '/dashboard/settings/chat/mcp': typeof DashboardSettingsChatMcpRoute
-  '/dashboard/settings/chat/model-filters': typeof DashboardSettingsChatModelFiltersRoute
-  '/dashboard/settings/chat/models': typeof DashboardSettingsChatModelsRoute
-  '/dashboard/settings/chat/triggers': typeof DashboardSettingsChatTriggersRoute
-  '/dashboard/settings/chat/usage': typeof DashboardSettingsChatUsageRoute
   '/dashboard/settings/connectors/callback': typeof DashboardSettingsConnectorsCallbackRoute
-  '/dashboard/settings/connectors/messenger': typeof DashboardSettingsConnectorsMessengerRoute
   '/auth/accept-invitation/$invitationId/': typeof AuthAcceptInvitationInvitationIdIndexRoute
-  '/dashboard/settings/connectors/': typeof DashboardSettingsConnectorsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -897,7 +686,7 @@ export interface FileRouteTypes {
     | '/pages/$pageId'
     | '/api/auth/$'
     | '/auth/two-factor/otp'
-    | '/dashboard/settings/privacy'
+    | '/dashboard/settings/$'
     | '/chat/'
     | '/workflow/'
     | '/gateway/'
@@ -910,29 +699,8 @@ export interface FileRouteTypes {
     | '/auth/two-factor/'
     | '/workflow/shared/$token'
     | '/pages/invite/$token'
-    | '/dashboard/settings/app/customization'
-    | '/dashboard/settings/app/keyboard-shortcuts'
-    | '/dashboard/settings/app/personalization'
-    | '/dashboard/settings/auth/account'
-    | '/dashboard/settings/auth/api-keys'
-    | '/dashboard/settings/auth/members'
-    | '/dashboard/settings/auth/organization'
-    | '/dashboard/settings/auth/organizations'
-    | '/dashboard/settings/auth/security'
-    | '/dashboard/settings/auth/teams'
-    | '/dashboard/settings/chat/agent'
-    | '/dashboard/settings/chat/bots'
-    | '/dashboard/settings/chat/devices'
-    | '/dashboard/settings/chat/knowledge'
-    | '/dashboard/settings/chat/mcp'
-    | '/dashboard/settings/chat/model-filters'
-    | '/dashboard/settings/chat/models'
-    | '/dashboard/settings/chat/triggers'
-    | '/dashboard/settings/chat/usage'
     | '/dashboard/settings/connectors/callback'
-    | '/dashboard/settings/connectors/messenger'
     | '/auth/accept-invitation/$invitationId/'
-    | '/dashboard/settings/connectors/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -981,7 +749,7 @@ export interface FileRouteTypes {
     | '/pages/$pageId'
     | '/api/auth/$'
     | '/auth/two-factor/otp'
-    | '/dashboard/settings/privacy'
+    | '/dashboard/settings/$'
     | '/chat'
     | '/workflow'
     | '/gateway'
@@ -994,29 +762,8 @@ export interface FileRouteTypes {
     | '/auth/two-factor'
     | '/workflow/shared/$token'
     | '/pages/invite/$token'
-    | '/dashboard/settings/app/customization'
-    | '/dashboard/settings/app/keyboard-shortcuts'
-    | '/dashboard/settings/app/personalization'
-    | '/dashboard/settings/auth/account'
-    | '/dashboard/settings/auth/api-keys'
-    | '/dashboard/settings/auth/members'
-    | '/dashboard/settings/auth/organization'
-    | '/dashboard/settings/auth/organizations'
-    | '/dashboard/settings/auth/security'
-    | '/dashboard/settings/auth/teams'
-    | '/dashboard/settings/chat/agent'
-    | '/dashboard/settings/chat/bots'
-    | '/dashboard/settings/chat/devices'
-    | '/dashboard/settings/chat/knowledge'
-    | '/dashboard/settings/chat/mcp'
-    | '/dashboard/settings/chat/model-filters'
-    | '/dashboard/settings/chat/models'
-    | '/dashboard/settings/chat/triggers'
-    | '/dashboard/settings/chat/usage'
     | '/dashboard/settings/connectors/callback'
-    | '/dashboard/settings/connectors/messenger'
     | '/auth/accept-invitation/$invitationId'
-    | '/dashboard/settings/connectors'
   id:
     | '__root__'
     | '/(chat)'
@@ -1073,7 +820,7 @@ export interface FileRouteTypes {
     | '/_shortcut/pages/$pageId'
     | '/api/auth/$'
     | '/auth/two-factor/otp'
-    | '/dashboard/settings/privacy'
+    | '/dashboard/settings/$'
     | '/(chat)/chat/'
     | '/(chat)/workflow/'
     | '/(public)/gateway/'
@@ -1086,29 +833,8 @@ export interface FileRouteTypes {
     | '/auth/two-factor/'
     | '/(chat)/workflow/shared/$token'
     | '/_shortcut/pages/invite/$token'
-    | '/dashboard/settings/app/customization'
-    | '/dashboard/settings/app/keyboard-shortcuts'
-    | '/dashboard/settings/app/personalization'
-    | '/dashboard/settings/auth/account'
-    | '/dashboard/settings/auth/api-keys'
-    | '/dashboard/settings/auth/members'
-    | '/dashboard/settings/auth/organization'
-    | '/dashboard/settings/auth/organizations'
-    | '/dashboard/settings/auth/security'
-    | '/dashboard/settings/auth/teams'
-    | '/dashboard/settings/chat/agent'
-    | '/dashboard/settings/chat/bots'
-    | '/dashboard/settings/chat/devices'
-    | '/dashboard/settings/chat/knowledge'
-    | '/dashboard/settings/chat/mcp'
-    | '/dashboard/settings/chat/model-filters'
-    | '/dashboard/settings/chat/models'
-    | '/dashboard/settings/chat/triggers'
-    | '/dashboard/settings/chat/usage'
     | '/dashboard/settings/connectors/callback'
-    | '/dashboard/settings/connectors/messenger'
     | '/auth/accept-invitation/$invitationId/'
-    | '/dashboard/settings/connectors/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -1589,11 +1315,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthTwoFactorOtpRouteImport
       parentRoute: typeof AuthRouteRoute
     }
-    '/dashboard/settings/privacy': {
-      id: '/dashboard/settings/privacy'
-      path: '/settings/privacy'
-      fullPath: '/dashboard/settings/privacy'
-      preLoaderRoute: typeof DashboardSettingsPrivacyRouteImport
+    '/dashboard/settings/$': {
+      id: '/dashboard/settings/$'
+      path: '/settings/$'
+      fullPath: '/dashboard/settings/$'
+      preLoaderRoute: typeof DashboardSettingsSplatRouteImport
       parentRoute: typeof DashboardRouteRoute
     }
     '/(chat)/workflow/shared/$token': {
@@ -1617,158 +1343,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthAcceptInvitationInvitationIdIndexRouteImport
       parentRoute: typeof AuthRouteRoute
     }
-    '/dashboard/settings/app/customization': {
-      id: '/dashboard/settings/app/customization'
-      path: '/settings/app/customization'
-      fullPath: '/dashboard/settings/app/customization'
-      preLoaderRoute: typeof DashboardSettingsAppCustomizationRouteImport
-      parentRoute: typeof DashboardRouteRoute
-    }
-    '/dashboard/settings/app/keyboard-shortcuts': {
-      id: '/dashboard/settings/app/keyboard-shortcuts'
-      path: '/settings/app/keyboard-shortcuts'
-      fullPath: '/dashboard/settings/app/keyboard-shortcuts'
-      preLoaderRoute: typeof DashboardSettingsAppKeyboardShortcutsRouteImport
-      parentRoute: typeof DashboardRouteRoute
-    }
-    '/dashboard/settings/app/personalization': {
-      id: '/dashboard/settings/app/personalization'
-      path: '/settings/app/personalization'
-      fullPath: '/dashboard/settings/app/personalization'
-      preLoaderRoute: typeof DashboardSettingsAppPersonalizationRouteImport
-      parentRoute: typeof DashboardRouteRoute
-    }
-    '/dashboard/settings/auth/account': {
-      id: '/dashboard/settings/auth/account'
-      path: '/settings/auth/account'
-      fullPath: '/dashboard/settings/auth/account'
-      preLoaderRoute: typeof DashboardSettingsAuthAccountRouteImport
-      parentRoute: typeof DashboardRouteRoute
-    }
-    '/dashboard/settings/auth/api-keys': {
-      id: '/dashboard/settings/auth/api-keys'
-      path: '/settings/auth/api-keys'
-      fullPath: '/dashboard/settings/auth/api-keys'
-      preLoaderRoute: typeof DashboardSettingsAuthApiKeysRouteImport
-      parentRoute: typeof DashboardRouteRoute
-    }
-    '/dashboard/settings/auth/members': {
-      id: '/dashboard/settings/auth/members'
-      path: '/settings/auth/members'
-      fullPath: '/dashboard/settings/auth/members'
-      preLoaderRoute: typeof DashboardSettingsAuthMembersRouteImport
-      parentRoute: typeof DashboardRouteRoute
-    }
-    '/dashboard/settings/auth/organization': {
-      id: '/dashboard/settings/auth/organization'
-      path: '/settings/auth/organization'
-      fullPath: '/dashboard/settings/auth/organization'
-      preLoaderRoute: typeof DashboardSettingsAuthOrganizationRouteImport
-      parentRoute: typeof DashboardRouteRoute
-    }
-    '/dashboard/settings/auth/organizations': {
-      id: '/dashboard/settings/auth/organizations'
-      path: '/settings/auth/organizations'
-      fullPath: '/dashboard/settings/auth/organizations'
-      preLoaderRoute: typeof DashboardSettingsAuthOrganizationsRouteImport
-      parentRoute: typeof DashboardRouteRoute
-    }
-    '/dashboard/settings/auth/security': {
-      id: '/dashboard/settings/auth/security'
-      path: '/settings/auth/security'
-      fullPath: '/dashboard/settings/auth/security'
-      preLoaderRoute: typeof DashboardSettingsAuthSecurityRouteImport
-      parentRoute: typeof DashboardRouteRoute
-    }
-    '/dashboard/settings/auth/teams': {
-      id: '/dashboard/settings/auth/teams'
-      path: '/settings/auth/teams'
-      fullPath: '/dashboard/settings/auth/teams'
-      preLoaderRoute: typeof DashboardSettingsAuthTeamsRouteImport
-      parentRoute: typeof DashboardRouteRoute
-    }
-    '/dashboard/settings/chat/agent': {
-      id: '/dashboard/settings/chat/agent'
-      path: '/settings/chat/agent'
-      fullPath: '/dashboard/settings/chat/agent'
-      preLoaderRoute: typeof DashboardSettingsChatAgentRouteImport
-      parentRoute: typeof DashboardRouteRoute
-    }
-    '/dashboard/settings/chat/bots': {
-      id: '/dashboard/settings/chat/bots'
-      path: '/settings/chat/bots'
-      fullPath: '/dashboard/settings/chat/bots'
-      preLoaderRoute: typeof DashboardSettingsChatBotsRouteImport
-      parentRoute: typeof DashboardRouteRoute
-    }
-    '/dashboard/settings/chat/devices': {
-      id: '/dashboard/settings/chat/devices'
-      path: '/settings/chat/devices'
-      fullPath: '/dashboard/settings/chat/devices'
-      preLoaderRoute: typeof DashboardSettingsChatDevicesRouteImport
-      parentRoute: typeof DashboardRouteRoute
-    }
-    '/dashboard/settings/chat/knowledge': {
-      id: '/dashboard/settings/chat/knowledge'
-      path: '/settings/chat/knowledge'
-      fullPath: '/dashboard/settings/chat/knowledge'
-      preLoaderRoute: typeof DashboardSettingsChatKnowledgeRouteImport
-      parentRoute: typeof DashboardRouteRoute
-    }
-    '/dashboard/settings/chat/mcp': {
-      id: '/dashboard/settings/chat/mcp'
-      path: '/settings/chat/mcp'
-      fullPath: '/dashboard/settings/chat/mcp'
-      preLoaderRoute: typeof DashboardSettingsChatMcpRouteImport
-      parentRoute: typeof DashboardRouteRoute
-    }
-    '/dashboard/settings/chat/model-filters': {
-      id: '/dashboard/settings/chat/model-filters'
-      path: '/settings/chat/model-filters'
-      fullPath: '/dashboard/settings/chat/model-filters'
-      preLoaderRoute: typeof DashboardSettingsChatModelFiltersRouteImport
-      parentRoute: typeof DashboardRouteRoute
-    }
-    '/dashboard/settings/chat/models': {
-      id: '/dashboard/settings/chat/models'
-      path: '/settings/chat/models'
-      fullPath: '/dashboard/settings/chat/models'
-      preLoaderRoute: typeof DashboardSettingsChatModelsRouteImport
-      parentRoute: typeof DashboardRouteRoute
-    }
-    '/dashboard/settings/chat/triggers': {
-      id: '/dashboard/settings/chat/triggers'
-      path: '/settings/chat/triggers'
-      fullPath: '/dashboard/settings/chat/triggers'
-      preLoaderRoute: typeof DashboardSettingsChatTriggersRouteImport
-      parentRoute: typeof DashboardRouteRoute
-    }
-    '/dashboard/settings/chat/usage': {
-      id: '/dashboard/settings/chat/usage'
-      path: '/settings/chat/usage'
-      fullPath: '/dashboard/settings/chat/usage'
-      preLoaderRoute: typeof DashboardSettingsChatUsageRouteImport
-      parentRoute: typeof DashboardRouteRoute
-    }
-    '/dashboard/settings/connectors/': {
-      id: '/dashboard/settings/connectors/'
-      path: '/settings/connectors'
-      fullPath: '/dashboard/settings/connectors/'
-      preLoaderRoute: typeof DashboardSettingsConnectorsIndexRouteImport
-      parentRoute: typeof DashboardRouteRoute
-    }
     '/dashboard/settings/connectors/callback': {
       id: '/dashboard/settings/connectors/callback'
       path: '/settings/connectors/callback'
       fullPath: '/dashboard/settings/connectors/callback'
       preLoaderRoute: typeof DashboardSettingsConnectorsCallbackRouteImport
-      parentRoute: typeof DashboardRouteRoute
-    }
-    '/dashboard/settings/connectors/messenger': {
-      id: '/dashboard/settings/connectors/messenger'
-      path: '/settings/connectors/messenger'
-      fullPath: '/dashboard/settings/connectors/messenger'
-      preLoaderRoute: typeof DashboardSettingsConnectorsMessengerRouteImport
       parentRoute: typeof DashboardRouteRoute
     }
   }
@@ -1882,64 +1461,15 @@ const AuthRouteRouteWithChildren = AuthRouteRoute._addFileChildren(
 
 interface DashboardRouteRouteChildren {
   DashboardIndexRoute: typeof DashboardIndexRoute
-  DashboardSettingsPrivacyRoute: typeof DashboardSettingsPrivacyRoute
-  DashboardSettingsAppCustomizationRoute: typeof DashboardSettingsAppCustomizationRoute
-  DashboardSettingsAppKeyboardShortcutsRoute: typeof DashboardSettingsAppKeyboardShortcutsRoute
-  DashboardSettingsAppPersonalizationRoute: typeof DashboardSettingsAppPersonalizationRoute
-  DashboardSettingsAuthAccountRoute: typeof DashboardSettingsAuthAccountRoute
-  DashboardSettingsAuthApiKeysRoute: typeof DashboardSettingsAuthApiKeysRoute
-  DashboardSettingsAuthMembersRoute: typeof DashboardSettingsAuthMembersRoute
-  DashboardSettingsAuthOrganizationRoute: typeof DashboardSettingsAuthOrganizationRoute
-  DashboardSettingsAuthOrganizationsRoute: typeof DashboardSettingsAuthOrganizationsRoute
-  DashboardSettingsAuthSecurityRoute: typeof DashboardSettingsAuthSecurityRoute
-  DashboardSettingsAuthTeamsRoute: typeof DashboardSettingsAuthTeamsRoute
-  DashboardSettingsChatAgentRoute: typeof DashboardSettingsChatAgentRoute
-  DashboardSettingsChatBotsRoute: typeof DashboardSettingsChatBotsRoute
-  DashboardSettingsChatDevicesRoute: typeof DashboardSettingsChatDevicesRoute
-  DashboardSettingsChatKnowledgeRoute: typeof DashboardSettingsChatKnowledgeRoute
-  DashboardSettingsChatMcpRoute: typeof DashboardSettingsChatMcpRoute
-  DashboardSettingsChatModelFiltersRoute: typeof DashboardSettingsChatModelFiltersRoute
-  DashboardSettingsChatModelsRoute: typeof DashboardSettingsChatModelsRoute
-  DashboardSettingsChatTriggersRoute: typeof DashboardSettingsChatTriggersRoute
-  DashboardSettingsChatUsageRoute: typeof DashboardSettingsChatUsageRoute
+  DashboardSettingsSplatRoute: typeof DashboardSettingsSplatRoute
   DashboardSettingsConnectorsCallbackRoute: typeof DashboardSettingsConnectorsCallbackRoute
-  DashboardSettingsConnectorsMessengerRoute: typeof DashboardSettingsConnectorsMessengerRoute
-  DashboardSettingsConnectorsIndexRoute: typeof DashboardSettingsConnectorsIndexRoute
 }
 
 const DashboardRouteRouteChildren: DashboardRouteRouteChildren = {
   DashboardIndexRoute: DashboardIndexRoute,
-  DashboardSettingsPrivacyRoute: DashboardSettingsPrivacyRoute,
-  DashboardSettingsAppCustomizationRoute:
-    DashboardSettingsAppCustomizationRoute,
-  DashboardSettingsAppKeyboardShortcutsRoute:
-    DashboardSettingsAppKeyboardShortcutsRoute,
-  DashboardSettingsAppPersonalizationRoute:
-    DashboardSettingsAppPersonalizationRoute,
-  DashboardSettingsAuthAccountRoute: DashboardSettingsAuthAccountRoute,
-  DashboardSettingsAuthApiKeysRoute: DashboardSettingsAuthApiKeysRoute,
-  DashboardSettingsAuthMembersRoute: DashboardSettingsAuthMembersRoute,
-  DashboardSettingsAuthOrganizationRoute:
-    DashboardSettingsAuthOrganizationRoute,
-  DashboardSettingsAuthOrganizationsRoute:
-    DashboardSettingsAuthOrganizationsRoute,
-  DashboardSettingsAuthSecurityRoute: DashboardSettingsAuthSecurityRoute,
-  DashboardSettingsAuthTeamsRoute: DashboardSettingsAuthTeamsRoute,
-  DashboardSettingsChatAgentRoute: DashboardSettingsChatAgentRoute,
-  DashboardSettingsChatBotsRoute: DashboardSettingsChatBotsRoute,
-  DashboardSettingsChatDevicesRoute: DashboardSettingsChatDevicesRoute,
-  DashboardSettingsChatKnowledgeRoute: DashboardSettingsChatKnowledgeRoute,
-  DashboardSettingsChatMcpRoute: DashboardSettingsChatMcpRoute,
-  DashboardSettingsChatModelFiltersRoute:
-    DashboardSettingsChatModelFiltersRoute,
-  DashboardSettingsChatModelsRoute: DashboardSettingsChatModelsRoute,
-  DashboardSettingsChatTriggersRoute: DashboardSettingsChatTriggersRoute,
-  DashboardSettingsChatUsageRoute: DashboardSettingsChatUsageRoute,
+  DashboardSettingsSplatRoute: DashboardSettingsSplatRoute,
   DashboardSettingsConnectorsCallbackRoute:
     DashboardSettingsConnectorsCallbackRoute,
-  DashboardSettingsConnectorsMessengerRoute:
-    DashboardSettingsConnectorsMessengerRoute,
-  DashboardSettingsConnectorsIndexRoute: DashboardSettingsConnectorsIndexRoute,
 }
 
 const DashboardRouteRouteWithChildren = DashboardRouteRoute._addFileChildren(

@@ -6,7 +6,6 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import { Avatar, AvatarFallback, AvatarImage } from "@neore/ui/components/avatar";
 import { Badge } from "@neore/ui/components/badge";
 import { Button } from "@neore/ui/components/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@neore/ui/components/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@neore/ui/components/select";
 import { Skeleton } from "@neore/ui/components/skeleton";
 import { formatDateTime } from "@neore/ui/utils/locale-format";
@@ -15,6 +14,7 @@ import { useState } from "react";
 
 import type { AdminFeedbackItem, FeedbackKind } from "../hooks/use-admin";
 import { useAdminFeedback } from "../hooks/use-admin";
+import { AdminSection } from "./admin-section";
 
 /** One page of the list; the route loader preloads the first with the same size. */
 export const FEEDBACK_PAGE_SIZE = 20;
@@ -38,7 +38,7 @@ const FeedbackRow = ({ item }: { item: AdminFeedbackItem }) => {
     const sentAt = formatDateTime(item.createdAt, i18n.locale);
 
     return (
-        <li className="flex flex-col gap-3 border-b pb-4 last:border-0">
+        <li className="flex flex-col gap-3 py-4">
             <div className="flex flex-wrap items-center gap-3">
                 <Avatar className="size-8">
                     <AvatarImage alt="" src={sender.image || undefined} />
@@ -46,16 +46,16 @@ const FeedbackRow = ({ item }: { item: AdminFeedbackItem }) => {
                 </Avatar>
                 <div className="flex min-w-0 flex-col">
                     {/* No email means no user row: the account is gone, and only its id is left to show. */}
-                    <span className="truncate font-medium">{sender.email === null ? t`Deleted user` : sender.name || t`No name`}</span>
-                    <span className="text-muted-foreground truncate text-sm">{sender.email ?? sender.userId}</span>
+                    <span className="truncate text-sm font-medium">{sender.email === null ? t`Deleted user` : sender.name || t`No name`}</span>
+                    <span className="text-muted-foreground truncate text-xs">{sender.email ?? sender.userId}</span>
                 </div>
                 <Badge variant={KIND_VARIANTS[item.kind]}>{i18n._(KIND_LABELS[item.kind])}</Badge>
-                <time className="text-muted-foreground text-xs" dateTime={new Date(item.createdAt).toISOString()}>
+                <time className="text-muted-foreground font-mono text-xs" dateTime={new Date(item.createdAt).toISOString()}>
                     {sentAt}
                 </time>
             </div>
 
-            <p className="text-sm break-words whitespace-pre-wrap">{item.message}</p>
+            <p className="text-sm leading-relaxed break-words whitespace-pre-wrap">{item.message}</p>
 
             {item.pagePath && (
                 <p className="text-muted-foreground text-xs">
@@ -77,12 +77,12 @@ const FeedbackRow = ({ item }: { item: AdminFeedbackItem }) => {
                             <li key={index}>
                                 {image.url ? (
                                     <a className="block" href={image.url} rel="noreferrer" target="_blank">
-                                        <img alt={label} className="size-24 rounded-md border object-cover" loading="lazy" src={image.url} />
+                                        <img alt={label} className="border-border/50 size-24 rounded-lg border object-cover" loading="lazy" src={image.url} />
                                     </a>
                                 ) : (
                                     <div
                                         aria-label={t`Image ${position} could not be loaded`}
-                                        className="text-muted-foreground flex size-24 items-center justify-center rounded-md border"
+                                        className="text-muted-foreground border-border/50 flex size-24 items-center justify-center rounded-lg border"
                                         role="img"
                                     >
                                         <ImageOff aria-hidden="true" className="size-5" />
@@ -116,9 +116,9 @@ const FeedbackAdminPage = () => {
 
     if (isPending) {
         body = (
-            <div aria-label={t`Loading feedback`} className="space-y-4" role="status">
+            <div aria-label={t`Loading feedback`} className="divide-border/50 divide-y px-4 py-1" role="status">
                 {[1, 2, 3].map((index) => (
-                    <div className="space-y-2" key={index}>
+                    <div className="space-y-2 py-4" key={index}>
                         <Skeleton className="h-4 w-48" />
                         <Skeleton className="h-12 w-full" />
                     </div>
@@ -128,15 +128,15 @@ const FeedbackAdminPage = () => {
     } else if (data === undefined) {
         // Only when there is nothing to show: a failed background read keeps the list it already has.
         body = (
-            <p className="text-destructive py-8 text-center" role="alert">
+            <p className="text-destructive py-8 text-center text-sm" role="alert">
                 {t`Feedback could not be loaded.`}
             </p>
         );
     } else if (data.page.length === 0) {
-        body = <p className="text-muted-foreground py-8 text-center">{kind === "all" ? t`No feedback yet` : t`No feedback of this kind`}</p>;
+        body = <p className="text-muted-foreground py-8 text-center text-sm">{kind === "all" ? t`No feedback yet` : t`No feedback of this kind`}</p>;
     } else {
         body = (
-            <ul aria-label={t`Feedback`} className="space-y-4">
+            <ul aria-label={t`Feedback`} className="divide-border/50 divide-y px-4 py-1">
                 {data.page.map((item) => (
                     <FeedbackRow item={item} key={item._id} />
                 ))}
@@ -149,15 +149,10 @@ const FeedbackAdminPage = () => {
     const kindItems = { all: t`All kinds`, idea: t`Ideas`, problem: t`Problems`, other: t`Other` };
 
     return (
-        <Card>
-            <CardHeader>
-                <div className="flex flex-wrap items-center justify-between gap-4">
-                    <div>
-                        <CardTitle>{t`Feedback`}</CardTitle>
-                        <CardDescription>{t`What users sent from the app, newest first`}</CardDescription>
-                    </div>
-
-                    <div className="flex items-center gap-2">
+        <div className="flex flex-col gap-3">
+            <AdminSection
+                action={
+                    <div className="flex flex-wrap items-center gap-2">
                         <Button onClick={() => refetch()} size="sm" variant="outline">
                             <RefreshCw aria-hidden="true" className={isFetching ? "size-4 animate-spin" : "size-4"} />
                             {t`Refresh`}
@@ -175,33 +170,33 @@ const FeedbackAdminPage = () => {
                             </SelectContent>
                         </Select>
                     </div>
-                </div>
-            </CardHeader>
-
-            <CardContent className="space-y-4">
+                }
+                description={t`What users sent from the app, newest first`}
+                title={t`Feedback`}
+            >
                 {body}
+            </AdminSection>
 
-                <nav aria-label={t`Feedback pages`} className="flex justify-end gap-2">
-                    <Button disabled={cursors.length <= 1} onClick={() => setCursors((previous) => previous.slice(0, -1))} size="sm" variant="outline">
-                        <ChevronLeft aria-hidden="true" className="size-4" />
-                        {t`Newer`}
-                    </Button>
-                    <Button
-                        disabled={nextCursor === null}
-                        onClick={() => {
-                            if (nextCursor !== null) {
-                                setCursors((previous) => [...previous, nextCursor]);
-                            }
-                        }}
-                        size="sm"
-                        variant="outline"
-                    >
-                        {t`Older`}
-                        <ChevronRight aria-hidden="true" className="size-4" />
-                    </Button>
-                </nav>
-            </CardContent>
-        </Card>
+            <nav aria-label={t`Feedback pages`} className="flex justify-end gap-2">
+                <Button disabled={cursors.length <= 1} onClick={() => setCursors((previous) => previous.slice(0, -1))} size="sm" variant="outline">
+                    <ChevronLeft aria-hidden="true" className="size-4" />
+                    {t`Newer`}
+                </Button>
+                <Button
+                    disabled={nextCursor === null}
+                    onClick={() => {
+                        if (nextCursor !== null) {
+                            setCursors((previous) => [...previous, nextCursor]);
+                        }
+                    }}
+                    size="sm"
+                    variant="outline"
+                >
+                    {t`Older`}
+                    <ChevronRight aria-hidden="true" className="size-4" />
+                </Button>
+            </nav>
+        </div>
     );
 };
 
