@@ -53,8 +53,8 @@ const RESERVED_HEADERS: &[&str] = &[
     "transfer-encoding",
 ];
 
-/// A header value (or the credential after its scheme) shorter than this stays in what the server says: replacing it
-/// could garble an answer. A header that holds a credential must be at least this long.
+/// A secret shorter than this stays in what the server says: replacing it could garble an answer. So a credential (a
+/// header's, a cookie's, or one in the address's query) must be at least this long.
 const MIN_REDACTED_BYTES: usize = 8;
 
 /// Where the bridge sends, checked once at start.
@@ -62,7 +62,8 @@ const MIN_REDACTED_BYTES: usize = 8;
 pub struct Target {
     url: String,
     headers: Vec<(HeaderName, HeaderValue)>,
-    /// The header values, longest first, that nothing the server says may carry on to the chat.
+    /// The header credentials, cookie values and query values, longest first, that nothing the server says may carry
+    /// on to the chat.
     secrets: Vec<String>,
 }
 

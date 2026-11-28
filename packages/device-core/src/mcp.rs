@@ -1427,10 +1427,14 @@ sleep 1"#
             Arc::new(AtomicBool::new(false)),
             Arc::new(AtomicUsize::new(0)),
         );
-        let call = |manager: Arc<McpManager>,
-                    config: McpServerConfig,
-                    entered: Arc<AtomicBool>,
-                    calls: Arc<AtomicUsize>| {
+        let call = || {
+            let (manager, config, entered, calls) = (
+                manager.clone(),
+                config.clone(),
+                entered.clone(),
+                calls.clone(),
+            );
+
             std::thread::spawn(move || {
                 manager.with(&config, None, |process| {
                     // The first call holds the old copy, so the second waits on it.
@@ -1443,21 +1447,11 @@ sleep 1"#
                 })
             })
         };
-        let first = call(
-            manager.clone(),
-            config.clone(),
-            entered.clone(),
-            calls.clone(),
-        );
+        let first = call();
 
         assert!(wait_until(|| entered.load(Ordering::SeqCst)));
 
-        let second = call(
-            manager.clone(),
-            config.clone(),
-            entered.clone(),
-            calls.clone(),
-        );
+        let second = call();
 
         assert_eq!(first.join().unwrap(), Ok(json!({})));
         assert_eq!(second.join().unwrap(), Ok(json!({})));
