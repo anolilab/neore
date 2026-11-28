@@ -50,7 +50,7 @@ export type RememberResult = { facts: ExtractionOutcome["facts"]; refused?: Aske
 /**
  * What the extractor's run comes to for the tool, and whether the prompt's claim stays: it does when something was written
  * or nothing was asked, so the message is handled and the turn's later extraction leaves its prompt alone. Anything else
- * (the model never asked, a refusal before any write, the evidence gate refusing what was found) releases it.
+ * (the model never asked, a refusal before any write, the evidence gate refusing what was asked) releases it.
  */
 export const rememberResultOf = (outcome: ExtractionOutcome): { keepClaim: boolean; result: RememberResult } => {
     if (!outcome.asked) {
@@ -82,7 +82,8 @@ export const rememberResultOf = (outcome: ExtractionOutcome): { keepClaim: boole
         };
     }
 
-    if (outcome.blocked !== undefined || outcome.refused > 0) {
+    // Refused only for what was asked: an unasked fact the gate dropped (a quote not in the typed words) is no refusal.
+    if (outcome.blocked !== undefined || outcome.refusedAsked.length > 0) {
         return { keepClaim: false, result: { facts: [], status: outcome.blocked ?? "refused" } };
     }
 

@@ -97,75 +97,39 @@ export const rememberClaimState = internalQuery
 const REMEMBER_DONE_TTL_MS = 24 * 60 * 60 * 1000;
 
 /**
- * Marks the prompt handled and holds it for a day, written by prompt whatever holds it now: rows were written, so the reply's
- * extraction must skip the prompt even when the request's own claim lapsed meanwhile.
+ * Marks the prompt handled and holds it for a day: rows were written, so the reply's extraction must skip the prompt even
+ * when the request's own claim lapsed meanwhile. `false` when a newer request took the prompt after it lapsed: that one's
+ * outcome stands, and this stale call marks nothing.
  */
 export const markRememberDone = internalMutation
     .input({ claimedAt: v.number(), promptMessageId: v.string(), userId: v.string() })
-    .output(v.null())
-    .mutation(async ({ args, ctx }) => {
-        await putClaimResult(ctx, REMEMBER_SCOPE, args.promptMessageId, {
-            claimedAt: args.claimedAt,
-            result: REMEMBER_DONE,
-            ttlMs: REMEMBER_DONE_TTL_MS,
-            userId: args.userId,
-        });
-
-        return null;
-    });
-
-/** Rows under a prompt the fresh-send check reads per page, and the pages it reads before it gives up on the prompt. */
-const PROMPT_REPLY_PAGE_ROWS = 100;
-const PROMPT_REPLY_PAGES = 10;
-
-type PromptReplyRow = { message?: unknown; replyId?: string; status: string };
-type ToolPart = { toolCallId?: string; type?: string };
-
-const toolPartsOf = (row: PromptReplyRow): ToolPart[] => {
-    const content = (row.message as { content?: unknown } | undefined)?.content;
-
-    return Array.isArray(content) ? (content as ToolPart[]) : [];
-};
+    .output(v.boolean())
+    .mutation(
+        async ({ args, ctx }) =>
+            await putClaimResult(ctx, REMEMBER_SCOPE, args.promptMessageId, {
+                claimedAt: args.claimedAt,
+                result: REMEMBER_DONE,
+                ttlMs: REMEMBER_DONE_TTL_MS,
+                userId: args.userId,
+            }),
+    );
 
 /**
- * Whether the rows under a prompt (its `order`, after it, in order) are only this reply's: its saved rows (`replyId`, the
- * reply's first stream), its pending row, not yet saved under its run, and the answer to one of its own tool calls that an
- * approval or a denial saved outside any run (a row of tool results and approval responses only, each result for a call
- * a row of this reply made). A row of another run means the prompt was answered before: a regenerate, or a prompt a task
- * or a sub-agent wrote, which is not the user's words. An unknown reply is no answer. `ownCalls` carries the reply's tool
- * calls across pages.
+ * Rows under a prompt the fresh-send check reads per page, and the pages it reads. Another run's reply lies before this
+ * one's rows, so it is found in the first page; past the cap the prompt counts as fresh (see `checkRequestedSource`).
  */
-const isFreshPrompt = (rows: ReadonlyArray<PromptReplyRow>, replyKey: string | undefined, ownCalls: Set<string>): boolean =>
-    replyKey !== undefined &&
-    rows.every((row) => {
-        if (row.replyId === replyKey) {
-            for (const part of toolPartsOf(row)) {
-                if (part.type === "tool-call" && part.toolCallId !== undefined) {
-                    ownCalls.add(part.toolCallId);
-                }
-            }
+const PROMPT_REPLY_PAGE_ROWS = 50;
+const PROMPT_REPLY_PAGES = 2;
 
-            return true;
-        }
-
-        if (row.replyId !== undefined) {
-            return false;
-        }
-
-        if (row.status === "pending") {
-            return true;
-        }
-
-        const parts = toolPartsOf(row);
-
-        return (
-            parts.some((part) => part.type === "tool-result") &&
-            parts.every(
-                (part) =>
-                    part.type === "tool-approval-response" || (part.type === "tool-result" && part.toolCallId !== undefined && ownCalls.has(part.toolCallId)),
-            )
-        );
-    });
+/**
+ * Whether the rows under a prompt (its `order`, after it) leave it this reply's: none carries a reply other than this one.
+ * A row with another non-empty `replyId` is another run's reply, so the prompt was answered before: a regenerate, or a
+ * prompt a task or a sub-agent wrote. A row with none counts as this reply's (its pending row, an approval's or a denial's
+ * continuation and its later steps). A concurrent regenerate's pending row is accepted on purpose: both runs answer the
+ * same typed prompt, so remembering the user's own words there exposes nothing. An unknown reply is no answer.
+ */
+const isFreshPrompt = (rows: ReadonlyArray<{ replyId?: string }>, replyKey: string | undefined): boolean =>
+    replyKey !== undefined && rows.every((row) => ["", replyKey, undefined].includes(row.replyId));
 
 /**
  * Whether a memory the user asked for may be written from this prompt now, with the thread and prompt when it may. Read
@@ -221,10 +185,8 @@ export const checkRequestedSource = async (
         return { refused: "not_your_words" };
     }
 
-    // Page by page, stopping at the first row of another run: the reply's own rows never count against the prompt, however
-    // many tool steps it ran before the call.
+    // Page by page, stopping at the first row of another run: the reply's own rows never count against the prompt.
     let cursor: string | null = null;
-    const ownCalls = new Set<string>();
 
     for (let page = 0; page < PROMPT_REPLY_PAGES; page += 1) {
         const rows = await ctx.db
@@ -232,7 +194,7 @@ export const checkRequestedSource = async (
             .withIndex("by_threadId_order_stepOrder", (q) => q.eq("threadId", source.threadId).eq("order", prompt.order).gt("stepOrder", prompt.stepOrder))
             .paginate({ cursor, numItems: PROMPT_REPLY_PAGE_ROWS });
 
-        if (!isFreshPrompt(rows.page, source.replyKey, ownCalls)) {
+        if (!isFreshPrompt(rows.page, source.replyKey)) {
             return { refused: "not_your_words" };
         }
 
@@ -243,8 +205,9 @@ export const checkRequestedSource = async (
         cursor = rows.continueCursor;
     }
 
-    // More rows than a reply writes: no fresh prompt.
-    return { refused: "not_your_words" };
+    // No other run's reply within the cap: fresh. This check attributes the prompt to this reply; it guards no privacy (the
+    // chat checks above do), so it fails open past the cap rather than read a long reply's rows into the transaction.
+    return { prompt, thread };
 };
 
 /**

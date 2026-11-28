@@ -288,30 +288,30 @@ export const recordClaimResult = async (ctx: ClaimCtx, scope: string, key: strin
 };
 
 /**
- * Records `result` on the key whatever holds it now, and holds it `ttlMs` from `claimedAt`: for work that finished and must be marked so
- * even when its own claim lapsed or another took the key meanwhile (the finished work wins; a fenced release of the other
- * holder then finds nothing to release). The claim `claimedAt` keeps its row; any other is replaced.
+ * Records `result` on the claim `claimedAt` and holds it `ttlMs` from `claimedAt`, lapsed or not: for work that finished and
+ * must be marked so even when its own claim ran out meanwhile. Compare and set: when another claim holds the key (it was
+ * taken again after this one lapsed), nothing is written and the answer is `false`, so a stale call never marks a newer
+ * one's work. With no row left (purged), the claim is written again under `claimedAt`.
  */
 export const putClaimResult = async (
     ctx: ClaimCtx,
     scope: string,
     key: string,
     { claimedAt, result, ttlMs, userId }: { claimedAt: number; result: string; ttlMs: number; userId?: string },
-): Promise<void> => {
+): Promise<boolean> => {
     const existing = await findClaim(ctx, scope, key);
+
+    if (existing && existing.claimedAt !== claimedAt) {
+        return false;
+    }
+
     const expiresAt = claimedAt + ttlMs;
 
-    if (existing?.claimedAt === claimedAt) {
-        await patchRow(ctx.db, "idempotencyClaims", existing, { expiresAt: Math.max(existing.expiresAt, expiresAt), result });
+    await (existing
+        ? patchRow(ctx.db, "idempotencyClaims", existing, { expiresAt: Math.max(existing.expiresAt, expiresAt), result })
+        : ctx.db.insert("idempotencyClaims", { claimedAt, expiresAt, key, result, scope, ...(userId !== undefined && { userId }) }));
 
-        return;
-    }
-
-    if (existing) {
-        await ctx.db.delete("idempotencyClaims", existing._id);
-    }
-
-    await ctx.db.insert("idempotencyClaims", { claimedAt, expiresAt, key, result, scope, ...(userId !== undefined && { userId }) });
+    return true;
 };
 
 /**

@@ -228,6 +228,17 @@ describe(rememberFactFor, () => {
         expect(await memories()).toHaveLength(0);
     });
 
+    it("says nothing asked, not refused, when only an unasked fact failed the quote check", async () => {
+        // The question asks nothing to be remembered; the ordinary fact found beside it quotes words the user never typed.
+        answer([{ asked: false, memory: "User gets up early", quote: "I always get up at five" }]);
+
+        await expect(remember(await setUp({ prompt: "I get up early. What should I eat first?" }))).resolves.toStrictEqual({
+            facts: [],
+            status: "nothing_asked",
+        });
+        expect(await memories()).toHaveLength(0);
+    });
+
     it("saves a request typed after a long attachment: its quote is read where the model read it", async () => {
         answer([{ memory: "User is vegan", quote: "I'm vegan" }]);
 
@@ -305,8 +316,10 @@ describe(rememberFactFor, () => {
         ["a sub-agent's or worker's thread", { subAgentChild: true as const }, "not_private"],
         ["a task's thread", { thread: { tags: ["task"] } }, "not_private"],
         ["a row that is not the user's prompt", { promptRow: { message: { content: ASK, role: "assistant" } } }, "not_your_words"],
-        // A regenerate, or a prompt a task or sub-agent wrote: its earlier reply belongs to another run.
-        ["a prompt another run answered first", { replies: [{ replyId: undefined }] }, "not_your_words"],
+        // A prompt a task or sub-agent wrote and another run already answered: its completed reply is another run's.
+        ["a prompt another run answered first", { replies: [{ replyId: "stream-0" }] }, "not_your_words"],
+        // A regenerate: the earlier reply's rows, then this reply's.
+        ["a regenerate of an answered prompt", { replies: [{ replyId: "stream-0" }, { replyId: "stream-0" }, { replyId: REPLY }] }, "not_your_words"],
     ])("saves nothing, and asks no model, with %s", async (_name, setup: Setup, status) => {
         answer([{ memory: "User is vegan", quote: "I'm vegan" }]);
 
@@ -609,7 +622,7 @@ describe(rememberFactFor, () => {
         expect(await memories()).toHaveLength(0);
     });
 
-    it("reads an approval's answer to the reply's own tool call as part of the reply", async () => {
+    it("reads an approval's answer to the reply's own tool call, and the steps after it, as part of the reply", async () => {
         answer([{ memory: "User is vegan", quote: "I'm vegan" }]);
 
         // The reply's call, then the result an approval saved outside any run, under the same prompt.
@@ -631,15 +644,38 @@ describe(rememberFactFor, () => {
         harness.close();
         harness = lunoraTest(schema as never);
 
-        // An answer to a call this reply did not make is another run's.
-        const foreign = [
+        // The continuation's later tool step carries no reply either: still this reply's.
+        const furtherStep = [
+            ...replies,
+            { message: { content: [{ input: {}, toolCallId: "call-2", toolName: "dateTime", type: "tool-call" }], role: "assistant" } },
             {
-                ...replies[1],
-                message: { content: [{ output: { type: "text", value: "x" }, toolCallId: "call-9", toolName: "dateTime", type: "tool-result" }], role: "tool" },
+                message: {
+                    content: [{ output: { type: "text", value: "later" }, toolCallId: "call-2", toolName: "dateTime", type: "tool-result" }],
+                    role: "tool",
+                },
             },
         ];
 
-        await expect(remember(await setUp({ replies: foreign }))).resolves.toMatchObject({ status: "not_your_words" });
+        await expect(remember(await setUp({ replies: furtherStep }))).resolves.toMatchObject({ status: "saved" });
+    });
+
+    it("reads no further than the cap for another run's reply: a reply with very large tool rows still saves", async () => {
+        answer([{ memory: "User is vegan", quote: "I'm vegan" }]);
+
+        // 150 of the reply's own tool rows, each carrying a large result. Only two pages are read: a row of another run past
+        // them (here the last) is never reached, and the prompt counts as fresh, as an attribution check may.
+        const result = "x".repeat(20_000);
+        const replies = Array.from({ length: 150 }, (_, index) => {
+            return {
+                message: {
+                    content: [{ output: { type: "text", value: result }, toolCallId: `call-${String(index)}`, toolName: "fetch", type: "tool-result" }],
+                    role: "tool",
+                },
+                replyId: index === 149 ? "stream-0" : REPLY,
+            };
+        });
+
+        await expect(remember(await setUp({ replies }))).resolves.toMatchObject({ status: "saved" });
     });
 
     it("frees the prompt by itself when a request's claim was never given back, and holds a handled one for a day", async () => {
@@ -681,6 +717,36 @@ describe(rememberFactFor, () => {
 
         expect(claim).toMatchObject({ result: "done", userId: USER });
         expect(claim.expiresAt).toBeGreaterThan(Date.now());
+    });
+
+    it("marks nothing when a newer request took the prompt after this one's claim lapsed", async () => {
+        const ids = await setUp();
+        let newer: number | undefined;
+
+        generateText.mockImplementationOnce(async () => {
+            // This request's claim lapses, and a newer request takes the prompt while this one still runs.
+            await harness.run(async (ctx: any) => {
+                const claim = await ctx.db.query("idempotencyClaims").first();
+
+                newer = claim.claimedAt + 1;
+                await ctx.db.delete("idempotencyClaims", claim._id);
+                await ctx.db.insert("idempotencyClaims", {
+                    claimedAt: newer,
+                    expiresAt: Number.MAX_SAFE_INTEGER,
+                    key: ids.promptMessageId,
+                    scope: "memory-remember",
+                });
+            });
+
+            return { output: { facts: [{ asked: true, confidence: 90, importance: 70, memory: "User is vegan", quote: "I'm vegan", type: "preference" }] } };
+        });
+
+        await expect(remember(ids)).resolves.toMatchObject({ status: "saved" });
+
+        const claim = await harness.run(async (ctx: any) => await ctx.db.query("idempotencyClaims").first());
+
+        expect(claim.claimedAt).toBe(newer);
+        expect(claim.result).toBeUndefined();
     });
 
     it("returns the saved facts when marking the prompt handled fails", async () => {
