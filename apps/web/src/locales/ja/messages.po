@@ -334,7 +334,7 @@ msgid "{0, plural, one {# member} other {# members}}"
 msgstr "{0, plural, other {# 人のメンバー}}"
 
 #. placeholder {0}: forgotten.length
-#: src/features/chat/thread/tool-approval.tsx:209
+#: src/features/chat/thread/tool-approval.tsx:223
 msgid "{0, plural, one {# memory is waiting for the chat owner to confirm.} other {# memories are waiting for the chat owner to confirm.}}"
 msgstr "{0, plural, other {#件のメモリがチャットの所有者の確認を待っています。}}"
 
@@ -698,7 +698,7 @@ msgid "{0} lines"
 msgstr "{0} 行"
 
 #. placeholder {0}: stats.total
-#: src/features/settings/components/personalization/memory-settings.tsx:195
+#: src/features/settings/components/personalization/memory-settings.tsx:200
 msgid "{0} memories"
 msgstr "{0} 件のメモリ"
 
@@ -790,7 +790,7 @@ msgid "{0} on {1}, in {2}"
 msgstr "{2} の {1} 上の {0}"
 
 #. placeholder {0}: stats.pinned
-#: src/features/settings/components/personalization/memory-settings.tsx:196
+#: src/features/settings/components/personalization/memory-settings.tsx:201
 msgid "{0} pinned"
 msgstr "ピン留め {0} 件"
 
@@ -3537,7 +3537,7 @@ msgid "All"
 msgstr "すべて"
 
 #. placeholder {0}: memories.length
-#: src/features/settings/components/personalization/memory-settings.tsx:217
+#: src/features/settings/components/personalization/memory-settings.tsx:222
 msgid "All ({0})"
 msgstr "すべて（{0}）"
 
@@ -3725,11 +3725,11 @@ msgstr "すべてのユースケース"
 msgid "All Users"
 msgstr "すべてのユーザー"
 
-#: src/features/chat/thread/tool-approval.tsx:231
+#: src/features/chat/thread/tool-approval.tsx:245
 msgid "Allow \"{tool}\" from {server}?"
 msgstr "{server} の「{tool}」を許可しますか？"
 
-#: src/features/chat/thread/tool-approval.tsx:231
+#: src/features/chat/thread/tool-approval.tsx:245
 msgid "Allow \"{tool}\"?"
 msgstr "「{tool}」を許可しますか？"
 
@@ -5705,6 +5705,14 @@ msgstr "このプロンプトの簡単な説明"
 msgid "Brightness"
 msgstr "明るさ"
 
+#: src/features/settings/components/personalization/retired-memories.tsx:59
+msgid "Bring back"
+msgstr "元に戻す"
+
+#: src/features/settings/components/personalization/retired-memories.tsx:59
+msgid "Bring back (replaces the current version)"
+msgstr "元に戻す（現在のバージョンと置き換えます）"
+
 #: ../../packages/ui/src/components/canvas-editor/fabric-canvas-editor.tsx:614
 msgid "Bring Forward"
 msgstr "前面へ移動"
@@ -5733,6 +5741,10 @@ msgstr "Telegram、Slack、Discord、WhatsApp、LINE、Feishu/Lark、Microsoft T
 #: src/features/marketing/components/tutorials-page.tsx:120
 msgid "Bring Your Own Keys (BYOK)"
 msgstr "独自キーの持ち込み（BYOK）"
+
+#: src/features/settings/components/personalization/retired-memories.tsx:81
+msgid "Bringing back…"
+msgstr "元に戻しています…"
 
 #: src/features/marketing/data/models-data.ts:33
 msgid "Broad style range from photorealism to illustration"
@@ -6191,7 +6203,7 @@ msgstr "カナダ"
 #: src/features/settings/components/chat/usage-settings.tsx:594
 #: src/features/settings/components/knowledge/knowledge-base-settings.tsx:416
 #: src/features/settings/components/personalization/memory-item.tsx:351
-#: src/features/settings/components/personalization/memory-settings.tsx:266
+#: src/features/settings/components/personalization/memory-settings.tsx:273
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:381
 #: src/features/settings/connectors/messenger/messenger-setup-dialog.tsx:156
 #: src/features/skills/components/bundle-export-dialog.tsx:219
@@ -7109,11 +7121,11 @@ msgstr "すべてクリア"
 msgid "Clear All"
 msgstr "すべてクリア"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:256
+#: src/features/settings/components/personalization/memory-settings.tsx:263
 msgid "Clear All Memories"
 msgstr "すべてのメモリを消去"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:260
+#: src/features/settings/components/personalization/memory-settings.tsx:267
 msgid "Clear all memories?"
 msgstr "すべてのメモリを消去しますか？"
 
@@ -7164,7 +7176,7 @@ msgstr "タグフィルターをクリア"
 msgid "Clear the queue"
 msgstr "キューをクリア"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:140
+#: src/features/settings/components/personalization/memory-settings.tsx:145
 msgid "Cleared {count} memories"
 msgstr "{count} 件のメモリを消去しました"
 
@@ -7638,6 +7650,10 @@ msgstr "列"
 #: src/features/settings/lib/settings-keywords.ts:76
 msgid "combine images"
 msgstr "画像を合成"
+
+#: src/features/settings/components/personalization/retired-memories.tsx:32
+msgid "Combined into a shorter summary"
+msgstr "より短い要約にまとめられました"
 
 #: src/features/appearance/components/appearance-controls.tsx:128
 msgid "Comfortable (default)"
@@ -10766,7 +10782,7 @@ msgstr "アカウントを削除"
 msgid "Delete alert \"{ruleName}\""
 msgstr "アラート「{ruleName}」を削除"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:267
+#: src/features/settings/components/personalization/memory-settings.tsx:274
 msgid "Delete All"
 msgstr "すべて削除"
 
@@ -12733,7 +12749,7 @@ msgstr "フォローアップの提案を有効化"
 msgid "Enable for Next Chat"
 msgstr "次のチャットで有効化"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:174
+#: src/features/settings/components/personalization/memory-settings.tsx:179
 msgid "Enable memory"
 msgstr "メモリを有効化"
 
@@ -13960,6 +13976,10 @@ msgstr "ファクトチェック：砂糖は子どもの多動を引き起こし
 msgid "Facts to save"
 msgstr "保存する事実"
 
+#: src/features/settings/components/personalization/retired-memories.tsx:34
+msgid "Faded after a long time without coming up"
+msgstr "長い間話題に上らなかったため薄れました"
+
 #: src/features/evals/components/model-comparison.tsx:90
 #: src/features/evals/components/run-detail.tsx:39
 msgid "Fail"
@@ -14045,7 +14065,7 @@ msgstr "タグの色を変更できませんでした"
 msgid "Failed to clear filter rules"
 msgstr "フィルタールールをクリアできませんでした"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:136
+#: src/features/settings/components/personalization/memory-settings.tsx:141
 msgid "Failed to clear memories"
 msgstr "メモリを消去できませんでした"
 
@@ -14142,7 +14162,7 @@ msgstr "ファイルを削除できませんでした。もう一度お試しく
 msgid "Failed to delete files"
 msgstr "ファイルを削除できませんでした"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:108
+#: src/features/settings/components/personalization/memory-settings.tsx:113
 msgid "Failed to delete memory"
 msgstr "メモリを削除できませんでした"
 
@@ -14671,8 +14691,8 @@ msgstr "キーボードショートカットを更新できませんでした"
 msgid "Failed to update MCP server"
 msgstr "MCP サーバーを更新できませんでした"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:119
-#: src/features/settings/components/personalization/memory-settings.tsx:127
+#: src/features/settings/components/personalization/memory-settings.tsx:124
+#: src/features/settings/components/personalization/memory-settings.tsx:132
 msgid "Failed to update memory"
 msgstr "メモリを更新できませんでした"
 
@@ -14700,7 +14720,7 @@ msgstr "プルリクエストの設定を更新できませんでした"
 msgid "Failed to update reply tools"
 msgstr "返信ツールを更新できませんでした"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:151
+#: src/features/settings/components/personalization/memory-settings.tsx:156
 #: src/features/settings/components/personalization/schedule-ideas-switch.tsx:41
 msgid "Failed to update setting"
 msgstr "設定を更新できませんでした"
@@ -15399,7 +15419,7 @@ msgstr "種類で絞り込み"
 msgid "Filter condition"
 msgstr "フィルター条件"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:203
+#: src/features/settings/components/personalization/memory-settings.tsx:208
 msgid "Filter memories by type"
 msgstr "種類でメモリを絞り込み"
 
@@ -15751,7 +15771,7 @@ msgstr "フォレスト"
 msgid "forget"
 msgstr "忘れる"
 
-#: src/features/chat/thread/tool-approval.tsx:217
+#: src/features/chat/thread/tool-approval.tsx:231
 msgid "Forget these memories?"
 msgstr "これらのメモリを忘れますか？"
 
@@ -19718,6 +19738,11 @@ msgstr "詳細"
 msgid "Learn more about MCP"
 msgstr "MCP について詳しく見る"
 
+#. placeholder {0}: memory.botName
+#: src/features/settings/components/personalization/retired-memories.tsx:66
+msgid "Learned by {0}"
+msgstr "{0} が学習"
+
 #: src/features/settings/components/personalization/memory-item.tsx:86
 msgid "Learned by {botName} · {learnedOn}"
 msgstr "{botName} が学習 · {learnedOn}"
@@ -20347,6 +20372,10 @@ msgstr "プロジェクトを読み込み中…"
 #: src/features/projects/components/project-repositories.tsx:304
 msgid "Loading repositories…"
 msgstr "リポジトリを読み込んでいます…"
+
+#: src/features/settings/components/personalization/retired-memories.tsx:114
+msgid "Loading retired memories…"
+msgstr "使われなくなったメモリを読み込んでいます…"
 
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:483
 msgid "Loading roles…"
@@ -21357,11 +21386,15 @@ msgid "memories"
 msgstr "メモリ"
 
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:31
-#: src/features/settings/components/personalization/memory-settings.tsx:229
+#: src/features/settings/components/personalization/memory-settings.tsx:234
 msgid "Memories"
 msgstr "メモリ"
 
-#: src/features/chat/thread/tool-approval.tsx:202
+#: src/features/settings/components/personalization/retired-memories.tsx:233
+msgid "Memories the AI stopped using, and why. Bring one back to use it again."
+msgstr "AI が使わなくなったメモリとその理由です。元に戻すと再び使われます。"
+
+#: src/features/chat/thread/tool-approval.tsx:216
 msgid "Memories to forget"
 msgstr "忘れるメモリ"
 
@@ -21379,7 +21412,7 @@ msgid "Memories used for this reply ({0})"
 msgstr "この返信で使用したメモリ（{0}）"
 
 #: src/features/marketing/use-cases/use-case-data.ts:114
-#: src/features/settings/components/personalization/memory-settings.tsx:167
+#: src/features/settings/components/personalization/memory-settings.tsx:172
 #: src/features/settings/lib/settings-keywords.ts:96
 msgid "Memory"
 msgstr "メモリ"
@@ -21388,15 +21421,19 @@ msgstr "メモリ"
 msgid "Memory — what the agent keeps across chats"
 msgstr "メモリ — エージェントがチャットをまたいで保持する内容"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:112
+#: src/features/settings/components/personalization/retired-memories.tsx:207
+msgid "Memory brought back."
+msgstr "メモリを元に戻しました。"
+
+#: src/features/settings/components/personalization/memory-settings.tsx:117
 msgid "Memory deleted"
 msgstr "メモリを削除しました"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:149
+#: src/features/settings/components/personalization/memory-settings.tsx:154
 msgid "Memory disabled"
 msgstr "メモリを無効にしました"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:149
+#: src/features/settings/components/personalization/memory-settings.tsx:154
 msgid "Memory enabled"
 msgstr "メモリを有効にしました"
 
@@ -21494,6 +21531,10 @@ msgstr "マージ済みのチャットはそのままになります"
 #: src/features/settings/components/chat/chat-lifecycle-settings.tsx:133
 msgid "Merged chats will be archived"
 msgstr "マージ済みのチャットはアーカイブされます"
+
+#: src/features/settings/components/personalization/retired-memories.tsx:37
+msgid "Merged into a similar memory"
+msgstr "似たメモリに統合されました"
 
 #: src/features/develop/components/merge-panel.tsx:99
 msgid "Merged on {hostLabel}."
@@ -23548,11 +23589,11 @@ msgstr "MCP サーバーが設定されていません。サーバーを追加�
 msgid "No members in this team yet"
 msgstr "このチームにはまだメンバーがいません"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:245
+#: src/features/settings/components/personalization/memory-settings.tsx:250
 msgid "No memories of this type."
 msgstr "この種類のメモリはありません。"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:246
+#: src/features/settings/components/personalization/memory-settings.tsx:251
 msgid "No memories yet. The AI will start learning from your conversations automatically."
 msgstr "メモリはまだありません。AI は会話から自動的に学習を始めます。"
 
@@ -23767,6 +23808,10 @@ msgstr "“{searchTerm}” の結果が見つかりません"
 #: src/features/chat/thread/widgets/wolfram-widget.tsx:34
 msgid "No results found."
 msgstr "結果が見つかりません。"
+
+#: src/features/settings/components/personalization/retired-memories.tsx:139
+msgid "No retired memories."
+msgstr "使われなくなったメモリはありません。"
 
 #: src/features/evals/components/dataset-panel.tsx:215
 msgid "No runs yet. Start one to score every case."
@@ -24245,6 +24290,11 @@ msgstr "新しいアーキテクチャ"
 #: src/features/marketing/data/models-data.ts:1462
 msgid "Novel diffusion-based language model architecture"
 msgstr "拡散ベースの新しい言語モデルアーキテクチャ"
+
+#. placeholder {0}: memory.successor
+#: src/features/settings/components/personalization/retired-memories.tsx:68
+msgid "Now remembered as: {0}"
+msgstr "現在の記憶: {0}"
 
 #: src/features/admin/components/nsfw-review-page.tsx:16
 msgid "NSFW Content Review"
@@ -26084,6 +26134,10 @@ msgstr "パスワードが一致しません"
 #: src/features/admin/components/admin-cleanup-dashboard.tsx:358
 msgid "Past cleanup runs and their results"
 msgstr "過去のクリーンアップの実行とその結果"
+
+#: src/features/settings/components/personalization/retired-memories.tsx:36
+msgid "Past its end date"
+msgstr "終了日を過ぎました"
 
 #: src/features/evals/components/dataset-panel.tsx:323
 msgid "Past runs keep their results for this case."
@@ -29183,6 +29237,18 @@ msgstr "繰り返し（{cronExpression} UTC）"
 msgid "Replace"
 msgstr "置換"
 
+#: src/features/settings/components/personalization/retired-memories.tsx:38
+msgid "Replaced by a newer version"
+msgstr "新しいバージョンに置き換えられました"
+
+#: src/features/settings/components/personalization/retired-memories.tsx:33
+msgid "Replaced by a newer, conflicting memory"
+msgstr "矛盾する新しいメモリに置き換えられました"
+
+#: src/features/settings/components/personalization/retired-memories.tsx:31
+msgid "Replaced when you brought back an earlier version"
+msgstr "以前のバージョンを元に戻したときに置き換えられました"
+
 #: src/features/settings/components/personalization/personalization-settings.tsx:388
 msgid "Replay Onboarding"
 msgstr "オンボーディングを再生"
@@ -29594,6 +29660,18 @@ msgstr "最新のチャットを再開しています"
 #: src/features/settings/components/account/account-settings.tsx:703
 msgid "Retention period updated to {hours} hours"
 msgstr "保持期間を {hours} 時間に更新しました"
+
+#: src/features/settings/components/personalization/retired-memories.tsx:41
+msgid "Retired (reason not recorded)"
+msgstr "使用停止（理由は記録されていません）"
+
+#: src/features/settings/components/personalization/retired-memories.tsx:225
+msgid "Retired memories"
+msgstr "使われなくなったメモリ"
+
+#: src/features/settings/components/personalization/retired-memories.tsx:122
+msgid "Retired memories could not be loaded."
+msgstr "使われなくなったメモリを読み込めませんでした。"
 
 #: src/features/tasks/components/task-detail-dialog.tsx:129
 msgid "retried after review"
@@ -30208,6 +30286,10 @@ msgstr "Safari はこの安全なページから http://localhost への通信�
 #: src/features/local-models/components/local-setup-guide.tsx:148
 msgid "Safari is not supported: it blocks a secure page from calling http://localhost."
 msgstr "Safari には対応していません。安全なページから http://localhost への通信がブロックされます。"
+
+#: src/features/settings/components/personalization/retired-memories.tsx:35
+msgid "Same as an existing memory"
+msgstr "既存のメモリと同じ内容"
 
 #: src/features/marketing/data/models-data.ts:368
 msgid "Same frontier architecture, optimized for speed"
@@ -31834,6 +31916,7 @@ msgid "Show less of the instructions for \"{title}\""
 msgstr "「{title}」の指示を折りたたむ"
 
 #: src/features/chat/pins/pin-item.tsx:214
+#: src/features/settings/components/personalization/retired-memories.tsx:142
 msgid "Show more"
 msgstr "さらに表示"
 
@@ -35129,7 +35212,7 @@ msgstr "エージェントのプラン"
 msgid "The agent's tool calls"
 msgstr "エージェントのツール呼び出し"
 
-#: src/features/settings/components/personalization/memory-settings.tsx:166
+#: src/features/settings/components/personalization/memory-settings.tsx:171
 msgid "The AI learns from your conversations to personalize its responses, and reflects on what it learned each night. Everything it remembers is listed here — edit, retype, pin or delete any of it."
 msgstr "AI は会話から学習して応答をパーソナライズし、毎晩学んだことを振り返ります。記憶している内容はすべてここに表示され、編集、種類の変更、ピン留め、削除ができます。"
 
@@ -36608,6 +36691,10 @@ msgstr "このログインは別の場所で変更されました。再度保存
 msgid "This machine is not ready yet."
 msgstr "このコンピューターはまだ準備ができていません。"
 
+#: src/features/settings/components/personalization/retired-memories.tsx:85
+msgid "This memory could not be brought back. Please try again in a moment."
+msgstr "このメモリを元に戻せませんでした。しばらくしてからもう一度お試しください。"
+
 #: src/features/chat/thread/memory-usage-action.tsx:63
 msgid "This memory has since been deleted."
 msgstr "このメモリはその後削除されました。"
@@ -36899,7 +36986,7 @@ msgid "This will permanently delete {0} anonymous user accounts and all their da
 msgstr "{0} 件の匿名ユーザーアカウントとそのすべてのデータが完全に削除されます。この操作は元に戻せません。"
 
 #. placeholder {0}: memories.length
-#: src/features/settings/components/personalization/memory-settings.tsx:262
+#: src/features/settings/components/personalization/memory-settings.tsx:269
 msgid "This will permanently delete all {0} memories and their daily digests. The AI will start learning fresh from your next conversation."
 msgstr "{0} 件のメモリとその日次ダイジェストがすべて完全に削除されます。AI は次の会話から改めて学習を始めます。"
 
@@ -37766,6 +37853,7 @@ msgstr "検索キーワードを変えてみてください。"
 #: src/features/projects/components/repo-rule-file-import.tsx:183
 #: src/features/settings/components/chat/default-models-settings.tsx:455
 #: src/features/settings/components/personalization/memory-file-import.tsx:473
+#: src/features/settings/components/personalization/retired-memories.tsx:123
 #: src/features/tasks/components/task-form-dialog.tsx:459
 #: src/features/vault/components/site-logins.tsx:480
 #: src/features/vault/components/site-logins.tsx:612

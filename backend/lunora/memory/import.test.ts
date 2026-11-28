@@ -970,7 +970,7 @@ describe("importing another assistant's memory", () => {
 
 describe("import limits", () => {
     it("counts a confirmation the save could not apply as added, and saves its fact", async () => {
-        expect.assertions(3);
+        expect.assertions(4);
 
         await setMemoryEnabled(true);
 
@@ -997,6 +997,7 @@ describe("import limits", () => {
 
         expect(result).toStrictEqual({ added: 2, alreadyKnown: 0, updated: 0 });
         expect(rows.find((row: { _id: string }) => row._id === berlin)?.supersededBy).toBeTypeOf("string");
+        expect(rows.find((row: { _id: string }) => row._id === berlin)?.retiredReason).toBe("revised");
         expect(rows.filter((row: { memory: string }) => row.memory === "The user is a nurse in Hamburg")).toHaveLength(1);
     });
 

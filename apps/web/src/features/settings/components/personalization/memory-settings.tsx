@@ -34,6 +34,7 @@ import MemoryImportDialog from "./memory-import-dialog";
 import MemoryItem from "./memory-item";
 import type { MemoryType } from "./memory-types";
 import { isMemoryType, MEMORY_TYPES, useMemoryTypeLabels } from "./memory-types";
+import RetiredMemories from "./retired-memories";
 import ScheduleIdeasSwitch from "./schedule-ideas-switch";
 
 type TypeFilter = MemoryType | "all";
@@ -97,9 +98,13 @@ const MemorySettings: FC = () => {
         enabled: memoryEnabled,
     });
 
+    // Moved by every change made here, so the open retired list is read again too (a delete takes retired rows with it).
+    const [readCount, setReadCount] = useState(0);
+
     const refresh = useCallback(() => {
         void refetchMemories();
         void refetchStats();
+        setReadCount((count) => count + 1);
     }, [refetchMemories, refetchStats]);
 
     const { isPending: isDeleting, mutate: deleteMemory } = useMutation({
@@ -246,6 +251,8 @@ const MemorySettings: FC = () => {
                                     : t`No memories yet. The AI will start learning from your conversations automatically.`}
                             </div>
                         )}
+
+                        <RetiredMemories onBroughtBack={refresh} readCount={readCount} />
 
                         {/* Clear all */}
                         {memories && memories.length > 0 && (

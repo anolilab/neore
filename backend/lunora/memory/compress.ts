@@ -21,6 +21,7 @@ import { getUtilityModel } from "../lib/utility-model";
 import { logRedaction, redactMemoryFacts } from "./redact";
 import { MEMORY_TYPE_GUIDE, MEMORY_TYPES } from "./taxonomy";
 import { factDatesOf, hasFactDates } from "./dates";
+import { recentlyRestored } from "./reflection-logic";
 
 const COMPRESSION_SYSTEM_PROMPT = `You are a memory consolidation system. Given a list of related memories, synthesize them into a smaller set of high-quality, comprehensive facts.
 
@@ -148,7 +149,10 @@ export const getThreadMemoriesForCompression = internalQuery
         return (
             memories
                 // Only the same scope compresses together: a bot's memories with that bot's, the user's with the user's.
-                .filter((m) => m.userId === args.userId && !m.supersededBy && (m.botId as string | undefined) === args.botId)
+                // A row the person brought back recently stays as they chose it (`RESTORED_PROTECTION_MS`).
+                .filter(
+                    (m) => m.userId === args.userId && !m.supersededBy && !recentlyRestored(m, Date.now()) && (m.botId as string | undefined) === args.botId,
+                )
                 .map((m) => {
                     return {
                         _id: m._id,

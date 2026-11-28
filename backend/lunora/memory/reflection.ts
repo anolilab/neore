@@ -42,6 +42,7 @@ import { runAfterOnShard } from "../lib/shard-scheduler";
 import { getUtilityModel } from "../lib/utility-model";
 import { runBeliefRevision } from "./extract";
 import { reembedRewordedMemory, supersedeMemory } from "./functions";
+import { reflectionRetiredReason } from "./retired";
 import {
     buildReflectionPrompt,
     checkReflectionEligibility,
@@ -58,6 +59,7 @@ import {
     planReflection,
     reflectionSourceIds,
     promotionToOp,
+    recentlyRestored,
     REFLECTION_LIMITS,
     REFLECTION_SYSTEM_PROMPT,
     type ContradictionCandidate,
@@ -285,7 +287,9 @@ export const loadReflectionInputs = internalQuery
             .query("memories")
             .withIndex("by_userId_botId", (q) => q.eq("userId", userId).eq("botId", scopeBot))
             .take(REFLECTION_READ_CAP);
-        const memories = rows.filter((m) => !m.supersededBy).map((m) => toReflectionRow(m));
+        // A row the person brought back recently is not reflection's to plan at all: not merged, revised, decayed or promoted,
+        // and never a merge's survivor either (`RESTORED_PROTECTION_MS`).
+        const memories = rows.filter((m) => !m.supersededBy && !recentlyRestored(m, now)).map((m) => toReflectionRow(m));
 
         // "The day's threads": the ones that produced a memory in the last day.
         const since = now - DAY_MS;
@@ -324,7 +328,7 @@ export const loadExpiredMemoriesPage = internalQuery
 
         return {
             continueCursor: result.continueCursor,
-            expired: result.page.filter((m) => m.pinned !== true && isExpired(m, today)).map((m) => toReflectionRow(m)),
+            expired: result.page.filter((m) => m.pinned !== true && !recentlyRestored(m, now) && isExpired(m, today)).map((m) => toReflectionRow(m)),
             isDone: result.isDone,
         };
     });
@@ -339,6 +343,7 @@ const vReflectionOp = v.union(
                 memory: v.object({ eventEnd: v.optional(v.string()), eventStart: v.optional(v.string()), validUntil: v.optional(v.string()) }),
             }),
         ),
+        duplicate: v.optional(v.literal(true)),
         expiredOn: v.optional(v.string()),
         kind: v.literal("supersede"),
         memoryId: v.string(),
@@ -397,7 +402,8 @@ export const applyReflectionOps = internalMutation
         const active = async (id: string): Promise<Doc<"memories"> | null> => {
             const row = await ctx.db.get("memories", id as Id<"memories">);
 
-            return row?.userId === userId && (row.botId as string | undefined) === botId && !row.supersededBy ? row : null;
+            // A row brought back after the plan read it is left as the person chose it: no op rewrites or retires it.
+            return row?.userId === userId && (row.botId as string | undefined) === botId && !row.supersededBy && !recentlyRestored(row, now) ? row : null;
         };
 
         // A merge applies whole or not at all: when its survivor was edited, or a row it absorbs was revised, deleted,
@@ -504,7 +510,7 @@ export const applyReflectionOps = internalMutation
                     });
 
                     for (const source of sources) {
-                        await supersedeMemory(ctx, source._id, promotedId, now);
+                        await supersedeMemory(ctx, source._id, promotedId, now, "merged");
                         supersededIds.push(source._id);
                     }
 
@@ -539,7 +545,7 @@ export const applyReflectionOps = internalMutation
                         break;
                     }
 
-                    await supersedeMemory(ctx, row._id, by._id, now);
+                    await supersedeMemory(ctx, row._id, by._id, now, reflectionRetiredReason(op));
 
                     // The survivor takes the absorbed row's words when they were said later. Outside a merge, a survivor
                     // with no quote takes none: it is the newer belief that contradicts or reworded the absorbed one.

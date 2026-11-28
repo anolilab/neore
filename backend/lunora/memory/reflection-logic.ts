@@ -90,6 +90,17 @@ export const DECAY_STEP = 15;
 /** A decayed activity below this confidence is retired. */
 export const RETIRE_BELOW_CONFIDENCE = 40;
 
+/**
+ * A row the person brought back (`restoredAt`) is left alone this long: reflection does not plan it at all (no decay,
+ * expiry, merge, as survivor or absorbed, revision or promotion), an op planned before the bring-back skips it, and
+ * compression neither reads nor retires it.
+ */
+export const RESTORED_PROTECTION_MS = 30 * DAY_MS;
+
+/** Whether a row was brought back recently enough to be left alone ({@link RESTORED_PROTECTION_MS}). */
+export const recentlyRestored = (row: { restoredAt?: number | null }, now: number): boolean =>
+    typeof row.restoredAt === "number" && now - row.restoredAt < RESTORED_PROTECTION_MS;
+
 /** Types a belief revision may run over: facts that can be wrong, not events that happened. */
 const REVISABLE_TYPES: ReadonlySet<MemoryType> = new Set(["context", "identity", "preference"]);
 
@@ -155,6 +166,8 @@ export type ReflectionOp =
               by: { eventEnd?: string; eventStart?: string; validUntil?: string };
               memory: { eventEnd?: string; eventStart?: string; validUntil?: string };
           };
+          /** A belief revision's IGNORE: the newer row only restated the older one, which stands. */
+          duplicate?: true;
           expiredOn?: string;
           kind: "supersede";
           memoryId: string;
@@ -549,7 +562,10 @@ export const revisionToOps = (
                 return [{ kind: "patch", lastConfirmedAt: now, memoryId: pair.newerId }, supersedeChecked(pair.olderId, pair.newerId, memories)];
             }
 
-            return [supersedeChecked(pair.newerId, pair.olderId, memories), { kind: "patch", lastConfirmedAt: now, memoryId: pair.olderId }];
+            return [
+                { ...supersedeChecked(pair.newerId, pair.olderId, memories), duplicate: true },
+                { kind: "patch", lastConfirmedAt: now, memoryId: pair.olderId },
+            ];
         }
         case "SUPERSEDE": {
             return [supersedeChecked(pair.olderId, pair.newerId, memories)];

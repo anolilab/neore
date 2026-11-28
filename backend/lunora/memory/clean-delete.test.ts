@@ -134,6 +134,8 @@ describe("a retired row loses its vector", () => {
 
         expect(row).not.toBeNull();
         expect(row?.supersededBy).toBe(next);
+        expect(row).toMatchObject({ retiredReason: "revised" });
+        expect(row?.retiredAt).toBeTypeOf("number");
         expect(row?.embeddingId).toBeUndefined();
         expect(await vectorExists(old.embeddingId)).toBe(false);
     });
@@ -152,16 +154,24 @@ describe("a retired row loses its vector", () => {
 
         expect(saved).toBeDefined();
         expect(await supersededByOf(a.memoryId)).toBe(a.memoryId);
+        expect(await rowOf(a.memoryId)).toMatchObject({ retiredReason: "compressed" });
         expect(await vectorExists(a.embeddingId)).toBe(false);
         expect(await vectorExists(b.embeddingId)).toBe(false);
     });
 
-    it("drops the vector of a row reflection expires, and of one it merges away or promotes", async () => {
+    it("drops the vector of a row reflection expires, and of one it merges away or promotes, and says why each went", async () => {
         const expired = await seed("in Lisbon until 2026-09-20");
         const kept = await seed("lives in Porto");
         const absorbed = await seed("lives in porto city");
         const sourceA = await seed("runs on Mondays");
         const sourceB = await seed("runs on Fridays");
+        const lapsed = await seed("in Rome until 2020-01-01");
+        const merged = await seed("lives in Porto, Portugal");
+        const restated = await seed("lives in Porto these days");
+
+        await run(async (ctx) => {
+            await ctx.db.patch("memories", lapsed.memoryId, { validUntil: "2020-01-01" });
+        });
 
         await run(
             async (ctx) =>
@@ -171,6 +181,9 @@ describe("a retired row loses its vector", () => {
                         ops: [
                             { byMemoryId: expired.memoryId, kind: "supersede", memoryId: expired.memoryId },
                             { byMemoryId: kept.memoryId, kind: "supersede", memoryId: absorbed.memoryId },
+                            { byMemoryId: lapsed.memoryId, expiredOn: "2026-11-28", kind: "supersede", memoryId: lapsed.memoryId },
+                            { byMemoryId: kept.memoryId, kind: "supersede", memoryId: merged.memoryId, merge: true },
+                            { byMemoryId: kept.memoryId, duplicate: true, kind: "supersede", memoryId: restated.memoryId },
                             {
                                 confidence: 80,
                                 importance: 50,
@@ -189,6 +202,10 @@ describe("a retired row loses its vector", () => {
             expect(await supersededByOf(retired.memoryId)).toBeDefined();
             expect(await vectorExists(retired.embeddingId)).toBe(false);
         }
+
+        const rows = await Promise.all([expired, absorbed, lapsed, merged, restated, sourceA].map(async ({ memoryId }) => await rowOf(memoryId)));
+
+        expect(rows.map((row) => row?.retiredReason)).toStrictEqual(["decayed", "contradicted", "expired", "merged", "duplicate", "merged"]);
 
         expect(await vectorExists(kept.embeddingId)).toBe(true);
     });
@@ -572,7 +589,7 @@ describe("saving a digest while a memory is deleted", () => {
         const retired = await seed("likes coffee");
         const next = await seed("likes espresso");
 
-        await run(async (ctx) => await supersedeMemory(ctx as never, retired.memoryId, next.memoryId, Date.now()));
+        await run(async (ctx) => await supersedeMemory(ctx as never, retired.memoryId, next.memoryId, Date.now(), "revised"));
         await asOwner().mutation(deleteMemory as never, { memoryId: gone.memoryId } as never);
 
         await run(
@@ -668,7 +685,7 @@ describe("a vector delete that cannot be retried", () => {
                 },
             });
 
-            await supersedeMemory(lost, old.memoryId, next.memoryId, Date.now());
+            await supersedeMemory(lost, old.memoryId, next.memoryId, Date.now(), "revised");
         });
 
         expect(await supersededByOf(old.memoryId)).toBe(next.memoryId);
@@ -835,7 +852,7 @@ describe("a cleanup step that fails", () => {
         const next = await seed("likes green tea");
 
         vi.mocked(deleteVectorRow).mockRejectedValueOnce(new Error("vector index unavailable"));
-        await run(async (ctx) => await supersedeMemory(ctx as never, old.memoryId, next.memoryId, Date.now()));
+        await run(async (ctx) => await supersedeMemory(ctx as never, old.memoryId, next.memoryId, Date.now(), "revised"));
 
         const [record] = await cleanups();
         const cleanupId = record?._id as Id<"memoryCleanups">;
@@ -981,7 +998,7 @@ describe("a cleanup step that fails", () => {
         const next = await seed("likes green tea");
 
         vi.mocked(deleteVectorRow).mockRejectedValueOnce(new Error("vector index unavailable"));
-        await run(async (ctx) => await supersedeMemory(ctx as never, old.memoryId, next.memoryId, Date.now()));
+        await run(async (ctx) => await supersedeMemory(ctx as never, old.memoryId, next.memoryId, Date.now(), "revised"));
 
         const [record] = await cleanups();
 
@@ -1028,7 +1045,7 @@ describe("erasing an account", () => {
         const next = await seed("likes green tea");
 
         vi.mocked(deleteVectorRow).mockRejectedValueOnce(new Error("vector index unavailable"));
-        await run(async (ctx) => await supersedeMemory(ctx as never, old.memoryId, next.memoryId, Date.now()));
+        await run(async (ctx) => await supersedeMemory(ctx as never, old.memoryId, next.memoryId, Date.now(), "revised"));
         expect(await cleanups()).toHaveLength(1);
 
         const result: any = await run(async (ctx) => await ctx.runMutation(deleteUserMemoryReflectionData, { userId: OWNER }));
@@ -1043,7 +1060,7 @@ describe("erasing an account", () => {
         const next = await seed("likes green tea");
 
         vi.mocked(deleteVectorRow).mockRejectedValueOnce(new Error("vector index unavailable"));
-        await run(async (ctx) => await supersedeMemory(ctx as never, old.memoryId, next.memoryId, Date.now()));
+        await run(async (ctx) => await supersedeMemory(ctx as never, old.memoryId, next.memoryId, Date.now(), "revised"));
         await run(
             async (ctx) =>
                 await ctx.db.insert("gdprRequests", {

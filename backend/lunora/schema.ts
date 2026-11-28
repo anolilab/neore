@@ -1802,6 +1802,27 @@ export const schema = defineSchema({
         memory: v.string(),
         // Pinned by the user: nightly reflection never decays, retires or merges it away.
         pinned: v.optional(v.boolean()),
+        // When and why the row stopped being a current memory (`memory/retired.ts`); set beside `supersededBy` by
+        // `supersedeMemory`, cleared by a bring-back. A row retired before these columns has `retiredAt` from the
+        // `backfill-memory-retired-at` migration and no reason.
+        // When the person last brought the row back from retirement: reflection and compression leave it alone for a while
+        // (`RESTORED_PROTECTION_MS`).
+        restoredAt: v.optional(v.number()),
+        retiredAt: v.optional(v.number()),
+        retiredReason: v.optional(
+            v.union(
+                v.literal("revised"),
+                v.literal("merged"),
+                v.literal("compressed"),
+                v.literal("expired"),
+                v.literal("decayed"),
+                v.literal("contradicted"),
+                // The person brought back the earlier version this row had replaced.
+                v.literal("brought_back_over"),
+                // Reflection found it only restated an older row, which stands (a belief revision's IGNORE).
+                v.literal("duplicate"),
+            ),
+        ),
         source: v.optional(
             v.union(v.literal("auto"), v.literal("manual"), v.literal("compressed"), v.literal("reflection"), v.literal("imported"), v.literal("requested")),
         ),
@@ -1821,6 +1842,8 @@ export const schema = defineSchema({
         .index("embeddingId", ["embeddingId"])
         .index("by_userId_type", ["userId", "type"])
         .index("by_userId_supersededBy", ["userId", "supersededBy"])
+        // Retired rows, newest retirement first (Memory settings, "Retired"); an active row has no `retiredAt`.
+        .index("by_userId_retiredAt", ["userId", "retiredAt"])
         // A scope's rows read directly: the user's own (`botId` null) or one bot's. `type` keeps
         // the type-first order the old by_userId_type read had, so a window still keeps preferences.
         .index("by_userId_botId", ["userId", "botId", "type"])
