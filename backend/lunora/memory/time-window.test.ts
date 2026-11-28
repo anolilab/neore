@@ -6,10 +6,17 @@ import { timeWindowOf } from "./time-window";
 /** A Friday. */
 const TODAY = "2026-11-27";
 
-const windowOf = (text: string, today = TODAY): [string, string] | undefined => {
+const windowOf = (text: string, today = TODAY): [string, string] | [string, string][] | undefined => {
     const window = timeWindowOf(text, today);
 
-    return window === undefined ? undefined : [window.start, window.end];
+    // One span as `[start, end]`; several as a list of them.
+    if (window === undefined) {
+        return undefined;
+    }
+
+    const spans = window.spans.map(({ end, start }): [string, string] => [start, end]);
+
+    return spans.length === 1 ? spans[0] : spans;
 };
 
 describe("timeWindowOf", () => {
@@ -66,9 +73,44 @@ describe("timeWindowOf", () => {
         ["was steht übermorgen an", ["2026-11-29", "2026-11-29"]],
         ["was war vorgestern", ["2026-11-25", "2026-11-25"]],
         // Several phrases are one window while it stays within a month; past that, the first alone
-        ["what is on today or tomorrow", ["2026-11-27", "2026-11-28"]],
-        ["was steht heute oder morgen an", ["2026-11-27", "2026-11-28"]],
-        ["what did I do last week or in May", ["2026-11-16", "2026-11-22"]],
+        [
+            "what is on today or tomorrow",
+            [
+                ["2026-11-27", "2026-11-27"],
+                ["2026-11-28", "2026-11-28"],
+            ],
+        ],
+        [
+            "was steht heute oder morgen an",
+            [
+                ["2026-11-27", "2026-11-27"],
+                ["2026-11-28", "2026-11-28"],
+            ],
+        ],
+        [
+            "what is on 3 December or 5 December",
+            [
+                ["2026-12-03", "2026-12-03"],
+                ["2026-12-05", "2026-12-05"],
+            ],
+        ],
+        // A relative year never joins a month across `or`
+        [
+            "what did I do in May or last year",
+            [
+                ["2026-05-01", "2026-05-31"],
+                ["2025-01-01", "2025-12-31"],
+            ],
+        ],
+        // `going` is future only in `going to`; an `-ed` word after am/is/are is the passive
+        ["what was going on in May", ["2026-05-01", "2026-05-31"]],
+        ["what was going on in December", ["2025-12-01", "2025-12-31"]],
+        ["what am I going to do in January", ["2027-01-01", "2027-01-31"]],
+        ["am I booked for December", ["2026-12-01", "2026-12-31"]],
+        ["am I scheduled for anything in January", ["2027-01-01", "2027-01-31"]],
+        // `Morgen` after one of the adjectives is the morning; after a noun it is tomorrow
+        ["was mache ich mit der Schwester morgen", ["2026-11-28", "2026-11-28"]],
+        ["was lerne ich mit dem Lehrer morgen", ["2026-11-28", "2026-11-28"]],
         // Agenda words ask of what is ahead
         ["what is scheduled for January", ["2027-01-01", "2027-01-31"]],
         ["was steht im Januar an", ["2027-01-01", "2027-01-31"]],
@@ -148,6 +190,9 @@ describe("timeWindowOf", () => {
         expect(only("what is coming up in 100 days")).toBe(true);
         // A number is a time word only inside the phrase.
         expect(only("what is on 42 tomorrow")).toBe(false);
+        // Agenda nouns ask of the time alone.
+        expect(only("what are my appointments tomorrow")).toBe(true);
+        expect(only("was für Termine habe ich morgen")).toBe(true);
         expect(only(`what is coming up tomorrow ${"and ".repeat(250)}about the weather`)).toBe(false);
         expect(["what is the weather like tomorrow", "draft an email saying I am away next week", "was koche ich heute"].map((text) => only(text))).toEqual([
             false,

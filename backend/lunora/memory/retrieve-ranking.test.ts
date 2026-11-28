@@ -429,7 +429,7 @@ describe("rankMemories", () => {
     });
 
     describe("the asked time", () => {
-        const week = { end: "2026-12-06", onlyTime: true, start: "2026-11-30", today: "2026-11-27" };
+        const week = { onlyTime: true, spans: [{ end: "2026-12-06", start: "2026-11-30" }], today: "2026-11-27" };
         const timed = (candidates: RankCandidate[], vectorScores: [string, number][], timeWindow: TimeWindow = week) =>
             rankMemories({ candidates, ...keywordSignalsFor(candidates, "zzz"), now: NOW, timeWindow, vectorScores: new Map(vectorScores) });
         const plain = { confidence: 70, importance: 50, lastConfirmedAt: NOW - 60 * DAY };
@@ -461,7 +461,7 @@ describe("rankMemories", () => {
 
         it("finds an event of a narrow window by its date alone for a question about the time alone, never one of a year", () => {
             const rows = [candidate("appointment", { ...plain, eventStart: "2026-12-02" }), candidate("other", plain)];
-            const year = { end: "2026-12-31", onlyTime: true, start: "2026-01-01", today: "2026-11-27" };
+            const year = { onlyTime: true, spans: [{ end: "2026-12-31", start: "2026-01-01" }], today: "2026-11-27" };
 
             expect(timed(rows, []).map((m) => m.memoryId)).toEqual(["appointment"]);
             expect(timed(rows, [], year)).toEqual([]);
@@ -469,9 +469,30 @@ describe("rankMemories", () => {
             expect(timed(rows, [], { ...week, onlyTime: false })).toEqual([]);
         });
 
+        it("grants the date only to a short event, and only inside one of the asked spans", () => {
+            // A period overlapping the week (where the user lives) is no answer to "what is on next week" by its date.
+            const period = [candidate("lease", { ...plain, eventEnd: "2027-06-30", eventStart: "2026-01-01" })];
+
+            expect(timed(period, [])).toEqual([]);
+            expect(timed(period, at({ lease: 0.6 }))[0]!.score).toBeCloseTo(rank(period, at({ lease: 0.6 }))[0]!.score + TIME_WEIGHTS.event, 10);
+
+            // "3 December or 5 December" is two days: the 4th is in neither.
+            const twoDays = {
+                onlyTime: true,
+                spans: [
+                    { end: "2026-12-03", start: "2026-12-03" },
+                    { end: "2026-12-05", start: "2026-12-05" },
+                ],
+                today: "2026-11-27",
+            };
+            const days = ["2026-12-03", "2026-12-04", "2026-12-05"].map((day) => candidate(day, { ...plain, eventStart: day }));
+
+            expect(idsOf(timed(days, [], twoDays))).toEqual(["2026-12-03", "2026-12-05"]);
+        });
+
         it("gives no holds bonus to a pinned fact past its end date", () => {
             // Ended 2026-11-25, two days before today, but after the window began: in the window, yet holding nothing now.
-            const month = { end: "2026-11-30", start: "2026-11-01", today: "2026-11-27" };
+            const month = { spans: [{ end: "2026-11-30", start: "2026-11-01" }], today: "2026-11-27" };
             const rows = [
                 candidate("expired", { ...plain, pinned: true, validUntil: "2026-11-25" }),
                 candidate("current", { ...plain, pinned: true, validUntil: "2026-12-31" }),

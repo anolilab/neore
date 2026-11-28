@@ -417,11 +417,14 @@ describe("memory retrieval eval", () => {
             if (query.category === "temporal") {
                 const eventStart = fixture.personas.flatMap((p) => p.memories).find((m) => m.id === query.expected[0])!.eventStart!;
 
-                expect(window && eventStart >= window.start && eventStart <= window.end, query.id).toBe(true);
+                expect(
+                    window?.spans.some(({ end, start }) => eventStart >= start && eventStart <= end),
+                    query.id,
+                ).toBe(true);
             }
 
             if (query.window) {
-                expect({ end: window?.end, start: window?.start }, query.text).toEqual(query.window);
+                expect(window?.spans, query.text).toEqual([query.window]);
             }
         }
 

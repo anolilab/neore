@@ -9,12 +9,17 @@
  * beside a preposition, a day number or a year. Weeks start on Monday.
  */
 
-/** The asked time as local days, both inclusive, and the day it was read on. */
-export interface TimeWindow {
+/** Local days `YYYY-MM-DD`, both inclusive. */
+export interface Span {
     end: string;
+    start: string;
+}
+
+/** The asked times, one span per phrase ("3 December or 5 December" is two days, not three), and the day they were read on. */
+export interface TimeWindow {
     /** The question asks about the time alone ("what is coming up tomorrow"): it has no word the lexicons do not know. */
     onlyTime?: boolean;
-    start: string;
+    spans: Span[];
     today: string;
 }
 
@@ -29,7 +34,7 @@ export type TimePhrase =
      * word before it ("next May", "letzten Mai"), the first such month after today or the last before it.
      */
     {
-        /** The question's other phrases ("today or tomorrow"), joined into one window when it stays short. */
+        /** The question's other phrases ("today or tomorrow"), each a span of its own. */
         also?: TimePhrase[];
         onlyTime?: boolean;
     } & (
@@ -49,10 +54,10 @@ interface Lexicon {
     /** Question and agenda words: a question of only these and time words asks about the time alone. */
     asking: string[];
     /**
-     * A day word, and the words right before it that make it something else (`guten Morgen` is no tomorrow); `articles`
-     * also do with an adjective between (`am frühen Morgen`).
+     * A day word, and the words right before it that make it something else (`guten Morgen` is no tomorrow), or an
+     * adjective of `adjectives` (by its stem: `früh` is `frühen`, `ganz` is `den ganzen`) right before it.
      */
-    days: Record<string, { articles?: string[]; blockedAfter?: string[]; offset: number }>;
+    days: Record<string, { adjectives?: string[]; blockedAfter?: string[]; offset: number }>;
     dayUnits: string[];
     /** Words of a question about what will be (a month without a year is then the next one). */
     future: string[];
@@ -81,26 +86,32 @@ const inflected = (stems: [string, Shift][]): Record<string, Shift> =>
 /** Month names, a space between months and a comma between the names of one: `januar,jänner februar …`. */
 const monthsOf = (names: string): string[][] => names.split(" ").map((month) => month.split(","));
 
+/** The words before a participle that make it the perfect (`have I booked`) or the passive (`am I booked`). */
+const ENGLISH_AUXILIARIES = new Set(["am", "are", "had", "has", "have", "is", "was", "were"]);
+
 const ENGLISH: Lexicon = {
     agoAfter: ["ago"],
     agoBefore: [],
     ahead: ["in"],
-    asking: "what whats s is are am was were i me my do did does doing have has had on up at the a for to be there anything any and or happening happen scheduled schedule agenda".split(
+    asking: "what whats s is are am was were i me my do did does doing have has had on up at the a for to be there anything any and or happening happen scheduled schedule agenda appointment appointments meeting meetings event events".split(
         " ",
     ),
     days: { today: { offset: 0 }, tomorrow: { offset: 1 }, tonight: { offset: 0 }, yesterday: { offset: -1 } },
     dayUnits: ["day", "days"],
-    future: ["will", "plan", "plans", "planned", "planning", "upcoming", "coming", "going", "next", "scheduled", "schedule", "agenda"],
+    future: ["will", "plan", "plans", "planned", "planning", "upcoming", "coming", "next", "scheduled", "schedule", "agenda"],
+    // `going to`, never `what was going on`.
+    futureForm: (index, words) => words[index] === "going" && words[index + 1] === "to",
     leads: ["in", "on", "during", "for", "of", "since", "until", "by", "from", "before", "after"],
     months: monthsOf("january february march april may june july august september october november december"),
     numbers: { a: 1, eight: 8, five: 5, four: 4, nine: 9, one: 1, seven: 7, six: 6, ten: 10, three: 3, two: 2 },
     past: ["did", "was", "were", "had", "went", "ago", "last", "saw"],
     // The simple past only: `I booked`, `where I lived`, `what happened`. A participle after have/has/had is the perfect
-    // (`what have I booked for December` asks of a booking ahead) and sets no tense; `I need` is no `-ed` verb.
+    // (`what have I booked for December` asks of a booking ahead), one after am/is/are/was/were the passive (`am I
+    // booked for December`); neither sets a tense. `I need` is no `-ed` verb.
     pastForm: (index, words) => {
         const [word, before, beforeThat] = [words[index]!, words[index - 1], words[index - 2]];
 
-        if ([before, beforeThat].some((auxiliary) => auxiliary !== undefined && ["had", "has", "have"].includes(auxiliary))) {
+        if ([before, beforeThat].some((auxiliary) => auxiliary !== undefined && ENGLISH_AUXILIARIES.has(auxiliary))) {
             return false;
         }
 
@@ -114,21 +125,23 @@ const ENGLISH: Lexicon = {
     yearLeads: ["in", "during", "since", "until"],
 };
 
-/** Articles and prepositions before a noun, also with an adjective between: `am (frühen) Morgen`. */
-const GERMAN_ARTICLES = ["am", "jeden", "diesen", "den", "einen", "einem", "dem", "der", "vom"];
-
 const GERMAN: Lexicon = {
     agoAfter: [],
     agoBefore: ["vor"],
     ahead: ["in"],
-    asking: "was wann ist sind steht stehen an los habe hast hat haben ich mein meine meinen mir gibt es termin termine da denn noch alles etwas mache machen der die das den dem".split(
+    asking: "was wann ist sind steht stehen an los habe hast hat haben ich mein meine meinen mir gibt es termin termine verabredung verabredungen da denn noch alles etwas mache machen der die das den dem".split(
         " ",
     ),
     days: {
         gestern: { offset: -1 },
         heute: { offset: 0 },
-        // `heute Morgen` reads `heute` first; `guten Morgen`, `am (frühen) Morgen`, `jeden Morgen` are mornings, not tomorrow.
-        morgen: { articles: GERMAN_ARTICLES, blockedAfter: ["guten", "heute", "gestern", ...GERMAN_ARTICLES], offset: 1 },
+        // `am Morgen`, `heute Morgen`, `jeden Morgen`, `am frühen Morgen`, `den ganzen Morgen` are mornings; `mit der
+        // Schwester morgen` is tomorrow. `guten Morgen` greets, and `gestern Morgen` is yesterday's.
+        morgen: {
+            adjectives: ["früh", "spät", "ganz", "gleich", "selb", "nächst", "jed"],
+            blockedAfter: ["am", "heute", "gestern", "jeden", "guten"],
+            offset: 1,
+        },
         übermorgen: { offset: 2 },
         vorgestern: { offset: -2 },
     },
@@ -169,8 +182,6 @@ const YEAR_RE = /^(?:19|20|21)\d{2}$/u;
 const DAY_NUMBER_RE = /^(\d{1,2})(?:st|nd|rd|th)?$/u;
 const SMALL_NUMBER_RE = /^\d{1,3}$/u;
 const ISO_DAY_RE = /^\d{1,2}$/u;
-/** A German adjective's ending before a noun: `frühen`, `späten`, `ganzen`. */
-const isAdjective = (word: string): boolean => word.length > 3 && ["en", "em", "er"].some((ending) => word.endsWith(ending));
 
 interface Token {
     end: number;
@@ -240,8 +251,9 @@ const phraseAt = (words: string[], at: number, lexicon: Lexicon, tense: Tense): 
     }
 
     const day = lexicon.days[word];
-    const [before, adjective] = [words[at - 2] ?? "", words[at - 1] ?? ""];
-    const blocked = day?.blockedAfter?.includes(adjective) === true || (isAdjective(adjective) && day?.articles?.includes(before) === true);
+    const previous = words[at - 1] ?? "";
+    const blocked =
+        day?.blockedAfter?.includes(previous) === true || day?.adjectives?.some((stem) => previous.length > stem.length && previous.startsWith(stem)) === true;
 
     if (day !== undefined && !blocked) {
         return { phrase: { days: day.offset, kind: "offset" }, size: 1 };
@@ -364,6 +376,9 @@ const LEXICON_WORDS = new Map(
 
 const isNumber = (word: string): boolean => SMALL_NUMBER_RE.test(word) || DAY_NUMBER_RE.test(word) || YEAR_RE.test(word);
 
+/** Words that part two times: a relative year never joins a month across them. */
+const ALTERNATIVES = new Set(["oder", "or"]);
+
 /** The words that may join a month and a relative year: `in May last year`, `letztes Jahr im Mai`. */
 const MAX_YEAR_GAP = 4;
 
@@ -381,8 +396,9 @@ export const readTimePhrase = (text: string): TimePhrase | undefined => {
     });
     const phraseFrom = (index: number): Read | undefined => ranked.map(({ lexicon, tense }) => phraseAt(words, index, lexicon, tense)).find(Boolean);
     // A month without a year and a relative year near it are one time: `in May last year` is May of 2025.
+    // Never across `or`: "in May or last year" names two times.
     const firstNear = (from: number, wanted: (near: TimePhrase) => boolean): { read: Read; start: number } | undefined => {
-        for (let index = from + 1; index <= from + MAX_YEAR_GAP && index < tokens.length; index += 1) {
+        for (let index = from + 1; index <= from + MAX_YEAR_GAP && index < tokens.length && !ALTERNATIVES.has(words[index]!); index += 1) {
             const near = phraseFrom(index);
 
             if (near !== undefined && wanted(near.phrase)) {
@@ -471,8 +487,6 @@ const dayOf = (year: number, month: number, day: number): string => {
     return `${String(date.getUTCFullYear())}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}`;
 };
 
-type Span = Pick<TimeWindow, "end" | "start">;
-
 const isRealDay = (year: number, month: number, day: number): boolean =>
     month >= 1 && month <= 12 && dayOf(year, month, day) === `${String(year)}-${pad(month)}-${pad(day)}`;
 
@@ -485,13 +499,11 @@ const calendarSpan = (year: number, month: number, day: number | undefined): Spa
     return month >= 1 && month <= 12 ? { end: dayOf(year, month + 1, 0), start: dayOf(year, month, 1) } : undefined;
 };
 
-/** The widest window several phrases are joined into: about a month. */
-const MAX_JOINED_DAYS = 31;
-
 /**
- * The window a phrase names, read on `today` (the user's local day). A month or day without a year is the latest one
- * on or before today for a question about what was, the next one ending on or after today for one about what will be,
- * and this year's otherwise. `undefined` for a day that does not exist (`31 February`, `29 February 2027`).
+ * The window a phrase names, read on `today` (the user's local day): its span, and one per other phrase of the question.
+ * A month or day without a year is the latest one on or before today for a question about what was, the next one ending
+ * on or after today for one about what will be, and this year's otherwise. `undefined` when the first phrase names a day
+ * that does not exist (`31 February`, `29 February 2027`); such a day among the others is left out.
  */
 export const windowOf = (phrase: TimePhrase, today: string): TimeWindow | undefined => {
     const span = spanOf(phrase, today);
@@ -500,19 +512,20 @@ export const windowOf = (phrase: TimePhrase, today: string): TimeWindow | undefi
         return undefined;
     }
 
-    // "today or tomorrow" is both days: every phrase's window joined, from the earliest start to the latest end, while
-    // that stays within `MAX_JOINED_DAYS`; past it, the first phrase alone.
-    const spans = [span, ...(phrase.also ?? []).map((other) => spanOf(other, today)).filter((other) => other !== undefined)];
-    // Days as `YYYY-MM-DD` sort as text.
-    const joined = {
-        end: spans
-            .map(({ end }) => end)
-            .toSorted((a, b) => a.localeCompare(b))
-            .at(-1)!,
-        start: spans.map(({ start }) => start).toSorted((a, b) => a.localeCompare(b))[0]!,
-    };
+    const spans = [span];
 
-    return { ...(windowDays(joined) <= MAX_JOINED_DAYS ? joined : span), ...(phrase.onlyTime === true && { onlyTime: true }), today };
+    // A time named twice ("today or tonight") is one span.
+    const others = phrase.also ?? [];
+
+    for (const also of others) {
+        const other = spanOf(also, today);
+
+        if (other !== undefined && spans.every(({ end, start }) => start !== other.start || end !== other.end)) {
+            spans.push(other);
+        }
+    }
+
+    return { ...(phrase.onlyTime === true && { onlyTime: true }), spans, today };
 };
 
 const spanOf = (phrase: TimePhrase, today: string): Span | undefined => {
