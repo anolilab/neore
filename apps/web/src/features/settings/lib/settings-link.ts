@@ -34,8 +34,11 @@ const TAB_BY_SETTINGS_PATH: Readonly<Record<string, SettingsTab>> = {
     privacy: "privacy",
 };
 
-/** Settings paths that stay pages: the OAuth providers return to the callback, and admin has its own area. */
-const PAGE_PATHS = ["connectors/callback", "admin"];
+/** The one settings path that stays a page: the OAuth providers return to it. Nothing lives under it. */
+const CALLBACK_PATH = "connectors/callback";
+
+/** Admin has its own area: its paths and everything under them are not settings tabs (`adminPathFor`). */
+const ADMIN_PATH = "admin";
 
 const DEFAULT_TAB: SettingsTab = "app-customization";
 
@@ -69,7 +72,7 @@ export const settingsTabForPath = (pathname: string): SettingsTab | undefined =>
 
     const rest = path.slice(SETTINGS_PATH_PREFIX.length + 1);
 
-    if (PAGE_PATHS.some((page) => rest === page || rest.startsWith(`${page}/`))) {
+    if (rest === CALLBACK_PATH || rest === ADMIN_PATH || rest.startsWith(`${ADMIN_PATH}/`)) {
         return undefined;
     }
 

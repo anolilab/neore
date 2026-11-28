@@ -46,6 +46,10 @@ describe("settingsTabForPath", () => {
         expect(settingsTabForPath("/dashboard/settings/admin/users")).toBeUndefined();
     });
 
+    it("opens the first tab for a made-up path under the callback, which has no page of its own", () => {
+        expect(settingsTabForPath("/dashboard/settings/connectors/callback/foo")).toBe("app-customization");
+    });
+
     it("is not fooled by a path that only starts with the same letters, or by other pages", () => {
         expect(settingsTabForPath("/dashboard/settingsx")).toBeUndefined();
         expect(settingsTabForPath("/dashboard")).toBeUndefined();
