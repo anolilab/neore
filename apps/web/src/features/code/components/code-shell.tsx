@@ -4,11 +4,13 @@ import cn from "@neore/ui/utils/cn";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeftIcon } from "lucide-react";
 import type { FC, ReactNode } from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 
 import SettingsLink from "@/components/settings/settings-link";
+import CodeSetup from "@/features/code/components/code-setup";
 import CodeWorkspace from "@/features/code/components/code-workspace";
 import { useCodeModeEnabled } from "@/features/code/hooks/use-code-mode-enabled";
+import { useCodeSetup } from "@/features/code/hooks/use-code-setup";
 import { hostTabId } from "@/features/code/lib/layout";
 import { useCodeLayoutStore } from "@/features/code/stores/code-layout-store";
 import { isDeviceOnline } from "@/features/devices/lib/device-relay";
@@ -119,11 +121,15 @@ const RunsSection: FC = () => {
 const CodeShell: FC = () => {
     const { t } = useLingui();
     const enabled = useCodeModeEnabled();
-    const [listOpen, setListOpen] = useState(true);
+    // On a phone the list and the workspace take turns; the first view is settled below once setup has answered.
+    const [listChoice, setListChoice] = useState<boolean | undefined>(undefined);
+    const [setupInList, setSetupInList] = useState(false);
+    const setupPanelId = useId();
     const now = useNow();
     const dispatch = useCodeLayoutStore((state) => state.dispatch);
     const activeTab = useCodeLayoutStore((state) => state.layout.panes[state.layout.activePane]?.active);
-    const { data: devices } = useDevices(enabled === true);
+    const { data: devices, isError: devicesFailed } = useDevices(enabled === true);
+    const setup = useCodeSetup(devices, devicesFailed);
 
     if (enabled === undefined) {
         return null;
@@ -139,10 +145,21 @@ const CodeShell: FC = () => {
         );
     }
 
+    // A device still waiting for its pairing to be confirmed has never been seen, and is not a host to pick yet.
+    const hasPairedHost = devices?.some((device) => device.lastSeenAt !== undefined) === true;
+    // The list comes first (hosts, pull requests, runs) unless setup steps are waiting and there is no host to pick yet.
+    const listFirst = setup !== "needed" || hasPairedHost;
+
+    // Settled once setup has answered: a computer paired, or a step skipped, while the user looks must not swap the view.
+    if (listChoice === undefined && setup !== "loading") {
+        setListChoice(listFirst);
+    }
+
+    const listOpen = listChoice ?? listFirst;
     const selectedId = activeTab?.startsWith("host:") ? activeTab.slice("host:".length) : undefined;
     const openHost = (id: string) => {
         dispatch({ tabId: hostTabId(id), type: "open" });
-        setListOpen(false);
+        setListChoice(false);
     };
 
     return (
@@ -151,18 +168,38 @@ const CodeShell: FC = () => {
                 aria-label={t`Code navigation`}
                 className={cn("bg-background border-border/50 w-full shrink-0 overflow-y-auto md:block md:w-72 md:border-r", listOpen ? "block" : "hidden")}
             >
+                {/* On a phone the steps open here in the list: the workspace may hold a host tab, and the steps show only in an empty
+                    pane. Once opened they stay while open, so skipping the last step keeps the focused button and its messages. */}
+                {(setup === "needed" || setupInList) && (
+                    <div className="p-2 md:hidden">
+                        <Button
+                            aria-controls={setupInList ? setupPanelId : undefined}
+                            aria-expanded={setupInList}
+                            className="min-h-11"
+                            onClick={() => setSetupInList((open) => !open)}
+                            variant="outline"
+                        >
+                            {t`Coding setup`}
+                        </Button>
+                        {setupInList && (
+                            <div id={setupPanelId}>
+                                <CodeSetup devices={devices ?? []} />
+                            </div>
+                        )}
+                    </div>
+                )}
                 <HostsSection devices={devices} now={now} onSelect={openHost} selected={selectedId} />
                 <PullRequestsSection />
                 <RunsSection />
             </aside>
             <div className={cn("min-w-0 flex-1 flex-col md:flex", listOpen ? "hidden" : "flex")}>
                 <div className="p-2 md:hidden">
-                    <Button className="min-h-11" onClick={() => setListOpen(true)} variant="ghost">
+                    <Button className="min-h-11" onClick={() => setListChoice(true)} variant="ghost">
                         <ArrowLeftIcon aria-hidden="true" className="size-4" />
                         <Trans>Back</Trans>
                     </Button>
                 </div>
-                <CodeWorkspace devices={devices} now={now} />
+                <CodeWorkspace devices={devices} now={now} setup={setup} />
             </div>
         </>
     );

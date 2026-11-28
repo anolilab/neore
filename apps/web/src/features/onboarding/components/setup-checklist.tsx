@@ -2,18 +2,19 @@ import { useLingui } from "@lingui/react/macro";
 import { Button, buttonVariants } from "@neore/ui/components/button";
 import { CardContent } from "@neore/ui/components/card";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check } from "lucide-react";
-import type { FC } from "react";
+import type { FC, ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import SettingsCard from "@/components/settings/settings-card";
+import SettingsLink from "@/components/settings/settings-link";
 import { hasPendingSettingsWrites, useUserSettings } from "@/features/auth/hooks/use-user-settings";
 import { useAuth } from "@/features/auth/lib/auth-ui-provider";
 import { useCRPC } from "@/lib/lunora/crpc";
 
 import type { SetupStepId, SetupStepStatus } from "../lib/setup-steps";
 import { deriveSetupSteps, SETUP_STEP_IDS, toggleSkipped } from "../lib/setup-steps";
+import SetupStepRow from "./setup-step-row";
 
 /** Where each step's action goes: the control on this page, or the guide for the part that happens in the desktop app. */
 const STEP_TARGET: Record<SetupStepId, string> = {
@@ -41,11 +42,25 @@ const errorCode = (error: unknown) => {
     return data?.code ?? code;
 };
 
+/** Where the checklist is shown: the Devices settings page (its controls are on the page), the Code page, or the welcome dialog. */
+type SetupSurface = "code" | "dialog" | "settings";
+
+interface SetupChecklistProps {
+    /** More rows after the steps, in the same list. */
+    extra?: ReactNode;
+    serverFormShown: boolean;
+    surface?: SetupSurface;
+}
+
+const GUIDE_LINK_PROPS = { rel: "noopener noreferrer", target: "_blank" } as const;
+
 /**
  * First-run setup. The web only explains and links: pairing and agent installs happen in the desktop app's own
  * window, so nothing here makes the desktop do anything. `serverFormShown` says whether the servers card is on this page.
+ * Off the settings page the pairing and server steps open the Devices settings instead of a control on this page; the
+ * welcome dialog keeps only the guide link, because settings cannot open on top of it.
  */
-const SetupChecklist: FC<{ serverFormShown: boolean }> = ({ serverFormShown }) => {
+const SetupChecklist: FC<SetupChecklistProps> = ({ extra, serverFormShown, surface = "settings" }) => {
     const { t } = useLingui();
     const crpc = useCRPC();
     const queryClient = useQueryClient();
@@ -159,87 +174,135 @@ const SetupChecklist: FC<{ serverFormShown: boolean }> = ({ serverFormShown }) =
     }
 
     const pendingLabel = devicesQuery.isError || settingsQuery.isError ? t`Could not check` : t`Checking`;
+    // Off the settings page the first open step carries the one primary button.
+    const primaryId = surface === "settings" ? undefined : steps?.find((step) => step.status === "todo")?.id;
+    const renderAction = (id: SetupStepId) => {
+        const variant = id === primaryId ? "default" : "outline";
+        const className = buttonVariants({ size: "sm", variant });
+        const label = (
+            <>
+                {copy[id].action}
+                <span className="sr-only">: {copy[id].title}</span>
+            </>
+        );
+
+        if (surface === "settings") {
+            return id !== "ssh" || serverFormShown ? (
+                <a className={className} href={STEP_TARGET[id]}>
+                    {label}
+                </a>
+            ) : null;
+        }
+
+        if (id === "agent") {
+            return (
+                <a className={className} href={STEP_TARGET[id]} {...GUIDE_LINK_PROPS}>
+                    {label}
+                </a>
+            );
+        }
+
+        // The server form is only in the desktop app on a paired computer; elsewhere the link would land on a tab without it.
+        if (surface !== "code" || (id === "ssh" && !serverFormShown)) {
+            return null;
+        }
+
+        return (
+            <SettingsLink anchor={id === "pair" ? "devices-pairing" : "devices-ssh"} className={className} tab="chat-devices">
+                {label}
+            </SettingsLink>
+        );
+    };
+    const card = (
+        <CardContent>
+            <ol aria-label={t`Coding setup steps`} className="space-y-3">
+                {(
+                    steps ??
+                    SETUP_STEP_IDS.map((id) => {
+                        return { id, status: undefined };
+                    })
+                ).map(({ id, status }) => (
+                    <SetupStepRow
+                        description={copy[id].description}
+                        done={status === "done"}
+                        error={failedStep === id ? t`Could not save that choice. Try again.` : undefined}
+                        key={id}
+                        statusLabel={status ? statusLabel[status] : pendingLabel}
+                        title={copy[id].title}
+                    >
+                        {/* The links stay while the device check is pending or failed; only Skip and Resume need a known status. */}
+                        {status !== "done" && (
+                            <>
+                                {renderAction(id)}
+                                {status !== undefined && (
+                                    <Button
+                                        disabled={settingsQuery.isError || signedInId === undefined}
+                                        onClick={() => {
+                                            if (signedInId !== undefined) {
+                                                setSkipped.mutate({ owner: signedInId, skipped: status === "todo", stepId: id });
+                                            }
+                                        }}
+                                        size="sm"
+                                        variant="ghost"
+                                    >
+                                        {status === "todo" ? t`Skip` : t`Resume`}
+                                        <span className="sr-only">: {copy[id].title}</span>
+                                    </Button>
+                                )}
+                            </>
+                        )}
+                    </SetupStepRow>
+                ))}
+                {extra}
+            </ol>
+            <p className="sr-only" role="status">
+                {announcement}
+            </p>
+            {devicesQuery.isError && (
+                <div className="mt-3 flex flex-wrap items-center gap-3" role="alert">
+                    <p className="text-destructive text-xs">{t`Could not read your devices, so the steps cannot be checked yet. The links still work.`}</p>
+                    <Button
+                        onClick={() => {
+                            devicesQuery.refetch().catch(() => {});
+                        }}
+                        size="sm"
+                        variant="outline"
+                    >
+                        {t`Retry the device check`}
+                    </Button>
+                </div>
+            )}
+            {settingsQuery.isError && (
+                <div className="mt-3 flex flex-wrap items-center gap-3" role="alert">
+                    <p className="text-destructive text-xs">{t`Could not load your saved choices, so Skip and Resume are off until it is read again.`}</p>
+                    <Button
+                        onClick={() => {
+                            settingsQuery.refetch().catch(() => {});
+                        }}
+                        size="sm"
+                        variant="outline"
+                    >
+                        {t`Retry`}
+                    </Button>
+                </div>
+            )}
+        </CardContent>
+    );
+
+    if (surface === "dialog") {
+        return card;
+    }
 
     return (
-        <SettingsCard description={t`Three steps to use coding agents on your own machines. Skip any of them and come back later.`} title={t`Coding setup`}>
-            <CardContent>
-                <ol aria-label={t`Coding setup steps`} className="space-y-3">
-                    {(
-                        steps ??
-                        SETUP_STEP_IDS.map((id) => {
-                            return { id, status: undefined };
-                        })
-                    ).map(({ id, status }) => (
-                        <li className="flex flex-wrap items-center gap-3" key={id}>
-                            <div className="min-w-0 flex-1">
-                                <p className="text-sm font-medium">
-                                    {status === "done" && <Check aria-hidden="true" className="mr-1 inline size-4" />}
-                                    {copy[id].title} <span className="text-muted-foreground font-normal">({status ? statusLabel[status] : pendingLabel})</span>
-                                </p>
-                                <p className="text-muted-foreground text-xs">{copy[id].description}</p>
-                                {failedStep === id && <p className="text-destructive mt-1 text-xs">{t`Could not save that choice. Try again.`}</p>}
-                            </div>
-                            {/* The links stay while the device check is pending or failed; only Skip and Resume need a known status. */}
-                            {status !== "done" && (
-                                <>
-                                    {(id !== "ssh" || serverFormShown) && (
-                                        <a className={buttonVariants({ size: "sm", variant: "outline" })} href={STEP_TARGET[id]}>
-                                            {copy[id].action}
-                                            <span className="sr-only">: {copy[id].title}</span>
-                                        </a>
-                                    )}
-                                    {status !== undefined && (
-                                        <Button
-                                            disabled={settingsQuery.isError || signedInId === undefined}
-                                            onClick={() => {
-                                                if (signedInId !== undefined) {
-                                                    setSkipped.mutate({ owner: signedInId, skipped: status === "todo", stepId: id });
-                                                }
-                                            }}
-                                            size="sm"
-                                            variant="ghost"
-                                        >
-                                            {status === "todo" ? t`Skip` : t`Resume`}
-                                            <span className="sr-only">: {copy[id].title}</span>
-                                        </Button>
-                                    )}
-                                </>
-                            )}
-                        </li>
-                    ))}
-                </ol>
-                <p className="sr-only" role="status">
-                    {announcement}
-                </p>
-                {devicesQuery.isError && (
-                    <div className="mt-3 flex flex-wrap items-center gap-3" role="alert">
-                        <p className="text-destructive text-xs">{t`Could not read your devices, so the steps cannot be checked yet. The links still work.`}</p>
-                        <Button
-                            onClick={() => {
-                                devicesQuery.refetch().catch(() => {});
-                            }}
-                            size="sm"
-                            variant="outline"
-                        >
-                            {t`Retry the device check`}
-                        </Button>
-                    </div>
-                )}
-                {settingsQuery.isError && (
-                    <div className="mt-3 flex flex-wrap items-center gap-3" role="alert">
-                        <p className="text-destructive text-xs">{t`Could not load your saved choices, so Skip and Resume are off until it is read again.`}</p>
-                        <Button
-                            onClick={() => {
-                                settingsQuery.refetch().catch(() => {});
-                            }}
-                            size="sm"
-                            variant="outline"
-                        >
-                            {t`Retry`}
-                        </Button>
-                    </div>
-                )}
-            </CardContent>
+        <SettingsCard
+            description={
+                surface === "code"
+                    ? t`Set up coding agents on your own machines. Skip any step and come back later.`
+                    : t`Three steps to use coding agents on your own machines. Skip any of them and come back later.`
+            }
+            title={t`Coding setup`}
+        >
+            {card}
         </SettingsCard>
     );
 };

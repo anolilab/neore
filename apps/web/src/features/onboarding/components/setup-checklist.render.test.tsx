@@ -5,6 +5,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import SetupChecklist from "./setup-checklist";
@@ -153,6 +154,15 @@ vi.mock("@/lib/lunora/crpc", () => {
     };
 });
 
+// The Code page's links open settings through the router; here a plain link shows where each one goes.
+vi.mock("@/components/settings/settings-link", () => {
+    return {
+        default: ({ anchor, children, tab }: { anchor?: string; children: ReactNode; tab: string }) => (
+            <a href={`?settingsTab=${tab}#${anchor ?? ""}`}>{children}</a>
+        ),
+    };
+});
+
 const RESkip = /Skip/;
 const REGoToPairing = /Go to pairing/;
 const REGoToServers = /Go to servers/;
@@ -179,10 +189,14 @@ const createGate = () => {
 
 const ownerMismatch = () => Object.assign(new Error("another account"), { data: { code: "SETUP_OWNER_MISMATCH" } });
 
-const renderChecklist = (serverFormShown = true, client = new QueryClient({ defaultOptions: { mutations: { retry: false }, queries: { retry: false } } })) => {
+const renderChecklist = (
+    serverFormShown = true,
+    client = new QueryClient({ defaultOptions: { mutations: { retry: false }, queries: { retry: false } } }),
+    surface?: "code" | "dialog" | "settings",
+) => {
     const tree = () => (
         <QueryClientProvider client={client}>
-            <SetupChecklist serverFormShown={serverFormShown} />
+            <SetupChecklist serverFormShown={serverFormShown} surface={surface} />
         </QueryClientProvider>
     );
 
@@ -242,6 +256,32 @@ describe("<SetupChecklist>", () => {
         expect(screen.getByRole("link", { name: REGoToPairing }).getAttribute("href")).toBe("#devices-pairing");
         expect(screen.getByRole("link", { name: REReadTheGuide }).getAttribute("href")).toBe("/docs/devices#coding-agents-on-a-computer");
         expect(screen.queryByRole("link", { name: REGoToServers })).toBeNull();
+    });
+
+    it("keeps only the guide link in the welcome dialog, where the page's controls and settings are out of reach", async () => {
+        renderChecklist(false, undefined, "dialog");
+
+        expect(await screen.findAllByText("(To do)")).toHaveLength(3);
+        expect(screen.getByRole("link", { name: REReadTheGuide }).getAttribute("target")).toBe("_blank");
+        expect(screen.queryByRole("link", { name: REGoToPairing })).toBeNull();
+        expect(screen.queryByRole("link", { name: REGoToServers })).toBeNull();
+        expect(screen.getAllByRole("button", { name: RESkip })).toHaveLength(3);
+    });
+
+    it("on the Code page, offers the servers step only where Devices settings shows its form", async () => {
+        renderChecklist(false, undefined, "code");
+
+        expect(await screen.findAllByText("(To do)")).toHaveLength(3);
+        expect(screen.queryByRole("link", { name: REGoToServers })).toBeNull();
+        expect(screen.getByRole("link", { name: REGoToPairing })).toBeTruthy();
+    });
+
+    it("on the Code page, offers the servers step when the form is there", async () => {
+        renderChecklist(true, undefined, "code");
+
+        const link = await screen.findByRole("link", { name: REGoToServers });
+
+        expect(link.getAttribute("href")).toBe("?settingsTab=chat-devices#devices-ssh");
     });
 
     it("links the servers step to its card when the card is on the page", async () => {

@@ -484,12 +484,12 @@ msgid "{0, plural, one {# user} other {# users}}"
 msgstr "{0, plural, one {# Benutzer} other {# Benutzer}}"
 
 #. placeholder {0}: selectedModelIds!.length
-#: src/components/model-picker/model-picker-button.tsx:173
+#: src/components/model-picker/model-picker-button.tsx:177
 msgid "{0, plural, one {1 model} other {# models}}"
 msgstr "{0, plural, one {1 Modell} other {# Modelle}}"
 
 #. placeholder {0}: selectedModelIds!.length
-#: src/components/model-picker/model-picker-button.tsx:160
+#: src/components/model-picker/model-picker-button.tsx:163
 msgid "{0, plural, one {Comparing # model} other {Comparing # models}}"
 msgstr "{0, plural, one {# Modell wird verglichen} other {# Modelle werden verglichen}}"
 
@@ -1637,15 +1637,19 @@ msgstr "{success, plural, one {# Pull Request verknüpft.} other {# Pull Request
 msgid "{text} (gave up after {attempts} attempts)"
 msgstr "{text} (nach {attempts} Versuchen aufgegeben)"
 
-#: src/features/onboarding/components/setup-checklist.tsx:138
+#: src/features/code/components/git-host-step.tsx:35
+msgid "{title} could not be checked."
+msgstr "{title}: konnte nicht geprüft werden."
+
+#: src/features/onboarding/components/setup-checklist.tsx:153
 msgid "{title} is done."
 msgstr "{title} ist erledigt."
 
-#: src/features/onboarding/components/setup-checklist.tsx:141
+#: src/features/onboarding/components/setup-checklist.tsx:156
 msgid "{title} is skipped."
 msgstr "{title} wurde übersprungen."
 
-#: src/features/onboarding/components/setup-checklist.tsx:141
+#: src/features/onboarding/components/setup-checklist.tsx:156
 msgid "{title} is to do."
 msgstr "{title} steht noch aus."
 
@@ -1926,7 +1930,7 @@ msgstr "30 Tage"
 msgid "30+ AI models for chat, images, video, documents, and code. One workspace, one subscription — free to start."
 msgstr "30+ KI-Modelle für Chat, Bilder, Video, Dokumente und Code. Ein Arbeitsbereich, ein Abonnement – kostenlos starten."
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:40
+#: src/features/onboarding/components/onboarding-dialog.tsx:50
 msgid "30+ Models, One Thread"
 msgstr "30+ Modelle, ein Thread"
 
@@ -2452,8 +2456,8 @@ msgid "Access for {name}"
 msgstr "Zugriff für {name}"
 
 #: src/features/onboarding/components/onboarding-dialog.tsx:41
-msgid "Access GPT-4, Claude, Gemini, and more from a single conversation. Switch models mid-thread to compare answers."
-msgstr "Nutze GPT-4, Claude, Gemini und mehr in einer einzigen Unterhaltung. Wechsle das Modell mitten im Thread, um Antworten zu vergleichen."
+#~ msgid "Access GPT-4, Claude, Gemini, and more from a single conversation. Switch models mid-thread to compare answers."
+#~ msgstr "Nutze GPT-4, Claude, Gemini und mehr in einer einzigen Unterhaltung. Wechsle das Modell mitten im Thread, um Antworten zu vergleichen."
 
 #: src/features/settings/components/chat/native-providers-settings.tsx:598
 msgid "Access key ID"
@@ -2668,7 +2672,7 @@ msgstr "Füge oben einen Alarm hinzu, um benachrichtigt zu werden, wenn deine Nu
 msgid "Add an extra layer of security to your account by enabling two-factor authentication."
 msgstr "Füge deinem Konto eine zusätzliche Sicherheitsebene hinzu, indem du die Zwei-Faktor-Authentifizierung aktivierst."
 
-#: src/features/onboarding/components/setup-checklist.tsx:132
+#: src/features/onboarding/components/setup-checklist.tsx:147
 msgid "Add an SSH server"
 msgstr "SSH-Server hinzufügen"
 
@@ -5116,8 +5120,8 @@ msgstr "Azure OpenAI"
 msgid "Azure portal → your OpenAI resource → Keys and Endpoint. Encrypted at rest and never shown again."
 msgstr "Azure-Portal → deine OpenAI-Ressource → Schlüssel und Endpunkt. Verschlüsselt gespeichert und nie wieder angezeigt."
 
-#: src/features/code/components/code-shell.tsx:162
-#: src/features/onboarding/components/onboarding-dialog.tsx:394
+#: src/features/code/components/code-shell.tsx:192
+#: src/features/onboarding/components/onboarding-dialog.tsx:498
 #: src/features/pages/components/page-version-panel.tsx:88
 #: src/features/projects/components/add-project-dialog.tsx:692
 #: src/features/settings/components/personalization/memory-import-dialog.tsx:309
@@ -5137,7 +5141,7 @@ msgstr "Zurück zum Editor"
 msgid "Back to Gallery"
 msgstr "Zurück zur Galerie"
 
-#: src/components/settings/settings-modal.tsx:704
+#: src/components/settings/settings-modal.tsx:705
 msgid "Back to settings sections"
 msgstr "Zurück zu den Einstellungsbereichen"
 
@@ -5598,7 +5602,7 @@ msgstr "Fließtext"
 
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:382
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:386
-#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:297
+#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:307
 #: ../../packages/ui/src/components/tiptap-editor.tsx:192
 msgid "Bold"
 msgstr "Fett"
@@ -5908,7 +5912,7 @@ msgstr "Entwickelt für <0>echte Workflows.</0>"
 msgid "Built for expert developers and complex systems"
 msgstr "Entwickelt für erfahrene Entwickler und komplexe Systeme"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:37
+#: src/features/onboarding/components/onboarding-dialog.tsx:45
 msgid "Built-in Canvas Editor"
 msgstr "Integrierter Canvas-Editor"
 
@@ -5940,7 +5944,7 @@ msgstr "Bulgarisch (Bulgarien)"
 #~ msgid "Bulk actions"
 #~ msgstr "Massenaktionen"
 
-#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:320
+#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:330
 #: ../../packages/ui/src/components/tiptap-editor.tsx:222
 msgid "Bulleted list"
 msgstr "Aufzählung"
@@ -6604,6 +6608,7 @@ msgstr "Chat"
 #: src/features/layout/components/sidebar-shortcut.tsx:79
 #: src/features/layout/components/workspace-switch.tsx:47
 #: src/features/layout/lib/dashboard-page-names.ts:20
+#: src/features/onboarding/components/onboarding-dialog.tsx:135
 #: src/features/settings/components/account/account-settings.tsx:355
 #: src/features/settings/components/chat/bots-settings.tsx:524
 #: src/features/settings/lib/settings-keywords.ts:33
@@ -6811,7 +6816,8 @@ msgstr "Ausgewählte Integrationen werden nach dem Speichern zur Einrichtung ang
 msgid "Checked: {0}"
 msgstr "Geprüft: {0}"
 
-#: src/features/onboarding/components/setup-checklist.tsx:161
+#: src/features/code/components/git-host-step.tsx:27
+#: src/features/onboarding/components/setup-checklist.tsx:176
 msgid "Checking"
 msgstr "Wird geprüft"
 
@@ -6956,7 +6962,7 @@ msgstr "Wähle, wie Züge verteilt werden: Supervisor (ein Routing-Schritt wähl
 msgid "Choose how you review this before you submit it."
 msgstr "Wähle, wie du dies prüfst, bevor du es absendest."
 
-#: src/features/code/components/code-workspace.tsx:48
+#: src/features/code/components/code-workspace.tsx:50
 msgid "Choose one on the left to start."
 msgstr "Wähle links eines aus, um zu beginnen."
 
@@ -7322,7 +7328,7 @@ msgid "Close"
 msgstr "Schließen"
 
 #. placeholder {0}: titleOf(tabId)
-#: src/features/code/components/code-workspace.tsx:121
+#: src/features/code/components/code-workspace.tsx:146
 msgid "Close {0}"
 msgstr "{0} schließen"
 
@@ -7351,9 +7357,9 @@ msgstr "Verlauf schließen"
 msgid "Close node search"
 msgstr "Node-Suche schließen"
 
-#: src/features/code/components/code-workspace.tsx:73
-#: src/features/code/components/code-workspace.tsx:147
-#: src/features/code/components/code-workspace.tsx:150
+#: src/features/code/components/code-workspace.tsx:92
+#: src/features/code/components/code-workspace.tsx:172
+#: src/features/code/components/code-workspace.tsx:175
 msgid "Close pane"
 msgstr "Bereich schließen"
 
@@ -7407,15 +7413,16 @@ msgid "Cloudflare Workers AI models run wherever Cloudflare has capacity, so any
 msgstr "Cloudflare-Workers-AI-Modelle laufen dort, wo Cloudflare gerade Kapazität hat, daher blendet jede Regionsregel sie aus."
 
 #: ../../packages/chat-ui/src/chat/document-artifact.tsx:40
-#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:309
+#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:319
 #: ../../packages/ui/src/components/tiptap-editor.tsx:204
 #: src/features/auth/components/device-code-parts.tsx:46
 #: src/features/auth/components/device-code-parts.tsx:80
 #: src/features/auth/components/device-code-parts.tsx:134
 #: src/features/canvas/canvas-panel.tsx:774
 #: src/features/chat/thread/composer-search-mode.tsx:57
-#: src/features/code/components/code-workspace.tsx:219
+#: src/features/code/components/code-workspace.tsx:246
 #: src/features/layout/components/workspace-switch.tsx:48
+#: src/features/onboarding/components/onboarding-dialog.tsx:141
 #: src/features/workflow/components/nodes/code-node.tsx:60
 #: src/features/workflow/types/index.ts:451
 #: src/features/workflow/types/index.ts:455
@@ -7424,7 +7431,7 @@ msgid "Code"
 msgstr "Code"
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:168
-#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:333
+#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:343
 msgid "Code block"
 msgstr "Codeblock"
 
@@ -7452,11 +7459,11 @@ msgstr "Code-Hervorhebungsthema aktualisiert"
 msgid "Code is required"
 msgstr "Code ist erforderlich"
 
-#: src/features/code/components/code-shell.tsx:136
+#: src/features/code/components/code-shell.tsx:143
 msgid "Code mode is not available for your account yet."
 msgstr "Der Code-Modus ist für dein Konto noch nicht verfügbar."
 
-#: src/features/code/components/code-shell.tsx:151
+#: src/features/code/components/code-shell.tsx:161
 msgid "Code navigation"
 msgstr "Code-Navigation"
 
@@ -7528,7 +7535,7 @@ msgstr "Coding-Agent-Lauf abgeschlossen"
 msgid "Coding agent run was not approved."
 msgstr "Der Durchlauf des Coding-Agents wurde nicht genehmigt."
 
-#: src/features/code/components/code-shell.tsx:110
+#: src/features/code/components/code-shell.tsx:112
 msgid "Coding agent runs"
 msgstr "Ausführungen von Coding-Agents"
 
@@ -7537,11 +7544,12 @@ msgstr "Ausführungen von Coding-Agents"
 msgid "Coding agents you can start on {0}"
 msgstr "Coding-Agents, die du auf {0} starten kannst"
 
-#: src/features/onboarding/components/setup-checklist.tsx:164
+#: src/features/code/components/code-shell.tsx:175
+#: src/features/onboarding/components/setup-checklist.tsx:303
 msgid "Coding setup"
 msgstr "Coding-Einrichtung"
 
-#: src/features/onboarding/components/setup-checklist.tsx:166
+#: src/features/onboarding/components/setup-checklist.tsx:218
 msgid "Coding setup steps"
 msgstr "Schritte der Coding-Einrichtung"
 
@@ -7887,11 +7895,11 @@ msgstr "Vergleichen, bevor du dich festlegst"
 msgid "Compare concepts across FLUX, Runway, and Stable Diffusion. Pick the best style, not the only option."
 msgstr "Vergleiche Konzepte über FLUX, Runway und Stable Diffusion. Wähle den besten Stil, nicht die einzige Option."
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:74
+#: src/features/onboarding/components/onboarding-dialog.tsx:84
 msgid "Compare how different AI models explain quantum computing to a beginner."
 msgstr "Vergleiche, wie verschiedene KI-Modelle einem Einsteiger Quantencomputing erklären."
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:73
+#: src/features/onboarding/components/onboarding-dialog.tsx:83
 msgid "Compare models"
 msgstr "Modelle vergleichen"
 
@@ -8140,7 +8148,7 @@ msgstr "Lege Variablenwerte für diesen Thread fest. Diese Werte ersetzen {VARIA
 msgid "Configure Variables"
 msgstr "Variablen konfigurieren"
 
-#: src/components/settings/settings-modal.tsx:621
+#: src/components/settings/settings-modal.tsx:622
 msgid "Configure your application settings"
 msgstr "Anwendungseinstellungen konfigurieren"
 
@@ -8226,7 +8234,14 @@ msgstr "Verbinde {label}, um hier zu sehen, was dein Review braucht."
 msgid "Connect a bot you own to a messaging app and message your agent from your phone. Messages from the app have their own pairing and rate-limit checks, then land in the same chat history as your web chats."
 msgstr "Verbinde einen eigenen Bot mit einer Messaging-App und schreibe deinem Agenten vom Handy aus. Nachrichten aus der App haben eigene Kopplungs- und Ratenlimit-Prüfungen und landen dann im selben Chatverlauf wie deine Web-Chats."
 
-#: src/features/code/components/code-shell.tsx:97
+#: src/features/code/components/git-host-step.tsx:15
+#: src/features/code/components/git-host-step.tsx:48
+#: src/features/code/components/git-host-step.tsx:54
+msgid "Connect a Git host"
+msgstr "Git-Host verbinden"
+
+#: src/features/code/components/code-shell.tsx:99
+#: src/features/code/components/git-host-step.tsx:31
 msgid "Connect a Git host to review pull requests here."
 msgstr "Verbinde einen Git-Host, um hier Pull Requests zu prüfen."
 
@@ -9134,7 +9149,8 @@ msgstr "Der Berechtigungsmodus konnte nicht geändert werden. Bitte versuche es 
 msgid "Could not change where this device is offered."
 msgstr "Es ließ sich nicht ändern, wo dieses Gerät angeboten wird."
 
-#: src/features/onboarding/components/setup-checklist.tsx:161
+#: src/features/code/components/git-host-step.tsx:23
+#: src/features/onboarding/components/setup-checklist.tsx:176
 msgid "Could not check"
 msgstr "Konnte nicht geprüft werden"
 
@@ -9354,7 +9370,7 @@ msgstr "Die Abrechnungsdetails deiner Organisation konnten nicht geladen werden.
 msgid "Could not load your roles."
 msgstr "Deine Rollen konnten nicht geladen werden."
 
-#: src/features/onboarding/components/setup-checklist.tsx:230
+#: src/features/onboarding/components/setup-checklist.tsx:277
 msgid "Could not load your saved choices, so Skip and Resume are off until it is read again."
 msgstr "Deine gespeicherten Entscheidungen konnten nicht geladen werden, daher sind Überspringen und Fortsetzen aus, bis sie erneut gelesen werden."
 
@@ -9434,7 +9450,7 @@ msgstr "Die eingefügte Liste konnte nicht gelesen werden"
 msgid "Could not read what blocks {name}. Try again"
 msgstr "Konnte nicht lesen, was {name} blockiert. Erneut versuchen"
 
-#: src/features/onboarding/components/setup-checklist.tsx:216
+#: src/features/onboarding/components/setup-checklist.tsx:263
 msgid "Could not read your devices, so the steps cannot be checked yet. The links still work."
 msgstr "Deine Geräte konnten nicht gelesen werden, daher können die Schritte noch nicht geprüft werden. Die Links funktionieren trotzdem."
 
@@ -9476,8 +9492,8 @@ msgid "Could not retry. Please try again."
 msgstr "Wiederholen nicht möglich. Bitte versuche es erneut."
 
 #: src/features/chat/goal/pinned-goal.tsx:155
-#: src/features/onboarding/components/setup-checklist.tsx:99
-#: src/features/onboarding/components/setup-checklist.tsx:180
+#: src/features/onboarding/components/setup-checklist.tsx:114
+#: src/features/onboarding/components/setup-checklist.tsx:228
 msgid "Could not save that choice. Try again."
 msgstr "Diese Auswahl konnte nicht gespeichert werden. Versuche es erneut."
 
@@ -9810,7 +9826,7 @@ msgstr "Gruppenchat erstellen"
 msgid "Create guest link"
 msgstr "Gastlink erstellen"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:39
+#: src/features/onboarding/components/onboarding-dialog.tsx:47
 msgid "Create Images and Videos"
 msgstr "Bilder und Videos erstellen"
 
@@ -11702,7 +11718,7 @@ msgstr "Möchtest du weitere Zeilen hinzufügen?"
 #: ../../packages/chat-ui/src/chat/message-content.tsx:320
 #: ../../packages/ui/src/components/file-renderers/docx-preview.tsx:115
 #: ../../packages/ui/src/components/file-renderers/epub-preview.tsx:308
-#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:182
+#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:184
 msgid "Document"
 msgstr "Dokument"
 
@@ -11755,9 +11771,10 @@ msgstr "Deine Standardanweisungen in diesem Projekt nicht verwenden"
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:120
 #: src/features/chat/thread/host-activity.tsx:78
 #: src/features/chat/thread/host-activity.tsx:133
+#: src/features/code/components/git-host-step.tsx:25
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:184
 #: src/features/devices/components/devices-settings.tsx:454
-#: src/features/onboarding/components/setup-checklist.tsx:135
+#: src/features/onboarding/components/setup-checklist.tsx:150
 #: src/features/skills/components/bundle-import-dialog.tsx:253
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:65
 #: src/features/sub-agents/components/worker-run-log.tsx:29
@@ -16345,7 +16362,7 @@ msgstr "Ein Storyboard für einen Kurzdokumentarfilm erstellen"
 msgid "Generate a video from a text description"
 msgstr "Ein Video aus einer Textbeschreibung generieren"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:68
+#: src/features/onboarding/components/onboarding-dialog.tsx:78
 msgid "Generate an image"
 msgstr "Ein Bild generieren"
 
@@ -16357,7 +16374,7 @@ msgstr "Ein Bild aus einem Text-Prompt generieren"
 msgid "Generate an image from a text prompt and upscale it to 4x"
 msgstr "Ein Bild aus einem Text-Prompt generieren und 4-fach hochskalieren"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:69
+#: src/features/onboarding/components/onboarding-dialog.tsx:79
 msgid "Generate an image of a cozy reading nook with warm lighting and plants."
 msgstr "Generiere ein Bild einer gemütlichen Leseecke mit warmem Licht und Pflanzen."
 
@@ -16386,13 +16403,17 @@ msgstr "Bild generieren"
 msgid "Generate Image"
 msgstr "Bild generieren"
 
+#: src/features/onboarding/components/onboarding-dialog.tsx:46
+msgid "Generate images and videos with leading image and video models, all from the same chat."
+msgstr "Erstelle Bilder und Videos mit führenden Bild- und Videomodellen, alles im selben Chat."
+
 #: src/features/workflow/templates/index.ts:307
 msgid "Generate images with consistent character appearance"
 msgstr "Bilder mit einheitlichem Aussehen der Charaktere generieren"
 
 #: src/features/onboarding/components/onboarding-dialog.tsx:38
-msgid "Generate images with FLUX and Stable Diffusion, create videos with Runway and Luma — all from the same chat."
-msgstr "Generiere Bilder mit FLUX und Stable Diffusion, erstelle Videos mit Runway und Luma – alles im selben Chat."
+#~ msgid "Generate images with FLUX and Stable Diffusion, create videos with Runway and Luma — all from the same chat."
+#~ msgstr "Generiere Bilder mit FLUX und Stable Diffusion, erstelle Videos mit Runway und Luma – alles im selben Chat."
 
 #: src/features/workflow/components/nodes/advanced-controls-node.tsx:213
 #: src/features/workflow/components/nodes/advanced-controls-node.tsx:217
@@ -16697,7 +16718,7 @@ msgstr "Zur Nachricht: {snippet}"
 msgid "Go to next page"
 msgstr "Zur nächsten Seite"
 
-#: src/features/onboarding/components/setup-checklist.tsx:125
+#: src/features/onboarding/components/setup-checklist.tsx:140
 msgid "Go to pairing"
 msgstr "Zur Kopplung"
 
@@ -16713,7 +16734,7 @@ msgstr "Zu den Prompts"
 msgid "Go to reply"
 msgstr "Zur Antwort"
 
-#: src/features/onboarding/components/setup-checklist.tsx:130
+#: src/features/onboarding/components/setup-checklist.tsx:145
 msgid "Go to servers"
 msgstr "Zu den Servern"
 
@@ -16738,7 +16759,7 @@ msgid "Go to slide {slideNumber}"
 msgstr "Zu Folie {slideNumber}"
 
 #. placeholder {0}: index + 1
-#: src/features/onboarding/components/onboarding-dialog.tsx:362
+#: src/features/onboarding/components/onboarding-dialog.tsx:466
 msgid "Go to step {0}"
 msgstr "Zu Schritt {0}"
 
@@ -17295,7 +17316,7 @@ msgstr "Header (optional)"
 
 #: ../../packages/ui/src/components/canvas-editor/canvas-element-palette.tsx:185
 #: ../../packages/ui/src/components/canvas-editor/canvas-element-palette.tsx:185
-#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:313
+#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:323
 #: ../../packages/ui/src/components/tiptap-editor.tsx:216
 msgid "Heading"
 msgstr "Überschrift"
@@ -17332,7 +17353,7 @@ msgstr "Hallo {0}! Was möchtest du heute tun?"
 msgid "Help"
 msgstr "Hilfe"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:64
+#: src/features/onboarding/components/onboarding-dialog.tsx:74
 msgid "Help me write a professional email to introduce myself to a new team."
 msgstr "Hilf mir, eine professionelle E-Mail zu schreiben, um mich einem neuen Team vorzustellen."
 
@@ -17347,6 +17368,10 @@ msgstr "Hilf der KI, dich besser zu verstehen, indem du einige Informationen üb
 #: src/features/marketing/use-cases/visuals/messaging-visual.tsx:45
 msgid "Here is a summary, with the open items first."
 msgstr "Hier ist eine Zusammenfassung, die offenen Punkte zuerst."
+
+#: src/features/onboarding/components/onboarding-dialog.tsx:48
+msgid "Here is what coding agents need. Skip any step and finish it later on the Code page."
+msgstr "Das brauchen Coding-Agents. Überspringe beliebige Schritte und erledige sie später auf der Code-Seite."
 
 #: src/features/appearance/components/appearance-controls.tsx:289
 msgid "Here they are: planning, budget and next steps."
@@ -17591,7 +17616,7 @@ msgstr "Höherer Reasoning-Aufwand kann durchdachtere Antworten erzeugen, dauert
 msgid "Highest quality output from Black Forest Labs"
 msgstr "Ausgabe in höchster Qualität von Black Forest Labs"
 
-#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:353
+#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:363
 #: ../../packages/ui/src/components/tiptap-editor.tsx:210
 msgid "Highlight"
 msgstr "Hervorheben"
@@ -17654,7 +17679,7 @@ msgstr "Honduras"
 msgid "Hong Kong"
 msgstr "Hongkong"
 
-#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:336
+#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:346
 msgid "Horizontal rule"
 msgstr "Horizontale Linie"
 
@@ -17663,11 +17688,11 @@ msgid "Horizontal Strips"
 msgstr "Horizontale Streifen"
 
 #. placeholder {0}: host.name
-#: src/features/code/components/code-workspace.tsx:87
+#: src/features/code/components/code-workspace.tsx:112
 msgid "Host: {0}"
 msgstr "Host: {0}"
 
-#: src/features/code/components/code-shell.tsx:58
+#: src/features/code/components/code-shell.tsx:60
 msgid "Hosts"
 msgstr "Hosts"
 
@@ -17701,6 +17726,10 @@ msgstr "Fahre über einen Tag oder fokussiere das Diagramm und nutze die Pfeilta
 #: src/features/chat/thread/thread-welcome.tsx:30
 msgid "How can I help you today?"
 msgstr "Wie kann ich dir heute helfen?"
+
+#: src/features/onboarding/components/onboarding-dialog.tsx:146
+msgid "How do you want to start?"
+msgstr "Wie möchtest du beginnen?"
 
 #. placeholder {0}: model.name
 #. placeholder {1}: copy.comparisonNoun
@@ -17906,7 +17935,7 @@ msgstr "Illustration"
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:107
 #: ../../packages/ui/src/components/ai-elements/attachments.tsx:109
 #: ../../packages/ui/src/components/canvas-editor/canvas-element-palette.tsx:330
-#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:343
+#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:353
 #: src/components/model-picker/model-picker.tsx:1261
 #: src/features/chat/image-gallery/thread-image-gallery.tsx:80
 #: src/features/chat/sidebar/usage-card.tsx:129
@@ -18659,11 +18688,11 @@ msgstr "installieren"
 msgid "Install"
 msgstr "Installieren"
 
-#: src/features/onboarding/components/setup-checklist.tsx:122
+#: src/features/onboarding/components/setup-checklist.tsx:137
 msgid "Install a coding agent"
 msgstr "Coding-Agent installieren"
 
-#: src/features/onboarding/components/setup-checklist.tsx:121
+#: src/features/onboarding/components/setup-checklist.tsx:136
 msgid "Install a coding agent in the Neore desktop app and approve it for a folder on a paired computer. The install happens in the desktop window, not here."
 msgstr "Installiere einen Coding-Agenten in der Neore-Desktop-App und genehmige ihn für einen Ordner auf einem gekoppelten Computer. Die Installation erfolgt im Desktop-Fenster, nicht hier."
 
@@ -19051,7 +19080,7 @@ msgstr "Italienisch"
 msgid "Italian (Switzerland)"
 msgstr "Italienisch (Schweiz)"
 
-#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:300
+#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:310
 #: ../../packages/ui/src/components/tiptap-editor.tsx:195
 msgid "Italic"
 msgstr "Kursiv"
@@ -19163,7 +19192,7 @@ msgstr "gerade eben"
 msgid "Just now"
 msgstr "Gerade eben"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:416
+#: src/features/onboarding/components/onboarding-dialog.tsx:395
 msgid "Just start chatting"
 msgstr "Einfach loschatten"
 
@@ -19912,7 +19941,7 @@ msgstr "Lass den Agenten über die Neore-Desktop-App Dateien, ein Terminal und l
 msgid "Let the agent work on a server you reach over SSH, with your own SSH client and keys. Neore asks you to trust the server's key the first time, and every action asks you on this computer before it is sent. The server holds no secret of yours."
 msgstr "Lass den Agenten auf einem Server arbeiten, den du per SSH mit deinem eigenen SSH-Client und deinen eigenen Schlüsseln erreichst. Neore bittet dich beim ersten Mal, dem Schlüssel des Servers zu vertrauen, und jede Aktion fragt dich auf diesem Computer, bevor sie gesendet wird. Der Server hält kein Secret von dir."
 
-#: src/features/onboarding/components/setup-checklist.tsx:131
+#: src/features/onboarding/components/setup-checklist.tsx:146
 msgid "Let the agent work on a server you reach over SSH. Needs a paired computer, and the form to add one is in the desktop app."
 msgstr "Lass den Agenten auf einem Server arbeiten, den du per SSH erreichst. Dafür ist ein gekoppelter Computer nötig; das Formular zum Hinzufügen findest du in der Desktop-App."
 
@@ -20055,7 +20084,7 @@ msgstr "Zeilen von {0}"
 msgid "Lines that are not valid JSON"
 msgstr "Zeilen, die kein gültiges JSON sind"
 
-#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:340
+#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:350
 #: src/features/auth/components/settings/providers/provider-cell.tsx:117
 #: src/features/develop/components/thread-pull-requests.tsx:419
 msgid "Link"
@@ -20312,7 +20341,7 @@ msgstr "Dokument wird geladen…"
 msgid "Loading editor..."
 msgstr "Editor wird geladen..."
 
-#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:280
+#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:290
 #: src/features/canvas/canvas-panel.tsx:133
 #: src/features/pages/components/page-editor.tsx:40
 msgid "Loading editor…"
@@ -20372,8 +20401,8 @@ msgstr "Knotendetails werden geladen..."
 msgid "Loading older messages..."
 msgstr "Ältere Nachrichten werden geladen..."
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:285
-#: src/features/onboarding/components/onboarding-dialog.tsx:288
+#: src/features/onboarding/components/onboarding-dialog.tsx:371
+#: src/features/onboarding/components/onboarding-dialog.tsx:374
 msgid "Loading onboarding"
 msgstr "Onboarding wird geladen"
 
@@ -20553,7 +20582,8 @@ msgstr "Wird geladen..."
 #: src/features/auth/components/device-approval.tsx:349
 #: src/features/chat/thread/memory-usage-action.tsx:46
 #: src/features/chat/thread/request-secret-prompt.tsx:478
-#: src/features/code/components/code-workspace.tsx:90
+#: src/features/code/components/code-workspace.tsx:99
+#: src/features/code/components/code-workspace.tsx:115
 #: src/features/pages/components/public-page-view.tsx:66
 #: src/features/settings/components/chat/bots-settings.tsx:468
 #: src/features/settings/components/personalization/memory-item.tsx:129
@@ -22049,7 +22079,7 @@ msgstr "Modell-Tabs"
 msgid "Model: {0}"
 msgstr "Modell: {0}"
 
-#: src/components/model-picker/model-picker-button.tsx:180
+#: src/components/model-picker/model-picker-button.tsx:185
 msgid "Model: {singleLabel}"
 msgstr "Modell: {singleLabel}"
 
@@ -23185,7 +23215,7 @@ msgstr "Newsletter-Hero-Bild"
 #: ../../packages/ui/src/components/pagination.tsx:52
 #: ../../packages/ui/src/components/spreadsheet/csv-renderer.tsx:342
 #: ../../packages/ui/src/components/spreadsheet/xlsx-renderer.tsx:656
-#: src/features/onboarding/components/onboarding-dialog.tsx:416
+#: src/features/onboarding/components/onboarding-dialog.tsx:520
 msgid "Next"
 msgstr "Weiter"
 
@@ -23718,7 +23748,7 @@ msgstr "Keine Seiten gefunden. Exportiere aus Notion als „Markdown & CSV“ od
 msgid "No pages yet."
 msgstr "Noch keine Seiten."
 
-#: src/features/code/components/code-shell.tsx:61
+#: src/features/code/components/code-shell.tsx:63
 msgid "No paired computer yet."
 msgstr "Noch kein Computer gekoppelt."
 
@@ -24368,7 +24398,7 @@ msgstr "Anzahl der Bilder"
 msgid "Number of messages"
 msgstr "Anzahl der Nachrichten"
 
-#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:323
+#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:333
 #: ../../packages/ui/src/components/tiptap-editor.tsx:225
 msgid "Numbered list"
 msgstr "Nummerierte Liste"
@@ -24431,7 +24461,7 @@ msgstr "Wird nur in Chats angeboten, die zu den obigen Projekten gehören. Gilt 
 msgid "Official"
 msgstr "Offiziell"
 
-#: src/features/code/components/code-shell.tsx:81
+#: src/features/code/components/code-shell.tsx:83
 #: src/features/code/components/host-details.tsx:32
 #: src/features/devices/components/devices-settings.tsx:382
 #: src/routes/admin/gateway/index.tsx:37
@@ -24548,19 +24578,23 @@ msgstr "On-Premise-Option"
 msgid "Onboarding"
 msgstr "Onboarding"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:253
+#: src/features/onboarding/components/onboarding-dialog.tsx:339
 msgid "Onboarding complete"
 msgstr "Onboarding abgeschlossen"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:272
+#: src/features/onboarding/components/onboarding-dialog.tsx:358
 msgid "Onboarding complete. Redirecting to chat."
 msgstr "Onboarding abgeschlossen. Weiterleitung zum Chat."
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:316
+#: src/features/onboarding/components/onboarding-dialog.tsx:358
+msgid "Onboarding complete. Redirecting to Code."
+msgstr "Einführung abgeschlossen. Weiterleitung zu Code."
+
+#: src/features/onboarding/components/onboarding-dialog.tsx:413
 msgid "Onboarding progress"
 msgstr "Onboarding-Fortschritt"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:358
+#: src/features/onboarding/components/onboarding-dialog.tsx:462
 msgid "Onboarding steps"
 msgstr "Onboarding-Schritte"
 
@@ -24568,7 +24602,7 @@ msgstr "Onboarding-Schritte"
 msgid "Onboarding will restart on your next visit to chat."
 msgstr "Das Onboarding startet bei deinem nächsten Besuch im Chat neu."
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:312
+#: src/features/onboarding/components/onboarding-dialog.tsx:402
 msgid "Onboarding wizard"
 msgstr "Onboarding-Assistent"
 
@@ -24648,7 +24682,7 @@ msgstr "Ein Abonnement. <0>Jedes Modell.</0>"
 msgid "One workspace for 30+ AI models. Chat, generate images, create videos, write documents, and run code — one account, one price."
 msgstr "Ein Arbeitsbereich für 30+ KI-Modelle. Chatten, Bilder generieren, Videos erstellen, Dokumente schreiben und Code ausführen — ein Konto, ein Preis."
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:42
+#: src/features/onboarding/components/onboarding-dialog.tsx:52
 msgid "One workspace for chat, images, video, documents, and code. 30+ AI models, one subscription."
 msgstr "Ein Arbeitsbereich für Chat, Bilder, Video, Dokumente und Code. 30+ KI-Modelle, ein Abonnement."
 
@@ -24668,7 +24702,7 @@ msgstr "Das Einmalpasswort ist ungültig"
 msgid "One-time password is required"
 msgstr "Das Einmalpasswort ist erforderlich"
 
-#: src/features/code/components/code-shell.tsx:81
+#: src/features/code/components/code-shell.tsx:83
 #: src/features/code/components/host-details.tsx:32
 #: src/features/devices/components/devices-settings.tsx:382
 msgid "Online"
@@ -24889,6 +24923,10 @@ msgstr "Als Seite öffnen"
 msgid "Open chat"
 msgstr "Chat öffnen"
 
+#: src/features/onboarding/components/onboarding-dialog.tsx:395
+msgid "Open Code"
+msgstr "Code öffnen"
+
 #: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:75
 msgid "Open command palette"
 msgstr "Befehlspalette öffnen"
@@ -24897,7 +24935,8 @@ msgstr "Befehlspalette öffnen"
 msgid "Open connectors"
 msgstr "Connectors öffnen"
 
-#: src/features/code/components/code-shell.tsx:99
+#: src/features/code/components/code-shell.tsx:101
+#: src/features/code/components/git-host-step.tsx:53
 msgid "Open Connectors"
 msgstr "Connectors öffnen"
 
@@ -25077,7 +25116,7 @@ msgstr "Open-Source-Flexibilität"
 msgid "Open source foundation with broad community support"
 msgstr "Open-Source-Grundlage mit breiter Community-Unterstützung"
 
-#: src/features/code/components/code-workspace.tsx:102
+#: src/features/code/components/code-workspace.tsx:127
 msgid "Open tabs"
 msgstr "Offene Tabs"
 
@@ -25955,15 +25994,15 @@ msgstr "Mit dir geteilte Seiten"
 msgid "Paint over the areas you want to edit. White regions will be regenerated, dark regions will be preserved."
 msgstr "Male über die Bereiche, die du bearbeiten möchtest. Weiße Bereiche werden neu generiert, dunkle Bereiche bleiben erhalten."
 
-#: src/features/onboarding/components/setup-checklist.tsx:127
+#: src/features/onboarding/components/setup-checklist.tsx:142
 msgid "Pair a computer"
 msgstr "Computer koppeln"
 
-#: src/features/onboarding/components/setup-checklist.tsx:126
+#: src/features/onboarding/components/setup-checklist.tsx:141
 msgid "Pair a computer in the Neore desktop app so agents can work on your files. You confirm the pairing on that computer, and the step is done once any computer is paired with your account."
 msgstr "Koppele einen Computer in der Neore-Desktop-App, damit Agenten an deinen Dateien arbeiten können. Du bestätigst die Kopplung auf diesem Computer, und der Schritt ist erledigt, sobald ein Computer mit deinem Konto gekoppelt ist."
 
-#: src/features/code/components/code-shell.tsx:63
+#: src/features/code/components/code-shell.tsx:65
 msgid "Pair one in Settings"
 msgstr "Koppel einen in den Einstellungen"
 
@@ -26008,8 +26047,8 @@ msgid "Panama"
 msgstr "Panama"
 
 #. placeholder {0}: index + 1
-#: src/features/code/components/code-workspace.tsx:70
-#: src/features/code/components/code-workspace.tsx:95
+#: src/features/code/components/code-workspace.tsx:89
+#: src/features/code/components/code-workspace.tsx:120
 msgid "Pane {0}"
 msgstr "Bereich {0}"
 
@@ -26491,7 +26530,7 @@ msgstr "Fotorealismus"
 msgid "Pick a dataset"
 msgstr "Datensatz auswählen"
 
-#: src/features/code/components/code-workspace.tsx:45
+#: src/features/code/components/code-workspace.tsx:47
 msgid "Pick a host or a pull request"
 msgstr "Wähle einen Host oder einen Pull Request"
 
@@ -26515,7 +26554,7 @@ msgstr "Skill auswählen"
 msgid "Pick a skill to evaluate."
 msgstr "Wähle einen Skill zum Evaluieren."
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:43
+#: src/features/onboarding/components/onboarding-dialog.tsx:53
 msgid "Pick a starting point or jump straight into chat."
 msgstr "Wähle einen Startpunkt oder spring direkt in den Chat."
 
@@ -27908,7 +27947,7 @@ msgid "Pull request settings updated"
 msgstr "Pull-Request-Einstellungen aktualisiert"
 
 #: src/features/chat/sidebar/thread-context.tsx:93
-#: src/features/code/components/code-shell.tsx:95
+#: src/features/code/components/code-shell.tsx:97
 #: src/features/develop/components/thread-pull-requests.tsx:375
 msgid "Pull requests"
 msgstr "Pull Requests"
@@ -28057,7 +28096,7 @@ msgstr "Schnelle, günstige Videogenerierung für den Alltag aus ByteDances Seed
 msgid "Quick, affordable video generation using Alibaba's Wan model at a fast, lower-quality tier"
 msgstr "Schnelle, günstige Videogenerierung mit Alibabas Wan-Modell in einer schnellen Stufe mit geringerer Qualität"
 
-#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:330
+#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:340
 #: ../../packages/ui/src/components/tiptap-editor.tsx:231
 msgid "Quote"
 msgstr "Zitat"
@@ -28287,7 +28326,7 @@ msgstr "Nur lesen"
 msgid "Read the docs"
 msgstr "Zur Dokumentation"
 
-#: src/features/onboarding/components/setup-checklist.tsx:120
+#: src/features/onboarding/components/setup-checklist.tsx:135
 msgid "Read the guide"
 msgstr "Die Anleitung lesen"
 
@@ -28634,7 +28673,7 @@ msgid "Redirecting to the thread..."
 msgstr "Weiterleitung zum Thread..."
 
 #: ../../packages/ui/src/components/canvas-editor/fabric-canvas-editor.tsx:607
-#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:293
+#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:303
 #: ../../packages/ui/src/components/tiptap-editor.tsx:186
 #: src/features/canvas/canvas-panel.tsx:239
 #: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:37
@@ -29482,7 +29521,7 @@ msgstr "Recherche"
 msgid "Research"
 msgstr "Recherche"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:78
+#: src/features/onboarding/components/onboarding-dialog.tsx:88
 msgid "Research a topic"
 msgstr "Ein Thema recherchieren"
 
@@ -29490,7 +29529,7 @@ msgstr "Ein Thema recherchieren"
 msgid "Research a topic in depth..."
 msgstr "Ein Thema ausführlich recherchieren..."
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:79
+#: src/features/onboarding/components/onboarding-dialog.tsx:89
 msgid "Research the latest developments in renewable energy storage technology."
 msgstr "Recherchiere die neuesten Entwicklungen bei Speichertechnologien für erneuerbare Energien."
 
@@ -29580,7 +29619,7 @@ msgstr "Spalte {label} in der Größe ändern"
 msgid "Resize chats {index} and {next}"
 msgstr "Chats {index} und {next} in der Größe ändern"
 
-#: src/features/code/components/code-workspace.tsx:241
+#: src/features/code/components/code-workspace.tsx:269
 msgid "Resize panes"
 msgstr "Bereiche in der Größe ändern"
 
@@ -29682,7 +29721,7 @@ msgid "Result not delivered"
 msgstr "Ergebnis nicht zugestellt"
 
 #: src/features/chat/thread/rate-limit-pause-notice.tsx:149
-#: src/features/onboarding/components/setup-checklist.tsx:202
+#: src/features/onboarding/components/setup-checklist.tsx:248
 #: src/features/settings/connectors/messenger/messenger-platform-card.tsx:157
 msgid "Resume"
 msgstr "Fortsetzen"
@@ -29746,9 +29785,10 @@ msgstr "wiederholen"
 #: src/features/chat/thread/chat-error.tsx:64
 #: src/features/chat/thread/request-secret-prompt.tsx:475
 #: src/features/chat/translation/message-translation.tsx:88
+#: src/features/code/components/git-host-step.tsx:47
 #: src/features/devices/components/devices-settings.tsx:308
 #: src/features/local-models/components/ollama-model-manager.tsx:188
-#: src/features/onboarding/components/setup-checklist.tsx:238
+#: src/features/onboarding/components/setup-checklist.tsx:285
 #: src/features/settings/components/chat/agent-settings.tsx:213
 #: src/features/settings/components/chat/bot-tool-selection.tsx:495
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:485
@@ -29773,7 +29813,7 @@ msgstr "Erneut in {retryAfterMinutes} Min."
 msgid "Retry now"
 msgstr "Jetzt wiederholen"
 
-#: src/features/onboarding/components/setup-checklist.tsx:224
+#: src/features/onboarding/components/setup-checklist.tsx:271
 msgid "Retry the device check"
 msgstr "Gerätprüfung erneut versuchen"
 
@@ -30287,7 +30327,7 @@ msgstr "Läuft einmal und schaltet sich dann selbst aus. Für eine wiederkehrend
 msgid "Runs when a webhook is received, on {0}. You get a new signing secret and URL for it."
 msgstr "Läuft, wenn ein Webhook eingeht, auf {0}. Du erhältst dafür ein neues Signatur-Secret und eine neue URL."
 
-#: src/features/code/components/code-shell.tsx:112
+#: src/features/code/components/code-shell.tsx:114
 msgid "Runs you start from a chat appear here."
 msgstr "Ausführungen, die du aus einem Chat startest, erscheinen hier."
 
@@ -31195,22 +31235,22 @@ msgid "Select mode"
 msgstr "Modus auswählen"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker-button.tsx:211
-#: src/components/model-picker/model-picker-button.tsx:243
+#: src/components/model-picker/model-picker-button.tsx:254
 msgid "Select model"
 msgstr "Modell auswählen"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker-button.tsx:173
-#: src/components/model-picker/model-picker-button.tsx:203
+#: src/components/model-picker/model-picker-button.tsx:214
 #: src/components/model-picker/model-picker-popup.tsx:42
 msgid "Select Model"
 msgstr "Modell auswählen"
 
-#: src/features/prompts/components/prompt-model-selector.tsx:44
+#: src/features/prompts/components/prompt-model-selector.tsx:47
 msgid "Select model (optional)"
 msgstr "Modell auswählen (optional)"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker-button.tsx:124
-#: src/components/model-picker/model-picker-button.tsx:100
+#: src/components/model-picker/model-picker-button.tsx:103
 #: src/features/workflow/components/nodes/background-removal-node.tsx:66
 #: src/features/workflow/components/nodes/character-ref-node.tsx:147
 #: src/features/workflow/components/nodes/controlnet-node.tsx:139
@@ -31688,14 +31728,26 @@ msgstr "Eine neue automatisierte Agentenausführung einrichten"
 msgid "Set up a webhook"
 msgstr "Webhook einrichten"
 
+#: src/features/onboarding/components/onboarding-dialog.tsx:49
+msgid "Set up coding"
+msgstr "Coding einrichten"
+
+#: src/features/onboarding/components/onboarding-dialog.tsx:138
+msgid "Set up coding agents on your computers."
+msgstr "Richte Coding-Agents auf deinen Computern ein."
+
+#: src/features/onboarding/components/setup-checklist.tsx:300
+msgid "Set up coding agents on your own machines. Skip any step and come back later."
+msgstr "Richte Coding-Agents auf deinen eigenen Rechnern ein. Überspringe beliebige Schritte und komm später zurück."
+
 #: src/features/marketing/components/tutorials-page.tsx:88
 msgid "Set up triggers to automate tasks on a schedule, via webhooks, or in response to events."
 msgstr "Richte Trigger ein, um Aufgaben nach Zeitplan, über Webhooks oder als Reaktion auf Events zu automatisieren."
 
 #: ../../packages/chat-ui/src/org-switcher/org-switcher.tsx:260
-#: src/components/settings/settings-modal.tsx:497
-#: src/components/settings/settings-modal.tsx:619
-#: src/components/settings/settings-modal.tsx:717
+#: src/components/settings/settings-modal.tsx:498
+#: src/components/settings/settings-modal.tsx:620
+#: src/components/settings/settings-modal.tsx:718
 #: src/features/layout/components/mobile-section-nav.tsx:59
 #: src/features/layout/lib/dashboard-page-names.ts:38
 msgid "Settings"
@@ -32435,8 +32487,8 @@ msgstr "Skills konnten nicht geladen werden. Du kannst trotzdem ohne Skill weite
 msgid "Skills views"
 msgstr "Skill-Ansichten"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:404
-#: src/features/onboarding/components/setup-checklist.tsx:202
+#: src/features/onboarding/components/onboarding-dialog.tsx:508
+#: src/features/onboarding/components/setup-checklist.tsx:248
 msgid "Skip"
 msgstr "Überspringen"
 
@@ -32452,13 +32504,13 @@ msgstr "Fragen überspringen"
 msgid "Skip to content"
 msgstr "Zum Inhalt springen"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:399
+#: src/features/onboarding/components/onboarding-dialog.tsx:503
 msgid "Skip tour"
 msgstr "Tour überspringen"
 
 #: src/features/develop/components/checks-tab.tsx:81
 #: src/features/evals/components/run-detail.tsx:36
-#: src/features/onboarding/components/setup-checklist.tsx:135
+#: src/features/onboarding/components/setup-checklist.tsx:150
 #: src/features/settings/components/chat/trigger-settings.tsx:182
 msgid "Skipped"
 msgstr "Übersprungen"
@@ -33008,8 +33060,8 @@ msgstr "{0} von einem Limit von {1} ausgegeben."
 msgid "Split cell"
 msgstr "Zelle teilen"
 
-#: src/features/code/components/code-workspace.tsx:135
-#: src/features/code/components/code-workspace.tsx:139
+#: src/features/code/components/code-workspace.tsx:160
+#: src/features/code/components/code-workspace.tsx:164
 msgid "Split right"
 msgstr "Nach rechts teilen"
 
@@ -33305,7 +33357,7 @@ msgstr "Probelauf starten"
 msgid "Start writing..."
 msgstr "Schreib los..."
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:44
+#: src/features/onboarding/components/onboarding-dialog.tsx:54
 msgid "Start Your First Chat"
 msgstr "Starte deinen ersten Chat"
 
@@ -33453,7 +33505,7 @@ msgid "Steering:"
 msgstr "Steuerhinweise:"
 
 #. placeholder {0}: currentIndex + 1
-#: src/features/onboarding/components/onboarding-dialog.tsx:354
+#: src/features/onboarding/components/onboarding-dialog.tsx:458
 msgid "Step {0} of {totalSteps}: {title}"
 msgstr "Schritt {0} von {totalSteps}: {title}"
 
@@ -33646,7 +33698,7 @@ msgstr "Wird gestreamt..."
 msgid "Strength"
 msgstr "Stärke"
 
-#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:306
+#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:316
 #: ../../packages/ui/src/components/tiptap-editor.tsx:201
 msgid "Strikethrough"
 msgstr "Durchgestrichen"
@@ -34402,7 +34454,7 @@ msgstr "Mit Tab zu den Zoom-Schaltflächen springen, dann zoomen Plus und Minus,
 #: ../../packages/ui/src/components/chat-markdown.tsx:116
 #: ../../packages/ui/src/components/file-renderers/delimited-text-preview.tsx:50
 #: ../../packages/ui/src/components/file-renderers/delimited-text-preview.tsx:67
-#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:346
+#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:356
 #: ../../packages/ui/src/lib/tiptap-table-bubble.tsx:71
 msgid "Table"
 msgstr "Tabelle"
@@ -34474,6 +34526,10 @@ msgstr "Während du als dieses Konto handelst, kannst du die Steuerung nicht üb
 #: ../../packages/chat-ui/src/chat/message-content.tsx:729
 msgid "Taking screenshot..."
 msgstr "Screenshot wird erstellt..."
+
+#: src/features/onboarding/components/onboarding-dialog.tsx:132
+msgid "Talk to any model and make images and documents."
+msgstr "Sprich mit jedem Modell und erstelle Bilder und Dokumente."
 
 #: src/features/marketing/components/gateway-landing-page.tsx:859
 #: src/features/marketing/components/landing-page.tsx:1097
@@ -34552,7 +34608,7 @@ msgstr "Aufgabe abgeschlossen"
 msgid "Task for the coding agent"
 msgstr "Aufgabe für den Coding-Agent"
 
-#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:326
+#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:336
 #: ../../packages/ui/src/components/tiptap-editor.tsx:228
 msgid "Task list"
 msgstr "Aufgabenliste"
@@ -34889,11 +34945,11 @@ msgid "Text & chat"
 msgstr "Text & Chat"
 
 #: ../../packages/ui/src/components/canvas-editor/canvas-property-panel.tsx:394
-#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:316
+#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:326
 msgid "Text alignment"
 msgstr "Textausrichtung"
 
-#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:350
+#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:360
 #: ../../packages/ui/src/components/tiptap-editor.tsx:207
 msgid "Text color"
 msgstr "Textfarbe"
@@ -37237,7 +37293,7 @@ msgstr "Threads behalten deinen gesamten Verlauf. Verzweige Ideen, hefte wichtig
 msgid "Threads working on this {requestNoun}"
 msgstr "Threads, die an diesem {requestNoun} arbeiten"
 
-#: src/features/onboarding/components/setup-checklist.tsx:164
+#: src/features/onboarding/components/setup-checklist.tsx:301
 msgid "Three steps to use coding agents on your own machines. Skip any of them and come back later."
 msgstr "Drei Schritte, um Coding-Agenten auf deinen eigenen Computern zu nutzen. Überspringe einen davon und komm später zurück."
 
@@ -37336,7 +37392,8 @@ msgid "to {0}"
 msgstr "bei {0}"
 
 #: src/features/chat/thread/host-activity.tsx:81
-#: src/features/onboarding/components/setup-checklist.tsx:135
+#: src/features/code/components/git-host-step.tsx:20
+#: src/features/onboarding/components/setup-checklist.tsx:150
 #: src/features/tasks/components/task-status.tsx:21
 msgid "To do"
 msgstr "Zu erledigen"
@@ -38297,13 +38354,13 @@ msgstr "Unverändert"
 msgid "Under the Hood"
 msgstr "Unter der Haube"
 
-#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:303
+#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:313
 #: ../../packages/ui/src/components/tiptap-editor.tsx:198
 msgid "Underline"
 msgstr "Unterstrichen"
 
 #: ../../packages/ui/src/components/canvas-editor/fabric-canvas-editor.tsx:604
-#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:290
+#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:300
 #: ../../packages/ui/src/components/tiptap-editor.tsx:183
 #: src/components/model-picker/model-picker.tsx:858
 #: src/features/canvas/canvas-panel.tsx:245
@@ -39014,6 +39071,10 @@ msgstr "Aus einem MCP-Client verwenden"
 #: src/features/skills/components/skill-form-dialog.tsx:81
 msgid "Use lowercase letters, numbers and single hyphens only"
 msgstr "Verwende nur Kleinbuchstaben, Ziffern und einzelne Bindestriche"
+
+#: src/features/onboarding/components/onboarding-dialog.tsx:51
+msgid "Use models from many providers in a single conversation. Switch models mid-thread to compare answers."
+msgstr "Nutze Modelle vieler Anbieter in einer einzigen Unterhaltung. Wechsle das Modell mitten im Chat, um Antworten zu vergleichen."
 
 #: src/features/chat/thread/media-gallery-view.tsx:641
 msgid "Use Original Prompt"
@@ -40228,8 +40289,8 @@ msgstr "Schriftstärke"
 msgid "Welcome back"
 msgstr "Willkommen zurück"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:45
-#: src/features/onboarding/components/onboarding-dialog.tsx:311
+#: src/features/onboarding/components/onboarding-dialog.tsx:55
+#: src/features/onboarding/components/onboarding-dialog.tsx:400
 msgid "Welcome to Neore"
 msgstr "Willkommen bei Neore"
 
@@ -40719,7 +40780,7 @@ msgstr "Erneut schreiben"
 msgid "Write long-form content alongside chat"
 msgstr "Lange Texte direkt neben dem Chat schreiben"
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:36
+#: src/features/onboarding/components/onboarding-dialog.tsx:44
 msgid "Write long-form content in a side-by-side canvas editor. Go from chat to finished document without switching tools."
 msgstr "Schreibe lange Texte in einem Canvas-Editor direkt neben dem Chat. Vom Chat zum fertigen Dokument, ohne das Tool zu wechseln."
 
@@ -40727,7 +40788,7 @@ msgstr "Schreibe lange Texte in einem Canvas-Editor direkt neben dem Chat. Vom C
 msgid "Write some code for me..."
 msgstr "Schreib Code für mich..."
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:63
+#: src/features/onboarding/components/onboarding-dialog.tsx:73
 msgid "Write something"
 msgstr "Etwas schreiben"
 
@@ -40739,7 +40800,7 @@ msgstr "Leitfaden schreiben"
 msgid "Write the task for the agent before you start the fix."
 msgstr "Schreibe die Aufgabe für den Agenten, bevor du die Korrektur startest."
 
-#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:163
+#: ../../packages/ui/src/components/tiptap-canvas-editor.tsx:165
 msgid "Write, or type '/' for commands…"
 msgstr "Schreib los oder tippe „/“ für Befehle…"
 
@@ -41112,7 +41173,7 @@ msgstr "Du benötigst eine Authentifikator-App wie Google Authenticator oder Aut
 msgid "You're all caught up."
 msgstr "Du bist auf dem neuesten Stand."
 
-#: src/features/onboarding/components/onboarding-dialog.tsx:269
+#: src/features/onboarding/components/onboarding-dialog.tsx:355
 msgid "You're all set!"
 msgstr "Alles bereit!"
 

@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect } from "storybook/test";
+import type { screen } from "storybook/test";
+import { expect, waitFor } from "storybook/test";
 
 import { Route as ShortcutRoute } from "@/routes/_shortcut";
 import { Route as CodeRoute } from "@/routes/_shortcut/code/index";
@@ -21,7 +22,7 @@ import { evalsFixtures, homeFixtures, promptsFixtures, skillsFixtures, tasksFixt
 import { gatewayModelsHandler } from "@/storybook/fixtures/models";
 import { shellFixtures } from "@/storybook/fixtures/shell";
 import { userFixtures } from "@/storybook/fixtures/user";
-import { codeFixtures, developFixtures, DEVICES, pagesFixtures, workflowFixtures } from "@/storybook/fixtures/workspace";
+import { codeFixtures, developFixtures, DEVICES, DEVICES_WITH_AGENT, pagesFixtures, workflowFixtures } from "@/storybook/fixtures/workspace";
 import { lunoraHandlers } from "@/storybook/lunora";
 import { StoryPage } from "@/storybook/page";
 
@@ -197,17 +198,49 @@ export const PagesEmpty: Story = {
     parameters: { msw: { handlers: handlers(...pagesFixtures({ owned: [], shared: [] })) } },
 };
 
+/** The row of a setup step, found by its title. */
+const setupRow = async (canvas: Pick<typeof screen, "findByText">, title: string) => {
+    const label = await canvas.findByText(title, undefined, PAGE_WAIT);
+
+    return label.closest("li");
+};
+
+const CODE_ARGS = { levels: [SHORTCUT, { path: "code/", route: CodeRoute }], url: "/code" } as const;
+
+/** Every setup step is done or skipped: the main area is the plain "pick a host" state. */
 export const Code: Story = {
-    args: { levels: [SHORTCUT, { path: "code/", route: CodeRoute }], url: "/code" },
-    parameters: { msw: { handlers: handlers(...codeFixtures(DEVICES)) } },
+    args: CODE_ARGS,
+    parameters: {
+        msw: { handlers: handlers(...codeFixtures(DEVICES_WITH_AGENT, { gitConnected: true }), ...userFixtures({ settings: { setupStepsSkipped: ["ssh"] } })) },
+    },
     play: async ({ canvas }) => {
         await expect(await canvas.findByText("Studio MacBook", undefined, PAGE_WAIT)).toBeVisible();
+        await expect(await canvas.findByText("Pick a host or a pull request", undefined, PAGE_WAIT)).toBeVisible();
     },
 };
 
+/** A computer is paired and the server step is skipped; the agent and the Git host are still open. */
+export const CodePartlySetUp: Story = {
+    args: CODE_ARGS,
+    parameters: { msw: { handlers: handlers(...codeFixtures(DEVICES), ...userFixtures({ settings: { setupStepsSkipped: ["ssh"] } })) } },
+    play: async ({ canvas }) => {
+        // On a phone the host list comes first when a host exists, so the steps are in the page but behind it.
+        await expect(await canvas.findByText("Coding setup", { ignore: "button, script, style" }, PAGE_WAIT)).toBeInTheDocument();
+        await expect(await setupRow(canvas, "Pair a computer")).toHaveTextContent("Done");
+        await expect(await setupRow(canvas, "Add an SSH server")).toHaveTextContent("Skipped");
+    },
+};
+
+/** Nothing paired, nothing skipped: the setup steps replace the "pick a host" message. */
 export const CodeNoComputer: Story = {
-    args: { levels: [SHORTCUT, { path: "code/", route: CodeRoute }], url: "/code" },
+    args: CODE_ARGS,
     parameters: { msw: { handlers: handlers(...codeFixtures([])) } },
+    play: async ({ canvas }) => {
+        await expect(await canvas.findByText("Coding setup", { ignore: "button, script, style" }, PAGE_WAIT)).toBeVisible();
+        // The host answers after the steps do.
+        await waitFor(async () => expect(await setupRow(canvas, "Connect a Git host")).toHaveTextContent("To do"), PAGE_WAIT);
+        await expect(canvas.queryByText("Pick a host or a pull request")).toBeNull();
+    },
 };
 
 const WORKFLOW_LEVELS = [{ path: "workflow", route: WorkflowLayoutRoute }] as const;
