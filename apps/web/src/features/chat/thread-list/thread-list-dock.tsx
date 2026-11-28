@@ -41,7 +41,7 @@ const ThreadListDock: FC<ThreadListDockProperties> = memo(({ isSearchLoading = f
     const compactShortcut = shortcutKeys.join(isMac ? "" : "+");
     const shownShortcut = compactShortcut.length <= 6 ? compactShortcut : "";
     // An unbound shortcut is "": the tooltip then names the action alone.
-    const newThreadShortcut = formatShortcutForDisplay(keyboardShortcuts.newChat);
+    const newThreadShortcut = shortcutToKeys(keyboardShortcuts.newChat, isMac).join(isMac ? "" : "+");
     const [isGroupChatOpen, setIsGroupChatOpen] = useState(false);
 
     const { openAddProjectDialog, searchQuery, searchType, setSearchQuery, showSearch, toggleShowSearch } = useThreadListUIStore(
@@ -158,7 +158,7 @@ const ThreadListDock: FC<ThreadListDockProperties> = memo(({ isSearchLoading = f
                         />
                         <TooltipContent className="flex items-center gap-2">
                             {t`New Thread`}
-                            {newThreadShortcut && <Kbd>{newThreadShortcut.replaceAll(" ", "")}</Kbd>}
+                            {newThreadShortcut && <Kbd>{newThreadShortcut}</Kbd>}
                         </TooltipContent>
                     </Tooltip>
                 </div>
