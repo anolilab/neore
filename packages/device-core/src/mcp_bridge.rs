@@ -122,18 +122,17 @@ fn redact(value: &mut Value, secrets: &[String]) {
 /// `author` is not).
 fn holds_a_credential(name: &str) -> bool {
     let mut words = String::with_capacity(name.len() * 2);
+    let mut previous: Option<char> = None;
 
-    for (at, character) in name.char_indices() {
-        let after_lower = name[..at]
-            .chars()
-            .next_back()
-            .is_some_and(|before| before.is_ascii_lowercase());
-
-        if character.is_ascii_uppercase() && after_lower {
+    for character in name.chars() {
+        if character.is_ascii_uppercase()
+            && previous.is_some_and(|before| before.is_ascii_lowercase())
+        {
             words.push('-');
         }
 
         words.push(character.to_ascii_lowercase());
+        previous = Some(character);
     }
 
     words.split(['-', '_', '.']).any(|word| {
