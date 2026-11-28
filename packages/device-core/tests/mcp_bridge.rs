@@ -210,6 +210,11 @@ fn only_an_http_or_https_address_without_credentials_and_valid_headers_are_taken
             "too short to keep out of the chat",
         ),
         (
+            "https://h/mcp?sessionId=abc",
+            "",
+            "too short to keep out of the chat",
+        ),
+        (
             "https://h/mcp",
             r#"{"X-ClientSecret":"abc"}"#,
             "too short to keep out of the chat",
@@ -504,7 +509,7 @@ fn a_cookie_or_a_key_in_the_address_the_server_echoes_does_not_reach_the_client(
             }
             _ => {
                 // The query value decoded, a token without the extra space, and a credential of digits as a number.
-                let result = json!({ "echoed": echoed, "pin": 444_444_444_444_u64, "code": 1.2345678e14, "count": 3 });
+                let result = json!({ "echoed": echoed, "pin": 444_444_444_444_u64, "code": 1.2345678e14, "count": 3, "near": 9_007_199_254_740_992_u64 });
 
                 json_reply(request, result, None)
             }
@@ -514,6 +519,8 @@ fn a_cookie_or_a_key_in_the_address_the_server_echoes_does_not_reach_the_client(
         "Cookie": format!("pref=wide-layout; sid={sid}"),
         "Authorization": format!("Bearer   {token}"),
         "X-Pin": pin,
+        // Not the number above: one more than it, which a float cannot tell apart.
+        "X-Id": "9007199254740993",
     })
     .to_string();
     let written = relay(
@@ -525,7 +532,7 @@ fn a_cookie_or_a_key_in_the_address_the_server_echoes_does_not_reach_the_client(
 
     assert_eq!(
         answer["result"],
-        json!({ "echoed": "saw [redacted], [redacted] and [redacted]", "pin": "[redacted]", "code": "[redacted]", "count": 3 }),
+        json!({ "echoed": "saw [redacted], [redacted] and [redacted]", "pin": "[redacted]", "code": "[redacted]", "count": 3, "near": 9_007_199_254_740_992_u64 }),
         "{answer}"
     );
 }

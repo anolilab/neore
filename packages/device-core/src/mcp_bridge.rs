@@ -86,14 +86,31 @@ fn redact(value: &mut Value, secrets: &[String]) {
 
             scrub(&mut text, secrets);
 
-            // Parsing can respell it (`12345678e7`): the value is compared too. Only a large one, so a secret like
-            // `00000000` does not blank every zero.
-            let same_value = number.as_f64().is_some_and(|number| {
-                number.abs() >= 1e7
-                    && secrets
-                        .iter()
-                        .any(|secret| secret.parse::<f64>().ok() == Some(number))
-            });
+            // Parsing can respell it (`12345678e7`): the value is compared too, an integer exactly. Only a large one, so a
+            // secret like `00000000` does not blank every zero.
+            let integer = number
+                .as_i64()
+                .map(i128::from)
+                .or_else(|| number.as_u64().map(i128::from));
+            let same_value = match integer {
+                Some(integer) => {
+                    integer.unsigned_abs() >= 10_000_000
+                        && secrets.iter().any(|secret| match secret.parse::<i128>() {
+                            Ok(secret) => secret == integer,
+                            // A float spelling, exact only while the integer fits a float.
+                            Err(_) => {
+                                integer.unsigned_abs() < 1 << 53
+                                    && secret.parse::<f64>().ok() == Some(integer as f64)
+                            }
+                        })
+                }
+                None => number.as_f64().is_some_and(|number| {
+                    number.abs() >= 1e7
+                        && secrets
+                            .iter()
+                            .any(|secret| secret.parse::<f64>().ok() == Some(number))
+                }),
+            };
 
             if same_value {
                 *value = Value::String("[redacted]".into());
@@ -135,26 +152,30 @@ fn holds_a_credential(name: &str) -> bool {
         previous = Some(character);
     }
 
-    words.split(['-', '_', '.']).any(|word| {
-        matches!(
-            word,
-            "auth"
-                | "authorization"
-                | "cookie"
-                | "token"
-                | "key"
-                | "secret"
-                | "password"
-                | "passwd"
-                // Joined, as some servers write them.
-                | "apikey"
-                | "accesstoken"
-                | "authtoken"
-                | "apitoken"
-                | "refreshtoken"
-                | "clientsecret"
-                | "sessionid"
-        )
+    let words: Vec<&str> = words.split(['-', '_', '.']).collect();
+
+    // Each word, and each run of words read as one (`session` + `id`, `access` + `token`).
+    (0..words.len()).any(|first| {
+        (first + 1..=words.len()).any(|end| {
+            matches!(
+                words[first..end].concat().as_str(),
+                "auth"
+                    | "authorization"
+                    | "cookie"
+                    | "token"
+                    | "key"
+                    | "secret"
+                    | "password"
+                    | "passwd"
+                    | "apikey"
+                    | "accesstoken"
+                    | "authtoken"
+                    | "apitoken"
+                    | "refreshtoken"
+                    | "clientsecret"
+                    | "sessionid"
+            )
+        })
     })
 }
 
