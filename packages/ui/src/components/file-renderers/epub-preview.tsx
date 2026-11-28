@@ -97,9 +97,10 @@ const originOf = (address: string): string | undefined => {
 const fetchBook = async (url: string, maxBytes: number, signal: AbortSignal): Promise<OpenedEpub> => {
     const response = await fetch(url, { signal });
 
-    // A redirect is followed only when it stays on the file's own origin. A browser does not hand a script the address of a redirect it is told
-    // not to follow, so the answer is judged by where it came from: one that was redirected to another origin is let go unread and refused.
-    // The size cap and the abort signal are those of the one request, whatever its hops.
+    // A redirect is followed by the browser, so a hop to another origin IS requested: a script cannot see where a redirect points without
+    // refusing to follow it (`redirect: "manual"` hides the address), and a refusal of every redirect would break files served through one. The
+    // trade-off accepted: that one request goes out, and what comes back from another origin is let go unread (its body is cancelled) and
+    // refused, so nothing from it reaches the book, the parser or the frame. The size cap and abort signal are those of the one request.
     if (response.redirected && originOf(response.url) !== originOf(url)) {
         await response.body?.cancel().catch(() => undefined);
 

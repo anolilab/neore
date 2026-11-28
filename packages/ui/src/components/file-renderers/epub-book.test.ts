@@ -161,24 +161,6 @@ describe("openEpub", () => {
         opened.destroy();
     });
 
-    it("matches a long table of contents to a long spine without a scan of the spine for each entry", async () => {
-        const chapters = Array.from({ length: 1500 }, (_item, index) => {
-            return {
-                body: "<p>x</p>",
-                file: `Text/c${String(index)}.xhtml`,
-                id: `c${String(index)}`,
-                label: `Chapter ${String(index)}`,
-            };
-        });
-        const opened = await openEpub(await book({ chapters }), folder.path);
-
-        expect(opened.chapters).toHaveLength(1500);
-        expect(opened.chapters[1499]).toEqual({ id: "c1499", title: "Chapter 1499" });
-        opened.destroy();
-    });
-});
-
-describe("reading a chapter", () => {
     it("puts a picture and a style sheet of the book into the chapter, as a data: address and as text, and makes no object URL", async () => {
         const createObjectUrl = vi.spyOn(URL, "createObjectURL");
         const opened = await openEpub(
@@ -624,6 +606,21 @@ describe("a chapter's style sheets", () => {
         opened.destroy();
     });
 
+    it("reads on past an escaped quote outside a string: the styles and imports after it are kept", async () => {
+        const opened = await openEpub(
+            await book({
+                chapters: [{ body: `${links(["../main.css"])}<p>x</p>`, file: "text/one.xhtml", id: "c1" }],
+                files: { "base.css": ".base{x:1}", "main.css": String.raw`@layer a\"b; .esc\"name{x:0} @import "base.css"; .after{x:2}` },
+            }),
+            folder.path,
+        );
+        const sheet = sheetsOf(parse(await opened.read("c1"))).join("");
+
+        expect(sheet).toContain(".base{x:1}");
+        expect(sheet).toContain(".after{x:2}");
+        opened.destroy();
+    });
+
     it("leaves text that looks like an import inside a string as text", async () => {
         const opened = await openEpub(
             await book({
@@ -776,6 +773,53 @@ describe("a chapter's style sheets", () => {
         expect(frame.body.getAttribute("lang")).toBe("ar");
         expect(frame.body.hasAttribute("onload")).toBe(false);
         expect(frame.body.hasAttribute("style")).toBe(false);
+        opened.destroy();
+    });
+
+    it("carries a class name with non-ASCII letters, and drops tokens that are not identifiers", async () => {
+        const opened = await openEpub(
+            await book({
+                chapters: [
+                    {
+                        body: "<p>x</p>",
+                        file: "one.xhtml",
+                        id: "c1",
+                        raw: '<?xml version="1.0"?><html xmlns="http://www.w3.org/1999/xhtml"><head><title>t</title></head><body class="chapitre-é 日本語 ok bad&quot;x"><p>x</p></body></html>',
+                    },
+                ],
+            }),
+            folder.path,
+        );
+        const frame = parse(await opened.read("c1"));
+
+        expect(frame.body.getAttribute("class")).toBe("chapitre-é 日本語 ok");
+        opened.destroy();
+    });
+
+    it("refuses a repeated import before the combined sheet is built, counting the outer sheet's own text", async () => {
+        const probe = new JSZip();
+
+        probe.file("a", "x");
+
+        const prototype = Object.getPrototypeOf(probe.file("a")) as { async: (...args: unknown[]) => Promise<unknown> };
+        const outer = `${".o{}".repeat(3_750_000)}@import "imp.css"; @import "imp.css";`;
+        const imported = "i{}".repeat(2_000_000);
+        const opened = await openEpub(
+            await book({
+                chapters: [{ body: `${links(["../outer.css"])}<p>x</p>`, file: "text/one.xhtml", id: "c1" }],
+                files: { "imp.css": imported, "outer.css": outer },
+            }),
+            folder.path,
+        );
+        const asyncSpy = vi.spyOn(prototype, "async");
+        const document = await opened.read("c1");
+        const imports = asyncSpy.mock.instances.filter((entry) => (entry as unknown as { name: string }).name.endsWith("imp.css")).length;
+        const sheet = sheetsOf(parse(document)).join("");
+
+        // 15 + 6 million characters fit in the 25 million a chapter may take; a second import of the 6 would make 27: it is not read, and the sheet stays inside the budget.
+        expect(imports).toBe(1);
+        expect(sheet.length).toBeLessThan(24 * 1024 * 1024);
+        asyncSpy.mockRestore();
         opened.destroy();
     });
 

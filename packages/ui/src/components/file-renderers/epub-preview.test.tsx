@@ -626,3 +626,40 @@ describe("EpubPreview position and controls", () => {
         }
     });
 });
+
+describe("EpubPreview position when the person comes back to a book", () => {
+    const show = async (url: string) => {
+        await act(async () => {
+            view.root.render(
+                <FetchableOriginsProvider origins={[ORIGIN]}>
+                    <EpubPreview filename="book.epub" url={url} />
+                </FetchableOriginsProvider>,
+            );
+        });
+        await act(async () => {
+            await Promise.resolve();
+        });
+        await act(async () => {
+            await Promise.resolve();
+        });
+    };
+
+    it("opens a shorter book at its first chapter and a book returned to at its first too, never past the end of either", async () => {
+        answer(new Uint8Array([1]));
+        await show(`${ORIGIN}/a.epub`);
+        await click(button("Next chapter"));
+        await click(button("Next chapter"));
+        expect(view.container.textContent).toContain("Chapter 3 of 3");
+
+        book.chapters = 1;
+        await show(`${ORIGIN}/b.epub`);
+        expect(view.container.textContent).toContain("Chapter 1 of 1");
+        expect(view.container.textContent).not.toContain("Chapter 3 of 1");
+
+        // Back to the first file, which is longer than the saved place was short: its saved place (3) is not kept for a new load.
+        book.chapters = 3;
+        await show(`${ORIGIN}/a.epub`);
+        expect(view.container.textContent).toContain("Chapter 1 of 3");
+        expect(view.container.textContent).not.toContain("Chapter 3 of 1");
+    });
+});

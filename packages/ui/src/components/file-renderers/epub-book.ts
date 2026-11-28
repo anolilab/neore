@@ -467,6 +467,11 @@ const scanCss = (css: string): { code: string; text: string } => {
             text += " ";
             code += " ";
             step = (end === -1 ? css.length : end + 2) - at;
+        } else if (char === "\\" && at + 1 < css.length) {
+            // Outside a string a backslash escapes the next character too (`\"` in an identifier is not the start of a string).
+            text += `${char}${css[at + 1] ?? ""}`;
+            code += `${char}${css[at + 1] ?? ""}`;
+            step = 2;
         } else {
             quote = char === '"' || char === "'" ? char : "";
             text += char;
@@ -541,7 +546,7 @@ const expandImports = async (
             path === undefined ||
             stack.includes(path) ||
             stack.length >= MAX_IMPORT_DEPTH ||
-            (declared !== undefined && !reader.fits(declared)) ||
+            (declared !== undefined && !reader.fits(produced.length + declared)) ||
             !reader.takeFile()
         ) {
             continue;
@@ -647,15 +652,28 @@ const neutralize = (root: Element): void => {
     }
 };
 
-const CLASS_NAMES = /^[\w\s-]{1,400}$/u;
+/** One class name: a CSS identifier, non-ASCII letters included (`chapitre-é`). */
+const CLASS_TOKEN = /^-?[\p{L}_][\p{L}\p{N}_-]*$/u;
+const MAX_CLASS_LENGTH = 400;
+const WHITESPACE = /\s+/u;
+
+const safeClassNames = (value: string): string =>
+    value
+        .trim()
+        .split(WHITESPACE)
+        .filter((token) => CLASS_TOKEN.test(token))
+        .join(" ")
+        .slice(0, MAX_CLASS_LENGTH);
 const DIRECTIONS: ReadonlySet<string> = new Set(["auto", "ltr", "rtl"]);
 
 const safeBodyAttributes = (attributes: Readonly<Record<string, string>>): Record<string, string> => {
     const kept: Record<string, string> = {};
     const { class: classNames, dir, lang } = attributes;
 
-    if (classNames !== undefined && CLASS_NAMES.test(classNames)) {
-        kept.class = classNames.trim();
+    const classes = classNames === undefined ? "" : safeClassNames(classNames);
+
+    if (classes !== "") {
+        kept.class = classes;
     }
 
     if (dir !== undefined && DIRECTIONS.has(dir.trim().toLowerCase())) {
@@ -885,7 +903,8 @@ const readChapter = async (chapterPath: string, reader: AssetReader): Promise<{ 
         // What the pictures and imports of this sheet take is staged: kept only if the sheet is, so a rejected sheet leaves the room it used.
         const staged = reader.snapshot();
         // Imports first, then addresses, then cleaned; the exact text that will be written is what is charged.
-        const expanded = await expandImports(text, base, reader, self);
+        // The outer sheet's own text is reserved with what its imports add, so the combined text is bounded before any of it is built.
+        const expanded = await expandImports(text, base, reader, self, { length: text.length + 3 * countLessThan(text) });
         const sheet = safeStylesheet(await inlineStylesheetUrls(expanded, base, reader));
 
         reader.check();
