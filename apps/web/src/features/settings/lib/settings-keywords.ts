@@ -84,10 +84,8 @@ export const SETTINGS_KEYWORDS: Record<SettingsTab, ReadonlyArray<SettingsKeywor
         { keywords: [], label: msg`New bot` },
         { keywords: [], label: msg`Your bots` },
     ],
-    "chat-devices": [
-        { keywords: [], label: msg`Servers over SSH` },
-        { keywords: [], label: msg`Device activity` },
-    ],
+    // "Servers over SSH" is left out: its card shows only on a paired desktop, and the search cannot tell, so it would lead nowhere.
+    "chat-devices": [{ keywords: [], label: msg`Device activity` }],
     "chat-knowledge": [],
     "chat-mcp": [{ keywords: [msg`catalog`, msg`browse`, msg`install`, msg`connectors`, msg`integrations`], label: msg`MCP Registry` }],
     "chat-model-filters": [
