@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { formatFileSize, getFileRendererType, isDelimitedTable, isJsonl, isMermaid, TEXT_PREVIEW_EXTENSIONS } from "./file-type-utilities";
+import { formatFileSize, getFileRendererType, isDelimitedTable, isEpub, isJsonl, isMermaid, TEXT_PREVIEW_EXTENSIONS } from "./file-type-utilities";
 
 describe("text previews are recognised by file name", () => {
     it.each(["rows.jsonl", "ROWS.JSONL", "events.ndjson"])("%s is JSON Lines", (filename) => {
@@ -20,6 +20,23 @@ describe("text previews are recognised by file name", () => {
         expect(isMermaid("notes.txt")).toBe(false);
         expect(isDelimitedTable("notes.md")).toBe(false);
         expect(isJsonl(undefined)).toBe(false);
+    });
+});
+
+describe("an EPUB book is recognised by its type or its name", () => {
+    it.each([
+        ["application/epub+zip", undefined],
+        ["application/octet-stream", "novel.epub"],
+        [undefined, "NOVEL.EPUB"],
+    ])("%s %s is an EPUB", (mediaType, filename) => {
+        expect(isEpub(mediaType, filename)).toBe(true);
+        expect(getFileRendererType(mediaType, filename)).toBe("epub");
+    });
+
+    it("does not claim another zip, or no name", () => {
+        expect(isEpub("application/zip", "archive.zip")).toBe(false);
+        expect(isEpub(undefined, undefined)).toBe(false);
+        expect(getFileRendererType("application/zip", "novel.epub.zip")).toBe("generic");
     });
 });
 

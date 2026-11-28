@@ -3,7 +3,7 @@
  * Used by all renderers to determine which component should handle a given file.
  */
 
-export type FileRendererType = "audio" | "docx" | "generic" | "image" | "jsonl" | "mermaid" | "pdf" | "table" | "video";
+export type FileRendererType = "audio" | "docx" | "epub" | "generic" | "image" | "jsonl" | "mermaid" | "pdf" | "table" | "video";
 
 /**
  * Text files that get a preview of their own, recognised by name: the chat
@@ -55,6 +55,10 @@ export const getFileRendererType = (mediaType?: string, filename?: string): File
         return "docx";
     }
 
+    if (isEpub(mediaType, filename)) {
+        return "epub";
+    }
+
     // Older uploads of a JSON Lines file carry application/json, which the chat allowlist accepts.
     if (isJsonl(filename) && (isTextLikeType(mediaType) || mediaType === "application/json")) {
         return "jsonl";
@@ -72,6 +76,10 @@ export const getFileRendererType = (mediaType?: string, filename?: string): File
 
     return "generic";
 };
+
+/** An EPUB book: by its type, or by `.epub` when the upload carried a generic one. */
+export const isEpub = (mediaType?: string, filename?: string): boolean =>
+    mediaType === "application/epub+zip" || filename?.toLowerCase().endsWith(".epub") === true;
 
 export const isPdf = (mediaType?: string, filename?: string): boolean => mediaType === "application/pdf" || filename?.toLowerCase().endsWith(".pdf") === true;
 
