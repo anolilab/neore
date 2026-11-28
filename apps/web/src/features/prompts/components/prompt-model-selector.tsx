@@ -2,12 +2,15 @@
 
 import { useLingui } from "@lingui/react/macro";
 import clsx from "clsx";
-import type { FC } from "react";
+import type { ComponentProps, FC } from "react";
 
 import { ModelPickerButton } from "@/components/model-picker";
 import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
 
-interface PromptModelSelectorProps {
+/** `FormControl` hands its control these; they go to the picker button, the element the field's label and messages are about. */
+type FieldControlProps = Pick<ComponentProps<"button">, "aria-describedby" | "aria-invalid" | "id">;
+
+interface PromptModelSelectorProps extends FieldControlProps {
     disabled?: boolean;
     errorMessage?: string;
     onChange: (modelId: string | undefined) => void;
@@ -15,7 +18,7 @@ interface PromptModelSelectorProps {
     value: string | undefined;
 }
 
-const PromptModelSelector: FC<PromptModelSelectorProps> = ({ disabled, errorMessage, onChange, showError, value }) => {
+const PromptModelSelector: FC<PromptModelSelectorProps> = ({ disabled, errorMessage, onChange, showError, value, ...fieldControl }) => {
     const { t } = useLingui();
     const models = useFeatureFlaggedModels();
     const selectedModel = value ? models.find((m) => m.id === value) : undefined;
@@ -42,6 +45,7 @@ const PromptModelSelector: FC<PromptModelSelectorProps> = ({ disabled, errorMess
                 modelId={value}
                 onSelect={handleSelect}
                 placeholder={t`Select model (optional)`}
+                triggerProps={fieldControl}
             />
             {showError && errorMessage && <p className="text-destructive text-xs">{errorMessage}</p>}
         </div>

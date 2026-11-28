@@ -13,6 +13,7 @@ The rules for working in `packages/device-core/`. The detail and reasoning are i
 - Network tiers (`NetworkTier`, key `shellNetwork`, legacy `allowShellNetwork`): Off default. The middle tier's CONNECT proxy (`egress.rs`) must require the ClientHello server name == CONNECT host; Linux REFUSES the middle tier, never downgrades.
 - Off on Linux is a seccomp filter (`socket(2)` → `EPERM` except `AF_UNIX`/`AF_NETLINK`, plus `io_uring_setup`) on x86_64/aarch64 LE only; elsewhere refuse unless unsandboxed shells are allowed, and then say the network is NOT blocked.
 - Local MCP servers run in the same sandbox, both paths via `actions::plan_mcp_launch`, each with its own tier and private `<app data>/mcp/<name>/`; never make the user's own package caches reachable. Restart on policy change. Allowed paths and hosts: `README.md`.
+- An HTTP MCP server runs as `neore-host mcp-bridge` (feature `mcp-bridge`, never the addon) under the same sandbox: URL and headers via env only, http/https without credentials, no redirects, no env proxy, and no address or header value in any error text.
 - No sandbox → REFUSE unless the user disabled "Require sandbox…" (`allowUnsandboxedShell`, absent = required).
 - Allow rules, shared folders, that setting and local MCP servers live ONLY in Rust.
 - The pairing secret crosses the page exactly once (`registerDevice` → `device_pair`). HMAC vectors are pinned on BOTH sides — change one, update both.

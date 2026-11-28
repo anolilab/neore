@@ -53,6 +53,7 @@ import {
     peopleSearchTool,
     redditSearchTool,
     rememberTool,
+    forgetTool,
     renderUITool,
     requestSecretTool,
     retrieveTool,
@@ -136,7 +137,7 @@ export const SEARCH_MODES: SearchModeInfo[] = [
 // Document tools are available in all search modes
 const DOCUMENT_TOOLS = [ToolName.CreateDocument, ToolName.UpdateDocument, ToolName.RenderUI];
 // Memory search is available in all modes for progressive disclosure
-const MEMORY_TOOLS = [ToolName.SearchMemory, ToolName.SearchPastChats, ToolName.Remember];
+const MEMORY_TOOLS = [ToolName.SearchMemory, ToolName.SearchPastChats, ToolName.Remember, ToolName.Forget];
 // Knowledge base search is available in all modes
 const KNOWLEDGE_TOOLS = [ToolName.KnowledgeSearch];
 
@@ -387,35 +388,36 @@ const ALL_TOOLS: Record<ToolName, unknown> = {
 
     // Travel Tools
     [ToolName.FlightTracker]: flightTrackerTool,
+    [ToolName.Forget]: forgetTool,
+
     [ToolName.GithubSearch]: githubSearchTool,
 
     // Image Editing Tools
     [ToolName.ImageEditing]: imageEditingTool,
-
     // Image/Video/Music Generation Tools
     [ToolName.ImageGeneration]: imageGenerationTool,
     // Image/Video Search Tools
     [ToolName.ImageSearch]: imageSearchTool,
+
     // Knowledge Base Tools
     [ToolName.KnowledgeSearch]: knowledgeSearchTool,
-
     [ToolName.ListCurrencies]: listCurrenciesTool,
     [ToolName.ListLanguages]: listLanguagesTool,
     [ToolName.MergePullRequest]: mergePullRequestTool,
-    [ToolName.MessageWorker]: messageWorkerTool,
 
+    [ToolName.MessageWorker]: messageWorkerTool,
     // Entertainment Tools
     [ToolName.MovieTvSearch]: movieTvSearchTool,
     [ToolName.MusicGeneration]: musicGenerationTool,
     [ToolName.NearbyPlacesSearch]: nearbyPlacesSearchTool,
+
     // People & Company Search Tools
     [ToolName.PeopleSearch]: peopleSearchTool,
-
     [ToolName.ReadFailingChecks]: readFailingChecksTool,
     [ToolName.ReadPullRequest]: readPullRequestTool,
-    [ToolName.RedditSearch]: redditSearchTool,
 
-    // Saving a fact the user asked to be remembered
+    [ToolName.RedditSearch]: redditSearchTool,
+    // Saving a fact the user asked to be remembered, and deleting one they asked to be forgotten
     [ToolName.Remember]: rememberTool,
 
     // Generative UI Tools
@@ -511,7 +513,7 @@ const TOOLS_BY_CATEGORY = {
     interaction: [ToolName.AskUser, ToolName.RequestSecret, ToolName.SaveSecretAsProviderKey, ToolName.SetMcpServerSecret],
     knowledge: [ToolName.KnowledgeSearch],
     location: [ToolName.FindPlace, ToolName.NearbyPlacesSearch, ToolName.Weather],
-    memory: [ToolName.SearchMemory, ToolName.SearchPastChats, ToolName.Remember],
+    memory: [ToolName.SearchMemory, ToolName.SearchPastChats, ToolName.Remember, ToolName.Forget],
     pullRequest: [
         ToolName.ReadPullRequest,
         ToolName.ReadFailingChecks,

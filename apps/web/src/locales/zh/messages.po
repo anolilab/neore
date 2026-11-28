@@ -338,6 +338,11 @@ msgstr "{0, plural, other {# 个匹配}}"
 msgid "{0, plural, one {# member} other {# members}}"
 msgstr "{0, plural, other {# 名成员}}"
 
+#. placeholder {0}: forgotten.length
+#: src/features/chat/thread/tool-approval.tsx:221
+msgid "{0, plural, one {# memory is waiting for the chat owner to confirm.} other {# memories are waiting for the chat owner to confirm.}}"
+msgstr "{0, plural, other {# 条记忆正在等待聊天所有者确认。}}"
+
 #. placeholder {0}: c.messages.length
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:369
 msgid "{0, plural, one {# message} other {# messages}}"
@@ -479,12 +484,12 @@ msgid "{0, plural, one {# user} other {# users}}"
 msgstr "{0, plural, other {# 位用户}}"
 
 #. placeholder {0}: selectedModelIds!.length
-#: src/components/model-picker/model-picker-button.tsx:173
+#: src/components/model-picker/model-picker-button.tsx:177
 msgid "{0, plural, one {1 model} other {# models}}"
 msgstr "{0, plural, other {# 个模型}}"
 
 #. placeholder {0}: selectedModelIds!.length
-#: src/components/model-picker/model-picker-button.tsx:160
+#: src/components/model-picker/model-picker-button.tsx:163
 msgid "{0, plural, one {Comparing # model} other {Comparing # models}}"
 msgstr "{0, plural, other {正在对比 # 个模型}}"
 
@@ -1207,7 +1212,7 @@ msgstr "{hostLabel} 会向所有能查看此{requestNoun}的人显示新的标�
 msgid "{hostLabel} will merge this {requestNoun} with “{0}” once its rules are met. It is turned on for the commit {1}: if the branch has changed since you opened this page, {hostLabel} refuses. You can turn this off until then."
 msgstr "规则满足后，{hostLabel} 将以“{0}”方式合并此{requestNoun}。此功能针对提交 {1} 开启：如果自你打开此页面后分支已更改，{hostLabel} 将拒绝。在此之前你可以关闭它。"
 
-#: src/features/chat/header/temporary-chat-dropdown.tsx:88
+#: src/features/chat/header/temporary-chat-dropdown.tsx:103
 msgid "{hours} hours"
 msgstr "{hours} 小时"
 
@@ -1219,7 +1224,7 @@ msgstr "{hours}小时"
 msgid "{hours}h {minutes}m"
 msgstr "{hours} 小时 {minutes} 分钟"
 
-#: src/features/chat/header/temporary-chat-dropdown.tsx:206
+#: src/features/chat/header/temporary-chat-dropdown.tsx:221
 msgid "{hours}h {minutes}m remaining"
 msgstr "剩余 {hours} 小时 {minutes} 分钟"
 
@@ -1338,7 +1343,7 @@ msgstr "{minutes} 分钟"
 msgid "{minutes}m ago"
 msgstr "{minutes} 分钟前"
 
-#: src/features/chat/header/temporary-chat-dropdown.tsx:209
+#: src/features/chat/header/temporary-chat-dropdown.tsx:224
 msgid "{minutes}m remaining"
 msgstr "剩余 {minutes} 分钟"
 
@@ -1796,7 +1801,7 @@ msgid "1 Day"
 msgstr "1 天"
 
 #: src/features/admin/components/ban-user-dialog.tsx:28
-#: src/features/chat/header/temporary-chat-dropdown.tsx:85
+#: src/features/chat/header/temporary-chat-dropdown.tsx:100
 msgid "1 hour"
 msgstr "1 小时"
 
@@ -2567,7 +2572,7 @@ msgstr "活跃天数"
 msgid "Active Sessions ({0})"
 msgstr "活跃会话（{0}）"
 
-#: src/components/command-palette.tsx:780
+#: src/components/command-palette.tsx:782
 msgid "Active Threads"
 msgstr "活跃对话"
 
@@ -2695,7 +2700,7 @@ msgstr "添加附件"
 msgid "Add background"
 msgstr "添加背景"
 
-#: src/features/settings/components/chat/usage-settings.tsx:417
+#: src/features/settings/components/chat/usage-settings.tsx:421
 #~ msgid "Add budget alert"
 #~ msgstr "添加预算提醒"
 
@@ -2807,8 +2812,8 @@ msgid "Add picked frame as image node"
 msgstr "将选取的帧添加为图片节点"
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:147
-#: src/features/chat/thread-list/thread-list-dock.tsx:131
-#: src/features/chat/thread-list/thread-list-dock.tsx:141
+#: src/features/chat/thread-list/thread-list-dock.tsx:133
+#: src/features/chat/thread-list/thread-list-dock.tsx:143
 #: src/features/projects/components/add-project-dialog.tsx:695
 msgid "Add project"
 msgstr "添加项目"
@@ -3748,11 +3753,11 @@ msgstr "全部使用场景"
 msgid "All Users"
 msgstr "所有用户"
 
-#: src/features/chat/thread/tool-approval.tsx:167
+#: src/features/chat/thread/tool-approval.tsx:243
 msgid "Allow \"{tool}\" from {server}?"
 msgstr "允许来自 {server} 的“{tool}”吗？"
 
-#: src/features/chat/thread/tool-approval.tsx:167
+#: src/features/chat/thread/tool-approval.tsx:243
 msgid "Allow \"{tool}\"?"
 msgstr "允许“{tool}”吗？"
 
@@ -3760,19 +3765,19 @@ msgstr "允许“{tool}”吗？"
 msgid "Allow \"delete_files\" from the drafts server?"
 msgstr "允许草稿服务器的“delete_files”吗？"
 
-#: src/features/chat/thread/tool-approval.tsx:138
+#: src/features/chat/thread/tool-approval.tsx:157
 #~ msgid "Allow {tool} for 1 hour"
 #~ msgstr "允许 {tool} 1 小时"
 
-#: src/features/chat/thread/tool-approval.tsx:142
+#: src/features/chat/thread/tool-approval.tsx:161
 #~ msgid "Allow {tool} for today"
 #~ msgstr "允许 {tool} 今天"
 
-#: src/features/chat/thread/tool-approval.tsx:134
+#: src/features/chat/thread/tool-approval.tsx:153
 msgid "Allow for 1 hour"
 msgstr "允许 1 小时"
 
-#: src/features/chat/thread/tool-approval.tsx:140
+#: src/features/chat/thread/tool-approval.tsx:159
 msgid "Allow for today"
 msgstr "允许今天"
 
@@ -3835,12 +3840,12 @@ msgstr "同时在看"
 msgid "Always"
 msgstr "始终"
 
-#: src/features/chat/thread/tool-approval.tsx:128
+#: src/features/chat/thread/tool-approval.tsx:146
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:35
 msgid "Always allow"
 msgstr "始终允许"
 
-#: src/features/chat/thread/tool-approval.tsx:126
+#: src/features/chat/thread/tool-approval.tsx:144
 msgid "Always allow {tool}"
 msgstr "始终允许 {tool}"
 
@@ -4331,14 +4336,14 @@ msgid "Approvals in Neore: a tool you set to Ask stops before it runs, and you d
 msgstr "Neore 中的批准：设为“询问”的工具会在运行前暂停，由你结合确切的输入决定。"
 
 #: src/features/auth/components/device-approval.tsx:242
-#: src/features/chat/thread/tool-approval.tsx:120
+#: src/features/chat/thread/tool-approval.tsx:137
 #: src/features/develop/components/review-panel.tsx:64
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:32
 #: src/features/tasks/components/task-detail-dialog.tsx:104
 msgid "Approve"
 msgstr "批准"
 
-#: src/features/chat/thread/tool-approval.tsx:118
+#: src/features/chat/thread/tool-approval.tsx:135
 msgid "Approve {tool} once"
 msgstr "批准一次 {tool}"
 
@@ -4366,7 +4371,7 @@ msgstr "请在 {name} 上的桌面应用中批准此请求。"
 msgid "Approved"
 msgstr "已批准"
 
-#: src/features/chat/thread/tool-approval.tsx:83
+#: src/features/chat/thread/tool-approval.tsx:98
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:23
 msgid "Approved — running tool"
 msgstr "已批准——正在运行工具"
@@ -4467,13 +4472,13 @@ msgid "Archive this chat?"
 msgstr "归档此对话？"
 
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:98
-#: src/components/command-palette.tsx:720
-#: src/components/command-palette.tsx:1030
+#: src/components/command-palette.tsx:722
+#: src/components/command-palette.tsx:1032
 #: src/features/chat/thread-list/thread-node.tsx:142
 msgid "Archive thread"
 msgstr "归档对话"
 
-#: src/components/command-palette.tsx:975
+#: src/components/command-palette.tsx:977
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:654
 #: src/features/chat/thread-list/section-bar.tsx:46
 #: src/features/sub-agents/components/worker-list.tsx:107
@@ -4491,7 +4496,7 @@ msgstr "已归档的对话仍可搜索，你可以从归档中恢复。"
 msgid "Archived for at least"
 msgstr "已归档至少"
 
-#: src/components/command-palette.tsx:797
+#: src/components/command-palette.tsx:799
 msgid "Archived Threads"
 msgstr "已归档的对话"
 
@@ -4524,7 +4529,7 @@ msgstr "确定要删除此 API 密钥吗？任何使用它的内容（如脚本�
 msgid "Are you sure you want to delete this item? This action cannot be undone."
 msgstr "确定要删除此项吗？此操作无法撤销。"
 
-#: src/components/command-palette.tsx:913
+#: src/components/command-palette.tsx:915
 #: src/features/chat/thread-list/thread-node.tsx:1174
 #: src/features/chat/thread/thread-shortcuts-listener.tsx:82
 msgid "Are you sure you want to delete this thread? This action cannot be undone and will permanently remove all messages in this conversation."
@@ -4917,7 +4922,7 @@ msgstr "只要聊天关联的拉取请求仍处于打开状态，自动归档就
 msgid "Auto-archive turned off"
 msgstr "已关闭自动归档"
 
-#: src/features/chat/header/temporary-chat-dropdown.tsx:308
+#: src/features/chat/header/temporary-chat-dropdown.tsx:323
 msgid "Auto-Delete Active"
 msgstr "自动删除已启用"
 
@@ -6610,7 +6615,7 @@ msgstr "聊天"
 msgid "Chat · Images · Video · Audio · Documents"
 msgstr "聊天 · 图像 · 视频 · 音频 · 文档"
 
-#: src/features/chat/header/chat-header.tsx:149
+#: src/features/chat/header/chat-header.tsx:152
 #: src/features/chat/header/thread-download-button.tsx:113
 #: src/features/chat/header/thread-download-button.tsx:154
 msgid "Chat actions"
@@ -7301,7 +7306,7 @@ msgstr "克隆或新建…"
 #: ../../packages/ui/src/components/dialog.tsx:84
 #: ../../packages/ui/src/components/image-editor.tsx:264
 #: ../../packages/ui/src/components/sheet.tsx:75
-#: src/components/command-palette.tsx:1114
+#: src/components/command-palette.tsx:1116
 #: src/features/admin/components/user-sessions-dialog.tsx:159
 #: src/features/canvas/canvas-panel.tsx:839
 #: src/features/canvas/pdf-preview-panel.tsx:105
@@ -7700,7 +7705,7 @@ msgstr "请输入命令"
 msgid "Command must be {SKILL_SLUG_MAX} characters or less"
 msgstr "命令不能超过 {SKILL_SLUG_MAX} 个字符"
 
-#: src/components/command-palette.tsx:947
+#: src/components/command-palette.tsx:949
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:158
 #: src/features/settings/lib/settings-keywords.ts:36
 msgid "Command Palette"
@@ -8049,7 +8054,7 @@ msgstr "需要对视觉输入进行透明思考的复杂视觉推理"
 msgid "Composer"
 msgstr "输入框"
 
-#: src/features/chat/thread/composer-status-line.tsx:95
+#: src/features/chat/thread/composer-status-line.tsx:96
 msgid "Composer status"
 msgstr "输入框状态"
 
@@ -9549,7 +9554,7 @@ msgid "Could not send your answer."
 msgstr "无法发送你的回答。"
 
 #: src/features/chat/thread/ask-user-prompt.tsx:115
-#: src/features/chat/thread/tool-approval.tsx:72
+#: src/features/chat/thread/tool-approval.tsx:87
 msgid "Could not send your answer. Please try again."
 msgstr "无法发送你的答复，请重试。"
 
@@ -9781,7 +9786,7 @@ msgstr "创建 API 密钥"
 msgid "Create bot"
 msgstr "创建机器人"
 
-#: src/components/command-palette.tsx:704
+#: src/components/command-palette.tsx:706
 #: src/features/chat/thread-list/thread-node.tsx:594
 #: src/features/chat/thread-list/thread-node.tsx:599
 msgid "Create branch"
@@ -10091,7 +10096,7 @@ msgstr "古巴"
 msgid "Currency Conversion"
 msgstr "货币换算"
 
-#: src/components/command-palette.tsx:1026
+#: src/components/command-palette.tsx:1028
 #: src/features/auth/components/settings/security/session-cell.tsx:81
 #: src/features/projects/components/move-to-project-dialog.tsx:84
 #: src/features/prompts/components/prompt-history-dialog.tsx:136
@@ -11012,8 +11017,8 @@ msgid "Delete this login?"
 msgstr "删除此登录信息？"
 
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:118
-#: src/components/command-palette.tsx:726
-#: src/components/command-palette.tsx:1055
+#: src/components/command-palette.tsx:728
+#: src/components/command-palette.tsx:1057
 #: src/features/chat/thread-list/thread-node.tsx:700
 #: src/features/chat/thread-list/thread-node.tsx:706
 #: src/features/pages/components/page-comments-panel.tsx:190
@@ -11024,7 +11029,7 @@ msgstr "删除对话"
 msgid "Delete Thread"
 msgstr "删除对话"
 
-#: src/components/command-palette.tsx:939
+#: src/components/command-palette.tsx:941
 #: src/features/chat/thread/thread-shortcuts-listener.tsx:96
 msgid "Delete thread?"
 msgstr "删除对话？"
@@ -11112,7 +11117,7 @@ msgstr "最看重极致 AI 能力和精细推理的高要求任务"
 msgid "Denied"
 msgstr "已拒绝"
 
-#: src/features/chat/thread/tool-approval.tsx:81
+#: src/features/chat/thread/tool-approval.tsx:96
 msgid "Denied — continuing without it"
 msgstr "已拒绝——在不使用它的情况下继续"
 
@@ -11133,12 +11138,12 @@ msgid "Density updated"
 msgstr "密度已更新"
 
 #: src/features/auth/components/device-approval.tsx:233
-#: src/features/chat/thread/tool-approval.tsx:124
+#: src/features/chat/thread/tool-approval.tsx:141
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:34
 msgid "Deny"
 msgstr "拒绝"
 
-#: src/features/chat/thread/tool-approval.tsx:122
+#: src/features/chat/thread/tool-approval.tsx:139
 msgid "Deny {tool}"
 msgstr "拒绝 {tool}"
 
@@ -12071,7 +12076,7 @@ msgid "Duplicate selected ({selectedNonGroupCount})"
 msgstr "复制所选（{selectedNonGroupCount}）"
 
 #: src/features/admin/components/ban-user-dialog.tsx:121
-#: src/features/chat/header/temporary-chat-dropdown.tsx:315
+#: src/features/chat/header/temporary-chat-dropdown.tsx:330
 #: src/features/chat/thread/media-gallery-view.tsx:577
 #: src/features/workflow/components/nodes/node-expand-modal.tsx:136
 msgid "Duration"
@@ -12768,15 +12773,15 @@ msgstr "全部启用"
 msgid "Enable at least two skills in Settings → Skills to start a group chat."
 msgstr "请在“设置 → 技能”中至少启用两个技能，才能开始群聊。"
 
-#: src/features/chat/header/temporary-chat-dropdown.tsx:235
+#: src/features/chat/header/temporary-chat-dropdown.tsx:250
 msgid "Enable auto-delete"
 msgstr "启用自动删除"
 
-#: src/features/chat/header/temporary-chat-dropdown.tsx:223
+#: src/features/chat/header/temporary-chat-dropdown.tsx:238
 msgid "Enable Auto-Delete"
 msgstr "启用自动删除"
 
-#: src/features/chat/header/temporary-chat-dropdown.tsx:261
+#: src/features/chat/header/temporary-chat-dropdown.tsx:276
 msgid "Enable auto-delete for this conversation."
 msgstr "为此对话启用自动删除。"
 
@@ -12793,7 +12798,7 @@ msgstr "为复杂的多步骤任务开启深度工作模式。AI 会最多迭代
 msgid "Enable Follow-up Suggestions"
 msgstr "启用后续建议"
 
-#: src/features/chat/header/temporary-chat-dropdown.tsx:226
+#: src/features/chat/header/temporary-chat-dropdown.tsx:241
 msgid "Enable for Next Chat"
 msgstr "为下一个聊天启用"
 
@@ -13763,7 +13768,7 @@ msgid "Expiration"
 msgstr "有效期"
 
 #. placeholder {0}: formatHours(result.retentionHours)
-#: src/features/chat/header/temporary-chat-dropdown.tsx:105
+#: src/features/chat/header/temporary-chat-dropdown.tsx:120
 msgid "Expiration updated to {0}"
 msgstr "有效期已更新为 {0}"
 
@@ -13818,7 +13823,7 @@ msgstr "过期时间："
 msgid "Expires: {expiresAt}"
 msgstr "过期时间：{expiresAt}"
 
-#: src/features/chat/header/temporary-chat-dropdown.tsx:199
+#: src/features/chat/header/temporary-chat-dropdown.tsx:214
 msgid "Expiring soon"
 msgstr "即将过期"
 
@@ -14252,10 +14257,10 @@ msgstr "删除数据集失败"
 msgid "Failed to delete the thread. {0, plural, one {# branch was deleted.} other {# branches were deleted.}}"
 msgstr "无法删除对话。{0, plural, other {已删除 # 个分支。}}"
 
-#: src/components/command-palette.tsx:519
-#: src/components/command-palette.tsx:527
-#: src/components/command-palette.tsx:590
-#: src/components/command-palette.tsx:597
+#: src/components/command-palette.tsx:521
+#: src/components/command-palette.tsx:529
+#: src/components/command-palette.tsx:592
+#: src/components/command-palette.tsx:599
 msgid "Failed to delete thread"
 msgstr "无法删除对话"
 
@@ -14314,8 +14319,8 @@ msgstr "启用所有模型失败"
 msgid "Failed to enable models by provider"
 msgstr "按提供商启用模型失败"
 
-#: src/features/chat/header/temporary-chat-dropdown.tsx:124
-#: src/features/chat/header/temporary-chat-dropdown.tsx:173
+#: src/features/chat/header/temporary-chat-dropdown.tsx:139
+#: src/features/chat/header/temporary-chat-dropdown.tsx:188
 msgid "Failed to enable temporary mode"
 msgstr "启用临时模式失败"
 
@@ -14415,8 +14420,8 @@ msgstr "加载用量数据失败。请确保 LLM Gateway 正在运行且可访�
 msgid "Failed to load video stream."
 msgstr "加载视频流失败。"
 
-#: src/features/chat/header/temporary-chat-dropdown.tsx:143
-#: src/features/chat/header/temporary-chat-dropdown.tsx:160
+#: src/features/chat/header/temporary-chat-dropdown.tsx:158
+#: src/features/chat/header/temporary-chat-dropdown.tsx:175
 msgid "Failed to make thread permanent"
 msgstr "将对话设为永久失败"
 
@@ -15426,7 +15431,7 @@ msgstr "借助参考图引导制作电影感剧照的电影人和摄像师"
 msgid "Filmmakers creating cinematic videos with a strong focus on visual narrative and storytelling quality"
 msgstr "专注视觉叙事和故事品质、制作电影感视频的电影人"
 
-#: src/components/command-palette.tsx:1110
+#: src/components/command-palette.tsx:1112
 msgid "Filter"
 msgstr "{'de': 'Filtern', 'es': 'Filtrar', 'fr': 'Filtrer', 'it': 'Filtra', 'ja': '絞り込み', 'pl': 'Filtruj', 'pt': 'Filtrar', 'zh': '筛选'}"
 
@@ -15479,7 +15484,7 @@ msgstr "按类型筛选记忆"
 msgid "Filter path"
 msgstr "筛选路径"
 
-#: src/components/command-palette.tsx:950
+#: src/components/command-palette.tsx:952
 msgid "Filter results"
 msgstr "筛选结果"
 
@@ -15822,6 +15827,10 @@ msgstr "森林"
 #: src/features/settings/lib/settings-keywords.ts:114
 msgid "forget"
 msgstr "忘记"
+
+#: src/features/chat/thread/tool-approval.tsx:229
+msgid "Forget these memories?"
+msgstr "忘记这些记忆？"
 
 #: src/features/auth/components/auth/forms/two-factor-form.tsx:288
 msgid "Forgot authenticator"
@@ -16664,7 +16673,7 @@ msgstr "从创意到成品，无需切换工具。文本、图像、视频和文
 msgid "Go to chat"
 msgstr "前往聊天"
 
-#: src/components/command-palette.tsx:645
+#: src/components/command-palette.tsx:647
 #: src/routes/(public)/invite/$inviteToken.tsx:70
 msgid "Go to Chat"
 msgstr "前往聊天"
@@ -16707,7 +16716,7 @@ msgstr "前往配对"
 msgid "Go to previous page"
 msgstr "上一页"
 
-#: src/components/command-palette.tsx:651
+#: src/components/command-palette.tsx:653
 msgid "Go to Prompts"
 msgstr "前往提示词"
 
@@ -16719,7 +16728,7 @@ msgstr "转到回复"
 msgid "Go to servers"
 msgstr "前往服务器"
 
-#: src/components/command-palette.tsx:663
+#: src/components/command-palette.tsx:665
 msgid "Go to Settings"
 msgstr "前往设置"
 
@@ -16744,7 +16753,7 @@ msgstr "转到第 {slideNumber} 张幻灯片"
 msgid "Go to step {0}"
 msgstr "前往第 {0} 步"
 
-#: src/components/command-palette.tsx:657
+#: src/components/command-palette.tsx:659
 msgid "Go to Vault"
 msgstr "前往文件库"
 
@@ -16782,7 +16791,7 @@ msgid "Goal: {goalTitle}"
 msgstr "目标：{goalTitle}"
 
 #: src/features/chat/goal/composer-goal.tsx:66
-#: src/features/chat/thread/composer-status-line.tsx:111
+#: src/features/chat/thread/composer-status-line.tsx:112
 msgid "Goal: run until done"
 msgstr "目标：运行直至完成"
 
@@ -18080,14 +18089,14 @@ msgstr "图片（最多 {MAX_FEEDBACK_IMAGES} 张）"
 msgid "images and video"
 msgstr "图片和视频"
 
-#: src/features/chat/header/chat-header.tsx:147
+#: src/features/chat/header/chat-header.tsx:150
 #: src/features/chat/image-gallery/thread-image-gallery.tsx:172
-#: src/features/chat/image-gallery/thread-images-button.tsx:45
+#: src/features/chat/image-gallery/thread-images-button.tsx:48
 msgid "Images in this chat"
 msgstr "此聊天中的图像"
 
 #. placeholder {0}: images.length
-#: src/features/chat/image-gallery/thread-images-button.tsx:34
+#: src/features/chat/image-gallery/thread-images-button.tsx:37
 msgid "Images in this chat ({0})"
 msgstr "此聊天中的图像（{0}）"
 
@@ -19231,7 +19240,7 @@ msgstr "保留"
 msgid "Keep part of the video. The kept part is re-encoded as MP4 in this browser, which can take a moment."
 msgstr "保留视频的一部分。保留的部分会在此浏览器中重新编码为 MP4，可能需要一点时间。"
 
-#: src/features/chat/header/temporary-chat-dropdown.tsx:333
+#: src/features/chat/header/temporary-chat-dropdown.tsx:348
 msgid "Keep Permanently"
 msgstr "永久保留"
 
@@ -19256,7 +19265,7 @@ msgid "Key file (optional, absolute path)"
 msgstr "密钥文件（可选，绝对路径）"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:333
-#: src/components/command-palette.tsx:669
+#: src/components/command-palette.tsx:671
 #: src/features/chat/thread-list/thread-list-filter-menu.tsx:191
 #: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:137
 #: src/features/layout/components/sidebar-shortcut.tsx:315
@@ -19310,7 +19319,7 @@ msgid "Kling 2.6 text-to-video with native audio via direct API"
 msgstr "通过直接 API 提供的支持原生音频的 Kling 2.6 文生视频"
 
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:30
-#: src/features/chat/header/chat-header.tsx:148
+#: src/features/chat/header/chat-header.tsx:151
 #: src/features/chat/header/kb-attachment-button.tsx:170
 #: src/features/chat/header/kb-attachment-button.tsx:182
 #: src/features/chat/header/kb-attachment-button.tsx:283
@@ -20634,7 +20643,7 @@ msgstr "锁定此聊天"
 msgid "Locked chat"
 msgstr "已锁定的聊天"
 
-#: src/components/command-palette.tsx:991
+#: src/components/command-palette.tsx:993
 msgid "Locked chats do not reveal their project, so some may be missing here."
 msgstr "已锁定的聊天不会显示其所属项目，因此这里可能缺少部分聊天。"
 
@@ -21442,6 +21451,10 @@ msgstr "记忆"
 msgid "Memories"
 msgstr "记忆"
 
+#: src/features/chat/thread/tool-approval.tsx:214
+msgid "Memories to forget"
+msgstr "要忘记的记忆"
+
 #: src/features/chat/thread/memory-usage-action.tsx:42
 msgid "Memories used"
 msgstr "使用的记忆"
@@ -21631,7 +21644,7 @@ msgstr "消息版本"
 msgid "Message..."
 msgstr "输入消息..."
 
-#: src/components/command-palette.tsx:816
+#: src/components/command-palette.tsx:818
 #: src/features/chat/sharing/shared-thread-page.tsx:151
 #: src/features/chat/thread-list/thread-list-filter-menu.tsx:108
 msgid "Messages"
@@ -22058,7 +22071,7 @@ msgstr "模型标签页"
 msgid "Model: {0}"
 msgstr "模型：{0}"
 
-#: src/components/model-picker/model-picker-button.tsx:180
+#: src/components/model-picker/model-picker-button.tsx:185
 msgid "Model: {singleLabel}"
 msgstr "模型：{singleLabel}"
 
@@ -22233,8 +22246,8 @@ msgstr "关于你的更多信息"
 #: src/features/auth/components/organization/invitation-cell.tsx:92
 #: src/features/auth/components/organization/member-cell.tsx:59
 #: src/features/auth/components/organization/organization-cell.tsx:79
-#: src/features/layout/components/mobile-header-actions.tsx:23
-#: src/features/layout/components/mobile-header-actions.tsx:33
+#: src/features/layout/components/mobile-header-actions.tsx:38
+#: src/features/layout/components/mobile-header-actions.tsx:49
 msgid "More actions"
 msgstr "更多操作"
 
@@ -22736,7 +22749,7 @@ msgid "navigate"
 msgstr "导航"
 
 #: ../../packages/chat-ui/src/chat/browser-panel.tsx:110
-#: src/components/command-palette.tsx:1097
+#: src/components/command-palette.tsx:1099
 msgid "Navigate"
 msgstr "导航"
 
@@ -22765,7 +22778,7 @@ msgid "Navigating to {target}..."
 msgstr "正在导航到 {target}..."
 
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:132
-#: src/components/command-palette.tsx:677
+#: src/components/command-palette.tsx:679
 #: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:68
 #: src/features/workflow/components/canvas/keyboard-shortcuts-dialog.tsx:59
 msgid "Navigation"
@@ -23145,7 +23158,7 @@ msgstr "新建临时聊天"
 msgid "New Temporary Chat"
 msgstr "新建临时聊天"
 
-#: src/components/command-palette.tsx:693
+#: src/components/command-palette.tsx:695
 msgid "New temporary thread"
 msgstr "新建临时对话"
 
@@ -23153,13 +23166,13 @@ msgstr "新建临时对话"
 msgid "New this week"
 msgstr "本周新增"
 
-#: src/components/command-palette.tsx:686
+#: src/components/command-palette.tsx:688
 msgid "New thread"
 msgstr "新建对话"
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:150
-#: src/features/chat/thread-list/thread-list-dock.tsx:147
-#: src/features/chat/thread-list/thread-list-dock.tsx:158
+#: src/features/chat/thread-list/thread-list-dock.tsx:149
+#: src/features/chat/thread-list/thread-list-dock.tsx:160
 msgid "New Thread"
 msgstr "新建对话"
 
@@ -23858,7 +23871,7 @@ msgstr "未找到结果"
 msgid "No results found for “{searchTerm}”"
 msgstr "未找到“{searchTerm}”的结果"
 
-#: src/components/command-palette.tsx:1004
+#: src/components/command-palette.tsx:1006
 #: src/features/chat/thread/widgets/wolfram-widget.tsx:34
 msgid "No results found."
 msgstr "未找到结果。"
@@ -24754,7 +24767,7 @@ msgid "Only someone who can write in this chat can take control of the browser."
 msgstr "只有可以在此聊天中发言的人才能接管浏览器。"
 
 #. placeholder {0}: allThreadsData.lunora.length
-#: src/components/command-palette.tsx:987
+#: src/components/command-palette.tsx:989
 msgid "Only the {0} threads loaded here are filtered; older ones are not included."
 msgstr "仅筛选此处已加载的 {0} 个对话；较早的对话未包含在内。"
 
@@ -24763,7 +24776,7 @@ msgid "Only the best matches are searched, so an older or newer prompt may not b
 msgstr "只搜索最相关的结果，因此较早或较新的提示词可能不会列出。添加一个词可缩小搜索范围。"
 
 #. placeholder {0}: projects.length
-#: src/components/command-palette.tsx:994
+#: src/components/command-palette.tsx:996
 msgid "Only the first {0} projects are listed here."
 msgstr "此处仅列出前 {0} 个项目。"
 
@@ -24853,7 +24866,7 @@ msgid "Opacity"
 msgstr "不透明度"
 
 #: ../../packages/chat-ui/src/chat/message-content.tsx:780
-#: src/components/command-palette.tsx:1103
+#: src/components/command-palette.tsx:1105
 #: src/features/chat/link-preview/link-preview-card.tsx:117
 #: src/features/develop/components/pull-request-actions-panel.tsx:112
 #: src/features/develop/components/pull-request-view.tsx:75
@@ -26618,7 +26631,7 @@ msgid "Pin message"
 msgstr "置顶消息"
 
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:81
-#: src/components/command-palette.tsx:710
+#: src/components/command-palette.tsx:712
 #: src/features/chat/thread-list/thread-node.tsx:134
 msgid "Pin thread"
 msgstr "置顶对话"
@@ -27422,7 +27435,7 @@ msgstr "正在处理音频"
 msgid "Processing voice input"
 msgstr "正在处理语音输入"
 
-#: src/features/chat/header/temporary-chat-dropdown.tsx:215
+#: src/features/chat/header/temporary-chat-dropdown.tsx:230
 #: src/features/chat/thread-list/thread-node.tsx:131
 #: src/features/chat/thread-list/thread-node.tsx:139
 #: src/features/settings/components/privacy/data-export.tsx:105
@@ -27590,12 +27603,12 @@ msgid "Project repository"
 msgstr "项目仓库"
 
 #. placeholder {0}: projectFilter.title
-#: src/components/command-palette.tsx:979
+#: src/components/command-palette.tsx:981
 msgid "Project: {0}"
 msgstr "项目：{0}"
 
-#: src/components/command-palette.tsx:759
-#: src/components/command-palette.tsx:967
+#: src/components/command-palette.tsx:761
+#: src/components/command-palette.tsx:969
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:608
 msgid "Projects"
 msgstr "项目"
@@ -28845,11 +28858,11 @@ msgstr "拒绝"
 msgid "Rejecting a result in review marks the run as failed. The rejected answer stays on record."
 msgstr "在审阅中拒绝结果会将运行标记为失败。被拒绝的回答会保留在记录中。"
 
-#: src/components/command-palette.tsx:999
+#: src/components/command-palette.tsx:1001
 msgid "Related archived threads are picked from the closest matches across all your threads, so some may not be listed."
 msgstr "相关的已归档对话是从你所有对话中最接近的匹配里选出的，因此可能有部分未列出。"
 
-#: src/components/command-palette.tsx:840
+#: src/components/command-palette.tsx:842
 msgid "Related threads"
 msgstr "相关对话"
 
@@ -29376,7 +29389,7 @@ msgstr "回复已就绪"
 msgid "Reply tools are off by default. You switch them on per connection and choose which groups they may use."
 msgstr "回复工具默认关闭。你可以按连接开启，并选择允许使用的工具组。"
 
-#: src/features/chat/thread/composer-status-line.tsx:99
+#: src/features/chat/thread/composer-status-line.tsx:100
 msgid "Replying"
 msgstr "正在回复"
 
@@ -30719,7 +30732,7 @@ msgstr "搜索"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:241
 #: src/features/chat/signed-out/signed-out-chat.tsx:141
-#: src/features/chat/thread-list/thread-list-dock.tsx:105
+#: src/features/chat/thread-list/thread-list-dock.tsx:107
 #: src/features/chat/thread/thread-welcome-suggestions.tsx:93
 msgid "Search"
 msgstr "搜索"
@@ -30732,11 +30745,11 @@ msgstr "搜索学术论文和 PDF"
 msgid "Search across the entire internet"
 msgstr "搜索整个互联网"
 
-#: src/components/command-palette.tsx:904
+#: src/components/command-palette.tsx:906
 msgid "Search by meaning failed, so related threads are not listed. Try again in a moment."
 msgstr "按含义搜索失败，因此未列出相关对话。请稍后重试。"
 
-#: src/components/command-palette.tsx:903
+#: src/components/command-palette.tsx:905
 msgid "Search by meaning isn't available under your account's model rules, so related threads are not listed."
 msgstr "根据你账户的模型规则，按含义搜索不可用，因此未列出相关对话。"
 
@@ -30967,7 +30980,7 @@ msgstr "搜索对话"
 msgid "Search threads ({focusSearchShortcut})"
 msgstr "搜索对话（{focusSearchShortcut}）"
 
-#: src/components/command-palette.tsx:949
+#: src/components/command-palette.tsx:951
 msgid "Search threads, navigate, or perform actions..."
 msgstr "搜索对话、导航或执行操作..."
 
@@ -31205,22 +31218,22 @@ msgid "Select mode"
 msgstr "选择模式"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker-button.tsx:211
-#: src/components/model-picker/model-picker-button.tsx:243
+#: src/components/model-picker/model-picker-button.tsx:254
 msgid "Select model"
 msgstr "选择模型"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker-button.tsx:173
-#: src/components/model-picker/model-picker-button.tsx:203
+#: src/components/model-picker/model-picker-button.tsx:214
 #: src/components/model-picker/model-picker-popup.tsx:42
 msgid "Select Model"
 msgstr "选择模型"
 
-#: src/features/prompts/components/prompt-model-selector.tsx:44
+#: src/features/prompts/components/prompt-model-selector.tsx:47
 msgid "Select model (optional)"
 msgstr "选择模型（可选）"
 
 #: ../../packages/chat-ui/src/model-picker/model-picker-button.tsx:124
-#: src/components/model-picker/model-picker-button.tsx:100
+#: src/components/model-picker/model-picker-button.tsx:103
 #: src/features/workflow/components/nodes/background-removal-node.tsx:66
 #: src/features/workflow/components/nodes/character-ref-node.tsx:147
 #: src/features/workflow/components/nodes/controlnet-node.tsx:139
@@ -32047,7 +32060,7 @@ msgstr "显示时间戳"
 msgid "Show up to {rowLimit} rows ({byteCount} bytes)"
 msgstr "最多显示 {rowLimit} 行（{byteCount} 字节）"
 
-#: src/features/chat/thread/tool-approval.tsx:111
+#: src/features/chat/thread/tool-approval.tsx:128
 msgid "Show what it will send"
 msgstr "显示将要发送的内容"
 
@@ -33429,7 +33442,7 @@ msgstr "在所有基准测试中表现顶尖"
 msgid "State:"
 msgstr "状态："
 
-#: src/features/chat/header/chat-header.tsx:175
+#: src/features/chat/header/chat-header.tsx:178
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:649
 msgid "Stateless"
 msgstr "无状态"
@@ -34772,21 +34785,21 @@ msgstr "模板"
 msgid "Temporary"
 msgstr "临时"
 
-#: src/features/chat/header/chat-header.tsx:146
+#: src/features/chat/header/chat-header.tsx:149
 #: src/features/chat/thread-list/thread-node.tsx:1003
 msgid "Temporary chat"
 msgstr "临时聊天"
 
-#: src/features/chat/header/temporary-chat-dropdown.tsx:308
+#: src/features/chat/header/temporary-chat-dropdown.tsx:323
 #: src/features/chat/signed-out/signed-out-chat.tsx:290
 msgid "Temporary Chat"
 msgstr "临时聊天"
 
-#: src/features/chat/header/temporary-chat-dropdown.tsx:238
+#: src/features/chat/header/temporary-chat-dropdown.tsx:253
 msgid "Temporary chat mode"
 msgstr "临时聊天模式"
 
-#: src/features/chat/header/temporary-chat-dropdown.tsx:249
+#: src/features/chat/header/temporary-chat-dropdown.tsx:264
 msgid "Temporary chat mode, on for your next chat"
 msgstr "临时聊天模式，已为你的下一个聊天开启"
 
@@ -34796,7 +34809,7 @@ msgid "Temporary Chat Retention (hours)"
 msgstr "临时聊天保留时长（小时）"
 
 #. placeholder {0}: formatExpiresAt(temporaryStatus.expiresAt)
-#: src/features/chat/header/temporary-chat-dropdown.tsx:245
+#: src/features/chat/header/temporary-chat-dropdown.tsx:260
 msgid "Temporary chat settings, {0}"
 msgstr "临时聊天设置，{0}"
 
@@ -34804,12 +34817,12 @@ msgstr "临时聊天设置，{0}"
 msgid "Temporary chats expire, so they can't be tagged. Convert it to a permanent chat to add tags."
 msgstr "临时聊天会过期，因此无法添加标签。将其转为永久聊天即可添加标签。"
 
-#: src/features/chat/header/temporary-chat-dropdown.tsx:184
+#: src/features/chat/header/temporary-chat-dropdown.tsx:199
 msgid "Temporary mode enabled"
 msgstr "已启用临时模式"
 
 #. placeholder {0}: formatHours(retentionHours)
-#: src/features/chat/header/temporary-chat-dropdown.tsx:118
+#: src/features/chat/header/temporary-chat-dropdown.tsx:133
 msgid "Temporary mode enabled ({0})"
 msgstr "已启用临时模式（{0}）"
 
@@ -35350,7 +35363,7 @@ msgstr "机器人及其电脑将被移除。它的聊天会保留，成为普通
 msgid "The bot gets only the tools you allow. With none allowed, it gets no tools."
 msgstr "机器人只获得你允许的工具。未允许任何工具时，它不会获得任何工具。"
 
-#: src/features/chat/thread/composer-status-line.tsx:123
+#: src/features/chat/thread/composer-status-line.tsx:124
 msgid "The bot sets the model for this chat."
 msgstr "机器人为此聊天设置模型。"
 
@@ -37130,7 +37143,7 @@ msgstr "对话"
 msgid "Thread"
 msgstr "对话"
 
-#: src/components/command-palette.tsx:735
+#: src/components/command-palette.tsx:737
 msgid "Thread Actions"
 msgstr "对话操作"
 
@@ -37151,8 +37164,8 @@ msgstr "对话详情"
 msgid "Thread Invite"
 msgstr "对话邀请"
 
-#: src/features/chat/header/temporary-chat-dropdown.tsx:139
-#: src/features/chat/header/temporary-chat-dropdown.tsx:157
+#: src/features/chat/header/temporary-chat-dropdown.tsx:154
+#: src/features/chat/header/temporary-chat-dropdown.tsx:172
 msgid "Thread is now permanent"
 msgstr "对话已设为永久"
 
@@ -37227,12 +37240,12 @@ msgid "Thread Variables"
 msgstr "对话变量"
 
 #. placeholder {0}: formatHours(result.retentionHours)
-#: src/features/chat/header/temporary-chat-dropdown.tsx:107
-#: src/features/chat/header/temporary-chat-dropdown.tsx:170
+#: src/features/chat/header/temporary-chat-dropdown.tsx:122
+#: src/features/chat/header/temporary-chat-dropdown.tsx:185
 msgid "Thread will auto-delete in {0}"
 msgstr "对话将在 {0} 后自动删除"
 
-#: src/components/command-palette.tsx:952
+#: src/components/command-palette.tsx:954
 #: src/features/admin/components/admin-shard-footprint-row.tsx:124
 #: src/features/admin/components/admin-shard-footprint-row.tsx:143
 #: src/features/admin/components/admin-shard-footprint-row.tsx:166
@@ -37604,7 +37617,7 @@ msgstr "{0} 的工具"
 msgid "Tools run on their own settings; a quick check can clear low-risk calls"
 msgstr "工具按各自的设置运行；快速检查可放行低风险调用"
 
-#: src/features/chat/thread/composer-status-line.tsx:117
+#: src/features/chat/thread/composer-status-line.tsx:118
 msgid "Tools run without asking"
 msgstr "工具无需询问即可运行"
 
@@ -38263,8 +38276,8 @@ msgstr "超广角，建筑感"
 msgid "unarchive"
 msgstr "取消归档"
 
-#: src/components/command-palette.tsx:720
-#: src/components/command-palette.tsx:1030
+#: src/components/command-palette.tsx:722
+#: src/components/command-palette.tsx:1032
 #: src/features/chat/thread-list/thread-node.tsx:142
 msgid "Unarchive thread"
 msgstr "取消归档对话"
@@ -38485,7 +38498,7 @@ msgid "Unpin this chat?"
 msgstr "取消置顶此对话？"
 
 #: ../../packages/chat-ui/src/threads/thread-item.tsx:81
-#: src/components/command-palette.tsx:710
+#: src/components/command-palette.tsx:712
 #: src/features/chat/thread-list/thread-node.tsx:134
 msgid "Unpin thread"
 msgstr "取消置顶对话"
@@ -38557,8 +38570,8 @@ msgstr "未命名对话"
 
 #: src/components/command-palette.tsx:446
 #: src/components/command-palette.tsx:459
-#: src/components/command-palette.tsx:808
-#: src/components/command-palette.tsx:833
+#: src/components/command-palette.tsx:810
+#: src/components/command-palette.tsx:835
 #: src/features/chat/core/hooks/use-thread-manager.ts:254
 msgid "Untitled Thread"
 msgstr "无标题对话"
@@ -38591,7 +38604,7 @@ msgstr "最多 25 次迭代"
 msgid "Up-to-date docs for any library or framework"
 msgstr "任意库或框架的最新文档"
 
-#: src/features/chat/header/temporary-chat-dropdown.tsx:219
+#: src/features/chat/header/temporary-chat-dropdown.tsx:234
 msgid "Update Duration"
 msgstr "更新时长"
 
@@ -40015,7 +40028,7 @@ msgstr "正在等待所有者"
 msgid "Waiting for the owner to answer"
 msgstr "正在等待所有者回答"
 
-#: src/features/chat/thread/tool-approval.tsx:78
+#: src/features/chat/thread/tool-approval.tsx:93
 msgid "Waiting for the owner to approve"
 msgstr "正在等待所有者批准"
 
@@ -40041,7 +40054,7 @@ msgstr "正在“{0}”中等待你的回答"
 
 #: src/features/chat/thread-list/thread-node.tsx:919
 #: src/features/chat/thread-list/thread-node.tsx:926
-#: src/features/chat/thread/tool-approval.tsx:78
+#: src/features/chat/thread/tool-approval.tsx:93
 #: src/features/home/components/home-page.tsx:119
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:20
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:60
@@ -41414,7 +41427,7 @@ msgstr "你的消息："
 msgid "Your messages"
 msgstr "你的消息"
 
-#: src/features/chat/header/temporary-chat-dropdown.tsx:265
+#: src/features/chat/header/temporary-chat-dropdown.tsx:280
 msgid "Your next chat is temporary. Turn this off in Settings to keep it."
 msgstr "你的下一个聊天为临时聊天。如要保留，请在设置中关闭此项。"
 
@@ -41422,7 +41435,7 @@ msgstr "你的下一个聊天为临时聊天。如要保留，请在设置中关
 msgid "Your next message is a goal. The agent keeps working until a review confirms it is met."
 msgstr "你的下一条消息是一个目标。智能体会持续工作，直到审查确认目标已达成。"
 
-#: src/features/chat/header/temporary-chat-dropdown.tsx:268
+#: src/features/chat/header/temporary-chat-dropdown.tsx:283
 msgid "Your next message will start a self-destructing chat."
 msgstr "你的下一条消息将开始一个阅后即焚的聊天。"
 
@@ -41480,7 +41493,7 @@ msgstr "你的方案"
 msgid "Your plan and credit allowance follow your subscription."
 msgstr "你的方案和额度取决于你的订阅。"
 
-#: src/components/command-palette.tsx:906
+#: src/components/command-palette.tsx:908
 msgid "Your projects could not be loaded. Try again in a moment."
 msgstr "无法加载你的项目。请稍后再试。"
 

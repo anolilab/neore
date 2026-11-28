@@ -27,10 +27,11 @@ export const dispatchCallDeadline = (expiresAt: number, now: number): number | n
 };
 
 /**
- * One request's dispatch claim: keyed by the chat, the prompt and the request (its prompt claim's `claimedAt`), so a
- * request's release never reaches another's claim, not even a later request for the same prompt after its own lapsed.
+ * One request's dispatch claim: keyed by the chat, the prompt and the request (a remember request's prompt claim
+ * `claimedAt`, a forget lookup's own id), so a request's release never reaches another's claim, not even a later request
+ * for the same prompt after its own lapsed.
  */
-const dispatchKey = (threadId: string, promptMessageId: string, request: number): string => `${threadId}:${promptMessageId}:${String(request)}`;
+const dispatchKey = (threadId: string, promptMessageId: string, request: number | string): string => `${threadId}:${promptMessageId}:${String(request)}`;
 
 /**
  * Runs `call` with a signal that aborts after `deadline` ms (none without one). A timer backs `AbortSignal.timeout`, as the
@@ -52,6 +53,25 @@ export const withDeadline = async <T>(deadline: number | undefined, call: (abort
     }
 };
 
+/**
+ * Runs `call` under what is left of a dispatch claim that lapses at `expiresAt`, measured when the call starts (`now`), so
+ * the setup before it never stretches the call past the claim. `null`, and no call, when nothing is left. Unset
+ * `expiresAt`: no claim, no deadline.
+ */
+export const withClaimDeadline = async <T>(
+    expiresAt: number | undefined,
+    call: (abortSignal: AbortSignal | undefined) => Promise<T>,
+    now: () => number = Date.now,
+): Promise<T | null> => {
+    if (expiresAt === undefined) {
+        return await call(undefined);
+    }
+
+    const deadline = dispatchCallDeadline(expiresAt, now());
+
+    return deadline === null ? null : await withDeadline(deadline, call);
+};
+
 /** Whether a requested extraction's model call for this chat is being sent: locking the chat waits until none is. */
 export const rememberDispatchInFlight = async (ctx: Pick<QueryCtx, "db">, threadId: Id<"threads">): Promise<boolean> =>
     await hasClaimWithPrefix(ctx, REMEMBER_DISPATCH_SCOPE, `${threadId}:`);
@@ -64,7 +84,7 @@ export const takeRememberDispatch = async (
     ctx: Pick<MutationCtx, "db">,
     threadId: string,
     promptMessageId: string,
-    request: number,
+    request: number | string,
 ): Promise<{ claimedAt: number; expiresAt: number } | null> => {
     // Dispatches whose release never landed are cleared here, so the lock's check reads a short range.
     await dropExpiredClaimsWithPrefix(ctx, REMEMBER_DISPATCH_SCOPE, `${threadId}:`);
@@ -77,7 +97,7 @@ export const takeRememberDispatch = async (
 /** The run's model calls are answered: this request's dispatch claim goes, and the chat may be locked. */
 export const dropRememberDispatch = async (
     ctx: Pick<MutationCtx, "db">,
-    { claimedAt, promptMessageId, request, threadId }: { claimedAt?: number; promptMessageId: string; request: number; threadId: string },
+    { claimedAt, promptMessageId, request, threadId }: { claimedAt?: number; promptMessageId: string; request: number | string; threadId: string },
 ): Promise<void> => {
     await releaseClaim(ctx, REMEMBER_DISPATCH_SCOPE, dispatchKey(threadId, promptMessageId, request), claimedAt);
 };
