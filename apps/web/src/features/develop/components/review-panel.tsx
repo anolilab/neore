@@ -191,8 +191,8 @@ const ReviewPanel = ({
     const commentCount = stored?.comments.length ?? 0;
 
     return (
-        <section aria-labelledby={`${summaryId}-title`} className="space-y-3 rounded-md border p-3">
-            <h3 className="text-sm font-semibold" id={`${summaryId}-title`}>
+        <section aria-labelledby={`${summaryId}-title`} className="surface-raised space-y-3 rounded-xl p-4">
+            <h3 className="text-[15px] font-semibold" id={`${summaryId}-title`}>
                 {t`Your review`}
             </h3>
             <p className="text-muted-foreground text-xs">
@@ -203,7 +203,7 @@ const ReviewPanel = ({
                 )}
             </p>
             {commentCount > 0 && stored && stored.commitId !== headSha && (
-                <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm" role="note">
+                <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm" role="note">
                     {t`Your comments were written on an earlier version of this change. They are posted against that version, and the lines shown below may have moved.`}
                 </p>
             )}

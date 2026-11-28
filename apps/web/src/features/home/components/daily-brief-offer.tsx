@@ -99,8 +99,8 @@ const DailyBriefOffer: FC<{ offered: boolean }> = ({ offered }) => {
     }
 
     return (
-        <section aria-labelledby={headingId} className="bg-card text-card-foreground ring-foreground/10 flex flex-col gap-3 rounded-lg p-4 ring-1">
-            <h2 className="flex items-center gap-2 text-base font-medium" id={headingId}>
+        <section aria-labelledby={headingId} className="surface-raised flex flex-col gap-3 rounded-xl p-4">
+            <h2 className="flex items-center gap-2 text-[15px] font-semibold" id={headingId}>
                 <Sunrise aria-hidden="true" className="size-4" />
                 {t`Daily Brief`}
             </h2>

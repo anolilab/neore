@@ -112,10 +112,10 @@ const PromptToWorkflowDialog = () => {
                         />
                     </div>
 
-                    {error && <div className="text-destructive rounded bg-red-500/10 p-2 text-xs">{error}</div>}
+                    {error && <div className="text-destructive rounded-lg bg-red-500/10 p-2 text-xs">{error}</div>}
 
                     <div>
-                        <p className="text-muted-foreground mb-2 text-xs font-medium">
+                        <p className="text-muted-foreground mb-2 font-mono text-xs">
                             <Trans>Examples:</Trans>
                         </p>
                         <div className="flex flex-wrap gap-1.5">
@@ -124,7 +124,7 @@ const PromptToWorkflowDialog = () => {
 
                                 return (
                                     <button
-                                        className="bg-muted hover:bg-muted/80 rounded-full px-2.5 py-1 text-[11px] transition-colors"
+                                        className="bg-surface-row hover:bg-surface-row-hover border-border/50 rounded-full border px-2.5 py-1 text-xs transition-colors"
                                         disabled={isGenerating}
                                         key={descriptor.id}
                                         onClick={() => handleExampleClick(example)}

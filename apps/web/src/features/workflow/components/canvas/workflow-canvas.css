@@ -1,0 +1,22 @@
+/*
+ * React Flow styles the wrapper of its built-in node types by class name (`react-flow__node-input`, `-default`,
+ * `-output`, `-group`): white fill, 1px border, 10px padding, 150px width, centred text. Two of our own node types
+ * are called `output` and `group`, so their wrappers picked all of that up: a white box behind the Result node in
+ * dark mode and centred text inside it. Both draw their own surface, so the wrapper stays bare.
+ * Not in a Tailwind layer on purpose: the library's sheet is unlayered and would win over a utility.
+ */
+.react-flow .react-flow__node.react-flow__node-output,
+.react-flow .react-flow__node.react-flow__node-group {
+    --xy-node-background-color: transparent;
+    --xy-node-group-background-color: transparent;
+    --xy-node-border: none;
+    --xy-node-border-radius: 0;
+    --xy-node-boxshadow-hover: none;
+    --xy-node-boxshadow-selected: none;
+    --xy-node-color: inherit;
+
+    width: auto;
+    padding: 0;
+    font-size: inherit;
+    text-align: start;
+}

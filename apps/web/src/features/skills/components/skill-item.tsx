@@ -86,11 +86,11 @@ const SkillItem = ({ canDelete, isBusy = false, onDelete, onEdit, onExport, onFo
         )[sourceType] || sourceType;
 
     return (
-        <Card className={cn("group relative transition-all hover:shadow-md", isEnabled && "ring-primary/20 ring-1")}>
+        <Card className={cn("group relative", isEnabled && "outline-primary/30 -outline-offset-1 outline-1")}>
             <CardHeader className="space-y-3 pb-3">
                 <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center gap-2">
-                        <div aria-hidden="true" className="bg-primary/10 text-primary-text flex size-8 items-center justify-center rounded-md">
+                        <div aria-hidden="true" className="surface-well text-primary-text flex size-8 items-center justify-center rounded-lg">
                             {skill.icon || <Zap className="size-4" />}
                         </div>
                         <div>
@@ -138,8 +138,8 @@ const SkillItem = ({ canDelete, isBusy = false, onDelete, onEdit, onExport, onFo
                 </div>
 
                 {/* Actions */}
-                <div className="flex items-center justify-between border-t pt-3">
-                    <div className="text-muted-foreground flex items-center gap-2 text-xs">
+                <div className="flex items-center justify-between pt-1">
+                    <div className="text-muted-foreground flex items-center gap-2 font-mono text-xs">
                         <span>{skill.category || t`Uncategorized`}</span>
                     </div>
                     {skill.isInstalled ? (

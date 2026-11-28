@@ -407,12 +407,12 @@ const PromptList = ({ onUsePrompt }: PromptListProps) => {
         return (
             <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                    <div className="bg-muted h-10 w-64 animate-pulse rounded-lg" />
-                    <div className="bg-muted h-9 w-32 animate-pulse rounded-lg" />
+                    <div className="surface-well h-10 w-64 animate-pulse rounded-lg" />
+                    <div className="surface-well h-9 w-32 animate-pulse rounded-lg" />
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     {Array.from({ length: 6 }, (_, i) => (
-                        <div className="bg-muted h-40 animate-pulse rounded-lg" key={i} />
+                        <div className="surface-well h-40 animate-pulse rounded-xl" key={i} />
                     ))}
                 </div>
             </div>
@@ -434,8 +434,8 @@ const PromptList = ({ onUsePrompt }: PromptListProps) => {
             {/* Favorites Section */}
             {favoritePrompts.length > 0 && (
                 <div className="space-y-4">
-                    <h2 className="flex items-center gap-2 text-lg font-semibold">
-                        <Star className="size-5 fill-yellow-500 text-yellow-500" />
+                    <h2 className="flex items-center gap-2 text-[15px] font-semibold">
+                        <Star aria-hidden="true" className="fill-warning text-warning size-4" />
                         {t`Favorites`}
                     </h2>
                     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -460,7 +460,7 @@ const PromptList = ({ onUsePrompt }: PromptListProps) => {
 
             {/* All Prompts Section */}
             <div className="space-y-4">
-                {favoritePrompts.length > 0 && <h2 className="text-lg font-semibold">{t`All Prompts`}</h2>}
+                {favoritePrompts.length > 0 && <h2 className="text-[15px] font-semibold">{t`All Prompts`}</h2>}
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                     {otherPrompts.map((prompt) => (
                         <PromptItem
@@ -501,7 +501,7 @@ const PromptList = ({ onUsePrompt }: PromptListProps) => {
         <>
             <div className="space-y-8">
                 {/* Sticky Toolbar */}
-                <div className="bg-background/95 supports-[backdrop-filter]:bg-background/60 sticky top-0 z-10 -mx-4 -mt-4 px-4 py-4 backdrop-blur-md">
+                <div className="bg-surface-main/95 supports-[backdrop-filter]:bg-surface-main/80 sticky top-0 z-10 -mx-4 -mt-4 px-4 py-4 backdrop-blur-md md:-mx-6 md:-mt-6 md:px-6 md:py-5">
                     <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                         <div className="relative flex-1 md:max-w-md">
                             <Search className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
@@ -515,7 +515,7 @@ const PromptList = ({ onUsePrompt }: PromptListProps) => {
                         </div>
                         <div className="flex items-center gap-2">
                             <Select onValueChange={(v) => setSortBy(v as SortOption)} value={sortBy}>
-                                <SelectTrigger className="w-40">
+                                <SelectTrigger aria-label={t`Sort by`} className="w-40">
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -545,10 +545,11 @@ const PromptList = ({ onUsePrompt }: PromptListProps) => {
                                     </SelectItem>
                                 </SelectContent>
                             </Select>
-                            <div className="bg-border mx-2 h-6 w-px" />
-                            <div className="bg-muted flex rounded-md p-1" role="tablist">
+                            <div className="bg-border/50 mx-1 h-6 w-px" />
+                            <div className="surface-well flex rounded-lg p-0.5" role="group">
                                 <Button
                                     aria-label={t`Board view`}
+                                    aria-pressed={viewMode === "board"}
                                     className="h-7 px-2"
                                     onClick={() => setViewMode("board")}
                                     size="sm"
@@ -558,6 +559,7 @@ const PromptList = ({ onUsePrompt }: PromptListProps) => {
                                 </Button>
                                 <Button
                                     aria-label={t`List view`}
+                                    aria-pressed={viewMode === "list"}
                                     className="h-7 px-2"
                                     onClick={() => setViewMode("list")}
                                     size="sm"
@@ -566,7 +568,7 @@ const PromptList = ({ onUsePrompt }: PromptListProps) => {
                                     <List aria-hidden="true" className="size-4" />
                                 </Button>
                             </div>
-                            <div className="bg-border mx-2 h-6 w-px" />
+                            <div className="bg-border/50 mx-1 h-6 w-px" />
                             {isLoggedIn && (
                                 <Button
                                     onClick={() => {
@@ -583,7 +585,7 @@ const PromptList = ({ onUsePrompt }: PromptListProps) => {
                                     {selectionMode ? t`Cancel Selection` : t`Select`}
                                 </Button>
                             )}
-                            <div className="bg-border mx-2 h-6 w-px" />
+                            <div className="bg-border/50 mx-1 h-6 w-px" />
                             <Button disabled={promptCount ? !promptCount.canCreate : false} onClick={handleCreatePrompt}>
                                 <Plus className="mr-2 size-4" />
                                 {t`New Prompt`}
@@ -620,7 +622,7 @@ const PromptList = ({ onUsePrompt }: PromptListProps) => {
 
                 {/* Selection Toolbar */}
                 {selectionMode && selectedPromptIds.size > 0 && (
-                    <div className="bg-primary/10 border-primary/20 flex items-center justify-between rounded-lg border p-3">
+                    <div className="bg-primary/10 border-primary/20 flex items-center justify-between rounded-xl border p-3">
                         <div className="flex items-center gap-2">
                             <span className="text-sm font-medium">
                                 <Plural one="# prompt selected" other="# prompts selected" value={selectedPromptIds.size} />

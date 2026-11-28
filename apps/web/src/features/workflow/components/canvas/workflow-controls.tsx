@@ -298,7 +298,7 @@ const WorkflowControls = ({ onRun, onSave, onShowShortcuts, onToggleHistory, sho
 
     return (
         <div className="absolute top-4 right-4 z-10">
-            <div className="bg-background/95 flex items-center gap-2 rounded-lg border p-2 shadow-lg backdrop-blur-sm">
+            <div className="surface-raised flex items-center gap-2 rounded-xl p-2">
                 {/* Template picker */}
                 <TemplatePicker />
 
@@ -384,12 +384,12 @@ const WorkflowControls = ({ onRun, onSave, onShowShortcuts, onToggleHistory, sho
                     </Tooltip>
                 )}
 
-                <div className="bg-border h-6 w-px" />
+                <div className="bg-border/50 h-6 w-px" />
 
                 {/* Version history with undo/redo */}
                 <VersionHistory />
 
-                <div className="bg-border h-6 w-px" />
+                <div className="bg-border/50 h-6 w-px" />
 
                 {/* Save indicator / button */}
                 {onSave && (
@@ -411,7 +411,7 @@ const WorkflowControls = ({ onRun, onSave, onShowShortcuts, onToggleHistory, sho
                 {/* Multi-select actions */}
                 {hasSelected && (
                     <>
-                        <div className="bg-border h-6 w-px" />
+                        <div className="bg-border/50 h-6 w-px" />
 
                         {/* Duplicate selected */}
                         <Tooltip>
@@ -586,7 +586,7 @@ const WorkflowControls = ({ onRun, onSave, onShowShortcuts, onToggleHistory, sho
                 {/* Execution history toggle */}
                 {onToggleHistory && (
                     <>
-                        <div className="bg-border h-6 w-px" />
+                        <div className="bg-border/50 h-6 w-px" />
                         <Tooltip>
                             <TooltipTrigger
                                 render={
@@ -609,7 +609,7 @@ const WorkflowControls = ({ onRun, onSave, onShowShortcuts, onToggleHistory, sho
                 )}
 
                 {/* Execution controls */}
-                <div className="bg-border h-6 w-px" />
+                <div className="bg-border/50 h-6 w-px" />
 
                 {isRunning ? (
                     <>
@@ -679,7 +679,7 @@ const WorkflowControls = ({ onRun, onSave, onShowShortcuts, onToggleHistory, sho
                 {/* Status indicator */}
                 {executionStatus !== "idle" && (
                     <>
-                        <div className="bg-border h-6 w-px" />
+                        <div className="bg-border/50 h-6 w-px" />
                         <div className="flex items-center gap-1.5 px-2">
                             <div className={`size-2 rounded-full ${STATUS_DOT_CLASSES[executionStatus] ?? "bg-yellow-500"}`} />
                             <span className="text-muted-foreground text-xs capitalize">{statusLabel ? i18n._(statusLabel) : executionStatus}</span>
@@ -690,7 +690,7 @@ const WorkflowControls = ({ onRun, onSave, onShowShortcuts, onToggleHistory, sho
 
             {/* Validation errors panel */}
             {validationErrors.length > 0 && (
-                <div className="bg-destructive/10 border-destructive/30 mt-2 max-w-sm rounded-lg border p-3" role="alert">
+                <div className="bg-destructive/10 border-destructive/30 mt-2 max-w-sm rounded-xl border p-3" role="alert">
                     <div className="mb-2 flex items-center justify-between">
                         <div className="text-destructive flex items-center gap-1.5 text-xs font-medium">
                             <AlertTriangle aria-hidden="true" className="size-3.5" />

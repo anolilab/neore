@@ -134,7 +134,6 @@
         "cookie-es": "catalog:server",
         "date-fns": "catalog:utils",
         "dompurify": "catalog:security",
-        "emblor": "catalog:forms",
         "fumadocs-core": "catalog:fumadocs",
         "fumadocs-ui": "catalog:fumadocs",
         "geist": "catalog:style",

@@ -135,7 +135,7 @@ const WorkflowBottomToolbar = () => {
 
     return (
         <div className="absolute bottom-4 left-1/2 z-10 -translate-x-1/2">
-            <div className="bg-background/95 border-border/60 flex items-center gap-0.5 rounded-2xl border px-1.5 py-1.5 shadow-lg backdrop-blur-md">
+            <div className="surface-raised flex items-center gap-0.5 rounded-2xl p-1.5">
                 {/* Add node */}
                 <Popover>
                     <Tooltip>
@@ -155,11 +155,11 @@ const WorkflowBottomToolbar = () => {
                         </TooltipContent>
                     </Tooltip>
 
-                    <PopoverContent align="center" className="w-auto max-w-[320px] p-2" side="top" sideOffset={8}>
+                    <PopoverContent align="center" aria-label={t`Add node`} className="w-auto max-w-[320px] p-2" side="top" sideOffset={8}>
                         <div className="space-y-2">
                             {QUICK_ADD_GROUPS.map((group) => (
                                 <div key={group.label.id}>
-                                    <p className="text-muted-foreground mb-1 px-1 text-[10px] font-medium tracking-wide uppercase">{i18n._(group.label)}</p>
+                                    <p className="text-muted-foreground mb-1 px-1 font-mono text-xs">{i18n._(group.label)}</p>
                                     <div className="grid grid-cols-6 gap-0.5">
                                         {group.items.map(({ icon: Icon, type }) => {
                                             const config = NODE_CONFIGS[type];
@@ -199,7 +199,7 @@ const WorkflowBottomToolbar = () => {
                     </PopoverContent>
                 </Popover>
 
-                <div className="bg-border/60 mx-0.5 h-5 w-px" />
+                <div className="bg-border/50 mx-0.5 h-5 w-px" />
 
                 {/* Select mode */}
                 <Tooltip>
@@ -241,7 +241,7 @@ const WorkflowBottomToolbar = () => {
                     </TooltipContent>
                 </Tooltip>
 
-                <div className="bg-border/60 mx-0.5 h-5 w-px" />
+                <div className="bg-border/50 mx-0.5 h-5 w-px" />
 
                 {/* Zoom out */}
                 <Tooltip>
@@ -262,7 +262,8 @@ const WorkflowBottomToolbar = () => {
                     <TooltipTrigger
                         render={
                             <button
-                                aria-label={t`Reset zoom (currently ${zoomPercent}%)`}
+                                // Named by the figure it shows first, so a speech-input user can say what they see.
+                                aria-label={`${zoomPercent}%, ${t`Reset zoom`}`}
                                 className="text-muted-foreground hover:text-foreground hover:bg-accent flex h-8 min-w-[3.75rem] items-center justify-center gap-1.5 rounded-lg px-2.5 text-xs font-medium tabular-nums transition-colors"
                                 onClick={handleZoomReset}
                                 type="button"

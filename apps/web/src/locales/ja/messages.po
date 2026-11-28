@@ -274,12 +274,12 @@ msgid "{0, plural, one {# char} other {# chars}}"
 msgstr "{0, plural, other {# 文字}}"
 
 #. placeholder {0}: rollup.failing
-#: src/features/develop/components/checks-tab.tsx:88
+#: src/features/develop/components/checks-tab.tsx:89
 msgid "{0, plural, one {# check is failing} other {# checks are failing}}"
 msgstr "{0, plural, other {# 件のチェックが失敗しています}}"
 
 #. placeholder {0}: rollup.pending
-#: src/features/develop/components/checks-tab.tsx:91
+#: src/features/develop/components/checks-tab.tsx:92
 msgid "{0, plural, one {# check is still running} other {# checks are still running}}"
 msgstr "{0, plural, other {# 件のチェックがまだ実行中です}}"
 
@@ -301,8 +301,8 @@ msgstr "{0, plural, other {今回は # 件のファイルを読み込めませ�
 #. placeholder {0}: files.length
 #. placeholder {0}: listed.length
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-file.tsx:707
-#: src/features/develop/components/files-tab.tsx:426
-#: src/features/develop/components/files-tab.tsx:434
+#: src/features/develop/components/files-tab.tsx:429
+#: src/features/develop/components/files-tab.tsx:437
 msgid "{0, plural, one {# file} other {# files}}"
 msgstr "{0, plural, other {# 個のファイル}}"
 
@@ -367,12 +367,12 @@ msgid "{0, plural, one {# node} other {# nodes}}"
 msgstr "{0, plural, other {# 個のノード}}"
 
 #. placeholder {0}: rollup.optionalFailing
-#: src/features/develop/components/checks-tab.tsx:142
+#: src/features/develop/components/checks-tab.tsx:149
 msgid "{0, plural, one {# optional check failed.} other {# optional checks failed.}}"
 msgstr "{0, plural, other {# 件の任意チェックが失敗しました。}}"
 
 #. placeholder {0}: review.draftComments.length
-#: src/features/develop/components/files-tab.tsx:245
+#: src/features/develop/components/files-tab.tsx:248
 msgid "{0, plural, one {# pending comment} other {# pending comments}}"
 msgstr "{0, plural, other {# 件の保留中のコメント}}"
 
@@ -382,7 +382,7 @@ msgid "{0, plural, one {# prompt found} other {# prompts found}}"
 msgstr "{0, plural, other {# 件のプロンプトが見つかりました}}"
 
 #. placeholder {0}: selectedPromptIds.size
-#: src/features/prompts/components/prompt-list.tsx:626
+#: src/features/prompts/components/prompt-list.tsx:628
 msgid "{0, plural, one {# prompt selected} other {# prompts selected}}"
 msgstr "{0, plural, other {# 件のプロンプトを選択中}}"
 
@@ -399,22 +399,22 @@ msgid "{0, plural, one {# reply} other {# replies}}"
 msgstr "{0, plural, other {#件の返信}}"
 
 #. placeholder {0}: rollup.failing
-#: src/features/develop/components/checks-tab.tsx:94
+#: src/features/develop/components/checks-tab.tsx:95
 msgid "{0, plural, one {# required check is failing} other {# required checks are failing}}"
 msgstr "{0, plural, other {# 件の必須チェックが失敗しています}}"
 
 #. placeholder {0}: rollup.pending
-#: src/features/develop/components/checks-tab.tsx:97
+#: src/features/develop/components/checks-tab.tsx:98
 msgid "{0, plural, one {# required check is still running} other {# required checks are still running}}"
 msgstr "{0, plural, other {# 件の必須チェックがまだ実行中です}}"
 
 #. placeholder {0}: rollup.failing
-#: src/features/develop/components/checks-tab.tsx:100
+#: src/features/develop/components/checks-tab.tsx:101
 msgid "{0, plural, one {# required or unknown check is failing} other {# required or unknown checks are failing}}"
 msgstr "{0, plural, other {# 件の必須または不明なチェックが失敗しています}}"
 
 #. placeholder {0}: rollup.pending
-#: src/features/develop/components/checks-tab.tsx:104
+#: src/features/develop/components/checks-tab.tsx:105
 msgid "{0, plural, one {# required or unknown check is still running} other {# required or unknown checks are still running}}"
 msgstr "{0, plural, other {# 件の必須または不明なチェックがまだ実行中です}}"
 
@@ -450,7 +450,7 @@ msgid "{0, plural, one {# slide} other {# slides}}"
 msgstr "{0, plural, other {# 枚のスライド}}"
 
 #. placeholder {0}: review.threads.length
-#: src/features/develop/components/files-tab.tsx:240
+#: src/features/develop/components/files-tab.tsx:243
 msgid "{0, plural, one {# thread} other {# threads}}"
 msgstr "{0, plural, other {# 件のスレッド}}"
 
@@ -560,7 +560,7 @@ msgid "{0} (shared)"
 msgstr "{0}（共有）"
 
 #. placeholder {0}: upload.files.length
-#: src/features/skills/components/skill-import-dialog.tsx:231
+#: src/features/skills/components/skill-import-dialog.tsx:233
 msgid "{0} additional file(s)"
 msgstr "追加ファイル {0} 件"
 
@@ -645,7 +645,7 @@ msgid "{0} eligible · {1} deleted · {2}ms"
 msgstr "対象 {0} 件 · 削除 {1} 件 · {2}ms"
 
 #. placeholder {0}: progress.failed
-#: src/features/tasks/components/goal-list.tsx:47
+#: src/features/tasks/components/goal-list.tsx:44
 msgid "{0} failed"
 msgstr "{0} 件失敗"
 
@@ -683,7 +683,7 @@ msgid "{0} is required"
 msgstr "{0} は必須です"
 
 #. placeholder {0}: done.items.length
-#: src/features/skills/components/bundle-import-dialog.tsx:224
+#: src/features/skills/components/bundle-import-dialog.tsx:229
 msgid "{0} items were created. Skills, schedules and webhooks are switched off; turn each one on when you are ready."
 msgstr "{0} 件のアイテムを作成しました。スキル、スケジュール、Webhook はオフになっています。準備ができたら、それぞれオンにしてください。"
 
@@ -763,7 +763,7 @@ msgstr "{1} 件中 {0} 件の会話をインポートしました"
 
 #. placeholder {0}: progress.done
 #. placeholder {1}: progress.total
-#: src/features/tasks/components/goal-list.tsx:64
+#: src/features/tasks/components/goal-list.tsx:61
 msgid "{0} of {1} tasks done"
 msgstr "{1} 件中 {0} 件のタスクが完了"
 
@@ -815,7 +815,7 @@ msgid "{0} times"
 msgstr "{0} 回"
 
 #. placeholder {0}: progress.needsReview
-#: src/features/tasks/components/goal-list.tsx:46
+#: src/features/tasks/components/goal-list.tsx:43
 msgid "{0} to review"
 msgstr "要レビュー {0} 件"
 
@@ -841,7 +841,7 @@ msgid "{0} tools: {1}"
 msgstr "{0} 個のツール: {1}"
 
 #. placeholder {0}: overview.unreadCount
-#: src/features/home/components/home-page.tsx:223
+#: src/features/home/components/home-page.tsx:226
 msgid "{0} unread"
 msgstr "未読 {0} 件"
 
@@ -859,7 +859,7 @@ msgid "{0} wants to merge {1, plural, one {# commit} other {# commits}} into {2}
 msgstr "{0} が {3} から {2} への {1, plural, other {# 件のコミット}}のマージを希望しています"
 
 #. placeholder {0}: target.name
-#: src/features/develop/components/checks-tab.tsx:126
+#: src/features/develop/components/checks-tab.tsx:127
 msgid "{0} was started again."
 msgstr "{0} を再開しました。"
 
@@ -1071,11 +1071,11 @@ msgstr "{duration, plural, other {# 秒間思考しました}}"
 msgid "{edgeCount, plural, one {# edge} other {# edges}}"
 msgstr "{edgeCount, plural, other {# 本のエッジ}}"
 
-#: src/features/pages/components/page-view.tsx:477
+#: src/features/pages/components/page-view.tsx:494
 msgid "{editorNames} is editing this page."
 msgstr "{editorNames} がこのページを編集中です。"
 
-#: src/features/pages/components/page-view.tsx:476
+#: src/features/pages/components/page-view.tsx:493
 msgid "{editorNames} is editing this page. If you both change the same version, the second save is stopped and asked what to do."
 msgstr "{editorNames} がこのページを編集中です。同じバージョンを両方が変更した場合、2 番目の保存は停止され、どうするか確認されます。"
 
@@ -1127,8 +1127,8 @@ msgstr "{firstLabel} ×{firstCount}"
 msgid "{firstName}, {secondName}"
 msgstr "{firstName}、{secondName}"
 
-#: src/features/workflow/components/nodes/image-to-video-node.tsx:152
-#: src/features/workflow/components/nodes/video-node.tsx:236
+#: src/features/workflow/components/nodes/image-to-video-node.tsx:163
+#: src/features/workflow/components/nodes/video-node.tsx:240
 msgid "{fps} fps"
 msgstr "{fps} fps"
 
@@ -1477,7 +1477,7 @@ msgstr "{nodeCount, plural, other {# 個のノード}}"
 msgid "{onlineCount} online"
 msgstr "{onlineCount} 人がオンライン"
 
-#: src/features/pages/components/page-comments-panel.tsx:232
+#: src/features/pages/components/page-comments-panel.tsx:234
 msgid "{openCount} open comments"
 msgstr "未解決のコメント {openCount} 件"
 
@@ -1542,11 +1542,11 @@ msgstr "{requestNoun}ビュー"
 msgid "{resultCount, plural, one {# result} other {# results}}"
 msgstr "{resultCount, plural, other {# 件の結果}}"
 
-#: src/features/pages/components/pages-sidebar.tsx:63
+#: src/features/pages/components/pages-sidebar.tsx:64
 msgid "{resultCount} results"
 msgstr "{resultCount} 件の結果"
 
-#: src/features/tasks/components/tasks-page.tsx:222
+#: src/features/tasks/components/tasks-page.tsx:227
 msgid "{reviewCount} tasks need your review"
 msgstr "{reviewCount} 件のタスクがレビュー待ちです"
 
@@ -2023,7 +2023,7 @@ msgstr "組み込みツールは名前で、サーバーのツールは server:t
 msgid "a change is waiting to be read"
 msgstr "読み取り待ちの変更があります"
 
-#: src/features/home/components/home-page.tsx:172
+#: src/features/home/components/home-page.tsx:175
 msgid "A chat is waiting for your answer"
 msgstr "チャットがあなたの回答を待っています"
 
@@ -2092,7 +2092,7 @@ msgstr "所有者だけが読めるファイル（キーチェーンは利用で
 msgid "A file read when needed needs a line saying when to read it."
 msgstr "必要なときに読むファイルには、いつ読むかを示す 1 行が必要です。"
 
-#: src/features/skills/components/skill-import-dialog.tsx:202
+#: src/features/skills/components/skill-import-dialog.tsx:203
 msgid "A GitHub link to a skill folder or its SKILL.md, a skills.sh link, or an npx skills add command. Only the SKILL.md is imported; scripts and other files in the skill are not."
 msgstr "スキルフォルダまたはその SKILL.md への GitHub リンク、skills.sh のリンク、または npx skills add コマンド。インポートされるのは SKILL.md のみで、スキル内のスクリプトやその他のファイルはインポートされません。"
 
@@ -2209,7 +2209,7 @@ msgstr "Neore から共有されたページです。"
 msgid "A passcode keeps this chat closed to anyone using a browser you are already signed in to. It is not end-to-end encryption: the service can still read the chat. If you forget the passcode, the only way out is to delete the chat."
 msgstr "パスコードにより、すでにサインインしているブラウザを使っている人からもこのチャットを閉じた状態に保てます。これはエンドツーエンド暗号化ではなく、サービスはチャットを読み取ることができます。パスコードを忘れた場合は、チャットを削除するしかありません。"
 
-#: src/features/workflow/components/nodes/text-node.tsx:218
+#: src/features/workflow/components/nodes/text-node.tsx:219
 msgid "A placeholder or @mention outside quotes is read as null here, so this error may come from it until a run fills it in"
 msgstr "引用符の外のプレースホルダーまたは @メンションはここでは null として扱われるため、実行時に値が入るまでこのエラーが出ることがあります"
 
@@ -2238,7 +2238,7 @@ msgstr "参照動画の長さは最大 {0} 秒です。"
 msgid "A regular expression the answer must match"
 msgstr "回答が一致すべき正規表現"
 
-#: src/features/develop/components/review-thread.tsx:82
+#: src/features/develop/components/review-thread.tsx:83
 msgid "A reply is posted straight away, not with the rest of your review."
 msgstr "返信は、残りのレビューとは別に、すぐに投稿されます。"
 
@@ -2429,7 +2429,7 @@ msgid "Accept or reject invitations to join organizations"
 msgstr "組織への招待を承諾または拒否します"
 
 #: src/features/chat/sharing/thread-share-button.tsx:264
-#: src/features/pages/components/page-share-dialog.tsx:96
+#: src/features/pages/components/page-share-dialog.tsx:129
 msgid "Access"
 msgstr "アクセス"
 
@@ -2437,7 +2437,7 @@ msgstr "アクセス"
 msgid "Access 200+ models (Claude, GPT-4, Gemini, Llama) through a single API"
 msgstr "1 つの API で 200 以上のモデル（Claude、GPT-4、Gemini、Llama）にアクセス"
 
-#: src/features/pages/components/page-share-dialog.tsx:173
+#: src/features/pages/components/page-share-dialog.tsx:179
 msgid "Access for {name}"
 msgstr "{name} のアクセス権"
 
@@ -2522,7 +2522,7 @@ msgid "Actions for project {0}"
 msgstr "プロジェクト {0} のアクション"
 
 #. placeholder {0}: prompt.name
-#: src/features/prompts/components/prompt-item.tsx:168
+#: src/features/prompts/components/prompt-item.tsx:164
 msgid "Actions for prompt {0}"
 msgstr "プロンプト {0} のアクション"
 
@@ -2583,10 +2583,10 @@ msgid "Activity per month"
 msgstr "月別アクティビティ"
 
 #: src/features/chat/tags/manage-thread-tags-dialog.tsx:225
-#: src/features/projects/components/project-repositories.tsx:425
+#: src/features/projects/components/project-repositories.tsx:419
 #: src/features/settings/components/chat/bot-tool-selection.tsx:359
 #: src/features/settings/components/chat/mcp/server-catalog.tsx:102
-#: src/features/workflow/components/gallery/publish-dialog.tsx:220
+#: src/features/workflow/components/gallery/publish-dialog.tsx:221
 msgid "Add"
 msgstr "追加"
 
@@ -2633,11 +2633,11 @@ msgstr "メモを追加…"
 msgid "Add a server over SSH"
 msgstr "SSH でサーバーを追加"
 
-#: src/features/prompts/components/prompt-form-dialog.tsx:293
+#: src/features/prompts/components/prompt-tags-field.tsx:90
 msgid "Add a tag"
 msgstr "タグを追加"
 
-#: src/features/workflow/components/gallery/publish-dialog.tsx:216
+#: src/features/workflow/components/gallery/publish-dialog.tsx:217
 msgid "Add a tag..."
 msgstr "タグを追加..."
 
@@ -2776,6 +2776,7 @@ msgstr "行を追加"
 
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:146
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:154
+#: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:158
 msgid "Add node"
 msgstr "ノードを追加"
 
@@ -2829,7 +2830,7 @@ msgstr "既存のプルリクエストをこのスレッドに追加します。
 msgid "Add Rectangle"
 msgstr "長方形を追加"
 
-#: src/features/workflow/components/nodes/character-ref-node.tsx:191
+#: src/features/workflow/components/nodes/character-ref-node.tsx:192
 msgid "Add reference image"
 msgstr "参照画像を追加"
 
@@ -2841,7 +2842,7 @@ msgstr "参照画像を追加"
 msgid "Add reference images (up to {maxReferenceImages})"
 msgstr "参照画像を追加（最大 {maxReferenceImages} 枚）"
 
-#: src/features/workflow/components/nodes/character-ref-node.tsx:210
+#: src/features/workflow/components/nodes/character-ref-node.tsx:211
 msgid "Add reference images to maintain consistency"
 msgstr "一貫性を保つために参照画像を追加"
 
@@ -2900,11 +2901,11 @@ msgid "Add title text"
 msgstr "タイトルテキストを追加"
 
 #: src/features/pages/components/page-tree-item.tsx:152
-#: src/features/pages/components/page-view.tsx:418
+#: src/features/pages/components/page-view.tsx:435
 msgid "Add to favorites"
 msgstr "お気に入りに追加"
 
-#: src/features/prompts/components/prompt-item.tsx:218
+#: src/features/prompts/components/prompt-item.tsx:214
 #: src/features/prompts/components/prompt-list-view.tsx:222
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:878
 msgid "Add to Favorites"
@@ -3022,11 +3023,11 @@ msgstr "アドレス"
 msgid "Address review"
 msgstr "レビューに対応"
 
-#: src/features/skills/components/bundle-import-dialog.tsx:120
+#: src/features/skills/components/bundle-import-dialog.tsx:125
 msgid "Adds no tools."
 msgstr "ツールは追加されません。"
 
-#: src/features/skills/components/bundle-import-dialog.tsx:118
+#: src/features/skills/components/bundle-import-dialog.tsx:123
 msgid "Adds these tools:"
 msgstr "次のツールが追加されます:"
 
@@ -3320,7 +3321,7 @@ msgstr "MoE の効率性を備えた Alibaba の次世代コードモデルを�
 msgid "agents"
 msgstr "エージェント"
 
-#: src/features/tasks/components/tasks-page.tsx:197
+#: src/features/tasks/components/tasks-page.tsx:202
 msgid "Agents work your tasks on their own. A verifier checks each result against its success criteria, and anything it will not pass comes back to you."
 msgstr "エージェントがタスクを自律的に処理します。検証役が各結果を成功基準と照らし合わせ、合格しなかったものはあなたに戻されます。"
 
@@ -3341,7 +3342,7 @@ msgstr "AI チャット"
 msgid "AI Chat Pipeline"
 msgstr "AI チャットパイプライン"
 
-#: src/features/pages/components/page-version-panel.tsx:50
+#: src/features/pages/components/page-version-panel.tsx:49
 msgid "AI edit"
 msgstr "AI 編集"
 
@@ -3545,7 +3546,7 @@ msgstr "垂直方向に整列（V）"
 #: src/features/settings/components/chat/models-settings.tsx:440
 #: src/features/settings/components/chat/models-settings.tsx:461
 #: src/features/settings/connectors/connectors-page.tsx:63
-#: src/routes/(chat)/workflow/gallery.tsx:20
+#: src/routes/(chat)/workflow/gallery.tsx:19
 msgid "All"
 msgstr "すべて"
 
@@ -3586,13 +3587,13 @@ msgstr "すべてのカテゴリ"
 msgid "All changes saved"
 msgstr "すべての変更を保存しました"
 
-#: src/features/home/components/home-page.tsx:243
+#: src/features/home/components/home-page.tsx:246
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:439
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:442
 msgid "All chats"
 msgstr "すべてのチャット"
 
-#: src/features/develop/components/checks-tab.tsx:90
+#: src/features/develop/components/checks-tab.tsx:91
 msgid "All checks passed."
 msgstr "すべてのチェックに合格しました。"
 
@@ -3693,11 +3694,11 @@ msgstr "すべてのプロバイダー + BYOK"
 msgid "All real {0} work goes to this model, even quick work."
 msgstr "{0}の実作業はすべて、短いものも含めてこのモデルに任されます。"
 
-#: src/features/develop/components/checks-tab.tsx:96
+#: src/features/develop/components/checks-tab.tsx:97
 msgid "All required checks passed."
 msgstr "すべての必須チェックに合格しました。"
 
-#: src/features/develop/components/checks-tab.tsx:102
+#: src/features/develop/components/checks-tab.tsx:103
 msgid "All required or unknown checks passed."
 msgstr "すべての必須または不明なチェックに合格しました。"
 
@@ -3718,7 +3719,7 @@ msgstr "すべてのサーバー"
 msgid "All shards measured."
 msgstr "すべてのシャードの測定が完了しました。"
 
-#: src/features/tasks/components/tasks-page.tsx:255
+#: src/features/tasks/components/tasks-page.tsx:260
 msgid "All tasks"
 msgstr "すべてのタスク"
 
@@ -3814,7 +3815,7 @@ msgstr "アカウントをお持ちですか？"
 msgid "Already linked to this thread."
 msgstr "すでにこのスレッドにリンクされています。"
 
-#: src/features/pages/components/page-view.tsx:402
+#: src/features/pages/components/page-view.tsx:419
 msgid "Also viewing"
 msgstr "他の閲覧者"
 
@@ -4149,7 +4150,7 @@ msgstr "期間を問わず"
 msgid "Anyone with a guest link can leave you a message here. Nothing they write runs until you send it."
 msgstr "ゲストリンクを持っている人は、ここにメッセージを残せます。あなたが送信するまで、書かれた内容は実行されません。"
 
-#: src/features/pages/components/page-share-dialog.tsx:63
+#: src/features/pages/components/page-share-dialog.tsx:72
 msgid "Anyone with the link can read this page. Comments are never shown. Turning it off revokes the link."
 msgstr "リンクを知っている人は誰でもこのページを閲覧できます。コメントは表示されません。オフにするとリンクは無効になります。"
 
@@ -4273,7 +4274,7 @@ msgstr "芸術的なスタイルを適用"
 msgid "Apply best practices, patterns, and domain-specific guidelines. Enhances responses with expert knowledge and proven approaches."
 msgstr "ベストプラクティス、パターン、分野固有のガイドラインを適用します。専門知識と実績あるアプローチで応答を強化します。"
 
-#: src/features/pages/components/page-agent-dialog.tsx:142
+#: src/features/pages/components/page-agent-dialog.tsx:144
 msgid "Apply changes"
 msgstr "変更を適用"
 
@@ -4648,7 +4649,7 @@ msgstr "返信を中断せずにサイドクエスチョンをする"
 msgid "Ask all models anything..."
 msgstr "すべてのモデルに何でも質問..."
 
-#: src/features/home/components/home-page.tsx:94
+#: src/features/home/components/home-page.tsx:97
 msgid "Ask anything to start a new chat…"
 msgstr "何でも質問して新しいチャットを始めましょう…"
 
@@ -4811,7 +4812,7 @@ msgstr "オークランド"
 #: src/features/workflow/components/gallery/gallery-card.tsx:25
 #: src/features/workflow/components/gallery/publish-dialog.tsx:31
 #: src/features/workflow/components/template-picker.tsx:18
-#: src/routes/(chat)/workflow/gallery.tsx:24
+#: src/routes/(chat)/workflow/gallery.tsx:23
 msgid "Audio"
 msgstr "音声"
 
@@ -5015,7 +5016,7 @@ msgstr "オートメーション"
 #: src/features/workflow/components/gallery/gallery-card.tsx:26
 #: src/features/workflow/components/gallery/publish-dialog.tsx:32
 #: src/features/workflow/components/template-picker.tsx:19
-#: src/routes/(chat)/workflow/gallery.tsx:25
+#: src/routes/(chat)/workflow/gallery.tsx:24
 msgid "Automation"
 msgstr "自動化"
 
@@ -5101,7 +5102,7 @@ msgstr "Azure ポータル → OpenAI リソース → キーとエンドポイ�
 
 #: src/features/code/components/code-shell.tsx:162
 #: src/features/onboarding/components/onboarding-dialog.tsx:394
-#: src/features/pages/components/page-version-panel.tsx:89
+#: src/features/pages/components/page-version-panel.tsx:88
 #: src/features/projects/components/add-project-dialog.tsx:692
 #: src/features/settings/components/personalization/memory-import-dialog.tsx:309
 msgid "Back"
@@ -5124,7 +5125,7 @@ msgstr "ギャラリーに戻る"
 msgid "Back to settings sections"
 msgstr "設定セクションに戻る"
 
-#: src/routes/(chat)/workflow/gallery.tsx:95
+#: src/routes/(chat)/workflow/gallery.tsx:94
 msgid "Back to workflows"
 msgstr "ワークフローに戻る"
 
@@ -5562,7 +5563,7 @@ msgstr "ブルー"
 msgid "Blue Channel"
 msgstr "青チャンネル"
 
-#: src/features/tasks/components/tasks-page.tsx:262
+#: src/features/tasks/components/tasks-page.tsx:267
 msgid "Board"
 msgstr "ボード"
 
@@ -5717,7 +5718,7 @@ msgstr "複雑なタスクを番号付きのステップに分解し、進捗を
 msgid "Brief description of this project"
 msgstr "このプロジェクトの簡単な説明"
 
-#: src/features/prompts/components/prompt-form-dialog.tsx:273
+#: src/features/prompts/components/prompt-form-dialog.tsx:258
 msgid "Brief description of this prompt"
 msgstr "このプロンプトの簡単な説明"
 
@@ -5766,7 +5767,7 @@ msgstr "閲覧"
 msgid "Browse and restore previous versions of your workflow."
 msgstr "ワークフローの以前のバージョンを閲覧して復元します。"
 
-#: src/routes/(chat)/workflow/gallery.tsx:103
+#: src/routes/(chat)/workflow/gallery.tsx:102
 msgid "Browse, fork, and remix workflows shared by the community"
 msgstr "コミュニティが共有したワークフローを閲覧、フォーク、リミックス"
 
@@ -5927,7 +5928,7 @@ msgstr "ブルガリア語（ブルガリア）"
 msgid "Bulleted list"
 msgstr "箇条書きリスト"
 
-#: src/features/skills/components/bundle-import-dialog.tsx:223
+#: src/features/skills/components/bundle-import-dialog.tsx:228
 msgid "Bundle imported"
 msgstr "バンドルをインポートしました"
 
@@ -5948,7 +5949,7 @@ msgstr "名刺"
 msgid "by <0>{0}</0>"
 msgstr "提供元：<0>{0}</0>"
 
-#: src/features/pages/components/page-version-panel.tsx:140
+#: src/features/pages/components/page-version-panel.tsx:137
 msgid "by a collaborator"
 msgstr "共同編集者による編集"
 
@@ -5974,7 +5975,7 @@ msgstr "モデル別（プロンプトトークンの多い順）：プロバイ
 msgid "By model, most prompt tokens first."
 msgstr "モデル別（プロンプトトークンの多い順）。"
 
-#: src/features/pages/components/page-version-panel.tsx:140
+#: src/features/pages/components/page-version-panel.tsx:137
 msgid "by you"
 msgstr "自分による編集"
 
@@ -6094,11 +6095,11 @@ msgstr "カメラ制御"
 msgid "Camera Type"
 msgstr "カメラの種類"
 
-#: src/features/pages/components/page-share-dialog.tsx:46
+#: src/features/pages/components/page-share-dialog.tsx:48
 msgid "Can comment"
 msgstr "コメント可"
 
-#: src/features/pages/components/page-share-dialog.tsx:46
+#: src/features/pages/components/page-share-dialog.tsx:48
 msgid "Can edit"
 msgstr "編集可"
 
@@ -6110,7 +6111,7 @@ msgstr "画像や動画を生成できますか？"
 msgid "Can I use my own API keys?"
 msgstr "自分の API キーを使えますか？"
 
-#: src/features/pages/components/page-share-dialog.tsx:46
+#: src/features/pages/components/page-share-dialog.tsx:48
 msgid "Can manage"
 msgstr "管理可"
 
@@ -6122,7 +6123,7 @@ msgstr "チームの設定とメンバーを管理できます"
 msgid "Can use team resources"
 msgstr "チームのリソースを利用できます"
 
-#: src/features/pages/components/page-share-dialog.tsx:46
+#: src/features/pages/components/page-share-dialog.tsx:48
 msgid "Can view"
 msgstr "閲覧可"
 
@@ -6189,14 +6190,14 @@ msgstr "カナダ"
 #: src/features/knowledge/components/collection-dialog.tsx:97
 #: src/features/knowledge/components/collection-picker.tsx:113
 #: src/features/local-models/components/ollama-model-manager.tsx:300
-#: src/features/pages/components/page-agent-dialog.tsx:148
+#: src/features/pages/components/page-agent-dialog.tsx:150
 #: src/features/pages/components/page-comments-panel.tsx:87
 #: src/features/projects/components/add-project-dialog.tsx:686
 #: src/features/projects/components/computer-rule-file-import.tsx:613
 #: src/features/projects/components/move-to-project-dialog.tsx:95
-#: src/features/projects/components/project-form-dialog.tsx:474
+#: src/features/projects/components/project-form-dialog.tsx:479
 #: src/features/projects/components/repo-rule-file-import.tsx:467
-#: src/features/prompts/components/prompt-form-dialog.tsx:501
+#: src/features/prompts/components/prompt-form-dialog.tsx:465
 #: src/features/prompts/components/prompt-optimize-dialog.tsx:194
 #: src/features/prompts/components/variable-fill-dialog.tsx:185
 #: src/features/settings/components/chat/api-keys-settings.tsx:437
@@ -6215,10 +6216,10 @@ msgstr "カナダ"
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:381
 #: src/features/settings/connectors/messenger/messenger-setup-dialog.tsx:156
 #: src/features/skills/components/bundle-export-dialog.tsx:219
-#: src/features/skills/components/bundle-import-dialog.tsx:432
+#: src/features/skills/components/bundle-import-dialog.tsx:437
 #: src/features/skills/components/skill-builder-dialog.tsx:323
 #: src/features/skills/components/skill-form-dialog.tsx:506
-#: src/features/skills/components/skill-import-dialog.tsx:243
+#: src/features/skills/components/skill-import-dialog.tsx:245
 #: src/features/slides/components/slide-editor-dialog.tsx:114
 #: src/features/tasks/components/goal-form-dialog.tsx:164
 #: src/features/tasks/components/task-card.tsx:106
@@ -6259,14 +6260,14 @@ msgstr "キャンセルまたは閉じる"
 msgid "Cancel run"
 msgstr "実行をキャンセル"
 
-#: src/features/prompts/components/prompt-list.tsx:583
+#: src/features/prompts/components/prompt-list.tsx:585
 msgid "Cancel Selection"
 msgstr "選択をキャンセル"
 
 #: src/features/chat/thread/host-activity.tsx:130
 #: src/features/chat/thread/widgets/flight-widget.tsx:56
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:180
-#: src/features/develop/components/checks-tab.tsx:76
+#: src/features/develop/components/checks-tab.tsx:77
 #: src/features/evals/components/run-status.tsx:12
 #: src/features/tasks/components/task-detail-dialog.tsx:134
 #: src/features/workflow/components/canvas/execution-history-panel.tsx:62
@@ -6410,7 +6411,7 @@ msgstr "{pullRequest} を {base} に追いつかせる"
 #: src/features/skills/components/skill-builder-diff.tsx:27
 #: src/features/skills/components/skill-form-dialog.tsx:317
 #: src/features/skills/components/skill-marketplace.tsx:160
-#: src/features/workflow/components/gallery/publish-dialog.tsx:189
+#: src/features/workflow/components/gallery/publish-dialog.tsx:190
 msgid "Category"
 msgstr "カテゴリ"
 
@@ -6431,6 +6432,7 @@ msgid "Central Time (US & Canada)"
 msgstr "中部標準時（米国およびカナダ）"
 
 #: src/features/workflow/components/nodes/advanced-controls-node.tsx:108
+#: src/features/workflow/components/nodes/advanced-controls-node.tsx:118
 msgid "CFG Scale"
 msgstr "CFG スケール"
 
@@ -6501,7 +6503,7 @@ msgid "Change your organization's unique identifier"
 msgstr "組織の一意の識別子を変更します"
 
 #: src/features/develop/components/files-tab.tsx:207
-#: src/features/develop/components/files-tab.tsx:248
+#: src/features/develop/components/files-tab.tsx:251
 msgid "Changed"
 msgstr "変更あり"
 
@@ -6653,7 +6655,7 @@ msgstr "チャットの通知をオフにしました"
 msgid "Chat notification turned on"
 msgstr "チャットの通知をオンにしました"
 
-#: src/features/prompts/components/prompt-form-dialog.tsx:377
+#: src/features/prompts/components/prompt-form-dialog.tsx:341
 msgid "Chat Settings (Optional)"
 msgstr "チャット設定（任意）"
 
@@ -6778,7 +6780,7 @@ msgstr "確認済み"
 msgid "Checked in the page (recommended)"
 msgstr "ページ内で確認してクリック（推奨）"
 
-#: src/features/skills/components/skill-builder-review.tsx:251
+#: src/features/skills/components/skill-builder-review.tsx:254
 msgid "Checked integrations are offered for setup after you save. Nothing connects until you confirm it there."
 msgstr "チェックした連携は、保存後にセットアップの候補として表示されます。そこで確認するまで何も接続されません。"
 
@@ -6856,7 +6858,7 @@ msgstr "中国語（簡体字）"
 msgid "Chinese (Traditional)"
 msgstr "中国語（繁体字）"
 
-#: src/features/skills/components/skill-import-dialog.tsx:165
+#: src/features/skills/components/skill-import-dialog.tsx:166
 msgid "Choose .md or .zip"
 msgstr ".md または .zip を選択"
 
@@ -6900,7 +6902,7 @@ msgstr "一意のユーザー名を選んでください"
 msgid "Choose at least one permission"
 msgstr "権限を 1 つ以上選択してください"
 
-#: src/features/skills/components/bundle-import-dialog.tsx:363
+#: src/features/skills/components/bundle-import-dialog.tsx:368
 msgid "Choose bundle file"
 msgstr "バンドルファイルを選択"
 
@@ -7112,7 +7114,7 @@ msgstr "クリーンアップに失敗しました"
 #: src/features/chat/components/reference-picker/reference-picker-dialog.tsx:254
 #: src/features/chat/thread-list/hierarchical-thread-list.tsx:98
 #: src/features/chat/thread/media-gallery-view.tsx:382
-#: src/features/prompts/components/prompt-list.tsx:614
+#: src/features/prompts/components/prompt-list.tsx:616
 #: src/features/settings/components/chat/api-keys-settings.tsx:382
 #: src/features/settings/components/chat/models-settings.tsx:474
 #: src/features/settings/components/keyboard/keyboard-shortcuts-settings.tsx:370
@@ -7172,7 +7174,7 @@ msgid "Clear selection"
 msgstr "選択を解除"
 
 #: src/features/prompts/components/prompt-list-view.tsx:292
-#: src/features/prompts/components/prompt-list.tsx:636
+#: src/features/prompts/components/prompt-list.tsx:638
 msgid "Clear Selection"
 msgstr "選択を解除"
 
@@ -7257,7 +7259,8 @@ msgstr "クリニカルなシャープさ、立体感"
 msgid "clip"
 msgstr "クリップ"
 
-#: src/features/workflow/components/nodes/advanced-controls-node.tsx:224
+#: src/features/workflow/components/nodes/advanced-controls-node.tsx:233
+#: src/features/workflow/components/nodes/advanced-controls-node.tsx:243
 msgid "CLIP Skip"
 msgstr "CLIP Skip"
 
@@ -7532,7 +7535,7 @@ msgstr "Alibaba の特化型 30B コーディングモデルを必要とする�
 msgid "Coding tasks requiring Mistral's specialized development-focused model"
 msgstr "Mistral の開発特化型モデルを必要とするコーディングタスク"
 
-#: src/features/projects/components/project-repositories.tsx:283
+#: src/features/projects/components/project-repositories.tsx:277
 msgid "Coding-agent runs in this project offer these repositories, with the default preselected."
 msgstr "このプロジェクトのコーディングエージェントの実行では、これらのリポジトリが選択肢に表示され、デフォルトがあらかじめ選択されます。"
 
@@ -7661,7 +7664,7 @@ msgstr "ゆったり（デフォルト）"
 
 #: src/features/devices/components/device-tool-call.tsx:75
 #: src/features/skills/components/skill-builder-diff.tsx:36
-#: src/features/skills/components/skill-builder-review.tsx:145
+#: src/features/skills/components/skill-builder-review.tsx:148
 #: src/features/skills/components/skill-form-dialog.tsx:225
 msgid "Command"
 msgstr "コマンド"
@@ -7689,7 +7692,7 @@ msgstr "{agentLabel} からのコマンド"
 
 #: src/features/develop/components/review-panel.tsx:64
 #: src/features/pages/components/page-comments-panel.tsx:146
-#: src/features/pages/components/page-view.tsx:429
+#: src/features/pages/components/page-view.tsx:446
 #: src/features/workflow/components/nodes/comment-node.tsx:95
 #: src/features/workflow/types/index.ts:461
 #: src/features/workflow/types/index.ts:465
@@ -7733,7 +7736,7 @@ msgstr "ファイル全体 {0} にコメント"
 
 #: src/features/pages/components/page-comments-panel.tsx:135
 #: src/features/pages/components/page-comments-panel.tsx:137
-#: src/features/pages/components/page-view.tsx:439
+#: src/features/pages/components/page-view.tsx:456
 msgid "Comments"
 msgstr "コメント"
 
@@ -7776,7 +7779,7 @@ msgstr "コミットはあなたの名前とメールアドレスで作成され
 msgid "Communication"
 msgstr "コミュニケーション"
 
-#: src/routes/(chat)/workflow/gallery.tsx:100
+#: src/routes/(chat)/workflow/gallery.tsx:99
 #: src/routes/(chat)/workflow/index.tsx:47
 msgid "Community Gallery"
 msgstr "コミュニティギャラリー"
@@ -8069,7 +8072,7 @@ msgstr "条件分岐"
 msgid "Configure chat behavior and preferences."
 msgstr "チャットの動作と設定を構成します。"
 
-#: src/features/projects/components/project-form-dialog.tsx:406
+#: src/features/projects/components/project-form-dialog.tsx:411
 msgid "Configure default model, reasoning effort, and features for new chats created in this project."
 msgstr "このプロジェクトで作成する新しいチャットの既定のモデル、推論レベル、機能を設定します。"
 
@@ -8081,7 +8084,7 @@ msgstr "アプリケーションの動作を設定します。"
 msgid "Configure language preferences and location settings."
 msgstr "言語設定と地域設定を構成します。"
 
-#: src/features/prompts/components/prompt-form-dialog.tsx:379
+#: src/features/prompts/components/prompt-form-dialog.tsx:343
 msgid "Configure model, reasoning effort, and features to preconfigure chat when using this prompt."
 msgstr "このプロンプトを使うときにチャットへ事前設定するモデル、推論レベル、機能を設定します。"
 
@@ -8110,7 +8113,7 @@ msgstr "UI の設定と表示オプションを構成します。"
 msgid "Configure variable values for this thread. These values will replace {VARIABLE_PLACEHOLDER} placeholders when you use prompts."
 msgstr "このスレッドの変数の値を設定します。プロンプトを使うときに {VARIABLE_PLACEHOLDER} プレースホルダーがこれらの値に置き換えられます。"
 
-#: src/features/prompts/components/prompt-form-dialog.tsx:483
+#: src/features/prompts/components/prompt-form-dialog.tsx:447
 msgid "Configure Variables"
 msgstr "変数を設定"
 
@@ -8213,8 +8216,8 @@ msgid "Connect an audio/file node as input"
 msgstr "音声/ファイルノードを入力として接続してください"
 
 #: src/features/workflow/components/nodes/background-removal-node.tsx:122
-#: src/features/workflow/components/nodes/image-to-video-node.tsx:168
-#: src/features/workflow/components/nodes/outpaint-node.tsx:148
+#: src/features/workflow/components/nodes/image-to-video-node.tsx:179
+#: src/features/workflow/components/nodes/outpaint-node.tsx:156
 #: src/features/workflow/components/nodes/video-node.tsx:158
 msgid "Connect an image node as input"
 msgstr "画像ノードを入力として接続してください"
@@ -8430,7 +8433,7 @@ msgstr "コネクタを切断しました。プロバイダーの設定にまだ
 
 #. placeholder {0}: CONNECTOR_LABELS[connector.id] ?? connector.id
 #. placeholder {0}: connectorLabels[connector.id] ?? connector.id
-#: src/features/skills/components/skill-builder-review.tsx:276
+#: src/features/skills/components/skill-builder-review.tsx:279
 #: src/features/skills/components/skill-builder-setup.tsx:118
 msgid "Connector: {0}"
 msgstr "コネクタ：{0}"
@@ -8516,7 +8519,7 @@ msgid "Contains"
 msgstr "含む"
 
 #: src/features/devices/components/device-tool-call.tsx:131
-#: src/features/prompts/components/prompt-form-dialog.tsx:347
+#: src/features/prompts/components/prompt-form-dialog.tsx:311
 #: src/features/prompts/components/prompt-list-view.tsx:133
 #: src/features/prompts/components/prompt-list-view.tsx:136
 msgid "Content"
@@ -8534,7 +8537,7 @@ msgstr "コンテンツ画像"
 msgid "Content Image URL (optional)"
 msgstr "コンテンツ画像の URL（任意）"
 
-#: src/features/prompts/components/prompt-form-dialog.tsx:174
+#: src/features/prompts/components/prompt-form-dialog.tsx:159
 msgid "Content is required"
 msgstr "コンテンツは必須です"
 
@@ -8551,7 +8554,7 @@ msgstr "コンテンツスライド"
 msgid "Context"
 msgstr "コンテキスト"
 
-#: src/features/projects/components/project-form-dialog.tsx:379
+#: src/features/projects/components/project-form-dialog.tsx:384
 msgid "Context / Instructions"
 msgstr "コンテキスト / 指示"
 
@@ -8675,10 +8678,11 @@ msgid "Control panel"
 msgstr "コントロールパネル"
 
 #: src/features/workflow/components/nodes/controlnet-node.tsx:182
+#: src/features/workflow/components/nodes/controlnet-node.tsx:192
 msgid "Control Strength"
 msgstr "制御の強さ"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:192
+#: src/features/workflow/components/nodes/controlnet-node.tsx:200
 msgid "Control Timing"
 msgstr "制御のタイミング"
 
@@ -8686,7 +8690,7 @@ msgstr "制御のタイミング"
 msgid "Control Type"
 msgstr "制御の種類"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:215
+#: src/features/workflow/components/nodes/controlnet-node.tsx:239
 msgid "Control when the ControlNet influence applies during generation"
 msgstr "生成中に ControlNet の影響を適用するタイミングを制御します"
 
@@ -8723,7 +8727,7 @@ msgstr "会話履歴"
 msgid "Conversation not available"
 msgstr "会話を利用できません"
 
-#: src/features/develop/components/files-tab.tsx:471
+#: src/features/develop/components/files-tab.tsx:474
 msgid "Conversations and pending comments on files this list does not show"
 msgstr "このリストに表示されていないファイルの会話と保留中のコメント"
 
@@ -8805,7 +8809,7 @@ msgstr "クリップボードにコピーしました"
 #: src/components/copy-button.tsx:50
 #: src/features/auth/components/settings/two-factor/backup-codes-dialog.tsx:95
 #: src/features/chat/thread/message-item.tsx:358
-#: src/features/prompts/components/prompt-item.tsx:261
+#: src/features/prompts/components/prompt-item.tsx:256
 msgid "Copied!"
 msgstr "コピーしました！"
 
@@ -8818,7 +8822,7 @@ msgstr "コピーしました！"
 #: src/features/chat/thread/message-item.tsx:358
 #: src/features/chat/thread/text-selection-menu.tsx:525
 #: src/features/settings/components/chat/trigger-settings.tsx:767
-#: src/features/skills/components/bundle-import-dialog.tsx:207
+#: src/features/skills/components/bundle-import-dialog.tsx:212
 msgid "Copy"
 msgstr "コピー"
 
@@ -8853,11 +8857,11 @@ msgstr "診断情報をコピー"
 msgid "Copy diagnostics for {0}"
 msgstr "{0} の診断情報をコピー"
 
-#: src/features/pages/components/page-share-dialog.tsx:132
+#: src/features/pages/components/page-share-dialog.tsx:137
 msgid "Copy invite link"
 msgstr "招待リンクをコピー"
 
-#: src/features/pages/components/page-share-dialog.tsx:142
+#: src/features/pages/components/page-share-dialog.tsx:147
 msgid "Copy it now — it is not shown again."
 msgstr "今すぐコピーしてください。再表示はされません。"
 
@@ -8882,8 +8886,7 @@ msgstr "オブジェクトをコピー"
 msgid "Copy prompt"
 msgstr "プロンプトをコピー"
 
-#: src/features/prompts/components/prompt-item.tsx:240
-#: src/features/prompts/components/prompt-item.tsx:266
+#: src/features/prompts/components/prompt-item.tsx:261
 msgid "Copy Prompt"
 msgstr "プロンプトをコピー"
 
@@ -8892,7 +8895,7 @@ msgstr "プロンプトをコピー"
 msgid "Copy prompt link"
 msgstr "プロンプトのリンクをコピー"
 
-#: src/features/pages/components/page-share-dialog.tsx:76
+#: src/features/pages/components/page-share-dialog.tsx:80
 msgid "Copy public link"
 msgstr "公開リンクをコピー"
 
@@ -8930,7 +8933,7 @@ msgid "Copy the Phone number ID, a permanent (System User) access token, and the
 msgstr "Phone number ID、永続的な（System User）アクセストークン、App Secret（App settings > Basic）をコピーしてください。Verify token は任意の値を指定できます。"
 
 #: src/features/settings/components/chat/trigger-settings.tsx:753
-#: src/features/skills/components/bundle-import-dialog.tsx:195
+#: src/features/skills/components/bundle-import-dialog.tsx:200
 msgid "Copy this secret now and store it with your webhook sender. It will not be shown again."
 msgstr "このシークレットは今すぐコピーして、Webhook の送信元に保存してください。再表示はされません。"
 
@@ -8942,7 +8945,7 @@ msgstr "このシークレットは今すぐコピーして、Webhook の送信�
 msgid "Copy to clipboard"
 msgstr "クリップボードにコピー"
 
-#: src/features/prompts/components/prompt-item.tsx:189
+#: src/features/prompts/components/prompt-item.tsx:185
 #: src/features/prompts/components/prompt-list-view.tsx:204
 msgid "Copy to Clipboard"
 msgstr "クリップボードにコピー"
@@ -9049,7 +9052,7 @@ msgstr "質問に回答できませんでした。もう一度お試しくださ
 msgid "Could not answer. Please try again."
 msgstr "回答できませんでした。もう一度お試しください。"
 
-#: src/features/pages/components/page-agent-dialog.tsx:81
+#: src/features/pages/components/page-agent-dialog.tsx:82
 msgid "Could not apply the changes"
 msgstr "変更を適用できませんでした"
 
@@ -9117,7 +9120,7 @@ msgid "Could not compact the conversation. Try again."
 msgstr "会話の圧縮に失敗しました。もう一度お試しください。"
 
 #. placeholder {0}: target.name
-#: src/features/develop/components/checks-tab.tsx:124
+#: src/features/develop/components/checks-tab.tsx:125
 msgid "Could not confirm that {0} was started again. Check on {hostLabel} before you try again."
 msgstr "{0} が再開されたことを確認できませんでした。もう一度試す前に {hostLabel} を確認してください。"
 
@@ -9162,7 +9165,7 @@ msgid "Could not copy the prompt link. Your browser did not allow access to the 
 msgstr "プロンプトのリンクをコピーできませんでした。ブラウザがクリップボードへのアクセスを許可しませんでした。"
 
 #: src/features/settings/components/chat/trigger-settings.tsx:662
-#: src/features/skills/components/bundle-import-dialog.tsx:188
+#: src/features/skills/components/bundle-import-dialog.tsx:193
 msgid "Could not copy the secret. Select it and copy it manually."
 msgstr "シークレットをコピーできませんでした。選択して手動でコピーしてください。"
 
@@ -9189,7 +9192,7 @@ msgstr "ボットを作成できませんでした。"
 msgid "Could not create the group chat"
 msgstr "グループチャットを作成できませんでした"
 
-#: src/features/pages/components/pages-sidebar.tsx:90
+#: src/features/pages/components/pages-sidebar.tsx:91
 msgid "Could not create the page"
 msgstr "ページを作成できませんでした"
 
@@ -9205,7 +9208,7 @@ msgstr "コメントを削除できませんでした"
 msgid "Could not delete the login."
 msgstr "ログインを削除できませんでした。"
 
-#: src/features/pages/components/pages-sidebar.tsx:134
+#: src/features/pages/components/pages-sidebar.tsx:135
 msgid "Could not delete the page"
 msgstr "ページを削除できませんでした"
 
@@ -9295,12 +9298,12 @@ msgstr "読み込めませんでした"
 msgid "Could not load this chat's details."
 msgstr "このチャットの詳細を読み込めませんでした。"
 
-#: src/features/projects/components/project-repositories.tsx:288
+#: src/features/projects/components/project-repositories.tsx:282
 msgid "Could not load this project, so its repositories cannot be changed."
 msgstr "このプロジェクトを読み込めなかったため、リポジトリを変更できません。"
 
 #: src/features/projects/components/project-repo-picker.tsx:234
-#: src/features/projects/components/project-repositories.tsx:310
+#: src/features/projects/components/project-repositories.tsx:304
 msgid "Could not load this project's repositories."
 msgstr "このプロジェクトのリポジトリを読み込めませんでした。"
 
@@ -9336,7 +9339,7 @@ msgstr "保存された選択を読み込めなかったため、再度読み込
 msgid "Could not look up this repository's project."
 msgstr "このリポジトリのプロジェクトを取得できませんでした。"
 
-#: src/features/pages/components/pages-sidebar.tsx:97
+#: src/features/pages/components/pages-sidebar.tsx:98
 msgid "Could not move the page"
 msgstr "ページを移動できませんでした"
 
@@ -9432,11 +9435,11 @@ msgstr "参加者を削除できませんでした"
 msgid "Could not rename the device."
 msgstr "デバイス名を変更できませんでした。"
 
-#: src/features/pages/components/page-view.tsx:372
+#: src/features/pages/components/page-view.tsx:388
 msgid "Could not rename the page"
 msgstr "ページの名前を変更できませんでした"
 
-#: src/features/pages/components/page-view.tsx:283
+#: src/features/pages/components/page-view.tsx:299
 msgid "Could not restore this version"
 msgstr "このバージョンを復元できませんでした"
 
@@ -9486,8 +9489,8 @@ msgstr "メモリを保存できませんでした"
 msgid "Could not save the new order for {label}"
 msgstr "{label} の新しい順序を保存できませんでした"
 
-#: src/features/pages/components/page-view.tsx:160
-#: src/features/pages/components/page-view.tsx:248
+#: src/features/pages/components/page-view.tsx:162
+#: src/features/pages/components/page-view.tsx:264
 msgid "Could not save the page"
 msgstr "ページを保存できませんでした"
 
@@ -9596,7 +9599,7 @@ msgstr "元に戻せませんでした。もう一度お試しください。"
 msgid "Could not unsnooze the thread. Please try again."
 msgstr "スレッドのスヌーズを解除できませんでした。もう一度お試しください。"
 
-#: src/features/pages/components/page-comments-panel.tsx:216
+#: src/features/pages/components/page-comments-panel.tsx:218
 msgid "Could not update the comment"
 msgstr "コメントを更新できませんでした"
 
@@ -9695,7 +9698,7 @@ msgstr "チームで共同作業するための新しい組織を作成します
 msgid "Create a new project to group related chats with shared context."
 msgstr "関連するチャットを共有コンテキストでまとめる新しいプロジェクトを作成します。"
 
-#: src/features/prompts/components/prompt-form-dialog.tsx:239
+#: src/features/prompts/components/prompt-form-dialog.tsx:224
 msgid "Create a new prompt to use as a system prompt."
 msgstr "システムプロンプトとして使う新しいプロンプトを作成します。"
 
@@ -9719,7 +9722,7 @@ msgstr "api.slack.com/apps で Events API を有効にした Slack アプリを�
 msgid "Create a tag…"
 msgstr "タグを作成…"
 
-#: src/features/tasks/components/tasks-page.tsx:247
+#: src/features/tasks/components/tasks-page.tsx:252
 msgid "Create a task, give it success criteria, and run it. You can chain tasks with dependencies and repeat them on a schedule."
 msgstr "タスクを作成し、成功基準を設定して実行します。依存関係でタスクをつなげたり、スケジュールで繰り返したりできます。"
 
@@ -9795,7 +9798,7 @@ msgstr "FLUX、Imagen、Stable Diffusion で画像を作成し、Runway、Luma�
 msgid "Create Invite"
 msgstr "招待を作成"
 
-#: src/features/pages/components/page-share-dialog.tsx:124
+#: src/features/pages/components/page-share-dialog.tsx:125
 msgid "Create link"
 msgstr "リンクを作成"
 
@@ -9830,13 +9833,13 @@ msgstr "PR を作成"
 #~ msgstr "プロジェクトを作成"
 
 #: src/features/projects/components/project-form-dialog.tsx:243
-#: src/features/projects/components/project-form-dialog.tsx:487
+#: src/features/projects/components/project-form-dialog.tsx:492
 msgid "Create Project"
 msgstr "プロジェクトを作成"
 
 #: src/features/prompts/components/prompt-empty-state.tsx:49
-#: src/features/prompts/components/prompt-form-dialog.tsx:237
-#: src/features/prompts/components/prompt-form-dialog.tsx:517
+#: src/features/prompts/components/prompt-form-dialog.tsx:222
+#: src/features/prompts/components/prompt-form-dialog.tsx:481
 msgid "Create Prompt"
 msgstr "プロンプトを作成"
 
@@ -9867,7 +9870,7 @@ msgstr "チームを作成して、メンバーをグループに整理します
 msgid "Create Trigger"
 msgstr "トリガーを作成"
 
-#: src/routes/(chat)/workflow/index.tsx:65
+#: src/routes/(chat)/workflow/index.tsx:66
 msgid "Create Workflow"
 msgstr "ワークフローを作成"
 
@@ -9887,7 +9890,7 @@ msgstr "最初のスキルを作成してワークフローを自動化しまし
 msgid "Create your first trigger to automate agent execution on a schedule or via webhooks."
 msgstr "最初のトリガーを作成して、スケジュールまたはWebhook経由でエージェントの実行を自動化しましょう。"
 
-#: src/routes/(chat)/workflow/index.tsx:62
+#: src/routes/(chat)/workflow/index.tsx:63
 msgid "Create your first workflow to automate AI tasks visually."
 msgstr "最初のワークフローを作成して、AI タスクを視覚的に自動化しましょう。"
 
@@ -9901,7 +9904,7 @@ msgstr "作成日"
 msgid "Created {0}"
 msgstr "{0} を作成しました"
 
-#: src/features/skills/components/bundle-import-dialog.tsx:151
+#: src/features/skills/components/bundle-import-dialog.tsx:156
 msgid "Created switched off."
 msgstr "オフの状態で作成されました。"
 
@@ -9909,7 +9912,7 @@ msgstr "オフの状態で作成されました。"
 msgid "Created: {createdAt}"
 msgstr "作成日：{createdAt}"
 
-#: src/features/pages/components/page-share-dialog.tsx:93
+#: src/features/pages/components/page-share-dialog.tsx:95
 msgid "Creates a single-use link, valid for 7 days. Whoever opens it signed in gets access."
 msgstr "7 日間有効な 1 回限りのリンクを作成します。サインインした状態で開いた人がアクセス権を得ます。"
 
@@ -10114,7 +10117,7 @@ msgstr "現在制限中"
 #: src/features/chat/sharing/thread-share-button.tsx:336
 #: src/features/marketing/components/gateway-landing-page.tsx:792
 #: src/features/marketing/components/landing-page.tsx:1014
-#: src/features/prompts/components/prompt-form-dialog.tsx:444
+#: src/features/prompts/components/prompt-form-dialog.tsx:408
 #: src/features/settings/components/chat/bot-tool-selection.tsx:480
 #: src/features/settings/components/chat/webhook-trigger-fields.tsx:77
 msgid "Custom"
@@ -10423,7 +10426,7 @@ msgid "Debate rounds"
 msgstr "ディベートのラウンド数"
 
 #. placeholder {0}: String(group.debateRounds)
-#: src/features/skills/components/bundle-import-dialog.tsx:158
+#: src/features/skills/components/bundle-import-dialog.tsx:163
 msgid "Debates for {0} rounds."
 msgstr "{0} ラウンドにわたって討論します。"
 
@@ -10541,7 +10544,7 @@ msgid "default"
 msgstr "デフォルト"
 
 #: src/features/appearance/components/appearance-controls.tsx:185
-#: src/features/projects/components/project-repositories.tsx:342
+#: src/features/projects/components/project-repositories.tsx:336
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:108
 msgid "Default"
 msgstr "既定"
@@ -10556,11 +10559,11 @@ msgstr "既定のエージェント"
 msgid "Default AI Response Language"
 msgstr "AI の既定の応答言語"
 
-#: src/features/projects/components/project-form-dialog.tsx:404
+#: src/features/projects/components/project-form-dialog.tsx:409
 msgid "Default AI Settings"
 msgstr "既定の AI 設定"
 
-#: src/features/projects/components/project-repositories.tsx:403
+#: src/features/projects/components/project-repositories.tsx:397
 #: src/features/tasks/components/task-form-dialog.tsx:341
 msgid "Default branch"
 msgstr "既定のブランチ"
@@ -10569,7 +10572,7 @@ msgstr "既定のブランチ"
 msgid "Default branch of {name}"
 msgstr "{name} のデフォルトブランチ"
 
-#: src/features/projects/components/project-repositories.tsx:337
+#: src/features/projects/components/project-repositories.tsx:331
 msgid "Default branch:"
 msgstr "デフォルトブランチ:"
 
@@ -10598,7 +10601,7 @@ msgstr "既定の言語を更新しました"
 msgid "default model"
 msgstr "デフォルトモデル"
 
-#: src/features/projects/components/project-form-dialog.tsx:414
+#: src/features/projects/components/project-form-dialog.tsx:419
 msgid "Default Model"
 msgstr "既定のモデル"
 
@@ -10711,8 +10714,8 @@ msgstr "委任された{0}の作業はこのモデルで実行されます。"
 #: src/features/evals/components/evals-page.tsx:163
 #: src/features/local-models/components/ollama-model-manager.tsx:336
 #: src/features/pages/components/page-tree-item.tsx:174
-#: src/features/pages/components/pages-sidebar.tsx:281
-#: src/features/prompts/components/prompt-item.tsx:228
+#: src/features/pages/components/pages-sidebar.tsx:282
+#: src/features/prompts/components/prompt-item.tsx:224
 #: src/features/prompts/components/prompt-list-view.tsx:227
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:751
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:890
@@ -10721,9 +10724,9 @@ msgstr "委任された{0}の作業はこのモデルで実行されます。"
 #: src/features/settings/components/chat/system-prompt-preset-settings.tsx:334
 #: src/features/settings/components/chat/trigger-settings.tsx:1088
 #: src/features/skills/components/skill-list.tsx:311
-#: src/features/tasks/components/goal-list.tsx:54
+#: src/features/tasks/components/goal-list.tsx:51
 #: src/features/tasks/components/task-card.tsx:113
-#: src/features/tasks/components/tasks-page.tsx:334
+#: src/features/tasks/components/tasks-page.tsx:339
 #: src/features/vault/components/site-logins.tsx:655
 msgid "Delete"
 msgstr "削除"
@@ -10737,7 +10740,7 @@ msgstr "削除"
 msgid "Delete \"{0}\"?"
 msgstr "「{0}」を削除しますか？"
 
-#: src/features/pages/components/pages-sidebar.tsx:289
+#: src/features/pages/components/pages-sidebar.tsx:290
 msgid "Delete “{pendingDeleteTitle}”?"
 msgstr "「{pendingDeleteTitle}」を削除しますか？"
 
@@ -10829,11 +10832,11 @@ msgstr "データセット「{0}」を削除しますか？"
 msgid "Delete File"
 msgstr "ファイルを削除"
 
-#: src/features/tasks/components/tasks-page.tsx:344
+#: src/features/tasks/components/tasks-page.tsx:349
 msgid "Delete goal \"{deleteTitle}\"?"
 msgstr "目標「{deleteTitle}」を削除しますか？"
 
-#: src/features/tasks/components/goal-list.tsx:54
+#: src/features/tasks/components/goal-list.tsx:51
 msgid "Delete goal {title}"
 msgstr "目標 {title} を削除"
 
@@ -10896,7 +10899,7 @@ msgstr "プリセットを削除しますか？"
 msgid "Delete Project"
 msgstr "プロジェクトを削除"
 
-#: src/features/prompts/components/prompt-item.tsx:308
+#: src/features/prompts/components/prompt-item.tsx:303
 #: src/features/prompts/components/prompt-list-view.tsx:316
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:972
 msgid "Delete Prompt"
@@ -10906,7 +10909,7 @@ msgstr "プロンプトを削除"
 msgid "Delete Prompts"
 msgstr "プロンプトを削除"
 
-#: src/features/pages/components/page-comments-panel.tsx:188
+#: src/features/pages/components/page-comments-panel.tsx:190
 msgid "Delete reply"
 msgstr "返信を削除"
 
@@ -10928,7 +10931,7 @@ msgstr "選択項目を削除"
 
 #: ../../packages/ui/src/components/canvas-editor/fabric-canvas-editor.tsx:624
 #: src/features/prompts/components/prompt-list-view.tsx:288
-#: src/features/prompts/components/prompt-list.tsx:632
+#: src/features/prompts/components/prompt-list.tsx:634
 msgid "Delete Selected"
 msgstr "選択した項目を削除"
 
@@ -10958,7 +10961,7 @@ msgstr "タグを削除"
 msgid "Delete tag {0}"
 msgstr "タグ {0} を削除"
 
-#: src/features/tasks/components/tasks-page.tsx:344
+#: src/features/tasks/components/tasks-page.tsx:349
 msgid "Delete task \"{deleteTitle}\"?"
 msgstr "タスク「{deleteTitle}」を削除しますか？"
 
@@ -10986,7 +10989,7 @@ msgstr "このログインを削除しますか？"
 #: src/components/command-palette.tsx:1041
 #: src/features/chat/thread-list/thread-node.tsx:658
 #: src/features/chat/thread-list/thread-node.tsx:664
-#: src/features/pages/components/page-comments-panel.tsx:188
+#: src/features/pages/components/page-comments-panel.tsx:190
 msgid "Delete thread"
 msgstr "スレッドを削除"
 
@@ -11162,7 +11165,7 @@ msgstr "彩度を下げる"
 msgid "Desc"
 msgstr "降順"
 
-#: src/features/pages/components/page-agent-dialog.tsx:91
+#: src/features/pages/components/page-agent-dialog.tsx:92
 msgid "Describe a change. You review the result before anything is saved; applying it creates a version you can restore."
 msgstr "変更内容を説明してください。保存前に結果を確認でき、適用すると復元可能なバージョンが作成されます。"
 
@@ -11191,7 +11194,7 @@ msgstr "動き/アニメーションを説明してください..."
 msgid "Describe the scene or add style modifiers..."
 msgstr "シーンを説明するか、スタイル修飾子を追加してください..."
 
-#: src/features/workflow/components/nodes/character-ref-node.tsx:256
+#: src/features/workflow/components/nodes/character-ref-node.tsx:265
 msgid "Describe the scene or context..."
 msgstr "シーンやコンテキストを説明してください..."
 
@@ -11211,7 +11214,7 @@ msgstr "作成したい動画を説明してください..."
 msgid "Describe what the skill should do. The fields below are filled in for you to review."
 msgstr "スキルに何をさせたいかを説明してください。下のフィールドが自動入力されるので、確認してください。"
 
-#: src/features/workflow/components/gallery/publish-dialog.tsx:181
+#: src/features/workflow/components/gallery/publish-dialog.tsx:182
 msgid "Describe what this workflow does..."
 msgstr "このワークフローの内容を説明してください..."
 
@@ -11241,18 +11244,18 @@ msgstr "ワークフローを説明してください...例：「テキストか
 #: src/features/evals/components/dataset-form-dialog.tsx:102
 #: src/features/knowledge/components/collection-dialog.tsx:69
 #: src/features/projects/components/project-form-dialog.tsx:273
-#: src/features/prompts/components/prompt-form-dialog.tsx:266
+#: src/features/prompts/components/prompt-form-dialog.tsx:251
 #: src/features/prompts/components/prompt-list-view.tsx:117
 #: src/features/prompts/components/prompt-list-view.tsx:120
 #: src/features/prompts/components/variable-definitions.tsx:122
 #: src/features/settings/components/chat/bots-settings.tsx:386
-#: src/features/skills/components/bundle-import-dialog.tsx:115
-#: src/features/skills/components/bundle-import-dialog.tsx:148
+#: src/features/skills/components/bundle-import-dialog.tsx:120
+#: src/features/skills/components/bundle-import-dialog.tsx:153
 #: src/features/skills/components/skill-builder-diff.tsx:28
-#: src/features/skills/components/skill-builder-review.tsx:157
+#: src/features/skills/components/skill-builder-review.tsx:160
 #: src/features/skills/components/skill-form-dialog.tsx:255
 #: src/features/tasks/components/goal-form-dialog.tsx:109
-#: src/features/workflow/components/gallery/publish-dialog.tsx:176
+#: src/features/workflow/components/gallery/publish-dialog.tsx:177
 msgid "Description"
 msgstr "説明"
 
@@ -11440,7 +11443,7 @@ msgstr "不合格"
 msgid "Did you mean: {suggestion}?"
 msgstr "もしかして: {suggestion}？"
 
-#: src/features/develop/components/files-tab.tsx:305
+#: src/features/develop/components/files-tab.tsx:308
 msgid "Diffs are not available from this host."
 msgstr "このホストでは差分を利用できません。"
 
@@ -11473,7 +11476,7 @@ msgid "Disable deep work mode"
 msgstr "ディープワークモードを無効にする"
 
 #. placeholder {0}: tool.name
-#: src/features/skills/components/skill-builder-review.tsx:235
+#: src/features/skills/components/skill-builder-review.tsx:238
 msgid "Disable tool <0>{0}</0>"
 msgstr "ツール <0>{0}</0> を無効化"
 
@@ -11501,12 +11504,12 @@ msgstr "無効化しています..."
 
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:808
 #: src/features/develop/components/review-panel.tsx:284
-#: src/features/pages/components/page-agent-dialog.tsx:139
+#: src/features/pages/components/page-agent-dialog.tsx:141
 #: src/features/pages/components/page-kept-draft.tsx:42
 msgid "Discard"
 msgstr "破棄"
 
-#: src/features/projects/components/project-form-dialog.tsx:515
+#: src/features/projects/components/project-form-dialog.tsx:520
 #: src/features/projects/components/project-rule-files.tsx:1041
 msgid "Discard changes"
 msgstr "変更を破棄"
@@ -11515,7 +11518,7 @@ msgstr "変更を破棄"
 msgid "Discard comments"
 msgstr "コメントを破棄"
 
-#: src/features/projects/components/project-form-dialog.tsx:502
+#: src/features/projects/components/project-form-dialog.tsx:507
 msgid "Discard rule file changes?"
 msgstr "ルールファイルの変更を破棄しますか？"
 
@@ -11729,7 +11732,7 @@ msgstr "このプロジェクトでは既定の指示を使わない"
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:184
 #: src/features/devices/components/devices-settings.tsx:448
 #: src/features/onboarding/components/setup-checklist.tsx:135
-#: src/features/skills/components/bundle-import-dialog.tsx:248
+#: src/features/skills/components/bundle-import-dialog.tsx:253
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:65
 #: src/features/sub-agents/components/worker-run-log.tsx:29
 #: src/features/tasks/components/task-status.tsx:16
@@ -11917,9 +11920,9 @@ msgstr "ダウンロードは GitHub のリリースページに移動します�
 
 #: src/features/chat/link-preview/link-preview-card.tsx:117
 #: src/features/chat/thread-list/thread-node.tsx:946
-#: src/features/develop/components/inbox-list.tsx:118
+#: src/features/develop/components/inbox-list.tsx:119
 #: src/features/develop/components/pull-request-view.tsx:83
-#: src/features/skills/components/skill-builder-review.tsx:133
+#: src/features/skills/components/skill-builder-review.tsx:136
 msgid "Draft"
 msgstr "下書き"
 
@@ -12045,7 +12048,9 @@ msgid "Duration"
 msgstr "長さ"
 
 #: src/features/workflow/components/nodes/image-to-video-node.tsx:122
+#: src/features/workflow/components/nodes/image-to-video-node.tsx:130
 #: src/features/workflow/components/nodes/video-node.tsx:197
+#: src/features/workflow/components/nodes/video-node.tsx:205
 msgid "Duration: {duration}s"
 msgstr "長さ: {duration} 秒"
 
@@ -12106,7 +12111,7 @@ msgstr "例：製品ハンドブック"
 msgid "e.g. Review pull requests for security issues and summarise the risks in a table"
 msgstr "例：プルリクエストのセキュリティ問題をレビューし、リスクを表にまとめる"
 
-#: src/features/pages/components/page-agent-dialog.tsx:126
+#: src/features/pages/components/page-agent-dialog.tsx:127
 msgid "e.g. Tighten the introduction and add a summary at the end"
 msgstr "例：導入部を簡潔にし、最後に要約を追加する"
 
@@ -12142,7 +12147,7 @@ msgstr "例：JSON 出力をより厳密に、コード例を追加..."
 msgid "e.g., Product Designer, Software Developer"
 msgstr "例：プロダクトデザイナー、ソフトウェア開発者"
 
-#: src/features/prompts/components/prompt-form-dialog.tsx:254
+#: src/features/prompts/components/prompt-form-dialog.tsx:239
 msgid "e.g., Professional Writer"
 msgstr "例：プロのライター"
 
@@ -12262,12 +12267,12 @@ msgstr "エッジに沿った生成"
 #: src/features/chat/thread/composer-text-attachment-editor.tsx:799
 #: src/features/chat/thread/message-item.tsx:398
 #: src/features/develop/components/draft-comment-card.tsx:51
-#: src/features/pages/components/page-version-panel.tsx:50
-#: src/features/prompts/components/prompt-item.tsx:212
+#: src/features/pages/components/page-version-panel.tsx:49
+#: src/features/prompts/components/prompt-item.tsx:208
 #: src/features/prompts/components/prompt-list-view.tsx:218
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:730
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:869
-#: src/features/tasks/components/goal-list.tsx:51
+#: src/features/tasks/components/goal-list.tsx:48
 #: src/features/tasks/components/task-card.tsx:110
 #: src/features/workflow/components/version-history.tsx:67
 msgid "Edit"
@@ -12330,7 +12335,7 @@ msgstr "抜粋を編集"
 msgid "Edit goal"
 msgstr "目標を編集"
 
-#: src/features/tasks/components/goal-list.tsx:51
+#: src/features/tasks/components/goal-list.tsx:48
 msgid "Edit goal {title}"
 msgstr "目標 {title} を編集"
 
@@ -12380,9 +12385,9 @@ msgstr "プリセットを編集"
 msgid "Edit Project"
 msgstr "プロジェクトを編集"
 
-#: src/features/prompts/components/prompt-form-dialog.tsx:237
+#: src/features/prompts/components/prompt-form-dialog.tsx:222
+#: src/features/prompts/components/prompt-item.tsx:150
 #: src/features/prompts/components/prompt-item.tsx:154
-#: src/features/prompts/components/prompt-item.tsx:158
 msgid "Edit Prompt"
 msgstr "プロンプトを編集"
 
@@ -12456,7 +12461,7 @@ msgstr "動画を編集"
 msgid "Edit your message..."
 msgstr "メッセージを編集..."
 
-#: src/features/pages/components/page-comments-panel.tsx:184
+#: src/features/pages/components/page-comments-panel.tsx:186
 msgid "edited"
 msgstr "編集済み"
 
@@ -12779,7 +12784,7 @@ msgid "Enable specialized modules to enhance AI capabilities"
 msgstr "専用モジュールを有効にして AI の機能を強化"
 
 #. placeholder {0}: tool.name
-#: src/features/skills/components/skill-builder-review.tsx:220
+#: src/features/skills/components/skill-builder-review.tsx:223
 msgid "Enable tool <0>{0}</0>"
 msgstr "ツール <0>{0}</0> を有効化"
 
@@ -12824,7 +12829,8 @@ msgstr "「Events & Callbacks > Encryption Strategy」にある Encrypt Key（�
 msgid "Encrypted at rest and never shown again. Local servers such as Ollama usually need none."
 msgstr "保存時に暗号化され、再表示されることはありません。Ollama などのローカルサーバーでは通常不要です。"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:207
+#: src/features/workflow/components/nodes/controlnet-node.tsx:223
+#: src/features/workflow/components/nodes/controlnet-node.tsx:233
 #: src/features/workflow/components/nodes/video-trim-dialog.tsx:192
 msgid "End"
 msgstr "終了"
@@ -12901,13 +12907,11 @@ msgstr "英語（英国）"
 msgid "English (US)"
 msgstr "英語（米国）"
 
-#: src/features/workflow/components/nodes/upscale-node.tsx:130
-#: src/features/workflow/components/nodes/upscale-node.tsx:133
+#: src/features/workflow/components/nodes/upscale-node.tsx:125
 msgid "Enhance Details"
 msgstr "ディテールを強化"
 
 #: src/features/workflow/components/nodes/upscale-node.tsx:117
-#: src/features/workflow/components/nodes/upscale-node.tsx:120
 msgid "Enhance Faces"
 msgstr "顔を補正"
 
@@ -13036,7 +13040,7 @@ msgstr "プルリクエストは owner/name#123 の形式で入力してくだ�
 msgid "Enter puts the prompt in the composer. It is not sent."
 msgstr "Enter でプロンプトを入力欄に入れます。送信はされません。"
 
-#: src/features/workflow/components/nodes/advanced-controls-node.tsx:199
+#: src/features/workflow/components/nodes/advanced-controls-node.tsx:208
 msgid "Enter seed..."
 msgstr "シードを入力..."
 
@@ -13049,7 +13053,7 @@ msgid "Enter text or leave empty to use input from previous node..."
 msgstr "テキストを入力するか、空欄のままにして前のノードの入力を使用..."
 
 #: ../../packages/ui/src/components/data-grid/data-grid-cell-long-text.tsx:174
-#: src/features/workflow/components/nodes/text-node.tsx:151
+#: src/features/workflow/components/nodes/text-node.tsx:152
 msgid "Enter text..."
 msgstr "テキストを入力..."
 
@@ -13187,7 +13191,7 @@ msgstr "二要素認証を有効にするにはパスワードを入力してく
 msgid "Enter your profession"
 msgstr "職業を入力"
 
-#: src/features/prompts/components/prompt-form-dialog.tsx:357
+#: src/features/prompts/components/prompt-form-dialog.tsx:321
 msgid "Enter your prompt content here... Use {VARIABLE_PLACEHOLDER} for dynamic content."
 msgstr "プロンプトの内容をここに入力してください... 動的な内容には {VARIABLE_PLACEHOLDER} を使用します。"
 
@@ -13682,6 +13686,7 @@ msgid "Expand to fullscreen"
 msgstr "全画面表示に展開"
 
 #: src/features/workflow/components/nodes/outpaint-node.tsx:126
+#: src/features/workflow/components/nodes/outpaint-node.tsx:134
 msgid "Expand: {expandPixels}px"
 msgstr "拡張: {expandPixels}px"
 
@@ -13732,7 +13737,7 @@ msgstr "有効期限"
 msgid "Expiration updated to {0}"
 msgstr "有効期限を {0} に更新しました"
 
-#: src/features/pages/components/page-share-dialog.tsx:206
+#: src/features/pages/components/page-share-dialog.tsx:216
 msgid "expired"
 msgstr "期限切れ"
 
@@ -14002,7 +14007,7 @@ msgstr "不合格"
 #: src/features/chat/thread-list/thread-status-icon.tsx:88
 #: src/features/chat/thread/host-activity.tsx:139
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:181
-#: src/features/develop/components/checks-tab.tsx:77
+#: src/features/develop/components/checks-tab.tsx:78
 #: src/features/devices/components/devices-settings.tsx:451
 #: src/features/evals/components/model-comparison.tsx:112
 #: src/features/evals/components/run-status.tsx:15
@@ -15144,17 +15149,17 @@ msgstr "ファビコン"
 msgid "Favorite models"
 msgstr "お気に入りのモデル"
 
-#: src/features/pages/components/pages-sidebar.tsx:191
+#: src/features/pages/components/pages-sidebar.tsx:192
 msgid "Favorite pages"
 msgstr "お気に入りのページ"
 
-#: src/features/pages/components/pages-sidebar.tsx:194
+#: src/features/pages/components/pages-sidebar.tsx:195
 #: src/features/prompts/components/prompt-list.tsx:439
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:644
 msgid "Favorites"
 msgstr "お気に入り"
 
-#: src/routes/(chat)/workflow/gallery.tsx:114
+#: src/routes/(chat)/workflow/gallery.tsx:113
 msgid "Featured"
 msgstr "注目"
 
@@ -15175,7 +15180,7 @@ msgid "Features"
 msgstr "機能"
 
 #. placeholder {0}: enabledFeatures.join(", ")
-#: src/features/prompts/components/prompt-form-dialog.tsx:452
+#: src/features/prompts/components/prompt-form-dialog.tsx:416
 msgid "Features: {0}"
 msgstr "機能：{0}"
 
@@ -15222,7 +15227,7 @@ msgstr "Feishu Encrypt Key"
 msgid "Feishu Verification Token"
 msgstr "Feishu Verification Token"
 
-#: src/features/skills/components/skill-import-dialog.tsx:195
+#: src/features/skills/components/skill-import-dialog.tsx:196
 msgid "Fetch"
 msgstr "取得"
 
@@ -15231,7 +15236,7 @@ msgstr "取得"
 msgid "Fetch models"
 msgstr "モデルを取得"
 
-#: src/features/skills/components/skill-import-dialog.tsx:198
+#: src/features/skills/components/skill-import-dialog.tsx:199
 msgid "Fetching link…"
 msgstr "リンクを取得中…"
 
@@ -15463,7 +15468,7 @@ msgstr "スキルを絞り込む"
 msgid "Filter value"
 msgstr "フィルターの値"
 
-#: src/features/prompts/components/prompt-list.tsx:599
+#: src/features/prompts/components/prompt-list.tsx:601
 msgid "Filter:"
 msgstr "フィルター："
 
@@ -15837,11 +15842,11 @@ msgstr "「{0}」をフォークしました — コピーを開いています�
 msgid "Forking..."
 msgstr "フォークしています..."
 
-#: src/features/workflow/components/nodes/text-node.tsx:212
+#: src/features/workflow/components/nodes/text-node.tsx:213
 msgid "Format"
 msgstr "整形"
 
-#: src/features/workflow/components/nodes/text-node.tsx:104
+#: src/features/workflow/components/nodes/text-node.tsx:105
 msgid "Formatting would change values"
 msgstr "整形すると値が変わります"
 
@@ -16357,8 +16362,8 @@ msgstr "キャラクターの外見を一貫させて画像を生成"
 msgid "Generate images with FLUX and Stable Diffusion, create videos with Runway and Luma — all from the same chat."
 msgstr "FLUX や Stable Diffusion で画像を生成し、Runway や Luma で動画を作成。すべて同じチャットから行えます。"
 
-#: src/features/workflow/components/nodes/advanced-controls-node.tsx:204
-#: src/features/workflow/components/nodes/advanced-controls-node.tsx:208
+#: src/features/workflow/components/nodes/advanced-controls-node.tsx:213
+#: src/features/workflow/components/nodes/advanced-controls-node.tsx:217
 msgid "Generate random seed"
 msgstr "ランダムなシードを生成"
 
@@ -16457,7 +16462,7 @@ msgstr "生成"
 msgid "Generation Prompt"
 msgstr "生成プロンプト"
 
-#: src/features/workflow/components/nodes/character-ref-node.tsx:250
+#: src/features/workflow/components/nodes/character-ref-node.tsx:259
 #: src/features/workflow/components/nodes/style-ref-node.tsx:160
 msgid "Generation Prompt (optional)"
 msgstr "生成プロンプト（任意）"
@@ -16591,7 +16596,7 @@ msgstr "GitLab シークレットトークン（X-Gitlab-Token）"
 msgid "Give every rule file a name."
 msgstr "すべてのルールファイルに名前を付けてください。"
 
-#: src/features/pages/components/page-share-dialog.tsx:231
+#: src/features/pages/components/page-share-dialog.tsx:241
 msgid "Give people access to this page, or publish a read-only link."
 msgstr "このページへのアクセス権を付与するか、読み取り専用のリンクを公開します。"
 
@@ -16630,7 +16635,7 @@ msgstr "チャットへ移動"
 msgid "Go to Chat"
 msgstr "チャットへ移動"
 
-#: src/features/pages/components/page-comments-panel.tsx:169
+#: src/features/pages/components/page-comments-panel.tsx:171
 msgid "Go to commented text: "
 msgstr "コメント箇所へ移動： "
 
@@ -16747,7 +16752,7 @@ msgstr "目標：{goalTitle}"
 msgid "Goal: run until done"
 msgstr "目標: 完了するまで実行"
 
-#: src/features/tasks/components/tasks-page.tsx:228
+#: src/features/tasks/components/tasks-page.tsx:233
 msgid "Goals"
 msgstr "目標"
 
@@ -17530,11 +17535,11 @@ msgstr "OpenAI の最小かつ最速のモデルを必要とする大量の軽�
 msgid "High-volume, time-sensitive workflows where generation speed is the top priority"
 msgstr "生成速度が最優先となる、大量かつ時間的制約のあるワークフロー"
 
-#: src/features/workflow/components/nodes/character-ref-node.tsx:244
+#: src/features/workflow/components/nodes/character-ref-node.tsx:253
 msgid "Higher = closer match to reference"
 msgstr "高いほど参照に近くなる"
 
-#: src/features/workflow/components/nodes/advanced-controls-node.tsx:114
+#: src/features/workflow/components/nodes/advanced-controls-node.tsx:122
 msgid "Higher = more prompt adherence, Lower = more creativity"
 msgstr "高いほどプロンプトに忠実、低いほど創造的"
 
@@ -17598,7 +17603,7 @@ msgid "Holds until"
 msgstr "有効期限"
 
 #: src/components/error-boundaries/route-error-boundary.tsx:118
-#: src/features/home/components/home-page.tsx:130
+#: src/features/home/components/home-page.tsx:133
 #: src/features/layout/components/sidebar-shortcut.tsx:71
 #: src/features/layout/lib/dashboard-page-names.ts:24
 msgid "Home"
@@ -17792,7 +17797,7 @@ msgstr "アイスランド語"
 msgid "Icelandic (Iceland)"
 msgstr "アイスランド語（アイスランド）"
 
-#: src/features/projects/components/project-form-dialog.tsx:334
+#: src/features/projects/components/project-form-dialog.tsx:339
 msgid "Icon"
 msgstr "アイコン"
 
@@ -17846,7 +17851,7 @@ msgid "If this problem persists, please contact support."
 msgstr "問題が解決しない場合は、サポートにお問い合わせください。"
 
 #. placeholder {0}: new Date(trigger.nextRunAt).toLocaleString()
-#: src/features/skills/components/bundle-import-dialog.tsx:138
+#: src/features/skills/components/bundle-import-dialog.tsx:143
 msgid "If you turn it on, the next run is {0}."
 msgstr "オンにすると、次回の実行は {0} です。"
 
@@ -17854,7 +17859,7 @@ msgstr "オンにすると、次回の実行は {0} です。"
 msgid "If your chosen model is unavailable, the reply is retried on these models in order"
 msgstr "選択したモデルが利用できない場合、返信はこれらのモデルで順番に再試行されます"
 
-#: src/features/skills/components/bundle-import-dialog.tsx:123
+#: src/features/skills/components/bundle-import-dialog.tsx:128
 msgid "Ignored, not available here:"
 msgstr "無視されました（ここでは利用できません）:"
 
@@ -17887,7 +17892,7 @@ msgstr "イラスト"
 #: src/features/workflow/templates/index.ts:364
 #: src/features/workflow/types/index.ts:508
 #: src/features/workflow/types/index.ts:512
-#: src/routes/(chat)/workflow/gallery.tsx:21
+#: src/routes/(chat)/workflow/gallery.tsx:20
 msgid "Image"
 msgstr "画像"
 
@@ -18110,17 +18115,17 @@ msgstr "実装"
 
 #: src/features/evals/components/dataset-panel.tsx:115
 #: src/features/evals/components/import-cases-dialog.tsx:116
-#: src/features/skills/components/skill-import-dialog.tsx:247
+#: src/features/skills/components/skill-import-dialog.tsx:249
 #: src/features/skills/components/skill-list.tsx:352
 msgid "Import"
 msgstr "インポート"
 
 #. placeholder {0}: selectedCount(selected, entries)
-#: src/features/skills/components/bundle-import-dialog.tsx:436
+#: src/features/skills/components/bundle-import-dialog.tsx:441
 msgid "Import {0} items"
 msgstr "{0} 件のアイテムをインポート"
 
-#: src/features/skills/components/bundle-import-dialog.tsx:352
+#: src/features/skills/components/bundle-import-dialog.tsx:357
 msgid "Import a bundle"
 msgstr "バンドルをインポート"
 
@@ -18255,7 +18260,7 @@ msgid "Imported {imported} · Updated {updated} · Duplicates {duplicates} · To
 msgstr "インポート済み {imported} · 更新 {updated} · 重複 {duplicates} · 長すぎる {tooLong} · 無効 {invalid}"
 
 #. placeholder {0}: skill.slug
-#: src/features/skills/components/bundle-import-dialog.tsx:129
+#: src/features/skills/components/bundle-import-dialog.tsx:134
 msgid "Imported as /{0}."
 msgstr "/{0} としてインポートしました。"
 
@@ -18538,7 +18543,7 @@ msgstr "インペインティング"
 msgid "Input"
 msgstr "入力"
 
-#: src/features/workflow/components/nodes/text-node.tsx:131
+#: src/features/workflow/components/nodes/text-node.tsx:132
 msgid "Input (Rich Text)"
 msgstr "入力（リッチテキスト）"
 
@@ -18657,11 +18662,11 @@ msgstr "指示"
 
 #: src/features/projects/components/project-rule-files.tsx:347
 #: src/features/settings/components/chat/bots-settings.tsx:395
-#: src/features/skills/components/bundle-import-dialog.tsx:116
-#: src/features/skills/components/bundle-import-dialog.tsx:150
+#: src/features/skills/components/bundle-import-dialog.tsx:121
+#: src/features/skills/components/bundle-import-dialog.tsx:155
 #: src/features/skills/components/marketplace-skill-detail-dialog.tsx:155
 #: src/features/skills/components/skill-builder-diff.tsx:31
-#: src/features/skills/components/skill-builder-review.tsx:166
+#: src/features/skills/components/skill-builder-review.tsx:169
 #: src/features/skills/components/skill-form-dialog.tsx:274
 #: src/features/tasks/components/task-detail-dialog.tsx:233
 #: src/features/tasks/components/task-form-dialog.tsx:239
@@ -18695,7 +18700,7 @@ msgstr "連携"
 
 #: src/features/marketing/components/landing-page.tsx:289
 #: src/features/marketing/components/tutorials-page.tsx:133
-#: src/features/skills/components/skill-builder-review.tsx:249
+#: src/features/skills/components/skill-builder-review.tsx:252
 msgid "Integrations"
 msgstr "連携"
 
@@ -18756,11 +18761,11 @@ msgstr "無効なファイル拡張子です。テキストベースのファイ
 msgid "Invalid icon URL format"
 msgstr "アイコン URL の形式が無効です"
 
-#: src/features/workflow/components/nodes/output-node.tsx:55
+#: src/features/workflow/components/nodes/output-node.tsx:56
 msgid "Invalid image output"
 msgstr "無効な画像出力"
 
-#: src/features/workflow/components/nodes/text-node.tsx:75
+#: src/features/workflow/components/nodes/text-node.tsx:76
 msgid "Invalid JSON"
 msgstr "無効な JSON"
 
@@ -18849,7 +18854,7 @@ msgstr "新しいメンバーを組織に招待します"
 msgid "Invite Accepted!"
 msgstr "招待を承諾しました！"
 
-#: src/features/pages/components/page-share-dialog.tsx:91
+#: src/features/pages/components/page-share-dialog.tsx:95
 msgid "Invite by link"
 msgstr "リンクで招待"
 
@@ -18857,7 +18862,7 @@ msgstr "リンクで招待"
 msgid "Invite Error"
 msgstr "招待エラー"
 
-#: src/features/pages/components/page-share-dialog.tsx:130
+#: src/features/pages/components/page-share-dialog.tsx:135
 msgid "Invite link"
 msgstr "招待リンク"
 
@@ -18978,7 +18983,7 @@ msgstr "存在しないか、お使いの {label} アカウントでは表示で
 msgid "It is on {hostLabel} now."
 msgstr "現在 {hostLabel} 上にあります。"
 
-#: src/features/pages/components/page-view.tsx:190
+#: src/features/pages/components/page-view.tsx:204
 msgid "It may have been deleted, or you no longer have access."
 msgstr "削除されたか、アクセス権がなくなった可能性があります。"
 
@@ -19075,7 +19080,7 @@ msgid "JPEG image"
 msgstr "JPEG 画像"
 
 #: src/features/workflow/components/nodes/output-node.tsx:18
-#: src/features/workflow/components/nodes/text-node.tsx:170
+#: src/features/workflow/components/nodes/text-node.tsx:171
 msgid "JSON"
 msgstr "JSON"
 
@@ -19168,7 +19173,7 @@ msgstr "操作を続ける"
 msgid "Keep current rows"
 msgstr "現在の行を保持"
 
-#: src/features/projects/components/project-form-dialog.tsx:506
+#: src/features/projects/components/project-form-dialog.tsx:511
 msgid "Keep editing"
 msgstr "編集を続ける"
 
@@ -19830,7 +19835,7 @@ msgstr "組織から退出しました"
 msgid "Left to Right (LTR)"
 msgstr "左から右（LTR）"
 
-#: src/features/pages/components/page-version-panel.tsx:97
+#: src/features/pages/components/page-version-panel.tsx:96
 msgid "Left: this version. Right: the page now."
 msgstr "左：このバージョン。右：現在のページ。"
 
@@ -19950,7 +19955,7 @@ msgstr "{0} 行目：{1}"
 msgid "Line {0}: not valid JSON"
 msgstr "{0} 行目: 有効な JSON ではありません"
 
-#: src/features/workflow/components/nodes/text-node.tsx:101
+#: src/features/workflow/components/nodes/text-node.tsx:102
 msgid "Line {line}, column {column}"
 msgstr "{line} 行目、{column} 列目"
 
@@ -20024,8 +20029,8 @@ msgstr "{expiresAt} までリンクが有効です"
 msgid "Link at most {MAX_PULL_REQUESTS_PER_ATTACH} pull requests at a time."
 msgstr "一度にリンクできるプルリクエストは最大 {MAX_PULL_REQUESTS_PER_ATTACH} 件です。"
 
-#: src/features/pages/components/page-share-dialog.tsx:78
-#: src/features/pages/components/page-share-dialog.tsx:134
+#: src/features/pages/components/page-share-dialog.tsx:82
+#: src/features/pages/components/page-share-dialog.tsx:139
 msgid "Link copied"
 msgstr "リンクをコピーしました"
 
@@ -20072,7 +20077,7 @@ msgstr "リンク中…"
 msgid "Linux"
 msgstr "Linux"
 
-#: src/features/tasks/components/tasks-page.tsx:266
+#: src/features/tasks/components/tasks-page.tsx:271
 msgid "List"
 msgstr "リスト"
 
@@ -20084,7 +20089,7 @@ msgstr "利用可能なすべてのモデルと料金を一覧表示"
 msgid "List everything you remember about me from our past conversations and your saved memory. Write one fact per line, in the third person, starting with \"The user\" (for example: \"The user works as a nurse in Hamburg.\"). Where you know when you learned a fact, add the date in brackets at the end of its line. Leave out passwords, keys, account numbers and health details. Write no introduction, headings or comments."
 msgstr "過去の会話と保存されたメモリから、私について覚えていることをすべて一覧にしてください。1 行に 1 つの事実を、三人称で \"The user\" から始めて書いてください（例: \"The user works as a nurse in Hamburg.\"）。事実を知った日付がわかる場合は、その行の末尾に角括弧で日付を書いてください。パスワード、キー、口座番号、健康に関する詳細は省いてください。前置き、見出し、コメントは書かないでください。"
 
-#: src/features/prompts/components/prompt-list.tsx:560
+#: src/features/prompts/components/prompt-list.tsx:561
 msgid "List view"
 msgstr "リスト表示"
 
@@ -20175,7 +20180,7 @@ msgid "Load earlier messages"
 msgstr "以前のメッセージを読み込む"
 
 #: ../../packages/chat-ui/src/threads/thread-list.tsx:181
-#: src/features/develop/components/inbox-list.tsx:128
+#: src/features/develop/components/inbox-list.tsx:129
 #: src/features/settings/components/chat/mcp/server-catalog.tsx:215
 #: src/features/skills/components/skill-marketplace.tsx:227
 msgid "Load more"
@@ -20185,7 +20190,7 @@ msgstr "さらに読み込む"
 msgid "Load more commits"
 msgstr "さらにコミットを読み込む"
 
-#: src/features/develop/components/files-tab.tsx:496
+#: src/features/develop/components/files-tab.tsx:499
 msgid "Load more files"
 msgstr "さらにファイルを読み込む"
 
@@ -20204,13 +20209,13 @@ msgstr "前のメッセージを読み込んでから、もう一度お試しく
 
 #. placeholder {0}: listed.length
 #. placeholder {1}: Math.min(fileCount, fileLimit)
-#: src/features/develop/components/files-tab.tsx:430
+#: src/features/develop/components/files-tab.tsx:433
 msgid "Loaded {0} of {1, plural, one {# file} other {# files}}…"
 msgstr "{1, plural, other {# 個のファイル}}のうち {0} 個を読み込みました…"
 
 #: ../../packages/ui/src/components/spinner.tsx:8
 #: src/features/develop/components/develop-page.tsx:28
-#: src/features/develop/components/inbox-list.tsx:86
+#: src/features/develop/components/inbox-list.tsx:87
 #: src/features/develop/components/pull-request-view.tsx:62
 #: src/features/develop/components/watched-repositories.tsx:171
 msgid "Loading"
@@ -20224,7 +20229,7 @@ msgstr "API キーを読み込み中…"
 msgid "Loading canvas editor..."
 msgstr "キャンバスエディターを読み込んでいます..."
 
-#: src/features/develop/components/checks-tab.tsx:56
+#: src/features/develop/components/checks-tab.tsx:57
 msgid "Loading checks"
 msgstr "チェックを読み込み中"
 
@@ -20234,8 +20239,8 @@ msgstr "コミットを読み込み中"
 
 #: src/features/evals/components/model-comparison.tsx:70
 #: src/features/evals/components/run-comparison.tsx:45
-#: src/features/pages/components/page-agent-dialog.tsx:112
-#: src/features/pages/components/page-version-panel.tsx:101
+#: src/features/pages/components/page-agent-dialog.tsx:113
+#: src/features/pages/components/page-version-panel.tsx:100
 msgid "Loading comparison…"
 msgstr "比較を読み込んでいます…"
 
@@ -20282,11 +20287,11 @@ msgstr "フィードバックを読み込み中"
 msgid "Loading file…"
 msgstr "ファイルを読み込んでいます…"
 
-#: src/features/develop/components/files-tab.tsx:395
+#: src/features/develop/components/files-tab.tsx:398
 msgid "Loading files"
 msgstr "ファイルを読み込み中"
 
-#: src/features/develop/components/files-tab.tsx:426
+#: src/features/develop/components/files-tab.tsx:429
 msgid "Loading files…"
 msgstr "ファイルを読み込み中…"
 
@@ -20336,7 +20341,7 @@ msgstr "オンボーディングを読み込んでいます"
 msgid "Loading output..."
 msgstr "出力を読み込んでいます..."
 
-#: src/features/pages/components/page-view.tsx:181
+#: src/features/pages/components/page-view.tsx:184
 msgid "Loading page…"
 msgstr "ページを読み込んでいます…"
 
@@ -20371,7 +20376,7 @@ msgid "Loading projects…"
 msgstr "プロジェクトを読み込み中…"
 
 #: src/features/projects/components/project-repo-picker.tsx:241
-#: src/features/projects/components/project-repositories.tsx:304
+#: src/features/projects/components/project-repositories.tsx:298
 msgid "Loading repositories…"
 msgstr "リポジトリを読み込んでいます…"
 
@@ -20411,7 +20416,7 @@ msgstr "スプレッドシートを読み込んでいます…"
 msgid "Loading statistics…"
 msgstr "統計を読み込み中…"
 
-#: src/features/tasks/components/tasks-page.tsx:216
+#: src/features/tasks/components/tasks-page.tsx:221
 msgid "Loading tasks…"
 msgstr "タスクを読み込んでいます…"
 
@@ -20456,7 +20461,7 @@ msgstr "トリガーを読み込んでいます..."
 msgid "Loading usage…"
 msgstr "使用状況を読み込み中…"
 
-#: src/routes/(chat)/workflow/$workflowId.tsx:47
+#: src/routes/(chat)/workflow/$workflowId.tsx:49
 #: src/routes/(chat)/workflow/shared/$token.tsx:32
 msgid "Loading workflow..."
 msgstr "ワークフローを読み込んでいます..."
@@ -20469,7 +20474,7 @@ msgstr "自分のアイテムを読み込み中…"
 msgid "Loading your messages…"
 msgstr "メッセージを読み込んでいます…"
 
-#: src/features/home/components/home-page.tsx:138
+#: src/features/home/components/home-page.tsx:141
 msgid "Loading your overview…"
 msgstr "概要を読み込み中…"
 
@@ -20782,7 +20787,7 @@ msgstr "低"
 msgid "Low latency text-to-video"
 msgstr "低レイテンシのテキストから動画生成"
 
-#: src/features/workflow/components/nodes/img2img-node.tsx:86
+#: src/features/workflow/components/nodes/img2img-node.tsx:94
 msgid "Lower = subtle changes, Higher = major transformation"
 msgstr "低い = 控えめな変化、高い = 大幅な変換"
 
@@ -20891,7 +20896,7 @@ msgstr "生成間で被写体の一貫性を維持"
 msgid "Major improvements in reasoning and instruction following"
 msgstr "推論と指示追従が大幅に向上"
 
-#: src/features/projects/components/project-repositories.tsx:345
+#: src/features/projects/components/project-repositories.tsx:339
 msgid "Make {name} the default repository"
 msgstr "{name} をデフォルトのリポジトリにする"
 
@@ -20899,7 +20904,7 @@ msgstr "{name} をデフォルトのリポジトリにする"
 msgid "Make Admin"
 msgstr "管理者にする"
 
-#: src/features/projects/components/project-repositories.tsx:354
+#: src/features/projects/components/project-repositories.tsx:348
 msgid "Make default"
 msgstr "デフォルトにする"
 
@@ -20982,7 +20987,7 @@ msgstr "組織のメンバーとそのロールを管理します"
 msgid "Manage participants"
 msgstr "参加者を管理"
 
-#: src/features/workflow/components/gallery/publish-dialog.tsx:163
+#: src/features/workflow/components/gallery/publish-dialog.tsx:164
 msgid "Manage Publication"
 msgstr "公開を管理"
 
@@ -21059,7 +21064,7 @@ msgstr "マラーティー語（インド）"
 msgid "Mark all read"
 msgstr "すべて既読にする"
 
-#: src/features/prompts/components/prompt-form-dialog.tsx:324
+#: src/features/prompts/components/prompt-form-dialog.tsx:288
 msgid "Mark as favorite"
 msgstr "お気に入りにする"
 
@@ -21236,7 +21241,7 @@ msgid "MCP server updated"
 msgstr "MCP サーバーを更新しました"
 
 #. placeholder {0}: server.title
-#: src/features/skills/components/skill-builder-review.tsx:265
+#: src/features/skills/components/skill-builder-review.tsx:268
 #: src/features/skills/components/skill-builder-setup.tsx:98
 msgid "MCP server: {0}"
 msgstr "MCP サーバー：{0}"
@@ -21889,14 +21894,14 @@ msgstr "モバイルアプリアイコン"
 #: src/features/chat/host/host-options.tsx:146
 #: src/features/workflow/components/nodes/image-node.tsx:45
 #: src/features/workflow/components/nodes/node-expand-modal.tsx:132
-#: src/features/workflow/components/nodes/text-node.tsx:123
+#: src/features/workflow/components/nodes/text-node.tsx:124
 #: src/features/workflow/components/nodes/video-node.tsx:116
 msgid "Mode"
 msgstr "モード"
 
 #. placeholder {0}: group.mode
 #. placeholder {1}: group.model
-#: src/features/skills/components/bundle-import-dialog.tsx:154
+#: src/features/skills/components/bundle-import-dialog.tsx:159
 msgid "Mode {0}, on {1}. Nothing starts when it is created."
 msgstr "モード {0}、{1} 上。作成しても何も開始されません。"
 
@@ -21909,7 +21914,7 @@ msgstr "モード:"
 #: src/features/chat/sidebar/thread-context.tsx:109
 #: src/features/evals/components/model-comparison.tsx:110
 #: src/features/evals/components/run-dialog.tsx:212
-#: src/features/prompts/components/prompt-form-dialog.tsx:387
+#: src/features/prompts/components/prompt-form-dialog.tsx:351
 #: src/features/settings/components/chat/bots-settings.tsx:414
 #: src/features/settings/components/chat/sub-agent-roles-settings.tsx:257
 #: src/features/settings/components/chat/usage-settings.tsx:324
@@ -21994,7 +21999,7 @@ msgstr "モデルタブ"
 #. placeholder {0}: modelDefinition.name
 #. placeholder {0}: selectedModel?.name || model
 #: src/features/chat/thread/composer-context-count.tsx:35
-#: src/features/prompts/components/prompt-form-dialog.tsx:450
+#: src/features/prompts/components/prompt-form-dialog.tsx:414
 msgid "Model: {0}"
 msgstr "モデル：{0}"
 
@@ -22201,7 +22206,7 @@ msgstr "その他のページ"
 msgid "More requests are waiting in the sub-agent's thread."
 msgstr "サブエージェントのスレッドで、ほかのリクエストが待っています。"
 
-#: src/features/workflow/components/nodes/advanced-controls-node.tsx:172
+#: src/features/workflow/components/nodes/advanced-controls-node.tsx:180
 msgid "More steps = higher quality, longer generation"
 msgstr "ステップ数が多い = 高品質、生成に時間がかかる"
 
@@ -22225,15 +22230,15 @@ msgstr "Claude 4.x ファミリーで最も手頃なモデル"
 msgid "Most capable language model"
 msgstr "最も高性能な言語モデル"
 
-#: src/routes/(chat)/workflow/gallery.tsx:31
+#: src/routes/(chat)/workflow/gallery.tsx:30
 msgid "Most Forked"
 msgstr "フォーク数順"
 
-#: src/routes/(chat)/workflow/gallery.tsx:30
+#: src/routes/(chat)/workflow/gallery.tsx:29
 msgid "Most Popular"
 msgstr "人気順"
 
-#: src/routes/(chat)/workflow/gallery.tsx:29
+#: src/routes/(chat)/workflow/gallery.tsx:28
 msgid "Most Recent"
 msgstr "新着順"
 
@@ -22259,8 +22264,10 @@ msgstr "滑らかな動き"
 msgid "Motion Prompt"
 msgstr "モーションプロンプト"
 
-#: src/features/workflow/components/nodes/image-to-video-node.tsx:136
-#: src/features/workflow/components/nodes/video-node.tsx:212
+#: src/features/workflow/components/nodes/image-to-video-node.tsx:137
+#: src/features/workflow/components/nodes/image-to-video-node.tsx:145
+#: src/features/workflow/components/nodes/video-node.tsx:213
+#: src/features/workflow/components/nodes/video-node.tsx:221
 msgid "Motion: {motionPercent}%"
 msgstr "モーション: {motionPercent}%"
 
@@ -22524,7 +22531,7 @@ msgstr "名前"
 #: src/features/evals/components/dataset-form-dialog.tsx:81
 #: src/features/knowledge/components/collection-dialog.tsx:57
 #: src/features/projects/components/project-rule-files.tsx:262
-#: src/features/prompts/components/prompt-form-dialog.tsx:247
+#: src/features/prompts/components/prompt-form-dialog.tsx:232
 #: src/features/prompts/components/prompt-list-view.tsx:98
 #: src/features/prompts/components/prompt-list-view.tsx:101
 #: src/features/settings/components/chat/bots-settings.tsx:377
@@ -22535,7 +22542,7 @@ msgstr "名前"
 #: src/features/settings/components/chat/trigger-settings.tsx:218
 #: src/features/settings/components/chat/usage-settings.tsx:420
 #: src/features/skills/components/skill-builder-diff.tsx:32
-#: src/features/skills/components/skill-builder-review.tsx:136
+#: src/features/skills/components/skill-builder-review.tsx:139
 #: src/features/skills/components/skill-form-dialog.tsx:201
 #: src/features/workflow/components/nodes/node-expand-modal.tsx:110
 msgid "Name"
@@ -22557,7 +22564,7 @@ msgstr "名前とプロンプトは必須です"
 #: src/features/auth/components/auth/forms/sign-up-form.tsx:163
 #: src/features/auth/components/settings/api-key/create-api-key-dialog.tsx:46
 #: src/features/evals/components/dataset-form-dialog.tsx:42
-#: src/features/prompts/components/prompt-form-dialog.tsx:170
+#: src/features/prompts/components/prompt-form-dialog.tsx:155
 #: src/features/settings/components/chat/custom-providers-settings.tsx:192
 #: src/features/settings/components/chat/native-providers-settings.tsx:222
 #: src/features/skills/components/skill-form-dialog.tsx:75
@@ -22718,7 +22725,7 @@ msgstr "要レビュー"
 #: src/features/chat/browser-live-view/browser-human-check.tsx:496
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:541
 #: src/features/chat/thread-list/section-bar.tsx:46
-#: src/features/home/components/home-page.tsx:165
+#: src/features/home/components/home-page.tsx:168
 msgid "Needs you"
 msgstr "対応が必要"
 
@@ -22728,7 +22735,7 @@ msgstr "ネガティブプロンプト — 除外したい要素"
 
 #: src/features/workflow/components/nodes/inpaint-node.tsx:110
 #: src/features/workflow/components/nodes/object-editor-node.tsx:151
-#: src/features/workflow/components/nodes/outpaint-node.tsx:135
+#: src/features/workflow/components/nodes/outpaint-node.tsx:143
 msgid "Negative Prompt (optional)"
 msgstr "ネガティブプロンプト (任意)"
 
@@ -22863,7 +22870,7 @@ msgid "Netherlands"
 msgstr "オランダ"
 
 #: src/features/appearance/components/appearance-controls.tsx:187
-#: src/features/develop/components/checks-tab.tsx:78
+#: src/features/develop/components/checks-tab.tsx:79
 msgid "Neutral"
 msgstr "ニュートラル"
 
@@ -22992,7 +22999,7 @@ msgid "New first"
 msgstr "新しい順"
 
 #: src/features/tasks/components/goal-form-dialog.tsx:73
-#: src/features/tasks/components/tasks-page.tsx:203
+#: src/features/tasks/components/tasks-page.tsx:208
 msgid "New goal"
 msgstr "新しい目標"
 
@@ -23019,7 +23026,7 @@ msgstr "新しいログイン"
 msgid "New model excelling at anime"
 msgstr "アニメに優れた新モデル"
 
-#: src/features/pages/components/pages-sidebar.tsx:143
+#: src/features/pages/components/pages-sidebar.tsx:144
 msgid "New page"
 msgstr "新しいページ"
 
@@ -23050,7 +23057,7 @@ msgstr "新しいパスワードは必須です"
 msgid "New preset"
 msgstr "新しいプリセット"
 
-#: src/features/prompts/components/prompt-list.tsx:589
+#: src/features/prompts/components/prompt-list.tsx:591
 msgid "New Prompt"
 msgstr "新しいプロンプト"
 
@@ -23059,7 +23066,7 @@ msgid "New tag"
 msgstr "新しいタグ"
 
 #: src/features/tasks/components/task-form-dialog.tsx:206
-#: src/features/tasks/components/tasks-page.tsx:207
+#: src/features/tasks/components/tasks-page.tsx:212
 msgid "New task"
 msgstr "新しいタスク"
 
@@ -23315,11 +23322,11 @@ msgstr "カメラが選択されていません"
 msgid "No cases yet. Add one by hand, import a CSV or JSONL file, or save a chat turn with \"Save as eval case\"."
 msgstr "まだケースがありません。手動で追加するか、CSV または JSONL ファイルをインポートするか、チャットのターンを「評価ケースとして保存」で保存してください。"
 
-#: src/features/home/components/home-page.tsx:250
+#: src/features/home/components/home-page.tsx:253
 msgid "No chats yet. Start one above."
 msgstr "まだチャットはありません。上から始めましょう。"
 
-#: src/features/develop/components/checks-tab.tsx:70
+#: src/features/develop/components/checks-tab.tsx:71
 msgid "No checks have run for this commit."
 msgstr "このコミットに対して実行されたチェックはありません。"
 
@@ -23410,7 +23417,7 @@ msgstr "データセットはまだありません"
 msgid "No description"
 msgstr "説明なし"
 
-#: src/features/develop/components/pull-request-view.tsx:146
+#: src/features/develop/components/pull-request-view.tsx:147
 msgid "No description provided."
 msgstr "説明はありません。"
 
@@ -23431,7 +23438,7 @@ msgid "No enabled MCP servers."
 msgstr "有効な MCP サーバーはありません。"
 
 #: src/features/settings/components/chat/trigger-settings.tsx:1029
-#: src/features/workflow/components/canvas/execution-history-panel.tsx:236
+#: src/features/workflow/components/canvas/execution-history-panel.tsx:238
 msgid "No executions yet"
 msgstr "まだ実行されていません"
 
@@ -23448,7 +23455,7 @@ msgstr "このプロジェクトには追加の指示がありません。リセ
 msgid "No facts found in the pasted text."
 msgstr "貼り付けられたテキストに事実が見つかりませんでした。"
 
-#: src/features/develop/components/checks-tab.tsx:138
+#: src/features/develop/components/checks-tab.tsx:145
 msgid "No failures in the checks shown."
 msgstr "表示されているチェックに失敗はありません。"
 
@@ -23637,11 +23644,11 @@ msgstr "オプションが見つかりません。"
 msgid "No other tasks yet."
 msgstr "他のタスクはまだありません。"
 
-#: src/features/workflow/components/nodes/output-node.tsx:44
+#: src/features/workflow/components/nodes/output-node.tsx:45
 msgid "No output yet. Run the workflow to see results."
 msgstr "まだ出力がありません。ワークフローを実行すると結果が表示されます。"
 
-#: src/features/pages/components/pages-sidebar.tsx:68
+#: src/features/pages/components/pages-sidebar.tsx:69
 msgid "No pages found"
 msgstr "ページが見つかりません"
 
@@ -23649,7 +23656,7 @@ msgstr "ページが見つかりません"
 msgid "No pages found. Export from Notion as \"Markdown & CSV\" or \"HTML\"."
 msgstr "ページが見つかりません。Notion から「Markdown & CSV」または「HTML」でエクスポートしてください。"
 
-#: src/features/pages/components/pages-sidebar.tsx:217
+#: src/features/pages/components/pages-sidebar.tsx:218
 msgid "No pages yet."
 msgstr "ページはまだありません。"
 
@@ -23714,7 +23721,7 @@ msgstr "プロンプトなし"
 msgid "No prompts found matching \"{searchQuery}\""
 msgstr "「{searchQuery}」に一致するプロンプトは見つかりませんでした"
 
-#: src/features/prompts/components/prompt-list.tsx:645
+#: src/features/prompts/components/prompt-list.tsx:647
 msgid "No prompts found matching your search."
 msgstr "検索に一致するプロンプトは見つかりませんでした。"
 
@@ -23862,7 +23869,7 @@ msgstr "要約はありません。「生成」をクリックして作成して
 msgid "No tags yet"
 msgstr "タグはまだありません"
 
-#: src/features/tasks/components/tasks-page.tsx:246
+#: src/features/tasks/components/tasks-page.tsx:251
 msgid "No tasks yet"
 msgstr "タスクはまだありません"
 
@@ -23927,7 +23934,7 @@ msgstr "ツールはありません。"
 msgid "No triggers yet"
 msgstr "トリガーはまだありません"
 
-#: src/features/home/components/home-page.tsx:230
+#: src/features/home/components/home-page.tsx:233
 msgid "No unread notifications."
 msgstr "未読の通知はありません。"
 
@@ -23961,7 +23968,7 @@ msgstr "変数が検出されませんでした。動的な内容を追加する
 msgid "No variables found"
 msgstr "変数が見つかりません"
 
-#: src/features/pages/components/page-version-panel.tsx:118
+#: src/features/pages/components/page-version-panel.tsx:117
 msgid "No versions yet. Versions are saved as you edit."
 msgstr "バージョンはまだありません。編集するとバージョンが保存されます。"
 
@@ -23973,7 +23980,7 @@ msgstr "動画はまだありません"
 msgid "No workflows found"
 msgstr "ワークフローが見つかりません"
 
-#: src/routes/(chat)/workflow/index.tsx:61
+#: src/routes/(chat)/workflow/index.tsx:62
 msgid "No workflows yet"
 msgstr "ワークフローはまだありません"
 
@@ -24139,7 +24146,7 @@ msgstr "未ペアリング — ボットはまだ誰にも応答しません"
 msgid "Not rated"
 msgstr "未評価"
 
-#: src/features/develop/components/checks-tab.tsx:191
+#: src/features/develop/components/checks-tab.tsx:196
 msgid "Not re-run"
 msgstr "再実行されませんでした"
 
@@ -24195,7 +24202,7 @@ msgstr "見つかりません"
 msgid "Nothing has run on a device yet."
 msgstr "デバイスではまだ何も実行されていません。"
 
-#: src/features/develop/components/inbox-list.tsx:94
+#: src/features/develop/components/inbox-list.tsx:95
 msgid "Nothing here."
 msgstr "ここには何もありません。"
 
@@ -24203,7 +24210,7 @@ msgstr "ここには何もありません。"
 msgid "Nothing is listening at that address. Start Ollama or LM Studio's server, check the port, and make sure the URL ends in /v1."
 msgstr "そのアドレスで待ち受けているサーバーがありません。Ollama または LM Studio のサーバーを起動し、ポートを確認して、URL が /v1 で終わっていることを確認してください。"
 
-#: src/features/home/components/home-page.tsx:186
+#: src/features/home/components/home-page.tsx:189
 msgid "Nothing is running right now."
 msgstr "現在実行中のものはありません。"
 
@@ -24211,7 +24218,7 @@ msgstr "現在実行中のものはありません。"
 msgid "Nothing is saved, installed or enabled until you choose to save."
 msgstr "保存を選択するまで、何も保存、インストール、有効化されません。"
 
-#: src/features/home/components/home-page.tsx:167
+#: src/features/home/components/home-page.tsx:170
 msgid "Nothing is waiting on you."
 msgstr "対応待ちのものはありません。"
 
@@ -24227,7 +24234,7 @@ msgstr "通知"
 msgid "Notification workflows, channels, and recipient preferences"
 msgstr "通知ワークフロー、チャネル、受信者の設定"
 
-#: src/features/home/components/home-page.tsx:227
+#: src/features/home/components/home-page.tsx:230
 #: src/features/notifications/components/notification-bell.tsx:72
 #: src/features/notifications/components/notification-bell.tsx:102
 #: src/features/notifications/components/notification-settings.tsx:251
@@ -24724,7 +24731,7 @@ msgstr "新しいコンテキストを開始できるのはチャットの所有
 msgid "Only the owner of the chat can answer. Everyone else in a shared chat sees that the owner has to decide."
 msgstr "回答できるのはチャットの所有者だけです。共有チャットの他の参加者には、所有者が判断する必要があることが表示されます。"
 
-#: src/features/projects/components/project-repositories.tsx:377
+#: src/features/projects/components/project-repositories.tsx:371
 msgid "Only the project's owner can change its repositories."
 msgstr "このプロジェクトのリポジトリを変更できるのはプロジェクトの所有者だけです。"
 
@@ -24736,7 +24743,7 @@ msgstr "ロールを変更できるのはプロジェクトのオーナーだけ
 msgid "Only these projects"
 msgstr "これらのプロジェクトのみ"
 
-#: src/features/develop/components/checks-tab.tsx:197
+#: src/features/develop/components/checks-tab.tsx:202
 msgid "Only this check is started again on {hostLabel}, not the rest of its workflow."
 msgstr "{hostLabel} で再開されるのはこのチェックのみで、ワークフローの残りは再開されません。"
 
@@ -24748,7 +24755,7 @@ msgstr "データを一切保持しないことを保証するプロバイダー
 msgid "Only when it contains (optional)"
 msgstr "含む場合のみ（任意）"
 
-#: src/features/skills/components/bundle-import-dialog.tsx:145
+#: src/features/skills/components/bundle-import-dialog.tsx:150
 msgid "Only when:"
 msgstr "条件:"
 
@@ -24756,7 +24763,7 @@ msgstr "条件:"
 msgid "Only you can see and use it."
 msgstr "あなただけが表示・使用できます。"
 
-#: src/features/pages/components/page-share-dialog.tsx:151
+#: src/features/pages/components/page-share-dialog.tsx:154
 msgid "Only you."
 msgstr "自分のみ。"
 
@@ -24887,7 +24894,7 @@ msgstr "新しいウィンドウで開く"
 msgid "Open in split view"
 msgstr "分割ビューで開く"
 
-#: src/features/pages/components/page-share-dialog.tsx:198
+#: src/features/pages/components/page-share-dialog.tsx:205
 msgid "Open invite links"
 msgstr "有効な招待リンク"
 
@@ -25441,7 +25448,7 @@ msgstr "システムプロンプトを最適化"
 msgid "Optimize thread system prompt"
 msgstr "スレッドのシステムプロンプトを最適化"
 
-#: src/features/prompts/components/prompt-item.tsx:196
+#: src/features/prompts/components/prompt-item.tsx:192
 #: src/features/prompts/components/prompt-list-view.tsx:209
 msgid "Optimize with AI"
 msgstr "AI で最適化"
@@ -25475,12 +25482,12 @@ msgstr "最適化されたプロンプト"
 msgid "Optimizing..."
 msgstr "最適化しています..."
 
-#: src/features/projects/components/project-repositories.tsx:412
+#: src/features/projects/components/project-repositories.tsx:406
 #: src/features/prompts/components/prompt-optimize-dialog.tsx:160
 msgid "optional"
 msgstr "任意"
 
-#: src/features/develop/components/checks-tab.tsx:170
+#: src/features/develop/components/checks-tab.tsx:174
 msgid "Optional"
 msgstr "任意"
 
@@ -25527,7 +25534,7 @@ msgstr "または Text ノードを接続してプロンプトを指定"
 msgid "or continue with"
 msgstr "または次で続行"
 
-#: src/features/skills/components/skill-import-dialog.tsx:179
+#: src/features/skills/components/skill-import-dialog.tsx:180
 msgid "Or fetch from a link"
 msgstr "またはリンクから取得"
 
@@ -25660,7 +25667,7 @@ msgstr "その他"
 msgid "Other clients (JSON)"
 msgstr "その他のクライアント（JSON）"
 
-#: src/features/develop/components/files-tab.tsx:470
+#: src/features/develop/components/files-tab.tsx:473
 msgid "Other conversations"
 msgstr "その他の会話"
 
@@ -25715,7 +25722,7 @@ msgstr "アウトペイント"
 #: ../../packages/ui/src/components/ai-elements/context.tsx:277
 #: src/components/model-picker/model-picker.tsx:261
 #: src/features/devices/components/device-tool-call.tsx:173
-#: src/features/workflow/components/nodes/output-node.tsx:52
+#: src/features/workflow/components/nodes/output-node.tsx:53
 #: src/features/workflow/types/index.ts:584
 #: src/features/workflow/types/index.ts:588
 msgid "Output"
@@ -25767,7 +25774,7 @@ msgstr "{title} の出力"
 msgid "Output tokens"
 msgstr "出力トークン"
 
-#: src/features/workflow/components/nodes/output-node.tsx:79
+#: src/features/workflow/components/nodes/output-node.tsx:80
 msgid "Output Type"
 msgstr "出力タイプ"
 
@@ -25800,7 +25807,7 @@ msgstr "ご自身の API キーで既定の AI プロバイダーを上書きし
 msgid "Override the default search and retrieval providers with your own API keys for web search and URL content extraction."
 msgstr "Web 検索と URL のコンテンツ抽出について、既定の検索・取得プロバイダーをご自身の API キーで上書きします。"
 
-#: src/features/pages/components/page-conflict-banner.tsx:33
+#: src/features/pages/components/page-conflict-banner.tsx:30
 msgid "Overwrite with mine"
 msgstr "自分の内容で上書き"
 
@@ -25838,8 +25845,8 @@ msgstr "ページを追加しました。取得とインデックス作成を行
 msgid "Page address"
 msgstr "ページのアドレス"
 
-#: src/features/pages/components/page-agent-dialog.tsx:90
-#: src/features/pages/components/page-view.tsx:435
+#: src/features/pages/components/page-agent-dialog.tsx:91
+#: src/features/pages/components/page-view.tsx:452
 msgid "Page agent"
 msgstr "ページエージェント"
 
@@ -25856,11 +25863,11 @@ msgid "Page not available"
 msgstr "ページを利用できません"
 
 #: src/components/not-found.tsx:128
-#: src/features/pages/components/page-view.tsx:189
+#: src/features/pages/components/page-view.tsx:202
 msgid "Page not found"
 msgstr "ページが見つかりません"
 
-#: src/features/pages/components/page-view.tsx:487
+#: src/features/pages/components/page-view.tsx:504
 msgid "Page title"
 msgstr "ページのタイトル"
 
@@ -25874,13 +25881,15 @@ msgid "Page: {0}"
 msgstr "ページ: {0}"
 
 #: src/features/layout/components/sidebar-shortcut.tsx:125
-#: src/features/pages/components/pages-sidebar.tsx:139
-#: src/features/pages/components/pages-sidebar.tsx:141
-#: src/routes/_shortcut/pages/index.tsx:11
+#: src/features/pages/components/pages-layout.tsx:44
+#: src/features/pages/components/pages-layout.tsx:117
+#: src/features/pages/components/pages-sidebar.tsx:140
+#: src/features/pages/components/pages-sidebar.tsx:142
+#: src/routes/_shortcut/pages/index.tsx:13
 msgid "Pages"
 msgstr "ページ"
 
-#: src/features/pages/components/pages-sidebar.tsx:252
+#: src/features/pages/components/pages-sidebar.tsx:253
 msgid "Pages shared with you"
 msgstr "共有されたページ"
 
@@ -25994,7 +26003,7 @@ msgstr "参加者"
 msgid "Participants take turns, one reply per message."
 msgstr "参加者が順番に、1 メッセージにつき 1 件ずつ返信します。"
 
-#: src/features/skills/components/bundle-import-dialog.tsx:155
+#: src/features/skills/components/bundle-import-dialog.tsx:160
 msgid "Participants:"
 msgstr "参加者:"
 
@@ -26034,7 +26043,7 @@ msgstr "パスコード"
 msgid "passed"
 msgstr "合格"
 
-#: src/features/develop/components/checks-tab.tsx:81
+#: src/features/develop/components/checks-tab.tsx:82
 #: src/features/evals/components/model-comparison.tsx:111
 #: src/features/tasks/components/task-detail-dialog.tsx:137
 msgid "Passed"
@@ -26167,7 +26176,7 @@ msgstr "スタイルを適用するコンテンツ画像の URL を貼り付け.
 msgid "Paste image URL"
 msgstr "画像 URL を貼り付け"
 
-#: src/features/workflow/components/nodes/character-ref-node.tsx:188
+#: src/features/workflow/components/nodes/character-ref-node.tsx:189
 msgid "Paste image URL..."
 msgstr "画像 URL を貼り付け..."
 
@@ -26256,7 +26265,7 @@ msgstr "PE 実行ファイル"
 msgid "Pen"
 msgstr "ペン"
 
-#: src/features/develop/components/checks-tab.tsx:79
+#: src/features/develop/components/checks-tab.tsx:80
 #: src/features/settings/components/chat/trigger-settings.tsx:183
 #: src/features/workflow/components/canvas/execution-history-panel.tsx:59
 #: src/features/workflow/components/canvas/workflow-controls.tsx:53
@@ -26280,7 +26289,7 @@ msgstr "保留中: レビューを送信すると投稿されます"
 msgid "people"
 msgstr "人物"
 
-#: src/features/pages/components/page-share-dialog.tsx:149
+#: src/features/pages/components/page-share-dialog.tsx:153
 msgid "People with access"
 msgstr "アクセスできるユーザー"
 
@@ -26432,7 +26441,7 @@ msgstr "ホストまたはプルリクエストを選択"
 msgid "Pick a model to evaluate."
 msgstr "評価するモデルを選択してください。"
 
-#: src/routes/_shortcut/pages/index.tsx:12
+#: src/routes/_shortcut/pages/index.tsx:14
 msgid "Pick a page on the left, or create one with the + button."
 msgstr "左からページを選ぶか、+ ボタンで作成してください。"
 
@@ -26874,7 +26883,7 @@ msgid "Preferred model"
 msgstr "推奨モデル"
 
 #. placeholder {0}: draft.preferredModel.name
-#: src/features/skills/components/skill-builder-review.tsx:193
+#: src/features/skills/components/skill-builder-review.tsx:196
 msgid "Preferred model: {0}"
 msgstr "推奨モデル：{0}"
 
@@ -26889,7 +26898,7 @@ msgid "Prefers short answers"
 msgstr "短い回答を好む"
 
 #. placeholder {0}: skill.model
-#: src/features/skills/components/bundle-import-dialog.tsx:124
+#: src/features/skills/components/bundle-import-dialog.tsx:129
 msgid "Prefers the model {0}."
 msgstr "モデル {0} を優先します。"
 
@@ -27273,7 +27282,7 @@ msgstr "独自インデックスを持つプライバシー重視の Web 検索"
 msgid "private"
 msgstr "非公開"
 
-#: src/features/pages/components/pages-sidebar.tsx:216
+#: src/features/pages/components/pages-sidebar.tsx:217
 #: src/features/skills/components/skill-form-dialog.tsx:470
 msgid "Private"
 msgstr "非公開"
@@ -27493,7 +27502,7 @@ msgstr "プロジェクトの操作"
 msgid "Project context"
 msgstr "プロジェクトのコンテキスト"
 
-#: src/features/projects/components/project-form-dialog.tsx:384
+#: src/features/projects/components/project-form-dialog.tsx:389
 msgid "Project Context"
 msgstr "プロジェクトのコンテキスト"
 
@@ -27596,7 +27605,7 @@ msgstr "プロンプトを作成しました"
 msgid "Prompt deleted"
 msgstr "プロンプトを削除しました"
 
-#: src/features/workflow/components/nodes/text-node.tsx:159
+#: src/features/workflow/components/nodes/text-node.tsx:160
 msgid "Prompt format"
 msgstr "プロンプトの形式"
 
@@ -27683,11 +27692,11 @@ msgstr "この会話のプロンプト"
 msgid "Prompts:"
 msgstr "プロンプト："
 
-#: src/features/pages/components/page-agent-dialog.tsx:151
+#: src/features/pages/components/page-agent-dialog.tsx:153
 msgid "Propose changes"
 msgstr "変更を提案"
 
-#: src/features/pages/components/page-agent-dialog.tsx:48
+#: src/features/pages/components/page-agent-dialog.tsx:49
 msgid "Proposed changes ready for review"
 msgstr "提案された変更を確認できます"
 
@@ -27783,8 +27792,8 @@ msgstr "公開アクセス"
 msgid "Public key from the Discord Developer Portal for signature verification"
 msgstr "署名検証用の Discord Developer Portal の公開鍵"
 
-#: src/features/pages/components/page-share-dialog.tsx:61
-#: src/features/pages/components/page-share-dialog.tsx:74
+#: src/features/pages/components/page-share-dialog.tsx:73
+#: src/features/pages/components/page-share-dialog.tsx:78
 msgid "Public link"
 msgstr "公開リンク"
 
@@ -27796,20 +27805,20 @@ msgstr "公開リンク"
 msgid "Public link copied to clipboard!"
 msgstr "公開リンクをクリップボードにコピーしました！"
 
-#: src/features/workflow/components/gallery/publish-dialog.tsx:153
+#: src/features/workflow/components/gallery/publish-dialog.tsx:154
 msgid "Publish"
 msgstr "公開"
 
-#: src/features/workflow/components/gallery/publish-dialog.tsx:163
-#: src/features/workflow/components/gallery/publish-dialog.tsx:257
+#: src/features/workflow/components/gallery/publish-dialog.tsx:164
+#: src/features/workflow/components/gallery/publish-dialog.tsx:258
 msgid "Publish to Gallery"
 msgstr "ギャラリーに公開"
 
-#: src/features/workflow/components/gallery/publish-dialog.tsx:148
+#: src/features/workflow/components/gallery/publish-dialog.tsx:149
 msgid "Published"
 msgstr "公開済み"
 
-#: src/features/workflow/components/gallery/publish-dialog.tsx:257
+#: src/features/workflow/components/gallery/publish-dialog.tsx:258
 msgid "Publishing..."
 msgstr "公開しています..."
 
@@ -27928,9 +27937,9 @@ msgstr "メッセージを待機列に追加"
 msgid "Queue message — sends when the current reply finishes"
 msgstr "メッセージを待機列に追加 — 現在の返信が終わると送信されます"
 
-#: src/features/home/components/home-page.tsx:113
-#: src/features/home/components/home-page.tsx:190
-#: src/features/home/components/home-page.tsx:198
+#: src/features/home/components/home-page.tsx:116
+#: src/features/home/components/home-page.tsx:193
+#: src/features/home/components/home-page.tsx:201
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:63
 #: src/features/sub-agents/components/worker-list.tsx:104
 #: src/features/sub-agents/components/worker-run-log.tsx:29
@@ -28068,12 +28077,12 @@ msgid "Ramp API documentation search and implementation guidance"
 msgstr "Ramp API ドキュメントの検索と実装ガイダンス"
 
 #: src/features/chat/thread/composer-image-settings.tsx:249
-#: src/features/workflow/components/nodes/advanced-controls-node.tsx:184
+#: src/features/workflow/components/nodes/advanced-controls-node.tsx:192
 msgid "Random"
 msgstr "ランダム"
 
 #: src/features/chat/thread/composer-image-settings.tsx:269
-#: src/features/workflow/components/nodes/advanced-controls-node.tsx:187
+#: src/features/workflow/components/nodes/advanced-controls-node.tsx:195
 msgid "Random seed"
 msgstr "ランダムシード"
 
@@ -28162,18 +28171,18 @@ msgstr "再最適化"
 msgid "Re-pair with a new code"
 msgstr "新しいコードで再ペアリング"
 
-#: src/features/develop/components/checks-tab.tsx:179
-#: src/features/develop/components/checks-tab.tsx:196
+#: src/features/develop/components/checks-tab.tsx:183
+#: src/features/develop/components/checks-tab.tsx:201
 msgid "Re-run"
 msgstr "再実行"
 
 #. placeholder {0}: check.name
-#: src/features/develop/components/checks-tab.tsx:173
+#: src/features/develop/components/checks-tab.tsx:177
 msgid "Re-run {0}"
 msgstr "{0} を再実行"
 
 #. placeholder {0}: target?.name ?? ""
-#: src/features/develop/components/checks-tab.tsx:205
+#: src/features/develop/components/checks-tab.tsx:210
 msgid "Re-run {0}?"
 msgstr "{0} を再実行しますか？"
 
@@ -28190,7 +28199,7 @@ msgstr "読み取りと書き込み"
 msgid "Read aloud"
 msgstr "読み上げ"
 
-#: src/features/skills/components/bundle-import-dialog.tsx:385
+#: src/features/skills/components/bundle-import-dialog.tsx:390
 msgid "Read each item below before you import it. Nothing in the bundle runs until you turn it on: schedules and webhooks are created switched off, group chats are created without starting anything, and skills are imported switched off, so they join no chat until you turn them on in your skill list. A skill adds the tools listed for it, and your own tool permissions still apply."
 msgstr "インポートする前に、以下の各項目をお読みください。バンドル内のものは、オンにするまで何も実行されません。スケジュールと Webhook はオフの状態で作成され、グループチャットは何も開始せずに作成され、スキルはオフの状態でインポートされるため、スキル一覧でオンにするまでどのチャットにも参加しません。スキルは一覧にあるツールを追加し、ご自身のツール権限も引き続き適用されます。"
 
@@ -28394,12 +28403,12 @@ msgid "Reasoning effort: {0}"
 msgstr "推論の強度: {0}"
 
 #. placeholder {0}: draft.reasoningEffort.value
-#: src/features/skills/components/skill-builder-review.tsx:209
+#: src/features/skills/components/skill-builder-review.tsx:212
 msgid "Reasoning effort: {0} of 4"
 msgstr "推論レベル：{0} / 4"
 
 #. placeholder {0}: String(skill.reasoningEffort)
-#: src/features/skills/components/bundle-import-dialog.tsx:127
+#: src/features/skills/components/bundle-import-dialog.tsx:132
 msgid "Reasoning effort: {0} of 4."
 msgstr "推論の強度: {0} / 4。"
 
@@ -28439,7 +28448,7 @@ msgstr "Grok 4.1 Fast の推論対応版"
 msgid "Reasoning-intensive tasks that need fast xAI inference with transparent thinking"
 msgstr "透明な思考を備えた xAI の高速推論を必要とする推論中心のタスク"
 
-#: src/features/prompts/components/prompt-form-dialog.tsx:451
+#: src/features/prompts/components/prompt-form-dialog.tsx:415
 msgid "Reasoning: {effortLabel}"
 msgstr "推論: {effortLabel}"
 
@@ -28455,7 +28464,7 @@ msgstr "リベースしてマージ"
 msgid "Recent"
 msgstr "最近"
 
-#: src/features/home/components/home-page.tsx:247
+#: src/features/home/components/home-page.tsx:250
 msgid "Recent chats"
 msgstr "最近のチャット"
 
@@ -28475,7 +28484,7 @@ msgstr "最近作成"
 msgid "Recently Used"
 msgstr "最近使用"
 
-#: src/features/skills/components/skill-builder-review.tsx:188
+#: src/features/skills/components/skill-builder-review.tsx:191
 msgid "Recommended settings"
 msgstr "推奨設定"
 
@@ -28605,7 +28614,7 @@ msgstr "参照画像 ({referenceCount}/{maxImages})"
 msgid "Reference mode"
 msgstr "参照モード"
 
-#: src/features/workflow/components/nodes/character-ref-node.tsx:216
+#: src/features/workflow/components/nodes/character-ref-node.tsx:217
 msgid "Reference Mode"
 msgstr "参照モード"
 
@@ -28613,7 +28622,8 @@ msgstr "参照モード"
 msgid "Reference Photo"
 msgstr "参照写真"
 
-#: src/features/workflow/components/nodes/character-ref-node.tsx:238
+#: src/features/workflow/components/nodes/character-ref-node.tsx:239
+#: src/features/workflow/components/nodes/character-ref-node.tsx:249
 msgid "Reference Strength"
 msgstr "参照の強さ"
 
@@ -28864,7 +28874,7 @@ msgstr "ページを再読み込み"
 msgid "Reload preview"
 msgstr "プレビューを再読み込み"
 
-#: src/features/pages/components/page-conflict-banner.tsx:30
+#: src/features/pages/components/page-conflict-banner.tsx:27
 msgid "Reload their version"
 msgstr "相手のバージョンを再読み込み"
 
@@ -28887,8 +28897,8 @@ msgstr "サインイン状態を保持"
 #: src/features/chat/thread/composer-input.tsx:431
 #: src/features/devices/components/devices-settings.tsx:398
 #: src/features/devices/components/devices-settings.tsx:405
-#: src/features/projects/components/project-form-dialog.tsx:323
-#: src/features/projects/components/project-form-dialog.tsx:364
+#: src/features/projects/components/project-form-dialog.tsx:328
+#: src/features/projects/components/project-form-dialog.tsx:369
 #: src/features/settings/components/chat/custom-providers-settings.tsx:645
 #: src/features/settings/components/chat/favorite-models-settings.tsx:180
 #: src/features/settings/components/chat/native-providers-settings.tsx:720
@@ -28940,8 +28950,8 @@ msgstr "{model} を削除"
 msgid "Remove {modelId} from blocked list"
 msgstr "{modelId} をブロックリストから削除"
 
-#: src/features/pages/components/page-share-dialog.tsx:185
-#: src/features/projects/components/project-repositories.tsx:359
+#: src/features/pages/components/page-share-dialog.tsx:191
+#: src/features/projects/components/project-repositories.tsx:353
 #: src/features/settings/components/chat/default-models-settings.tsx:414
 msgid "Remove {name}"
 msgstr "{name} を削除"
@@ -29012,11 +29022,11 @@ msgid "Remove filter (when focused)"
 msgstr "フィルターを削除 (フォーカス時)"
 
 #: src/features/pages/components/page-tree-item.tsx:152
-#: src/features/pages/components/page-view.tsx:418
+#: src/features/pages/components/page-view.tsx:435
 msgid "Remove from favorites"
 msgstr "お気に入りから削除"
 
-#: src/features/prompts/components/prompt-item.tsx:218
+#: src/features/prompts/components/prompt-item.tsx:214
 #: src/features/prompts/components/prompt-list-view.tsx:222
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:739
 msgid "Remove from Favorites"
@@ -29102,7 +29112,7 @@ msgstr "並べ替えを解除"
 msgid "Remove sort (when focused)"
 msgstr "並べ替えを解除 (フォーカス時)"
 
-#: src/features/workflow/components/gallery/publish-dialog.tsx:229
+#: src/features/workflow/components/gallery/publish-dialog.tsx:230
 msgid "Remove tag {tag}"
 msgstr "タグ {tag} を削除"
 
@@ -29165,8 +29175,8 @@ msgstr "名前を変更しました"
 msgid "Renames, lockfiles, snapshots and generated files. Read last, and only as far as you need to."
 msgstr "名前の変更、ロックファイル、スナップショット、生成されたファイル。最後に、必要な範囲でのみ読んでください。"
 
-#: src/features/develop/components/review-thread.tsx:110
-#: src/features/pages/components/page-comments-panel.tsx:223
+#: src/features/develop/components/review-thread.tsx:112
+#: src/features/pages/components/page-comments-panel.tsx:225
 msgid "Reopen"
 msgstr "未解決に戻す"
 
@@ -29268,9 +29278,9 @@ msgstr "選択した期間のスキルまたはエージェントごとの返信
 
 #: src/features/develop/components/review-thread.tsx:67
 #: src/features/develop/components/review-thread.tsx:80
-#: src/features/develop/components/review-thread.tsx:88
-#: src/features/pages/components/page-comments-panel.tsx:204
-#: src/features/pages/components/page-comments-panel.tsx:208
+#: src/features/develop/components/review-thread.tsx:90
+#: src/features/pages/components/page-comments-panel.tsx:206
+#: src/features/pages/components/page-comments-panel.tsx:210
 msgid "Reply"
 msgstr "返信"
 
@@ -29294,11 +29304,11 @@ msgstr "返信中"
 msgid "Repos, issues, PRs, and code search"
 msgstr "リポジトリ、Issue、PR、コード検索"
 
-#: src/features/projects/components/project-repositories.tsx:282
+#: src/features/projects/components/project-repositories.tsx:276
 msgid "Repositories"
 msgstr "リポジトリ"
 
-#: src/features/projects/components/project-repositories.tsx:383
+#: src/features/projects/components/project-repositories.tsx:377
 #: src/features/projects/components/repo-rule-file-import.tsx:382
 #: src/features/tasks/components/task-form-dialog.tsx:318
 msgid "Repository"
@@ -29369,7 +29379,7 @@ msgstr "リクエスト"
 msgid "required"
 msgstr "必須"
 
-#: src/features/develop/components/checks-tab.tsx:169
+#: src/features/develop/components/checks-tab.tsx:173
 #: src/features/prompts/components/variable-definitions.tsx:93
 #: src/features/prompts/components/variable-fill-dialog.tsx:154
 msgid "Required"
@@ -29480,16 +29490,17 @@ msgid "Reset to Defaults"
 msgstr "既定に戻す"
 
 #: ../../packages/ui/src/components/zoomable-image.tsx:394
+#: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:266
 msgid "Reset zoom"
 msgstr "ズームをリセット"
 
-#: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:276
+#: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:277
 msgid "Reset zoom (100%)"
 msgstr "ズームをリセット (100%)"
 
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:265
-msgid "Reset zoom (currently {zoomPercent}%)"
-msgstr "ズームをリセット (現在 {zoomPercent}%)"
+#~ msgid "Reset zoom (currently {zoomPercent}%)"
+#~ msgstr "ズームをリセット (現在 {zoomPercent}%)"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-column-header.tsx:243
 msgid "Resize {label} column"
@@ -29507,8 +29518,8 @@ msgstr "ペインのサイズを変更"
 msgid "Resolution"
 msgstr "解像度"
 
-#: src/features/develop/components/review-thread.tsx:110
-#: src/features/pages/components/page-comments-panel.tsx:223
+#: src/features/develop/components/review-thread.tsx:112
+#: src/features/pages/components/page-comments-panel.tsx:225
 msgid "Resolve"
 msgstr "解決"
 
@@ -29550,7 +29561,7 @@ msgstr "応答言語: {0}"
 msgid "Restart Ollama ({0})"
 msgstr "Ollama を再起動（{0}）"
 
-#: src/features/pages/components/page-version-panel.tsx:93
+#: src/features/pages/components/page-version-panel.tsx:92
 msgid "Restore this version"
 msgstr "このバージョンを復元"
 
@@ -29568,7 +29579,7 @@ msgstr "バージョン {0} を復元"
 msgid "Restore version {selectedVersion}"
 msgstr "バージョン {selectedVersion} を復元"
 
-#: src/features/pages/components/page-version-panel.tsx:50
+#: src/features/pages/components/page-version-panel.tsx:49
 #: src/features/prompts/components/prompt-history-dialog.tsx:44
 msgid "Restored"
 msgstr "復元しました"
@@ -29591,7 +29602,7 @@ msgid "restyle"
 msgstr "リスタイル"
 
 #: src/features/evals/components/run-detail.tsx:223
-#: src/features/workflow/components/nodes/output-node.tsx:97
+#: src/features/workflow/components/nodes/output-node.tsx:98
 #: src/features/workflow/templates/index.ts:116
 msgid "Result"
 msgstr "結果"
@@ -29712,7 +29723,7 @@ msgstr "メモを付けて再試行"
 msgid "Retrying now"
 msgstr "再試行中"
 
-#: src/features/home/components/home-page.tsx:154
+#: src/features/home/components/home-page.tsx:157
 msgid "Retrying…"
 msgstr "再試行しています…"
 
@@ -29788,7 +29799,7 @@ msgid "Review submitted"
 msgstr "レビューを送信しました"
 
 #. placeholder {0}: task.title
-#: src/features/home/components/home-page.tsx:177
+#: src/features/home/components/home-page.tsx:180
 msgid "Review task: {0}"
 msgstr "タスクを確認：{0}"
 
@@ -29814,7 +29825,7 @@ msgstr "レビュアーのメモ"
 
 #: src/features/auth/components/settings/account/account-cell.tsx:140
 #: src/features/chat/guest-links/use-guest-link-revoke.tsx:105
-#: src/features/pages/components/page-share-dialog.tsx:209
+#: src/features/pages/components/page-share-dialog.tsx:219
 #: src/features/settings/components/chat/tool-permissions-settings.tsx:212
 msgid "Revoke"
 msgstr "取り消す"
@@ -30128,17 +30139,17 @@ msgstr "完了するまで実行"
 msgid "Run workflow"
 msgstr "ワークフローを実行"
 
-#: src/features/workflow/components/canvas/execution-history-panel.tsx:239
+#: src/features/workflow/components/canvas/execution-history-panel.tsx:241
 msgid "Run your workflow to see execution history here."
 msgstr "ワークフローを実行すると、ここに実行履歴が表示されます。"
 
 #: src/features/chat/thread/host-activity.tsx:142
 #: src/features/evals/components/run-detail.tsx:28
 #: src/features/evals/components/run-status.tsx:16
-#: src/features/home/components/home-page.tsx:116
-#: src/features/home/components/home-page.tsx:184
-#: src/features/home/components/home-page.tsx:190
-#: src/features/home/components/home-page.tsx:198
+#: src/features/home/components/home-page.tsx:119
+#: src/features/home/components/home-page.tsx:187
+#: src/features/home/components/home-page.tsx:193
+#: src/features/home/components/home-page.tsx:201
 #: src/features/settings/components/chat/trigger-settings.tsx:184
 #: src/features/tasks/components/task-detail-dialog.tsx:138
 #: src/features/tasks/components/task-status.tsx:20
@@ -30187,7 +30198,7 @@ msgstr "Cloudflare Workers で動作 — コールドスタート 50ms 未満、
 #. placeholder {0}: trigger.schedule ?? ""
 #. placeholder {1}: trigger.timezone ? ` (${trigger.timezone})` : " (UTC)"
 #. placeholder {2}: trigger.model
-#: src/features/skills/components/bundle-import-dialog.tsx:135
+#: src/features/skills/components/bundle-import-dialog.tsx:140
 msgid "Runs on the schedule {0}{1}, on {2}."
 msgstr "{2} で、スケジュール {0}{1} に従って実行します。"
 
@@ -30200,7 +30211,7 @@ msgid "Runs once, then switches itself off. For a repeating time, use a schedule
 msgstr "1 回実行した後、自動的にオフになります。繰り返し実行するには、スケジュールを使用してください。"
 
 #. placeholder {0}: trigger.model
-#: src/features/skills/components/bundle-import-dialog.tsx:144
+#: src/features/skills/components/bundle-import-dialog.tsx:149
 msgid "Runs when a webhook is received, on {0}. You get a new signing secret and URL for it."
 msgstr "{0} で、Webhook を受信したときに実行します。そのための新しい署名シークレットと URL が発行されます。"
 
@@ -30257,7 +30268,7 @@ msgstr "同じフロンティアアーキテクチャをスピード向けに最
 msgid "Same length as current"
 msgstr "現在と同じ長さ"
 
-#: src/features/workflow/components/nodes/advanced-controls-node.tsx:216
+#: src/features/workflow/components/nodes/advanced-controls-node.tsx:225
 msgid "Same seed = reproducible results"
 msgstr "同じシード = 再現可能な結果"
 
@@ -30265,7 +30276,7 @@ msgstr "同じシード = 再現可能な結果"
 msgid "Same thread, fresh context each run"
 msgstr "同じスレッド、実行ごとに新しいコンテキスト"
 
-#: src/features/workflow/components/nodes/advanced-controls-node.tsx:121
+#: src/features/workflow/components/nodes/advanced-controls-node.tsx:129
 msgid "Sampler"
 msgstr "サンプラー"
 
@@ -30365,7 +30376,7 @@ msgstr "ケースを保存"
 msgid "Save changes"
 msgstr "変更を保存"
 
-#: src/features/workflow/components/gallery/publish-dialog.tsx:251
+#: src/features/workflow/components/gallery/publish-dialog.tsx:252
 msgid "Save Changes"
 msgstr "変更を保存"
 
@@ -30482,9 +30493,9 @@ msgstr "回答を保存しています…"
 
 #: src/features/auth/components/team/team-settings-dialog.tsx:215
 #: src/features/chat/prompt-improvement/components/system-prompt-optimizer-dialog.tsx:394
-#: src/features/projects/components/project-form-dialog.tsx:491
+#: src/features/projects/components/project-form-dialog.tsx:496
 #: src/features/projects/components/project-rule-files.tsx:1018
-#: src/features/prompts/components/prompt-form-dialog.tsx:521
+#: src/features/prompts/components/prompt-form-dialog.tsx:485
 #: src/features/prompts/components/thread-variables-config.tsx:286
 #: src/features/settings/components/chat/api-keys-settings.tsx:434
 #: src/features/settings/components/chat/custom-providers-settings.tsx:633
@@ -30565,7 +30576,7 @@ msgstr "スケジュールされたジョブ"
 msgid "Scheduled runs can run shell commands and edit files on the bot's computer, unless you turn those tools off in your tool settings."
 msgstr "ツール設定でオフにしない限り、スケジュール実行ではボットのコンピュータ上でシェルコマンドの実行やファイルの編集ができます。"
 
-#: src/features/workflow/components/nodes/advanced-controls-node.tsx:143
+#: src/features/workflow/components/nodes/advanced-controls-node.tsx:151
 msgid "Scheduler"
 msgstr "スケジューラー"
 
@@ -30615,7 +30626,7 @@ msgstr "一番下までスクロール"
 msgid "Scroll up one page"
 msgstr "1 ページ上にスクロール"
 
-#: src/features/workflow/components/nodes/image-to-video-node.tsx:161
+#: src/features/workflow/components/nodes/image-to-video-node.tsx:172
 msgid "Seamless Loop"
 msgstr "シームレスループ"
 
@@ -30743,12 +30754,12 @@ msgstr "検索モード"
 #. placeholder {0}: currentMode.label
 #. placeholder {0}: draft.searchMode.id
 #: src/features/chat/thread/composer-search-mode.tsx:103
-#: src/features/skills/components/skill-builder-review.tsx:201
+#: src/features/skills/components/skill-builder-review.tsx:204
 msgid "Search mode: {0}"
 msgstr "検索モード：{0}"
 
 #. placeholder {0}: skill.searchMode
-#: src/features/skills/components/bundle-import-dialog.tsx:125
+#: src/features/skills/components/bundle-import-dialog.tsx:130
 msgid "Search mode: {0}."
 msgstr "検索モード: {0}。"
 
@@ -30773,8 +30784,8 @@ msgstr "ノードを検索..."
 msgid "Search or create variable..."
 msgstr "変数を検索または作成..."
 
-#: src/features/pages/components/pages-sidebar.tsx:155
-#: src/features/pages/components/pages-sidebar.tsx:161
+#: src/features/pages/components/pages-sidebar.tsx:156
+#: src/features/pages/components/pages-sidebar.tsx:162
 msgid "Search pages"
 msgstr "ページを検索"
 
@@ -30796,7 +30807,7 @@ msgid "Search Reddit posts"
 msgstr "Reddit の投稿を検索"
 
 #: src/components/settings/settings-search.tsx:167
-#: src/features/pages/components/pages-sidebar.tsx:169
+#: src/features/pages/components/pages-sidebar.tsx:170
 msgid "Search results"
 msgstr "検索結果"
 
@@ -30883,7 +30894,7 @@ msgstr "スレッドの検索、移動、操作の実行..."
 msgid "Search variables..."
 msgstr "変数を検索..."
 
-#: src/routes/(chat)/workflow/gallery.tsx:129
+#: src/routes/(chat)/workflow/gallery.tsx:128
 msgid "Search workflows..."
 msgstr "ワークフローを検索..."
 
@@ -30924,7 +30935,7 @@ msgid "Searching..."
 msgstr "検索しています..."
 
 #: src/features/chat/thread/find/thread-find-bar.tsx:186
-#: src/features/pages/components/pages-sidebar.tsx:66
+#: src/features/pages/components/pages-sidebar.tsx:67
 msgid "Searching…"
 msgstr "検索しています…"
 
@@ -30989,7 +31000,7 @@ msgstr "チームが Neore で AI スタック全体をどのように置き換�
 msgid "See what's new →"
 msgstr "新機能を見る →"
 
-#: src/features/workflow/components/nodes/advanced-controls-node.tsx:180
+#: src/features/workflow/components/nodes/advanced-controls-node.tsx:188
 msgid "Seed"
 msgstr "シード"
 
@@ -30997,7 +31008,7 @@ msgstr "シード"
 #: ../../packages/ui/src/components/data-grid/data-grid-column-header.tsx:30
 #: src/features/chat/forward/select-messages-action.tsx:29
 #: src/features/chat/thread-list/thread-node.tsx:819
-#: src/features/prompts/components/prompt-list.tsx:583
+#: src/features/prompts/components/prompt-list.tsx:585
 #: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:220
 msgid "Select"
 msgstr "選択"
@@ -31046,8 +31057,8 @@ msgid "Select all in {0}"
 msgstr "{0} 内をすべて選択"
 
 #: ../../packages/ui/src/components/icon-picker.tsx:470
-#: src/features/projects/components/project-form-dialog.tsx:346
-#: src/features/projects/components/project-form-dialog.tsx:359
+#: src/features/projects/components/project-form-dialog.tsx:351
+#: src/features/projects/components/project-form-dialog.tsx:364
 msgid "Select an icon"
 msgstr "アイコンを選択"
 
@@ -31162,7 +31173,7 @@ msgstr "ロールを選択"
 msgid "Select row"
 msgstr "行を選択"
 
-#: src/features/pages/components/page-view.tsx:305
+#: src/features/pages/components/page-view.tsx:321
 msgid "Select some text to comment on"
 msgstr "コメントするテキストを選択してください"
 
@@ -31677,7 +31688,7 @@ msgstr "測定中のシャード: {0}。完了させるには、さらにシャ�
 msgid "Shards that could not be measured are left out of the totals: {0}."
 msgstr "測定できなかったシャードは合計から除外されています: {0}。"
 
-#: src/features/pages/components/page-view.tsx:459
+#: src/features/pages/components/page-view.tsx:476
 msgid "Share"
 msgstr "共有"
 
@@ -31686,7 +31697,7 @@ msgstr "共有"
 msgid "Share of spend"
 msgstr "支出の割合"
 
-#: src/features/pages/components/page-share-dialog.tsx:230
+#: src/features/pages/components/page-share-dialog.tsx:240
 msgid "Share page"
 msgstr "ページを共有"
 
@@ -31704,7 +31715,7 @@ msgstr "スレッドを共有し、議論をブランチし、1 つのプラン�
 msgid "Share with organization"
 msgstr "組織と共有"
 
-#: src/features/workflow/components/gallery/publish-dialog.tsx:168
+#: src/features/workflow/components/gallery/publish-dialog.tsx:169
 msgid "Share your workflow with the community. Others can browse, view, and fork it."
 msgstr "ワークフローをコミュニティと共有しましょう。他のユーザーが閲覧、表示、フォークできます。"
 
@@ -31737,7 +31748,7 @@ msgstr "共有プロンプト"
 msgid "Shared threads"
 msgstr "共有スレッド"
 
-#: src/features/pages/components/pages-sidebar.tsx:255
+#: src/features/pages/components/pages-sidebar.tsx:256
 msgid "Shared with me"
 msgstr "共有アイテム"
 
@@ -31830,7 +31841,7 @@ msgstr "チャットの返信が完了したときにアプリ内でメッセー
 msgid "Show a message in the app when a chat waits for your answer or your approval."
 msgstr "チャットがあなたの返答または承認を待っているときにアプリ内でメッセージを表示します。"
 
-#: src/features/skills/components/bundle-import-dialog.tsx:99
+#: src/features/skills/components/bundle-import-dialog.tsx:104
 #: src/features/tasks/components/task-suggestions.tsx:265
 msgid "Show all"
 msgstr "すべて表示"
@@ -31843,7 +31854,7 @@ msgstr "{lines} 行すべてを表示"
 msgid "Show all instructions for \"{title}\""
 msgstr "「{title}」の指示をすべて表示"
 
-#: src/features/tasks/components/goal-list.tsx:73
+#: src/features/tasks/components/goal-list.tsx:70
 msgid "Show all tasks"
 msgstr "すべてのタスクを表示"
 
@@ -31879,13 +31890,12 @@ msgid "Show keyboard shortcuts (outside text fields)"
 msgstr "キーボードショートカットを表示（テキストフィールド外）"
 
 #: src/features/workflow/components/nodes/parallel-compare-node.tsx:172
-#: src/features/workflow/components/nodes/parallel-compare-node.tsx:178
 msgid "Show Labels"
 msgstr "ラベルを表示"
 
 #: ../../packages/ui/src/components/chat-markdown.tsx:83
 #: src/features/chat/pins/pin-item.tsx:214
-#: src/features/skills/components/bundle-import-dialog.tsx:99
+#: src/features/skills/components/bundle-import-dialog.tsx:104
 #: src/features/tasks/components/task-suggestions.tsx:265
 msgid "Show less"
 msgstr "表示を減らす"
@@ -31938,7 +31948,7 @@ msgstr "実行履歴を表示"
 msgid "Show source"
 msgstr "ソースを表示"
 
-#: src/features/tasks/components/goal-list.tsx:73
+#: src/features/tasks/components/goal-list.tsx:70
 msgid "Show this goal's tasks"
 msgstr "この目標のタスクを表示"
 
@@ -31964,7 +31974,7 @@ msgid "Show/Hide Columns"
 msgstr "列の表示/非表示"
 
 #. placeholder {0}: list.length
-#: src/features/develop/components/checks-tab.tsx:148
+#: src/features/develop/components/checks-tab.tsx:137
 msgid "Showing {0} of {total, plural, one {# check} other {# checks}}."
 msgstr "{total, plural, other {# 件のチェック}}のうち {0} 件を表示しています。"
 
@@ -32333,7 +32343,7 @@ msgstr "スキルを更新しました"
 msgid "Skill: {skillName}"
 msgstr "スキル：{skillName}"
 
-#: src/features/skills/components/skill-import-dialog.tsx:206
+#: src/features/skills/components/skill-import-dialog.tsx:207
 msgid "SKILL.md"
 msgstr "SKILL.md"
 
@@ -32357,7 +32367,7 @@ msgstr "スキルの表示"
 msgid "Skip"
 msgstr "スキップ"
 
-#: src/features/workflow/components/nodes/advanced-controls-node.tsx:230
+#: src/features/workflow/components/nodes/advanced-controls-node.tsx:247
 msgid "Skip CLIP layers (0 = none, 1-2 = more stylized)"
 msgstr "CLIP レイヤーをスキップ (0 = なし、1〜2 = よりスタイライズ)"
 
@@ -32373,7 +32383,7 @@ msgstr "コンテンツへスキップ"
 msgid "Skip tour"
 msgstr "ツアーをスキップ"
 
-#: src/features/develop/components/checks-tab.tsx:80
+#: src/features/develop/components/checks-tab.tsx:81
 #: src/features/evals/components/run-detail.tsx:36
 #: src/features/onboarding/components/setup-checklist.tsx:135
 #: src/features/settings/components/chat/trigger-settings.tsx:182
@@ -32634,7 +32644,7 @@ msgstr "このブラウザーは別の人が操作しています。"
 
 #: src/components/error-boundary.tsx:200
 #: src/components/settings/settings-modal.tsx:128
-#: src/features/pages/components/page-share-dialog.tsx:50
+#: src/features/pages/components/page-share-dialog.tsx:52
 msgid "Something went wrong"
 msgstr "問題が発生しました"
 
@@ -32665,6 +32675,8 @@ msgid "Sort asc"
 msgstr "昇順で並べ替え"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-sort-menu.tsx:157
+#: src/features/prompts/components/prompt-list.tsx:518
+#: src/routes/(chat)/workflow/gallery.tsx:131
 msgid "Sort by"
 msgstr "並べ替えの基準"
 
@@ -33074,7 +33086,8 @@ msgstr "スター付き"
 msgid "Starred"
 msgstr "スター付き"
 
-#: src/features/workflow/components/nodes/controlnet-node.tsx:198
+#: src/features/workflow/components/nodes/controlnet-node.tsx:206
+#: src/features/workflow/components/nodes/controlnet-node.tsx:216
 #: src/features/workflow/components/nodes/video-trim-dialog.tsx:174
 msgid "Start"
 msgstr "開始"
@@ -33109,7 +33122,7 @@ msgstr "メッセージをピン留めするには会話を始めてください
 msgid "Start a conversation, generate images, write a document in canvas, run code — no tab-switching, no copy-pasting between apps."
 msgstr "会話を始めて、画像を生成し、キャンバスでドキュメントを書き、コードを実行 — タブの切り替えもアプリ間のコピー&ペーストも不要です。"
 
-#: src/features/home/components/home-page.tsx:83
+#: src/features/home/components/home-page.tsx:86
 msgid "Start a new chat"
 msgstr "新しいチャットを開始"
 
@@ -33139,7 +33152,7 @@ msgstr "新しい一時チャットを開始（{0}）"
 msgid "Start building"
 msgstr "構築を始める"
 
-#: src/features/home/components/home-page.tsx:97
+#: src/features/home/components/home-page.tsx:100
 msgid "Start chat"
 msgstr "チャットを開始"
 
@@ -33382,7 +33395,8 @@ msgstr "StepFun の高速で効率的なモデル"
 msgid "steps"
 msgstr "ステップ"
 
-#: src/features/workflow/components/nodes/advanced-controls-node.tsx:166
+#: src/features/workflow/components/nodes/advanced-controls-node.tsx:174
+#: src/features/workflow/components/nodes/advanced-controls-node.tsx:178
 msgid "Steps"
 msgstr "ステップ数"
 
@@ -33549,6 +33563,7 @@ msgid "Streaming..."
 msgstr "ストリーミング中..."
 
 #: src/features/workflow/components/nodes/img2img-node.tsx:80
+#: src/features/workflow/components/nodes/img2img-node.tsx:90
 #: src/features/workflow/components/nodes/node-expand-modal.tsx:140
 msgid "Strength"
 msgstr "強度"
@@ -34075,7 +34090,7 @@ msgid "Summary of the conversation"
 msgstr "会話の要約"
 
 #. placeholder {0}: group.synthesizer
-#: src/features/skills/components/bundle-import-dialog.tsx:156
+#: src/features/skills/components/bundle-import-dialog.tsx:161
 msgid "Summed up by /{0}."
 msgstr "/{0} が要約しました。"
 
@@ -34318,14 +34333,14 @@ msgstr "テーブル"
 #: src/features/chat/thread-list/thread-list-filter-menu.tsx:137
 #: src/features/chat/thread-list/thread-node.tsx:582
 #: src/features/chat/thread-list/thread-node.tsx:588
-#: src/features/prompts/components/prompt-form-dialog.tsx:285
+#: src/features/prompts/components/prompt-form-dialog.tsx:270
 #: src/features/prompts/components/prompt-list-view.tsx:161
 #: src/features/skills/components/skill-builder-diff.tsx:37
 #: src/features/skills/components/skill-form-dialog.tsx:349
 msgid "Tags"
 msgstr "タグ"
 
-#: src/features/workflow/components/gallery/publish-dialog.tsx:207
+#: src/features/workflow/components/gallery/publish-dialog.tsx:208
 msgid "Tags (up to 10)"
 msgstr "タグ (最大 10 個)"
 
@@ -34419,7 +34434,7 @@ msgstr "翻訳先の言語"
 msgid "Target model (optional)"
 msgstr "対象モデル（任意）"
 
-#: src/features/skills/components/bundle-import-dialog.tsx:149
+#: src/features/skills/components/bundle-import-dialog.tsx:154
 msgid "Task"
 msgstr "タスク"
 
@@ -34481,18 +34496,18 @@ msgstr "タスクを再実行の待機列に追加しました"
 msgid "Task rejected"
 msgstr "タスクを却下しました"
 
-#: src/features/tasks/components/tasks-page.tsx:259
+#: src/features/tasks/components/tasks-page.tsx:264
 msgid "Task views"
 msgstr "タスクの表示"
 
 #: src/features/auth/components/settings/api-key/api-key-scope-picker.tsx:34
 #: src/features/layout/components/sidebar-shortcut.tsx:101
-#: src/features/tasks/components/tasks-page.tsx:194
+#: src/features/tasks/components/tasks-page.tsx:199
 msgid "Tasks"
 msgstr "タスク"
 
 #. placeholder {0}: goalTitleById.get(selectedGoalId) ?? ""
-#: src/features/tasks/components/tasks-page.tsx:255
+#: src/features/tasks/components/tasks-page.tsx:260
 msgid "Tasks for {0}"
 msgstr "{0} のタスク"
 
@@ -34655,7 +34670,7 @@ msgstr "テルグ語"
 msgid "Telugu (India)"
 msgstr "テルグ語（インド）"
 
-#: src/features/workflow/components/nodes/text-node.tsx:181
+#: src/features/workflow/components/nodes/text-node.tsx:182
 msgid "Template"
 msgstr "テンプレート"
 
@@ -34775,11 +34790,11 @@ msgstr "テキスト"
 #: src/features/settings/lib/settings-keywords.ts:73
 #: src/features/workflow/components/gallery/gallery-card.tsx:28
 #: src/features/workflow/components/nodes/output-node.tsx:16
-#: src/features/workflow/components/nodes/text-node.tsx:167
+#: src/features/workflow/components/nodes/text-node.tsx:168
 #: src/features/workflow/components/template-picker.tsx:21
 #: src/features/workflow/types/index.ts:623
 #: src/features/workflow/types/index.ts:627
-#: src/routes/(chat)/workflow/gallery.tsx:22
+#: src/routes/(chat)/workflow/gallery.tsx:21
 msgid "Text"
 msgstr "テキスト"
 
@@ -34805,7 +34820,7 @@ msgstr "テキストの配置"
 msgid "Text color"
 msgstr "文字色"
 
-#: src/features/workflow/components/nodes/text-node.tsx:143
+#: src/features/workflow/components/nodes/text-node.tsx:144
 msgid "Text Content"
 msgstr "テキストコンテンツ"
 
@@ -34846,7 +34861,7 @@ msgstr "テキストのみ：Web 検索、ツール、ファイルや画像の�
 msgid "text processing"
 msgstr "テキスト処理"
 
-#: src/features/pages/components/page-comments-panel.tsx:160
+#: src/features/pages/components/page-comments-panel.tsx:162
 msgid "Text removed."
 msgstr "テキストを削除しました。"
 
@@ -35293,7 +35308,7 @@ msgstr "組み込みツールを読み込めませんでした。追加するに
 msgid "The bundle could not be exported."
 msgstr "バンドルをエクスポートできませんでした。"
 
-#: src/features/skills/components/bundle-import-dialog.tsx:341
+#: src/features/skills/components/bundle-import-dialog.tsx:346
 msgid "The bundle could not be imported."
 msgstr "バンドルをインポートできませんでした。"
 
@@ -35398,7 +35413,7 @@ msgstr "コスト上限には正のドル金額を指定してください。"
 msgid "The dataset, its cases and every run of it are removed."
 msgstr "データセット、そのケース、およびすべての実行が削除されます。"
 
-#: src/features/develop/components/pull-request-view.tsx:148
+#: src/features/develop/components/pull-request-view.tsx:149
 msgid "The description is cut short."
 msgstr "説明が途中で切れています。"
 
@@ -35442,7 +35457,7 @@ msgstr "下書きがいっぱいです。コメントをさらに追加する前
 msgid "The edited image is too large to save (>1 MB). Try cropping, downscaling, or applying fewer effects."
 msgstr "編集した画像が大きすぎて保存できません（1 MB 超）。トリミング、縮小、またはエフェクトを減らしてみてください。"
 
-#: src/features/pages/components/page-agent-dialog.tsx:59
+#: src/features/pages/components/page-agent-dialog.tsx:60
 msgid "The editor is not ready yet"
 msgstr "エディターの準備がまだできていません"
 
@@ -35469,7 +35484,7 @@ msgid "The extension will be able to read and send chats as {0}. You can disconn
 msgstr "拡張機能は {0} としてチャットを読み取り・送信できるようになります。拡張機能でサインアウトするか、アカウント設定でセッションを終了すれば、いつでも切断できます。"
 
 #. placeholder {0}: MAX_BUNDLE_BYTES / 1024
-#: src/features/skills/components/bundle-import-dialog.tsx:310
+#: src/features/skills/components/bundle-import-dialog.tsx:315
 msgid "The file is larger than {0} KB, which is more than a bundle can be."
 msgstr "ファイルが {0} KB を超えており、バンドルの上限を超えています。"
 
@@ -35529,7 +35544,7 @@ msgstr "無料プランには、厳選された高速・低コストなモデル
 msgid "The full system prompt to send to the model..."
 msgstr "モデルに送信する完全なシステムプロンプト..."
 
-#: src/features/tasks/components/tasks-page.tsx:337
+#: src/features/tasks/components/tasks-page.tsx:342
 msgid "The goal is removed; its tasks stay, without a goal."
 msgstr "目標は削除されます。タスクは目標なしの状態で残ります。"
 
@@ -35606,7 +35621,7 @@ msgstr "ホストキーを検証できませんでした"
 msgid "The host lists at most {commitLimit, plural, one {# commit} other {# commits}} for one change. {leftOut, plural, one {# more is not shown here.} other {# more are not shown here.}}"
 msgstr "ホストが 1 つの変更について一覧表示するのは、最大 {commitLimit, plural, other {# 件のコミット}}です。{leftOut, plural, other {他 # 件はここに表示されません。}}"
 
-#: src/features/develop/components/files-tab.tsx:439
+#: src/features/develop/components/files-tab.tsx:442
 msgid "The host lists at most {fileLimit, plural, one {# file} other {# files}} for one change. {leftOut, plural, one {# more is not shown here.} other {# more are not shown here.}}"
 msgstr "ホストが 1 つの変更について一覧表示するのは、最大 {fileLimit, plural, other {# 個のファイル}}です。{leftOut, plural, other {他 # 件はここに表示されません。}}"
 
@@ -35738,7 +35753,7 @@ msgstr "以下のコンピューターは {email} のデバイスになります
 msgid "The machine was not paired. You can close this tab."
 msgstr "コンピューターはペアリングされませんでした。このタブは閉じて構いません。"
 
-#: src/features/skills/components/skill-builder-review.tsx:257
+#: src/features/skills/components/skill-builder-review.tsx:260
 msgid "The MCP registry could not be reached, so server suggestions may be missing."
 msgstr "MCP レジストリに接続できなかったため、サーバーの候補が表示されない場合があります。"
 
@@ -35825,7 +35840,7 @@ msgstr "新しいクエリにインデックスが付けられました。追加
 msgid "The operating system keychain"
 msgstr "OS のキーチェーン"
 
-#: src/features/pages/components/page-agent-dialog.tsx:64
+#: src/features/pages/components/page-agent-dialog.tsx:65
 msgid "The page agent could not edit this page"
 msgstr "ページエージェントがこのページを編集できませんでした"
 
@@ -35845,7 +35860,7 @@ msgstr "ログインフォームがあるページです。空欄にすると、
 msgid "The page you opened is still loading."
 msgstr "開いたページはまだ読み込み中です。"
 
-#: src/features/pages/components/pages-sidebar.tsx:282
+#: src/features/pages/components/pages-sidebar.tsx:283
 msgid "The page, every sub-page, its comments and its version history are deleted. This cannot be undone."
 msgstr "ページ、すべてのサブページ、コメント、バージョン履歴が削除されます。この操作は元に戻せません。"
 
@@ -36032,7 +36047,7 @@ msgstr "サブエージェントを開始できませんでした。"
 msgid "The tag \"{pendingDeleteName}\" will be removed from every chat that has it. The chats themselves are not deleted."
 msgstr "タグ「{pendingDeleteName}」は、このタグが付いたすべてのチャットから削除されます。チャット自体は削除されません。"
 
-#: src/features/tasks/components/tasks-page.tsx:338
+#: src/features/tasks/components/tasks-page.tsx:343
 msgid "The task and its run history are removed. Tasks that depend on it stop waiting for it."
 msgstr "タスクとその実行履歴が削除されます。このタスクに依存するタスクは待機しなくなります。"
 
@@ -36245,7 +36260,7 @@ msgstr "考えています..."
 #: src/features/chat/aside/aside-panel.tsx:139
 #: src/features/chat/aside/aside-panel.tsx:228
 #: src/features/chat/voice-mode/voice-mode-button.tsx:70
-#: src/features/pages/components/page-agent-dialog.tsx:151
+#: src/features/pages/components/page-agent-dialog.tsx:153
 #: src/features/skills/components/skill-builder-dialog.tsx:182
 msgid "Thinking…"
 msgstr "考え中…"
@@ -36298,11 +36313,11 @@ msgstr "このブランチはその間に変更されました。確認してか
 msgid "This browser cannot receive push notifications here."
 msgstr "このブラウザーではここでプッシュ通知を受信できません。"
 
-#: src/features/skills/components/bundle-import-dialog.tsx:383
+#: src/features/skills/components/bundle-import-dialog.tsx:388
 msgid "This bundle came from someone else"
 msgstr "このバンドルは他の人から提供されたものです"
 
-#: src/features/skills/components/bundle-import-dialog.tsx:394
+#: src/features/skills/components/bundle-import-dialog.tsx:399
 msgid "This bundle has no items."
 msgstr "このバンドルにはアイテムがありません。"
 
@@ -36488,11 +36503,11 @@ msgstr "このコンピュータの時計はサーバーより約 {minutes} 分�
 msgid "This connection needs to be renewed."
 msgstr "この接続は更新が必要です。"
 
-#: src/features/projects/components/project-form-dialog.tsx:388
+#: src/features/projects/components/project-form-dialog.tsx:393
 msgid "This context will be automatically added to each chat in your project. You can include instructions, background information, or any shared knowledge."
 msgstr "このコンテキストは、プロジェクト内の各チャットに自動的に追加されます。指示、背景情報、共有の知識などを含めることができます。"
 
-#: src/features/projects/components/project-form-dialog.tsx:393
+#: src/features/projects/components/project-form-dialog.tsx:398
 msgid "This context will be prepended to the system prompt for all chats in this project."
 msgstr "このコンテキストは、このプロジェクトのすべてのチャットでシステムプロンプトの先頭に追加されます。"
 
@@ -36532,7 +36547,7 @@ msgstr "正しくないようです。{prefix}で始まる必要があります�
 msgid "This endpoint is not Ollama. Model management is available for Ollama only — in LM Studio, download models in the app."
 msgstr "このエンドポイントは Ollama ではありません。モデル管理は Ollama でのみ利用できます。LM Studio ではアプリ内でモデルをダウンロードしてください。"
 
-#: src/features/skills/components/bundle-import-dialog.tsx:329
+#: src/features/skills/components/bundle-import-dialog.tsx:334
 msgid "This file could not be read as a bundle."
 msgstr "このファイルはバンドルとして読み取れませんでした。"
 
@@ -36733,7 +36748,7 @@ msgstr "このモデルには推論の強度がありません"
 msgid "This note waits in its own chat. Open that chat to send it."
 msgstr "このメッセージは元のチャットで待機しています。送信するにはそのチャットを開いてください。"
 
-#: src/features/pages/components/page-conflict-banner.tsx:27
+#: src/features/pages/components/page-conflict-banner.tsx:24
 msgid "This page changed while you were editing."
 msgstr "編集中にこのページが変更されました。"
 
@@ -36801,7 +36816,7 @@ msgstr "このプロンプトは、会話履歴とともにすべてのメッセ
 msgid "This prompt will be used for every message. Each message is processed independently without chat history."
 msgstr "このプロンプトはすべてのメッセージで使用されます。各メッセージはチャット履歴なしで個別に処理されます。"
 
-#: src/features/prompts/components/prompt-form-dialog.tsx:448
+#: src/features/prompts/components/prompt-form-dialog.tsx:412
 msgid "This prompt will configure:"
 msgstr "このプロンプトで設定される内容："
 
@@ -36979,7 +36994,7 @@ msgstr "プロジェクトと関連するすべてのスレッドが完全に削
 
 #. placeholder {0}: prompt.name
 #. placeholder {0}: promptToDelete?.name
-#: src/features/prompts/components/prompt-item.tsx:300
+#: src/features/prompts/components/prompt-item.tsx:295
 #: src/features/prompts/components/prompt-list-view.tsx:300
 #: src/features/prompts/components/prompts-sidebar-tab.tsx:962
 msgid "This will permanently delete the prompt \"{0}\". This action cannot be undone."
@@ -37249,7 +37264,7 @@ msgstr "未着手"
 
 #: ../../packages/chat-ui/src/threads/thread-list.tsx:47
 #: src/features/chat/thread-list/hooks/use-thread-groups.ts:639
-#: src/features/pages/components/page-version-panel.tsx:56
+#: src/features/pages/components/page-version-panel.tsx:55
 msgid "Today"
 msgstr "今日"
 
@@ -37391,7 +37406,7 @@ msgstr "大きすぎて添付できません: {0}。ファイルを小さくし�
 msgid "Too long to add: the server's address or the tool's name is too long."
 msgstr "長すぎるため追加できません。サーバーのアドレスまたはツール名が長すぎます。"
 
-#: src/features/workflow/components/nodes/text-node.tsx:78
+#: src/features/workflow/components/nodes/text-node.tsx:79
 msgid "Too long to check as JSON"
 msgstr "JSON として確認するには長すぎます"
 
@@ -37625,7 +37640,7 @@ msgstr "変換"
 msgid "Transform"
 msgstr "変形"
 
-#: src/features/workflow/components/nodes/text-node.tsx:134
+#: src/features/workflow/components/nodes/text-node.tsx:135
 msgid "Transform (Template)"
 msgstr "変換 (テンプレート)"
 
@@ -37831,13 +37846,13 @@ msgstr "検索キーワードを変えてみてください。"
 #: src/features/chat/browser-live-view/browser-live-view.tsx:1277
 #: src/features/chat/guest-links/guest-page.tsx:269
 #: src/features/connection/components/offline-screen.tsx:64
-#: src/features/develop/components/files-tab.tsx:400
+#: src/features/develop/components/files-tab.tsx:403
 #: src/features/develop/components/thread-pull-requests.tsx:338
-#: src/features/home/components/home-page.tsx:154
+#: src/features/home/components/home-page.tsx:157
 #: src/features/projects/components/computer-rule-file-import.tsx:495
 #: src/features/projects/components/project-repo-picker.tsx:190
 #: src/features/projects/components/project-repo-picker.tsx:198
-#: src/features/projects/components/project-repositories.tsx:297
+#: src/features/projects/components/project-repositories.tsx:291
 #: src/features/projects/components/repo-rule-file-import.tsx:183
 #: src/features/settings/components/chat/default-models-settings.tsx:467
 #: src/features/settings/components/personalization/memory-file-import.tsx:473
@@ -37944,7 +37959,7 @@ msgstr "メモリをオンにする"
 msgid "Turn on memory to import a file."
 msgstr "ファイルをインポートするには、メモリをオンにしてください。"
 
-#: src/features/skills/components/bundle-import-dialog.tsx:122
+#: src/features/skills/components/bundle-import-dialog.tsx:127
 msgid "Turns these tools off:"
 msgstr "次のツールをオフにします:"
 
@@ -38007,7 +38022,7 @@ msgid "Type"
 msgstr "種類"
 
 #: src/features/workflow/components/nodes/ai-node.tsx:43
-#: src/features/workflow/components/nodes/text-node.tsx:180
+#: src/features/workflow/components/nodes/text-node.tsx:181
 msgid "Type @ to insert the output of a connected text node"
 msgstr "@ を入力すると、接続されたテキストノードの出力を挿入できます"
 
@@ -38297,7 +38312,7 @@ msgstr "不明"
 msgid "Unknown Device"
 msgstr "不明なデバイス"
 
-#: src/features/pages/components/page-share-dialog.tsx:154
+#: src/features/pages/components/page-share-dialog.tsx:157
 msgid "Unknown user"
 msgstr "不明なユーザー"
 
@@ -38378,7 +38393,7 @@ msgstr "このチャットのピン留めを解除しますか？"
 msgid "Unpin thread"
 msgstr "スレッドのピン留めを解除"
 
-#: src/features/workflow/components/gallery/publish-dialog.tsx:248
+#: src/features/workflow/components/gallery/publish-dialog.tsx:249
 msgid "Unpublish"
 msgstr "公開を停止"
 
@@ -38407,7 +38422,7 @@ msgid "unsupported type"
 msgstr "未対応の形式"
 
 #. placeholder {0}: dateFormat.format(invite.expiresAt)
-#: src/features/pages/components/page-share-dialog.tsx:206
+#: src/features/pages/components/page-share-dialog.tsx:216
 msgid "until {0}"
 msgstr "{0} まで"
 
@@ -38425,19 +38440,19 @@ msgid "Until a chat is paired, the bot answers only that it is private. Send /pa
 msgstr "チャットがペアリングされるまで、ボットは非公開であることのみ返信します。設定のコードを添えて /pair を送信し、連絡先をリンクしてください。"
 
 #: src/features/pages/components/page-tree-item.tsx:53
-#: src/features/pages/components/page-view.tsx:390
-#: src/features/pages/components/page-view.tsx:397
-#: src/features/pages/components/page-view.tsx:500
-#: src/features/pages/components/pages-sidebar.tsx:61
-#: src/features/pages/components/pages-sidebar.tsx:181
-#: src/features/pages/components/pages-sidebar.tsx:208
-#: src/features/pages/components/pages-sidebar.tsx:269
+#: src/features/pages/components/page-view.tsx:407
+#: src/features/pages/components/page-view.tsx:414
+#: src/features/pages/components/page-view.tsx:517
+#: src/features/pages/components/pages-sidebar.tsx:62
+#: src/features/pages/components/pages-sidebar.tsx:182
+#: src/features/pages/components/pages-sidebar.tsx:209
+#: src/features/pages/components/pages-sidebar.tsx:270
 #: src/features/pages/components/public-page-view.tsx:53
 #: src/features/settings/components/chat/event-trigger-fields.tsx:281
 msgid "Untitled"
 msgstr "無題"
 
-#: src/features/home/components/home-page.tsx:255
+#: src/features/home/components/home-page.tsx:258
 msgid "Untitled chat"
 msgstr "無題のチャット"
 
@@ -38485,11 +38500,11 @@ msgstr "期間を更新"
 msgid "Update failed"
 msgstr "更新に失敗しました"
 
-#: src/features/projects/components/project-form-dialog.tsx:487
+#: src/features/projects/components/project-form-dialog.tsx:492
 msgid "Update Project"
 msgstr "プロジェクトを更新"
 
-#: src/features/prompts/components/prompt-form-dialog.tsx:517
+#: src/features/prompts/components/prompt-form-dialog.tsx:481
 msgid "Update Prompt"
 msgstr "プロンプトを更新"
 
@@ -38527,11 +38542,11 @@ msgstr "アカウントのメールアドレスを更新します"
 msgid "Update your project details below."
 msgstr "以下でプロジェクトの詳細を更新してください。"
 
-#: src/features/prompts/components/prompt-form-dialog.tsx:239
+#: src/features/prompts/components/prompt-form-dialog.tsx:224
 msgid "Update your prompt details below."
 msgstr "以下でプロンプトの詳細を更新してください。"
 
-#: src/features/workflow/components/gallery/publish-dialog.tsx:166
+#: src/features/workflow/components/gallery/publish-dialog.tsx:167
 msgid "Update your workflow's gallery settings or unpublish it."
 msgstr "ワークフローのギャラリー設定を更新するか、公開を停止します。"
 
@@ -38638,7 +38653,7 @@ msgstr "アップロード"
 msgid "Upload"
 msgstr "アップロード"
 
-#: src/features/skills/components/bundle-import-dialog.tsx:353
+#: src/features/skills/components/bundle-import-dialog.tsx:358
 msgid "Upload a bundle file (.md). You will see everything in it and choose what to import; nothing is created until you confirm."
 msgstr "バンドルファイル（.md）をアップロードします。内容がすべて表示され、インポートするものを選べます。確認するまで何も作成されません。"
 
@@ -38837,10 +38852,10 @@ msgstr "{0, plural, other {# 件の参照を使用}}"
 
 #. placeholder {0}: skill.name
 #: src/features/skills/components/skill-builder-review.tsx:118
-msgid "Use {0} instead"
-msgstr "代わりに {0} を使用"
+#~ msgid "Use {0} instead"
+#~ msgstr "代わりに {0} を使用"
 
-#: src/features/workflow/components/nodes/text-node.tsx:186
+#: src/features/workflow/components/nodes/text-node.tsx:187
 msgid "Use {templateVariable} for variables from connected nodes..."
 msgstr "接続されたノードの変数には {templateVariable} を使用します..."
 
@@ -38848,7 +38863,7 @@ msgstr "接続されたノードの変数には {templateVariable} を使用し�
 msgid "Use {VARIABLE_PLACEHOLDER} for values supplied when the skill runs."
 msgstr "スキルの実行時に渡される値には {VARIABLE_PLACEHOLDER} を使用します。"
 
-#: src/features/prompts/components/prompt-form-dialog.tsx:363
+#: src/features/prompts/components/prompt-form-dialog.tsx:327
 msgid "Use {VARIABLE_PLACEHOLDER} syntax to add dynamic content. Example: \"Hello {EXAMPLE_PLACEHOLDER}!\""
 msgstr "動的な内容を追加するには {VARIABLE_PLACEHOLDER} 構文を使用します。例：「こんにちは、{EXAMPLE_PLACEHOLDER}！」"
 
@@ -38898,11 +38913,11 @@ msgstr "描画を使用"
 msgid "Use five cron fields, e.g. \"0 9 * * 1\" for Mondays at 09:00 UTC"
 msgstr "5 つの cron フィールドを使用します。例：「0 9 * * 1」は毎週月曜日 09:00 UTC"
 
-#: src/features/prompts/components/prompt-item.tsx:180
+#: src/features/prompts/components/prompt-item.tsx:176
 msgid "Use in Chat"
 msgstr "チャットで使用"
 
-#: src/features/prompts/components/prompt-item.tsx:184
+#: src/features/prompts/components/prompt-item.tsx:180
 msgid "Use in Temp Chat"
 msgstr "一時チャットで使用"
 
@@ -38943,7 +38958,7 @@ msgstr "これらのキーボードショートカットを使うと、データ
 msgid "Use this computer for agent tools"
 msgstr "このコンピューターをエージェントのツールに使う"
 
-#: src/features/skills/components/skill-builder-review.tsx:125
+#: src/features/skills/components/skill-builder-review.tsx:128
 msgid "Use this instead"
 msgstr "代わりにこれを使用"
 
@@ -39128,7 +39143,7 @@ msgstr "ウズベク語（ウズベキスタン）"
 msgid "Uzbekistan"
 msgstr "ウズベキスタン"
 
-#: src/features/workflow/components/nodes/text-node.tsx:81
+#: src/features/workflow/components/nodes/text-node.tsx:82
 msgid "Valid JSON"
 msgstr "有効な JSON"
 
@@ -39178,11 +39193,12 @@ msgstr "変数を保存しました"
 msgid "Variables starting with \"context.\" or \"user.\" are system-managed and cannot be edited"
 msgstr "「context.」または「user.」で始まる変数はシステムで管理されており、編集できません"
 
-#: src/features/skills/components/skill-builder-review.tsx:182
+#: src/features/skills/components/skill-builder-review.tsx:185
 msgid "Variables:"
 msgstr "変数："
 
 #: src/features/layout/components/sidebar-shortcut.tsx:141
+#: src/features/vault/components/header.tsx:12
 msgid "Vault"
 msgstr "Vault"
 
@@ -39334,9 +39350,9 @@ msgid "Version {position} of {total}"
 msgstr "バージョン {position} / {total}"
 
 #: src/features/canvas/canvas-panel.tsx:792
-#: src/features/pages/components/page-version-panel.tsx:81
-#: src/features/pages/components/page-version-panel.tsx:83
-#: src/features/pages/components/page-view.tsx:448
+#: src/features/pages/components/page-version-panel.tsx:80
+#: src/features/pages/components/page-version-panel.tsx:82
+#: src/features/pages/components/page-view.tsx:465
 msgid "Version history"
 msgstr "バージョン履歴"
 
@@ -39345,7 +39361,7 @@ msgstr "バージョン履歴"
 msgid "Version History"
 msgstr "バージョン履歴"
 
-#: src/features/pages/components/page-version-panel.tsx:71
+#: src/features/pages/components/page-version-panel.tsx:70
 msgid "Version restored"
 msgstr "バージョンを復元しました"
 
@@ -39418,7 +39434,7 @@ msgstr "動画"
 #: src/features/workflow/components/template-picker.tsx:22
 #: src/features/workflow/types/index.ts:660
 #: src/features/workflow/types/index.ts:664
-#: src/routes/(chat)/workflow/gallery.tsx:23
+#: src/routes/(chat)/workflow/gallery.tsx:22
 msgid "Video"
 msgstr "動画"
 
@@ -39575,7 +39591,7 @@ msgstr "エラーの詳細を表示"
 msgid "View full docs"
 msgstr "ドキュメント全体を見る"
 
-#: src/features/prompts/components/prompt-item.tsx:203
+#: src/features/prompts/components/prompt-item.tsx:199
 #: src/features/prompts/components/prompt-list-view.tsx:213
 msgid "View History"
 msgstr "履歴を表示"
@@ -39605,16 +39621,16 @@ msgstr "プルリクエストを表示"
 msgid "View Sessions"
 msgstr "セッションを表示"
 
-#: src/features/develop/components/files-tab.tsx:261
+#: src/features/develop/components/files-tab.tsx:264
 msgid "Viewed"
 msgstr "表示済み"
 
-#: src/features/develop/components/files-tab.tsx:261
+#: src/features/develop/components/files-tab.tsx:264
 msgid "Viewed (changed since)"
 msgstr "表示済み（その後変更あり）"
 
 #. placeholder {0}: listed.length
-#: src/features/develop/components/files-tab.tsx:442
+#: src/features/develop/components/files-tab.tsx:445
 msgid "Viewed {viewedCount} of {0} files"
 msgstr "{0} 個中 {viewedCount} 個のファイルを表示済み"
 
@@ -39859,7 +39875,7 @@ msgid "Waiting"
 msgstr "保留中"
 
 #. placeholder {0}: rollup.waiting.join(", ")
-#: src/features/develop/components/checks-tab.tsx:85
+#: src/features/develop/components/checks-tab.tsx:86
 msgid "Waiting for {0}."
 msgstr "{0} を待っています。"
 
@@ -39920,14 +39936,14 @@ msgid "Waiting for your answer"
 msgstr "あなたの回答を待っています"
 
 #. placeholder {0}: approval.threadTitle
-#: src/features/home/components/home-page.tsx:172
+#: src/features/home/components/home-page.tsx:175
 msgid "Waiting for your answer in {0}"
 msgstr "{0} であなたの回答を待っています"
 
 #: src/features/chat/thread-list/thread-node.tsx:874
 #: src/features/chat/thread-list/thread-node.tsx:881
 #: src/features/chat/thread/tool-approval.tsx:78
-#: src/features/home/components/home-page.tsx:116
+#: src/features/home/components/home-page.tsx:119
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:20
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:60
 msgid "Waiting for your approval"
@@ -40035,7 +40051,7 @@ msgid "Webhook notifications"
 msgstr "Webhook 通知"
 
 #: src/features/settings/components/chat/trigger-settings.tsx:660
-#: src/features/skills/components/bundle-import-dialog.tsx:186
+#: src/features/skills/components/bundle-import-dialog.tsx:191
 msgid "Webhook secret copied to clipboard"
 msgstr "Webhook シークレットをクリップボードにコピーしました"
 
@@ -40044,7 +40060,7 @@ msgstr "Webhook シークレットをクリップボードにコピーしまし�
 msgid "Webhook secret for \"{0}\""
 msgstr "「{0}」の Webhook シークレット"
 
-#: src/features/skills/components/bundle-import-dialog.tsx:194
+#: src/features/skills/components/bundle-import-dialog.tsx:199
 msgid "Webhook secret for \"{title}\""
 msgstr "「{title}」の Webhook シークレット"
 
@@ -40202,7 +40218,7 @@ msgstr "キャンバス機能とは？"
 msgid "What it evaluates"
 msgstr "評価対象"
 
-#: src/features/home/components/home-page.tsx:131
+#: src/features/home/components/home-page.tsx:134
 msgid "What needs you, what's running, and where you left off."
 msgstr "対応が必要なこと、実行中のこと、前回の続き。"
 
@@ -40210,7 +40226,7 @@ msgstr "対応が必要なこと、実行中のこと、前回の続き。"
 msgid "What Neore does day to day: work that runs on a schedule, approvals before risky actions, and the chat apps you already use."
 msgstr "Neore が日常的に行うこと: スケジュールに沿って実行される作業、リスクのある操作の前の承認、そして普段お使いのチャットアプリ。"
 
-#: src/features/pages/components/page-agent-dialog.tsx:121
+#: src/features/pages/components/page-agent-dialog.tsx:122
 #: src/features/skills/components/skill-builder-dialog.tsx:283
 msgid "What should change?"
 msgstr "何を変更しますか？"
@@ -40254,7 +40270,7 @@ msgstr "この変数が表すもの..."
 
 #: src/features/workflow/components/nodes/inpaint-node.tsx:116
 #: src/features/workflow/components/nodes/object-editor-node.tsx:157
-#: src/features/workflow/components/nodes/outpaint-node.tsx:141
+#: src/features/workflow/components/nodes/outpaint-node.tsx:149
 msgid "What to avoid..."
 msgstr "避けたい要素..."
 
@@ -40524,11 +40540,11 @@ msgstr "Workers、KV、R2 などの Cloudflare プラットフォームツール
 msgid "Workflow automation across thousands of apps"
 msgstr "数千のアプリをまたぐワークフロー自動化"
 
-#: src/features/workflow/components/canvas/workflow-canvas.tsx:306
+#: src/features/workflow/components/canvas/workflow-canvas.tsx:307
 msgid "Workflow canvas"
 msgstr "ワークフローキャンバス"
 
-#: src/routes/(chat)/workflow/$workflowId.tsx:57
+#: src/routes/(chat)/workflow/$workflowId.tsx:63
 #: src/routes/(chat)/workflow/shared/$token.tsx:45
 msgid "Workflow not found"
 msgstr "ワークフローが見つかりません"
@@ -40577,7 +40593,7 @@ msgstr "目標に向けて作業中: ラウンド {nextRound} / {0}"
 #: src/features/auth/components/device-approval.tsx:242
 #: src/features/chat/thread/streaming-placeholder.tsx:634
 #: src/features/coding-agents/components/coding-agent-run-view.tsx:183
-#: src/features/pages/components/page-agent-dialog.tsx:46
+#: src/features/pages/components/page-agent-dialog.tsx:47
 msgid "Working…"
 msgstr "処理しています…"
 
@@ -40740,7 +40756,7 @@ msgstr "OpenRouter 経由の Xiaomi の高速 Mimo V2 Flash モデル（思考�
 msgid "Y position"
 msgstr "Y 座標"
 
-#: src/features/workflow/components/nodes/text-node.tsx:173
+#: src/features/workflow/components/nodes/text-node.tsx:174
 msgid "YAML"
 msgstr "YAML"
 
@@ -40770,7 +40786,7 @@ msgid "Yes. You can bring your own API keys for any supported provider. Keys are
 msgstr "はい。対応するすべてのプロバイダーで独自の API キーを使用できます。キーは保存時に暗号化され、ログに記録されることはなく、プロバイダーに直接渡されます。これにより、ルーティング、分析、フォールバックの恩恵を受けながら、ご自身の請求契約を利用できます。"
 
 #: ../../packages/chat-ui/src/threads/thread-list.tsx:48
-#: src/features/pages/components/page-version-panel.tsx:59
+#: src/features/pages/components/page-version-panel.tsx:58
 msgid "Yesterday"
 msgstr "昨日"
 
@@ -40779,7 +40795,7 @@ msgstr "昨日"
 msgid "You"
 msgstr "あなた"
 
-#: src/features/pages/components/page-view.tsx:378
+#: src/features/pages/components/page-view.tsx:394
 msgid "You (another tab)"
 msgstr "あなた（別のタブ）"
 
@@ -40848,11 +40864,11 @@ msgid "You are watching as many repositories as is allowed."
 msgstr "許可されている数のリポジトリを監視しています。"
 
 #. placeholder {0}: review.skillSlotsLeft ?? 0
-#: src/features/skills/components/bundle-import-dialog.tsx:424
+#: src/features/skills/components/bundle-import-dialog.tsx:429
 msgid "You can add {0} more skills on this plan. Untick some skills or upgrade."
 msgstr "このプランでは、あと {0} 個のスキルを追加できます。いくつかのスキルのチェックを外すか、アップグレードしてください。"
 
-#: src/features/pages/components/page-view.tsx:482
+#: src/features/pages/components/page-view.tsx:499
 msgid "You can comment on this page but not edit it."
 msgstr "このページにはコメントできますが、編集はできません。"
 
@@ -40872,7 +40888,7 @@ msgstr "分析、マーケティング、AI 機能など、さまざまな種類
 msgid "You can try again now!"
 msgstr "もう一度お試しいただけます！"
 
-#: src/features/pages/components/page-view.tsx:482
+#: src/features/pages/components/page-view.tsx:499
 msgid "You can view this page but not edit it."
 msgstr "このページは閲覧できますが、編集はできません。"
 
@@ -41134,7 +41150,7 @@ msgstr "お使いのブラウザはプロセッサーの種類を示さないた
 msgid "Your browser talks to the server on this computer directly — the prompt and reply never pass through our AI servers, and nothing is billed."
 msgstr "ブラウザーがこのコンピューター上のサーバーと直接通信します。プロンプトと返信が当社の AI サーバーを経由することはなく、課金もされません。"
 
-#: src/features/projects/components/project-form-dialog.tsx:503
+#: src/features/projects/components/project-form-dialog.tsx:508
 msgid "Your changes to this project's rule files are not saved. Closing drops them."
 msgstr "このプロジェクトのルールファイルへの変更は保存されていません。閉じると破棄されます。"
 
@@ -41263,7 +41279,7 @@ msgstr "ナレッジベースが上限に達しました。追加するにはフ
 msgid "Your last import stopped before it finished. Resume it to import the conversations that are left."
 msgstr "前回のインポートは完了する前に停止しました。再開すると、残りの会話をインポートします。"
 
-#: src/features/pages/components/page-conflict-banner.tsx:27
+#: src/features/pages/components/page-conflict-banner.tsx:24
 msgid "Your latest changes are not saved yet."
 msgstr "最新の変更はまだ保存されていません。"
 
@@ -41329,7 +41345,7 @@ msgstr "Daily Brief は組織によって管理されています。"
 msgid "Your organization's projects, summed over every member, for the selected period"
 msgstr "選択した期間の、組織のすべてのメンバーを合算したプロジェクトの利用量"
 
-#: src/features/home/components/home-page.tsx:144
+#: src/features/home/components/home-page.tsx:147
 msgid "Your overview could not be loaded."
 msgstr "概要を読み込めませんでした。"
 
@@ -41349,7 +41365,7 @@ msgstr "自分のチャットのみ"
 msgid "Your own OpenAI key — used for OpenAI models and required to delegate work to Codex."
 msgstr "ご自身の OpenAI キー。OpenAI のモデルに使用され、Codex に作業を任せるために必要です。"
 
-#: src/features/pages/components/pages-sidebar.tsx:215
+#: src/features/pages/components/pages-sidebar.tsx:216
 msgid "Your pages"
 msgstr "自分のページ"
 
@@ -41551,8 +41567,8 @@ msgstr "ZIP アーカイブ"
 
 #: ../../packages/ui/src/components/file-renderers/pdf-viewer.tsx:166
 #: ../../packages/ui/src/components/zoomable-image.tsx:397
-#: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:284
-#: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:290
+#: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:285
+#: src/features/workflow/components/canvas/workflow-bottom-toolbar.tsx:291
 #: src/features/workflow/hooks/use-canvas-aria-labels.ts:25
 msgid "Zoom in"
 msgstr "拡大"

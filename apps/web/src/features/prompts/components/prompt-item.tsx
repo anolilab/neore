@@ -127,11 +127,7 @@ const PromptItem = ({
 
     return (
         <Card
-            className={cn(
-                "group hover:border-primary/50 relative flex flex-col transition-all hover:shadow-lg",
-                isSelected && "border-primary ring-primary/20 ring-2",
-                selectionMode && "cursor-pointer",
-            )}
+            className={cn("group relative flex flex-col", isSelected && "outline-primary/70 outline-2", selectionMode && "cursor-pointer")}
             onClick={selectionMode ? handleCardClick : undefined}
             ref={cardRef}
         >
@@ -143,7 +139,7 @@ const PromptItem = ({
                         )}
                         <div className="min-w-0 flex-1 space-y-1">
                             <div className="flex items-center gap-2">
-                                <CardTitle className="truncate text-base font-semibold">{prompt.name}</CardTitle>
+                                <CardTitle className="truncate text-sm font-medium">{prompt.name}</CardTitle>
                             </div>
                             {prompt.description && <CardDescription className="line-clamp-2 text-xs">{prompt.description}</CardDescription>}
                         </div>
@@ -237,8 +233,7 @@ const PromptItem = ({
             <CardContent className="flex-1 pb-3">
                 {/* Content Preview */}
                 <div
-                    aria-label={t`Copy Prompt`}
-                    className="bg-muted/50 group/preview hover:bg-muted/80 text-muted-foreground relative cursor-pointer rounded-md p-3 font-mono text-sm transition-colors"
+                    className="surface-well group/preview text-muted-foreground relative cursor-pointer rounded-lg p-3 font-mono text-sm"
                     onClick={handleCopy}
                     onKeyDown={(e) => {
                         if (!(e.key === "Enter" || e.key === " ")) {
@@ -252,9 +247,9 @@ const PromptItem = ({
                     tabIndex={0}
                 >
                     <div className="line-clamp-4 break-words whitespace-pre-wrap">{truncatedContent}</div>
-                    <div className="bg-background/50 absolute inset-0 flex items-center justify-center rounded-md opacity-0 backdrop-blur-[1px] transition-opacity group-hover/preview:opacity-100">
+                    <div className="bg-surface-well/70 absolute inset-0 flex items-center justify-center rounded-lg opacity-0 backdrop-blur-[1px] transition-opacity group-hover/preview:opacity-100">
                         {/* A span styled as a button: the whole preview is the button, and a nested one would break its semantics. */}
-                        <span className={buttonVariants({ className: "shadow-sm", size: "sm", variant: "secondary" })}>
+                        <span className={buttonVariants({ size: "sm", variant: "secondary" })}>
                             {copied ? (
                                 <>
                                     <Check className="mr-2 size-4" />
@@ -291,7 +286,7 @@ const PromptItem = ({
                                 {variables.length}
                             </Badge>
                         )}
-                        {prompt.isFavorite && <Star className="size-3 fill-current text-yellow-500" />}
+                        {prompt.isFavorite && <Star aria-hidden="true" className="fill-warning text-warning size-3" />}
                     </div>
                 </div>
             </CardContent>

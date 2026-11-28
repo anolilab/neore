@@ -8,7 +8,7 @@ import PromptList from "@/features/prompts/components/prompt-list";
 export const Route = createFileRoute("/_shortcut/prompts")({
     component: () => (
         <RouteErrorBoundary routeName="/prompts">
-            <ScrollArea className="h-full w-full p-4">
+            <ScrollArea className="h-full w-full p-4 md:p-6">
                 <div className="space-y-6">
                     <PromptHeader />
                     <PromptList />

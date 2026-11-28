@@ -80,12 +80,12 @@ const KeyboardShortcutsDialog = ({ onClose, open }: KeyboardShortcutsDialogProps
                 <div className="space-y-4">
                     {SHORTCUT_GROUPS.map((group) => (
                         <div key={group.label.id}>
-                            <p className="text-muted-foreground mb-2 text-[11px] font-medium tracking-wide uppercase">{i18n._(group.label)}</p>
-                            <div className="space-y-1">
+                            <p className="text-muted-foreground mb-2 font-mono text-xs">{i18n._(group.label)}</p>
+                            <div className="border-border/50 divide-border/50 divide-y rounded-xl border px-3">
                                 {group.shortcuts.map((shortcut) => (
-                                    <div className="flex items-center justify-between py-1" key={shortcut.description.id}>
+                                    <div className="flex items-center justify-between py-2" key={shortcut.description.id}>
                                         <span className="text-sm">{i18n._(shortcut.description)}</span>
-                                        <kbd className="bg-muted text-muted-foreground rounded border px-1.5 py-0.5 font-mono text-xs">{shortcut.keys}</kbd>
+                                        <kbd className="surface-well text-muted-foreground rounded-md px-1.5 py-0.5 font-mono text-xs">{shortcut.keys}</kbd>
                                     </div>
                                 ))}
                             </div>

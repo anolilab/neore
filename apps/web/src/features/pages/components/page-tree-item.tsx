@@ -56,8 +56,8 @@ const PageTreeItem: FC<PageTreeItemProps> = ({ activePageId, expanded, node, onA
         <li>
             <div
                 className={cn(
-                    "group hover:bg-sidebar-accent/60 relative flex items-center gap-0.5 rounded-md pr-1 text-sm",
-                    activePageId === node._id && "bg-sidebar-accent text-sidebar-accent-foreground",
+                    "group hover:bg-surface-row-hover relative flex items-center gap-0.5 rounded-lg pr-1 text-sm",
+                    activePageId === node._id && "bg-surface-row-active",
                     dropPosition === "inside" && "ring-primary ring-2",
                     dropPosition === "before" && "before:bg-primary before:absolute before:inset-x-0 before:-top-px before:h-0.5",
                     dropPosition === "after" && "after:bg-primary after:absolute after:inset-x-0 after:-bottom-px after:h-0.5",

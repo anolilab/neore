@@ -52,7 +52,7 @@ export const GuideStops = ({ onOpenFile, stops }: { onOpenFile: (path: string) =
     return (
         <ol aria-label={t`Reading order`} className="space-y-3">
             {stops.map((stop, index) => (
-                <li className="rounded-md border p-3" key={stop.id}>
+                <li className="surface-raised rounded-xl p-4" key={stop.id}>
                     <section aria-labelledby={`guide-stop-${stop.id}`} className="space-y-2">
                         <div className="flex flex-wrap items-center gap-2">
                             <span className="text-muted-foreground text-xs">{index + 1}</span>
@@ -112,7 +112,7 @@ export const GuideProposals = ({
     return (
         <ul aria-label={t`Suggestions`} className="space-y-2">
             {proposals.map((proposal) => (
-                <li className="space-y-2 rounded-md border p-3" key={proposal.id}>
+                <li className="surface-raised space-y-2 rounded-xl p-4" key={proposal.id}>
                     {proposal.kind === "comment" ? (
                         <>
                             <p className="font-mono text-xs break-words">

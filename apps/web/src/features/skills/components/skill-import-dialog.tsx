@@ -158,62 +158,64 @@ const SkillImportDialogBody: FC<Omit<SkillImportDialogProps, "open">> = ({ onClo
                 <DialogTitle>{t`Import skill`}</DialogTitle>
                 <DialogDescription>{t`Upload a SKILL.md or a skill .zip (as used by Claude and other Agent Skills tools), paste the markdown, or fetch it from a link.`}</DialogDescription>
             </DialogHeader>
-            <DialogPanel className="space-y-4">
-                <div className="flex items-center gap-2">
-                    <Button onClick={() => fileInput.current?.click()} type="button" variant="outline">
-                        <FileUpIcon aria-hidden="true" className="mr-2 size-4" />
-                        {t`Choose .md or .zip`}
-                    </Button>
-                    {upload.filename !== "SKILL.md" && <span className="text-muted-foreground truncate text-xs">{upload.filename}</span>}
-                    <input
-                        accept=".md,.markdown,.zip,text/markdown,application/zip"
-                        aria-hidden="true"
-                        className="hidden"
-                        onChange={handleFile}
-                        ref={fileInput}
-                        tabIndex={-1}
-                        type="file"
-                    />
-                </div>
-                <div className="space-y-1.5">
-                    <Label htmlFor={linkId}>{t`Or fetch from a link`}</Label>
-                    <div className="flex gap-2">
-                        <Input
-                            id={linkId}
-                            onChange={(event) => {
-                                // A fetch in flight is for the link the user just replaced: its result must not land.
-                                uploadRevision.current += 1;
-                                setLink(event.target.value);
-                            }}
-                            onKeyDown={handleLinkKeyDown}
-                            placeholder="https://github.com/owner/repo/tree/main/skills/my-skill"
-                            type="text"
-                            value={link}
-                        />
-                        <Button disabled={!link.trim() || isFetching} onClick={handleFetchLink} type="button" variant="outline">
-                            {isFetching && <Loader2Icon aria-hidden="true" className="mr-2 size-4 animate-spin" />}
-                            {t`Fetch`}
+            <DialogPanel>
+                <div className="divide-border/50 divide-y *:py-3 *:first:pt-0 *:last:pb-0">
+                    <div className="flex items-center gap-2">
+                        <Button onClick={() => fileInput.current?.click()} type="button" variant="outline">
+                            <FileUpIcon aria-hidden="true" className="mr-2 size-4" />
+                            {t`Choose .md or .zip`}
                         </Button>
-                        <span aria-live="polite" className="sr-only" role="status">
-                            {isFetching ? t`Fetching link…` : ""}
-                        </span>
+                        {upload.filename !== "SKILL.md" && <span className="text-muted-foreground truncate text-xs">{upload.filename}</span>}
+                        <input
+                            accept=".md,.markdown,.zip,text/markdown,application/zip"
+                            aria-hidden="true"
+                            className="hidden"
+                            onChange={handleFile}
+                            ref={fileInput}
+                            tabIndex={-1}
+                            type="file"
+                        />
                     </div>
-                    <p className="text-muted-foreground text-xs">
-                        {t`A GitHub link to a skill folder or its SKILL.md, a skills.sh link, or an npx skills add command. Only the SKILL.md is imported; scripts and other files in the skill are not.`}
-                    </p>
+                    <div className="space-y-1.5">
+                        <Label htmlFor={linkId}>{t`Or fetch from a link`}</Label>
+                        <div className="flex gap-2">
+                            <Input
+                                id={linkId}
+                                onChange={(event) => {
+                                    // A fetch in flight is for the link the user just replaced: its result must not land.
+                                    uploadRevision.current += 1;
+                                    setLink(event.target.value);
+                                }}
+                                onKeyDown={handleLinkKeyDown}
+                                placeholder="https://github.com/owner/repo/tree/main/skills/my-skill"
+                                type="text"
+                                value={link}
+                            />
+                            <Button disabled={!link.trim() || isFetching} onClick={handleFetchLink} type="button" variant="outline">
+                                {isFetching && <Loader2Icon aria-hidden="true" className="mr-2 size-4 animate-spin" />}
+                                {t`Fetch`}
+                            </Button>
+                            <span aria-live="polite" className="sr-only" role="status">
+                                {isFetching ? t`Fetching link…` : ""}
+                            </span>
+                        </div>
+                        <p className="text-muted-foreground text-xs">
+                            {t`A GitHub link to a skill folder or its SKILL.md, a skills.sh link, or an npx skills add command. Only the SKILL.md is imported; scripts and other files in the skill are not.`}
+                        </p>
+                    </div>
+                    <div className="space-y-1.5">
+                        <Label htmlFor={markdownId}>{t`SKILL.md`}</Label>
+                        <Textarea
+                            className="max-h-72 font-mono text-xs"
+                            id={markdownId}
+                            onChange={(event) => replaceUpload({ filename: "SKILL.md", files: [], markdown: event.target.value })}
+                            placeholder={"---\nname: my-skill\ndescription: What it does and when to use it.\n---\n\nInstructions…"}
+                            rows={10}
+                            value={upload.markdown}
+                        />
+                    </div>
                 </div>
-                <div className="space-y-1.5">
-                    <Label htmlFor={markdownId}>{t`SKILL.md`}</Label>
-                    <Textarea
-                        className="max-h-72 font-mono text-xs"
-                        id={markdownId}
-                        onChange={(event) => replaceUpload({ filename: "SKILL.md", files: [], markdown: event.target.value })}
-                        placeholder={"---\nname: my-skill\ndescription: What it does and when to use it.\n---\n\nInstructions…"}
-                        rows={10}
-                        value={upload.markdown}
-                    />
-                </div>
-                <div aria-live="polite" role="status">
+                <div aria-live="polite" className="not-empty:border-border/50 not-empty:mt-3 not-empty:border-t not-empty:pt-3" role="status">
                     {readError && <p className="text-destructive text-sm">{readError}</p>}
                     {preview && !preview.ok && (
                         <ul className="text-destructive list-disc space-y-0.5 pl-5 text-sm">
@@ -223,14 +225,14 @@ const SkillImportDialogBody: FC<Omit<SkillImportDialogProps, "open">> = ({ onClo
                         </ul>
                     )}
                     {preview?.ok && (
-                        <div className="bg-muted/50 space-y-1 rounded-md p-3 text-sm">
+                        <div className="surface-well space-y-1 rounded-lg p-3 text-sm">
                             <p className="font-medium">
                                 {preview.skill.name} <span className="text-muted-foreground font-normal">/{preview.skill.slug}</span>
                             </p>
                             <p className="text-muted-foreground line-clamp-3 text-xs">{preview.skill.description}</p>
                             {upload.files.length > 0 && <p className="text-muted-foreground text-xs">{t`${upload.files.length} additional file(s)`}</p>}
                             {preview.warnings.map((warning) => (
-                                <p className="text-xs text-amber-600 dark:text-amber-400" key={warning}>
+                                <p className="text-warning-foreground text-xs" key={warning}>
                                     {warning}
                                 </p>
                             ))}
@@ -238,7 +240,7 @@ const SkillImportDialogBody: FC<Omit<SkillImportDialogProps, "open">> = ({ onClo
                     )}
                 </div>
             </DialogPanel>
-            <DialogFooter>
+            <DialogFooter className="border-border/50 border-t" variant="bare">
                 <Button onClick={onClose} type="button" variant="outline">
                     {t`Cancel`}
                 </Button>

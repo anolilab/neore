@@ -41,7 +41,7 @@ const SharedWorkflowPage = () => {
             <RouteErrorBoundary routeName={route}>
                 <div className="flex h-full flex-col items-center justify-center gap-4">
                     <Workflow className="text-muted-foreground size-12" />
-                    <h2 className="text-lg font-medium">
+                    <h2 className="text-[15px] font-semibold">
                         <Trans>Workflow not found</Trans>
                     </h2>
                     <p className="text-muted-foreground">
@@ -85,13 +85,13 @@ const SharedWorkflowPage = () => {
         <RouteErrorBoundary routeName={route}>
             <>
                 {/* Header Bar */}
-                <div className="bg-background flex items-center justify-between border-b px-4 py-3">
+                <div className="border-border/50 flex items-center justify-between border-b px-4 py-3">
                     <div className="flex items-center gap-3">
                         <Button aria-label={t`Back to Gallery`} onClick={() => navigate({ to: "/workflow/gallery" })} size="icon" variant="ghost">
                             <ArrowLeft className="size-4" />
                         </Button>
                         <div
-                            className="flex size-8 items-center justify-center rounded"
+                            className="flex size-8 items-center justify-center rounded-lg"
                             style={{
                                 backgroundColor: workflow.color ? `${workflow.color}20` : "var(--muted)",
                                 color: workflow.color ?? "var(--muted-foreground)",

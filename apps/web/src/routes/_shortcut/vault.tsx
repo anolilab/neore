@@ -9,8 +9,8 @@ import VaultView from "@/features/vault/components/view";
 export const Route = createFileRoute("/_shortcut/vault")({
     component: () => (
         <RouteErrorBoundary routeName="/vault">
-            <ScrollArea className="h-full w-full p-4">
-                <div className="space-y-6">
+            <ScrollArea className="h-full w-full p-4 md:p-6">
+                <div className="mx-auto max-w-7xl space-y-6">
                     <VaultHeader />
                     <VaultView />
                     <SiteLogins />

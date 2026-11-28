@@ -24,7 +24,7 @@ const DraftCommentCard = ({
     const [error, setError] = useState<string | null>(null);
 
     return (
-        <div className="bg-background text-foreground sticky left-0 my-1 max-w-3xl space-y-2 rounded-md border border-dashed p-3 font-sans text-sm whitespace-normal">
+        <div className="bg-surface-panel text-foreground border-border sticky left-0 mx-3 my-2 max-w-3xl space-y-2 rounded-xl border border-dashed p-3 font-sans text-sm whitespace-normal">
             <Badge variant="outline">{t`Pending: posted when you submit the review`}</Badge>
             {editing ? (
                 <CommentComposer

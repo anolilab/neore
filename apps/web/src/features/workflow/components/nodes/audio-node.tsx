@@ -61,11 +61,11 @@ const AudioNodeComponent = (props: NodeProps<Node<AudioNodeData>>) => {
                 </div>
 
                 <div className="space-y-1.5">
-                    <Label className="text-muted-foreground text-xs">
+                    <Label className="text-muted-foreground text-xs" htmlFor={`${id}-voice`}>
                         <Trans>Voice</Trans>
                     </Label>
                     <Select onValueChange={handleVoiceChange} value={data.voice ?? "alloy"}>
-                        <SelectTrigger className="nodrag h-8 text-sm">
+                        <SelectTrigger className="nodrag h-8 text-sm" id={`${id}-voice`}>
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>

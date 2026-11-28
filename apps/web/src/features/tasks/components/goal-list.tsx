@@ -34,10 +34,7 @@ const GoalList = ({ goals, onDelete, onEdit, onSelect, selectedGoalId }: GoalLis
                 const isSelected = selectedGoalId === goal._id;
 
                 return (
-                    <li
-                        className={cn("bg-card space-y-3 rounded-lg border p-4", isSelected ? "border-primary ring-primary/30 ring-2" : "border-border")}
-                        key={goal._id}
-                    >
+                    <li className={cn("surface-raised space-y-3 rounded-xl p-4", isSelected && "outline-primary/70 outline-2")} key={goal._id}>
                         <div className="flex items-start justify-between gap-2">
                             <div className="min-w-0 space-y-1">
                                 <h3 className="text-sm font-medium break-words">{title}</h3>

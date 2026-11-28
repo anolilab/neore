@@ -190,7 +190,12 @@ const TasksPage = () => {
         <div className="mx-auto max-w-7xl space-y-8">
             <header className="flex flex-wrap items-start justify-between gap-4">
                 <div className="space-y-1">
-                    <h1 className="focus:ring-ring/30 text-xl font-semibold outline-none focus:ring-[2px]" id={headingId} ref={titleRef} tabIndex={-1}>
+                    <h1
+                        className="focus:ring-ring/30 text-xl font-semibold tracking-tight outline-none focus:ring-[2px]"
+                        id={headingId}
+                        ref={titleRef}
+                        tabIndex={-1}
+                    >
                         {t`Tasks`}
                     </h1>
                     <p className="text-muted-foreground text-sm">
@@ -224,7 +229,7 @@ const TasksPage = () => {
 
             {goals.length > 0 && (
                 <section aria-labelledby={`${headingId}-goals`} className="space-y-3">
-                    <h2 className="text-sm font-medium" id={`${headingId}-goals`}>
+                    <h2 className="text-[15px] font-semibold" id={`${headingId}-goals`}>
                         {t`Goals`}
                     </h2>
                     <GoalList
@@ -238,7 +243,7 @@ const TasksPage = () => {
             )}
 
             {board && allTasks.length === 0 ? (
-                <Empty>
+                <Empty className="surface-raised py-16">
                     <EmptyHeader>
                         <EmptyMedia variant="icon">
                             <ListChecks aria-hidden />
@@ -251,7 +256,7 @@ const TasksPage = () => {
                 board && (
                     <section aria-labelledby={`${headingId}-tasks`} className="space-y-3">
                         <div className="flex flex-wrap items-center justify-between gap-2">
-                            <h2 className="text-sm font-medium" id={`${headingId}-tasks`}>
+                            <h2 className="text-[15px] font-semibold" id={`${headingId}-tasks`}>
                                 {selectedGoalId ? t`Tasks for ${goalTitleById.get(selectedGoalId) ?? ""}` : t`All tasks`}
                             </h2>
                         </div>
@@ -274,7 +279,7 @@ const TasksPage = () => {
                                         const columnId = `${headingId}-${status}`;
 
                                         return (
-                                            <section aria-labelledby={columnId} className="bg-muted/40 w-72 shrink-0 space-y-2 rounded-lg p-2" key={status}>
+                                            <section aria-labelledby={columnId} className="surface-well w-72 shrink-0 space-y-2 rounded-xl p-2" key={status}>
                                                 <h3 className="flex items-center gap-2 px-1 text-xs font-medium" id={columnId}>
                                                     <TaskStatusIcon status={status} />
                                                     {statusLabels[status]}

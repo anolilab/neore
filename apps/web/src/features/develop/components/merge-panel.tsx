@@ -136,8 +136,8 @@ const MergePanel = ({
     const dialog = pending === null ? null : dialogs[pending];
 
     return (
-        <section aria-labelledby={titleId} className="space-y-3 rounded-md border p-3">
-            <h3 className="text-sm font-semibold" id={titleId}>
+        <section aria-labelledby={titleId} className="surface-raised space-y-3 rounded-xl p-4">
+            <h3 className="text-[15px] font-semibold" id={titleId}>
                 {t`Merge`}
             </h3>
             {stateHints[state] !== "" && <p className="text-muted-foreground text-xs">{stateHints[state]}</p>}

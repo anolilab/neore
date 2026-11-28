@@ -45,7 +45,7 @@ const TemplateCard = ({ onSelect, template }: TemplateCardProps) => {
 
     return (
         <button
-            className="bg-card hover:bg-accent hover:border-primary flex w-full flex-col gap-3 rounded-lg border p-4 text-left transition-colors"
+            className="bg-surface-row hover:bg-surface-row-hover border-border/50 flex w-full flex-col gap-3 rounded-xl border p-4 text-left transition-colors"
             onClick={() => onSelect(template)}
             type="button"
         >

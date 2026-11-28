@@ -137,9 +137,9 @@ const PromptOptimizeDialog = ({ onClose, onOptimized, open, prompt }: PromptOpti
                 </DialogHeader>
 
                 <DialogPanel>
-                    <div className="space-y-4">
+                    <div className="divide-border/50 divide-y *:py-3 *:first:pt-0 *:last:pb-0">
                         {error && (
-                            <div className="bg-destructive/10 border-destructive/20 text-destructive flex items-center gap-2 rounded-md border px-3 py-2 text-sm">
+                            <div className="bg-destructive/10 border-destructive/20 text-destructive flex items-center gap-2 rounded-lg border px-3 py-2 text-sm">
                                 <AlertCircle className="size-4 flex-shrink-0" />
                                 <span>{error}</span>
                             </div>
@@ -148,7 +148,7 @@ const PromptOptimizeDialog = ({ onClose, onOptimized, open, prompt }: PromptOpti
                         {/* Original prompt */}
                         <div className="space-y-2">
                             <Label>{t`Original Prompt`}</Label>
-                            <div className="bg-muted max-h-40 overflow-y-auto rounded-md p-3">
+                            <div className="surface-well max-h-40 overflow-y-auto rounded-lg p-3">
                                 <p className="text-sm whitespace-pre-wrap">{prompt.content}</p>
                             </div>
                         </div>
@@ -176,7 +176,7 @@ const PromptOptimizeDialog = ({ onClose, onOptimized, open, prompt }: PromptOpti
                                     <Sparkles className="size-4" />
                                     {t`Optimized Prompt`}
                                 </Label>
-                                <div className="border-primary/30 bg-primary/5 max-h-60 overflow-y-auto rounded-md border p-3">
+                                <div className="border-primary/30 bg-primary/5 max-h-60 overflow-y-auto rounded-lg border p-3">
                                     <Textarea
                                         className="border-0 bg-transparent p-0 focus-visible:ring-0"
                                         onChange={(e) => setOptimizedContent(e.target.value)}
@@ -189,7 +189,7 @@ const PromptOptimizeDialog = ({ onClose, onOptimized, open, prompt }: PromptOpti
                     </div>
                 </DialogPanel>
 
-                <DialogFooter>
+                <DialogFooter className="border-border/50 border-t" variant="bare">
                     <Button onClick={onClose} variant="outline">
                         {t`Cancel`}
                     </Button>

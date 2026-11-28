@@ -83,7 +83,7 @@ const SkillBuilderTestDrive = ({ acceptance, draft }: SkillBuilderTestDriveProps
     };
 
     return (
-        <section aria-labelledby={`${id}-heading`} className="bg-muted/40 space-y-3 rounded-lg border p-4">
+        <section aria-labelledby={`${id}-heading`} className="space-y-3">
             <div className="space-y-1">
                 <h3 className="flex items-center gap-2 text-sm font-medium" id={`${id}-heading`}>
                     <FlaskConical aria-hidden="true" className="size-4" />

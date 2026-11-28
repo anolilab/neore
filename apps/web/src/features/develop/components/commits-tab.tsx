@@ -15,7 +15,7 @@ const CommitsTab = ({ address, commitLimit, hostLabel, leftOut }: { address: Pul
     const commits = usePullRequestCommits(address, true);
 
     if (commits.isPending) {
-        return <Skeleton aria-label={t`Loading commits`} className="h-24 w-full" role="status" />;
+        return <Skeleton aria-label={t`Loading commits`} className="h-24 w-full rounded-xl" role="status" />;
     }
 
     const pages = commits.data?.pages ?? [];
@@ -30,13 +30,13 @@ const CommitsTab = ({ address, commitLimit, hostLabel, leftOut }: { address: Pul
     return (
         <div className="space-y-3">
             {leftOut > 0 && (
-                <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm" role="note">
+                <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm" role="note">
                     {t`The host lists at most ${plural(commitLimit, { one: "# commit", other: "# commits" })} for one change. ${plural(leftOut, { one: "# more is not shown here.", other: "# more are not shown here." })}`}
                 </p>
             )}
-            <ol className="rounded-md border">
+            <ol className="surface-raised overflow-hidden rounded-xl">
                 {listed.map((commit) => (
-                    <li className="flex items-baseline gap-3 border-b px-3 py-2 text-sm last:border-b-0" key={commit.sha}>
+                    <li className="border-border/50 flex items-baseline gap-3 border-b px-4 py-2.5 text-sm last:border-b-0" key={commit.sha}>
                         <code className="text-muted-foreground shrink-0 font-mono text-xs">{shortSha(commit.sha)}</code>
                         <span className="min-w-0 flex-1 truncate">{commitSubject(commit.message)}</span>
                         <span className="text-muted-foreground shrink-0 text-xs">{commit.authorName}</span>

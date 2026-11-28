@@ -76,7 +76,7 @@ const ImportCasesBody = ({ datasetId, onClose }: Omit<ImportCasesDialogProps, "o
                 }}
             >
                 <DialogPanel>
-                    <div className="space-y-4">
+                    <div className="divide-border/50 divide-y *:py-3 *:first:pt-0 *:last:pb-0">
                         <div className="space-y-2">
                             <Label htmlFor={`${baseId}-file`}>{t`File`}</Label>
                             <Input
@@ -92,12 +92,12 @@ const ImportCasesBody = ({ datasetId, onClose }: Omit<ImportCasesDialogProps, "o
                         </div>
                         <div className="text-muted-foreground space-y-2 text-xs" id={`${baseId}-formats`}>
                             <p>{t`CSV needs a header row with an "input" column. Optional columns: expected_answer, rubric, expected_sources (separated by ;), and one column per check: contains, not_contains, exact, regex, json_schema, max_latency_ms, max_cost_usd.`}</p>
-                            <pre className="bg-muted overflow-x-auto rounded p-2 font-mono">{CSV_EXAMPLE}</pre>
+                            <pre className="surface-well rounded-lg p-2 font-mono break-all whitespace-pre-wrap">{CSV_EXAMPLE}</pre>
                             <p>{t`JSONL has one case per line:`}</p>
-                            <pre className="bg-muted overflow-x-auto rounded p-2 font-mono">{JSONL_EXAMPLE}</pre>
+                            <pre className="surface-well rounded-lg p-2 font-mono break-all whitespace-pre-wrap">{JSONL_EXAMPLE}</pre>
                         </div>
                         {errors.length > 0 && (
-                            <div aria-live="assertive" className="border-destructive/40 bg-destructive/5 rounded-md border p-3" role="alert">
+                            <div aria-live="assertive" className="border-destructive/40 bg-destructive/5 rounded-lg border p-3" role="alert">
                                 <p className="text-destructive text-sm font-medium">{t`The file was not imported:`}</p>
                                 <ul className="mt-2 max-h-48 list-disc space-y-1 overflow-y-auto pl-5 text-xs">
                                     {errors.map((error) => (
@@ -108,7 +108,7 @@ const ImportCasesBody = ({ datasetId, onClose }: Omit<ImportCasesDialogProps, "o
                         )}
                     </div>
                 </DialogPanel>
-                <DialogFooter>
+                <DialogFooter className="border-border/50 border-t" variant="bare">
                     <Button onClick={onClose} type="button" variant="outline">
                         {t`Cancel`}
                     </Button>

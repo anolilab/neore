@@ -128,7 +128,7 @@ const RunDialogBody = ({ dataset, onClose, onStarted }: Omit<RunDialogProps, "op
                 }}
             >
                 <DialogPanel>
-                    <div className="space-y-4">
+                    <div className="divide-border/50 divide-y *:py-3 *:first:pt-0 *:last:pb-0">
                         {rag ? (
                             <fieldset className="space-y-2">
                                 <legend className="text-sm font-medium">{t`Knowledge files to search`}</legend>
@@ -277,7 +277,7 @@ const RunDialogBody = ({ dataset, onClose, onStarted }: Omit<RunDialogProps, "op
                         )}
                     </div>
                 </DialogPanel>
-                <DialogFooter>
+                <DialogFooter className="border-border/50 border-t" variant="bare">
                     <Button onClick={onClose} type="button" variant="outline">
                         {t`Cancel`}
                     </Button>

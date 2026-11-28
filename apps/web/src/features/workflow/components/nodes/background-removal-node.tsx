@@ -69,11 +69,11 @@ const BackgroundRemovalNodeComponent = (props: NodeProps<Node<BackgroundRemovalN
                 </div>
 
                 <div className="space-y-1.5">
-                    <Label className="text-muted-foreground text-xs">
+                    <Label className="text-muted-foreground text-xs" htmlFor={`${id}-format`}>
                         <Trans>Output Format</Trans>
                     </Label>
                     <Select onValueChange={handleFormatChange} value={data.outputFormat ?? "png"}>
-                        <SelectTrigger className="nodrag h-8 text-sm">
+                        <SelectTrigger className="nodrag h-8 text-sm" id={`${id}-format`}>
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>

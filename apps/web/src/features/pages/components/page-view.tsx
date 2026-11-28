@@ -3,12 +3,13 @@
 import { useLingui } from "@lingui/react/macro";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@neore/ui/components/breadcrumb";
 import { Button } from "@neore/ui/components/button";
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@neore/ui/components/empty";
 import type { TiptapCanvasEditorRef } from "@neore/ui/components/tiptap-canvas-editor";
 import cn from "@neore/ui/utils/cn";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import type { JSONContent } from "@tiptap/core";
-import { History, MessageSquare, MessageSquarePlus, Share2, Sparkles, Star } from "lucide-react";
+import { FileQuestion, History, Loader2, MessageSquare, MessageSquarePlus, Share2, Sparkles, Star } from "lucide-react";
 import type { FC } from "react";
 import { Fragment, useCallback, useEffect, useId, useRef, useState } from "react";
 
@@ -27,6 +28,7 @@ import PageEditor from "./page-editor";
 import PageKeptDraft from "./page-kept-draft";
 import PageShareDialog from "./page-share-dialog";
 import PageVersionPanel from "./page-version-panel";
+import { PagesSidebarToggle } from "./pages-layout";
 
 type Permission = "admin" | "comment" | "read" | "write";
 
@@ -177,7 +179,8 @@ const PageView: FC<{ pageId: string }> = ({ pageId }) => {
 
     if (isPending) {
         return (
-            <p aria-live="polite" className="text-muted-foreground p-8 text-sm" role="status">
+            <p aria-live="polite" className="text-muted-foreground flex min-w-0 flex-1 items-center justify-center gap-2 p-8 text-sm" role="status">
+                <Loader2 aria-hidden="true" className="size-4 animate-spin" />
                 {t`Loading page…`}
             </p>
         );
@@ -185,9 +188,22 @@ const PageView: FC<{ pageId: string }> = ({ pageId }) => {
 
     if (error || !page) {
         return (
-            <div className="p-8 text-sm" role="alert">
-                <p className="font-medium">{t`Page not found`}</p>
-                <p className="text-muted-foreground">{t`It may have been deleted, or you no longer have access.`}</p>
+            <div className="flex min-w-0 flex-1 flex-col">
+                {/* Below `lg` the tree is a drawer, and this is the only way to it from a page that is not there. */}
+                <div className="px-4 py-2 lg:hidden">
+                    <PagesSidebarToggle />
+                </div>
+                <Empty className="min-w-0" role="alert">
+                    <EmptyHeader>
+                        <EmptyMedia variant="icon">
+                            <FileQuestion aria-hidden="true" />
+                        </EmptyMedia>
+                        <EmptyTitle>
+                            <h1>{t`Page not found`}</h1>
+                        </EmptyTitle>
+                        <EmptyDescription>{t`It may have been deleted, or you no longer have access.`}</EmptyDescription>
+                    </EmptyHeader>
+                </Empty>
             </div>
         );
     }
@@ -380,7 +396,8 @@ const PageView: FC<{ pageId: string }> = ({ pageId }) => {
     return (
         <div className="flex h-full min-w-0 flex-1">
             <div className="flex min-w-0 flex-1 flex-col">
-                <header className="flex flex-wrap items-center gap-2 border-b px-4 py-2">
+                <header className="border-border/50 flex flex-wrap items-center gap-2 border-b px-4 py-2">
+                    <PagesSidebarToggle />
                     <Breadcrumb className="min-w-0 flex-1">
                         <BreadcrumbList>
                             {page.breadcrumbs.map((crumb) => (
@@ -471,14 +488,14 @@ const PageView: FC<{ pageId: string }> = ({ pageId }) => {
                     />
                 )}
                 {presence.editors.length > 0 && (
-                    <p aria-live="polite" className="bg-amber-50 px-4 py-1.5 text-xs text-amber-900 dark:bg-amber-950/40 dark:text-amber-200" role="status">
+                    <p aria-live="polite" className="border-border/50 bg-warning/10 text-foreground border-b px-4 py-2 text-xs" role="status">
                         {canWrite
                             ? t`${editorNames} is editing this page. If you both change the same version, the second save is stopped and asked what to do.`
                             : t`${editorNames} is editing this page.`}
                     </p>
                 )}
                 {!canWrite && (
-                    <p className="bg-muted text-muted-foreground px-4 py-1.5 text-xs" role="note">
+                    <p className="border-border/50 text-muted-foreground border-b px-4 py-2 text-xs" role="note">
                         {canComment ? t`You can comment on this page but not edit it.` : t`You can view this page but not edit it.`}
                     </p>
                 )}
@@ -487,7 +504,7 @@ const PageView: FC<{ pageId: string }> = ({ pageId }) => {
                         {t`Page title`}
                     </label>
                     <input
-                        className="w-full bg-transparent text-3xl font-bold outline-none placeholder:opacity-40"
+                        className="w-full bg-transparent text-3xl font-semibold tracking-tight outline-none placeholder:opacity-40"
                         id={titleId}
                         maxLength={200}
                         onBlur={commitTitle}
@@ -514,7 +531,7 @@ const PageView: FC<{ pageId: string }> = ({ pageId }) => {
                 </div>
             </div>
             {panel && (
-                <aside className="w-80 shrink-0 border-l">
+                <aside className="border-border/50 w-80 shrink-0 border-l">
                     {panel === "draft" && keptDraft !== null && (
                         <PageKeptDraft
                             markdown={keptDraft}

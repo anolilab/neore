@@ -168,14 +168,14 @@ const ParallelCompareNodeComponent = (props: NodeProps<Node<ParallelCompareNodeD
 
                 <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
-                        <Label className="text-muted-foreground text-xs">
+                        <Label className="text-muted-foreground text-xs" htmlFor={`${id}-show-labels`}>
                             <Trans>Show Labels</Trans>
                         </Label>
                         <p className="text-muted-foreground text-xs">
                             <Trans>Display model names on results</Trans>
                         </p>
                     </div>
-                    <Switch aria-label={t`Show Labels`} checked={data.showLabels ?? true} className="nodrag" onCheckedChange={handleShowLabelsChange} />
+                    <Switch checked={data.showLabels ?? true} className="nodrag" id={`${id}-show-labels`} onCheckedChange={handleShowLabelsChange} />
                 </div>
             </div>
         </BaseNode>

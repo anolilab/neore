@@ -24,7 +24,7 @@ const WebhookSetup = ({ watched }: { watched: Watched }) => {
     return (
         <div className="space-y-2 text-xs">
             {issued && (
-                <div className="bg-muted space-y-1 rounded-md p-2" role="status">
+                <div className="surface-well space-y-1 rounded-lg p-2" role="status">
                     <p>{t`Add this as a webhook on the repository (content type JSON). Choose individual events and tick Pull requests and Pull request reviews: without them a new review request waits for the next poll, up to 30 minutes. The secret is shown once.`}</p>
                     <p className="break-all">
                         <span className="font-medium">{t`URL`}:</span> {webhookUrl(issued.id)}
@@ -93,11 +93,11 @@ const WatchedRow = ({ onSelect, watched, webhooks }: { onSelect: (repo: string, 
             )}
             <p className="text-muted-foreground text-xs">{checkedNote}</p>
             {watched.requested.length > 0 && (
-                <ul aria-label={t`Review requests in ${watched.repository}`} className="divide-y rounded-md border">
+                <ul aria-label={t`Review requests in ${watched.repository}`} className="surface-raised divide-border/50 divide-y overflow-hidden rounded-xl">
                     {watched.requested.map((request) => (
                         <li key={request.number}>
                             <button
-                                className="hover:bg-muted focus-visible:ring-ring w-full px-2 py-1 text-left text-xs outline-none focus-visible:ring-2"
+                                className="hover:bg-muted/50 focus-visible:ring-ring w-full px-3 py-1.5 text-left text-xs outline-none focus-visible:ring-2"
                                 onClick={() => onSelect(watched.repository, request.number)}
                                 type="button"
                             >
@@ -171,7 +171,7 @@ const WatchedRepositories = ({ onSelect, webhooks }: { onSelect: (repo: string, 
             {list.isPending && <Skeleton aria-label={t`Loading`} className="h-12 w-full" role="status" />}
             {list.data && list.data.watched.length === 0 && <p className="text-muted-foreground text-sm">{t`You are not watching any repository.`}</p>}
             {list.data && list.data.watched.length > 0 && (
-                <ul className="divide-y rounded-md border">
+                <ul className="surface-raised divide-border/50 divide-y overflow-hidden rounded-xl">
                     {list.data.watched.map((watched) => (
                         <WatchedRow key={watched.id} onSelect={onSelect} watched={watched} webhooks={webhooks} />
                     ))}

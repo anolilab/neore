@@ -4,7 +4,6 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import { ScrollArea } from "@neore/ui/components/scroll-area";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Button } from "@ui/components/button";
-import { Card, CardContent } from "@ui/components/card";
 import { Input } from "@ui/components/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@ui/components/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@ui/components/tabs";
@@ -67,17 +66,17 @@ const GalleryPage = () => {
 
     const workflowGrid =
         filteredWorkflows.length === 0 ? (
-            <Card className="border-dashed">
-                <CardContent className="flex flex-col items-center justify-center py-12">
-                    <Workflow className="text-muted-foreground mb-4 size-12" />
-                    <h3 className="mb-2 text-lg font-medium">
-                        <Trans>No workflows found</Trans>
-                    </h3>
-                    <p className="text-muted-foreground text-center">
-                        {searchQuery ? <Trans>Try adjusting your search terms.</Trans> : <Trans>No community workflows in this category yet.</Trans>}
-                    </p>
-                </CardContent>
-            </Card>
+            <div className="surface-raised flex flex-col items-center justify-center rounded-xl px-6 py-16 text-center">
+                <div aria-hidden="true" className="surface-well text-muted-foreground mb-4 flex size-12 items-center justify-center rounded-xl">
+                    <Workflow className="size-6" />
+                </div>
+                <h2 className="mb-1 text-[15px] font-semibold">
+                    <Trans>No workflows found</Trans>
+                </h2>
+                <p className="text-muted-foreground text-sm">
+                    {searchQuery ? <Trans>Try adjusting your search terms.</Trans> : <Trans>No community workflows in this category yet.</Trans>}
+                </p>
+            </div>
         ) : (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {filteredWorkflows.map((workflow) => (
@@ -89,17 +88,17 @@ const GalleryPage = () => {
     return (
         <RouteErrorBoundary routeName={route}>
             <ScrollArea className="h-full">
-                <div className="container mx-auto max-w-6xl py-8">
+                <div className="mx-auto w-full max-w-7xl p-4 md:p-6">
                     {/* Header */}
-                    <div className="mb-8 flex items-center gap-4">
+                    <div className="mb-6 flex items-center gap-3">
                         <Button aria-label={t`Back to workflows`} onClick={() => navigate({ to: "/workflow" })} size="icon" variant="ghost">
                             <ArrowLeft className="size-4" />
                         </Button>
                         <div className="flex-1">
-                            <h1 className="text-2xl font-bold">
+                            <h1 className="text-xl font-semibold tracking-tight">
                                 <Trans>Community Gallery</Trans>
                             </h1>
-                            <p className="text-muted-foreground">
+                            <p className="text-muted-foreground text-sm">
                                 <Trans>Browse, fork, and remix workflows shared by the community</Trans>
                             </p>
                         </div>
@@ -109,8 +108,8 @@ const GalleryPage = () => {
                     {featured.length > 0 && (
                         <div className="mb-8">
                             <div className="mb-4 flex items-center gap-2">
-                                <Sparkles className="size-4 text-amber-500" />
-                                <h2 className="text-lg font-semibold">
+                                <Sparkles aria-hidden="true" className="text-warning size-4" />
+                                <h2 className="text-[15px] font-semibold">
                                     <Trans>Featured</Trans>
                                 </h2>
                             </div>
@@ -129,7 +128,7 @@ const GalleryPage = () => {
                             <Input className="pl-9" onChange={(e) => setSearchQuery(e.target.value)} placeholder={t`Search workflows...`} value={searchQuery} />
                         </div>
                         <Select onValueChange={(v) => setSortBy(v as GallerySortOption)} value={sortBy}>
-                            <SelectTrigger className="w-40">
+                            <SelectTrigger aria-label={t`Sort by`} className="w-40">
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -157,9 +156,7 @@ const GalleryPage = () => {
                             {isLoading ? (
                                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                                     {[1, 2, 3, 4, 5, 6].map((i) => (
-                                        <Card className="animate-pulse" key={i}>
-                                            <CardContent className="h-36" />
-                                        </Card>
+                                        <div className="surface-well h-36 animate-pulse rounded-xl" key={i} />
                                     ))}
                                 </div>
                             ) : (

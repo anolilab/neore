@@ -11,7 +11,7 @@ const DevelopRoute = () => {
 
     return (
         <RouteErrorBoundary routeName="/develop">
-            <ScrollArea className="h-full w-full p-4">
+            <ScrollArea className="h-full w-full p-4 md:p-6">
                 <DevelopPage onSearchChange={(next) => navigate({ search: next })} search={search} />
             </ScrollArea>
         </RouteErrorBoundary>

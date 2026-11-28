@@ -133,28 +133,30 @@ const PageCommentsPanel: FC<PageCommentsPanelProps> = ({ canComment, canModerate
 
     return (
         <section aria-label={t`Comments`} className="flex h-full flex-col">
-            <div className="flex items-center justify-between border-b px-3 py-2">
-                <h2 className="text-sm font-semibold">{t`Comments`}</h2>
+            <div className="border-border/50 flex min-h-[49px] items-center justify-between border-b px-3 py-2">
+                <h2 className="text-[15px] font-semibold">{t`Comments`}</h2>
                 <Button aria-pressed={showResolved} onClick={() => setShowResolved((value) => !value)} size="sm" variant="ghost">
                     {showResolved ? t`Show open` : t`Show resolved`}
                 </Button>
             </div>
             <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
                 {draft && (
-                    <div className="bg-muted/50 space-y-2 rounded-md border p-2">
-                        <blockquote className="border-l-2 border-amber-500 pl-2 text-xs italic">{draft.quote}</blockquote>
+                    <div className="surface-raised space-y-2 rounded-xl p-3">
+                        <blockquote className="border-warning border-l-2 pl-2 text-xs italic">{draft.quote}</blockquote>
                         <CommentComposer label={t`Add a comment`} onCancel={onCancelDraft} onSubmit={onSubmitDraft} submitLabel={t`Comment`} />
                     </div>
                 )}
                 {threads !== undefined && visible.length === 0 && !draft && (
-                    <p className="text-muted-foreground flex flex-col items-center gap-2 py-8 text-center text-xs">
-                        <MessageSquare aria-hidden="true" className="size-5" />
+                    <p className="text-muted-foreground flex flex-col items-center gap-3 py-8 text-center text-xs">
+                        <span aria-hidden="true" className="surface-well flex size-10 items-center justify-center rounded-xl">
+                            <MessageSquare className="size-5" />
+                        </span>
                         {emptyMessage}
                     </p>
                 )}
-                <ul className="space-y-3">
+                <ul className={cn("surface-raised divide-border/50 divide-y overflow-hidden rounded-xl", visible.length === 0 && "hidden")}>
                     {visible.map((thread) => (
-                        <li className={cn("space-y-2 rounded-md border p-2", thread.status === "resolved" && "opacity-75")} key={thread._id}>
+                        <li className={cn("space-y-2 p-3", thread.status === "resolved" && "opacity-75")} key={thread._id}>
                             {thread.orphaned ? (
                                 <p className="text-muted-foreground text-xs">
                                     <span className="font-medium">{t`Text removed.`}</span>{" "}
@@ -162,7 +164,7 @@ const PageCommentsPanel: FC<PageCommentsPanelProps> = ({ canComment, canModerate
                                 </p>
                             ) : (
                                 <button
-                                    className="hover:bg-muted block w-full rounded-sm border-l-2 border-amber-500 pl-2 text-left text-xs italic"
+                                    className="hover:bg-surface-row-hover border-warning block w-full rounded-sm border-l-2 pl-2 text-left text-xs italic"
                                     onClick={() => onFocusAnchor(thread.commentId)}
                                     type="button"
                                 >

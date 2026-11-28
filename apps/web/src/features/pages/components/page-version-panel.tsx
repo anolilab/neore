@@ -3,7 +3,6 @@
 import { useLingui } from "@lingui/react/macro";
 import { Badge } from "@neore/ui/components/badge";
 import { Button } from "@neore/ui/components/button";
-import cn from "@neore/ui/utils/cn";
 import { skipToken, useQuery } from "@tanstack/react-query";
 import type { JSONContent } from "@tiptap/core";
 import type { FC } from "react";
@@ -79,12 +78,12 @@ const PageVersionPanel: FC<PageVersionPanelProps> = ({ canRestore, currentJson, 
 
     return (
         <section aria-label={t`Version history`} className="flex h-full flex-col">
-            <div className="border-b px-3 py-2">
-                <h2 className="text-sm font-semibold">{t`Version history`}</h2>
+            <div className="border-border/50 flex min-h-[49px] items-center border-b px-3 py-2">
+                <h2 className="text-[15px] font-semibold">{t`Version history`}</h2>
             </div>
             {selected ? (
                 <div className="flex min-h-0 flex-1 flex-col">
-                    <div className="flex items-center justify-between gap-2 border-b px-3 py-2">
+                    <div className="border-border/50 flex items-center justify-between gap-2 border-b px-3 py-2">
                         <Button onClick={() => setSelectedId(null)} size="sm" variant="ghost">
                             {t`Back`}
                         </Button>
@@ -119,14 +118,12 @@ const PageVersionPanel: FC<PageVersionPanelProps> = ({ canRestore, currentJson, 
                     )}
                     {groups.map((group) => (
                         <div className="mb-3" key={group.day}>
-                            <h3 className="text-muted-foreground px-2 pb-1 text-xs font-medium">{dayLabel(group.day)}</h3>
+                            <h3 className="text-muted-foreground px-2 pb-1 font-mono text-xs">{dayLabel(group.day)}</h3>
                             <ul>
                                 {group.versions.map((version) => (
                                     <li key={version._id}>
                                         <button
-                                            className={cn(
-                                                "hover:bg-muted flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-sm",
-                                            )}
+                                            className="hover:bg-surface-row-hover flex w-full items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-left text-sm"
                                             onClick={() => setSelectedId(version._id)}
                                             type="button"
                                         >

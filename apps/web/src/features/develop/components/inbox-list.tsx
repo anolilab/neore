@@ -68,14 +68,15 @@ const InboxList = ({
 
     return (
         <div className="space-y-3">
-            <div aria-label={t`Inbox sections`} className="flex flex-wrap gap-1" role="group">
+            <div aria-label={t`Inbox sections`} className="surface-well flex flex-wrap gap-0.5 rounded-lg p-0.5" role="group">
                 {sections.map((candidate) => (
                     <Button
                         aria-pressed={candidate === section}
+                        className={cn(candidate === section && "bg-surface-row-active hover:bg-surface-row-active")}
                         key={candidate}
                         onClick={() => onSectionChange(candidate)}
                         size="sm"
-                        variant={candidate === section ? "default" : "outline"}
+                        variant="ghost"
                     >
                         {labels[candidate]}
                     </Button>
@@ -93,7 +94,7 @@ const InboxList = ({
             {failure && <FailureNotice label={host.label} status={failure.status} />}
             {!failure && inbox.data && items.length === 0 && <p className="text-muted-foreground text-sm">{t`Nothing here.`}</p>}
             {items.length > 0 && (
-                <ul className="divide-y rounded-md border">
+                <ul className="surface-raised divide-border/50 divide-y overflow-hidden rounded-xl">
                     {items.map((item) => {
                         const isCurrent = selected?.repository === item.repository && selected?.number === item.number;
 
@@ -102,8 +103,8 @@ const InboxList = ({
                                 <button
                                     aria-current={isCurrent ? "true" : undefined}
                                     className={cn(
-                                        "hover:bg-muted focus-visible:ring-ring w-full space-y-1 px-3 py-2 text-left outline-none focus-visible:ring-2",
-                                        isCurrent && "bg-muted",
+                                        "focus-visible:ring-ring w-full space-y-1 px-4 py-2.5 text-left outline-none focus-visible:ring-2",
+                                        isCurrent ? "surface-well" : "hover:bg-muted/50",
                                     )}
                                     onClick={() => onSelect(item.repository, item.number)}
                                     type="button"

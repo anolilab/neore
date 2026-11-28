@@ -97,7 +97,7 @@ const DatasetPanel = ({ dataset, onDelete, onEdit }: DatasetPanelProps) => {
         <section aria-labelledby={headingId} className="min-w-0 flex-1 space-y-4">
             <header className="flex flex-wrap items-start justify-between gap-3">
                 <div className="space-y-1">
-                    <h2 className="flex items-center gap-2 text-lg font-semibold" id={headingId}>
+                    <h2 className="flex items-center gap-2 text-base font-semibold" id={headingId}>
                         {dataset.name}
                         <Badge variant="secondary">{rag ? t`Retrieval` : t`Agent`}</Badge>
                     </h2>
@@ -136,7 +136,7 @@ const DatasetPanel = ({ dataset, onDelete, onEdit }: DatasetPanelProps) => {
                     {cases.length === 0 ? (
                         <p className="text-muted-foreground text-sm">{t`No cases yet. Add one by hand, import a CSV or JSONL file, or save a chat turn with "Save as eval case".`}</p>
                     ) : (
-                        <div className="overflow-x-auto">
+                        <div className="surface-raised overflow-x-auto rounded-xl">
                             <Table>
                                 <TableCaption className="sr-only">{t`Cases in ${dataset.name}`}</TableCaption>
                                 <TableHeader>
@@ -222,7 +222,7 @@ const DatasetPanel = ({ dataset, onDelete, onEdit }: DatasetPanelProps) => {
                                     {t`Compare`}
                                 </Button>
                             </div>
-                            <div className="overflow-x-auto">
+                            <div className="surface-raised overflow-x-auto rounded-xl">
                                 <Table>
                                     <TableCaption className="sr-only">{t`Runs of ${dataset.name}`}</TableCaption>
                                     <TableHeader>

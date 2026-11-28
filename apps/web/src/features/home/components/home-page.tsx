@@ -23,10 +23,10 @@ const Section: FC<{ action?: ReactNode; children: ReactNode; count?: number; ico
     const headingId = useId();
 
     return (
-        <section aria-labelledby={headingId} className="bg-card text-card-foreground ring-foreground/10 flex flex-col gap-2 rounded-lg py-4 ring-1">
-            <div className="flex items-center justify-between gap-2 px-4">
-                <h2 className="flex items-center gap-2 text-base font-medium" id={headingId}>
-                    {icon}
+        <section aria-labelledby={headingId} className="flex min-w-0 flex-col gap-2">
+            <div className="flex items-center justify-between gap-2 px-1">
+                <h2 className="flex items-center gap-2 text-[15px] font-semibold" id={headingId}>
+                    <span className="text-muted-foreground">{icon}</span>
                     {title}
                     {count !== undefined && count > 0 && (
                         <Badge className="tabular-nums" variant="secondary">
@@ -36,21 +36,24 @@ const Section: FC<{ action?: ReactNode; children: ReactNode; count?: number; ico
                 </h2>
                 {action}
             </div>
-            <div>{children}</div>
+            <div className="surface-raised overflow-hidden rounded-xl">{children}</div>
         </section>
     );
 };
 
 const Row: FC<{ children: ReactNode; meta?: ReactNode; to: string }> = ({ children, meta, to }) => (
     <li>
-        <Link className="hover:bg-accent focus-visible:bg-accent flex items-center justify-between gap-3 px-4 py-2 text-sm outline-none" to={to as never}>
+        <Link
+            className="hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:ring-ring flex items-center justify-between gap-3 px-4 py-2.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-inset"
+            to={to as never}
+        >
             <span className="min-w-0 flex-1 truncate">{children}</span>
             {meta && <span className="text-muted-foreground shrink-0 text-xs">{meta}</span>}
         </Link>
     </li>
 );
 
-const Empty: FC<{ children: ReactNode }> = ({ children }) => <p className="text-muted-foreground px-4 py-2 text-sm">{children}</p>;
+const Empty: FC<{ children: ReactNode }> = ({ children }) => <p className="text-muted-foreground px-4 py-3 text-sm">{children}</p>;
 
 /** Starts a chat through the same hand-off the landing page and onboarding use (`handOffLandingMessage`). */
 const HomeComposer: FC = () => {
@@ -78,12 +81,12 @@ const HomeComposer: FC = () => {
     };
 
     return (
-        <form className="bg-card relative rounded-xl border p-2 shadow-sm" onSubmit={submit}>
+        <form className="surface-raised relative rounded-2xl p-2" onSubmit={submit}>
             <label className="sr-only" htmlFor={inputId}>
                 {t`Start a new chat`}
             </label>
             <Textarea
-                className="max-h-48 min-h-20 resize-none border-0 pr-12 shadow-none focus-visible:ring-0"
+                className="max-h-48 min-h-20 resize-none border-0 bg-transparent pr-12 shadow-none focus-visible:ring-0 dark:bg-transparent"
                 id={inputId}
                 onChange={(event) => setPrompt(event.target.value)}
                 onKeyDown={(event) => {
@@ -127,7 +130,7 @@ const HomePage: FC = () => {
     return (
         <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 pb-10">
             <header className="space-y-1">
-                <h1 className="text-2xl font-semibold">{t`Home`}</h1>
+                <h1 className="text-xl font-semibold tracking-tight">{t`Home`}</h1>
                 <p className="text-muted-foreground text-sm">{t`What needs you, what's running, and where you left off.`}</p>
             </header>
 
@@ -140,7 +143,7 @@ const HomePage: FC = () => {
             )}
 
             {isError && !overview && (
-                <div className="border-destructive/40 flex flex-wrap items-center justify-between gap-3 rounded-lg border p-4" role="alert">
+                <div className="border-destructive/40 flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4" role="alert">
                     <p className="text-sm">{t`Your overview could not be loaded.`}</p>
                     <Button
                         disabled={isFetching}
@@ -166,7 +169,7 @@ const HomePage: FC = () => {
                         {needsYouCount === 0 ? (
                             <Empty>{t`Nothing is waiting on you.`}</Empty>
                         ) : (
-                            <ul>
+                            <ul className="divide-border/50 divide-y">
                                 {overview.approvals.map((approval) => (
                                     <Row key={approval.approvalId} meta={ago(approval.createdAt)} to={`/chat/${approval.threadId}`}>
                                         {approval.threadTitle ? t`Waiting for your answer in ${approval.threadTitle}` : t`A chat is waiting for your answer`}
@@ -185,7 +188,7 @@ const HomePage: FC = () => {
                         {runningCount === 0 ? (
                             <Empty>{t`Nothing is running right now.`}</Empty>
                         ) : (
-                            <ul>
+                            <ul className="divide-border/50 divide-y">
                                 {overview.runningTasks.map((task) => (
                                     <Row key={task._id} meta={task.status === "queued" ? t`Queued` : t`Running`} to="/tasks">
                                         <ListChecks aria-hidden="true" className="mr-2 inline size-3.5" />
@@ -249,7 +252,7 @@ const HomePage: FC = () => {
                         {overview.recentThreads.length === 0 ? (
                             <Empty>{t`No chats yet. Start one above.`}</Empty>
                         ) : (
-                            <ul>
+                            <ul className="divide-border/50 divide-y">
                                 {overview.recentThreads.map((thread) => (
                                     <Row key={thread._id} meta={ago(thread.updatedAt)} to={`/chat/${thread._id}`}>
                                         {thread.title ?? t`Untitled chat`}
