@@ -18,6 +18,8 @@ interface ThreadStatsDialogProps {
     model: string;
     onOpenChange: (open: boolean) => void;
     open: boolean;
+    /** Where focus goes when it closes: opened from a menu item, the item is gone by then. */
+    returnFocus?: () => HTMLElement | null;
     threadId: string;
 }
 
@@ -26,7 +28,7 @@ interface ThreadStatsDialogProps {
  * export query the download menu uses, so it covers every reply on every branch
  * rather than the messages currently paged in. Loads only while open.
  */
-const ThreadStatsDialog: FC<ThreadStatsDialogProps> = ({ model, onOpenChange, open, threadId }) => {
+const ThreadStatsDialog: FC<ThreadStatsDialogProps> = ({ model, onOpenChange, open, returnFocus, threadId }) => {
     const { i18n, t } = useLingui();
     const crpc = useCRPC();
 
@@ -51,7 +53,7 @@ const ThreadStatsDialog: FC<ThreadStatsDialogProps> = ({ model, onOpenChange, op
 
     return (
         <Dialog onOpenChange={onOpenChange} open={open}>
-            <DialogContent className="max-w-md">
+            <DialogContent className="max-w-md" finalFocus={returnFocus ? () => returnFocus() ?? true : undefined}>
                 <DialogHeader>
                     <DialogTitle>{t`Thread statistics`}</DialogTitle>
                     <DialogDescription>{t`Totals across every reply in this thread, including regenerated alternatives.`}</DialogDescription>
