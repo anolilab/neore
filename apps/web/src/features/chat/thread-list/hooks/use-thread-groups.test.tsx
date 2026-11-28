@@ -16,7 +16,7 @@ const composite = {
     pinnedThreads: [],
     relationships: [],
     tags: [],
-    temporaryThreads: { page: [] },
+    temporaryThreads: { page: [] as Record<string, unknown>[] },
     threadOrders: [],
     threads: {
         page: [
@@ -154,6 +154,23 @@ describe("project chats while the project list is unavailable", () => {
 
         expect(titles(view, "Projects")).toBeUndefined();
         expect(titles(view, "Work")).toEqual(["In project"]);
+    });
+
+    it("sends an archived temporary chat to the archive, and keeps an active one in Temporary", () => {
+        state.isPlaceholderData = false;
+        composite.temporaryThreads.page = [
+            { _id: "tmp1", _creationTime: NOW, createdAt: NOW, expiresAt: NOW + 3_600_000, isTemporary: true, status: "active", title: "Scratch" },
+            { _id: "tmp2", _creationTime: NOW, createdAt: NOW, expiresAt: NOW + 3_600_000, isTemporary: true, status: "archived", title: "Old scratch" },
+        ];
+
+        try {
+            const view = groupsFor();
+
+            expect(titles(view, "Temporary")).toEqual(["Scratch"]);
+            expect(titles(view, "Archived")).toContain("Old scratch");
+        } finally {
+            composite.temporaryThreads.page = [];
+        }
     });
 
     it("sends a loaded project's archived chats to the archive, not out of the list", () => {

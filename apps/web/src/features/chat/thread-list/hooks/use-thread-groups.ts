@@ -494,6 +494,17 @@ const useThreadGroups = (
         const olderThreads: BranchNode[] = [];
         const archivedThreads: BranchNode[] = [];
 
+        // Temporary chats keep their own group; an archived one goes to the archive like any other.
+        const activeTemporaryThreads: BranchNode[] = [];
+
+        for (const thread of temporaryThreadsList) {
+            if (thread.status === "archived") {
+                archivedThreads.push(thread);
+            } else {
+                activeTemporaryThreads.push(thread);
+            }
+        }
+
         // Group stateless threads separately (excluding archived)
         for (const thread of statelessThreads) {
             if (thread.status === "archived") {
@@ -633,7 +644,7 @@ const useThreadGroups = (
             threads: BranchNode[];
             title: string;
         }[] = [
-            { groupType: "temporary", threads: temporaryThreadsList, title: t`Temporary` },
+            { groupType: "temporary", threads: activeTemporaryThreads, title: t`Temporary` },
             { groupType: "pinned", threads: pinnedThreadsList, title: t`Pinned` },
             { groupType: "stateless", threads: statelessThreadsList, title: t`Stateless` },
             { groupType: "today", threads: todayThreads, title: t`Today` },
