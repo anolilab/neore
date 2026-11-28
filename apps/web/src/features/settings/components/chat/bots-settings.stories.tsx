@@ -64,9 +64,14 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
+/** A fade that a loaded machine renders late: the 1 s default would fail the story on the wait instead of the check. */
+const STATE_WAIT = { timeout: 15_000 } as const;
+
 /**
  * Clicks the bot's Tools button once it takes clicks: while a dialog opens or closes (a sheet on a phone) the page under it
- * has `pointer-events: none`, and a click then would fail instead of opening the dialog.
+ * has `pointer-events: none`, and a click then would fail instead of opening the dialog. The dialog is returned once it has
+ * finished fading in: until then its opacity rises from 0, and on a loaded machine a frame can come so late that a
+ * `toBeVisible` check at the end of a story still reads 0.
  */
 const openTools = async (canvas: ReturnType<typeof within>): Promise<HTMLElement> => {
     const button = await canvas.findByRole("button", { name: "Tools for Docs helper" });
@@ -74,7 +79,14 @@ const openTools = async (canvas: ReturnType<typeof within>): Promise<HTMLElement
     await waitFor(async () => await expect(getComputedStyle(button).pointerEvents).not.toBe("none"));
     await userEvent.click(button);
 
-    return await screen.findByRole("dialog");
+    const dialog = await screen.findByRole("dialog");
+
+    await waitFor(async () => {
+        await expect(dialog).not.toHaveAttribute("data-starting-style");
+        await expect(dialog.getAnimations().filter((animation) => animation.playState === "running")).toHaveLength(0);
+    }, STATE_WAIT);
+
+    return dialog;
 };
 
 /** Waits for every list a typed server name resolves against: until all are read, a name is not added. */
