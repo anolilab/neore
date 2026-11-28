@@ -59,11 +59,15 @@ export const rememberResultOf = (outcome: ExtractionOutcome): { keepClaim: boole
 
     if (outcome.facts.length > 0) {
         // Saved whenever anything new was written, asked or not (each listed fact says which); already known only when every
-        // fact found was a row that already held it.
+        // fact found was a row that already held it. Nothing new and nothing asked kept: refused if what was asked was.
         let status: RememberStatus = "saved";
 
         if (outcome.facts.every((fact) => fact.status === "known")) {
-            status = outcome.facts.some((fact) => fact.asked) ? "already_known" : "nothing_asked";
+            if (outcome.facts.some((fact) => fact.asked)) {
+                status = "already_known";
+            } else {
+                status = outcome.refusedAsked.length > 0 ? "refused" : "nothing_asked";
+            }
         }
 
         // The claim stays: something was written. What was asked and refused is still told, so the reply names both.
@@ -139,6 +143,21 @@ const release = async (ctx: ActionCtx, claim: { claimedAt: number; key: string; 
     }
 };
 
+/**
+ * Marks the prompt handled, trying once more if the first try fails. The rows are written by then, so a failure is logged
+ * and never turns the saved result into a failed save: the claim lapses in minutes, and the reply's extraction then finds
+ * those rows and confirms them rather than adding them again.
+ */
+const markDone = async (ctx: ActionCtx, done: { claimedAt: number; promptMessageId: string; userId: string }): Promise<void> => {
+    try {
+        await ctx.runMutation(internal.memory.functions.markRememberDone, done);
+    } catch {
+        await ctx.runMutation(internal.memory.functions.markRememberDone, done).catch((error: unknown) => {
+            console.warn("[memory/remember] The prompt could not be marked handled; the saved facts stand:", error);
+        });
+    }
+};
+
 /** Reads the source, takes the prompt's one request, and runs the extractor in its requested mode over the typed prompt. */
 export const rememberFactFor = async (ctx: ActionCtx, args: Omit<SourceArgs, "now">): Promise<RememberResult> => {
     const read = await ctx.runQuery(internal.memory.remember.readRememberSource, { ...args, now: Date.now() });
@@ -191,9 +210,7 @@ export const rememberFactFor = async (ctx: ActionCtx, args: Omit<SourceArgs, "no
     const { keepClaim, result } = rememberResultOf(outcome);
 
     // Handled, so the reply's own extraction leaves the prompt alone; or given back, so it reads the prompt as usual.
-    await (keepClaim
-        ? ctx.runMutation(internal.memory.functions.markRememberDone, { claimedAt, promptMessageId: args.promptMessageId })
-        : release(ctx, { ...claim, claimedAt }));
+    await (keepClaim ? markDone(ctx, { claimedAt, promptMessageId: args.promptMessageId, userId: args.userId }) : release(ctx, { ...claim, claimedAt }));
 
     return result;
 };

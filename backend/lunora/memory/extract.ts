@@ -158,6 +158,11 @@ export type ExtractionOutcome = {
 
 const NOT_ASKED: ExtractionOutcome = { asked: false, facts: [], refused: 0, refusedAsked: [] };
 
+/** The shortest fact kept, in characters; one the user asked for counts only its non-space ones. */
+const MIN_FACT_CHARS = 10;
+const MIN_ASKED_FACT_CHARS = 4;
+const WHITESPACE_RE = /\s/gu;
+
 /** How long, and how often, a job waits for a `remember` call still running on its prompt before it reads the prompt itself. */
 const REMEMBER_WAIT_MS = 30_000;
 const REMEMBER_WAITS = 3;
@@ -517,6 +522,21 @@ export const extractMemories = internalAction
             throw error;
         }
 
+        // The last read before the typed prompt goes to the model: a chat locked, shared or switched off since `remember.ts`
+        // read the source sends it nothing (the writes check again, but a model call cannot be taken back).
+        if (args.requested && args.threadId !== undefined && args.promptMessageId !== undefined) {
+            const refusal = await ctx.runQuery(internal.memory.functions.requestedSourceRefusal, {
+                now: Date.now(),
+                requested: { promptMessageId: args.promptMessageId, replyKey: args.replyKey, threadId: args.threadId, userId: args.userId },
+            });
+
+            if (refusal !== null) {
+                logGate(refusal, "skip");
+
+                return { asked: true, blocked: refusal, facts: [], refused: 0, refusedAsked: [] };
+            }
+        }
+
         logGate(gate.reason, "extract");
 
         let extractedFacts: z.infer<typeof extractedFactSchema>[];
@@ -753,8 +773,12 @@ ${args.requested ? REQUESTED_RULE : "Extract NEW facts about the user not alread
             const dates = normalizeFactDates(fact);
             const evidence = factEvidence(fact.quote, args.promptAt ?? now, evidenceTurn);
 
-            // Skip very short or empty facts
-            if (fact.memory.trim().length < 10) {
+            // Skip very short or empty facts. An asked one needs less: the user asked, and the quote backs it ("User skis").
+            if (
+                args.requested && fact.asked === true
+                    ? fact.memory.replaceAll(WHITESPACE_RE, "").length < MIN_ASKED_FACT_CHARS
+                    : fact.memory.trim().length < MIN_FACT_CHARS
+            ) {
                 continue;
             }
 

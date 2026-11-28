@@ -43,6 +43,18 @@ describe("remember", () => {
         expect(noTurn.runAction).not.toHaveBeenCalled();
     });
 
+    it("reads only the message that started the reply, and tells the model to ask for a mid-reply request again", () => {
+        const tool = { ...rememberTool, ctx: contextWith({}) } as unknown as {
+            description: string;
+            toModelOutput: (options: { input: unknown; output: unknown; toolCallId: string }) => unknown;
+        };
+        const encoded = JSON.stringify(tool.toModelOutput({ input: {}, output: { facts: [], status: "nothing_asked" }, toolCallId: "call-1" }));
+
+        expect(tool.description).toContain("the message that started this reply");
+        expect(tool.description).toContain("ask them to send that as a new message");
+        expect(encoded).toContain("A request they sent while you were replying is not read: ask them to send it as a new message.");
+    });
+
     it("tells the model what was saved and which asked fact was refused and why", () => {
         const tool = { ...rememberTool, ctx: contextWith({}) } as unknown as {
             toModelOutput: (options: { input: unknown; output: unknown; toolCallId: string }) => unknown;

@@ -10,11 +10,18 @@ import schema from "../schema";
 import { documentTextPart } from "../chat/lib/attached-text";
 import { addMessagesHandler } from "../agent/messages";
 import { extractMemories } from "./extract";
+import { runAfterOnShard } from "../lib/shard-scheduler";
 import { saveMemoryBatch } from "./functions";
 import { rememberFactFor, rememberResultOf } from "./remember";
 
-const { generateText, registry } = vi.hoisted(() => {
-    return { generateText: vi.fn(), registry: new Map<string, unknown>() };
+const { generateText, getUtilityModel, registry } = vi.hoisted(() => {
+    return {
+        generateText: vi.fn(),
+        getUtilityModel: vi.fn(async () => {
+            return {};
+        }),
+        registry: new Map<string, unknown>(),
+    };
 });
 
 vi.mock("../_generated/api", async (importOriginal) => registeredApi(await importOriginal(), registry));
@@ -30,12 +37,12 @@ vi.mock("../chat/lib/model-filter-rules", () => {
     };
 });
 vi.mock("../lib/utility-model", () => {
-    return {
-        getUtilityModel: async () => {
-            return {};
-        },
-        NoAllowedUtilityModelError: class extends Error {},
-    };
+    return { getUtilityModel, NoAllowedUtilityModelError: class extends Error {} };
+});
+vi.mock("../lib/shard-scheduler", async (importOriginal) => {
+    const original = await importOriginal<typeof import("../lib/shard-scheduler")>();
+
+    return { ...original, runAfterOnShard: vi.fn(original.runAfterOnShard) };
 });
 // The harness action ctx has no `services`; dedup runs on text here.
 vi.mock("../lib/services", () => {
@@ -477,6 +484,45 @@ describe(rememberFactFor, () => {
         });
     });
 
+    it("saves a short asked fact the quote backs, which an unasked one that short is not", async () => {
+        answer([{ memory: "User skis", quote: "I ski" }]);
+
+        await expect(remember(await setUp({ prompt: "Remember that I ski" }))).resolves.toStrictEqual({
+            facts: [{ asked: true, memory: "User skis", status: "saved" }],
+            status: "saved",
+        });
+
+        const rows = await memories();
+
+        expect(rows.map((row) => [row.memory, row.source])).toStrictEqual([["User skis", "requested"]]);
+
+        harness.close();
+        harness = lunoraTest(schema as never);
+        answer([{ asked: false, memory: "User skis", quote: "I ski" }]);
+
+        await expect(remember(await setUp({ prompt: "Remember that I ski" }))).resolves.toMatchObject({ status: "nothing_asked" });
+        expect(await memories()).toHaveLength(0);
+    });
+
+    it("sends the model nothing when the chat is locked after the request took the prompt", async () => {
+        answer([{ memory: "User is vegan", quote: "I'm vegan" }]);
+
+        const ids = await setUp();
+
+        // Resolving the model comes after the claim and right before the call: the lock lands in between.
+        getUtilityModel.mockImplementationOnce(async () => {
+            await harness.run(async (ctx: any) => {
+                await ctx.db.patch("threads", ids.threadId, { lockedAt: Date.now() });
+            });
+
+            return {};
+        });
+
+        await expect(remember(ids)).resolves.toStrictEqual({ facts: [], status: "not_private" });
+        expect(generateText).not.toHaveBeenCalled();
+        expect(await memories()).toHaveLength(0);
+    });
+
     it("refuses a fact the extractor marks as about the user's health, and keeps a job in the field", async () => {
         answer([{ memory: "User takes Prozac", quote: "I take Prozac", sensitive: true }]);
 
@@ -567,6 +613,56 @@ describe(rememberFactFor, () => {
         expect(claim.expiresAt - claim.claimedAt).toBe(24 * 60 * 60 * 1000);
     });
 
+    it("marks the prompt handled though the request's claim lapsed while it ran", async () => {
+        const ids = await setUp();
+
+        generateText.mockImplementationOnce(async () => {
+            // The running claim lapses before the write: nothing holds the prompt when the request marks it done.
+            await harness.run(async (ctx: any) => {
+                const claim = await ctx.db.query("idempotencyClaims").first();
+
+                await ctx.db.patch("idempotencyClaims", claim._id, { expiresAt: 0 });
+            });
+
+            return { output: { facts: [{ asked: true, confidence: 90, importance: 70, memory: "User is vegan", quote: "I'm vegan", type: "preference" }] } };
+        });
+
+        await expect(remember(ids)).resolves.toMatchObject({ status: "saved" });
+
+        const claim = await harness.run(async (ctx: any) => await ctx.db.query("idempotencyClaims").first());
+
+        expect(claim).toMatchObject({ result: "done", userId: USER });
+        expect(claim.expiresAt).toBeGreaterThan(Date.now());
+    });
+
+    it("returns the saved facts when marking the prompt handled fails", async () => {
+        answer([{ memory: "User is vegan", quote: "I'm vegan" }]);
+
+        const ids = await setUp();
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+        const result = await harness.action(async (ctx: any) => {
+            // Only the done mark is sent `claimedAt` without a `scope`.
+            const failing = Object.create(ctx, {
+                runMutation: {
+                    value: async (reference: unknown, args: Record<string, unknown>) => {
+                        if ("claimedAt" in args && !("scope" in args)) {
+                            throw new Error("done mark failed");
+                        }
+
+                        return await ctx.runMutation(reference, args);
+                    },
+                },
+            });
+
+            return await rememberFactFor(failing, { promptMessageId: ids.promptMessageId, replyKey: REPLY, threadId: ids.threadId as never, userId: USER });
+        });
+
+        expect(result).toStrictEqual({ facts: [{ asked: true, memory: "User is vegan", status: "saved" }], status: "saved" });
+        expect(warn).toHaveBeenCalledWith(expect.stringContaining("could not be marked handled"), expect.any(Error));
+        expect(await memories()).toHaveLength(1);
+        warn.mockRestore();
+    });
+
     it("gives the prompt back when the model answers with no facts list", async () => {
         generateText.mockResolvedValueOnce({ output: undefined });
 
@@ -602,17 +698,30 @@ describe(rememberFactFor, () => {
         await harness.run(async (ctx: any) => {
             await ctx.db.insert("idempotencyClaims", { claimedAt: 1, expiresAt: Number.MAX_SAFE_INTEGER, key: ids.promptMessageId, scope: "memory-remember" });
         });
+        vi.mocked(runAfterOnShard).mockClear();
         await harness.action(async (ctx: any) => {
             await ctx.runAction(extractMemories, extraction(ids));
         });
 
         expect(generateText).not.toHaveBeenCalled();
+        expect(vi.mocked(runAfterOnShard).mock.calls).toStrictEqual([
+            [expect.anything(), 30_000, expect.anything(), { ...extraction(ids), rememberWaits: 1 }, USER],
+        ]);
 
-        // Past its last wait the job reads the prompt as usual: a call that never ended never costs the turn its facts.
-        await harness.action(async (ctx: any) => {
-            await ctx.runAction(extractMemories, { ...extraction(ids), rememberWaits: 3 });
-        });
+        // Each wait runs the job its predecessor scheduled; past its last wait the job reads the prompt as usual, so a call
+        // that never ended never costs the turn its facts.
+        for (let wait = 1; wait <= 3; wait += 1) {
+            const [, delay, , scheduled] = vi.mocked(runAfterOnShard).mock.calls.at(-1)!;
 
+            expect([delay, (scheduled as { rememberWaits: number }).rememberWaits]).toStrictEqual([30_000, wait]);
+
+            await harness.action(async (ctx: any) => {
+                await ctx.runAction(extractMemories, scheduled);
+            });
+        }
+
+        expect(runAfterOnShard).toHaveBeenCalledTimes(3);
+        expect(generateText).toHaveBeenCalledTimes(1);
         expect(await memories()).toHaveLength(1);
     });
 
@@ -738,6 +847,16 @@ describe(rememberResultOf, () => {
 
         expect(rememberResultOf({ asked: true, facts: [known, nurse], refused: 0, refusedAsked: [] }).result.status).toBe("saved");
         expect(rememberResultOf({ asked: true, facts: [known], refused: 0, refusedAsked: [] }).result.status).toBe("already_known");
+    });
+
+    it("says refused, not nothing asked, when the asked fact was refused and the rest was already known", () => {
+        const known = { asked: false, memory: "User works as a nurse", status: "known" as const };
+
+        expect(rememberResultOf({ asked: true, facts: [known], refused: 1, refusedAsked: ["health"] })).toStrictEqual({
+            keepClaim: true,
+            result: { facts: [known], refused: ["health"], status: "refused" },
+        });
+        expect(rememberResultOf({ asked: true, facts: [known], refused: 0, refusedAsked: [] }).result.status).toBe("nothing_asked");
     });
 
     it("gives a refusal before any write as the reason, and leaves the prompt to a later call", () => {

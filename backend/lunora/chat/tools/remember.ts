@@ -16,7 +16,8 @@ const NOTES: Record<RememberStatus, string> = {
     memory_off: "Nothing was saved: the user has memory turned off. They can turn it on in Settings → Personalization.",
     not_private: "Nothing was saved: facts are remembered only in a chat that is the user's alone (not shared, temporary, locked or run by an agent).",
     not_your_words: "Nothing was saved: only a message the user just typed in this chat can be remembered, not a regenerated, forwarded or attached one.",
-    nothing_asked: "No fact the user asked to remember was found in their message, or memory does not keep it; facts listed were learned from it as usual.",
+    nothing_asked:
+        "No fact the user asked to remember was found in the message that started this reply, or memory does not keep it; facts listed were learned from it as usual. A request they sent while you were replying is not read: ask them to send it as a new message.",
     private_marker: "Nothing was saved: the user's message carries a privacy marker.",
     refused:
         "Nothing was saved: what was found was not backed by the user's own typed words, or held a secret or health information, which memory never keeps.",
@@ -57,9 +58,10 @@ const noteOf = (output: RememberResult): string => {
  */
 const rememberTool = createTool<Record<string, never>, RememberResult, ToolContext>({
     description:
-        "Save to the user's long-term memory what they explicitly ask you to remember in the message they just sent ('remember that…'). " +
+        "Save to the user's long-term memory what they explicitly ask you to remember in the message that started this reply ('remember that…'). " +
         "Call it once per message, ONLY on such a request, never on your own initiative. It takes no input: what to save is read from " +
-        "the user's own words in that message. Report the outcome to the user as the result states it.",
+        "the user's own words in that message, never one they sent while you were replying (ask them to send that as a new message). " +
+        "Report the outcome to the user as the result states it.",
     execute: async (context) => {
         const promptMessageId = context.runTurn?.promptMessageId;
 

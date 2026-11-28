@@ -43,7 +43,7 @@ import { messageCarriesGuestText, promptCannotBeQuoted } from "../chat/lib/attac
 import type { typedTextOf } from "../chat/lib/attached-text";
 import { GOAL_CONTINUATION_AGENT } from "../chat/goals/shared";
 import { isTypedChatKind } from "../chat/lib/typed-chat-kind";
-import { claimRow, holdClaim, recordClaimResult } from "../lib/claim-once";
+import { claimRow, putClaimResult } from "../lib/claim-once";
 
 /**
  * Whether the user turned memory on. OPT-IN: absent means off. Memory extraction reads every
@@ -95,15 +95,23 @@ export const rememberClaimState = internalQuery
 /** How long a handled request keeps its prompt: a day, longer than any reply's later extraction job waits. */
 const REMEMBER_DONE_TTL_MS = 24 * 60 * 60 * 1000;
 
-/** Marks the claim `claimedAt` handled and holds it for a day; `false` when that claim no longer holds the prompt. */
+/**
+ * Marks the prompt handled and holds it for a day, written by prompt whatever holds it now: rows were written, so the reply's
+ * extraction must skip the prompt even when the request's own claim lapsed meanwhile.
+ */
 export const markRememberDone = internalMutation
-    .input({ claimedAt: v.number(), promptMessageId: v.string() })
-    .output(v.boolean())
-    .mutation(
-        async ({ args, ctx }) =>
-            (await recordClaimResult(ctx, REMEMBER_SCOPE, args.promptMessageId, args.claimedAt, REMEMBER_DONE)) &&
-            (await holdClaim(ctx, REMEMBER_SCOPE, args.promptMessageId, args.claimedAt, REMEMBER_DONE_TTL_MS)),
-    );
+    .input({ claimedAt: v.number(), promptMessageId: v.string(), userId: v.string() })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        await putClaimResult(ctx, REMEMBER_SCOPE, args.promptMessageId, {
+            claimedAt: args.claimedAt,
+            result: REMEMBER_DONE,
+            ttlMs: REMEMBER_DONE_TTL_MS,
+            userId: args.userId,
+        });
+
+        return null;
+    });
 
 /** Rows under a prompt the fresh-send check reads per page, and the pages it reads before it gives up on the prompt. */
 const PROMPT_REPLY_PAGE_ROWS = 100;
@@ -237,6 +245,19 @@ export const checkRequestedSource = async (
     // More rows than a reply writes: no fresh prompt.
     return { refused: "not_your_words" };
 };
+
+/**
+ * Why the request may not be written from its prompt now (`checkRequestedSource`), or `null` when it may: read again by a
+ * requested run right before its model call, so a chat locked or shared meanwhile sends the model nothing.
+ */
+export const requestedSourceRefusal = internalQuery
+    .input({ now: v.number(), requested: vRequestedSource })
+    .output(v.union(vRequestedRefusal, v.null()))
+    .query(async ({ args, ctx }) => {
+        const check = await checkRequestedSource(ctx, args.requested, args.now);
+
+        return "refused" in check ? check.refused : null;
+    });
 
 /** Most memories one user-facing read looks at. */
 const MEMORY_READ_CAP = 2000;
