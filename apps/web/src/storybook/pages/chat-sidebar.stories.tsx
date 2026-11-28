@@ -288,6 +288,21 @@ export const SelectionMode: Story = {
     },
 };
 
+/** Only active threads: the Working and Archived sections hold nothing, so their buttons show no counter. */
+export const DockZeroCounts: Story = {
+    parameters: {
+        msw: { handlers: { lunora: lunoraHandlers(...userFixtures(), ...shellFixtures(), ...chatFixtures()) } },
+    },
+    play: async ({ canvasElement }) => {
+        const root = await sidebar(canvasElement);
+        const bar = await root.findByRole("group", { name: "Thread sections (shift-click to show several)" }, PAGE_WAIT);
+        const working = await within(bar).findByRole("button", { name: /^Working, 0$/ }, PAGE_WAIT);
+
+        await expect(working).not.toHaveTextContent("0");
+        await expect(within(bar).getByRole("button", { name: /^Archived, 0$/ })).not.toHaveTextContent("0");
+    },
+};
+
 /** A section with nothing in it says so (on a new chat: an open thread would stay in the list). */
 export const EmptySection: Story = {
     args: {

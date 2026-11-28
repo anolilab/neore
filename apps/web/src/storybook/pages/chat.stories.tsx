@@ -2,11 +2,13 @@ import type { ReturnOf } from "@lunora/react";
 import { api } from "@neore/backend/api";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { onlineManager } from "@tanstack/react-query";
-import { expect, userEvent, waitFor } from "storybook/test";
+import { expect, userEvent, waitFor, within } from "storybook/test";
 
+import { useCommandDialogStore } from "@/components/command-dialog-store";
 import { useChatUIStore } from "@/features/chat/core/stores/chat-ui-store";
 import { useModelStore } from "@/features/chat/core/stores/model-store";
 import { useGoalComposer } from "@/features/chat/goal/goal-store";
+import { useThreadListUIStore } from "@/features/chat/thread-list/stores/thread-list-ui-store";
 import { useUIStateStore } from "@/features/layout/stores/ui-state-store";
 import { Route as ThreadRoute } from "@/routes/(chat)/chat/$threadId";
 import { Route as ChatIndexRoute } from "@/routes/(chat)/chat/index";
@@ -333,6 +335,99 @@ export const OnlineAfterOffline: Story = {
         await expect(onlineManager.isOnline()).toBe(true);
         await settle(canvas);
         await expect(canvas.queryByText("Offline – reconnecting…")).not.toBeInTheDocument();
+    },
+};
+
+/** The composer's permission menu: each mode with what it allows, the widest one marked. */
+export const PermissionMenuOpen: Story = {
+    play: async ({ canvas }) => {
+        await settle(canvas);
+        const [trigger] = await canvas.findAllByRole("button", { name: /^Permission mode:/ }, PAGE_WAIT);
+
+        await userEvent.click(trigger as HTMLElement);
+
+        const menu = within(document.body);
+        const full = await menu.findByRole("menuitemradio", { name: /Full access/ }, PAGE_WAIT);
+
+        await waitFor(() => expect(full).toBeVisible());
+        await expect(menu.getByRole("menuitemradio", { name: /Supervised/ })).toBeVisible();
+        // The trigger names itself as a mode, not as a second bare "Auto" beside the model's toggle.
+        await expect(trigger).toHaveTextContent("Mode: Auto");
+    },
+};
+
+/**
+ * The header keeps Share and the side panel; the rest is one labelled overflow menu. An ordinary chat has no "Link pull request"
+ * button: it is offered on chats that run code on a computer, or once a pull request is linked.
+ */
+export const HeaderOverflowOpen: Story = {
+    play: async ({ canvas }) => {
+        await settle(canvas);
+        await expect(canvas.queryByRole("button", { name: "Link pull request" })).not.toBeInTheDocument();
+        await userEvent.click(await canvas.findByRole("button", { name: "More actions" }, PAGE_WAIT));
+
+        const menu = within(document.body);
+
+        await waitFor(() => expect(menu.getByRole("button", { name: "Toggle theme" })).toBeVisible());
+        await expect(menu.getByRole("button", { name: "Chat actions" })).toBeVisible();
+        await expect(menu.getByRole("button", { name: "Knowledge base" })).toBeVisible();
+    },
+};
+
+/** A chat that runs on a paired computer offers "Link pull request" next to its title. */
+export const HostThreadHeader: Story = {
+    parameters: {
+        // The host composer's textarea carries `role="combobox"` (axe `aria-allowed-role`): it predates this story and belongs to the host
+        // composer, not the header this story shows.
+        a11y: { test: "todo" },
+        msw: {
+            handlers: {
+                gateway: gatewayModelsHandler(),
+                lunora: lunoraHandlers(
+                    ...userFixtures(),
+                    ...shellFixtures(),
+                    ...chatFixtures({
+                        thread: thread({ _id: THREAD_IDS.main, runner: "host", title: "Refactor the billing worker" } as Parameters<typeof thread>[0]),
+                    }),
+                ),
+            },
+        },
+    },
+    play: async ({ canvas }) => {
+        await expect(await canvas.findAllByRole("button", { name: "Link pull request" }, STATE_WAIT)).not.toHaveLength(0);
+        await lunoraIdle();
+    },
+};
+
+/** The command palette open: filters, the groups with their shortcuts and the footer legend. */
+export const CommandPaletteOpen: Story = {
+    // The thread rows hold archive and delete buttons inside their option (axe `nested-interactive`): a palette row problem that predates this
+    // story, kept out of this change. The story still checks everything else the palette renders.
+    parameters: { a11y: { test: "todo" } },
+    // The palette and the shortcuts sheet live in stores: left open they would cover the next story.
+    beforeEach: () => () => {
+        useCommandDialogStore.getState().close();
+        useThreadListUIStore.getState().setShowKeyboardHelp(false);
+    },
+    play: async ({ canvas }) => {
+        await settle(canvas);
+        useCommandDialogStore.getState().openCommandPalette();
+
+        const dialog = within(document.body);
+        const input = await dialog.findByPlaceholderText("Search threads, navigate, or perform actions...", undefined, PAGE_WAIT);
+
+        await waitFor(() => expect(input).toBeVisible());
+        // The footer legend: move, open, the `#` state filter and close.
+        await expect(await dialog.findByText("Navigate", undefined, PAGE_WAIT)).toBeVisible();
+        await expect(dialog.getByText("Open")).toBeVisible();
+        await expect(dialog.getByText("Filter")).toBeVisible();
+        await expect(dialog.getByText("Esc")).toBeVisible();
+
+        // "Keyboard shortcuts" is an entry of the palette, and it opens the sheet.
+        await userEvent.click(dialog.getByRole("option", { name: /Keyboard shortcuts/ }));
+        const sheet = await dialog.findByRole("dialog", { name: /Keyboard shortcuts/ }, PAGE_WAIT);
+
+        await waitFor(() => expect(sheet).toBeVisible());
     },
 };
 

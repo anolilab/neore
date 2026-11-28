@@ -45,6 +45,8 @@ const KEYBOARD_SHORTCUTS_NAME = /Keyboard shortcuts/u;
 const { default: ThreadListDock } = await import("./thread-list-dock");
 const { useThreadListUIStore } = await import("./stores/thread-list-ui-store");
 
+const MAC_KEY_SYMBOL = /[⌃⇧⌥⌘]/u;
+
 describe("ThreadListDock", () => {
     beforeEach(() => {
         localStorage.clear();
@@ -66,12 +68,28 @@ describe("ThreadListDock", () => {
         cleanup();
         navigate.mockClear();
         vi.unstubAllGlobals();
+        vi.restoreAllMocks();
     });
 
     it.each(["Search threads", "Search filters", "Add project", "New Thread"])("names the %s button", (name) => {
         render(<ThreadListDock />);
 
         expect(screen.getByRole("button", { name })).toBeTruthy();
+    });
+
+    // The store keeps the platform modifier as "ctrl", which is Command on a Mac.
+    it("prints the search shortcut with key symbols on a Mac, Command for the platform modifier", () => {
+        vi.spyOn(navigator, "platform", "get").mockReturnValue("MacIntel");
+        render(<ThreadListDock />);
+
+        expect(screen.getByText("⌘⇧F")).toBeTruthy();
+    });
+
+    it("prints no Mac key symbols elsewhere, where the chord is too long for the hint and stays in the tooltip", () => {
+        vi.spyOn(navigator, "platform", "get").mockReturnValue("Win32");
+        render(<ThreadListDock />);
+
+        expect(screen.queryByText(MAC_KEY_SYMBOL)).toBeNull();
     });
 
     it("names the closed search button for message search when that mode is selected", () => {

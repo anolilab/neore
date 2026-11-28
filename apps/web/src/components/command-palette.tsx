@@ -35,6 +35,7 @@ import {
     Folder,
     GitBranch,
     Hourglass,
+    Keyboard,
     MessageSquare,
     Pin,
     PinOff,
@@ -60,6 +61,7 @@ import useThreadHandlers from "@/features/chat/thread-list/hooks/use-thread-hand
 import type { ThreadState } from "@/features/chat/thread-list/lib/derived-sections";
 import { nextSnoozeWake, threadStateOf } from "@/features/chat/thread-list/lib/derived-sections";
 import { compareByStateRank, parseStateQuery } from "@/features/chat/thread-list/lib/state-query";
+import { useThreadListUIStore } from "@/features/chat/thread-list/stores/thread-list-ui-store";
 import { isThreadLocked } from "@/features/chat/thread-list/thread-lock";
 import { buildMatchSnippet } from "@/features/chat/thread-list/utilities";
 import convertShortcutToHotkeysHook from "@/features/keyboard/lib/shortcut-converter";
@@ -486,6 +488,13 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
         close();
     };
 
+    // The palette closes first and hands focus back to where it was; the sheet opens a frame later and keeps that as the place to
+    // return to. Opened the other way round, the sheet would return focus to a palette item that is gone.
+    const handleOpenKeyboardShortcuts = () => {
+        close();
+        requestAnimationFrame(() => useThreadListUIStore.getState().setShowKeyboardHelp(true));
+    };
+
     const handleNavigateToVault = () => {
         navigate({ to: "/vault" });
         close();
@@ -656,6 +665,13 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
                 label: t`Go to Settings`,
                 onClick: handleNavigateToSettings,
                 value: "nav-settings",
+            },
+            {
+                icon: <Keyboard className="size-4" />,
+                label: t`Keyboard shortcuts`,
+                onClick: handleOpenKeyboardShortcuts,
+                shortcut: "?",
+                value: "nav-keyboard-shortcuts",
             },
         ];
 
@@ -930,7 +946,7 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
                 }}
                 open={isOpen}
             >
-                <CommandDialogPopup>
+                <CommandDialogPopup aria-label={t`Command Palette`}>
                     <Command filter={filterItem} items={groupedItems} onValueChange={setSearchInput} value={searchInput}>
                         <CommandInput placeholder={t`Search threads, navigate, or perform actions...`} />
                         <div aria-label={t`Filter results`} className="flex flex-wrap items-center gap-1.5 px-3 pt-2" role="group">
@@ -1089,12 +1105,16 @@ const GlobalCommandPaletteContent: FC<GlobalCommandPaletteContentProps> = ({ isM
                                     <span>{t`Open`}</span>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-2">
-                                <KbdGroup>
-                                    <Kbd>⌘</Kbd>
-                                    <Kbd>K</Kbd>
-                                </KbdGroup>
-                                <span>{t`Close`}</span>
+                            <div className="flex items-center gap-4">
+                                {/* The leading `#state` tag the input reads (`parseStateQuery`). */}
+                                <div className="flex items-center gap-2">
+                                    <Kbd>#</Kbd>
+                                    <span>{t`Filter`}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <Kbd>Esc</Kbd>
+                                    <span>{t`Close`}</span>
+                                </div>
                             </div>
                         </CommandFooter>
                     </Command>

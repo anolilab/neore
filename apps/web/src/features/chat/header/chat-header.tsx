@@ -21,6 +21,7 @@ import SiteHeader from "@/features/layout/components/site-header";
 
 import KBAttachmentButton from "./kb-attachment-button";
 import TemporaryChatDropdown from "./temporary-chat-dropdown";
+import ThemeRow from "./theme-row";
 import ThreadDownloadButton from "./thread-download-button";
 
 /**
@@ -136,17 +137,19 @@ const ChatSiteHeader: FC<{ threadId?: string }> = ({ threadId }) => {
             anonymousUserBanner={<AnonymousUserBanner />}
             menu={
                 <>
-                    <ThreadImagesButton threadId={actualThreadId} />
-                    <KBAttachmentButton threadId={actualThreadId} />
-                    <ThreadDownloadButton model={model} threadId={actualThreadId} />
+                    {/* In the header, never the overflow menu: its hourglass is the warning that a chat is auto-deleted, and one place
+                        for it means changing the mode never moves the control the user is working. */}
+                    <TemporaryChatDropdown threadId={actualThreadId} />
                     <ThreadShareButton threadId={actualThreadId} />
                     <SidebarTrigger className="text-muted-foreground hover:text-foreground" icon={<PanelRightIcon />} name="right" />
                 </>
             }
-            themeToggle={
+            overflow={
                 <>
-                    <TemporaryChatDropdown className="text-muted-foreground hover:text-foreground" threadId={actualThreadId} />
-                    <ModeToggle className="text-muted-foreground hover:text-foreground" />
+                    <ThreadImagesButton label={t`Images in this chat`} threadId={actualThreadId} />
+                    <KBAttachmentButton label={t`Knowledge base`} threadId={actualThreadId} />
+                    <ThreadDownloadButton label={t`Chat actions`} model={model} threadId={actualThreadId} />
+                    <ThemeRow />
                 </>
             }
             trigger={<SidebarTrigger className="ml-2" name="left" />}
@@ -175,7 +178,8 @@ const ChatSiteHeader: FC<{ threadId?: string }> = ({ threadId }) => {
                     </Badge>
                 )}
                 <GroupParticipantBar isRunning={threadData?.status === "running"} threadId={validThreadId} />
-                <ThreadPullRequests compact key={validThreadId} threadId={validThreadId} />
+                {/* A chat that runs code on a computer (`runner: "host"`) can link a pull request; any other chat only shows the ones already linked. */}
+                <ThreadPullRequests compact key={validThreadId} showLinkButton={threadData?.runner === "host"} threadId={validThreadId} />
             </div>
         </SiteHeader>
     );

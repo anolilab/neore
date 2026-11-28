@@ -1,4 +1,5 @@
 import { useLingui } from "@lingui/react/macro";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@neore/ui/components/tooltip";
 import cn from "@neore/ui/utils/cn";
 import { AlarmClock, Archive, CircleAlert, Hammer, MessagesSquare } from "lucide-react";
 import type { FC, MouseEvent } from "react";
@@ -53,31 +54,49 @@ const SectionBar: FC = () => {
     };
 
     return (
-        <div aria-label={t`Thread sections (shift-click to show several)`} className="surface-well flex gap-0.5 rounded-[11px] p-[3px]" role="group">
-            {SECTION_KEYS.filter((key) => !HIDDEN_WHEN_EMPTY.has(key) || counts[key] > 0 || filter.includes(key)).map((key) => {
-                const Icon = SECTION_ICONS[key];
-                const label = labels[key];
-                const count = counts[key];
-                const isPressed = filter.includes(key);
+        <TooltipProvider>
+            <div aria-label={t`Thread sections (shift-click to show several)`} className="surface-well flex gap-0.5 rounded-[11px] p-[3px]" role="group">
+                {SECTION_KEYS.filter((key) => !HIDDEN_WHEN_EMPTY.has(key) || counts[key] > 0 || filter.includes(key)).map((key) => {
+                    const Icon = SECTION_ICONS[key];
+                    const label = labels[key];
+                    const count = counts[key];
+                    const isPressed = filter.includes(key);
 
-                return (
-                    <button
-                        aria-label={t`${label}, ${count}`}
-                        aria-pressed={isPressed}
-                        className={cn(
-                            "text-muted-foreground hover:text-foreground focus-visible:ring-ring flex h-[30px] min-w-0 flex-1 items-center justify-center gap-1.5 rounded-lg text-[12.5px] font-medium tabular-nums focus-visible:ring-2 focus-visible:outline-none",
-                            isPressed && "bg-surface-row-active surface-edge text-foreground",
-                        )}
-                        key={key}
-                        onClick={(event) => handleClick(key, event)}
-                        type="button"
-                    >
-                        <Icon aria-hidden className="size-3.5 shrink-0" />
-                        <span className={cn(key === "needsYou" && "text-attention")}>{count}</span>
-                    </button>
-                );
-            })}
-        </div>
+                    return (
+                        <Tooltip key={key}>
+                            <TooltipTrigger
+                                render={
+                                    // The button is its own container: the name shows inline once it is wide enough (three sections fit one, five do not).
+                                    <button
+                                        aria-label={t`${label}, ${count}`}
+                                        aria-pressed={isPressed}
+                                        className={cn(
+                                            "@container/section text-muted-foreground hover:text-foreground focus-visible:ring-ring flex h-[30px] min-w-0 flex-1 items-center justify-center gap-1.5 rounded-lg text-[12.5px] font-medium tabular-nums focus-visible:ring-2 focus-visible:outline-none",
+                                            isPressed && "bg-surface-row-active surface-edge text-foreground",
+                                        )}
+                                        onClick={(event) => handleClick(key, event)}
+                                        type="button"
+                                    >
+                                        <Icon aria-hidden className="size-3.5 shrink-0" />
+                                        <span aria-hidden="true" className="hidden truncate @min-[4.5rem]/section:inline">
+                                            {label}
+                                        </span>
+                                        {/* A space between the name and the number: axe reads the visible text against the aria-label ("Active, 6"), minus punctuation. */}
+                                        {count > 0 && (
+                                            <>
+                                                {" "}
+                                                <span className={cn(key === "needsYou" && "text-attention")}>{count}</span>
+                                            </>
+                                        )}
+                                    </button>
+                                }
+                            />
+                            <TooltipContent>{label}</TooltipContent>
+                        </Tooltip>
+                    );
+                })}
+            </div>
+        </TooltipProvider>
     );
 };
 

@@ -204,8 +204,19 @@ type AttachStatus =
 /**
  * `compact` is the header's form: one row that never wraps, the Link button an icon with its name kept for screen readers. The
  * thread's context box shows the full button.
+ *
+ * `showLinkButton: false` offers the Link button only once the thread has a linked pull request (the header: an ordinary chat has
+ * no code to link); the linked ones always show.
  */
-const ThreadPullRequests = ({ compact = false, threadId }: { compact?: boolean; threadId: string | undefined }) => {
+const ThreadPullRequests = ({
+    compact = false,
+    showLinkButton = true,
+    threadId,
+}: {
+    compact?: boolean;
+    showLinkButton?: boolean;
+    threadId: string | undefined;
+}) => {
     const { t } = useLingui();
     const dialogId = useId();
     const ready = useAfterFirstPaint();
@@ -226,6 +237,14 @@ const ThreadPullRequests = ({ compact = false, threadId }: { compact?: boolean; 
     const [busy, setBusy] = useState(false);
     const [visits] = useState(createDialogVisits);
     const linkButtonRef = useRef<HTMLButtonElement>(null);
+    // Once shown, the button stays (the focus fallback when the last linked pull request goes away): a thread that stops having a link
+    // keeps the way to add one.
+    const [linkButtonShown, setLinkButtonShown] = useState(false);
+    const wantsLinkButton = showLinkButton || (links.data?.length ?? 0) > 0;
+
+    if (wantsLinkButton && !linkButtonShown) {
+        setLinkButtonShown(true);
+    }
 
     // Only the owner can link: the attach action refuses anyone else, so the control is not shown to them.
     if (threadId === undefined || access.data?.isOwner !== true) {
@@ -340,17 +359,19 @@ const ThreadPullRequests = ({ compact = false, threadId }: { compact?: boolean; 
                 </p>
             )}
             <LinkedPullRequestList compact={compact} fallbackFocus={linkButtonRef} links={links.data ?? []} threadId={threadId} />
-            <Button
-                className={cn(compact && "size-7 shrink-0 p-0")}
-                onClick={() => setOpen(true)}
-                ref={linkButtonRef}
-                size="sm"
-                title={compact ? t`Link pull request` : undefined}
-                variant="ghost"
-            >
-                {compact && <GitPullRequestCreate aria-hidden="true" className="size-4" />}
-                <span className={cn(compact && "sr-only")}>{t`Link pull request`}</span>
-            </Button>
+            {(linkButtonShown || wantsLinkButton) && (
+                <Button
+                    className={cn(compact && "size-7 shrink-0 p-0")}
+                    onClick={() => setOpen(true)}
+                    ref={linkButtonRef}
+                    size="sm"
+                    title={compact ? t`Link pull request` : undefined}
+                    variant="ghost"
+                >
+                    {compact && <GitPullRequestCreate aria-hidden="true" className="size-4" />}
+                    <span className={cn(compact && "sr-only")}>{t`Link pull request`}</span>
+                </Button>
+            )}
             <Dialog
                 onOpenChange={(next) => {
                     // Opening or closing ends the visit: a request still in flight writes nothing into the next one.

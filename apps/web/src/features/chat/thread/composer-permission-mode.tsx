@@ -6,8 +6,9 @@ import { COMPARISON_COLUMN_MODE_CODE, isThreadPermissionMode, THREAD_PERMISSION_
 import { useUnlockProof } from "@neore/client-runtime";
 import { Button } from "@neore/ui/components/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from "@neore/ui/components/dropdown-menu";
+import cn from "@neore/ui/utils/cn";
 import { skipToken, useIsMutating, useMutation, useMutationState, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ShieldCheck } from "lucide-react";
+import { Shield, ShieldAlert, ShieldCheck } from "lucide-react";
 import type { FC } from "react";
 import { useId } from "react";
 
@@ -25,6 +26,8 @@ const isComparisonRefusal = (error: unknown): boolean => (error as { data?: { co
 const MODE_ORDER = THREAD_PERMISSION_MODES;
 
 const isMode = isThreadPermissionMode;
+
+const MODE_ICONS: Record<ThreadPermissionMode, typeof Shield> = { auto: ShieldCheck, full: ShieldAlert, supervised: Shield };
 
 interface ComposerPermissionModeProps {
     disabled?: boolean;
@@ -51,6 +54,14 @@ export const ComposerPermissionMode: FC<ComposerPermissionModeProps> = ({ disabl
     };
 
     const noteId = useId();
+    const ModeIcon = MODE_ICONS[mode];
+    // "Mode: Auto", so it is not a second bare "Auto" beside the model's toggle; its text is inside the aria-label ("Permission mode: Auto").
+    const triggerText = (
+        <>
+            <ModeIcon aria-hidden="true" className={cn("size-3 shrink-0", mode === "full" && "text-attention")} />
+            <span className="@max-[40rem]/strip:sr-only">{t`Mode: ${labels[mode]}`}</span>
+        </>
+    );
     const buttonClass =
         "bg-transparent hover:bg-surface-row-hover dark:hover:bg-surface-row-hover rounded-lg text-muted-foreground hover:text-foreground h-11 gap-1 px-2 sm:h-7";
 
@@ -66,8 +77,7 @@ export const ComposerPermissionMode: FC<ComposerPermissionModeProps> = ({ disabl
                 title={note}
                 variant="ghost"
             >
-                <ShieldCheck aria-hidden="true" className="size-3 shrink-0" />
-                <span className="@max-[40rem]/strip:sr-only">{labels[mode]}</span>
+                {triggerText}
                 <span className="sr-only" id={noteId}>
                     {note}
                 </span>
@@ -80,8 +90,7 @@ export const ComposerPermissionMode: FC<ComposerPermissionModeProps> = ({ disabl
             <DropdownMenuTrigger
                 render={
                     <Button aria-label={t`Permission mode: ${labels[mode]}`} className={buttonClass} disabled={disabled} variant="ghost">
-                        <ShieldCheck aria-hidden="true" className="size-3 shrink-0" />
-                        <span className="@max-[40rem]/strip:sr-only">{labels[mode]}</span>
+                        {triggerText}
                     </Button>
                 }
             />
@@ -95,12 +104,19 @@ export const ComposerPermissionMode: FC<ComposerPermissionModeProps> = ({ disabl
                     }}
                     value={mode}
                 >
-                    {MODE_ORDER.map((option) => (
-                        <DropdownMenuRadioItem className="flex-col items-start gap-0" key={option} value={option}>
-                            <span className="font-medium">{labels[option]}</span>
-                            <span className="text-muted-foreground text-xs">{descriptions[option]}</span>
-                        </DropdownMenuRadioItem>
-                    ))}
+                    {MODE_ORDER.map((option) => {
+                        const OptionIcon = MODE_ICONS[option];
+
+                        return (
+                            <DropdownMenuRadioItem className="flex-col items-start gap-0" key={option} value={option}>
+                                <span className={cn("flex items-center gap-1.5 font-medium", option === "full" && "text-attention")}>
+                                    <OptionIcon aria-hidden="true" className="size-3.5 shrink-0" />
+                                    {labels[option]}
+                                </span>
+                                <span className="text-muted-foreground text-xs">{descriptions[option]}</span>
+                            </DropdownMenuRadioItem>
+                        );
+                    })}
                 </DropdownMenuRadioGroup>
             </DropdownMenuContent>
         </DropdownMenu>

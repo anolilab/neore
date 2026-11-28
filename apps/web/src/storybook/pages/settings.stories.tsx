@@ -157,6 +157,14 @@ export const Customization: Story = {
     play: async () => {
         await settingsDialog();
         await expect(await screen.findAllByRole("switch", undefined, PAGE_WAIT)).not.toHaveLength(0);
+
+        // Appearance leads, with the System / Light / Dark tiles; Privacy follows it.
+        const modes = await screen.findByRole("radiogroup", { name: "Color mode" }, PAGE_WAIT);
+
+        await expect(screen.getAllByRole("radio", { name: /^(System|Light|Dark)$/ })).toHaveLength(3);
+        const privacy = screen.getByRole("switch", { name: "Hide Personal Information" });
+
+        await expect(modes.compareDocumentPosition(privacy)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     },
 };
 

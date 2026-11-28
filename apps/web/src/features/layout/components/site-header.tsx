@@ -13,12 +13,14 @@ const SiteHeader: FC<
         anonymousUserBanner?: ReactNode;
         menu?: ReactNode;
         notch?: boolean;
+        /** Actions listed by name in one overflow menu, after the few kept in `menu`. */
+        overflow?: ReactNode;
         themeToggle?: ReactNode;
         title?: string;
         trigger?: ReactNode;
         workspaceSwitch?: boolean;
     }>
-> = ({ anonymousUserBanner, children, menu, notch, themeToggle, title, trigger, workspaceSwitch }) => {
+> = ({ anonymousUserBanner, children, menu, notch, overflow, themeToggle, title, trigger, workspaceSwitch }) => {
     // Phones get the overflow button; everything else the cluster. Mounted once, never both.
     const isPhone = useMediaMatch(PHONE_QUERY);
 
@@ -36,14 +38,15 @@ const SiteHeader: FC<
                 <div className="grow" />
                 {anonymousUserBanner}
                 <div className="grow" />
-                {isPhone && (themeToggle || menu) && (
-                    <MobileHeaderActions>
+                {isPhone && (themeToggle || menu || overflow) && (
+                    <MobileHeaderActions overflow={overflow}>
                         {themeToggle}
                         {menu}
                     </MobileHeaderActions>
                 )}
                 {!isPhone && notch !== false && (
                     <div className="[&_[data-slot=button]:hover]:bg-surface-row-hover flex shrink-0 items-center gap-0.5 pr-3 [&_[data-slot=button]]:size-7 [&_[data-slot=button]]:rounded-lg">
+                        {overflow && <MobileHeaderActions compact overflow={overflow} />}
                         {themeToggle}
                         {menu}
                     </div>
