@@ -451,7 +451,8 @@ export const SettingsModal: FC = () => {
 
         const locked = new Set<SettingsTab>(isSignedOut ? SESSION_TABS : []);
 
-        for (const group of navigationGroups) {
+        // Every tab that needs an account, not only the ones the navigation shows: a link can open a hidden one (Teams, say).
+        for (const group of SETTINGS_NAVIGATION) {
             for (const item of group.items) {
                 if (item.requiresAuth) {
                     locked.add(item.tab);
@@ -460,7 +461,7 @@ export const SettingsModal: FC = () => {
         }
 
         return locked;
-    }, [isAnonymous, isSignedOut, navigationGroups]);
+    }, [isAnonymous, isSignedOut]);
 
     // Loads a tab's chunk and data ahead of opening it; a tab the navigation locks for a guest loads nothing.
     const previewTab = (tab: SettingsTab) => {
