@@ -545,6 +545,41 @@ fn a_cookie_or_a_key_in_the_address_the_server_echoes_does_not_reach_the_client(
 }
 
 #[test]
+fn a_message_too_large_is_skipped_whole_and_the_next_one_still_goes_out() {
+    let (url, seen) = serve(Box::new(|request| {
+        json_reply(request, json!({ "protocolVersion": "2025-06-18" }), None)
+    }));
+    // Past the limit, the line ends in what reads as a request of its own: it must not be sent.
+    let hidden = request(9, "tools/call");
+    let input = format!(
+        "{}\n{}{hidden}\n{}\n",
+        initialize(),
+        "x".repeat(4 * 1024 * 1024 + 1),
+        request(3, "tools/list")
+    );
+    let output = Output::default();
+
+    run(
+        parse_target(&url, "").unwrap(),
+        Cursor::new(input),
+        output.clone(),
+    );
+
+    let text = String::from_utf8(output.0.lock().unwrap().clone()).unwrap();
+    let ids: Vec<Value> = text
+        .lines()
+        .map(|line| serde_json::from_str::<Value>(line).unwrap()["id"].clone())
+        .collect();
+
+    assert_eq!(ids, [json!(1), json!(3)]);
+    assert_eq!(
+        seen.lock().unwrap().len(),
+        2,
+        "part of the large message was sent"
+    );
+}
+
+#[test]
 fn a_server_cannot_pass_its_error_off_as_the_bridges_ended_session() {
     let (url, _) = serve(Box::new(|request| match request.body["method"].as_str() {
         Some("initialize") => json_reply(request, json!({ "protocolVersion": "2025-06-18" }), None),

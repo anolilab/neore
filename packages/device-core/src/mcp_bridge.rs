@@ -36,6 +36,8 @@ const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(150);
 /// One reply: a JSON object or a whole event stream.
 const MAX_REPLY_BYTES: u64 = 16 * 1024 * 1024;
+/// One message from the client. A request runs beside up to `MAX_IN_FLIGHT - 1` others, each holding its own.
+const MAX_MESSAGE_BYTES: usize = 4 * 1024 * 1024;
 const MAX_URL_BYTES: usize = 2048;
 const MAX_HEADERS: usize = 32;
 const MAX_HEADER_VALUE_BYTES: usize = 8192;
@@ -728,7 +730,7 @@ impl<W: Write> Bridge<W> {
 /// Relays `input` (one JSON-RPC message per line) until it ends. Requests run side by side; notifications and responses
 /// are sent before the next line is read, so `notifications/initialized` always comes before the request that follows
 /// it. While `initialize` runs, only responses go out: the server may ping before it answers, and waits for the reply.
-pub fn run<W: Write + Send + 'static>(target: Target, input: impl BufRead, output: W) {
+pub fn run<W: Write + Send + 'static>(target: Target, mut input: impl BufRead, output: W) {
     let bridge = Arc::new(Bridge {
         agent: agent(),
         target,
@@ -739,8 +741,30 @@ pub fn run<W: Write + Send + 'static>(target: Target, input: impl BufRead, outpu
     let mut running: Vec<JoinHandle<()>> = Vec::new();
     let mut opening: Option<JoinHandle<()>> = None;
 
-    for line in input.lines().map_while(Result::ok) {
-        let Ok(message) = serde_json::from_str::<Value>(&line) else {
+    loop {
+        let mut line = Vec::new();
+
+        match (&mut input)
+            .take(MAX_MESSAGE_BYTES as u64 + 1)
+            .read_until(b'\n', &mut line)
+        {
+            Ok(0) | Err(_) => break,
+            Ok(_) => {}
+        }
+
+        if line.len() > MAX_MESSAGE_BYTES {
+            // The rest of it is read past, never held.
+            if line.last() != Some(&b'\n') && input.skip_until(b'\n').is_err() {
+                break;
+            }
+
+            eprintln!(
+                "neore-host mcp-bridge: skipped a message larger than {MAX_MESSAGE_BYTES} bytes"
+            );
+            continue;
+        }
+
+        let Ok(message) = serde_json::from_slice::<Value>(&line) else {
             eprintln!("neore-host mcp-bridge: skipped a line that is not JSON");
             continue;
         };
