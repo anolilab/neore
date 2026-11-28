@@ -7,6 +7,9 @@
 /** The category the server names on an approval alert. Must match `TOOL_APPROVAL_CATEGORY` on the backend. */
 export const TOOL_APPROVAL_CATEGORY = "tool_approval";
 
+/** The category of an approval only answered in the chat (`forget`): deny alone. Must match `TOOL_DENY_ONLY_CATEGORY` on the backend. */
+export const TOOL_DENY_ONLY_CATEGORY = "tool_approval_deny_only";
+
 export const APPROVE_ACTION = "approve";
 export const DENY_ACTION = "deny";
 

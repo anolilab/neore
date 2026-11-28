@@ -92,6 +92,11 @@ export interface RankedMemory {
     memory: string;
     /** Recorded on the reply for the "why was this used" view. */
     memoryId: string;
+    /**
+     * Its relevance to the search alone: the better of its vector cosine and its keyword share, whether or not either
+     * cleared its floor (which only decides whether the row is relevant at all). `score` adds the other terms.
+     */
+    relevance: number;
     score: number;
     validUntil?: string;
 }
@@ -622,6 +627,8 @@ export const rankMemories = (input: {
     /** The least cosine similarity a vector hit needs before the other terms count. */
     minRelevance?: number;
     now: number;
+    /** Sorts by `relevance` before the cut to `limit`, not by `score` (`forget.ts`: what the user is asked to confirm). */
+    orderByRelevance?: boolean;
     /** Candidates holding the query's rare term: found by keyword even when the vector search lacks them or scores them low. */
     rareTermMatches?: ReadonlySet<string>;
     threshold?: number;
@@ -638,6 +645,7 @@ export const rankMemories = (input: {
         minKeywordRelevance = INJECT_MIN_KEYWORD_RELEVANCE,
         minRelevance = INJECT_MIN_RELEVANCE,
         now,
+        orderByRelevance = false,
         rareTermMatches = new Set<string>(),
         threshold = AUTO_INJECT_THRESHOLD,
         timeWindow,
@@ -670,6 +678,7 @@ export const rankMemories = (input: {
                     lastConfirmedAt: m.lastConfirmedAt,
                     memory: m.memory,
                     memoryId: m._id,
+                    relevance: Math.max(hit ?? 0, keyword, byVector ?? 0, byKeyword ?? 0),
                     relevant: byVector !== undefined || byKeyword !== undefined || byDate !== undefined,
                     score: score + signal,
                     ...factDatesOf(m),
@@ -678,7 +687,7 @@ export const rankMemories = (input: {
             // Confidence, importance and recency only order what is relevant: a fresh, pinned or confident row
             // with no relevance never clears the bar on those terms alone.
             .filter((m) => m.relevant && m.gate >= threshold)
-            .toSorted((a, b) => b.score - a.score)
+            .toSorted((a, b) => (orderByRelevance ? b.relevance - a.relevance : b.score - a.score))
             .slice(0, limit)
             // Overwriting `score` keeps its place among the keys.
             .map(({ gate: _gate, relevant: _relevant, ...ranked }) => {

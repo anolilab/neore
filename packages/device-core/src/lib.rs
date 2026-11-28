@@ -46,6 +46,8 @@ pub mod launch;
 #[cfg(feature = "keychain")]
 pub mod lifecycle;
 pub mod mcp;
+#[cfg(feature = "mcp-bridge")]
+pub mod mcp_bridge;
 pub mod media;
 pub mod outbox;
 pub mod sandbox;

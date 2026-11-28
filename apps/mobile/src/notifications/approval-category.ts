@@ -2,7 +2,7 @@
  * The approval category the phone registers, without the device API: its actions, and the call that registers them through a
  * setter it is given. `approval-actions.ts` passes the real one.
  */
-import { APPROVE_ACTION, DENY_ACTION, TOOL_APPROVAL_CATEGORY } from "./approval-response";
+import { APPROVE_ACTION, DENY_ACTION, TOOL_APPROVAL_CATEGORY, TOOL_DENY_ONLY_CATEGORY } from "./approval-response";
 
 export interface ApprovalAction {
     buttonTitle: string;
@@ -59,10 +59,17 @@ export const approvalActionsFor = (locale: string | undefined): ApprovalAction[]
     ];
 };
 
-/** Registers the approval category through `setCategory`, with a fresh copy of the actions. A failure reaches the caller to retry. */
+/**
+ * Registers the approval categories through `setCategory`, with a fresh copy of the actions: approve and deny, and deny alone
+ * for an approval only read in the chat (`TOOL_DENY_ONLY_CATEGORY`). A failure reaches the caller to retry.
+ */
 export const registerApprovalActionsWith = async (
     setCategory: (identifier: string, actions: ApprovalAction[]) => Promise<unknown>,
     locale?: string,
 ): Promise<void> => {
     await setCategory(TOOL_APPROVAL_CATEGORY, approvalActionsFor(locale));
+    await setCategory(
+        TOOL_DENY_ONLY_CATEGORY,
+        approvalActionsFor(locale).filter((action) => action.identifier !== APPROVE_ACTION),
+    );
 };

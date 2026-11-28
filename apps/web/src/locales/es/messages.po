@@ -338,6 +338,11 @@ msgstr "{0, plural, one {# coincidencia} other {# coincidencias}}"
 msgid "{0, plural, one {# member} other {# members}}"
 msgstr "{0, plural, one {# miembro} other {# miembros}}"
 
+#. placeholder {0}: forgotten.length
+#: src/features/chat/thread/tool-approval.tsx:221
+msgid "{0, plural, one {# memory is waiting for the chat owner to confirm.} other {# memories are waiting for the chat owner to confirm.}}"
+msgstr "{0, plural, one {# recuerdo espera la confirmación del propietario del chat.} other {# recuerdos esperan la confirmación del propietario del chat.}}"
+
 #. placeholder {0}: c.messages.length
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:369
 msgid "{0, plural, one {# message} other {# messages}}"
@@ -2695,7 +2700,7 @@ msgstr "Añadir adjunto"
 msgid "Add background"
 msgstr "Añadir fondo"
 
-#: src/features/settings/components/chat/usage-settings.tsx:417
+#: src/features/settings/components/chat/usage-settings.tsx:421
 #~ msgid "Add budget alert"
 #~ msgstr "Añadir alerta de presupuesto"
 
@@ -2807,8 +2812,8 @@ msgid "Add picked frame as image node"
 msgstr "Añadir el fotograma elegido como nodo de imagen"
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:147
-#: src/features/chat/thread-list/thread-list-dock.tsx:120
-#: src/features/chat/thread-list/thread-list-dock.tsx:130
+#: src/features/chat/thread-list/thread-list-dock.tsx:123
+#: src/features/chat/thread-list/thread-list-dock.tsx:133
 #: src/features/projects/components/add-project-dialog.tsx:695
 msgid "Add project"
 msgstr "Añadir proyecto"
@@ -3748,11 +3753,11 @@ msgstr "Todos los casos de uso"
 msgid "All Users"
 msgstr "Todos los usuarios"
 
-#: src/features/chat/thread/tool-approval.tsx:167
+#: src/features/chat/thread/tool-approval.tsx:243
 msgid "Allow \"{tool}\" from {server}?"
 msgstr "¿Permitir \"{tool}\" de {server}?"
 
-#: src/features/chat/thread/tool-approval.tsx:167
+#: src/features/chat/thread/tool-approval.tsx:243
 msgid "Allow \"{tool}\"?"
 msgstr "¿Permitir \"{tool}\"?"
 
@@ -3760,19 +3765,19 @@ msgstr "¿Permitir \"{tool}\"?"
 msgid "Allow \"delete_files\" from the drafts server?"
 msgstr "¿Permitir «delete_files» desde el servidor de borradores?"
 
-#: src/features/chat/thread/tool-approval.tsx:138
+#: src/features/chat/thread/tool-approval.tsx:157
 #~ msgid "Allow {tool} for 1 hour"
 #~ msgstr "Permitir {tool} durante 1 hora"
 
-#: src/features/chat/thread/tool-approval.tsx:142
+#: src/features/chat/thread/tool-approval.tsx:161
 #~ msgid "Allow {tool} for today"
 #~ msgstr "Permitir {tool} durante hoy"
 
-#: src/features/chat/thread/tool-approval.tsx:134
+#: src/features/chat/thread/tool-approval.tsx:153
 msgid "Allow for 1 hour"
 msgstr "Permitir durante 1 hora"
 
-#: src/features/chat/thread/tool-approval.tsx:140
+#: src/features/chat/thread/tool-approval.tsx:159
 msgid "Allow for today"
 msgstr "Permitir durante hoy"
 
@@ -3835,12 +3840,12 @@ msgstr "También están viendo"
 msgid "Always"
 msgstr "Siempre"
 
-#: src/features/chat/thread/tool-approval.tsx:128
+#: src/features/chat/thread/tool-approval.tsx:146
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:35
 msgid "Always allow"
 msgstr "Permitir siempre"
 
-#: src/features/chat/thread/tool-approval.tsx:126
+#: src/features/chat/thread/tool-approval.tsx:144
 msgid "Always allow {tool}"
 msgstr "Permitir siempre {tool}"
 
@@ -4331,14 +4336,14 @@ msgid "Approvals in Neore: a tool you set to Ask stops before it runs, and you d
 msgstr "Aprobaciones en Neore: una herramienta que tengas en Preguntar se detiene antes de ejecutarse, y decides con la entrada exacta delante."
 
 #: src/features/auth/components/device-approval.tsx:242
-#: src/features/chat/thread/tool-approval.tsx:120
+#: src/features/chat/thread/tool-approval.tsx:137
 #: src/features/develop/components/review-panel.tsx:64
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:32
 #: src/features/tasks/components/task-detail-dialog.tsx:104
 msgid "Approve"
 msgstr "Aprobar"
 
-#: src/features/chat/thread/tool-approval.tsx:118
+#: src/features/chat/thread/tool-approval.tsx:135
 msgid "Approve {tool} once"
 msgstr "Aprobar {tool} una vez"
 
@@ -4366,7 +4371,7 @@ msgstr "Aprueba la solicitud en la aplicación de escritorio de {name}."
 msgid "Approved"
 msgstr "Aprobado"
 
-#: src/features/chat/thread/tool-approval.tsx:83
+#: src/features/chat/thread/tool-approval.tsx:98
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:23
 msgid "Approved — running tool"
 msgstr "Aprobado: ejecutando herramienta"
@@ -8044,7 +8049,7 @@ msgstr "Razonamiento visual complejo que requiere un pensamiento transparente so
 msgid "Composer"
 msgstr "Compositor"
 
-#: src/features/chat/thread/composer-status-line.tsx:95
+#: src/features/chat/thread/composer-status-line.tsx:96
 msgid "Composer status"
 msgstr "Estado del compositor"
 
@@ -9544,7 +9549,7 @@ msgid "Could not send your answer."
 msgstr "No se pudo enviar tu respuesta."
 
 #: src/features/chat/thread/ask-user-prompt.tsx:115
-#: src/features/chat/thread/tool-approval.tsx:72
+#: src/features/chat/thread/tool-approval.tsx:87
 msgid "Could not send your answer. Please try again."
 msgstr "No se pudo enviar tu respuesta. Inténtalo de nuevo."
 
@@ -10916,7 +10921,7 @@ msgstr "Eliminar preajuste"
 msgid "Delete preset?"
 msgstr "¿Eliminar preajuste?"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1330
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1341
 msgid "Delete Project"
 msgstr "Eliminar proyecto"
 
@@ -11106,7 +11111,7 @@ msgstr "Tareas exigentes en las que la máxima capacidad de IA y un razonamiento
 msgid "Denied"
 msgstr "Denegado"
 
-#: src/features/chat/thread/tool-approval.tsx:81
+#: src/features/chat/thread/tool-approval.tsx:96
 msgid "Denied — continuing without it"
 msgstr "Denegado: se continúa sin ella"
 
@@ -11127,12 +11132,12 @@ msgid "Density updated"
 msgstr "Densidad actualizada"
 
 #: src/features/auth/components/device-approval.tsx:233
-#: src/features/chat/thread/tool-approval.tsx:124
+#: src/features/chat/thread/tool-approval.tsx:141
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:34
 msgid "Deny"
 msgstr "Denegar"
 
-#: src/features/chat/thread/tool-approval.tsx:122
+#: src/features/chat/thread/tool-approval.tsx:139
 msgid "Deny {tool}"
 msgstr "Denegar {tool}"
 
@@ -14212,7 +14217,7 @@ msgstr "No se pudo eliminar la passkey"
 msgid "Failed to delete preset"
 msgstr "No se pudo eliminar el preajuste"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:688
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:699
 msgid "Failed to delete project"
 msgstr "No se pudo eliminar el proyecto"
 
@@ -14418,7 +14423,7 @@ msgstr "No se pudo hacer permanente la conversación"
 msgid "Failed to move file"
 msgstr "No se pudo mover el archivo"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:973
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:984
 #: src/features/projects/components/move-to-project-dialog.tsx:38
 msgid "Failed to move thread"
 msgstr "No se pudo mover la conversación"
@@ -15813,6 +15818,10 @@ msgstr "Bosque"
 msgid "forget"
 msgstr "olvidar"
 
+#: src/features/chat/thread/tool-approval.tsx:229
+msgid "Forget these memories?"
+msgstr "¿Olvidar estos recuerdos?"
+
 #: src/features/auth/components/auth/forms/two-factor-form.tsx:288
 msgid "Forgot authenticator"
 msgstr "¿No tienes acceso al autenticador?"
@@ -16772,7 +16781,7 @@ msgid "Goal: {goalTitle}"
 msgstr "Objetivo: {goalTitle}"
 
 #: src/features/chat/goal/composer-goal.tsx:66
-#: src/features/chat/thread/composer-status-line.tsx:111
+#: src/features/chat/thread/composer-status-line.tsx:112
 msgid "Goal: run until done"
 msgstr "Objetivo: ejecutar hasta terminar"
 
@@ -20478,7 +20487,7 @@ msgstr "Cargando esta verificación…"
 msgid "Loading threads"
 msgstr "Cargando conversaciones"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1079
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1090
 msgid "Loading threads..."
 msgstr "Cargando conversaciones..."
 
@@ -21425,6 +21434,10 @@ msgstr "recuerdos"
 #: src/features/settings/components/personalization/memory-settings.tsx:253
 msgid "Memories"
 msgstr "Recuerdos"
+
+#: src/features/chat/thread/tool-approval.tsx:214
+msgid "Memories to forget"
+msgstr "Recuerdos que se olvidarán"
 
 #: src/features/chat/thread/memory-usage-action.tsx:42
 msgid "Memories used"
@@ -23136,8 +23149,8 @@ msgid "New thread"
 msgstr "Nueva conversación"
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:150
-#: src/features/chat/thread-list/thread-list-dock.tsx:136
-#: src/features/chat/thread-list/thread-list-dock.tsx:146
+#: src/features/chat/thread-list/thread-list-dock.tsx:139
+#: src/features/chat/thread-list/thread-list-dock.tsx:149
 msgid "New Thread"
 msgstr "Nueva conversación"
 
@@ -23633,7 +23646,7 @@ msgstr "Aún no hay recuerdos. La IA empezará a aprender de tus conversaciones 
 msgid "No message of yours is loaded in this conversation"
 msgstr "No hay ningún mensaje tuyo cargado en esta conversación"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1127
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1138
 msgid "No messages found for"
 msgstr "No se encontraron mensajes para"
 
@@ -23943,7 +23956,7 @@ msgstr "No hay texto que mostrar."
 msgid "No thread has worked on this {requestNoun} yet."
 msgstr "Ningún hilo ha trabajado aún en este {requestNoun}."
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1127
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1138
 msgid "No threads found for"
 msgstr "No se encontraron conversaciones para"
 
@@ -23951,16 +23964,16 @@ msgstr "No se encontraron conversaciones para"
 msgid "No threads in this group"
 msgstr "No hay conversaciones en este grupo"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1093
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1104
 msgid "No threads in this section"
 msgstr "No hay hilos en esta sección"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:742
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:753
 msgid "No threads were active in that date range."
 msgstr "Ningún hilo estuvo activo en ese intervalo de fechas."
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:263
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1104
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1115
 msgid "No threads yet"
 msgstr "Aún no hay conversaciones"
 
@@ -27073,9 +27086,9 @@ msgstr "Preajuste actualizado"
 msgid "Presets"
 msgstr "Preajustes"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1106
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1119
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1145
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1117
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1130
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1156
 msgid "Press ? for keyboard shortcuts"
 msgstr "Pulsa ? para ver los atajos de teclado"
 
@@ -29354,7 +29367,7 @@ msgstr "Respuesta lista"
 msgid "Reply tools are off by default. You switch them on per connection and choose which groups they may use."
 msgstr "Las herramientas de respuesta están desactivadas por defecto. Las activas por conexión y eliges qué grupos pueden usar."
 
-#: src/features/chat/thread/composer-status-line.tsx:99
+#: src/features/chat/thread/composer-status-line.tsx:100
 msgid "Replying"
 msgstr "Respondiendo"
 
@@ -30697,7 +30710,7 @@ msgstr "buscar"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:241
 #: src/features/chat/signed-out/signed-out-chat.tsx:141
-#: src/features/chat/thread-list/thread-list-dock.tsx:95
+#: src/features/chat/thread-list/thread-list-dock.tsx:98
 #: src/features/chat/thread/thread-welcome-suggestions.tsx:93
 msgid "Search"
 msgstr "Buscar"
@@ -30745,7 +30758,7 @@ msgstr "Buscar datos..."
 msgid "Search depth: {0}"
 msgstr "Profundidad de búsqueda: {0}"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1118
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1129
 msgid "Search failed for \"{searchQuery}\". Try again."
 msgstr "La búsqueda de \"{searchQuery}\" falló. Reintentar."
 
@@ -30795,11 +30808,11 @@ msgstr "Buscar en el contenido de los mensajes"
 msgid "Search message content..."
 msgstr "Buscar en el contenido de los mensajes..."
 
-#: src/features/chat/thread-list/thread-list-dock.tsx:53
+#: src/features/chat/thread-list/thread-list-dock.tsx:54
 msgid "Search messages"
 msgstr "Buscar mensajes"
 
-#: src/features/chat/thread-list/thread-list-dock.tsx:57
+#: src/features/chat/thread-list/thread-list-dock.tsx:58
 msgid "Search messages ({focusSearchShortcut})"
 msgstr "Buscar mensajes ({focusSearchShortcut})"
 
@@ -30936,12 +30949,12 @@ msgid "Search thread titles..."
 msgstr "Buscar títulos de conversaciones..."
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:134
-#: src/features/chat/thread-list/thread-list-dock.tsx:53
+#: src/features/chat/thread-list/thread-list-dock.tsx:54
 #: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:82
 msgid "Search threads"
 msgstr "Buscar conversaciones"
 
-#: src/features/chat/thread-list/thread-list-dock.tsx:57
+#: src/features/chat/thread-list/thread-list-dock.tsx:58
 msgid "Search threads ({focusSearchShortcut})"
 msgstr "Buscar hilos ({focusSearchShortcut})"
 
@@ -30990,7 +31003,7 @@ msgstr "Se buscó solo en los últimos mensajes"
 msgid "Searching"
 msgstr "Buscando"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1135
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1146
 msgid "Searching..."
 msgstr "Buscando..."
 
@@ -32025,7 +32038,7 @@ msgstr "Mostrar la hora"
 msgid "Show up to {rowLimit} rows ({byteCount} bytes)"
 msgstr "Mostrar hasta {rowLimit} filas ({byteCount} bytes)"
 
-#: src/features/chat/thread/tool-approval.tsx:111
+#: src/features/chat/thread/tool-approval.tsx:128
 msgid "Show what it will send"
 msgstr "Mostrar lo que enviará"
 
@@ -33205,7 +33218,7 @@ msgstr "Inicia un nuevo chat para empezar"
 msgid "Start a new context: earlier messages are no longer sent to the model"
 msgstr "Empezar un contexto nuevo: los mensajes anteriores ya no se envían al modelo"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1105
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1116
 msgid "Start a new conversation to create your first thread"
 msgstr "Empieza una nueva conversación para crear la primera"
 
@@ -35326,7 +35339,7 @@ msgstr "El bot y su ordenador se eliminan. Sus chats se conservan, como chats no
 msgid "The bot gets only the tools you allow. With none allowed, it gets no tools."
 msgstr "El bot recibe solo las herramientas que permitas. Si no permites ninguna, no recibe herramientas."
 
-#: src/features/chat/thread/composer-status-line.tsx:123
+#: src/features/chat/thread/composer-status-line.tsx:124
 msgid "The bot sets the model for this chat."
 msgstr "El bot establece el modelo de este chat."
 
@@ -37055,7 +37068,7 @@ msgstr "Se eliminarán de forma permanente {0} cuentas de usuario anónimas y to
 msgid "This will permanently delete all {0} memories and their daily digests. The AI will start learning fresh from your next conversation."
 msgstr "Se eliminarán de forma permanente los {0} recuerdos y sus resúmenes diarios. La IA empezará a aprender de cero a partir de tu próxima conversación."
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1320
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1331
 msgid "This will permanently delete the project and all associated threads. This action cannot be undone."
 msgstr "Se eliminarán de forma permanente el proyecto y todas sus conversaciones. Esta acción no se puede deshacer."
 
@@ -37584,7 +37597,7 @@ msgstr "Herramientas de {0}"
 msgid "Tools run on their own settings; a quick check can clear low-risk calls"
 msgstr "Las herramientas se ejecutan según sus propios ajustes; una comprobación rápida puede aprobar llamadas de bajo riesgo"
 
-#: src/features/chat/thread/composer-status-line.tsx:117
+#: src/features/chat/thread/composer-status-line.tsx:118
 msgid "Tools run without asking"
 msgstr "Las herramientas se ejecutan sin preguntar"
 
@@ -37975,11 +37988,11 @@ msgstr "Prueba Neore"
 msgid "Try searching for a different term."
 msgstr "Prueba a buscar otro término."
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1141
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1152
 msgid "Try searching in message content"
 msgstr "Prueba a buscar en el contenido de los mensajes"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1141
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1152
 msgid "Try searching in thread titles or summaries"
 msgstr "Prueba a buscar en los títulos o resúmenes de las conversaciones"
 
@@ -39995,7 +40008,7 @@ msgstr "Esperando al propietario"
 msgid "Waiting for the owner to answer"
 msgstr "Esperando la respuesta del propietario"
 
-#: src/features/chat/thread/tool-approval.tsx:78
+#: src/features/chat/thread/tool-approval.tsx:93
 msgid "Waiting for the owner to approve"
 msgstr "Esperando la aprobación del propietario"
 
@@ -40021,7 +40034,7 @@ msgstr "Esperando tu respuesta en {0}"
 
 #: src/features/chat/thread-list/thread-node.tsx:935
 #: src/features/chat/thread-list/thread-node.tsx:942
-#: src/features/chat/thread/tool-approval.tsx:78
+#: src/features/chat/thread/tool-approval.tsx:93
 #: src/features/home/components/home-page.tsx:119
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:20
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:60

@@ -338,6 +338,11 @@ msgstr "{0, plural, other {# 个匹配}}"
 msgid "{0, plural, one {# member} other {# members}}"
 msgstr "{0, plural, other {# 名成员}}"
 
+#. placeholder {0}: forgotten.length
+#: src/features/chat/thread/tool-approval.tsx:221
+msgid "{0, plural, one {# memory is waiting for the chat owner to confirm.} other {# memories are waiting for the chat owner to confirm.}}"
+msgstr "{0, plural, other {# 条记忆正在等待聊天所有者确认。}}"
+
 #. placeholder {0}: c.messages.length
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:369
 msgid "{0, plural, one {# message} other {# messages}}"
@@ -2695,7 +2700,7 @@ msgstr "添加附件"
 msgid "Add background"
 msgstr "添加背景"
 
-#: src/features/settings/components/chat/usage-settings.tsx:417
+#: src/features/settings/components/chat/usage-settings.tsx:421
 #~ msgid "Add budget alert"
 #~ msgstr "添加预算提醒"
 
@@ -2807,8 +2812,8 @@ msgid "Add picked frame as image node"
 msgstr "将选取的帧添加为图片节点"
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:147
-#: src/features/chat/thread-list/thread-list-dock.tsx:120
-#: src/features/chat/thread-list/thread-list-dock.tsx:130
+#: src/features/chat/thread-list/thread-list-dock.tsx:123
+#: src/features/chat/thread-list/thread-list-dock.tsx:133
 #: src/features/projects/components/add-project-dialog.tsx:695
 msgid "Add project"
 msgstr "添加项目"
@@ -3748,11 +3753,11 @@ msgstr "全部使用场景"
 msgid "All Users"
 msgstr "所有用户"
 
-#: src/features/chat/thread/tool-approval.tsx:167
+#: src/features/chat/thread/tool-approval.tsx:243
 msgid "Allow \"{tool}\" from {server}?"
 msgstr "允许来自 {server} 的“{tool}”吗？"
 
-#: src/features/chat/thread/tool-approval.tsx:167
+#: src/features/chat/thread/tool-approval.tsx:243
 msgid "Allow \"{tool}\"?"
 msgstr "允许“{tool}”吗？"
 
@@ -3760,19 +3765,19 @@ msgstr "允许“{tool}”吗？"
 msgid "Allow \"delete_files\" from the drafts server?"
 msgstr "允许草稿服务器的“delete_files”吗？"
 
-#: src/features/chat/thread/tool-approval.tsx:138
+#: src/features/chat/thread/tool-approval.tsx:157
 #~ msgid "Allow {tool} for 1 hour"
 #~ msgstr "允许 {tool} 1 小时"
 
-#: src/features/chat/thread/tool-approval.tsx:142
+#: src/features/chat/thread/tool-approval.tsx:161
 #~ msgid "Allow {tool} for today"
 #~ msgstr "允许 {tool} 今天"
 
-#: src/features/chat/thread/tool-approval.tsx:134
+#: src/features/chat/thread/tool-approval.tsx:153
 msgid "Allow for 1 hour"
 msgstr "允许 1 小时"
 
-#: src/features/chat/thread/tool-approval.tsx:140
+#: src/features/chat/thread/tool-approval.tsx:159
 msgid "Allow for today"
 msgstr "允许今天"
 
@@ -3835,12 +3840,12 @@ msgstr "同时在看"
 msgid "Always"
 msgstr "始终"
 
-#: src/features/chat/thread/tool-approval.tsx:128
+#: src/features/chat/thread/tool-approval.tsx:146
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:35
 msgid "Always allow"
 msgstr "始终允许"
 
-#: src/features/chat/thread/tool-approval.tsx:126
+#: src/features/chat/thread/tool-approval.tsx:144
 msgid "Always allow {tool}"
 msgstr "始终允许 {tool}"
 
@@ -4331,14 +4336,14 @@ msgid "Approvals in Neore: a tool you set to Ask stops before it runs, and you d
 msgstr "Neore 中的批准：设为“询问”的工具会在运行前暂停，由你结合确切的输入决定。"
 
 #: src/features/auth/components/device-approval.tsx:242
-#: src/features/chat/thread/tool-approval.tsx:120
+#: src/features/chat/thread/tool-approval.tsx:137
 #: src/features/develop/components/review-panel.tsx:64
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:32
 #: src/features/tasks/components/task-detail-dialog.tsx:104
 msgid "Approve"
 msgstr "批准"
 
-#: src/features/chat/thread/tool-approval.tsx:118
+#: src/features/chat/thread/tool-approval.tsx:135
 msgid "Approve {tool} once"
 msgstr "批准一次 {tool}"
 
@@ -4366,7 +4371,7 @@ msgstr "请在 {name} 上的桌面应用中批准此请求。"
 msgid "Approved"
 msgstr "已批准"
 
-#: src/features/chat/thread/tool-approval.tsx:83
+#: src/features/chat/thread/tool-approval.tsx:98
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:23
 msgid "Approved — running tool"
 msgstr "已批准——正在运行工具"
@@ -8044,7 +8049,7 @@ msgstr "需要对视觉输入进行透明思考的复杂视觉推理"
 msgid "Composer"
 msgstr "输入框"
 
-#: src/features/chat/thread/composer-status-line.tsx:95
+#: src/features/chat/thread/composer-status-line.tsx:96
 msgid "Composer status"
 msgstr "输入框状态"
 
@@ -9544,7 +9549,7 @@ msgid "Could not send your answer."
 msgstr "无法发送你的回答。"
 
 #: src/features/chat/thread/ask-user-prompt.tsx:115
-#: src/features/chat/thread/tool-approval.tsx:72
+#: src/features/chat/thread/tool-approval.tsx:87
 msgid "Could not send your answer. Please try again."
 msgstr "无法发送你的答复，请重试。"
 
@@ -10916,7 +10921,7 @@ msgstr "删除预设"
 msgid "Delete preset?"
 msgstr "删除预设？"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1330
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1341
 msgid "Delete Project"
 msgstr "删除项目"
 
@@ -11106,7 +11111,7 @@ msgstr "最看重极致 AI 能力和精细推理的高要求任务"
 msgid "Denied"
 msgstr "已拒绝"
 
-#: src/features/chat/thread/tool-approval.tsx:81
+#: src/features/chat/thread/tool-approval.tsx:96
 msgid "Denied — continuing without it"
 msgstr "已拒绝——在不使用它的情况下继续"
 
@@ -11127,12 +11132,12 @@ msgid "Density updated"
 msgstr "密度已更新"
 
 #: src/features/auth/components/device-approval.tsx:233
-#: src/features/chat/thread/tool-approval.tsx:124
+#: src/features/chat/thread/tool-approval.tsx:141
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:34
 msgid "Deny"
 msgstr "拒绝"
 
-#: src/features/chat/thread/tool-approval.tsx:122
+#: src/features/chat/thread/tool-approval.tsx:139
 msgid "Deny {tool}"
 msgstr "拒绝 {tool}"
 
@@ -14212,7 +14217,7 @@ msgstr "删除通行密钥失败"
 msgid "Failed to delete preset"
 msgstr "删除预设失败"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:688
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:699
 msgid "Failed to delete project"
 msgstr "删除项目失败"
 
@@ -14418,7 +14423,7 @@ msgstr "将对话设为永久失败"
 msgid "Failed to move file"
 msgstr "移动文件失败"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:973
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:984
 #: src/features/projects/components/move-to-project-dialog.tsx:38
 msgid "Failed to move thread"
 msgstr "移动对话失败"
@@ -15813,6 +15818,10 @@ msgstr "森林"
 msgid "forget"
 msgstr "忘记"
 
+#: src/features/chat/thread/tool-approval.tsx:229
+msgid "Forget these memories?"
+msgstr "忘记这些记忆？"
+
 #: src/features/auth/components/auth/forms/two-factor-form.tsx:288
 msgid "Forgot authenticator"
 msgstr "忘记身份验证器"
@@ -16772,7 +16781,7 @@ msgid "Goal: {goalTitle}"
 msgstr "目标：{goalTitle}"
 
 #: src/features/chat/goal/composer-goal.tsx:66
-#: src/features/chat/thread/composer-status-line.tsx:111
+#: src/features/chat/thread/composer-status-line.tsx:112
 msgid "Goal: run until done"
 msgstr "目标：运行直至完成"
 
@@ -20478,7 +20487,7 @@ msgstr "正在加载此验证…"
 msgid "Loading threads"
 msgstr "正在加载对话"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1079
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1090
 msgid "Loading threads..."
 msgstr "正在加载对话..."
 
@@ -21425,6 +21434,10 @@ msgstr "记忆"
 #: src/features/settings/components/personalization/memory-settings.tsx:253
 msgid "Memories"
 msgstr "记忆"
+
+#: src/features/chat/thread/tool-approval.tsx:214
+msgid "Memories to forget"
+msgstr "要忘记的记忆"
 
 #: src/features/chat/thread/memory-usage-action.tsx:42
 msgid "Memories used"
@@ -23136,8 +23149,8 @@ msgid "New thread"
 msgstr "新建对话"
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:150
-#: src/features/chat/thread-list/thread-list-dock.tsx:136
-#: src/features/chat/thread-list/thread-list-dock.tsx:146
+#: src/features/chat/thread-list/thread-list-dock.tsx:139
+#: src/features/chat/thread-list/thread-list-dock.tsx:149
 msgid "New Thread"
 msgstr "新建对话"
 
@@ -23633,7 +23646,7 @@ msgstr "还没有记忆。AI 会自动从你的对话中开始学习。"
 msgid "No message of yours is loaded in this conversation"
 msgstr "此对话中未加载你的任何消息"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1127
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1138
 msgid "No messages found for"
 msgstr "未找到消息："
 
@@ -23943,7 +23956,7 @@ msgstr "无可显示的文本。"
 msgid "No thread has worked on this {requestNoun} yet."
 msgstr "还没有对话处理过此{requestNoun}。"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1127
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1138
 msgid "No threads found for"
 msgstr "未找到对话："
 
@@ -23951,16 +23964,16 @@ msgstr "未找到对话："
 msgid "No threads in this group"
 msgstr "此分组中没有对话"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1093
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1104
 msgid "No threads in this section"
 msgstr "此分区中没有对话"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:742
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:753
 msgid "No threads were active in that date range."
 msgstr "该日期范围内没有活跃的对话。"
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:263
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1104
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1115
 msgid "No threads yet"
 msgstr "还没有对话"
 
@@ -27073,9 +27086,9 @@ msgstr "预设已更新"
 msgid "Presets"
 msgstr "预设"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1106
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1119
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1145
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1117
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1130
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1156
 msgid "Press ? for keyboard shortcuts"
 msgstr "按 ? 查看键盘快捷键"
 
@@ -29354,7 +29367,7 @@ msgstr "回复已就绪"
 msgid "Reply tools are off by default. You switch them on per connection and choose which groups they may use."
 msgstr "回复工具默认关闭。你可以按连接开启，并选择允许使用的工具组。"
 
-#: src/features/chat/thread/composer-status-line.tsx:99
+#: src/features/chat/thread/composer-status-line.tsx:100
 msgid "Replying"
 msgstr "正在回复"
 
@@ -30697,7 +30710,7 @@ msgstr "搜索"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:241
 #: src/features/chat/signed-out/signed-out-chat.tsx:141
-#: src/features/chat/thread-list/thread-list-dock.tsx:95
+#: src/features/chat/thread-list/thread-list-dock.tsx:98
 #: src/features/chat/thread/thread-welcome-suggestions.tsx:93
 msgid "Search"
 msgstr "搜索"
@@ -30745,7 +30758,7 @@ msgstr "搜索数据..."
 msgid "Search depth: {0}"
 msgstr "搜索深度：{0}"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1118
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1129
 msgid "Search failed for \"{searchQuery}\". Try again."
 msgstr "搜索“{searchQuery}”失败。请重试。"
 
@@ -30795,11 +30808,11 @@ msgstr "搜索消息内容"
 msgid "Search message content..."
 msgstr "搜索消息内容..."
 
-#: src/features/chat/thread-list/thread-list-dock.tsx:53
+#: src/features/chat/thread-list/thread-list-dock.tsx:54
 msgid "Search messages"
 msgstr "搜索消息"
 
-#: src/features/chat/thread-list/thread-list-dock.tsx:57
+#: src/features/chat/thread-list/thread-list-dock.tsx:58
 msgid "Search messages ({focusSearchShortcut})"
 msgstr "搜索消息（{focusSearchShortcut}）"
 
@@ -30936,12 +30949,12 @@ msgid "Search thread titles..."
 msgstr "搜索对话标题..."
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:134
-#: src/features/chat/thread-list/thread-list-dock.tsx:53
+#: src/features/chat/thread-list/thread-list-dock.tsx:54
 #: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:82
 msgid "Search threads"
 msgstr "搜索对话"
 
-#: src/features/chat/thread-list/thread-list-dock.tsx:57
+#: src/features/chat/thread-list/thread-list-dock.tsx:58
 msgid "Search threads ({focusSearchShortcut})"
 msgstr "搜索对话（{focusSearchShortcut}）"
 
@@ -30990,7 +31003,7 @@ msgstr "仅搜索了最新消息"
 msgid "Searching"
 msgstr "正在搜索"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1135
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1146
 msgid "Searching..."
 msgstr "正在搜索..."
 
@@ -32025,7 +32038,7 @@ msgstr "显示时间戳"
 msgid "Show up to {rowLimit} rows ({byteCount} bytes)"
 msgstr "最多显示 {rowLimit} 行（{byteCount} 字节）"
 
-#: src/features/chat/thread/tool-approval.tsx:111
+#: src/features/chat/thread/tool-approval.tsx:128
 msgid "Show what it will send"
 msgstr "显示将要发送的内容"
 
@@ -33205,7 +33218,7 @@ msgstr "新建聊天即可开始"
 msgid "Start a new context: earlier messages are no longer sent to the model"
 msgstr "开始新的上下文：之前的消息不再发送给模型"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1105
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1116
 msgid "Start a new conversation to create your first thread"
 msgstr "开始聊天，创建你的第一个对话"
 
@@ -35326,7 +35339,7 @@ msgstr "机器人及其电脑将被移除。它的聊天会保留，成为普通
 msgid "The bot gets only the tools you allow. With none allowed, it gets no tools."
 msgstr "机器人只获得你允许的工具。未允许任何工具时，它不会获得任何工具。"
 
-#: src/features/chat/thread/composer-status-line.tsx:123
+#: src/features/chat/thread/composer-status-line.tsx:124
 msgid "The bot sets the model for this chat."
 msgstr "机器人为此聊天设置模型。"
 
@@ -37055,7 +37068,7 @@ msgstr "这将永久删除 {0} 个匿名用户账号及其所有数据。此操�
 msgid "This will permanently delete all {0} memories and their daily digests. The AI will start learning fresh from your next conversation."
 msgstr "这将永久删除全部 {0} 条记忆及其每日摘要。AI 将从你的下一次对话开始重新学习。"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1320
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1331
 msgid "This will permanently delete the project and all associated threads. This action cannot be undone."
 msgstr "这将永久删除该项目及所有相关对话。此操作无法撤销。"
 
@@ -37584,7 +37597,7 @@ msgstr "{0} 的工具"
 msgid "Tools run on their own settings; a quick check can clear low-risk calls"
 msgstr "工具按各自的设置运行；快速检查可放行低风险调用"
 
-#: src/features/chat/thread/composer-status-line.tsx:117
+#: src/features/chat/thread/composer-status-line.tsx:118
 msgid "Tools run without asking"
 msgstr "工具无需询问即可运行"
 
@@ -37975,11 +37988,11 @@ msgstr "试用 Neore"
 msgid "Try searching for a different term."
 msgstr "尝试搜索其他词。"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1141
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1152
 msgid "Try searching in message content"
 msgstr "尝试搜索消息内容"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1141
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1152
 msgid "Try searching in thread titles or summaries"
 msgstr "尝试搜索对话标题或摘要"
 
@@ -39995,7 +40008,7 @@ msgstr "正在等待所有者"
 msgid "Waiting for the owner to answer"
 msgstr "正在等待所有者回答"
 
-#: src/features/chat/thread/tool-approval.tsx:78
+#: src/features/chat/thread/tool-approval.tsx:93
 msgid "Waiting for the owner to approve"
 msgstr "正在等待所有者批准"
 
@@ -40021,7 +40034,7 @@ msgstr "正在“{0}”中等待你的回答"
 
 #: src/features/chat/thread-list/thread-node.tsx:935
 #: src/features/chat/thread-list/thread-node.tsx:942
-#: src/features/chat/thread/tool-approval.tsx:78
+#: src/features/chat/thread/tool-approval.tsx:93
 #: src/features/home/components/home-page.tsx:119
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:20
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:60

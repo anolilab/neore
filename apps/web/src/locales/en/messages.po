@@ -337,6 +337,11 @@ msgstr "{0, plural, one {# match} other {# matches}}"
 msgid "{0, plural, one {# member} other {# members}}"
 msgstr "{0, plural, one {# member} other {# members}}"
 
+#. placeholder {0}: forgotten.length
+#: src/features/chat/thread/tool-approval.tsx:221
+msgid "{0, plural, one {# memory is waiting for the chat owner to confirm.} other {# memories are waiting for the chat owner to confirm.}}"
+msgstr "{0, plural, one {# memory is waiting for the chat owner to confirm.} other {# memories are waiting for the chat owner to confirm.}}"
+
 #. placeholder {0}: c.messages.length
 #: src/features/settings/components/privacy/chat-import/data-import.tsx:369
 msgid "{0, plural, one {# message} other {# messages}}"
@@ -2694,7 +2699,7 @@ msgstr "Add attachment"
 msgid "Add background"
 msgstr "Add background"
 
-#: src/features/settings/components/chat/usage-settings.tsx:417
+#: src/features/settings/components/chat/usage-settings.tsx:421
 #~ msgid "Add budget alert"
 #~ msgstr "Add budget alert"
 
@@ -2806,8 +2811,8 @@ msgid "Add picked frame as image node"
 msgstr "Add picked frame as image node"
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:147
-#: src/features/chat/thread-list/thread-list-dock.tsx:120
-#: src/features/chat/thread-list/thread-list-dock.tsx:130
+#: src/features/chat/thread-list/thread-list-dock.tsx:123
+#: src/features/chat/thread-list/thread-list-dock.tsx:133
 #: src/features/projects/components/add-project-dialog.tsx:695
 msgid "Add project"
 msgstr "Add project"
@@ -3747,11 +3752,11 @@ msgstr "All use cases"
 msgid "All Users"
 msgstr "All Users"
 
-#: src/features/chat/thread/tool-approval.tsx:167
+#: src/features/chat/thread/tool-approval.tsx:243
 msgid "Allow \"{tool}\" from {server}?"
 msgstr "Allow \"{tool}\" from {server}?"
 
-#: src/features/chat/thread/tool-approval.tsx:167
+#: src/features/chat/thread/tool-approval.tsx:243
 msgid "Allow \"{tool}\"?"
 msgstr "Allow \"{tool}\"?"
 
@@ -3759,19 +3764,19 @@ msgstr "Allow \"{tool}\"?"
 msgid "Allow \"delete_files\" from the drafts server?"
 msgstr "Allow \"delete_files\" from the drafts server?"
 
-#: src/features/chat/thread/tool-approval.tsx:138
+#: src/features/chat/thread/tool-approval.tsx:157
 #~ msgid "Allow {tool} for 1 hour"
 #~ msgstr "Allow {tool} for 1 hour"
 
-#: src/features/chat/thread/tool-approval.tsx:142
+#: src/features/chat/thread/tool-approval.tsx:161
 #~ msgid "Allow {tool} for today"
 #~ msgstr "Allow {tool} for today"
 
-#: src/features/chat/thread/tool-approval.tsx:134
+#: src/features/chat/thread/tool-approval.tsx:153
 msgid "Allow for 1 hour"
 msgstr "Allow for 1 hour"
 
-#: src/features/chat/thread/tool-approval.tsx:140
+#: src/features/chat/thread/tool-approval.tsx:159
 msgid "Allow for today"
 msgstr "Allow for today"
 
@@ -3834,12 +3839,12 @@ msgstr "Also viewing"
 msgid "Always"
 msgstr "Always"
 
-#: src/features/chat/thread/tool-approval.tsx:128
+#: src/features/chat/thread/tool-approval.tsx:146
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:35
 msgid "Always allow"
 msgstr "Always allow"
 
-#: src/features/chat/thread/tool-approval.tsx:126
+#: src/features/chat/thread/tool-approval.tsx:144
 msgid "Always allow {tool}"
 msgstr "Always allow {tool}"
 
@@ -4330,14 +4335,14 @@ msgid "Approvals in Neore: a tool you set to Ask stops before it runs, and you d
 msgstr "Approvals in Neore: a tool you set to Ask stops before it runs, and you decide with the exact input in front of you."
 
 #: src/features/auth/components/device-approval.tsx:242
-#: src/features/chat/thread/tool-approval.tsx:120
+#: src/features/chat/thread/tool-approval.tsx:137
 #: src/features/develop/components/review-panel.tsx:64
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:32
 #: src/features/tasks/components/task-detail-dialog.tsx:104
 msgid "Approve"
 msgstr "Approve"
 
-#: src/features/chat/thread/tool-approval.tsx:118
+#: src/features/chat/thread/tool-approval.tsx:135
 msgid "Approve {tool} once"
 msgstr "Approve {tool} once"
 
@@ -4365,7 +4370,7 @@ msgstr "Approve the request in the desktop app on {name}."
 msgid "Approved"
 msgstr "Approved"
 
-#: src/features/chat/thread/tool-approval.tsx:83
+#: src/features/chat/thread/tool-approval.tsx:98
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:23
 msgid "Approved — running tool"
 msgstr "Approved — running tool"
@@ -8043,7 +8048,7 @@ msgstr "Complex visual reasoning requiring transparent thinking over visual inpu
 msgid "Composer"
 msgstr "Composer"
 
-#: src/features/chat/thread/composer-status-line.tsx:95
+#: src/features/chat/thread/composer-status-line.tsx:96
 msgid "Composer status"
 msgstr "Composer status"
 
@@ -9543,7 +9548,7 @@ msgid "Could not send your answer."
 msgstr "Could not send your answer."
 
 #: src/features/chat/thread/ask-user-prompt.tsx:115
-#: src/features/chat/thread/tool-approval.tsx:72
+#: src/features/chat/thread/tool-approval.tsx:87
 msgid "Could not send your answer. Please try again."
 msgstr "Could not send your answer. Please try again."
 
@@ -10915,7 +10920,7 @@ msgstr "Delete preset"
 msgid "Delete preset?"
 msgstr "Delete preset?"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1330
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1341
 msgid "Delete Project"
 msgstr "Delete Project"
 
@@ -11105,7 +11110,7 @@ msgstr "Demanding tasks where maximum AI capability and refined reasoning matter
 msgid "Denied"
 msgstr "Denied"
 
-#: src/features/chat/thread/tool-approval.tsx:81
+#: src/features/chat/thread/tool-approval.tsx:96
 msgid "Denied — continuing without it"
 msgstr "Denied — continuing without it"
 
@@ -11126,12 +11131,12 @@ msgid "Density updated"
 msgstr "Density updated"
 
 #: src/features/auth/components/device-approval.tsx:233
-#: src/features/chat/thread/tool-approval.tsx:124
+#: src/features/chat/thread/tool-approval.tsx:141
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:34
 msgid "Deny"
 msgstr "Deny"
 
-#: src/features/chat/thread/tool-approval.tsx:122
+#: src/features/chat/thread/tool-approval.tsx:139
 msgid "Deny {tool}"
 msgstr "Deny {tool}"
 
@@ -14211,7 +14216,7 @@ msgstr "Failed to delete passkey"
 msgid "Failed to delete preset"
 msgstr "Failed to delete preset"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:688
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:699
 msgid "Failed to delete project"
 msgstr "Failed to delete project"
 
@@ -14417,7 +14422,7 @@ msgstr "Failed to make thread permanent"
 msgid "Failed to move file"
 msgstr "Failed to move file"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:973
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:984
 #: src/features/projects/components/move-to-project-dialog.tsx:38
 msgid "Failed to move thread"
 msgstr "Failed to move thread"
@@ -15812,6 +15817,10 @@ msgstr "Forest"
 msgid "forget"
 msgstr "forget"
 
+#: src/features/chat/thread/tool-approval.tsx:229
+msgid "Forget these memories?"
+msgstr "Forget these memories?"
+
 #: src/features/auth/components/auth/forms/two-factor-form.tsx:288
 msgid "Forgot authenticator"
 msgstr "Forgot authenticator"
@@ -16771,7 +16780,7 @@ msgid "Goal: {goalTitle}"
 msgstr "Goal: {goalTitle}"
 
 #: src/features/chat/goal/composer-goal.tsx:66
-#: src/features/chat/thread/composer-status-line.tsx:111
+#: src/features/chat/thread/composer-status-line.tsx:112
 msgid "Goal: run until done"
 msgstr "Goal: run until done"
 
@@ -20477,7 +20486,7 @@ msgstr "Loading this check…"
 msgid "Loading threads"
 msgstr "Loading threads"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1079
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1090
 msgid "Loading threads..."
 msgstr "Loading threads..."
 
@@ -21424,6 +21433,10 @@ msgstr "memories"
 #: src/features/settings/components/personalization/memory-settings.tsx:253
 msgid "Memories"
 msgstr "Memories"
+
+#: src/features/chat/thread/tool-approval.tsx:214
+msgid "Memories to forget"
+msgstr "Memories to forget"
 
 #: src/features/chat/thread/memory-usage-action.tsx:42
 msgid "Memories used"
@@ -23135,8 +23148,8 @@ msgid "New thread"
 msgstr "New thread"
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:150
-#: src/features/chat/thread-list/thread-list-dock.tsx:136
-#: src/features/chat/thread-list/thread-list-dock.tsx:146
+#: src/features/chat/thread-list/thread-list-dock.tsx:139
+#: src/features/chat/thread-list/thread-list-dock.tsx:149
 msgid "New Thread"
 msgstr "New Thread"
 
@@ -23632,7 +23645,7 @@ msgstr "No memories yet. The AI will start learning from your conversations auto
 msgid "No message of yours is loaded in this conversation"
 msgstr "No message of yours is loaded in this conversation"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1127
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1138
 msgid "No messages found for"
 msgstr "No messages found for"
 
@@ -23942,7 +23955,7 @@ msgstr "No text to show."
 msgid "No thread has worked on this {requestNoun} yet."
 msgstr "No thread has worked on this {requestNoun} yet."
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1127
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1138
 msgid "No threads found for"
 msgstr "No threads found for"
 
@@ -23950,16 +23963,16 @@ msgstr "No threads found for"
 msgid "No threads in this group"
 msgstr "No threads in this group"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1093
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1104
 msgid "No threads in this section"
 msgstr "No threads in this section"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:742
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:753
 msgid "No threads were active in that date range."
 msgstr "No threads were active in that date range."
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:263
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1104
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1115
 msgid "No threads yet"
 msgstr "No threads yet"
 
@@ -27072,9 +27085,9 @@ msgstr "Preset updated"
 msgid "Presets"
 msgstr "Presets"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1106
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1119
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1145
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1117
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1130
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1156
 msgid "Press ? for keyboard shortcuts"
 msgstr "Press ? for keyboard shortcuts"
 
@@ -29353,7 +29366,7 @@ msgstr "Reply ready"
 msgid "Reply tools are off by default. You switch them on per connection and choose which groups they may use."
 msgstr "Reply tools are off by default. You switch them on per connection and choose which groups they may use."
 
-#: src/features/chat/thread/composer-status-line.tsx:99
+#: src/features/chat/thread/composer-status-line.tsx:100
 msgid "Replying"
 msgstr "Replying"
 
@@ -30696,7 +30709,7 @@ msgstr "search"
 
 #: ../../packages/ui/src/components/data-grid/data-grid-keyboard-shortcuts.tsx:241
 #: src/features/chat/signed-out/signed-out-chat.tsx:141
-#: src/features/chat/thread-list/thread-list-dock.tsx:95
+#: src/features/chat/thread-list/thread-list-dock.tsx:98
 #: src/features/chat/thread/thread-welcome-suggestions.tsx:93
 msgid "Search"
 msgstr "Search"
@@ -30744,7 +30757,7 @@ msgstr "Search data..."
 msgid "Search depth: {0}"
 msgstr "Search depth: {0}"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1118
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1129
 msgid "Search failed for \"{searchQuery}\". Try again."
 msgstr "Search failed for \"{searchQuery}\". Try again."
 
@@ -30794,11 +30807,11 @@ msgstr "Search message content"
 msgid "Search message content..."
 msgstr "Search message content..."
 
-#: src/features/chat/thread-list/thread-list-dock.tsx:53
+#: src/features/chat/thread-list/thread-list-dock.tsx:54
 msgid "Search messages"
 msgstr "Search messages"
 
-#: src/features/chat/thread-list/thread-list-dock.tsx:57
+#: src/features/chat/thread-list/thread-list-dock.tsx:58
 msgid "Search messages ({focusSearchShortcut})"
 msgstr "Search messages ({focusSearchShortcut})"
 
@@ -30935,12 +30948,12 @@ msgid "Search thread titles..."
 msgstr "Search thread titles..."
 
 #: src/features/chat/signed-out/signed-out-chat.tsx:134
-#: src/features/chat/thread-list/thread-list-dock.tsx:53
+#: src/features/chat/thread-list/thread-list-dock.tsx:54
 #: src/features/keyboard/components/keyboard-shortcuts-sheet.tsx:82
 msgid "Search threads"
 msgstr "Search threads"
 
-#: src/features/chat/thread-list/thread-list-dock.tsx:57
+#: src/features/chat/thread-list/thread-list-dock.tsx:58
 msgid "Search threads ({focusSearchShortcut})"
 msgstr "Search threads ({focusSearchShortcut})"
 
@@ -30989,7 +31002,7 @@ msgstr "Searched the latest messages only"
 msgid "Searching"
 msgstr "Searching"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1135
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1146
 msgid "Searching..."
 msgstr "Searching..."
 
@@ -32024,7 +32037,7 @@ msgstr "Show Timestamps"
 msgid "Show up to {rowLimit} rows ({byteCount} bytes)"
 msgstr "Show up to {rowLimit} rows ({byteCount} bytes)"
 
-#: src/features/chat/thread/tool-approval.tsx:111
+#: src/features/chat/thread/tool-approval.tsx:128
 msgid "Show what it will send"
 msgstr "Show what it will send"
 
@@ -33204,7 +33217,7 @@ msgstr "Start a new chat to get started"
 msgid "Start a new context: earlier messages are no longer sent to the model"
 msgstr "Start a new context: earlier messages are no longer sent to the model"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1105
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1116
 msgid "Start a new conversation to create your first thread"
 msgstr "Start a new conversation to create your first thread"
 
@@ -35325,7 +35338,7 @@ msgstr "The bot and its computer are removed. Its chats stay, as plain chats."
 msgid "The bot gets only the tools you allow. With none allowed, it gets no tools."
 msgstr "The bot gets only the tools you allow. With none allowed, it gets no tools."
 
-#: src/features/chat/thread/composer-status-line.tsx:123
+#: src/features/chat/thread/composer-status-line.tsx:124
 msgid "The bot sets the model for this chat."
 msgstr "The bot sets the model for this chat."
 
@@ -37054,7 +37067,7 @@ msgstr "This will permanently delete {0} anonymous user accounts and all their d
 msgid "This will permanently delete all {0} memories and their daily digests. The AI will start learning fresh from your next conversation."
 msgstr "This will permanently delete all {0} memories and their daily digests. The AI will start learning fresh from your next conversation."
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1320
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1331
 msgid "This will permanently delete the project and all associated threads. This action cannot be undone."
 msgstr "This will permanently delete the project and all associated threads. This action cannot be undone."
 
@@ -37583,7 +37596,7 @@ msgstr "Tools for {0}"
 msgid "Tools run on their own settings; a quick check can clear low-risk calls"
 msgstr "Tools run on their own settings; a quick check can clear low-risk calls"
 
-#: src/features/chat/thread/composer-status-line.tsx:117
+#: src/features/chat/thread/composer-status-line.tsx:118
 msgid "Tools run without asking"
 msgstr "Tools run without asking"
 
@@ -37974,11 +37987,11 @@ msgstr "Try Neore"
 msgid "Try searching for a different term."
 msgstr "Try searching for a different term."
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1141
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1152
 msgid "Try searching in message content"
 msgstr "Try searching in message content"
 
-#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1141
+#: src/features/chat/thread-list/hierarchical-thread-list.tsx:1152
 msgid "Try searching in thread titles or summaries"
 msgstr "Try searching in thread titles or summaries"
 
@@ -39994,7 +40007,7 @@ msgstr "Waiting for the owner"
 msgid "Waiting for the owner to answer"
 msgstr "Waiting for the owner to answer"
 
-#: src/features/chat/thread/tool-approval.tsx:78
+#: src/features/chat/thread/tool-approval.tsx:93
 msgid "Waiting for the owner to approve"
 msgstr "Waiting for the owner to approve"
 
@@ -40020,7 +40033,7 @@ msgstr "Waiting for your answer in {0}"
 
 #: src/features/chat/thread-list/thread-node.tsx:935
 #: src/features/chat/thread-list/thread-node.tsx:942
-#: src/features/chat/thread/tool-approval.tsx:78
+#: src/features/chat/thread/tool-approval.tsx:93
 #: src/features/home/components/home-page.tsx:119
 #: src/features/marketing/use-cases/visuals/approvals-visual.tsx:20
 #: src/features/sub-agents/components/sub-agent-tool-view.tsx:60

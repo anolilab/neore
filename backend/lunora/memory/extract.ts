@@ -1036,6 +1036,7 @@ ${args.requested ? REQUESTED_RULE : "Extract NEW facts about the user not alread
 
             try {
                 applied = await ctx.runMutation(internal.memory.functions.reviseExtractedMemory, {
+                    asked: requested !== undefined && update.fact.asked === true,
                     base: update.base,
                     botId: update.botId,
                     confidence: update.confidence,
@@ -1068,8 +1069,8 @@ ${args.requested ? REQUESTED_RULE : "Extract NEW facts about the user not alread
         const unconfirmed =
             blocked === undefined && memoriesToConfirm.length > 0
                 ? await ctx.runMutation(internal.memory.functions.confirmMemories, {
-                      confirms: memoriesToConfirm.map(({ base, evidence, memoryId }) => {
-                          return { base, evidence, memoryId };
+                      confirms: memoriesToConfirm.map(({ base, evidence, fact, memoryId }) => {
+                          return { asked: requested !== undefined && fact.asked === true, base, evidence, memoryId };
                       }),
                       requested,
                       userId: args.userId,

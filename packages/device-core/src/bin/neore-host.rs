@@ -20,6 +20,19 @@ fn main() -> ExitCode {
         ExitCode::from(2)
     };
 
+    // A local MCP server that relays to one MCP server over HTTP (`device_core::mcp_bridge`): its address and headers
+    // come from the environment, never from here, and nothing else may follow the subcommand.
+    if std::env::args().nth(1).as_deref() == Some("mcp-bridge") {
+        #[cfg(feature = "mcp-bridge")]
+        if std::env::args().len() == 2 {
+            return device_core::mcp_bridge::main();
+        }
+
+        eprintln!("usage: neore-host mcp-bridge (address in NEORE_MCP_BRIDGE_URL, headers in NEORE_MCP_BRIDGE_HEADERS)");
+
+        return ExitCode::from(2);
+    }
+
     // A machine that pairs itself by code (`pair`, `run`, `unpair`): a build with the `headless` feature only.
     #[cfg(feature = "headless")]
     {
