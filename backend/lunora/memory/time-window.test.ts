@@ -368,6 +368,17 @@ describe("timeWindowOf", () => {
         ["what did I do until May 2023", [OPEN_START, "2023-05-31"]],
         ["wo habe ich bis 2023 gewohnt", [OPEN_START, "2023-12-31"]],
         ["since 2027", ["2027-01-01", OPEN_END]],
+        // A bare year after `before` and `after`, which lead no year of their own.
+        ["what did I do before 2023", [OPEN_START, "2022-12-31"]],
+        ["anything after 2023", ["2024-01-01", OPEN_END]],
+        ["was war vor 2023", [OPEN_START, "2022-12-31"]],
+        ["was ist nach 2023", ["2024-01-01", OPEN_END]],
+        // An ISO date after a range word: the range, never the named day alone.
+        ["what is on before 2026-12-03", [OPEN_START, "2026-12-02"]],
+        ["anything since 2026-12", ["2026-12-01", OPEN_END]],
+        ["anything since 2026-11", ["2026-11-01", TODAY]],
+        ["was ist nach 2026-12-03", ["2026-12-04", OPEN_END]],
+        ["was steht bis zum 2026-12-03 an", [TODAY, "2026-12-03"]],
     ])("reads %j as a range", (text, expected) => {
         expect(windowOf(text)).toEqual(expected);
     });

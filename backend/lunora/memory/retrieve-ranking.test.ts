@@ -561,6 +561,25 @@ describe("rankMemories", () => {
             expect(ranked[0]!.score).toBeCloseTo(ranked[1]!.score + TIME_WEIGHTS.event, 10);
         });
 
+        it("boosts the days a range word names of an ISO date, never the named day itself", () => {
+            const rows = ["2026-12-02", "2026-12-03", "2026-12-04"].map((day) => candidate(day, { ...plain, eventStart: day }));
+            const scores = at({ "2026-12-02": 0.6, "2026-12-03": 0.6, "2026-12-04": 0.6 });
+            const base = rank([rows[1]!], at({ "2026-12-03": 0.6 }))[0]!.score;
+
+            for (const [question, boosted] of [
+                ["what is on before 2026-12-03", "2026-12-02"],
+                ["was ist nach 2026-12-03", "2026-12-04"],
+            ] as const) {
+                const window = timeWindowOf(question, "2026-11-27")!;
+                const ranked = timed(rows, scores, window);
+
+                // Open at one side: nothing by its date alone.
+                expect(timed(rows, [], window), question).toEqual([]);
+                expect(ranked[0]!.memoryId, question).toBe(boosted);
+                expect(ranked.find((m) => m.memoryId === "2026-12-03")!.score, question).toBeCloseTo(base, 10);
+            }
+        });
+
         it("finds the appointments of part of a month, or between two ISO dates, by their date alone", () => {
             const rows = ["2026-12-03", "2026-12-12"].map((day) => candidate(day, { ...plain, eventStart: day }));
 

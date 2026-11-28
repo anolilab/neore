@@ -636,15 +636,22 @@ export const readTimePhrase = (text: string): TimePhrase | undefined => {
     // A phrase at a token: a range word before a month, a day or a year (`since May`, `bis 2023`), the part of a month
     // asked (`Ende Mai`), else the time itself with its group and year. A range word before any other time (`vor drei
     // Tagen`, `bis morgen`) reads as before.
+    const boundAt = (index: number): Bound | undefined => ranked.map(({ lexicon }) => entryOf(lexicon.bounds, words[index])).find(Boolean);
+    // A bare year after a range word that is no year lead: `before 2023`, `nach 2023`.
+    const yearAt = (index: number): Read | undefined => {
+        const year = yearOf(words[index]);
+
+        return year === undefined ? undefined : { phrase: { kind: "year", year }, size: 1 };
+    };
     const readAt = (index: number): Read | undefined => {
-        const bound = ranked.map(({ lexicon }) => entryOf(lexicon.bounds, words[index])).find(Boolean);
+        const bound = boundAt(index);
 
         if (bound !== undefined) {
-            // A year is read at its lead (`since 2023`); a month or a day after the range word, past an article (`before
-            // the 3rd of June`).
+            // A year is read at its lead (`since 2023`) or bare after the range word (`before 2023`); a month or a day after
+            // it, past an article (`before the 3rd of June`).
             const own = phraseFrom(index);
             const at = index + (BOUND_ARTICLES.has(words[index + 1] ?? "") ? 2 : 1);
-            const bounded = own?.phrase.kind === "year" ? own : readAt(at);
+            const bounded = own?.phrase.kind === "year" ? own : (readAt(at) ?? yearAt(at));
 
             if (bounded !== undefined && bounded.more === undefined && (bounded.phrase.kind === "date" || bounded.phrase.kind === "year")) {
                 return { phrase: { bound, kind: "bound", of: bounded.phrase }, size: (bounded === own ? 0 : at - index) + bounded.size };
@@ -688,6 +695,17 @@ export const readTimePhrase = (text: string): TimePhrase | undefined => {
         return found;
     };
     const isBetween = (word: string | undefined): boolean => word !== undefined && ranked.some(({ lexicon }) => lexicon.between.includes(word));
+    // An ISO date after a range word is the range (`before 2026-12-03`, `seit 2026-11`), as a date in words is.
+    const withBound = ({ read, start }: Found): Found => {
+        const lead = start - (BOUND_ARTICLES.has(words[start - 1] ?? "") ? 2 : 1);
+        const bound = boundAt(lead);
+
+        if (bound === undefined || read.phrase.kind !== "date") {
+            return { read, start };
+        }
+
+        return { read: { phrase: { bound, kind: "bound", of: read.phrase }, size: start - lead + read.size }, start: lead };
+    };
     // Every ISO date, each a span of its own; `between X and Y` is one span from the first to the second.
     const isoDates = (): Found[] => {
         const dates = readAll((index) => isoAt(lowered, tokens, index));
@@ -705,7 +723,7 @@ export const readTimePhrase = (text: string): TimePhrase | undefined => {
                 });
                 index += 1;
             } else {
-                found.push(from);
+                found.push(withBound(from));
             }
         }
 
