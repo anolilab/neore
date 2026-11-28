@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { adminPathFor, anchorFromHash, settingsLinkSearch, settingsLocation, settingsTabForPath } from "./settings-link";
+import { adminPathFor, anchorFromHash, settingsAnchorForPath, settingsLinkSearch, settingsLocation, settingsTabForPath } from "./settings-link";
 
 describe("settingsTabForPath", () => {
     it.each([
@@ -31,6 +31,8 @@ describe("settingsTabForPath", () => {
         ["/dashboard/settings/billing/limits", "auth-billing"],
         ["/dashboard/settings/chat/model", "chat-models"],
         ["/dashboard/settings/compliance/model-filters", "chat-model-filters"],
+        ["/dashboard/settings/chat/compression", "app-customization"],
+        ["/dashboard/settings/compliance/pii", "privacy"],
     ])("maps %s to the %s tab", (path, tab) => {
         expect(settingsTabForPath(path)).toBe(tab);
     });
@@ -54,6 +56,14 @@ describe("settingsTabForPath", () => {
         expect(settingsTabForPath("/dashboard/settingsx")).toBeUndefined();
         expect(settingsTabForPath("/dashboard")).toBeUndefined();
         expect(settingsTabForPath("/chat/abc")).toBeUndefined();
+    });
+});
+
+describe("settingsAnchorForPath", () => {
+    it("points the gateway's compression action at the row that summarises long chats, and other paths at nothing", () => {
+        expect(settingsAnchorForPath("/dashboard/settings/chat/compression")).toBe("thread-summaries");
+        expect(settingsAnchorForPath("/dashboard/settings/chat/models")).toBeUndefined();
+        expect(settingsAnchorForPath("/chat/compression")).toBeUndefined();
     });
 });
 

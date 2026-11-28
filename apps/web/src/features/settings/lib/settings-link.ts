@@ -29,6 +29,9 @@ const TAB_BY_SETTINGS_PATH: Readonly<Record<string, SettingsTab>> = {
     "billing/limits": "auth-billing",
     "chat/model": "chat-models",
     "compliance/model-filters": "chat-model-filters",
+    // The gateway's error actions. There is no page of PII rules: Privacy & Data is the nearest.
+    "chat/compression": "app-customization",
+    "compliance/pii": "privacy",
     connectors: "connectors",
     "connectors/messenger": "connectors-messenger",
     privacy: "privacy",
@@ -53,6 +56,22 @@ export const adminPathFor = (pathname: string): string | undefined => {
     const rest = pathname.slice(prefix.length);
 
     return rest === "" || rest === "/" ? "/admin" : `/admin${rest}`;
+};
+
+/** The row an old settings path points at inside its tab, for a path that names one setting rather than a page. */
+const ANCHOR_BY_SETTINGS_PATH: Record<string, string> = {
+    "chat/compression": "thread-summaries",
+};
+
+/** The element id an old settings path points at in its tab, or `undefined`. */
+export const settingsAnchorForPath = (pathname: string): string | undefined => {
+    let path = pathname;
+
+    while (path.endsWith("/")) {
+        path = path.slice(0, -1);
+    }
+
+    return path.startsWith(`${SETTINGS_PATH_PREFIX}/`) ? ANCHOR_BY_SETTINGS_PATH[path.slice(SETTINGS_PATH_PREFIX.length + 1)] : undefined;
 };
 
 /**
