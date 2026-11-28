@@ -146,14 +146,7 @@ describe("repair of a plugin group chat whose skill was deleted", () => {
             await run(async (context) => await context.db.delete("skills", row._id));
         }
 
-        const { page } = await run(async (context) => await context.db.pluginItems.findMany({ where: { installId: install._id } }));
-
-        for (const link of page) {
-            if (slugs.includes((link as { entryKey: string }).entryKey.replace("skill:", ""))) {
-                await run(async (context) => await context.db.patch("pluginItems", link._id, { state: "intent" }));
-            }
-        }
-
+        // The links stay `created`: repair finds the child gone and records the id it held.
         await run(async (context) => await context.db.patch("pluginInstalls", install._id, { status: "needs-repair" }));
 
         return file;
@@ -181,21 +174,92 @@ describe("repair of a plugin group chat whose skill was deleted", () => {
         expect(await installRow()).toMatchObject({ partial: false, status: "installed" });
     });
 
-    it("finishes partial and names the group when the remap cannot match one to one", async () => {
-        const file = await breakSkills(["a"]);
-        const group = await groupRow();
-        const live = await skillBySlug("b");
+    const participantIds = (group: { groupChat: { participants: { skillId: string }[] } }) =>
+        group.groupChat.participants.map((participant) => participant.skillId);
 
-        // The owner removed the live participant, so the group names no skill the file's key maps to once: two fresh ids for one gone.
+    it("gives each of two deleted skills its own replacement after the owner reordered the group", async () => {
+        const file = await breakSkills(["a", "b"]);
+        const group = await groupRow();
+        const [oldA, oldB] = participantIds(group);
+
+        await run(
+            async (context) =>
+                await context.db.patch("threads", group._id, {
+                    groupChat: { ...group.groupChat, participants: group.groupChat.participants.toReversed() },
+                }),
+        );
+
+        await expect(repair(file)).resolves.toMatchObject({ status: "installed", unmatchedGroups: [] });
+
+        const freshA = await skillBySlug("a");
+        const freshB = await skillBySlug("b");
+
+        expect(participantIds(await groupRow())).toEqual([freshB._id, freshA._id]);
+        expect(oldA).not.toBe(freshA._id);
+        expect(oldB).not.toBe(freshB._id);
+        expect(await installRow()).toMatchObject({ partial: false, status: "installed" });
+    });
+
+    it("remaps on the next call when a repair stopped after its last skill was made", async () => {
+        const file = await breakSkills(["a"]);
+        const oldId = participantIds(await groupRow())[0];
+        const remap = registry.get("plugins_repair_resume:remapGroupParticipants") as { handler?: unknown } | undefined;
+
+        expect(remap).toBeDefined();
+
+        const spy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+        let first = true;
+
+        // The first remap throws once, after the skill was made and linked.
+        const original = (remap as { handler: (...args: unknown[]) => Promise<unknown> }).handler;
+
+        (remap as { handler: unknown }).handler = async (...args: unknown[]) => {
+            if (first) {
+                first = false;
+                throw new Error("interrupted");
+            }
+
+            return await original(...args);
+        };
+
+        try {
+            await expect(repair(file)).rejects.toThrow();
+            expect(participantIds(await groupRow())).toContain(oldId);
+
+            // The install is left for repair, with the recreated skill linked: nothing is missing now.
+            const install = await installRow();
+
+            await run(async (context) => await context.db.patch("pluginInstalls", install._id, { status: "needs-repair" }));
+            await expect(repair(file)).resolves.toMatchObject({ created: [], status: "installed", unmatchedGroups: [] });
+        } finally {
+            (remap as { handler: unknown }).handler = original;
+            spy.mockRestore();
+        }
+
+        const fresh = await skillBySlug("a");
+
+        expect(participantIds(await groupRow())).toContain(fresh._id);
+        expect(participantIds(await groupRow())).not.toContain(oldId);
+        expect(await installRow()).toMatchObject({ partial: false, status: "installed" });
+    });
+
+    it("leaves the install partial when a gone participant has no mapping", async () => {
+        const file = await breakSkills([]);
+        const group = await groupRow();
+        const outside = "kd7outsideskillthatwasdeleted";
+
         await run(
             async (context) =>
                 await context.db.patch("threads", group._id, {
                     groupChat: {
                         ...group.groupChat,
-                        participants: group.groupChat.participants.filter((participant: { skillId: string }) => participant.skillId !== live._id),
+                        participants: [...group.groupChat.participants, { addedAt: 1, skillId: outside }],
                     },
                 }),
         );
+        const install = await installRow();
+
+        await run(async (context) => await context.db.patch("pluginInstalls", install._id, { status: "needs-repair" }));
 
         await expect(repair(file)).resolves.toMatchObject({ status: "installed", unmatchedGroups: ["group:panel"] });
         expect(await installRow()).toMatchObject({ partial: true, status: "installed" });

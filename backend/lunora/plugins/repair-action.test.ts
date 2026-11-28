@@ -196,6 +196,21 @@ describe("repair through the action", () => {
         expect(skills.map((skill: { instructions: string }) => skill.instructions)).toEqual([ANALYST.instructions]);
     });
 
+    it("refuses a repair whose file has the same body but another version in its header", async () => {
+        await as().action(procedureAt("plugins_install_action", "installPlugin"), { contentHash: hash, markdown: pluginFile(hash) } as never);
+
+        // The body hash leaves the header out, so only the version check can tell this file from the installed one.
+        const relabelled = withPluginHeader(body(), { contentHash: hash, slug: "daily-brief", version: "9.9.9" });
+
+        await expect(
+            as().action(procedureAt("plugins_repair_resume", "repairPlugin"), {
+                contentHash: hash,
+                markdown: relabelled,
+                pluginSlug: "daily-brief",
+            } as never),
+        ).rejects.toThrow("not the file");
+    });
+
     it("does not finish the install while an entry the file holds cannot be planned now, and says why", async () => {
         const unplannable = buildBundleMarkdown({
             description: "",

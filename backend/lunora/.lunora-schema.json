@@ -23354,6 +23354,12 @@
           "optional": true,
           "unique": false
         },
+        "replacedItemId": {
+          "kind": "string",
+          "nullable": false,
+          "optional": true,
+          "unique": false
+        },
         "state": {
           "kind": "union",
           "nullable": false,

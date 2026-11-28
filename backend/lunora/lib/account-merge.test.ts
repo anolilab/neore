@@ -1668,7 +1668,9 @@ describe("reassignGlobalRows", () => {
 
                 expect(result).toMatchObject({ busy: true, done: false });
                 expect(install).toMatchObject({ generation: 1, userId: "guest" });
-                expect(slots.map((row: any) => [row.userId, row.installId]).toSorted()).toStrictEqual([
+                expect(
+                    slots.map((row: any) => [row.userId, row.installId]).toSorted((a: string[], b: string[]) => a.join(",").localeCompare(b.join(","))),
+                ).toStrictEqual([
                     ["guest", guestInstall],
                     ["user", undefined],
                 ]);

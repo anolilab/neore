@@ -44,6 +44,13 @@ export const childIdByMarker = async (
     return row && row.userId === userId ? (row._id as string) : undefined;
 };
 
+/**
+ * The id a skill link's gone skill held, kept for the group remap: an older value is never replaced by a newer one (the older id is
+ * the one a group may still name). Other kinds keep none.
+ */
+const replacedIdOf = (row: { itemId?: string; kind: ChildKind; replacedItemId?: string }): string | undefined =>
+    row.kind === "skill" ? row.replacedItemId || row.itemId : row.replacedItemId;
+
 export interface RepairResult {
     /** Children an update dropped that stay as the person's own, with the plugin's marker removed. */
     kept: string[];
@@ -132,7 +139,7 @@ const repairStoppedUpdate = async (ctx: MutationCtx, install: Doc<"pluginInstall
             // A linked child deleted while the update was stopped goes back to an intent, and the install waits for a plain repair,
             // which makes it again from the install's own file. Left linked, every later update would read it as edited and skip it.
             if (childId === undefined && !row.pendingHash) {
-                await ctx.db.patch("pluginItems", row._id as Id<"pluginItems">, { state: "intent" });
+                await patchRow(ctx.db, "pluginItems", row, { replacedItemId: replacedIdOf(row), state: "intent" });
                 missing.push(row.entryKey);
             }
 
@@ -329,7 +336,12 @@ export const repairRows = async (
             continue;
         }
 
-        await patchRow(ctx.db, "pluginItems", row, { itemId: undefined, pendingHash: undefined, state: "intent" });
+        await patchRow(ctx.db, "pluginItems", row, {
+            itemId: undefined,
+            pendingHash: undefined,
+            replacedItemId: replacedIdOf(row),
+            state: "intent",
+        });
         missing.push(row.entryKey);
     }
 

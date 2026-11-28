@@ -12,6 +12,7 @@ import { LunoraError, v } from "lunorash/server";
 import type { Id } from "../_generated/dataModel";
 import { internal } from "../_generated/internal";
 import type { MutationCtx } from "../_generated/server";
+import { patchThread } from "../agent/table-writes";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { authAction } from "../lib/crpc";
 import { MAX_LENGTH } from "../lib/validators";
@@ -21,7 +22,7 @@ import { assertNoToolConfig, checkPluginFile } from "./install-action";
 import { childOps, importFailure } from "./install-ops";
 import { entryHash } from "./entry-hash";
 import { refuseUnderKillSwitch } from "./gate";
-import { heldInstall, patchInstallIf, STALE } from "./held-install";
+import { heldInstall, heldInstallForShardWrite, patchInstallIf, STALE } from "./held-install";
 import { pluginSkillsByKey } from "./live-hash";
 import { refuseWhileErasing, requireOwnerShard } from "./owner-shard";
 import { childIdByMarker, repairableNow, repairRows } from "./repair";
@@ -37,12 +38,13 @@ export const beginRepair = internalMutation
         fileKeys: v.optional(v.array(v.string().max(256))),
         pluginSlug: v.string().max(64),
         userId: v.string().max(128),
+        /** The file header's version: the body hash leaves the header out, so the version is checked on its own. */
+        version: v.optional(v.string().max(64)),
     })
     .output(
         v.object({
             existing: v.array(v.object({ entryKey: v.string(), itemId: v.string() })),
             generation: v.number(),
-            groupLinks: v.array(v.string()),
             installId: v.string(),
             kept: v.array(v.string()),
             linked: v.number(),
@@ -62,6 +64,7 @@ export const beginRepair = internalMutation
                 args.contentHash,
                 args.entries,
                 args.fileKeys === undefined ? undefined : new Set(args.fileKeys),
+                args.version,
             ),
     );
 
@@ -74,11 +77,11 @@ export const beginRepairRows = async (
     entries: { contentHash: string; entryKey: string; kind: "group" | "skill" | "trigger" }[] = [],
     /** Every key the file holds. With it, an install kept from an update detaches the children the file dropped. */
     fileKeys?: ReadonlySet<string>,
+    /** The file header's version, which must be the one the install finishes at: recreated children are stamped with it. */
+    version?: string,
 ): Promise<{
     existing: { entryKey: string; itemId: string }[];
     generation: number;
-    /** Group chats that are linked and whose thread exists: a recreated skill they name is mapped in by repair. */
-    groupLinks: string[];
     installId: string;
     /** Children the update dropped, detached and kept as the person's own. */
     kept: string[];
@@ -103,7 +106,10 @@ export const beginRepairRows = async (
 
     // Repair may only use the file this install was made from (or last updated to). Any other file would create children from different content.
     // A stopped update is the exception: its repair creates nothing from the file, and the stored hash is still the old file's.
-    if (install.status !== "updating" && install.contentHash !== contentHash) {
+    if (
+        install.status !== "updating" &&
+        (install.contentHash !== contentHash || (version !== undefined && version !== (install.targetVersion ?? install.version)))
+    ) {
         throw new LunoraError("CONFLICT", "This is not the file the plugin was installed from. Preview it again to repair it.");
     }
 
@@ -166,7 +172,6 @@ export const beginRepairRows = async (
         return {
             existing,
             generation: current.generation,
-            groupLinks: [],
             installId,
             kept: result.kept,
             linked: result.linked,
@@ -191,25 +196,9 @@ export const beginRepairRows = async (
         current.status,
     );
 
-    const groupLinks: string[] = [];
-
-    for (const row of page) {
-        const inFile = fileKeys === undefined || fileKeys.has(row.entryKey);
-
-        if (
-            row.kind === "group" &&
-            row.state === "created" &&
-            inFile &&
-            (await childIdByMarker(ctx, "group", markerFor(installId, row.entryKey), userId)) !== undefined
-        ) {
-            groupLinks.push(row.entryKey);
-        }
-    }
-
     return {
         existing,
         generation,
-        groupLinks,
         installId,
         kept: result.kept,
         linked: result.linked,
@@ -319,6 +308,95 @@ export const groupsNamingGoneSkills = internalMutation
         return dead;
     });
 
+/**
+ * Points each group chat of the install at the skill repair made in place of a deleted one, exactly: `replacedItemId` on a skill link
+ * is the id the group named, the link's `itemId` the new one. Order and every other participant stay. A link's old id is cleared once no
+ * group of the install names it, so an interrupted call is finished by the next. Returns the install's linked group chats (entry keys).
+ * Bounded by the bundle limits: at most 9 skill links and 9 group chats.
+ */
+export const remapGroupParticipants = internalMutation
+    .input({ generation: v.number(), installId: v.string().max(128), userId: v.string().max(128) })
+    .output(v.array(v.string()))
+    .mutation(async ({ args, ctx }) => {
+        requireOwnerShard(args.userId, "repair");
+
+        const install = await heldInstallForShardWrite(ctx, args.installId as Id<"pluginInstalls">, args.generation);
+
+        if (install.userId !== args.userId) {
+            throw new LunoraError("NOT_FOUND", "That plugin is not installed");
+        }
+
+        const { page } = await ctx.db.pluginItems.findMany({ consistency: "primary", where: { installId: args.installId } });
+        const replacement = new Map<string, string>();
+
+        for (const link of page) {
+            if (link.kind === "skill" && link.state === "created" && link.itemId && link.replacedItemId && link.replacedItemId !== link.itemId) {
+                replacement.set(link.replacedItemId, link.itemId);
+            }
+        }
+
+        const groups: string[] = [];
+        const named = new Set<string>();
+
+        for (const link of page) {
+            if (link.kind !== "group" || link.state !== "created") {
+                continue;
+            }
+
+            const thread = await ctx.db
+                .query("threads")
+                .withIndex("by_plugin_marker", (q) => q.eq("pluginMarker", markerFor(args.installId, link.entryKey)))
+                .first();
+            const stored = thread && thread.userId === args.userId ? thread.groupChat : undefined;
+
+            if (!thread || !stored) {
+                continue;
+            }
+
+            groups.push(link.entryKey);
+
+            const swap = (skillId: string) => replacement.get(skillId) ?? skillId;
+            const participants: typeof stored.participants = [];
+
+            for (const participant of stored.participants) {
+                const skillId = swap(participant.skillId);
+
+                // The owner may have added the replacement already: keep one.
+                if (participants.every((kept) => kept.skillId !== skillId)) {
+                    participants.push(skillId === participant.skillId ? participant : { addedAt: participant.addedAt, skillId });
+                }
+            }
+
+            const synthesizerSkillId = stored.synthesizerSkillId === undefined ? undefined : swap(stored.synthesizerSkillId);
+            const changed =
+                participants.length !== stored.participants.length ||
+                participants.some((participant, index) => participant.skillId !== stored.participants[index]!.skillId) ||
+                synthesizerSkillId !== stored.synthesizerSkillId;
+
+            if (changed) {
+                await patchThread(ctx.db, thread._id, {
+                    groupChat: { ...stored, participants, ...(synthesizerSkillId !== undefined && { synthesizerSkillId }) },
+                });
+            }
+
+            for (const participant of participants) {
+                named.add(participant.skillId);
+            }
+
+            if (synthesizerSkillId !== undefined) {
+                named.add(synthesizerSkillId);
+            }
+        }
+
+        for (const link of page) {
+            if (link.state === "created" && link.replacedItemId && !named.has(link.replacedItemId)) {
+                await ctx.db.patch("pluginItems", link._id, { replacedItemId: "" });
+            }
+        }
+
+        return groups;
+    });
+
 /** The id of the child that carries a marker, if it exists and belongs to the owner: what a create that threw may have left behind. */
 export const childIdForMarker = internalMutation
     .input({ kind: vPluginItemKind, marker: v.string().max(256), userId: v.string().max(128) })
@@ -385,6 +463,7 @@ export const repairPlugin = authAction
                 fileKeys: entries.map((entry) => entry.key),
                 pluginSlug: args.pluginSlug,
                 userId,
+                version: header.version,
             });
         let begun = await begin();
         const kept = [...begun.kept];
@@ -395,8 +474,29 @@ export const repairPlugin = authAction
             kept.push(...begun.kept);
         }
 
+        // Every call remaps the groups, the one that created nothing too: an earlier call may have stopped after its last skill was
+        // made and before the groups were pointed at it.
+        const remapGroups = async (generation: number, installId: string): Promise<string[]> => {
+            const groups = await ctx.runMutation(internal.plugins.repair_resume.remapGroupParticipants, { generation, installId, userId });
+
+            return groups.length === 0
+                ? []
+                : await ctx.runMutation(internal.plugins.repair_resume.groupsNamingGoneSkills, { entryKeys: groups, installId, userId });
+        };
+
         if (begun.missing.length === 0) {
-            return { created: [], kept, status: begun.status, unmatchedGroups: [] };
+            const unmatchedGroups = await remapGroups(begun.generation, begun.installId);
+
+            // An install already finished by `beginRepair` becomes partial while a group still names a gone skill.
+            if (begun.status === "installed" && unmatchedGroups.length > 0) {
+                await ctx.runMutation(internal.plugins.repair_resume.finishRepair, {
+                    generation: begun.generation,
+                    installId: begun.installId,
+                    partial: true,
+                });
+            }
+
+            return { created: [], kept, status: begun.status, unmatchedGroups };
         }
 
         const missingKeys = new Set(begun.missing.map((entry) => entry.entryKey));
@@ -443,54 +543,7 @@ export const repairPlugin = authAction
             const knownIds = new Map(begun.existing.map((row) => [row.entryKey, row.itemId] as const));
             const created = await runBundleImport(entries, missingKeys, ops, { keepOnRateLimit: true, knownIds });
 
-            // A linked group chat still names the skills that were gone. The create path finds the group by its marker and points each
-            // gone participant at the skill made in its place (one to one); it is not part of the import, so a failure never rolls it back.
-            for (const item of created) {
-                if (item.kind === "skill") {
-                    knownIds.set(item.key, item.id);
-                }
-            }
-
-            for (const entry of entries) {
-                const group = entry.plan?.kind === "group" ? entry.plan.create : undefined;
-
-                if (!group || !begun.groupLinks.includes(entry.key)) {
-                    continue;
-                }
-
-                const { participantKeys, synthesizerKey, ...rest } = group;
-
-                if ([...participantKeys, ...(synthesizerKey === undefined ? [] : [synthesizerKey])].every((key) => !missingKeys.has(key))) {
-                    continue;
-                }
-
-                const skillIds = participantKeys.map((key) => knownIds.get(key));
-                const synthesizerSkillId = synthesizerKey === undefined ? undefined : knownIds.get(synthesizerKey);
-
-                if (skillIds.includes(undefined)) {
-                    continue;
-                }
-
-                await ctx.runMutation(internal.chat.group.functions.createPluginGroupChat, {
-                    ...rest,
-                    generation: begun.generation,
-                    plan,
-                    pluginInstallId: begun.installId,
-                    pluginMarker: markerFor(begun.installId, entry.key),
-                    skillIds: skillIds as string[],
-                    ...(synthesizerSkillId !== undefined && { synthesizerSkillId }),
-                    userId,
-                });
-            }
-
-            const unmatchedGroups =
-                begun.groupLinks.length === 0
-                    ? []
-                    : await ctx.runMutation(internal.plugins.repair_resume.groupsNamingGoneSkills, {
-                          entryKeys: begun.groupLinks,
-                          installId: begun.installId,
-                          userId,
-                      });
+            const unmatchedGroups = await remapGroups(begun.generation, begun.installId);
 
             // A child whose pending hash is still unresolved keeps the install in needs-repair, with its target version unchanged.
             if (begun.unresolved.length > 0) {

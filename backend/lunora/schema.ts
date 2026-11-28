@@ -2607,6 +2607,8 @@ export const schema = defineSchema({
         itemId: v.optional(v.string()),
         kind: vPluginItemKind,
         pendingHash: v.optional(v.string()),
+        /** The id a skill link held before repair found its skill gone: a group naming it is pointed at the new `itemId`. "" once done. */
+        replacedItemId: v.optional(v.string()),
         state: vPluginItemState,
         userId: v.string(),
     })
