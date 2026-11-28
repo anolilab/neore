@@ -199,6 +199,25 @@ describe("openEpub", () => {
         expect(index.get(`d1999/c7.xhtml`)).toEqual(new Set(["i7"]));
     });
 
+    it("names a chapter by a table-of-contents path of any depth that is the end of its path, and none by a deeper path that matches no chapter", async () => {
+        const segments = Array.from({ length: 12 }, (_item, index) => `s${String(index)}`);
+        const file = `${segments.join("/")}.xhtml`;
+        const opened = await openEpub(
+            await book({
+                chapters: [
+                    { body: "<p>deep</p>", file, id: "deep", label: "Deep chapter", tocHref: `../${segments.slice(2).join("/")}.xhtml` },
+                    { body: "<p>two</p>", file: "two.xhtml", id: "two", label: "Nowhere", tocHref: `../x/${file}` },
+                ],
+            }),
+            folder.path,
+        );
+
+        // The table of contents sits in a folder of its own, so `../` leaves it: ten of the twelve segments name the chapter (the spine path
+        // has the book's folder before them); thirteen, with a folder it is not in, name nothing.
+        expect(opened.chapters).toEqual([{ id: "deep", title: "Deep chapter" }, { id: "two" }]);
+        opened.destroy();
+    });
+
     it("puts a picture and a style sheet of the book into the chapter, as a data: address and as text, and makes no object URL", async () => {
         const createObjectUrl = vi.spyOn(URL, "createObjectURL");
         const opened = await openEpub(

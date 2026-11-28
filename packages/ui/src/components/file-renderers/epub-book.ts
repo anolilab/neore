@@ -99,6 +99,42 @@ export const spineTailIndex = (spine: ReadonlyArray<SpineItem>): Map<string, Set
  */
 const titlesBySpineItem = (toc: EpubToc, spine: ReadonlyArray<SpineItem>): Map<string, string> => {
     const byTail = spineTailIndex(spine);
+    const pathById = new Map(spine.map((item) => [item.id, pathOf(item.href)] as const));
+
+    // The items a table-of-contents path names. One of up to N segments is a key of the index. A longer one is looked up by its own last N
+    // segments, which gives the items that could end with it, and each is confirmed against its whole path: the work is the candidates, not the
+    // spine. Two are enough to know it is ambiguous, so the confirming stops there.
+    const fitting = (tocPath: string): ReadonlySet<string> | undefined => {
+        const direct = byTail.get(tocPath);
+
+        if (direct !== undefined) {
+            return direct;
+        }
+
+        const segments = tocPath.split("/");
+
+        if (segments.length <= MAX_INDEXED_TAIL_SEGMENTS) {
+            return undefined;
+        }
+
+        const confirmed = new Set<string>();
+
+        const candidates = byTail.get(segments.slice(-MAX_INDEXED_TAIL_SEGMENTS).join("/")) ?? new Set<string>();
+
+        for (const id of candidates) {
+            if (pathById.get(id)?.endsWith(`/${tocPath}`) !== true) {
+                continue;
+            }
+
+            confirmed.add(id);
+
+            if (confirmed.size > 1) {
+                break;
+            }
+        }
+
+        return confirmed;
+    };
 
     // A title is set only by an entry whose path fits exactly one item. An entry that fits several sets none and takes none away: an item a
     // longer, unambiguous path already named keeps its title.
@@ -106,7 +142,7 @@ const titlesBySpineItem = (toc: EpubToc, spine: ReadonlyArray<SpineItem>): Map<s
 
     const visit = (points: EpubToc): void => {
         for (const point of points) {
-            const fits = point.label === "" ? undefined : byTail.get(pathOf(point.href));
+            const fits = point.label === "" ? undefined : fitting(pathOf(point.href));
 
             if (fits?.size === 1) {
                 const [id] = fits;
