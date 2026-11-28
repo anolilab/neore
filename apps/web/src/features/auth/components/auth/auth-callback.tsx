@@ -35,7 +35,7 @@ const AuthCallback = ({ redirectTo }: { redirectTo?: string }) => {
         onSuccess();
     }, [isRestoring, persistClient, onSuccess]);
 
-    return <Loader2 className="animate-spin" />;
+    return <Loader2 className="text-muted-foreground mx-auto animate-spin" />;
 };
 
 export default AuthCallback;

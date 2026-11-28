@@ -93,7 +93,7 @@ const ComposerPromptImprovementButton: FC<ComposerPromptImprovementButtonProps> 
             </div>
             <div className="flex items-center">
                 <TooltipIconButton
-                    className={cn("mx-0 my-4 p-2 transition-opacity ease-in dark:text-neutral-100", isOpen && "bg-accent text-accent-foreground")}
+                    className={cn("mx-0 my-4 p-2 transition-opacity ease-in", isOpen && "bg-accent text-accent-foreground")}
                     disabled={isImproving}
                     onClick={handleClick}
                     tooltip={getTooltip()}

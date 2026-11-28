@@ -1,12 +1,17 @@
 import { expect, test } from "@playwright/test";
 
-import { isInviteOnly } from "./chat-helpers";
+import { dismissOverlays, isInviteOnly } from "./chat-helpers";
 import { AUTH_PATHS, PROTECTED_PATHS, PUBLIC_PATHS } from "./fixtures";
 
 const SIGN_IN_URL_RE = /\/auth\/sign-in/;
 const ADMIN_URL_RE = /\/admin$/;
 
 test.describe("Auth route navigation", () => {
+    // The sign-in panel is centred, and the cookie banner and the dev-only devtools card can sit over its links.
+    test.beforeEach(async ({ page }) => {
+        await dismissOverlays(page);
+    });
+
     // Registration is invite-only in this suite: sign-up is offered only on an invitation link (`?invite=`),
     // which the links between the two pages carry along. The token is checked only when the form is submitted.
     test("moves between sign-in and sign-up in both directions on an invitation link", async ({ page }) => {

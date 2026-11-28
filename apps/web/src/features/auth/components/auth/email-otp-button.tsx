@@ -23,13 +23,13 @@ const EmailOTPButton = ({ classNames, isSubmitting, redirectTo, view }: EmailOTP
 
     return (
         <Button
-            className={cn("w-full", classNames?.form?.button, classNames?.form?.secondaryButton)}
+            className={cn("w-full", classNames?.form?.button, classNames?.form?.outlineButton)}
             disabled={isSubmitting}
             onClick={() => {
                 navigate(`${basePath}/${view === "EMAIL_OTP" ? viewPaths.SIGN_IN : viewPaths.EMAIL_OTP}${authViewSearch(redirectTo)}`);
             }}
             type="button"
-            variant="secondary"
+            variant="outline"
         >
             {view === "EMAIL_OTP" ? <LockIcon className={classNames?.form?.icon} /> : <MailIcon className={classNames?.form?.icon} />}
             {view === "EMAIL_OTP" ? t`Sign in with password` : t`Sign in with email code`}

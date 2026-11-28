@@ -104,7 +104,7 @@ const McpAppView = memo<McpAppViewProps>(({ lunoraSiteUrl, part, resourceUri, se
     }
 
     return (
-        <div className={cn("mt-2 overflow-hidden rounded-md border border-gray-200 dark:border-gray-700", "min-h-[200px]")}>
+        <div className={cn("surface-edge mt-2 overflow-hidden rounded-xl", "min-h-[200px]")}>
             <AppRenderer
                 onCallTool={onCallTool}
                 onOpenLink={onOpenLink}

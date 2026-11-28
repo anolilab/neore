@@ -215,15 +215,7 @@ const VariableAutocompletePopup: FC<VariableAutocompletePopupProps> = ({
             }}
         >
             <div
-                className={clsx(
-                    "overflow-hidden rounded-lg border",
-                    "bg-popover text-popover-foreground",
-                    "dark:bg-[oklch(0.205_0_0)] dark:text-[oklch(0.985_0_0)]",
-                    "border-border dark:border-white/10",
-                    "shadow-md dark:shadow-xl dark:shadow-black/50",
-                    "ring-foreground/10 ring-1 dark:ring-white/10",
-                    POPUP_ENTER_MOTION,
-                )}
+                className={clsx("bg-popover text-popover-foreground surface-edge overflow-hidden rounded-xl", POPUP_ENTER_MOTION)}
                 style={{ width: MENU_WIDTH }}
             >
                 <Command>

@@ -174,7 +174,7 @@ const PinItem: FC<PinItemProps> = ({ pin }) => {
 
     return (
         <>
-            <div className="group/pin relative flex overflow-hidden rounded-md border">
+            <div className="surface-raised group/pin relative flex overflow-hidden rounded-xl">
                 <div className="flex w-full flex-col px-3 pt-2.5 pb-2">
                     {pin.kind === "image" && pin.imageIndex !== undefined && messageId !== undefined && (
                         <PinnedImagePreview alt={pin.selectedText} imageIndex={pin.imageIndex} imageKey={pin.imageKey} messageId={messageId} />

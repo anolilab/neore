@@ -61,13 +61,13 @@ const PasskeyButton = ({ classNames, isSubmitting, redirectTo, setIsSubmitting }
 
     return (
         <Button
-            className={cn("w-full", classNames?.form?.button, classNames?.form?.secondaryButton)}
+            className={cn("w-full", classNames?.form?.button, classNames?.form?.outlineButton)}
             disabled={isSubmitting}
             formNoValidate
             name="passkey"
             onClick={signInPassKey}
             value="true"
-            variant="secondary"
+            variant="outline"
         >
             <FingerprintIcon />
             {t`Sign in with passkey`}

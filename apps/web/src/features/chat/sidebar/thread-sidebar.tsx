@@ -28,6 +28,9 @@ import ThreadVariablesConfig from "@/features/prompts/components/thread-variable
 import useFeatureFlaggedModels from "@/hooks/use-feature-flagged-models";
 import { useCRPC } from "@/lib/lunora/crpc";
 
+import type { ThreadContextRecord } from "./thread-context";
+import ThreadContext from "./thread-context";
+
 interface ThreadSidebarProps {
     threadId?: string;
 }
@@ -136,6 +139,8 @@ const ThreadSummary: FC<{ threadId?: string }> = ({ threadId }) => {
 
     return (
         <div className="space-y-5 py-4 pr-2 pl-1">
+            {!isNewThread && threadId && <ThreadContext thread={thread as ThreadContextRecord} threadId={threadId} />}
+
             <div className="space-y-3">
                 <div className="flex items-center justify-between">
                     <h2 className="text-foreground text-base font-semibold">{t`Thread summary`}</h2>

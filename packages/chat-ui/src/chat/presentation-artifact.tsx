@@ -31,14 +31,14 @@ const PresentationArtifact: FC<PresentationArtifactProps> = memo(({ className, o
     return (
         <button
             className={cn(
-                "group my-2 flex w-full max-w-sm items-center gap-3 rounded-lg border p-3 text-left transition-colors",
-                "hover:bg-accent hover:border-accent-foreground/20",
+                "surface-edge bg-surface-panel group my-2 flex w-full max-w-sm items-center gap-3 rounded-xl p-3 text-left transition-colors",
+                "hover:bg-surface-row-hover",
                 className,
             )}
             onClick={handleClick}
             type="button"
         >
-            <div className="bg-muted flex size-10 shrink-0 items-center justify-center rounded-md">
+            <div className="surface-well flex size-10 shrink-0 items-center justify-center rounded-lg">
                 <Presentation aria-hidden="true" className="text-muted-foreground size-5" />
             </div>
             <div className="min-w-0 flex-1">

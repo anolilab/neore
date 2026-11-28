@@ -113,7 +113,7 @@ const AsideItem: FC<AsideItemProps> = ({ entry, isRunning, onAdd, onDismiss }) =
     const addErrorKind = asideErrorKind({ code: entry.addErrorCode });
 
     return (
-        <li className="border-sidebar-border bg-sidebar-accent/30 space-y-2 rounded-md border p-3 text-sm" data-aside-entry-id={entry.id}>
+        <li className="surface-raised space-y-2 rounded-xl p-3 text-sm" data-aside-entry-id={entry.id}>
             <div className="flex items-start gap-2">
                 <p className="text-foreground grow font-medium break-words whitespace-pre-line" data-find-text="">
                     {entry.question}

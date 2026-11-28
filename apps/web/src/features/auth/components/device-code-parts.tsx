@@ -40,7 +40,7 @@ export const DeviceCodeField = ({
 
     return (
         <div className="flex flex-col gap-2">
-            <p className="text-center text-sm text-gray-700" id="device-code-hint">
+            <p className="text-muted-foreground text-center text-sm" id="device-code-hint">
                 {t`Enter the code that \`neore login --device\` or \`neore-host pair\` shows in your terminal, then choose Continue.`}
             </p>
             <Label htmlFor="device-code">{t`Code`}</Label>
@@ -71,18 +71,18 @@ export const DeviceCodeDetails = ({ code, hostname }: { code: string; hostname: 
     return (
         <>
             <div aria-describedby="device-code-check" aria-label={t`Sign-in request`} role="group">
-                <dl className="flex flex-col gap-1 rounded-md bg-gray-100 p-3 text-sm">
+                <dl className="surface-well flex flex-col gap-1 rounded-lg p-3 text-sm">
                     <div className="flex justify-between gap-4">
-                        <dt className="text-gray-600">{t`Computer`}</dt>
+                        <dt className="text-muted-foreground">{t`Computer`}</dt>
                         <dd className="font-medium break-all">{hostname ?? t`unknown`}</dd>
                     </div>
                     <div className="flex justify-between gap-4">
-                        <dt className="text-gray-600">{t`Code`}</dt>
+                        <dt className="text-muted-foreground">{t`Code`}</dt>
                         <dd className="font-mono font-medium">{code}</dd>
                     </div>
                 </dl>
             </div>
-            <p className="text-center text-sm text-gray-700" id="device-code-check">
+            <p className="text-muted-foreground text-center text-sm" id="device-code-check">
                 {t`Only continue if you started this just now by running \`neore login --device\`, and the code above matches the one in your terminal.`}
             </p>
         </>
@@ -117,26 +117,26 @@ export const MachineCodeDetails = ({
     return (
         <>
             <div aria-describedby="machine-code-check" aria-label={t`Pairing request`} role="group">
-                <dl className="flex flex-col gap-1 rounded-md bg-gray-100 p-3 text-sm">
+                <dl className="surface-well flex flex-col gap-1 rounded-lg p-3 text-sm">
                     <div className="flex justify-between gap-4">
-                        <dt className="text-gray-600">{t`Machine`}</dt>
+                        <dt className="text-muted-foreground">{t`Machine`}</dt>
                         <dd className="font-medium break-all">{hostname ?? t`unknown`}</dd>
                     </div>
                     <div className="flex justify-between gap-4">
-                        <dt className="text-gray-600">{t`System`}</dt>
+                        <dt className="text-muted-foreground">{t`System`}</dt>
                         <dd className="font-medium break-all">{platform ?? t`unknown`}</dd>
                     </div>
                     <div className="flex justify-between gap-4">
-                        <dt className="text-gray-600">{t`Secret kept in`}</dt>
+                        <dt className="text-muted-foreground">{t`Secret kept in`}</dt>
                         <dd className="font-medium">{storageText}</dd>
                     </div>
                     <div className="flex justify-between gap-4">
-                        <dt className="text-gray-600">{t`Code`}</dt>
+                        <dt className="text-muted-foreground">{t`Code`}</dt>
                         <dd className="font-mono font-medium">{code}</dd>
                     </div>
                 </dl>
             </div>
-            <p className="text-center text-sm text-gray-700" id="machine-code-check">
+            <p className="text-muted-foreground text-center text-sm" id="machine-code-check">
                 {t`Only continue if you started this just now by running \`neore-host pair\` on a machine you own, and the code above matches the one it shows. The machine tells you where it actually stored the secret when it is done.`}
             </p>
         </>
@@ -182,7 +182,7 @@ export const DeviceCodeForm = ({ onCode }: { onCode: (code: string) => void }) =
                 value={typed}
             />
             {hasError && (
-                <p className="text-center text-sm text-red-600" id="device-code-error" role="alert">
+                <p className="text-destructive text-center text-sm" id="device-code-error" role="alert">
                     {t`The code must contain the letters and digits shown in your terminal.`}
                 </p>
             )}
