@@ -161,6 +161,29 @@ describe("plugin update: early removal", () => {
         expect(again.plan.every((step) => step.action === "same")).toBe(true);
     });
 
+    it("removes nothing early below the limit when the new skill does not want the dropped slug, and a failed create keeps the old skill", async () => {
+        session.plan = "premium";
+        await completeIndex();
+        const next = await fileOf([...FIVE.slice(0, 4), ["f", "f"]], "1.1.0");
+        const create = procedureAt("skills_create_skill", "createPluginSkill") as { handler: (...args: unknown[]) => unknown };
+        const spy = vi.spyOn(create, "handler").mockRejectedValueOnce(new Error("create failed"));
+
+        try {
+            await expect(apply(next)).rejects.toThrow();
+        } finally {
+            spy.mockRestore();
+        }
+
+        expect(await skillSlugs()).toStrictEqual(["a", "b", "c", "d", "e"]);
+
+        await apply(next);
+
+        expect(await skillSlugs()).toStrictEqual(["a", "b", "c", "d", "f"]);
+        const again = await preview(next.markdown);
+
+        expect(again.plan.every((step) => step.action === "same")).toBe(true);
+    });
+
     it("keeps today's order when the owner's index is not complete: the free limit refuses the create", async () => {
         const next = await fileOf(SWAPPED, "1.1.0");
 

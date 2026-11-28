@@ -21,7 +21,7 @@ import { assertNoToolConfig, checkPluginFile } from "./install-action";
 import { entryHash, skillContent, skillRowHash } from "./entry-hash";
 import { skillVisibility } from "../skills/access";
 import { indexedGroupNames } from "../chat/group/skill-index";
-import { fileEntryKeys, freedSkills } from "./early-removal";
+import { fileEntryKeys, planWithNeededRemovals } from "./early-removal";
 import type { SureSkill } from "./early-removal";
 import { liveHashOf, pluginSkillsByKey } from "./live-hash";
 import type { SkillKeyCache } from "./live-hash";
@@ -171,8 +171,12 @@ export const previewUpdate = authAction
             throw new LunoraError("CONFLICT", `The plugin "${header.slug}" is ${installed.status}, not installed. Repair it first.`);
         }
 
-        const freed = freedSkills(installed.sureToGo, fileEntryKeys(args.markdown));
-        const { entries } = await planFor(ctx, args.markdown, undefined, { freedSlugs: freed.map((row) => row.slug), ownSlugs: installed.ownSlugs });
+        const { entries } = await planWithNeededRemovals(
+            installed.sureToGo,
+            fileEntryKeys(args.markdown),
+            installed.children,
+            async (freedSlugs) => await planFor(ctx, args.markdown, undefined, { freedSlugs, ownSlugs: installed.ownSlugs }),
+        );
 
         assertNoToolConfig(entries);
         const incoming = await Promise.all(
@@ -258,8 +262,12 @@ export const updatePlugin = authAction
             );
         }
 
-        const freed = freedSkills(installed.sureToGo, fileEntryKeys(args.markdown));
-        const { entries } = await planFor(ctx, args.markdown, undefined, { freedSlugs: freed.map((row) => row.slug), ownSlugs: installed.ownSlugs });
+        const { entries, freed } = await planWithNeededRemovals(
+            installed.sureToGo,
+            fileEntryKeys(args.markdown),
+            installed.children,
+            async (freedSlugs) => await planFor(ctx, args.markdown, undefined, { freedSlugs, ownSlugs: installed.ownSlugs }),
+        );
 
         assertNoToolConfig(entries);
         const incoming = await Promise.all(
@@ -332,7 +340,7 @@ export const updatePlugin = authAction
         const applied: string[] = [];
         const webhookSecrets: { entryKey: string; secret: string }[] = [];
         let importDone = false;
-        // Dropped skills removed before any create; the old version has lost them even if the update then fails.
+        // Dropped skills removed before any create because a create needs their place or slug; the old version has lost them even if the update then fails.
         const removedEarly = new Set<string>();
         const freedKeys = new Set(freed.map((row) => row.entryKey));
         const skipped: { action: UpdateAction; entryKey: string }[] = [];
@@ -347,7 +355,7 @@ export const updatePlugin = authAction
         };
 
         try {
-            // Before the creates, so the dropped skill's slot and slug are free for the new one. A skill that was sure to go and is kept
+            // Before the creates, for the skills a create needs (its slot or slug): they are free for the new one. A skill that was sure to go and is kept
             // after all (a group chat took it since) stops the update here, with nothing created.
             for (const step of plan) {
                 if (step.action !== "delete" || !freedKeys.has(step.entryKey)) {
