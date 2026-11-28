@@ -161,6 +161,25 @@ describe("install-prompt-store", () => {
         expect(store.hasInstalledHref(APP)).toBe(false);
     });
 
+    it("clears the pending attribution when the dialog is dismissed, so a later browser install is not credited to it", async () => {
+        const store = await loadStore();
+        const event = Object.assign(new Event("beforeinstallprompt", { cancelable: true }), {
+            prompt: vi.fn().mockResolvedValue(undefined),
+            userChoice: Promise.resolve({ outcome: "dismissed" as const }),
+        });
+
+        setManifestHref(PAGE);
+        globalThis.dispatchEvent(event);
+        await store.installApp(PAGE);
+
+        // The user dismisses the dialog, then installs Neore from the browser's own menu.
+        setManifestHref(APP);
+        globalThis.dispatchEvent(new Event("appinstalled"));
+
+        expect(store.hasInstalledHref(APP)).toBe(true);
+        expect(store.hasInstalledHref(PAGE)).toBe(false);
+    });
+
     it("reports a refused prompt instead of throwing into the click handler", async () => {
         const store = await loadStore();
         const refusal = new Error("prompt refused");

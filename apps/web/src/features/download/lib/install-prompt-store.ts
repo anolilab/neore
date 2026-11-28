@@ -3,6 +3,8 @@ import { captureException } from "@/lib/analytics/posthog-client";
 // lib.dom does not type the install prompt. Chromium and Edge fire it; Safari and Firefox never do.
 export interface BeforeInstallPromptEvent extends Event {
     prompt: () => Promise<void>;
+    /** Chromium's answer to the dialog. Browsers that do not report it leave it undefined. */
+    userChoice?: Promise<{ outcome: "accepted" | "dismissed" }>;
 }
 
 /** The manifest of the Neore app itself (`__root.tsx`). A page's install uses its own manifest href. */
@@ -38,6 +40,11 @@ const notify = (): void => {
     for (const listener of listeners) {
         listener();
     }
+};
+
+/** Tells subscribers the document's manifest link changed, so each re-checks its prompt against the new href. */
+export const notifyInstallPromptChanged = (): void => {
+    notify();
 };
 
 const handleBeforeInstallPrompt = (event: Event): void => {
@@ -105,9 +112,25 @@ export const installApp = async (manifestHref: string): Promise<void> => {
     state.pendingInstallHref = manifestHref;
     notify();
 
+    // Only the pending attribution of this manifest is cleared: a newer install may have claimed it since.
+    const clearPending = (): void => {
+        if (state.pendingInstallHref === manifestHref) {
+            state.pendingInstallHref = null;
+        }
+    };
+
     try {
         await event.prompt();
+
+        // An accepted choice keeps the pending href until `appinstalled`, which can arrive after the dialog closes.
+        // A dismissal clears it, so a later browser install of another manifest is not credited to this one.
+        const choice = await event.userChoice;
+
+        if (choice?.outcome === "dismissed") {
+            clearPending();
+        }
     } catch (error) {
+        clearPending();
         captureException(error, { context: "install_app_prompt" });
     }
 };

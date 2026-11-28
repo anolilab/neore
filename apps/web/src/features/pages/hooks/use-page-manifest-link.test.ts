@@ -1,6 +1,8 @@
 // eslint-disable-next-line testing-library/no-manual-cleanup -- vitest runs without globals, so nothing else cleans up between tests
 import { cleanup, renderHook } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { subscribeInstallPrompt } from "@/features/download/lib/install-prompt-store";
 
 import { usePageManifestLink } from "./use-page-manifest-link";
 
@@ -47,5 +49,21 @@ describe("usePageManifestLink", () => {
 
         unmount();
         expect(link.getAttribute("href")).toBe("/manifest.json");
+    });
+
+    it("tells the install store each time the link changes, so a button rendered before the swap checks again", () => {
+        mountManifestLink();
+        const listener = vi.fn();
+        const unsubscribe = subscribeInstallPrompt(listener);
+        const { unmount } = renderHook(() => {
+            usePageManifestLink("page_1");
+        });
+
+        expect(listener).toHaveBeenCalledTimes(1);
+
+        unmount();
+        expect(listener).toHaveBeenCalledTimes(2);
+
+        unsubscribe();
     });
 });

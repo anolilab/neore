@@ -665,11 +665,16 @@ const openSiteWindow = (url: URL): BrowserWindow => {
 /** The open window of each thread, by its URL. Asking again for a thread brings that window forward. */
 const windowsByUrl = new Map<string, BrowserWindow>();
 
-const openOrFocusSiteWindow = (url: URL): void => {
+/**
+ * `pageWindow`: a page navigates inside the app, so its window keeps its key after it moves to another page, and it
+ * counts only while it still shows this URL. A thread window may be redirected (a public thread opens at its token URL),
+ * so it keeps its key and is focused as before.
+ */
+const openOrFocusSiteWindow = (url: URL, pageWindow: boolean): void => {
     const open = windowsByUrl.get(url.href);
+    const stillShows = !pageWindow || open?.webContents.getURL() === url.href;
 
-    // A window keeps its key after it navigates away, so it counts only while it still shows this URL.
-    if (open !== undefined && !open.isDestroyed() && open.webContents.getURL() === url.href) {
+    if (stillShows && open !== undefined && !open.isDestroyed()) {
         bringForward(open);
 
         return;
@@ -1222,7 +1227,7 @@ const registerIpc = (): void => {
             throw new Error("open-thread-window: invalid thread id");
         }
 
-        openOrFocusSiteWindow(url);
+        openOrFocusSiteWindow(url, false);
     });
 
     ipcMain.handle(CHANNEL.openPageWindow, (event, pageId: unknown): void => {
@@ -1236,7 +1241,7 @@ const registerIpc = (): void => {
             throw new Error("open-page-window: invalid page id");
         }
 
-        openOrFocusSiteWindow(url);
+        openOrFocusSiteWindow(url, true);
     });
 
     // Sent, not invoked: the page has nothing to wait for.

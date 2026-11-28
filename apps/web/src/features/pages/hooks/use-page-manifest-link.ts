@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 
-import { MANIFEST_LINK_SELECTOR } from "@/features/download/lib/install-prompt-store";
+import { MANIFEST_LINK_SELECTOR, notifyInstallPromptChanged } from "@/features/download/lib/install-prompt-store";
 
 import { pageManifestHref } from "../lib/page-manifest";
 
@@ -8,6 +8,7 @@ import { pageManifestHref } from "../lib/page-manifest";
  * While a page is mounted, points the document's manifest link at the page's own manifest, so the browser
  * offers an install of that page. The original href is restored on unmount, so the app's install is unchanged
  * elsewhere. The swap changes the link in place: a second link would be ignored, since the browser keeps the first.
+ * Each change tells the install store, so a button that rendered before the swap checks its prompt again.
  */
 export const usePageManifestLink = (pageId: string): void => {
     useEffect(() => {
@@ -20,9 +21,11 @@ export const usePageManifestLink = (pageId: string): void => {
         const originalHref = link.getAttribute("href") ?? "";
 
         link.setAttribute("href", pageManifestHref(pageId));
+        notifyInstallPromptChanged();
 
         return () => {
             link.setAttribute("href", originalHref);
+            notifyInstallPromptChanged();
         };
     }, [pageId]);
 };
