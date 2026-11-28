@@ -223,18 +223,21 @@ const FileRowView = ({ context, file, focus, showDiff, ...review }: FileRowProps
     const reviewable = isHostCapabilityAvailable(context.capabilities, "review.lineComments");
 
     return (
-        <li className="border-b last:border-b-0" ref={row}>
+        <li className="border-border/50 border-b last:border-b-0" ref={row}>
             <div className="flex items-center">
                 <button
                     aria-controls={panelId}
                     aria-expanded={open}
-                    className="hover:bg-muted focus-visible:ring-ring flex min-w-0 flex-1 items-center gap-2 px-3 py-2 text-left text-sm outline-none focus-visible:ring-2"
+                    className={cn(
+                        "hover:bg-foreground/5 focus-visible:ring-ring/60 flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 px-4 py-2.5 text-left text-sm outline-none focus-visible:ring-2 focus-visible:ring-inset",
+                        open && "bg-surface-row-active",
+                    )}
                     onClick={() => setOpen((current) => !current)}
                     ref={toggle}
                     type="button"
                 >
                     <ChevronRight aria-hidden className={cn("size-4 shrink-0 transition-transform", open && "rotate-90")} />
-                    <span className="min-w-0 flex-1 truncate font-mono text-xs">{file.previousPath ? `${file.previousPath} → ${file.path}` : file.path}</span>
+                    <span className="min-w-32 flex-1 truncate font-mono text-xs">{file.previousPath ? `${file.previousPath} → ${file.path}` : file.path}</span>
                     {review.threads.length > 0 && (
                         <span className="text-muted-foreground shrink-0 text-xs">
                             <Plural one="# thread" other="# threads" value={review.threads.length} />
@@ -246,11 +249,11 @@ const FileRowView = ({ context, file, focus, showDiff, ...review }: FileRowProps
                         </span>
                     )}
                     <span className="text-muted-foreground shrink-0 text-xs">{statuses[file.status] ?? t`Changed`}</span>
-                    <span className="shrink-0 font-mono text-xs text-emerald-600 dark:text-emerald-400">+{file.additions}</span>
-                    <span className="shrink-0 font-mono text-xs text-red-600 dark:text-red-400">−{file.deletions}</span>
+                    <span className="text-success-foreground shrink-0 font-mono text-xs">+{file.additions}</span>
+                    <span className="text-destructive shrink-0 font-mono text-xs">−{file.deletions}</span>
                 </button>
                 {viewedEnabled && (
-                    <div className="flex shrink-0 items-center gap-2 px-3">
+                    <div className="border-border/50 flex shrink-0 items-center gap-2 self-stretch border-l px-4">
                         <Checkbox
                             checked={review.viewed === "viewed"}
                             disabled={review.viewedPending}
@@ -263,7 +266,7 @@ const FileRowView = ({ context, file, focus, showDiff, ...review }: FileRowProps
                     </div>
                 )}
             </div>
-            <div hidden={!open} id={panelId}>
+            <div className={cn(open && "border-border/50 border-t bg-[var(--surface-code)]")} hidden={!open} id={panelId}>
                 {open && showDiff && file.patch !== null && reviewable && (
                     <ReviewDiff
                         address={context.address}
@@ -301,8 +304,8 @@ const FileRowView = ({ context, file, focus, showDiff, ...review }: FileRowProps
                             locked={review.locked}
                         />
                     ))}
-                {open && notes[file.patchState] && <p className="text-muted-foreground px-3 py-2 text-xs">{notes[file.patchState]}</p>}
-                {open && !showDiff && <p className="text-muted-foreground px-3 py-2 text-xs">{t`Diffs are not available from this host.`}</p>}
+                {open && notes[file.patchState] && <p className="text-muted-foreground px-4 py-3 text-xs">{notes[file.patchState]}</p>}
+                {open && !showDiff && <p className="text-muted-foreground px-4 py-3 text-xs">{t`Diffs are not available from this host.`}</p>}
             </div>
         </li>
     );
@@ -392,7 +395,7 @@ const FilesTab = ({
     }, [failure, fetchNextPage, hasNextPage, isFetchingNextPage]);
 
     if (files.isPending) {
-        return <Skeleton aria-label={t`Loading files`} className="h-24 w-full" role="status" />;
+        return <Skeleton aria-label={t`Loading files`} className="h-24 w-full rounded-xl" role="status" />;
     }
 
     const retryButton = (
@@ -425,7 +428,7 @@ const FilesTab = ({
             <p className="sr-only" role="status">
                 {loading ? t`Loading files…` : <Plural one="# file" other="# files" value={listed.length} />}
             </p>
-            <p aria-hidden className="text-muted-foreground text-sm">
+            <p aria-hidden className="text-muted-foreground font-mono text-xs">
                 {loading || failure ? (
                     <Trans>
                         Loaded {listed.length} of <Plural one="# file" other="# files" value={Math.min(fileCount, fileLimit)} />…
@@ -435,17 +438,17 @@ const FilesTab = ({
                 )}
             </p>
             {leftOut > 0 && (
-                <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm" role="note">
+                <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm" role="note">
                     {t`The host lists at most ${plural(fileLimit, { one: "# file", other: "# files" })} for one change. ${plural(leftOut, { one: "# more is not shown here.", other: "# more are not shown here." })}`}
                 </p>
             )}
-            {viewedEnabled && !loading && <p className="text-muted-foreground text-sm">{t`Viewed ${viewedCount} of ${listed.length} files`}</p>}
+            {viewedEnabled && !loading && <p className="text-muted-foreground font-mono text-xs">{t`Viewed ${viewedCount} of ${listed.length} files`}</p>}
             {viewedError !== null && (
                 <p className="text-destructive text-sm" role="alert">
                     {viewedError}
                 </p>
             )}
-            <ul className="rounded-md border">
+            <ul className="surface-raised overflow-hidden rounded-xl">
                 {listed.map((file) => {
                     const key = fileKeyOf(file);
 
@@ -468,7 +471,7 @@ const FilesTab = ({
             </ul>
             {!loading && (strayThreads.length > 0 || strayDrafts.length > 0) && (
                 <section aria-label={t`Other conversations`} className="space-y-2">
-                    <p className="text-muted-foreground text-xs">{t`Conversations and pending comments on files this list does not show`}</p>
+                    <p className="text-muted-foreground font-mono text-xs">{t`Conversations and pending comments on files this list does not show`}</p>
                     {strayThreads.map((thread) => (
                         <ReviewThreadCard address={address} capabilities={capabilities} hostLabel={hostLabel} key={thread.id} thread={thread} />
                     ))}

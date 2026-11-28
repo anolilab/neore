@@ -59,7 +59,7 @@ const PullRequestView = ({
         return pull.isError ? (
             <FailureNotice label={host.label} status="host_error" />
         ) : (
-            <Skeleton aria-label={t`Loading`} className="h-40 w-full" role="status" />
+            <Skeleton aria-label={t`Loading`} className="h-40 w-full rounded-xl" role="status" />
         );
     }
 
@@ -82,7 +82,7 @@ const PullRequestView = ({
                     <Badge variant={detail.state === "open" ? "default" : "secondary"}>
                         {detail.draft && detail.state === "open" ? t`Draft` : stateLabels[detail.state]}
                     </Badge>
-                    <span className="text-muted-foreground text-xs">
+                    <span className="text-muted-foreground font-mono text-xs">
                         {detail.repository}#{detail.number}
                     </span>
                     {href && (
@@ -105,7 +105,7 @@ const PullRequestView = ({
                 </p>
                 <p className="text-sm">
                     <span className="text-success-foreground font-mono">+{detail.additions}</span>{" "}
-                    <span className="font-mono text-red-600 dark:text-red-400">−{detail.deletions}</span>{" "}
+                    <span className="text-destructive font-mono">−{detail.deletions}</span>{" "}
                     <span className="text-muted-foreground">{t`in ${plural(detail.changedFiles, { one: "# file", other: "# files" })}`}</span>
                 </p>
             </header>
@@ -142,10 +142,12 @@ const PullRequestView = ({
                     </TabsList>
                     <TabsContent className="pt-3" value="description">
                         {/* The body is text from the host: shown as text, line breaks kept, never parsed as markup. */}
-                        <pre className="font-sans text-sm break-words whitespace-pre-wrap">
-                            {detail.body === "" ? t`No description provided.` : detail.body}
-                        </pre>
-                        {detail.bodyTruncated && <p className="text-muted-foreground mt-2 text-xs">{t`The description is cut short.`}</p>}
+                        <div className="surface-raised rounded-xl p-4">
+                            <pre className="font-sans text-sm break-words whitespace-pre-wrap">
+                                {detail.body === "" ? t`No description provided.` : detail.body}
+                            </pre>
+                            {detail.bodyTruncated && <p className="text-muted-foreground mt-2 font-mono text-xs">{t`The description is cut short.`}</p>}
+                        </div>
                     </TabsContent>
                     <TabsContent className="pt-3" value="commits">
                         {current === "commits" && (

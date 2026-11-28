@@ -15,7 +15,7 @@ const CommitsTab = ({ address, commitLimit, hostLabel, leftOut }: { address: Pul
     const commits = usePullRequestCommits(address, true);
 
     if (commits.isPending) {
-        return <Skeleton aria-label={t`Loading commits`} className="h-24 w-full" role="status" />;
+        return <Skeleton aria-label={t`Loading commits`} className="h-24 w-full rounded-xl" role="status" />;
     }
 
     const pages = commits.data?.pages ?? [];
@@ -30,7 +30,7 @@ const CommitsTab = ({ address, commitLimit, hostLabel, leftOut }: { address: Pul
     return (
         <div className="space-y-3">
             {leftOut > 0 && (
-                <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm" role="note">
+                <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm" role="note">
                     {t`The host lists at most ${plural(commitLimit, { one: "# commit", other: "# commits" })} for one change. ${plural(leftOut, { one: "# more is not shown here.", other: "# more are not shown here." })}`}
                 </p>
             )}
