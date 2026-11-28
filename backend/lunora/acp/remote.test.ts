@@ -608,7 +608,7 @@ describe("forkHostThread", () => {
         expect(await textOf(threadId)).toEqual(["first question", "first answer", "second question", "second answer"]);
     });
 
-    it("copies only settled messages when the source is still replying", async () => {
+    it("copies only settled messages when the source has an unsettled tail but no live reply", async () => {
         const { threadId } = await started();
 
         await say(threadId, [
@@ -1080,7 +1080,14 @@ describe("forkHostThread", () => {
             // The prompt that arrives while the session is `starting` would be saved ahead of the divider and lose the summary.
             expect(await outcomeOfSend(result.threadId)).toBe("session_starting");
 
+            // The page reads the session while it waits, and again after the fallback: the added marks do not break the read.
+            const waiting = (await as(ownerId).query(getHostSession as never, { threadId: result.threadId } as never)) as Row;
+
+            expect(waiting).toMatchObject({ status: "starting" });
+            expect(waiting).not.toHaveProperty("awaitingForkResult");
+
             await open(device, result.threadId, { forked: false, reason: "fork_unsupported" });
+            expect(await as(ownerId).query(getHostSession as never, { threadId: result.threadId } as never)).toMatchObject({ status: "idle" });
 
             const [opened] = await rows("acpSessions", { threadId: result.threadId });
 
