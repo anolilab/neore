@@ -464,6 +464,12 @@ const PARTING_WORDS = new Set(["and", "oder", "or", "und"]);
 /** The words that may join a month and a relative year: `in May last year`, `letztes Jahr im Mai`. */
 const MAX_YEAR_GAP = 4;
 
+/**
+ * The most phrase reads one question may cost. Each token is read once (`readAt` keeps what it read), so a question of
+ * `MAX_TEXT_LENGTH` stays far under it; a text that still reaches it names no time.
+ */
+const MAX_READS = 2000;
+
 /** Most words a part of a month is named with (`last week of`). */
 const MAX_PART_WORDS = 3;
 
@@ -655,28 +661,33 @@ export const readTimePhrase = (text: string): TimePhrase | undefined => {
 
         const fromAt = index + (BOUND_ARTICLES.has(words[index + 1] ?? "") ? 2 : 1);
         const from = readAt(fromAt) ?? yearAt(fromAt);
-        const fromDay = from === undefined ? dayNumberOf(words[fromAt]) : undefined;
         const endAt = fromAt + (from?.size ?? 1);
         const toAt = endAt + (BOUND_ARTICLES.has(words[endAt + 1] ?? "") ? 2 : 1);
-        const to = lexicon.rangeEnds.includes(words[endAt] ?? "") ? (readAt(toAt) ?? yearAt(toAt)) : undefined;
+
+        if (!lexicon.rangeEnds.includes(words[endAt] ?? "") || !joinedThrough(index, toAt)) {
+            return undefined;
+        }
+
+        const to = readAt(toAt) ?? yearAt(toAt);
         const isTime = (read: Read | undefined): read is Read =>
             read !== undefined && read.more === undefined && (read.phrase.kind === "date" || read.phrase.kind === "year");
 
-        if (!isTime(to) || !joinedThrough(index, toAt)) {
-            return undefined;
+        if (isTime(from) && isTime(to)) {
+            return { phrase: { from: from.phrase, kind: "between", to: to.phrase }, size: toAt - index + to.size };
         }
 
-        const size = toAt - index + to.size;
+        // A bare day at one end takes the month and year of the other: `vom 3. bis 10. Dezember`, `from March 3 to 10`.
+        const [fromDay, toDay] = [from === undefined ? dayNumberOf(words[fromAt]) : undefined, to === undefined ? dayNumberOf(words[toAt]) : undefined];
 
-        if (isTime(from)) {
-            return { phrase: { from: from.phrase, kind: "between", to: to.phrase }, size };
+        if (fromDay !== undefined && isTime(to) && to.phrase.kind === "date") {
+            return { phrase: { from: { ...to.phrase, day: fromDay, part: undefined }, kind: "between", to: to.phrase }, size: toAt - index + to.size };
         }
 
-        if (fromDay === undefined || to.phrase.kind !== "date") {
-            return undefined;
+        if (toDay !== undefined && isTime(from) && from.phrase.kind === "date" && from.phrase.day !== undefined) {
+            return { phrase: { from: from.phrase, kind: "between", to: { ...from.phrase, day: toDay } }, size: toAt - index + 1 };
         }
 
-        return { phrase: { from: { ...to.phrase, day: fromDay, part: undefined }, kind: "between", to: to.phrase }, size };
+        return undefined;
     };
     // A phrase at a token: a range word before a month, a day or a year (`since May`, `bis 2023`), the part of a month
     // asked (`Ende Mai`), else the time itself with its group and year. A range word before any other time (`vor drei
@@ -688,7 +699,20 @@ export const readTimePhrase = (text: string): TimePhrase | undefined => {
 
         return year === undefined ? undefined : { phrase: { kind: "year", year }, size: 1 };
     };
+    // What each token reads, kept: a range or a range word reads the tokens after it, which the walk reads again, and
+    // nested range words would otherwise read them again for every way they nest.
+    const reads = new Map<number, Read | undefined>();
+    let budget = MAX_READS;
     const readAt = (index: number): Read | undefined => {
+        if (!reads.has(index)) {
+            budget -= 1;
+            reads.set(index, budget < 0 ? undefined : readFresh(index));
+        }
+
+        return reads.get(index);
+    };
+
+    function readFresh(index: number): Read | undefined {
         const range = rangeAt(index);
 
         if (range !== undefined) {
@@ -725,7 +749,7 @@ export const readTimePhrase = (text: string): TimePhrase | undefined => {
         const near = phraseFrom(index);
 
         return near === undefined ? undefined : withNearYear(near, index);
-    };
+    }
 
     // Every phrase in order, each read from where the one before it ends.
     const readAll = (read: (index: number) => Read | undefined): Found[] => {
@@ -784,9 +808,11 @@ export const readTimePhrase = (text: string): TimePhrase | undefined => {
     // ISO dates are the most exact a question can be and are read alone; otherwise every phrase is, the first leading.
     const iso = isoDates();
     const phrases = iso.length > 0 ? iso : readAll(readAt);
+
     const [first, ...rest] = phrases.flatMap(({ read }) => [read.phrase, ...(read.more ?? [])]);
 
-    if (first === undefined) {
+    // A text that spent every read is built to, not a question: it names no time.
+    if (first === undefined || budget < 0) {
         return undefined;
     }
 

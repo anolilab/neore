@@ -389,6 +389,8 @@ describe("timeWindowOf", () => {
         ["what did I do from March 3 until March 10", ["2026-03-03", "2026-03-10"]],
         ["from the 3rd to the 10th of December", ["2026-12-03", "2026-12-10"]],
         ["was steht vom 3. bis 10. Dezember an", ["2026-12-03", "2026-12-10"]],
+        ["what did I do from March 3 to 10", ["2026-03-03", "2026-03-10"]],
+        ["was war vom 3. März bis 10.", ["2026-03-03", "2026-03-10"]],
         ["was war von Mai bis Juli", ["2026-05-01", "2026-07-31"]],
         ["wo habe ich von 2021 bis 2023 gewohnt", ["2021-01-01", "2023-12-31"]],
         // An end before the start is the next one; a start without a year takes the end's.
@@ -401,6 +403,18 @@ describe("timeWindowOf", () => {
         ["what did I do from May", ["2026-05-01", "2026-05-31"]],
     ])("reads %j as one span", (text, expected) => {
         expect(windowOf(text)).toEqual(expected);
+    });
+
+    it("reads a text of nested range words in bounded time", () => {
+        // Each token is read once: nested `from … until` would otherwise read the tokens after them once per nesting.
+        for (const unit of ["from from until ", "von von bis ", "from the until "]) {
+            const text = unit.repeat(1000).slice(0, 1000);
+            const started = performance.now();
+            const window = timeWindowOf(`${text} May`, TODAY);
+
+            expect(performance.now() - started, unit).toBeLessThan(50);
+            expect(window, unit).toBeUndefined();
+        }
     });
 
     it("keeps a range word before a time it does not bound as it was", () => {
