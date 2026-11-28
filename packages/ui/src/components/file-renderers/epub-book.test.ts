@@ -665,6 +665,21 @@ describe("a chapter's style sheets", () => {
         opened.destroy();
     });
 
+    it("inlines a picture whose quoted name holds an escaped quote", async () => {
+        const opened = await openEpub(
+            await book({
+                chapters: [{ body: `${links(["../main.css"])}<p>x</p>`, file: "text/one.xhtml", id: "c1" }],
+                files: { 'images/say "hi".png': PNG, "main.css": String.raw`.a{background:url("images/say \"hi\".png")} .b{x:1}` },
+            }),
+            folder.path,
+        );
+        const sheet = sheetsOf(parse(await opened.read("c1"))).join("");
+
+        expect(sheet).toContain('url("data:image/png;base64,');
+        expect(sheet).toContain(".b{x:1}");
+        opened.destroy();
+    });
+
     it("leaves text that looks like an import inside a string as text", async () => {
         const opened = await openEpub(
             await book({

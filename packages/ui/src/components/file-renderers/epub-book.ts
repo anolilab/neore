@@ -399,7 +399,9 @@ const assetReader = (zip: JSZip, declared: ReadonlyMap<string, string>, signal?:
     };
 };
 
-const CSS_URL = /url\(("[^"]*"|'[^']*'|[^)]*)\)/giu;
+// A quoted address reads an escaped character inside it (`\"`), so a quote or a parenthesis in a file name does not end it early.
+const CSS_URL = /url\(("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|[^)]*)\)/gisu;
+const CSS_ESCAPED = /\\([\s\S])/gu;
 const CSS_QUOTE = /^["']|["']$/gu;
 const CSS_SCRIPTY = /expression\s*\(|-moz-binding\s*:|behaviou?r\s*:/giu;
 const LESS_THAN = /</gu;
@@ -407,7 +409,10 @@ const CSS_ESCAPE = /\\([\da-f]{1,6})\s?/giu;
 const IMAGE_SET = /(?:-webkit-)?image-set\s*\((?:[^()]|\([^()]*\))*\)/giu;
 const SRC_FUNCTION = /(?<![\w-])src\s*\((?:[^()]|\([^()]*\))*\)/giu;
 
-const isDataUrl = (address: string): boolean => address.trim().replaceAll(CSS_QUOTE, "").trim().toLowerCase().startsWith("data:");
+/** The address a `url()` argument names: trimmed, unquoted, and with each backslash escape read as the character it escapes. */
+const addressOf = (argument: string): string => argument.trim().replaceAll(CSS_QUOTE, "").replaceAll(CSS_ESCAPED, "$1").trim();
+
+const isDataUrl = (address: string): boolean => addressOf(address).toLowerCase().startsWith("data:");
 
 const dataOnly = (match: string, argument: string): string => (isDataUrl(argument) ? match : 'url("")');
 
@@ -449,7 +454,7 @@ const inlineStylesheetUrls = async (css: string, directory: string, reader: Asse
     const answers: (string | undefined)[] = [];
 
     for (const argument of found) {
-        const path = resolveInArchive(argument.trim().replaceAll(CSS_QUOTE, "").trim(), directory);
+        const path = resolveInArchive(addressOf(argument), directory);
 
         answers.push(path === undefined ? undefined : await reader.dataUrl(path));
     }
