@@ -13,7 +13,7 @@
 //! request after it, without being sent. `mcp.rs` reads that error, stops the bridge and sends the call once more to a
 //! new one, which opens a new session.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::io::{self, BufRead, BufReader, Read, Write};
 use std::process::ExitCode;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -36,7 +36,7 @@ const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(150);
 /// One reply: a JSON object or a whole event stream.
 const MAX_REPLY_BYTES: u64 = 16 * 1024 * 1024;
-/// One message from the client. A request runs beside up to `MAX_IN_FLIGHT - 1` others, each holding its own.
+/// One message from the client. Each request, running or waiting for a slot, holds its own.
 const MAX_MESSAGE_BYTES: usize = 4 * 1024 * 1024;
 const MAX_URL_BYTES: usize = 2048;
 const MAX_HEADERS: usize = 32;
@@ -96,12 +96,12 @@ fn scrub(text: &mut String, secrets: &Secrets) {
         }
 
         let bytes = haystack.as_bytes();
+        let word_byte = |at: Option<&u8>| at.is_some_and(|byte| byte.is_ascii_alphanumeric());
         let mut scrubbed = String::with_capacity(text.len());
         let mut from = 0;
 
         for (at, _) in haystack.match_indices(&needle) {
             let end = at + needle.len();
-            let word_byte = |at: Option<&u8>| at.is_some_and(|byte| byte.is_ascii_alphanumeric());
 
             if whole_word
                 && (word_byte(at.checked_sub(1).and_then(|before| bytes.get(before)))
@@ -177,8 +177,7 @@ fn redact(value: &mut Value, secrets: &Secrets) {
         Value::Object(fields) => {
             let mut kept = serde_json::Map::new();
             // The next suffix to try for each key, so many keys that blank alike do not each search from the start.
-            let mut next: std::collections::HashMap<String, usize> =
-                std::collections::HashMap::new();
+            let mut next: HashMap<String, usize> = HashMap::new();
 
             for (mut key, mut item) in std::mem::take(fields) {
                 scrub(&mut key, secrets);
