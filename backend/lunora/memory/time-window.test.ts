@@ -116,6 +116,36 @@ describe("timeWindowOf", () => {
                 ["2027-01-01", "2027-12-31"],
             ],
         ],
+        // A year after a group of months is every month's; a month and a year phrase stay apart
+        [
+            "what events did I have in May and June last year",
+            [
+                ["2025-05-01", "2025-05-31"],
+                ["2025-06-01", "2025-06-30"],
+            ],
+        ],
+        [
+            "im Mai und Juni letztes Jahr",
+            [
+                ["2025-05-01", "2025-05-31"],
+                ["2025-06-01", "2025-06-30"],
+            ],
+        ],
+        [
+            "what did I do in March, April and May 2024",
+            [
+                ["2024-03-01", "2024-03-31"],
+                ["2024-04-01", "2024-04-30"],
+                ["2024-05-01", "2024-05-31"],
+            ],
+        ],
+        [
+            "what did I do in May and June",
+            [
+                ["2026-05-01", "2026-05-31"],
+                ["2026-06-01", "2026-06-30"],
+            ],
+        ],
         // `für den Morgen` is the morning of the day named
         ["Was ist für den Morgen am 3. Dezember geplant?", ["2026-12-03", "2026-12-03"]],
         // `going` is future only in `going to`; an `-ed` word after am/is/are is the passive
@@ -169,6 +199,9 @@ describe("timeWindowOf", () => {
         // `Morgen` the time of day is no tomorrow; `morgen` the adverb is
         ["habe ich morgen frei", ["2026-11-28", "2026-11-28"]],
         ["wir sehen uns morgen früh", ["2026-11-28", "2026-11-28"]],
+        // An adjective stem blocks only with its inflection: `spätestens` and `Frühstück` are other words
+        ["was muss ich spätestens morgen erledigen", ["2026-11-28", "2026-11-28"]],
+        ["was gibt es zum Frühstück morgen", ["2026-11-28", "2026-11-28"]],
     ])("reads %j", (text, expected) => {
         expect(windowOf(text)).toEqual(expected);
     });

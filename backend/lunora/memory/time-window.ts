@@ -237,6 +237,8 @@ const isoAt = (text: string, tokens: Token[], at: number): Read | undefined => {
 
 /** A phrase read at a token, and how many tokens it took. */
 interface Read {
+    /** The other months of a group the phrase leads ("May and June last year"), each a span of its own. */
+    more?: TimePhrase[];
     phrase: TimePhrase;
     size: number;
 }
@@ -253,7 +255,8 @@ const phraseAt = (words: string[], at: number, lexicon: Lexicon, tense: Tense): 
     const day = lexicon.days[word];
     const previous = words[at - 1] ?? "";
     const blocked =
-        day?.blockedAfter?.includes(previous) === true || day?.adjectives?.some((stem) => previous.length > stem.length && previous.startsWith(stem)) === true;
+        day?.blockedAfter?.includes(previous) === true ||
+        day?.adjectives?.some((stem) => ADJECTIVE_ENDINGS.some((ending) => previous === `${stem}${ending}`)) === true;
 
     if (day !== undefined && !blocked) {
         return { phrase: { days: day.offset, kind: "offset" }, size: 1 };
@@ -376,6 +379,12 @@ const LEXICON_WORDS = new Map(
 
 const isNumber = (word: string): boolean => SMALL_NUMBER_RE.test(word) || DAY_NUMBER_RE.test(word) || YEAR_RE.test(word);
 
+/** A German adjective's inflection: `früh` + `en` is `frühen`; `spätestens` and `Frühstück` are other words. */
+const ADJECTIVE_ENDINGS = ["e", "em", "en", "er", "es"];
+
+/** Words that join months into one group: a year after the last is every month's ("May and June last year"). */
+const GROUP_WORDS = new Set(["and", "und"]);
+
 /** Words that part two times: a relative year never joins a month across them ("in May or last year", "May and next year"). */
 const PARTING_WORDS = new Set(["and", "oder", "or", "und"]);
 
@@ -410,14 +419,51 @@ export const readTimePhrase = (text: string): TimePhrase | undefined => {
     };
     const isRelativeYear = (near: TimePhrase): boolean => near.kind === "relative" && near.unit === "year";
     const isYearlessMonth = (near: TimePhrase): boolean => near.kind === "date" && near.year === undefined;
+    const monthOf = (word: string | undefined): number | undefined =>
+        ranked.map(({ lexicon }) => monthIndexOf(word, lexicon)).find((month) => month !== undefined);
+    // The months right after a phrase's own, each after `and`/`und` or a comma (gone from the tokens): `May, June and July`.
+    const monthsAfter = (from: number): { end: number; months: number[] } => {
+        const months: number[] = [];
+        let at = from;
+
+        for (;;) {
+            const joined = GROUP_WORDS.has(words[at] ?? "") ? at + 1 : at;
+            const month = monthOf(words[joined]);
+
+            if (month === undefined) {
+                return { end: at, months };
+            }
+
+            months.push(month);
+            at = joined + 1;
+        }
+    };
     const withNearYear = ({ phrase, size }: Read, index: number): Read => {
         // The joined phrase runs to the end of the later one.
         const through = (near: { read: Read; start: number }): number => Math.max(size, near.start - index + near.read.size);
 
         if (phrase.kind === "date" && phrase.year === undefined) {
-            const near = firstNear(index, isRelativeYear);
+            // A year after the last month of a group is every month's: "May and June last year", "Mai und Juni 2023".
+            const group = monthsAfter(index + size);
+            const explicit = group.months.length > 0 ? yearOf(words[group.end]) : undefined;
+            const lastMonth = group.months.length > 0 ? group.end - 1 : index;
+            const near = explicit === undefined ? firstNear(lastMonth, isRelativeYear) : undefined;
+            let years: { year?: number; yearShift?: Shift } = {};
+            let end = group.end - index;
 
-            return near?.read.phrase.kind === "relative" ? { phrase: { ...phrase, yearShift: near.read.phrase.shift }, size: through(near) } : { phrase, size };
+            if (explicit !== undefined) {
+                years = { year: explicit };
+                end += 1;
+            } else if (near?.read.phrase.kind === "relative") {
+                years = { yearShift: near.read.phrase.shift };
+                end = through(near);
+            }
+
+            const more = group.months.map((month): TimePhrase => {
+                return { kind: "date", month, tense: phrase.tense, ...(phrase.nearest !== undefined && { nearest: phrase.nearest }), ...years };
+            });
+
+            return { ...(more.length > 0 && { more }), phrase: { ...phrase, ...years }, size: Math.max(size, end) };
         }
 
         if (phrase.kind !== "relative" || phrase.unit !== "year") {
@@ -458,7 +504,7 @@ export const readTimePhrase = (text: string): TimePhrase | undefined => {
 
                   return near === undefined ? undefined : withNearYear(near, index);
               });
-    const [first, ...rest] = phrases;
+    const [first, ...rest] = phrases.flatMap(({ read }) => [read.phrase, ...(read.more ?? [])]);
 
     if (first === undefined) {
         return undefined;
@@ -472,8 +518,8 @@ export const readTimePhrase = (text: string): TimePhrase | undefined => {
         isNumber(word) ? inPhrase(index) : LEXICONS.some((lexicon) => LEXICON_WORDS.get(lexicon)!.has(word));
 
     return {
-        ...first.read.phrase,
-        ...(rest.length > 0 && { also: rest.map(({ read }) => read.phrase) }),
+        ...first,
+        ...(rest.length > 0 && { also: rest }),
         onlyTime: whole && words.every((word, index) => isTimeWord(word, index)),
     };
 };
