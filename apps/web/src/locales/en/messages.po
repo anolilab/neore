@@ -6507,6 +6507,11 @@ msgstr "Channel secret from the Basic settings tab, used to verify X-Line-Signat
 msgid "Channels"
 msgstr "Channels"
 
+#. placeholder {0}: index + 1
+#: ../../packages/ui/src/components/file-renderers/epub-preview.tsx:161
+msgid "Chapter {0} of {total}"
+msgstr "Chapter {0} of {total}"
+
 #: src/features/workflow/templates/index.ts:311
 msgid "character"
 msgstr "character"
@@ -23064,6 +23069,10 @@ msgstr "Next"
 msgid "Next branch"
 msgstr "Next branch"
 
+#: ../../packages/ui/src/components/file-renderers/epub-preview.tsx:217
+msgid "Next chapter"
+msgstr "Next chapter"
+
 #: src/features/marketing/data/models-data.ts:270
 msgid "next gen"
 msgstr "next gen"
@@ -27058,6 +27067,10 @@ msgstr "Previous"
 #: ../../packages/ui/src/components/ai-elements/message.tsx:208
 msgid "Previous branch"
 msgstr "Previous branch"
+
+#: ../../packages/ui/src/components/file-renderers/epub-preview.tsx:205
+msgid "Previous chapter"
+msgstr "Previous chapter"
 
 #: src/features/settings/components/privacy/data-export.tsx:138
 msgid "Previous export was cancelled"
@@ -37246,6 +37259,10 @@ msgstr "too large"
 #: src/features/chat/thread/use-ask-user-attachments.ts:180
 msgid "Too large to attach: {0}. Reduce the file and attach it again."
 msgstr "Too large to attach: {0}. Reduce the file and attach it again."
+
+#: ../../packages/ui/src/components/file-renderers/epub-preview.tsx:152
+msgid "Too large to preview · Click to download"
+msgstr "Too large to preview · Click to download"
 
 #: src/features/settings/components/chat/bot-tool-selection.tsx:366
 msgid "Too long to add: the server's address or the tool's name is too long."

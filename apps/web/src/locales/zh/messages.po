@@ -6508,6 +6508,11 @@ msgstr "“基本设置”标签页中的 Channel secret，用于验证 X-Line-S
 msgid "Channels"
 msgstr "通道"
 
+#. placeholder {0}: index + 1
+#: ../../packages/ui/src/components/file-renderers/epub-preview.tsx:161
+msgid "Chapter {0} of {total}"
+msgstr "第 {0} 章，共 {total} 章"
+
 #: src/features/workflow/templates/index.ts:311
 msgid "character"
 msgstr "角色"
@@ -23065,6 +23070,10 @@ msgstr "下一步"
 msgid "Next branch"
 msgstr "下一个分支"
 
+#: ../../packages/ui/src/components/file-renderers/epub-preview.tsx:217
+msgid "Next chapter"
+msgstr "下一章"
+
 #: src/features/marketing/data/models-data.ts:270
 msgid "next gen"
 msgstr "新一代"
@@ -27059,6 +27068,10 @@ msgstr "上一个"
 #: ../../packages/ui/src/components/ai-elements/message.tsx:208
 msgid "Previous branch"
 msgstr "上一个分支"
+
+#: ../../packages/ui/src/components/file-renderers/epub-preview.tsx:205
+msgid "Previous chapter"
+msgstr "上一章"
 
 #: src/features/settings/components/privacy/data-export.tsx:138
 msgid "Previous export was cancelled"
@@ -37247,6 +37260,10 @@ msgstr "文件过大"
 #: src/features/chat/thread/use-ask-user-attachments.ts:180
 msgid "Too large to attach: {0}. Reduce the file and attach it again."
 msgstr "文件过大，无法附加：{0}。请缩小文件后重新附加。"
+
+#: ../../packages/ui/src/components/file-renderers/epub-preview.tsx:152
+msgid "Too large to preview · Click to download"
+msgstr "文件过大，无法预览 · 点击下载"
 
 #: src/features/settings/components/chat/bot-tool-selection.tsx:366
 msgid "Too long to add: the server's address or the tool's name is too long."
