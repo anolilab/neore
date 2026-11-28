@@ -150,7 +150,7 @@ const CharacterRefNodeComponent = (props: NodeProps<Node<CharacterRefNodeData>>)
                 </div>
 
                 <div className="space-y-1.5">
-                    <Label className="text-muted-foreground text-xs">
+                    <Label className="text-muted-foreground text-xs" htmlFor={`ref-input-${id}`}>
                         <Trans>
                             Reference Images ({referenceCount}/{maxImages})
                         </Trans>
@@ -177,6 +177,7 @@ const CharacterRefNodeComponent = (props: NodeProps<Node<CharacterRefNodeData>>)
                             <div className="flex gap-2">
                                 <Input
                                     className="nodrag h-8 text-xs"
+                                    id={`ref-input-${id}`}
                                     onKeyDown={(e) => {
                                         if (e.key !== "Enter" || e.nativeEvent.isComposing) {
                                             return;
@@ -212,11 +213,11 @@ const CharacterRefNodeComponent = (props: NodeProps<Node<CharacterRefNodeData>>)
                 </div>
 
                 <div className="space-y-1.5">
-                    <Label className="text-muted-foreground text-xs">
+                    <Label className="text-muted-foreground text-xs" htmlFor={`${id}-mode`}>
                         <Trans>Reference Mode</Trans>
                     </Label>
                     <Select onValueChange={handleModeChange} value={data.mode ?? "face"}>
-                        <SelectTrigger className="nodrag h-8 text-sm">
+                        <SelectTrigger className="nodrag h-8 text-sm" id={`${id}-mode`}>
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -239,7 +240,15 @@ const CharacterRefNodeComponent = (props: NodeProps<Node<CharacterRefNodeData>>)
                         </Label>
                         <span className="text-muted-foreground text-xs">{((data.strength ?? 0.8) * 100).toFixed(0)}%</span>
                     </div>
-                    <Slider className="nodrag" max={1} min={0} onValueChange={handleStrengthChange} step={0.05} value={[data.strength ?? 0.8]} />
+                    <Slider
+                        className="nodrag"
+                        max={1}
+                        min={0}
+                        onValueChange={handleStrengthChange}
+                        step={0.05}
+                        thumbLabel={t`Reference Strength`}
+                        value={[data.strength ?? 0.8]}
+                    />
                     <p className="text-muted-foreground text-xs">
                         <Trans>Higher = closer match to reference</Trans>
                     </p>
