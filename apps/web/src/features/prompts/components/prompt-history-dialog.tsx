@@ -24,22 +24,22 @@ interface PromptHistoryDialogProps {
 
 const changeTypeConfig = {
     created: {
-        color: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+        color: "bg-success/10 text-success-foreground",
         icon: Check,
         label: msg`Created`,
     },
     manual: {
-        color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
+        color: "bg-info/10 text-info-foreground",
         icon: User,
         label: msg`Manual Edit`,
     },
     optimized: {
-        color: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
+        color: "bg-primary/10 text-primary-text",
         icon: Sparkles,
         label: msg`AI Optimized`,
     },
     restored: {
-        color: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
+        color: "bg-warning/10 text-warning-foreground",
         icon: RotateCcw,
         label: msg`Restored`,
     },
@@ -121,8 +121,8 @@ const PromptHistoryDialog = ({ onClose, open, prompt }: PromptHistoryDialogProps
 
                                             return (
                                                 <button
-                                                    className={`w-full rounded-lg border p-3 text-left transition-colors ${
-                                                        isSelected ? "border-primary bg-primary/5" : "hover:bg-muted border-transparent"
+                                                    className={`w-full rounded-lg p-3 text-left transition-colors ${
+                                                        isSelected ? "bg-surface-row-active" : "hover:bg-surface-row-hover"
                                                     }`}
                                                     key={entry._id}
                                                     onClick={() => setSelectedVersion(entry as Doc<"promptHistory">)}
@@ -160,7 +160,7 @@ const PromptHistoryDialog = ({ onClose, open, prompt }: PromptHistoryDialogProps
                             <h3 className="mb-2 text-sm font-medium">
                                 {selectedVersion ? t`Version ${selectedVersion.version} Content` : t`Select a version to preview`}
                             </h3>
-                            <div className="bg-muted h-96 overflow-hidden rounded-lg">
+                            <div className="surface-well h-96 overflow-hidden rounded-lg">
                                 {selectedVersion ? (
                                     <ScrollArea className="h-full">
                                         <div className="p-4">
@@ -190,7 +190,7 @@ const PromptHistoryDialog = ({ onClose, open, prompt }: PromptHistoryDialogProps
                     </div>
                 </DialogPanel>
 
-                <DialogFooter>
+                <DialogFooter className="border-border/50 border-t" variant="bare">
                     <Button onClick={onClose} variant="outline">
                         {t`Close`}
                     </Button>

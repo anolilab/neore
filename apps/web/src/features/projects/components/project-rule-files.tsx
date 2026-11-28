@@ -889,7 +889,7 @@ const ProjectRuleFiles: FC<{
     };
 
     return (
-        <section aria-labelledby={headingId} className="bg-muted/30 space-y-4 rounded-lg border p-4">
+        <section aria-labelledby={headingId} className="border-border/50 space-y-4 border-t pt-5">
             <div className="space-y-1">
                 <h3 className="text-sm font-medium" id={headingId}>{t`Rule files`}</h3>
                 <p className="text-muted-foreground text-xs">

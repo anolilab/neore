@@ -154,12 +154,152 @@ export const MARKETPLACE: MarketplaceSkill[] = [
     marketplaceSkill(6, "Bug triage", "Group incoming bug reports and propose owners.", "Code", 4.3, 280),
 ];
 
+const BUILDER_DRAFT = {
+    category: "Code",
+    description: "Summarise new GitHub issues every Monday and draft replies for the urgent ones.",
+    disableTools: [{ name: "run_code", reason: "The skill only reads and writes text." }],
+    enableTools: [{ name: "web_search", reason: "To read linked pages in an issue." }],
+    instructions: "List the issues opened since last Monday.\nGroup them by label and flag the urgent ones.\nDraft a short reply for each urgent issue.",
+    name: "Weekly issue digest",
+    preferredModel: { id: "anthropic/claude-sonnet-4.5", name: "Claude Sonnet 4.5", reason: "Good at summarising long threads." },
+    reasoningEffort: { reason: "A summary needs little reasoning.", value: 0.3 },
+    searchMode: { id: "web", reason: "Issues link to pages outside the repository." },
+    slug: "weekly-issue-digest",
+    tags: ["github", "weekly"],
+    variables: [{ defaultValue: "acme/storefront", description: "The repository to read", name: "repository", required: true }],
+};
+
 /** The skills page with a populated list; `skills` empty gives the empty state. */
 export const skillsFixtures = (options: { marketplace?: MarketplaceSkill[]; skills?: SkillRow[] } = {}): LunoraFixture[] => [
     lunora(api.skills.functions.getSkills, options.skills ?? SKILLS),
     lunora(api.skills.functions.getSkillCount, { canCreate: true, count: (options.skills ?? SKILLS).length, isPremium: true, limit: null }),
     lunora(api.skills.marketplace.browseSkills, { hasMore: false, skills: options.marketplace ?? MARKETPLACE }),
     lunora(api.skills.marketplace.searchSkills, []),
+    // The dialogs over the page: the form's tool picker, the bundle export's lists and a marketplace skill's detail.
+    lunora(api.skills.functions.getAvailableSkillTools, [
+        { category: "Web", description: "Search the web and read a page.", name: "web_search" },
+        { category: "Files", description: "Read a file from the vault.", name: "read_file" },
+        { category: "Code", description: "Run a snippet in a sandbox.", name: "run_code" },
+    ]),
+    lunora(api.skills.bundle.listBundleCandidates, {
+        groupChats: [
+            { exportable: true, id: id<"threads">("thread_g1"), mode: "group", participantSkillIds: ["skill_1"], title: "Launch room" },
+            {
+                exportable: false,
+                id: id<"threads">("thread_g2"),
+                mode: "group",
+                participantSkillIds: [],
+                reason: "Has a participant that is not a skill.",
+                title: "Standup",
+            },
+        ],
+        limits: { groupChats: 5, skills: 50, triggers: 10 },
+        skills: (options.skills ?? SKILLS).slice(0, 4).map((row) => {
+            return { description: row.description, id: row._id, name: row.name, slug: row.slug };
+        }),
+        triggers: [
+            { exportable: true, id: id<"triggers">("trigger_1"), name: "Monday brief", schedule: "0 8 * * 1", type: "schedule" },
+            { exportable: false, id: id<"triggers">("trigger_2"), name: "Deploy hook", reason: "A webhook secret cannot be exported.", type: "webhook" },
+        ],
+    } as never),
+    // The agent builder's turn and refinement, and the bundle import's dry run.
+    lunora(api.skills.builder.runBuilderTurn, {
+        draft: BUILDER_DRAFT,
+        kind: "draft",
+        recommendations: {
+            connectors: [],
+            marketplaceSkills: [
+                {
+                    reason: "It already turns notes into a status update.",
+                    skill: {
+                        _id: id<"skills">("market_1"),
+                        description: "Turn a transcript into minutes with decisions and owners.",
+                        name: "Meeting minutes",
+                        rating: 4.6,
+                        ratingCount: 13,
+                        slug: "meeting-minutes",
+                        usageCount: 1840,
+                    },
+                },
+            ],
+            mcpRegistryAvailable: true,
+            mcpServers: [
+                {
+                    reason: "Reads the issues of your repository.",
+                    server: { description: "Issues, pull requests and files from GitHub.", id: "io.github.github", remotes: [], title: "GitHub" },
+                },
+            ],
+        },
+    } as never),
+    lunora(api.skills.builder.refineBuilderDraft, {
+        changedFields: ["instructions", "tags"],
+        draft: { ...BUILDER_DRAFT, instructions: `${BUILDER_DRAFT.instructions}\nKeep it under ten lines.`, tags: ["github", "weekly", "issues"] },
+    } as never),
+    lunora(api.skills.bundle.previewBundle, {
+        description: "Three skills and a schedule for the support team.",
+        entries: [
+            {
+                key: "skill:0",
+                kind: "skill",
+                problems: [],
+                requires: [],
+                skill: {
+                    baseSlug: "support-reply",
+                    description: "Answer a customer email in a calm tone.",
+                    disabledTools: [],
+                    droppedTools: [],
+                    instructions: "Answer in a calm tone and follow the refund policy.",
+                    name: "Support reply",
+                    slug: "support-reply-2",
+                    tools: ["web_search"],
+                },
+                title: "Support reply",
+                warnings: ['You already have a skill named "support-reply"; this one will be imported as "support-reply-2".'],
+            },
+            {
+                key: "skill:1",
+                kind: "skill",
+                problems: ["Needs the tool run_code, which your plan does not include."],
+                requires: [],
+                title: "Code review",
+                warnings: [],
+            },
+            {
+                key: "trigger:0",
+                kind: "trigger",
+                problems: [],
+                requires: ["skill:0"],
+                title: "Monday digest",
+                trigger: { filters: [], model: "anthropic/claude-sonnet-4.5", schedule: "0 8 * * 1", task: "Summarise last week's tickets.", type: "schedule" },
+                warnings: [],
+            },
+        ],
+        existingSlugs: ["support-reply"],
+        name: "Support team bundle",
+        skillSlotsLeft: 5,
+    } as never),
+    lunora(api.skills.marketplace.getSkillDetail, ({ skillId }: { skillId: unknown }) => {
+        const listed = (options.marketplace ?? MARKETPLACE).find((candidate) => candidate._id === skillId) ?? MARKETPLACE[0]!;
+
+        return {
+            _id: listed._id,
+            category: listed.category,
+            currentVersion: 3,
+            description: listed.description,
+            instructions: "Read the transcript. List each decision with its owner, then the open questions.\n\nKeep the minutes under one page.",
+            isEnabled: false,
+            isInstalled: false,
+            isOwner: false,
+            myRating: null,
+            name: listed.name,
+            rating: listed.rating,
+            ratingCount: listed.ratingCount,
+            slug: listed.slug,
+            tags: listed.tags,
+            usageCount: listed.usageCount,
+            variables: [{ defaultValue: "", description: "The transcript to summarise", name: "transcript", required: true }],
+        } as never;
+    }),
 ];
 
 type PromptRow = Awaited<ReturnOf<typeof api.prompts.functions.getPrompts>>[number];
@@ -205,6 +345,34 @@ export const promptsFixtures = (prompts: PromptRow[] = PROMPTS): LunoraFixture[]
     lunora(api.prompts.functions.getPrompts, prompts),
     lunora(api.prompts.functions.getPromptCount, { canCreate: true, count: prompts.length, isPremium: true, limit: null }),
     lunora(api.prompts.functions.getPromptTags, prompts.length > 0 ? ["writing", "code", "summary", "language", "learning"] : []),
+    lunora(api.prompts.functions.getPromptHistory, ({ promptId }: { promptId: unknown }) => {
+        const row = prompts.find((candidate) => candidate._id === promptId) ?? prompts[0];
+
+        return row
+            ? ([
+                  {
+                      _id: "hist_3",
+                      changeType: "optimized",
+                      content: row.content,
+                      createdAt: ago(HOUR),
+                      note: "Tighter wording",
+                      promptId: row._id,
+                      userId: OWNER,
+                      version: 3,
+                  },
+                  {
+                      _id: "hist_2",
+                      changeType: "manual",
+                      content: `${row.content} Keep the tone.`,
+                      createdAt: ago(2 * DAY),
+                      promptId: row._id,
+                      userId: OWNER,
+                      version: 2,
+                  },
+                  { _id: "hist_1", changeType: "created", content: "Rewrite the text.", createdAt: ago(5 * DAY), promptId: row._id, userId: OWNER, version: 1 },
+              ] as never)
+            : [];
+    }),
 ];
 
 type TaskBoard = ReturnOf<typeof api.tasks.functions.getTaskBoard>;
@@ -351,7 +519,7 @@ type Dataset = ReturnOf<typeof api.evals.functions.listDatasets>[number];
 type Run = ReturnOf<typeof api.evals.functions.listRuns>[number];
 type DatasetDetail = ReturnOf<typeof api.evals.functions.getDataset>;
 
-const DATASETS: Dataset[] = [
+export const DATASETS: Dataset[] = [
     {
         _id: id<"evalDatasets">("ds_1"),
         caseCount: 24,
@@ -469,4 +637,31 @@ export const evalsFixtures = (datasets: Dataset[] = DATASETS): LunoraFixture[] =
     }),
     lunora(api.evals.functions.listRuns, ({ datasetId }: { datasetId: unknown }) => (datasetId === DATASETS[0]!._id ? RUNS : [])),
     lunora(api.knowledge.functions.listFiles, [] as never),
+];
+
+/** What the project form reads once it edits a project: its rule files, repositories, usage, knowledge links and the project. */
+export const projectFormFixtures = (): LunoraFixture[] => [
+    lunora(api.projects.functions.getProject, ({ projectId }: { projectId: unknown }) => {
+        return {
+            _id: projectId,
+            _creationTime: ago(9 * DAY),
+            canEditSettings: true,
+            color: "#6366f1",
+            description: "The storefront rebuild",
+            title: "Storefront",
+            updatedAt: ago(DAY),
+            userId: OWNER,
+        } as never;
+    }),
+    lunora(api.projects.functions.listProjectRuleFiles, {
+        canEdit: true,
+        files: [{ content: "Always answer in British English.", id: "rule_1", mode: "always", title: "House style" }],
+        revision: "r1",
+    } as never),
+    lunora(api.projects.functions.listProjectRepos, [
+        { defaultBranch: "main", id: "repo_1", isDefault: true, revision: 1, url: "https://github.com/acme/storefront" },
+    ]),
+    lunora(api.usage.activity.getProjectUsage, { costMicrodollars: 1_240_000, replies: 86, tokens: 412_000, truncated: false }),
+    lunora(api.knowledge.collections.listCollections, [] as never),
+    lunora(api.knowledge.collections.getProjectCollections, [] as never),
 ];

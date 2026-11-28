@@ -106,9 +106,9 @@ const MarketplaceSkillDetailDialog = ({ onClose, onForked, skillId }: Marketplac
                         </p>
                     )}
                     {skill && (
-                        <div className="space-y-5">
+                        <div className="divide-border/50 divide-y *:py-3 *:first:pt-0 *:last:pb-0">
                             <div className="flex flex-wrap items-center gap-2 text-sm">
-                                <code className="bg-muted rounded px-1.5 py-0.5 text-xs">/{skill.slug}</code>
+                                <code className="surface-well rounded px-1.5 py-0.5 text-xs">/{skill.slug}</code>
                                 {skill.category && <Badge variant="secondary">{skill.category}</Badge>}
                                 {skill.tags?.map((tag) => (
                                     <Badge key={tag} variant="outline">
@@ -120,7 +120,7 @@ const MarketplaceSkillDetailDialog = ({ onClose, onForked, skillId }: Marketplac
                             <dl className="text-muted-foreground flex flex-wrap gap-x-6 gap-y-1 text-sm">
                                 <div className="flex items-center gap-1">
                                     <dt className="sr-only">{t`Rating`}</dt>
-                                    <Star aria-hidden="true" className="size-4 fill-amber-400 text-amber-400" />
+                                    <Star aria-hidden="true" className="fill-warning text-warning size-4" />
                                     <dd>{skill.ratingCount > 0 ? t`${formatRating(skill.rating)} from ${skill.ratingCount} ratings` : t`No ratings yet`}</dd>
                                 </div>
                                 <div className="flex items-center gap-1">
@@ -153,7 +153,7 @@ const MarketplaceSkillDetailDialog = ({ onClose, onForked, skillId }: Marketplac
 
                             <div className="space-y-1">
                                 <h3 className="text-sm font-medium">{t`Instructions`}</h3>
-                                <pre className="bg-muted max-h-64 overflow-auto rounded-md p-3 text-xs whitespace-pre-wrap">{skill.instructions}</pre>
+                                <pre className="surface-well max-h-64 overflow-auto rounded-lg p-3 text-xs whitespace-pre-wrap">{skill.instructions}</pre>
                             </div>
 
                             {!skill.isOwner && (
@@ -167,7 +167,7 @@ const MarketplaceSkillDetailDialog = ({ onClose, onForked, skillId }: Marketplac
                         </div>
                     )}
                 </DialogPanel>
-                <DialogFooter>
+                <DialogFooter className="border-border/50 border-t" variant="bare">
                     <Button onClick={onClose} type="button" variant="outline">
                         {t`Close`}
                     </Button>

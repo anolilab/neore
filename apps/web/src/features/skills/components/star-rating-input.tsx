@@ -52,7 +52,7 @@ const StarRatingInput = ({ disabled, legend, onChange, value }: StarRatingInputP
                                 htmlFor={id}
                                 onMouseEnter={() => setHovered(star)}
                             >
-                                <Star aria-hidden="true" className={cn("size-5", star <= shown ? "fill-amber-400 text-amber-400" : "text-muted-foreground")} />
+                                <Star aria-hidden="true" className={cn("size-5", star <= shown ? "fill-warning text-warning" : "text-muted-foreground")} />
                                 <span className="sr-only">{t`${plural(star, { one: "# star", other: "# stars" })}`}</span>
                             </label>
                         </span>
