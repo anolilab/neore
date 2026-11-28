@@ -36,9 +36,6 @@ const SCHEDULERS = [
 type SamplerType = AdvancedControlsNodeData["sampler"];
 type SchedulerType = AdvancedControlsNodeData["scheduler"];
 
-/** How many seeds there are: 0 to 2,147,483,646. */
-const SEED_SPAN = 2_147_483_647;
-
 const AdvancedControlsNodeComponent = (props: NodeProps<Node<AdvancedControlsNodeData>>) => {
     const { data, id } = props;
     const updateNode = useWorkflowStore((state) => state.updateNode);
@@ -89,15 +86,8 @@ const AdvancedControlsNodeComponent = (props: NodeProps<Node<AdvancedControlsNod
     };
 
     const generateRandomSeed = () => {
-        // Seeds run 0 to 2,147,483,646, as everywhere else they are drawn. Halving maps exactly two values to each seed, an even
-        // spread where a modulo would favour the low ones; the two values above that range (1 in 2^31) are drawn again.
-        let entropy = SEED_SPAN * 2;
-
-        while (entropy >= SEED_SPAN * 2) {
-            [entropy = 0] = crypto.getRandomValues(new Uint32Array(1));
-        }
-
-        const randomSeed = Math.floor(entropy / 2);
+        // A seed only varies the output: drawn as every other seed in the app is, 0 to 2,147,483,646.
+        const randomSeed = Math.floor(Math.random() * 2_147_483_647);
 
         updateNode(id, { seed: randomSeed, useRandomSeed: false });
     };
