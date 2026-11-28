@@ -72,6 +72,7 @@ const PagesLayout: FC<{ children: ReactNode }> = ({ children }) => {
     const open = openedFor === pageKey && !isWide;
     const toggleRef = useRef<HTMLButtonElement | null>(null);
     const focusToggleWhenMounted = useRef(false);
+    const listRef = useRef<HTMLDivElement>(null);
     const treeIsContent = isListPath(pathname);
 
     const setOpen = useCallback(
@@ -92,9 +93,14 @@ const PagesLayout: FC<{ children: ReactNode }> = ({ children }) => {
     }, []);
 
     // Called when the drawer has closed: focus the toggle if it is there, else the next toggle to mount (the new page's header).
+    // On the Pages list (the open page was deleted from the drawer) there is no page header and no toggle: focus the tree.
     const returnFocus = useCallback(() => {
         if (toggleRef.current?.isConnected) {
             return toggleRef.current;
+        }
+
+        if (isListPath(globalThis.location.pathname)) {
+            return listRef.current?.querySelector<HTMLElement>("input, a[href], button") ?? false;
         }
 
         focusToggleWhenMounted.current = true;
@@ -108,7 +114,7 @@ const PagesLayout: FC<{ children: ReactNode }> = ({ children }) => {
 
     return (
         <PagesDrawerContext value={drawer}>
-            <div className="flex h-full min-h-0 w-full">
+            <div className="flex h-full min-h-0 w-full" ref={listRef}>
                 <PagesSidebar className={treeIsContent ? "max-lg:w-full max-lg:border-r-0" : "max-lg:hidden"} />
                 <div className={cn("flex min-w-0 flex-1", treeIsContent && "max-lg:hidden")}>{children}</div>
             </div>
