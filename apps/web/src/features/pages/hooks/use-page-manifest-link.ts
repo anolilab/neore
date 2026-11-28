@@ -1,8 +1,8 @@
 import { useEffect } from "react";
 
-import { pageManifestHref } from "../lib/page-manifest";
+import { MANIFEST_LINK_SELECTOR } from "@/features/download/lib/install-prompt-store";
 
-const MANIFEST_LINK_SELECTOR = 'link[rel="manifest"]';
+import { pageManifestHref } from "../lib/page-manifest";
 
 /**
  * While a page is mounted, points the document's manifest link at the page's own manifest, so the browser

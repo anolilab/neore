@@ -8,7 +8,8 @@ export interface BeforeInstallPromptEvent extends Event {
 /** The manifest of the Neore app itself (`__root.tsx`). A page's install uses its own manifest href. */
 export const APP_MANIFEST_HREF = "/manifest.json";
 
-const MANIFEST_LINK_SELECTOR = 'link[rel="manifest"]';
+/** The document's manifest link. Pages swap its href (`features/pages/hooks/use-page-manifest-link.ts`), so both read it through this selector. */
+export const MANIFEST_LINK_SELECTOR = 'link[rel="manifest"]';
 
 /** The manifest the document points at right now. Chromium reads this link when it decides what to install. */
 const currentManifestHref = (): string => document.querySelector(MANIFEST_LINK_SELECTOR)?.getAttribute("href") ?? APP_MANIFEST_HREF;

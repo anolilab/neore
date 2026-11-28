@@ -156,12 +156,9 @@ export const openThreadWindow = async (threadId: string): Promise<boolean> => {
     }
 };
 
-/** Whether the shell can open a page in its own window. Known synchronously, so a control can show or hide itself. */
-export const supportsPageWindows = (): boolean => getNative()?.capabilities.includes("page-windows") === true;
-
 /** Opens the page in its own shell window. `false` unless the shell advertises `page-windows`, or when it refuses the id. */
 export const openPageWindow = async (pageId: string): Promise<boolean> => {
-    if (!supportsPageWindows()) {
+    if (!hasNativeCapability("page-windows")) {
         return false;
     }
 

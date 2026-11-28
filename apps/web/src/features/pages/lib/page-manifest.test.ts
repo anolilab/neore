@@ -1,18 +1,21 @@
 import { describe, expect, it } from "vitest";
 
-import { buildPageManifest, isPageId, pageManifestHref } from "./page-manifest";
+import { buildPageManifest, pageManifestHref } from "./page-manifest";
+
+const FIRST = "1d0e2944-748e-4cd8-b8f4-7cd88273786a";
+const SECOND = "9b2f6c1e-0a3d-4e7b-8c5a-2f1d9e8b7a60";
 
 describe("buildPageManifest", () => {
     it("gives each page its own id, start URL and scope", () => {
-        const first = buildPageManifest("page_one");
-        const second = buildPageManifest("page_two");
+        const first = buildPageManifest(FIRST);
+        const second = buildPageManifest(SECOND);
 
-        expect(first).toMatchObject({ id: "/pages/page_one", scope: "/pages/page_one", start_url: "/pages/page_one" });
-        expect(second).toMatchObject({ id: "/pages/page_two", scope: "/pages/page_two", start_url: "/pages/page_two" });
+        expect(first).toMatchObject({ id: `/pages/${FIRST}`, scope: `/pages/${FIRST}`, start_url: `/pages/${FIRST}` });
+        expect(second).toMatchObject({ id: `/pages/${SECOND}`, scope: `/pages/${SECOND}`, start_url: `/pages/${SECOND}` });
     });
 
     it("uses the same generic name and the Neore icons for every page, so no title is exposed", () => {
-        const manifest = buildPageManifest("page_one");
+        const manifest = buildPageManifest(FIRST);
 
         expect(manifest).toMatchObject({ name: "Neore page", short_name: "Neore page", display: "standalone" });
         expect(manifest?.icons).toEqual([
@@ -21,23 +24,17 @@ describe("buildPageManifest", () => {
         ]);
     });
 
-    it("refuses an id that is not a plain URL segment", () => {
+    it("refuses anything that is not a Lunora row id, and never echoes it", () => {
         expect(buildPageManifest("")).toBeUndefined();
         expect(buildPageManifest("../settings")).toBeUndefined();
         expect(buildPageManifest("page one")).toBeUndefined();
-        expect(buildPageManifest("a".repeat(129))).toBeUndefined();
-    });
-});
-
-describe("isPageId", () => {
-    it("accepts letters, digits, underscores and dashes up to 128 characters", () => {
-        expect(isPageId("page_1-abc")).toBe(true);
-        expect(isPageId("a".repeat(128))).toBe(true);
+        expect(buildPageManifest("page_1")).toBeUndefined();
+        expect(buildPageManifest(FIRST.toUpperCase())).toBeUndefined();
     });
 });
 
 describe("pageManifestHref", () => {
     it("points at the page's manifest route", () => {
-        expect(pageManifestHref("page_1")).toBe("/page-manifest/page_1");
+        expect(pageManifestHref(FIRST)).toBe(`/page-manifest/${FIRST}`);
     });
 });

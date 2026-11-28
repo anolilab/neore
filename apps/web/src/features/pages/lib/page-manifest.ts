@@ -1,5 +1,4 @@
-const PAGE_ID_PATTERN = /^[\w-]+$/u;
-const MAX_PAGE_ID_LENGTH = 128;
+import { isLunoraId } from "@neore/client-runtime";
 
 export interface PageManifest {
     background_color: string;
@@ -13,9 +12,6 @@ export interface PageManifest {
     theme_color: string;
 }
 
-/** A page id is only ever a URL segment; anything else is refused, never echoed back. */
-export const isPageId = (pageId: string): boolean => pageId !== "" && pageId.length <= MAX_PAGE_ID_LENGTH && PAGE_ID_PATTERN.test(pageId);
-
 /** The app path of a page. It is also the manifest's `id`, `start_url` and `scope`. */
 export const pagePath = (pageId: string): string => `/pages/${pageId}`;
 
@@ -27,7 +23,7 @@ export const pageManifestHref = (pageId: string): string => `/page-manifest/${pa
  * no title, no user data, no session. Every page gets the same name, so the page's title stays private.
  */
 export const buildPageManifest = (pageId: string): PageManifest | undefined => {
-    if (!isPageId(pageId)) {
+    if (!isLunoraId(pageId)) {
         return undefined;
     }
 
