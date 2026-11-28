@@ -77,7 +77,7 @@ vi.mock("./kb-attachment-button", () => {
 });
 
 vi.mock("./temporary-chat-dropdown", () => {
-    return { default: () => null, useTemporaryChatActive: () => false };
+    return { default: () => null };
 });
 
 vi.mock("./thread-download-button", () => {

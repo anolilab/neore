@@ -26,7 +26,7 @@ import {
     Zap,
 } from "lucide-react";
 import type { ComponentType, FC } from "react";
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 
 import Neore from "@/assets/logo/neore.svg?react";
 import { preloadSettingsTabs } from "@/components/settings/settings-modal";
@@ -195,6 +195,7 @@ interface SidebarShortcutProps {
 }
 
 const SidebarShortcut: FC<SidebarShortcutProps> = ({ userDropdown = false }) => {
+    const helpTriggerRef = useRef<HTMLButtonElement>(null);
     const location = useLocation();
     const isAdminActive = location.pathname.startsWith("/admin");
     const { t } = useLingui();
@@ -286,7 +287,7 @@ const SidebarShortcut: FC<SidebarShortcutProps> = ({ userDropdown = false }) => 
                         <Cog className="size-5" strokeWidth={1.5} />
                     </button>
                     <HoverCard>
-                        <HoverCardTrigger className={cn(RAIL_ITEM, RAIL_ITEM_IDLE)} render={<button aria-label={t`Help`} type="button" />}>
+                        <HoverCardTrigger className={cn(RAIL_ITEM, RAIL_ITEM_IDLE)} render={<button aria-label={t`Help`} ref={helpTriggerRef} type="button" />}>
                             <HelpCircle className="size-5" strokeWidth={1.5} />
                             {unreadCount > 0 && <span className="bg-destructive absolute top-1 right-1 flex size-2 rounded-full" />}
                         </HoverCardTrigger>
@@ -308,7 +309,11 @@ const SidebarShortcut: FC<SidebarShortcutProps> = ({ userDropdown = false }) => 
                             <p className="mt-2 mb-2 text-xs font-medium opacity-60">{t`Help`}</p>
                             <button
                                 className="hover:bg-accent flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors"
-                                onClick={() => useThreadListUIStore.getState().setShowKeyboardHelp(true)}
+                                onClick={() => {
+                                    // The card goes away while the sheet is open: focus its Help button first, so the sheet hands focus back there.
+                                    helpTriggerRef.current?.focus();
+                                    useThreadListUIStore.getState().setShowKeyboardHelp(true);
+                                }}
                                 type="button"
                             >
                                 <Keyboard className="size-3.5 shrink-0 opacity-70" strokeWidth={1.5} />
