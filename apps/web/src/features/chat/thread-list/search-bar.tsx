@@ -59,6 +59,8 @@ const SearchBar: FC<SearchBarProperties> = ({ isSearchLoading, onClose, onSearch
                     className="absolute top-1/2 right-1 size-6 -translate-y-1/2 p-0"
                     onClick={() => {
                         onSearchQueryChange("");
+                        // The button leaves with the query; the field it cleared takes the focus.
+                        inputReference.current?.focus();
                     }}
                     size="icon"
                     variant="ghost"
