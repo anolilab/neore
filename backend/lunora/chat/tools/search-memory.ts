@@ -19,6 +19,7 @@ import { createTool } from "../../agent/client";
 import { callOnShard } from "../../lib/cross-shard";
 import { servesUser } from "../../lib/shard-context";
 import { localDayOf } from "../../memory/reflection-logic";
+import { readTimePhrase } from "../../memory/time-window";
 import toonEncodeOutput from "./toon-encode";
 
 /** A found memory as the model reads it: every row has the same keys, so TOON lists them as one table. */
@@ -80,12 +81,22 @@ const searchMemoryTool = createTool<{ limit?: number; query: string }, { memorie
             const bot = thread?.botId ? await context.runQuery(internal.bots.functions.getBotForRun, { botId: thread.botId, userId: context.userId }) : null;
             // A search of its own: a lower relevance floor than the injection's and the tool's own `limit`, so it
             // finds what the 8 injected memories left out.
-            const memoryArgs = { botId: bot ? thread?.botId : undefined, limit, search: true, searchText: query, userId: context.userId };
             const onUserShard = servesUser(context.userId);
+            const timeZoneRead = readTimeZone(context, context.userId, onUserShard);
+            // A search naming a time ("last week") reads it on the user's day: the one zone read serves both, so the
+            // search waits for it then, and runs beside it otherwise.
+            const memoryArgs = {
+                botId: bot ? thread?.botId : undefined,
+                limit,
+                search: true,
+                searchText: query,
+                ...(readTimePhrase(query) !== undefined && { timeZone: await timeZoneRead }),
+                userId: context.userId,
+            };
             const search = onUserShard
                 ? context.runAction(internal.memory.retrieve.retrieveRelevantMemories, memoryArgs)
                 : callOnShard(internal.memory.retrieve.retrieveRelevantMemories, memoryArgs, { shardKey: context.userId });
-            const [memories, timeZone] = await Promise.all([search, readTimeZone(context, context.userId, onUserShard)]);
+            const [memories, timeZone] = await Promise.all([search, timeZoneRead]);
 
             return {
                 memories: memories.map((m) => {

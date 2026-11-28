@@ -62,6 +62,8 @@ const ColorModePicker: FC = () => {
                     // eslint-disable-next-line jsx-a11y/label-has-associated-control -- Radio.Root renders the control inside this label
                     <label className="group flex cursor-pointer flex-col gap-1.5" key={option.id}>
                         <Radio.Root
+                            // The preview is hidden from assistive technology and the caption sits outside the radio: name it here.
+                            aria-label={option.label}
                             className="border-border/50 data-checked:border-primary data-checked:ring-primary/30 focus-visible:outline-ring relative h-14 w-24 overflow-hidden rounded-lg border outline-offset-2 focus-visible:outline-2 data-checked:ring-2"
                             value={option.id}
                         >

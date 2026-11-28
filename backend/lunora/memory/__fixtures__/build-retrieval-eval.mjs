@@ -347,9 +347,170 @@ for (const [p, persona] of personas.entries()) {
     }
 }
 
+// Explicit times ("tomorrow", "last week", "im Dezember", "in 2023", "2026-11-22"), a third pass with its own seed. It
+// runs on a sixth persona, a copy of the first with these rows added, so no row of the queries above changes. Each row
+// is an event with a date, a fact with an end date, or a fact with none; each theme has a dimension of its own (DATED0 +
+// theme), and an event carries its month as above. A question with a topic embeds on it; one about a time alone
+// ("what is coming up tomorrow") embeds on an aspect only, since an embedding does not know which day "tomorrow" is.
+// `window` is the time each question asks about, written here as days, never read by the parser under test: the
+// expected rows are every event in it (of the question's theme, when it names one), or the ids it lists.
+const DATED0 = EXACT0 + EXACT.length;
+const THEMES = { appointments: 1, contracts: 5, home: 0, social: 4, travel: 2, work: 3 };
+const DAY = 86400000;
+const TODAY = dayString(NOW);
+const ago = (days) => dayString(NOW - days * DAY);
+
+{
+    const r = rng("dated");
+    const source = personas[0];
+    const pid = "p6";
+    const noise = (o) => {
+        o[NOISE0 + between(r, 0, 22)] = 0.3;
+        o[NOISE0 + between(r, 0, 22)] = 0.3;
+
+        return o;
+    };
+    // A copied event after the fixture's day is worded as planned, so a question about what is ahead is not answered by
+    // a row that says it already happened. The first persona keeps its rows as they are.
+    const PLANNED = { "p1-ev-hiking": "On 4 December 2026 the user leads a group walk to the lake circuit" };
+    const memories = source.memories.map((m) => {
+        if (m.eventStart > dayString(NOW) && PLANNED[m.id] === undefined) throw new Error(`no planned wording for ${m.id}`);
+
+        return {
+            ...m,
+            id: m.id.replace(/^p1-/u, `${pid}-`),
+            ...(m.supersededBy && { supersededBy: m.supersededBy.replace(/^p1-/u, `${pid}-`) }),
+            ...(PLANNED[m.id] && { text: PLANNED[m.id] }),
+        };
+    });
+    const dims = (theme, aspect, eventStart) => {
+        const topic = typeof theme === "number" ? theme : DATED0 + THEMES[theme];
+
+        return { [topic]: 1, [ASPECT0 + aspect]: 0.6, [COMMON]: 0.5, ...(eventStart && { [MONTH0 + Number(eventStart.slice(5, 7)) - 1]: 0.6 }) };
+    };
+    const topic = (label) => TOPICS.findIndex(([name]) => name === label);
+    // [id, theme, text, eventStart, eventEnd, validUntil]; an event ahead was mentioned in the last days, one past around its day.
+    const ROWS = [
+        ["dentist-tomorrow", "appointments", "Dentist appointment on 28 November 2026 at nine", "2026-11-28"],
+        ["dentist-october", "appointments", "Dentist appointment on 14 October 2026 for a cleaning", "2026-10-14"],
+        ["haircut-today", "appointments", "Haircut booked for 27 November 2026 after work", TODAY],
+        ["dinner-yesterday", "social", "Had dinner with Mara at the Thai place on 26 November 2026", ago(1)],
+        ["dinner-november", "social", "Had dinner with Jonas at the pizzeria on 5 November 2026", "2026-11-05"],
+        ["christmas", "social", "Spends 24 December 2026 at the parents' house", "2026-12-24"],
+        ["race", topic("running"), "Ran a 10 km race through the old town on 22 November 2026", "2026-11-22"],
+        ["tasting", topic("coffee"), "Went to a coffee tasting with light roasts on 22 November 2026", ago(5)],
+        ["tasting-september", topic("coffee"), "Went to a coffee tasting of espresso blends on 1 September 2026", "2026-09-01"],
+        ["lesson-soon", topic("guitar"), "Has a guitar lesson on fingerpicking on 30 November 2026", "2026-11-30"],
+        ["lesson-november", topic("guitar"), "Had a guitar lesson on barre chords on 2 November 2026", "2026-11-02"],
+        ["offsite", "work", "Team offsite in the mountains planned for 3 December 2026", "2026-12-03"],
+        ["offsite-june", "work", "Team offsite at the lake on 10 June 2026", "2026-06-10"],
+        ["flight", "travel", "Flight to Lisbon on 18 December 2026", "2026-12-18"],
+        ["kyoto", "travel", "Travelled to Kyoto in May 2023", "2023-05-10", "2023-05-20"],
+        ["oslo", "travel", "Travelled to Oslo in May 2025", "2025-05-08", "2025-05-12"],
+        ["porto", "travel", "Flight to Porto on 12 March 2026", "2026-03-12"],
+        ["leipzig", "home", "Lived in a flat in Leipzig", "2021-04-01", "2024-02-29"],
+        ["bremen", "home", "Lived in a shared flat in Bremen", "2016-09-01", "2021-03-31"],
+        ["hamburg", "home", "Lives in a flat in Hamburg"],
+        ["parking", "contracts", "Rents a parking spot near the flat until 31 March 2027", undefined, undefined, "2027-03-31"],
+        ["gym", "contracts", "Gym membership with a parking spot runs until 30 November 2026", undefined, undefined, "2026-11-30"],
+    ];
+
+    for (const [name, theme, text, eventStart, eventEnd, validUntil] of ROWS) {
+        const ahead = (eventStart ?? TODAY) >= TODAY;
+        const age = ahead ? between(r, 1, 10) : round(Math.max(1, (NOW - Date.parse(eventEnd ?? eventStart ?? ago(200))) / DAY), 1);
+
+        memories.push({
+            ageDays: age,
+            confidence: between(r, 70, 90),
+            createdDays: round(age + 1, 1),
+            ...(eventStart && { eventStart }),
+            ...(eventEnd && { eventEnd }),
+            id: `${pid}-dated-${name}`,
+            importance: between(r, 40, 70),
+            tags: noise(dims(theme, theme === "home" ? 4 : ahead ? 5 : 3, eventStart)),
+            text,
+            type: theme === "home" || theme === "contracts" ? "context" : "activity",
+            ...(validUntil && { validUntil }),
+        });
+    }
+
+    personas.push({ ...source, id: pid, memories, userId: `user-${pid}` });
+
+    const LAST_WEEK = { end: "2026-11-22", start: "2026-11-16" };
+    const NEXT_WEEK = { end: "2026-12-06", start: "2026-11-30" };
+    const DECEMBER = { end: "2026-12-31", start: "2026-12-01" };
+    const day = (at) => {
+        return { end: at, start: at };
+    };
+    // [text, window, embedding (theme or topic, aspect, month), expected ids or undefined for every event in the window]
+    const QUESTIONS = [
+        ["what is coming up tomorrow", day("2026-11-28"), [undefined, 5]],
+        ["was steht morgen an", day("2026-11-28"), [undefined, 5]],
+        ["what do I have on today", day(TODAY), [undefined, 5]],
+        ["was habe ich heute vor", day(TODAY), [undefined, 5]],
+        ["who did I have dinner with yesterday", day(ago(1)), ["social", 3]],
+        ["mit wem war ich gestern essen", day(ago(1)), ["social", 3]],
+        ["what did I do last week", LAST_WEEK, [undefined, 3]],
+        ["was habe ich letzte Woche gemacht", LAST_WEEK, [undefined, 3]],
+        ["what is happening next week", NEXT_WEEK, [undefined, 5]],
+        ["was ist nächste Woche los", NEXT_WEEK, [undefined, 5]],
+        ["what are my plans for December", DECEMBER, [undefined, 5, 11]],
+        ["was habe ich im Dezember vor", DECEMBER, [undefined, 5, 11]],
+        ["what is planned for 3 December", day("2026-12-03"), [undefined, 5, 11]],
+        ["was ist am 3. Dezember geplant", day("2026-12-03"), [undefined, 5, 11]],
+        ["what was I doing on 2026-11-22", day("2026-11-22"), [undefined, 3, 10]],
+        ["what guitar lesson do I have in 3 days", day("2026-11-30"), [topic("guitar"), 5], ["lesson-soon"]],
+        ["welche Gitarrenstunde habe ich in 3 Tagen", day("2026-11-30"), [topic("guitar"), 5], ["lesson-soon"]],
+        ["what coffee tasting did I go to 5 days ago", day(ago(5)), [topic("coffee"), 3], ["tasting"]],
+        ["bei welchem Kaffee Tasting war ich vor 5 Tagen", day(ago(5)), [topic("coffee"), 3], ["tasting"]],
+        ["where did I travel in May 2023", { end: "2023-05-31", start: "2023-05-01" }, ["travel", 3, 4], ["kyoto"]],
+        ["wohin bin ich im Mai 2023 gereist", { end: "2023-05-31", start: "2023-05-01" }, ["travel", 3, 4], ["kyoto"]],
+        ["where was I living in 2023", { end: "2023-12-31", start: "2023-01-01" }, ["home", 4], ["leipzig"]],
+        ["wo habe ich im Jahr 2023 gewohnt", { end: "2023-12-31", start: "2023-01-01" }, ["home", 4], ["leipzig"]],
+        ["do I still have a parking spot next month", DECEMBER, ["contracts", 5], ["parking"]],
+        ["habe ich nächsten Monat noch einen Parkplatz", DECEMBER, ["contracts", 5], ["parking"]],
+    ];
+    const inWindow = (m, { end, start }) => m.eventStart !== undefined && !m.supersededBy && m.eventStart <= end && (m.eventEnd ?? m.eventStart) >= start;
+
+    for (const [text, window, [theme, aspect, month], ids] of QUESTIONS) {
+        const tags = noise({
+            ...(theme !== undefined && { [typeof theme === "number" ? theme : DATED0 + THEMES[theme]]: 1 }),
+            [ASPECT0 + aspect]: 0.6,
+            [COMMON]: 0.5,
+            ...(month !== undefined && { [MONTH0 + month]: 0.6 }),
+        });
+        const expected = ids?.map((name) => `${pid}-dated-${name}`) ?? memories.filter((m) => !m.botId && inWindow(m, window)).map((m) => m.id);
+
+        queries.push({ category: "dated", expected, id: `${pid}-dated-${queries.length}`, persona: pid, tags, text, window });
+    }
+
+    // Questions that name a time but ask about something nobody mentioned: no event of that time is their answer.
+    const NEXT_DAY = day("2026-11-28");
+    const ABSTAIN = [
+        ["what did I do about skydiving in May", { end: "2026-05-31", start: "2026-05-01" }, 0, 3, 4],
+        ["draft an email saying I am away next week", NEXT_WEEK, 1, 5],
+        ["schreib eine Mail, dass ich nächste Woche nicht da bin", NEXT_WEEK, 1, 5],
+        ["what should I cook today", day(TODAY), 2, 5],
+        ["was koche ich heute", day(TODAY), 2, 5],
+        ["what is the weather like tomorrow", NEXT_DAY, 3],
+        ["wie wird das Wetter morgen", NEXT_DAY, 3],
+    ];
+
+    for (const [text, window, unseen, aspect, month] of ABSTAIN) {
+        const tags = noise({
+            [16 + unseen]: 1,
+            ...(aspect !== undefined && { [ASPECT0 + aspect]: 0.6 }),
+            [COMMON]: 0.5,
+            ...(month !== undefined && { [MONTH0 + month]: 0.6 }),
+        });
+
+        queries.push({ category: "abstain", expected: [], id: `${pid}-abstain-${queries.length}`, persona: pid, tags, text, window });
+    }
+}
+
 const fixture = {
     meta: {
-        dimensions: EXACT0 + EXACT.length,
+        dimensions: DATED0 + Object.keys(THEMES).length,
         now: NOW,
         today: dayString(NOW),
     },
