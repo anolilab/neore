@@ -9,10 +9,13 @@ import { registeredApi, registerModule } from "../../test/registered-api";
 import schema from "../schema";
 import { documentTextPart } from "../chat/lib/attached-text";
 import { addMessagesHandler } from "../agent/messages";
+import { enableThreadLock } from "../agent/thread-lock";
 import { extractMemories } from "./extract";
+import { internal } from "../_generated/internal";
 import { runAfterOnShard } from "../lib/shard-scheduler";
 import { saveMemoryBatch } from "./functions";
 import { rememberFactFor, rememberResultOf } from "./remember";
+import { rememberDispatchInFlight } from "./remember-dispatch";
 
 const { generateText, getUtilityModel, registry } = vi.hoisted(() => {
     return {
@@ -43,6 +46,14 @@ vi.mock("../lib/shard-scheduler", async (importOriginal) => {
     const original = await importOriginal<typeof import("../lib/shard-scheduler")>();
 
     return { ...original, runAfterOnShard: vi.fn(original.runAfterOnShard) };
+});
+// The owner's lock attempt reads its identity from the harness.
+vi.mock("../auth/session", async (importOriginal) => {
+    return {
+        ...(await importOriginal<typeof import("../auth/session")>()),
+        getAuthUserIdentity: async (context: { auth: { userId?: string | null } }) =>
+            context.auth.userId ? { subject: context.auth.userId, userId: context.auth.userId } : null,
+    };
 });
 // The harness action ctx has no `services`; dedup runs on text here.
 vi.mock("../lib/services", () => {
@@ -162,6 +173,7 @@ beforeAll(async () => {
     registerModule(registry, "memory_remember", await import("./remember"));
     registerModule(registry, "lib_claim_once", await import("../lib/claim-once"));
     registerModule(registry, "lib_action_cache", await import("../lib/action-cache"));
+    registerModule(registry, "agent_thread_lock", await import("../agent/thread-lock"));
 });
 
 beforeEach(() => {
@@ -523,6 +535,42 @@ describe(rememberFactFor, () => {
         expect(await memories()).toHaveLength(0);
     });
 
+    it("makes a lock attempted while the model call is out wait, and lets it through once the call is answered", async () => {
+        const ids = await setUp();
+        const inFlight = async () => await harness.run(async (ctx: any) => await rememberDispatchInFlight(ctx, ids.threadId as never));
+        // Locking a chat mints an unlock proof, which needs the signing secret.
+        const previousSecret = process.env.STORAGE_SIGNING_SECRET;
+        const lock = async () =>
+            await harness
+                .withIdentity({ userId: USER } as never)
+                .mutation(enableThreadLock as never, { passcode: "correct horse battery", threadId: ids.threadId } as never);
+        let lockDuringCall: unknown;
+
+        process.env.STORAGE_SIGNING_SECRET = "test-unlock-secret";
+
+        try {
+            // After the recheck, while the prompt is with the provider: the owner locks the chat, and the lock is refused.
+            generateText.mockImplementationOnce(async () => {
+                lockDuringCall = await lock().catch((error: unknown) => error);
+
+                return {
+                    output: { facts: [{ asked: true, confidence: 90, importance: 70, memory: "User is vegan", quote: "I'm vegan", type: "preference" }] },
+                };
+            });
+
+            await expect(remember(ids)).resolves.toMatchObject({ status: "saved" });
+            expect(lockDuringCall).toMatchObject({ code: "CONFLICT" });
+            await expect(inFlight()).resolves.toBe(false);
+            await expect(lock()).resolves.toBeDefined();
+        } finally {
+            if (previousSecret === undefined) {
+                delete process.env.STORAGE_SIGNING_SECRET;
+            } else {
+                process.env.STORAGE_SIGNING_SECRET = previousSecret;
+            }
+        }
+    });
+
     it("refuses a fact the extractor marks as about the user's health, and keeps a job in the field", async () => {
         answer([{ memory: "User takes Prozac", quote: "I take Prozac", sensitive: true }]);
 
@@ -705,7 +753,7 @@ describe(rememberFactFor, () => {
 
         expect(generateText).not.toHaveBeenCalled();
         expect(vi.mocked(runAfterOnShard).mock.calls).toStrictEqual([
-            [expect.anything(), 30_000, expect.anything(), { ...extraction(ids), rememberWaits: 1 }, USER],
+            [expect.anything(), 30_000, internal.memory.extract.extractMemories, { ...extraction(ids), rememberWaits: 1 }, USER],
         ]);
 
         // Each wait runs the job its predecessor scheduled; past its last wait the job reads the prompt as usual, so a call

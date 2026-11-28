@@ -522,19 +522,23 @@ export const extractMemories = internalAction
             throw error;
         }
 
-        // The last read before the typed prompt goes to the model: a chat locked, shared or switched off since `remember.ts`
-        // read the source sends it nothing (the writes check again, but a model call cannot be taken back).
+        // The last check before the typed prompt goes to the model, and the claim the chat's lock waits for until it is answered:
+        // a chat locked, shared or switched off since `remember.ts` read the source sends it nothing, and one cannot be locked
+        // while the prompt is out (the writes check again, but a model call cannot be taken back).
+        let dispatch: { claimedAt: number; promptMessageId: string; threadId: Id<"threads"> } | undefined;
+
         if (args.requested && args.threadId !== undefined && args.promptMessageId !== undefined) {
-            const refusal = await ctx.runQuery(internal.memory.functions.requestedSourceRefusal, {
-                now: Date.now(),
+            const begun = await ctx.runMutation(internal.memory.functions.beginRememberDispatch, {
                 requested: { promptMessageId: args.promptMessageId, replyKey: args.replyKey, threadId: args.threadId, userId: args.userId },
             });
 
-            if (refusal !== null) {
-                logGate(refusal, "skip");
+            if ("refused" in begun) {
+                logGate(begun.refused, "skip");
 
-                return { asked: true, blocked: refusal, facts: [], refused: 0, refusedAsked: [] };
+                return { asked: true, blocked: begun.refused, facts: [], refused: 0, refusedAsked: [] };
             }
+
+            dispatch = { claimedAt: begun.claimedAt, promptMessageId: args.promptMessageId, threadId: args.threadId };
         }
 
         logGate(gate.reason, "extract");
@@ -583,6 +587,13 @@ ${args.requested ? REQUESTED_RULE : "Extract NEW facts about the user not alread
             console.error("[memory/extract] LLM extraction failed:", error);
 
             return NOT_ASKED;
+        } finally {
+            // A release that never lands lapses on its own (`REMEMBER_DISPATCH_TTL_MS`), which only delays a lock.
+            if (dispatch !== undefined) {
+                await ctx.runMutation(internal.memory.functions.endRememberDispatch, dispatch).catch((error: unknown) => {
+                    console.warn("[memory/extract] The chat's dispatch claim could not be released; it lapses on its own:", error);
+                });
+            }
         }
 
         // Evidence gate: a fact is kept only when a verbatim excerpt of the user's own typed words backs it

@@ -44,6 +44,7 @@ import type { typedTextOf } from "../chat/lib/attached-text";
 import { GOAL_CONTINUATION_AGENT } from "../chat/goals/shared";
 import { isTypedChatKind } from "../chat/lib/typed-chat-kind";
 import { claimRow, putClaimResult } from "../lib/claim-once";
+import { dropRememberDispatch, takeRememberDispatch } from "./remember-dispatch";
 
 /**
  * Whether the user turned memory on. OPT-IN: absent means off. Memory extraction reads every
@@ -247,16 +248,34 @@ export const checkRequestedSource = async (
 };
 
 /**
- * Why the request may not be written from its prompt now (`checkRequestedSource`), or `null` when it may: read again by a
- * requested run right before its model call, so a chat locked or shared meanwhile sends the model nothing.
+ * Lets a requested run's model call leave: checks the source again (`checkRequestedSource`) and takes the call's dispatch
+ * claim on the chat in the same transaction, so a chat locked or shared meanwhile sends the model nothing, and locking it
+ * waits until the call is answered (`memory/remember-dispatch.ts`). The claim's `claimedAt`, or why the call must not leave.
  */
-export const requestedSourceRefusal = internalQuery
-    .input({ now: v.number(), requested: vRequestedSource })
-    .output(v.union(vRequestedRefusal, v.null()))
-    .query(async ({ args, ctx }) => {
-        const check = await checkRequestedSource(ctx, args.requested, args.now);
+export const beginRememberDispatch = internalMutation
+    .input({ requested: vRequestedSource })
+    .output(v.union(v.object({ claimedAt: v.number() }), v.object({ refused: vRequestedRefusal })))
+    .mutation(async ({ args, ctx }) => {
+        const check = await checkRequestedSource(ctx, args.requested, ctx.now);
 
-        return "refused" in check ? check.refused : null;
+        if ("refused" in check) {
+            return { refused: check.refused };
+        }
+
+        const claimedAt = await takeRememberDispatch(ctx, args.requested.threadId, args.requested.promptMessageId);
+
+        // Held only by another call for this same prompt, which the prompt's own claim already refuses: it is that call's.
+        return claimedAt === null ? { refused: "not_your_words" as const } : { claimedAt };
+    });
+
+/** The requested run's model call was answered: its dispatch claim goes, and the chat may be locked. */
+export const endRememberDispatch = internalMutation
+    .input({ claimedAt: v.number(), promptMessageId: v.string(), threadId: v.id("threads") })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        await dropRememberDispatch(ctx, args.threadId, args.promptMessageId, args.claimedAt);
+
+        return null;
     });
 
 /** Most memories one user-facing read looks at. */
