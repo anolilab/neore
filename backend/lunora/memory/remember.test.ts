@@ -851,7 +851,8 @@ describe(rememberFactFor, () => {
         const claim = await harness.run(async (ctx: any) => await rememberClaimOf(ctx, ids.promptMessageId));
 
         expect(claim).toMatchObject({ result: "done", userId: USER });
-        expect(claim.expiresAt).toBeGreaterThan(Date.now());
+        // Held a day from the request's own claim, read off the row rather than the wall clock.
+        expect(claim.expiresAt).toBe(claim.claimedAt + 24 * 60 * 60 * 1000);
     });
 
     it("marks nothing when a newer request took the prompt after this one's claim lapsed", async () => {
