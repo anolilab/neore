@@ -70,10 +70,9 @@ const titlesBySpineItem = (toc: EpubToc, spine: ReadonlyArray<SpineItem>): Map<s
         }
     }
 
+    // A title is set only by an entry whose path fits exactly one item. An entry that fits several sets none and takes none away: an item a
+    // longer, unambiguous path already named keeps its title.
     const titles = new Map<string, string>();
-    const ambiguous = new Set<string>();
-    // A tail that fits several items is marked once, however many entries name it.
-    const marked = new Set<string>();
 
     const visit = (points: EpubToc): void => {
         for (const point of points) {
@@ -85,12 +84,6 @@ const titlesBySpineItem = (toc: EpubToc, spine: ReadonlyArray<SpineItem>): Map<s
                 if (id !== undefined && !titles.has(id)) {
                     titles.set(id, point.label);
                 }
-            } else if (fits !== undefined && !marked.has(pathOf(point.href))) {
-                marked.add(pathOf(point.href));
-
-                for (const id of fits) {
-                    ambiguous.add(id);
-                }
             }
 
             if (point.children !== undefined) {
@@ -100,10 +93,6 @@ const titlesBySpineItem = (toc: EpubToc, spine: ReadonlyArray<SpineItem>): Map<s
     };
 
     visit(toc);
-
-    for (const id of ambiguous) {
-        titles.delete(id);
-    }
 
     return titles;
 };
@@ -376,7 +365,6 @@ const assetReader = (zip: JSZip, declared: ReadonlyMap<string, string>, signal?:
     };
 };
 
-const CSS_IMPORT = /@import\b[^;{]*;?/giu;
 const CSS_URL = /url\(([^)]*)\)/giu;
 const CSS_QUOTE = /^["']|["']$/gu;
 const CSS_SCRIPTY = /expression\s*\(|-moz-binding\s*:|behaviou?r\s*:/giu;
@@ -400,9 +388,16 @@ export const safeStylesheet = (css: string): string => {
     const plain = css.replaceAll(CSS_ESCAPE, (match, hex: string) => {
         const code = Number.parseInt(hex, 16);
 
-        return ASCII_LETTER.test(String.fromCodePoint(code)) && code < 128 ? String.fromCodePoint(code) : match;
+        // Only an ASCII value is looked at: a larger one (`\FFFFFF`) is not a code point, and `fromCodePoint` of it would throw.
+        if (code === 0 || code >= 128) {
+            return match;
+        }
+
+        const letter = String.fromCodePoint(code);
+
+        return ASCII_LETTER.test(letter) ? letter : match;
     });
-    const withoutImports = plain.replaceAll(CSS_IMPORT, "");
+    const withoutImports = withoutImportRules(plain);
     const dataUrlsOnly = withoutImports.replaceAll(CSS_URL, (match, argument: string) => dataOnly(match, argument));
 
     return dataUrlsOnly
@@ -436,9 +431,53 @@ const inlineStylesheetUrls = async (css: string, directory: string, reader: Asse
     });
 };
 
-const IMPORT_RULE = /@import\s+(?:url\(\s*)?(?:"([^"]*)"|'([^']*)'|([^\s;)]*))([^;{]*);?/giu;
 const ASCII_LETTER = /[a-z]/iu;
-const CSS_COMMENT = /\/\*[\s\S]*?\*\//gu;
+const IMPORT_AT = /@import/giu;
+const IMPORT_END = /[;{]/u;
+const IMPORT_RULE_STICKY = /@import\s+(?:url\(\s*)?(?:"([^"]*)"|'([^']*)'|([^\s;)]*))([^;{]*);?/iuy;
+
+/**
+ * The CSS with each comment (outside any string) written as one space, so the words either side stay apart, and a second copy of the same
+ * length in which the inside of every quoted string is blanked. `@import` is looked for in the second, so one inside `content: "@import 'x';"`
+ * is text, not a rule; the rule itself is read from the first, so a path like `"a/*b*\/.css"` is read whole, comment marks inside it included.
+ */
+const scanCss = (css: string): { code: string; text: string } => {
+    let text = "";
+    let code = "";
+    let quote = "";
+    let at = 0;
+
+    while (at < css.length) {
+        const char = css[at] ?? "";
+        let step = 1;
+
+        if (quote !== "") {
+            if (char === "\\" && at + 1 < css.length) {
+                text += `${char}${css[at + 1] ?? ""}`;
+                code += "\u{1}\u{1}";
+                step = 2;
+            } else {
+                text += char;
+                code += char === quote ? char : "\u{1}";
+                quote = char === quote ? "" : quote;
+            }
+        } else if (char === "/" && css[at + 1] === "*") {
+            const end = css.indexOf("*/", at + 2);
+
+            text += " ";
+            code += " ";
+            step = (end === -1 ? css.length : end + 2) - at;
+        } else {
+            quote = char === '"' || char === "'" ? char : "";
+            text += char;
+            code += char;
+        }
+
+        at += step;
+    }
+
+    return { code, text };
+};
 const CLOSING_PAREN = /^\s*\)/u;
 /** A media list that can be carried into an `@media` rule as it is: words, numbers, commas, parentheses, colons, comparison signs and spaces, nothing that opens or ends a rule or names a function. */
 const SAFE_MEDIA = /^[\w\s,():.<>=/-]+$/u;
@@ -459,9 +498,26 @@ const expandImports = async (
     shared?: { length: number },
 ): Promise<string> => {
     const produced = shared ?? { length: 0 };
-    // A comment is not a rule: an import inside one is inert, and must not take a file of the count.
-    const css = source.replaceAll(CSS_COMMENT, "");
-    const rules = [...css.matchAll(IMPORT_RULE)];
+    // A comment is not a rule, and neither is text inside a string: an `@import` in either is inert and must not take a file of the count.
+    const { code, text: css } = scanCss(source);
+    const rules: { 0: string; 1?: string; 2?: string; 3?: string; 4?: string; index: number }[] = [];
+    let resume = 0;
+
+    for (const found of code.matchAll(IMPORT_AT)) {
+        if (found.index < resume) {
+            continue;
+        }
+
+        IMPORT_RULE_STICKY.lastIndex = found.index;
+
+        const rule = IMPORT_RULE_STICKY.exec(css);
+
+        if (rule !== null) {
+            rules.push({ ...rule, 0: rule[0], index: found.index });
+            resume = found.index + rule[0].length;
+        }
+    }
+
     let out = "";
     let at = 0;
 
@@ -518,7 +574,10 @@ const expandImports = async (
  */
 export const FRAME_POLICY = "default-src 'none'; img-src data:; style-src 'unsafe-inline'; font-src data:; form-action 'none'";
 
-const LANGUAGE = /^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8}){0,3}$/u;
+const LANGUAGE_TAG = /^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8}){0,12}$/u;
+const MAX_LANGUAGE_LENGTH = 64;
+/** A well-formed language tag (letters, digits and hyphens, subtags of one to eight characters), of a length that is capped. */
+const isLanguageTag = (value: string): boolean => value.length <= MAX_LANGUAGE_LENGTH && LANGUAGE_TAG.test(value);
 
 const BASE_STYLE = "body{font-family:system-ui,sans-serif;line-height:1.6;margin:1rem;overflow-wrap:anywhere}img,svg,video{max-width:100%;height:auto}";
 
@@ -603,11 +662,34 @@ const safeBodyAttributes = (attributes: Readonly<Record<string, string>>): Recor
         kept.dir = dir.trim().toLowerCase();
     }
 
-    if (lang !== undefined && LANGUAGE.test(lang.trim())) {
+    if (lang !== undefined && isLanguageTag(lang.trim())) {
         kept.lang = lang.trim();
     }
 
     return kept;
+};
+
+/** The CSS without its `@import` rules, which are read where the code is, not inside a string; a comment is one space (see `scanCss`). */
+const withoutImportRules = (css: string): string => {
+    const { code, text } = scanCss(css);
+    let out = "";
+    let at = 0;
+
+    for (const found of code.matchAll(IMPORT_AT)) {
+        if (found.index < at) {
+            continue;
+        }
+
+        const end = text.slice(found.index).search(IMPORT_END);
+
+        out += text.slice(at, found.index);
+        // The `;` ends the rule and goes with it; a `{` is not part of it.
+        const closer = text[found.index + end] === ";" ? 1 : 0;
+
+        at = end === -1 ? text.length : found.index + end + closer;
+    }
+
+    return out + text.slice(at);
 };
 
 /**
@@ -654,7 +736,7 @@ export const chapterDocument = (
         frame.head.appendChild(node);
     }
 
-    if (language !== undefined && LANGUAGE.test(language)) {
+    if (language !== undefined && isLanguageTag(language)) {
         frame.documentElement.setAttribute("lang", language);
     }
 

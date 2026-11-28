@@ -16,6 +16,7 @@ import { assertZipDirectoryExact, chapterDocument, FRAME_POLICY, MAX_ASSETS_PER_
 
 const PNG_PREFIX = /^data:image\/png;base64,/u;
 const PNG_DATA = /^data:image\/png;base64,iVBORw0KGgo=$/u;
+const CONDITIONED = /@media screen\s+and \(min-width: 40em\) \{ \.cond\{x:1\} \}/u;
 const TRACKER = /tracker\.example/u;
 const SCRIPTY = /expression\s*\(|behaviou?r\s*:|-moz-binding\s*:/iu;
 const NS = 'xmlns="http://www.idpf.org/2007/opf"';
@@ -141,6 +142,23 @@ describe("openEpub", () => {
         // Destroying again is harmless, and says so.
         opened.destroy();
         expect(opened.destroyed).toBe(true);
+    });
+
+    it("keeps the title a unique path gave a chapter when another entry's short name fits it and a sibling", async () => {
+        const opened = await openEpub(
+            await book({
+                chapters: [
+                    { body: "<p>a</p>", file: "a/chap.xhtml", id: "a", label: "Unique long path" },
+                    { body: "<p>b</p>", file: "b/chap.xhtml", id: "b" },
+                ],
+            }),
+            folder.path,
+        );
+
+        // The first entry names `a/chap.xhtml`, which fits one item; a bare `chap.xhtml` would fit both and names neither.
+        expect(opened.chapters[0]).toEqual({ id: "a", title: "Unique long path" });
+        expect(opened.chapters[1]).toEqual({ id: "b" });
+        opened.destroy();
     });
 
     it("matches a long table of contents to a long spine without a scan of the spine for each entry", async () => {
@@ -572,6 +590,56 @@ describe("a chapter's style sheets", () => {
         expect(() => assertZipDirectoryExact(copy.buffer as ArrayBuffer)).toThrow("Corrupt ZIP directory");
     });
 
+    it("shows a chapter whose style sheet holds an escape that is not a character", async () => {
+        const opened = await openEpub(
+            await book({
+                chapters: [{ body: `${links(["../bad.css"])}<p>kept text</p>`, file: "text/one.xhtml", id: "c1" }],
+                files: { "bad.css": String.raw`.a\FFFFFF{x:1} .b\0{x:2} .c\75 {x:3}` },
+            }),
+            folder.path,
+        );
+        const frame = parse(await opened.read("c1"));
+
+        expect(frame.body.textContent).toContain("kept text");
+        expect(sheetsOf(frame).join("")).toContain("{x:1}");
+        opened.destroy();
+    });
+
+    it("reads a quoted import path whole when it holds comment marks, and keeps a condition a comment sits inside", async () => {
+        const opened = await openEpub(
+            await book({
+                chapters: [{ body: `${links(["../main.css"])}<p>x</p>`, file: "text/one.xhtml", id: "c1" }],
+                files: {
+                    "a/*b*/.css": ".quoted{x:1}",
+                    "main.css": '@import "a/*b*/.css"; @import "print.css" screen/* x */and (min-width: 40em);',
+                    "print.css": ".cond{x:1}",
+                },
+            }),
+            folder.path,
+        );
+        const sheet = sheetsOf(parse(await opened.read("c1"))).join("");
+
+        expect(sheet).toContain(".quoted{x:1}");
+        expect(sheet).toMatch(CONDITIONED);
+        opened.destroy();
+    });
+
+    it("leaves text that looks like an import inside a string as text", async () => {
+        const opened = await openEpub(
+            await book({
+                chapters: [{ body: `${links(["../main.css"])}<p>x</p>`, file: "text/one.xhtml", id: "c1" }],
+                files: { "base.css": ".base{x:1}", "main.css": "p::before{content:\"@import 'base.css';\"} .after{x:2}" },
+            }),
+            folder.path,
+        );
+        const sheet = sheetsOf(parse(await opened.read("c1"))).join("");
+
+        expect(sheet).toContain("@import 'base.css';");
+        expect(sheet).not.toContain(".base{x:1}");
+        expect(sheet).toContain(".after{x:2}");
+        opened.destroy();
+    });
+
     it("ends an import cycle", async () => {
         const opened = await openEpub(
             await book({
@@ -835,6 +903,10 @@ describe("chapterDocument", () => {
     it("carries the book's language on the document, and only a well-formed one", () => {
         expect(parse(chapterDocument("<p>x</p>", [], "de-CH")).documentElement.getAttribute("lang")).toBe("de-CH");
         expect(parse(chapterDocument("<p>x</p>", [], 'en"><script>')).documentElement.hasAttribute("lang")).toBe(false);
+        expect(parse(chapterDocument("<p>x</p>", [], "en-US", { lang: "en-US-u-hc-h12" })).body.getAttribute("lang")).toBe("en-US-u-hc-h12");
+        const tooLong = chapterDocument("<p>x</p>", [], "en-US", { lang: `en-${"a".repeat(100)}` });
+
+        expect(parse(tooLong).body.hasAttribute("lang")).toBe(false);
         expect(parse(chapterDocument("<p>x</p>", [])).documentElement.hasAttribute("lang")).toBe(false);
     });
 
