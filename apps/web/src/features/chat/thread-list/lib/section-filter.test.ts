@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { BranchNode, GroupType, ThreadGroup } from "../types";
-import { countSections, filterGroupsBySection, groupsToOpenOnPick, nextSectionFilter, sanitizeSectionFilter } from "./section-filter";
+import { ancestorsOf, countSections, filterGroupsBySection, groupsToOpenOnPick, nextSectionFilter, sanitizeSectionFilter } from "./section-filter";
 
 const node = (threadId: string, children: BranchNode[] = []): BranchNode => {
     return { branchPoint: 0, branchType: "root", children, createdAt: 0, depth: 0, status: "idle", threadId, title: threadId };
@@ -50,6 +50,16 @@ describe("countSections", () => {
     });
 });
 
+describe("ancestorsOf", () => {
+    it("names the threads above one in its tree, root first, and nothing for a thread elsewhere", () => {
+        const tree = node("r", [node("b", [node("leaf")])]);
+
+        expect(ancestorsOf(tree, "leaf")).toEqual(["r", "b"]);
+        expect(ancestorsOf(tree, "r")).toEqual([]);
+        expect(ancestorsOf(tree, "elsewhere")).toBeUndefined();
+    });
+});
+
 describe("filterGroupsBySection", () => {
     it("shows Active as everything but Working, Snoozed and Archived, Needs you included", () => {
         expect(filterGroupsBySection(groups, ["active"], undefined)).toEqual([needsYou, pinned, today]);
@@ -92,6 +102,7 @@ describe("filterGroupsBySection", () => {
         const kept = shown.find((candidate) => candidate.groupType === "archived");
 
         expect(kept?.isCollapsed).toBe(false);
+        expect(kept?.keepsOpenThread).toBe(true);
         expect(kept?.threads.map((thread) => thread.threadId)).toEqual(["a1"]);
         expect(shown.map((candidate) => candidate.groupType)).toEqual(["needsYou", "pinned", "today", "archived"]);
     });

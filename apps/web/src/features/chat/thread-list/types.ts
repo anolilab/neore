@@ -43,6 +43,8 @@ export interface ThreadGroup {
     isCollapsed?: boolean;
     /** A stand-in or derived group (stored project chats before the project list answers; Needs you, Working, Snoozed): read-only, nothing in it may be reordered or moved. */
     isPlaceholder?: boolean;
+    /** Shown only to keep the open thread in the list, its section being filtered out: the path down to that thread stays open. */
+    keepsOpenThread?: boolean;
     projectColor?: string;
     projectIcon?: string;
     projectId?: string;

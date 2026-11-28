@@ -38,7 +38,7 @@ import useStableCallback from "./hooks/use-stable-callback";
 import useThreadGroups from "./hooks/use-thread-groups";
 import useThreadHandlers from "./hooks/use-thread-handlers";
 import useThreadListKeyboard from "./hooks/use-thread-list-keyboard";
-import { countSections, EMPTY_SECTION_COUNTS, filterGroupsBySection, groupsToOpenOnPick, sameSectionCounts } from "./lib/section-filter";
+import { ancestorsOf, countSections, EMPTY_SECTION_COUNTS, filterGroupsBySection, groupsToOpenOnPick, sameSectionCounts } from "./lib/section-filter";
 import { renameFocusTarget } from "./rename-focus-target";
 import RenameThreadDialog from "./rename-thread-dialog";
 import SnoozeUntilDialog from "./snooze-until-dialog";
@@ -392,7 +392,7 @@ const HierarchicalThreadList: FC<
     collapsedGroups,
     collapsedProjects,
     currentThreadId,
-    expandedThreads,
+    expandedThreads: storedExpandedThreads,
     isSearchError = false,
     isSearchLoading,
     isSelectionMode,
@@ -495,6 +495,25 @@ const HierarchicalThreadList: FC<
         () => (isSearching ? allThreadGroups : filterGroupsBySection(allThreadGroups, sectionFilter, currentThreadId)),
         [allThreadGroups, currentThreadId, isSearching, sectionFilter],
     );
+
+    // A group kept only for the open thread shows the path down to it, even past a branch collapsed by hand.
+    const expandedThreads = useMemo(() => {
+        if (!currentThreadId) {
+            return storedExpandedThreads;
+        }
+
+        const path = filteredGroups
+            .filter((group) => group.keepsOpenThread)
+            .flatMap((group) => group.threads)
+            .map((root) => ancestorsOf(root, currentThreadId))
+            .find((ancestors) => ancestors !== undefined);
+
+        if (!path || path.every((threadId) => storedExpandedThreads.has(threadId))) {
+            return storedExpandedThreads;
+        }
+
+        return new Set([...storedExpandedThreads, ...path]);
+    }, [currentThreadId, filteredGroups, storedExpandedThreads]);
 
     // A selection made while searching spans every section; once search closes, the rows the section hides drop out of it, so
     // bulk delete never takes a thread the list no longer shows. Collapsed groups still count as shown. While searching the list

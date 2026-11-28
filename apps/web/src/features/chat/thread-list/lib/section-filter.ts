@@ -95,6 +95,23 @@ export const sameSectionCounts = (left: SectionCounts, right: SectionCounts): bo
 const containsThread = (node: BranchNode, threadId: string): boolean =>
     node.threadId === threadId || node.children.some((child) => containsThread(child, threadId));
 
+/** The threads above `threadId` in `node`'s tree, root first, or `undefined` when the tree does not hold it. */
+export const ancestorsOf = (node: BranchNode, threadId: string): string[] | undefined => {
+    if (node.threadId === threadId) {
+        return [];
+    }
+
+    for (const child of node.children) {
+        const below = ancestorsOf(child, threadId);
+
+        if (below) {
+            return [node.threadId, ...below];
+        }
+    }
+
+    return undefined;
+};
+
 /** Whether a filter shows a group. Needs you shows under Active as well as on its own. */
 const showsGroup = (filter: ReadonlyArray<SectionKey>, section: SectionKey): boolean =>
     filter.includes(section) || (section === "needsYou" && filter.includes("active"));
@@ -121,7 +138,7 @@ export const filterGroupsBySection = (
             const root = group.threads.find((thread) => containsThread(thread, openThreadId));
 
             if (root) {
-                result.push({ ...group, isCollapsed: false, threads: [root] });
+                result.push({ ...group, isCollapsed: false, keepsOpenThread: true, threads: [root] });
             }
         }
     }
