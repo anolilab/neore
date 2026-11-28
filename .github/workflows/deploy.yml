@@ -556,6 +556,13 @@ jobs:
                   # Android kill switch for the data-only phone push. Set the repo variable to `off` before an
                   # Android rollback, then deploy; unset keeps the data-only push on.
                   ANDROID_DATA_ONLY_PUSH: "${{ vars.ANDROID_DATA_ONLY_PUSH }}"
+                  # Plugin feature gate (`plugins/gate.ts`): comma-separated user ids per feature, `*` for everyone,
+                  # unset for off. Repo variables, not secrets. `PLUGINS_KILL_SWITCH=on` turns every feature off.
+                  PLUGINS_ALLOWED_USERS: "${{ vars.PLUGINS_ALLOWED_USERS }}"
+                  PLUGIN_UI_ALLOWED_USERS: "${{ vars.PLUGIN_UI_ALLOWED_USERS }}"
+                  PLUGIN_SERVICES_ALLOWED_USERS: "${{ vars.PLUGIN_SERVICES_ALLOWED_USERS }}"
+                  PLUGIN_AUTHORING_ALLOWED_USERS: "${{ vars.PLUGIN_AUTHORING_ALLOWED_USERS }}"
+                  PLUGINS_KILL_SWITCH: "${{ vars.PLUGINS_KILL_SWITCH }}"
                   # Display name sent in connector OAuth client registration;
                   # unset = "Neore".
                   APP_NAME: "${{ secrets.APP_NAME }}"

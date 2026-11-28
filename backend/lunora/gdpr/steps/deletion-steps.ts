@@ -26,6 +26,7 @@ import { erasePromptsForUser } from "../../prompts/gdpr";
 import { eraseMemoriesForUser } from "../../memory/gdpr";
 import { eraseImportJobsForUser } from "../../chat-import/gdpr";
 import { eraseSkillsForUser } from "../../skills/gdpr";
+import { erasePluginsForUser } from "../../plugins/gdpr";
 import { eraseBrowserDataForUser } from "../../browser/gdpr";
 import { BATCH } from "../batch";
 
@@ -216,6 +217,12 @@ export const deleteUserSkills = internalMutation
 
         return null;
     });
+
+/** The user's plugin installs and their child links (`plugins/gdpr.ts`). The children are erased by their own steps. */
+export const deleteUserPlugins = internalMutation
+    .input({ userId: v.string() })
+    .output(vBatchResult)
+    .mutation(async ({ args: { userId }, ctx: context }) => await erasePluginsForUser(context, userId));
 
 export const deleteUserConnectors = internalMutation
     .input({ userId: v.string() })

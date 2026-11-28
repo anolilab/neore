@@ -25,8 +25,10 @@ export interface RecordedQueueMessage {
 
 export const jobsQueueMessages: RecordedQueueMessage[] = [];
 
-export const env: { EMAIL?: unknown; MAIL_FROM: string; QUEUE_JOBS: unknown } = {
+export const env: { EMAIL?: unknown; MAIL_FROM: string; PLUGINS_ALLOWED_USERS?: string; QUEUE_JOBS: unknown } = {
     MAIL_FROM: "Neore <noreply@neore.test>",
+    // The plugin feature gate (`plugins/gate.ts`) is off when unset; on for everyone here so the plugin tests reach their code.
+    PLUGINS_ALLOWED_USERS: "*",
     QUEUE_JOBS: {
         send: async (body: RecordedQueueMessage["body"], options?: { delaySeconds?: number }) => {
             jobsQueueMessages.push({ body, ...(options?.delaySeconds !== undefined && { delaySeconds: options.delaySeconds }) });

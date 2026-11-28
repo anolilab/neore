@@ -83,6 +83,7 @@ const MODULES = {
     chat_custom_providers: async () => await import("../chat/custom-providers"),
     chat_group_functions: async () => await import("../chat/group/functions"),
     lib_claim_once: async () => await import("../lib/claim-once"),
+    plugins_export: async () => await import("../plugins/export"),
     skills_bundle: async () => await import("./bundle"),
     skills_functions: async () => await import("./functions"),
     triggers_functions: async () => await import("../triggers/functions"),
@@ -349,6 +350,32 @@ describe("importBundle", () => {
 
         expect(left).toContain(used);
         expect(left).not.toContain(untouched);
+    });
+
+    it("keeps a rolled-back group chat that has pins, because its delete would continue on unfenced pages", async () => {
+        const skillIds = [await createSkill(OWNER, "alpha"), await createSkill(OWNER, "beta")];
+        const pinned = await createGroup(OWNER, skillIds);
+
+        await run(async (context) => {
+            await context.db.insert("threadPins", {
+                createdAt: Date.now(),
+                messageId: "m1",
+                messageRole: "user",
+                selectedText: "hello",
+                threadId: pinned,
+                updatedAt: Date.now(),
+                userId: OWNER,
+            });
+        });
+
+        const outcome = await run(
+            async (context) => await context.runMutation(procedureAt("skills_bundle", "removeImportedItem"), { id: pinned, kind: "group", userId: OWNER }),
+        );
+
+        expect(outcome).toStrictEqual({ kept: true });
+        const threads = await rows("threads");
+
+        expect(threads.filter((thread) => thread.deleted !== true).map((thread) => thread._id)).toContain(pinned);
     });
 
     it("imports once per importId: a retry of the same id is refused, a new id is not, and a failed import frees its id", async () => {

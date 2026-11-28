@@ -75,4 +75,16 @@ describe("threadForViewer", () => {
         expect(threadForViewer(row, "owner")).toMatchObject({ capOrganizationId: "org-a" });
         expect(threadForViewer(row, "grantee")).not.toHaveProperty("capOrganizationId");
     });
+
+    it("hides the plugin install a group chat came from from everyone but its owner", async () => {
+        await harness.run(async (ctx: any) => await ctx.db.patch("threads", threadId, { pluginInstallId: "install-1", pluginMarker: "install-1:group:a" }));
+        const row = (await thread()) as never;
+
+        expect(threadForViewer(row, "owner")).toMatchObject({ pluginInstallId: "install-1", pluginMarker: "install-1:group:a" });
+
+        const seen = threadForViewer(row, "grantee");
+
+        expect(seen).not.toHaveProperty("pluginInstallId");
+        expect(seen).not.toHaveProperty("pluginMarker");
+    });
 });

@@ -218,6 +218,9 @@ const OWNER_TABLES = [
     "oauthStates",
     "outcomeEmails",
     "passkey",
+    "pluginInstallSlots",
+    "pluginInstalls",
+    "pluginItems",
     "presentations",
     "pushDevices",
     "pullRequestGuides",
@@ -463,6 +466,10 @@ export const UNPOLICED_TABLES: Record<string, string> = {
     connectorDefinitions: "global connector catalog",
     cronRuns: "cron slot claims; system only",
     documentHistory: "audit trail written by triggers; no client read",
+    groupChatSkillIndex:
+        "per-owner state of the group-chat skill index (`chat/group/skill-index-backfill.ts`); written by the owner's shard sweep, erased with the account (`chat/gdpr.ts`); no client reads it",
+    groupChatSkills:
+        "rows of the group-chat skill index, kept by the `threads` triggers (`chat/group/skill-index.ts`); read only by plugin update and uninstall on the owner's shard, erased with the account (`chat/gdpr.ts`); no client reads it",
     idempotencyClaims: "internal claims; no client access",
     invitation: "better-auth organization invitations; org-scoped, checked by org role",
     jwks: "better-auth signing keys",

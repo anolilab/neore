@@ -15,4 +15,5 @@ import { env } from "cloudflare:workers";
 import { currentShard, ROOT_SHARD_KEY, servesUser } from "./shard-context";
 import { isShardRoutingEnabled } from "./shard-namespace";
 
-export const onOwnShard = (userId: string): boolean => (currentShard() !== ROOT_SHARD_KEY || !isShardRoutingEnabled(env)) && servesUser(userId);
+export const onOwnShard = (userId: string): boolean =>
+    (currentShard() !== ROOT_SHARD_KEY || !isShardRoutingEnabled(env as { ENVIRONMENT?: string; SHARD_ROUTING?: string })) && servesUser(userId);

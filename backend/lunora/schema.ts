@@ -15,6 +15,7 @@ import { defineSchema, defineTable, v } from "lunorash/server";
 
 import { vAcpAgentState, vAcpOptionResult, vAcpSessionStatus, vHostEndReason, vHostEvent, vHostState } from "./acp/validators";
 import { vAgentRef } from "./agent/agent-switch-validators";
+import { groupSkillIndexTriggers } from "./chat/group/skill-index";
 import { threadSearchMessageTriggers, threadSearchTriggers } from "./agent/thread-search-triggers";
 import { vGoalRunConfig, vGoalStatus as vThreadGoalStatus, vGoalStopReason, vGoalVerdict, vPinnedGoal } from "./chat/goals/validators";
 import { vGroupChat } from "./chat/group/validators";
@@ -49,6 +50,7 @@ import { vNotTypedMarks } from "./lib/not-typed-text-validator";
 import { vMemoryEvidence } from "./memory/evidence";
 import { vCapabilityReport } from "./lib/capability-report";
 import { notificationInputFields } from "./notifications/validators";
+import { vPluginInstallStatus, vPluginItemKind, vPluginItemState } from "./plugins/validators";
 import {
     vCachedRequest,
     vDraftComment,
@@ -1562,6 +1564,27 @@ export const schema = defineSchema({
         .shardBy("userId")
         .index("by_user_and_status", ["userId", "status"]),
 
+    // One per user: the backfill's position over the owner's threads, and `completedAt` once every thread is indexed
+    // (`chat/group/skill-index-backfill.ts`). Unset, readers scan as before.
+    groupChatSkillIndex: defineTable({
+        completedAt: v.optional(v.number()),
+        cursor: v.optional(v.string()),
+        userId: v.string(),
+    })
+        .shardBy("userId")
+        .index("by_userId", ["userId"]),
+
+    // One row per (group chat, skill it names), kept by the `threads` triggers (`chat/group/skill-index.ts`): which of an owner's
+    // group chats use a skill, without scanning their chats. Read only when the owner's `groupChatSkillIndex` row is complete.
+    groupChatSkills: defineTable({
+        skillId: v.string(),
+        threadId: v.string(),
+        userId: v.string(),
+    })
+        .shardBy("userId")
+        .index("by_user_and_skill", ["userId", "skillId"])
+        .index("by_thread", ["threadId"]),
+
     /**
      * Claim-once rows (`lib/claim-once.ts`): one per messenger event, trigger
      * webhook delivery or queue job that must happen at most once. `scope` names
@@ -2543,6 +2566,56 @@ export const schema = defineSchema({
         name: v.optional(v.string()),
     }).index("name", ["name"]),
 
+    // A plugin install and the children it created. Global: install state must be readable without a user's shard.
+    pluginInstalls: defineTable({
+        contentHash: v.string(),
+        generation: v.number(),
+        installedAt: v.number(),
+        leaseUntil: v.optional(v.number()),
+        // Set while some child holds content that is not the installed version's (an update skipped or kept a child, or stopped after
+        // rewriting some). Export refuses such an install as a plugin file; a later complete update clears it.
+        partial: v.optional(v.boolean()),
+        pluginSlug: v.string(),
+        status: vPluginInstallStatus,
+        targetVersion: v.optional(v.string()),
+        updatedAt: v.number(),
+        userId: v.string(),
+        version: v.string(),
+    })
+        .global()
+        .index("by_user_and_slug", ["userId", "pluginSlug"]),
+
+    // One row per person and plugin, held for as long as the install row exists: its unique index is what refuses a second install of
+    // a plugin. A table of its own because a unique index cannot be added to the existing `pluginInstalls` table (`lunora prepare`
+    // blocks it, and a migration never reaches a `.global()` table).
+    pluginInstallSlots: defineTable({
+        createdAt: v.number(),
+        // Set once the install row exists; a slot without one is a create that stopped between its two inserts.
+        installId: v.optional(v.string()),
+        pluginSlug: v.string(),
+        userId: v.string(),
+    })
+        .global()
+        .index("by_install", ["installId"])
+        .index("by_user_and_plugin_slug", ["userId", "pluginSlug"], { unique: true }),
+
+    pluginItems: defineTable({
+        contentHash: v.string(),
+        createdAt: v.number(),
+        entryKey: v.string(),
+        installId: v.string(),
+        itemId: v.optional(v.string()),
+        kind: vPluginItemKind,
+        pendingHash: v.optional(v.string()),
+        /** The id a skill link held before repair found its skill gone: a group naming it is pointed at the new `itemId`. "" once done. */
+        replacedItemId: v.optional(v.string()),
+        state: vPluginItemState,
+        userId: v.string(),
+    })
+        .global()
+        .index("by_install", ["installId"])
+        .index("by_user", ["userId"]),
+
     presentations: defineTable({
         createdAt: v.number(),
         description: v.optional(v.string()),
@@ -3374,9 +3447,12 @@ export const schema = defineSchema({
         instructions: v.string(),
         name: v.string(),
         organizationId: v.optional(v.string()),
+        pluginInstallId: v.optional(v.string()),
+        pluginMarker: v.optional(v.string()),
         slug: v.string(),
         source: v.union(
             v.object({ type: v.literal("editor") }),
+            v.object({ type: v.literal("plugin"), version: v.string() }),
             v.object({ commitSha: v.optional(v.string()), path: v.optional(v.string()), repoUrl: v.string(), type: v.literal("github") }),
             v.object({ originalSkillId: v.string(), type: v.literal("official") }),
             v.object({ filename: v.string(), type: v.literal("upload"), uploadedAt: v.number() }),
@@ -3397,6 +3473,8 @@ export const schema = defineSchema({
         .index("by_organization", ["organizationId"])
         .index("by_category", ["category"])
         .index("by_visibility", ["visibility"])
+        .index("by_plugin_install", ["pluginInstallId"])
+        .index("by_plugin_marker", ["pluginMarker"])
         .searchIndex("search_skills_name", { field: "name", filterFields: ["userId"] })
         .searchIndex("search_skills_description", { field: "description", filterFields: ["userId"] })
         .relations((r) => {
@@ -4136,6 +4214,9 @@ export const schema = defineSchema({
         pinnedAt: v.optional(v.number()),
         // The goal every following message in this chat runs with, until it is cleared (`chat/goals/functions.ts`).
         pinnedGoal: v.optional(vPinnedGoal),
+        // A plugin install's child. Written only by internal wrappers.
+        pluginInstallId: v.optional(v.string()),
+        pluginMarker: v.optional(v.string()),
         projectId: v.optional(v.id("projects")),
         publicAccessToken: v.optional(v.string()),
         reasoningEffort: v.optional(v.number()),
@@ -4201,10 +4282,14 @@ export const schema = defineSchema({
         .index("by_user_and_order", ["userId", "order"])
         // Home's "recent threads" and the Daily Brief's "threads touched since".
         .index("by_user_and_updatedAt", ["userId", "updatedAt"])
+        .index("by_plugin_install", ["pluginInstallId"])
+        .index("by_plugin_marker", ["pluginMarker"])
         .index("by_user_and_organization_and_updatedAt", ["userId", "organizationId", "updatedAt"])
         .searchIndex("title", { field: "title", filterFields: ["userId"] })
         .searchIndex("summary", { field: "summary", filterFields: ["userId"] })
-        .triggers((t) => threadSearchTriggers(t))
+        .triggers((t) => {
+            return { ...threadSearchTriggers(t), ...groupSkillIndexTriggers(t) };
+        })
         .relations((r) => {
             return {
                 access: r.many("threadAccess", { field: "threadId" }),
@@ -4371,6 +4456,8 @@ export const schema = defineSchema({
         nextTriggerAt: v.optional(v.number()),
         organizationId: v.optional(v.string()),
         payloadTemplate: v.optional(v.string()),
+        pluginInstallId: v.optional(v.string()),
+        pluginMarker: v.optional(v.string()),
         // A bot routine that only posts when there is something to report (`triggers/quiet.ts`). Absent = off. Only with a botId.
         quietWhenEmpty: v.optional(v.boolean()),
         searchMode: v.optional(v.string()),
@@ -4394,7 +4481,9 @@ export const schema = defineSchema({
         .index("by_enabled_nextTriggerAt", ["enabled", "nextTriggerAt"])
         // The active-watcher cap counts one user's switched-on event triggers; the dispatcher reads the due ones in order. Both stop at a bound.
         .index("by_userId_type_enabled", ["userId", "type", "enabled"])
-        .index("by_type_enabled_nextTriggerAt", ["type", "enabled", "nextTriggerAt"]),
+        .index("by_type_enabled_nextTriggerAt", ["type", "enabled", "nextTriggerAt"])
+        .index("by_plugin_install", ["pluginInstallId"])
+        .index("by_plugin_marker", ["pluginMarker"]),
 
     twoFactor: defineTable({
         backupCodes: v.string(),

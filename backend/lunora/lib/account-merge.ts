@@ -90,6 +90,7 @@ import { AUDIT_TABLES } from "./audit-triggers";
 import { hasClaimWithPrefix, prefixEnd, releaseClaimsWithPrefix } from "./claim-once";
 import { authLogger } from "./logger";
 import { callOnShard } from "./cross-shard";
+import { moveInstallSlot, releaseInstallSlot } from "../plugins/install-slots";
 import { enqueueJob } from "./job-queue";
 import { noteRetentionDueAt, noteShardActivity, noteShardDue } from "./shard-housekeeping";
 import { currentShard } from "./shard-context";
@@ -165,9 +166,11 @@ const NOT_MOVED = new Set(["cronRuns", "idempotencyClaims", "rateLimits"]);
  * Dropped with the guest's shard, never copied. A scan position into the guest's pull-request links, which the merge re-inserts
  * under new ids, so a carried cursor would point at nothing; the new account's sweep starts from its first link. A subscription is
  * keyed to the API key that made it, which the new account did not make, so a copy would be a live delivery it could not list
- * or cancel with its own key. The guest's subscriptions end with the merge instead.
+ * or cancel with its own key. The guest's subscriptions end with the merge instead. The group-chat skill index is the same as the
+ * scan position: its rows are made by the `threads` triggers as the guest's threads are imported, and the guest's "complete" mark
+ * says nothing about the new account's own threads, so it is never carried over.
  */
-const NOT_COPIED = new Set(["eventWebhookSubscriptions", "pullRequestStateScans"]);
+const NOT_COPIED = new Set(["eventWebhookSubscriptions", "groupChatSkillIndex", "groupChatSkills", "pullRequestStateScans"]);
 
 /**
  * The tables whose rows live on a user's shard — everything but `.global()` — sorted, but `threads` just before
@@ -244,6 +247,11 @@ export const GLOBAL_USER_COLUMNS: Readonly<Record<string, ReadonlyArray<string>>
     passkey: ["userId"],
     // A route restore still owed to the guest's pins (`chat/pins/functions.ts`): both columns follow the merge, as `sharedPinRoutes` does.
     pendingPinRestores: ["ownerId", "userId"],
+    pluginInstalls: [],
+    // A plugin install is moved by its own step (`mergePluginInstallsPage`) ahead of this loop: a person has one install per plugin, so
+    // an install of a plugin the new account already has is dropped with its links, and its children detached, rather than moved.
+    pluginInstallSlots: [],
+    pluginItems: [],
     projectRepositories: ["userId"],
     projectRuleFiles: ["userId"],
     projects: ["userId"],
@@ -2157,12 +2165,178 @@ const REASSIGN_BATCH = 200;
  */
 const REASSIGN_BATCH_BY_TABLE: Readonly<Record<string, number>> = { projectRuleFiles: 8 };
 
+/** Installs one `mergePluginInstallsPage` call moves: each costs a read, and a patch that reads before it writes (3 D1 queries). */
+const PLUGIN_MERGE_INSTALLS = 6;
+
+/**
+ * Skills, then links, one call detaches or deletes for a duplicate install; the call that does the rest deletes the install. A
+ * patch or delete of a `.global()` row reads before it writes (two D1 queries): 4 + 4 of them, three reads and the install's
+ * delete are about 22, leaving room in the invocation for the grant steps ahead of this one.
+ */
+const PLUGIN_MERGE_CHILDREN = 4;
+
+/**
+ * Moves the guest's plugin installs to the new account, one install per plugin: for a plugin the new account already has, the
+ * guest's install is not moved. Its children (skills, triggers, group chats) are detached, as an uninstall keeps an edited one,
+ * and its links and the install row are deleted. A duplicate takes as many calls as it has rows (`done: false`); the rest of the
+ * installs are moved with their links (the links first, then the install), so no install is split from its links.
+ * `statements` is the D1 work the call did.
+ */
+export const mergePluginInstallsPage = async (ctx: MutationCtx, from: string, to: string): Promise<{ busy?: boolean; done: boolean; statements: number }> => {
+    const { page } = await ctx.db.pluginInstalls.findMany({ consistency: "primary", limit: PLUGIN_MERGE_INSTALLS + 1, where: { userId: from } });
+    let statements = 1;
+    let busy = false;
+
+    for (const install of page.slice(0, PLUGIN_MERGE_INSTALLS)) {
+        // An action holding the install (a live lease) is using its rows: left alone this page, and found again by a later one.
+        if (install.leaseUntil !== undefined && install.leaseUntil > ctx.now) {
+            busy = true;
+
+            continue;
+        }
+
+        const installId = install._id as string;
+        const target = await ctx.db.pluginInstalls.findFirst({ consistency: "primary", where: { pluginSlug: install.pluginSlug, userId: to } });
+
+        statements += 1;
+
+        if (!target) {
+            // The install's links move first, a few a call, and the install last: a merge stopped between two calls leaves the install
+            // still the guest's, found again by the next call, never an install whose links name another account.
+            const links = await ctx.db.pluginItems.findMany({ consistency: "primary", limit: PLUGIN_MERGE_CHILDREN + 1, where: { installId, userId: from } });
+
+            statements += 1;
+
+            for (const link of links.page.slice(0, PLUGIN_MERGE_CHILDREN)) {
+                await ctx.db.patch("pluginItems", link._id, { userId: to });
+                statements += 2;
+            }
+
+            if (links.page.length > PLUGIN_MERGE_CHILDREN) {
+                return { done: false, statements };
+            }
+
+            // The slot moves first; a person who already holds one for the plugin gets this install dropped below, as a duplicate.
+            const slotMoved = await moveInstallSlot(ctx, installId, to);
+
+            statements += 3;
+
+            if (slotMoved) {
+                // Only while the install is still the one read: an action that took it over since (a new generation) keeps it for a later page.
+                const { applied } = await ctx.db.patchIf("pluginInstalls", install._id, { patch: { userId: to }, where: { generation: install.generation } });
+
+                statements += 2;
+
+                if (!applied) {
+                    busy = true;
+
+                    continue;
+                }
+
+                // An install with links is a call of its own, as a duplicate is.
+                if (links.page.length > 0) {
+                    return { done: false, statements };
+                }
+
+                continue;
+            }
+
+            // The slot move was refused: the new account holds a live slot for the plugin but no install yet (another merge's move is
+            // mid-way, or a create of theirs has not finished). Not a duplicate to drop yet, so the step waits and comes back.
+            busy = true;
+
+            continue;
+        }
+
+        // A duplicate costs up to two dozen D1 statements (its skills and links are global rows), so it gets a call to itself.
+        if (statements > 2) {
+            return { done: false, statements };
+        }
+
+        // The drop writes other tables that cannot be fenced on the install, so the generation moves first: an action still holding the
+        // old one stops at its next step (`STALE_LEASE`), and a takeover since the read keeps the install for a later page.
+        const { applied: claimed } = await ctx.db.patchIf("pluginInstalls", install._id, {
+            patch: { generation: install.generation + 1 },
+            where: { generation: install.generation },
+        });
+
+        statements += 2;
+
+        if (!claimed) {
+            busy = true;
+
+            continue;
+        }
+
+        const skills = await ctx.db.skills.findMany({ consistency: "primary", limit: PLUGIN_MERGE_CHILDREN + 1, where: { pluginInstallId: installId } });
+
+        statements += 1;
+
+        for (const skill of skills.page.slice(0, PLUGIN_MERGE_CHILDREN)) {
+            await ctx.db.patch("skills", skill._id as Id<"skills">, { pluginInstallId: "", pluginMarker: "" });
+            statements += 2;
+        }
+
+        const triggers = await ctx.db
+            .query("triggers")
+            .withIndex("by_plugin_install", (q) => q.eq("pluginInstallId", installId))
+            .take(PLUGIN_MERGE_CHILDREN + 1);
+
+        for (const trigger of triggers.slice(0, PLUGIN_MERGE_CHILDREN)) {
+            // Off as well: the new account's own install of the plugin has its own copy of this trigger.
+            await ctx.db.patch("triggers", trigger._id as Id<"triggers">, { enabled: false, pluginInstallId: "", pluginMarker: "" });
+        }
+
+        const groups = await ctx.db
+            .query("threads")
+            .withIndex("by_plugin_install", (q) => q.eq("pluginInstallId", installId))
+            .take(PLUGIN_MERGE_CHILDREN + 1);
+
+        for (const group of groups.slice(0, PLUGIN_MERGE_CHILDREN)) {
+            await ctx.db.patch("threads", group._id as Id<"threads">, { pluginInstallId: "", pluginMarker: "" });
+        }
+
+        const more = skills.page.length > PLUGIN_MERGE_CHILDREN || triggers.length > PLUGIN_MERGE_CHILDREN || groups.length > PLUGIN_MERGE_CHILDREN;
+
+        const links = await ctx.db.pluginItems.findMany({ consistency: "primary", limit: PLUGIN_MERGE_CHILDREN + 1, where: { installId } });
+
+        statements += 1;
+
+        for (const link of links.page.slice(0, PLUGIN_MERGE_CHILDREN)) {
+            await ctx.db.delete("pluginItems", link._id);
+            statements += 2;
+        }
+
+        // The install goes last, once nothing names it; a call that left rows behind is followed by another.
+        if (more || links.page.length > PLUGIN_MERGE_CHILDREN) {
+            return { done: false, statements };
+        }
+
+        await releaseInstallSlot(ctx, installId);
+        await ctx.db.delete("pluginInstalls", install._id);
+        statements += 4;
+
+        return { done: false, statements };
+    }
+
+    // A skipped install is still the guest's: `busy` asks the caller to try again later, not at once.
+    return { done: !busy && page.length <= PLUGIN_MERGE_INSTALLS, statements, ...(busy && { busy }) };
+};
+
 export const reassignGlobalRows = internalMutation
     // `guestDrained: false` when rows are still on the guest's shard: the organization contributor entries are left as the hand-over
     // marked them (their cohorts withheld), so the guest's leftover ledger rows are never booked into a cohort of their own. The merge's
     // `global` step runs only after its clear emptied the guest's shard, so it never passes `false`.
     .input({ from: v.string(), generation: v.number(), guestDrained: v.optional(v.boolean()), to: v.string() })
-    .output(v.object({ done: v.boolean(), erasing: v.optional(v.boolean()), fenced: v.optional(v.boolean()), reassigned: v.number() }))
+    .output(
+        v.object({
+            deferred: v.optional(v.boolean()),
+            done: v.boolean(),
+            erasing: v.optional(v.boolean()),
+            fenced: v.optional(v.boolean()),
+            reassigned: v.number(),
+        }),
+    )
     .mutation(async ({ args, ctx }) => {
         // In the transaction that writes: a delivery whose lease a later one took (one that may have stopped the merge for an
         // erasure since) re-points nothing, nor does one that finds an erasure begun since its run's start.
@@ -2214,7 +2388,15 @@ export const reassignGlobalRows = internalMutation
             return { done: false, reassigned: owned.moved };
         }
 
-        let reassigned = 0;
+        // The guest's plugin installs: one per plugin for the new account, so a duplicate is dropped, not moved.
+        const plugins = await mergePluginInstallsPage(ctx, args.from, args.to);
+
+        if (!plugins.done) {
+            // An install an action holds is tried again after a delay (`deferred`); its lease ends within `LEASE_MS`.
+            return { done: false, reassigned: plugins.statements, ...(plugins.busy && { deferred: true }) };
+        }
+
+        let reassigned = plugins.statements - 1;
 
         const settleContributors = args.guestDrained !== false;
 
@@ -2536,6 +2718,9 @@ interface MergeState {
 /** How long a `repins` step waits for the pins another merge's clear moved away to be routed where they now are. */
 export const PINS_LEFT_RECHECK_MS = 60 * 1000;
 
+/** Wait before the merge looks again at a plugin install an action holds. */
+const PLUGIN_BUSY_RECHECK_MS = 60 * 1000;
+
 interface MergeContext {
     call: ShardCall;
     from: string;
@@ -2785,10 +2970,11 @@ const STEPS: Readonly<Record<MergePhase, (context: MergeContext, state: MergeSta
     global: async ({ call, from, generation, references, to }, state) => {
         state.calls -= 1;
         const {
+            deferred,
             done,
             erasing,
             fenced: stale,
-        }: { done: boolean; erasing?: boolean; fenced?: boolean } = await call(references.reassignGlobal, { from, generation, to }, to);
+        }: { deferred?: boolean; done: boolean; erasing?: boolean; fenced?: boolean } = await call(references.reassignGlobal, { from, generation, to }, to);
 
         if (erasing === true) {
             return stoppedByErasure(state);
@@ -2798,6 +2984,12 @@ const STEPS: Readonly<Record<MergePhase, (context: MergeContext, state: MergeSta
             state.superseded = true;
 
             return true;
+        }
+
+        if (deferred === true) {
+            state.deferMs = PLUGIN_BUSY_RECHECK_MS;
+
+            return false;
         }
 
         if (done) {
@@ -2823,7 +3015,7 @@ const STEPS: Readonly<Record<MergePhase, (context: MergeContext, state: MergeSta
         // A `.global()` row the guest wrote after the `global` step (a project made meanwhile) still names the guest: moved
         // here before the guest goes, and then the merge goes back to that step, the guest kept until it is done again.
         state.calls -= 1;
-        const global: { done: boolean; erasing?: boolean; fenced?: boolean; reassigned: number } = await call(
+        const global: { deferred?: boolean; done: boolean; erasing?: boolean; fenced?: boolean; reassigned: number } = await call(
             references.reassignGlobal,
             { from, generation, to },
             to,
@@ -2841,6 +3033,10 @@ const STEPS: Readonly<Record<MergePhase, (context: MergeContext, state: MergeSta
 
         if (!global.done || global.reassigned > 0) {
             enter(state, "global");
+
+            if (global.deferred === true) {
+                state.deferMs = PLUGIN_BUSY_RECHECK_MS;
+            }
 
             return false;
         }

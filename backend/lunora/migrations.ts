@@ -431,3 +431,24 @@ export const backfillPullRequestWatchActive = defineMigration({
         return { ...document, watchActive: true };
     },
 });
+
+/**
+ * `threads.isGroupChat` is no longer in the schema. A group chat's shape is `groupChat` now. No deployed build has written
+ * the flag (`main` never had it), so this only clears it from rows written by a development build of this branch. A row
+ * without the flag is skipped.
+ */
+export const dropThreadIsGroupChat = defineMigration({
+    id: "drop-thread-is-group-chat",
+    table: "threads",
+    up: (document) => {
+        if (!("isGroupChat" in document)) {
+            return undefined;
+        }
+
+        const row: Record<string, unknown> = { ...document };
+
+        delete row.isGroupChat;
+
+        return row as typeof document;
+    },
+});

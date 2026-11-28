@@ -37,7 +37,10 @@ import { internalMutation, internalQuery } from "../_generated/server";
 import { authAction, authQuery, rateLimit } from "../lib/crpc";
 import { MAX_LENGTH } from "../lib/validators";
 import type { BundleItem, SkillSource } from "./bundle-format";
-import { BUNDLE_LIMITS, buildBundleMarkdown, groupItemOf, parseBundleMarkdown, skillItemOf, triggerItemOf } from "./bundle-format";
+import { withPluginHeader } from "../plugins/export";
+import { heldInstall } from "../plugins/held-install";
+import { bodyHash } from "../plugins/logic";
+import { BUNDLE_LIMITS, buildBundleMarkdown, groupItemOf, isCustomModel, parseBundleMarkdown, skillItemOf, triggerItemOf } from "./bundle-format";
 import type { PlanEntry, PlanEnv } from "./bundle-plan";
 import { assertSelectionImportable, BundleImportError, mayRetryImport, planBundle, runBundleImport, skillLimitFor } from "./bundle-plan";
 import { isSelectableTextModel } from "@neore/ai/models";
@@ -481,7 +484,38 @@ export const exportBundle = authAction
             slugById.set(skillId, slug);
         }
 
-        const items: BundleItem[] = [...skillSources].map(([skillId, skill]) => skillItemOf(skill, { isKnownTool, slug: slugById.get(skillId) }));
+        // A selection that is exactly one installed plugin's unedited children is exported as that plugin's own file, with each
+        // item under the key its install gave it. The lookup runs first, because a plugin file's body carries the keys.
+        // A skill's custom model is left out of every file (another account has no such endpoint), so a selection that holds one is not
+        // the plugin's own content any more: it is exported as a plain bundle, never as that plugin at its version.
+        let dropsCustomModel = false;
+
+        for (const skill of skillSources.values()) {
+            if (skill.config?.preferredModel !== undefined && isCustomModel(skill.config.preferredModel)) {
+                dropsCustomModel = true;
+                break;
+            }
+        }
+
+        const plugin = dropsCustomModel
+            ? null
+            : await ctx.runQuery(internal.plugins.export.pluginForSelection, {
+                  groupChatIds,
+                  // The skills the file will hold, a group's participants included: a plugin group alone is still that plugin's content.
+                  skillIds: [...skillSources.keys()],
+                  triggerIds,
+                  userId,
+              });
+        const keyById = new Map((plugin?.keys ?? []).map((child) => [child.id, child.key] as const));
+        const keyed = <T extends BundleItem>(item: T, id: string): T => {
+            const key = keyById.get(id);
+
+            return key === undefined ? item : { ...item, key };
+        };
+
+        const items: BundleItem[] = [...skillSources].map(([skillId, skill]) =>
+            keyed(skillItemOf(skill, { isKnownTool, slug: slugById.get(skillId) }), skillId),
+        );
 
         for (const trigger of sources.triggers) {
             const result = triggerItemOf(trigger);
@@ -490,7 +524,7 @@ export const exportBundle = authAction
                 throw new LunoraError("BAD_REQUEST", `"${trigger.name}" cannot be exported. ${result.reason}`);
             }
 
-            items.push(result.item);
+            items.push(keyed(result.item, trigger.id));
         }
 
         for (const group of sources.groupChats) {
@@ -500,11 +534,13 @@ export const exportBundle = authAction
                 throw new LunoraError("BAD_REQUEST", `"${group.title ?? "A group chat"}" cannot be exported. ${result.reason}`);
             }
 
-            items.push(result.item);
+            items.push(keyed(result.item, group.id));
         }
 
         const name = args.name.trim() || "Team bundle";
-        const markdown = buildBundleMarkdown({ description: args.description ?? "", items, name });
+        const built = buildBundleMarkdown({ description: args.description ?? "", items, name });
+        const markdown = plugin ? withPluginHeader(built, { contentHash: await bodyHash(built), slug: plugin.slug, version: plugin.version }) : built;
+        // The check reads the file that is returned, so a plugin file is checked with its header and its keys.
         const check = parseBundleMarkdown(markdown);
 
         if (!check.ok) {
@@ -530,12 +566,27 @@ export const exportBundle = authAction
  * and soft-fail an import that is already half done. An item that is already gone is a success.
  */
 export const removeImportedItem = internalMutation
-    .input({ id: v.string().max(MAX_LENGTH.id), kind: vKind, userId: v.string().max(MAX_LENGTH.id) })
-    .output(v.object({ kept: v.boolean() }))
-    .mutation(async ({ args: { id, kind, userId }, ctx }) => {
+    .input({
+        id: v.string().max(MAX_LENGTH.id),
+        kind: vKind,
+        // A plugin rollback: the delete happens only while the action still holds the install, checked in this same mutation so a
+        // repair that took over cannot have linked the child in between. A lost lease keeps the child for that repair.
+        lease: v.optional(v.object({ generation: v.number(), installId: v.string().max(MAX_LENGTH.id) })),
+        userId: v.string().max(MAX_LENGTH.id),
+    })
+    .output(v.object({ kept: v.boolean(), leaseLost: v.optional(v.boolean()) }))
+    .mutation(async ({ args: { id, kind, lease, userId }, ctx }) => {
         const forbidden = (): never => {
             throw new LunoraError("FORBIDDEN", "Not authorized to remove this item");
         };
+
+        if (lease) {
+            try {
+                await heldInstall(ctx, lease.installId as Id<"pluginInstalls">, lease.generation);
+            } catch {
+                return { kept: true, leaseLost: true };
+            }
+        }
 
         if (kind === "skill") {
             const skill = await ctx.db.skills.findFirst({ where: { _id: id as Id<"skills"> } });
@@ -578,6 +629,12 @@ export const removeImportedItem = internalMutation
                     return { kept: true };
                 }
 
+                // A pinned group is kept as one with messages is: its delete would continue on unfenced scheduled pages, and a
+                // rollback may only delete what finishes in this one.
+                if (await ctx.db.threadPins.findFirst({ where: { threadId: thread._id } })) {
+                    return { kept: true };
+                }
+
                 await ctx.runMutation(internal.agent.threads.deleteAllForThreadIdAsync, { threadId: thread._id });
             }
         }
@@ -601,13 +658,25 @@ export const loadImportContext = internalQuery
         return { skillCount: skills.length, slugs: skills.map((skill) => skill.slug) };
     });
 
-const planFor = async (
+/** A plugin file is installed by the plugin procedures, never through the bundle preview or import. */
+const refuseIfPlugin = (markdown: string): void => {
+    const parsed = parseBundleMarkdown(markdown);
+
+    if (parsed.ok && parsed.bundle.plugin) {
+        throw new LunoraError("BAD_REQUEST", "This file is a plugin. Install it from the plugin install page; a bundle import cannot install it.");
+    }
+};
+
+export const planFor = async (
     ctx: {
         runQuery: (reference: typeof internal.skills.bundle.loadImportContext, args: { userId: string }) => Promise<{ skillCount: number; slugs: string[] }>;
         user: { isAdmin?: boolean; plan?: string | null; userId: string };
     },
     markdown: string,
     selected: ReadonlySet<string> | undefined,
+    // `ownSlugs`: the slug each of the plugin's installed skills holds, by entry key. An update may keep it under that key only.
+    // `freedSlugs`: slugs of skills an update removes before it creates, so a new skill may take them and they do not count against the limit.
+    options: { freedSlugs?: ReadonlyArray<string>; ownSlugs?: ReadonlyArray<{ entryKey: string; slug: string }> } = {},
 ): Promise<{ bundle: { description: string; name: string }; entries: PlanEntry[]; env: PlanEnv }> => {
     const parsed = parseBundleMarkdown(markdown);
 
@@ -617,12 +686,14 @@ const planFor = async (
 
     const known = await ctx.runQuery(internal.skills.bundle.loadImportContext, { userId: ctx.user.userId });
     const knownTools = knownToolNames();
+    const freed = new Set(options.freedSlugs);
     const env: PlanEnv = {
-        existingSkillCount: known.skillCount,
-        existingSlugs: new Set(known.slugs),
+        existingSkillCount: Math.max(0, known.skillCount - freed.size),
+        existingSlugs: new Set(known.slugs.filter((slug) => !freed.has(slug))),
         isKnownTool: (name) => knownTools.has(name),
         isModelRunnable: isRunnableModel,
         now: Date.now(),
+        ownSlugByKey: new Map((options.ownSlugs ?? []).map((own) => [own.entryKey, own.slug] as const)),
         skillLimit: skillLimitFor(ctx.user),
     };
 
@@ -694,6 +765,7 @@ export const previewBundle = authAction
         }),
     )
     .action(async ({ args, ctx }) => {
+        refuseIfPlugin(args.markdown);
         const { bundle, entries, env } = await planFor(ctx, args.markdown, undefined);
 
         ctx.log.event("skills.bundle_preview", { entries: entries.length, ready: entries.filter((entry) => entry.problems.length === 0).length });
@@ -752,6 +824,7 @@ export const importBundle = authAction
 
         assertWithin(selected.size, BUNDLE_LIMITS.skills + BUNDLE_LIMITS.triggers + BUNDLE_LIMITS.groupChats, "items");
 
+        refuseIfPlugin(args.markdown);
         const { entries } = await planFor(ctx, args.markdown, selected);
 
         assertSelectionImportable(entries, selected);

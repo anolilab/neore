@@ -54,6 +54,7 @@ import {
     GLOBAL_USER_TABLES_NOT_REASSIGNED,
     firstTableWithGuestRows,
     handOverOrganizationContributors,
+    mergePluginInstallsPage,
     markGuestMerging,
     mergeGuestInto,
     NOT_USER_REFERENCE_FIELDS,
@@ -1275,6 +1276,503 @@ describe("reassignGlobalRows", () => {
         } finally {
             harness.close();
         }
+    });
+
+    it("keeps one install per plugin: a plugin the new account has is dropped with its links and its children detached, the rest move", async () => {
+        const harness = lunoraTest(schemaWithShardedTables([...Object.keys(GLOBAL_USER_COLUMNS), "shardActivity"]) as never);
+        const install = (userId: string, pluginSlug: string) => {
+            return {
+                contentHash: "a".repeat(64),
+                createdAt: 0,
+                generation: 1,
+                pluginSlug,
+                status: "installed" as const,
+                updatedAt: 0,
+                userId,
+                version: "1.0.0",
+            };
+        };
+
+        try {
+            const { guestOnly, guestShared, userShared } = await harness.run(async (context: any) => {
+                const userSharedId = await context.db.insert("pluginInstalls", install("user", "shared"));
+                const guestSharedId = await context.db.insert("pluginInstalls", install("guest", "shared"));
+                const guestOnlyId = await context.db.insert("pluginInstalls", install("guest", "only"));
+
+                for (const [installId, key] of [
+                    [guestSharedId, "skill:a"],
+                    [guestOnlyId, "skill:b"],
+                ] as const) {
+                    await context.db.insert("pluginItems", {
+                        contentHash: "b".repeat(64),
+                        createdAt: 0,
+                        entryKey: key,
+                        installId,
+                        kind: "skill",
+                        state: "created",
+                        userId: "guest",
+                    });
+                }
+
+                await context.db.insert("skills", {
+                    description: "d",
+                    instructions: "i",
+                    name: "Dup",
+                    pluginInstallId: guestSharedId,
+                    pluginMarker: "marker",
+                    slug: "dup",
+                    userId: "user",
+                });
+
+                return { guestOnly: guestOnlyId, guestShared: guestSharedId, userShared: userSharedId };
+            });
+
+            for (let call = 0; call < 10; call += 1) {
+                const { done } = await harness.run(async (context: any) => await asLeaseHolder(context, reassignGlobalRows));
+
+                if (done) {
+                    break;
+                }
+            }
+
+            const { page: installs } = await harness.run(async (context: any) => await context.db.pluginInstalls.findMany({}));
+            const { page: links } = await harness.run(async (context: any) => await context.db.pluginItems.findMany({}));
+            const skill = await harness.run(async (context: any) => await context.db.skills.findFirst({ where: { slug: "dup" } }));
+
+            expect(installs.map((row: any) => row._id).toSorted((a: string, b: string) => a.localeCompare(b))).toStrictEqual(
+                [userShared, guestOnly].toSorted((a: string, b: string) => a.localeCompare(b)),
+            );
+            expect(installs.every((row: any) => row.userId === "user")).toBe(true);
+            expect(installs.some((row: any) => row._id === guestShared)).toBe(false);
+            expect(links.map((row: any) => [row.installId, row.userId])).toStrictEqual([[guestOnly, "user"]]);
+            expect(skill).toMatchObject({ pluginInstallId: "", pluginMarker: "" });
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("gives each duplicate plugin install a call of its own, so no call sends more than 50 D1 statements", async () => {
+        const harness = lunoraTest(schemaWithShardedTables([...Object.keys(GLOBAL_USER_COLUMNS), "shardActivity"]) as never);
+
+        try {
+            await harness.run(async (context: any) => {
+                for (const slug of ["one", "two", "three"]) {
+                    const base = {
+                        contentHash: "a".repeat(64),
+                        createdAt: 0,
+                        generation: 1,
+                        pluginSlug: slug,
+                        status: "installed" as const,
+                        updatedAt: 0,
+                        version: "1.0.0",
+                    };
+
+                    await context.db.insert("pluginInstalls", { ...base, userId: "user" });
+
+                    const guestId = await context.db.insert("pluginInstalls", { ...base, userId: "guest" });
+
+                    for (let index = 0; index < 12; index += 1) {
+                        await context.db.insert("pluginItems", {
+                            contentHash: "b".repeat(64),
+                            createdAt: 0,
+                            entryKey: `skill:${String(index)}`,
+                            installId: guestId,
+                            kind: "skill",
+                            state: "created",
+                            userId: "guest",
+                        });
+                        await context.db.insert("skills", {
+                            description: "d",
+                            instructions: "i",
+                            name: `${slug}-${String(index)}`,
+                            pluginInstallId: guestId,
+                            pluginMarker: `${guestId}:skill:${String(index)}`,
+                            slug: `${slug}-${String(index)}`,
+                            userId: "user",
+                        });
+                    }
+                }
+            });
+
+            const counts: number[] = [];
+
+            await harness.run(async (context: any) => await mergePluginInstallsPage(context, "guest", "user"));
+
+            const { page: afterFirst } = await harness.run(async (context: any) => await context.db.pluginInstalls.findMany({ where: { userId: "guest" } }));
+
+            // One duplicate per call, and only a few of its rows: the first call never drops all three.
+            expect(afterFirst.length).toBeGreaterThanOrEqual(2);
+
+            for (let call = 0; call < 20; call += 1) {
+                const result = await harness.run(async (context: any) => await mergePluginInstallsPage(context, "guest", "user"));
+
+                counts.push(result.statements);
+
+                if (result.done) {
+                    break;
+                }
+            }
+
+            const { page: left } = await harness.run(async (context: any) => await context.db.pluginInstalls.findMany({ where: { userId: "guest" } }));
+
+            expect(left).toStrictEqual([]);
+            expect(Math.max(...counts)).toBeLessThanOrEqual(50);
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("spends a duplicate install's skills and links over several calls, each within an invocation's D1 queries", async () => {
+        const harness = lunoraTest(schemaWithShardedTables([...Object.keys(GLOBAL_USER_COLUMNS), "shardActivity"]) as never);
+
+        try {
+            const base = { contentHash: "a".repeat(64), createdAt: 0, generation: 1, status: "installed" as const, updatedAt: 0, version: "1.0.0" };
+
+            await harness.run(async (context: any) => {
+                await context.db.insert("pluginInstalls", { ...base, pluginSlug: "shared", userId: "user" });
+
+                const guestInstall = await context.db.insert("pluginInstalls", { ...base, pluginSlug: "shared", userId: "guest" });
+
+                for (let index = 0; index < 12; index += 1) {
+                    await context.db.insert("skills", {
+                        description: "d",
+                        instructions: "i",
+                        name: `S${String(index)}`,
+                        pluginInstallId: guestInstall,
+                        pluginMarker: "m",
+                        slug: `s${String(index)}`,
+                        userId: "user",
+                    });
+                    await context.db.insert("pluginItems", {
+                        contentHash: "b".repeat(64),
+                        createdAt: 0,
+                        entryKey: `skill:${String(index)}`,
+                        installId: guestInstall,
+                        kind: "skill",
+                        state: "created",
+                        userId: "guest",
+                    });
+                }
+            });
+
+            const queries: number[] = [];
+
+            for (let call = 0; call < 20; call += 1) {
+                const count = { queries: 0 };
+                const { done } = await harness.run(
+                    async (context: any) => await mergePluginInstallsPage({ ...context, db: counting(context.db, count) }, "guest", "user"),
+                );
+
+                queries.push(count.queries);
+
+                if (done) {
+                    break;
+                }
+            }
+
+            const { page: installs } = await harness.run(async (context: any) => await context.db.pluginInstalls.findMany({}));
+            const { page: links } = await harness.run(async (context: any) => await context.db.pluginItems.findMany({}));
+
+            expect(queries.length).toBeGreaterThan(2);
+            expect(Math.max(...queries)).toBeLessThanOrEqual(30);
+            expect(installs).toHaveLength(1);
+            expect(links).toHaveLength(0);
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("moves an install with its links, links first and a few a call, so a merge stopped midway never splits them", async () => {
+        const harness = lunoraTest(schemaWithShardedTables([...Object.keys(GLOBAL_USER_COLUMNS), "shardActivity"]) as never);
+
+        try {
+            const base = { contentHash: "a".repeat(64), createdAt: 0, generation: 1, status: "installed" as const, updatedAt: 0, version: "1.0.0" };
+            const installId = await harness.run(async (context: any) => {
+                const id = await context.db.insert("pluginInstalls", { ...base, pluginSlug: "only", userId: "guest" });
+
+                for (let index = 0; index < 10; index += 1) {
+                    await context.db.insert("pluginItems", {
+                        contentHash: "b".repeat(64),
+                        createdAt: 0,
+                        entryKey: `skill:${String(index)}`,
+                        installId: id,
+                        kind: "skill",
+                        state: "created",
+                        userId: "guest",
+                    });
+                }
+
+                return id;
+            });
+            const queries: number[] = [];
+
+            for (let call = 0; call < 10; call += 1) {
+                const count = { queries: 0 };
+                const { done } = await harness.run(
+                    async (context: any) => await mergePluginInstallsPage({ ...context, db: counting(context.db, count) }, "guest", "user"),
+                );
+
+                queries.push(count.queries);
+
+                const install = await harness.run(async (context: any) => await context.db.pluginInstalls.findFirst({ where: { _id: installId } }));
+                const { page: links } = await harness.run(async (context: any) => await context.db.pluginItems.findMany({ where: { installId } }));
+
+                // Until the last call the install is still the guest's, so the next call finds it and its remaining links.
+                if (links.some((link: any) => link.userId === "guest")) {
+                    expect(install.userId).toBe("guest");
+                }
+
+                if (done) {
+                    break;
+                }
+            }
+
+            const { page: links } = await harness.run(async (context: any) => await context.db.pluginItems.findMany({ where: { installId } }));
+            const install = await harness.run(async (context: any) => await context.db.pluginInstalls.findFirst({ where: { _id: installId } }));
+
+            expect(queries.length).toBeGreaterThan(2);
+            expect(Math.max(...queries)).toBeLessThanOrEqual(30);
+            expect(install.userId).toBe("user");
+            expect(links).toHaveLength(10);
+            expect(links.every((link: any) => link.userId === "user")).toBe(true);
+        } finally {
+            harness.close();
+        }
+    });
+
+    it("reads a duplicate install's skills from the primary, so a lagging replica cannot leave one attached to a deleted install", async () => {
+        const harness = lunoraTest(schemaWithShardedTables([...Object.keys(GLOBAL_USER_COLUMNS), "shardActivity"]) as never);
+
+        try {
+            const base = { contentHash: "a".repeat(64), createdAt: 0, generation: 1, status: "installed" as const, updatedAt: 0, version: "1.0.0" };
+            const guestInstall = await harness.run(async (context: any) => {
+                await context.db.insert("pluginInstalls", { ...base, pluginSlug: "shared", userId: "user" });
+
+                const id = await context.db.insert("pluginInstalls", { ...base, pluginSlug: "shared", userId: "guest" });
+
+                await context.db.insert("skills", {
+                    description: "d",
+                    instructions: "i",
+                    name: "S",
+                    pluginInstallId: id,
+                    pluginMarker: "m",
+                    slug: "s",
+                    userId: "user",
+                });
+
+                return id;
+            });
+
+            // A replica that has not seen the skill shows none to a read at default consistency.
+            const lagging = (context: any) => {
+                const skills = {
+                    ...context.db.skills,
+                    findMany: async (options: any) =>
+                        options.consistency === "primary" ? await context.db.skills.findMany(options) : { isDone: true, page: [] },
+                };
+
+                return { ...context, db: new Proxy(context.db, { get: (target, key) => (key === "skills" ? skills : Reflect.get(target, key)) }) };
+            };
+
+            for (let call = 0; call < 10; call += 1) {
+                const { done } = await harness.run(async (context: any) => await mergePluginInstallsPage(lagging(context), "guest", "user"));
+
+                if (done) {
+                    break;
+                }
+            }
+
+            const skill = await harness.run(async (context: any) => await context.db.skills.findFirst({ where: { slug: "s" } }));
+            const install = await harness.run(async (context: any) => await context.db.pluginInstalls.findFirst({ where: { _id: guestInstall } }));
+
+            expect(install).toBeNull();
+            expect(skill).toMatchObject({ pluginInstallId: "", pluginMarker: "" });
+        } finally {
+            harness.close();
+        }
+    });
+
+    describe("plugin installs and their slots", () => {
+        const base = { contentHash: "a".repeat(64), createdAt: 0, generation: 1, status: "installed" as const, updatedAt: 0, version: "1.0.0" };
+        const open = () => lunoraTest(schemaWithShardedTables([...Object.keys(GLOBAL_USER_COLUMNS), "shardActivity"]) as never);
+
+        it("takes the drop path when the move meets an install the new account gained since the read", async () => {
+            const harness = open();
+
+            try {
+                const guestInstall = await harness.run(async (context: any) => {
+                    const userId = await context.db.insert("pluginInstalls", { ...base, pluginSlug: "shared", userId: "user" });
+                    const id = await context.db.insert("pluginInstalls", { ...base, pluginSlug: "shared", userId: "guest" });
+
+                    await context.db.insert("pluginInstallSlots", { createdAt: 0, installId: userId, pluginSlug: "shared", userId: "user" });
+                    await context.db.insert("pluginInstallSlots", { createdAt: 0, installId: id, pluginSlug: "shared", userId: "guest" });
+
+                    return id;
+                });
+
+                // The target read misses the new account's install, as a read that ran before its create would.
+                const blind = (context: any) => {
+                    const installs = {
+                        ...context.db.pluginInstalls,
+                        findFirst: async (options: any) => (options.where?.userId === "user" ? null : await context.db.pluginInstalls.findFirst(options)),
+                    };
+
+                    return {
+                        ...context,
+                        db: new Proxy(context.db, { get: (target, key) => (key === "pluginInstalls" ? installs : Reflect.get(target, key)) }),
+                    };
+                };
+
+                const first = await harness.run(async (context: any) => await mergePluginInstallsPage(blind(context), "guest", "user"));
+
+                expect(first.done).toBe(false);
+
+                for (let call = 0; call < 10; call += 1) {
+                    const { done } = await harness.run(async (context: any) => await mergePluginInstallsPage(context, "guest", "user"));
+
+                    if (done) {
+                        break;
+                    }
+                }
+
+                const { page } = await harness.run(async (context: any) => await context.db.pluginInstalls.findMany({}));
+
+                expect(page.map((row: any) => [row.userId, row.pluginSlug])).toStrictEqual([["user", "shared"]]);
+                expect(page.some((row: any) => row._id === guestInstall)).toBe(false);
+
+                const { page: slots } = await harness.run(async (context: any) => await context.db.pluginInstallSlots.findMany({}));
+
+                expect(slots.map((row: any) => row.userId)).toStrictEqual(["user"]);
+            } finally {
+                harness.close();
+            }
+        });
+
+        it("waits and comes back when the new account holds a live slot for the plugin but no install yet", async () => {
+            const harness = open();
+
+            try {
+                const { guestInstall } = await harness.run(async (context: any) => {
+                    const id = await context.db.insert("pluginInstalls", { ...base, pluginSlug: "shared", userId: "guest" });
+
+                    await context.db.insert("pluginInstallSlots", { createdAt: 0, installId: id, pluginSlug: "shared", userId: "guest" });
+                    // A fresh slot with no install id: another move or a create of the new account's is mid-way.
+                    await context.db.insert("pluginInstallSlots", { createdAt: context.now, pluginSlug: "shared", userId: "user" });
+
+                    return { guestInstall: id };
+                });
+
+                const result = await harness.run(async (context: any) => await mergePluginInstallsPage(context, "guest", "user"));
+                const install = await harness.run(async (context: any) => await context.db.pluginInstalls.findFirst({ where: { _id: guestInstall } }));
+                const { page: slots } = await harness.run(async (context: any) => await context.db.pluginInstallSlots.findMany({}));
+
+                expect(result).toMatchObject({ busy: true, done: false });
+                expect(install).toMatchObject({ generation: 1, userId: "guest" });
+                expect(
+                    slots.map((row: any) => [row.userId, row.installId]).toSorted((a: string[], b: string[]) => a.join(",").localeCompare(b.join(","))),
+                ).toStrictEqual([
+                    ["guest", guestInstall],
+                    ["user", undefined],
+                ]);
+            } finally {
+                harness.close();
+            }
+        });
+
+        it("moves the slot with the install", async () => {
+            const harness = open();
+
+            try {
+                await harness.run(async (context: any) => {
+                    const id = await context.db.insert("pluginInstalls", { ...base, pluginSlug: "only", userId: "guest" });
+
+                    await context.db.insert("pluginInstallSlots", { createdAt: 0, installId: id, pluginSlug: "only", userId: "guest" });
+                });
+
+                await harness.run(async (context: any) => await mergePluginInstallsPage(context, "guest", "user"));
+
+                const { page } = await harness.run(async (context: any) => await context.db.pluginInstallSlots.findMany({}));
+
+                expect(page.map((row: any) => row.userId)).toStrictEqual(["user"]);
+            } finally {
+                harness.close();
+            }
+        });
+
+        it("skips an install an action holds, asks to be tried again, and finishes once the lease has ended", async () => {
+            const harness = open();
+
+            try {
+                const { held, settled } = await harness.run(async (context: any) => {
+                    const heldId = await context.db.insert("pluginInstalls", {
+                        ...base,
+                        leaseUntil: context.now + 60_000,
+                        pluginSlug: "busy",
+                        status: "updating",
+                        userId: "guest",
+                    });
+                    const settledId = await context.db.insert("pluginInstalls", { ...base, pluginSlug: "idle", userId: "guest" });
+
+                    return { held: heldId, settled: settledId };
+                });
+
+                const result = await harness.run(async (context: any) => await mergePluginInstallsPage(context, "guest", "user"));
+                const { page: mid } = await harness.run(async (context: any) => await context.db.pluginInstalls.findMany({}));
+
+                expect(result).toMatchObject({ busy: true, done: false });
+                expect(mid.find((row: any) => row._id === held)).toMatchObject({ generation: 1, userId: "guest" });
+                expect(mid.find((row: any) => row._id === settled)).toMatchObject({ userId: "user" });
+
+                await harness.run(async (context: any) => {
+                    await context.db.patch("pluginInstalls", held, { leaseUntil: 1, status: "installed" });
+                });
+
+                const after = await harness.run(async (context: any) => await mergePluginInstallsPage(context, "guest", "user"));
+                const { page: end } = await harness.run(async (context: any) => await context.db.pluginInstalls.findMany({}));
+
+                expect(after.busy).toBeUndefined();
+                expect(end.every((row: any) => row.userId === "user")).toBe(true);
+            } finally {
+                harness.close();
+            }
+        });
+
+        it("keeps an install an action took over between the merge's read and its write", async () => {
+            const harness = open();
+
+            try {
+                const id = await harness.run(
+                    async (context: any) => await context.db.insert("pluginInstalls", { ...base, pluginSlug: "taken", userId: "guest" }),
+                );
+
+                // The merge reads generation 1; by its write an action has moved the row to generation 2.
+                const racing = (context: any) => {
+                    const installs = {
+                        ...context.db.pluginInstalls,
+                        findMany: async (options: any) => {
+                            const read = await context.db.pluginInstalls.findMany(options);
+
+                            await context.db.patch("pluginInstalls", id, { generation: 2 });
+
+                            return read;
+                        },
+                    };
+
+                    return {
+                        ...context,
+                        db: new Proxy(context.db, { get: (target, key) => (key === "pluginInstalls" ? installs : Reflect.get(target, key)) }),
+                    };
+                };
+
+                const result = await harness.run(async (context: any) => await mergePluginInstallsPage(racing(context), "guest", "user"));
+                const row = await harness.run(async (context: any) => await context.db.pluginInstalls.findFirst({ where: { _id: id } }));
+
+                expect(result).toMatchObject({ busy: true, done: false });
+                expect(row).toMatchObject({ generation: 2, userId: "guest" });
+            } finally {
+                harness.close();
+            }
+        });
     });
 
     it("moves a guest's rule-file rows a few per call, each read charged whole, until all are the new account's", async () => {

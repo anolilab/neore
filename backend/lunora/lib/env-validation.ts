@@ -157,6 +157,13 @@ const optionalEnvSchema = z.object({
     // Checked by `parseOidcIssuer`, not here: this schema runs per request, and
     // a bad issuer must switch off OIDC alone rather than every route.
     OIDC_ISSUER: z.string().trim().optional(),
+    // Plugin feature gate (`plugins/gate.ts`): one allowlist of user ids per feature, comma-separated; `*` alone is every
+    // signed-in user; unset is off. `PLUGINS_KILL_SWITCH=on` turns every plugin feature off.
+    PLUGIN_AUTHORING_ALLOWED_USERS: z.string().trim().optional(),
+    PLUGIN_SERVICES_ALLOWED_USERS: z.string().trim().optional(),
+    PLUGIN_UI_ALLOWED_USERS: z.string().trim().optional(),
+    PLUGINS_ALLOWED_USERS: z.string().trim().optional(),
+    PLUGINS_KILL_SWITCH: z.string().trim().optional(),
     POSTHOG_API_KEY: z.string().trim().optional(),
     POSTHOG_HOST: z.string().trim().optional(),
     // Person write (GDPR delete) plus project:read: the delete verifies the project before it trusts a 404.

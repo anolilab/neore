@@ -29,6 +29,7 @@ import { attachProjectRuleFiles, collectAllOwnedProjects, collectAllRepositories
 import {
     chatFilesReadBudget,
     feedbackReadBudget,
+    pluginsReadBudget,
     projectDetailsReadBudget,
     repositoriesReadBudget,
     threadFollowsReadBudget,
@@ -828,12 +829,41 @@ export const generateExportFile = internalAction
                 async (cursor) => await context.runQuery(internal.acp.gdpr.collectAcpSessionsForExport, { cursor, userId: args.userId }),
                 MAX_EXPORT_BYTES,
             ));
-        // The project repositories share the action's read budget with the ACP sessions. Their rows cannot be cut short,
-        // so a set too large for what is left fails with PAYLOAD_TOO_LARGE (a floor keeps a small set exportable even past
+        const readBytes = (value: unknown): number => new TextEncoder().encode(JSON.stringify(value)).byteLength;
+
+        // The plugin installs and links (`plugins/gdpr.ts`), read here a page per query so no workflow step result carries them, within
+        // what the ACP sessions left of the read budget; past it the section is marked as cut, as the neighbours' are.
+        const plugins: { installs: unknown[]; items: unknown[]; truncated: boolean } = { installs: [], items: [], truncated: false };
+        const pluginsBudget = pluginsReadBudget(readBytes(acpSessions));
+        let pluginReadBytes = 0;
+
+        for (let cursor: string | undefined; ;) {
+            if (pluginReadBytes >= pluginsBudget) {
+                plugins.truncated = true;
+                break;
+            }
+
+            const page: { continueCursor?: string; installs: unknown[]; items: unknown[]; readBytes: number } = await context.runQuery(
+                internal.plugins.gdpr.collectPluginsForExport,
+                { cursor, userId: args.userId },
+            );
+
+            plugins.installs.push(...page.installs);
+            plugins.items.push(...page.items);
+            pluginReadBytes += page.readBytes;
+
+            if (page.continueCursor === undefined) {
+                break;
+            }
+
+            cursor = page.continueCursor;
+        }
+
+        // The project repositories share the action's read budget with the ACP sessions and the plugin rows. Their rows cannot be cut
+        // short, so a set too large for what is left fails with PAYLOAD_TOO_LARGE (a floor keeps a small set exportable even past
         // the ACP sessions); their projects' details past the budget are marked as left out. The trigger history, which
         // is cut oldest first, reads only from what is left after both.
-        const readBytes = (value: unknown): number => new TextEncoder().encode(JSON.stringify(value)).byteLength;
-        const earlierReadBytes = readBytes(acpSessions);
+        const earlierReadBytes = readBytes(acpSessions) + pluginReadBytes;
         // The user's repository rows with their projects' details (`projects/gdpr.ts`), read here a page per query.
         const repositories = await collectAllRepositories(
             async (cursor) => await context.runQuery(internal.projects.gdpr.collectProjectRepositoriesForExport, { cursor, userId: args.userId }),
@@ -994,6 +1024,7 @@ export const generateExportFile = internalAction
             memories: args.memories ?? { digests: [], memories: [] },
             notifications: args.notifications ?? { notifications: [], pushSubscriptions: [] },
             pages: args.pages ?? { comments: [], favorites: [], grants: [], pages: [] },
+            plugins,
             profile: args.profile,
             projectRepositories,
             projects: ownedWithRules.projects,

@@ -17,6 +17,9 @@ import { LunoraError, v } from "lunorash/server";
 import type { Doc, Id } from "../../_generated/dataModel";
 import { refuseHostThread } from "../../acp/lib/host-thread";
 import { internalMutation, internalQuery } from "../../_generated/server";
+import { rateLimitGuard } from "../../lib/rate-limiter";
+import { heldInstallForShardWrite } from "../../plugins/held-install";
+import { refuseWhileErasing } from "../../plugins/owner-shard";
 import type { MutationCtx, QueryCtx as QueryContext } from "../../_generated/server";
 import { loadActivePathTail } from "../../agent/branch-rows";
 import { insertThread, patchMessage, patchThread } from "../../agent/table-writes";
@@ -39,7 +42,7 @@ import { refuseWhileWaking } from "../../source-control/pr-watch-wake-lease";
 import { callerRestrictsFull, ownerNewChatMode } from "../lib/new-chat-mode";
 import type { ThreadPermissionMode } from "../lib/thread-permission-mode";
 
-const DEFAULT_GROUP_TITLE = "Group chat";
+export const DEFAULT_GROUP_TITLE = "Group chat";
 
 const vParticipantSummary = v.object({
     description: v.string(),
@@ -181,7 +184,7 @@ interface NewGroupChat {
 const insertGroupChat = async (
     ctx: Pick<MutationCtx, "db" | "now">,
     { debateRounds, mode, model, organizationId, permissionMode, skillIds, synthesizerSkillId, title, userId }: NewGroupChat,
-    { requireEnabled }: { requireEnabled: boolean },
+    { plugin, requireEnabled }: { plugin?: { pluginInstallId: string; pluginMarker: string }; requireEnabled: boolean },
 ): Promise<{ threadId: string }> => {
     if (skillIds.length < 2) {
         throw new LunoraError("BAD_REQUEST", "A group chat needs at least two participants");
@@ -204,6 +207,8 @@ const insertGroupChat = async (
         model,
         ...(organizationId && { organizationId }),
         ...(permissionMode && { permissionMode }),
+        pluginInstallId: plugin?.pluginInstallId,
+        pluginMarker: plugin?.pluginMarker,
         status: "active",
         tags: ["chat"],
         title: title?.trim().slice(0, 200) || DEFAULT_GROUP_TITLE,
@@ -341,6 +346,98 @@ export const createImportedGroupChat = internalMutation
     })
     .output(v.object({ threadId: v.string() }))
     .mutation(async ({ args, ctx }) => await insertGroupChat(ctx, args, { requireEnabled: false }));
+
+/**
+ * Creates a group chat for a plugin install, after the install's skills exist. Called from an action. A group with the same
+ * marker is returned as it is, so a retried install makes no second group and spends no budget on the re-find. Its skills arrive
+ * switched off, so the owner must switch them on before a turn runs them (`loadUsableParticipants`).
+ */
+export const createPluginGroupChat = internalMutation
+    .input({
+        debateRounds: v.optional(v.number()),
+        // The install generation the caller started under: a create under an older one is refused.
+        generation: v.optional(v.number()),
+        mode: vGroupChatMode,
+        model: v.string().max(MAX_LENGTH.short),
+        organizationId: v.optional(v.string().max(MAX_LENGTH.id)),
+        plan: v.optional(v.string().max(MAX_LENGTH.short)),
+        pluginInstallId: v.string().max(MAX_LENGTH.id),
+        pluginMarker: v.string().max(MAX_LENGTH.short),
+        skillIds: v.array(v.string().max(MAX_LENGTH.id)),
+        synthesizerSkillId: v.optional(v.string().max(MAX_LENGTH.id)),
+        title: v.optional(v.string().max(MAX_LENGTH.long)),
+        userId: v.string().max(MAX_LENGTH.id),
+    })
+    .output(v.object({ threadId: v.string() }))
+    .mutation(async ({ args: { generation, plan, pluginInstallId, pluginMarker, userId, ...fields }, ctx }) => {
+        const { organizationId, skillIds } = fields;
+        const existing = await ctx.db
+            .query("threads")
+            .withIndex("by_plugin_marker", (q) => q.eq("pluginMarker", pluginMarker))
+            .first();
+
+        if (existing) {
+            if (existing.userId !== userId) {
+                throw new LunoraError("FORBIDDEN", "That plugin group belongs to another account");
+            }
+
+            // A repair recreates a deleted skill under a new id: a participant whose skill is gone is pointed at the skill given in its
+            // place, or the group would keep naming the deleted one, which a turn silently drops. Nothing else is touched: the owner's
+            // own choices (participants they added or removed, the options, the synthesizer) stay, and a group that cannot be matched
+            // one to one is left as it is.
+            const stored = existing.groupChat;
+
+            // The patch below writes, so a stale action must not reach it.
+            if (generation !== undefined && stored) {
+                await heldInstallForShardWrite(ctx, pluginInstallId as Id<"pluginInstalls">, generation);
+            }
+
+            if (stored) {
+                const gone: string[] = [];
+
+                for (const participant of stored.participants) {
+                    // From the primary: a replica that lags would call a live skill gone, and the one-to-one match below would fail.
+                    if (!(await ctx.db.skills.findFirst({ consistency: "primary", where: { _id: participant.skillId as Id<"skills"> } }))) {
+                        gone.push(participant.skillId);
+                    }
+                }
+
+                const present = new Set(stored.participants.map((participant) => participant.skillId));
+                const fresh = skillIds.filter((skillId) => !present.has(skillId));
+
+                if (gone.length > 0 && gone.length === fresh.length) {
+                    const replacement = new Map(gone.map((skillId, index) => [skillId, fresh[index]!]));
+
+                    await requireUsableSkills(ctx, fresh, { organizationId, userId }, false);
+                    await ctx.db.patch("threads", existing._id, {
+                        groupChat: {
+                            ...stored,
+                            ...(stored.synthesizerSkillId !== undefined &&
+                                replacement.has(stored.synthesizerSkillId) && { synthesizerSkillId: replacement.get(stored.synthesizerSkillId) }),
+                            participants: stored.participants.map((participant) => {
+                                const next = replacement.get(participant.skillId);
+
+                                return next === undefined ? participant : { addedAt: participant.addedAt, skillId: next };
+                            }),
+                        },
+                    });
+                }
+            }
+
+            return { threadId: existing._id as string };
+        }
+
+        await refuseWhileErasing(ctx, userId);
+
+        // A stale action (its lease taken over) must not start a new child: the one it made would be lost to the new holder.
+        if (generation !== undefined) {
+            await heldInstallForShardWrite(ctx, pluginInstallId as Id<"pluginInstalls">, generation);
+        }
+
+        await rateLimitGuard({ ...ctx, rateLimitKey: "chat/create", user: { plan, userId } } as never);
+
+        return await insertGroupChat(ctx, { ...fields, userId }, { plugin: { pluginInstallId, pluginMarker }, requireEnabled: false });
+    });
 
 /**
  * Open a group chat from a seeded template (`templates.ts`): the caller gets

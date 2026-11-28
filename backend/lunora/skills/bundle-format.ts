@@ -30,6 +30,10 @@
  * follows fence state line by line, so a `## ` heading (or a fence) inside an
  * embedded SKILL.md is content, never a new item.
  *
+ * A `bundle: 2` file (a plugin's own file) declares a stable key on every section, after the label:
+ * `## skill: paper-summary {key=paper-summary}`. The key names the item to an install, so an insert or removal elsewhere
+ * in the file does not change it. A plain bundle carries no keys.
+ *
  * Everything an export writes is picked from a whitelist of fields. Whatever
  * a row carries beyond it — secrets, owners, organization, bot, enabled — never
  * reaches the file, and an import reads only the same whitelist back, so a
@@ -43,6 +47,16 @@ import type { SkillConfigData, SkillMarkdownData, SkillVariableData } from "./ma
 import { FRONTMATTER_RE, parseFrontmatterYaml, parseSkillMarkdown, skillToMarkdown, yamlString } from "./markdown";
 
 export const BUNDLE_VERSION = 1;
+
+/** A plugin's own file: the same items as a bundle, with a plugin header that names the install's slug, version and content hash. */
+export const PLUGIN_BUNDLE_VERSION = 2;
+
+/** The header keys that only a plugin file carries. */
+const PLUGIN_HEADER_KEYS = ["plugin", "pluginVersion", "contentHash"] as const;
+
+const PLUGIN_SLUG_RE = /^[a-z][a-z0-9-]{0,63}$/u;
+const PLUGIN_VERSION_RE = /^\d+\.\d+\.\d+$/u;
+const CONTENT_HASH_RE = /^[0-9a-f]{64}$/u;
 
 /**
  * The caps. The per-kind counts sit below the smallest window of the create
@@ -103,7 +117,10 @@ export interface BundleGroup {
     title: string;
 }
 
-export type BundleItem = { group: BundleGroup; kind: "group" } | { kind: "skill"; skill: SkillMarkdownData } | { kind: "trigger"; trigger: BundleTrigger };
+/** An item of a bundle. `key` is its declared key: every item of a plugin file has one, a plain bundle has none. */
+export type BundleItem = ({ group: BundleGroup; kind: "group" } | { kind: "skill"; skill: SkillMarkdownData } | { kind: "trigger"; trigger: BundleTrigger }) & {
+    key?: string;
+};
 
 export interface Bundle {
     description: string;
@@ -113,6 +130,8 @@ export interface Bundle {
 
 /** One section as read: the item, or the problems that keep it from being one. */
 export interface BundleEntry {
+    /** The key the section declares (`bundle: 2` only). */
+    declaredKey?: string;
     index: number;
     item?: BundleItem;
     kind: BundleItemKind;
@@ -121,10 +140,18 @@ export interface BundleEntry {
     warnings: string[];
 }
 
+/** The plugin header of a `bundle: 2` file. The header is a label: it grants nothing, and an install recomputes the hash. */
+export interface PluginHeader {
+    contentHash: string;
+    slug: string;
+    version: string;
+}
+
 export interface ParsedBundle {
     description: string;
     entries: BundleEntry[];
     name: string;
+    plugin?: PluginHeader;
 }
 
 export type ParseBundleResult = { bundle: ParsedBundle; ok: true } | { errors: string[]; ok: false };
@@ -139,6 +166,9 @@ const WHITESPACE_RE = /\s+/g;
 const LINE_BREAK_RE = /\r\n?/g;
 const NON_ICON_RE = /[:/@\\]/;
 const KINDS: ReadonlyArray<BundleItemKind> = ["skill", "trigger", "group"];
+/** A declared key: a letter first, so it can never read as a position (`skill:0`). Same shape as a plugin slug. */
+const DECLARED_KEY_RE = /^[a-z][a-z0-9-]{0,63}$/u;
+const KEY_ATTRIBUTE_RE = /(?:^| )\{key=([^{}\s]*)\}$/u;
 
 /** Strings a trigger or group carries, with the longest the file may hold. */
 const FIELD_CAPS = { cron: 200, description: MAX_LENGTH.long, label: 500, model: 200, short: 500, text: 60_000, timezone: 100 } as const;
@@ -152,7 +182,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> => typeof va
 /** An icon an export keeps: short and not a URL or path. */
 const isPlainIcon = (icon: string | undefined): icon is string => !!icon && icon.length <= 64 && !NON_ICON_RE.test(icon);
 
-const isCustomModel = (model: string): boolean => model.startsWith("custom:") || parseCustomModelId(model) !== null;
+export const isCustomModel = (model: string): boolean => model.startsWith("custom:") || parseCustomModelId(model) !== null;
 
 // ─── Writing ─────────────────────────────────────────────────────────────────
 
@@ -172,10 +202,12 @@ const withoutTrailingNewlines = (text: string): string => {
     return text.slice(0, end);
 };
 
-const section = (kind: BundleItemKind, label: string, info: string, content: string): string => {
+const section = (kind: BundleItemKind, label: string, info: string, content: string, key: string | undefined): string => {
     const fence = fenceFor(content);
+    // The key goes after the label, so the label's own truncation can never cut it off.
+    const heading = `## ${kind}: ${singleLine(label, 100)}${key === undefined ? "" : ` {key=${key}}`}`;
 
-    return [`## ${kind}: ${singleLine(label, 100)}`, "", `${fence}${info}`, withoutTrailingNewlines(content), fence, ""].join("\n");
+    return [heading, "", `${fence}${info}`, withoutTrailingNewlines(content), fence, ""].join("\n");
 };
 
 const triggerJson = (trigger: BundleTrigger): string => {
@@ -233,11 +265,11 @@ export const buildBundleMarkdown = (bundle: Bundle): string => {
 
     for (const item of bundle.items) {
         if (item.kind === "skill") {
-            lines.push(section("skill", item.skill.slug, SKILL_FENCE_INFO, skillToMarkdown(item.skill)));
+            lines.push(section("skill", item.skill.slug, SKILL_FENCE_INFO, skillToMarkdown(item.skill), item.key));
         } else if (item.kind === "trigger") {
-            lines.push(section("trigger", item.trigger.name, JSON_FENCE_INFO, triggerJson(item.trigger)));
+            lines.push(section("trigger", item.trigger.name, JSON_FENCE_INFO, triggerJson(item.trigger), item.key));
         } else {
-            lines.push(section("group", item.group.title, JSON_FENCE_INFO, groupJson(item.group)));
+            lines.push(section("group", item.group.title, JSON_FENCE_INFO, groupJson(item.group), item.key));
         }
     }
 
@@ -248,15 +280,29 @@ export const buildBundleMarkdown = (bundle: Bundle): string => {
 
 interface RawSection {
     content: string;
+    declaredKey?: string;
     index: number;
     kind: BundleItemKind;
     label: string;
 }
 
+/** Takes a trailing `{key=…}` off a heading's text. Only a `bundle: 2` file declares keys; in a plain bundle the label is taken as written. */
+const splitKey = (text: string, declaresKeys: boolean): { key?: string; label: string } => {
+    // A trailing space or tab after `{key=…}` is an editor's leftover, not part of the key, so it does not stop the key being read.
+    const trimmed = text.trimEnd();
+    const match = declaresKeys ? KEY_ATTRIBUTE_RE.exec(trimmed) : null;
+
+    if (!match) {
+        return { label: text };
+    }
+
+    return { key: match[1]!, label: trimmed.slice(0, match.index) };
+};
+
 /** Splits the body into sections, tracking fence state line by line. */
-const readSections = (body: string[], errors: string[]): RawSection[] => {
+const readSections = (body: string[], errors: string[], declaresKeys: boolean): RawSection[] => {
     const sections: RawSection[] = [];
-    let current: { fenced: boolean; index: number; kind: BundleItemKind; label: string } | undefined;
+    let current: { declaredKey?: string; fenced: boolean; index: number; kind: BundleItemKind; label: string } | undefined;
     let fence: { content: string[]; ticks: number } | undefined;
 
     for (const [offset, line] of body.entries()) {
@@ -264,7 +310,13 @@ const readSections = (body: string[], errors: string[]): RawSection[] => {
             const close = CLOSE_FENCE_RE.exec(line);
 
             if (close && close[1]!.length >= fence.ticks) {
-                sections.push({ content: fence.content.join("\n"), index: current!.index, kind: current!.kind, label: current!.label });
+                sections.push({
+                    content: fence.content.join("\n"),
+                    declaredKey: current!.declaredKey,
+                    index: current!.index,
+                    kind: current!.kind,
+                    label: current!.label,
+                });
                 fence = undefined;
             } else {
                 fence.content.push(line);
@@ -288,7 +340,17 @@ const readSections = (body: string[], errors: string[]): RawSection[] => {
                 continue;
             }
 
-            current = { fenced: false, index: sections.length, kind, label: singleLine(heading[2] ?? "", 100) };
+            const named = splitKey(heading[2] ?? "", declaresKeys);
+            const label = singleLine(named.label, 100);
+            const position = `Item ${String(sections.length + 1)} (${kind}: ${label})`;
+
+            if (declaresKeys && named.key === undefined) {
+                errors.push(`${position} has no key`);
+            } else if (named.key !== undefined && !DECLARED_KEY_RE.test(named.key)) {
+                errors.push(`${position} has a key that is not lowercase letters, digits and dashes`);
+            }
+
+            current = { declaredKey: named.key, fenced: false, index: sections.length, kind, label };
             continue;
         }
 
@@ -480,7 +542,7 @@ const readGroup = (raw: unknown, problems: string[]): BundleGroup | undefined =>
 const readEntry = (raw: RawSection, seenSlugs: Set<string>): BundleEntry => {
     const problems: string[] = [];
     const warnings: string[] = [];
-    const entry: BundleEntry = { index: raw.index, kind: raw.kind, label: raw.label, problems, warnings };
+    const entry: BundleEntry = { declaredKey: raw.declaredKey, index: raw.index, kind: raw.kind, label: raw.label, problems, warnings };
 
     if (byteLength(raw.content) > BUNDLE_LIMITS.itemBytes) {
         problems.push(`This item is larger than ${String(BUNDLE_LIMITS.itemBytes / 1024)} KB`);
@@ -545,6 +607,26 @@ const readEntry = (raw: RawSection, seenSlugs: Set<string>): BundleEntry => {
     return entry;
 };
 
+/** Reads the plugin header of a `bundle: 2` file, refusing a value that is not a slug, a version or a SHA-256 hex digest. */
+const readPluginHeader = (frontmatter: Record<string, unknown>): { header: PluginHeader; ok: true } | { errors: string[]; ok: false } => {
+    const header = { contentHash: String(frontmatter.contentHash), slug: String(frontmatter.plugin), version: String(frontmatter.pluginVersion) };
+    const errors: string[] = [];
+
+    if (!PLUGIN_SLUG_RE.test(header.slug)) {
+        errors.push("The plugin slug must be lowercase letters, digits and dashes, starting with a letter");
+    }
+
+    if (!PLUGIN_VERSION_RE.test(header.version)) {
+        errors.push("The plugin version must be major.minor.patch");
+    }
+
+    if (!CONTENT_HASH_RE.test(header.contentHash)) {
+        errors.push("The content hash must be a SHA-256 hex digest");
+    }
+
+    return errors.length > 0 ? { errors, ok: false } : { header, ok: true };
+};
+
 /** Reads a bundle file. Structural trouble (version, size, counts, fences) fails the file; trouble inside one item stays on that item. */
 export const parseBundleMarkdown = (markdown: string): ParseBundleResult => {
     const size = byteLength(markdown);
@@ -574,12 +656,49 @@ export const parseBundleMarkdown = (markdown: string): ParseBundleResult => {
         return { errors: ["This is not a bundle: the frontmatter has no `bundle` version"], ok: false };
     }
 
-    if (version !== String(BUNDLE_VERSION)) {
-        return { errors: [`Unsupported bundle version "${String(version)}"; this app reads version ${String(BUNDLE_VERSION)}`], ok: false };
+    const isPlugin = version === String(PLUGIN_BUNDLE_VERSION);
+
+    if (version !== String(BUNDLE_VERSION) && !isPlugin) {
+        return {
+            errors: [`Unsupported bundle version "${String(version)}"; this app reads versions ${String(BUNDLE_VERSION)} and ${String(PLUGIN_BUNDLE_VERSION)}`],
+            ok: false,
+        };
+    }
+
+    const headerKeys = PLUGIN_HEADER_KEYS.filter((key) => frontmatter[key] !== undefined);
+
+    if (!isPlugin && headerKeys.length > 0) {
+        return { errors: ["A plugin header needs `bundle: 2`"], ok: false };
+    }
+
+    if (isPlugin && headerKeys.length !== PLUGIN_HEADER_KEYS.length) {
+        return { errors: ["A `bundle: 2` file must carry `plugin`, `pluginVersion` and `contentHash`"], ok: false };
+    }
+
+    const plugin = isPlugin ? readPluginHeader(frontmatter) : undefined;
+
+    if (plugin && !plugin.ok) {
+        return { errors: plugin.errors, ok: false };
     }
 
     const errors: string[] = [];
-    const sections = readSections(text.slice(match[0].length).split("\n"), errors);
+    const sections = readSections(text.slice(match[0].length).split("\n"), errors, isPlugin);
+    const declared = new Set<string>();
+
+    for (const { declaredKey, kind } of sections) {
+        if (declaredKey === undefined) {
+            continue;
+        }
+
+        const id = `${kind}:${declaredKey}`;
+
+        if (declared.has(id)) {
+            errors.push(`Two ${kind} items share the key "${declaredKey}"`);
+        }
+
+        declared.add(id);
+    }
+
     const counts = { group: 0, skill: 0, trigger: 0 };
 
     for (const { kind } of sections) {
@@ -605,7 +724,7 @@ export const parseBundleMarkdown = (markdown: string): ParseBundleResult => {
     const description = typeof frontmatter.description === "string" ? singleLine(frontmatter.description, BUNDLE_LIMITS.description) : "";
 
     return {
-        bundle: { description, entries: sections.map((raw) => readEntry(raw, seenSlugs)), name: name || "Bundle" },
+        bundle: { description, entries: sections.map((raw) => readEntry(raw, seenSlugs)), name: name || "Bundle", ...(plugin && { plugin: plugin.header }) },
         ok: true,
     };
 };

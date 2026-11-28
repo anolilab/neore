@@ -28,6 +28,7 @@ import { patchById, patchRow, withoutUndefined } from "../lib/patch";
 import { paginationOptionsValidator, MAX_LENGTH } from "../lib/validators";
 import { endHostThread, restoreHostThread } from "../acp/lib/thread-removed";
 import { settleOwedMergesOf } from "../source-control/pr-thread-links";
+import { groupFingerprint } from "../chat/group/fingerprint";
 import { deleteMessage } from "./messages";
 import { deleteChatFileLinksForThread } from "./files";
 import { deleteStreamsPageForThreadId } from "./streams";
@@ -80,7 +81,8 @@ const OWNER_STATE_KEYS = [
 export const threadForViewer = (thread: Doc<"threads">, viewerId: string | undefined): ThreadDoc => {
     const isOwner = thread.userId !== undefined && thread.userId === viewerId;
 
-    return publicThread(isOwner ? thread : (omit(thread, [...OWNER_STATE_KEYS]) as Doc<"threads">));
+    // The plugin install a group chat came from is the owner's bookkeeping, as for a skill (`getSkill`): a viewer sees neither id.
+    return publicThread(isOwner ? thread : (omit(thread, [...OWNER_STATE_KEYS, "pluginInstallId", "pluginMarker"]) as Doc<"threads">));
 };
 
 /**
@@ -455,9 +457,86 @@ export const _deletePageForThreadId = internalMutation
     .mutation(async ({ args, ctx }) => await deletePageForThreadIdHandler(ctx, args));
 
 export const deleteAllForThreadIdAsync = internalMutation
-    .input(deleteThreadArgs)
-    .output(v.object({ isDone: v.boolean() }))
+    .input({
+        ...deleteThreadArgs,
+        // False from a plugin update: a kept group is detached alone, as the plugin's skills it names usually stay in the plugin.
+        // Unset or true (uninstall) detaches those skills with it.
+        detachSkills: v.optional(v.boolean()),
+        // With `pluginInstallId`, checked on the first page only (the point of no return): the install must still be at this generation,
+        // and, when `expectedGroupFingerprint` is given, the group's fields must still match it (`chat/group/fingerprint.ts`).
+        // A mismatch keeps the group as a message does. Later pages never stop.
+        expectedGroupFingerprint: v.optional(v.string()),
+        pluginGeneration: v.optional(v.number()),
+        // Set only by a plugin uninstall, which drives every page itself: the first call rechecks, in its transaction, that the group
+        // is still the plugin's and still empty, and detaches and keeps it otherwise (`kept`). An incomplete page returns its
+        // continuation (`next`) for the caller to pass back instead of scheduling the next page, so one party owns the pagination.
+        // Ordinary deletes leave it unset and keep their scheduled chain.
+        pluginInstallId: v.optional(v.string()),
+    })
+    .output(
+        v.object({
+            isDone: v.boolean(),
+            kept: v.optional(v.boolean()),
+            next: v.optional(
+                v.object({
+                    cursor: v.optional(v.string()),
+                    deltaCursor: v.optional(v.string()),
+                    messagesDone: v.boolean(),
+                    pinsDone: v.boolean(),
+                    streamOrder: v.optional(v.number()),
+                    streamsDone: v.boolean(),
+                }),
+            ),
+        }),
+    )
     .mutation(async ({ args, ctx }) => {
+        if (args.pluginInstallId !== undefined && args.cursor === undefined && !args.messagesDone) {
+            const group = await ctx.db.get("threads", args.threadId);
+
+            if (!group || group.pluginInstallId !== args.pluginInstallId) {
+                return { isDone: true, kept: true };
+            }
+
+            const message = await ctx.db
+                .query("messages")
+                .withIndex("by_threadId_order_stepOrder", (q) => q.eq("threadId", args.threadId))
+                .first();
+
+            // A pin keeps the group as a message does: its deletion would need a second page after the thread row has gone.
+            const pin = message
+                ? undefined
+                : await ctx.db
+                      .query("threadPins")
+                      .withIndex("by_thread", (q) => q.eq("threadId", args.threadId))
+                      .first();
+
+            let fenced = false;
+
+            if (!message && !pin && args.pluginGeneration !== undefined) {
+                const install = await ctx.db.pluginInstalls.findFirst({ consistency: "primary", where: { _id: args.pluginInstallId as Id<"pluginInstalls"> } });
+
+                // A caller that lost the install writes nothing: the action that took it over decides this group.
+                if (!install || install.generation !== args.pluginGeneration) {
+                    return { isDone: true, kept: true };
+                }
+
+                fenced = args.expectedGroupFingerprint !== undefined && groupFingerprint(group) !== args.expectedGroupFingerprint;
+            }
+
+            if (message || pin || fenced) {
+                // Loaded lazily, as the sub-agent module above: the group and the plugin skills it names are detached together.
+                if (args.detachSkills === false) {
+                    await ctx.db.patch("threads", args.threadId, { pluginInstallId: "", pluginMarker: "" });
+                } else {
+                    const { detachKeptGroup } = await import("../plugins/uninstall");
+
+                    await detachKeptGroup(ctx, args.threadId, args.pluginInstallId);
+                }
+
+                return { isDone: true, kept: true };
+            }
+        }
+
         let messagesResult: { cursor: null | string | undefined; isDone: boolean } = {
             cursor: args.cursor,
             isDone: args.messagesDone ?? false,
@@ -515,7 +594,7 @@ export const deleteAllForThreadIdAsync = internalMutation
             await deleteThreadSummaries(ctx, args.threadId);
             // A chat deleted for good without passing the trash keeps no grant either, nor any grant's revision.
             await revokeThreadGrants(ctx, args.threadId, { purge: true });
-        } else {
+        } else if (args.pluginInstallId === undefined) {
             await ctx.scheduler.runAfter(0, internal.agent.threads.deleteAllForThreadIdAsync, {
                 cursor: messagesResult.cursor,
                 deltaCursor: streamResult.deltaCursor,
@@ -525,6 +604,18 @@ export const deleteAllForThreadIdAsync = internalMutation
                 streamsDone: streamResult.isDone,
                 threadId: args.threadId,
             });
+        } else {
+            return {
+                isDone,
+                next: {
+                    cursor: messagesResult.cursor ?? undefined,
+                    deltaCursor: streamResult.deltaCursor ?? undefined,
+                    messagesDone: messagesResult.isDone,
+                    pinsDone,
+                    streamOrder: streamResult.streamOrder ?? undefined,
+                    streamsDone: streamResult.isDone,
+                },
+            };
         }
 
         return { isDone };

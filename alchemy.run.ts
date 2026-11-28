@@ -204,6 +204,12 @@ const PLAIN_ENV_KEYS = new Set([
     "OIDC_BUTTON_LABEL",
     "OIDC_CLIENT_ID",
     "OIDC_ISSUER",
+    // Plugin feature gate: user ids and a switch, not credentials.
+    "PLUGIN_AUTHORING_ALLOWED_USERS",
+    "PLUGIN_SERVICES_ALLOWED_USERS",
+    "PLUGIN_UI_ALLOWED_USERS",
+    "PLUGINS_ALLOWED_USERS",
+    "PLUGINS_KILL_SWITCH",
     "POSTHOG_HOST",
     "POSTHOG_PROJECT_ID",
     "R2_BUCKET",

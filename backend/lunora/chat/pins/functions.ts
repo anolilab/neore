@@ -715,6 +715,18 @@ export const reassignUserPinsOnThread = internalMutation
         return { hasMore: batch.length === PIN_EXPORT_PAGE };
     });
 
+/**
+ * A thread marked `deletingAt` is being deleted for good in pages (`agent/threads.ts`), so a pin made now would be erased by a later
+ * page, or outlive the thread. Pins are refused from the moment the delete starts.
+ */
+const refuseWhileDeleting = async (context: Pick<MutationCtx, "db">, threadId: Id<"threads">): Promise<void> => {
+    const thread = await context.db.get("threads", threadId);
+
+    if (thread?.deletingAt !== undefined) {
+        throw new LunoraError("CONFLICT", "This chat is being deleted, so it cannot be pinned");
+    }
+};
+
 export const createPin = authMutation
     .use(rateLimit("pins/create"))
     .input({
@@ -740,6 +752,7 @@ export const createPin = authMutation
 
         // A pin is listed only through the thread's read grant (`getThreadPins`), so it is written only under that grant, locked or not.
         throwUnlessGranted(await threadGateOutcome(context, { level: "read", primary: true, threadId, unlockProof, userId }));
+        await refuseWhileDeleting(context, threadId as Id<"threads">);
 
         // A refused write adds no lease; an admitted one adds its own, which lasts until it expires (`lib/account-moves.ts`).
         const writerId = await admitPinWriteAs(context, userId, now);
@@ -803,6 +816,7 @@ export const createDocumentPin = authMutation
         // and an unlocked shared thread is readable only with its read grant. The grant is read from the primary, so a
         // replica that still holds a revoked grant cannot admit the write.
         throwUnlessGranted(await threadGateOutcome(context, { level: "read", primary: true, threadId, unlockProof, userId }));
+        await refuseWhileDeleting(context, threadId as Id<"threads">);
 
         const document = await context.db.get("documents", documentId as Id<"documents">);
 

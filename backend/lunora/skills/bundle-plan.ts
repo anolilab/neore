@@ -33,6 +33,8 @@ export interface PlanEnv {
     /** An enabled platform text model — never a user's own `custom:` endpoint. */
     isModelRunnable: (model: string) => boolean;
     now: number;
+    /** An update's installed skills: the slug each holds, by entry key. That entry may keep the slug; no other entry may take it. */
+    ownSlugByKey?: ReadonlyMap<string, string>;
     /** `undefined` for an account without a skill limit. */
     skillLimit: number | undefined;
 }
@@ -81,7 +83,7 @@ export type PlannedCreate = { create: GroupCreate; kind: "group" } | { create: S
 
 /** What the review screen shows for one item. */
 export interface PlanEntry {
-    /** `<kind>:<index>`: how the client names an item in its selection. */
+    /** `<kind>:<declared key>` (or `<kind>:<position>` in a plain bundle): how the client names an item in its selection. */
     key: string;
     kind: BundleItemKind;
     plan?: PlannedCreate;
@@ -123,7 +125,8 @@ export interface PlanView {
     };
 }
 
-export const entryKey = (kind: BundleItemKind, index: number): string => `${kind}:${String(index)}`;
+/** An entry's key: the author's declared key in a plugin file, else the section's position in a plain bundle. */
+export const entryKey = (kind: BundleItemKind, index: number, declaredKey?: string | undefined): string => `${kind}:${declaredKey ?? String(index)}`;
 
 /** A longer value is blocked here, not at import: `createSkill` caps these at `MAX_LENGTH.short` / `MAX_LENGTH.long`. */
 const skillCapProblems = (skill: SkillMarkdownData): string[] => {
@@ -202,6 +205,18 @@ const planTrigger = (trigger: BundleTrigger, env: PlanEnv, problems: string[]): 
         problems.push(templateProblem);
     }
 
+    // `createTrigger` refuses a prompt that is only hidden characters, so the preview does too.
+    for (const [label, text] of [
+        ["The input", trigger.inputTemplate],
+        ["The system prompt", trigger.systemPrompt],
+    ] as const) {
+        const cleaned = text === undefined ? undefined : stripHiddenText(text);
+
+        if (cleaned !== undefined && cleaned.removed > 0 && cleaned.text.trim() === "") {
+            problems.push(`${label} is empty after removing hidden characters.`);
+        }
+    }
+
     if (problems.length > 0) {
         return { view };
     }
@@ -233,6 +248,12 @@ const planTrigger = (trigger: BundleTrigger, env: PlanEnv, problems: string[]): 
 export const planBundle = (bundle: ParsedBundle, selected: ReadonlySet<string> | undefined, env: PlanEnv): PlanEntry[] => {
     const isSelected = (key: string): boolean => selected === undefined || selected.has(key);
     const taken = new Set(env.existingSlugs);
+    // The slugs an entry may take: all taken ones, but not the slug its own installed child holds, which it keeps or gives up.
+    const freeFor = (key: string): Set<string> => {
+        const own = env.ownSlugByKey?.get(key);
+
+        return own === undefined ? taken : new Set([...taken].filter((slug) => slug !== own));
+    };
     const slotsLeft = env.skillLimit === undefined ? Infinity : Math.max(0, env.skillLimit - env.existingSkillCount);
     let slotsUsed = 0;
     const entries: PlanEntry[] = [];
@@ -241,7 +262,7 @@ export const planBundle = (bundle: ParsedBundle, selected: ReadonlySet<string> |
 
     for (const entry of bundle.entries) {
         if (entry.item?.kind === "skill") {
-            skillKeyBySlug.set(entry.item.skill.slug, entryKey("skill", entry.index));
+            skillKeyBySlug.set(entry.item.skill.slug, entryKey("skill", entry.index, entry.declaredKey));
         }
     }
 
@@ -251,7 +272,7 @@ export const planBundle = (bundle: ParsedBundle, selected: ReadonlySet<string> |
             continue;
         }
 
-        const key = entryKey(entry.kind, entry.index);
+        const key = entryKey(entry.kind, entry.index, entry.declaredKey);
         const problems = [...entry.problems];
         const warnings = [...entry.warnings];
 
@@ -278,7 +299,7 @@ export const planBundle = (bundle: ParsedBundle, selected: ReadonlySet<string> |
             let { slug } = planned;
 
             try {
-                slug = pickFreeSlug(planned.slug, taken);
+                slug = pickFreeSlug(planned.slug, freeFor(key));
             } catch (error) {
                 problems.push(messageOf(error));
             }
@@ -334,7 +355,7 @@ export const planBundle = (bundle: ParsedBundle, selected: ReadonlySet<string> |
             continue;
         }
 
-        const key = entryKey(entry.kind, entry.index);
+        const key = entryKey(entry.kind, entry.index, entry.declaredKey);
         const problems = [...entry.problems];
         const warnings = [...entry.warnings];
         const base = { key, kind: entry.kind, requires: [] as string[], warnings };
@@ -441,16 +462,23 @@ export const planBundle = (bundle: ParsedBundle, selected: ReadonlySet<string> |
         entries.push({ ...base, problems: problems.length > 0 ? problems : ["This item could not be read."], title: entry.label, view: {} });
     }
 
-    return entries.toSorted((a, b) => Number(a.key.split(":", 2)[1]) - Number(b.key.split(":", 2)[1]));
+    // The file's order: a declared key is not a number, so the position comes from the bundle, not the key.
+    const position = new Map(bundle.entries.map((entry, at) => [entryKey(entry.kind, entry.index, entry.declaredKey), at] as const));
+
+    return entries.toSorted((a, b) => (position.get(a.key) ?? 0) - (position.get(b.key) ?? 0));
 };
 
 // ─── The import ─────────────────────────────────────────────────────────────
 
 /** The creates and deletes an import is made of; the procedure wires them to `createSkill`, `createImportedGroupChat`, `createTrigger` and the unlimited, owner-only `removeImportedItem`. */
 export interface BundleOps {
-    createGroupChat: (args: Omit<GroupCreate, "participantKeys" | "synthesizerKey"> & { skillIds: string[]; synthesizerSkillId?: string }) => Promise<string>;
-    createSkill: (args: SkillCreate) => Promise<string>;
-    createTrigger: (args: TriggerCreate) => Promise<{ triggerId: string; webhookSecret?: string }>;
+    /** `key`: the entry's key in the file, which a plugin install turns into the child's marker. */
+    createGroupChat: (
+        args: Omit<GroupCreate, "participantKeys" | "synthesizerKey"> & { skillIds: string[]; synthesizerSkillId?: string },
+        key: string,
+    ) => Promise<string>;
+    createSkill: (args: SkillCreate, key: string) => Promise<string>;
+    createTrigger: (args: TriggerCreate, key: string) => Promise<{ triggerId: string; webhookSecret?: string }>;
     /** `kept`: the group chat has messages by now, so it was not deleted. */
     deleteGroupChat: (threadId: string) => Promise<undefined | void | { kept: boolean }>;
     deleteSkill: (skillId: string) => Promise<unknown>;
@@ -470,10 +498,14 @@ export class BundleImportError extends Error {
     /** What could not be removed again after the failure. */
     leftBehind: string[];
 
-    constructor(message: string, leftBehind: string[]) {
-        super(message);
+    /** Set when the rows created so far are kept on purpose, so a repair can finish the rest (a rate limit). */
+    resumable: boolean;
+
+    constructor(message: string, leftBehind: string[], resumable = false, cause?: unknown) {
+        super(message, cause === undefined ? undefined : { cause });
         this.name = "BundleImportError";
         this.leftBehind = leftBehind;
+        this.resumable = resumable;
     }
 }
 
@@ -506,7 +538,7 @@ const createPlanned = async (entry: PlanEntry, ops: BundleOps, idByKey: Map<stri
     const { plan } = entry;
 
     if (plan?.kind === "skill") {
-        const id = await ops.createSkill(plan.create);
+        const id = await ops.createSkill(plan.create, entry.key);
 
         idByKey.set(entry.key, id);
 
@@ -516,17 +548,20 @@ const createPlanned = async (entry: PlanEntry, ops: BundleOps, idByKey: Map<stri
     if (plan?.kind === "group") {
         const { participantKeys, synthesizerKey, ...rest } = plan.create;
         const synthesizerSkillId = synthesizerKey === undefined ? undefined : idByKey.get(synthesizerKey);
-        const id = await ops.createGroupChat({
-            ...rest,
-            skillIds: participantKeys.map((key) => createdId(idByKey, key)),
-            ...(synthesizerSkillId !== undefined && { synthesizerSkillId }),
-        });
+        const id = await ops.createGroupChat(
+            {
+                ...rest,
+                skillIds: participantKeys.map((key) => createdId(idByKey, key)),
+                ...(synthesizerSkillId !== undefined && { synthesizerSkillId }),
+            },
+            entry.key,
+        );
 
         return { id, key: entry.key, kind: "group", title: entry.title };
     }
 
     if (plan?.kind === "trigger") {
-        const { triggerId, webhookSecret } = await ops.createTrigger(plan.create);
+        const { triggerId, webhookSecret } = await ops.createTrigger(plan.create, entry.key);
 
         return { id: triggerId, key: entry.key, kind: "trigger", title: entry.title, ...(webhookSecret !== undefined && { webhookSecret }) };
     }
@@ -540,22 +575,43 @@ const createPlanned = async (entry: PlanEntry, ops: BundleOps, idByKey: Map<stri
  * of them fails. Removal is best effort (each create is its own mutation): an
  * item it cannot remove is named in the error; a skill and a trigger stay switched off, a group chat starts nothing.
  */
-export const runBundleImport = async (entries: ReadonlyArray<PlanEntry>, selected: ReadonlySet<string>, ops: BundleOps): Promise<ImportedItem[]> => {
+export const runBundleImport = async (
+    entries: ReadonlyArray<PlanEntry>,
+    selected: ReadonlySet<string>,
+    ops: BundleOps,
+    options: {
+        keepOnRateLimit?: boolean;
+        /** Entry key → id of a skill that already exists (a repair's linked children), so a group made now can name it. */
+        knownIds?: ReadonlyMap<string, string>;
+    } = {},
+): Promise<ImportedItem[]> => {
     const created: ImportedItem[] = [];
-    const idByKey = new Map<string, string>();
+    const idByKey = new Map<string, string>(options.knownIds);
     const order: Record<BundleItemKind, number> = { group: 1, skill: 0, trigger: 2 };
     const todo = entries
         .filter((entry) => entry.plan && selected.has(entry.key))
-        .toSorted((a, b) => order[a.kind] - order[b.kind] || Number(a.key.split(":", 2)[1]) - Number(b.key.split(":", 2)[1]));
+        // `entries` is in the file's order, and the sort is stable: each kind keeps the file's order within it.
+        .toSorted((a, b) => order[a.kind] - order[b.kind]);
 
     const planFor = (key: string): PlannedCreate | undefined => entries.find((entry) => entry.key === key)?.plan;
 
     // `failed`: could not be removed and still needs deleting by hand. `kept`: stays on purpose, with the skills it uses.
-    const rollback = async (): Promise<{ failed: string[]; kept: string[] }> => {
+    const rollback = async (leftKeys: ReadonlyArray<string> = []): Promise<{ failed: string[]; kept: string[] }> => {
         const failed: string[] = [];
         const kept: string[] = [];
         // Skill keys that a group chat which is still there names: they stay, or it would point at nothing.
         const protectedBy = new Map<string, "failed" | "kept">();
+
+        // A group its own create step could not remove is not in `created`, but it is still there: its skills stay too.
+        for (const key of leftKeys) {
+            const left = planFor(key);
+
+            if (left?.kind === "group") {
+                for (const skillKey of [...left.create.participantKeys, ...(left.create.synthesizerKey === undefined ? [] : [left.create.synthesizerKey])]) {
+                    protectedBy.set(skillKey, "failed");
+                }
+            }
+        }
 
         for (const item of created.toReversed()) {
             if (item.kind === "skill" && protectedBy.has(item.key)) {
@@ -600,7 +656,22 @@ export const runBundleImport = async (entries: ReadonlyArray<PlanEntry>, selecte
         try {
             created.push(await createPlanned(entry, ops, idByKey));
         } catch (error) {
-            const { failed, kept } = await rollback();
+            // A rate limit is not a failure of the import: what was created is kept, and a repair resumes the rest.
+            if (options.keepOnRateLimit && error instanceof LunoraError && error.code === "TOO_MANY_REQUESTS") {
+                throw new BundleImportError(
+                    `"${entry.title}" hit the rate limit. What was created so far is kept, and repair finishes the rest.`,
+                    [],
+                    true,
+                    error,
+                );
+            }
+
+            const leftKeys = error instanceof BundleImportError ? error.leftBehind : [];
+            const { failed, kept } = await rollback(leftKeys);
+
+            // A child its own step could not remove again is already named by the error it threw.
+            failed.push(...leftKeys.map((key) => entries.find((candidate) => candidate.key === key)?.title ?? key));
+
             const reason = messageOf(error);
             const failedNote = failed.length === 0 ? "" : ` These could not be removed again: ${failed.join(", ")}. Delete them by hand.`;
             const keptNote =

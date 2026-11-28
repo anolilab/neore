@@ -1,0 +1,170 @@
+/**
+ * The database steps of an install, each one a small internal mutation the install action calls in order:
+ * create the install row, record each child's intent and then its link, and finish or fail the install.
+ * Every step after the first checks the install's generation, so an action whose lease was taken over stops
+ * and writes nothing more (`STALE_LEASE`).
+ */
+import { v, LunoraError } from "lunorash/server";
+
+import type { Id } from "../_generated/dataModel";
+import { internalMutation } from "../_generated/server";
+import { heldInstall, heldInstallForShardWrite, patchInstallIf } from "./held-install";
+import { claimInstallSlot, releaseInstallSlot, releaseSlotById } from "./install-slots";
+import { refuseWhileErasing, requireOwnerShard } from "./owner-shard";
+import { LEASE_MS } from "./logic";
+import { vPluginItemKind } from "./validators";
+
+export const createInstallRow = internalMutation
+    .input({
+        contentHash: v.string().max(128),
+        pluginSlug: v.string().max(64),
+        userId: v.string().max(128),
+        version: v.string().max(32),
+    })
+    .output(v.object({ generation: v.number(), installId: v.string() }))
+    .mutation(async ({ args, ctx }) => {
+        requireOwnerShard(args.userId, "install");
+        await refuseWhileErasing(ctx, args.userId);
+
+        const existing = await ctx.db.pluginInstalls.findFirst({ consistency: "primary", where: { pluginSlug: args.pluginSlug, userId: args.userId } });
+
+        if (existing) {
+            throw new LunoraError("CONFLICT", `The plugin "${args.pluginSlug}" is already installed. Uninstall it first.`);
+        }
+
+        const { now } = ctx;
+
+        // The slot first: its unique index refuses a second create that read before the first one wrote.
+        const slotId = await claimInstallSlot(ctx, args.userId, args.pluginSlug);
+        let installId: string;
+
+        try {
+            installId = await ctx.db.insert("pluginInstalls", {
+                contentHash: args.contentHash,
+                generation: 1,
+                installedAt: now,
+                leaseUntil: now + LEASE_MS,
+                pluginSlug: args.pluginSlug,
+                status: "installing",
+                updatedAt: now,
+                userId: args.userId,
+                version: args.version,
+            });
+        } catch (error) {
+            await releaseSlotById(ctx, slotId);
+
+            throw error;
+        }
+
+        await ctx.db.patch("pluginInstallSlots", slotId, { installId });
+
+        return { generation: 1, installId };
+    });
+
+export const recordIntent = internalMutation
+    .input({
+        contentHash: v.string().max(128),
+        entryKey: v.string().max(256),
+        generation: v.number(),
+        installId: v.string().max(128),
+        kind: vPluginItemKind,
+        userId: v.string().max(128),
+    })
+    .output(v.string())
+    .mutation(async ({ args, ctx }) => {
+        await refuseWhileErasing(ctx, args.userId);
+
+        // Each create that follows writes a sharded table (skills, triggers, group chats) and needs time left on the lease.
+        await heldInstallForShardWrite(ctx, args.installId as Id<"pluginInstalls">, args.generation);
+
+        const itemId = await ctx.db.insert("pluginItems", {
+            contentHash: args.contentHash,
+            createdAt: ctx.now,
+            entryKey: args.entryKey,
+            installId: args.installId,
+            kind: args.kind,
+            state: "intent",
+            userId: args.userId,
+        });
+
+        return itemId as string;
+    });
+
+export const recordCreated = internalMutation
+    .input({
+        generation: v.number(),
+        installId: v.string().max(128),
+        intentId: v.string().max(128),
+        itemId: v.string().max(128),
+    })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        await heldInstall(ctx, args.installId as Id<"pluginInstalls">, args.generation);
+
+        await ctx.db.patch("pluginItems", args.intentId as Id<"pluginItems">, { itemId: args.itemId, state: "created" });
+
+        return null;
+    });
+
+export const finishInstall = internalMutation
+    .input({ generation: v.number(), installId: v.string().max(128) })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        const install = await heldInstall(ctx, args.installId as Id<"pluginInstalls">, args.generation);
+
+        // An update kept for repair holds its target version: finishing it makes that the installed version, to match the new file's hash.
+        // The target version is not removed (a removal is a replace of the row, which cannot be conditional); it is set equal to the
+        // version, so it reads the same as none (`targetVersion ?? version`) and the whole write stays one conditional patch.
+        const version = install.targetVersion ?? install.version;
+
+        await patchInstallIf(ctx, args.installId as Id<"pluginInstalls">, args.generation, {
+            // A finished install or repair has every child its file holds, so an earlier partial update no longer applies.
+            partial: false,
+            status: "installed",
+            ...(install.targetVersion !== undefined && { targetVersion: version }),
+            updatedAt: ctx.now,
+            version,
+        });
+
+        return null;
+    });
+
+/** A failed install with rows it could not remove keeps them: the row is `needs-repair` and names the resume point. */
+export const markNeedsRepair = internalMutation
+    .input({ generation: v.number(), installId: v.string().max(128) })
+    .output(v.null())
+    .mutation(async ({ args, ctx }) => {
+        await heldInstall(ctx, args.installId as Id<"pluginInstalls">, args.generation);
+
+        await patchInstallIf(ctx, args.installId as Id<"pluginInstalls">, args.generation, { status: "needs-repair", updatedAt: ctx.now });
+
+        return null;
+    });
+
+/**
+ * A clean rollback: the install and its links go, once every child is gone. A call deletes at most 10 links (each a read and a delete
+ * against the invocation's D1 queries) and the install only once none are left; `hasMore` tells the caller to call again.
+ */
+export const deleteInstall = internalMutation
+    .input({ generation: v.number(), installId: v.string().max(128) })
+    .output(v.object({ hasMore: v.boolean() }))
+    .mutation(async ({ args, ctx }) => {
+        await heldInstall(ctx, args.installId as Id<"pluginInstalls">, args.generation);
+
+        const batch = 10;
+        const { page: links } = await ctx.db.pluginItems.findMany({ consistency: "primary", limit: batch + 1, where: { installId: args.installId } });
+
+        for (const link of links.slice(0, batch)) {
+            await ctx.db.delete("pluginItems", link._id);
+        }
+
+        // A link left behind would name an install that no longer exists, so the install goes last.
+        if (links.length > batch) {
+            return { hasMore: true };
+        }
+
+        await releaseInstallSlot(ctx, args.installId);
+        await ctx.db.delete("pluginInstalls", args.installId as Id<"pluginInstalls">);
+
+        return { hasMore: false };
+    });

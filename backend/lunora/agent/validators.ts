@@ -766,6 +766,9 @@ export const vThreadDocFields = {
     permissionMode: v.optional(v.union(v.literal("supervised"), v.literal("auto"), v.literal("full"))),
     // Written only by `chat/goals/functions.ts` (set and clear), which checks the caller owns the thread.
     pinnedGoal: v.optional(vPinnedGoal),
+    // A plugin install's child, written only by its internal wrapper.
+    pluginInstallId: v.optional(v.string()),
+    pluginMarker: v.optional(v.string()),
     // Written once by `acp/ingest.ts` when a host session opens, so deliberately not a create field: a client
     // that could set it could mint a host thread, or turn a cloud thread into one.
     runner: v.optional(v.literal("host")),

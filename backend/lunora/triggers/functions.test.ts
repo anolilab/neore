@@ -19,10 +19,12 @@ import {
     getTriggerExecutions,
     getTriggers,
     pruneExpiredRunPrompts,
+    purgeTriggerExecutions,
     releaseQuietWindow,
     reserveQuietWindow,
     setTriggerEnabled,
     testRunTrigger,
+    TRIGGER_RUN_BATCH,
     updateExecution,
     updateTrigger,
     updateTriggerStats,
@@ -1505,6 +1507,35 @@ describe("deleteTrigger", () => {
         expect(remaining).toHaveLength(2);
         expect(remaining.every((key) => key.startsWith(`${other}:`))).toBe(true);
         expect(harness.scheduler.list()).toEqual([]);
+    });
+
+    it("deletes one batch of runs and hands the rest to a scheduled purge", async () => {
+        const triggerId = await seed(0);
+
+        await harness.run(async (ctx: any) => {
+            for (let n = 0; n < 1000; n += 1) {
+                await ctx.db.insert("triggerExecutions", { startedAt: 10 + n, status: "completed", triggerId });
+            }
+        });
+
+        const runs = async (): Promise<number> => {
+            const rows = await harness.run(async (ctx: any) => await ctx.db.query("triggerExecutions").collect());
+
+            return rows.length;
+        };
+        const before = await runs();
+
+        await as().mutation(deleteTrigger as never, { triggerId } as never);
+
+        expect(await readTrigger(triggerId)).toBeNull();
+        expect(await runs()).toBe(before - TRIGGER_RUN_BATCH);
+        expect(harness.scheduler.list().map((job) => job.args)).toContainEqual({ triggerId });
+
+        for (let call = 0; call < 10 && (await runs()) > 0; call += 1) {
+            await harness.run(async (ctx: any) => await ctx.runMutation(purgeTriggerExecutions, { triggerId }));
+        }
+
+        expect(await runs()).toBe(0);
     });
 
     it("hands what is left past one batch to a scheduled purge", async () => {

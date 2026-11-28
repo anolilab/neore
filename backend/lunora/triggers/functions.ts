@@ -17,6 +17,11 @@ import { internal } from "../_generated/internal";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { internalMutation, internalQuery } from "../_generated/server";
+import { rateLimitGuard } from "../lib/rate-limiter";
+import { runAfterWithRetry } from "../lib/shard-scheduler";
+import { CLEANUP_RETRY } from "../agent/thread-search-triggers";
+import { heldInstallForShardWrite } from "../plugins/held-install";
+import { refuseWhileErasing } from "../plugins/owner-shard";
 import { isThreadLocked } from "../lib/thread-lock";
 import { authAction, authMutation, authQuery, rateLimit } from "../lib/crpc";
 import {
@@ -56,7 +61,7 @@ import type { EventSourceConfig, WebhookSignatureScheme } from "./validators";
 import { vEventSource, vWebhookSignatureScheme } from "./validators";
 
 // "event" stays in the union because existing rows carry it; removing a member is a breaking schema change.
-const triggerTypeSchema = v.union(v.literal("schedule"), v.literal("webhook"), v.literal("event"));
+export const triggerTypeSchema = v.union(v.literal("schedule"), v.literal("webhook"), v.literal("event"));
 
 /**
  * A provider and one of its events: one object per provider, so a mismatched pair cannot be sent.
@@ -113,7 +118,7 @@ const eventSourceInputMatchesTable: EventSourceInputMatchesTable = true;
 void eventSourceInputMatchesTable;
 
 /** A `custom:<provider>/<model>` names one of the caller's own endpoints; a missing, disabled or browser-only one would fail every run. */
-const assertCustomModelRunnable = async (context: Pick<MutationCtx, "runQuery">, model: string, userId: string): Promise<void> => {
+export const assertCustomModelRunnable = async (context: Pick<MutationCtx, "runQuery">, model: string, userId: string): Promise<void> => {
     const custom = parseCustomModelId(model);
 
     if (custom && !(await context.runQuery(internal.chat.custom_providers.isCustomProviderRunnable, { providerId: custom.providerId, userId }))) {
@@ -125,7 +130,7 @@ const assertCustomModelRunnable = async (context: Pick<MutationCtx, "runQuery">,
  * The event condition a trigger is saved with. Only an event trigger has one, and it must: the shape is checked
  * and normalised (`normalizeEventSource`), and a thread must be one the caller may read.
  */
-const checkedEventSource = async (
+export const checkedEventSource = async (
     context: Pick<MutationCtx, "db">,
     source: EventSourceConfig | undefined,
     type: Doc<"triggers">["type"],
@@ -158,7 +163,7 @@ const checkedEventSource = async (
  * expression fires every minute (`getNextCronTime` reads garbage as a wildcard),
  * and each run is a paid agent turn.
  */
-const assertCronExpression = (cronExpression: string): void => {
+export const assertCronExpression = (cronExpression: string): void => {
     if (!isHourlyOrSlowerCronExpression(cronExpression)) {
         throw new LunoraError(
             "BAD_REQUEST",
@@ -171,7 +176,7 @@ const assertCronExpression = (cronExpression: string): void => {
  * A zone the scheduler would read as UTC (`resolveTimeZone`) is a typo here, not UTC:
  * the row would show the typed name beside a cron that runs in UTC.
  */
-const assertTimeZone = (timeZone: string): void => {
+export const assertTimeZone = (timeZone: string): void => {
     if (resolveTimeZone(timeZone) !== timeZone) {
         throw new LunoraError("BAD_REQUEST", "Unknown time zone");
     }
@@ -214,7 +219,7 @@ const checkedFilters = (filters: PayloadFilter[] | undefined, type: Doc<"trigger
  * mismatch would verify the sender with the wrong credential. A webhook without a
  * preset is "timestamped" unless it names a scheme; other types store neither.
  */
-const webhookSetup = (
+export const webhookSetup = (
     args: { filters?: PayloadFilter[]; webhookPreset?: WebhookPreset; webhookSignatureScheme?: WebhookSignatureScheme },
     type: Doc<"triggers">["type"],
 ): { filters: PayloadFilter[] | undefined; webhookSignatureScheme: WebhookSignatureScheme | undefined } => {
@@ -372,7 +377,7 @@ export const getTriggers = authQuery.output(v.from(vGetTriggersOutput)).query(as
 
 /** Create a new trigger */
 /** A prompt field without hidden characters; one that was only those is refused rather than stored empty. */
-const cleanPromptField = <T extends string | undefined>(value: T, label: string): T => {
+export const cleanPromptField = <T extends string | undefined>(value: T, label: string): T => {
     if (value === undefined) {
         return value;
     }
@@ -390,7 +395,7 @@ const cleanPromptField = <T extends string | undefined>(value: T, label: string)
  * A webhook's Input Template is its prompt. A template that could render past the prompt limit with long values would
  * refuse those deliveries, so it is refused when it is saved (`longestWebhookPrompt` in `webhook-template.ts`).
  */
-const assertWebhookTemplateFits = (type: string, template: string | undefined): void => {
+export const assertWebhookTemplateFits = (type: string, template: string | undefined): void => {
     const problem = type === "webhook" && template !== undefined ? webhookTemplateProblem(template) : undefined;
 
     if (problem !== undefined) {
@@ -398,138 +403,210 @@ const assertWebhookTemplateFits = (type: string, template: string | undefined): 
     }
 };
 
+export const triggerCreateFields = {
+    botComputer: v.optional(v.boolean()),
+    botId: v.optional(v.string().max(MAX_LENGTH.id)),
+    cronExpression: v.optional(v.string().max(MAX_LENGTH.short)),
+    description: v.optional(v.string().max(MAX_LENGTH.long)),
+    // Event triggers only: what to watch (a page, a moment, a thread). Required for an event trigger.
+    eventSource: v.optional(vEventSourceInput),
+    // Webhook triggers only. The whole set replaces the stored one; an empty array clears it.
+    // At most MAX_FILTERS entries; `assertValidFilters` checks the rest of the grammar.
+    filters: v.optional(
+        v
+            .array(
+                v.object({
+                    op: v.union(
+                        v.literal("equals"),
+                        v.literal("not_equals"),
+                        v.literal("contains"),
+                        v.literal("starts_with"),
+                        v.literal("exists"),
+                        v.literal("not_exists"),
+                    ),
+                    path: v.string().max(MAX_PATH_LENGTH),
+                    value: v.optional(v.string().max(MAX_FILTER_VALUE_LENGTH)),
+                }),
+            )
+            .check((value) => value.length <= MAX_FILTERS, { message: `at most ${String(MAX_FILTERS)} payload filters` }),
+    ),
+    inputTemplate: v.optional(v.string().max(MAX_LENGTH.document)),
+    model: v.string().max(MAX_LENGTH.short),
+    name: v.string().max(MAX_LENGTH.short),
+    // Bot routines only. Skips a run that has nothing to report (`triggers/quiet.ts`); unset means off.
+    quietWhenEmpty: v.optional(v.boolean()),
+    searchMode: v.optional(v.string().max(MAX_LENGTH.short)),
+    systemPrompt: v.optional(v.string().max(MAX_LENGTH.document)),
+    timezone: v.optional(v.string().max(MAX_LENGTH.short)),
+    type: v.from(triggerTypeSchema),
+    // Webhook triggers only. Compiles to the event's filters and the provider's scheme; takes no `filters`.
+    webhookPreset: v.optional(vWebhookPreset),
+    // Webhook triggers only; unset means "timestamped". Fixed at creation, with the secret.
+    webhookSignatureScheme: v.optional(vWebhookSignatureScheme),
+};
+
+type TriggerCreateArgs = Infer<ReturnType<typeof v.object<typeof triggerCreateFields>>>;
+
+/** The owner a trigger row is created for. The caller stamps it from its own identity, never from request input. */
+export interface TriggerOwner {
+    /** The creator's verified active organization, which caps the runs' tools. Absent means the personal space. */
+    organizationId?: string;
+    userId: string;
+}
+
+/** The plugin link a trigger carries when an install created it. */
+export interface TriggerPluginLink {
+    pluginInstallId: string;
+    pluginMarker: string;
+}
+
+/** Creates a trigger row (disabled until the owner enables it) and its webhook route. Shared by `createTrigger` and the plugin wrapper. */
+export const insertTrigger = async (
+    context: MutationCtx,
+    owner: TriggerOwner,
+    args: TriggerCreateArgs,
+    plugin?: TriggerPluginLink,
+): Promise<{ triggerId: string; webhookSecret?: string }> => {
+    const { userId } = owner;
+    const { now } = context;
+
+    // `v.from(zodSchema)` surfaces the field as `unknown` on the args type, so
+    // re-parse here to recover the `"schedule" | "webhook" | "event"` union the
+    // `triggers` table declares.
+    const triggerType = triggerTypeSchema.parse(args.type);
+
+    await assertCustomModelRunnable(context, args.model, userId);
+
+    const timezone = args.timezone?.trim() || undefined;
+
+    if (timezone !== undefined) assertTimeZone(timezone);
+
+    if (args.cronExpression !== undefined || triggerType === "schedule") {
+        assertCronExpression(args.cronExpression ?? "");
+    }
+
+    // Generate webhook secret for webhook triggers
+    const plaintextSecret = triggerType === "webhook" ? crypto.randomUUID() : undefined;
+    // Encrypt the secret before storing — only the encrypted form is persisted
+    const webhookSecret = plaintextSecret ? await encryptKey(plaintextSecret, "tool-keys") : undefined;
+
+    // A routine can only name a bot the caller owns; a foreign id is a refusal, not a silent plain routine.
+    const createBot = args.botId ? await context.runQuery(internal.bots.functions.getBotForRun, { botId: args.botId, userId }) : null;
+
+    if (args.botId && !createBot) {
+        throw new LunoraError("NOT_FOUND", "Bot not found");
+    }
+
+    // The bot's model is the one the run uses, so it is checked like the trigger's own.
+    if (createBot) await assertCustomModelRunnable(context, createBot.model, userId);
+
+    assertBotRoutineOptions({ botComputer: args.botComputer === true, botId: args.botId, quietWhenEmpty: args.quietWhenEmpty === true, type: triggerType });
+
+    const { filters, webhookSignatureScheme } = webhookSetup(args, triggerType);
+    const eventSource = await checkedEventSource(context, args.eventSource, triggerType, userId, now);
+
+    // Checked as stored: removing hidden characters can join a placeholder (`{{pay\u{200B}load}}`) that was not one before.
+    const inputTemplate = cleanPromptField(args.inputTemplate, "The input");
+
+    assertWebhookTemplateFits(triggerType, inputTemplate);
+
+    const inserted = await context.db.insert("triggers", {
+        botComputer: args.botComputer === true ? true : undefined,
+        botId: args.botId as Id<"bots"> | undefined,
+        createdAt: now,
+        cronExpression: args.cronExpression,
+        description: args.description,
+        enabled: false, // Start disabled — user must explicitly enable
+        eventSource,
+        filters,
+        inputTemplate,
+        model: args.model,
+        name: args.name,
+        // Triggers created before this column was written have none and run in the personal space.
+        organizationId: owner.organizationId,
+        pluginInstallId: plugin?.pluginInstallId,
+        pluginMarker: plugin?.pluginMarker,
+        quietWhenEmpty: args.quietWhenEmpty === true ? true : undefined,
+        searchMode: args.searchMode,
+        systemPrompt: cleanPromptField(args.systemPrompt, "The system prompt"),
+        timezone,
+        triggerCount: 0,
+        type: triggerType,
+        updatedAt: now,
+        userId,
+        webhookSecret,
+        webhookSignatureScheme,
+    });
+
+    // A webhook names only the trigger; this is how it finds the shard.
+    await setShardRoute(context, "trigger", inserted as string, userId);
+    // `db.insert` returns the branded id STRING, not a row and not an array. The
+    // `Array.isArray(...)` narrowing produced an `any` branch, which is the only
+    // reason `.id` compiled — at runtime it read `.id` off a string, so
+    // `createTrigger` returned `{ triggerId: undefined }`. Fourth site with this
+    // shape (see also workflow/presence, system-prompts, messenger).
+    const triggerId = inserted;
+
+    // Return the plaintext secret once so the user can configure their webhook sender.
+    // It is never returned again — only the encrypted form is stored.
+    context.log.event("triggers.create_trigger", { hasWebhookSecret: plaintextSecret !== undefined, type: triggerType });
+
+    return {
+        triggerId: triggerId as string,
+        ...(plaintextSecret && { webhookSecret: plaintextSecret }),
+    };
+};
+
+/** Create a new trigger */
 export const createTrigger = authMutation
     .use(rateLimit("triggers/create"))
+    .input({ ...triggerCreateFields })
+    .output(v.object({ triggerId: v.string(), webhookSecret: v.optional(v.string()) }))
+    .mutation(
+        async ({ args, ctx: context }) =>
+            await insertTrigger(context, { organizationId: context.user.activeOrganization?.id, userId: context.user.userId }, args),
+    );
+
+/**
+ * Creates a trigger for a plugin install. Called from an action. A trigger with the same marker is returned as it is, so a
+ * retried install makes no second copy and spends no rate-limit budget on the re-find. A webhook secret is returned once, when the
+ * trigger is created; a re-found trigger returns none, so the install must say the secret was already issued.
+ */
+export const createPluginTrigger = internalMutation
     .input({
-        botComputer: v.optional(v.boolean()),
-        botId: v.optional(v.string().max(MAX_LENGTH.id)),
-        cronExpression: v.optional(v.string().max(MAX_LENGTH.short)),
-        description: v.optional(v.string().max(MAX_LENGTH.long)),
-        // Event triggers only: what to watch (a page, a moment, a thread). Required for an event trigger.
-        eventSource: v.optional(vEventSourceInput),
-        // Webhook triggers only. The whole set replaces the stored one; an empty array clears it.
-        // At most MAX_FILTERS entries; `assertValidFilters` checks the rest of the grammar.
-        filters: v.optional(
-            v
-                .array(
-                    v.object({
-                        op: v.union(
-                            v.literal("equals"),
-                            v.literal("not_equals"),
-                            v.literal("contains"),
-                            v.literal("starts_with"),
-                            v.literal("exists"),
-                            v.literal("not_exists"),
-                        ),
-                        path: v.string().max(MAX_PATH_LENGTH),
-                        value: v.optional(v.string().max(MAX_FILTER_VALUE_LENGTH)),
-                    }),
-                )
-                .check((value) => value.length <= MAX_FILTERS, { message: `at most ${String(MAX_FILTERS)} payload filters` }),
-        ),
-        inputTemplate: v.optional(v.string().max(MAX_LENGTH.document)),
-        model: v.string().max(MAX_LENGTH.short),
-        name: v.string().max(MAX_LENGTH.short),
-        // Bot routines only. Skips a run that has nothing to report (`triggers/quiet.ts`); unset means off.
-        quietWhenEmpty: v.optional(v.boolean()),
-        searchMode: v.optional(v.string().max(MAX_LENGTH.short)),
-        systemPrompt: v.optional(v.string().max(MAX_LENGTH.document)),
-        timezone: v.optional(v.string().max(MAX_LENGTH.short)),
-        type: v.from(triggerTypeSchema),
-        // Webhook triggers only. Compiles to the event's filters and the provider's scheme; takes no `filters`.
-        webhookPreset: v.optional(vWebhookPreset),
-        // Webhook triggers only; unset means "timestamped". Fixed at creation, with the secret.
-        webhookSignatureScheme: v.optional(vWebhookSignatureScheme),
+        ...triggerCreateFields,
+        // The install generation the caller started under: a create under an older one is refused.
+        generation: v.optional(v.number()),
+        plan: v.optional(v.string().max(MAX_LENGTH.short)),
+        pluginInstallId: v.string().max(MAX_LENGTH.id),
+        pluginMarker: v.string().max(MAX_LENGTH.short),
+        userId: v.string().max(MAX_LENGTH.id),
     })
     .output(v.object({ triggerId: v.string(), webhookSecret: v.optional(v.string()) }))
-    .mutation(async ({ args, ctx: context }) => {
-        const { userId } = context.user;
-        const { now } = context;
+    .mutation(async ({ args: { generation, plan, pluginInstallId, pluginMarker, userId, ...fields }, ctx }) => {
+        const existing = await ctx.db
+            .query("triggers")
+            .withIndex("by_plugin_marker", (q) => q.eq("pluginMarker", pluginMarker))
+            .first();
 
-        // `v.from(zodSchema)` surfaces the field as `unknown` on the args type, so
-        // re-parse here to recover the `"schedule" | "webhook" | "event"` union the
-        // `triggers` table declares.
-        const triggerType = triggerTypeSchema.parse(args.type);
+        if (existing) {
+            if (existing.userId !== userId) {
+                throw new LunoraError("FORBIDDEN", "That plugin trigger belongs to another account");
+            }
 
-        await assertCustomModelRunnable(context, args.model, userId);
-
-        const timezone = args.timezone?.trim() || undefined;
-
-        if (timezone !== undefined) assertTimeZone(timezone);
-
-        if (args.cronExpression !== undefined || triggerType === "schedule") {
-            assertCronExpression(args.cronExpression ?? "");
+            return { triggerId: existing._id as string };
         }
 
-        // Generate webhook secret for webhook triggers
-        const plaintextSecret = triggerType === "webhook" ? crypto.randomUUID() : undefined;
-        // Encrypt the secret before storing — only the encrypted form is persisted
-        const webhookSecret = plaintextSecret ? await encryptKey(plaintextSecret, "tool-keys") : undefined;
+        await refuseWhileErasing(ctx, userId);
 
-        // A routine can only name a bot the caller owns; a foreign id is a refusal, not a silent plain routine.
-        const createBot = args.botId ? await context.runQuery(internal.bots.functions.getBotForRun, { botId: args.botId, userId }) : null;
-
-        if (args.botId && !createBot) {
-            throw new LunoraError("NOT_FOUND", "Bot not found");
+        // A stale action (its lease taken over) must not start a new child: the one it made would be lost to the new holder.
+        if (generation !== undefined) {
+            await heldInstallForShardWrite(ctx, pluginInstallId as Id<"pluginInstalls">, generation);
         }
 
-        // The bot's model is the one the run uses, so it is checked like the trigger's own.
-        if (createBot) await assertCustomModelRunnable(context, createBot.model, userId);
+        await rateLimitGuard({ ...ctx, rateLimitKey: "triggers/create", user: { plan, userId } } as never);
 
-        assertBotRoutineOptions({ botComputer: args.botComputer === true, botId: args.botId, quietWhenEmpty: args.quietWhenEmpty === true, type: triggerType });
-
-        const { filters, webhookSignatureScheme } = webhookSetup(args, triggerType);
-        const eventSource = await checkedEventSource(context, args.eventSource, triggerType, userId, now);
-
-        // Checked as stored: removing hidden characters can join a placeholder (`{{pay\u{200B}load}}`) that was not one before.
-        const inputTemplate = cleanPromptField(args.inputTemplate, "The input");
-
-        assertWebhookTemplateFits(triggerType, inputTemplate);
-
-        const inserted = await context.db.insert("triggers", {
-            botComputer: args.botComputer === true ? true : undefined,
-            botId: args.botId as Id<"bots"> | undefined,
-            createdAt: now,
-            cronExpression: args.cronExpression,
-            description: args.description,
-            enabled: false, // Start disabled — user must explicitly enable
-            eventSource,
-            filters,
-            inputTemplate,
-            model: args.model,
-            name: args.name,
-            // The creator's verified active organization caps the runs' tools. Triggers created before this column was written have
-            // none and run in the personal space.
-            organizationId: context.user.activeOrganization?.id,
-            quietWhenEmpty: args.quietWhenEmpty === true ? true : undefined,
-            searchMode: args.searchMode,
-            systemPrompt: cleanPromptField(args.systemPrompt, "The system prompt"),
-            timezone,
-            triggerCount: 0,
-            type: triggerType,
-            updatedAt: now,
-            userId,
-            webhookSecret,
-            webhookSignatureScheme,
-        });
-
-        // A webhook names only the trigger; this is how it finds the shard.
-        await setShardRoute(context, "trigger", inserted as string, userId);
-        // `db.insert` returns the branded id STRING, not a row and not an array. The
-        // `Array.isArray(...)` narrowing produced an `any` branch, which is the only
-        // reason `.id` compiled — at runtime it read `.id` off a string, so
-        // `createTrigger` returned `{ triggerId: undefined }`. Fourth site with this
-        // shape (see also workflow/presence, system-prompts, messenger).
-        const triggerId = inserted;
-
-        // Return the plaintext secret once so the user can configure their webhook sender.
-        // It is never returned again — only the encrypted form is stored.
-        context.log.event("triggers.create_trigger", { hasWebhookSecret: plaintextSecret !== undefined, type: triggerType });
-
-        return {
-            triggerId: triggerId as string,
-            ...(plaintextSecret && { webhookSecret: plaintextSecret }),
-        };
+        return await insertTrigger(ctx, { userId }, fields, { pluginInstallId, pluginMarker });
     });
 
 /** Update an existing trigger */
@@ -841,24 +918,56 @@ export const rotateWebhookSecret = authMutation
         return { previousSecretExpiresAt, webhookSecret: plaintextSecret };
     });
 
-/**
- * Removes a trigger the caller has already been checked to own: its execution logs, its claims and its shard route.
- * Returns how many execution logs went. `deleteTrigger` rate-limits first; the bundle rollback does not.
- */
-export const deleteTriggerRows = async (context: MutationCtx, triggerId: Id<"triggers">): Promise<number> => {
-    // Delete associated execution logs
-    const executions = await context.db
+/** Runs of one trigger a single call deletes; a trigger with more hands the rest to `purgeTriggerExecutions`. */
+export const TRIGGER_RUN_BATCH = 200;
+
+/** Deletes up to one batch of a trigger's runs and says whether more may remain. */
+const deleteRunBatch = async (context: MutationCtx, triggerId: Id<"triggers">): Promise<{ deleted: number; more: boolean }> => {
+    const runs = await context.db
         .query("triggerExecutions")
         .withIndex("by_triggerId_startedAt", (q) => q.eq("triggerId", triggerId))
-        .collect();
+        .take(TRIGGER_RUN_BATCH);
 
-    // Its webhook replay claims (`lib/claim-once.ts`) expire on their own within minutes, except a
-    // `gitlab-token` trigger's delivery claims, which last for years: one batch is cleared here, the rest on the scheduler.
-    await Promise.allSettled(executions.map((row) => context.db.delete("triggerExecutions", row._id)));
+    await Promise.all(runs.map((row) => context.db.delete("triggerExecutions", row._id)));
+
+    return { deleted: runs.length, more: runs.length >= TRIGGER_RUN_BATCH };
+};
+
+/**
+ * What a deleted trigger's run history has left past its first batch: one batch per call, rescheduling itself while batches come
+ * back full. The trigger row is already gone, so every read of a run (which starts from its trigger) no longer reaches these.
+ */
+export const purgeTriggerExecutions = internalMutation
+    .input({ triggerId: v.string().max(200) })
+    .output(v.null())
+    .mutation(async ({ args: { triggerId }, ctx }) => {
+        const { more } = await deleteRunBatch(ctx, triggerId as Id<"triggers">);
+
+        if (more) {
+            await runAfterWithRetry(ctx.scheduler, 0, internal.triggers.functions.purgeTriggerExecutions, { triggerId }, CLEANUP_RETRY);
+        }
+
+        return null;
+    });
+
+/**
+ * Removes a trigger the caller has already been checked to own: its claims, its shard route and one batch of its run history
+ * (the rest goes on the scheduler). Returns how many runs went in this call. `deleteTrigger` rate-limits first; the bundle
+ * rollback does not.
+ */
+export const deleteTriggerRows = async (context: MutationCtx, triggerId: Id<"triggers">): Promise<number> => {
+    const { deleted, more } = await deleteRunBatch(context, triggerId);
 
     // Delete the trigger
     await context.db.delete("triggers", triggerId);
 
+    // Retried with no cap: once the trigger row is gone, nothing else would find these runs again.
+    if (more) {
+        await runAfterWithRetry(context.scheduler, 0, internal.triggers.functions.purgeTriggerExecutions, { triggerId }, CLEANUP_RETRY);
+    }
+
+    // Its webhook replay claims (`lib/claim-once.ts`) expire on their own within minutes, except a
+    // `gitlab-token` trigger's delivery claims, which last for years: one batch is cleared here, the rest on the scheduler.
     const deliveryPrefix = `${triggerId}:`;
 
     if (await releaseClaimsWithPrefix(context, TRIGGER_DELIVERY_SCOPE, deliveryPrefix, CLAIM_PREFIX_BATCH)) {
@@ -867,7 +976,7 @@ export const deleteTriggerRows = async (context: MutationCtx, triggerId: Id<"tri
 
     await deleteShardRoute(context, "trigger", triggerId);
 
-    return executions.length;
+    return deleted;
 };
 
 /** Delete a trigger */

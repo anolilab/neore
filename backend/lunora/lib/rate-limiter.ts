@@ -463,20 +463,23 @@ export const RATE_LIMIT_CONFIGS = {
     "pins/delete:premium": Ratelimit.fixedWindow(60, MINUTE),
     "pins/update:free": Ratelimit.fixedWindow(30, MINUTE),
     "pins/update:premium": Ratelimit.fixedWindow(100, MINUTE),
-    premium: Ratelimit.tokenBucket(100, 10 * SECOND, 100),
+    // Installing or updating a plugin: five an hour per person. Repair is not under this limit, so it always makes progress.
+    "plugins/install:free": Ratelimit.fixedWindow(5, HOUR),
 
+    "plugins/install:premium": Ratelimit.fixedWindow(5, HOUR),
+
+    premium: Ratelimit.tokenBucket(100, 10 * SECOND, 100),
     // Project limits
     "project/create:free": Ratelimit.fixedWindow(5, MINUTE),
-
     "project/create:premium": Ratelimit.fixedWindow(20, MINUTE),
     "project/member:free": Ratelimit.fixedWindow(10, MINUTE),
+
     "project/member:premium": Ratelimit.fixedWindow(30, MINUTE),
     "project/update:free": Ratelimit.fixedWindow(20, MINUTE),
 
     "project/update:premium": Ratelimit.fixedWindow(60, MINUTE),
     // Projects (plural) aliases used by projects/functions.ts
     "projects/create:free": Ratelimit.fixedWindow(5, MINUTE),
-
     "projects/create:premium": Ratelimit.fixedWindow(20, MINUTE),
     "projects/delete:free": Ratelimit.fixedWindow(5, MINUTE),
     "projects/delete:premium": Ratelimit.fixedWindow(15, MINUTE),
@@ -484,9 +487,9 @@ export const RATE_LIMIT_CONFIGS = {
     "projects/update:premium": Ratelimit.fixedWindow(60, MINUTE),
     // Prompts limits
     "prompts/create:free": Ratelimit.fixedWindow(10, MINUTE),
+
     "prompts/create:premium": Ratelimit.fixedWindow(30, MINUTE),
     "prompts/delete:free": Ratelimit.fixedWindow(10, MINUTE),
-
     "prompts/delete:premium": Ratelimit.fixedWindow(30, MINUTE),
     "prompts/update:free": Ratelimit.fixedWindow(20, MINUTE),
     "prompts/update:premium": Ratelimit.fixedWindow(60, MINUTE),
@@ -511,10 +514,10 @@ export const RATE_LIMIT_CONFIGS = {
     "sandbox/execute:public": Ratelimit.fixedWindow(5, HOUR),
     // Scraper limits (admin only)
     scraper: Ratelimit.fixedWindow(10, MINUTE),
+
     // Settings are written on every toggle and autosave; a loop of them is abuse, not use.
     "settings/update:free": Ratelimit.fixedWindow(60, MINUTE),
     "settings/update:premium": Ratelimit.fixedWindow(180, MINUTE),
-
     "share/view:free": Ratelimit.fixedWindow(600, MINUTE),
     "share/view:premium": Ratelimit.fixedWindow(600, MINUTE),
     // Public share views (`getPublicThread`, `getPublicPage`, `getPublicWorkflow`),
@@ -528,6 +531,7 @@ export const RATE_LIMIT_CONFIGS = {
     "sharing/create:free": Ratelimit.fixedWindow(5, MINUTE),
     "sharing/create:premium": Ratelimit.fixedWindow(15, MINUTE),
     "sharing/update:free": Ratelimit.fixedWindow(10, MINUTE),
+
     "sharing/update:premium": Ratelimit.fixedWindow(30, MINUTE),
     // Skills limits — mirror the prompts CRUD shape; `invoke` is closer to a chat
     // action, so it gets a token bucket rather than a fixed window.
@@ -542,7 +546,6 @@ export const RATE_LIMIT_CONFIGS = {
     // conversation takes several — its own budget, so building one agent does
     // not starve the prompt optimizer's `chat/promptImprovement`.
     "skills/builder:free": Ratelimit.tokenBucket(10, MINUTE, 20),
-
     "skills/builder:premium": Ratelimit.tokenBucket(30, MINUTE, 60),
     // Exporting, previewing and importing a team bundle (`skills/bundle.ts`). The creates an import makes are
     // charged to their own families (`skills/create`, `triggers/create`, `chat/create`); this one only bounds the
