@@ -45,9 +45,9 @@ The rules are summarized in `packages/device-core/AGENTS.md`, which agents load 
   never name the address or a header value: they reach the chat, and the cloud learns only the server's name. TLS
   trusts the bundled public roots only, never a skip-verify switch. What the server says is passed on with every
   header value blanked (keys too), so a header that holds a credential must be at least 8 characters. When the server
-  drops the session (404), the bridge answers that call and every later one with `mcp::SESSION_GONE` without sending
-  it; `McpManager::with` stops the bridge before it sends the call once more to a new one (any other failure is not
-  retried on a live server). Not wired into settings yet.
+  answers a call with a 404 (the session ended), the bridge answers it with `mcp::SESSION_GONE`, and every later call
+  too without sending it; `McpManager::with` stops the bridge before it sends the call once more to a new one (any
+  other failure is not retried on a live server). Not wired into settings yet.
   Where there is no sandbox the call
   is REFUSED unless the user turned off "Require sandbox for shell commands and local MCP servers"
   (stored inverted, `allowUnsandboxedShell`, so absent = required). Allow

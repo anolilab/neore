@@ -295,6 +295,12 @@ fn a_failure_is_answered_as_an_error_that_names_no_address_and_a_redirect_is_not
     let (url, seen) = serve(Box::new(|request| match request.body["method"].as_str() {
         Some("initialize") => json_reply(request, json!({ "protocolVersion": "2025-06-18" }), None),
         Some("tools/list") => reply("500 Internal Server Error", &[], "boom"),
+        // Neither a result nor an error: not an answer.
+        Some("prompts/list") => reply(
+            "200 OK",
+            &[("Content-Type", "application/json")],
+            &json!({ "jsonrpc": "2.0", "id": 5 }).to_string(),
+        ),
         // A well-formed answer, but to another request: it must not reach this caller.
         Some("resources/list") => reply(
             "200 OK",
@@ -307,11 +313,8 @@ fn a_failure_is_answered_as_an_error_that_names_no_address_and_a_redirect_is_not
             "",
         ),
     }));
-    let closed = TcpListener::bind("127.0.0.1:0")
-        .unwrap()
-        .local_addr()
-        .unwrap();
-    let unreachable = relay(&format!("http://{closed}/mcp"), "", &[initialize()]);
+    // Port 1 needs privileges to listen on, so no other test can take it: the connection is refused.
+    let unreachable = relay("http://127.0.0.1:1/mcp", "", &[initialize()]);
     let written = relay(
         &url,
         "",
@@ -320,6 +323,7 @@ fn a_failure_is_answered_as_an_error_that_names_no_address_and_a_redirect_is_not
             request(2, "tools/list"),
             request(3, "tools/call"),
             request(4, "resources/list"),
+            request(5, "prompts/list"),
         ],
     );
     let error_of = |id: i64| {
@@ -334,13 +338,17 @@ fn a_failure_is_answered_as_an_error_that_names_no_address_and_a_redirect_is_not
         error_of(4),
         Some(json!("the MCP server answered a different request"))
     );
+    assert_eq!(
+        error_of(5),
+        Some(json!("the MCP server answered a different request"))
+    );
     assert!(
         written.iter().all(|message| message["id"] != 99),
         "{written:?}"
     );
     assert_eq!(
         seen.lock().unwrap().len(),
-        4,
+        5,
         "the redirect must not be followed"
     );
     assert_eq!(
@@ -412,7 +420,7 @@ fn an_event_stream_may_end_its_lines_with_cr_lf_or_crlf() {
         _ => {
             let answer = json!({ "jsonrpc": "2.0", "id": request.body["id"], "result": { "n": request.body["id"] } });
             let events = match request.body["id"].as_i64() {
-                Some(2) => format!(": hi\r\rdata: {answer}\r\r"),
+                Some(2) => format!("\u{feff}data: {answer}\r\r: bye\r\r"),
                 Some(3) => format!(": hi\n\ndata: {answer}\n\n"),
                 _ => format!(": hi\r\n\r\ndata: {answer}\r\n\r\n"),
             };
@@ -529,6 +537,9 @@ fn a_ping_the_server_sends_before_it_answers_initialize_gets_its_reply_within_th
             match listener.accept() {
                 Ok((mut stream, _)) => {
                     stream.set_nonblocking(false).unwrap();
+                    stream
+                        .set_read_timeout(Some(Duration::from_secs(5)))
+                        .unwrap();
 
                     let pong = read_request(&stream);
                     let status = if pong.header("mcp-session-id") == Some("s-1") {
@@ -599,4 +610,23 @@ fn a_ping_the_server_sends_before_it_answers_initialize_gets_its_reply_within_th
 
     drop(writer);
     bridge.join().unwrap();
+}
+
+#[cfg(unix)]
+#[test]
+fn headers_that_cannot_be_read_stop_the_bridge_instead_of_being_left_out() {
+    use std::os::unix::ffi::OsStrExt;
+
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_neore-host"))
+        .arg("mcp-bridge")
+        .env("NEORE_MCP_BRIDGE_URL", "http://127.0.0.1:1/mcp")
+        .env(
+            "NEORE_MCP_BRIDGE_HEADERS",
+            std::ffi::OsStr::from_bytes(b"{\"X\":\"\xff\"}"),
+        )
+        .output()
+        .unwrap();
+
+    assert_eq!(output.status.code(), Some(2));
+    assert!(String::from_utf8_lossy(&output.stderr).contains("not valid text"));
 }

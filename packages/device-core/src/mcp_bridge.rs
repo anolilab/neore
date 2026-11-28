@@ -7,10 +7,11 @@
 //! address or a header value: a call's error text reaches the chat, and the cloud must learn only the server's name.
 //!
 //! Each message is one POST. A reply is one JSON object or an event stream; every message in it goes to stdout as one
-//! line, and `mcp.rs` answers the server's own requests (it offers none). Redirects are not followed (a header such
-//! as `Authorization` would go to another host), no proxy is read from the environment, and a reply is capped.
-//! A server that ends the session (a 404) ends the bridge without an answer: `mcp.rs` then starts it again, which opens a
-//! new session, and sends the call once more (the server never ran it).
+//! line, and `mcp.rs` answers the server's own requests (a ping; it offers nothing else). Redirects are not followed (a
+//! header such as `Authorization` would go to another host), no proxy is read from the environment, and a reply is
+//! capped. A request the server answers with a 404 (the session ended) gets `mcp::SESSION_GONE`, and so does every
+//! request after it, without being sent. `mcp.rs` reads that error, stops the bridge and sends the call once more to a
+//! new one, which opens a new session.
 
 use std::collections::BTreeMap;
 use std::io::{self, BufRead, BufReader, Read, Write};
@@ -313,7 +314,9 @@ fn event_line(reader: &mut impl BufRead, after_cr: &mut bool) -> io::Result<Opti
 
 /// Whether `message` is the response to the request `id`. Anything else must not reach that request's caller.
 fn is_answer_to(message: &Value, id: &Value) -> bool {
-    message.get("method").is_none() && message.get("id") == Some(id)
+    message.get("method").is_none()
+        && message.get("id") == Some(id)
+        && (message.get("result").is_some() || message.get("error").is_some())
 }
 
 /// Visible ASCII only, as the transport requires of a session id.
@@ -474,6 +477,8 @@ impl<W: Write> Bridge<W> {
             event_line(&mut reader, &mut after_cr).map_err(|error| read_failure(&error))?
         {
             let line = String::from_utf8_lossy(&line);
+            // A stream may open with a byte order mark.
+            let line = line.strip_prefix('\u{feff}').unwrap_or(&line);
 
             if let Some(field) = line.strip_prefix("data:") {
                 if !data.is_empty() {
@@ -612,7 +617,15 @@ pub fn run<W: Write + Send + 'static>(target: Target, input: impl BufRead, outpu
 /// `neore-host mcp-bridge`, reading its target from the environment.
 pub fn main() -> ExitCode {
     let url = std::env::var(URL_VAR).unwrap_or_default();
-    let headers = std::env::var(HEADERS_VAR).unwrap_or_default();
+    // Headers that cannot be read must not be taken as none: the requests would go out without them.
+    let headers = match std::env::var(HEADERS_VAR) {
+        Ok(headers) => headers,
+        Err(std::env::VarError::NotPresent) => String::new(),
+        Err(std::env::VarError::NotUnicode(_)) => {
+            eprintln!("neore-host mcp-bridge: the headers are not valid text");
+            return ExitCode::from(2);
+        }
+    };
 
     match parse_target(&url, &headers) {
         Ok(target) => {
