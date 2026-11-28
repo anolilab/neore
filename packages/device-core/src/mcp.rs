@@ -770,8 +770,22 @@ impl McpManager {
 
                     self.process_locked(&mut processes, config, policy)?
                 }
-                // A call that waited on the same server meanwhile replaced it: this one goes to the replacement.
-                Some(_) => self.process_locked(&mut processes, config, policy)?,
+                // A call that waited on the same server meanwhile replaced it: this one goes to the replacement, but
+                // only if it was started from the same settings. Never put back what an edit took away.
+                Some(current) => {
+                    let replacement = current.clone();
+                    let same = {
+                        let running = replacement.lock().unwrap_or_else(PoisonError::into_inner);
+
+                        running.config == *config && running.policy.as_ref() == policy
+                    };
+
+                    if !same {
+                        return first;
+                    }
+
+                    replacement
+                }
                 None => return first,
             }
         };
@@ -1455,6 +1469,61 @@ sleep 1"#
 
         assert_eq!(first.join().unwrap(), Ok(json!({})));
         assert_eq!(second.join().unwrap(), Ok(json!({})));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_call_that_waited_on_a_bridge_whose_settings_changed_does_not_bring_the_old_ones_back() {
+        use std::sync::atomic::{AtomicBool, Ordering};
+
+        let root = temp_root("session-gone-edited");
+        let starts = root.join("starts");
+        // As in the test above: the first copy answers with the session-gone error, a later one with a result.
+        let script = r#"echo $$ >> 'STARTS'; n=$(wc -l < 'STARTS'); read l; echo '{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-06-18","capabilities":{},"serverInfo":{"name":"f","version":"1"}}}'; read l; while read l; do id=$(printf '%s' "$l" | sed 's/.*"id":\([0-9]*\).*/\1/'); if [ $n -eq 1 ]; then echo "{\"jsonrpc\":\"2.0\",\"id\":$id,\"error\":{\"code\":-32000,\"message\":\"GONE\"}}"; else echo "{\"jsonrpc\":\"2.0\",\"id\":$id,\"result\":{}}"; fi; done"#
+            .replace("STARTS", &starts.display().to_string())
+            .replace("GONE", SESSION_GONE);
+
+        std::fs::create_dir_all(&root).unwrap();
+
+        let old = McpServerConfig {
+            args: vec!["-c".into(), script],
+            ..idle_server("session-gone-edited")
+        };
+        // The person edits the server while a call on the old settings is still running.
+        let edited = McpServerConfig {
+            env: BTreeMap::from([("EDITED".to_owned(), "1".to_owned())]),
+            ..old.clone()
+        };
+        let manager = Arc::new(McpManager::new(root.to_path_buf()));
+        let entered = Arc::new(AtomicBool::new(false));
+        let first = {
+            let (manager, old, entered) = (manager.clone(), old.clone(), entered.clone());
+
+            std::thread::spawn(move || {
+                manager.with(&old, None, |process| {
+                    entered.store(true, Ordering::SeqCst);
+                    std::thread::sleep(Duration::from_millis(300));
+                    process.request("tools/list", json!({}), Duration::from_secs(10))
+                })
+            })
+        };
+
+        assert!(wait_until(|| entered.load(Ordering::SeqCst)));
+        assert_eq!(
+            manager.with(&edited, None, |process| process.request(
+                "tools/list",
+                json!({}),
+                Duration::from_secs(10)
+            )),
+            Ok(json!({}))
+        );
+
+        // The old call is not sent again, and the edited server keeps running.
+        assert_eq!(first.join().unwrap(), Err(SESSION_GONE.to_owned()));
+
+        let running = manager.processes.lock().unwrap()["session-gone-edited"].clone();
+
+        assert_eq!(running.lock().unwrap().config, edited);
     }
 
     #[cfg(unix)]

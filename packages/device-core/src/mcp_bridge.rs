@@ -79,6 +79,16 @@ fn scrub(text: &mut String, secrets: &[String]) {
 fn redact(value: &mut Value, secrets: &[String]) {
     match value {
         Value::String(text) => scrub(text, secrets),
+        // A credential of digits can come back as a number.
+        Value::Number(number) => {
+            let mut text = number.to_string();
+
+            scrub(&mut text, secrets);
+
+            if text != number.to_string() {
+                *value = Value::String(text);
+            }
+        }
         Value::Array(items) => items.iter_mut().for_each(|item| redact(item, secrets)),
         Value::Object(fields) => {
             *fields = std::mem::take(fields)
@@ -96,22 +106,32 @@ fn redact(value: &mut Value, secrets: &[String]) {
 
 /// Whether a header or a query parameter carries a credential by its name. Its secret must be long enough to blank out
 /// of what the server says (`MIN_REDACTED_BYTES`), or the address or header is refused.
+/// By whole words, so `x-api-key` and `access_token` are one, and `max_tokens` or `author` is not.
 fn holds_a_credential(name: &str) -> bool {
-    let name = name.to_ascii_lowercase();
-
-    matches!(
-        name.as_str(),
-        "authorization" | "proxy-authorization" | "cookie"
-    ) || ["auth", "token", "key", "secret", "password"]
-        .iter()
-        .any(|word| name.contains(word))
+    name.to_ascii_lowercase()
+        .split(['-', '_', '.'])
+        .any(|word| {
+            matches!(
+                word,
+                "auth"
+                    | "authorization"
+                    | "cookie"
+                    | "token"
+                    | "key"
+                    | "apikey"
+                    | "secret"
+                    | "password"
+            )
+        })
 }
 
-/// A header's credential: the whole value, and the part after its scheme (`Bearer <credential>`).
+/// A header's credential: the whole value, and the part after its scheme (`Bearer <credential>`, however spaced).
 fn credentials(value: &str) -> impl Iterator<Item = &str> {
     [
         Some(value),
-        value.split_once(' ').map(|(_, credential)| credential),
+        value
+            .split_once(|character: char| character.is_ascii_whitespace())
+            .map(|(_, credential)| credential.trim()),
     ]
     .into_iter()
     .flatten()
@@ -121,6 +141,37 @@ fn credentials(value: &str) -> impl Iterator<Item = &str> {
 fn pairs(text: &str, separator: char) -> impl Iterator<Item = (&str, &str)> {
     text.split(separator)
         .filter_map(|pair| pair.trim().split_once('='))
+}
+
+/// `%XX` and `+` decoded, as a server reads a query string. Anything that does not decode stays as it is.
+fn percent_decoded(text: &str) -> String {
+    let bytes = text.as_bytes();
+    let mut decoded = Vec::with_capacity(bytes.len());
+    let mut at = 0;
+
+    while at < bytes.len() {
+        let hex = bytes
+            .get(at + 1..at + 3)
+            .and_then(|hex| std::str::from_utf8(hex).ok())
+            .and_then(|hex| u8::from_str_radix(hex, 16).ok());
+
+        match (bytes[at], hex) {
+            (b'%', Some(byte)) => {
+                decoded.push(byte);
+                at += 3;
+            }
+            (b'+', _) => {
+                decoded.push(b' ');
+                at += 1;
+            }
+            (byte, _) => {
+                decoded.push(byte);
+                at += 1;
+            }
+        }
+    }
+
+    String::from_utf8_lossy(&decoded).into_owned()
 }
 
 /// Checks the address and headers. The errors name neither the address nor a header value.
@@ -196,9 +247,14 @@ pub fn parse_target(url: &str, headers: &str) -> Result<Target, String> {
         parsed.push((name, header));
     }
 
-    let query = uri.query().unwrap_or_default();
+    let raw_query = uri.query().unwrap_or_default();
+    // As the server reads them: decoded.
+    let query: Vec<(String, String)> = pairs(raw_query, '&')
+        .map(|(name, value)| (percent_decoded(name), percent_decoded(value)))
+        .collect();
 
-    if pairs(query, '&')
+    if query
+        .iter()
         .any(|(name, value)| holds_a_credential(name) && value.len() < MIN_REDACTED_BYTES)
     {
         return Err(format!(
@@ -206,11 +262,13 @@ pub fn parse_target(url: &str, headers: &str) -> Result<Target, String> {
         ));
     }
 
-    // Each header's credential, each cookie's value, and each value in the address's query (`?key=…`).
+    // Each header's credential, each cookie's value, and each value in the address's query (`?key=…`), as written and
+    // decoded.
     let mut secrets: Vec<String> = given
         .values()
         .flat_map(|value| credentials(value).chain(pairs(value, ';').map(|(_, cookie)| cookie)))
-        .chain(pairs(query, '&').map(|(_, value)| value))
+        .chain(query.iter().map(|(_, value)| value.as_str()))
+        .chain(pairs(raw_query, '&').map(|(_, value)| value))
         .filter(|secret| secret.len() >= MIN_REDACTED_BYTES)
         .map(str::to_owned)
         .collect();

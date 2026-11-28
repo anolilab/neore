@@ -160,6 +160,8 @@ fn authorization() -> String {
 #[test]
 fn only_an_http_or_https_address_without_credentials_and_valid_headers_are_taken() {
     assert!(parse_target("https://mcp.internal.example/mcp", "").is_ok());
+    // Ordinary names that only contain a credential word.
+    assert!(parse_target("https://h/mcp?author=ai&max_tokens=50&keyword=ab", "").is_ok());
     assert!(parse_target("http://10.0.0.5:8080/mcp", &authorization()).is_ok());
 
     for (url, headers, expected) in [
@@ -195,6 +197,17 @@ fn only_an_http_or_https_address_without_credentials_and_valid_headers_are_taken
         (
             "https://h/mcp?api_key=abc",
             "",
+            "too short to keep out of the chat",
+        ),
+        // An encoded name is read as the server reads it.
+        (
+            "https://h/mcp?%74oken=abc",
+            "",
+            "too short to keep out of the chat",
+        ),
+        (
+            "https://h/mcp",
+            "{\"Authorization\":\"Bearer\\tabc\"}",
             "too short to keep out of the chat",
         ),
         (
@@ -462,35 +475,43 @@ fn an_event_stream_may_end_its_lines_with_cr_lf_or_crlf() {
 
 #[test]
 fn a_cookie_or_a_key_in_the_address_the_server_echoes_does_not_reach_the_client() {
-    let (key, sid) = ("k".repeat(12), "s".repeat(12));
-    let echoed = format!("saw {key} and {sid}");
+    let (key, sid, token, pin) = (
+        "k".repeat(12),
+        "s".repeat(12),
+        "t".repeat(12),
+        "4".repeat(12),
+    );
+    let echoed = format!("saw {key}-x, {sid} and {token}");
     let (url, _) = serve(Box::new(move |request| {
         match request.body["method"].as_str() {
             Some("initialize") => {
                 json_reply(request, json!({ "protocolVersion": "2025-06-18" }), None)
             }
             _ => {
-                let body = json!({ "jsonrpc": "2.0", "id": request.body["id"], "error": { "code": -32001, "message": echoed } });
+                // The query value decoded, a token without the extra space, and a credential of digits as a number.
+                let result = json!({ "echoed": echoed, "pin": 444_444_444_444_u64 });
 
-                reply(
-                    "200 OK",
-                    &[("Content-Type", "application/json")],
-                    &body.to_string(),
-                )
+                json_reply(request, result, None)
             }
         }
     }));
-    let headers = json!({ "Cookie": format!("pref=wide-layout; sid={sid}") }).to_string();
+    let headers = json!({
+        "Cookie": format!("pref=wide-layout; sid={sid}"),
+        "Authorization": format!("Bearer   {token}"),
+        "X-Pin": pin,
+    })
+    .to_string();
     let written = relay(
-        &format!("{url}?key={key}&v=1"),
+        &format!("{url}?key={key}%2Dx&v=1"),
         &headers,
         &[initialize(), request(2, "tools/call")],
     );
-    let refused = written.iter().find(|message| message["id"] == 2).unwrap();
+    let answer = written.iter().find(|message| message["id"] == 2).unwrap();
 
     assert_eq!(
-        refused["error"]["message"], "saw [redacted] and [redacted]",
-        "{refused}"
+        answer["result"],
+        json!({ "echoed": "saw [redacted], [redacted] and [redacted]", "pin": "[redacted]" }),
+        "{answer}"
     );
 }
 
